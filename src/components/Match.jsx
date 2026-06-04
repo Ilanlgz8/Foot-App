@@ -16,7 +16,7 @@ function groupByMatchday(matches) {
 }
 
 function Matchs() {
-  console.log('test') // Debug: vérifier que la c
+  console.log('test2') // Debug: vérifier que la c
   const [selectedComp, setSelectedComp] = useState('FL1')
   const [matches, setMatches]           = useState([])
   const [loading, setLoading]           = useState(false)
