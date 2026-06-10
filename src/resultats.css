@@ -1,0 +1,431 @@
+.resultats {
+  position: relative;
+  isolation: isolate;
+  min-height: calc(100vh - 4rem);
+  overflow: hidden;
+  padding: 2rem 1rem 3rem;
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.07), transparent 22%),
+    linear-gradient(180deg, #090c10 0%, #11151b 52%, #171b21 100%);
+  color: #e5e7eb;
+}
+
+.resultats__backdrop {
+  position: absolute;
+  inset: auto;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: 0.5;
+}
+
+.resultats__backdrop--one {
+  top: 4rem;
+  left: -4rem;
+  width: 14rem;
+  height: 14rem;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.resultats__backdrop--two {
+  right: -5rem;
+  bottom: 1rem;
+  width: 18rem;
+  height: 18rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Layout */
+.resultats__layout {
+  display: flex;
+  gap: 1.5rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+/* Sidebar */
+.resultats__sidebar {
+  flex: 0 0 13rem;
+  position: sticky;
+  top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 22, 28, 0.94);
+  border-radius: 1.2rem;
+  padding: 1rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+}
+
+.resultats__sidebarLabel {
+  margin: 0 0 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f87171;
+}
+
+.resultats__sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.resultats__sidebarItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.resultats__sidebarItem:hover {
+  background: rgba(239, 68, 68, 0.07);
+  color: #f9fafb;
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.resultats__sidebarItem--active {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f9fafb;
+  border-color: rgba(239, 68, 68, 0.25);
+  font-weight: 700;
+}
+
+.resultats__competitionLogo {
+  display: inline-block;
+  box-sizing: border-box;
+  object-fit: contain;
+  flex-shrink: 0;
+  mix-blend-mode: screen;  /* efface le blanc sur fond sombre */
+}
+
+.resultats__competitionLogo--sidebar {
+  width: 2rem;
+  height: 2rem;
+}
+
+.resultats__competitionLogo--title {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.resultats__sidebarName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultats__sidebarDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #f87171;
+  flex-shrink: 0;
+}
+
+/* Contenu principal */
+.resultats__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.resultats__header {
+  margin-bottom: 1.25rem;
+}
+
+.resultats__kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f87171;
+}
+
+.resultats__title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f9fafb;
+}
+
+/* État chargement / erreur */
+.resultats__state {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 0;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.resultats__state--error {
+  color: #f87171;
+}
+
+.resultats__spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(239, 68, 68, 0.25);
+  border-top-color: #ef4444;
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Navigation journées */
+.resultats__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 22, 28, 0.94);
+  border-radius: 0.9rem;
+}
+
+.resultats__navBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f87171;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.resultats__navBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f9fafb;
+}
+
+.resultats__navBtn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.resultats__navLabel {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #f9fafb;
+  letter-spacing: 0.05em;
+}
+
+/* Panel matchs */
+.resultats__panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 22, 28, 0.94);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* 
+  Ligne match :
+  - colonne gauche (domicile) : largeur fixe
+  - colonne centre (score)    : largeur fixe
+  - colonne droite (extérieur): largeur fixe
+*/
+.resultats__match {
+  display: grid;
+  grid-template-columns: 1fr 8rem 1fr;
+  align-items: center;
+  padding: 0.8rem 1.25rem;
+  transition: background 0.15s ease;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.resultats__match:first-child {
+  border-top: none;
+}
+
+.resultats__match:hover {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+/* 
+  Équipe domicile :
+  nom à gauche, logo collé au score à droite
+*/
+.resultats__team--home {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding-right: 0.5rem;
+  overflow: hidden;
+}
+
+.resultats__team--home .resultats__teamName {
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.resultats__team--home .resultats__crest {
+  flex-shrink: 0;
+}
+
+/*
+  Équipe extérieure :
+  logo collé au score à gauche, nom à droite
+*/
+.resultats__team--away {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding-left: 0.5rem;
+  overflow: hidden;
+}
+
+.resultats__team--away .resultats__teamName {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.resultats__team--away .resultats__crest {
+  flex-shrink: 0;
+}
+
+.resultats__crest {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+.resultats__teamName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e8dddd;
+}
+
+.resultats__teamName--winner {
+  color: #dee8e0;
+  font-weight: 700;
+}
+
+/* Score */
+.resultats__score {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 30px;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.resultats__scoreDate {
+  font-size: 0.62rem;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+
+.resultats__scoreNums {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.resultats__scoreNum {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #eadfdf;
+  min-width: 1.2rem;
+  text-align: center;
+}
+
+.resultats__scoreNum--win {
+  color: #f4d408;
+}
+
+.resultats__scoreSep {
+  color: #374151;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* Responsive mobile */
+@media (max-width: 767px) {
+  .resultats__layout {
+    flex-direction: column;
+  }
+
+  .resultats__sidebar {
+    flex: none;
+    width: 100%;
+    position: static;
+  }
+
+  .resultats__sidebarNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .resultats__sidebarItem {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.65rem;
+  }
+
+  .resultats__sidebarName {
+    display: none;
+  }
+
+  .resultats__competitionLogo--sidebar {
+    width: 2.8rem;
+    height: 1.85rem;
+  }
+
+  .resultats__competitionLogo--title {
+    width: 4.1rem;
+    height: 2.45rem;
+  }
+
+  .resultats__match {
+    grid-template-columns: 1fr 6rem 1fr;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .resultats__teamName {
+    font-size: 0.78rem;
+  }
+
+  .resultats__scoreNum {
+    font-size: 0.95rem;
+  }
+}
