@@ -1,68 +1,207 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import './../classement.css'
 import { COMPETITIONS as competitions } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
+import { useScorers } from '../hooks/useScorers'
+
 
 function Classement() {
+  const [selectedComp, setSelectedComp] = useState('WC')
+  const [view, setView] = useState('classement') // 'classement' | 'buteurs'
 
-  const [selectedComp, setSelectedComp] = useState('FL1')
-
-  const { standings, loading, error } = useStandings(selectedComp)
-
+  const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
 
   const selectedCompetition = competitions.find((c) => c.id === selectedComp)
 
   const competitionRules = {
     FL1: [
-      { label: 'Ligue des champions',     start: 1, end: 3, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Barrage', start: 4, end: 4, dotClassName: 'classement__zoneDot classement__L1__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-      { label: 'Europa League',  start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',    cardClassName: 'classement__zoneCard--uel' },
+      { label: 'Ligue des champions', start: 1, end: 3, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Barrage',             start: 4, end: 4, dotClassName: 'classement__zoneDot classement__L1__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
+      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',    cardClassName: 'classement__zoneCard--uel' },
       { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl',   cardClassName: 'classement__zoneCard--uecl' },
     ],
     SA: [
-      { label: 'Ligue des champions',    start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League', start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',  start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
+      { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
+      { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
     ],
     BL1: [
-      { label: 'Ligue des champions',    start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League', start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',  start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
+      { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
+      { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
     ],
     CL: [
-      { label: 'Qualifié', start: 1, end: 8, dotClassName: 'classement__zoneDot classement__zoneDot--ucl', cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Barrage', start: 9, end: 24, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-      { label: 'Éliminé', start: 25, end: 36, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
+      { label: 'Qualifié', start: 1, end: 8,  dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Barrage',  start: 9, end: 24, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
+      { label: 'Éliminé',  start: 25,end: 36, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
+    ],
+    WC: [
+      { label: 'Qualifié (2 premières)', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Éliminé',                start: 3, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
     ],
     default: [
-      { label: 'Ligue des champions',    start: 1, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League', start: 6, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',  start: 8, end: 8, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
+      { label: 'Ligue des champions', start: 1, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Europa League',       start: 6, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
+      { label: 'Conférence League',   start: 8, end: 8, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
     ],
   }
 
+  // Traduction des codes API (W/D/L) vers le français (V/N/D)
+  const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
+
   function Forme({ results }) {
-  if (!results || results.length === 0) return <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>—</span>
-  return (
-    <div className="classement__forme">
-      {results.map((result, i) => (
-        <span key={i} className={`classement__formeBadge classement__formeBadge--${result}`}>
-          {result === 'W' ? 'V' : result === 'D' ? 'N' : 'D'}
-        </span>
-      ))}
-    </div>
-  )
-}
+    if (!results || results.length === 0)
+      return <span style={{ color: '#3d4d60', fontSize: '0.75rem' }}>—</span>
+    return (
+      <div className="classement__forme">
+        {results.map((result, i) => (
+          <span key={i} className={`classement__formeBadge classement__formeBadge--${result}`}>
+            {RESULT_LABEL[result] ?? result}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  /* Formate "GROUP_A" → "Groupe A" */
+  const formatGroupName = (raw = '') =>
+    raw.replace('GROUP_', 'Groupe ')
 
   const qualificationRules = competitionRules[selectedComp] ?? competitionRules.default
-
   const getQualificationZone = (position) =>
-    qualificationRules.find((rule) => position >= rule.start && position <= rule.end) ?? null
+    qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
- 
+  /* Tableau générique — compact=true pour la vue multi-groupes WC */
+  function StandingsTable({ rows, compact = false }) {
+    return (
+      <div className={`classement__tableWrap${compact ? ' classement__tableWrap--compact' : ''}`}>
+        <table className={`classement__table${compact ? ' classement__table--compact' : ''}`}>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Équipe</th>
+              <th>Pts</th>
+              <th>MJ</th>
+              <th>V</th>
+              <th>N</th>
+              <th>D</th>
+              <th>Diff</th>
+              {!compact && <th>BM</th>}
+              <th>Forme</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((team) => {
+              const topRank           = team.position <= 3
+              const qualificationZone = getQualificationZone(team.position)
+              const forme             = formMap[team.team.id]
+              // En compact : garder seulement les 3 derniers matchs
+              const formeSlice        = compact && forme ? forme.slice(-3) : forme
+
+              return (
+                <tr
+                  key={team.team.id}
+                  className={topRank ? `classement__row classement__row--top${team.position}` : 'classement__row'}
+                >
+                  <td>
+                    <span className="classement__position">{team.position}</span>
+                  </td>
+                  <td>
+                    <div className="classement__teamCell">
+                      <div className="classement__teamTopLine">
+                        {qualificationZone
+                          ? <span className={qualificationZone.dotClassName} aria-hidden="true" />
+                          : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
+                        }
+                        {team.team.crest && (
+                          <img src={team.team.crest} alt="" className="classement__teamCrest"
+                            onError={e => e.currentTarget.style.display = 'none'} />
+                        )}
+                        <span className="classement__teamName">
+                          {translateTeam(team.team.shortName || team.team.name)}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><strong>{team.points}</strong></td>
+                  <td>{team.playedGames}</td>
+                  <td>{team.won}</td>
+                  <td>{team.draw}</td>
+                  <td>{team.lost}</td>
+                  <td>{team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}</td>
+                  {!compact && <td>{team.goalsFor}</td>}
+                  <td><Forme results={formeSlice} /></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
+  function GroupModal({ group, onClose }) {
+    useEffect(() => {
+      const handler = e => { if (e.key === 'Escape') onClose() }
+      window.addEventListener('keydown', handler)
+      document.body.style.overflow = 'hidden'
+      return () => {
+        window.removeEventListener('keydown', handler)
+        document.body.style.overflow = ''
+      }
+    }, [onClose])
+
+    return createPortal(
+      <div className="classement__modalOverlay" onClick={onClose}>
+        <div className="classement__modalBox" onClick={e => e.stopPropagation()}>
+          <div className="classement__modalHeader">
+            <h3 className="classement__modalTitle">{formatGroupName(group.name)}</h3>
+            <button className="classement__modalClose" onClick={onClose} aria-label="Fermer">✕</button>
+          </div>
+          <StandingsTable rows={group.table} compact={false} />
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
+  /* Affichage multi-groupes (CdM, etc.) */
+  function MultiGroupView() {
+    const [selectedGroup, setSelectedGroup] = useState(null)
+
+    return (
+      <>
+        <div className="classement__groups">
+          {groups.map(group => (
+            <div
+              key={group.name}
+              className="classement__groupBlock classement__groupBlock--clickable"
+              onClick={() => setSelectedGroup(group)}
+              title="Voir le groupe en détail"
+            >
+              <div className="classement__groupHeader">
+                <h3 className="classement__groupTitle">{formatGroupName(group.name)}</h3>
+                <span className="classement__groupExpandHint">↗</span>
+              </div>
+              <StandingsTable rows={group.table} compact />
+            </div>
+          ))}
+        </div>
+        {selectedGroup && (
+          <GroupModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />
+        )}
+      </>
+    )
+  }
+
+  const isMultiGroup = groups.length > 1
+
   return (
     <section className="classement">
       <div className="classement__backdrop classement__backdrop--one" />
@@ -70,21 +209,37 @@ function Classement() {
 
       <div className="classement__panel">
 
-        {/* Header avec titre + dropdown */}
+        {/* Header */}
         <div className="classement__panelHeader">
           <div>
-            <p className="classement__panelKicker">Championnat sélectionné</p>
+            <p className="classement__panelKicker">Compétition sélectionnée</p>
             <h2 className="classement__panelTitle">
               {selectedCompetition?.emblem && (
                 <img
                   src={selectedCompetition.emblem}
                   alt=""
                   className="classement__competitionLogo"
-                  onError={(e) => e.currentTarget.style.display = 'none'}
+                  onError={e => e.currentTarget.style.display = 'none'}
                 />
               )}
               {selectedCompetition?.name ?? 'Championnat'}
             </h2>
+          </div>
+
+          {/* Toggle classement / buteurs */}
+          <div className="classement__viewToggle">
+            <button
+              className={`classement__viewBtn ${view === 'classement' ? 'classement__viewBtn--active' : ''}`}
+              onClick={() => setView('classement')}
+            >
+              Classement
+            </button>
+            <button
+              className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
+              onClick={() => setView('buteurs')}
+            >
+              Buteurs
+            </button>
           </div>
 
           <div className="classement__selectShell">
@@ -92,12 +247,10 @@ function Classement() {
               id="competition-select"
               className="classement__select"
               value={selectedComp}
-              onChange={(e) => setSelectedComp(e.target.value)}
+              onChange={e => setSelectedComp(e.target.value)}
             >
-              {competitions.map((competition) => (
-                <option key={competition.id} value={competition.id}>
-                  {competition.name}
-                </option>
+              {competitions.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
             <span className="classement__selectIcon" aria-hidden="true" />
@@ -105,91 +258,139 @@ function Classement() {
         </div>
 
         {/* Légende zones */}
-        <div className="classement__zoneStrip">
-          {qualificationRules.map((rule) => (
-            <div key={rule.label} className={`classement__zoneCard ${rule.cardClassName}`}>
-              <span className={rule.dotClassName} />
-              <div>
+        {view === 'classement' && (
+          <div className="classement__zoneStrip">
+            {qualificationRules.map(rule => (
+              <div key={rule.label} className={`classement__zoneCard ${rule.cardClassName}`}>
+                <span className={rule.dotClassName} />
                 <strong>{rule.label}</strong>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* États */}
-        {loading && <p className="classement__state">Chargement du classement...</p>}
-        {error && (
-                  <p className="classement__state">
-                    Classement non disponible pour cette compétition.
-                  </p>
+            ))}
+          </div>
         )}
 
-        {/* Tableau */}
-        {!loading && !error && standings.length > 0 && (
+        {/* ── Vue Buteurs ── */}
+        {view === 'buteurs' && (
+          <>
+            {scorersLoading && (
+              <div className="classement__scorersList">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="classement__scorerRow" style={{ pointerEvents: 'none' }}>
+                    <div className="sk" style={{ width: '1.1rem', height: '1.1rem', margin: '0 auto' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1 }}>
+                      <div className="sk" style={{ width: `${6 + (i % 3)}rem`, height: '0.85rem' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <div className="sk" style={{ width: '1.1rem', height: '1.1rem', borderRadius: '50%' }} />
+                        <div className="sk" style={{ width: '4rem', height: '0.65rem' }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div className="sk" style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }} />
+                      <div className="sk" style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {scorersError && <p className="classement__state">Données non disponibles.</p>}
+            {!scorersLoading && !scorersError && scorers.length === 0 && (
+              <p className="classement__state">Aucun buteur disponible.</p>
+            )}
+            {!scorersLoading && !scorersError && scorers.length > 0 && (
+              <div className="classement__scorersList">
+                {scorers.map((s, i) => {
+                  const playerName = s.player?.name ?? '?'
+                  const isTop3     = i < 3
+
+                  return (
+                    <div
+                      key={s.player?.id ?? i}
+                      className={`classement__scorerRow ${isTop3 ? `classement__scorerRow--top${i + 1}` : ''}`}
+                    >
+                      {/* Rang */}
+                      <div className="classement__scorerRankWrap">
+                        <span className="classement__scorerRank">{i + 1}</span>
+                      </div>
+
+                      {/* Nom + équipe */}
+                      <div className="classement__scorerInfo">
+                        <span className="classement__scorerName">{playerName}</span>
+                        <div className="classement__scorerTeamRow">
+                          {s.team?.crest && (
+                            <img src={s.team.crest} alt="" className="classement__scorerCrest"
+                              onError={e => e.currentTarget.style.display = 'none'} />
+                          )}
+                          <span className="classement__scorerTeam">
+                            {translateTeam(s.team?.shortName || s.team?.name || '')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="classement__scorerStats">
+                        <div className="classement__scorerStatItem classement__scorerStatItem--goals">
+                          <span className="classement__scorerGoals">{s.goals ?? 0}</span>
+                          <span className="classement__scorerStatLabel">G</span>
+                        </div>
+                        <div className="classement__scorerStatItem classement__scorerStatItem--assists">
+                          <span className="classement__scorerAssists">{s.assists ?? '—'}</span>
+                          <span className="classement__scorerStatLabel">A</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Skeleton classement */}
+        {view === 'classement' && loading && (
           <div className="classement__tableWrap">
             <table className="classement__table">
               <thead>
                 <tr>
-                  <th>Pos</th>
-                  <th>Équipe</th>
-                  <th>Points</th>
-                  <th>MJ</th>
-                  <th>V</th>
-                  <th>N</th>
-                  <th>D</th>
-                  <th>Diff</th>
-                  <th>BM</th>
-                  <th>Forme</th>
+                  <th>Pos</th><th>Équipe</th><th>Pts</th><th>MJ</th>
+                  <th>V</th><th>N</th><th>D</th><th>Diff</th><th>BM</th><th>Forme</th>
                 </tr>
               </thead>
               <tbody>
-                {standings.map((team) => {
-                  
-                  const topRank = team.position <= 3
-                  
-                  const qualificationZone = getQualificationZone(team.position)
-
-                  return (
-                    <tr
-                      key={team.team.id}
-                      className={topRank ? `classement__row classement__row--top${team.position}` : 'classement__row'}
-                    >
-                      <td>
-                        <span className="classement__position">{team.position}</span>
-                      </td>
-                      <td>
-                        <div className="classement__teamCell">
-                          <div className="classement__teamTopLine">
-                            {qualificationZone ? (
-                              <span className={qualificationZone.dotClassName} aria-hidden="true" />
-                            ) : (
-                              <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
-                            )}
-                            <span className="classement__teamName">
-                              {translateTeam(team.team.shortName || team.team.name)}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td><strong>{team.points}</strong></td>
-                      <td>{team.playedGames}</td>
-                      <td>{team.won}</td>
-                      <td>{team.draw}</td>
-                      <td>{team.lost}</td>
-                      <td>{team.goalDifference}</td>
-                      <td>{team.goalsFor}</td>
-                      <td><Forme results={formMap[team.team.id]} /></td>
-                    </tr>
-                    
-                  )
-                })}
-                
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <tr key={i} className="classement__row">
+                    <td><div className="sk" style={{ width: '1.2rem', height: '0.8rem' }} /></td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="sk" style={{ width: '1.5rem', height: '1.5rem', borderRadius: '50%', flexShrink: 0 }} />
+                        <div className="sk" style={{ width: `${5 + (i % 3)}rem`, height: '0.8rem' }} />
+                      </div>
+                    </td>
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j}><div className="sk" style={{ width: '1.5rem', height: '0.8rem', margin: '0 auto' }} /></td>
+                    ))}
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.2rem' }}>
+                        {Array.from({ length: 5 }).map((_, k) => (
+                          <div key={k} className="sk" style={{ width: '1.35rem', height: '1.35rem', borderRadius: '0.3rem' }} />
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
+        {view === 'classement' && error && (
+          <p className="classement__state">Classement non disponible pour cette compétition.</p>
+        )}
 
-        {!loading && !error && standings.length === 0 && (
+        {/* Tableau(x) */}
+        {view === 'classement' && !loading && !error && standings.length > 0 && (
+          isMultiGroup ? <MultiGroupView /> : <StandingsTable rows={standings} />
+        )}
+
+        {view === 'classement' && !loading && !error && standings.length === 0 && (
           <p className="classement__state">Aucune donnée disponible.</p>
         )}
 

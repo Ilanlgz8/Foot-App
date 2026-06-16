@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StatFootix — Glossaire Technique</title>
+<style>
+:root{
+  --bg:#0d0d11;--bg2:#13131a;--bg3:#1a1a24;--bd:#252532;
+  --red:#e74c3c;--white:#e8eaf0;--dim:#8892a4;--faint:#3d4455;
+  --blue:#3498db;--green:#27ae60;--gold:#f39c12;--purp:#9b59b6;--teal:#1abc9c;
+  --mono:'Cascadia Code','Fira Code',Consolas,monospace
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--white);font-family:'Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.7;display:flex;min-height:100vh}
+
+/* NAV */
+nav{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--bd);position:fixed;top:0;left:0;bottom:0;overflow-y:auto;padding:0 0 60px;z-index:100}
+.nav-brand{padding:18px 16px 14px;border-bottom:1px solid var(--bd)}
+.nav-brand h1{font-size:.9rem;color:var(--red);font-weight:800}
+.nav-brand p{font-size:.65rem;color:var(--dim);margin-top:2px}
+.nav-sec{padding:10px 16px 3px;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-top:6px}
+nav a{display:block;padding:5px 16px;color:var(--dim);text-decoration:none;font-size:.78rem;border-left:2px solid transparent;transition:all .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav a:hover{color:var(--white);background:rgba(255,255,255,.04);border-left-color:var(--faint)}
+nav a.active{color:var(--white);background:rgba(231,76,60,.1);border-left-color:var(--red)}
+
+/* MAIN */
+main{margin-left:220px;flex:1;padding:40px 44px 100px;max-width:900px}
+
+/* HERO */
+.hero{margin-bottom:52px;padding-bottom:32px;border-bottom:1px solid var(--bd)}
+.hero h1{font-size:2.2rem;font-weight:900}
+.hero h1 span{color:var(--red)}
+.hero p{color:var(--dim);margin-top:8px;max-width:560px}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.badge{background:var(--bg2);border:1px solid var(--bd);border-radius:4px;padding:3px 10px;font-size:.72rem;color:var(--dim)}
+
+/* SECTIONS */
+.section{margin-bottom:60px;scroll-margin-top:20px}
+.section-title{font-size:1.05rem;font-weight:700;color:var(--white);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--bd)}
+
+/* TERM BLOCKS */
+.term{margin-bottom:32px}
+.term-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+.term-name{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--white);background:var(--bg3);border:1px solid var(--bd);border-radius:5px;padding:3px 10px;display:inline-block}
+.term-name.red{border-left:3px solid var(--red);color:var(--red)}
+.term-name.blue{border-left:3px solid var(--blue);color:var(--blue)}
+.term-name.green{border-left:3px solid var(--green);color:var(--green)}
+.term-name.gold{border-left:3px solid var(--gold);color:var(--gold)}
+.term-name.purp{border-left:3px solid var(--purp);color:var(--purp)}
+.term-name.teal{border-left:3px solid var(--teal);color:var(--teal)}
+.term-name.faint{border-left:3px solid var(--faint);color:var(--dim)}
+.term-desc{color:var(--dim);font-size:.9rem;margin-bottom:12px;max-width:680px}
+.term-desc strong{color:var(--white);font-weight:600}
+.file-ref{font-size:.72rem;color:var(--faint);font-family:var(--mono);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.file-ref::before{content:'📄';font-size:.7rem}
+
+/* CODE */
+pre{background:#08080f;border:1px solid var(--bd);border-radius:7px;padding:16px 18px;font-family:var(--mono);font-size:.76rem;line-height:1.65;overflow-x:auto;margin-top:6px}
+.c{color:#546e7a;font-style:italic}
+.kw{color:#c792ea;font-weight:600}
+.s{color:#c3e88d}
+.n{color:#f78c6c}
+.fn{color:#82aaff}
+.p{color:#89ddff}
+
+/* REPLACED */
+.replaced{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:28px}
+.replaced-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bd)}
+.replaced-col{padding:10px 14px;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.replaced-col.old{color:#e74c3c;border-right:1px solid var(--bd);background:rgba(231,76,60,.06)}
+.replaced-col.new{color:var(--green);background:rgba(39,174,96,.06)}
+.replaced-body{display:grid;grid-template-columns:1fr 1fr}
+.replaced-body pre{border:none;border-radius:0;margin:0}
+.replaced-body .old-code{border-right:1px solid var(--bd)}
+
+/* NOTE */
+.note{background:var(--bg2);border:1px solid var(--bd);border-left:3px solid var(--gold);border-radius:6px;padding:10px 14px;font-size:.83rem;color:var(--dim);margin-top:10px}
+.note strong{color:var(--white)}
+
+hr{border:none;border-top:1px solid var(--bd);margin:40px 0}
+
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <h1>StatFootix</h1>
+    <p>Glossaire technique complet</p>
+  </div>
+  <div class="nav-sec">React</div>
+  <a href="#hooks-natifs">Hooks natifs</a>
+  <a href="#custom-hooks">Custom Hooks</a>
+  <a href="#router">React Router</a>
+  <div class="nav-sec">TanStack Query</div>
+  <a href="#usequery">useQuery</a>
+  <a href="#querykey">queryKey</a>
+  <a href="#staletime">staleTime / gcTime</a>
+  <a href="#refetch">refetchInterval</a>
+  <a href="#initialdata">initialData</a>
+  <a href="#enabled">enabled</a>
+  <a href="#persist">Persistance localStorage</a>
+  <div class="nav-sec">Netlify Functions</div>
+  <a href="#proxy">Proxy pattern</a>
+  <a href="#env">Variables d'env</a>
+  <div class="nav-sec">Cache & Data</div>
+  <a href="#localcache">localCache.js</a>
+  <a href="#ttl">TTL adaptatif</a>
+  <a href="#polling">Polling intelligent</a>
+  <a href="#fuzzy">Fuzzy matching</a>
+  <div class="nav-sec">Patterns avancés</div>
+  <a href="#promise-all">Promise.all / allSettled</a>
+  <a href="#calcminute">calcMinute()</a>
+  <a href="#tracker">matchStateTracker</a>
+  <div class="nav-sec">Anciens patterns</div>
+  <a href="#avant-apres">Avant → Après</a>
+</nav>
+
+<main>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Glossaire <span>Technique</span></h1>
+  <p>Tous les termes et patterns utilisés dans StatFootix — avec le code réel du projet, expliqué ligne par ligne.</p>
+  <div class="badges">
+    <span class="badge">React 18</span>
+    <span class="badge">TanStack Query v5</span>
+    <span class="badge">React Router v6</span>
+    <span class="badge">Netlify Functions</span>
+    <span class="badge">localStorage</span>
+  </div>
+</div>
+
+
+<!-- ═══ REACT ════════════════════════════════════════════════════════════════ -->
+<div class="section" id="hooks-natifs">
+  <div class="section-title">Hooks React natifs</div>
+
+  <div class="term">
+    <div class="term-name blue">useState</div>
+    <p class="term-desc">Crée une <strong>variable réactive</strong> dans un composant. Chaque fois que la valeur change, React re-rend le composant. Dans ce projet, utilisé pour les états locaux d'UI (page active, modal ouverte, index courant…).</p>
+    <div class="file-ref">src/accueil/ResultPanel.jsx · src/accueil/NewsCarousel.jsx</div>
+    <pre><span class="c">// ResultPanel.jsx — index du jour affiché</span>
+<span class="kw">const</span> [dayIndex, setDayIndex] = useState(<span class="n">0</span>)
+
+<span class="c">// NewsCarousel.jsx — page du carousel + auto-défilement</span>
+<span class="kw">const</span> [page, setPage] = useState(<span class="n">0</span>)
+useEffect(() => {
+  <span class="kw">const</span> id = setInterval(() => {
+    setPage(p => (p + <span class="n">1</span>) % pages)   <span class="c">// boucle circulaire</span>
+  }, <span class="n">20_000</span>)
+  <span class="kw">return</span> () => clearInterval(id)    <span class="c">// cleanup au démontage</span>
+}, [pages])</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name blue">useEffect</div>
+    <p class="term-desc">Exécute du code en <strong>réaction à un changement</strong> (montage, dépendances). La fonction retournée est un <em>cleanup</em> — elle s'exécute quand le composant se démonte. Dans ce projet, utilisé pour les timers, prefetch et IntersectionObserver.</p>
+    <div class="file-ref">src/components/Accueil.jsx</div>
+    <pre><span class="c">// Ticker 30s : force un re-render pour actualiser les minutes sans refetch réseau</span>
+useEffect(() => {
+  <span class="kw">const</span> id = setInterval(() => setTick(t => t + <span class="n">1</span>), <span class="n">30_000</span>)
+  <span class="kw">return</span> () => clearInterval(id)
+}, [])
+
+<span class="c">// Prefetch des jours adjacents 2s après le chargement</span>
+useEffect(() => {
+  <span class="kw">const</span> t = setTimeout(() => {
+    prefetchMatchesForDate(queryClient, tomorrow)
+    prefetchMatchesForDate(queryClient, yesterday)
+  }, <span class="n">2000</span>)
+  <span class="kw">return</span> () => clearTimeout(t)
+}, [dayOffset])</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name blue">useRef</div>
+    <p class="term-desc">Crée une référence qui <strong>persiste entre les renders sans les déclencher</strong>. Utile pour stocker des valeurs "techniques" (timer id, valeur précédente…) sans provoquer de re-render inutile.</p>
+    <div class="file-ref">src/hooks/useLiveMinute.js</div>
+    <pre><span class="c">// Stocke l'état précédent du match (status) pour détecter les transitions</span>
+<span class="kw">const</span> prevStates = useRef({})
+
+<span class="c">// Utilisation : comparer l'état actuel vs précédent</span>
+<span class="kw">const</span> prev = prevStates.current[matchId] ?? {}
+<span class="kw">if</span> (prev.status !== <span class="s">'PAUSED'</span> &amp;&amp; curr.status === <span class="s">'PAUSED'</span>) {
+  <span class="c">// Transition détectée → enregistrer pausedAt</span>
+}</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name blue">useMemo / useCallback</div>
+    <p class="term-desc"><strong>useMemo</strong> mémorise le résultat d'un calcul coûteux. <strong>useCallback</strong> mémorise une fonction. Les deux évitent de recalculer à chaque render si les dépendances n'ont pas changé.</p>
+    <div class="file-ref">src/hooks/useMatchs.js</div>
+    <pre><span class="c">// groupByMatchday est recalculé seulement si matches change</span>
+<span class="kw">const</span> grouped = useMemo(() => groupByMatchday(matches, order), [matches, order])</pre>
+  </div>
+</div>
+
+
+<!-- CUSTOM HOOKS -->
+<div class="section" id="custom-hooks">
+  <div class="section-title">Custom Hooks</div>
+
+  <div class="term">
+    <div class="term-name purp">Custom Hook</div>
+    <p class="term-desc">Une fonction qui commence par <code>use</code> et qui peut appeler d'autres hooks. Permet d'<strong>extraire la logique</strong> hors des composants pour la réutiliser. Les 13 hooks de ce projet sont tous des custom hooks.</p>
+    <div class="file-ref">src/hooks/useLiveMatches.js</div>
+    <pre><span class="c">// Un custom hook = une fonction useXxx qui retourne des données</span>
+<span class="kw">export function</span> <span class="fn">useLiveMatches</span>() {
+  <span class="kw">const</span> { data } = useQuery({
+    queryKey: [<span class="s">'liveMatches'</span>],
+    queryFn: <span class="kw">async</span> () => { <span class="c">/* ... fetch IN_PLAY + PAUSED */</span> },
+    refetchInterval: <span class="n">30_000</span>,
+  })
+  <span class="kw">return</span> data ?? []
+}
+
+<span class="c">// Dans le composant, on appelle simplement :</span>
+<span class="kw">const</span> liveMatches = useLiveMatches()  <span class="c">// propre, pas de logique dans le composant</span></pre>
+  </div>
+</div>
+
+
+<!-- ROUTER -->
+<div class="section" id="router">
+  <div class="section-title">React Router v6</div>
+
+  <div class="term">
+    <div class="term-name teal">BrowserRouter / Routes / Route</div>
+    <p class="term-desc">Gère la <strong>navigation côté client</strong> sans rechargement de page. <code>BrowserRouter</code> lit l'URL, <code>Routes</code> choisit le composant qui correspond, <code>Route</code> définit une correspondance URL → composant.</p>
+    <div class="file-ref">src/main.jsx · src/App.jsx</div>
+    <pre><span class="c">// main.jsx — BrowserRouter enveloppe toute l'app</span>
+&lt;BrowserRouter&gt;
+  &lt;App /&gt;
+&lt;/BrowserRouter&gt;
+
+<span class="c">// App.jsx — chaque Route mappe une URL à une page</span>
+&lt;Routes location={location} key={location.pathname}&gt;
+  &lt;Route path=<span class="s">"/"</span>           element={&lt;Accueil /&gt;} /&gt;
+  &lt;Route path=<span class="s">"/match"</span>      element={&lt;Match /&gt;} /&gt;
+  &lt;Route path=<span class="s">"/classement"</span> element={&lt;Classement /&gt;} /&gt;
+  &lt;Route path=<span class="s">"/resultat"</span>   element={&lt;Resultat /&gt;} /&gt;
+&lt;/Routes&gt;</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name teal">NavLink / useLocation</div>
+    <p class="term-desc"><code>NavLink</code> ajoute automatiquement la classe <code>active</code> sur le lien qui correspond à l'URL courante. <code>useLocation</code> expose l'objet location pour réagir aux changements d'URL.</p>
+    <div class="file-ref">src/components/navbar.jsx · src/App.jsx</div>
+    <pre><span class="c">// navbar.jsx — la classe active s'ajoute automatiquement</span>
+&lt;NavLink
+  to={item.path}
+  className={({ isActive }) => isActive ? <span class="s">'nav-link active'</span> : <span class="s">'nav-link'</span>}
+&gt;
+
+<span class="c">// App.jsx — key=pathname force la recréation du composant → animation CSS</span>
+<span class="kw">const</span> location = useLocation()
+&lt;Routes location={location} key={location.pathname}&gt;</pre>
+  </div>
+</div>
+
+
+<!-- ═══ TANSTACK ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="usequery">
+  <div class="section-title">TanStack Query — useQuery</div>
+
+  <div class="term">
+    <div class="term-name red">useQuery</div>
+    <p class="term-desc">Le hook central de TanStack. Il <strong>fetche, met en cache, et synchronise</strong> des données distantes. Remplace complètement le pattern <code>useEffect + fetch + useState</code> et gère automatiquement loading, error, et refetch.</p>
+    <div class="file-ref">src/hooks/useLiveMatches.js</div>
+    <pre><span class="kw">const</span> { data, isLoading, error } = useQuery({
+  queryKey:  [<span class="s">'liveMatches'</span>],                 <span class="c">// identifiant du cache</span>
+  queryFn:   <span class="kw">async</span> () => { <span class="c">/* fetch */</span> },      <span class="c">// fonction qui fetche les données</span>
+  staleTime: <span class="n">20_000</span>,                           <span class="c">// fraîches 20s → pas de refetch</span>
+  refetchInterval: <span class="n">30_000</span>,                     <span class="c">// re-fetch auto toutes les 30s</span>
+  retry: <span class="kw">false</span>,                                 <span class="c">// pas de retry sur erreur</span>
+})</pre>
+    <div class="note"><strong>Avantage clé :</strong> Si deux composants appellent <code>useQuery</code> avec le même <code>queryKey</code>, TanStack ne fait <strong>qu'une seule requête</strong> réseau et partage le résultat. C'est pour ça que <code>LiveWidget</code> et <code>Accueil.jsx</code> partagent les données live sans double fetch.</div>
+  </div>
+</div>
+
+<div class="section" id="querykey">
+  <div class="section-title">TanStack Query — queryKey</div>
+
+  <div class="term">
+    <div class="term-name red">queryKey</div>
+    <p class="term-desc">L'<strong>identifiant unique du cache</strong>. C'est un tableau. Si une valeur dans le tableau change, TanStack considère que c'est une nouvelle requête et refetch. Si deux useQuery partagent le même queryKey → même cache, une seule requête.</p>
+    <div class="file-ref">src/hooks/useTodayMatches.js</div>
+    <pre><span class="c">// queryKey contient la date → chaque jour a son propre cache</span>
+useQuery({
+  queryKey: [<span class="s">'todayMatches'</span>, date],   <span class="c">// ['todayMatches', '2026-06-16']</span>
+  queryFn: () => fetchTodayMatches(date),
+})
+<span class="c">// Changer date → nouveau queryKey → refetch automatique</span>
+<span class="c">// Revenir à une date → queryKey déjà en cache → données immédiates</span>
+
+<span class="c">// Autres exemples dans le projet :</span>
+queryKey: [<span class="s">'liveMatches'</span>]              <span class="c">// useLiveMatches</span>
+queryKey: [<span class="s">'news'</span>]                     <span class="c">// useNews</span>
+queryKey: [<span class="s">'standings'</span>, compId]        <span class="c">// useStandings</span>
+queryKey: [<span class="s">'matchDetails'</span>, matchId]    <span class="c">// useMatchDetails</span></pre>
+  </div>
+</div>
+
+<div class="section" id="staletime">
+  <div class="section-title">TanStack Query — staleTime &amp; gcTime</div>
+
+  <div class="term">
+    <div class="term-name red">staleTime</div>
+    <p class="term-desc">Durée pendant laquelle les données sont considérées <strong>"fraîches"</strong>. Pendant ce délai, TanStack ne refetch pas même si tu remountes le composant ou changes d'onglet. Après ce délai, les données sont "périmées" (stale) mais toujours affichées en attendant le refetch.</p>
+    <div class="file-ref">src/hooks/ — plusieurs fichiers</div>
+    <pre><span class="c">// useLiveMatches — données live très courtes durée</span>
+staleTime: <span class="n">20_000</span>           <span class="c">// fraîches 20s</span>
+
+<span class="c">// useNews — actus peuvent attendre 30min</span>
+staleTime: <span class="n">30</span> * <span class="n">60</span> * <span class="n">1000</span>   <span class="c">// fraîches 30min</span>
+
+<span class="c">// useMatchDetails — détails d'un match terminé très stables</span>
+staleTime: <span class="n">60</span> * <span class="n">60</span> * <span class="n">1000</span>   <span class="c">// fraîches 1h</span>
+
+<span class="c">// useScorers — stats changent après chaque journée</span>
+staleTime: <span class="n">10</span> * <span class="n">60</span> * <span class="n">1000</span>   <span class="c">// fraîches 10min</span></pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name red">gcTime</div>
+    <p class="term-desc">Durée pendant laquelle les données restent en <strong>mémoire</strong> après que le composant se démonte. Après ce délai, le garbage collector supprime l'entrée du cache. Dans ce projet, mis à 24h pour que les données survivent à la navigation entre les onglets.</p>
+    <div class="file-ref">src/main.jsx</div>
+    <pre><span class="c">// Configuration globale dans main.jsx</span>
+<span class="kw">const</span> queryClient = <span class="kw">new</span> QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: <span class="n">1000</span> * <span class="n">60</span> * <span class="n">60</span> * <span class="n">24</span>,  <span class="c">// garde 24h en mémoire (et localStorage)</span>
+      retry: <span class="kw">false</span>,
+      refetchOnWindowFocus: <span class="kw">false</span>,    <span class="c">// pas de refetch au retour sur l'onglet</span>
+    }
+  }
+})</pre>
+  </div>
+</div>
+
+<div class="section" id="refetch">
+  <div class="section-title">TanStack Query — refetchInterval</div>
+
+  <div class="term">
+    <div class="term-name red">refetchInterval</div>
+    <p class="term-desc">Lance un <strong>refetch automatique</strong> à intervalle régulier (polling). Peut être une valeur fixe ou une <em>fonction</em> qui reçoit le state actuel du cache pour décider dynamiquement de l'intervalle.</p>
+    <div class="file-ref">src/hooks/useLiveMatches.js</div>
+    <pre><span class="c">// Valeur fixe</span>
+refetchInterval: <span class="n">30_000</span>   <span class="c">// toutes les 30s</span>
+
+<span class="c">// Fonction dynamique : adapte l'intervalle selon les données actuelles</span>
+refetchInterval: (query) => {
+  <span class="kw">const</span> hasLive = (query.state.data ?? []).length > <span class="n">0</span>
+  <span class="kw">return</span> hasLive ? <span class="n">30_000</span> : <span class="n">5</span> * <span class="n">60_000</span>
+  <span class="c">// 30s si matchs en cours, 5min sinon → économise le quota API</span>
+}
+
+<span class="c">// useTodayMatches — encore plus adaptatif</span>
+refetchInterval: (query) => {
+  <span class="kw">const</span> hasLive = matches.some(m =>
+    m.status === <span class="s">'IN_PLAY'</span> || m.status === <span class="s">'PAUSED'</span>
+  )
+  <span class="kw">return</span> hasLive ? <span class="n">2</span> * <span class="n">60_000</span> : <span class="n">10</span> * <span class="n">60_000</span>
+}</pre>
+  </div>
+</div>
+
+<div class="section" id="initialdata">
+  <div class="section-title">TanStack Query — initialData</div>
+
+  <div class="term">
+    <div class="term-name red">initialData</div>
+    <p class="term-desc">Données affichées <strong>immédiatement</strong> au premier render, avant même que la requête parte. Élimine le spinner de chargement si on a des données en cache local. TanStack refetch en arrière-plan si elles sont périmées.</p>
+    <div class="file-ref">src/hooks/useTodayMatches.js</div>
+    <pre><span class="kw">export function</span> <span class="fn">useTodayMatches</span>(date) {
+  <span class="kw">const</span> cacheKey = `matches_${date}`
+
+  <span class="kw">return</span> useQuery({
+    queryKey: [<span class="s">'todayMatches'</span>, date],
+    queryFn: () => fetchTodayMatches(date),
+
+    <span class="c">// Données immédiates depuis localStorage → zéro spinner</span>
+    initialData: () => readCacheStale(cacheKey) ?? <span class="kw">undefined</span>,
+
+    <span class="c">// TanStack a besoin de savoir QUAND ces données ont été sauvées</span>
+    <span class="c">// pour décider si elles sont encore fraîches</span>
+    initialDataUpdatedAt: () => getCacheSavedAt(cacheKey),
+  })
+}</pre>
+  </div>
+</div>
+
+<div class="section" id="enabled">
+  <div class="section-title">TanStack Query — enabled</div>
+
+  <div class="term">
+    <div class="term-name red">enabled</div>
+    <p class="term-desc">Contrôle si la requête doit se lancer. <code>enabled: false</code> = la requête est suspendue, aucun fetch ne part. Utile pour des requêtes conditionnelles (modal fermée, id manquant…).</p>
+    <div class="file-ref">src/hooks/useMatchDetails.js · src/hooks/useEspnScores.js</div>
+    <pre><span class="c">// useMatchDetails — ne fetche pas si la modal est fermée (matchId = null)</span>
+useQuery({
+  queryKey: [<span class="s">'matchDetails'</span>, matchId],
+  queryFn: () => fetch(`/api/v4/matches/${matchId}`),
+  enabled: !!matchId,   <span class="c">// null → false → pas de requête</span>
+})
+
+<span class="c">// useEspnScores — ne fetche pas si aucun match live</span>
+useQuery({
+  queryKey: [<span class="s">'espnScores'</span>],
+  queryFn: () => fetchEspnScores(liveMatches),
+  enabled: liveMatches.length > <span class="n">0</span>,   <span class="c">// économise des requêtes ESPN inutiles</span>
+  refetchInterval: <span class="n">10_000</span>,
+})</pre>
+  </div>
+</div>
+
+<div class="section" id="persist">
+  <div class="section-title">TanStack Query — Persistance localStorage</div>
+
+  <div class="term">
+    <div class="term-name red">PersistQueryClientProvider</div>
+    <p class="term-desc">Sauvegarde <strong>tout le cache TanStack</strong> dans localStorage automatiquement. Quand l'utilisateur revient sur l'app (même après avoir fermé l'onglet), les données s'affichent instantanément. TanStack refetch silencieusement si les données sont périmées.</p>
+    <div class="file-ref">src/main.jsx</div>
+    <pre><span class="kw">import</span> { PersistQueryClientProvider } <span class="kw">from</span> <span class="s">'@tanstack/react-query-persist-client'</span>
+<span class="kw">import</span> { createSyncStoragePersister } <span class="kw">from</span> <span class="s">'@tanstack/query-sync-storage-persister'</span>
+
+<span class="c">// 1. Créer le persister — lie TanStack au localStorage</span>
+<span class="kw">const</span> persister = createSyncStoragePersister({
+  storage: window.localStorage
+})
+
+<span class="c">// 2. Envelopper l'app avec le provider</span>
+&lt;PersistQueryClientProvider
+  client={queryClient}
+  persistOptions={{ persister }}
+&gt;
+  &lt;App /&gt;
+&lt;/PersistQueryClientProvider&gt;
+
+<span class="c">// Résultat : toutes les données (matchs, classements, actus…)</span>
+<span class="c">// sont sauvées dans localStorage et rechargées instantanément</span></pre>
+  </div>
+</div>
+
+
+<!-- ═══ NETLIFY ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="proxy">
+  <div class="section-title">Netlify Functions — Proxy Pattern</div>
+
+  <div class="term">
+    <div class="term-name green">Netlify Function (proxy)</div>
+    <p class="term-desc">Petit serveur Node.js qui tourne sur les serveurs de Netlify. Le navigateur appelle <code>/api/v4/matches</code>, la fonction l'intercepte, <strong>ajoute la clé API secrète</strong>, et retransmet la requête à football-data.org. La clé n'est jamais visible dans le code source.</p>
+    <div class="file-ref">netlify/functions/football.js</div>
+    <pre><span class="c">// Le navigateur appelle /api/v4/matches?status=IN_PLAY</span>
+<span class="c">// Netlify intercepte → cette fonction tourne côté serveur</span>
+
+exports.handler = <span class="kw">async</span> (event) => {
+  <span class="kw">const</span> apiPath = event.path.replace(<span class="s">/^\/api/</span>, <span class="s">''</span>)
+  <span class="kw">const</span> qs  = event.rawQuery ? `?${event.rawQuery}` : <span class="s">''</span>
+  <span class="kw">const</span> url = `https://api.football-data.org${apiPath}${qs}`
+
+  <span class="kw">const</span> res = <span class="kw">await</span> fetch(url, {
+    headers: { <span class="s">'X-Auth-Token'</span>: process.env.API_KEY }
+    <span class="c">// ↑ clé secrète stockée dans Netlify — jamais dans le code</span>
+  })
+
+  <span class="kw">return</span> {
+    statusCode: res.status,   <span class="c">// retransmet le 429 pour que TanStack garde le cache</span>
+    body: <span class="kw">await</span> res.text(),
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="section" id="env">
+  <div class="section-title">Netlify Functions — Variables d'environnement</div>
+
+  <div class="term">
+    <div class="term-name green">process.env</div>
+    <p class="term-desc">Les <strong>variables d'environnement</strong> sont des valeurs secrètes définies dans le tableau de bord Netlify (jamais dans le code). Accessibles uniquement côté serveur via <code>process.env.NOM_VARIABLE</code>. Le navigateur ne les voit jamais.</p>
+    <div class="file-ref">netlify/functions/</div>
+    <pre><span class="c">// football.js — clé football-data.org</span>
+process.env.API_KEY
+
+<span class="c">// apifootball.js — clé api-football.com (100 req/jour)</span>
+process.env.APIFOOTBALL_KEY
+
+<span class="c">// Dans Netlify : Site Settings → Environment Variables → Add variable</span>
+<span class="c">// API_KEY = xxxxxxxxxxxxx</span>
+<span class="c">// APIFOOTBALL_KEY = xxxxxxxxxxxxx</span></pre>
+    <div class="note"><strong>Pourquoi ?</strong> Si la clé était dans le code React (qui tourne dans le navigateur), n'importe qui pourrait l'inspecter avec les DevTools et l'utiliser pour épuiser ton quota à ta place.</div>
+  </div>
+</div>
+
+
+<!-- ═══ CACHE & DATA ══════════════════════════════════════════════════════════ -->
+<div class="section" id="localcache">
+  <div class="section-title">Cache — localCache.js</div>
+
+  <div class="term">
+    <div class="term-name gold">localStorage</div>
+    <p class="term-desc">Base de données clé-valeur du navigateur. Persiste entre les sessions (contrairement à <code>sessionStorage</code>). Limite ~5MB. Dans ce projet, utilisé pour deux choses : le cache des données API (via <code>localCache.js</code>) et les timestamps des matchs live (via <code>matchStateTracker.js</code>).</p>
+    <div class="file-ref">src/hooks/localCache.js</div>
+    <pre><span class="kw">const</span> PREFIX = <span class="s">'foot_'</span>  <span class="c">// toutes les clés du projet commencent par foot_</span>
+
+<span class="c">// Écrire avec TTL (Time To Live)</span>
+<span class="kw">export function</span> <span class="fn">writeCache</span>(key, data, ttlMs) {
+  localStorage.setItem(PREFIX + key, JSON.stringify({
+    data,
+    exp: Date.now() + ttlMs,  <span class="c">// timestamp d'expiration</span>
+    savedAt: Date.now()
+  }))
+}
+
+<span class="c">// Lire — retourne null si expiré</span>
+<span class="kw">export function</span> <span class="fn">readCache</span>(key) {
+  <span class="kw">const</span> entry = _parse(key)
+  <span class="kw">if</span> (!entry) <span class="kw">return null</span>
+  <span class="kw">if</span> (Date.now() > entry.exp) {
+    localStorage.removeItem(PREFIX + key)
+    <span class="kw">return null</span>
+  }
+  <span class="kw">return</span> entry.data
+}
+
+<span class="c">// Lire même si expiré — fallback si l'API est down</span>
+<span class="kw">export function</span> <span class="fn">readCacheStale</span>(key) { <span class="kw">return</span> _parse(key)?.data ?? <span class="kw">null</span> }</pre>
+  </div>
+</div>
+
+<div class="section" id="ttl">
+  <div class="section-title">Cache — TTL adaptatif</div>
+
+  <div class="term">
+    <div class="term-name gold">TTL (Time To Live)</div>
+    <p class="term-desc">Durée de vie d'une entrée en cache. Dans ce projet, le TTL <strong>s'adapte selon le contexte</strong> : si un match est en cours, le cache expire vite pour rester à jour. Si le jour est passé ou futur, le cache dure plus longtemps.</p>
+    <div class="file-ref">src/hooks/useTodayMatches.js</div>
+    <pre><span class="c">// TTL différent selon le contexte</span>
+<span class="kw">const</span> hasLive = matches.some(m =>
+  m.status === <span class="s">'IN_PLAY'</span> || m.status === <span class="s">'PAUSED'</span>
+)
+<span class="kw">const</span> isToday = dayOffset === <span class="n">0</span>
+
+<span class="kw">const</span> ttl = hasLive
+  ? <span class="n">2</span> * <span class="n">60</span> * <span class="n">1000</span>      <span class="c">// 2min  — match en cours</span>
+  : isToday
+    ? <span class="n">60</span> * <span class="n">60</span> * <span class="n">1000</span>    <span class="c">// 1h    — aujourd'hui, pas de live</span>
+    : <span class="n">6</span> * <span class="n">60</span> * <span class="n">60</span> * <span class="n">1000</span> <span class="c">// 6h    — hier ou demain</span>
+
+writeCache(cacheKey, matches, ttl)</pre>
+  </div>
+</div>
+
+<div class="section" id="polling">
+  <div class="section-title">Polling intelligent</div>
+
+  <div class="term">
+    <div class="term-name gold">Polling &amp; Fenêtres temporelles</div>
+    <p class="term-desc">Au lieu de poller en continu (qui épuiserait le quota de 100 req/jour d'api-football.com), <code>useLiveMinute</code> définit <strong>4 fenêtres critiques</strong> par match. En dehors de ces fenêtres, aucune requête n'est envoyée.</p>
+    <div class="file-ref">src/hooks/useLiveMinute.js</div>
+    <pre><span class="c">// 4 fenêtres de polling par match :</span>
+<span class="c">//   Fenêtre 0 : autour du KO (0-60min depuis utcDate) → détecte le début</span>
+<span class="c">//   Fenêtre 1 : à partir de la 45e min → détecte la mi-temps</span>
+<span class="c">//   Fenêtre 2 : après 15min de pause → détecte la reprise</span>
+<span class="c">//   Fenêtre 3 : à partir de la 90e min → détecte la fin</span>
+
+<span class="kw">function</span> <span class="fn">isInPollingWindow</span>(match, trackedIds) {
+  <span class="kw">if</span> (quotaRemaining < <span class="n">5</span>) <span class="kw">return false</span>  <span class="c">// bascule heuristique si quota bas</span>
+
+  <span class="kw">const</span> elapsed = (Date.now() - <span class="kw">new</span> Date(match.utcDate)) / <span class="n">60000</span>
+
+  <span class="c">// Fenêtre 0 : KO — s'applique à tous les matchs</span>
+  <span class="kw">if</span> (elapsed >= <span class="n">0</span> &amp;&amp; elapsed <= <span class="n">60</span> &amp;&amp; match.status === <span class="s">'TIMED'</span>) <span class="kw">return true</span>
+
+  <span class="c">// Fenêtres 1-3 : seulement les matchs trackés par l'utilisateur</span>
+  <span class="kw">if</span> (!trackedIds.has(String(match.id))) <span class="kw">return false</span>
+  <span class="c">// ...</span>
+}</pre>
+  </div>
+</div>
+
+<div class="section" id="fuzzy">
+  <div class="section-title">Fuzzy Matching</div>
+
+  <div class="term">
+    <div class="term-name gold">Fuzzy matching (correspondance floue)</div>
+    <p class="term-desc">Technique pour associer deux chaînes <strong>similaires mais pas identiques</strong>. Ici, utilisé pour associer un match football-data.org à son équivalent ESPN — les deux APIs utilisent des noms d'équipe différents ("Paris SG" vs "Paris Saint-Germain").</p>
+    <div class="file-ref">src/hooks/useEspnScores.js</div>
+    <pre><span class="c">// Normalise un nom : minuscules, sans accents, sans espaces superflus</span>
+<span class="kw">function</span> <span class="fn">normalize</span>(name = <span class="s">''</span>) {
+  <span class="kw">return</span> name.toLowerCase()
+    .replace(<span class="s">/[àáâ]/g</span>, <span class="s">'a'</span>)
+    .replace(<span class="s">/[éèê]/g</span>, <span class="s">'e'</span>)
+    .trim()
+}
+
+<span class="c">// Associe un event ESPN à notre match par les 5 premiers caractères</span>
+<span class="kw">function</span> <span class="fn">matchEvent</span>(espnEvent, matches) {
+  <span class="kw">const</span> espnHome = normalize(homeTeam).slice(<span class="n">0</span>, <span class="n">5</span>)  <span class="c">// "paris"</span>
+  <span class="kw">const</span> espnAway = normalize(awayTeam).slice(<span class="n">0</span>, <span class="n">5</span>)  <span class="c">// "lyon "</span>
+
+  <span class="kw">return</span> matches.find(m => {
+    <span class="kw">const</span> h = normalize(m.homeTeam.name).slice(<span class="n">0</span>, <span class="n">5</span>)  <span class="c">// "paris"</span>
+    <span class="kw">const</span> a = normalize(m.awayTeam.name).slice(<span class="n">0</span>, <span class="n">5</span>)  <span class="c">// "lyon "</span>
+    <span class="kw">return</span> h === espnHome &amp;&amp; a === espnAway
+    <span class="c">// 5 chars suffisent pour éviter les faux positifs</span>
+  })
+}</pre>
+  </div>
+</div>
+
+
+<!-- ═══ PATTERNS AVANCÉS ═══════════════════════════════════════════════════════ -->
+<div class="section" id="promise-all">
+  <div class="section-title">Promise.all / Promise.allSettled</div>
+
+  <div class="term">
+    <div class="term-name purp">Promise.all</div>
+    <p class="term-desc">Lance plusieurs requêtes <strong>en parallèle</strong> et attend que toutes soient terminées. Si une échoue, tout échoue. Dans ce projet : fetch simultané de IN_PLAY et PAUSED pour le widget live.</p>
+    <div class="file-ref">src/hooks/useLiveMatches.js</div>
+    <pre><span class="c">// Les deux fetches partent EN MÊME TEMPS → deux fois plus rapide qu'en séquence</span>
+<span class="kw">const</span> [r1, r2] = <span class="kw">await</span> Promise.all([
+  fetch(<span class="s">'/api/v4/matches?status=IN_PLAY'</span>),
+  fetch(<span class="s">'/api/v4/matches?status=PAUSED'</span>),
+])</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-name purp">Promise.allSettled</div>
+    <p class="term-desc">Comme <code>Promise.all</code> mais <strong>ne s'arrête pas si une requête échoue</strong>. Retourne le statut (fulfilled/rejected) de chacune. Utilisé dans <code>news.js</code> pour que si un flux RSS plante, les 3 autres continuent.</p>
+    <div class="file-ref">netlify/functions/news.js</div>
+    <pre><span class="c">// Si L'Équipe est down → RMC, Eurosport et Goal fonctionnent quand même</span>
+<span class="kw">const</span> results = <span class="kw">await</span> Promise.allSettled(
+  RSS_FEEDS.map(url => fetch(url).then(r => r.text()))
+)
+
+<span class="c">// On ne traite que les flux qui ont réussi</span>
+results
+  .filter(r => r.status === <span class="s">'fulfilled'</span>)
+  .forEach(r => articles.push(...parseRSS(r.value)))</pre>
+  </div>
+</div>
+
+<div class="section" id="calcminute">
+  <div class="section-title">calcMinute() — 3 niveaux de précision</div>
+
+  <div class="term">
+    <div class="term-name teal">calcMinute()</div>
+    <p class="term-desc">Fonction utilitaire qui calcule la minute à afficher côté client. Elle descend en cascade : si les données précises existent, elle les utilise ; sinon elle passe au niveau d'approximation suivant.</p>
+    <div class="file-ref">src/utils/matchUtils.js</div>
+    <pre><span class="kw">export function</span> <span class="fn">calcMinute</span>(match) {
+  <span class="kw">if</span> (match.status === <span class="s">'PAUSED'</span>) <span class="kw">return</span> <span class="s">'MT'</span>
+  <span class="kw">if</span> (match.status !== <span class="s">'IN_PLAY'</span>) <span class="kw">return null</span>
+
+  <span class="kw">const</span> state = getMatchState(match.id)
+
+  <span class="c">// NIVEAU 1 — 2ème MT précise via api-football.com</span>
+  <span class="kw">if</span> (state.half2Start) {
+    <span class="kw">const</span> min2 = Math.floor((Date.now() - state.half2Start) / <span class="n">60_000</span>) + <span class="n">1</span>
+    <span class="kw">return</span> min2 <= <span class="n">45</span> ? `${<span class="n">45</span> + min2}'` : `90+${min2 - <span class="n">45</span>}'`
+  }
+
+  <span class="c">// NIVEAU 1 — 1ère MT précise via api-football.com</span>
+  <span class="kw">if</span> (state.kickoffAt) {
+    <span class="kw">const</span> min1 = Math.floor((Date.now() - state.kickoffAt) / <span class="n">60_000</span>)
+    <span class="kw">return</span> min1 <= <span class="n">45</span> ? `${min1}'` : `45+${min1 - <span class="n">45</span>}'`
+  }
+
+  <span class="c">// NIVEAU 2 — heuristique depuis l'heure prévue (utcDate)</span>
+  <span class="kw">const</span> elapsed = (Date.now() - <span class="kw">new</span> Date(match.utcDate)) / <span class="n">60_000</span>
+  <span class="kw">if</span> (elapsed < <span class="n">45</span>) <span class="kw">return</span> `${Math.floor(elapsed)}'`
+  <span class="kw">if</span> (elapsed < <span class="n">64</span>) <span class="kw">return</span> <span class="s">'MT'</span>   <span class="c">// simule la mi-temps</span>
+  <span class="kw">return</span> `${Math.floor(elapsed - <span class="n">19</span>)}'`  <span class="c">// 2ème MT estimée</span>
+}</pre>
+  </div>
+</div>
+
+<div class="section" id="tracker">
+  <div class="section-title">matchStateTracker — Timestamps localStorage</div>
+
+  <div class="term">
+    <div class="term-name teal">matchStateTracker</div>
+    <p class="term-desc">Module utilitaire qui stocke les <strong>timestamps clés d'un match</strong> dans localStorage. Permet à <code>calcMinute()</code> d'être précis même après un rechargement de page.</p>
+    <div class="file-ref">src/utils/matchStateTracker.js</div>
+    <pre><span class="c">// Clés localStorage pour un match :</span>
+<span class="c">// foot_ms_12345 = { kickoffAt, pausedAt, half2Start }</span>
+
+<span class="c">// Détecte les transitions de statut à chaque refetch</span>
+<span class="kw">export function</span> <span class="fn">trackMatchState</span>(match) {
+  <span class="kw">const</span> stored = JSON.parse(localStorage.getItem(`foot_ms_${match.id}`) || <span class="s">'{}'</span>)
+
+  <span class="c">// Première fois qu'on voit PAUSED → enregistrer pausedAt</span>
+  <span class="kw">if</span> (match.status === <span class="s">'PAUSED'</span> &amp;&amp; !stored.pausedAt) {
+    stored.pausedAt = Date.now()
+  }
+  <span class="c">// On voit IN_PLAY après PAUSED → reprise 2ème MT</span>
+  <span class="kw">if</span> (match.status === <span class="s">'IN_PLAY'</span> &amp;&amp; stored.pausedAt &amp;&amp; !stored.half2Start) {
+    stored.half2Start = Date.now()
+  }
+
+  localStorage.setItem(`foot_ms_${match.id}`, JSON.stringify(stored))
+}</pre>
+  </div>
+</div>
+
+
+<!-- ═══ AVANT → APRÈS ════════════════════════════════════════════════════════ -->
+<div class="section" id="avant-apres">
+  <div class="section-title">Anciens patterns → Patterns actuels</div>
+
+  <p style="color:var(--dim);font-size:.88rem;margin-bottom:24px">Ce qu'on a changé dans le projet — et pourquoi.</p>
+
+  <!-- 1 -->
+  <p style="color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">1 — Fetch direct → Netlify Function proxy</p>
+  <div class="replaced">
+    <div class="replaced-header">
+      <div class="replaced-col old">❌ Avant — clé API exposée</div>
+      <div class="replaced-col new">✅ Après — clé sécurisée côté serveur</div>
+    </div>
+    <div class="replaced-body">
+      <pre class="old-code"><span class="c">// Dans un hook React (tourne dans le navigateur)</span>
+<span class="c">// N'importe qui peut lire la clé dans les DevTools</span>
+fetch(<span class="s">'https://api.football-data.org/v4/matches'</span>, {
+  headers: {
+    <span class="s">'X-Auth-Token'</span>: <span class="s">'abc123secret'</span>
+  }
+})</pre>
+      <pre><span class="c">// Dans le hook — URL locale, pas de clé</span>
+fetch(<span class="s">'/api/v4/matches?status=IN_PLAY'</span>)
+
+<span class="c">// Dans netlify/functions/football.js</span>
+<span class="c">// La clé est ajoutée ici, côté serveur</span>
+headers: { <span class="s">'X-Auth-Token'</span>: process.env.API_KEY }</pre>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <p style="color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;margin-top:24px">2 — useEffect + fetch → useQuery</p>
+  <div class="replaced">
+    <div class="replaced-header">
+      <div class="replaced-col old">❌ Avant — boilerplate manuel</div>
+      <div class="replaced-col new">✅ Après — TanStack gère tout</div>
+    </div>
+    <div class="replaced-body">
+      <pre class="old-code"><span class="c">// Beaucoup de code pour une seule requête</span>
+<span class="kw">const</span> [data, setData] = useState(<span class="kw">null</span>)
+<span class="kw">const</span> [loading, setLoading] = useState(<span class="kw">true</span>)
+<span class="kw">const</span> [error, setError] = useState(<span class="kw">null</span>)
+
+useEffect(() => {
+  fetch(<span class="s">'/api/v4/matches'</span>)
+    .then(r => r.json())
+    .then(d => { setData(d); setLoading(<span class="kw">false</span>) })
+    .catch(e => { setError(e); setLoading(<span class="kw">false</span>) })
+}, [])
+<span class="c">// Pas de cache, pas de refetch, pas de dédup...</span></pre>
+      <pre><span class="c">// Cache auto, refetch, dédup, loading, error</span>
+<span class="kw">const</span> { data, isLoading, error } = useQuery({
+  queryKey: [<span class="s">'matches'</span>],
+  queryFn: () =>
+    fetch(<span class="s">'/api/v4/matches'</span>).then(r => r.json()),
+  staleTime: <span class="n">60_000</span>,
+  refetchInterval: <span class="n">30_000</span>,
+})
+<span class="c">// Cache, refetch, dédup → tout inclus</span></pre>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <p style="color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;margin-top:24px">3 — Composant monolithique → sous-composants</p>
+  <div class="replaced">
+    <div class="replaced-header">
+      <div class="replaced-col old">❌ Avant — tout dans Accueil.jsx</div>
+      <div class="replaced-col new">✅ Après — chaque composant dans son fichier</div>
+    </div>
+    <div class="replaced-body">
+      <pre class="old-code"><span class="c">// Accueil.jsx faisait ~500 lignes</span>
+<span class="c">// MatchCard, LiveWidget, ResultPanel,</span>
+<span class="c">// NewsCarousel — tout inline</span>
+<span class="c">// Impossible à maintenir</span>
+
+<span class="kw">function</span> Accueil() {
+  <span class="c">// ... 500 lignes de JSX mélangées</span>
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      <span class="c">{/* MatchCard inliné ici */}</span>
+      <span class="c">{/* LiveWidget inliné ici */}</span>
+      <span class="c">{/* NewsCarousel inliné ici */}</span>
+    &lt;/div&gt;
+  )
+}</pre>
+      <pre><span class="c">// Accueil.jsx ~170 lignes — orchestrateur</span>
+<span class="kw">import</span> MatchCard    <span class="kw">from</span> <span class="s">'../accueil/MatchCard'</span>
+<span class="kw">import</span> LiveWidget   <span class="kw">from</span> <span class="s">'../accueil/LiveWidget'</span>
+<span class="kw">import</span> ResultPanel  <span class="kw">from</span> <span class="s">'../accueil/ResultPanel'</span>
+<span class="kw">import</span> NewsCarousel <span class="kw">from</span> <span class="s">'../accueil/NewsCarousel'</span>
+
+<span class="kw">function</span> Accueil() {
+  <span class="c">// Gère les données, passe en props</span>
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;LiveWidget /&gt;
+      &lt;MatchCard match={m} /&gt;
+      &lt;ResultPanel /&gt;
+      &lt;NewsCarousel /&gt;
+    &lt;/div&gt;
+  )
+}</pre>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <p style="color:var(--dim);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;margin-top:24px">4 — Score affiché depuis football-data.org → ESPN (fallback)</p>
+  <div class="replaced">
+    <div class="replaced-header">
+      <div class="replaced-col old">❌ Avant — délai ~1min</div>
+      <div class="replaced-col new">✅ Après — délai &lt;10s via ESPN</div>
+    </div>
+    <div class="replaced-body">
+      <pre class="old-code"><span class="c">// football-data.org met ~1min à mettre</span>
+<span class="c">// à jour les scores. L'API ne garantit</span>
+<span class="c">// pas de temps réel sur le free tier.</span>
+
+score = match.score.fullTime.home
+      + <span class="s">' - '</span>
+      + match.score.fullTime.away</pre>
+      <pre><span class="c">// ESPN prioritaire (< 10s de délai)</span>
+<span class="c">// Fallback → football-data.org</span>
+
+<span class="kw">const</span> espn = espnScores[match.id]
+score = espn
+  ? `${espn.home} - ${espn.away}`
+  : `${match.score.fullTime.home}` +
+    <span class="s">' - '</span> +
+    `${match.score.fullTime.away}`</pre>
+    </div>
+  </div>
+
+</div>
+
+</main>
+
+<script>
+const sections = document.querySelectorAll('.section');
+const links = document.querySelectorAll('nav a');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(a => a.classList.remove('active'));
+      const l = document.querySelector('nav a[href="#' + e.target.id + '"]');
+      if (l) l.classList.add('active');
+    }
+  });
+}, { rootMargin: '-5% 0px -85% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

@@ -1,10 +1,10 @@
-import React from 'react'
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import Accueil from './Accueil.jsx'
 import MatchAVenir from './Match.jsx'
 import Resultat from './Resultat.jsx'
 import Classement from './Classement.jsx'
+import logo from '../assets/logo.svg'
 import '../../navbar.css'
 
 function Navbar() {
@@ -24,13 +24,11 @@ function Navbar() {
         <div className="navbar__inner">
 
           <div className="navbar__main">
-            <a href="#" className="navbar__brand">
-              <span className="navbar__badge">
-                FC
-              </span>
+            <a href="/" className="navbar__brand">
               <span className="navbar__brandText">
-                <span className="navbar__brandKicker">Club</span>
-                <span className="navbar__brandName">Foot App</span>
+                <span className="navbar__brandName">
+                  <span className="navbar__brandStat">Stat</span>Footix
+                </span>
               </span>
             </a>
 

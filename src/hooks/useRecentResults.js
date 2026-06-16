@@ -1,36 +1,54 @@
 import { useQuery } from '@tanstack/react-query'
-import { COMPETITIONS } from '../data/competitions'
+import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
-const API_KEY = import.meta.env.VITE_API_KEY
-const LEAGUE_COMPETITIONS = ['FL1', 'PL', 'PD', 'BL1', 'SA']
+const TTL_MS = 30 * 60 * 1000  // 30min (au lieu de 1h)
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10)
+}
 
 export function useRecentResults() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['recentResults'],
+  const dateTo   = isoDate(new Date())
+  const dateFrom = isoDate(new Date(Date.now() - 4 * 24 * 60 * 60 * 1000))
+
+  // Clé incluant la date du jour → cache invalidé automatiquement chaque nouveau jour
+  const cacheKey = `results_wc_${dateTo}`
+
+  const cachedData    = readCacheStale(cacheKey)
+  const cachedSavedAt = getCacheSavedAt(cacheKey)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['recentResults', dateTo],
     queryFn: async () => {
-      const results = await Promise.all(
-        LEAGUE_COMPETITIONS.map(id =>
-          fetch(`/api/v4/competitions/${id}/matches?status=FINISHED`, {
-            headers: { 'X-Auth-Token': API_KEY }
-          })
-            .then(res => res.ok ? res.json() : { matches: [] })
-            .then(json => {
-              const matches = json.matches ?? []
-              return matches.slice(-3).reverse().map(m => ({
-                ...m,
-                compId: id
-              }))
-            })
+      try {
+        const res = await fetch(
+          `/api/v4/competitions/WC/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`
         )
-      )
-      return results.flat()
+
+        if (!res.ok) {
+          console.warn('[results] WC HTTP', res.status)
+          return cachedData ?? []
+        }
+
+        const json = await res.json()
+        const matches = (json.matches ?? [])
+          .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+
+        if (matches.length > 0) writeCache(cacheKey, matches, TTL_MS)
+        return matches.length > 0 ? matches : (cachedData ?? [])
+      } catch (e) {
+        console.warn('[results]', e.message)
+        return cachedData ?? []
+      }
     },
-    staleTime: 1000 * 60 * 10,
+    initialData: cachedData ?? undefined,
+    initialDataUpdatedAt: cachedSavedAt,
+    staleTime: TTL_MS,
+    retry: false,
   })
 
   return {
     results: data ?? [],
     loading: isLoading,
-    error: error?.message ?? null,
   }
 }

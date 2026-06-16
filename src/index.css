@@ -1,102 +1,81 @@
 @import 'tailwindcss';
 
+/* =========================================================
+   GLOBAL — Foot App
+   ========================================================= */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --red:        #ef4444;
+  --red-light:  #f87171;
+  --red-vivid:  #ff2d2d;
+  --red-dim:    rgba(239,68,68,0.12);
+  --green:      #16a34a;
+  --green-light:#4ade80;
+  --green-dim:  rgba(22,163,74,0.10);
+  --gold:       #f59e0b;
+  --gold-light: #fbbf24;
+  --gold-dim:   rgba(245,158,11,0.15);
+  --bg-deep:    #05080d;
+  --bg-dark:    #080c14;
+  --bg-mid:     #0d1320;
+  --bg-card:    rgba(10,15,24,0.97);
+  --border:     rgba(255,255,255,0.065);
+  --border-red: rgba(239,68,68,0.2);
+  --border-glow:rgba(239,68,68,0.35);
+  --text-main:  #f1f5f9;
+  --text-mid:   #8b9ab0;
+  --text-dim:   #3d4d60;
+  --shadow-red: 0 0 40px rgba(239,68,68,0.18);
+  --shadow-card:0 16px 48px rgba(0,0,0,0.4);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-}
-
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  line-height: 1.6;
+  color: var(--text-main);
+  background: var(--bg-deep);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Texture ballon de foot en filigrane sur tout le site ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='92'%3E%3Cpolygon points='40,3 77,23 77,69 40,89 3,69 3,23' fill='none' stroke='%23ffffff' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-size: 80px 92px;
+}
+
+
+/* ── Animations globales ── */
+@keyframes spin     { to { transform: rotate(360deg); } }
+@keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+@keyframes pulseRed { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 50%{box-shadow:0 0 0 6px rgba(239,68,68,.0)} }
+@keyframes fadeUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes glowRed  { 0%,100%{text-shadow:0 0 10px rgba(239,68,68,.5)} 50%{text-shadow:0 0 22px rgba(239,68,68,.9)} }
+@keyframes shimmer  {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+@keyframes float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes scoreIn  { from{transform:scale(.8);opacity:0} to{transform:scale(1);opacity:1} }
+
+/* ── Skeleton loader ── */
+.sk {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.05) 25%,
+    rgba(255,255,255,0.1)  50%,
+    rgba(255,255,255,0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.35rem;
 }

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 
-const API_KEY = import.meta.env.VITE_API_KEY
 
 function groupByMatchday(matches, order = 'asc') {
   const groups = {}
@@ -9,9 +8,19 @@ function groupByMatchday(matches, order = 'asc') {
     if (!groups[day]) groups[day] = []
     groups[day].push(match)
   })
-  return Object.entries(groups).sort(([a], [b]) =>
-    order === 'asc' ? Number(a) - Number(b) : Number(b) - Number(a)
+  // Trier les matchs dans chaque groupe par date (desc si order=desc, asc sinon)
+  Object.values(groups).forEach(g =>
+    g.sort((a, b) =>
+      order === 'desc'
+        ? new Date(b.utcDate) - new Date(a.utcDate)
+        : new Date(a.utcDate) - new Date(b.utcDate)
+    )
   )
+  return Object.entries(groups).sort((pairA, pairB) => {
+    const dayA = Number(pairA[0])
+    const dayB = Number(pairB[0])
+    return order === 'asc' ? dayA - dayB : dayB - dayA
+  })
 }
 
 export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
@@ -19,8 +28,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
     queryKey: ['matches', selectedComp, status],
     queryFn: async () => {
       const res = await fetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=${status}`,
-        { headers: { 'X-Auth-Token': API_KEY } }
+        `/api/v4/competitions/${selectedComp}/matches?status=${status}`
       )
       if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
       const json = await res.json()

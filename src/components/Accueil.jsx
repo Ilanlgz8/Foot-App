@@ -1,22 +1,104 @@
+import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
-import { useTodayMatches } from '../hooks/useTodayMatches'
-import { translateTeam } from '../data/teamNames'
+import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
+import { useRecentResults } from '../hooks/useRecentResults'
+import { useLiveMatches } from '../hooks/useLiveMatches'
+import { useLiveMinute } from '../hooks/useLiveMinute'
+import { useEspnScores } from '../hooks/useEspnScores'
+import { getTrackedMatches, toggleTrackedMatch } from '../utils/matchStateTracker'
 import { COMPETITIONS } from '../data/competitions'
+import { LiveWidget } from '../accueil/LiveWidget'
+import { MatchPanel } from '../accueil/MatchCard'
+import { ResultPanel } from '../accueil/ResultPanel'
+import { NewsCarousel } from '../accueil/NewsCarousel'
 import '../accueil.css'
 
-function formatHour(dateStr) {
-  return new Date(dateStr).toLocaleTimeString('fr-FR', {
-    hour: '2-digit', minute: '2-digit'
-  })
+const MAX_TRACKED = 5
+
+function getDayLabel(offset) {
+  if (offset === 0) return "Aujourd'hui"
+  if (offset === 1) return 'Demain'
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function getTargetDate(offset) {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return d.toISOString().split('T')[0]
 }
 
 function Accueil() {
-  const { news, loading: newsLoading, error: newsError } = useNews()
-  const { matches, loading: matchesLoading } = useTodayMatches()
+  const [dayOffset, setDayOffset] = useState(0)
+  const targetDate   = getTargetDate(dayOffset)
+  const queryClient  = useQueryClient()
 
-  const todayStr = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long', day: 'numeric', month: 'long'
-  })
+  // ── Données ──
+  const { news, loading: newsLoading, error: newsError } = useNews()
+  const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
+  const { results, loading: resultsLoading }             = useRecentResults()
+  const globalLive                                        = useLiveMatches()
+
+  // ── Système live ──
+  const { recalibrate } = useLiveMinute(
+    globalLive.length > 0
+      ? [...matches, ...globalLive.filter(g => !matches.some(m => m.id === g.id))]
+      : matches
+  )
+  const liveMatches = globalLive.length > 0
+    ? globalLive
+    : matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
+  const espnScores = useEspnScores(liveMatches)
+
+  // ── Suivi précis ──
+  const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())
+
+  useEffect(() => {
+    if (matches.length > 0 && matches.length <= MAX_TRACKED) {
+      let changed = false
+      const ids = getTrackedMatches()
+      matches.filter(m => m.status !== 'FINISHED').forEach(m => {
+        if (!ids.has(String(m.id))) { toggleTrackedMatch(m.id); changed = true }
+      })
+      if (changed) setTrackedIds(getTrackedMatches())
+    }
+  }, [matches.length])
+
+  const handleToggleTrack = (matchId) => {
+    const ids = getTrackedMatches()
+    if (!ids.has(String(matchId)) && ids.size >= MAX_TRACKED) return
+    toggleTrackedMatch(matchId)
+    setTrackedIds(getTrackedMatches())
+  }
+  const trackHandler = matches.length > MAX_TRACKED ? handleToggleTrack : null
+
+  // ── Préchargement des jours adjacents ──
+  useEffect(() => {
+    if (matchesLoading) return
+    let cancelled = false
+    const run = async () => {
+      await new Promise(r => setTimeout(r, 2000))
+      if (cancelled) return
+      await prefetchMatchesForDate(queryClient, getTargetDate(dayOffset + 1))
+      if (dayOffset > 0 && !cancelled) {
+        await prefetchMatchesForDate(queryClient, getTargetDate(dayOffset - 1))
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [dayOffset, matchesLoading, queryClient])
+
+  // ── Ticker 30s pour faire avancer calcMinute() ──
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const wcComp   = COMPETITIONS.find(c => c.id === 'WC')
+  const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <section className="accueil">
@@ -25,150 +107,61 @@ function Accueil() {
 
       <div className="accueil__inner">
 
-        {/* Hero */}
-        <div className="accueil__hero">
-          <p className="accueil__kicker">
-            <span className="accueil__kickerDot" />
-            Actualités football
-          </p>
-          <h1 className="accueil__title">
-            L'actu du <span>football</span>
-          </h1>
-          <p className="accueil__subtitle">
-            Les dernières nouvelles des championnats européens
-          </p>
+        {/* ── Hero ── */}
+        <div className="accueil__hero accueil__hero--inline">
+          <div className="accueil__heroLeft">
+            <h1 className="accueil__title">Stat<span>Footix</span></h1>
+            <p className="accueil__kicker">
+              <span className="accueil__kickerDot" />
+              Le foot comme tu veux le voir
+            </p>
+          </div>
+          <div className="accueil__heroRight">
+            <p className="accueil__heroDate">{todayStr}</p>
+            <LiveWidget liveMatches={liveMatches} espnScores={espnScores} trackedIds={trackedIds} onRecalibrate={recalibrate} />
+          </div>
         </div>
 
-        {/* Matchs du jour */}
-        <div className="accueil__section">
-          <div className="accueil__sectionHeader">
-            <h2 className="accueil__sectionTitle">Matchs du jour</h2>
-            <span className="accueil__sectionDate">{todayStr}</span>
+        {/* ── Dashboard : 2 colonnes ── */}
+        <div className="accueil__dashboard">
+
+          {/* Panel gauche : Matchs du jour */}
+          <div className="accueil__dashPanel">
+            <div className="accueil__dashPanelHeader">
+              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(0, o - 1))} disabled={dayOffset === 0} aria-label="Jour précédent">‹</button>
+              <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
+              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
+            </div>
+            <div className="accueil__dashPanelDivider" />
+            <MatchPanel
+              matches={matches}
+              loading={matchesLoading}
+              espnScores={espnScores}
+              trackedIds={trackedIds}
+              onTrack={trackHandler}
+              totalMatchCount={matches.length}
+            />
           </div>
 
-          {matchesLoading && (
-            <div className="accueil__state">
-              <div className="accueil__spinner" />
-              <span>Chargement des matchs...</span>
-            </div>
-          )}
-
-          {!matchesLoading && matches.length === 0 && (
-            <p className="accueil__empty">Aucun match aujourd'hui.</p>
-          )}
-
-          {!matchesLoading && matches.length > 0 && (
-            <div className="accueil__matches">
-              {matches.map(match => {
-                const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
-                const isLive = match.status === 'IN_PLAY' || match.status === 'PAUSED'
-                const isFinished = match.status === 'FINISHED'
-                const homeScore = match.score?.fullTime?.home
-                const awayScore = match.score?.fullTime?.away
-
-                return (
-                  <div key={match.id} className={`accueil__match ${isLive ? 'accueil__match--live' : ''}`}>
-                    <div className="accueil__matchComp">
-                      {comp?.emblem && (
-                        <img src={comp.emblem} alt="" className="accueil__matchCompLogo"
-                          onError={e => e.currentTarget.style.display = 'none'} />
-                      )}
-                      <span className="accueil__matchCompName">
-                        {comp?.name ?? match.competition?.name}
-                      </span>
-                      {isLive && <span className="accueil__matchLiveBadge">● Live</span>}
-                    </div>
-
-                    <div className="accueil__matchRow">
-                      <span className="accueil__matchTeam accueil__matchTeam--home">
-                        {match.homeTeam.crest && (
-                          <img src={match.homeTeam.crest} alt="" className="accueil__matchCrest"
-                            onError={e => e.currentTarget.style.display = 'none'} />
-                        )}
-                        {translateTeam(match.homeTeam.shortName || match.homeTeam.name)}
-                      </span>
-
-                      <div className="accueil__matchScore">
-                        {isFinished || isLive ? (
-                          <span className="accueil__matchScoreNums">
-                            {homeScore ?? 0} — {awayScore ?? 0}
-                          </span>
-                        ) : (
-                          <span className="accueil__matchScoreTime">
-                            {formatHour(match.utcDate)}
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="accueil__matchTeam accueil__matchTeam--away">
-                        {translateTeam(match.awayTeam.shortName || match.awayTeam.name)}
-                        {match.awayTeam.crest && (
-                          <img src={match.awayTeam.crest} alt="" className="accueil__matchCrest"
-                            onError={e => e.currentTarget.style.display = 'none'} />
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* News */}
-        <div className="accueil__section">
-          <div className="accueil__sectionHeader">
-            <h2 className="accueil__sectionTitle">Dernières actualités</h2>
-          </div>
-
-          {newsLoading && (
-            <div className="accueil__state">
-              <div className="accueil__spinner" />
-              <span>Chargement des articles...</span>
-            </div>
-          )}
-
-          {newsError && (
-            <p className="accueil__state accueil__state--error">{newsError}</p>
-          )}
-
-          {!newsLoading && !newsError && (
-            <div className="accueil__grid">
-              {news.length === 0 && (
-                <p className="accueil__empty">Aucun article disponible.</p>
+          {/* Panel droit : Résultats récents */}
+          <div className="accueil__dashPanel">
+            <div className="accueil__dashPanelHeader">
+              <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
+              {wcComp?.emblem && (
+                <span className="accueil__dashPanelSub accueil__dashPanelSub--comp">
+                  <img src={wcComp.emblem} alt="" className="accueil__dashPanelCompLogo" />
+                  Coupe du monde
+                </span>
               )}
-              {news.map(article => (
-                <a key={article.url} href={article.url}
-                  target="_blank" rel="noreferrer" className="accueil__card">
-                  {article.image && (
-                    <div className="accueil__cardImgWrap">
-                      <img src={article.image} alt={article.title}
-                        className="accueil__cardImg"
-                        onError={e => e.currentTarget.style.display = 'none'} />
-                    </div>
-                  )}
-                  <div className="accueil__cardBody">
-                    {article.source && (
-                      <span className="accueil__cardSource">{article.source}</span>
-                    )}
-                    <h3 className="accueil__cardTitle">{article.title}</h3>
-                    {article.description && (
-                      <p className="accueil__cardDesc">{article.description}</p>
-                    )}
-                    <div className="accueil__cardFooter">
-                      <span className="accueil__cardDate">
-                        {new Date(article.publishedAt).toLocaleDateString('fr-FR', {
-                          day: '2-digit', month: 'short', year: 'numeric'
-                        })}
-                      </span>
-                      <span className="accueil__cardLink">Lire l'article →</span>
-                    </div>
-                  </div>
-                </a>
-              ))}
             </div>
-          )}
+            <div className="accueil__dashPanelDivider" />
+            <ResultPanel results={results} loading={resultsLoading} />
+          </div>
+
         </div>
+
+        {/* ── Actualités ── */}
+        <NewsCarousel news={news} loading={newsLoading} error={newsError} />
 
       </div>
     </section>

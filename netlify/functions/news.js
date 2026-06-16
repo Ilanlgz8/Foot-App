@@ -1,0 +1,70 @@
+// Agrège plusieurs flux RSS football français et les retourne en JSON
+// Aucune clé API requise — flux publics, articles du jour
+
+const RSS_FEEDS = [
+  'https://www.lequipe.fr/rss/actu_rss_Football.xml',
+  'https://rmcsport.bfmtv.com/rss/football/',
+  'https://www.footmercato.net/feed',
+  'https://www.eurosport.fr/football/rss.xml',
+]
+
+// Extraire la valeur d'une balise XML (gère <tag>valeur</tag> et <tag><![CDATA[valeur]]></tag>)
+function extractTag(xml, tag) {
+  const match = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))
+  if (!match) return ''
+  return match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim()
+}
+
+// Extraire l'URL de l'image depuis <enclosure url="..."/> ou <media:content url="..."/>
+function extractImage(itemXml) {
+  const enclosure = itemXml.match(/enclosure[^>]+url="([^"]+)"/i)
+  if (enclosure) return enclosure[1]
+  const media = itemXml.match(/media:(?:content|thumbnail)[^>]+url="([^"]+)"/i)
+  if (media) return media[1]
+  return null
+}
+
+// Parser un flux RSS XML → tableau d'articles
+function parseRSS(xml, sourceName) {
+  const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? []
+  return items.map(item => ({
+    title:       extractTag(item, 'title'),
+    url:         extractTag(item, 'link') || extractTag(item, 'guid'),
+    description: extractTag(item, 'description').replace(/<[^>]+>/g, '').slice(0, 200),
+    image:       extractImage(item),
+    publishedAt: new Date(extractTag(item, 'pubDate')).toISOString(),
+    source:      sourceName,
+  })).filter(a => a.title && a.url)
+}
+
+exports.handler = async () => {
+  try {
+    // Fetch tous les flux en parallèle
+    const results = await Promise.allSettled(
+      RSS_FEEDS.map(url => fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }))
+    )
+
+    const articles = []
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      if (result.status !== 'fulfilled' || !result.value.ok) continue
+      const xml        = await result.value.text()
+      const sourceName = RSS_FEEDS[i].includes('lequipe') ? "L'Équipe"
+                       : RSS_FEEDS[i].includes('rmc')     ? 'RMC Sport'
+                       : RSS_FEEDS[i].includes('footmercato') ? 'Foot Mercato'
+                       : 'Eurosport'
+      articles.push(...parseRSS(xml, sourceName))
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articles }),
+    }
+  } catch (err) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message }),
+    }
+  }
+}

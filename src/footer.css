@@ -1,0 +1,151 @@
+.footer {
+  border-top: 1px solid rgba(255,255,255,0.05);
+  background: #04070c;
+  padding: 1.4rem 1.5rem;
+}
+
+.footer__container {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  text-align: center;
+}
+
+.footer__brand {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #f1f5f9;
+  letter-spacing: -0.02em;
+}
+
+.footer__brandStat {
+  font-weight: 300;
+}
+
+.footer__copy {
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.footer__links {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.footer__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.72rem;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+
+.footer__link:hover { color: #ef4444; }
+
+.footer__sep {
+  color: rgba(255,255,255,0.12);
+  font-size: 0.72rem;
+}
+
+.footer__legal {
+  font-size: 0.72rem;
+  color: #334155;
+}
+
+/* ── Modal Mentions légales ── */
+.footer__modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.footer__modalBox {
+  background: #0d1320;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1.2rem;
+  width: 95vw;
+  max-width: 900px;
+  height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+}
+
+.footer__modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: sticky;
+  top: 0;
+  background: #0d1320;
+  z-index: 1;
+}
+
+.footer__modalTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  letter-spacing: -0.02em;
+}
+
+.footer__modalClose {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.4rem;
+  transition: color 0.15s, background 0.15s;
+}
+
+.footer__modalClose:hover {
+  color: #f1f5f9;
+  background: rgba(255,255,255,0.06);
+}
+
+.footer__modalBody {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.footer__modalBody h3 {
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ef4444;
+}
+
+.footer__modalBody p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.65;
+}
+
+.footer__modalBody strong {
+  color: #cbd5e1;
+  font-weight: 600;
+}

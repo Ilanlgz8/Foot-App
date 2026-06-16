@@ -1,14 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 
-const API_KEY = import.meta.env.VITE_API_KEY
+
+// Retourne 'W', 'L' ou 'D' selon les buts marqués et encaissés
+function getResult(myGoals, theirGoals) {
+  if (myGoals > theirGoals) return 'W'
+  if (myGoals < theirGoals) return 'L'
+  return 'D'
+}
 
 export function useTeamForm(selectedComp) {
   const { data } = useQuery({
     queryKey: ['teamForm', selectedComp],
     queryFn: async () => {
       const res = await fetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`,
-        { headers: { 'X-Auth-Token': API_KEY } }
+        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
       )
       if (!res.ok) return {}
 
@@ -25,8 +30,8 @@ export function useTeamForm(selectedComp) {
 
         if (homeGoals === null || awayGoals === null) return
 
-        const homeResult = homeGoals > awayGoals ? 'W' : homeGoals < awayGoals ? 'L' : 'D'
-        const awayResult = awayGoals > homeGoals ? 'W' : awayGoals < homeGoals ? 'L' : 'D'
+        const homeResult = getResult(homeGoals, awayGoals)
+        const awayResult = getResult(awayGoals, homeGoals)
 
         if (!formMap[homeId]) formMap[homeId] = []
         if (!formMap[awayId]) formMap[awayId] = []
@@ -42,7 +47,7 @@ export function useTeamForm(selectedComp) {
 
       return formMap
     },
-    staleTime: 1000 * 60 * 60 * 24, // cache 24h
+    staleTime: 1000 * 60 * 30, // cache 30min
     retry: false
   })
 

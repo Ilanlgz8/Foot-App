@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doc — src/accueil/</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --bg2: #16161d;
+    --bg3: #1e1e2a;
+    --border: #2a2a3a;
+    --red: #e53e3e;
+    --blue: #4299e1;
+    --green: #48bb78;
+    --yellow: #ecc94b;
+    --purple: #9f7aea;
+    --orange: #ed8936;
+    --text: #e2e8f0;
+    --dim: #94a3b8;
+    --faint: #4a5568;
+    --mono: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.7; display: flex; min-height: 100vh; }
+
+  /* NAV */
+  nav { width: 240px; min-width: 240px; background: var(--bg2); border-right: 1px solid var(--border); position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto; padding: 20px 0 40px; }
+  .nav-logo { padding: 0 18px 18px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .nav-logo h1 { font-size: 1rem; color: var(--red); }
+  .nav-logo p  { font-size: 0.72rem; color: var(--dim); margin-top: 2px; }
+  .nav-sec { padding: 10px 18px 3px; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-top: 8px; }
+  nav a { display: block; padding: 6px 18px; color: var(--dim); text-decoration: none; font-size: 0.85rem; border-left: 2px solid transparent; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.04); border-left-color: var(--red); }
+  nav a.active { color: var(--text); background: rgba(229,62,62,0.12); border-left-color: var(--red); }
+
+  /* MAIN */
+  main { margin-left: 240px; flex: 1; max-width: 860px; padding: 44px 44px 80px; }
+
+  /* FILE SECTION */
+  .file { margin-bottom: 64px; scroll-margin-top: 20px; }
+  .file-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; font-family: var(--mono); font-size: 0.82rem; color: var(--yellow); margin-bottom: 14px; }
+  .file-role { color: var(--dim); margin-bottom: 20px; font-size: 0.95rem; }
+  .file-role strong { color: var(--text); }
+
+  /* BLOCK */
+  .block { margin-bottom: 24px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .block-header { background: var(--bg3); padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+  .block-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 4px; }
+  .tag-fn       { background: rgba(66,153,225,0.2);  color: var(--blue); }
+  .tag-const    { background: rgba(236,201,75,0.15); color: var(--yellow); }
+  .tag-comp     { background: rgba(72,187,120,0.15); color: var(--green); }
+  .tag-render   { background: rgba(159,122,234,0.15);color: var(--purple); }
+  .tag-hook     { background: rgba(237,137,54,0.15); color: var(--orange); }
+  .block-name { font-family: var(--mono); font-size: 0.88rem; color: var(--text); font-weight: 600; }
+  .block-body { padding: 14px 18px; background: var(--bg2); }
+  .block-body p { color: var(--dim); margin-bottom: 10px; font-size: 0.9rem; }
+  .block-body p:last-child { margin-bottom: 0; }
+  .block-body p strong { color: var(--text); }
+  .block-body ul { padding-left: 18px; color: var(--dim); font-size: 0.88rem; }
+  .block-body li { margin-bottom: 5px; }
+  .block-body li strong { color: var(--text); }
+
+  /* CODE */
+  .code-line { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; margin: 10px 0; overflow-x: auto; color: var(--dim); }
+  .hl { color: var(--text); }
+  .kw { color: #c792ea; }
+  .str { color: #c3e88d; }
+  .num { color: #f78c6c; }
+  .fn2 { color: #82aaff; }
+
+  /* DIVIDER */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <h1>src/accueil/</h1>
+    <p>Documentation des composants</p>
+  </div>
+  <div class="nav-sec">Fichiers</div>
+  <a href="#matchcard">MatchCard.jsx</a>
+  <a href="#livewidget">LiveWidget.jsx</a>
+  <a href="#resultpanel">ResultPanel.jsx</a>
+  <a href="#newscarousel">NewsCarousel.jsx</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════
+     MATCHCARD.JSX
+══════════════════════════════════════════ -->
+<section class="file" id="matchcard">
+  <div class="file-badge">📄 MatchCard.jsx</div>
+  <p class="file-role">
+    Ce fichier contient <strong>3 composants</strong> et <strong>2 fonctions utilitaires</strong>.<br>
+    Son rôle principal : afficher une carte de match (logo équipe dom · score/heure · logo équipe ext) dans tous les contextes — matchs du jour, widget live, résultats récents.
+  </p>
+
+  <!-- formatHour -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-fn">Fonction</span>
+      <span class="block-name">formatHour(dateStr)</span>
+    </div>
+    <div class="block-body">
+      <p>Convertit une date UTC en heure affichable en français. Par exemple <strong>"2026-06-16T19:00:00Z"</strong> devient <strong>"21:00"</strong> (heure locale).</p>
+      <div class="code-line"><span class="kw">function</span> <span class="fn2">formatHour</span>(dateStr) {
+  <span class="kw">return new</span> <span class="fn2">Date</span>(dateStr).<span class="fn2">toLocaleTimeString</span>(<span class="str">'fr-FR'</span>, { hour: <span class="str">'2-digit'</span>, minute: <span class="str">'2-digit'</span> })
+}</div>
+      <p>Utilisée pour afficher l'heure de coup d'envoi sur les matchs à venir.</p>
+    </div>
+  </div>
+
+  <!-- matchClass -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-fn">Fonction</span>
+      <span class="block-name">matchClass(base, isWinner, isLoser)</span>
+    </div>
+    <div class="block-body">
+      <p>Construit une classe CSS selon si l'équipe a gagné, perdu, ou match nul. Elle prend un nom de classe de base et lui ajoute un modificateur CSS.</p>
+      <div class="code-line"><span class="fn2">matchClass</span>(<span class="str">'accueil__matchCardName'</span>, <span class="kw">true</span>, <span class="kw">false</span>)
+<span class="hl">→ "accueil__matchCardName accueil__matchCardName--winner"</span>
+
+<span class="fn2">matchClass</span>(<span class="str">'accueil__matchCardName'</span>, <span class="kw">false</span>, <span class="kw">true</span>)
+<span class="hl">→ "accueil__matchCardName accueil__matchCardName--loser"</span>
+
+<span class="fn2">matchClass</span>(<span class="str">'accueil__matchCardName'</span>, <span class="kw">false</span>, <span class="kw">false</span>)
+<span class="hl">→ "accueil__matchCardName"</span> (nul ou match en cours)</div>
+      <p>Appelée 4 fois dans MatchCard : pour le nom et le blason de chaque équipe.</p>
+    </div>
+  </div>
+
+  <!-- PanelSkeleton -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant</span>
+      <span class="block-name">PanelSkeleton</span>
+    </div>
+    <div class="block-body">
+      <p>Affiche <strong>3 cartes grises animées</strong> pendant que les données chargent — ce qu'on appelle un "skeleton loader". Ça évite un écran vide blanc.</p>
+      <p>Chaque carte skeleton contient : un cercle gris (blason), une barre grise (nom), un rectangle gris (score), même chose pour l'équipe adverse. La classe CSS <strong>.sk</strong> applique l'animation de pulsation.</p>
+    </div>
+  </div>
+
+  <!-- MatchCard -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant principal</span>
+      <span class="block-name">MatchCard({ match, noWinnerLoser, tracked, onTrack, espnScore })</span>
+    </div>
+    <div class="block-body">
+      <p>La carte d'un match. Affiche trois zones côte à côte :</p>
+      <ul>
+        <li><strong>Gauche</strong> — blason + nom de l'équipe domicile</li>
+        <li><strong>Centre</strong> — la minute live / l'heure / "FT" + le score</li>
+        <li><strong>Droite</strong> — blason + nom de l'équipe extérieure</li>
+      </ul>
+      <p style="margin-top:10px;">Les 5 props qu'elle reçoit :</p>
+      <ul>
+        <li><strong>match</strong> — l'objet du match (vient de football-data.org)</li>
+        <li><strong>noWinnerLoser</strong> — si true, désactive les styles gagnant/perdant (utilisé dans le widget live)</li>
+        <li><strong>tracked</strong> — si ce match est suivi pour les minutes précises</li>
+        <li><strong>onTrack</strong> — fonction appelée au clic sur "Suivre". Si null → bouton caché</li>
+        <li><strong>espnScore</strong> — le score ESPN { home, away } — mise à jour quasi instantanée</li>
+      </ul>
+      <p style="margin-top:10px;"><strong>Bloc 1 — Déterminer le statut du match</strong></p>
+      <div class="code-line"><span class="kw">const</span> isLive     = match.status === <span class="str">'IN_PLAY'</span> || match.status === <span class="str">'PAUSED'</span>
+<span class="kw">const</span> isFinished = match.status === <span class="str">'FINISHED'</span></div>
+      <p>Deux booléens simples. <strong>isLive</strong> est true si le match est en cours ou en pause (mi-temps). <strong>isFinished</strong> est true si terminé. Si ni l'un ni l'autre → match à venir.</p>
+
+      <p><strong>Bloc 2 — Le score</strong></p>
+      <div class="code-line"><span class="kw">const</span> hs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
+<span class="kw">const</span> as_ = espnScore?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away</div>
+      <p>On prend ESPN en priorité (quasi temps réel). Si ESPN n'a rien → on prend le score fullTime de football-data.org (~1min de délai). Si pas encore de fullTime → score de mi-temps. Le <strong>??</strong> signifie "si c'est null ou undefined, essaie le suivant".</p>
+
+      <p><strong>Bloc 3 — Qui a gagné ?</strong></p>
+      <div class="code-line"><span class="kw">const</span> homeWins = !noWinnerLoser && isFinished && hs != <span class="kw">null</span> && as_ != <span class="kw">null</span> && hs > as_
+<span class="kw">const</span> awayWins = !noWinnerLoser && isFinished && hs != <span class="kw">null</span> && as_ != <span class="kw">null</span> && as_ > hs</div>
+      <p>Vrai uniquement si : on n'a pas désactivé les styles ET le match est terminé ET on a un score ET l'équipe a plus de buts. Les deux sont false en cas de match nul.</p>
+
+      <p><strong>Bloc 4 — Le texte du centre</strong></p>
+      <div class="code-line"><span class="kw">const</span> label     = isFinished ? <span class="str">'FT'</span> : !isLive ? <span class="fn2">formatHour</span>(match.utcDate) : <span class="kw">null</span>
+<span class="kw">const</span> liveLabel = isLive ? <span class="fn2">calcMinute</span>(match) : <span class="kw">null</span></div>
+      <p><strong>label</strong> = "FT" si terminé, l'heure si à venir, null si en cours. <strong>liveLabel</strong> = la minute calculée (ex: "73'", "MT", "90+2'") si en cours, null sinon.</p>
+
+      <p><strong>Bloc 5 — Les classes CSS avec gagnant/perdant</strong></p>
+      <div class="code-line"><span class="kw">const</span> homeNameCls  = <span class="fn2">matchClass</span>(<span class="str">'accueil__matchCardName'</span>,  homeWins, awayWins)
+<span class="kw">const</span> homeCrestCls = <span class="fn2">matchClass</span>(<span class="str">'accueil__matchCardCrest'</span>, <span class="kw">false</span>,    awayWins)</div>
+      <p>Pour le nom domicile : winner si homeWins, loser si awayWins. Pour le blason domicile : jamais winner (pas de style gagnant sur les logos), loser si l'équipe adverse a gagné (blason grisé).</p>
+
+      <p><strong>Bloc 6 — Le rendu JSX</strong></p>
+      <p>Trois zones dans la carte : équipe domicile (blason + nom), centre (label + score), équipe extérieure (nom + blason). Puis en dessous le bouton "Suivre" — affiché uniquement si <strong>onTrack</strong> est fourni et que le match n'est pas terminé.</p>
+    </div>
+  </div>
+
+  <!-- MatchPanel -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant</span>
+      <span class="block-name">MatchPanel({ matches, loading, espnScores, trackedIds, onTrack, totalMatchCount })</span>
+    </div>
+    <div class="block-body">
+      <p>Affiche la <strong>liste des matchs du jour</strong> dans le panel gauche de l'accueil. Reçoit tous les matchs et décide lesquels montrer.</p>
+      <p><strong>Logique d'affichage :</strong></p>
+      <div class="code-line"><span class="kw">const</span> active    = allMatches.<span class="fn2">filter</span>(m => m.status !== <span class="str">'FINISHED'</span>)
+<span class="kw">const</span> displayed = active.length > <span class="num">0</span> ? active : allMatches</div>
+      <p>Si des matchs sont en cours ou à venir → affiche uniquement ceux-là. Si tous les matchs du jour sont terminés → affiche quand même tous les résultats du jour.</p>
+      <p><strong>Logique du bouton Suivre :</strong> visible si plus de 5 matchs ce jour-là ET que la limite de 5 suivis n'est pas atteinte (ou que le match est déjà suivi).</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════
+     LIVEWIDGET.JSX
+══════════════════════════════════════════ -->
+<section class="file" id="livewidget">
+  <div class="file-badge">📄 LiveWidget.jsx</div>
+  <p class="file-role">
+    Affiche le <strong>widget "EN DIRECT"</strong> en haut à droite de l'accueil quand des matchs sont en cours. Totalement indépendant du jour affiché dans le panel principal — il montre toujours les matchs live du moment.
+  </p>
+
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant</span>
+      <span class="block-name">LiveWidget({ espnScores, trackedIds, onRecalibrate })</span>
+    </div>
+    <div class="block-body">
+      <p>Les 3 props qu'il reçoit :</p>
+      <ul>
+        <li><strong>espnScores</strong> — objet { matchId: { home, away } } avec les scores ESPN quasi temps réel</li>
+        <li><strong>trackedIds</strong> — Set des IDs de matchs suivis (pour afficher le bon style sur les MatchCards)</li>
+        <li><strong>onRecalibrate</strong> — fonction du bouton ⟳ pour recalibrer les minutes si elles dérivent</li>
+      </ul>
+
+      <p style="margin-top:10px;"><strong>Bloc 1 — Récupérer les matchs live</strong></p>
+      <div class="code-line"><span class="kw">const</span> matches = <span class="fn2">useLiveMatches</span>()
+<span class="kw">const</span> live    = matches.<span class="fn2">filter</span>(m => m.status === <span class="str">'IN_PLAY'</span> || m.status === <span class="str">'PAUSED'</span>)</div>
+      <p><strong>useLiveMatches()</strong> est appelé dans Accueil.jsx aussi — grâce au cache React Query (même queryKey), aucune requête réseau supplémentaire n'est faite ici. On filtre pour ne garder que les matchs vraiment en cours ou en pause.</p>
+
+      <p><strong>Bloc 2 — Si aucun match en direct</strong></p>
+      <div class="code-line"><span class="kw">if</span> (live.length === <span class="num">0</span>) <span class="kw">return null</span></div>
+      <p>Le widget disparaît complètement quand aucun match n'est en direct. React retourne null = rien n'est affiché dans le DOM.</p>
+
+      <p><strong>Bloc 3 — L'en-tête du widget</strong></p>
+      <p>Contient : le point rouge clignotant, le texte "EN DIRECT", le nombre de matchs si plus d'un, et le bouton ⟳ de recalibration (visible uniquement si <strong>onRecalibrate</strong> est fourni).</p>
+
+      <p><strong>Bloc 4 — La liste des matchs</strong></p>
+      <div class="code-line">live.<span class="fn2">slice</span>(<span class="num">0</span>, <span class="num">5</span>).<span class="fn2">map</span>(match => &lt;MatchCard ... /&gt;)</div>
+      <p>Maximum 5 matchs affichés dans le widget (cas rare mais possible lors de grosses journées). Chaque match utilise le composant MatchCard avec <strong>noWinnerLoser=true</strong> (pas de style gagnant/perdant sur des matchs en cours).</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════
+     RESULTPANEL.JSX
+══════════════════════════════════════════ -->
+<section class="file" id="resultpanel">
+  <div class="file-badge">📄 ResultPanel.jsx</div>
+  <p class="file-role">
+    Affiche les <strong>résultats récents</strong> dans le panel droit de l'accueil. Permet de naviguer entre les jours avec des flèches ← →.
+  </p>
+
+  <!-- groupByDay -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-fn">Fonction</span>
+      <span class="block-name">groupByDay(matches)</span>
+    </div>
+    <div class="block-body">
+      <p>Reçoit un tableau de matchs et les regroupe par date. Retourne un tableau de paires <strong>[date, matchs]</strong> triées du plus récent au plus ancien.</p>
+      <div class="code-line"><span class="hl">Entrée :</span>  [{ utcDate: "2026-06-16T...", ... }, { utcDate: "2026-06-15T...", ... }]
+<span class="hl">Sortie :</span>  [["2026-06-16", [...matchs]], ["2026-06-15", [...matchs]]]</div>
+      <p><strong>m.utcDate.slice(0, 10)</strong> extrait uniquement la partie date "2026-06-16" depuis la chaîne complète "2026-06-16T19:00:00Z". Le <strong>sort</strong> final compare les dates comme des chaînes de caractères — ça fonctionne car le format YYYY-MM-DD est naturellement triable alphabétiquement.</p>
+    </div>
+  </div>
+
+  <!-- formatDayLabel -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-fn">Fonction</span>
+      <span class="block-name">formatDayLabel(dateStr)</span>
+    </div>
+    <div class="block-body">
+      <p>Convertit une date "2026-06-15" en texte lisible. Cas spéciaux pour aujourd'hui et hier, sinon format long.</p>
+      <div class="code-line"><span class="str">"2026-06-16"</span> → <span class="hl">"Aujourd'hui"</span>
+<span class="str">"2026-06-15"</span> → <span class="hl">"Hier"</span>
+<span class="str">"2026-06-14"</span> → <span class="hl">"dimanche 14 juin"</span></div>
+      <p><strong>864e5</strong> c'est 864 × 10⁵ = 86 400 000 millisecondes = exactement 24h. On soustrait ça à Date.now() pour obtenir la date d'hier.</p>
+    </div>
+  </div>
+
+  <!-- ResultPanel -->
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant</span>
+      <span class="block-name">ResultPanel({ results, loading })</span>
+    </div>
+    <div class="block-body">
+      <p>Reçoit tous les résultats récents et gère la navigation entre les jours.</p>
+
+      <p><strong>Bloc 1 — L'état de navigation</strong></p>
+      <div class="code-line"><span class="kw">const</span> grouped  = <span class="fn2">groupByDay</span>(results)
+<span class="kw">const</span> [dayIndex, setDayIndex] = <span class="fn2">useState</span>(<span class="num">0</span>)</div>
+      <p><strong>grouped</strong> = les résultats organisés par jour. <strong>dayIndex</strong> = le jour actuellement affiché, 0 = le plus récent. Quand on clique sur la flèche gauche → dayIndex + 1 (on recule dans le temps).</p>
+
+      <p><strong>Bloc 2 — Les données du jour actuel</strong></p>
+      <div class="code-line"><span class="kw">const</span> currentDay     = grouped[dayIndex]
+<span class="kw">const</span> dayLabel       = currentDay ? <span class="fn2">formatDayLabel</span>(currentDay[<span class="num">0</span>]) : <span class="kw">null</span>
+<span class="kw">const</span> currentMatches = currentDay ? currentDay[<span class="num">1</span>] : []
+<span class="kw">const</span> canGoBack      = dayIndex &lt; grouped.length - <span class="num">1</span>
+<span class="kw">const</span> canGoForward   = dayIndex > <span class="num">0</span></div>
+      <p><strong>currentDay[0]</strong> = la date du jour sélectionné (ex: "2026-06-15"). <strong>currentDay[1]</strong> = le tableau des matchs de ce jour. <strong>canGoBack</strong> = il reste des jours plus anciens à afficher. <strong>canGoForward</strong> = on n'est pas déjà sur le jour le plus récent.</p>
+
+      <p><strong>Bloc 3 — Le rendu</strong></p>
+      <p>Une barre de navigation avec deux boutons flèches SVG et le label du jour au centre. En dessous : skeleton si loading, message vide si aucun résultat, sinon les MatchCards des matchs du jour sélectionné.</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ══════════════════════════════════════════
+     NEWSCAROUSEL.JSX
+══════════════════════════════════════════ -->
+<section class="file" id="newscarousel">
+  <div class="file-badge">📄 NewsCarousel.jsx</div>
+  <p class="file-role">
+    Affiche les <strong>actualités football</strong> en bas de l'accueil sous forme de carousel 3 par 3. Défile automatiquement toutes les 20 secondes, navigable manuellement avec des flèches et des points.
+  </p>
+
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-const">Constante</span>
+      <span class="block-name">PER_PAGE = 3</span>
+    </div>
+    <div class="block-body">
+      <p>Nombre d'articles affichés par page du carousel. Changer cette valeur suffit à afficher 2 ou 4 articles par page.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-header">
+      <span class="block-tag tag-comp">Composant</span>
+      <span class="block-name">NewsCarousel({ news, loading, error })</span>
+    </div>
+    <div class="block-body">
+      <p>Reçoit le tableau d'articles, un état de chargement, et une éventuelle erreur.</p>
+
+      <p><strong>Bloc 1 — La pagination</strong></p>
+      <div class="code-line"><span class="kw">const</span> [page, setPage] = <span class="fn2">useState</span>(<span class="num">0</span>)
+<span class="kw">const</span> pages = <span class="fn2">Math.ceil</span>(news.length / PER_PAGE)
+<span class="kw">const</span> slice = news.<span class="fn2">slice</span>(page * PER_PAGE, page * PER_PAGE + PER_PAGE)</div>
+      <p><strong>page</strong> = numéro de la page actuelle (commence à 0). <strong>pages</strong> = nombre total de pages (ex: 9 articles ÷ 3 = 3 pages). <strong>slice</strong> = les 3 articles à afficher pour cette page. Ex: page=1 → slice(3, 6) → articles 3, 4, 5.</p>
+
+      <p><strong>Bloc 2 — Le défilement automatique</strong></p>
+      <div class="code-line"><span class="fn2">useEffect</span>(() => {
+  <span class="kw">if</span> (loading || pages &lt;= <span class="num">1</span>) <span class="kw">return</span>
+  <span class="kw">const</span> id = <span class="fn2">setInterval</span>(() => <span class="fn2">setPage</span>(p => (p + <span class="num">1</span>) % pages), <span class="num">20000</span>)
+  <span class="kw">return</span> () => <span class="fn2">clearInterval</span>(id)
+}, [page, pages, loading])</div>
+      <p>Toutes les 20 secondes, on avance d'une page. <strong>(p + 1) % pages</strong> fait tourner en boucle : après la dernière page on revient à la première. On ne lance pas le timer si les articles chargent encore ou s'il n'y a qu'une seule page. Le <strong>return () => clearInterval(id)</strong> arrête le timer quand le composant se démonte (nettoyage).</p>
+
+      <p><strong>Bloc 3 — L'en-tête</strong></p>
+      <p>Titre "Dernières actualités" + les points de navigation (un point par page). Le point de la page active a la classe <strong>--active</strong> pour être mis en évidence. Cliquer sur un point saute directement à cette page.</p>
+
+      <p><strong>Bloc 4 — Le skeleton de chargement</strong></p>
+      <p>Si loading est true → 3 cartes grises animées (image + source + titre + description). Même principe que PanelSkeleton dans MatchCard.jsx.</p>
+
+      <p><strong>Bloc 5 — Le carousel d'articles</strong></p>
+      <p>Deux boutons flèches ‹ › encadrent la grille d'articles. La flèche gauche est désactivée sur la première page, la droite sur la dernière. Chaque article est un lien <strong>&lt;a&gt;</strong> cliquable qui ouvre l'article dans un nouvel onglet. À l'intérieur : image (avec fallback si elle plante), source, titre, description, date et "Lire l'article →".</p>
+
+      <p><strong>key={page}</strong> sur la grille force React à recréer le DOM à chaque changement de page, ce qui permet l'animation CSS de transition entre les pages.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('.file')
+  const links    = document.querySelectorAll('nav a')
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'))
+        const l = document.querySelector('nav a[href="#' + e.target.id + '"]')
+        if (l) l.classList.add('active')
+      }
+    })
+  }, { rootMargin: '-20% 0px -70% 0px' })
+  sections.forEach(s => obs.observe(s))
+</script>
+
+</body>
+</html>
