@@ -8,7 +8,9 @@ function groupByDay(matches) {
     if (!groups[day]) groups[day] = []
     groups[day].push(m)
   })
-  return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+  return Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([day, ms]) => [day, ms.sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))])
 }
 
 function formatDayLabel(dateStr) {

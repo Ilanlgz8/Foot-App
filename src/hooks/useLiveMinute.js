@@ -45,10 +45,10 @@ function isInPollingWindow(match, trackedIds) {
   // dans ce cas on poll quand même API-Football pour y détecter HT et set pausedAt.
   if ((match.status === 'IN_PLAY' || match.status === 'PAUSED') && elapsed >= 45 && elapsed <= 60 && !state.pausedAt) return true
 
-  // Fenêtre 2 : attente reprise après MT (à partir de 15min de pause)
+  // Fenêtre 2 : attente reprise après MT (à partir de 13min de pause)
   if (state.pausedAt && !state.half2Start) {
     const pauseDuration = (Date.now() - state.pausedAt) / 60000
-    if (pauseDuration >= 15) return true
+    if (pauseDuration >= 13) return true
   }
 
   // Fenêtre 3 : temps additionnel 2ème MT (à partir de la 90ème minute globale)
@@ -181,6 +181,22 @@ export function useLiveMinute(matches) {
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
   }, [queryClient])
+
+  // Poll immédiat dès qu'un match passe IN_PLAY sans kickoffAt connu.
+  // Évite d'attendre jusqu'à 60s avant d'écrire kickoffAt → minute correcte dès le départ.
+  const knownInPlayRef = useRef(new Set())
+  useEffect(() => {
+    const newMatches = matches.filter(m =>
+      (m.status === 'IN_PLAY' || m.status === 'PAUSED') &&
+      !getMatchState(m.id).kickoffAt &&
+      !knownInPlayRef.current.has(m.id)
+    )
+    newMatches.forEach(m => knownInPlayRef.current.add(m.id))
+
+    if (newMatches.length > 0 && pollRef.current) {
+      pollRef.current()
+    }
+  }, [matches])
 
   // Recalibration manuelle : clear les états + poll forcé (ignore les fenêtres)
   // Consomme 1 requête API-Football intentionnellement.

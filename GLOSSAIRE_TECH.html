@@ -566,7 +566,7 @@ writeCache(cacheKey, matches, ttl)</pre>
     <pre><span class="c">// 4 fenêtres de polling par match :</span>
 <span class="c">//   Fenêtre 0 : autour du KO (0-60min depuis utcDate) → détecte le début</span>
 <span class="c">//   Fenêtre 1 : à partir de la 45e min → détecte la mi-temps</span>
-<span class="c">//   Fenêtre 2 : après 15min de pause → détecte la reprise</span>
+<span class="c">//   Fenêtre 2 : après 13min de pause → détecte la reprise</span>
 <span class="c">//   Fenêtre 3 : à partir de la 90e min → détecte la fin</span>
 
 <span class="kw">function</span> <span class="fn">isInPollingWindow</span>(match, trackedIds) {
@@ -581,6 +581,25 @@ writeCache(cacheKey, matches, ttl)</pre>
   <span class="kw">if</span> (!trackedIds.has(String(match.id))) <span class="kw">return false</span>
   <span class="c">// ...</span>
 }</pre>
+  </div>
+</div>
+
+<div class="section" id="page-visibility">
+  <div class="section-title">Page Visibility API</div>
+  <div class="term">
+    <div class="term-name gold">Page Visibility API</div>
+    <p class="term-desc">API navigateur qui détecte quand l'onglet passe en arrière-plan ou revient au premier plan. Quand le PC est en veille ou l'onglet caché, Chrome/Safari <strong>throttle les intervals et les refetch</strong>. Sans ce correctif, les données pourraient être périmées de plusieurs minutes au réveil.</p>
+    <div class="file-ref">src/hooks/useLiveMatches.js</div>
+    <pre><span class="c">// Dès que l'onglet redevient visible → refetch immédiat de liveMatches</span>
+<span class="fn">useEffect</span>(() => {
+  <span class="kw">const</span> onVisible = () => {
+    <span class="kw">if</span> (document.visibilityState === <span class="s">'visible'</span>) {
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="s">'liveMatches'</span>] })
+    }
+  }
+  document.<span class="fn">addEventListener</span>(<span class="s">'visibilitychange'</span>, onVisible)
+  <span class="kw">return</span> () => document.<span class="fn">removeEventListener</span>(<span class="s">'visibilitychange'</span>, onVisible)
+}, [queryClient])</pre>
   </div>
 </div>
 
@@ -647,35 +666,46 @@ results
 </div>
 
 <div class="section" id="calcminute">
-  <div class="section-title">calcMinute() — 3 niveaux de précision</div>
+  <div class="section-title">calcMinute() — MT &amp; minutes en local</div>
 
   <div class="term">
     <div class="term-name teal">calcMinute()</div>
-    <p class="term-desc">Fonction utilitaire qui calcule la minute à afficher côté client. Elle descend en cascade : si les données précises existent, elle les utilise ; sinon elle passe au niveau d'approximation suivant.</p>
+    <p class="term-desc">Fonction utilitaire qui calcule la minute affichée côté client. Depuis la mi-temps, elle pilote l'affichage en local depuis <code>pausedAt</code> — indépendamment du statut football-data.org (trop imprévisible). Priorité : api-football.com (précis) → estimation pausedAt+15min (fiable) → heuristique utcDate (fallback).</p>
     <div class="file-ref">src/utils/matchUtils.js</div>
     <pre><span class="kw">export function</span> <span class="fn">calcMinute</span>(match) {
-  <span class="kw">if</span> (match.status === <span class="s">'PAUSED'</span>) <span class="kw">return</span> <span class="s">'MT'</span>
-  <span class="kw">if</span> (match.status !== <span class="s">'IN_PLAY'</span>) <span class="kw">return null</span>
+  <span class="kw">if</span> (match.status !== <span class="s">'IN_PLAY'</span> &amp;&amp; match.status !== <span class="s">'PAUSED'</span>) <span class="kw">return null</span>
 
   <span class="kw">const</span> state = getMatchState(match.id)
 
-  <span class="c">// NIVEAU 1 — 2ème MT précise via api-football.com</span>
-  <span class="kw">if</span> (state.half2Start) {
-    <span class="kw">const</span> min2 = Math.floor((Date.now() - state.half2Start) / <span class="n">60_000</span>) + <span class="n">1</span>
+  <span class="c">// MT &amp; 2ème MT — piloté en local depuis pausedAt (indépendant du statut API)</span>
+  <span class="kw">if</span> (state.pausedAt) {
+    <span class="c">// Source précise api-football.com → prioritaire</span>
+    <span class="kw">if</span> (state.half2Start) {
+      <span class="kw">const</span> min2 = Math.floor((Date.now() - state.half2Start) / <span class="n">60_000</span>) + <span class="n">1</span>
+      <span class="kw">return</span> min2 <= <span class="n">45</span> ? `${<span class="n">45</span> + min2}'` : `90+${min2 - <span class="n">45</span>}'`
+    }
+    <span class="c">// Estimation : MT dure 15min, puis bascule côté client automatiquement</span>
+    <span class="c">// Football-data.org peut changer statut trop tôt ou trop tard → on l'ignore</span>
+    <span class="kw">const</span> sinceP = Date.now() - state.pausedAt
+    <span class="kw">if</span> (sinceP < <span class="n">15</span> * <span class="n">60_000</span>) <span class="kw">return</span> <span class="s">'MT'</span>
+    <span class="kw">const</span> min2 = Math.floor((sinceP - <span class="n">15</span> * <span class="n">60_000</span>) / <span class="n">60_000</span>) + <span class="n">1</span>
     <span class="kw">return</span> min2 <= <span class="n">45</span> ? `${<span class="n">45</span> + min2}'` : `90+${min2 - <span class="n">45</span>}'`
   }
 
-  <span class="c">// NIVEAU 1 — 1ère MT précise via api-football.com</span>
+  <span class="kw">if</span> (match.status === <span class="s">'PAUSED'</span>) <span class="kw">return</span> <span class="s">'MT'</span>  <span class="c">// pausedAt pas encore écrit</span>
+
+  <span class="c">// 1ère MT précise via api-football.com (kickoffAt)</span>
   <span class="kw">if</span> (state.kickoffAt) {
     <span class="kw">const</span> min1 = Math.floor((Date.now() - state.kickoffAt) / <span class="n">60_000</span>)
-    <span class="kw">return</span> min1 <= <span class="n">45</span> ? `${min1}'` : `45+${min1 - <span class="n">45</span>}'`
+    <span class="kw">return</span> min1 <= <span class="n">45</span> ? `${Math.max(<span class="n">1</span>, min1)}'` : `45+${min1 - <span class="n">45</span>}'`
   }
 
-  <span class="c">// NIVEAU 2 — heuristique depuis l'heure prévue (utcDate)</span>
-  <span class="kw">const</span> elapsed = (Date.now() - <span class="kw">new</span> Date(match.utcDate)) / <span class="n">60_000</span>
-  <span class="kw">if</span> (elapsed < <span class="n">45</span>) <span class="kw">return</span> `${Math.floor(elapsed)}'`
-  <span class="kw">if</span> (elapsed < <span class="n">64</span>) <span class="kw">return</span> <span class="s">'MT'</span>   <span class="c">// simule la mi-temps</span>
-  <span class="kw">return</span> `${Math.floor(elapsed - <span class="n">19</span>)}'`  <span class="c">// 2ème MT estimée</span>
+  <span class="c">// Heuristique depuis utcDate (aucun timestamp dispo)</span>
+  <span class="kw">const</span> elapsed = Math.floor((Date.now() - <span class="kw">new</span> Date(match.utcDate)) / <span class="n">60_000</span>)
+  <span class="kw">if</span> (elapsed <= <span class="n">45</span>) <span class="kw">return</span> `${Math.max(<span class="n">1</span>, elapsed)}'`
+  <span class="kw">if</span> (elapsed <= <span class="n">64</span>) <span class="kw">return</span> <span class="s">'MT'</span>
+  <span class="kw">const</span> half2 = elapsed - <span class="n">64</span>
+  <span class="kw">return</span> half2 <= <span class="n">45</span> ? `${<span class="n">45</span> + half2}'` : `90+${half2 - <span class="n">45</span>}'`
 }</pre>
   </div>
 </div>
@@ -690,20 +720,18 @@ results
     <pre><span class="c">// Clés localStorage pour un match :</span>
 <span class="c">// foot_ms_12345 = { kickoffAt, pausedAt, half2Start }</span>
 
-<span class="c">// Détecte les transitions de statut à chaque refetch</span>
+<span class="c">// Détecte les transitions de statut à chaque refetch (football-data.org)</span>
 <span class="kw">export function</span> <span class="fn">trackMatchState</span>(match) {
   <span class="kw">const</span> stored = JSON.parse(localStorage.getItem(`foot_ms_${match.id}`) || <span class="s">'{}'</span>)
 
   <span class="c">// Première fois qu'on voit PAUSED → enregistrer pausedAt</span>
   <span class="kw">if</span> (match.status === <span class="s">'PAUSED'</span> &amp;&amp; !stored.pausedAt) {
     stored.pausedAt = Date.now()
+    localStorage.setItem(`foot_ms_${match.id}`, JSON.stringify(stored))
   }
-  <span class="c">// On voit IN_PLAY après PAUSED → reprise 2ème MT</span>
-  <span class="kw">if</span> (match.status === <span class="s">'IN_PLAY'</span> &amp;&amp; stored.pausedAt &amp;&amp; !stored.half2Start) {
-    stored.half2Start = Date.now()
-  }
-
-  localStorage.setItem(`foot_ms_${match.id}`, JSON.stringify(stored))
+  <span class="c">// half2Start n'est PAS écrit ici — football-data.org bascule IN_PLAY trop tôt.</span>
+  <span class="c">// Seul setHalf2Start() (useLiveMinute / api-football.com) peut l'écrire.</span>
+  <span class="c">// calcMinute() gère MT→2ème MT via pausedAt + estimation 15min.</span>
 }</pre>
   </div>
 </div>

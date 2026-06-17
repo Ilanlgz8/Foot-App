@@ -162,7 +162,6 @@
     <button class="sidebar__btn" onclick="show('localcache', this)">localCache.js</button>
     <button class="sidebar__btn" onclick="show('usetodaymatches', this)">useTodayMatches.js</button>
     <button class="sidebar__btn" onclick="show('usematchs', this)">useMatchs.js</button>
-    <button class="sidebar__btn" onclick="show('userecentresults', this)">useRecentResults.js</button>
     <button class="sidebar__btn" onclick="show('usestandings', this)">useStandings.js</button>
     <button class="sidebar__btn" onclick="show('useteamform', this)">useTeamForm.js</button>
     <button class="sidebar__btn" onclick="show('usescorers', this)">useScorers.js</button>
@@ -297,7 +296,7 @@
 
       <div class="section">
         <h2 class="section__title">Vue d'ensemble</h2>
-        <p class="section__explain">La page est découpée en 3 zones : un dashboard en 2 colonnes (matchs du jour à gauche, résultats récents à droite), et un carousel d'actus en dessous. Plusieurs sous-composants sont définis dans ce même fichier.</p>
+        <p class="section__explain">La page est découpée en 3 zones : un dashboard en 2 colonnes (matchs du jour à gauche, résultats récents à droite), et un carousel d'actus en dessous. Le panel résultats utilise <code>useMatches('WC', 'FINISHED', 'desc')</code> — le même hook que la page Résultats, donc ils partagent le même cache TanStack Query et se mettent à jour au même moment sans double requête.</p>
         <div class="flow">
           <div class="flow__step">Accueil</div>
           <div class="flow__arrow">→</div>
@@ -305,8 +304,22 @@
           <div class="flow__arrow">+</div>
           <div class="flow__step">ResultPanel</div>
           <div class="flow__arrow">+</div>
+          <div class="flow__step">LiveWidget</div>
+          <div class="flow__arrow">+</div>
           <div class="flow__step">NewsCarousel</div>
         </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section__title">LiveWidget — bandeau match en direct</h2>
+        <p class="section__explain"><code>liveMatches</code> vient directement de <code>useLiveMatches()</code> sans fallback. Quand un match se termine, <code>useLiveMatches</code> le détecte au prochain poll (max 30s), le widget disparaît et le localStorage est nettoyé automatiquement. Une animation typographique s'affiche sur la carte quand un but est détecté via les scores ESPN.</p>
+        <pre class="code"><span class="cmt">// Source autoritaire — pas de fallback stale</span>
+<span class="kw">const</span> liveMatches = globalLive
+
+<span class="cmt">// Nettoyage auto quand un match quitte la liste live</span>
+<span class="kw">for</span> (<span class="kw">const</span> id <span class="kw">of</span> prevLiveIds) {
+  <span class="kw">if</span> (!seen.<span class="fn">has</span>(id)) <span class="fn">clearMatchState</span>(id)
+}</pre>
       </div>
 
       <div class="section">
@@ -657,32 +670,6 @@ className=<span class="str">{`resultats__team ${aWin ? 'resultats__team--loser' 
   error:   error?.message ?? <span class="kw">null</span>,
   grouped: <span class="fn">groupByMatchday</span>(data ?? [], order),
 }</pre>
-      </div>
-    </div>
-
-    <!-- useRecentResults.js -->
-    <div class="page" id="page-userecentresults">
-      <p class="page__tag">Hook</p>
-      <h1 class="page__title">useRecentResults.js</h1>
-      <p class="page__subtitle">Récupère les résultats WC des 3 derniers jours pour le panel de l'accueil.</p>
-
-      <div class="section">
-        <h2 class="section__title">C'est quoi ce fichier ?</h2>
-        <p class="section__explain">Hook utilisé dans le panel droit de l'accueil. Il calcule une fenêtre de 3 jours jusqu'à aujourd'hui et récupère les matchs WC terminés sur cette période, avec un cache intelligent.</p>
-      </div>
-
-      <div class="section">
-        <h2 class="section__title">Cache qui s'invalide chaque jour automatiquement</h2>
-        <p class="section__explain">La clé de cache inclut la date du jour. Donc le cache d'hier (<code>results_wc_2024-01-14</code>) ne sera jamais utilisé aujourd'hui (<code>results_wc_2024-01-15</code>). Données toujours fraîches sans invalidation manuelle.</p>
-        <pre class="code"><span class="kw">const</span> cacheKey = <span class="str">`results_wc_${dateTo}`</span>
-<span class="cmt">// demain la clé change automatiquement → nouvelles données</span></pre>
-      </div>
-
-      <div class="section">
-        <h2 class="section__title">Fallback sur le cache si l'API échoue</h2>
-        <p class="section__explain">Si l'API retourne une erreur ou des données vides, on affiche les données du cache (même expirées) plutôt qu'une erreur.</p>
-        <pre class="code"><span class="kw">if</span> (!res.ok) <span class="kw">return</span> cachedData ?? []
-<span class="kw">return</span> matches.length > <span class="num">0</span> ? matches : (cachedData ?? [])</pre>
       </div>
     </div>
 

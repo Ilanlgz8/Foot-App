@@ -42,11 +42,9 @@ export function trackMatchState(match) {
     localStorage.setItem(key(match.id), JSON.stringify(stored))
   }
 
-  // On voit IN_PLAY après avoir vu PAUSED → c'est le début de la 2ème MT
-  if (match.status === 'IN_PLAY' && stored.pausedAt && !stored.half2Start) {
-    stored.half2Start = Date.now()
-    localStorage.setItem(key(match.id), JSON.stringify(stored))
-  }
+  // half2Start est écrit uniquement par setHalf2Start() (useLiveMinute / api-football.com).
+  // On ne le déduit plus du statut football-data.org : trop imprévisible.
+  // calcMinute gère la transition MT→2ème MT via pausedAt + estimation 15min.
 }
 
 /**

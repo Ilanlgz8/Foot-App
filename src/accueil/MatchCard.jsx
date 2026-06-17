@@ -58,8 +58,11 @@ export function PanelSkeleton() {
 //   onTrack       → callback pour activer/désactiver le suivi (null = bouton caché)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
 export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null }) {
-  const isLive     = match.status === 'IN_PLAY' || match.status === 'PAUSED'
   const isFinished = match.status === 'FINISHED'
+  // calcMinute retourne une valeur même si l'API dit brièvement SCHEDULED (timestamps locaux)
+  // → on garde l'affichage live tant qu'on a une minute calculable
+  const liveMinute = isFinished ? null : calcMinute(match)
+  const isLive     = match.status === 'IN_PLAY' || match.status === 'PAUSED' || liveMinute !== null
 
   // Score : ESPN en priorité (quasi temps réel), sinon football-data.org (~1min de délai)
   const hs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
@@ -97,7 +100,6 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   //   - Match terminé   → "FT"
   //   - Match en cours  → minute calculée (ex: "73'" ou "MT") via calcMinute()
   const label     = isFinished ? 'FT' : !isLive ? formatHour(match.utcDate) : null
-  const liveLabel = isLive ? calcMinute(match) : null
 
   // Classes CSS avec modificateur gagnant/perdant sur les noms et blasons
   const homeNameCls  = matchClass('accueil__matchCardName',  homeWins, awayWins)
@@ -127,7 +129,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
         <div className="accueil__matchCardLabelRow">
           {isLive && <span className="accueil__matchCardLiveDot" />}
           <span className={`accueil__matchCardLabel${isLive ? ' accueil__matchCardLabel--live' : ''}`}>
-            {isLive ? (liveLabel ?? 'En cours') : label}
+            {isLive ? (liveMinute ?? 'En cours') : label}
           </span>
         </div>
         <span className={`accueil__matchCardValue${isLive ? ' accueil__matchCardValue--live' : ''}`}>

@@ -1,7 +1,31 @@
-import { useQuery } from '@tanstack/react-query'
-import { trackMatchState } from '../utils/matchStateTracker'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { trackMatchState, clearMatchState } from '../utils/matchStateTracker'
+
+// IDs des matchs vus lors du dernier fetch réussi
+// Quand un match disparaît de la liste live → il est terminé → on nettoie son état
+const prevLiveIds = new Set()
+
+// Matches vus IN_PLAY/PAUSED avec leur dernière version connue + timestamp
+// Permet de les garder dans la liste si l'API les fait brièvement disparaître (faux SCHEDULED)
+const stickyLive = new Map() // id → { match, seenAt }
+const STICKY_TTL = 3 * 60_000 // 3 minutes max sans confirmation API
 
 export function useLiveMatches() {
+  const queryClient = useQueryClient()
+
+  // Quand la page redevient visible (réveil ordi, retour sur l'onglet),
+  // forcer un refetch immédiat — évite les données périmées après une longue inactivité
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [queryClient])
+
   const { data } = useQuery({
     queryKey: ['liveMatches'],
     queryFn: async () => {
@@ -24,11 +48,34 @@ export function useLiveMatches() {
 
         // Dédupliquer par id
         const seen = new Set()
-        return [...live, ...paused, ...wcLive, ...wcPaused].filter(m => {
+        const result = [...live, ...paused, ...wcLive, ...wcPaused].filter(m => {
           if (seen.has(m.id)) return false
           seen.add(m.id)
           return true
         })
+
+        const now = Date.now()
+
+        // Mettre à jour le cache sticky avec les matchs fraîchement vus
+        result.forEach(m => stickyLive.set(m.id, { match: m, seenAt: now }))
+
+        // Ré-injecter les matchs "sticky" que l'API a fait disparaître temporairement
+        // (football-data.org peut brièvement retourner SCHEDULED pendant un match live)
+        for (const [id, { match: m, seenAt }] of stickyLive) {
+          if (m.status === 'FINISHED') { stickyLive.delete(id); continue }
+          if (now - seenAt > STICKY_TTL) { stickyLive.delete(id); continue }
+          if (!seen.has(id)) { result.push(m); seen.add(id) }
+        }
+
+        // Nettoyer le localStorage des matchs qui ont quitté la liste live (terminés)
+        // On n'efface que si hors du sticky aussi
+        for (const id of prevLiveIds) {
+          if (!seen.has(id)) clearMatchState(id)
+        }
+        prevLiveIds.clear()
+        seen.forEach(id => prevLiveIds.add(id))
+
+        return result
       } catch {
         return []
       }

@@ -147,8 +147,8 @@ hr{border:none;border-top:1px solid var(--bd);margin:48px 0}
   <div class="list-grid">
     <div class="list-item"><div class="dot" style="background:var(--faint)"></div><div><div class="name">localCache.js</div><div class="desc">Cache localStorage avec TTL. Fallback données périmées si API down.</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--blue)"></div><div><div class="name">useTodayMatches</div><div class="desc">Matchs du jour + navigation par date. TTL 2min si live, 1h sinon.</div></div></div>
-    <div class="list-item"><div class="dot" style="background:var(--red)"></div><div><div class="name">useLiveMatches</div><div class="desc">IN_PLAY + PAUSED en parallèle. Refetch 30s si actifs, 5min sinon.</div></div></div>
-    <div class="list-item"><div class="dot" style="background:var(--red)"></div><div><div class="name">useLiveMinute</div><div class="desc">Minute précise via api-football. 4 fenêtres de polling ciblées.</div></div></div>
+    <div class="list-item"><div class="dot" style="background:var(--red)"></div><div><div class="name">useLiveMatches</div><div class="desc">IN_PLAY + PAUSED · 4 fetches (+ WC). Refetch 30s si actifs, 60s sinon. Auto-clear état si match terminé. Page Visibility API → refetch immédiat au réveil de l'onglet.</div></div></div>
+    <div class="list-item"><div class="dot" style="background:var(--red)"></div><div><div class="name">useLiveMinute</div><div class="desc">Minute précise via api-football. 4 fenêtres de polling ciblées (Fenêtre 2 : dès 13min de pause).</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--gold)"></div><div><div class="name">useEspnScores</div><div class="desc">Scores ESPN par fuzzy matching des noms d'équipe (5 premiers chars).</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--green)"></div><div><div class="name">useNews</div><div class="desc">RSS filtré (mots-clés foot) + déduplication par similarité de titres.</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--purp)"></div><div><div class="name">useStandings</div><div class="desc">Classement simple OU multi-groupes (CdM/LDC) selon la réponse API.</div></div></div>
@@ -156,7 +156,7 @@ hr{border:none;border-top:1px solid var(--bd);margin:48px 0}
     <div class="list-item"><div class="dot" style="background:var(--faint)"></div><div><div class="name">useTeamForm</div><div class="desc">Forme 5 derniers matchs (V/N/D) pour toutes les équipes.</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--faint)"></div><div><div class="name">useScorers</div><div class="desc">Top 20 buteurs d'une compétition. Chargé par le composant Classement.</div></div></div>
     <div class="list-item"><div class="dot" style="background:var(--faint)"></div><div><div class="name">useWcKnockout</div><div class="desc">Matchs phase finale CdM, triés dans l'ordre du bracket.</div></div></div>
-    <div class="list-item"><div class="dot" style="background:var(--blue)"></div><div><div class="name">useRecentResults / useMatchs</div><div class="desc">Résultats J-4 et matchs par compétition groupés par journée.</div></div></div>
+    <div class="list-item"><div class="dot" style="background:var(--blue)"></div><div><div class="name">useMatchs</div><div class="desc">Matchs par compétition groupés par journée — partagé entre la page Résultats et le panel Accueil (même cache, synchro instantanée).</div></div></div>
   </div>
 </section>
 
@@ -164,13 +164,13 @@ hr{border:none;border-top:1px solid var(--bd);margin:48px 0}
 <section>
   <h2>Système Live — pipeline</h2>
   <div class="pipeline">
-    <div class="step red"><div class="step-num">1</div><h3>useLiveMatches</h3><p>IN_PLAY + PAUSED<br>Refetch 30s</p></div>
+    <div class="step red"><div class="step-num">1</div><h3>useLiveMatches</h3><p>IN_PLAY + PAUSED · Refetch 30s<br>Page Visibility API → refetch au réveil<br>Auto-clear localStorage si match terminé</p></div>
     <div class="arrow">›</div>
     <div class="step gold"><div class="step-num">2</div><h3>matchStateTracker</h3><p>Timestamps localStorage<br>kickoffAt · pausedAt</p></div>
     <div class="arrow">›</div>
-    <div class="step purp"><div class="step-num">3</div><h3>useLiveMinute</h3><p>4 fenêtres de polling<br>api-football (100/jour)</p></div>
+    <div class="step purp"><div class="step-num">3</div><h3>useLiveMinute</h3><p>4 fenêtres de polling<br>Fenêtre 2 : dès 13min de pause<br>api-football (100/jour)</p></div>
     <div class="arrow">›</div>
-    <div class="step blue"><div class="step-num">4</div><h3>calcMinute()</h3><p>3 niveaux : précis API<br>→ heuristique → estimation</p></div>
+    <div class="step blue"><div class="step-num">4</div><h3>calcMinute()</h3><p>pausedAt+15min (client)<br>→ api-football précis<br>→ heuristique utcDate</p></div>
     <div class="arrow">›</div>
     <div class="step green"><div class="step-num">5</div><h3>useEspnScores</h3><p>Score ESPN en overlay<br>Fuzzy match équipes</p></div>
   </div>
@@ -192,8 +192,8 @@ hr{border:none;border-top:1px solid var(--bd);margin:48px 0}
   <h2>Sous-composants Accueil</h2>
   <div class="cards c3">
     <div class="card red"><h3>MatchCard</h3><p>Carte d'un match : score, minute live, blasons, état gagnant/perdant.</p></div>
-    <div class="card red"><h3>LiveWidget</h3><p>Bandeau EN DIRECT avec les matchs en cours. Disparaît si aucun match live.</p></div>
-    <div class="card blue"><h3>ResultPanel</h3><p>Résultats groupés par jour avec navigation temporelle.</p></div>
+    <div class="card red"><h3>LiveWidget</h3><p>Bandeau EN DIRECT. Animation typographique sur but détecté via ESPN. Disparaît dès que le match est terminé.</p></div>
+    <div class="card blue"><h3>ResultPanel</h3><p>Résultats WC groupés par jour, triés du plus récent au plus ancien. Cache partagé avec la page Résultats.</p></div>
     <div class="card green"><h3>NewsCarousel</h3><p>Carousel d'actus foot avec défilement automatique toutes les 20s.</p></div>
     <div class="card gold"><h3>MatchModal</h3><p>Modal détail : buts, cartons, forme des équipes, stade, arbitre.</p></div>
   </div>
