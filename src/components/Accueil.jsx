@@ -57,6 +57,19 @@ function Accueil() {
     }
   }, [matches.length])
 
+  // Auto-avance au jour suivant si aujourd'hui n'a plus de match à venir
+  // (tous terminés ou aucun match ce jour-là)
+  useEffect(() => {
+    if (matchesLoading) return
+    if (dayOffset !== 0) return  // seulement si on est sur "aujourd'hui"
+    const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
+    if (!hasUpcoming) {
+      // Petit délai pour éviter un flash si les données arrivent en deux temps
+      const id = setTimeout(() => setDayOffset(1), 800)
+      return () => clearTimeout(id)
+    }
+  }, [matches, matchesLoading, dayOffset])
+
   const handleToggleTrack = (matchId) => {
     const ids = getTrackedMatches()
     if (!ids.has(String(matchId)) && ids.size >= MAX_TRACKED) return
