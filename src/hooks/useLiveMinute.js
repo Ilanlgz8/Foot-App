@@ -639,17 +639,26 @@ export function useLiveMinute(matches) {
 
     let worker = null
     let fallbackId = null
+    const lastTickAt = { t: Date.now() }
+
     try {
       worker = new EspnTimerWorker()
-      worker.onmessage = tick
+      worker.onmessage = () => { lastTickAt.t = Date.now(); tick() }
     } catch {
       // Fallback si les Workers ne sont pas supportés (rare)
       fallbackId = setInterval(tick, 15_000)
     }
 
+    // Watchdog : si le Worker se bloque silencieusement (crash, HMR, onglet gelé),
+    // on continue à poller toutes les 10s depuis le main thread.
+    const watchdogId = setInterval(() => {
+      if (Date.now() - lastTickAt.t > 10_000) tick()
+    }, 10_000)
+
     return () => {
       worker?.terminate()
       if (fallbackId) clearInterval(fallbackId)
+      clearInterval(watchdogId)
     }
   }, [queryClient])
 
