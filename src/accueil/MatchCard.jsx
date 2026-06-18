@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { calcMinute } from '../utils/matchUtils'
+import { notifyGoal } from '../utils/notifications'
+import { getMatchState } from '../utils/matchStateTracker'
 
 function GoalCelebration({ teamName, scoreStr }) {
   return (
@@ -57,36 +59,86 @@ export function PanelSkeleton() {
 //   tracked       → si ce match est suivi avec minutes précises
 //   onTrack       → callback pour activer/désactiver le suivi (null = bouton caché)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
-export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null }) {
-  const isFinished = match.status === 'FINISHED'
-  // calcMinute retourne une valeur même si l'API dit brièvement SCHEDULED (timestamps locaux)
-  // → on garde l'affichage live tant qu'on a une minute calculable
+export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false }) {
+  // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
+  // (flag ft dans localStorage), on traite le match comme terminé immédiatement
+  // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
+  const isFinished = match.status === 'FINISHED' || getMatchState(match.id).ft === true
   const liveMinute = isFinished ? null : calcMinute(match)
-  const isLive     = match.status === 'IN_PLAY' || match.status === 'PAUSED' || liveMinute !== null
+  const isLive     = !isFinished && (match.status === 'IN_PLAY' || match.status === 'PAUSED' || liveMinute !== null)
+
+  // Countdown mi-temps : remplace "MT" par "~8 min" ou "Imminente"
+  const [htLabel, setHtLabel] = useState(null)
+  useEffect(() => {
+    if (liveMinute !== 'MT') { setHtLabel(null); return }
+    const compute = () => {
+      const state  = getMatchState(match.id)
+      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
+      const remMin = Math.max(0, Math.ceil((15 * 60_000 - (Date.now() - state.pausedAt)) / 60_000))
+      setHtLabel(remMin > 0 ? `~${remMin} min` : 'Imminente')
+    }
+    compute()
+    const id = setInterval(compute, 30_000)
+    return () => clearInterval(id)
+  }, [liveMinute, match.id])
 
   // Score : ESPN en priorité (quasi temps réel), sinon football-data.org (~1min de délai)
   const hs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = espnScore?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
 
   // ── Détection de but ──
+  // scoreKey : clé localStorage pour mémoriser le dernier score connu.
+  // Sans persistance, prevHs/prevAs repartent à null au reload → FD.org donne 0,
+  // puis ESPN arrive avec score=2 → 2 > 0 → fausse animation de but.
+  const scoreKey = `foot_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
   const timerRef = useRef(null)
   const [goal, setGoal] = useState(null) // { team: string } | null
 
+  // Initialisation one-shot depuis localStorage pour éviter les fausses animations au reload
+  const initDone = useRef(false)
+  if (!initDone.current) {
+    initDone.current = true
+    try {
+      const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
+      if (s?.home != null) prevHs.current = s.home
+      if (s?.away != null) prevAs.current = s.away
+    } catch {}
+  }
+
   useEffect(() => {
-    if (!isLive) { prevHs.current = null; prevAs.current = null; return }
+    if (!isLive) {
+      prevHs.current = null
+      prevAs.current = null
+      try { localStorage.removeItem(scoreKey) } catch {}
+      return
+    }
     if (prevHs.current !== null && hs != null && hs > prevHs.current) {
-      setGoal({ team: translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || ''), scoreStr: `${hs} – ${as_ ?? 0}` })
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoal(null), 5200)
+      if (!noAnimation) {
+        const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
+        const score = `${hs} – ${as_ ?? 0}`
+        setGoal({ team, scoreStr: score })
+        notifyGoal({ teamName: team, scoreStr: score, minute: liveMinute })
+        clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setGoal(null), 5200)
+      }
     } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
-      setGoal({ team: translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || ''), scoreStr: `${hs ?? 0} – ${as_}` })
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoal(null), 5200)
+      if (!noAnimation) {
+        const team = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
+        const score = `${hs ?? 0} – ${as_}`
+        setGoal({ team, scoreStr: score })
+        notifyGoal({ teamName: team, scoreStr: score, minute: liveMinute })
+        clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setGoal(null), 5200)
+      }
     }
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
+    // Persister le score pour que le prochain reload initialise les refs correctement
+    if (hs != null && as_ != null) {
+      try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
+    }
   }, [hs, as_, isLive])
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
@@ -99,7 +151,8 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   //   - Match à venir   → heure (ex: "20:45")
   //   - Match terminé   → "FT"
   //   - Match en cours  → minute calculée (ex: "73'" ou "MT") via calcMinute()
-  const label     = isFinished ? 'FT' : !isLive ? formatHour(match.utcDate) : null
+  // Dans le widget live, pendant les 5min post-FT : "Terminé" au lieu de "FT"
+  const label     = isFinished ? (isTermine ? 'Terminé' : 'FT') : !isLive ? formatHour(match.utcDate) : null
 
   // Classes CSS avec modificateur gagnant/perdant sur les noms et blasons
   const homeNameCls  = matchClass('accueil__matchCardName',  homeWins, awayWins)
@@ -131,6 +184,9 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           <span className={`accueil__matchCardLabel${isLive ? ' accueil__matchCardLabel--live' : ''}`}>
             {isLive ? (liveMinute ?? 'En cours') : label}
           </span>
+          {liveMinute === 'MT' && htLabel && (
+            <span className="accueil__matchCardHTCountdown">{htLabel}</span>
+          )}
         </div>
         <span className={`accueil__matchCardValue${isLive ? ' accueil__matchCardValue--live' : ''}`}>
           {/* Match en cours ou terminé → score | À venir → heure */}
@@ -193,6 +249,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, trac
                 espnScore={espnScores[match.id] ?? null}
                 tracked={isTracked}
                 onTrack={showTrack ? () => onTrack(match.id) : null}
+                noAnimation
               />
             )
           })}

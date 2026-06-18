@@ -1,36 +1,41 @@
 import { useQuery } from '@tanstack/react-query'
+import { fdFetch } from '../utils/fdFetch'
+import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
+const STALE_MS = 1000 * 60 * 15  // 15min
 
 export function useStandings(selectedComp) {
+  const key = `standings_${selectedComp}`
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
     queryFn: async () => {
-      const res = await fetch(`/api/v4/competitions/${selectedComp}/standings`)
+      const res = await fdFetch(`/api/v4/competitions/${selectedComp}/standings`)
+      if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
       const json = await res.json()
       const allGroups = json.standings ?? []
 
-      // Compétitions à groupes multiples (CdM, LDC phase de ligue…)
-      // On filtre les entrées parasites (type TOTAL, phase suivante, table à 1 équipe)
       const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
 
-      if (realGroups.length > 1) {
-        return {
-          table: realGroups.flatMap(g => g.table ?? []),
-          groups: realGroups.map(g => ({
-            name: g.group,    // ex: "GROUP_A"
-            table: g.table ?? [],
-          })),
-        }
-      }
+      const result = realGroups.length > 1
+        ? {
+            table: realGroups.flatMap(g => g.table ?? []),
+            groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
+          }
+        : {
+            table: allGroups[0]?.table ?? [],
+            groups: [],
+          }
 
-      // Championnat classique (1 seul groupe)
-      return {
-        table: allGroups[0]?.table ?? [],
-        groups: [],
-      }
+      writeCache(key, result, STALE_MS)
+      return result
     },
-    staleTime: 1000 * 60 * 5,
+    initialData:          readCacheStale(key) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(key),
+    staleTime:            STALE_MS,
+    retry: false,
+    enabled: !!selectedComp,
   })
 
   return {

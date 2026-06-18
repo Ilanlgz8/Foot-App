@@ -1,6 +1,17 @@
 // Mémorise les transitions d'état des matchs dans le localStorage.
 // But : détecter PAUSED → IN_PLAY pour connaître l'heure exacte du début de la 2ème MT.
 
+// ─── Santé ESPN ───────────────────────────────────────────────────────────────
+// Flag in-memory mis à jour par useLiveMinute :
+//   • setEspnWorking(true)  → quand ESPN répond avec des données valides
+//   • setEspnWorking(false) → après 3 échecs ESPN consécutifs (~60s)
+// Consulté par useLiveMatches pour savoir si FD.org est nécessaire en fallback.
+let _espnWorking = false
+
+export const setEspnWorking = (v) => { _espnWorking = v }
+export const isEspnWorking  = ()  => _espnWorking
+// ─────────────────────────────────────────────────────────────────────────────
+
 const key = (id) => `foot_ms_${id}`
 const TRACKED_KEY = 'foot_tracked_matches'
 
@@ -75,8 +86,22 @@ export function setKickoffAt(matchId, kickoffAt) {
 }
 
 /**
+ * Met à jour les données ESPN en direct (espnClock, espnStatus).
+ * Écrase toujours : appelé à chaque poll ESPN (20s) pour avoir les données fraîches.
+ * espnClock ex. "42:00" ou "45:00+2:00" ; espnStatus ex. "STATUS_IN_PROGRESS".
+ */
+export function setEspnData(matchId, { espnClock, espnStatus }) {
+  if (!matchId) return
+  const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+  stored.espnClock       = espnClock
+  stored.espnStatus      = espnStatus
+  stored.espnCapturedAt  = Date.now()  // timestamp du poll → permet l'interpolation côté client
+  localStorage.setItem(key(matchId), JSON.stringify(stored))
+}
+
+/**
  * Retourne les données mémorisées pour un match :
- * { kickoffAt?: number, pausedAt?: number, half2Start?: number }
+ * { kickoffAt?, pausedAt?, half2Start?, espnClock?, espnStatus?, espnCapturedAt? }
  */
 export function getMatchState(matchId) {
   return JSON.parse(localStorage.getItem(key(matchId)) || '{}')

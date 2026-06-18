@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { fdFetch } from '../utils/fdFetch'
+import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
+const STALE_MS = 1000 * 60 * 10  // 10min
 
-/* Ordre des tours et libellés FR */
 export const KNOCKOUT_ORDER = [
   'ROUND_OF_32',
   'LAST_16',
@@ -20,37 +22,36 @@ export const KNOCKOUT_LABELS = {
   FINAL:          'Finale',
 }
 
-/* Référence stable pour éviter que `data ?? []` recrée un tableau à chaque render */
 const EMPTY_ROUNDS = []
+const CACHE_KEY = 'wc_knockout'
 
 export function useWcKnockout() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['wc-knockout'],
     queryFn: async () => {
-      const res = await fetch(`/api/v4/competitions/WC/matches`)
+      const res = await fdFetch(`/api/v4/competitions/WC/matches`)
+      if (res.status === 403 || res.status === 429) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
       const json = await res.json()
       const all = json.matches ?? []
 
-      /* Ne garder que les tours à élimination directe */
       const knockout = all.filter(m => KNOCKOUT_ORDER.includes(m.stage))
 
-      /* Indexer par stage dans l'ordre */
       const rounds = []
       for (const stage of KNOCKOUT_ORDER) {
         const stageMatches = knockout.filter(m => m.stage === stage)
         if (stageMatches.length > 0) {
-          rounds.push({
-            stage,
-            label: KNOCKOUT_LABELS[stage],
-            matches: stageMatches,
-          })
+          rounds.push({ stage, label: KNOCKOUT_LABELS[stage], matches: stageMatches })
         }
       }
 
+      writeCache(CACHE_KEY, rounds, STALE_MS)
       return rounds
     },
-    staleTime: 1000 * 60 * 5,
+    initialData:          readCacheStale(CACHE_KEY) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(CACHE_KEY),
+    staleTime:            STALE_MS,
+    retry: false,
   })
 
   return {

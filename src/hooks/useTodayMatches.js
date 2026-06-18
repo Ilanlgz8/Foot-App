@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localCache'
+import { fdFetch } from '../utils/fdFetch'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
-const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA'
+const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA' // EL/ECL non couverts par FD.org free tier
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms))
 
 async function safeFetch(url) {
-  const res = await fetch(url)
-  // 429 → on lève une erreur pour que TanStack garde le dernier state valide
-  if (res.status === 429) throw new Error('429')
+  const res = await fdFetch(url)
+  // 429/403 → on lève une erreur pour que TanStack garde le dernier state valide
+  if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+  if (!res.ok) return []
   if (!res.ok) return []
   const json = await res.json()
   return (json.matches ?? []).filter(m => VALID_STATUS.includes(m.status))

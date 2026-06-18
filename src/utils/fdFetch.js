@@ -1,0 +1,59 @@
+/**
+ * fdFetch — wrapper rate-limité pour football-data.org (free tier : 10 req/min)
+ *
+ * Sliding window counter PERSISTÉ en localStorage :
+ *   - Le log survit aux rechargements de page
+ *   - Le serveur se souvient des requêtes des 60s précédentes même après reload
+ *   - Sans persistence, le limiter se réinitialisait à 0 au reload → 429 garanti
+ *
+ * MAX_RPM = 9 (1 de marge sur la limite officielle de 10 req/min)
+ */
+
+const MAX_RPM    = 9
+const WINDOW     = 60_000
+const STORAGE_KEY = 'fd_req_log'
+
+// Restaure le log depuis localStorage au chargement du module
+function loadLog() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    // Ne garder que les entrées encore dans la fenêtre
+    return Array.isArray(parsed) ? parsed.filter(t => t > Date.now() - WINDOW) : []
+  } catch { return [] }
+}
+
+function saveLog(log) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(log)) } catch {}
+}
+
+// Singleton partagé entre tous les hooks
+const log = loadLog()
+
+async function waitForSlot() {
+  for (;;) {
+    const now = Date.now()
+
+    // Purger les requêtes hors fenêtre
+    while (log.length > 0 && log[0] < now - WINDOW) {
+      log.shift()
+    }
+
+    if (log.length < MAX_RPM) {
+      log.push(now)
+      saveLog(log)
+      return
+    }
+
+    // Slot plein → attendre que le plus ancien expire
+    const waitMs = WINDOW - (now - log[0]) + 50
+    console.warn(`[fdFetch] Limite atteinte (${log.length}/${MAX_RPM} req/min) — attente ${waitMs}ms`)
+    await new Promise(r => setTimeout(r, waitMs))
+  }
+}
+
+export async function fdFetch(url, options) {
+  await waitForSlot()
+  return fetch(url, options)
+}

@@ -2,11 +2,13 @@ import { useState } from 'react'
 import './../resultats.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
-import { useMatches } from '../hooks/useMatchs'
+import { useMatches }    from '../hooks/useMatchs'
+import MatchModal        from './MatchModal'
 
 function Resultats() {
   const [selectedComp, setSelectedComp] = useState('WC')
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [selectedMatch, setSelected]    = useState(null)
 
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'FINISHED', 'desc')
 
@@ -115,7 +117,10 @@ function Resultats() {
                   const draw = hs === as_
 
                   return (
-                    <div key={match.id} className="resultats__card">
+                    <div key={match.id} className="resultats__card"
+                      onClick={() => setSelected(match)}
+                      style={{ cursor: 'pointer' }}
+                    >
 
                       {/* Équipe domicile */}
                       <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
@@ -165,6 +170,14 @@ function Resultats() {
 
         </main>
       </div>
+
+      {selectedMatch && (
+        <MatchModal
+          match={selectedMatch}
+          compId={selectedMatch.competition?.id}
+          onClose={() => setSelected(null)}
+        />
+      )}
 
     </section>
   )

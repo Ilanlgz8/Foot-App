@@ -47,6 +47,7 @@ export function useTeamForm(selectedComp) {
 
       return formMap
     },
+    enabled:   !!selectedComp,  // ne pas fetch si compId est null (ex: modal match terminé)
     staleTime: 1000 * 60 * 30, // cache 30min
     retry: false
   })

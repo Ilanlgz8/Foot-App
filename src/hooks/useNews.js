@@ -19,6 +19,16 @@ const EXCLUDE_KEYWORDS = [
   'moto gp', 'boxe', 'judo', 'escrime', 'golf', 'ski', 'hockey', 'baseball'
 ]
 
+// Indicateurs d'articles "profil joueur" / biographies evergreen → toujours filtrer
+const EXCLUDE_PROFILE = [
+  'biographie', 'biographic', 'tout savoir sur', 'qui est vraiment', 'portrait de',
+  'fiche joueur', 'vie privée', 'sa vie privée', 'salaire de', 'salaire du',
+  'fortune de', 'fortune du', 'palmarès complet', 'meilleur joueur de tous les temps',
+  'le meilleur de tous les temps', 'goat', 'top 10 joueurs', 'top 5 joueurs',
+  'les meilleurs joueurs', 'histoire de sa carrière', 'retour sur la carrière',
+  'tout sur ', 'que sait-on de', 'ce qu\'il faut savoir sur',
+]
+
 // Mots vides français à ignorer pour la comparaison de similarité
 const STOPWORDS = new Set([
   'le', 'la', 'les', 'de', 'du', 'des', 'un', 'une', 'et', 'en', 'au', 'aux',
@@ -60,12 +70,16 @@ export function useNews() {
       const json = await res.json()
       const articles = json.articles ?? []
 
-      // Étape 1 : filtrer par mots-clés foot + exclure les autres sports
+      // Étape 1 : filtrer par mots-clés foot + exclure les autres sports + exclure bios/profils
       const footballOnly = articles.filter(a => {
         const text = `${a.title ?? ''} ${a.description ?? ''}`.toLowerCase()
         const isFootball = FOOTBALL_KEYWORDS.some(kw => text.includes(kw))
         const isOtherSport = EXCLUDE_KEYWORDS.some(kw => text.includes(kw))
-        return isFootball && !isOtherSport
+        const isProfile = EXCLUDE_PROFILE.some(kw => text.includes(kw))
+        // Rejeter les "articles" dont le titre est juste un nom de joueur/équipe (< 4 mots)
+        const titleWords = (a.title ?? '').trim().split(/\s+/).filter(Boolean)
+        const isTooShort = titleWords.length < 4
+        return isFootball && !isOtherSport && !isProfile && !isTooShort
       })
 
       // Étape 2 : déduplication par similarité de mots-clés

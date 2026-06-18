@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MatchCard, PanelSkeleton } from './MatchCard'
+import MatchModal from '../components/MatchModal'
 
 function groupByDay(matches) {
   const groups = {}
@@ -23,7 +24,8 @@ function formatDayLabel(dateStr) {
 
 export function ResultPanel({ results, loading }) {
   const grouped = groupByDay(results)
-  const [dayIndex, setDayIndex] = useState(0)
+  const [dayIndex, setDayIndex]       = useState(0)
+  const [selectedMatch, setSelected]  = useState(null)
 
   const currentDay     = grouped[dayIndex]
   const dayLabel       = currentDay ? formatDayLabel(currentDay[0]) : null
@@ -50,10 +52,25 @@ export function ResultPanel({ results, loading }) {
         )}
         {!loading && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
-            {currentMatches.map((match, i) => <MatchCard key={match.id ?? i} match={match} noWinnerLoser />)}
+            {currentMatches.map((match, i) => (
+              <div key={match.id ?? i}
+                onClick={() => setSelected(match)}
+                style={{ cursor: 'pointer' }}
+              >
+                <MatchCard match={match} noWinnerLoser />
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {selectedMatch && (
+        <MatchModal
+          match={selectedMatch}
+          compId={selectedMatch.competition?.id}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   )
 }

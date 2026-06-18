@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glossaire technique — StatFootix</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    .header { margin-bottom: 2rem; }
+    .header h1 { font-size: 26px; font-weight: 600; color: #111; }
+    .header p { font-size: 15px; color: #666; margin-top: 6px; }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .tab {
+      font-size: 13px; padding: 7px 16px;
+      border-radius: 999px; border: 1px solid #ddd;
+      background: #fff; color: #555;
+      cursor: pointer; transition: all .15s;
+      font-family: inherit;
+    }
+    .tab:hover { border-color: #aaa; color: #222; }
+    .tab.active { background: #111; color: #fff; border-color: #111; }
+
+    .section { display: none; }
+    .section.visible { display: block; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e8e8e4;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+    }
+
+    .card-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 6px; margin-bottom: 8px;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .tag-api    { background: #deeeff; color: #1a5fa8; }
+    .tag-react  { background: #eeebff; color: #5040a0; }
+    .tag-live   { background: #dff5ec; color: #0f6e56; }
+    .tag-data   { background: #fef3dc; color: #8a5200; }
+
+    .card h3 {
+      font-size: 15px; font-weight: 600; color: #111;
+      margin-bottom: 7px; display: flex; align-items: center; gap: 8px;
+    }
+    .card h3 i { font-size: 17px; color: #888; }
+    .card p { font-size: 13px; line-height: 1.7; color: #555; }
+    .card code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px; background: #f2f2ef;
+      padding: 1px 5px; border-radius: 4px; color: #222;
+    }
+    .card strong { color: #222; font-weight: 600; }
+
+    .hint {
+      background: #f0f7ff;
+      border-left: 3px solid #60a5e8;
+      border-radius: 0 8px 8px 0;
+      padding: 0.85rem 1rem;
+      margin-top: 1rem;
+      font-size: 13px; line-height: 1.7; color: #444;
+    }
+    .hint strong { color: #111; font-weight: 600; }
+
+    @media (max-width: 600px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>Glossaire technique — StatFootix</h1>
+    <p>Tous les termes à connaître pour présenter le projet</p>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-s="sources">Sources de données</button>
+    <button class="tab" data-s="reseau">Réseau &amp; requêtes</button>
+    <button class="tab" data-s="stockage">Stockage &amp; état</button>
+    <button class="tab" data-s="react">React &amp; TanStack</button>
+    <button class="tab" data-s="live">Logique live</button>
+  </div>
+
+  <!-- ── Sources de données ── -->
+  <div id="sources" class="section visible">
+    <div class="cards">
+      <div class="card">
+        <span class="card-tag tag-api">API</span>
+        <h3><i class="ti ti-plug"></i>API REST</h3>
+        <p>Porte d'entrée pour récupérer des données d'un service externe. Tu envoies une URL, le serveur répond en <code>JSON</code>. Ton projet en utilise 3 : football-data.org, api-football.com, ESPN.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">API</span>
+        <h3><i class="ti ti-file-code"></i>JSON</h3>
+        <p>Format texte structuré utilisé par toutes les APIs pour répondre. Ressemble à un objet JS : <code>{ "home": "PSG", "score": 2 }</code>. Facile à lire pour un humain et pour le code.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">Source principale</span>
+        <h3><i class="ti ti-ball-football"></i>football-data.org</h3>
+        <p>Source principale pour les matchs, résultats, classements. Free tier = 10 req/min. Lent à mettre à jour les statuts live (1–3 min de délai).</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">Fallback</span>
+        <h3><i class="ti ti-clock"></i>api-football.com</h3>
+        <p>Très précis pour le live (minute exacte, mi-temps...). Problème : free tier = <code>100 req/jour</code>. Utilisé uniquement en fallback dans 4 fenêtres précises pour ne pas gaspiller le quota.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Primaire</span>
+        <h3><i class="ti ti-star"></i>ESPN (non-officielle)</h3>
+        <p>API utilisée par ESPN lui-même, sans clé ni quota documenté. Retourne <code>displayClock</code> ("42:00") et le statut précis en temps réel. Source <strong>primaire</strong> pour le live.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">API</span>
+        <h3><i class="ti ti-link"></i>Slug</h3>
+        <p>Identifiant court dans une URL. <code>fra.1</code> = Ligue 1, <code>eng.1</code> = Premier League, <code>uefa.champions</code> = Champions League. Utilisé pour dire à ESPN quelle compétition tu veux.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">API</span>
+        <h3><i class="ti ti-alert-triangle"></i>Quota</h3>
+        <p>Limite de requêtes autorisées. api-football.com = <code>100 req/jour</code> sur le free tier. À 97% utilisé en une journée → c'est le bug qu'on a corrigé avec les fenêtres de polling.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Réseau & requêtes ── -->
+  <div id="reseau" class="section">
+    <div class="cards">
+      <div class="card">
+        <span class="card-tag tag-api">Réseau</span>
+        <h3><i class="ti ti-world"></i>Requête HTTP / fetch</h3>
+        <p>Appel réseau vers une URL. <code>fetch('/espn?slug=fra.1')</code> → navigateur → Netlify → ESPN → JSON en retour.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-repeat"></i>Polling</h3>
+        <p>Interroger une API à intervalles réguliers. 20s pour ESPN, 60s pour api-football. Différent d'un WebSocket (connexion permanente) — ici tu "poses la question" périodiquement.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">JS</span>
+        <h3><i class="ti ti-clock-play"></i>setInterval</h3>
+        <p>Fonction JS qui répète du code à intervalles fixes. <code>setInterval(tick, 20_000)</code> → appelle <code>tick()</code> toutes les 20s. Nettoyé avec <code>clearInterval</code> pour éviter les fuites mémoire.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">JS</span>
+        <h3><i class="ti ti-player-pause"></i>async / await</h3>
+        <p>Syntaxe pour le code asynchrone. <code>await fetch(url)</code> = "attends la réponse avant de continuer". Sans ça, le code passerait à la suite sans avoir les données.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">Infra</span>
+        <h3><i class="ti ti-server"></i>Netlify Functions</h3>
+        <p>Mini-serveurs hébergés par Netlify. Les navigateurs bloquent les appels directs à ESPN (CORS). La fonction Netlify fait l'intermédiaire : navigateur → ta fonction → ESPN.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-api">Réseau</span>
+        <h3><i class="ti ti-ban"></i>CORS</h3>
+        <p>Mécanisme de sécurité des navigateurs : un site ne peut pas appeler directement une API d'un autre domaine. D'où les Netlify Functions — elles contournent ça côté serveur.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Stockage & état ── -->
+  <div id="stockage" class="section">
+    <div class="cards">
+      <div class="card">
+        <span class="card-tag tag-data">Stockage</span>
+        <h3><i class="ti ti-device-floppy"></i>localStorage</h3>
+        <p>Stockage persistant dans le navigateur. Reste là même après rechargement ou fermeture d'onglet. Sert à mémoriser les timestamps des matchs entre deux polls.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-data">Stockage</span>
+        <h3><i class="ti ti-clock"></i>Timestamp</h3>
+        <p>Nombre = millisecondes depuis le 1er janvier 1970. <code>Date.now()</code> = timestamp actuel. Soustraction de deux timestamps = durée écoulée. Utilisé pour tous les calculs de minutes.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-data">État match</span>
+        <h3><i class="ti ti-list"></i>matchState</h3>
+        <p>Ce qu'on stocke par match : <code>kickoffAt</code> (timestamp KO), <code>pausedAt</code> (MT), <code>half2Start</code> (2ème MT), <code>espnClock</code>, <code>espnStatus</code>, <code>espnCapturedAt</code>.</p>
+      </div>
+    </div>
+    <div class="hint">
+      <strong>Pourquoi localStorage ?</strong> football-data.org peut brièvement retourner un mauvais statut. Grâce aux timestamps locaux, <code>calcMinute</code> continue d'afficher la bonne minute même si l'API est incohérente — les données locales priment sur le statut distant.
+    </div>
+  </div>
+
+  <!-- ── React & TanStack ── -->
+  <div id="react" class="section">
+    <div class="cards">
+      <div class="card">
+        <span class="card-tag tag-react">React</span>
+        <h3><i class="ti ti-hook"></i>Hook React</h3>
+        <p>Fonction spéciale React (commence par <code>use</code>) qui gère de l'état ou des effets. <code>useState</code>, <code>useEffect</code>, <code>useRef</code> sont natifs. <code>useLiveMinute</code> est un hook custom.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">React</span>
+        <h3><i class="ti ti-refresh"></i>Re-render</h3>
+        <p>React re-exécute un composant pour mettre à jour l'affichage. Déclenché par un changement de state ou de props. <code>calcMinute</code> est appelé à chaque re-render → minute mise à jour.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">React</span>
+        <h3><i class="ti ti-variable"></i>useRef</h3>
+        <p>Stocke une valeur persistante entre renders <em>sans</em> déclencher de re-render. Permet aux fonctions async d'accéder toujours à la version la plus récente de <code>matches</code>.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">TanStack</span>
+        <h3><i class="ti ti-database"></i>TanStack Query</h3>
+        <p>Librairie qui gère le cache des données serveur. <code>useQuery</code> déclare une requête, la met en cache, refetch automatiquement et notifie les composants quand les données changent.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">TanStack</span>
+        <h3><i class="ti ti-key"></i>queryKey</h3>
+        <p>Identifiant du cache. <code>['liveMatches']</code> = la clé qui identifie les matchs en direct. Deux composants avec la même queryKey partagent automatiquement le même cache.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">TanStack</span>
+        <h3><i class="ti ti-clock"></i>staleTime</h3>
+        <p>Durée pendant laquelle les données sont considérées fraîches. <code>staleTime: 20_000</code> → pendant 20s après un fetch, pas de refetch même si le composant est revisité.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">TanStack</span>
+        <h3><i class="ti ti-refresh"></i>invalidateQueries</h3>
+        <p>Marque le cache comme périmé → refetch immédiat. Utilisé quand ESPN détecte un KO pour forcer <code>useLiveMatches</code> à refetcher football-data.org tout de suite.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-react">TanStack</span>
+        <h3><i class="ti ti-pencil"></i>setQueryData</h3>
+        <p>Écrit directement dans le cache sans requête réseau. Utilisé dans <code>injectLiveMatch</code> pour ajouter un match au cache <code>['liveMatches']</code> instantanément.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Logique live ── -->
+  <div id="live" class="section">
+    <div class="cards">
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-window"></i>Fenêtres de polling</h3>
+        <p>Périodes précises où api-football peut poll. Hors fenêtre = 0 requête. Un match = 4 fenêtres courtes (KO, MT, reprise, FT) → ~20 req max au lieu de 120.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-pin"></i>stickyLive</h3>
+        <p><code>Map</code> en mémoire qui garde les matchs même si football-data.org les fait disparaître momentanément. Durée de vie : 3 min. Sert aussi à injecter un match dès qu'ESPN détecte le KO.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-math-function"></i>Interpolation</h3>
+        <p>Calculer une valeur entre deux points. ESPN donne "42:00" à T+0. À T+30s : <code>42 + 30/60 = 42'</code>. À T+60s : <code>43'</code>. Minute en temps réel sans requête supplémentaire.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">ESPN</span>
+        <h3><i class="ti ti-clock"></i>displayClock</h3>
+        <p>Champ ESPN contenant l'horloge du match. <code>"42:00"</code> = 42e minute. <code>"45:00+2:00"</code> = 45+2 en temps additionnel. Format <code>MM:SS</code> normal, <code>MM:SS+MM:SS</code> en prolongation.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">ESPN</span>
+        <h3><i class="ti ti-tag"></i>Statuts ESPN</h3>
+        <p><code>STATUS_IN_PROGRESS</code> = en cours · <code>STATUS_HALFTIME</code> = mi-temps · <code>STATUS_FINAL</code> = terminé. Plus rapides à se mettre à jour que les statuts football-data.org.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-text-wrap"></i>Fuzzy matching</h3>
+        <p>Comparaison approximative de textes. ESPN dit "Inter Milan", FD.org dit "FC Internazionale Milano" → mot commun "inter" détecté → match trouvé. Prefix 5 chars + overlap de mots ≥4 lettres.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-live">Live</span>
+        <h3><i class="ti ti-shield"></i>Cap de sécurité</h3>
+        <p>Limite max pour éviter les calculs aberrants. <code>ESPN_INTERP_CAP = 30s</code> : si le dernier poll date de plus de 30s (onglet en veille), on affiche la valeur brute plutôt qu'interpoler.</p>
+      </div>
+      <div class="card">
+        <span class="card-tag tag-data">Texte</span>
+        <h3><i class="ti ti-a-b"></i>Normalize</h3>
+        <p>Nettoyer un texte avant comparaison : minuscules + accents retirés (<code>é→e</code>, <code>ü→u</code>...). Sans ça <code>"Atlético"</code> ≠ <code>"atletico"</code> alors qu'ils désignent la même équipe.</p>
+      </div>
+    </div>
+    <div class="hint">
+      <strong>La règle d'or :</strong> ESPN est ta "montre" — elle donne l'heure exacte. api-football et football-data.org sont les montres de secours si ESPN est en panne. Tout passe par localStorage pour ne pas perdre l'état entre les requêtes.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.getElementById('tabs').addEventListener('click', function(e) {
+    var btn = e.target.closest('.tab');
+    if (!btn) return;
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('visible'); });
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.s).classList.add('visible');
+  });
+</script>
+</body>
+</html>

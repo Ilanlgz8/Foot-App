@@ -24,6 +24,7 @@
         "npm:eslint-plugin-react-refresh@~0.5.2",
         "npm:eslint@^10.3.0",
         "npm:globals@^17.6.0",
+        "npm:pptxgenjs@^4.0.1",
         "npm:react-dom@^19.2.7",
         "npm:react-router-dom@^7.16.0",
         "npm:react@^19.2.7",

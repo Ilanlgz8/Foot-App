@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
 import { useMatches } from '../hooks/useMatchs'
-import { useLiveMatches } from '../hooks/useLiveMatches'
-import { useLiveMinute } from '../hooks/useLiveMinute'
-import { useEspnScores } from '../hooks/useEspnScores'
+import { useLiveData } from '../context/LiveProvider'
 import { getTrackedMatches, toggleTrackedMatch } from '../utils/matchStateTracker'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
@@ -40,29 +38,9 @@ function Accueil() {
   const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
   // Même hook + même clé cache que la page Résultats (WC FINISHED) → requête partagée, synchro instantanée
   const { matches: results, loading: resultsLoading }    = useMatches('WC', 'FINISHED', 'desc')
-  const globalLive                                        = useLiveMatches()
 
-  // ── Système live ──
-  const { recalibrate } = useLiveMinute(
-    globalLive.length > 0
-      ? [...matches, ...globalLive.filter(g => !matches.some(m => m.id === g.id))]
-      : matches
-  )
-  // On utilise uniquement globalLive (source autoritaire).
-  // Pas de fallback sur useTodayMatches : il peut avoir du cache stale avec un match
-  // déjà terminé encore en status IN_PLAY, ce qui ferait afficher "90+11'" indéfiniment.
-  const liveMatches = globalLive
-  const espnScores = useEspnScores(liveMatches)
-
-  // Quand un nouveau match passe en live, forcer useTodayMatches à refetch immédiatement
-  // (sinon le panel attend jusqu'à 10min avant de montrer le statut IN_PLAY)
-  const prevLiveCount = useRef(0)
-  useEffect(() => {
-    if (globalLive.length > prevLiveCount.current) {
-      queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
-    }
-    prevLiveCount.current = globalLive.length
-  }, [globalLive.length, queryClient])
+  // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
+  const { liveMatches, espnScores, recalibrate } = useLiveData()
 
   // ── Suivi précis ──
   const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())

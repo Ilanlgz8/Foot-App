@@ -40,7 +40,8 @@ export const COMPETITIONS = [
     name: 'Ligue des Champions',
     emblem: championsLeagueLogo,
   },
-  {    id: 'WC',
+  {
+    id: 'WC',
     name: 'Coupe du Monde',
     emblem: worldCupLogo,
   },
