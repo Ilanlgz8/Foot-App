@@ -38,11 +38,11 @@ let _savedDate = getTargetDate(0)  // date locale au moment de la dernière sauv
 function Accueil() {
   // Si la date a changé depuis la dernière sauvegarde (passage de minuit),
   // on repart de 0 pour que l'offset corresponde à la nouvelle "aujourd'hui"
-  const todayStr = getTargetDate(0)
-  if (_savedDate !== todayStr) {
+  const todayDateStr = getTargetDate(0)
+  if (_savedDate !== todayDateStr) {
     _savedDayOffset = 0
     _savedMinDayOffset = 0
-    _savedDate = todayStr
+    _savedDate = todayDateStr
   }
 
   const [dayOffset, setDayOffset] = useState(_savedDayOffset)
