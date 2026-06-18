@@ -39,8 +39,12 @@ exports.handler = async (event) => {
 
   try {
     const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
-    const url  = dates ? `${base}?dates=${dates}` : base
-    const res  = await fetch(url)
+    // Cache-busting côté ESPN : évite que leur CDN ou le nôtre serve une réponse périmée
+    const bust = `_cb=${Date.now()}`
+    const url  = dates ? `${base}?dates=${dates}&${bust}` : `${base}?${bust}`
+    const res  = await fetch(url, {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+    })
 
     if (!res.ok) {
       return {
@@ -52,7 +56,12 @@ exports.handler = async (event) => {
     const body = await res.text()
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      // Interdire tout cache CDN/navigateur — les scores live changent en continu
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      },
       body,
     }
   } catch (err) {
