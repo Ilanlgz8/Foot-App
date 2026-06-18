@@ -61,25 +61,40 @@ function ESPNScorers({ scorers = [] }) {
 }
 
 // ── Stats ESPN (possession, tirs, corners) ───────────────────────────────────
+function StatBar({ homeVal, awayVal, label }) {
+  const hNum = parseFloat(homeVal) || 0
+  const aNum = parseFloat(awayVal) || 0
+  const total = hNum + aNum
+  const homePct = total === 0 ? 50 : Math.round((hNum / total) * 100)
+  return (
+    <div className="modal__statBar">
+      <span className="modal__statBarVal">{homeVal ?? '–'}</span>
+      <div className="modal__statBarTrack">
+        <div className="modal__statBarFill modal__statBarFill--home" style={{ width: `${homePct}%` }} />
+        <div className="modal__statBarFill modal__statBarFill--away" style={{ width: `${100 - homePct}%` }} />
+      </div>
+      <span className="modal__statBarVal modal__statBarVal--away">{awayVal ?? '–'}</span>
+      <span className="modal__statBarLabel">{label}</span>
+    </div>
+  )
+}
+
 function ESPNStats({ stats }) {
   if (!stats) return null
   const { home: h, away: a } = stats
   const rows = [
-    { label: 'Possession',  hv: h.poss   != null ? `${h.poss}%`   : null, av: a.poss   != null ? `${a.poss}%`   : null },
-    { label: 'Tirs',        hv: h.shots  != null ? `${h.shots}`   : null, av: a.shots  != null ? `${a.shots}`   : null },
-    { label: 'Corners',     hv: h.corners != null ? `${h.corners}` : null, av: a.corners != null ? `${a.corners}` : null },
-  ].filter(r => r.hv !== null || r.av !== null)
+    { label: 'Possession', hv: h.poss    != null ? `${h.poss}%`    : null, av: a.poss    != null ? `${a.poss}%`    : null },
+    { label: 'Tirs',       hv: h.shots   != null ? `${h.shots}`    : null, av: a.shots   != null ? `${a.shots}`    : null },
+    { label: 'Corners',    hv: h.corners != null ? `${h.corners}`  : null, av: a.corners != null ? `${a.corners}`  : null },
+  ].filter(r => r.hv != null || r.av != null)
 
   if (rows.length === 0) return null
 
   return (
     <div className="modal__espnStats">
+      <p className="modal__espnStatsTitle">Statistiques</p>
       {rows.map(({ label, hv, av }) => (
-        <div key={label} className="modal__espnStatRow">
-          <span className="modal__espnStatVal">{hv ?? '–'}</span>
-          <span className="modal__espnStatLabel">{label}</span>
-          <span className="modal__espnStatVal">{av ?? '–'}</span>
-        </div>
+        <StatBar key={label} label={label} homeVal={hv} awayVal={av} />
       ))}
     </div>
   )

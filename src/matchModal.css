@@ -474,3 +474,76 @@
   .modal__hour  { font-size: 1.25rem; }
   .modal__crest { width: 2.8rem; height: 2.8rem; }
 }
+
+/* ── Stats barres de progression (redesign) ── */
+.modal__espnStats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+  padding: 1rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 0.9rem;
+}
+
+.modal__espnStatsTitle {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+.modal__statBar {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2.5rem;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 0.5rem;
+}
+
+.modal__statBarVal {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal__statBarVal--away {
+  text-align: left;
+}
+
+.modal__statBarTrack {
+  display: flex;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+}
+
+.modal__statBarFill--home {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  border-radius: 999px 0 0 999px;
+  transition: width 0.6s ease;
+}
+
+.modal__statBarFill--away {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 0 999px 999px 0;
+  transition: width 0.6s ease;
+}
+
+.modal__statBarLabel {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 0.1rem;
+}
