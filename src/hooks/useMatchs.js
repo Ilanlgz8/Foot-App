@@ -55,19 +55,43 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', selectedComp, status],
     queryFn: async () => {
-      // Pour les ligues club FINISHED en intersaison, ajouter season= pour éviter 0 résultats
       const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
-      const seasonParam = (status === 'FINISHED' && isClub)
-        ? `&season=${getClubSeason()}`
-        : ''
-      const res = await fdFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=${status}${seasonParam}`
-      )
-      // 429/403 → TanStack garde la dernière donnée valide (pas d'erreur affichée)
-      if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-      if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
-      const json    = await res.json()
-      const matches = json.matches ?? []
+
+      // Helper : fetch une URL et retourne les matches (null si 429/403/erreur)
+      async function tryFetch(url) {
+        const res = await fdFetch(url)
+        if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+        if (!res.ok) return null
+        const json = await res.json()
+        return json.matches ?? []
+      }
+
+      let matches = null
+
+      if (status === 'FINISHED' && isClub) {
+        // 1. Essai avec saison courante (ex: 2025 pour la saison 2025/26)
+        matches = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
+        )
+        // 2. Si 0 résultats, fallback saison précédente (ex: 2024 pour la saison 2024/25)
+        if (!matches || matches.length === 0) {
+          matches = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason() - 1}`
+          )
+        }
+        // 3. Si toujours 0, fallback sans season= (FD.org retourne la saison courante par défaut)
+        if (!matches || matches.length === 0) {
+          matches = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+          )
+        }
+      } else {
+        matches = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+        )
+      }
+
+      if (!matches) return readCacheStale(key) ?? []
       if (matches.length > 0) writeCache(key, matches, ttl)
       return matches.length > 0 ? matches : (readCacheStale(key) ?? [])
     },
