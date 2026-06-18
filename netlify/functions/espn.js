@@ -6,16 +6,12 @@
 
 exports.handler = async (event) => {
   const slug  = event.queryStringParameters?.slug
-  const dates = event.queryStringParameters?.dates  // optionnel : YYYYMMDD
+  const dates = event.queryStringParameters?.dates
 
   if (!slug) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Paramètre slug manquant' }),
-    }
+    return { statusCode: 400, body: JSON.stringify({ error: 'Paramètre slug manquant' }) }
   }
 
-  // Whitelist des slugs autorisés (sécurité minimale)
   const ALLOWED_SLUGS = new Set([
     'fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1',
     'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
@@ -23,40 +19,35 @@ exports.handler = async (event) => {
   ])
 
   if (!ALLOWED_SLUGS.has(slug)) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Slug non autorisé' }),
-    }
+    return { statusCode: 400, body: JSON.stringify({ error: 'Slug non autorisé' }) }
   }
 
-  // Valider le format dates si présent (YYYYMMDD, 8 chiffres) — évite toute injection
   if (dates && !/^\d{8}$/.test(dates)) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Format dates invalide (YYYYMMDD attendu)' }),
-    }
+    return { statusCode: 400, body: JSON.stringify({ error: 'Format dates invalide (YYYYMMDD attendu)' }) }
   }
+
+  // Timeout explicite à 8s pour éviter que Netlify kill la fonction avec un 504 brutal
+  const controller = new AbortController()
+  const timeoutId  = setTimeout(() => controller.abort(), 8_000)
 
   try {
     const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
-    // Cache-busting côté ESPN : évite que leur CDN ou le nôtre serve une réponse périmée
     const bust = `_cb=${Date.now()}`
     const url  = dates ? `${base}?dates=${dates}&${bust}` : `${base}?${bust}`
-    const res  = await fetch(url, {
+
+    const res = await fetch(url, {
       headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     if (!res.ok) {
-      return {
-        statusCode: res.status,
-        body: JSON.stringify({ error: `ESPN a répondu ${res.status}` }),
-      }
+      return { statusCode: res.status, body: JSON.stringify({ error: `ESPN a répondu ${res.status}` }) }
     }
 
     const body = await res.text()
     return {
       statusCode: 200,
-      // Interdire tout cache CDN/navigateur — les scores live changent en continu
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -65,9 +56,10 @@ exports.handler = async (event) => {
       body,
     }
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+    clearTimeout(timeoutId)
+    if (err.name === 'AbortError') {
+      return { statusCode: 504, body: JSON.stringify({ error: 'ESPN timeout (>8s)' }) }
     }
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
   }
 }
