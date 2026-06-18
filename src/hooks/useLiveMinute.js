@@ -215,14 +215,22 @@ async function pollESPN(matches, queryClient) {
 
           const alreadyLive = isStickyLive(match.id)
           injectLiveMatch(match)
-          // (1) Première détection OU re-détection après éviction → invalider immédiatement
-          //     (pas de garde 30s : on veut que le widget réapparaisse en ≤15s, pas en 60s)
-          // (2) Match déjà dans stickyLive mais absent de queryData → invalider si données > 30s
+
+          // Mise à jour synchrone de liveMatches → LiveWidget apparaît en même temps
+          // que l'affichage live du MatchCard (pas de délai de refetch async)
+          const currentLive = queryClient.getQueryData(['liveMatches']) ?? []
+          if (!currentLive.some(m => m.id === match.id)) {
+            queryClient.setQueryData(
+              ['liveMatches'],
+              [...currentLive, { ...match, status: 'IN_PLAY' }]
+            )
+          }
+
+          // Invalider aussi pour que useLiveMatches confirme via son queryFn
           if (!alreadyLive) {
             queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
           } else {
-            const currentLive = queryClient.getQueryData(['liveMatches']) ?? []
-            const inLiveData  = currentLive.some(m => m.id === match.id)
+            const inLiveData = currentLive.some(m => m.id === match.id)
             if (!inLiveData) {
               const liveState = queryClient.getQueryState(['liveMatches'])
               const liveAge   = Date.now() - (liveState?.dataUpdatedAt ?? 0)
