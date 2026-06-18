@@ -32,8 +32,8 @@ exports.handler = async (event) => {
 
   try {
     const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
-    const bust = `_cb=${Date.now()}`
-    const url  = dates ? `${base}?dates=${dates}&${bust}` : `${base}?${bust}`
+    
+    const url  = dates ? `${base}?dates=${dates}` : base
 
     const res = await fetch(url, {
       headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
