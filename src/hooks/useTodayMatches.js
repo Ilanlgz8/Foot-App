@@ -18,25 +18,30 @@ async function safeFetch(url) {
 }
 
 async function fetchTodayMatches(date) {
-  // Requête 1 : toutes les ligues européennes en une seule requête
+  // Calculer le jour UTC précédent pour capturer les matchs après minuit local
+  // (ex: 00:00 local France UTC+2 = 22:00 UTC la veille → classé J-1 par FD.org)
+  const prevD = new Date(date + 'T12:00:00')
+  prevD.setDate(prevD.getDate() - 1)
+  const prevDate = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
+
+  // Requête 1 : ligues européennes sur J-1 et J (une seule requête, plage élargie)
   const euroMatches = await safeFetch(
-    `/api/v4/matches?dateFrom=${date}&dateTo=${date}&competitions=${EURO_COMPS}`
+    `/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`
   )
 
   await delay(700)
 
-  // Requête 2 : WC séparément (non retourné par l'endpoint global sur free tier)
+  // Requête 2 : WC sur J-1 et J
   const wcMatches = await safeFetch(
-    `/api/v4/competitions/WC/matches?dateFrom=${date}&dateTo=${date}`
+    `/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`
   )
 
-  // Dédupliquer par id et filtrer par date LOCALE (évite qu'un match à 00h-02h local
-  // apparaisse dans deux jours différents à cause du décalage UTC)
+  // Dédupliquer par id et filtrer par date LOCALE
+  // → un match à 00:00 local (= 22:00 UTC J-1) apparaît bien dans J local seulement
   const seen = new Set()
   const all = [...euroMatches, ...wcMatches].filter(m => {
     if (seen.has(m.id)) return false
     seen.add(m.id)
-    // Vérifier que la date locale du match correspond au jour demandé
     if (m.utcDate) {
       const d = new Date(m.utcDate)
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
