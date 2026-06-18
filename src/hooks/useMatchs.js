@@ -69,17 +69,11 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
       let matches = null
 
       if (status === 'FINISHED' && isClub) {
-        // 1. Essai avec saison courante (ex: 2025 pour la saison 2025/26)
+        // 1. Saison qui vient de se terminer (ex: juin 2026 → season=2025 = saison 2025/26)
         matches = await tryFetch(
           `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
         )
-        // 2. Si 0 résultats, fallback saison précédente (ex: 2024 pour la saison 2024/25)
-        if (!matches || matches.length === 0) {
-          matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason() - 1}`
-          )
-        }
-        // 3. Si toujours 0, fallback sans season= (FD.org retourne la saison courante par défaut)
+        // 2. Fallback sans season= si FD.org ne supporte pas le param pour cette compet
         if (!matches || matches.length === 0) {
           matches = await tryFetch(
             `/api/v4/competitions/${selectedComp}/matches?status=${status}`
