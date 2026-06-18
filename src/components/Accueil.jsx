@@ -31,6 +31,7 @@ function getTargetDate(offset) {
 
 function Accueil() {
   const [dayOffset, setDayOffset] = useState(0)
+  const [minDayOffset, setMinDayOffset] = useState(0)
   const targetDate   = getTargetDate(dayOffset)
   const queryClient  = useQueryClient()
 
@@ -65,7 +66,7 @@ function Accueil() {
     const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
     if (!hasUpcoming) {
       // Petit délai pour éviter un flash si les données arrivent en deux temps
-      const id = setTimeout(() => setDayOffset(1), 800)
+      const id = setTimeout(() => { setDayOffset(1); setMinDayOffset(1) }, 800)
       return () => clearTimeout(id)
     }
   }, [matches, matchesLoading, dayOffset])
@@ -132,7 +133,7 @@ function Accueil() {
           {/* Panel gauche : Matchs du jour */}
           <div className="accueil__dashPanel">
             <div className="accueil__dashPanelHeader">
-              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(0, o - 1))} disabled={dayOffset === 0} aria-label="Jour précédent">‹</button>
+              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
             </div>
