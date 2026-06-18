@@ -159,9 +159,14 @@ async function pollESPN(matches, queryClient) {
   }
   if (slugSet.size === 0) return
 
+  // Toujours passer la date locale du jour — sans ce paramètre ESPN retourne
+  // la dernière journée passée (pas forcément aujourd'hui).
+  const d = new Date()
+  const todayESPN = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+
   for (const slug of slugSet) {
     try {
-      const res = await fetch(`/espn?slug=${slug}`)
+      const res = await fetch(`/espn?slug=${slug}&dates=${todayESPN}`)
       if (!res.ok) {
         espnFailStreak++
         if (espnFailStreak >= 3) setEspnWorking(false)
@@ -432,20 +437,27 @@ async function pollESPN(matches, queryClient) {
 
           // Rafraîchir immédiatement → MatchCard passe en mode "Terminé"
           queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-          // Invalider todayMatches + résultats pour afficher le score final dans les listes
+          // Invalider todayMatches après 2s
           setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
+          // Vider le cache FINISHED immédiatement pour ne pas servir de données périmées
           if (match.competition?.code) {
-            const code = match.competition.code
-            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] }), 4_000)
+            try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
           }
 
-          // Éviction réelle après 5min → le widget disparaît
+          // Éviction réelle après 5min → widget disparaît + résultats mis à jour simultanément
+          // FD.org a eu 5min pour passer le match en FINISHED → timing parfait
+          const codeForEviction = match.competition?.code
           setTimeout(() => {
             evictLiveMatch(match.id)
             delete espnScoresCache[match.id]
             try { localStorage.removeItem('liveMatches_v1') } catch {}
             clearMatchState(match.id)
             queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+            // Résultats mis à jour au même moment que la disparition du widget
+            if (codeForEviction) {
+              queryClient.invalidateQueries({ queryKey: ['matches', codeForEviction, 'FINISHED'] })
+              queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+            }
           }, 5 * 60_000)
         }
       }
@@ -585,16 +597,20 @@ async function pollApiFootball(matches, queryClient) {
         queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
         setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
         if (match.competition?.code) {
-          const code = match.competition.code
-          setTimeout(() => queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] }), 4_000)
+          try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
         }
 
-        // Éviction réelle après 5min → widget disparaît
+        // Éviction réelle après 5min → widget disparaît + résultats mis à jour simultanément
+        const codeForEviction = match.competition?.code
         setTimeout(() => {
           evictLiveMatch(match.id)
           try { localStorage.removeItem('liveMatches_v1') } catch {}
           clearMatchState(match.id)
           queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+          if (codeForEviction) {
+            queryClient.invalidateQueries({ queryKey: ['matches', codeForEviction, 'FINISHED'] })
+            queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+          }
         }, 5 * 60_000)
       }
     }
