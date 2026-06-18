@@ -30,11 +30,18 @@ async function fetchTodayMatches(date) {
     `/api/v4/competitions/WC/matches?dateFrom=${date}&dateTo=${date}`
   )
 
-  // Dédupliquer par id et trier par heure
+  // Dédupliquer par id et filtrer par date LOCALE (évite qu'un match à 00h-02h local
+  // apparaisse dans deux jours différents à cause du décalage UTC)
   const seen = new Set()
   const all = [...euroMatches, ...wcMatches].filter(m => {
     if (seen.has(m.id)) return false
     seen.add(m.id)
+    // Vérifier que la date locale du match correspond au jour demandé
+    if (m.utcDate) {
+      const d = new Date(m.utcDate)
+      const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (localStr !== date) return false
+    }
     return true
   })
 
