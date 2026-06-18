@@ -29,11 +29,19 @@ function getTargetDate(offset) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Persisté au niveau module pour survivre aux navigations (remounts)
+let _savedDayOffset = 0
+let _savedMinDayOffset = 0
+
 function Accueil() {
-  const [dayOffset, setDayOffset] = useState(0)
-  const [minDayOffset, setMinDayOffset] = useState(0)
+  const [dayOffset, setDayOffset] = useState(_savedDayOffset)
+  const [minDayOffset, setMinDayOffset] = useState(_savedMinDayOffset)
   const targetDate   = getTargetDate(dayOffset)
   const queryClient  = useQueryClient()
+
+  // Sync les valeurs dans les variables module à chaque changement
+  useEffect(() => { _savedDayOffset = dayOffset }, [dayOffset])
+  useEffect(() => { _savedMinDayOffset = minDayOffset }, [minDayOffset])
 
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()

@@ -35,6 +35,17 @@ function groupByMatchday(matches, order = 'asc') {
   })
 }
 
+// Calcule l'année de saison pour les ligues clubs (ex: juin 2026 → 2025)
+// Les ligues club tournent Août-Mai, donc en juin/juillet on est en intersaison
+// WC 2026 : saison spéciale juin-juillet 2026
+function getClubSeason() {
+  const now = new Date()
+  const month = now.getMonth() + 1 // 1-12
+  const year = now.getFullYear()
+  // En juin et juillet, la saison précédente vient de se terminer
+  return month <= 7 ? year - 1 : year
+}
+
 export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   const key         = cacheKey(selectedComp, status)
   const cachedData  = readCacheStale(key)
@@ -44,8 +55,13 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', selectedComp, status],
     queryFn: async () => {
+      // Pour les ligues club FINISHED en intersaison, ajouter season= pour éviter 0 résultats
+      const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
+      const seasonParam = (status === 'FINISHED' && isClub)
+        ? `&season=${getClubSeason()}`
+        : ''
       const res = await fdFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+        `/api/v4/competitions/${selectedComp}/matches?status=${status}${seasonParam}`
       )
       // 429/403 → TanStack garde la dernière donnée valide (pas d'erreur affichée)
       if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
