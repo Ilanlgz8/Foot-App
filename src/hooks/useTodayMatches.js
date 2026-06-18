@@ -9,9 +9,9 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms))
 
 async function safeFetch(url) {
   const res = await fdFetch(url)
-  // 429/403 → on lève une erreur pour que TanStack garde le dernier state valide
+  // Erreurs serveur/rate-limit → throw pour que TanStack garde le dernier state valide
   if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-  if (!res.ok) return []
+  if (res.status >= 500) throw new Error(`server_${res.status}`)
   if (!res.ok) return []
   const json = await res.json()
   return (json.matches ?? []).filter(m => VALID_STATUS.includes(m.status))
@@ -107,7 +107,10 @@ export function useTodayMatches(targetDate) {
         writeCache(cacheKey, result, ttl)
         return result
       }
-      // API répond vide (pas de match ce jour) → retourner [] et NE PAS fallback sur le cache
+      // Résultat vide : si le cache contient des matchs (dont un live), garder le cache
+      // pour éviter que le panel s'efface sur une erreur réseau transitoire
+      const stale = readCacheStale(cacheKey)
+      if (stale?.length > 0) return stale
       return []
     },
     initialData: cachedData ?? undefined,
