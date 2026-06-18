@@ -30,17 +30,28 @@ function getTargetDate(offset) {
 }
 
 // Persisté au niveau module pour survivre aux navigations (remounts)
+// On sauvegarde aussi la date du jour pour détecter le passage de minuit
 let _savedDayOffset = 0
 let _savedMinDayOffset = 0
+let _savedDate = getTargetDate(0)  // date locale au moment de la dernière sauvegarde
 
 function Accueil() {
+  // Si la date a changé depuis la dernière sauvegarde (passage de minuit),
+  // on repart de 0 pour que l'offset corresponde à la nouvelle "aujourd'hui"
+  const todayStr = getTargetDate(0)
+  if (_savedDate !== todayStr) {
+    _savedDayOffset = 0
+    _savedMinDayOffset = 0
+    _savedDate = todayStr
+  }
+
   const [dayOffset, setDayOffset] = useState(_savedDayOffset)
   const [minDayOffset, setMinDayOffset] = useState(_savedMinDayOffset)
   const targetDate   = getTargetDate(dayOffset)
   const queryClient  = useQueryClient()
 
   // Sync les valeurs dans les variables module à chaque changement
-  useEffect(() => { _savedDayOffset = dayOffset }, [dayOffset])
+  useEffect(() => { _savedDayOffset = dayOffset; _savedDate = getTargetDate(0) }, [dayOffset])
   useEffect(() => { _savedMinDayOffset = minDayOffset }, [minDayOffset])
 
   // ── Données ──
