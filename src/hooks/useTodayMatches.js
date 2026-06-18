@@ -62,9 +62,14 @@ function getRefetchInterval(query) {
   return hasLive ? 2 * 60 * 1000 : 10 * 60 * 1000  // 2min si live, 10min sinon
 }
 
+function getLocalDateStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function useTodayMatches(targetDate) {
-  const today = targetDate ?? new Date().toISOString().split('T')[0]
-  const isToday = today === new Date().toISOString().split('T')[0]
+  const today = targetDate ?? getLocalDateStr()
+  const isToday = today === getLocalDateStr()
   const cacheKey = `matches_${today}`
 
   const cachedData    = readCacheStale(cacheKey)

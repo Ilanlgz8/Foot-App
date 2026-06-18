@@ -207,6 +207,30 @@ function Classement() {
       <div className="classement__backdrop classement__backdrop--one" />
       <div className="classement__backdrop classement__backdrop--two" />
 
+      <div className="classement__layout">
+
+        {/* Sidebar */}
+        <aside className="classement__sidebar">
+          <p className="classement__sidebarLabel">Championnats</p>
+          <nav className="classement__sidebarNav">
+            {competitions.map(comp => (
+              <button
+                key={comp.id}
+                onClick={() => setSelectedComp(comp.id)}
+                className={`classement__sidebarItem ${selectedComp === comp.id ? 'classement__sidebarItem--active' : ''}`}
+              >
+                <img src={comp.emblem} alt=""
+                  className="classement__sidebarLogo"
+                  onError={e => e.currentTarget.style.display = 'none'} />
+                <span className="classement__sidebarName">{comp.name}</span>
+                {selectedComp === comp.id && <span className="classement__sidebarDot" />}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Contenu principal */}
+        <main className="classement__main">
       <div className="classement__panel">
 
         {/* Header */}
@@ -240,20 +264,6 @@ function Classement() {
             >
               Buteurs
             </button>
-          </div>
-
-          <div className="classement__selectShell">
-            <select
-              id="competition-select"
-              className="classement__select"
-              value={selectedComp}
-              onChange={e => setSelectedComp(e.target.value)}
-            >
-              {competitions.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <span className="classement__selectIcon" aria-hidden="true" />
           </div>
         </div>
 
@@ -394,6 +404,8 @@ function Classement() {
           <p className="classement__state">Aucune donnée disponible.</p>
         )}
 
+      </div>
+        </main>
       </div>
     </section>
   )

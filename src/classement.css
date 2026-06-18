@@ -47,12 +47,114 @@
   animation: float 12s ease-in-out infinite reverse;
 }
 
+/* ── Layout sidebar + main ── */
+.classement__layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.classement__sidebar {
+  flex: 0 0 13.5rem;
+  position: sticky;
+  top: 1.5rem;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(8,12,20,0.97);
+  border-radius: 1.2rem;
+  padding: 1rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.classement__sidebar::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, rgba(239,68,68,0.5), transparent);
+  border-radius: 999px;
+}
+
+.classement__sidebarLabel {
+  margin: 0 0 0.8rem;
+  padding: 0 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ef4444;
+}
+
+.classement__sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; }
+
+.classement__sidebarItem {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: left;
+}
+
+.classement__sidebarItem:hover {
+  background: rgba(239,68,68,0.07);
+  color: #f1f5f9;
+  border-color: rgba(239,68,68,0.12);
+  transform: translateX(2px);
+}
+
+.classement__sidebarItem--active {
+  background: rgba(239,68,68,0.12);
+  color: #fff;
+  border-color: rgba(239,68,68,0.25);
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(239,68,68,0.1);
+}
+
+.classement__sidebarLogo {
+  width: 1.9rem;
+  height: 1.9rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  mix-blend-mode: screen;
+}
+
+.classement__sidebarName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classement__sidebarDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(239,68,68,0.7);
+}
+
+.classement__main { flex: 1; min-width: 0; }
+
 /* ── Panel principal ── */
 .classement__panel {
   position: relative;
   z-index: 1;
-  max-width: 1200px;
-  margin: 0 auto;
   border: 1px solid rgba(255,255,255,0.07);
   background: rgba(8,12,20,0.97);
   border-radius: 1.4rem;
