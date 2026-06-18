@@ -226,18 +226,11 @@ async function pollESPN(matches, queryClient) {
             )
           }
 
-          // Invalider aussi pour que useLiveMatches confirme via son queryFn
-          if (!alreadyLive) {
+          // Invalider si le match n'est pas encore dans liveMatches
+          // (première détection OU resync si liveMatches s'est vidé entre deux polls)
+          const inLiveData = currentLive.some(m => m.id === match.id)
+          if (!inLiveData) {
             queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-          } else {
-            const inLiveData = currentLive.some(m => m.id === match.id)
-            if (!inLiveData) {
-              const liveState = queryClient.getQueryState(['liveMatches'])
-              const liveAge   = Date.now() - (liveState?.dataUpdatedAt ?? 0)
-              if (liveAge > 30_000) {
-                queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-              }
-            }
           }
 
           // Scores + buteurs + stats
