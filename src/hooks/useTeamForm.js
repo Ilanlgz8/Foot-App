@@ -12,13 +12,8 @@ export function useTeamForm(selectedComp) {
   const { data } = useQuery({
     queryKey: ['teamForm', selectedComp],
     queryFn: async () => {
-      const now      = new Date()
-      const month    = now.getMonth() + 1
-      const year     = now.getFullYear()
-      const isNation = selectedComp === 'WC' || selectedComp === 'EC'
-      const season   = isNation ? year : (month <= 7 ? year - 1 : year)
       const res = await fetch(
-        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${season}`)
+        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED`)
       )
       if (!res.ok) return { formMap: {}, matches: [] }
 
