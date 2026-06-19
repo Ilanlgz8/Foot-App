@@ -15,7 +15,7 @@ export function useTeamForm(selectedComp) {
       const res = await fetch(
         `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
       )
-      if (!res.ok) return {}
+      if (!res.ok) return { formMap: {}, matches: [] }
 
       const json = await res.json()
       const matches = json.matches ?? []
@@ -45,12 +45,16 @@ export function useTeamForm(selectedComp) {
         formMap[id] = formMap[id].slice(-5)
       })
 
-      return formMap
+      return { formMap, matches }
     },
-    enabled:   !!selectedComp,  // ne pas fetch si compId est null (ex: modal match terminé)
+    enabled:   !!selectedComp,
     staleTime: 1000 * 60 * 30, // cache 30min
     retry: false
   })
 
-  return { formMap: data ?? {} }
+  return {
+    formMap:  data?.formMap  ?? {},
+    // Matches bruts — utilisés pour extraire le H2H en modal
+    compMatches: data?.matches ?? [],
+  }
 }

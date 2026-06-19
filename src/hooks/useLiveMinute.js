@@ -130,9 +130,11 @@ function extractMatchData(comp) {
   const awayPoss    = getStat(awayC, 'possessionPct')
   const homeShots   = getStatAny(homeC, 'totalShots', 'shotsTotal', 'shots')
   const awayShots   = getStatAny(awayC, 'totalShots', 'shotsTotal', 'shots')
-  const homeCorners = getStatAny(homeC, 'cornerKicks', 'corners')
-  const awayCorners = getStatAny(awayC, 'cornerKicks', 'corners')
-  const hasStats    = homePoss !== null || awayPoss !== null || homeShots !== null || awayShots !== null
+  const homeCorners  = getStatAny(homeC, 'cornerKicks', 'corners')
+  const awayCorners  = getStatAny(awayC, 'cornerKicks', 'corners')
+  const homeSOT      = getStatAny(homeC, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
+  const awaySOT      = getStatAny(awayC, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
+  const hasStats     = homePoss !== null || awayPoss !== null || homeShots !== null || awayShots !== null
 
   const scorers = (comp.details ?? [])
     .filter(d => d.type?.text === 'Goal' || d.type?.id === '57')
@@ -154,8 +156,8 @@ function extractMatchData(comp) {
     away:    parseScore(awayC.score),
     scorers,
     stats: hasStats ? {
-      home: { poss: homePoss, shots: homeShots, corners: homeCorners },
-      away: { poss: awayPoss, shots: awayShots, corners: awayCorners },
+      home: { poss: homePoss, shots: homeShots, shotsOnTarget: homeSOT, corners: homeCorners },
+      away: { poss: awayPoss, shots: awayShots, shotsOnTarget: awaySOT, corners: awayCorners },
     } : null,
   }
 }
@@ -222,7 +224,7 @@ async function pollESPN(matches, queryClient) {
         const prevState = getMatchState(match.id)
 
         // Toujours écrire les données ESPN brutes (pour calcMinute)
-        setEspnData(match.id, { espnClock, espnStatus })
+        setEspnData(match.id, { espnClock, espnStatus, espnPeriod: st.period ?? null })
 
         // ════════════════════════════════════════════════════════════════════
         // CAS 1 : Match EN COURS (IN_PROGRESS, HALFTIME, prolongations…)
@@ -232,7 +234,8 @@ async function pollESPN(matches, queryClient) {
           espnStatus === 'STATUS_HALFTIME'    ||
           espnStatus === 'STATUS_END_PERIOD'  ||
           espnStatus === 'STATUS_EXTRA_TIME'  ||
-          espnStatus === 'STATUS_OVERTIME'
+          espnStatus === 'STATUS_OVERTIME'      ||
+          espnStatus === 'STATUS_SHOOTOUT'
         ) {
           const ls = getLiveState(match.id)
 

@@ -140,12 +140,13 @@ export function setKickoffAt(matchId, kickoffAt) {
 /**
  * Met à jour les données ESPN en direct (espnClock, espnStatus).
  */
-export function setEspnData(matchId, { espnClock, espnStatus }) {
+export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
   if (!matchId) return
   const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
   stored.espnClock      = espnClock
   stored.espnStatus     = espnStatus
   stored.espnCapturedAt = Date.now()
+  if (espnPeriod != null) stored.espnPeriod = espnPeriod
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
 

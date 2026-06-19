@@ -71,6 +71,9 @@ export function calcMinute(match) {
   // calcMinute retombe sur l'heuristique utcDate → 90+X' continue de tourner.
   if (state.ft) return null
 
+  // ── Tirs au but (period 5 / STATUS_SHOOTOUT) ──
+  if (state.espnPeriod === 5 || state.espnStatus === 'STATUS_SHOOTOUT') return 'TAB'
+
   // ── ESPN (primaire) ──
   // Poll toutes les 20s + interpolation temps réel → retard résiduel ~2-3s.
   if (state.espnStatus) {
@@ -138,4 +141,27 @@ export function calcMinute(match) {
   const half2 = elapsed - 64
   if (half2 <= 45) return `${45 + half2}'`
   return `90+${half2 - 45}'`
+}
+
+/**
+ * Retourne l'indicateur de période affiché dans le LiveWidget.
+ * null → pas de label (match à venir ou terminé).
+ */
+export function getMatchPeriod(match) {
+  const state = getMatchState(match.id)
+  if (state.ft) return null
+
+  const status = state.espnStatus
+  const period = state.espnPeriod
+
+  if (status === 'STATUS_HALFTIME') return 'Mi-temps'
+  if (status === 'STATUS_SHOOTOUT' || period === 5) return 'T.A.B.'
+  if (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME' || period === 3 || period === 4) return 'Prolongations'
+  if (period === 2) return '2ème MT'
+  if (period === 1) return '1ère MT'
+
+  // Fallback FD.org sans ESPN
+  if (match.status === 'PAUSED')      return 'Mi-temps'
+  if (match.status === 'EXTRA_TIME')  return 'Prolongations'
+  return null
 }

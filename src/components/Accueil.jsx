@@ -10,6 +10,7 @@ import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
+import MatchModal from './MatchModal'
 import '../accueil.css'
 
 const MAX_TRACKED = 5
@@ -62,6 +63,10 @@ function Accueil() {
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
+
+  // ── Modal live (clic sur carte LiveWidget) ──
+  // liveModal = { match, espnScore } | null
+  const [liveModal, setLiveModal] = useState(null)
 
   // ── Suivi précis ──
   const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())
@@ -125,6 +130,7 @@ function Accueil() {
   const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
+    <>
     <section className="accueil">
       <div className="accueil__backdrop accueil__backdrop--one" />
       <div className="accueil__backdrop accueil__backdrop--two" />
@@ -142,7 +148,13 @@ function Accueil() {
           </div>
           <div className="accueil__heroRight">
             <p className="accueil__heroDate">{todayStr}</p>
-            <LiveWidget liveMatches={liveMatches} espnScores={espnScores} trackedIds={trackedIds} onRecalibrate={recalibrate} />
+            <LiveWidget
+              liveMatches={liveMatches}
+              espnScores={espnScores}
+              trackedIds={trackedIds}
+              onRecalibrate={recalibrate}
+              onMatchClick={(m) => setLiveModal({ match: m, espnScore: espnScores?.[m.id] })}
+            />
           </div>
         </div>
 
@@ -189,6 +201,17 @@ function Accueil() {
 
       </div>
     </section>
+
+    {/* ── Modal stats live (clic sur carte LiveWidget) ── */}
+    {liveModal && (
+      <MatchModal
+        match={liveModal.match}
+        espnScore={liveModal.espnScore}
+        onClose={() => setLiveModal(null)}
+        defaultTab="livestats"
+      />
+    )}
+    </>
   )
 }
 

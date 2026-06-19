@@ -469,10 +469,329 @@
   color: var(--text-dim, #3d4d60);
 }
 
+/* ── Onglets ── */
+.modal__tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 0.75rem;
+}
+
+.modal__tab {
+  flex: 1;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  border-radius: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.modal__tab:hover {
+  color: #94a3b8;
+  background: rgba(255,255,255,0.04);
+}
+
+.modal__tab--active {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.22);
+  box-shadow: 0 0 10px rgba(239,68,68,0.08);
+}
+
+/* ── Compos ── */
+.modal__compos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239,68,68,0.2) transparent;
+}
+
+.modal__composFormations {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.25rem 0.35rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.modal__composFormation {
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #22c55e;
+  letter-spacing: 0.04em;
+}
+
+.modal__composFormation--away {
+  text-align: right;
+}
+
+.modal__composGrid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 0 0.5rem;
+}
+
+.modal__composDivider {
+  background: rgba(255,255,255,0.05);
+  align-self: stretch;
+}
+
+.modal__composCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.modal__composPlayer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.25rem;
+  border-radius: 0.35rem;
+  transition: background 0.13s;
+}
+
+.modal__composPlayer:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.modal__composPlayer--away {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.modal__composPlayer--sub {
+  opacity: 0.55;
+}
+
+.modal__composNum {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #334155;
+  min-width: 1.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal__composName {
+  flex: 1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal__composPos {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+  min-width: 1.8rem;
+  text-align: center;
+}
+
+.modal__composSubs {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(255,255,255,0.06);
+}
+
+.modal__composSubsTitle {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+/* ── Probabilités ── */
+.modal__statsProba {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239,68,68,0.2) transparent;
+}
+
+.modal__probas {
+  padding: 0.75rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 0.75rem;
+}
+
+.modal__probaTitle {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: center;
+  margin-bottom: 0.65rem;
+}
+
+.modal__probaRow {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1fr;
+  gap: 0.5rem;
+}
+
+.modal__probaItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.modal__probaItem--draw .modal__probaVal { color: #facc15; }
+
+.modal__probaVal {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.modal__probaLabel {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── H2H ── */
+.modal__h2h {
+  padding: 0.5rem 0.25rem;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.modal__h2hTitle {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.modal__h2hRow {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto 1fr;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.25rem;
+  border-radius: 0.4rem;
+  transition: background 0.13s;
+}
+
+.modal__h2hRow:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.modal__h2hDate {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.modal__h2hTeam {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal__h2hTeam--home { text-align: right; }
+.modal__h2hTeam--away { text-align: left; }
+
+.modal__h2hScore {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #cbd5e1;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0.4rem;
+  background: rgba(255,255,255,0.04);
+  border-radius: 0.35rem;
+}
+
+/* ── Momentum chart ── */
+.modal__momentum {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 0.75rem;
+}
+
+.modal__momentumTitle {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.modal__momentumLegend {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.modal__momentumLegendHome {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(239,68,68,0.7);
+}
+
+.modal__momentumLegendAway {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(59,130,246,0.7);
+}
+
+.modal__momentumSvg {
+  width: 100%;
+  height: 72px;
+  display: block;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
 @media (max-width: 480px) {
   .modal__panel { padding: 1.4rem 1.2rem; border-radius: 1.2rem; }
   .modal__hour  { font-size: 1.25rem; }
   .modal__crest { width: 2.8rem; height: 2.8rem; }
+  .modal__composName { font-size: 0.65rem; }
 }
 
 /* ── Stats barres de progression (redesign) ── */

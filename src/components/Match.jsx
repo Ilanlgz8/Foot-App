@@ -270,7 +270,7 @@ function Matchs() {
       <div
         className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}`}
         style={{ borderTop: index === 0 ? 'none' : undefined }}
-        onClick={() => {}}
+        onClick={() => { if (match.status !== "SCHEDULED" && match.status !== "TIMED") setSelectedMatch(match) }}
       >
         <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
         <div className="matchs__team matchs__team--home">

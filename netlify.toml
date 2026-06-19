@@ -30,6 +30,13 @@
   status = 200
   force = true
 
+# Proxy SofaScore : /sofascore?path=... → api.sofascore.com (pas de clé requise)
+[[redirects]]
+  from = "/sofascore"
+  to = "/.netlify/functions/sofascore"
+  status = 200
+  force = true
+
 # Fallback SPA : toutes les autres routes vers index.html (obligatoire pour React Router)
 [[redirects]]
   from = "/*"

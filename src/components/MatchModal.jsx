@@ -1,8 +1,8 @@
-import { useEffect }               from 'react'
+import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
-import { useTeamForm }            from '../hooks/useTeamForm'
 import { useMatchDetail }      from '../hooks/useMatchDetail'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
+import { useSofaLineups, useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState }       from '../utils/matchStateTracker'
 import './../matchModal.css'
@@ -145,6 +145,198 @@ function GoalTimeline({ goals = [], homeId }) {
   )
 }
 
+// ── Graphique momentum ───────────────────────────────────────────────────────
+function MomentumChart({ points, homeName, awayName }) {
+  if (!points || points.length === 0) return null
+  const W = 400, H = 72
+  const maxAbs = Math.max(...points.map(p => Math.abs(p.value ?? 0)), 0.01)
+  const barW = W / points.length
+
+  return (
+    <div className="modal__momentum">
+      <p className="modal__momentumTitle">Momentum</p>
+      <div className="modal__momentumLegend">
+        <span className="modal__momentumLegendHome">■ {homeName}</span>
+        <span className="modal__momentumLegendAway">■ {awayName}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="modal__momentumSvg" preserveAspectRatio="none">
+        {/* Ligne centrale */}
+        <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+        {points.map((p, i) => {
+          const v         = p.value ?? 0
+          const norm      = v / maxAbs
+          const isHome    = norm >= 0
+          const barH      = Math.max(Math.abs(norm) * (H / 2 - 2), 1)
+          const x         = i * barW
+          const y         = isHome ? H / 2 - barH : H / 2
+          return (
+            <rect
+              key={i}
+              x={x + 0.2}
+              y={y}
+              width={Math.max(barW - 0.4, 0.8)}
+              height={barH}
+              fill={isHome ? 'rgba(239,68,68,0.65)' : 'rgba(59,130,246,0.65)'}
+              rx="0.5"
+            />
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+// ── Onglet Stats Live ─────────────────────────────────────────────────────────
+// Priorité : ESPN (déjà fetché par LiveProvider, 0 quota) → api-football fallback
+const STAT_KEYS = [
+  'Ball possession',
+  'Total shots',
+  'Shots on target',
+  'Corner kicks',
+  'Fouls',
+]
+const STAT_FR = {
+  'Ball possession': 'Possession',
+  'Total shots':     'Tirs',
+  'Shots on target': 'Tirs cadrés',
+  'Corner kicks':    'Corners',
+  'Fouls':           'Fautes',
+}
+
+function LiveStatsTab({ match, espnScore }) {
+  const isLive   = match.status === 'IN_PLAY' || match.status === 'PAUSED'
+  const hasEspn  = !!(espnScore?.stats)
+
+  // Appel api-football uniquement si pas de données ESPN (économise le quota 100/jour)
+  const { data: statsData, isLoading } = useSofaLiveStats(match, isLive && !hasEspn)
+
+  const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
+  const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
+
+  // ── Priorité ESPN ──
+  if (hasEspn) {
+    return (
+      <div>
+        <ESPNStats stats={espnScore.stats} />
+        {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+      </div>
+    )
+  }
+
+  // ── Fallback api-football ──
+  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
+  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
+  const rows      = STAT_KEYS
+    .map(k => items.find(item => item.name === k))
+    .filter(Boolean)
+
+  if (isLoading && rows.length === 0) {
+    return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+  }
+
+  return (
+    <div>
+      {rows.length > 0 ? (
+        <div className="modal__espnStats">
+          <p className="modal__espnStatsTitle">Statistiques live</p>
+          {rows.map(item => (
+            <StatBar
+              key={item.name}
+              label={STAT_FR[item.name] ?? item.name}
+              homeVal={item.home ?? '0'}
+              awayVal={item.away ?? '0'}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="modal__noEvents">Stats non disponibles</p>
+      )}
+    </div>
+  )
+}
+
+// ── Onglet Compos (SofaScore) ─────────────────────────────────────────────────
+const POS_COLOR = { G: '#f59e0b', D: '#3b82f6', M: '#22c55e', F: '#ef4444' }
+const POS_FR    = { G: 'GB', D: 'DEF', M: 'MIL', F: 'ATT', GK: 'GB' }
+
+function PlayerRow({ player, side, sub = false }) {
+  const name   = player.player?.shortName ?? player.player?.name ?? '?'
+  const pos    = (player.position ?? player.player?.position ?? '').toUpperCase()
+  const posKey = pos === 'GK' ? 'G' : pos.charAt(0)
+  const num    = player.shirtNumber ?? player.player?.jerseyNumber ?? ''
+  const color  = POS_COLOR[posKey] ?? '#64748b'
+  const label  = POS_FR[posKey] ?? pos.slice(0, 3)
+
+  if (side === 'home') {
+    return (
+      <div className={`modal__composPlayer${sub ? ' modal__composPlayer--sub' : ''}`}>
+        <span className="modal__composNum">{num}</span>
+        <span className="modal__composName">{name}</span>
+        <span className="modal__composPos" style={{ color }}>{label}</span>
+      </div>
+    )
+  }
+  return (
+    <div className={`modal__composPlayer modal__composPlayer--away${sub ? ' modal__composPlayer--sub' : ''}`}>
+      <span className="modal__composPos" style={{ color }}>{label}</span>
+      <span className="modal__composName">{name}</span>
+      <span className="modal__composNum">{num}</span>
+    </div>
+  )
+}
+
+function ComposTab({ match }) {
+  const { data: lineups, isLoading, isError } = useSofaLineups(match)
+
+  if (isLoading) {
+    return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
+  }
+  if (isError || !lineups?.home?.players) {
+    return <div className="modal__state">Compos non disponibles</div>
+  }
+
+  const { home, away } = lineups
+  const starters = (side) => (side.players ?? []).filter(p => !p.substitute)
+  const subs     = (side) => (side.players ?? []).filter(p => p.substitute)
+
+  return (
+    <div className="modal__compos">
+      {/* Formations */}
+      <div className="modal__composFormations">
+        <span className="modal__composFormation">{home.formation ?? '?'}</span>
+        <span className="modal__composFormation modal__composFormation--away">{away.formation ?? '?'}</span>
+      </div>
+
+      {/* Titulaires */}
+      <div className="modal__composGrid">
+        <div className="modal__composCol">
+          {starters(home).map((p, i) => <PlayerRow key={i} player={p} side="home" />)}
+        </div>
+        <div className="modal__composDivider" />
+        <div className="modal__composCol">
+          {starters(away).map((p, i) => <PlayerRow key={i} player={p} side="away" />)}
+        </div>
+      </div>
+
+      {/* Remplaçants */}
+      {(subs(home).length > 0 || subs(away).length > 0) && (
+        <div className="modal__composSubs">
+          <p className="modal__composSubsTitle">Remplaçants</p>
+          <div className="modal__composGrid">
+            <div className="modal__composCol">
+              {subs(home).map((p, i) => <PlayerRow key={i} player={p} side="home" sub />)}
+            </div>
+            <div className="modal__composDivider" />
+            <div className="modal__composCol">
+              {subs(away).map((p, i) => <PlayerRow key={i} player={p} side="away" sub />)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Cartons FD.org ────────────────────────────────────────────────────────────
 function Bookings({ bookings = [], homeId }) {
   if (bookings.length === 0) return null
@@ -230,9 +422,12 @@ function FinishedDetails({ match, espnData, detail, loading }) {
   )
 }
 
+
 // ── Modal principale ─────────────────────────────────────────────────────────
-function MatchModal({ match, compId, onClose }) {
+function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore }) {
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
+  const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
+  const [tab, setTab] = useState(defaultTab)
 
   // 1. Données ESPN déjà persistées en localStorage (match suivi en live)
   const cachedEspn = isFinished ? getEspnData(match?.id) : null
@@ -245,8 +440,6 @@ function MatchModal({ match, compId, onClose }) {
   )
   const espnData = cachedEspn ?? fetchedEspn
 
-  // Forme récente (matchs à venir uniquement)
-  const { formMap } = useTeamForm(isFinished ? null : compId)
   // FD.org uniquement si pas de données ESPN (fallback matchs anciens)
   const { detail, loading: detailLoading } = useMatchDetail(
     isFinished && !espnData && !espnLoading ? match?.id : null
@@ -258,9 +451,6 @@ function MatchModal({ match, compId, onClose }) {
   }, [])
 
   if (!match) return null
-
-  const homeForm = formMap?.[match.homeTeam?.id] ?? []
-  const awayForm = formMap?.[match.awayTeam?.id] ?? []
 
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away
@@ -336,32 +526,23 @@ function MatchModal({ match, compId, onClose }) {
             detail={detail}
             loading={espnLoading || detailLoading}
           />
-        ) : (
-          (homeForm.length > 0 || awayForm.length > 0) && (
-            <div className="modal__formes">
-              {homeForm.length > 0 && (
-                <div className="modal__forme">
-                  <span className="modal__formeLabel">
-                    {translateTeam(match.homeTeam.shortName || match.homeTeam.name)}
-                  </span>
-                  <div className="modal__formeBadges">
-                    {homeForm.map((r, i) => <FormBadge key={i} result={r} />)}
-                  </div>
-                </div>
-              )}
-              {awayForm.length > 0 && (
-                <div className="modal__forme">
-                  <span className="modal__formeLabel">
-                    {translateTeam(match.awayTeam.shortName || match.awayTeam.name)}
-                  </span>
-                  <div className="modal__formeBadges">
-                    {awayForm.map((r, i) => <FormBadge key={i} result={r} />)}
-                  </div>
-                </div>
-              )}
+        ) : isLive ? (
+          <>
+            {/* Onglets match en cours */}
+            <div className="modal__tabs">
+              <button
+                className={`modal__tab${tab === 'livestats' ? ' modal__tab--active' : ''}`}
+                onClick={() => setTab('livestats')}
+              >Stats Live</button>
+              <button
+                className={`modal__tab${tab === 'compos' ? ' modal__tab--active' : ''}`}
+                onClick={() => setTab('compos')}
+              >Compos</button>
             </div>
-          )
-        )}
+            {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
+            {tab === 'compos'    && <ComposTab match={match} />}
+          </>
+        ) : null}
 
       </div>
     </div>
