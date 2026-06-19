@@ -159,8 +159,9 @@
 }
 
 /* ── Navigation links ── */
+/* Caché sur mobile — affiché ≥ 640px via media query */
 .navbar__navWrap {
-  display: flex;
+  display: none;
   position: absolute;
   left: 50%;
   transform: translateX(-65%);
@@ -254,7 +255,7 @@
   color: #fff;
 }
 
-.navbar__menuButton  { padding: 0.5rem; border-radius: 0.5rem; }
+.navbar__menuButton  { padding: 0.5rem; border-radius: 0.5rem; display: none; }
 .navbar__iconButton  { padding: 0.35rem; border-radius: 50%; }
 .navbar__profileButton { width: 2.4rem; height: 2.4rem; border-radius: 50%; }
 
@@ -332,16 +333,35 @@
 }
 
 /* ── Responsive ── */
+
+/* Mobile < 640px : hamburger visible, navWrap caché */
+@media (max-width: 639px) {
+  .navbar__inner {
+    justify-content: space-between;
+  }
+  .navbar__menuButton {
+    display: inline-flex;
+  }
+  .navbar__brand {
+    margin-left: 0;
+  }
+}
+
+/* ≥ 640px : hamburger disparaît, nav desktop apparaît */
 @media (min-width: 640px) {
-  .navbar__container { padding: 0 1.5rem; }
-  .navbar__menuWrap  { display: none; }
-  .navbar__inner     { justify-content: flex-start; }
-  .navbar__main      { justify-content: flex-start; }
-  .navbar__navWrap   { display: block; margin-left: 4rem; }
-  .navbar__actions   { position: static; margin-left: auto; }
+  .navbar__container  { padding: 0 1.5rem; }
+  .navbar__menuButton { display: none; }
+  .navbar__inner      { justify-content: space-between; }
+  .navbar__navWrap    { display: flex; margin-left: 0; position: absolute; left: 50%; transform: translateX(-50%); }
 }
 
 @media (min-width: 1024px) {
   .navbar__container { padding: 0 2rem; }
-  .navbar__navWrap   { margin-left: 6rem; }
+}
+
+/* Mobile menu link actif */
+.navbar__mobileLink--active {
+  background: rgba(239,68,68,0.12);
+  color: #fff;
+  border-left: 2px solid #ef4444;
 }

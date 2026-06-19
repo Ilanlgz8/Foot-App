@@ -3,6 +3,72 @@ import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 
+// Map abréviations — clés = sortie de translateTeam (ou nom brut API si pas traduit)
+const TEAM_SHORT = {
+  // ── Ligue 1 ──
+  'Union Saint-Gilloise':    'Union SG',      // translateTeam('Union SG') → trop long
+  'Paris Saint-Germain':     'Paris SG',      // si API renvoie nom complet
+  'Paris Saint-Germain FC':  'Paris SG',
+
+  // ── Premier League ──
+  'Crystal Palace':          'C. Palace',
+  'Wolverhampton':           'Wolves',
+  'Wolverhampton Wanderers': 'Wolves',
+  'Nottingham Forest':       'Nott. Forest',
+  'Brighton & Hove Albion':  'Brighton',
+  'Brighton Hove Albion':    'Brighton',
+  'Newcastle United':        'Newcastle',
+  'Tottenham Hotspur':       'Tottenham',
+  'West Ham United':         'West Ham',
+  'Manchester City':         'Man. City',
+  'Manchester United':       'Man. United',
+  'Leeds United':            'Leeds',
+
+  // ── La Liga ──
+  'Atlético Madrid':         'Atl. Madrid',   // translateTeam('Atleti') → Atlético Madrid
+  'Athletic Bilbao':         'Ath. Bilbao',   // translateTeam('Athletic') → Athletic Bilbao
+  'Real Sociedad':           'R. Sociedad',
+  'Deportivo Alavés':        'Alavés',
+  'Rayo Vallecano':          'Rayo',
+
+  // ── Bundesliga ──
+  'Bayern Munich':           'Bayern',        // translateTeam('Bayern') → Bayern Munich
+  'Eintracht Frankfurt':     'Frankfurt',
+  'Werder Brême':            'Werder',        // translateTeam('Bremen') → Werder Brême
+  'Werder Bremen':           'Werder',
+  'Borussia Dortmund':       'Dortmund',
+
+  // ── Serie A ──
+  'Inter Milan':             'Inter',         // translateTeam('Inter') → Inter Milan
+  'Milan AC':                'Milan',         // translateTeam('Milan') → Milan AC
+  'Hellas Verona':           'Verona',
+
+  // ── Ligue des Champions ──
+  'PSV Eindhoven':           'PSV',
+  'Club Brugge':             'Bruges',
+  'Slavia Prague':           'Slavia',
+  'Slavia Praha':            'Slavia',
+
+  // ── Coupe du Monde / Nations ──
+  'Bosnie-Herzégovine':      'Bosnie-H.',     // translateTeam('Bosnia-H.') → Bosnie-Herzégovine
+  'Arabie Saoudite':         'Arabie S.',
+  'Nouvelle-Zélande':        'N.-Zélande',
+  "Côte d'Ivoire":           'Côte d\'Ivoire', // 13 chars, ok tel quel
+  'Corée du Sud':            'Corée du Sud',
+  'États-Unis':              'États-Unis',
+  'Afrique du Sud':          'Afrique S.',
+}
+
+// Fallback générique si > 13 caractères et pas dans la map
+function shortenName(name) {
+  if (!name) return name
+  if (TEAM_SHORT[name]) return TEAM_SHORT[name]
+  if (name.length <= 13) return name
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2) return name
+  return `${words[0][0]}. ${words.slice(1).join(' ')}`
+}
+
 // ── Badge compétition ────────────────────────────────────────────────────────
 function CompBadge({ match }) {
   const comp   = COMPETITIONS.find(c => c.id === match.competition?.code)
@@ -34,18 +100,9 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine }) {
 
   let homeCls = 'accueil__liveWidgetPill'
   let awayCls = 'accueil__liveWidgetPill'
-  if (isTermine && homeScore != null && awayScore != null) {
-    if (homeScore > awayScore) {
-      homeCls += ' accueil__liveWidgetPill--winner'
-      awayCls += ' accueil__liveWidgetPill--loser'
-    } else if (awayScore > homeScore) {
-      homeCls += ' accueil__liveWidgetPill--loser'
-      awayCls += ' accueil__liveWidgetPill--winner'
-    } else {
-      // nul — les deux légèrement atténués
-      homeCls += ' accueil__liveWidgetPill--loser'
-      awayCls += ' accueil__liveWidgetPill--loser'
-    }
+  if (isTermine) {
+    homeCls += ' accueil__liveWidgetPill--ft'
+    awayCls += ' accueil__liveWidgetPill--ft'
   }
 
   return (
@@ -60,22 +117,32 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine }) {
   )
 }
 
-// ── Buteurs en deux colonnes ─────────────────────────────────────────────────
+// ── Buteurs alignés sous chaque équipe ──────────────────────────────────────
 function ScorerColumns({ scorers = [] }) {
   const homeGoals = scorers.filter(s => s.team === 'home')
   const awayGoals = scorers.filter(s => s.team === 'away')
   if (homeGoals.length === 0 && awayGoals.length === 0) return null
 
-  const label = s =>
-    `⚽ ${s.name}${s.minute ? ' ' + s.minute : ''}${s.ownGoal ? ' (csc)' : ''}${s.penaltyKick ? ' (pen)' : ''}`
+  const suffix = s => (s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : '')
 
   return (
     <div className="accueil__liveWidgetScorers">
       <div className="accueil__liveWidgetScorersHome">
-        {homeGoals.map((s, i) => <span key={i} className="accueil__liveWidgetScorer">{label(s)}</span>)}
+        {homeGoals.map((s, i) => (
+          <div key={i} className="accueil__liveWidgetScorerItem">
+            <span className="accueil__liveWidgetScorerName">{s.name}{suffix(s)}</span>
+            {s.minute && <span className="accueil__liveWidgetScorerMin">{s.minute}</span>}
+          </div>
+        ))}
       </div>
+      <div className="accueil__liveWidgetScorersGap" />
       <div className="accueil__liveWidgetScorersAway">
-        {awayGoals.map((s, i) => <span key={i} className="accueil__liveWidgetScorer">{label(s)}</span>)}
+        {awayGoals.map((s, i) => (
+          <div key={i} className="accueil__liveWidgetScorerItem">
+            <span className="accueil__liveWidgetScorerName">{s.name}{suffix(s)}</span>
+            {s.minute && <span className="accueil__liveWidgetScorerMin">{s.minute}</span>}
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -114,15 +181,15 @@ function StatsBar({ stats }) {
         const homePct = (row.hNum / total) * 100
         return (
           <div key={i} className="accueil__liveWidgetStatRow">
-            <span className="accueil__liveWidgetStatNum accueil__liveWidgetStatNum--home">{row.h}</span>
+            <div className="accueil__liveWidgetStatHeader">
+              <span className="accueil__liveWidgetStatNum">{row.h}</span>
+              <span className="accueil__liveWidgetStatLabel">{row.label}</span>
+              <span className="accueil__liveWidgetStatNum">{row.a}</span>
+            </div>
             <div className="accueil__liveWidgetStatTrack">
               <div className="accueil__liveWidgetStatFill" style={{ width: `${homePct}%` }} />
-            </div>
-            <span className="accueil__liveWidgetStatLabel">{row.label}</span>
-            <div className="accueil__liveWidgetStatTrack">
               <div className="accueil__liveWidgetStatFill accueil__liveWidgetStatFill--away" style={{ width: `${100 - homePct}%` }} />
             </div>
-            <span className="accueil__liveWidgetStatNum">{row.a}</span>
           </div>
         )
       })}
@@ -156,8 +223,8 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           const minute    = isTermine ? null : calcMinute(match)
           const hs        = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
           const as_       = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
-          const homeName  = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-          const awayName  = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+          const homeName  = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
+          const awayName  = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
           const clickable = !!onMatchClick
 
           return (
@@ -199,6 +266,7 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
                 </div>
               </div>
 
+              {(espn?.scorers?.length > 0) && <div className="accueil__liveWidgetDivider" />}
               <ScorerColumns scorers={espn?.scorers ?? []} />
               <StatsBar stats={espn?.stats ?? null} />
             </div>

@@ -383,3 +383,62 @@
   .resultats__teamName { font-size: 0.88rem; }
   .resultats__scoreNum { font-size: 1.25rem; min-width: 1.3rem; }
 }
+
+/* ── Renforcement responsive mobile ── */
+@media (max-width: 900px) {
+  .resultats { padding: 1.75rem 1rem 3rem; }
+
+  .resultats__layout {
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .resultats__sidebar {
+    flex: none;
+    width: 100%;
+    position: static;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.95rem;
+  }
+
+  .resultats__sidebarLabel { display: none; }
+
+  .resultats__sidebarNav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.3rem;
+    padding-bottom: 2px;
+  }
+  .resultats__sidebarNav::-webkit-scrollbar { display: none; }
+
+  .resultats__sidebarItem {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.65rem;
+    transform: none !important;
+  }
+
+  .resultats__competitionLogo--sidebar { width: 2.2rem; height: 2.2rem; }
+}
+
+@media (max-width: 640px) {
+  .resultats { padding: 1.25rem 0.75rem 2.5rem; }
+
+  .resultats__card {
+    grid-template-columns: 1fr 6rem 1fr;
+    padding: 0.65rem 0.65rem;
+  }
+
+  .resultats__teamName  { font-size: 0.75rem; }
+  .resultats__crest     { width: 1.8rem; height: 1.8rem; }
+  .resultats__scoreNum  { font-size: 1.2rem; }
+}
+
+@media (max-width: 400px) {
+  .resultats { padding: 1rem 0.5rem 2rem; }
+  .resultats__card { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.55rem 0.5rem; }
+  .resultats__teamName { font-size: 0.68rem; }
+}

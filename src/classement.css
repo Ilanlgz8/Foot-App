@@ -977,3 +977,100 @@
   .classement__panelHeader { flex-wrap: wrap; gap: 0.75rem; }
   .classement__viewToggle { order: 3; width: 100%; justify-content: center; }
 }
+
+/* =========================================================
+   CLASSEMENT — RESPONSIVE COMPLET
+   ========================================================= */
+
+/* Tablette (< 900px) */
+@media (max-width: 900px) {
+  .classement { padding: 1.75rem 1rem 3rem; }
+
+  .classement__layout {
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .classement__sidebar {
+    flex: none;
+    width: 100%;
+    position: static;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.95rem;
+  }
+
+  .classement__sidebarLabel { display: none; }
+
+  .classement__sidebarNav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .classement__sidebarNav::-webkit-scrollbar { display: none; }
+
+  .classement__sidebarItem {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.65rem;
+    transform: none !important;
+  }
+
+  .classement__sidebarName { display: none; }
+
+  .classement__sidebarLogo {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+
+  .classement__panel { padding: 1.1rem; border-radius: 1.1rem; }
+  .classement__panelTitle { font-size: 1rem; }
+}
+
+/* Mobile (< 640px) */
+@media (max-width: 640px) {
+  .classement { padding: 1.25rem 0.75rem 2.5rem; }
+  .classement__panel { padding: 0.85rem 0.75rem; }
+
+  .classement__panelHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .classement__viewToggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Tableau classement : colonnes condensées */
+  .classement__tableHeader,
+  .classement__row {
+    grid-template-columns: 2rem 1.8rem 1fr 2.5rem 2.5rem 2.5rem 2.5rem;
+    gap: 0;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.72rem;
+  }
+
+  .classement__teamName { font-size: 0.78rem; }
+  .classement__crest    { width: 1.5rem; height: 1.5rem; }
+
+  /* Masquer colonnes moins importantes sur mobile */
+  .classement__colW,
+  .classement__colD,
+  .classement__colL,
+  .classement__colGD { display: none; }
+
+  /* Grille groupes */
+  .classement__groups { grid-template-columns: 1fr; gap: 1rem; }
+}
+
+/* Mobile S (< 400px) */
+@media (max-width: 400px) {
+  .classement { padding: 1rem 0.5rem 2rem; }
+  .classement__sidebarLogo { width: 1.9rem; height: 1.9rem; }
+}
