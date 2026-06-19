@@ -68,35 +68,45 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
 
       let matches = null
 
-      // FD.org utilise TIMED (heure confirmée) et SCHEDULED — on demande les deux
-      // pour les matchs à venir (la WC 2026 n'a que des TIMED, jamais SCHEDULED)
-      const statusParam = status === 'SCHEDULED' ? 'SCHEDULED,TIMED' : status
-
-      if (status === 'FINISHED' && isClub) {
-        // 1. Saison qui vient de se terminer (ex: juin 2026 → season=2025 = saison 2025/26)
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=${statusParam}&season=${getClubSeason()}`
-        )
-        // 2. Fallback sans season= si FD.org ne supporte pas le param pour cette compet
-        if (!matches || matches.length === 0) {
+      if (!isClub) {
+        // WC / EC : FD.org utilise TIMED (pas SCHEDULED) pour les matchs à heure confirmée
+        // Pour SCHEDULED → essayer TIMED d'abord, puis sans filtre de statut
+        // Pour FINISHED  → ajouter season=année courante
+        if (status === 'SCHEDULED') {
           matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=${statusParam}`
+            `/api/v4/competitions/${selectedComp}/matches?status=TIMED`
           )
+          if (!matches || matches.length === 0) {
+            matches = await tryFetch(
+              `/api/v4/competitions/${selectedComp}/matches?status=SCHEDULED`
+            )
+          }
+        } else {
+          // FINISHED
+          const wcSeason = new Date().getFullYear()
+          matches = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${wcSeason}`
+          )
+          if (!matches || matches.length === 0) {
+            matches = await tryFetch(
+              `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+            )
+          }
         }
-      } else if (status === 'FINISHED' && !isClub) {
-        // WC/EC : saison = année courante
-        const wcSeason = new Date().getFullYear()
+      } else if (status === 'FINISHED') {
+        // Clubs : saison qui vient de se terminer (juin 2026 → 2025)
         matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=${statusParam}&season=${wcSeason}`
+          `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
         )
         if (!matches || matches.length === 0) {
           matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=${statusParam}`
+            `/api/v4/competitions/${selectedComp}/matches?status=${status}`
           )
         }
       } else {
+        // Clubs SCHEDULED
         matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=${statusParam}`
+          `/api/v4/competitions/${selectedComp}/matches?status=${status}`
         )
       }
 
