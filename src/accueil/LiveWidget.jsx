@@ -93,7 +93,7 @@ function PeriodBadge({ match }) {
 }
 
 // ── Rang score custom : pills Chakra Petch + barre verticale ────────────────
-function ScoreDisplay({ homeScore, awayScore, minute, isTermine }) {
+function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
   const label = isTermine ? 'FT' : (minute ?? '–')
@@ -107,12 +107,18 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine }) {
 
   return (
     <div className="accueil__liveWidgetScoreWrap">
+      {/* Minute au-dessus du score */}
+      <div className="accueil__liveWidgetMinuteWrap">
+        <span className="accueil__liveWidgetMinute">{label}</span>
+        {repriseImminente && (
+          <span className="accueil__liveWidgetReprise">reprise imminente</span>
+        )}
+      </div>
       <div className="accueil__liveWidgetPills">
         <div className={homeCls}>{h}</div>
         <div className="accueil__liveWidgetPillBar" />
         <div className={awayCls}>{a}</div>
       </div>
-      <span className="accueil__liveWidgetMinute">{label}</span>
     </div>
   )
 }
@@ -224,8 +230,13 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
       <div className="accueil__liveWidgetMatches">
         {live.slice(0, 5).map(match => {
           const espn      = espnScores[match.id] ?? null
-          const isTermine = getMatchState(match.id).ft === true
+          const matchSt   = getMatchState(match.id)
+          const isTermine = matchSt.ft === true
           const minute    = isTermine ? null : calcMinute(match)
+          const repriseImminente = match.status === 'PAUSED'
+            && matchSt.pausedAt
+            && !matchSt.half2Start
+            && (Date.now() - matchSt.pausedAt) >= 15 * 60_000
           const hs        = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
           const as_       = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
           const homeName  = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
@@ -259,6 +270,7 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
                   awayScore={as_}
                   minute={minute}
                   isTermine={isTermine}
+                  repriseImminente={repriseImminente}
                 />
 
                 {/* Équipe extérieur */}

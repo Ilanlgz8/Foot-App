@@ -111,8 +111,12 @@ export function calcMinute(match) {
       if (min2 <= 45) return `${45 + min2}'`
       return `90+${min2 - 45}'`
     }
+    // Match encore en PAUSED → ne jamais avancer au-delà de MT
+    // (half2Start sera positionné dès que ESPN/api-football détecte la reprise)
+    if (match.status === 'PAUSED') return 'MT'
     const sinceP = now - state.pausedAt
     if (sinceP < HT_DURATION) return 'MT'
+    // half2Start absent et statut PAUSED déjà écarté → estimation
     const min2 = Math.floor((sinceP - HT_DURATION) / 60_000) + 1
     if (min2 <= 45) return `${45 + min2}'`
     return `90+${min2 - 45}'`

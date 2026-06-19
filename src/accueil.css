@@ -1648,6 +1648,12 @@
   align-items: center;
   gap: 0.15rem;
 }
+.accueil__liveWidgetMinuteWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: center;
+}
 .accueil__liveWidgetMinute {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 0.58rem;
@@ -1656,6 +1662,16 @@
   letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
+}
+.accueil__liveWidgetReprise {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: rgba(255, 200, 50, 0.9);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: pulse 1.8s ease-in-out infinite;
 }
 .accueil__liveWidgetPills {
   display: flex;
