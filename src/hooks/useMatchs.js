@@ -69,21 +69,20 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
       let matches = null
 
       if (!isClub) {
-        // WC / EC : FD.org utilise TIMED (pas SCHEDULED) pour les matchs à heure confirmée
-        // Pour SCHEDULED → essayer TIMED d'abord, puis sans filtre de statut
-        // Pour FINISHED  → ajouter season=année courante
+        // WC / EC : toujours préciser season=année courante
+        const wcSeason = new Date().getFullYear()
         if (status === 'SCHEDULED') {
+          // FD.org utilise TIMED pour les matchs à heure confirmée
           matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=TIMED`
+            `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
           )
           if (!matches || matches.length === 0) {
             matches = await tryFetch(
-              `/api/v4/competitions/${selectedComp}/matches?status=SCHEDULED`
+              `/api/v4/competitions/${selectedComp}/matches?status=SCHEDULED&season=${wcSeason}`
             )
           }
         } else {
           // FINISHED
-          const wcSeason = new Date().getFullYear()
           matches = await tryFetch(
             `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${wcSeason}`
           )
