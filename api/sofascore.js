@@ -1,16 +1,9 @@
-// Proxy vers l'API non-officielle SofaScore (api.sofascore.com)
-// Pas de clé API requise — injecte les headers navigateur pour éviter les blocages.
-// Paramètre attendu : ?path=sport/football/scheduled-events/2024-12-15
-
-module.exports = async (req, res) => {
+// Proxy SofaScore — headers navigateur pour éviter les blocages
+export default async function handler(req, res) {
   const path = req.query.path
 
-  if (!path) {
-    return res.status(400).json({ error: 'Paramètre path manquant' })
-  }
-  if (!/^[a-zA-Z0-9\/\-_.]+$/.test(path)) {
-    return res.status(400).json({ error: 'Chemin invalide' })
-  }
+  if (!path) return res.status(400).json({ error: 'Paramètre path manquant' })
+  if (!/^[a-zA-Z0-9\/\-_.]+$/.test(path)) return res.status(400).json({ error: 'Chemin invalide' })
 
   const controller = new AbortController()
   const timeoutId  = setTimeout(() => controller.abort(), 8_000)
@@ -24,28 +17,23 @@ module.exports = async (req, res) => {
         'Referer':         'https://www.sofascore.com/',
         'Origin':          'https://www.sofascore.com',
         'Accept':          'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
         'Cache-Control':   'no-cache',
       },
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `SofaScore a répondu ${response.status}` })
-    }
+    if (!response.ok) return res.status(response.status).json({ error: `SofaScore a répondu ${response.status}` })
 
     const body = await response.text()
-    res
-      .status(200)
-      .setHeader('Content-Type', 'application/json')
-      .setHeader('Cache-Control', 'public, max-age=30')
-      .send(body)
+    res.status(200)
+       .setHeader('Content-Type', 'application/json')
+       .setHeader('Cache-Control', 'public, max-age=30')
+       .send(body)
   } catch (err) {
     clearTimeout(timeoutId)
-    if (err.name === 'AbortError') {
-      return res.status(504).json({ error: 'SofaScore timeout (>8s)' })
-    }
+    if (err.name === 'AbortError') return res.status(504).json({ error: 'SofaScore timeout (>8s)' })
     res.status(500).json({ error: err.message })
   }
 }

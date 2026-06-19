@@ -1,8 +1,5 @@
 // Proxy football-data.org — catch-all Vercel pour /api/v4/**
-// req.query.path = tableau de segments, ex: ['competitions', 'WC', 'matches']
-// Les autres query params (status, dateFrom, etc.) sont dans le reste de req.query.
-
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     const { path: segments, ...rest } = req.query
     const parts   = Array.isArray(segments) ? segments : [segments]

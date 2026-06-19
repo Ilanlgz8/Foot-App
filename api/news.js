@@ -1,6 +1,4 @@
-// Agrège plusieurs flux RSS football français et les retourne en JSON
-// Aucune clé API requise — flux publics
-
+// Agrège plusieurs flux RSS football français
 const RSS_FEEDS = [
   'https://www.lequipe.fr/rss/actu_rss_Football.xml',
   'https://rmcsport.bfmtv.com/rss/football/',
@@ -40,7 +38,7 @@ function fetchWithTimeout(url, options, ms = 6000) {
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id))
 }
 
-module.exports = async (_req, res) => {
+export default async function handler(_req, res) {
   try {
     const results = await Promise.allSettled(
       RSS_FEEDS.map(url => fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }))
