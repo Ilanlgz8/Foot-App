@@ -32,6 +32,9 @@ let espnFailStreak = 0
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
+// ESPN event IDs : fdMatchId → espnEventId (pour le fetch du summary)
+const espnEventIds = {}
+
 // Restauration partielle au chargement
 try {
   const lastPoll = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
@@ -209,6 +212,8 @@ async function pollESPN(matches, queryClient) {
       try { localStorage.setItem('foot_espn_last_poll', String(Date.now())) } catch {}
 
       const json = await res.json()
+      const liveEventIds = [] // [{slug, eventId, matchId}] — pour les summary stats
+
       for (const evt of json.events ?? []) {
         const comp = evt.competitions?.[0]
         if (!comp) continue
@@ -237,6 +242,11 @@ async function pollESPN(matches, queryClient) {
           espnStatus === 'STATUS_OVERTIME'      ||
           espnStatus === 'STATUS_SHOOTOUT'
         ) {
+          // Sauvegarder l'ESPN event ID pour le fetch summary (stats live)
+          if (evt.id) {
+            espnEventIds[match.id] = evt.id
+            liveEventIds.push({ slug, eventId: evt.id, matchId: match.id })
+          }
           const ls = getLiveState(match.id)
 
           // Si liveState était 'ended' (fausse éviction) → récupérer sans condition.
@@ -396,6 +406,52 @@ async function pollESPN(matches, queryClient) {
             }
           }, 5 * 60_000)
         }
+      }
+      // ── Fetch summary pour les matchs live → stats détaillées ──────────
+      for (const { slug: s, eventId, matchId } of liveEventIds) {
+        try {
+          const sr = await fetch(`/espn?slug=${s}&eventId=${eventId}`)
+          if (!sr.ok) continue
+          const sj = await sr.json()
+
+          // Le summary renvoie "boxscore.players[].statistics[].athletes[]"
+          // + "boxscore.teams[].team" pour identifier home/away
+          const boxscore = sj.boxscore
+          if (!boxscore) continue
+
+          const teams = boxscore.teams ?? []
+          const homeTeam = teams.find(t => t.homeAway === 'home')
+          const awayTeam = teams.find(t => t.homeAway === 'away')
+
+          const extractTeamStats = (teamObj) => {
+            if (!teamObj) return {}
+            const stats = {}
+            for (const group of teamObj.statistics ?? []) {
+              for (const s of (Array.isArray(group) ? group : [group])) {
+                if (s?.name) stats[s.name] = parseFloat(s.displayValue) || 0
+              }
+            }
+            return stats
+          }
+
+          const hS = extractTeamStats(homeTeam)
+          const aS = extractTeamStats(awayTeam)
+
+          const poss = (name) => hS[name] ?? null
+          const getPoss = hS['possessionPct'] ?? hS['possession'] ?? null
+          const getShots = (obj) => obj['totalShots'] ?? obj['shots'] ?? null
+          const getCorners = (obj) => obj['cornerKicks'] ?? obj['corners'] ?? null
+          const getSOT = (obj) => obj['shotsOnTarget'] ?? obj['onTargetShots'] ?? null
+
+          const summaryStats = (getPoss !== null || getShots(hS) !== null) ? {
+            home: { poss: getPoss, shots: getShots(hS), shotsOnTarget: getSOT(hS), corners: getCorners(hS) },
+            away: { poss: hS['possessionPct'] != null ? (100 - getPoss) : null, shots: getShots(aS), shotsOnTarget: getSOT(aS), corners: getCorners(aS) },
+          } : null
+
+          if (summaryStats && espnScoresCache[matchId]) {
+            espnScoresCache[matchId].stats = summaryStats
+          }
+        } catch {}
       }
     } catch (err) {
       console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
