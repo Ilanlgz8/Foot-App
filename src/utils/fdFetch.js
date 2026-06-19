@@ -57,3 +57,21 @@ export async function fdFetch(url, options) {
   await waitForSlot()
   return fetch(url, options)
 }
+
+/**
+ * Transforme une URL /api/v4/PATH?QS en /api/football?apiPath=/v4/PATH&QS
+ * Permet d'utiliser api/football.js comme proxy sans catch-all routing Vercel.
+ * Le query string est passé tel quel (virgules non encodées).
+ *
+ * @param {string} rawPath  ex: '/api/v4/competitions/FL1/matches?status=FINISHED'
+ * @returns {string}        ex: '/api/football?apiPath=%2Fv4%2Fcompetitions%2FFL1%2Fmatches&status=FINISHED'
+ */
+export function fdUrl(rawPath) {
+  const sep = rawPath.indexOf('?')
+  if (sep >= 0) {
+    const p = rawPath.slice(4, sep)  // supprime '/api' → '/v4/...'
+    const q = rawPath.slice(sep + 1) // query string brut, virgules préservées
+    return `/api/football?apiPath=${encodeURIComponent(p)}&${q}`
+  }
+  return `/api/football?apiPath=${encodeURIComponent(rawPath.slice(4))}`
+}

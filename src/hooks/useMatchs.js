@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
-import { fdFetch } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)
@@ -59,7 +59,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
 
       // Helper : fetch une URL et retourne les matches (null si 429/403/erreur)
       async function tryFetch(url) {
-        const res = await fdFetch(url)
+        const res = await fdFetch(fdUrl(url))
         if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
         if (!res.ok) return null
         const json = await res.json()

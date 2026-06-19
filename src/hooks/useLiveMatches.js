@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { trackMatchState, clearMatchState, isEspnWorking } from '../utils/matchStateTracker'
 import { markLive } from './liveTracker'
-import { fdFetch } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 
 export function useLiveMatches() {
   const queryClient = useQueryClient()
@@ -39,8 +39,8 @@ export function useLiveMatches() {
 
       try {
         const [r1, r2] = await Promise.all([
-          fdFetch('/api/v4/matches?status=IN_PLAY'),
-          fdFetch('/api/v4/matches?status=PAUSED'),
+          fdFetch(fdUrl('/api/v4/matches?status=IN_PLAY')),
+          fdFetch(fdUrl('/api/v4/matches?status=PAUSED')),
         ])
 
         if (r1.status === 429 || r2.status === 429) throw new Error('429')

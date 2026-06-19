@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-
+import { fdUrl } from '../utils/fdFetch'
 
 // Retourne 'W', 'L' ou 'D' selon les buts marqués et encaissés
 function getResult(myGoals, theirGoals) {
@@ -13,7 +13,7 @@ export function useTeamForm(selectedComp) {
     queryKey: ['teamForm', selectedComp],
     queryFn: async () => {
       const res = await fetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
+        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED`)
       )
       if (!res.ok) return { formMap: {}, matches: [] }
 

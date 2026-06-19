@@ -3,7 +3,7 @@
 // Cache localStorage 24h — les données d'un match terminé ne changent jamais.
 import { useQuery } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
-import { fdFetch } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -11,7 +11,7 @@ export function useMatchDetail(matchId) {
   const { data, isLoading } = useQuery({
     queryKey: ['matchDetail', matchId],
     queryFn: async () => {
-      const res = await fdFetch(`/api/v4/matches/${matchId}`)
+      const res = await fdFetch(fdUrl(`/api/v4/matches/${matchId}`))
       if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`${res.status}`)
       const json = await res.json()

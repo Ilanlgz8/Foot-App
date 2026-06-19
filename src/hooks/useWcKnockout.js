@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fdFetch } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
@@ -29,7 +29,7 @@ export function useWcKnockout() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['wc-knockout'],
     queryFn: async () => {
-      const res = await fdFetch(`/api/v4/competitions/WC/matches`)
+      const res = await fdFetch(fdUrl(`/api/v4/competitions/WC/matches`))
       if (res.status === 403 || res.status === 429) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
       const json = await res.json()

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fdFetch } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
 const STALE_MS = 1000 * 60 * 15  // 15min
@@ -10,7 +10,7 @@ export function useStandings(selectedComp) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
     queryFn: async () => {
-      const res = await fdFetch(`/api/v4/competitions/${selectedComp}/standings`)
+      const res = await fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
       if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
       const json = await res.json()
