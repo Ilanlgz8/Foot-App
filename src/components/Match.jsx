@@ -313,7 +313,12 @@ function Matchs() {
 
   /* ── Modal poule ── */
   function GroupModal({ groupKey, onClose }) {
-    const groupMatches = matchesByGroup.get(groupKey) ?? []
+    const allGroupMatches = matchesByGroup.get(groupKey) ?? []
+    // Dans "matchs à venir" : seulement les matchs pas encore joués
+    const groupMatches = allGroupMatches.filter(m =>
+      m.status === 'TIMED' || m.status === 'SCHEDULED' ||
+      m.status === 'IN_PLAY' || m.status === 'PAUSED'
+    )
 
     useEffect(() => {
       const handler = e => { if (e.key === 'Escape') onClose() }
