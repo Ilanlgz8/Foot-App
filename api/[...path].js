@@ -3,7 +3,8 @@ export default async function handler(req, res) {
   try {
     const { path: segments, ...rest } = req.query
     const parts   = Array.isArray(segments) ? segments : [segments]
-    const apiPath = '/v4/' + parts.join('/')
+    const apiPath = '/' + parts.join('/')
+    // ex: parts = ['v4','competitions','FL1','matches'] → apiPath = '/v4/competitions/FL1/matches'
     const qs      = new URLSearchParams(rest).toString()
     const url     = `https://api.football-data.org${apiPath}${qs ? '?' + qs : ''}`
 
