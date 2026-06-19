@@ -69,19 +69,24 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
       let matches = null
 
       if (!isClub) {
-        // WC / EC : fetch TOUS les matchs de la saison courante sans filtre statut
-        // (FD.org utilise TIMED au lieu de SCHEDULED pour les matchs confirmés)
-        // puis on filtre côté client selon ce qu'on veut afficher
         const wcSeason = new Date().getFullYear()
-        const all = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
-        ) ?? []
         if (status === 'SCHEDULED') {
-          // Matchs à venir : TIMED ou SCHEDULED (pas encore joués)
-          matches = all.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED')
+          // Vue "Matchs à venir" WC : retourner TOUS les matchs de la saison
+          // La vue "poules" a besoin des matchs FINISHED aussi pour afficher les groupes complets
+          // FD.org utilise TIMED (pas SCHEDULED) pour les matchs à heure confirmée
+          matches = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
+          )
         } else {
-          // Résultats : FINISHED uniquement
-          matches = all.filter(m => m.status === 'FINISHED')
+          // Résultats WC : seulement FINISHED
+          matches = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
+          )
+          if (!matches || matches.length === 0) {
+            matches = await tryFetch(
+              `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
+            )
+          }
         }
       } else if (status === 'FINISHED') {
         // Clubs : saison qui vient de se terminer (juin 2026 → 2025)
