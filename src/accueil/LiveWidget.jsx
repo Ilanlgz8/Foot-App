@@ -107,12 +107,12 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine }) {
 
   return (
     <div className="accueil__liveWidgetScoreWrap">
-      <span className="accueil__liveWidgetMinute">{label}</span>
       <div className="accueil__liveWidgetPills">
         <div className={homeCls}>{h}</div>
         <div className="accueil__liveWidgetPillBar" />
         <div className={awayCls}>{a}</div>
       </div>
+      <span className="accueil__liveWidgetMinute">{label}</span>
     </div>
   )
 }
@@ -208,12 +208,17 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
   return (
     <div className="accueil__liveWidget">
       <div className="accueil__liveWidgetHeader">
-        <span className="accueil__liveWidgetDot" />
-        <span className="accueil__liveWidgetTitle">EN DIRECT</span>
-        {live.length > 1 && <span className="accueil__liveWidgetCount">{live.length}</span>}
-        {onRecalibrate && (
-          <button className="accueil__liveWidgetRecal" onClick={onRecalibrate} title="Recalibrer les minutes">⟳</button>
-        )}
+        {/* Compétition à gauche */}
+        <CompBadge match={live[0]} />
+        {/* EN DIRECT à droite */}
+        <div className="accueil__liveWidgetHeaderRight">
+          <span className="accueil__liveWidgetDot" />
+          <span className="accueil__liveWidgetTitle">EN DIRECT</span>
+          {live.length > 1 && <span className="accueil__liveWidgetCount">{live.length}</span>}
+          {onRecalibrate && (
+            <button className="accueil__liveWidgetRecal" onClick={onRecalibrate} title="Recalibrer les minutes">⟳</button>
+          )}
+        </div>
       </div>
 
       <div className="accueil__liveWidgetMatches">
@@ -237,7 +242,6 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
               onKeyDown={clickable ? e => e.key === 'Enter' && onMatchClick(match) : undefined}
             >
               <div className="accueil__liveWidgetMeta">
-                <CompBadge match={match} />
                 <PeriodBadge match={match} />
               </div>
 

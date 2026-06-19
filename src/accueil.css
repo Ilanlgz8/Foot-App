@@ -1597,18 +1597,16 @@
   gap: 0 0.6rem;
 }
 
-/* Équipe : blason + nom côte à côte sur la même ligne */
+/* Équipe : blason au-dessus, nom en dessous (layout colonne original) */
 .accueil__liveWidgetTeam {
   display: flex;
-  flex-direction: row-reverse; /* home : [nom][blason] — blason contre le score */
-  align-items: center;
-  gap: 0.45rem;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
   min-width: 0;
 }
 .accueil__liveWidgetTeam--away {
-  flex-direction: row; /* away : [blason][nom] */
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 .accueil__liveWidgetCrest {
   width: 1.6rem;
@@ -1697,10 +1695,18 @@
 .accueil__liveWidgetHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.45rem;
   padding: 0.45rem 0.75rem;
   border-bottom: 1px solid rgba(220,38,38,0.15);
   background: rgba(220,38,38,0.06);
+}
+
+.accueil__liveWidgetHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
 }
 
 .accueil__liveWidgetDot {
