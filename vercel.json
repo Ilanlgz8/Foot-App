@@ -1,10 +1,9 @@
 {
   "rewrites": [
-    { "source": "/news",         "destination": "/api/news" },
-    { "source": "/espn",         "destination": "/api/espn" },
-    { "source": "/sofascore",    "destination": "/api/sofascore" },
-    { "source": "/apifootball",  "destination": "/api/apifootball" },
-    { "source": "/api/v4/:path*", "destination": "/api/football?apiPath=/v4/:path*" },
-    { "source": "/(.*)",         "destination": "/index.html" }
+    { "source": "/news",        "destination": "/api/news" },
+    { "source": "/espn",        "destination": "/api/espn" },
+    { "source": "/sofascore",   "destination": "/api/sofascore" },
+    { "source": "/apifootball", "destination": "/api/apifootball" },
+    { "source": "/(.*)",        "destination": "/index.html" }
   ]
 }

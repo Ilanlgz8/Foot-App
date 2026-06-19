@@ -34,10 +34,16 @@ function parseRSS(xml, sourceName) {
   })).filter(a => a.title && a.url)
 }
 
+function fetchWithTimeout(url, options, ms = 6000) {
+  const ctrl = new AbortController()
+  const id   = setTimeout(() => ctrl.abort(), ms)
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id))
+}
+
 module.exports = async (_req, res) => {
   try {
     const results = await Promise.allSettled(
-      RSS_FEEDS.map(url => fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }))
+      RSS_FEEDS.map(url => fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }))
     )
 
     const articles = []
@@ -54,6 +60,7 @@ module.exports = async (_req, res) => {
 
     res.status(200).json({ articles })
   } catch (err) {
+    console.error('[news]', err)
     res.status(500).json({ error: err.message })
   }
 }
