@@ -1,13 +1,9 @@
 // Mémorise les transitions d'état des matchs dans le localStorage.
-// But : détecter PAUSED → IN_PLAY pour connaître l'heure exacte du début de la 2ème MT.
+// But : détecter PAUSED → IN_PLAY pour connaître l'heure exacte du début de la 2ème MT,
+// et suivre la machine d'états live (unknown → live → pendingEnd → ended).
 
 // ─── Santé ESPN ───────────────────────────────────────────────────────────────
-// Flag in-memory mis à jour par useLiveMinute :
-//   • setEspnWorking(true)  → quand ESPN répond avec des données valides
-//   • setEspnWorking(false) → après 3 échecs ESPN consécutifs (~60s)
-// Consulté par useLiveMatches pour savoir si FD.org est nécessaire en fallback.
 let _espnWorking = false
-
 export const setEspnWorking = (v) => { _espnWorking = v }
 export const isEspnWorking  = ()  => _espnWorking
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,8 +11,23 @@ export const isEspnWorking  = ()  => _espnWorking
 const key = (id) => `foot_ms_${id}`
 const TRACKED_KEY = 'foot_tracked_matches'
 
+// Auto-nettoyage au chargement : supprimer les états 'ended' de plus de 3h
+// (ils bloquent la ré-injection si ESPN revient — inutile après 3h)
+try {
+  const cutoff = Date.now() - 3 * 60 * 60_000
+  for (const k of Object.keys(localStorage)) {
+    if (!k.startsWith('foot_ms_')) continue
+    try {
+      const st = JSON.parse(localStorage.getItem(k) || '{}')
+      if (st.liveState === 'ended' && st.endedAt && st.endedAt < cutoff) {
+        localStorage.removeItem(k)
+      }
+    } catch {}
+  }
+} catch {}
+
 /**
- * Retourne l'ensemble des IDs de matchs sélectionnés pour le suivi précis (API-Football).
+ * Retourne l'ensemble des IDs de matchs sélectionnés pour le suivi précis.
  */
 export function getTrackedMatches() {
   try {
@@ -28,7 +39,6 @@ export function getTrackedMatches() {
 
 /**
  * Active ou désactive le suivi précis d'un match.
- * Retourne true si le match est désormais suivi, false sinon.
  */
 export function toggleTrackedMatch(matchId) {
   const ids = getTrackedMatches()
@@ -40,83 +50,156 @@ export function toggleTrackedMatch(matchId) {
 }
 
 /**
+ * Retourne l'état live d'un match :
+ * { state: 'unknown' | 'live' | 'pendingEnd' | 'ended', since?, endedAt? }
+ *
+ * - 'unknown'    : pas encore vu comme live
+ * - 'live'       : ESPN a confirmé en cours au moins une fois
+ * - 'pendingEnd' : ESPN dit FINAL depuis `since` ms (en attente confirmation 2min)
+ * - 'ended'      : fin confirmée (espéré réel, pas un faux positif)
+ *
+ * L'état 'ended' auto-expire après 3h (nettoyé au module load ci-dessus).
+ */
+export function getLiveState(matchId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    return {
+      state:   stored.liveState    ?? 'unknown',
+      since:   stored.pendingEndSince ?? null,
+      endedAt: stored.endedAt      ?? null,
+    }
+  } catch {
+    return { state: 'unknown', since: null, endedAt: null }
+  }
+}
+
+/**
+ * Écrit l'état live dans foot_ms_ (sans écraser les autres champs).
+ *
+ * @param {string} state - 'live' | 'pendingEnd' | 'ended'
+ * @param {object} opts
+ *   since    : timestamp de début de pendingEnd (pour state='pendingEnd')
+ *   endedAt  : timestamp de fin confirmée (pour state='ended')
+ */
+export function setLiveState(matchId, state, { since, endedAt } = {}) {
+  if (!matchId) return
+  try {
+    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    stored.liveState = state
+
+    if (state === 'pendingEnd') {
+      stored.pendingEndSince = since ?? stored.pendingEndSince ?? Date.now()
+    } else {
+      delete stored.pendingEndSince
+    }
+
+    if (state === 'ended') {
+      stored.endedAt = endedAt ?? Date.now()
+    } else {
+      delete stored.endedAt
+    }
+
+    localStorage.setItem(key(matchId), JSON.stringify(stored))
+  } catch {}
+}
+
+/**
  * À appeler à chaque fois qu'on reçoit des données fraîches sur un match en live.
- * Enregistre les transitions PAUSED et IN_PLAY (reprise).
  */
 export function trackMatchState(match) {
   if (!match?.id) return
   const stored = JSON.parse(localStorage.getItem(key(match.id)) || '{}')
 
-  // On voit PAUSED pour la 1ère fois → noter l'heure
   if (match.status === 'PAUSED' && !stored.pausedAt) {
     stored.pausedAt = Date.now()
     localStorage.setItem(key(match.id), JSON.stringify(stored))
   }
-
-  // half2Start est écrit uniquement par setHalf2Start() (useLiveMinute / api-football.com).
-  // On ne le déduit plus du statut football-data.org : trop imprévisible.
-  // calcMinute gère la transition MT→2ème MT via pausedAt + estimation 15min.
 }
 
 /**
- * Force l'enregistrement de half2Start (utile si pausedAt n'a jamais été capturé).
- * Reconstruit depuis apiElapsed : half2Start = now - (elapsed - 45) * 60s
- * N'écrase pas si déjà défini.
+ * Force l'enregistrement de half2Start.
  */
 export function setHalf2Start(matchId, half2Start) {
   if (!matchId) return
   const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
-  // Pas de guard : on recalcule depuis apiElapsed à chaque poll 2H,
-  // ce qui auto-corrige toute valeur pourrie issue d'un bug précédent.
   stored.half2Start = half2Start
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
 
 /**
- * Mémorise le timestamp exact du coup d'envoi réel (détecté via API-Football).
- * Reconstruit depuis la minute elapsed au moment de la détection.
- * N'écrase pas si déjà défini.
+ * Mémorise le timestamp exact du coup d'envoi réel.
  */
 export function setKickoffAt(matchId, kickoffAt) {
   if (!matchId) return
   const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
-  if (stored.kickoffAt) return  // déjà mémorisé, ne pas écraser
+  if (stored.kickoffAt) return
   stored.kickoffAt = kickoffAt
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
 
 /**
  * Met à jour les données ESPN en direct (espnClock, espnStatus).
- * Écrase toujours : appelé à chaque poll ESPN (20s) pour avoir les données fraîches.
- * espnClock ex. "42:00" ou "45:00+2:00" ; espnStatus ex. "STATUS_IN_PROGRESS".
  */
 export function setEspnData(matchId, { espnClock, espnStatus }) {
   if (!matchId) return
   const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
-  stored.espnClock       = espnClock
-  stored.espnStatus      = espnStatus
-  stored.espnCapturedAt  = Date.now()  // timestamp du poll → permet l'interpolation côté client
+  stored.espnClock      = espnClock
+  stored.espnStatus     = espnStatus
+  stored.espnCapturedAt = Date.now()
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
 
 /**
- * Retourne les données mémorisées pour un match :
- * { kickoffAt?, pausedAt?, half2Start?, espnClock?, espnStatus?, espnCapturedAt? }
+ * Retourne toutes les données mémorisées pour un match.
  */
 export function getMatchState(matchId) {
   return JSON.parse(localStorage.getItem(key(matchId)) || '{}')
 }
 
 /**
- * Nettoie l'état d'un match terminé.
+ * Efface uniquement les flags ft/termineAt sans toucher le reste du state.
+ * Utilisé quand ESPN revient en IN_PLAY après un faux STATUS_FINAL :
+ * on veut supprimer le flag "Terminé" sans perdre liveState, matchSnapshot,
+ * kickoffAt, pausedAt, espnClock, etc.
  */
-export function clearMatchState(matchId) {
+export function clearFtFlags(matchId) {
+  if (!matchId) return
+  try {
+    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    if (!stored.ft && !stored.termineAt) return  // rien à faire
+    delete stored.ft
+    delete stored.termineAt
+    localStorage.setItem(key(matchId), JSON.stringify(stored))
+  } catch {}
+}
+
+/**
+ * Nettoie l'état d'un match.
+ *
+ * @param {object} opts
+ *   preserveEnded : si true et que liveState === 'ended', conserve uniquement
+ *                   { liveState, endedAt } — utilisé après la grace period pour
+ *                   bloquer toute ré-injection ESPN post-FT sans perdre l'info.
+ */
+export function clearMatchState(matchId, { preserveEnded = false } = {}) {
+  if (preserveEnded) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+      if (stored.liveState === 'ended') {
+        // Garder uniquement l'info de fin — efface kickoffAt, pausedAt, espnClock, ft, etc.
+        localStorage.setItem(key(matchId), JSON.stringify({
+          liveState: 'ended',
+          endedAt:   stored.endedAt ?? Date.now(),
+        }))
+        return
+      }
+    } catch {}
+  }
   localStorage.removeItem(key(matchId))
 }
 
 /**
  * Efface tous les états de matchs (foot_ms_*).
- * Utile pour recalibrer les minutes en cas de dérive.
  */
 export function clearAllMatchStates() {
   Object.keys(localStorage)

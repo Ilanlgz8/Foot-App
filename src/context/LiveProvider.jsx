@@ -5,27 +5,25 @@
  * Quand l'utilisateur va sur Classement, Résultats, etc., le polling ESPN continue.
  *
  * Fournit via useLiveData() :
- *   • liveMatches  — matchs actuellement en cours (source : stickyLive)
+ *   • liveMatches  — matchs actuellement en cours (source : liveTracker, persisté localStorage)
  *   • espnScores   — scores + buteurs + stats ESPN en temps réel
  *   • recalibrate  — force un re-poll complet (bouton ⟳ dans LiveWidget)
+ *
+ * Architecture :
+ *   liveTracker.js est la seule source de vérité.
+ *   markLive(match) → widget visible immédiatement, même après reload.
+ *   markEnded(id)   → widget disparaît (5min de STATUS_FINAL + horloge >= 85min).
+ *   Pas de stickyLive, pas de machine d'états complexe, pas de pendingEviction.
  */
 
-import { createContext, useContext, useEffect, useRef, useMemo } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTodayMatches } from '../hooks/useTodayMatches'
 import { useLiveMatches } from '../hooks/useLiveMatches'
 import { useLiveMinute } from '../hooks/useLiveMinute'
 import { useEspnScores } from '../hooks/useEspnScores'
-import { getMatchState } from '../utils/matchStateTracker'
+import { useLiveTracker } from '../hooks/liveTracker'
 import { requestNotificationPermission } from '../utils/notifications'
-
-const ESPN_LIVE_STATUSES = new Set([
-  'STATUS_IN_PROGRESS',
-  'STATUS_HALFTIME',
-  'STATUS_END_PERIOD',
-  'STATUS_EXTRA_TIME',
-  'STATUS_OVERTIME',
-])
 
 const LiveCtx = createContext({
   liveMatches:  [],
@@ -38,26 +36,18 @@ export function LiveProvider({ children }) {
 
   // Toujours aujourd'hui — le live ne concerne que le jour courant
   const { matches } = useTodayMatches()
-  const rawLiveMatches = useLiveMatches()
+
+  // FD.org polling (fallback si ESPN down) — side effect uniquement
+  // Quand ESPN est down, useLiveMatches appelle markLive() pour les matchs IN_PLAY FD.org
+  useLiveMatches()
+
   const espnScores = useEspnScores()
 
-  // Source de vérité combinée :
-  // 1. rawLiveMatches (stickyLive via useLiveMatches)
-  // 2. Fallback : matchs du jour dont ESPN confirme le live via localStorage (espnStatus)
-  //    → si stickyLive se vide (visibilité, refresh), le widget reste affiché
-  //    → espnScores comme dépendance garantit le recalcul à chaque poll ESPN (5s)
-  const liveMatches = useMemo(() => {
-    const result = [...rawLiveMatches]
-    for (const m of matches) {
-      if (result.some(r => r.id === m.id)) continue
-      const state = getMatchState(m.id)
-      if (ESPN_LIVE_STATUSES.has(state.espnStatus)) {
-        result.push({ ...m, status: 'IN_PLAY' })
-      }
-    }
-    return result
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawLiveMatches, matches, espnScores])
+  // ── Source de vérité unique ─────────────────────────────────────────────────
+  // liveTracker lit depuis localStorage au module load → disponible immédiatement.
+  // markLive() appelé dans useLiveMinute → met à jour liveTracker → re-render ici.
+  // Survit aux rechargements, aux faux STATUS_FINAL ESPN, et aux buts.
+  const liveMatches = useLiveTracker()
 
   const { recalibrate } = useLiveMinute(
     liveMatches.length > 0
@@ -66,8 +56,6 @@ export function LiveProvider({ children }) {
   )
 
   // Quand un nouveau match passe en live → invalider useTodayMatches immédiatement
-  // (sinon le panel attend jusqu'à 10min pour afficher IN_PLAY)
-  // + demander la permission de notifier au bon moment
   const prevLiveCount = useRef(0)
   useEffect(() => {
     if (liveMatches.length > prevLiveCount.current) {
