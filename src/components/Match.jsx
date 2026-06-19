@@ -248,11 +248,28 @@ function Matchs() {
     return teams
   }
 
+  /* Auto-switch : si des matchs existent mais aucun groupe détecté → vue par journée */
+  useEffect(() => {
+    if (isWC && wcView === 'poules' && !loading && matches.length > 0 && wcGroups.length === 0) {
+      setWcView('matchs')
+      setCurrentIndex(0)
+    }
+  }, [isWC, wcView, loading, matches.length, wcGroups.length])
+
+  /* Pour "matchs à venir" WC en vue par journée : on ne montre que les TIMED/SCHEDULED/live */
+  const filteredGrouped = useMemo(() => {
+    if (!isWC || wcView !== 'matchs') return grouped
+    return grouped.map(([day, dayMatches]) => [
+      day,
+      dayMatches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED' || m.status === 'IN_PLAY' || m.status === 'PAUSED')
+    ]).filter(([, ms]) => ms.length > 0)
+  }, [isWC, wcView, grouped])
+
   /* Navigation journées */
-  const currentGroup    = grouped[currentIndex]
+  const currentGroup    = filteredGrouped[currentIndex]
   const currentMatchday = currentGroup?.[0]
   const currentMatches  = currentGroup?.[1] ?? []
-  const total           = grouped.length
+  const total           = filteredGrouped.length
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {

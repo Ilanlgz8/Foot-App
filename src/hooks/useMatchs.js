@@ -71,12 +71,22 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
       if (!isClub) {
         const wcSeason = new Date().getFullYear()
         if (status === 'SCHEDULED') {
-          // Vue "Matchs à venir" WC : retourner TOUS les matchs de la saison
-          // La vue "poules" a besoin des matchs FINISHED aussi pour afficher les groupes complets
-          // FD.org utilise TIMED (pas SCHEDULED) pour les matchs à heure confirmée
+          // Essai 1 : tous les matchs de la saison (poules + bracket complets)
           matches = await tryFetch(
             `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
           )
+          // Essai 2 : seulement TIMED si retourne vide (FD.org utilise TIMED pour heure confirmée)
+          if (!matches || matches.length === 0) {
+            matches = await tryFetch(
+              `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
+            )
+          }
+          // Essai 3 : sans filtre de saison (saison courante par défaut sur FD.org)
+          if (!matches || matches.length === 0) {
+            matches = await tryFetch(
+              `/api/v4/competitions/${selectedComp}/matches`
+            )
+          }
         } else {
           // Résultats WC : seulement FINISHED
           matches = await tryFetch(
