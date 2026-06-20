@@ -897,6 +897,7 @@
   padding: 1.5rem;
   backdrop-filter: blur(4px);
   animation: fadeIn 0.15s ease;
+  overscroll-behavior: none;
 }
 
 @keyframes fadeIn {
