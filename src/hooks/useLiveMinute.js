@@ -306,9 +306,6 @@ function _runFtSafeguards(matches, now, queryClient) {
 async function pollESPN(matches, queryClient) {
   const now = Date.now()
 
-  // Safeguards toujours actifs — avant le early return
-  _runFtSafeguards(matches, now, queryClient)
-
   const slugSet = new Set()
   for (const m of matches) {
     const elapsed = (now - new Date(m.utcDate)) / 60000
@@ -318,7 +315,12 @@ async function pollESPN(matches, queryClient) {
       if (slug) slugSet.add(slug)
     }
   }
-  if (slugSet.size === 0) return
+
+  // Pas de slugs → safeguards + sortie
+  if (slugSet.size === 0) {
+    _runFtSafeguards(matches, now, queryClient)
+    return
+  }
 
   const d = new Date()
   const todayESPN = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
@@ -521,6 +523,10 @@ async function pollESPN(matches, queryClient) {
       console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
     }
   }
+
+  // Safeguards après traitement ESPN — scores à jour dans espnScoresCache
+  // (évite que safeguard 3 confirme FT avec l'ancien score avant qu'ESPN mette à jour)
+  _runFtSafeguards(matches, now, queryClient)
 
   // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé
   queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
