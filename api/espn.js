@@ -36,7 +36,9 @@ export default async function handler(req, res) {
     const body = await response.text()
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+       .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
+       .setHeader('Pragma', 'no-cache')
+       .setHeader('Surrogate-Control', 'no-store')
        .send(body)
   } catch (err) {
     clearTimeout(timeoutId)

@@ -321,7 +321,7 @@ async function pollESPN(matches, queryClient) {
 
   for (const slug of slugSet) {
     try {
-      const res = await fetch(`/espn?slug=${slug}&dates=${todayESPN}`)
+      const res = await fetch(`/espn?slug=${slug}&dates=${todayESPN}&_t=${Date.now()}`)
       if (!res.ok) {
         espnFailStreak++
         if (espnFailStreak >= 3) setEspnWorking(false)
