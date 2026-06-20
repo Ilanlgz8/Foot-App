@@ -41,12 +41,53 @@ const FD_TO_AFL = {
 }
 
 // ── Normalisation pour le fuzzy matching ───────────────────────────────────────
+// Aliases connus FD.org -> api-football (noms normalisés)
+const TEAM_ALIASES = {
+  'paris saint-germain': 'paris saint-germain',
+  'psg': 'paris saint-germain',
+  'olympique de marseille': 'marseille',
+  'olympique lyonnais': 'olympique lyonnais',
+  'stade rennais': 'rennes',
+  'stade brestois 29': 'brest',
+  'manchester united': 'manchester united',
+  'manchester city': 'manchester city',
+  'tottenham hotspur': 'tottenham',
+  'wolverhampton wanderers': 'wolverhampton',
+  'brighton hove albion': 'brighton',
+  'brighton & hove albion': 'brighton',
+  'nottingham forest': 'nottingham forest',
+  'newcastle united': 'newcastle',
+  'west ham united': 'west ham',
+  'leeds united': 'leeds',
+  'atletico madrid': 'atletico madrid',
+  'athletic bilbao': 'athletic club',
+  'real sociedad': 'real sociedad',
+  'deportivo alaves': 'alaves',
+  'bayer 04 leverkusen': 'bayer leverkusen',
+  'borussia dortmund': 'borussia dortmund',
+  'rb leipzig': 'rb leipzig',
+  'eintracht frankfurt': 'eintracht frankfurt',
+  'werder breme': 'werder bremen',
+  'inter milan': 'inter',
+  'milan ac': 'ac milan',
+  'ac milan': 'ac milan',
+  'ss lazio': 'lazio',
+  'as roma': 'roma',
+  'hellas verona': 'hellas verona',
+}
+
 function normTeam(name = '') {
-  return name
+  const lower = name
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(fc|sc|ac|cf|rc|as|us|sv|fk|sk|if|bk|gd|cd|sd|ud|rcd|afc|cfc|sfc|real|atletico|atletico|borussia|sporting|olympique|stade|racing|paris|saint|germain|manchester|united|city)\b/g, ' ')
     .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Alias connu -> forme canonique
+  if (TEAM_ALIASES[lower]) return TEAM_ALIASES[lower]
+  // Supprime uniquement les suffixes generiques (FC, SC...), pas les noms de ville
+  return lower
+    .replace(/\b(fc|sc|cf|rc|us|sv|fk|sk|if|bk|gd|cd|sd|ud|rcd|afc|cfc|sfc)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
