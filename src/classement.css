@@ -1126,7 +1126,7 @@
   .classement__table--compact tbody td:nth-child(7) { display: none; }
 }
 
-/* Modal groupe — toutes les données comme desktop, compacté pour mobile */
+/* Modal groupe — table scrollable horizontalement dans le modal (comme ESPN/SofaScore) */
 @media (max-width: 640px) {
   .classement__modalOverlay { padding: 0.4rem; }
   .classement__modalBox {
@@ -1135,13 +1135,20 @@
     overflow-y: auto;
     width: 100%;
   }
-  .classement__modalBox .classement__tableWrap { overflow-x: hidden; }
 
-  /* table-layout:fixed + largeurs px précises pour 355px de table */
+  /* Le tableWrap scroll horizontalement — le modal reste fixe */
+  .classement__modalBox .classement__tableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .classement__modalBox .classement__tableWrap::-webkit-scrollbar { display: none; }
+
+  /* Table à taille naturelle compacte — pas de min-width forcé */
   .classement__modalBox .classement__table {
-    width: 100%;
-    min-width: 0;
-    table-layout: fixed;
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
   }
 
   /* Restaurer V/N/D/Diff cachés par la règle générale mobile */
@@ -1158,49 +1165,35 @@
   .classement__modalBox .classement__table thead th:nth-child(9),
   .classement__modalBox .classement__table tbody td:nth-child(9) { display: none; }
 
-  /* Largeurs px : total fixed = 192px, Équipe prend le reste (~163px sur 355px) */
-  .classement__modalBox .classement__table thead th:nth-child(1)  { width: 20px; }  /* Pos  */
-  .classement__modalBox .classement__table thead th:nth-child(2)  { width: auto; }  /* Équipe */
-  .classement__modalBox .classement__table thead th:nth-child(3)  { width: 22px; }  /* Pts  */
-  .classement__modalBox .classement__table thead th:nth-child(4)  { width: 20px; }  /* MJ   */
-  .classement__modalBox .classement__table thead th:nth-child(5),
-  .classement__modalBox .classement__table thead th:nth-child(6),
-  .classement__modalBox .classement__table thead th:nth-child(7)  { width: 18px; }  /* V N D */
-  .classement__modalBox .classement__table thead th:nth-child(8)  { width: 22px; }  /* Diff */
-  .classement__modalBox .classement__table thead th:last-child     { width: 52px; }  /* Forme (4 badges) */
-
-  /* Padding ultra-serré + font réduite */
+  /* Cellules compactes mais lisibles */
   .classement__modalBox .classement__table thead th,
   .classement__modalBox .classement__table tbody td {
-    padding: 0.5rem 0.1rem;
-    font-size: 0.65rem;
-    overflow: hidden;
-  }
-  .classement__modalBox .classement__table thead th {
-    font-size: 0.46rem;
-    letter-spacing: 0;
+    padding: 0.55rem 0.5rem;
+    font-size: 0.75rem;
     white-space: nowrap;
   }
+  .classement__modalBox .classement__table thead th { font-size: 0.58rem; }
 
-  /* Équipe : crest + nom tronqué */
+  /* Nom d'équipe : tronqué à 6rem max */
   .classement__modalBox .classement__teamName {
-    max-width: 4.2rem;
+    max-width: 6rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
-  .classement__modalBox .classement__teamCrest { width: 0.95rem; height: 0.95rem; }
+  .classement__modalBox .classement__teamCrest { width: 1.1rem; height: 1.1rem; }
+  .classement__modalBox .classement__teamTopLine { gap: 0.3rem; }
+  .classement__modalBox .classement__zoneDot { width: 0.45rem; height: 0.45rem; }
 
-  /* 4 badges Forme seulement (masquer le 5e) — 4 × 10.4px + 3 × 1px = ~45px dans 52px ✓ */
+  /* Badges Forme compacts */
   .classement__modalBox .classement__formeBadge {
-    width: 0.65rem;
-    height: 0.65rem;
-    font-size: 0.32rem;
-    border-radius: 0.1rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    font-size: 0.4rem;
+    border-radius: 0.15rem;
   }
-  .classement__modalBox .classement__forme { gap: 0.06rem; flex-wrap: nowrap; }
-  .classement__modalBox .classement__formeBadge:nth-child(5) { display: none; }
+  .classement__modalBox .classement__forme { gap: 0.1rem; flex-wrap: nowrap; }
 
   /* Sidebar active state plus visible */
   .classement__sidebarItem--active {
