@@ -389,6 +389,7 @@
   }
 
   .resultats__sidebarLabel { display: none; }
+  .resultats__sidebarName  { display: none; }
 
   .resultats__sidebarNav {
     flex-direction: row;

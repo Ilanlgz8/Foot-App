@@ -563,15 +563,24 @@
 }
 
 /* Largeurs % : identiques dans tous les groupes → colonnes alignées */
-.classement__table--compact thead th:nth-child(1) { width: 5%; }      /* Pos  */
-.classement__table--compact thead th:nth-child(2) { width: auto; }    /* Équipe — prend le reste */
-.classement__table--compact thead th:nth-child(3) { width: 8%; }      /* Pts  */
-.classement__table--compact thead th:nth-child(4) { width: 7%; }      /* MJ   */
+.classement__table--compact thead th:nth-child(1) { width: 5%; text-align: center; }   /* Pos  */
+.classement__table--compact thead th:nth-child(2) { width: auto; }                        /* Équipe — prend le reste */
+.classement__table--compact thead th:nth-child(3) { width: 8%; text-align: center; }   /* Pts  */
+.classement__table--compact thead th:nth-child(4) { width: 7%; text-align: center; }   /* MJ   */
 .classement__table--compact thead th:nth-child(5),
 .classement__table--compact thead th:nth-child(6),
-.classement__table--compact thead th:nth-child(7) { width: 7%; }      /* V N D */
-.classement__table--compact thead th:nth-child(8) { width: 8%; }      /* Diff */
-.classement__table--compact thead th:last-child   { width: 16%; }     /* Forme */
+.classement__table--compact thead th:nth-child(7) { width: 7%; text-align: center; }   /* V N D */
+.classement__table--compact thead th:nth-child(8) { width: 8%; text-align: center; }   /* Diff */
+.classement__table--compact thead th:last-child   { width: 16%; }                         /* Forme */
+
+/* Centrer les cellules numériques dans les lignes aussi */
+.classement__table--compact .classement__row td:nth-child(1),
+.classement__table--compact .classement__row td:nth-child(3),
+.classement__table--compact .classement__row td:nth-child(4),
+.classement__table--compact .classement__row td:nth-child(5),
+.classement__table--compact .classement__row td:nth-child(6),
+.classement__table--compact .classement__row td:nth-child(7),
+.classement__table--compact .classement__row td:nth-child(8) { text-align: center; }
 
 .classement__table--compact thead th,
 .classement__table--compact .classement__row td {
