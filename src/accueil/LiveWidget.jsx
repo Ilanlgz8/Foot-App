@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
@@ -209,26 +210,38 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
     m.status === 'IN_PLAY' || m.status === 'PAUSED' || getMatchState(m.id).ft === true
   )
 
+  const [activeIdx, setActiveIdx] = useState(0)
+  const matchesRef = useRef(null)
+
+  const onScroll = useCallback(() => {
+    const el = matchesRef.current
+    if (!el) return
+    const idx = Math.round(el.scrollLeft / el.offsetWidth)
+    setActiveIdx(idx)
+  }, [])
+
   if (live.length === 0) return null
+
+  const sliced = live.slice(0, 5)
 
   return (
     <div className="accueil__liveWidget">
       <div className="accueil__liveWidgetHeader">
         {/* Compétition à gauche */}
-        <CompBadge match={live[0]} />
+        <CompBadge match={sliced[activeIdx] ?? sliced[0]} />
         {/* EN DIRECT à droite */}
         <div className="accueil__liveWidgetHeaderRight">
           <span className="accueil__liveWidgetDot" />
           <span className="accueil__liveWidgetTitle">EN DIRECT</span>
-          {live.length > 1 && <span className="accueil__liveWidgetCount">{live.length}</span>}
+          {sliced.length > 1 && <span className="accueil__liveWidgetCount">{sliced.length}</span>}
           {onRecalibrate && (
             <button className="accueil__liveWidgetRecal" onClick={onRecalibrate} title="Recalibrer les minutes">⟳</button>
           )}
         </div>
       </div>
 
-      <div className="accueil__liveWidgetMatches">
-        {live.slice(0, 5).map(match => {
+      <div className="accueil__liveWidgetMatches" ref={matchesRef} onScroll={onScroll}>
+        {sliced.map(match => {
           const espn      = espnScores[match.id] ?? null
           const matchSt   = getMatchState(match.id)
           const isTermine = matchSt.ft === true
@@ -289,6 +302,23 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           )
         })}
       </div>
+
+      {/* Dots indicateurs — visibles seulement si plusieurs matchs */}
+      {sliced.length > 1 && (
+        <div className="accueil__liveWidgetDots">
+          {sliced.map((_, i) => (
+            <button
+              key={i}
+              className={`accueil__liveWidgetDotBtn${i === activeIdx ? ' accueil__liveWidgetDotBtn--active' : ''}`}
+              onClick={() => {
+                const el = matchesRef.current
+                if (el) el.scrollTo({ left: i * el.offsetWidth, behavior: 'smooth' })
+              }}
+              aria-label={`Match ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
