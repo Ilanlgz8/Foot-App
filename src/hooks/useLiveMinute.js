@@ -462,15 +462,15 @@ async function pollESPN(matches, queryClient) {
             continue
           }
 
-          // ── DÉTECTION FT : double-confirmation anti-faux-positif ─────────────
+          // ── DÉTECTION FT ──────────────────────────────────────────────────────
           //
-          // ESPN flashe STATUS_FINAL juste après un but (même à 87', 90'…).
-          // Pour distinguer un flash d'un vrai FT :
+          // ESPN peut flasher STATUS_FINAL juste après un but (but + sifflet dans
+          // le même poll). On compare le score actuel avec le score du poll précédent
+          // (prevCache, capturé AVANT la mise à jour espnScoresCache ci-dessus).
+          //
           //   1) Horloge < 85min → faux positif certain (trop tôt)
-          //   2) Horloge >= 85min → mémoriser dans pendingFt avec le score actuel
-          //   3) Poll suivant (+15s) : STATUS_FINAL + même score → FT confirmé
-          //                           score changé (but tardif) → remettre le timer à 0
-          //                           STATUS_IN_PROGRESS → flash annulé (géré dans CAS 1)
+          //   2) Score changé dans ce même poll → but tardif, rester live
+          //   3) Score inchangé → FT immédiat (pas besoin d'un 2ème poll)
           const mins = parseClockMins(espnClock)
           const timePlausible = mins !== null && mins >= 85
 
@@ -482,27 +482,19 @@ async function pollESPN(matches, queryClient) {
             continue
           }
 
-          // Horloge >= 85min — double-confirmation
-          const currentScore = currData ? `${currData.home}-${currData.away}` : null
-          const pft = pendingFt[match.id]
+          // Horloge >= 85min — comparer score actuel vs score du poll précédent
+          const prevScore    = prevCache ? `${prevCache.home}-${prevCache.away}` : null
+          const currentScore = currData  ? `${currData.home}-${currData.away}`  : null
 
-          if (!pft) {
-            // 1ère détection STATUS_FINAL → mémoriser, attendre poll suivant
-            pendingFt[match.id] = { since: now, score: currentScore }
+          if (prevScore !== null && currentScore !== null && prevScore !== currentScore) {
+            // Score a changé dans CE poll en même temps que STATUS_FINAL → but tardif
+            delete pendingFt[match.id]
             markLive(match)
             clearFtFlags(match.id)
             continue
           }
 
-          if (pft.score !== currentScore) {
-            // Score a changé depuis la 1ère détection → but tardif, repartir
-            pendingFt[match.id] = { since: now, score: currentScore }
-            markLive(match)
-            clearFtFlags(match.id)
-            continue
-          }
-
-          // Score stable sur 2 polls consécutifs + horloge >= 85min → FT réel
+          // STATUS_FINAL + score inchangé → FT immédiat
           delete pendingFt[match.id]
           confirmFt(match, now, queryClient)
         }
