@@ -392,11 +392,12 @@
   text-transform: capitalize;
 }
 
-/* ── Titre + bouton DIRECT inline sur mobile ─────────────────────────────── */
-.accueil__titleRow {
+/* ── Kicker + bouton DIRECT inline sur mobile ────────────────────────────── */
+.accueil__kickerRow {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  justify-content: space-between;
+  gap: 1.5rem;
 }
 
 /* ── Bouton DIRECT ─────────────────────────────────────────────────────────── */

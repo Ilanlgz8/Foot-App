@@ -142,8 +142,11 @@ function Accueil() {
         {/* ── Hero ── */}
         <div className="accueil__hero accueil__hero--inline">
           <div className="accueil__heroLeft">
-            <div className="accueil__titleRow">
-              <h1 className="accueil__title">Stat<span>Footix</span></h1>
+            <div className="accueil__kickerRow">
+              <p className="accueil__kicker">
+                <span className="accueil__kickerDot" />
+                Le foot comme tu veux le voir
+              </p>
               {liveMatches.length > 0 && (
                 <button className="accueil__livePageBtn accueil__livePageBtn--mobile" onClick={() => navigate('/live')}>
                   <span className="accueil__livePageBtnDot" />
@@ -152,10 +155,6 @@ function Accueil() {
                 </button>
               )}
             </div>
-            <p className="accueil__kicker">
-              <span className="accueil__kickerDot" />
-              Le foot comme tu veux le voir
-            </p>
           </div>
           <div className="accueil__heroRight">
             <p className="accueil__heroDate">{todayStr}</p>
@@ -182,7 +181,11 @@ function Accueil() {
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
               matches={dayOffset === 0
-                ? matches.filter(m => !liveMatches.some(l => l.id === m.id) && !getMatchState(m.id).ft)
+                ? matches.filter(m =>
+                    m.status !== 'FINISHED' &&
+                    !liveMatches.some(l => l.id === m.id) &&
+                    !getMatchState(m.id).ft
+                  )
                 : matches}
               loading={matchesLoading}
               espnScores={espnScores}

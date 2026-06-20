@@ -94,7 +94,7 @@ function PeriodBadge({ match }) {
 }
 
 // ── Rang score custom : pills Chakra Petch + barre verticale ────────────────
-function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente }) {
+function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, repriseDans }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
   const label = isTermine ? 'FT' : (minute ?? '–')
@@ -111,15 +111,19 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
       {/* Minute au-dessus du score */}
       <div className="accueil__liveWidgetMinuteWrap">
         <span className="accueil__liveWidgetMinute">{label}</span>
-        {repriseImminente && (
-          <span className="accueil__liveWidgetReprise">reprise imminente</span>
-        )}
       </div>
       <div className="accueil__liveWidgetPills">
         <div className={homeCls}>{h}</div>
         <div className="accueil__liveWidgetPillBar" />
         <div className={awayCls}>{a}</div>
       </div>
+      {/* Infos mi-temps sous le score */}
+      {repriseImminente && (
+        <span className="accueil__liveWidgetReprise">reprise imminente</span>
+      )}
+      {repriseDans != null && !repriseImminente && (
+        <span className="accueil__liveWidgetReprise">reprise dans {repriseDans} min</span>
+      )}
     </div>
   )
 }
@@ -246,10 +250,11 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           const matchSt   = getMatchState(match.id)
           const isTermine = matchSt.ft === true
           const minute    = isTermine ? null : calcMinute(match)
-          const repriseImminente = match.status === 'PAUSED'
-            && matchSt.pausedAt
-            && !matchSt.half2Start
-            && (Date.now() - matchSt.pausedAt) >= 15 * 60_000
+          const pauseElapsed = match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start
+            ? Date.now() - matchSt.pausedAt : null
+          const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
+          const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
+            ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
           const hs        = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
           const as_       = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
           const homeName  = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
@@ -284,6 +289,7 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
                   minute={minute}
                   isTermine={isTermine}
                   repriseImminente={repriseImminente}
+                  repriseDans={repriseDans}
                 />
 
                 {/* Équipe extérieur */}
