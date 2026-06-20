@@ -10,7 +10,7 @@ function getResult(myGoals, theirGoals) {
 
 export function useTeamForm(selectedComp) {
   const { data } = useQuery({
-    queryKey: ['teamForm', selectedComp],
+    queryKey: ['teamForm', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: async () => {
       // WC 2026 : sans filtre saison FD.org renvoie WC 2022 → forme incorrecte
       const seasonParam = selectedComp === 'WC' ? '&season=2026' : ''

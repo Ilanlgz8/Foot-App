@@ -36,6 +36,10 @@ const espnScoresCache = {}
 // { [matchId]: { since: number, score: string } }
 const pendingFt = {}
 
+// Dernière fois que chaque match a été vu dans un event ESPN (scoreboard ou STATUS_FINAL)
+// { [matchId]: timestamp }
+const lastSeenInEspn = {}
+
 // Restauration partielle au chargement
 try {
   const lastPoll = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
@@ -255,10 +259,26 @@ function _runFtSafeguards(matches, now, queryClient) {
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
-    if (pendingFt[mid]) continue  // déjà en cours de confirmation via safeguard 1
+    if (pendingFt[mid]) continue
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
     if (ageMin < 150) continue
     console.log(`[useLiveMinute] match ${mid} > 150min → FT forcé`)
+    confirmFt(lm, now, queryClient)
+  }
+
+  // Safeguard 3 : match disparu du scoreboard ESPN depuis > 5min après avoir été vu
+  // Cas : ESPN retire l'event sans STATUS_FINAL (pas de pendingFt, pas encore 150min)
+  // → FT forcé dès que le match a > 90min de jeu et n'est plus dans le scoreboard
+  for (const lm of getLiveMatches()) {
+    const mid = lm.id
+    if (getLiveState(mid).state === 'ended') continue
+    if (pendingFt[mid]) continue
+    const lastSeen = lastSeenInEspn[mid]
+    if (!lastSeen) continue                         // jamais vu par ESPN cette session → skip
+    if (now - lastSeen < 5 * 60_000) continue       // vu récemment → ok
+    const ageMin = (now - new Date(lm.utcDate)) / 60_000
+    if (ageMin < 90) continue                       // trop tôt pour être terminé
+    console.log(`[useLiveMinute] match ${mid} disparu d'ESPN depuis ${Math.round((now - lastSeen) / 60_000)}min → FT`)
     confirmFt(lm, now, queryClient)
   }
 }
@@ -307,6 +327,9 @@ async function pollESPN(matches, queryClient) {
 
         const match = findMatchESPN(comp.competitors ?? [], matches)
         if (!match) continue
+
+        // Mémoriser que ce match est encore visible dans le scoreboard ESPN
+        lastSeenInEspn[match.id] = now
 
         const prevState = getMatchState(match.id)
 
