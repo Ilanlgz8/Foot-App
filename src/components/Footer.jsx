@@ -7,10 +7,20 @@ function AProposModal({ onClose }) {
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
+    const scrollY = window.scrollY
     document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
     return () => {
       window.removeEventListener('keydown', handler)
       document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
+      window.scrollTo(0, scrollY)
     }
   }, [onClose])
 
@@ -29,19 +39,19 @@ function AProposModal({ onClose }) {
           <p>L'idée est née d'un constat simple : les applications foot existantes sont soit trop chargées, soit trop lentes, soit derrière un paywall. StatFootix se veut léger, rapide et entièrement gratuit, sans pub ni inscription.</p>
 
           <h3>Compétitions couvertes</h3>
-          <p>StatFootix couvre actuellement la <strong>Coupe du Monde FIFA</strong> avec les phases de groupes, le tableau à élimination directe, les classements et les résultats en temps réel. D'autres compétitions (Champions League, Ligue 1, Premier League…) sont prévues.</p>
+          <p>StatFootix couvre actuellement la <strong>Coupe du Monde FIFA</strong> avec les phases de groupes, le tableau à élimination directe, les classements et les résultats en temps réel. D'autres compétitions (Champions League, Ligue 1, Premier League…) arrivent prochainement.</p>
 
           <h3>Fonctionnalités</h3>
-          <p>Scores en direct avec minutes calculées en temps réel, matchs à venir avec navigation jour par jour, résultats récents, classements de groupes interactifs, widget live dans l'accueil, actualités football et modal de détail par match.</p>
+          <p>Scores en direct avec minutes calculées en temps réel, matchs à venir avec navigation jour par jour, résultats récents, classements de groupes interactifs, widget live dans l'accueil, actualités football, compos d'équipes, statistiques live, historique des confrontations et probabilités de victoire.</p>
 
           <h3>Roadmap</h3>
-          <p>Prochainement : support multi-compétitions (Champions League, Ligue 1, Premier League), notifications de buts, historique des confrontations, statistiques joueurs et recherche d'équipes.</p>
+          <p>Prochainement : support multi-compétitions (Champions League, Ligue 1, Premier League), notifications de buts et statistiques joueurs.</p>
 
           <h3>Données & fraîcheur</h3>
-          <p>Les données sont fournies par l'API <strong>football-data.org</strong> et mises en cache localement (30 min pour les résultats, rafraîchissement automatique en direct). Les scores live sont mis à jour toutes les 30 secondes.</p>
+          <p>Les données sont fournies par <strong>football-data.org</strong>, <strong>ESPN</strong> et <strong>api-football</strong>, mises en cache localement. Les scores live sont mis à jour toutes les 30 secondes via plusieurs sources croisées pour une précision maximale.</p>
 
           <h3>Technologies</h3>
-          <p>Développé avec <strong>React</strong> + <strong>TanStack Query</strong> pour la gestion du cache. Déployé sur <strong>Netlify</strong> avec des fonctions serverless pour sécuriser les appels API. Zéro dépendance inutile, code 100% open.</p>
+          <p>Développé avec <strong>React</strong> + <strong>TanStack Query</strong> pour la gestion du cache. Déployé sur <strong>Vercel</strong> avec des fonctions serverless pour sécuriser les appels API. Zéro dépendance inutile, code 100% open.</p>
 
           <h3>Contact</h3>
           <p>Une suggestion, un bug ou une idée ? Contacte-nous à <strong>korityx.pro@gmail.com</strong>.</p>

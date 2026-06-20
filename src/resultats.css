@@ -423,6 +423,15 @@
   .resultats__scoreNum  { font-size: 1.2rem; }
 }
 
+@media (max-width: 640px) {
+  /* Sidebar active state plus visible sur mobile */
+  .resultats__sidebarItem--active {
+    background: rgba(239,68,68,0.2) !important;
+    border-color: rgba(239,68,68,0.45) !important;
+    box-shadow: 0 0 12px rgba(239,68,68,0.18);
+  }
+}
+
 @media (max-width: 400px) {
   .resultats { padding: 1rem 0.5rem 2rem; }
   .resultats__card { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.55rem 0.5rem; }

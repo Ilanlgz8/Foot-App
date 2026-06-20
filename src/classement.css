@@ -1109,8 +1109,19 @@
 @media (max-width: 640px) {
   .classement__modalOverlay { padding: 0.5rem; }
   .classement__modalBox { border-radius: 0.85rem; max-height: 92dvh; overflow-y: auto; }
-  .classement__modalBox .classement__tableWrap { overflow-x: auto; }
-  .classement__modalBox .classement__table { min-width: 500px; }
+  .classement__modalBox .classement__tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* min-width réduit pour éviter le scroll horizontal forcé sur petits écrans */
+  .classement__modalBox .classement__table { min-width: 340px; }
   .classement__modalBox .classement__table thead th,
-  .classement__modalBox .classement__table tbody td { padding: 0.65rem 0.65rem; font-size: 0.85rem; }
+  .classement__modalBox .classement__table tbody td { padding: 0.5rem 0.4rem; font-size: 0.78rem; }
+  /* Masquer Diff (col 8) dans le modal groupe sur mobile */
+  .classement__modalBox .classement__table thead th:nth-child(8),
+  .classement__modalBox .classement__table tbody td:nth-child(8) { display: none; }
+
+  /* Sidebar active state plus visible */
+  .classement__sidebarItem--active {
+    background: rgba(239,68,68,0.2) !important;
+    border-color: rgba(239,68,68,0.45) !important;
+    box-shadow: 0 0 12px rgba(239,68,68,0.18);
+  }
 }

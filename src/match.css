@@ -1082,6 +1082,30 @@
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
   .bracket__card   { min-width: 170px; }
+
+  /* Bracket : zoom pour réduire l'empreinte horizontale */
+  .bracket__container {
+    -webkit-overflow-scrolling: touch;
+    /* Fondu droit pour indiquer qu'il y a du contenu à scroller */
+    -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+    mask-image: linear-gradient(to right, black 80%, transparent 100%);
+  }
+  .bracket__svgWrap {
+    zoom: 0.68;
+  }
+
+  /* wcModal : meilleur fit sur petit écran */
+  .wcModal__overlay { padding: 0.5rem; }
+  .wcModal__panel   { max-height: 92dvh; }
+  .wcModal__header  { padding: 1rem 1.1rem 0.8rem; }
+  .wcModal__title   { font-size: 1rem; }
+
+  /* Sidebar mobile : active state plus visible */
+  .matchs__sidebarItem--active {
+    background: rgba(239,68,68,0.2) !important;
+    border-color: rgba(239,68,68,0.45) !important;
+    box-shadow: 0 0 12px rgba(239,68,68,0.18);
+  }
 }
 
 @media (max-width: 400px) {
@@ -1089,4 +1113,7 @@
   .matchs__match { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.6rem 0.5rem; }
   .matchs__teamName { font-size: 0.68rem; }
   .matchs__sidebarLogo { width: 1.9rem; height: 1.9rem; }
+
+  /* Bracket encore plus petit sur 375px */
+  .bracket__svgWrap { zoom: 0.55; }
 }
