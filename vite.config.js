@@ -1,13 +1,47 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // loadEnv charge toutes les variables de .env.local côté Node (pas dans le bundle navigateur)
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
+        manifest: {
+          name: 'StatFootix',
+          short_name: 'StatFootix',
+          description: 'Scores et stats foot en direct',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ],
+        },
+        workbox: {
+          // Ne pas cacher les appels API — toujours réseau pour les données live
+          navigateFallback: '/index.html',
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+            },
+          ],
+        },
+      }),
+    ],
     server: {
       proxy: {
         // Proxy football-data.org : la clé est ajoutée ici côté serveur Vite, pas dans le bundle
