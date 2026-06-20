@@ -167,6 +167,48 @@ function extractMatchData(comp) {
 }
 
 // ─────────────────────────────────────────────
+// Helper : confirmer un FT et planifier l'éviction
+// ─────────────────────────────────────────────
+
+function confirmFt(match, now, queryClient) {
+  const id = match.id
+  setLiveState(id, 'ended', { endedAt: now })
+
+  // Persister le score ESPN pour MatchModal post-match
+  if (espnScoresCache[id]) {
+    try { localStorage.setItem(`foot_espn_${id}`, JSON.stringify(espnScoresCache[id])) } catch {}
+  }
+
+  // ft: true → stoppe calcMinute, MatchCard passe en "Terminé"
+  try {
+    localStorage.setItem(`foot_ms_${id}`, JSON.stringify({
+      ...getMatchState(id),
+      ft:        true,
+      termineAt: now,
+    }))
+  } catch {}
+
+  queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+  setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
+  if (match.competition?.code) {
+    try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
+  }
+
+  // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
+  const code = match.competition?.code
+  setTimeout(() => {
+    markEnded(id)
+    delete espnScoresCache[id]
+    clearMatchState(id, { preserveEnded: true })
+    queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+    if (code) {
+      queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
+      queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+    }
+  }, 5 * 60_000)
+}
+
+// ─────────────────────────────────────────────
 // ESPN — couche primaire
 // ─────────────────────────────────────────────
 
@@ -386,53 +428,41 @@ async function pollESPN(matches, queryClient) {
 
           // Score stable sur 2 polls consécutifs + horloge >= 85min → FT réel
           delete pendingFt[match.id]
-
-          // ── FT confirmé ───────────────────────────────────────────────────
-          setLiveState(match.id, 'ended', { endedAt: now })
-
-          // Persister les scores pour MatchModal post-match
-          if (espnScoresCache[match.id]) {
-            try {
-              localStorage.setItem(
-                `foot_espn_${match.id}`,
-                JSON.stringify(espnScoresCache[match.id])
-              )
-            } catch {}
-          }
-
-          // Écrire ft: true → stoppe calcMinute, MatchCard passe en "Terminé"
-          try {
-            const currentState = getMatchState(match.id)
-            localStorage.setItem(`foot_ms_${match.id}`, JSON.stringify({
-              ...currentState,
-              ft:        true,
-              termineAt: now,
-            }))
-          } catch {}
-
-          queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-          setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
-          if (match.competition?.code) {
-            try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
-          }
-
-          // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
-          const codeForEviction = match.competition?.code
-          setTimeout(() => {
-            markEnded(match.id)
-            delete espnScoresCache[match.id]
-            clearMatchState(match.id, { preserveEnded: true })
-            queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-            if (codeForEviction) {
-              queryClient.invalidateQueries({ queryKey: ['matches', codeForEviction, 'FINISHED'] })
-              queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
-            }
-          }, 5 * 60_000)
+          confirmFt(match, now, queryClient)
         }
       }
     } catch (err) {
       console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
     }
+  }
+
+  // ── Safeguard 1 : pendingFt timeout (45s) ────────────────────────────────────
+  // ESPN envoie STATUS_FINAL une fois puis retire l'event du scoreboard →
+  // la 2e confirmation n'arrive jamais → confirmer quand même après 45s.
+  for (const [midStr, pft] of Object.entries(pendingFt)) {
+    if (now - pft.since < 45_000) continue
+    const mid = Number(midStr)
+    delete pendingFt[midStr]
+    if (getLiveState(mid).state === 'ended') continue
+    const match = matches.find(m => m.id === mid)
+    if (!match || !isTrackedLive(mid)) continue
+    console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
+    confirmFt(match, now, queryClient)
+  }
+
+  // ── Safeguard 2 : durée max live (150 min depuis utcDate) ─────────────────────
+  // Si ESPN a complètement arrêté d'envoyer un match et qu'il est > 150min →
+  // forcer FT (couvre matchs normaux 90min + prolongations + penaltys + retard KO).
+  for (const midStr of getTrackedMatches()) {
+    const mid = Number(midStr)
+    if (getLiveState(mid).state === 'ended') continue
+    if (pendingFt[mid]) continue  // déjà en cours de confirmation → laisser faire
+    const match = matches.find(m => m.id === mid)
+    if (!match) continue
+    const ageMin = (now - new Date(match.utcDate)) / 60_000
+    if (ageMin < 150) continue
+    console.log(`[useLiveMinute] match ${mid} > 150min → FT forcé`)
+    confirmFt(match, now, queryClient)
   }
 
   // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé
