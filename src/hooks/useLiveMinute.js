@@ -46,9 +46,10 @@ const lastSeenInEspn = {}
 const lastSummaryFetch = {}
 
 // Restauration partielle au chargement
+// On garde le cache jusqu'à 30 min pour couvrir les reloads pendant un match
 try {
   const lastPoll = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
-  if (Date.now() - lastPoll < 5 * 60_000) {
+  if (Date.now() - lastPoll < 30 * 60_000) {
     const raw = localStorage.getItem('espn_scores_cache')
     if (raw) Object.assign(espnScoresCache, JSON.parse(raw))
   }
@@ -734,6 +735,15 @@ export function useLiveMinute(matches) {
   const queryClient  = useQueryClient()
   const matchesRef   = useRef(matches)
   matchesRef.current = matches
+
+  // ── Seed immédiat depuis localStorage au montage ──
+  // Évite le flash "stats vides" pendant le 1er poll réseau (~1-2s)
+  useEffect(() => {
+    if (Object.keys(espnScoresCache).length > 0) {
+      queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── ESPN : Web Worker timer (non throttlé même en arrière-plan) ──
   useEffect(() => {
