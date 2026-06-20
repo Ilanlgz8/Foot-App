@@ -54,79 +54,53 @@
   margin: 0 auto;
 }
 
-/* ── HERO (inline, compact) ── */
-.accueil__hero--inline {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 0.5rem;
-  padding-top: 0.5rem;
-  animation: fadeUp 0.5s ease both;
+/* ── Bouton DIRECT mobile (barre au-dessus de la grille) ── */
+.accueil__mobileLiveBar {
+  display: none;
 }
-
 @media (max-width: 640px) {
-  .accueil__hero--inline {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.6rem;
-  }
-  /* Bouton DIRECT à droite sur mobile */
-  .accueil__heroLeft {
-    width: 100%;
+  .accueil__mobileLiveBar {
     display: flex;
     justify-content: flex-end;
+    margin-bottom: 0.75rem;
   }
 }
 
-/* Desktop : heroLeft prend tout l'espace à gauche */
-.accueil__heroLeft {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Panel matchs dans le hero — visible desktop, caché mobile */
-.accueil__dashPanel.accueil__dashPanel--desktopHero { display: flex; }
-.accueil__dashPanel.accueil__dashPanel--mobileOnly  { display: none; }
-.accueil__dashPanel.accueil__dashPanel--results     { grid-column: 1 / -1; }
-
-@media (max-width: 900px) {
-  .accueil__dashPanel.accueil__dashPanel--desktopHero { display: none; }
-  .accueil__dashPanel.accueil__dashPanel--mobileOnly  { display: flex; }
-  .accueil__dashPanel.accueil__dashPanel--results     { grid-column: auto; }
-}
-
-.accueil__heroRight {
-  text-align: right;
-  flex-shrink: 0;
-}
-
-@media (max-width: 640px) {
-  .accueil__heroRight { text-align: left; }
-}
-
-/* ── HERO ── */
-.accueil__hero {
-  animation: fadeUp 0.5s ease both;
-}
-
-/* ── DASHBOARD — desktop : 1 colonne (résultats pleine largeur) | mobile : 2 colonnes ── */
-.accueil__dashboard {
+/* ── GRILLE PRINCIPALE ── */
+/* Pas de live : 50/50 */
+.accueil__mainGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: start;
   gap: 1.2rem;
   margin-bottom: 1.2rem;
-  animation: fadeUp 0.55s ease both;
+  animation: fadeUp 0.5s ease both;
+}
+/* Avec live : 60/40 */
+.accueil__mainGrid--live {
+  grid-template-columns: 3fr 2fr;
 }
 
-/* Tablet/mobile : 2 colonnes (match + résultats) */
-@media (max-width: 900px) {
-  .accueil__dashboard { grid-template-columns: 1fr 1fr; }
-}
-/* Petit mobile : 1 colonne */
+/* Mobile : 1 colonne */
 @media (max-width: 640px) {
-  .accueil__dashboard { grid-template-columns: 1fr; }
+  .accueil__mainGrid,
+  .accueil__mainGrid--live {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Col droite : live widget + résultats empilés */
+.accueil__rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Wrapper live widget desktop */
+.accueil__liveWidgetWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 /* Panel individuel */

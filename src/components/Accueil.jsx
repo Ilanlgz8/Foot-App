@@ -139,63 +139,22 @@ function Accueil() {
 
       <div className="accueil__inner">
 
-        {/* ── Hero ── */}
-        <div className="accueil__hero accueil__hero--inline">
-
-          {/* Desktop : panel matchs à gauche | Mobile : kicker + bouton */}
-          <div className="accueil__heroLeft">
-
-            {/* Mobile uniquement : bouton DIRECT si match en cours */}
-            {liveMatches.length > 0 && (
-              <button className="accueil__livePageBtn accueil__livePageBtn--mobile" onClick={() => navigate('/live')}>
-                <span className="accueil__livePageBtnDot" />
-                DIRECT
-                <span className="accueil__livePageBtnArrow">›</span>
-              </button>
-            )}
-
-            {/* Desktop uniquement : panel matchs */}
-            <div className="accueil__dashPanel accueil__dashPanel--desktopHero">
-              <div className="accueil__dashPanelHeader">
-                <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
-                <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
-                <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
-              </div>
-              <div className="accueil__dashPanelDivider" />
-              <MatchPanel
-                matches={dayOffset === 0
-                  ? matches.filter(m =>
-                      m.status !== 'FINISHED' &&
-                      !liveMatches.some(l => l.id === m.id) &&
-                      !getMatchState(m.id).ft
-                    )
-                  : matches}
-                loading={matchesLoading}
-                espnScores={espnScores}
-                trackedIds={trackedIds}
-                onTrack={trackHandler}
-                totalMatchCount={matches.length}
-              />
-            </div>
+        {/* Mobile uniquement : bouton DIRECT */}
+        {liveMatches.length > 0 && (
+          <div className="accueil__mobileLiveBar">
+            <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
+              <span className="accueil__livePageBtnDot" />
+              DIRECT
+              <span className="accueil__livePageBtnArrow">›</span>
+            </button>
           </div>
+        )}
 
-          <div className="accueil__heroRight">
-            <p className="accueil__heroDate">{todayStr}</p>
-            <LiveWidget
-              liveMatches={liveMatches}
-              espnScores={espnScores}
-              trackedIds={trackedIds}
-              onRecalibrate={recalibrate}
-              onMatchClick={(m) => setLiveModal({ match: m, espnScore: espnScores?.[m.id] })}
-            />
-          </div>
-        </div>
+        {/* ── Grille principale ── */}
+        <div className={`accueil__mainGrid${liveMatches.length > 0 ? ' accueil__mainGrid--live' : ''}`}>
 
-        {/* ── Dashboard ── */}
-        <div className="accueil__dashboard">
-
-          {/* Mobile uniquement : panel matchs */}
-          <div className="accueil__dashPanel accueil__dashPanel--mobileOnly">
+          {/* Col gauche : Matchs */}
+          <div className="accueil__dashPanel">
             <div className="accueil__dashPanelHeader">
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
@@ -218,19 +177,36 @@ function Accueil() {
             />
           </div>
 
-          {/* Résultats récents */}
-          <div className="accueil__dashPanel accueil__dashPanel--results">
-            <div className="accueil__dashPanelHeader">
-              <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
-              {wcComp?.emblem && (
-                <span className="accueil__dashPanelSub accueil__dashPanelSub--comp">
-                  <img src={wcComp.emblem} alt="" className="accueil__dashPanelCompLogo" />
-                  Coupe du monde
-                </span>
-              )}
-            </div>
-            <div className="accueil__dashPanelDivider" />
-            {(() => {
+          {/* Col droite : Live widget (si live) + Résultats récents */}
+          <div className="accueil__rightCol">
+
+            {/* Live widget — desktop : dans la col droite | mobile : toujours visible */}
+            {liveMatches.length > 0 && (
+              <div className="accueil__liveWidgetWrap">
+                <p className="accueil__heroDate">{todayStr}</p>
+                <LiveWidget
+                  liveMatches={liveMatches}
+                  espnScores={espnScores}
+                  trackedIds={trackedIds}
+                  onRecalibrate={recalibrate}
+                  onMatchClick={(m) => setLiveModal({ match: m, espnScore: espnScores?.[m.id] })}
+                />
+              </div>
+            )}
+
+            {/* Résultats récents */}
+            <div className="accueil__dashPanel">
+              <div className="accueil__dashPanelHeader">
+                <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
+                {wcComp?.emblem && (
+                  <span className="accueil__dashPanelSub accueil__dashPanelSub--comp">
+                    <img src={wcComp.emblem} alt="" className="accueil__dashPanelCompLogo" />
+                    Coupe du monde
+                  </span>
+                )}
+              </div>
+              <div className="accueil__dashPanelDivider" />
+              {(() => {
                 const todayFt = matches.filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
                 const todayFtIds = new Set(todayFt.map(m => m.id))
                 const todayFtMapped = todayFt.map(m => ({
@@ -253,8 +229,9 @@ function Accueil() {
                   />
                 )
               })()}
-          </div>
+            </div>
 
+          </div>
         </div>
 
         {/* ── Actualités ── */}
