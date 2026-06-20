@@ -371,20 +371,6 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 767px) {
-  .resultats__layout { flex-direction: column; }
-  .resultats__sidebar { flex: none; width: 100%; position: static; }
-  .resultats__sidebarNav { flex-direction: row; flex-wrap: wrap; gap: 0.35rem; }
-  .resultats__sidebarItem { flex: 0 0 auto; padding: 0.4rem 0.6rem; }
-  .resultats__sidebarName { display: none; }
-  .resultats__competitionLogo--sidebar { width: 2.4rem; height: 2.4rem; }
-  .resultats__card { grid-template-columns: 1fr 7rem 1fr; padding: 0.8rem 0.9rem; }
-  .resultats__crest { width: 2rem; height: 2rem; }
-  .resultats__teamName { font-size: 0.88rem; }
-  .resultats__scoreNum { font-size: 1.25rem; min-width: 1.3rem; }
-}
-
-/* ── Renforcement responsive mobile ── */
 @media (max-width: 900px) {
   .resultats { padding: 1.75rem 1rem 3rem; }
 

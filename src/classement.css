@@ -555,7 +555,24 @@
   min-width: auto;
 }
 
-/* ── Mode compact (groupes WC) — tout tient sans scroll ── */
+/* ── Mode compact (groupes WC) — colonnes alignées entre tous les groupes ── */
+/* table-layout:fixed garantit que chaque groupe a exactement les mêmes largeurs */
+.classement__table--compact {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Largeurs fixes : identiques dans tous les groupes → colonnes alignées */
+.classement__table--compact thead th:nth-child(1) { width: 2rem; }     /* Pos  */
+.classement__table--compact thead th:nth-child(2) { width: auto; }      /* Équipe — prend le reste */
+.classement__table--compact thead th:nth-child(3) { width: 2.6rem; }   /* Pts  */
+.classement__table--compact thead th:nth-child(4) { width: 2rem; }     /* MJ   */
+.classement__table--compact thead th:nth-child(5),
+.classement__table--compact thead th:nth-child(6),
+.classement__table--compact thead th:nth-child(7) { width: 1.8rem; }   /* V N D */
+.classement__table--compact thead th:nth-child(8) { width: 2.4rem; }   /* Diff */
+.classement__table--compact thead th:last-child   { width: 4rem; }     /* Forme */
+
 .classement__table--compact thead th,
 .classement__table--compact .classement__row td {
   padding: 0.55rem 0.45rem;
@@ -568,6 +585,9 @@
 
 .classement__table--compact .classement__teamName {
   font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .classement__table--compact .classement__teamCrest {
@@ -1048,23 +1068,25 @@
     justify-content: center;
   }
 
-  /* Tableau classement : colonnes condensées */
-  .classement__tableHeader,
-  .classement__row {
-    grid-template-columns: 2rem 1.8rem 1fr 2.5rem 2.5rem 2.5rem 2.5rem;
-    gap: 0;
-    padding: 0.5rem 0.5rem;
-    font-size: 0.72rem;
-  }
+  /* Tableau classement : taille texte réduite */
+  .classement__table thead th,
+  .classement__table tbody td { padding: 0.5rem 0.55rem; font-size: 0.72rem; }
 
   .classement__teamName { font-size: 0.78rem; }
   .classement__crest    { width: 1.5rem; height: 1.5rem; }
 
-  /* Masquer colonnes moins importantes sur mobile */
-  .classement__colW,
-  .classement__colD,
-  .classement__colL,
-  .classement__colGD { display: none; }
+  /* Masquer V, N, D, Diff sur le tableau normal (non-compact) sur mobile */
+  .classement__table:not(.classement__table--compact) thead th:nth-child(5),
+  .classement__table:not(.classement__table--compact) thead th:nth-child(6),
+  .classement__table:not(.classement__table--compact) thead th:nth-child(7),
+  .classement__table:not(.classement__table--compact) thead th:nth-child(8),
+  .classement__table:not(.classement__table--compact) tbody td:nth-child(5),
+  .classement__table:not(.classement__table--compact) tbody td:nth-child(6),
+  .classement__table:not(.classement__table--compact) tbody td:nth-child(7),
+  .classement__table:not(.classement__table--compact) tbody td:nth-child(8) { display: none; }
+
+  /* Table normale moins large une fois les colonnes masquées */
+  .classement__table:not(.classement__table--compact) { min-width: 420px; }
 
   /* Grille groupes */
   .classement__groups { grid-template-columns: 1fr; gap: 1rem; }
@@ -1074,4 +1096,21 @@
 @media (max-width: 400px) {
   .classement { padding: 1rem 0.5rem 2rem; }
   .classement__sidebarLogo { width: 1.9rem; height: 1.9rem; }
+  /* Compact encore plus serré sur 375px */
+  .classement__table--compact thead th:nth-child(5),
+  .classement__table--compact thead th:nth-child(6),
+  .classement__table--compact thead th:nth-child(7),
+  .classement__table--compact tbody td:nth-child(5),
+  .classement__table--compact tbody td:nth-child(6),
+  .classement__table--compact tbody td:nth-child(7) { display: none; }
+}
+
+/* Modal groupe — réduction padding sur mobile pour la table */
+@media (max-width: 640px) {
+  .classement__modalOverlay { padding: 0.5rem; }
+  .classement__modalBox { border-radius: 0.85rem; max-height: 92dvh; overflow-y: auto; }
+  .classement__modalBox .classement__tableWrap { overflow-x: auto; }
+  .classement__modalBox .classement__table { min-width: 500px; }
+  .classement__modalBox .classement__table thead th,
+  .classement__modalBox .classement__table tbody td { padding: 0.65rem 0.65rem; font-size: 0.85rem; }
 }

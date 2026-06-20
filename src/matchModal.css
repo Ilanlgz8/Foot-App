@@ -889,7 +889,7 @@
     overscroll-behavior: contain;
   }
 
-  /* Barre de drag en haut */
+  /* Barre de drag en haut — override complet du gradient desktop */
   .modal__panel::before {
     content: '';
     position: absolute;
@@ -897,11 +897,11 @@
     left: 50%;
     transform: translateX(-50%);
     width: 2.5rem;
-    height: 3px;
-    background: rgba(255,255,255,0.15);
+    height: 4px;
+    background: rgba(255,255,255,0.22);
     border-radius: 999px;
-    /* Override le gradient existant */
-    background: rgba(255,255,255,0.18);
+    box-shadow: none;
+    inset: unset;
   }
 
   .modal__close {
