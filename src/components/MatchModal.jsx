@@ -6,6 +6,7 @@ import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLineups, useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState }       from '../utils/matchStateTracker'
+import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -578,18 +579,46 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore })
 
           <div className="modal__vs">
             {isFinished ? (
-              <div className="modal__scoreboard">
-                <span className={`modal__scoreNum ${hWin ? 'modal__scoreNum--win' : ''}`}>{hs}</span>
-                <span className="modal__scoreSep">–</span>
-                <span className={`modal__scoreNum ${aWin ? 'modal__scoreNum--win' : ''}`}>{as_}</span>
-              </div>
-            ) : (
+              <>
+                <div className="modal__scoreboard">
+                  <span className={`modal__scoreNum ${hWin ? 'modal__scoreNum--win' : ''}`}>{hs}</span>
+                  <span className="modal__scoreSep">–</span>
+                  <span className={`modal__scoreNum ${aWin ? 'modal__scoreNum--win' : ''}`}>{as_}</span>
+                </div>
+                <span className="modal__ftLabel">Terminé</span>
+              </>
+            ) : isLive ? (() => {
+              const matchSt = getMatchState(match.id)
+              const liveHs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
+              const liveAs  = espnScore?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+              const minute  = calcMinute(match)
+              const period  = getMatchPeriod(match)
+              const pauseElapsed = match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start
+                ? Date.now() - matchSt.pausedAt : null
+              const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
+              const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
+                ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
+              return (
+                <>
+                  <div className="modal__liveMinuteRow">
+                    <span className="modal__liveDot" />
+                    <span className="modal__liveMinute">{minute ?? period ?? 'LIVE'}</span>
+                  </div>
+                  <div className="modal__scoreboard">
+                    <span className="modal__scoreNum">{liveHs ?? '–'}</span>
+                    <span className="modal__scoreSep">–</span>
+                    <span className="modal__scoreNum">{liveAs ?? '–'}</span>
+                  </div>
+                  {repriseImminente && <span className="modal__repriseLabel">reprise imminente</span>}
+                  {repriseDans != null && !repriseImminente && <span className="modal__repriseLabel">reprise dans {repriseDans} min</span>}
+                </>
+              )
+            })() : (
               <>
                 <span className="modal__date">{formatDate(match.utcDate)}</span>
                 <span className="modal__hour">{formatHour(match.utcDate)}</span>
               </>
             )}
-            {isFinished && <span className="modal__ftLabel">Terminé</span>}
           </div>
 
           <div className="modal__team modal__team--away">

@@ -247,6 +247,44 @@
   margin-top: 0.2rem;
 }
 
+/* ── Score live dans la modal ── */
+.modal__liveMinuteRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.15rem;
+}
+
+.modal__liveDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(239,68,68,0.8);
+  flex-shrink: 0;
+}
+
+.modal__liveMinute {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #ef4444;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.modal__repriseLabel {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: rgba(255,200,50,0.9);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  animation: pulse 1.8s ease-in-out infinite;
+  margin-top: 0.2rem;
+}
+
 /* ── Stats buts ── */
 .modal__stats {
   display: grid;
