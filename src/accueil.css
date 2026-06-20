@@ -392,6 +392,52 @@
   text-transform: capitalize;
 }
 
+/* ── Bouton "Live →" (visible si matchs en cours) ─────────────────────────── */
+.accueil__livePageBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #f87171;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+}
+.accueil__livePageBtn:hover {
+  background: rgba(239,68,68,0.18);
+  border-color: rgba(239,68,68,0.55);
+  transform: translateX(2px);
+}
+.accueil__livePageBtnDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 5px rgba(239,68,68,0.8);
+  flex-shrink: 0;
+}
+.accueil__livePageBtnCount {
+  font-size: 0.6rem;
+  background: rgba(239,68,68,0.2);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  color: #f87171;
+}
+.accueil__livePageBtnArrow {
+  font-size: 1rem;
+  line-height: 1;
+  color: rgba(248,113,113,0.7);
+}
+
 /* ══════════════════════════════════════════
    TICKER CAROUSEL
    ══════════════════════════════════════════ */

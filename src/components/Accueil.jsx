@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
@@ -63,6 +64,7 @@ function Accueil() {
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
+  const navigate = useNavigate()
 
   // ── Modal live (clic sur carte LiveWidget) ──
   // liveModal = { match, espnScore } | null
@@ -148,6 +150,14 @@ function Accueil() {
           </div>
           <div className="accueil__heroRight">
             <p className="accueil__heroDate">{todayStr}</p>
+            {liveMatches.length > 0 && (
+              <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
+                <span className="accueil__livePageBtnDot" />
+                Live
+                <span className="accueil__livePageBtnCount">{liveMatches.length}</span>
+                <span className="accueil__livePageBtnArrow">›</span>
+              </button>
+            )}
             <LiveWidget
               liveMatches={liveMatches}
               espnScores={espnScores}
