@@ -588,6 +588,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 9rem;
 }
 
 .classement__table--compact .classement__teamCrest {
@@ -1035,7 +1036,8 @@
 
   .classement__sidebarItem {
     flex: 0 0 auto;
-    padding: 0.4rem 0.55rem;
+    width: auto;
+    padding: 0.35rem 0.5rem;
     border-radius: 0.65rem;
     transform: none !important;
   }
@@ -1043,8 +1045,8 @@
   .classement__sidebarName { display: none; }
 
   .classement__sidebarLogo {
-    width: 2.2rem;
-    height: 2.2rem;
+    width: 1.9rem;
+    height: 1.9rem;
   }
 
   .classement__panel { padding: 1.1rem; border-radius: 1.1rem; }
@@ -1105,18 +1107,52 @@
   .classement__table--compact tbody td:nth-child(7) { display: none; }
 }
 
-/* Modal groupe — réduction padding sur mobile pour la table */
+/* Modal groupe — compact mobile sans scroll horizontal */
 @media (max-width: 640px) {
-  .classement__modalOverlay { padding: 0.5rem; }
-  .classement__modalBox { border-radius: 0.85rem; max-height: 92dvh; overflow-y: auto; }
-  .classement__modalBox .classement__tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  /* min-width réduit pour éviter le scroll horizontal forcé sur petits écrans */
-  .classement__modalBox .classement__table { min-width: 340px; }
-  .classement__modalBox .classement__table thead th,
-  .classement__modalBox .classement__table tbody td { padding: 0.5rem 0.4rem; font-size: 0.78rem; }
-  /* Masquer Diff (col 8) dans le modal groupe sur mobile */
+  .classement__modalOverlay { padding: 0.4rem; }
+  .classement__modalBox {
+    border-radius: 0.85rem;
+    max-height: 94dvh;
+    overflow-y: auto;
+    width: 100%;
+  }
+  /* Pas de scroll horizontal dans le modal — table s'adapte à la largeur */
+  .classement__modalBox .classement__tableWrap { overflow-x: hidden; }
+  .classement__modalBox .classement__table {
+    width: 100%;
+    min-width: unset;
+    table-layout: fixed;
+  }
+  /* Colonnes modal mobile : proportions adaptées */
+  .classement__modalBox .classement__table thead th:nth-child(1) { width: 5%; }
+  .classement__modalBox .classement__table thead th:nth-child(2) { width: auto; }
+  .classement__modalBox .classement__table thead th:nth-child(3) { width: 9%; }
+  .classement__modalBox .classement__table thead th:nth-child(4) { width: 8%; }
+  .classement__modalBox .classement__table thead th:nth-child(5),
+  .classement__modalBox .classement__table thead th:nth-child(6),
+  .classement__modalBox .classement__table thead th:nth-child(7) { width: 8%; }
+  /* Masquer Diff + Forme sur mobile pour que tout rentre */
   .classement__modalBox .classement__table thead th:nth-child(8),
-  .classement__modalBox .classement__table tbody td:nth-child(8) { display: none; }
+  .classement__modalBox .classement__table tbody td:nth-child(8),
+  .classement__modalBox .classement__table thead th:last-child,
+  .classement__modalBox .classement__table tbody td:last-child { display: none; }
+
+  .classement__modalBox .classement__table thead th,
+  .classement__modalBox .classement__table tbody td {
+    padding: 0.55rem 0.4rem;
+    font-size: 0.75rem;
+  }
+  .classement__modalBox .classement__table thead th { font-size: 0.58rem; }
+
+  /* Noms d'équipes tronqués dans le modal */
+  .classement__modalBox .classement__teamName {
+    max-width: 5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+  }
+  .classement__modalBox .classement__teamCrest { width: 1.2rem; height: 1.2rem; }
 
   /* Sidebar active state plus visible */
   .classement__sidebarItem--active {

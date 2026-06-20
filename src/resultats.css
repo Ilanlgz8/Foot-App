@@ -402,12 +402,13 @@
 
   .resultats__sidebarItem {
     flex: 0 0 auto;
-    padding: 0.4rem 0.55rem;
+    width: auto;
+    padding: 0.35rem 0.5rem;
     border-radius: 0.65rem;
     transform: none !important;
   }
 
-  .resultats__competitionLogo--sidebar { width: 2.2rem; height: 2.2rem; }
+  .resultats__competitionLogo--sidebar { width: 1.9rem; height: 1.9rem; }
 }
 
 @media (max-width: 640px) {
