@@ -786,14 +786,8 @@ export function useLiveMinute(matches) {
   // Dès que la page redevient visible, on force un poll ESPN immédiat
   // sans attendre le prochain tick (jusqu'à 15s de retard sinon).
   useEffect(() => {
-    let lastPollAt = Date.now()
-
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
-      const gap = Date.now() - lastPollAt
-      // Seulement si on était caché > 5s (évite un double-poll au 1er render)
-      if (gap < 5_000) return
-      lastPollAt = Date.now()
       await pollESPN(matchesRef.current, queryClient)
       // Invalider aussi todayMatches si données trop vieilles (> 2 min)
       const todayState = queryClient.getQueryState(['todayMatches'])
@@ -802,9 +796,6 @@ export function useLiveMinute(matches) {
         queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
       }
     }
-
-    // Met à jour lastPollAt après chaque tick ESPN normal
-    const origTick = () => { lastPollAt = Date.now() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [queryClient])
