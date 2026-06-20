@@ -266,7 +266,19 @@ function _runFtSafeguards(matches, now, queryClient) {
     confirmFt(lm, now, queryClient)
   }
 
-  // Safeguard 3 : match disparu du scoreboard ESPN depuis > 5min après avoir été vu
+  // Safeguard 3 : FD.org confirme FINISHED mais match encore dans liveTracker
+  // → FT immédiat, pas besoin d'attendre ESPN (FD.org se rafraîchit toutes les 2min en live)
+  for (const lm of getLiveMatches()) {
+    const mid = lm.id
+    if (getLiveState(mid).state === 'ended') continue
+    if (pendingFt[mid]) continue
+    const fdMatch = allLive.find(m => m.id === mid)
+    if (!fdMatch || fdMatch.status !== 'FINISHED') continue
+    console.log(`[useLiveMinute] match ${mid} FINISHED (FD.org) → FT`)
+    confirmFt(lm, now, queryClient)
+  }
+
+  // Safeguard 4 : match disparu du scoreboard ESPN depuis > 5min après avoir été vu
   // Cas : ESPN retire l'event sans STATUS_FINAL (pas de pendingFt, pas encore 150min)
   // → FT forcé dès que le match a > 90min de jeu et n'est plus dans le scoreboard
   for (const lm of getLiveMatches()) {
