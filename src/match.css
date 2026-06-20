@@ -1032,6 +1032,7 @@
   .matchs__layout {
     flex-direction: column;
     gap: 0.85rem;
+    align-items: stretch;
   }
 
   .matchs__sidebar {

@@ -1011,6 +1011,7 @@
   .classement__layout {
     flex-direction: column;
     gap: 0.85rem;
+    align-items: stretch;
   }
 
   .classement__sidebar {
