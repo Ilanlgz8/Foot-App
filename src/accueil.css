@@ -73,7 +73,22 @@
   }
 }
 
-.accueil__heroLeft { flex-shrink: 0; }
+/* Desktop : heroLeft prend tout l'espace à gauche */
+.accueil__heroLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Panel matchs dans le hero — visible desktop, caché mobile */
+.accueil__dashPanel--desktopHero { display: block; }
+.accueil__dashPanel--mobileOnly  { display: none; }
+.accueil__dashPanel--results     { grid-column: 1 / -1; }
+
+@media (max-width: 900px) {
+  .accueil__dashPanel--desktopHero { display: none; }
+  .accueil__dashPanel--mobileOnly  { display: block; }
+  .accueil__dashPanel--results     { grid-column: auto; }
+}
 
 .accueil__heroRight {
   text-align: right;
@@ -89,16 +104,21 @@
   animation: fadeUp 0.5s ease both;
 }
 
-/* ── DASHBOARD — 2 colonnes ── */
+/* ── DASHBOARD — desktop : 1 colonne (résultats pleine largeur) | mobile : 2 colonnes ── */
 .accueil__dashboard {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   align-items: start;
   gap: 1.2rem;
   margin-bottom: 1.2rem;
   animation: fadeUp 0.55s ease both;
 }
 
+/* Tablet/mobile : 2 colonnes (match + résultats) */
+@media (max-width: 900px) {
+  .accueil__dashboard { grid-template-columns: 1fr 1fr; }
+}
+/* Petit mobile : 1 colonne */
 @media (max-width: 640px) {
   .accueil__dashboard { grid-template-columns: 1fr; }
 }
