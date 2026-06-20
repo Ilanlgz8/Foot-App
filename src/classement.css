@@ -562,25 +562,25 @@
   width: 100%;
 }
 
-/* Largeurs fixes : identiques dans tous les groupes → colonnes alignées */
-.classement__table--compact thead th:nth-child(1) { width: 2rem; }     /* Pos  */
-.classement__table--compact thead th:nth-child(2) { width: auto; }      /* Équipe — prend le reste */
-.classement__table--compact thead th:nth-child(3) { width: 2.6rem; }   /* Pts  */
-.classement__table--compact thead th:nth-child(4) { width: 2rem; }     /* MJ   */
+/* Largeurs % : identiques dans tous les groupes → colonnes alignées */
+.classement__table--compact thead th:nth-child(1) { width: 5%; }      /* Pos  */
+.classement__table--compact thead th:nth-child(2) { width: auto; }    /* Équipe — prend le reste */
+.classement__table--compact thead th:nth-child(3) { width: 8%; }      /* Pts  */
+.classement__table--compact thead th:nth-child(4) { width: 7%; }      /* MJ   */
 .classement__table--compact thead th:nth-child(5),
 .classement__table--compact thead th:nth-child(6),
-.classement__table--compact thead th:nth-child(7) { width: 1.8rem; }   /* V N D */
-.classement__table--compact thead th:nth-child(8) { width: 2.4rem; }   /* Diff */
-.classement__table--compact thead th:last-child   { width: 4rem; }     /* Forme */
+.classement__table--compact thead th:nth-child(7) { width: 7%; }      /* V N D */
+.classement__table--compact thead th:nth-child(8) { width: 8%; }      /* Diff */
+.classement__table--compact thead th:last-child   { width: 16%; }     /* Forme */
 
 .classement__table--compact thead th,
 .classement__table--compact .classement__row td {
-  padding: 0.55rem 0.45rem;
-  font-size: 0.78rem;
+  padding: 0.65rem 0.7rem;
+  font-size: 0.82rem;
 }
 
 .classement__table--compact thead th {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
 }
 
 .classement__table--compact .classement__teamName {
