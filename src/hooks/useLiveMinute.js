@@ -307,8 +307,15 @@ function _runFtSafeguards(matches, now, queryClient) {
 async function pollESPN(matches, queryClient) {
   const now = Date.now()
 
+  // Étendre matches avec les matchs persistés dans liveTracker
+  // → fix cold start PWA : matches[] vide pendant 1-2s au chargement
+  const allMatches = [...matches]
+  for (const lm of getLiveMatches()) {
+    if (!allMatches.some(m => m.id === lm.id)) allMatches.push(lm)
+  }
+
   const slugSet = new Set()
-  for (const m of matches) {
+  for (const m of allMatches) {
     const elapsed = (now - new Date(m.utcDate)) / 60000
     // Étendre la fenêtre si le match est déjà tracké live (prolongations, retard KO…)
     if ((elapsed >= -5 && elapsed <= 150) || isTrackedLive(m.id)) {
@@ -319,7 +326,7 @@ async function pollESPN(matches, queryClient) {
 
   // Pas de slugs → safeguards + sortie
   if (slugSet.size === 0) {
-    _runFtSafeguards(matches, now, queryClient)
+    _runFtSafeguards(allMatches, now, queryClient)
     return
   }
 
@@ -348,7 +355,7 @@ async function pollESPN(matches, queryClient) {
         const espnClock  = st?.displayClock
         if (!espnStatus) continue
 
-        const match = findMatchESPN(comp.competitors ?? [], matches)
+        const match = findMatchESPN(comp.competitors ?? [], allMatches)
         if (!match) continue
 
         // Mémoriser que ce match est encore visible dans le scoreboard ESPN
@@ -527,7 +534,7 @@ async function pollESPN(matches, queryClient) {
 
   // Safeguards après traitement ESPN — scores à jour dans espnScoresCache
   // (évite que safeguard 3 confirme FT avec l'ancien score avant qu'ESPN mette à jour)
-  _runFtSafeguards(matches, now, queryClient)
+  _runFtSafeguards(allMatches, now, queryClient)
 
   // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé
   queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
@@ -799,6 +806,8 @@ export function useLiveMinute(matches) {
 
   // Poll api-football immédiat si un match passe IN_PLAY sans kickoffAt connu
   const knownInPlayRef = useRef(new Set())
+  // Re-poll ESPN dès que matches[] se peuple (cold start PWA : premier poll était sur tableau vide)
+  const prevMatchesLen = useRef(0)
   useEffect(() => {
     const newMatches = matches.filter(m =>
       (m.status === 'IN_PLAY' || m.status === 'PAUSED') &&
@@ -809,7 +818,12 @@ export function useLiveMinute(matches) {
     if (newMatches.length > 0 && apiFbRef.current) {
       apiFbRef.current()
     }
-  }, [matches])
+    // Cold start : matches[] vient de se charger (0 → N) → re-poll ESPN immédiatement
+    if (prevMatchesLen.current === 0 && matches.length > 0 && getLiveMatches().length > 0) {
+      pollESPN(matches, queryClient)
+    }
+    prevMatchesLen.current = matches.length
+  }, [matches, queryClient])
 
   // ── Repoll immédiat au retour sur l'app (PWA / Safari background) ──
   // iOS throttle les workers + timers en arrière-plan → score figé.
@@ -818,7 +832,10 @@ export function useLiveMinute(matches) {
   useEffect(() => {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
+      // Poll immédiat
       await pollESPN(matchesRef.current, queryClient)
+      // 2ème poll 3s plus tard — réseau pas toujours prêt au réveil PWA
+      setTimeout(() => pollESPN(matchesRef.current, queryClient), 3_000)
       const now = Date.now()
       // Invalider todayMatches + résultats si données > 2min (PWA background freeze)
       const todayState   = queryClient.getQueryState(['todayMatches'])
@@ -830,7 +847,6 @@ export function useLiveMinute(matches) {
       }
       if (resultsAge > 120_000) {
         queryClient.invalidateQueries({ queryKey: ['matches', 'WC', 'FINISHED'] })
-        // Aussi vider le cache localStorage pour forcer un vrai re-fetch
         try { localStorage.removeItem('foot_matches_WC_FINISHED') } catch {}
       }
     }

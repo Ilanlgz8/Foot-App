@@ -30,13 +30,23 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          // Ne pas cacher les appels API — toujours réseau pour les données live
           navigateFallback: '/index.html',
           runtimeCaching: [
+            // Fonts Google → cache long, jamais de fetch inutile
             {
               urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
               handler: 'CacheFirst',
               options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+            },
+            // ESPN — NetworkOnly : scores toujours en temps réel
+            {
+              urlPattern: /^https:\/\/site\.api\.espn\.com\/.*/i,
+              handler: 'NetworkOnly',
+            },
+            // API internes (/api, /espn, /apifootball, /news, /sofascore) — NetworkOnly
+            {
+              urlPattern: /^\/(api|espn|apifootball|news|sofascore)(\/|\?|$)/,
+              handler: 'NetworkOnly',
             },
           ],
         },
