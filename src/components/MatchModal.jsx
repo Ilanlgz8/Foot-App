@@ -263,9 +263,10 @@ function LiveStatsTab({ match, espnScore }) {
     isLive && !hasEspn && hasEspnId
   )
 
-  // Fallback api-football — uniquement si pas d'ESPN disponible du tout
+  // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary)
+  const espnSummaryFailed = !summaryLoading && !summaryStats
   const { data: statsData, isLoading: aflLoading } = useSofaLiveStats(
-    match, isLive && !hasEspn && !hasEspnId
+    match, isLive && !hasEspn && (!hasEspnId || espnSummaryFailed)
   )
 
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'

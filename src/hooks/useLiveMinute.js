@@ -40,6 +40,10 @@ const pendingFt = {}
 // { [matchId]: timestamp }
 const lastSeenInEspn = {}
 
+// Dernière fois qu'on a fetché les stats summary pour un match
+// { [matchId]: timestamp }
+const lastSummaryFetch = {}
+
 // Restauration partielle au chargement
 try {
   const lastPoll = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
@@ -507,6 +511,61 @@ async function pollESPN(matches, queryClient) {
   // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé
   queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
   try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
+
+  // ── Fetch summary stats en background (toutes les 60s par match live) ────────
+  // Le scoreboard ESPN ne retourne jamais de stats pour les matchs live.
+  // On fetch l'endpoint summary séparément pour alimenter StatsBar (card) + modal.
+  const SUMMARY_INTERVAL = 60_000
+  for (const [midStr, cached] of Object.entries(espnScoresCache)) {
+    const mid = Number(midStr)
+    if (!isTrackedLive(mid)) continue
+    if (!cached.espnEventId || !cached.espnSlug) continue
+    if (lastSummaryFetch[mid] && now - lastSummaryFetch[mid] < SUMMARY_INTERVAL) continue
+    lastSummaryFetch[mid] = now
+
+    // Fire-and-forget : ne bloque pas le poll principal
+    ;(async (mId, slug, eventId) => {
+      try {
+        const r = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
+        if (!r.ok) return
+        const json = await r.json()
+        const teams    = json.boxscore?.teams ?? []
+        const homeTeam = teams.find(t => t.homeAway === 'home')
+        const awayTeam = teams.find(t => t.homeAway === 'away')
+
+        const getStat = (team, ...names) => {
+          for (const name of names) {
+            const s = (team?.statistics ?? []).find(st => st.name === name)
+            if (s != null) { const v = parseFloat(s.displayValue); return isNaN(v) ? null : v }
+          }
+          return null
+        }
+
+        const homePoss    = getStat(homeTeam, 'possessionPct')
+        const awayPoss    = getStat(awayTeam, 'possessionPct')
+        const homeShots   = getStat(homeTeam, 'totalShots', 'shotsTotal', 'shots')
+        const awayShots   = getStat(awayTeam, 'totalShots', 'shotsTotal', 'shots')
+        const homeSOT     = getStat(homeTeam, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
+        const awaySOT     = getStat(awayTeam, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
+        const homeCorners = getStat(homeTeam, 'cornerKicks', 'corners')
+        const awayCorners = getStat(awayTeam, 'cornerKicks', 'corners')
+
+        if (homePoss === null && homeShots === null) return
+
+        if (espnScoresCache[mId]) {
+          espnScoresCache[mId] = {
+            ...espnScoresCache[mId],
+            stats: {
+              home: { poss: homePoss, shots: homeShots, shotsOnTarget: homeSOT, corners: homeCorners },
+              away: { poss: awayPoss, shots: awayShots, shotsOnTarget: awaySOT, corners: awayCorners },
+            },
+          }
+          queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
+          try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
+        }
+      } catch { /* silencieux */ }
+    })(mid, cached.espnSlug, cached.espnEventId)
+  }
 }
 
 // ─────────────────────────────────────────────
