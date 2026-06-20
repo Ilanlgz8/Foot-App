@@ -203,7 +203,8 @@ function confirmFt(match, now, queryClient) {
   queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
   setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
   if (match.competition?.code) {
-    try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
+    // La clé localCache utilise le préfixe foot_
+    try { localStorage.removeItem(`foot_matches_${match.competition.code}_FINISHED`) } catch {}
   }
 
   // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
@@ -818,11 +819,19 @@ export function useLiveMinute(matches) {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
       await pollESPN(matchesRef.current, queryClient)
-      // Invalider aussi todayMatches si données trop vieilles (> 2 min)
-      const todayState = queryClient.getQueryState(['todayMatches'])
-      const todayAge   = Date.now() - (todayState?.dataUpdatedAt ?? 0)
+      const now = Date.now()
+      // Invalider todayMatches + résultats si données > 2min (PWA background freeze)
+      const todayState   = queryClient.getQueryState(['todayMatches'])
+      const resultsState = queryClient.getQueryState(['matches', 'WC', 'FINISHED'])
+      const todayAge     = now - (todayState?.dataUpdatedAt ?? 0)
+      const resultsAge   = now - (resultsState?.dataUpdatedAt ?? 0)
       if (todayAge > 120_000) {
         queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+      }
+      if (resultsAge > 120_000) {
+        queryClient.invalidateQueries({ queryKey: ['matches', 'WC', 'FINISHED'] })
+        // Aussi vider le cache localStorage pour forcer un vrai re-fetch
+        try { localStorage.removeItem('foot_matches_WC_FINISHED') } catch {}
       }
     }
     document.addEventListener('visibilitychange', onVisible)
