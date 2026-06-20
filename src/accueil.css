@@ -392,50 +392,70 @@
   text-transform: capitalize;
 }
 
-/* ── Bouton "Live →" (visible si matchs en cours) ─────────────────────────── */
+/* ── Titre + bouton DIRECT inline sur mobile ─────────────────────────────── */
+.accueil__titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+/* ── Bouton DIRECT ─────────────────────────────────────────────────────────── */
 .accueil__livePageBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.75rem;
-  padding: 0.45rem 0.85rem;
-  background: rgba(239,68,68,0.1);
-  border: 1px solid rgba(239,68,68,0.3);
-  border-radius: 999px;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #dc2626;
+  border: none;
+  border-radius: 0.2rem;
   cursor: pointer;
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 0.78rem;
-  font-weight: 800;
-  color: #f87171;
-  letter-spacing: 0.1em;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 12px rgba(220,38,38,0.45);
 }
 .accueil__livePageBtn:hover {
-  background: rgba(239,68,68,0.18);
-  border-color: rgba(239,68,68,0.55);
+  background: #b91c1c;
   transform: translateX(2px);
+  box-shadow: 0 4px 20px rgba(220,38,38,0.6);
 }
+
+/* Desktop : sous le kicker, visible */
+.accueil__livePageBtn--desktop {
+  display: inline-flex;
+  margin-top: 1rem;
+}
+/* Mobile : dans la titleRow, caché sur desktop */
+.accueil__livePageBtn--mobile { display: none; }
+
 .accueil__livePageBtnDot {
-  width: 0.42rem;
-  height: 0.42rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
-  background: #ef4444;
+  background: #fff;
   animation: pulse 1.2s ease-in-out infinite;
-  box-shadow: 0 0 5px rgba(239,68,68,0.8);
+  box-shadow: 0 0 5px rgba(255,255,255,0.8);
   flex-shrink: 0;
 }
 .accueil__livePageBtnCount {
-  font-size: 0.6rem;
-  background: rgba(239,68,68,0.2);
-  border-radius: 999px;
-  padding: 0.05rem 0.4rem;
-  color: #f87171;
+  font-size: 0.65rem;
+  font-weight: 700;
+  opacity: 0.8;
+  letter-spacing: 0.05em;
 }
 .accueil__livePageBtnArrow {
   font-size: 1rem;
   line-height: 1;
-  color: rgba(248,113,113,0.7);
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .accueil__livePageBtn--desktop { display: none; }
+  .accueil__livePageBtn--mobile  { display: inline-flex; padding: 0.35rem 0.7rem; font-size: 0.68rem; }
 }
 
 /* ══════════════════════════════════════════
