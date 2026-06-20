@@ -80,14 +80,14 @@
 }
 
 /* Panel matchs dans le hero — visible desktop, caché mobile */
-.accueil__dashPanel--desktopHero { display: block; }
-.accueil__dashPanel--mobileOnly  { display: none; }
-.accueil__dashPanel--results     { grid-column: 1 / -1; }
+.accueil__dashPanel.accueil__dashPanel--desktopHero { display: flex; }
+.accueil__dashPanel.accueil__dashPanel--mobileOnly  { display: none; }
+.accueil__dashPanel.accueil__dashPanel--results     { grid-column: 1 / -1; }
 
 @media (max-width: 900px) {
-  .accueil__dashPanel--desktopHero { display: none; }
-  .accueil__dashPanel--mobileOnly  { display: block; }
-  .accueil__dashPanel--results     { grid-column: auto; }
+  .accueil__dashPanel.accueil__dashPanel--desktopHero { display: none; }
+  .accueil__dashPanel.accueil__dashPanel--mobileOnly  { display: flex; }
+  .accueil__dashPanel.accueil__dashPanel--results     { grid-column: auto; }
 }
 
 .accueil__heroRight {
