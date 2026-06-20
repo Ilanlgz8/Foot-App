@@ -71,6 +71,12 @@
     align-items: flex-start;
     gap: 0.6rem;
   }
+  /* Bouton DIRECT à droite sur mobile */
+  .accueil__heroLeft {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 
 /* Desktop : heroLeft prend tout l'espace à gauche */

@@ -230,25 +230,29 @@ function Accueil() {
               )}
             </div>
             <div className="accueil__dashPanelDivider" />
-            <ResultPanel
-              results={[
-                // Matchs du jour terminés via ESPN (ft flag) — en tête
-                ...matches
-                  .filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
-                  .map(m => ({
-                    ...m,
-                    score: {
-                      fullTime: {
-                        home: espnScores[m.id]?.home ?? m.score?.fullTime?.home,
-                        away: espnScores[m.id]?.away ?? m.score?.fullTime?.away,
-                      }
-                    },
-                    status: 'FINISHED',
-                  })),
-                ...results,
-              ]}
-              loading={resultsLoading}
-            />
+            {(() => {
+                const todayFt = matches.filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
+                const todayFtIds = new Set(todayFt.map(m => m.id))
+                const todayFtMapped = todayFt.map(m => ({
+                  ...m,
+                  score: {
+                    fullTime: {
+                      home: espnScores[m.id]?.home ?? m.score?.fullTime?.home,
+                      away: espnScores[m.id]?.away ?? m.score?.fullTime?.away,
+                    }
+                  },
+                  status: 'FINISHED',
+                }))
+                return (
+                  <ResultPanel
+                    results={[
+                      ...todayFtMapped,
+                      ...results.filter(r => !todayFtIds.has(r.id)),
+                    ]}
+                    loading={resultsLoading}
+                  />
+                )
+              })()}
           </div>
 
         </div>
