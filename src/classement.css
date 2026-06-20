@@ -1107,7 +1107,13 @@
   .classement__table--compact tbody td:nth-child(7) { display: none; }
 }
 
-/* Modal groupe — compact mobile sans scroll horizontal */
+/* Vue grille groupes mobile : masquer Forme (reste dans le modal) */
+@media (max-width: 640px) {
+  .classement__table--compact thead th:last-child,
+  .classement__table--compact tbody td:last-child { display: none; }
+}
+
+/* Modal groupe — max données comme desktop, compact pour mobile */
 @media (max-width: 640px) {
   .classement__modalOverlay { padding: 0.4rem; }
   .classement__modalBox {
@@ -1116,43 +1122,53 @@
     overflow-y: auto;
     width: 100%;
   }
-  /* Pas de scroll horizontal dans le modal — table s'adapte à la largeur */
   .classement__modalBox .classement__tableWrap { overflow-x: hidden; }
   .classement__modalBox .classement__table {
     width: 100%;
     min-width: unset;
     table-layout: fixed;
   }
-  /* Colonnes modal mobile : proportions adaptées */
+
+  /* Non-compact columns : Pos Équipe Pts MJ V N D Diff [BM=9 masqué] Forme=last */
   .classement__modalBox .classement__table thead th:nth-child(1) { width: 5%; }
   .classement__modalBox .classement__table thead th:nth-child(2) { width: auto; }
-  .classement__modalBox .classement__table thead th:nth-child(3) { width: 9%; }
-  .classement__modalBox .classement__table thead th:nth-child(4) { width: 8%; }
+  .classement__modalBox .classement__table thead th:nth-child(3) { width: 8%; }
+  .classement__modalBox .classement__table thead th:nth-child(4) { width: 7%; }
   .classement__modalBox .classement__table thead th:nth-child(5),
   .classement__modalBox .classement__table thead th:nth-child(6),
-  .classement__modalBox .classement__table thead th:nth-child(7) { width: 8%; }
-  /* Masquer Diff + Forme sur mobile pour que tout rentre */
-  .classement__modalBox .classement__table thead th:nth-child(8),
-  .classement__modalBox .classement__table tbody td:nth-child(8),
-  .classement__modalBox .classement__table thead th:last-child,
-  .classement__modalBox .classement__table tbody td:last-child { display: none; }
+  .classement__modalBox .classement__table thead th:nth-child(7) { width: 7%; }
+  .classement__modalBox .classement__table thead th:nth-child(8) { width: 7%; }
+  /* Masquer BM (buts marqués — col 9, moins utile) */
+  .classement__modalBox .classement__table thead th:nth-child(9),
+  .classement__modalBox .classement__table tbody td:nth-child(9) { display: none; }
+  /* Forme — last col */
+  .classement__modalBox .classement__table thead th:last-child { width: 20%; }
 
   .classement__modalBox .classement__table thead th,
   .classement__modalBox .classement__table tbody td {
-    padding: 0.55rem 0.4rem;
-    font-size: 0.75rem;
+    padding: 0.5rem 0.3rem;
+    font-size: 0.72rem;
   }
-  .classement__modalBox .classement__table thead th { font-size: 0.58rem; }
+  .classement__modalBox .classement__table thead th { font-size: 0.54rem; }
 
-  /* Noms d'équipes tronqués dans le modal */
+  /* Noms d'équipes tronqués */
   .classement__modalBox .classement__teamName {
     max-width: 5rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
   }
-  .classement__modalBox .classement__teamCrest { width: 1.2rem; height: 1.2rem; }
+  .classement__modalBox .classement__teamCrest { width: 1.1rem; height: 1.1rem; }
+
+  /* Badges Forme plus petits dans le modal */
+  .classement__modalBox .classement__formeBadge {
+    width: 0.85rem;
+    height: 0.85rem;
+    font-size: 0.38rem;
+    border-radius: 0.15rem;
+  }
+  .classement__modalBox .classement__forme { gap: 0.08rem; }
 
   /* Sidebar active state plus visible */
   .classement__sidebarItem--active {
