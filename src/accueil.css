@@ -6,7 +6,7 @@
   position: relative;
   isolation: isolate;
   min-height: calc(100vh - 4.2rem);
-  padding: 2.5rem 1.25rem 4rem;
+  padding: 1rem 1.25rem 4rem;
   color: #e5e7eb;
   overflow: hidden;
   background: #060606;
@@ -424,11 +424,8 @@
   box-shadow: 0 4px 20px rgba(220,38,38,0.6);
 }
 
-/* Desktop : sous le kicker, visible */
-.accueil__livePageBtn--desktop {
-  display: inline-flex;
-  margin-top: 1rem;
-}
+/* Desktop : caché (bouton dans la navbar) */
+.accueil__livePageBtn--desktop { display: none; }
 /* Mobile : dans la titleRow, caché sur desktop */
 .accueil__livePageBtn--mobile { display: none; }
 

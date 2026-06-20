@@ -156,14 +156,6 @@ function Accueil() {
               <span className="accueil__kickerDot" />
               Le foot comme tu veux le voir
             </p>
-            {liveMatches.length > 0 && (
-              <button className="accueil__livePageBtn accueil__livePageBtn--desktop" onClick={() => navigate('/live')}>
-                <span className="accueil__livePageBtnDot" />
-                DIRECT
-                <span className="accueil__livePageBtnCount">{liveMatches.length} match{liveMatches.length > 1 ? 's' : ''}</span>
-                <span className="accueil__livePageBtnArrow">›</span>
-              </button>
-            )}
           </div>
           <div className="accueil__heroRight">
             <p className="accueil__heroDate">{todayStr}</p>

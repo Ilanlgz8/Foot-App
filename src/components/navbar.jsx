@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useLiveData } from '../context/LiveProvider'
 import '../../navbar.css'
 
 const navigation = [
@@ -12,6 +13,8 @@ const navigation = [
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const close = () => setMobileOpen(false)
+  const { liveMatches } = useLiveData()
+  const navigate = useNavigate()
 
   return (
     <nav className="navbar">
@@ -47,6 +50,15 @@ function Navbar() {
               ))}
             </div>
           </div>
+
+          {/* Bouton DIRECT — desktop uniquement, visible si matchs en cours */}
+          {liveMatches.length > 0 && (
+            <button className="navbar__liveBtn" onClick={() => navigate('/live')}>
+              <span className="navbar__liveBtnDot" />
+              DIRECT
+              <span className="navbar__liveBtnArrow">›</span>
+            </button>
+          )}
 
           {/* Hamburger — visible sur mobile uniquement */}
           <button
