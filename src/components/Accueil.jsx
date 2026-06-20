@@ -170,7 +170,7 @@ function Accueil() {
             </div>
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
-              matches={matches}
+              matches={dayOffset === 0 ? matches.filter(m => !liveMatches.some(l => l.id === m.id)) : matches}
               loading={matchesLoading}
               espnScores={espnScores}
               trackedIds={trackedIds}
