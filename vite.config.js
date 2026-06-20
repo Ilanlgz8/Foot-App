@@ -29,18 +29,22 @@ export default defineConfig(({ mode }) => {
             return `/api/v4/search?${params.toString()}`
           },
         },
-        // Proxy ESPN : /espn?slug=fra.1[&dates=YYYYMMDD] → site.api.espn.com (pas de clé requise)
-        // Le param dates est optionnel : sans lui → matchs du jour ; avec lui → matchs de cette date.
-        // En prod, géré par netlify/functions/espn.js — ce proxy sert uniquement en dev local.
+        // Proxy ESPN : /espn?slug=fra.1[&dates=YYYYMMDD|&eventId=XXX] → site.api.espn.com
+        // ?eventId → summary (stats live complètes) ; sinon → scoreboard (scores + statuts).
+        // En prod, géré par api/espn.js (Vercel) — ce proxy sert uniquement en dev local.
         '/espn': {
           target: 'https://site.api.espn.com',
           changeOrigin: true,
           rewrite: (path) => {
-            const qs     = path.includes('?') ? path.split('?')[1] : ''
-            const params = new URLSearchParams(qs)
-            const slug   = params.get('slug') ?? ''
-            const dates  = params.get('dates')
-            const base   = `/apis/site/v2/sports/soccer/${slug}/scoreboard`
+            const qs      = path.includes('?') ? path.split('?')[1] : ''
+            const params  = new URLSearchParams(qs)
+            const slug    = params.get('slug') ?? ''
+            const eventId = params.get('eventId')
+            const dates   = params.get('dates')
+            if (eventId) {
+              return `/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`
+            }
+            const base = `/apis/site/v2/sports/soccer/${slug}/scoreboard`
             return dates ? `${base}?dates=${dates}` : base
           },
         },

@@ -1,5 +1,6 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
+import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail }      from '../hooks/useMatchDetail'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLineups, useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
@@ -186,6 +187,53 @@ function MomentumChart({ points, homeName, awayName }) {
   )
 }
 
+// ── Stats ESPN summary (possession, tirs, corners — endpoint summary) ─────────
+// Fetché à la demande quand espnEventId est connu mais le scoreboard n'a pas les stats.
+function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
+  return useQuery({
+    queryKey: ['espnSummary', espnEventId],
+    queryFn: async () => {
+      const res = await fetch(`/espn?slug=${espnSlug}&eventId=${espnEventId}`)
+      if (!res.ok) return null
+      const json = await res.json()
+
+      // Le summary ESPN retourne les stats dans boxscore.teams[]
+      const teams    = json.boxscore?.teams ?? []
+      const homeTeam = teams.find(t => t.homeAway === 'home')
+      const awayTeam = teams.find(t => t.homeAway === 'away')
+
+      const getStat = (team, ...names) => {
+        for (const name of names) {
+          const s = (team?.statistics ?? []).find(st => st.name === name)
+          if (s != null) {
+            const v = parseFloat(s.displayValue)
+            return isNaN(v) ? null : v
+          }
+        }
+        return null
+      }
+
+      const homePoss    = getStat(homeTeam, 'possessionPct')
+      const awayPoss    = getStat(awayTeam, 'possessionPct')
+      const homeShots   = getStat(homeTeam, 'totalShots', 'shotsTotal', 'shots')
+      const awayShots   = getStat(awayTeam, 'totalShots', 'shotsTotal', 'shots')
+      const homeCorners = getStat(homeTeam, 'cornerKicks', 'corners')
+      const awayCorners = getStat(awayTeam, 'cornerKicks', 'corners')
+
+      if (homePoss === null && homeShots === null) return null
+
+      return {
+        home: { poss: homePoss, shots: homeShots, corners: homeCorners },
+        away: { poss: awayPoss, shots: awayShots, corners: awayCorners },
+      }
+    },
+    enabled:         enabled && !!espnEventId && !!espnSlug,
+    staleTime:       60_000,
+    refetchInterval: enabled ? 90_000 : false,
+    retry:           false,
+  })
+}
+
 // ── Onglet Stats Live ─────────────────────────────────────────────────────────
 // Priorité : ESPN (déjà fetché par LiveProvider, 0 quota) → api-football fallback
 const STAT_KEYS = [
@@ -204,16 +252,26 @@ const STAT_FR = {
 }
 
 function LiveStatsTab({ match, espnScore }) {
-  const isLive   = match.status === 'IN_PLAY' || match.status === 'PAUSED'
-  const hasEspn  = !!(espnScore?.stats)
+  const isLive    = match.status === 'IN_PLAY' || match.status === 'PAUSED'
+  const hasEspn   = !!(espnScore?.stats)
+  const hasEspnId = !!(espnScore?.espnEventId && espnScore?.espnSlug)
 
-  // Appel api-football uniquement si pas de données ESPN (économise le quota 100/jour)
-  const { data: statsData, isLoading } = useSofaLiveStats(match, isLive && !hasEspn)
+  // ESPN summary — fetché si on a l'event ID mais pas encore les stats du scoreboard
+  const { data: summaryStats, isLoading: summaryLoading } = useEspnSummaryStats(
+    espnScore?.espnEventId,
+    espnScore?.espnSlug,
+    isLive && !hasEspn && hasEspnId
+  )
+
+  // Fallback api-football — uniquement si pas d'ESPN disponible du tout
+  const { data: statsData, isLoading: aflLoading } = useSofaLiveStats(
+    match, isLive && !hasEspn && !hasEspnId
+  )
 
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
-  // ── Priorité ESPN ──
+  // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
     return (
       <div>
@@ -223,14 +281,29 @@ function LiveStatsTab({ match, espnScore }) {
     )
   }
 
-  // ── Fallback api-football ──
+  // ── Priorité 2 : ESPN summary stats (via /espn?eventId=) ──
+  if (summaryStats) {
+    return (
+      <div>
+        <ESPNStats stats={summaryStats} />
+        {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+      </div>
+    )
+  }
+
+  // Loading ESPN summary
+  if (summaryLoading && hasEspnId) {
+    return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+  }
+
+  // ── Priorité 3 : Fallback api-football ──
   const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
   const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
   const rows      = STAT_KEYS
     .map(k => items.find(item => item.name === k))
     .filter(Boolean)
 
-  if (isLoading && rows.length === 0) {
+  if (aflLoading && rows.length === 0) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
   }
 

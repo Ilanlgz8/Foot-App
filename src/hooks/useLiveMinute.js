@@ -32,6 +32,10 @@ let espnFailStreak = 0
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
+// "FT potentiel" — STATUS_FINAL vu une 1ère fois, en attente de confirmation
+// { [matchId]: { since: number, score: string } }
+const pendingFt = {}
+
 // Restauration partielle au chargement
 try {
   const lastPoll = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
@@ -245,6 +249,9 @@ async function pollESPN(matches, queryClient) {
             setLiveState(match.id, 'live')
           }
 
+          // Annuler tout FT potentiel en cours (c'était un flash post-but, pas un vrai FT)
+          delete pendingFt[match.id]
+
           // Effacer ft/termineAt résiduels SANS effacer liveState/matchSnapshot
           clearFtFlags(match.id)
 
@@ -257,11 +264,14 @@ async function pollESPN(matches, queryClient) {
           if (data) {
             const prevStats = espnScoresCache[match.id]?.stats ?? null
             espnScoresCache[match.id] = {
-              home:    data.home,
-              away:    data.away,
-              scorers: data.scorers,
+              home:       data.home,
+              away:       data.away,
+              scorers:    data.scorers,
               // Si ESPN ne renvoie pas les stats ce poll → garder celles du précédent
-              stats:   data.stats ?? prevStats,
+              stats:      data.stats ?? prevStats,
+              // Stocker l'event ID + slug pour fetch summary (stats live) à la demande
+              espnEventId: evt.id,
+              espnSlug:    slug,
             }
           }
         }
@@ -318,10 +328,12 @@ async function pollESPN(matches, queryClient) {
           if (currData) {
             espnScoresCache[match.id] = {
               ...(prevCache ?? {}),
-              home:    currData.home,
-              away:    currData.away,
-              scorers: currData.scorers,
-              stats:   currData.stats ?? prevStats,
+              home:        currData.home,
+              away:        currData.away,
+              scorers:     currData.scorers,
+              stats:       currData.stats ?? prevStats,
+              espnEventId: evt.id,
+              espnSlug:    slug,
             }
           }
 
@@ -332,29 +344,50 @@ async function pollESPN(matches, queryClient) {
             continue
           }
 
-          // ── DÉTECTION FAUX POSITIF : score-change + clock guard ───────────
+          // ── DÉTECTION FT : double-confirmation anti-faux-positif ─────────────
           //
-          // Insight : quand ESPN flashe STATUS_FINAL après un but, le score dans
-          // cet event vient de changer (c'est le but qui a déclenché le flash).
-          // Quand le match est vraiment terminé, le score est stable depuis plusieurs polls.
-          //
-          // Deux guards indépendants — si l'UN ou l'AUTRE lève → faux positif :
-          //   1) scoreChanged : score différent du poll précédent → but, pas FT
-          //   2) !timePlausible : horloge < 85min → trop tôt pour finir
-          const scoreChanged = prevCache && currData && (
-            currData.home !== prevCache.home || currData.away !== prevCache.away
-          )
+          // ESPN flashe STATUS_FINAL juste après un but (même à 87', 90'…).
+          // Pour distinguer un flash d'un vrai FT :
+          //   1) Horloge < 85min → faux positif certain (trop tôt)
+          //   2) Horloge >= 85min → mémoriser dans pendingFt avec le score actuel
+          //   3) Poll suivant (+15s) : STATUS_FINAL + même score → FT confirmé
+          //                           score changé (but tardif) → remettre le timer à 0
+          //                           STATUS_IN_PROGRESS → flash annulé (géré dans CAS 1)
           const mins = parseClockMins(espnClock)
           const timePlausible = mins !== null && mins >= 85
 
-          if (scoreChanged || !timePlausible) {
-            // Faux positif → widget reste, score déjà mis à jour ci-dessus
+          if (!timePlausible) {
+            // Horloge trop basse → faux positif certain
+            delete pendingFt[match.id]
             markLive(match)
             clearFtFlags(match.id)
             continue
           }
 
-          // ── Score stable + horloge >= 85min → FT confirmé ────────────────
+          // Horloge >= 85min — double-confirmation
+          const currentScore = currData ? `${currData.home}-${currData.away}` : null
+          const pft = pendingFt[match.id]
+
+          if (!pft) {
+            // 1ère détection STATUS_FINAL → mémoriser, attendre poll suivant
+            pendingFt[match.id] = { since: now, score: currentScore }
+            markLive(match)
+            clearFtFlags(match.id)
+            continue
+          }
+
+          if (pft.score !== currentScore) {
+            // Score a changé depuis la 1ère détection → but tardif, repartir
+            pendingFt[match.id] = { since: now, score: currentScore }
+            markLive(match)
+            clearFtFlags(match.id)
+            continue
+          }
+
+          // Score stable sur 2 polls consécutifs + horloge >= 85min → FT réel
+          delete pendingFt[match.id]
+
+          // ── FT confirmé ───────────────────────────────────────────────────
           setLiveState(match.id, 'ended', { endedAt: now })
 
           // Persister les scores pour MatchModal post-match
