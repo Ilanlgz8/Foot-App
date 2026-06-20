@@ -66,15 +66,16 @@
   z-index: 10;
   background: none;
   border: none;
-  color: #475569;
+  outline: none;
+  color: rgba(255,255,255,0.3);
   width: 2.1rem; height: 2.1rem;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.18s;
+  transition: color 0.18s, transform 0.18s;
 }
 
 .modal__close:hover {

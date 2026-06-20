@@ -562,7 +562,6 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore })
         {/* Header */}
         <div className="modal__header">
           <span className="modal__kicker">{match.competition?.name}</span>
-          <span className="modal__journee">Journée {match.matchday}</span>
         </div>
 
         {/* Équipes + score */}

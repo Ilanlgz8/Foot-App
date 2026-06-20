@@ -4,7 +4,7 @@ import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
 import { useMatches } from '../hooks/useMatchs'
 import { useLiveData } from '../context/LiveProvider'
-import { getTrackedMatches, toggleTrackedMatch } from '../utils/matchStateTracker'
+import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/matchStateTracker'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchPanel } from '../accueil/MatchCard'
@@ -170,7 +170,9 @@ function Accueil() {
             </div>
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
-              matches={dayOffset === 0 ? matches.filter(m => !liveMatches.some(l => l.id === m.id)) : matches}
+              matches={dayOffset === 0
+                ? matches.filter(m => !liveMatches.some(l => l.id === m.id) && !getMatchState(m.id).ft)
+                : matches}
               loading={matchesLoading}
               espnScores={espnScores}
               trackedIds={trackedIds}
@@ -191,7 +193,25 @@ function Accueil() {
               )}
             </div>
             <div className="accueil__dashPanelDivider" />
-            <ResultPanel results={results} loading={resultsLoading} />
+            <ResultPanel
+              results={[
+                // Matchs du jour terminés via ESPN (ft flag) — en tête
+                ...matches
+                  .filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
+                  .map(m => ({
+                    ...m,
+                    score: {
+                      fullTime: {
+                        home: espnScores[m.id]?.home ?? m.score?.fullTime?.home,
+                        away: espnScores[m.id]?.away ?? m.score?.fullTime?.away,
+                      }
+                    },
+                    status: 'FINISHED',
+                  })),
+                ...results,
+              ]}
+              loading={resultsLoading}
+            />
           </div>
 
         </div>
