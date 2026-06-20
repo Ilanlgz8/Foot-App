@@ -21,6 +21,7 @@ import {
   getLiveState, setLiveState,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, isTrackedLive, getLiveMatches } from './liveTracker'
+import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
 
 // ─────────────────────────────────────────────
 // Constantes
@@ -179,7 +180,9 @@ function extractMatchData(comp) {
 // ─────────────────────────────────────────────
 
 function confirmFt(match, now, queryClient) {
-  const id = match.id
+  const id    = match.id
+  const cache = espnScoresCache[id]
+  notifyFullTime(match, cache?.home ?? 0, cache?.away ?? 0)
   setLiveState(id, 'ended', { endedAt: now })
 
   // Persister le score ESPN pour MatchModal post-match
@@ -384,7 +387,14 @@ async function pollESPN(matches, queryClient) {
           // ── Scores + buteurs + stats ─────────────────────────────────────
           const data = extractMatchData(comp)
           if (data) {
-            const prevStats = espnScoresCache[match.id]?.stats ?? null
+            const prevCache = espnScoresCache[match.id]
+            const prevStats = prevCache?.stats ?? null
+            // Détecter un but : score total augmente
+            const prevTotal = (prevCache?.home ?? -1) + (prevCache?.away ?? -1)
+            const newTotal  = data.home + data.away
+            if (prevCache && newTotal > prevTotal) {
+              notifyGoal(match, data.home, data.away, data.scorers)
+            }
             espnScoresCache[match.id] = {
               home:       data.home,
               away:       data.away,
@@ -408,11 +418,14 @@ async function pollESPN(matches, queryClient) {
           if (mins != null && mins > 0) {
             setKickoffAt(match.id, now - mins * 60_000)
           }
+          notifyKickoff(match)
         }
 
         // ── HT détecté ────────────────────────────────────────────────────
         if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
           trackMatchState({ ...match, status: 'PAUSED' })
+          const cache = espnScoresCache[match.id]
+          notifyHalfTime(match, cache?.home ?? 0, cache?.away ?? 0)
         }
 
         // ── 2H détecté ────────────────────────────────────────────────────

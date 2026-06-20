@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import './App.css'
 import Navbar from './components/navbar.jsx'
 import Footer from './components/Footer.jsx'
@@ -8,9 +9,19 @@ import Classement from './components/Classement.jsx'
 import MentionsLegales from './components/MentionsLegales.jsx'
 import { LiveProvider } from './context/LiveProvider.jsx'
 import { Routes, Route, useLocation } from 'react-router-dom'
+import { requestNotificationPermission } from './utils/notify'
 
 function App() {
   const location = useLocation()
+
+  // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return
+    if (Notification.permission === 'default') {
+      const t = setTimeout(() => requestNotificationPermission(), 3_000)
+      return () => clearTimeout(t)
+    }
+  }, [])
 
   return (
     // LiveProvider monté ici → hooks live survivent aux changements de route
