@@ -57,7 +57,7 @@
 /* ── HERO (inline, compact) ── */
 .accueil__hero--inline {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 2rem;
   margin-bottom: 0.5rem;
