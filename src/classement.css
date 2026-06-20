@@ -1056,7 +1056,7 @@
 /* Mobile (< 640px) */
 @media (max-width: 640px) {
   .classement { padding: 1.25rem 0.75rem 2.5rem; }
-  .classement__panel { padding: 0.85rem 0.75rem; }
+  .classement__panel { padding: 0.85rem 0.6rem; }
 
   .classement__panelHeader {
     flex-direction: column;
@@ -1070,14 +1070,13 @@
     justify-content: center;
   }
 
-  /* Tableau classement : taille texte réduite */
-  .classement__table thead th,
-  .classement__table tbody td { padding: 0.5rem 0.55rem; font-size: 0.72rem; }
-
   .classement__teamName { font-size: 0.78rem; }
   .classement__crest    { width: 1.5rem; height: 1.5rem; }
 
-  /* Masquer V, N, D, Diff sur le tableau normal (non-compact) sur mobile */
+  /* ── Table normale (non-compact) : masquer V/N/D/Diff, pas de min-width forcée ── */
+  .classement__table:not(.classement__table--compact) thead th,
+  .classement__table:not(.classement__table--compact) tbody td { padding: 0.5rem 0.45rem; font-size: 0.72rem; }
+
   .classement__table:not(.classement__table--compact) thead th:nth-child(5),
   .classement__table:not(.classement__table--compact) thead th:nth-child(6),
   .classement__table:not(.classement__table--compact) thead th:nth-child(7),
@@ -1087,8 +1086,28 @@
   .classement__table:not(.classement__table--compact) tbody td:nth-child(7),
   .classement__table:not(.classement__table--compact) tbody td:nth-child(8) { display: none; }
 
-  /* Table normale moins large une fois les colonnes masquées */
-  .classement__table:not(.classement__table--compact) { min-width: 420px; }
+  /* Pas de min-width qui force le scroll horizontal */
+  .classement__table:not(.classement__table--compact) { min-width: 0; }
+
+  /* ── Table compact (groupes WC) : layout auto sur mobile, padding serré ── */
+  /* table-layout:fixed avec % causait des cellules de 0.7px sur 375px → overflow */
+  .classement__table--compact {
+    table-layout: auto;
+    min-width: 0;
+  }
+  /* Masquer Forme sur la grille — elle reste dans le modal */
+  .classement__table--compact thead th:last-child,
+  .classement__table--compact tbody td:last-child { display: none; }
+
+  /* Padding serré pour que tout rentre sans scroll */
+  .classement__table--compact thead th,
+  .classement__table--compact tbody td {
+    padding: 0.5rem 0.22rem;
+    font-size: 0.73rem;
+  }
+  .classement__table--compact thead th { font-size: 0.55rem; }
+  .classement__table--compact .classement__teamName { max-width: 7rem; font-size: 0.73rem; }
+  .classement__table--compact .classement__teamCrest { width: 1.1rem; height: 1.1rem; }
 
   /* Grille groupes */
   .classement__groups { grid-template-columns: 1fr; gap: 1rem; }
@@ -1098,19 +1117,13 @@
 @media (max-width: 400px) {
   .classement { padding: 1rem 0.5rem 2rem; }
   .classement__sidebarLogo { width: 1.9rem; height: 1.9rem; }
-  /* Compact encore plus serré sur 375px */
+  /* Masquer V, N, D sur très petits écrans */
   .classement__table--compact thead th:nth-child(5),
   .classement__table--compact thead th:nth-child(6),
   .classement__table--compact thead th:nth-child(7),
   .classement__table--compact tbody td:nth-child(5),
   .classement__table--compact tbody td:nth-child(6),
   .classement__table--compact tbody td:nth-child(7) { display: none; }
-}
-
-/* Vue grille groupes mobile : masquer Forme (reste dans le modal) */
-@media (max-width: 640px) {
-  .classement__table--compact thead th:last-child,
-  .classement__table--compact tbody td:last-child { display: none; }
 }
 
 /* Modal groupe — max données comme desktop, compact pour mobile */
