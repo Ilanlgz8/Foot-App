@@ -226,13 +226,54 @@ function findMatchESPN(competitors, matches) {
   }) ?? null
 }
 
+// ── Safeguards FT — appelés avant le early return, même sans slugs à poller ──
+function _runFtSafeguards(matches, now, queryClient) {
+  // Pool combiné : matches FD.org du jour + matchs stockés dans liveTracker
+  // (un match terminé n'est plus dans matches FD.org mais reste dans liveTracker)
+  const allLive = [...matches]
+  for (const lm of getLiveMatches()) {
+    if (!allLive.some(m => m.id === lm.id)) allLive.push(lm)
+  }
+
+  // Safeguard 1 : pendingFt timeout (45s)
+  // ESPN a envoyé STATUS_FINAL une fois puis retiré l'event → confirmer après 45s
+  for (const [midStr, pft] of Object.entries(pendingFt)) {
+    if (now - pft.since < 45_000) continue
+    const mid = Number(midStr)
+    delete pendingFt[midStr]
+    if (getLiveState(mid).state === 'ended') continue
+    if (!isTrackedLive(mid)) continue
+    const match = allLive.find(m => m.id === mid)
+    if (!match) continue
+    console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
+    confirmFt(match, now, queryClient)
+  }
+
+  // Safeguard 2 : durée max live (150min depuis utcDate)
+  // ESPN a arrêté d'envoyer le match sans STATUS_FINAL → FT forcé
+  // Utilise getLiveMatches() (liveTracker) et non getTrackedMatches() (timing api-fb)
+  for (const lm of getLiveMatches()) {
+    const mid = lm.id
+    if (getLiveState(mid).state === 'ended') continue
+    if (pendingFt[mid]) continue  // déjà en cours de confirmation via safeguard 1
+    const ageMin = (now - new Date(lm.utcDate)) / 60_000
+    if (ageMin < 150) continue
+    console.log(`[useLiveMinute] match ${mid} > 150min → FT forcé`)
+    confirmFt(lm, now, queryClient)
+  }
+}
+
 async function pollESPN(matches, queryClient) {
   const now = Date.now()
+
+  // Safeguards toujours actifs — avant le early return
+  _runFtSafeguards(matches, now, queryClient)
 
   const slugSet = new Set()
   for (const m of matches) {
     const elapsed = (now - new Date(m.utcDate)) / 60000
-    if (elapsed >= -5 && elapsed <= 150) {
+    // Étendre la fenêtre si le match est déjà tracké live (prolongations, retard KO…)
+    if ((elapsed >= -5 && elapsed <= 150) || isTrackedLive(m.id)) {
       const slug = COMP_ESPN[m.competition?.id]
       if (slug) slugSet.add(slug)
     }
@@ -434,35 +475,6 @@ async function pollESPN(matches, queryClient) {
     } catch (err) {
       console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
     }
-  }
-
-  // ── Safeguard 1 : pendingFt timeout (45s) ────────────────────────────────────
-  // ESPN envoie STATUS_FINAL une fois puis retire l'event du scoreboard →
-  // la 2e confirmation n'arrive jamais → confirmer quand même après 45s.
-  for (const [midStr, pft] of Object.entries(pendingFt)) {
-    if (now - pft.since < 45_000) continue
-    const mid = Number(midStr)
-    delete pendingFt[midStr]
-    if (getLiveState(mid).state === 'ended') continue
-    const match = matches.find(m => m.id === mid)
-    if (!match || !isTrackedLive(mid)) continue
-    console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
-    confirmFt(match, now, queryClient)
-  }
-
-  // ── Safeguard 2 : durée max live (150 min depuis utcDate) ─────────────────────
-  // Si ESPN a complètement arrêté d'envoyer un match et qu'il est > 150min →
-  // forcer FT (couvre matchs normaux 90min + prolongations + penaltys + retard KO).
-  for (const midStr of getTrackedMatches()) {
-    const mid = Number(midStr)
-    if (getLiveState(mid).state === 'ended') continue
-    if (pendingFt[mid]) continue  // déjà en cours de confirmation → laisser faire
-    const match = matches.find(m => m.id === mid)
-    if (!match) continue
-    const ageMin = (now - new Date(match.utcDate)) / 60_000
-    if (ageMin < 150) continue
-    console.log(`[useLiveMinute] match ${mid} > 150min → FT forcé`)
-    confirmFt(match, now, queryClient)
   }
 
   // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé

@@ -12,8 +12,10 @@ export function useTeamForm(selectedComp) {
   const { data } = useQuery({
     queryKey: ['teamForm', selectedComp],
     queryFn: async () => {
+      // WC 2026 : sans filtre saison FD.org renvoie WC 2022 → forme incorrecte
+      const seasonParam = selectedComp === 'WC' ? '&season=2026' : ''
       const res = await fetch(
-        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED`)
+        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED${seasonParam}`)
       )
       if (!res.ok) return { formMap: {}, matches: [] }
 
