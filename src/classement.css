@@ -1184,6 +1184,24 @@
   }
   .classement__modalBox .classement__table thead th { font-size: 0.58rem; }
 
+  /* Centrer les colonnes numériques (Pos, Pts, MJ, V, N, D, Diff, Forme) */
+  .classement__modalBox .classement__table thead th:nth-child(1),
+  .classement__modalBox .classement__table thead th:nth-child(3),
+  .classement__modalBox .classement__table thead th:nth-child(4),
+  .classement__modalBox .classement__table thead th:nth-child(5),
+  .classement__modalBox .classement__table thead th:nth-child(6),
+  .classement__modalBox .classement__table thead th:nth-child(7),
+  .classement__modalBox .classement__table thead th:nth-child(8),
+  .classement__modalBox .classement__table thead th:last-child,
+  .classement__modalBox .classement__table tbody td:nth-child(1),
+  .classement__modalBox .classement__table tbody td:nth-child(3),
+  .classement__modalBox .classement__table tbody td:nth-child(4),
+  .classement__modalBox .classement__table tbody td:nth-child(5),
+  .classement__modalBox .classement__table tbody td:nth-child(6),
+  .classement__modalBox .classement__table tbody td:nth-child(7),
+  .classement__modalBox .classement__table tbody td:nth-child(8),
+  .classement__modalBox .classement__table tbody td:last-child { text-align: center; }
+
   /* Nom d'équipe : tronqué à 6rem max */
   .classement__modalBox .classement__teamName {
     max-width: 6rem;
