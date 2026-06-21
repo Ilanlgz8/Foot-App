@@ -112,11 +112,14 @@
   grid-template-columns: 3fr 2fr;
 }
 
-/* Mobile : 1 colonne */
+/* Mobile : 1 colonne + LiveWidget en premier */
 @media (max-width: 640px) {
   .accueil__mainGrid,
   .accueil__mainGrid--live {
     grid-template-columns: 1fr;
+  }
+  .accueil__rightCol {
+    order: -1;
   }
 }
 
