@@ -143,20 +143,18 @@ function Accueil() {
           <span className="accueil__heroStat">Stat</span>Footix
         </h1>
         <p className="accueil__heroSub">stats &amp; live</p>
+
+        {/* Bouton DIRECT — coin haut-droit du hero, mobile uniquement */}
+        {liveMatches.length > 0 && (
+          <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
+            <span className="accueil__livePageBtnDot" />
+            DIRECT
+            <span className="accueil__livePageBtnArrow">›</span>
+          </button>
+        )}
       </div>
 
       <div className="accueil__inner">
-
-        {/* Mobile uniquement : bouton DIRECT */}
-        {liveMatches.length > 0 && (
-          <div className="accueil__mobileLiveBar">
-            <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
-              <span className="accueil__livePageBtnDot" />
-              DIRECT
-              <span className="accueil__livePageBtnArrow">›</span>
-            </button>
-          </div>
-        )}
 
         {/* ── Grille principale ── */}
         <div className={`accueil__mainGrid${liveMatches.length > 0 ? ' accueil__mainGrid--live' : ''}`}>

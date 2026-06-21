@@ -85,17 +85,6 @@
   margin: 0 auto;
 }
 
-/* ── Bouton DIRECT mobile (barre au-dessus de la grille) ── */
-.accueil__mobileLiveBar {
-  display: none;
-}
-@media (max-width: 640px) {
-  .accueil__mobileLiveBar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.75rem;
-  }
-}
 
 /* ── GRILLE PRINCIPALE ── */
 /* Pas de live : 50/50 */
@@ -432,9 +421,9 @@
   gap: 1.5rem;
 }
 
-/* ── Bouton DIRECT ─────────────────────────────────────────────────────────── */
+/* ── Bouton DIRECT — coin haut-droit du hero, mobile uniquement ── */
 .accueil__livePageBtn {
-  display: inline-flex;
+  display: none; /* caché par défaut — desktop utilise le bouton navbar */
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
@@ -448,19 +437,26 @@
   color: #fff;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
   box-shadow: 0 2px 12px rgba(220,38,38,0.45);
 }
 .accueil__livePageBtn:hover {
   background: #b91c1c;
-  transform: translateX(2px);
   box-shadow: 0 4px 20px rgba(220,38,38,0.6);
 }
 
-/* Desktop : caché (bouton dans la navbar) */
+@media (max-width: 640px) {
+  .accueil__livePageBtn {
+    display: inline-flex;
+    position: absolute;
+    top: 0.6rem;
+    right: 0;
+  }
+}
+
+/* (legacy — inutilisées) */
 .accueil__livePageBtn--desktop { display: none; }
-/* Mobile : dans la titleRow, caché sur desktop */
-.accueil__livePageBtn--mobile { display: none; }
+.accueil__livePageBtn--mobile  { display: none; }
 
 .accueil__livePageBtnDot {
   width: 0.4rem;
