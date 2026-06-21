@@ -4,6 +4,7 @@
     { "source": "/espn",        "destination": "/api/espn" },
     { "source": "/sofascore",   "destination": "/api/sofascore" },
     { "source": "/apifootball", "destination": "/api/apifootball" },
+    { "source": "/api/cron/goals", "destination": "/api/cron/goals" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
