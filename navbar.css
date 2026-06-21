@@ -94,21 +94,25 @@
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
-  margin-left: -0.5rem;
+  margin-left: -0.75rem;
 }
 
 .navbar__brandIcon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
   object-fit: cover;
   display: block;
-  box-shadow: 0 2px 12px rgba(192,24,24,0.35);
+  box-shadow:
+    0 0 0 1.5px rgba(239,68,68,0.4),
+    0 3px 16px rgba(192,24,24,0.5);
   transition: box-shadow 0.25s;
 }
 
 .navbar__brand:hover .navbar__brandIcon {
-  box-shadow: 0 0 0 2px rgba(239,68,68,0.5), 0 4px 20px rgba(192,24,24,0.5);
+  box-shadow:
+    0 0 0 2px rgba(239,68,68,0.75),
+    0 4px 24px rgba(192,24,24,0.65);
 }
 
 .navbar__badge {
