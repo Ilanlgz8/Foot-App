@@ -15,11 +15,20 @@ const kv = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 })
 
-// Domaine de production autorisé — mis à jour avec ton vrai domaine Vercel
+// Domaines autorisés — production + previews Vercel
 const ALLOWED_ORIGINS = new Set([
   'https://statfootix.vercel.app',
-  // Ajoute ici ton domaine custom si tu en as un (ex: 'https://statfootix.com')
 ])
+
+// Accepter aussi tous les previews Vercel (foot-app-*.vercel.app) et domaines custom
+function isAllowedOrigin(origin) {
+  if (!origin) return true // pas d'origin = requête serveur ou curl
+  if (ALLOWED_ORIGINS.has(origin)) return true
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true
+  // Previews Vercel automatiques (ex: foot-app-git-main-xxx.vercel.app)
+  if (origin.endsWith('.vercel.app')) return true
+  return false
+}
 
 // Valide qu'un objet est bien une Web Push subscription
 function isValidSubscription(sub) {
@@ -37,8 +46,7 @@ export default async function handler(req, res) {
   // ── Vérification Origin (protection CSRF basique) ─────────────────────────
   // En dev local (origin undefined ou localhost), on laisse passer
   const origin = req.headers.origin ?? ''
-  const isDevLocal = !origin || origin.includes('localhost') || origin.includes('127.0.0.1')
-  if (!isDevLocal && !ALLOWED_ORIGINS.has(origin)) {
+  if (!isAllowedOrigin(origin)) {
     return res.status(403).json({ error: 'Origine non autorisée' })
   }
 
