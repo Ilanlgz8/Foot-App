@@ -586,6 +586,29 @@ async function pollESPN(matches, queryClient) {
           delete pendingFt[match.id]
           confirmFt(match, now, queryClient)
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        // FALLBACK J-1 : ESPN retourne STATUS_SCHEDULED (snapshot statique
+        // de la veille) mais FD.org sait que le match est en cours.
+        // On stocke quand même l'espnEventId pour que le fetch summary
+        // se déclenche et fournisse les stats live à LiveWidget.
+        // ════════════════════════════════════════════════════════════════════
+        if (
+          espnStatus === 'STATUS_SCHEDULED' &&
+          (match.status === 'IN_PLAY' || match.status === 'PAUSED' || isTrackedLive(match.id))
+        ) {
+          if (!espnScoresCache[match.id]) {
+            espnScoresCache[match.id] = { home: null, away: null, scorers: [], stats: null }
+          }
+          // Ne pas écraser si l'eventId est déjà là (cas normal)
+          if (!espnScoresCache[match.id].espnEventId) {
+            espnScoresCache[match.id] = {
+              ...espnScoresCache[match.id],
+              espnEventId: evt.id,
+              espnSlug:    slug,
+            }
+          }
+        }
       }
     } catch (err) {
       console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
