@@ -22,6 +22,7 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
+import { playGoalSound, playWhistleKO, playWhistleHT, playWhistleFT } from '../utils/sounds'
 
 // Push côté client supprimé — le cron /api/cron/goals gère toutes les notifs
 // (buts, KO, MT, reprise, prolongations, FT) pour éviter les doublons.
@@ -347,6 +348,7 @@ async function pollESPN(matches, queryClient) {
         // Détection but : score total augmente
         if (prevCache && newTotal > prevTotal) {
           notifyGoal(match, home, away, scorers)
+          playGoalSound()
         }
 
         espnScoresCache[mid] = {
@@ -368,6 +370,7 @@ async function pollESPN(matches, queryClient) {
         const mins = parseClockMins(espnClock)
         if (mins != null && mins > 0) setKickoffAt(mid, now - mins * 60_000)
         notifyKickoff(match)
+        playWhistleKO()
       }
 
       // ── HT détecté ──
@@ -375,6 +378,7 @@ async function pollESPN(matches, queryClient) {
         trackMatchState({ ...match, status: 'PAUSED' })
         const cache = espnScoresCache[mid]
         notifyHalfTime(match, cache?.home ?? 0, cache?.away ?? 0)
+        playWhistleHT()
       }
 
       // ── 2H détecté ──
@@ -445,6 +449,7 @@ async function pollESPN(matches, queryClient) {
         // STATUS_FINAL + score inchangé + horloge >= 85 → FT confirmé
         delete pendingFt[mid]
         confirmFt(match, now, queryClient)
+        playWhistleFT()
       }
 
       // ── FALLBACK J-1 : STATUS_SCHEDULED mais FD.org sait que c'est live ──

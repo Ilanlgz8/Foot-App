@@ -13,10 +13,14 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
 import { useOnline } from './hooks/useOnline'
 import { OfflineBanner } from './components/OfflineBanner'
+import { unlockAudio } from './utils/sounds'
 
 function App() {
   const location = useLocation()
   const online   = useOnline()
+
+  // Débloquer l'AudioContext au premier geste (requis par Chrome/Safari)
+  useEffect(() => { unlockAudio() }, [])
 
   // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
   useEffect(() => {
