@@ -62,31 +62,28 @@ function Navbar() {
       <div className="navbar__container">
         <div className="navbar__inner">
 
-          {/* ── Groupe gauche mobile : hamburger + logo ── */}
-          <div className="navbar__mobileLeft">
-            {/* Hamburger — visible sur mobile uniquement */}
-            <button
-              className="navbar__menuButton"
-              onClick={() => setMobileOpen(o => !o)}
-              aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
-              aria-expanded={mobileOpen}
-            >
-              {mobileOpen ? (
-                <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-              ) : (
-                <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-              )}
-            </button>
+          {/* Hamburger — visible sur mobile uniquement, tout à gauche */}
+          <button
+            className="navbar__menuButton"
+            onClick={() => setMobileOpen(o => !o)}
+            aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? (
+              <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            ) : (
+              <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            )}
+          </button>
 
-            {/* Brand */}
-            <NavLink to="/" className="navbar__brand" onClick={close}>
-              <img src="/icon-192.png" alt="StatFootix" className="navbar__brandIcon" />
-            </NavLink>
-          </div>
+          {/* Brand — centré sur mobile, à gauche sur desktop */}
+          <NavLink to="/" className="navbar__brand" onClick={close}>
+            <img src="/icon-192.png" alt="StatFootix" className="navbar__brandIcon" />
+          </NavLink>
 
           {/* Desktop nav — caché sur mobile via CSS */}
           <div className="navbar__navWrap">

@@ -413,7 +413,7 @@
   to   { transform: rotate(360deg); }
 }
 
-/* Mobile < 640px : hamburger visible, navWrap caché */
+/* Mobile < 640px : hamburger gauche, logo centré, actions droite */
 @media (max-width: 639px) {
   .navbar__inner {
     justify-content: space-between;
@@ -422,6 +422,9 @@
     display: inline-flex;
   }
   .navbar__brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     margin-left: 0;
   }
   .navbar__refreshBtn {
