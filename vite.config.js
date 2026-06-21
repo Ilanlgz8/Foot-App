@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           navigateFallback: '/index.html',
+          // Nouveau SW prend le contrôle immédiatement → pas besoin de vider le cache Safari
+          skipWaiting: true,
+          clientsClaim: true,
           // Injecte les handlers push dans le SW généré par workbox
           // sw-push.js est un fichier vanilla JS pur (pas d'import) → compatible generateSW
           importScripts: ['/sw-push.js'],
