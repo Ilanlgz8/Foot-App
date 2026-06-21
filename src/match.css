@@ -150,6 +150,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.matchs__sidebarName--short { display: none; }
 
 .matchs__sidebarDot {
   width: 0.4rem;

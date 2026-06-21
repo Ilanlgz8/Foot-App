@@ -141,6 +141,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.resultats__sidebarName--short { display: none; }
 
 .resultats__sidebarDot {
   width: 0.4rem; height: 0.4rem;

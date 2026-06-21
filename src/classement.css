@@ -139,6 +139,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.classement__sidebarName--short { display: none; }
 
 .classement__sidebarDot {
   width: 0.4rem;
