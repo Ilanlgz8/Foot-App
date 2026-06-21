@@ -263,10 +263,10 @@ export default async function handler(req, res) {
       const scoringTeamId = lastGoal?.team?.id
       const scoringTeam   = scoringTeamId === homeC.team?.id ? homeTeam : awayTeam
 
-      const title = scorer
-        ? `🔴 But ! ${scorer} (${scoringTeam})${clockLabel}`
-        : `🔴 But de ${scoringTeam}${clockLabel}`
-      const body  = `${homeTeam} ${scoreStr} ${awayTeam}`
+      const title = `🔴 But pour ${scoringTeam} !`
+      const body  = scorer
+        ? `${scorer}${clockLabel} · ${homeTeam} ${scoreStr} ${awayTeam}`
+        : `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`
 
       const sent = await sendDeduped(
         `push:goal:cron:${eventId}:${score}`,
