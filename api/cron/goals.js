@@ -130,10 +130,14 @@ export default async function handler(req, res) {
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
 
+  // Fetch l'endpoint par défaut (sans dates) EN PREMIER :
+  // pendant les périodes de fort trafic (CM 2026), l'endpoint ?dates= peut servir
+  // du cache stale côté CDN ESPN → les matchs restent STATUS_SCHEDULED.
+  // L'endpoint défaut est rafraîchi quasi temps réel.
   const fetches = await Promise.allSettled(
     SLUGS.flatMap(slug => [
-      fetchEvents(slug, today),
-      fetchEvents(slug, yesterday),
+      fetchEvents(slug, null),      // défaut — matchs du jour en temps réel
+      fetchEvents(slug, yesterday), // hier — matchs après minuit UTC
     ])
   )
 

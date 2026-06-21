@@ -51,10 +51,30 @@ export function usePushNotifications() {
 
     navigator.serviceWorker.ready
       .then(reg => reg.pushManager.getSubscription())
-      .then(sub => {
+      .then(async sub => {
         if (sub) {
           setStatus('subscribed')
           localStorage.setItem(LS_KEY, '1')
+          // Re-sync silencieuse toutes les 4h : si Redis a été vidé, ou la subscription
+          // supprimée suite à un 410, le cron n'aurait plus rien à qui envoyer.
+          // L'endpoint /subscribe est idempotent (sadd ignore les doublons).
+          const SYNC_INTERVAL = 4 * 60 * 60 * 1000
+          const lastSync = parseInt(localStorage.getItem('push_last_sync') || '0', 10)
+          if (Date.now() - lastSync > SYNC_INTERVAL) {
+            try {
+              const keyRes = await fetch('/api/vapid-key')
+              if (keyRes.ok) {
+                const storeRes = await fetch('/api/subscribe', {
+                  method:  'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body:    JSON.stringify(sub.toJSON()),
+                })
+                if (storeRes.ok || storeRes.status === 201) {
+                  localStorage.setItem('push_last_sync', String(Date.now()))
+                }
+              }
+            } catch { /* silently fail — pas critique */ }
+          }
         } else {
           localStorage.removeItem(LS_KEY)
           setStatus('idle')

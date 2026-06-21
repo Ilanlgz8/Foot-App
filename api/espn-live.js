@@ -249,16 +249,25 @@ export default async function handler(req, res) {
 
       if (!events) {
         // Cache expiré ou absent → fetch ESPN
+        // ⚠️ On utilise l'endpoint par défaut (sans ?dates=) pour les matchs du jour :
+        //    l'endpoint daté a une TTL CDN ESPN plus longue → scores figés pendant la CM.
+        //    L'endpoint défaut est rafraîchi quasi temps réel par le CDN ESPN.
         try {
-          const [rT, rY] = await Promise.all([
-            fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
+          const [rDefault, rY] = await Promise.all([
+            fetch(`${ESPN_BASE}/${slug}/scoreboard`,                    { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
             fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
           ])
-          const [jT, jY] = await Promise.all([
-            rT.ok ? rT.json() : { events: [] },
+          const [jDefault, jY] = await Promise.all([
+            rDefault.ok ? rDefault.json() : { events: [] },
             rY.ok ? rY.json() : { events: [] },
           ])
-          events = [...(jT.events ?? []), ...(jY.events ?? [])]
+          // Fusionner en déduplicant par ID (l'endpoint défaut peut inclure des matchs
+          // proches de minuit UTC qui apparaissent aussi dans yesterday)
+          const evtMap = new Map()
+          for (const e of [...(jDefault.events ?? []), ...(jY.events ?? [])]) {
+            evtMap.set(e.id, e)
+          }
+          events = [...evtMap.values()]
           // Stocker en cache Redis
           try { await kv.setex(cKey, SB_TTL, JSON.stringify(events)) } catch {}
         } catch {
