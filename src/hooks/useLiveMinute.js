@@ -473,7 +473,8 @@ async function pollESPN(matches, queryClient) {
             espnScoresCache[match.id] = {
               home:       data.home,
               away:       data.away,
-              scorers:    data.scorers,
+              // ESPN retourne parfois details:[] → garder les noms déjà en cache
+              scorers:    data.scorers.length > 0 ? data.scorers : (prevCache?.scorers ?? []),
               // Si ESPN ne renvoie pas les stats ce poll → garder celles du précédent
               stats:      data.stats ?? prevStats,
               // Stocker l'event ID + slug pour fetch summary (stats live) à la demande
@@ -633,7 +634,8 @@ async function pollESPN(matches, queryClient) {
   const SUMMARY_INTERVAL = 60_000
   for (const [midStr, cached] of Object.entries(espnScoresCache)) {
     const mid = Number(midStr)
-    if (!isTrackedLive(mid)) continue
+    // Fetch summary si le match est live OU si liveState=live (liveTracker peut avoir perdu l'entrée)
+    if (!isTrackedLive(mid) && getLiveState(mid).state !== 'live') continue
     if (!cached.espnEventId || !cached.espnSlug) continue
     if (lastSummaryFetch[mid] && now - lastSummaryFetch[mid] < SUMMARY_INTERVAL) continue
     lastSummaryFetch[mid] = now
