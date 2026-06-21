@@ -470,14 +470,17 @@ async function pollESPN(matches, queryClient) {
             if (prevCache && newTotal > prevTotal) {
               notifyGoal(match, data.home, data.away, data.scorers)
             }
+            // Garder la liste de buteurs la plus complète :
+            // ESPN peut lag sur details (score 3-0 mais seulement 2 entrées details)
+            const prevScorers = prevCache?.scorers ?? []
+            const newScorers  = data.scorers.length >= prevScorers.length
+              ? data.scorers   // nouvelle liste plus complète → utiliser
+              : prevScorers    // ancien cache plus complet → conserver
             espnScoresCache[match.id] = {
-              home:       data.home,
-              away:       data.away,
-              // ESPN retourne parfois details:[] → garder les noms déjà en cache
-              scorers:    data.scorers.length > 0 ? data.scorers : (prevCache?.scorers ?? []),
-              // Si ESPN ne renvoie pas les stats ce poll → garder celles du précédent
-              stats:      data.stats ?? prevStats,
-              // Stocker l'event ID + slug pour fetch summary (stats live) à la demande
+              home:        data.home,
+              away:        data.away,
+              scorers:     newScorers,
+              stats:       data.stats ?? prevStats,
               espnEventId: evt.id,
               espnSlug:    slug,
             }
@@ -667,19 +670,50 @@ async function pollESPN(matches, queryClient) {
         const homeCorners = getStat(homeTeam, 'cornerKicks', 'corners')
         const awayCorners = getStat(awayTeam, 'cornerKicks', 'corners')
 
-        if (homePoss === null && homeShots === null) return
+        // ── Buteurs depuis scoringPlays (plus fiable que details du scoreboard) ──
+        const scoringPlays = json.scoringPlays ?? []
+        let summaryScorers = null
+        if (scoringPlays.length > 0) {
+          const homeTeamId = homeTeam?.team?.id
+          summaryScorers = scoringPlays
+            .filter(p => {
+              const txt = p.type?.text?.toLowerCase() ?? ''
+              return txt.includes('goal') || p.type?.id === '57' || p.type?.id === '58'
+            })
+            .map(p => {
+              const athlete = p.participants?.[0]?.athlete ?? p.athletes?.[0]
+              const isHome  = p.team?.id === homeTeamId
+              const isOG    = p.type?.text?.toLowerCase().includes('own')
+              return {
+                name:        athlete?.shortName ?? athlete?.displayName ?? '?',
+                minute:      p.clock?.displayValue ?? '',
+                team:        isHome ? 'home' : 'away',
+                ownGoal:     isOG,
+                penaltyKick: p.type?.text?.toLowerCase().includes('penalty') ?? false,
+              }
+            })
+        }
 
-        if (espnScoresCache[mId]) {
-          espnScoresCache[mId] = {
-            ...espnScoresCache[mId],
+        if (!espnScoresCache[mId]) return
+
+        const prevCache    = espnScoresCache[mId]
+        const hasStats     = homePoss !== null || homeShots !== null
+        const bestScorers  = summaryScorers && summaryScorers.length >= (prevCache.scorers?.length ?? 0)
+          ? summaryScorers
+          : prevCache.scorers
+
+        espnScoresCache[mId] = {
+          ...prevCache,
+          scorers: bestScorers ?? prevCache.scorers,
+          ...(hasStats ? {
             stats: {
               home: { poss: homePoss, shots: homeShots, shotsOnTarget: homeSOT, corners: homeCorners },
               away: { poss: awayPoss, shots: awayShots, shotsOnTarget: awaySOT, corners: awayCorners },
             },
-          }
-          queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
-          try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
+          } : {}),
         }
+        queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
+        try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
       } catch { /* silencieux */ }
     })(mid, cached.espnSlug, cached.espnEventId)
   }
