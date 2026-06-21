@@ -24,6 +24,52 @@ import { markLive, markEnded, isTrackedLive, getLiveMatches } from './liveTracke
 import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
 
 // ─────────────────────────────────────────────
+// Push notifications — envoi serveur
+// ─────────────────────────────────────────────
+
+/**
+ * Appelle /api/push (Vercel) pour notifier tous les abonnés d'un but.
+ * Fire-and-forget : les erreurs sont silencieuses, la notification est optionnelle.
+ *
+ * Sécurité côté serveur : le serveur re-fetch ESPN pour vérifier le score avant
+ * d'envoyer la moindre notification (voir api/push.js).
+ */
+function _sendPushGoal(match, home, away, scorers, slug) {
+  // Si l'app est au premier plan → notifyGoal() gère déjà la notif locale,
+  // inutile d'envoyer un push serveur en doublon
+  if (document.visibilityState === 'visible') return
+
+  const homeTeam = match.homeTeam?.shortName ?? match.homeTeam?.name ?? ''
+  const awayTeam = match.awayTeam?.shortName ?? match.awayTeam?.name ?? ''
+
+  // Détecter but contre son camp
+  const lastScorer = scorers?.[scorers.length - 1]
+  const isOwnGoal  = lastScorer?.ownGoal === true
+  const scorer     = isOwnGoal ? null : scorers?.find(s => !s.ownGoal && s.minute)
+
+  const title = isOwnGoal
+    ? '⚽ But contre son camp !'
+    : scorer
+      ? `⚽ But ! — ${scorer.name}`
+      : '⚽ But !'
+
+  const message = `${homeTeam} ${home} – ${away} ${awayTeam}`
+
+  fetch('/api/push', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      matchId:  match.id,
+      espnSlug: slug,
+      home,
+      away,
+      title,
+      message,
+    }),
+  }).catch(() => { /* silencieux — push est un bonus, pas critique */ })
+}
+
+// ─────────────────────────────────────────────
 // Constantes
 // ─────────────────────────────────────────────
 
@@ -405,6 +451,8 @@ async function pollESPN(matches, queryClient) {
             const newTotal  = data.home + data.away
             if (prevCache && newTotal > prevTotal) {
               notifyGoal(match, data.home, data.away, data.scorers)
+              // Push server-side → notifie tous les abonnés, même app fermée
+              _sendPushGoal(match, data.home, data.away, data.scorers, slug)
             }
             espnScoresCache[match.id] = {
               home:       data.home,
@@ -825,6 +873,16 @@ export function useLiveMinute(matches) {
     prevMatchesLen.current = matches.length
   }, [matches, queryClient])
 
+  // ── Cold start réseau pas prêt (iOS PWA) ──
+  // Si le réseau est offline au montage du hook → attendre l'event 'online'
+  // (iOS peut mettre 1-3s à établir la connexion après ouverture de la PWA)
+  useEffect(() => {
+    if (navigator.onLine) return
+    const handler = () => pollESPN(matchesRef.current, queryClient)
+    window.addEventListener('online', handler, { once: true })
+    return () => window.removeEventListener('online', handler)
+  }, [queryClient])
+
   // ── Repoll immédiat au retour sur l'app (PWA / Safari background) ──
   // iOS throttle les workers + timers en arrière-plan → score figé.
   // Dès que la page redevient visible, on force un poll ESPN immédiat
@@ -834,21 +892,28 @@ export function useLiveMinute(matches) {
       if (document.visibilityState !== 'visible') return
       // Poll immédiat
       await pollESPN(matchesRef.current, queryClient)
-      // 2ème poll 3s plus tard — réseau pas toujours prêt au réveil PWA
-      setTimeout(() => pollESPN(matchesRef.current, queryClient), 3_000)
+      // 2ème poll : si réseau pas encore disponible → attendre l'event 'online'
+      // (plus précis qu'un timeout fixe — iOS fire 'online' exactement quand le réseau est prêt)
+      if (!navigator.onLine) {
+        window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient), { once: true })
+      } else {
+        setTimeout(() => pollESPN(matchesRef.current, queryClient), 3_000)
+      }
       const now = Date.now()
-      // Invalider todayMatches + résultats si données > 2min (PWA background freeze)
-      const todayState   = queryClient.getQueryState(['todayMatches'])
-      const resultsState = queryClient.getQueryState(['matches', 'WC', 'FINISHED'])
-      const todayAge     = now - (todayState?.dataUpdatedAt ?? 0)
-      const resultsAge   = now - (resultsState?.dataUpdatedAt ?? 0)
-      if (todayAge > 120_000) {
+      // Invalider todayMatches si données > 2min
+      const todayState = queryClient.getQueryState(['todayMatches'])
+      if (now - (todayState?.dataUpdatedAt ?? 0) > 120_000) {
         queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
       }
-      if (resultsAge > 120_000) {
-        queryClient.invalidateQueries({ queryKey: ['matches', 'WC', 'FINISHED'] })
-        try { localStorage.removeItem('foot_matches_WC_FINISHED') } catch {}
-      }
+      // Invalider TOUS les résultats FINISHED (toutes compétitions) si > 2min
+      // (était hardcodé WC uniquement avant — fix pour Ligue 1, PL, etc.)
+      queryClient.invalidateQueries({
+        predicate: q =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === 'matches' &&
+          q.queryKey[2] === 'FINISHED' &&
+          (now - (q.state.dataUpdatedAt ?? 0)) > 120_000,
+      })
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)

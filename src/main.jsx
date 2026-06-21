@@ -13,6 +13,11 @@ const queryClient = new QueryClient({
       gcTime: 1000 * 60 * 60 * 24, // garde en cache 24h dans localStorage
       retry: false,
       refetchOnWindowFocus: false,
+      // 'always' → RQ ne met jamais les requêtes en pause à cause du réseau
+      // Fix iOS PWA : au cold start, RQ peut détecter "offline" et bloquer les fetches silencieusement
+      networkMode: 'always',
+      // Refetch dès que le réseau revient (online event iOS)
+      refetchOnReconnect: true,
     }
   }
 })

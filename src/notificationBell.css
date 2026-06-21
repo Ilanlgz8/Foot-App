@@ -1,0 +1,69 @@
+/* ─── NotificationBell ───────────────────────────────────────────────────────
+   Bouton cloche flottant pour activer / désactiver les push notifications.
+   Design épuré, s'intègre dans la navbar ou n'importe quel header.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.notif-bell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.notif-bell:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.1);
+}
+
+.notif-bell:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* État abonné → couleur accent verte */
+.notif-bell--active {
+  color: #4ade80;
+}
+
+.notif-bell--active:hover:not(:disabled) {
+  color: #86efac;
+  background: rgba(74, 222, 128, 0.12);
+}
+
+/* État chargement */
+.notif-bell--loading {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Icône SVG */
+.notif-bell__icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* La ligne diagonale (état muted) est rendue via SVG directement */
+
+/* Spinner — anneau CSS animé */
+.notif-bell__spinner {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: notif-bell-spin 0.7s linear infinite;
+}
+
+@keyframes notif-bell-spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
+import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
 const navigation = [
@@ -25,12 +26,7 @@ function Navbar() {
 
           {/* Brand */}
           <NavLink to="/" className="navbar__brand" onClick={close}>
-            <span className="navbar__brandText">
-              <span className="navbar__brandKicker">stats & live</span>
-              <span className="navbar__brandName">
-                <span className="navbar__brandStat">Stat</span>Footix
-              </span>
-            </span>
+            <img src="/icon-192.png" alt="StatFootix" className="navbar__brandIcon" />
           </NavLink>
 
           {/* Desktop nav — caché sur mobile via CSS */}
@@ -59,6 +55,9 @@ function Navbar() {
               <span className="navbar__liveBtnArrow">›</span>
             </button>
           )}
+
+          {/* Cloche notifications — desktop + mobile */}
+          <NotificationBell />
 
           {/* Hamburger — visible sur mobile uniquement */}
           <button

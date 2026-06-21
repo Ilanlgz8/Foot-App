@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           navigateFallback: '/index.html',
+          // Injecte les handlers push dans le SW généré par workbox
+          // sw-push.js est un fichier vanilla JS pur (pas d'import) → compatible generateSW
+          importScripts: ['/sw-push.js'],
           runtimeCaching: [
             // Fonts Google → cache long, jamais de fetch inutile
             {

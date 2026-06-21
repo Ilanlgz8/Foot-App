@@ -47,6 +47,37 @@
   animation: float 10s ease-in-out infinite reverse;
 }
 
+/* ── Hero banner — titre pleine largeur sous la navbar ── */
+.accueil__hero {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: center;
+  padding: 2.2rem 1rem 1.4rem;
+}
+
+.accueil__heroTitle {
+  font-size: clamp(2.8rem, 11vw, 6.5rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin: 0;
+  line-height: 1;
+  text-shadow: 0 4px 32px rgba(0,0,0,0.6), 0 0 60px rgba(192,24,24,0.15);
+}
+
+.accueil__heroStat {
+  color: #ef4444;
+}
+
+.accueil__heroSub {
+  font-size: clamp(0.75rem, 2.8vw, 1rem);
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  margin: 0.55rem 0 0;
+}
+
 .accueil__inner {
   position: relative;
   z-index: 1;

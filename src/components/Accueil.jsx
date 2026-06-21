@@ -137,6 +137,14 @@ function Accueil() {
       <div className="accueil__backdrop accueil__backdrop--one" />
       <div className="accueil__backdrop accueil__backdrop--two" />
 
+      {/* ── Hero — titre pleine largeur sous la navbar ── */}
+      <div className="accueil__hero">
+        <h1 className="accueil__heroTitle">
+          <span className="accueil__heroStat">Stat</span>Footix
+        </h1>
+        <p className="accueil__heroSub">stats &amp; live</p>
+      </div>
+
       <div className="accueil__inner">
 
         {/* Mobile uniquement : bouton DIRECT */}
