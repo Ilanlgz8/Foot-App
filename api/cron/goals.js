@@ -259,7 +259,13 @@ export default async function handler(req, res) {
       const scorer    = lastGoal?.athletesInvolved?.[0]?.displayName ?? null
       const clockLabel = clock ? ` ${clock}'` : ''
 
-      const title = scorer ? `🔴 But ! ${scorer}${clockLabel}` : `🔴 But !${clockLabel}`
+      // Identifier quelle équipe a marqué
+      const scoringTeamId = lastGoal?.team?.id
+      const scoringTeam   = scoringTeamId === homeC.team?.id ? homeTeam : awayTeam
+
+      const title = scorer
+        ? `🔴 But ! ${scorer} (${scoringTeam})${clockLabel}`
+        : `🔴 But de ${scoringTeam}${clockLabel}`
       const body  = `${homeTeam} ${scoreStr} ${awayTeam}`
 
       const sent = await sendDeduped(
