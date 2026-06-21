@@ -352,6 +352,70 @@
 
 /* ── Responsive ── */
 
+/* ── Groupes gauche/droite mobile ── */
+.navbar__mobileLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navbar__mobileRight {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ── Bouton hard refresh ── */
+.navbar__refreshBtn {
+  display: none; /* caché par défaut, affiché sur mobile via media query */
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.navbar__refreshBtn:hover {
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* État gelé : devient orange pour alerter */
+.navbar__refreshBtn--stale {
+  border-color: rgba(251,146,60,0.5);
+  background: rgba(251,146,60,0.12);
+  color: #fb923c;
+  box-shadow: 0 0 8px rgba(251,146,60,0.2);
+}
+
+.navbar__refreshBtn--stale:hover {
+  background: rgba(251,146,60,0.22);
+  box-shadow: 0 0 14px rgba(251,146,60,0.35);
+}
+
+.navbar__refreshIcon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Animation rotation pendant le refresh */
+.navbar__refreshBtn--spinning .navbar__refreshIcon {
+  animation: refreshSpin 0.9s linear infinite;
+}
+
+@keyframes refreshSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Mobile < 640px : hamburger visible, navWrap caché */
 @media (max-width: 639px) {
   .navbar__inner {
@@ -361,16 +425,22 @@
     display: inline-flex;
   }
   .navbar__brand {
-    margin-left: -0.5rem;
+    margin-left: 0;
+  }
+  .navbar__refreshBtn {
+    display: inline-flex;
   }
 }
 
-/* ≥ 640px : hamburger disparaît, nav desktop apparaît */
+/* ≥ 640px : hamburger disparaît, nav desktop apparaît, refresh caché */
 @media (min-width: 640px) {
   .navbar__container  { padding: 0 1.5rem; }
   .navbar__menuButton { display: none; }
   .navbar__inner      { justify-content: space-between; }
   .navbar__navWrap    { display: flex; margin-left: 0; position: absolute; left: 50%; transform: translateX(-50%); }
+  .navbar__refreshBtn { display: none !important; }
+  /* Sur desktop, les groupes left/right se comportent normalement */
+  .navbar__mobileLeft { gap: 0; }
 }
 
 @media (min-width: 1024px) {
