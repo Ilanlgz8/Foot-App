@@ -40,12 +40,12 @@ const LIVE_STATUSES = new Set([
 ])
 
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-const SB_TTL     = 12         // scoreboard Redis TTL : 12s
+const SB_TTL     = 10         // scoreboard Redis TTL : 10s (poll client = 15s, cache < poll)
 const SUM_TTL    = 20         // summary Redis TTL : 20s (réduit pour buteurs plus réactifs)
 const EID_TTL    = 6 * 3600  // eventId mapping : 6h
 const MATCH_TTL  = 6 * 3600  // données match : 6h
-const SB_TIMEOUT = 3_500      // timeout scoreboard ESPN : 3.5s (Vercel Hobby limit = 10s)
-const SUM_TIMEOUT = 2_500     // timeout summary ESPN : 2.5s
+const SB_TIMEOUT = 4_500      // timeout scoreboard ESPN : 4.5s (WC = ESPN lent sous charge)
+const SUM_TIMEOUT = 2_000     // timeout summary ESPN : 2s (réduit pour compenser)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
