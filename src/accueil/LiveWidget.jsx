@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
@@ -226,6 +226,13 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
   const [activeIdx, setActiveIdx] = useState(0)
   const matchesRef = useRef(null)
 
+  // Re-render toutes les 30s pour que le décompte mi-temps tick
+  const [, forceUpdate] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => forceUpdate(n => n + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   const onScroll = useCallback(() => {
     const el = matchesRef.current
     if (!el) return
@@ -259,7 +266,9 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           const matchSt   = getMatchState(match.id)
           const isTermine = matchSt.ft === true
           const minute    = isTermine ? null : calcMinute(match)
-          const pauseElapsed = match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start
+          // Détecter la mi-temps via ESPN (rapide) OU FD.org (lent) — les deux peuvent marcher
+          const isHalftime = matchSt.espnStatus === 'STATUS_HALFTIME' || match.status === 'PAUSED'
+          const pauseElapsed = isHalftime && matchSt.pausedAt && !matchSt.half2Start
             ? Date.now() - matchSt.pausedAt : null
           const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
           const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
