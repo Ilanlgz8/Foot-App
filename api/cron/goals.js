@@ -248,15 +248,23 @@ export default async function handler(req, res) {
       prevScore !== score
     ) {
       log.push(`[${eventId}] but ${prevScore} → ${score}`)
-      const clockLabel = clock ? ` · ${clock}` : ''
+
+      // Chercher le buteur dans comp.details (scoring plays ESPN)
+      const details   = comp.details ?? []
+      const goalTypes = new Set(['Goal', 'goal', 'PenaltyKick', 'penalty'])
+      // Prendre le dernier événement de type but (le plus récent)
+      const lastGoal  = [...details].reverse().find(d =>
+        goalTypes.has(d.type?.text) || goalTypes.has(d.type?.name)
+      )
+      const scorer    = lastGoal?.athletesInvolved?.[0]?.displayName ?? null
+      const clockLabel = clock ? ` ${clock}'` : ''
+
+      const title = scorer ? `🔴 But ! ${scorer}` : '🔴 But !'
+      const body  = `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`
+
       const sent = await sendDeduped(
         `push:goal:cron:${eventId}:${score}`,
-        {
-          title:   '🔴 But !',
-          body:    `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`,
-          matchId: eventId,
-          url:     '/',
-        }
+        { title, body, matchId: eventId, url: '/' }
       )
       if (sent > 0) notifsSent++
     }
