@@ -1,12 +1,12 @@
 // Suivi live en deux couches :
 //
-// ── PRIMAIRE : ESPN (site.api.espn.com via /espn) ──
-//   • Pas de quota, pas de clé API
+// ── PRIMAIRE : /api/espn-live (Vercel function → ESPN + Redis cache) ──
+//   • Fetch server-side : scoreboard ESPN mis en cache Redis 12s
+//   • eventId → fdMatchId stocké Redis 6h → survit aux rechargements iOS
+//   • Scorer preservation + stats summary côté serveur
+//   • Données parsées retournées proprement : { [fdMatchId]: { home, away, scorers, stats, ... } }
+//   • Si ESPN est down → Redis renvoie les dernières données connues
 //   • Poll toutes les 15s dès qu'un match approche ou est en cours
-//   • liveTracker : source unique de vérité persistée en localStorage
-//       markLive(match) → match visible dans le widget immédiatement
-//       markEnded(id)   → fin confirmée (5min de STATUS_FINAL + horloge >= 85min)
-//   • Scores + buteurs + stats extraits ici → ['espnScores'] React Query
 //
 // ── FALLBACK : api-football.com (/apifootball?live=all) ──
 //   • Poll toutes les 60s, UNIQUEMENT dans les 4 fenêtres critiques
@@ -44,10 +44,6 @@ const pendingFt = {}
 // { [matchId]: timestamp }
 const lastSeenInEspn = {}
 
-// Dernière fois qu'on a fetché les stats summary pour un match
-// { [matchId]: timestamp }
-const lastSummaryFetch = {}
-
 // Restauration partielle au chargement
 // On garde le cache jusqu'à 30 min pour couvrir les reloads pendant un match
 try {
@@ -59,6 +55,7 @@ try {
 } catch {}
 
 // football-data.org competition ID → slug ESPN
+// Exporté pour useEspnMatchDetail
 export const COMP_ESPN = {
   2015: 'fra.1',
   2021: 'eng.1',
@@ -72,7 +69,7 @@ export const COMP_ESPN = {
 }
 
 // ─────────────────────────────────────────────
-// Helpers communs
+// Helpers communs (conservés pour api-football fallback)
 // ─────────────────────────────────────────────
 
 export function normalize(name = '') {
@@ -108,75 +105,6 @@ function parseClockMins(clock) {
   const extra = parseInt(clock.slice(plusIdx + 1).split(':')[0], 10)
   if (isNaN(base) || isNaN(extra)) return null
   return base + extra
-}
-
-/**
- * Convertit un score ESPN en entier.
- * ESPN peut renvoyer : string "1", nombre 1, ou objet { displayValue: "1" }.
- */
-function parseScore(raw) {
-  if (raw == null) return 0
-  if (typeof raw === 'number') return Math.round(raw)
-  if (typeof raw === 'string') return parseInt(raw, 10) || 0
-  if (typeof raw === 'object') return parseInt(raw.displayValue ?? raw.value ?? '0', 10) || 0
-  return 0
-}
-
-/**
- * Extrait scores, buteurs et stats d'une competition ESPN.
- * Retourne null si les competitors home/away sont absents.
- */
-function extractMatchData(comp) {
-  const homeC = (comp.competitors ?? []).find(c => c.homeAway === 'home')
-  const awayC = (comp.competitors ?? []).find(c => c.homeAway === 'away')
-  if (!homeC || !awayC) return null
-
-  const getStat = (c, name) => {
-    const found = (c.statistics ?? []).find(s => s.name === name)
-    return found != null ? (parseFloat(found.displayValue) || 0) : null
-  }
-  const getStatAny = (c, ...names) => {
-    for (const n of names) {
-      const v = getStat(c, n)
-      if (v !== null) return v
-    }
-    return null
-  }
-
-  const homePoss    = getStat(homeC, 'possessionPct')
-  const awayPoss    = getStat(awayC, 'possessionPct')
-  const homeShots   = getStatAny(homeC, 'totalShots', 'shotsTotal', 'shots')
-  const awayShots   = getStatAny(awayC, 'totalShots', 'shotsTotal', 'shots')
-  const homeCorners  = getStatAny(homeC, 'cornerKicks', 'corners')
-  const awayCorners  = getStatAny(awayC, 'cornerKicks', 'corners')
-  const homeSOT      = getStatAny(homeC, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
-  const awaySOT      = getStatAny(awayC, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
-  const hasStats     = homePoss !== null || awayPoss !== null || homeShots !== null || awayShots !== null
-
-  const scorers = (comp.details ?? [])
-    .filter(d => d.type?.text === 'Goal' || d.type?.id === '57')
-    .map(d => {
-      const ath = d.athletesInvolved?.[0]
-      return {
-        name:        ath?.shortName ?? ath?.displayName ?? '?',
-        minute:      d.clock?.displayValue ?? '',
-        team:        d.team?.id === homeC.team?.id ? 'home' : 'away',
-        ownGoal:     d.ownGoal     ?? false,
-        penaltyKick: d.penaltyKick ?? false,
-      }
-    })
-
-  return {
-    homeC,
-    awayC,
-    home:    parseScore(homeC.score),
-    away:    parseScore(awayC.score),
-    scorers,
-    stats: hasStats ? {
-      home: { poss: homePoss, shots: homeShots, shotsOnTarget: homeSOT, corners: homeCorners },
-      away: { poss: awayPoss, shots: awayShots, shotsOnTarget: awaySOT, corners: awayCorners },
-    } : null,
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -271,34 +199,16 @@ function _checkPendingKickoffs(matches, queryClient) {
 }
 
 // ─────────────────────────────────────────────
-// ESPN — couche primaire
+// Safeguards FT — appelés avant le early return, même sans slugs à poller
 // ─────────────────────────────────────────────
-
-function findMatchESPN(competitors, matches) {
-  const homeComp = competitors.find(c => c.homeAway === 'home') ?? competitors[0]
-  const awayComp = competitors.find(c => c.homeAway === 'away') ?? competitors[1]
-  const espnHome = homeComp?.team?.displayName ?? homeComp?.team?.name ?? ''
-  const espnAway = awayComp?.team?.displayName ?? awayComp?.team?.name ?? ''
-  if (!espnHome || !espnAway) return null
-
-  return matches.find(m => {
-    const h = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
-    const a = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
-    return fuzzyTeam(h, espnHome) && fuzzyTeam(a, espnAway)
-  }) ?? null
-}
-
-// ── Safeguards FT — appelés avant le early return, même sans slugs à poller ──
 function _runFtSafeguards(matches, now, queryClient) {
   // Pool combiné : matches FD.org du jour + matchs stockés dans liveTracker
-  // (un match terminé n'est plus dans matches FD.org mais reste dans liveTracker)
   const allLive = [...matches]
   for (const lm of getLiveMatches()) {
     if (!allLive.some(m => m.id === lm.id)) allLive.push(lm)
   }
 
   // Safeguard 1 : pendingFt timeout (45s)
-  // ESPN a envoyé STATUS_FINAL une fois puis retiré l'event → confirmer après 45s
   for (const [midStr, pft] of Object.entries(pendingFt)) {
     if (now - pft.since < 45_000) continue
     const mid = Number(midStr)
@@ -312,8 +222,6 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 2 : durée max live (150min depuis utcDate)
-  // ESPN a arrêté d'envoyer le match sans STATUS_FINAL → FT forcé
-  // Utilise getLiveMatches() (liveTracker) et non getTrackedMatches() (timing api-fb)
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
@@ -325,7 +233,6 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 3 : FD.org confirme FINISHED mais match encore dans liveTracker
-  // → FT immédiat, pas besoin d'attendre ESPN (FD.org se rafraîchit toutes les 2min en live)
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
@@ -337,21 +244,23 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 4 : match disparu du scoreboard ESPN depuis > 5min après avoir été vu
-  // Cas : ESPN retire l'event sans STATUS_FINAL (pas de pendingFt, pas encore 150min)
-  // → FT forcé dès que le match a > 90min de jeu et n'est plus dans le scoreboard
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
     if (pendingFt[mid]) continue
     const lastSeen = lastSeenInEspn[mid]
-    if (!lastSeen) continue                         // jamais vu par ESPN cette session → skip
-    if (now - lastSeen < 5 * 60_000) continue       // vu récemment → ok
+    if (!lastSeen) continue
+    if (now - lastSeen < 5 * 60_000) continue
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
-    if (ageMin < 90) continue                       // trop tôt pour être terminé
+    if (ageMin < 90) continue
     console.log(`[useLiveMinute] match ${mid} disparu d'ESPN depuis ${Math.round((now - lastSeen) / 60_000)}min → FT`)
     confirmFt(lm, now, queryClient)
   }
 }
+
+// ─────────────────────────────────────────────
+// ESPN — couche primaire (via /api/espn-live)
+// ─────────────────────────────────────────────
 
 async function pollESPN(matches, queryClient) {
   const now = Date.now()
@@ -366,362 +275,207 @@ async function pollESPN(matches, queryClient) {
     if (!allMatches.some(m => m.id === lm.id)) allMatches.push(lm)
   }
 
-  const slugSet = new Set()
-  for (const m of allMatches) {
-    const elapsed = (now - new Date(m.utcDate)) / 60000
-    // Étendre la fenêtre si le match est déjà tracké live (prolongations, retard KO…)
-    if ((elapsed >= -5 && elapsed <= 150) || isTrackedLive(m.id)) {
-      const slug = COMP_ESPN[m.competition?.id]
-      if (slug) slugSet.add(slug)
-    }
-  }
+  // Filtrer les matchs dans la fenêtre de poll (-5min → +150min)
+  const toTrack = allMatches.filter(m => {
+    const elapsed = (now - new Date(m.utcDate)) / 60_000
+    return (elapsed >= -5 && elapsed <= 150) || isTrackedLive(m.id)
+  })
 
-  // Pas de slugs → safeguards + sortie
-  if (slugSet.size === 0) {
+  if (toTrack.length === 0) {
     _runFtSafeguards(allMatches, now, queryClient)
     return
   }
 
-  const d = new Date()
-  const todayESPN = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  // J-1 UTC : pour les matchs qui commencent après ~22h heure locale (minuit UTC ou plus tard)
-  // ESPN range eux sous la date UTC précédente alors que l'app est en UTC+1/+2
-  const dYest = new Date(d - 86_400_000)
-  const yesterdayESPN = `${dYest.getFullYear()}${String(dYest.getMonth() + 1).padStart(2, '0')}${String(dYest.getDate()).padStart(2, '0')}`
+  try {
+    // ── Appel au nouvel endpoint server-side ──
+    // Fetch ESPN + Redis cache + matching + stats → retourne { [fdMatchId]: { ... } }
+    const res = await fetch('/api/espn-live', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ matches: toTrack }),
+    })
 
-  for (const slug of slugSet) {
-    try {
-      // Fetch J et J-1 en parallèle pour couvrir les matchs tardifs (décalage UTC)
-      const [resT, resY] = await Promise.all([
-        fetch(`/espn?slug=${slug}&dates=${todayESPN}&_t=${Date.now()}`),
-        fetch(`/espn?slug=${slug}&dates=${yesterdayESPN}&_t=${Date.now()}`),
-      ])
-      if (!resT.ok && !resY.ok) {
-        espnFailStreak++
-        if (espnFailStreak >= 3) setEspnWorking(false)
-        continue
-      }
-      espnFailStreak = 0
-      setEspnWorking(true)
-      try { localStorage.setItem('foot_espn_last_poll', String(Date.now())) } catch {}
-
-      const [jsonT, jsonY] = await Promise.all([
-        resT.ok ? resT.json() : Promise.resolve({ events: [] }),
-        resY.ok ? resY.json() : Promise.resolve({ events: [] }),
-      ])
-      const allEvents = [...(jsonT.events ?? []), ...(jsonY.events ?? [])]
-      for (const evt of allEvents) {
-        const comp = evt.competitions?.[0]
-        if (!comp) continue
-
-        const st         = comp.status
-        const espnStatus = st?.type?.name
-        const espnClock  = st?.displayClock
-        if (!espnStatus) continue
-
-        // ── Trouver le match FD.org correspondant ──
-        // 1. Chercher directement par ESPN event ID (si déjà connu) → fiable à 100%
-        //    Évite les ratés de fuzzy matching mid-match (noms équipes CdM changeants)
-        // 2. Fallback : fuzzy matching sur les noms d'équipes
-        let match = allMatches.find(m => espnScoresCache[m.id]?.espnEventId === evt.id) ?? null
-        if (!match) match = findMatchESPN(comp.competitors ?? [], allMatches)
-        if (!match) continue
-
-        // Mémoriser que ce match est encore visible dans le scoreboard ESPN
-        lastSeenInEspn[match.id] = now
-
-        const prevState = getMatchState(match.id)
-
-        // Toujours écrire les données ESPN brutes (pour calcMinute)
-        setEspnData(match.id, { espnClock, espnStatus, espnPeriod: st.period ?? null })
-
-        // ════════════════════════════════════════════════════════════════════
-        // CAS 1 : Match EN COURS (IN_PROGRESS, HALFTIME, prolongations…)
-        // ════════════════════════════════════════════════════════════════════
-        if (
-          espnStatus === 'STATUS_IN_PROGRESS' ||
-          espnStatus === 'STATUS_HALFTIME'    ||
-          espnStatus === 'STATUS_END_PERIOD'  ||
-          espnStatus === 'STATUS_EXTRA_TIME'  ||
-          espnStatus === 'STATUS_OVERTIME'      ||
-          espnStatus === 'STATUS_SHOOTOUT'
-        ) {
-          const ls = getLiveState(match.id)
-
-          // Si liveState était 'ended' (fausse éviction) → récupérer sans condition.
-          // Un vrai match ne revient JAMAIS en IN_PROGRESS/HALFTIME après être terminé.
-          if (ls.state !== 'live') {
-            setLiveState(match.id, 'live')
-          }
-
-          // Annuler tout FT potentiel en cours (c'était un flash post-but, pas un vrai FT)
-          delete pendingFt[match.id]
-
-          // Effacer ft/termineAt résiduels SANS effacer liveState/matchSnapshot
-          clearFtFlags(match.id)
-
-          // ── Marquer live dans liveTracker → widget visible immédiatement ──
-          // markLive persiste en localStorage → survit aux rechargements de page.
-          markLive(match)
-
-          // ── Scores + buteurs + stats ─────────────────────────────────────
-          const data = extractMatchData(comp)
-          if (data) {
-            const prevCache = espnScoresCache[match.id]
-            const prevStats = prevCache?.stats ?? null
-            // Détecter un but : score total augmente
-            const prevTotal = (prevCache?.home ?? -1) + (prevCache?.away ?? -1)
-            const newTotal  = data.home + data.away
-            if (prevCache && newTotal > prevTotal) {
-              notifyGoal(match, data.home, data.away, data.scorers)
-            }
-            // Garder la liste de buteurs la plus complète :
-            // ESPN peut lag sur details (score 3-0 mais seulement 2 entrées details)
-            const prevScorers = prevCache?.scorers ?? []
-            const newScorers  = data.scorers.length >= prevScorers.length
-              ? data.scorers   // nouvelle liste plus complète → utiliser
-              : prevScorers    // ancien cache plus complet → conserver
-            espnScoresCache[match.id] = {
-              home:        data.home,
-              away:        data.away,
-              scorers:     newScorers,
-              stats:       data.stats ?? prevStats,
-              espnEventId: evt.id,
-              espnSlug:    slug,
-            }
-          }
-        }
-
-        // ── KO détecté (1ère MT, kickoffAt pas encore connu) ──────────────
-        if (
-          espnStatus === 'STATUS_IN_PROGRESS' &&
-          (st.period ?? 1) === 1 &&
-          !prevState.kickoffAt
-        ) {
-          const mins = parseClockMins(espnClock)
-          if (mins != null && mins > 0) {
-            setKickoffAt(match.id, now - mins * 60_000)
-          }
-          notifyKickoff(match)
-        }
-
-        // ── HT détecté ────────────────────────────────────────────────────
-        if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
-          trackMatchState({ ...match, status: 'PAUSED' })
-          const cache = espnScoresCache[match.id]
-          notifyHalfTime(match, cache?.home ?? 0, cache?.away ?? 0)
-        }
-
-        // ── 2H détecté ────────────────────────────────────────────────────
-        if (
-          espnStatus === 'STATUS_IN_PROGRESS' &&
-          (st.period ?? 1) === 2 &&
-          prevState.pausedAt &&
-          !prevState.half2Start
-        ) {
-          const mins = parseClockMins(espnClock)
-          if (mins != null) {
-            setHalf2Start(match.id, now - Math.max(0, mins - 45) * 60_000)
-          }
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // CAS 2 : FT / ANNULÉ / REPORTÉ
-        // ════════════════════════════════════════════════════════════════════
-        if (
-          espnStatus === 'STATUS_FINAL'     ||
-          espnStatus === 'STATUS_FULL_TIME' ||
-          espnStatus === 'STATUS_POSTPONED' ||
-          espnStatus === 'STATUS_CANCELED'
-        ) {
-          // Jamais suivi comme live → rien à faire
-          if (!isTrackedLive(match.id)) continue
-
-          // Déjà confirmé terminé → ignorer (évite de reschedule le timeout à chaque poll)
-          if (getLiveState(match.id).state === 'ended') continue
-
-          // ── Extraire le score actuel (toujours — le but EST dans cet event) ──
-          const currData  = extractMatchData(comp)
-          const prevCache = espnScoresCache[match.id]
-          const prevStats = prevCache?.stats ?? null
-          if (currData) {
-            espnScoresCache[match.id] = {
-              ...(prevCache ?? {}),
-              home:        currData.home,
-              away:        currData.away,
-              scorers:     currData.scorers,
-              stats:       currData.stats ?? prevStats,
-              espnEventId: evt.id,
-              espnSlug:    slug,
-            }
-          }
-
-          // POSTPONED / CANCELED → pas de logique score, éviction immédiate
-          if (espnStatus === 'STATUS_POSTPONED' || espnStatus === 'STATUS_CANCELED') {
-            setLiveState(match.id, 'ended', { endedAt: now })
-            setTimeout(() => { markEnded(match.id); clearMatchState(match.id) }, 5 * 60_000)
-            continue
-          }
-
-          // ── DÉTECTION FT ──────────────────────────────────────────────────────
-          //
-          // ESPN peut flasher STATUS_FINAL juste après un but (but + sifflet dans
-          // le même poll). On compare le score actuel avec le score du poll précédent
-          // (prevCache, capturé AVANT la mise à jour espnScoresCache ci-dessus).
-          //
-          //   1) Horloge < 85min → faux positif certain (trop tôt)
-          //   2) Score changé dans ce même poll → but tardif, rester live
-          //   3) Score inchangé → FT immédiat (pas besoin d'un 2ème poll)
-          const mins = parseClockMins(espnClock)
-          const timePlausible = mins !== null && mins >= 85
-
-          if (!timePlausible) {
-            // Horloge trop basse → faux positif certain
-            delete pendingFt[match.id]
-            markLive(match)
-            clearFtFlags(match.id)
-            continue
-          }
-
-          // Horloge >= 85min — comparer score actuel vs score du poll précédent
-          const prevScore    = prevCache ? `${prevCache.home}-${prevCache.away}` : null
-          const currentScore = currData  ? `${currData.home}-${currData.away}`  : null
-
-          if (prevScore !== null && currentScore !== null && prevScore !== currentScore) {
-            // Score a changé dans CE poll en même temps que STATUS_FINAL → but tardif
-            delete pendingFt[match.id]
-            markLive(match)
-            clearFtFlags(match.id)
-            continue
-          }
-
-          // STATUS_FINAL + score inchangé → FT immédiat
-          delete pendingFt[match.id]
-          confirmFt(match, now, queryClient)
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // FALLBACK J-1 : ESPN retourne STATUS_SCHEDULED (snapshot statique
-        // de la veille) mais FD.org sait que le match est en cours.
-        // On stocke quand même l'espnEventId pour que le fetch summary
-        // se déclenche et fournisse les stats live à LiveWidget.
-        // ════════════════════════════════════════════════════════════════════
-        if (
-          espnStatus === 'STATUS_SCHEDULED' &&
-          (match.status === 'IN_PLAY' || match.status === 'PAUSED' || isTrackedLive(match.id))
-        ) {
-          if (!espnScoresCache[match.id]) {
-            espnScoresCache[match.id] = { home: null, away: null, scorers: [], stats: null }
-          }
-          // Ne pas écraser si l'eventId est déjà là (cas normal)
-          if (!espnScoresCache[match.id].espnEventId) {
-            espnScoresCache[match.id] = {
-              ...espnScoresCache[match.id],
-              espnEventId: evt.id,
-              espnSlug:    slug,
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[useLiveMinute] ESPN erreur pour slug', slug, ':', err.message)
+    if (!res.ok) {
+      espnFailStreak++
+      if (espnFailStreak >= 3) setEspnWorking(false)
+      _runFtSafeguards(allMatches, now, queryClient)
+      return
     }
+
+    espnFailStreak = 0
+    setEspnWorking(true)
+    try { localStorage.setItem('foot_espn_last_poll', String(Date.now())) } catch {}
+
+    // liveData = { [fdMatchId]: { espnEventId, espnSlug, espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache? } }
+    const liveData = await res.json()
+
+    for (const [midStr, data] of Object.entries(liveData)) {
+      const mid   = Number(midStr)
+      const match = allMatches.find(m => m.id === mid)
+      if (!match) continue
+
+      const { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache } = data
+
+      // Mémoriser que ce match est visible dans le scoreboard ESPN (sauf si fromCache)
+      if (!fromCache) lastSeenInEspn[mid] = now
+
+      const prevState = getMatchState(mid)
+
+      // Toujours écrire les données ESPN brutes (pour calcMinute + interpolation)
+      setEspnData(mid, { espnClock, espnStatus, espnPeriod: espnPeriod ?? null })
+
+      // ════════════════════════════════════════════════════════════════════
+      // CAS 1 : Match EN COURS (IN_PROGRESS, HALFTIME, prolongations…)
+      // ════════════════════════════════════════════════════════════════════
+      if (
+        espnStatus === 'STATUS_IN_PROGRESS' ||
+        espnStatus === 'STATUS_HALFTIME'    ||
+        espnStatus === 'STATUS_END_PERIOD'  ||
+        espnStatus === 'STATUS_EXTRA_TIME'  ||
+        espnStatus === 'STATUS_OVERTIME'    ||
+        espnStatus === 'STATUS_SHOOTOUT'
+      ) {
+        if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
+        delete pendingFt[mid]
+        clearFtFlags(mid)
+        markLive(match)
+
+        const prevCache = espnScoresCache[mid]
+        const prevTotal = (prevCache?.home ?? -1) + (prevCache?.away ?? -1)
+        const newTotal  = home + away
+
+        // Détection but : score total augmente
+        if (prevCache && newTotal > prevTotal) {
+          notifyGoal(match, home, away, scorers)
+        }
+
+        espnScoresCache[mid] = {
+          home,
+          away,
+          scorers:     scorers ?? prevCache?.scorers ?? [],
+          stats:       stats   ?? prevCache?.stats   ?? null,
+          espnEventId: data.espnEventId,
+          espnSlug:    data.espnSlug,
+        }
+      }
+
+      // ── KO détecté (1ère MT, kickoffAt pas encore connu) ──
+      if (
+        espnStatus === 'STATUS_IN_PROGRESS' &&
+        (espnPeriod ?? 1) === 1 &&
+        !prevState.kickoffAt
+      ) {
+        const mins = parseClockMins(espnClock)
+        if (mins != null && mins > 0) setKickoffAt(mid, now - mins * 60_000)
+        notifyKickoff(match)
+      }
+
+      // ── HT détecté ──
+      if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
+        trackMatchState({ ...match, status: 'PAUSED' })
+        const cache = espnScoresCache[mid]
+        notifyHalfTime(match, cache?.home ?? 0, cache?.away ?? 0)
+      }
+
+      // ── 2H détecté ──
+      if (
+        espnStatus === 'STATUS_IN_PROGRESS' &&
+        (espnPeriod ?? 1) === 2 &&
+        prevState.pausedAt &&
+        !prevState.half2Start
+      ) {
+        const mins = parseClockMins(espnClock)
+        if (mins != null) setHalf2Start(mid, now - Math.max(0, mins - 45) * 60_000)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // CAS 2 : FT / ANNULÉ / REPORTÉ
+      // ════════════════════════════════════════════════════════════════════
+      if (
+        espnStatus === 'STATUS_FINAL'     ||
+        espnStatus === 'STATUS_FULL_TIME' ||
+        espnStatus === 'STATUS_POSTPONED' ||
+        espnStatus === 'STATUS_CANCELED'
+      ) {
+        if (!isTrackedLive(mid)) continue
+        if (getLiveState(mid).state === 'ended') continue
+
+        const prevCache = espnScoresCache[mid]
+        const prevStats = prevCache?.stats ?? null
+
+        // Toujours mettre à jour le score (le but est peut-être dans ce poll)
+        espnScoresCache[mid] = {
+          ...(prevCache ?? {}),
+          home,
+          away,
+          scorers:     scorers ?? prevCache?.scorers ?? [],
+          stats:       stats   ?? prevStats,
+          espnEventId: data.espnEventId,
+          espnSlug:    data.espnSlug,
+        }
+
+        if (espnStatus === 'STATUS_POSTPONED' || espnStatus === 'STATUS_CANCELED') {
+          setLiveState(mid, 'ended', { endedAt: now })
+          setTimeout(() => { markEnded(mid); clearMatchState(mid) }, 5 * 60_000)
+          continue
+        }
+
+        // DÉTECTION FT : horloge >= 85min + score inchangé → FT
+        const mins = parseClockMins(espnClock)
+        const timePlausible = mins !== null && mins >= 85
+
+        if (!timePlausible) {
+          delete pendingFt[mid]
+          markLive(match)
+          clearFtFlags(mid)
+          continue
+        }
+
+        const prevScore    = prevCache ? `${prevCache.home}-${prevCache.away}` : null
+        const currentScore = `${home}-${away}`
+
+        if (prevScore !== null && prevScore !== currentScore) {
+          // But tardif dans le même poll → rester live
+          delete pendingFt[mid]
+          markLive(match)
+          clearFtFlags(mid)
+          continue
+        }
+
+        // STATUS_FINAL + score inchangé + horloge >= 85 → FT confirmé
+        delete pendingFt[mid]
+        confirmFt(match, now, queryClient)
+      }
+
+      // ── FALLBACK J-1 : STATUS_SCHEDULED mais FD.org sait que c'est live ──
+      if (
+        espnStatus === 'STATUS_SCHEDULED' &&
+        (match.status === 'IN_PLAY' || match.status === 'PAUSED' || isTrackedLive(mid))
+      ) {
+        if (!espnScoresCache[mid]) {
+          espnScoresCache[mid] = { home: null, away: null, scorers: [], stats: null }
+        }
+        if (!espnScoresCache[mid].espnEventId) {
+          espnScoresCache[mid] = {
+            ...espnScoresCache[mid],
+            espnEventId: data.espnEventId,
+            espnSlug:    data.espnSlug,
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[useLiveMinute] /api/espn-live erreur :', err.message)
+    espnFailStreak++
+    if (espnFailStreak >= 3) setEspnWorking(false)
   }
 
-  // Safeguards après traitement ESPN — scores à jour dans espnScoresCache
-  // (évite que safeguard 3 confirme FT avec l'ancien score avant qu'ESPN mette à jour)
+  // Safeguards après traitement ESPN
   _runFtSafeguards(allMatches, now, queryClient)
 
-  // Pousser les scores dans React Query → useEspnScores réactif sans fetch séparé
+  // Pousser les scores dans React Query
   queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
   try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
-
-  // ── Fetch summary stats en background (toutes les 60s par match live) ────────
-  // Le scoreboard ESPN ne retourne jamais de stats pour les matchs live.
-  // On fetch l'endpoint summary séparément pour alimenter StatsBar (card) + modal.
-  const SUMMARY_INTERVAL = 60_000
-  for (const [midStr, cached] of Object.entries(espnScoresCache)) {
-    const mid = Number(midStr)
-    // Fetch summary si le match est live OU si liveState=live (liveTracker peut avoir perdu l'entrée)
-    if (!isTrackedLive(mid) && getLiveState(mid).state !== 'live') continue
-    if (!cached.espnEventId || !cached.espnSlug) continue
-    if (lastSummaryFetch[mid] && now - lastSummaryFetch[mid] < SUMMARY_INTERVAL) continue
-    lastSummaryFetch[mid] = now
-
-    // Fire-and-forget : ne bloque pas le poll principal
-    ;(async (mId, slug, eventId) => {
-      try {
-        const r = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
-        if (!r.ok) return
-        const json = await r.json()
-        const teams    = json.boxscore?.teams ?? []
-        const homeTeam = teams.find(t => t.homeAway === 'home')
-        const awayTeam = teams.find(t => t.homeAway === 'away')
-
-        const getStat = (team, ...names) => {
-          for (const name of names) {
-            const s = (team?.statistics ?? []).find(st => st.name === name)
-            if (s != null) { const v = parseFloat(s.displayValue); return isNaN(v) ? null : v }
-          }
-          return null
-        }
-
-        const homePoss    = getStat(homeTeam, 'possessionPct')
-        const awayPoss    = getStat(awayTeam, 'possessionPct')
-        const homeShots   = getStat(homeTeam, 'totalShots', 'shotsTotal', 'shots')
-        const awayShots   = getStat(awayTeam, 'totalShots', 'shotsTotal', 'shots')
-        const homeSOT     = getStat(homeTeam, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
-        const awaySOT     = getStat(awayTeam, 'shotsOnTarget', 'onTargetShots', 'shotsOnGoal')
-        const homeCorners = getStat(homeTeam, 'cornerKicks', 'corners')
-        const awayCorners = getStat(awayTeam, 'cornerKicks', 'corners')
-
-        // ── Buteurs depuis scoringPlays (plus fiable que details du scoreboard) ──
-        const scoringPlays = json.scoringPlays ?? []
-        let summaryScorers = null
-        if (scoringPlays.length > 0) {
-          const homeTeamId = homeTeam?.team?.id
-          summaryScorers = scoringPlays
-            .filter(p => {
-              const txt = p.type?.text?.toLowerCase() ?? ''
-              return txt.includes('goal') || p.type?.id === '57' || p.type?.id === '58'
-            })
-            .map(p => {
-              const athlete = p.participants?.[0]?.athlete ?? p.athletes?.[0]
-              const isHome  = p.team?.id === homeTeamId
-              const isOG    = p.type?.text?.toLowerCase().includes('own')
-              return {
-                name:        athlete?.shortName ?? athlete?.displayName ?? '?',
-                minute:      p.clock?.displayValue ?? '',
-                team:        isHome ? 'home' : 'away',
-                ownGoal:     isOG,
-                penaltyKick: p.type?.text?.toLowerCase().includes('penalty') ?? false,
-              }
-            })
-        }
-
-        if (!espnScoresCache[mId]) return
-
-        const prevCache    = espnScoresCache[mId]
-        const hasStats     = homePoss !== null || homeShots !== null
-        const bestScorers  = summaryScorers && summaryScorers.length >= (prevCache.scorers?.length ?? 0)
-          ? summaryScorers
-          : prevCache.scorers
-
-        espnScoresCache[mId] = {
-          ...prevCache,
-          scorers: bestScorers ?? prevCache.scorers,
-          ...(hasStats ? {
-            stats: {
-              home: { poss: homePoss, shots: homeShots, shotsOnTarget: homeSOT, corners: homeCorners },
-              away: { poss: awayPoss, shots: awayShots, shotsOnTarget: awaySOT, corners: awayCorners },
-            },
-          } : {}),
-        }
-        queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
-        try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
-      } catch { /* silencieux */ }
-    })(mid, cached.espnSlug, cached.espnEventId)
-  }
 }
 
 // ─────────────────────────────────────────────
