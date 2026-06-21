@@ -1,12 +1,11 @@
 // api/cron/goals.js
 // Appelé par cron-job.org toutes les minutes (Vercel Hobby = pas de crons natifs).
 //
-// Flow :
-//   1. Poll ESPN scoreboard pour J + J-1 (couvre les matchs tardifs UTC)
-//   2. Pour chaque match EN COURS (STATUS_IN_PROGRESS / STATUS_HALFTIME)
-//      → compare le score avec le précédent stocké dans KV
-//   3. Score changé → envoie push à tous les abonnés (web-push VAPID)
-//   4. Met à jour le score dans KV pour le prochain poll
+// Détecte et notifie :
+//   ⚽ But         — score change pendant STATUS_IN_PROGRESS
+//   🟢 Coup d'envoi — STATUS_SCHEDULED → STATUS_IN_PROGRESS (period 1)
+//   ⏸  Mi-temps    — STATUS_IN_PROGRESS → STATUS_HALFTIME
+//   🏁 Fin de match — statut live → STATUS_FINAL / STATUS_FULL_TIME
 //
 // Sécurité : header "x-cron-secret" ou param ?secret= doit matcher CRON_SECRET.
 
@@ -31,6 +30,11 @@ const LIVE_STATUSES = new Set([
   'STATUS_EXTRA_TIME',
   'STATUS_OVERTIME',
   'STATUS_SHOOTOUT',
+])
+
+const FINAL_STATUSES = new Set([
+  'STATUS_FINAL',
+  'STATUS_FULL_TIME',
 ])
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -91,12 +95,20 @@ async function sendPushToAll(payload) {
     }
   }))
 
-  // Nettoyer les subscriptions mortes
   if (stale.length) {
     try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
   }
 
   return sent
+}
+
+async function sendDeduped(dedupKey, payload, ttl = 3 * 3600) {
+  try {
+    const already = await kv.get(dedupKey)
+    if (already) return 0
+    await kv.set(dedupKey, '1', { ex: ttl })
+  } catch { return 0 }
+  return sendPushToAll(payload)
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
@@ -117,7 +129,6 @@ export default async function handler(req, res) {
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
 
-  // Fetch tous les slugs pour J et J-1 en parallèle (~2s max)
   const fetches = await Promise.allSettled(
     SLUGS.flatMap(slug => [
       fetchEvents(slug, today),
@@ -125,7 +136,7 @@ export default async function handler(req, res) {
     ])
   )
 
-  // Dédupliquer les events par ID (J et J-1 peuvent retourner le même)
+  // Dédupliquer les events par ID
   const eventsById = new Map()
   for (const result of fetches) {
     if (result.status !== 'fulfilled') continue
@@ -134,78 +145,125 @@ export default async function handler(req, res) {
     }
   }
 
-  // Filtrer uniquement les matchs en cours
-  const liveEvents = []
-  for (const evt of eventsById.values()) {
-    const status = evt.competitions?.[0]?.status?.type?.name
-    if (LIVE_STATUSES.has(status)) liveEvents.push(evt)
-  }
-
-  let goalsFound = 0
+  let notifsSent = 0
   const log = []
 
-  for (const evt of liveEvents) {
-    const comp  = evt.competitions?.[0]
-    const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-    const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+  for (const evt of eventsById.values()) {
+    const comp    = evt.competitions?.[0]
+    if (!comp) continue
+
+    const status  = comp.status?.type?.name ?? ''
+    const period  = comp.status?.period ?? 1
+    const homeC   = comp.competitors?.find(c => c.homeAway === 'home')
+    const awayC   = comp.competitors?.find(c => c.homeAway === 'away')
     if (!homeC || !awayC) continue
 
     const eventId  = evt.id
     const home     = parseInt(homeC.score ?? '0', 10)
     const away     = parseInt(awayC.score ?? '0', 10)
-    const homeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? homeC.team?.name ?? '?'
-    const awayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? awayC.team?.name ?? '?'
-    const newScore = `${home}-${away}`
+    const homeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
+    const awayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
+    const score    = `${home}-${away}`
 
-    // ── Lire le score précédent depuis KV ─────────────────────────────────
-    const scoreKey = `cron:score:${eventId}`
-    let prevScore  = null
-    try { prevScore = await kv.get(scoreKey) } catch {}
+    // ── Lire l'état précédent depuis KV ───────────────────────────────────
+    const stateKey   = `cron:state:${eventId}`
+    let   prevState  = null
+    try { prevState = await kv.get(stateKey) } catch {}
+    // prevState = "STATUS_XXX|score" ex: "STATUS_IN_PROGRESS|1-0"
 
-    // Sauvegarder le score actuel (TTL 6h — nettoyage auto après le match)
-    try { await kv.set(scoreKey, newScore, { ex: 6 * 3600 }) } catch {}
+    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
 
-    // Premier poll pour ce match (pas de score précédent) → baseline, pas de notif
-    if (prevScore === null) {
-      log.push(`[${eventId}] baseline ${newScore}`)
+    // Sauvegarder l'état actuel (TTL 12h)
+    try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
+
+    // Premier poll pour ce match → baseline, pas de notif
+    if (prevState === null) {
+      log.push(`[${eventId}] baseline ${status}|${score}`)
       continue
     }
 
-    // Score inchangé → rien à faire
-    if (prevScore === newScore) continue
-
-    // ── But détecté ! ─────────────────────────────────────────────────────
-    log.push(`[${eventId}] but détecté ${prevScore} → ${newScore}`)
-
-    // Déduplication : éviter d'envoyer 2x la même notif (si cron overlap)
-    const dedupKey   = `push:goal:cron:${eventId}:${newScore}`
-    let alreadySent  = false
-    try { alreadySent = !!(await kv.get(dedupKey)) } catch {}
-    if (alreadySent) {
-      log.push(`[${eventId}] déjà envoyé (dedup)`)
-      continue
+    // ── 🟢 Coup d'envoi ───────────────────────────────────────────────────
+    // SCHEDULED (ou absent) → IN_PROGRESS period 1
+    if (
+      !LIVE_STATUSES.has(prevStatus) &&
+      status === 'STATUS_IN_PROGRESS' &&
+      period === 1
+    ) {
+      log.push(`[${eventId}] KO détecté`)
+      const sent = await sendDeduped(
+        `push:cron:ko:${eventId}`,
+        {
+          title: `🟢 Coup d'envoi !`,
+          body:  `${homeTeam} vs ${awayTeam}`,
+          matchId: eventId,
+          url: '/',
+        }
+      )
+      if (sent > 0) notifsSent++
     }
-    try { await kv.set(dedupKey, '1', { ex: 3 * 3600 }) } catch {}
 
-    // ── Envoyer la push notification ──────────────────────────────────────
-    const title   = `⚽ But !`
-    const message = `${homeTeam} ${home} – ${away} ${awayTeam}`
+    // ── ⏸ Mi-temps ────────────────────────────────────────────────────────
+    if (
+      LIVE_STATUSES.has(prevStatus) &&
+      prevStatus !== 'STATUS_HALFTIME' &&
+      status === 'STATUS_HALFTIME'
+    ) {
+      log.push(`[${eventId}] mi-temps détectée`)
+      const sent = await sendDeduped(
+        `push:cron:ht:${eventId}`,
+        {
+          title: `⏸ Mi-temps`,
+          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          matchId: eventId,
+          url: '/',
+        }
+      )
+      if (sent > 0) notifsSent++
+    }
 
-    const sent = await sendPushToAll({
-      title,
-      body:    message,
-      matchId: eventId,
-      url:     '/',
-    })
+    // ── 🏁 Fin de match ───────────────────────────────────────────────────
+    if (
+      LIVE_STATUSES.has(prevStatus) &&
+      FINAL_STATUSES.has(status)
+    ) {
+      log.push(`[${eventId}] fin de match détectée`)
+      const sent = await sendDeduped(
+        `push:cron:ft:${eventId}`,
+        {
+          title: `🏁 Fin de match`,
+          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          matchId: eventId,
+          url: '/',
+        }
+      )
+      if (sent > 0) notifsSent++
+    }
 
-    log.push(`[${eventId}] push envoyé à ${sent} abonné(s)`)
-    goalsFound++
+    // ── ⚽ But ─────────────────────────────────────────────────────────────
+    if (
+      LIVE_STATUSES.has(status) &&
+      status !== 'STATUS_HALFTIME' &&
+      prevScore !== null &&
+      prevScore !== score
+    ) {
+      log.push(`[${eventId}] but ${prevScore} → ${score}`)
+      const sent = await sendDeduped(
+        `push:goal:cron:${eventId}:${score}`,
+        {
+          title: `⚽ But !`,
+          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          matchId: eventId,
+          url: '/',
+        }
+      )
+      if (sent > 0) notifsSent++
+    }
   }
 
   return res.status(200).json({
-    ok:          true,
-    liveMatches: liveEvents.length,
-    goalsFound,
+    ok: true,
+    events: eventsById.size,
+    notifsSent,
     log,
   })
 }
