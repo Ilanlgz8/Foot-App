@@ -26,7 +26,8 @@ function Navbar() {
   useEffect(() => {
     const check = () => {
       const last = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
-      setIsStale(Date.now() - last > 45_000)
+      // Ne considérer comme gelé que si on a déjà pollé au moins une fois ET > 45s
+      setIsStale(last > 0 && Date.now() - last > 45_000)
     }
     check()
     const id = setInterval(check, 10_000)
