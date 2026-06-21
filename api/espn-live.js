@@ -40,9 +40,11 @@ const LIVE_STATUSES = new Set([
 
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const SB_TTL     = 12         // scoreboard Redis TTL : 12s
-const SUM_TTL    = 55         // summary Redis TTL : 55s
+const SUM_TTL    = 20         // summary Redis TTL : 20s (réduit pour buteurs plus réactifs)
 const EID_TTL    = 6 * 3600  // eventId mapping : 6h
 const MATCH_TTL  = 6 * 3600  // données match : 6h
+const SB_TIMEOUT = 3_500      // timeout scoreboard ESPN : 3.5s (Vercel Hobby limit = 10s)
+const SUM_TIMEOUT = 2_500     // timeout summary ESPN : 2.5s
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,15 +83,21 @@ function getStatVal(obj, ...names) {
 
 function extractScorers(comp, homeTeamId) {
   return (comp.details ?? [])
-    .filter(d => d.type?.text === 'Goal' || d.type?.id === '57')
+    .filter(d => {
+      const txt = (d.type?.text ?? '').toLowerCase()
+      const id  = String(d.type?.id ?? '')
+      // Couvrir Goal, PenaltyKick, OwnGoal et variantes ESPN (IDs connus : 57, 58, 72)
+      return txt.includes('goal') || txt === 'penaltykick' || id === '57' || id === '58' || id === '72'
+    })
     .map(d => {
       const ath = d.athletesInvolved?.[0]
+      const txt = (d.type?.text ?? '').toLowerCase()
       return {
         name:        ath?.shortName ?? ath?.displayName ?? '?',
         minute:      d.clock?.displayValue ?? '',
         team:        d.team?.id === homeTeamId ? 'home' : 'away',
-        ownGoal:     d.ownGoal ?? false,
-        penaltyKick: d.penaltyKick ?? false,
+        ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
+        penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
       }
     })
 }
@@ -240,8 +248,8 @@ export default async function handler(req, res) {
       // Cache expiré ou absent → fetch ESPN
       try {
         const [rT, rY] = await Promise.all([
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(6_000) }),
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(6_000) }),
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
         ])
         const [jT, jY] = await Promise.all([
           rT.ok ? rT.json() : { events: [] },
@@ -317,6 +325,14 @@ export default async function handler(req, res) {
     // Stats : nouvelles si disponibles, sinon fallback cache
     const bestStats   = stats ?? prevData?.stats ?? null
 
+    // But détecté côté serveur → invalider le cache summary immédiatement
+    // pour que le prochain poll (15s) ramène le buteur depuis scoringPlays ESPN
+    const prevTotal = (prevData?.home ?? -1) + (prevData?.away ?? -1)
+    const newTotal  = home + away
+    if (prevData && newTotal > prevTotal) {
+      try { await kv.del(`espn:sum:${fdMatch.id}`) } catch {}
+    }
+
     result[fdMatch.id]      = {
       espnEventId: evt.id,
       espnSlug:    slug,
@@ -357,7 +373,7 @@ export default async function handler(req, res) {
           const url = `${ESPN_BASE}/${data.espnSlug}/summary?event=${data.espnEventId}`
           const r   = await fetch(url, {
             headers: { 'Cache-Control': 'no-cache' },
-            signal:  AbortSignal.timeout(6_000),
+            signal:  AbortSignal.timeout(SUM_TIMEOUT),
           })
           if (r.ok) {
             const json = await r.json()
