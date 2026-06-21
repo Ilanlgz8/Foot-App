@@ -378,11 +378,19 @@ async function pollESPN(matches, queryClient) {
 
   const d = new Date()
   const todayESPN = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  // J-1 UTC : pour les matchs qui commencent après ~22h heure locale (minuit UTC ou plus tard)
+  // ESPN range eux sous la date UTC précédente alors que l'app est en UTC+1/+2
+  const dYest = new Date(d - 86_400_000)
+  const yesterdayESPN = `${dYest.getFullYear()}${String(dYest.getMonth() + 1).padStart(2, '0')}${String(dYest.getDate()).padStart(2, '0')}`
 
   for (const slug of slugSet) {
     try {
-      const res = await fetch(`/espn?slug=${slug}&dates=${todayESPN}&_t=${Date.now()}`)
-      if (!res.ok) {
+      // Fetch J et J-1 en parallèle pour couvrir les matchs tardifs (décalage UTC)
+      const [resT, resY] = await Promise.all([
+        fetch(`/espn?slug=${slug}&dates=${todayESPN}&_t=${Date.now()}`),
+        fetch(`/espn?slug=${slug}&dates=${yesterdayESPN}&_t=${Date.now()}`),
+      ])
+      if (!resT.ok && !resY.ok) {
         espnFailStreak++
         if (espnFailStreak >= 3) setEspnWorking(false)
         continue
@@ -391,8 +399,12 @@ async function pollESPN(matches, queryClient) {
       setEspnWorking(true)
       try { localStorage.setItem('foot_espn_last_poll', String(Date.now())) } catch {}
 
-      const json = await res.json()
-      for (const evt of json.events ?? []) {
+      const [jsonT, jsonY] = await Promise.all([
+        resT.ok ? resT.json() : Promise.resolve({ events: [] }),
+        resY.ok ? resY.json() : Promise.resolve({ events: [] }),
+      ])
+      const allEvents = [...(jsonT.events ?? []), ...(jsonY.events ?? [])]
+      for (const evt of allEvents) {
         const comp = evt.competitions?.[0]
         if (!comp) continue
 
