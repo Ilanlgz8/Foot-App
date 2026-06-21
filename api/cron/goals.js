@@ -11,6 +11,7 @@
 
 import { Redis } from '@upstash/redis'
 import webpush    from 'web-push'
+import { translateESPN } from '../../lib/teamNamesFr.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -162,8 +163,8 @@ export default async function handler(req, res) {
     const eventId  = evt.id
     const home     = parseInt(homeC.score ?? '0', 10)
     const away     = parseInt(awayC.score ?? '0', 10)
-    const homeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
-    const awayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
+    const homeTeam = translateESPN(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
+    const awayTeam = translateESPN(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
     const scoreStr = `${home} – ${away}`
     const score    = `${home}-${away}`
 
