@@ -51,7 +51,31 @@
   height: 1.1rem;
 }
 
-/* La ligne diagonale (état muted) est rendue via SVG directement */
+/* Cloche sonnante — légère oscillation */
+.notif-bell__icon--ringing {
+  animation: bellRing 2.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@keyframes bellRing {
+  0%, 100%       { transform: rotate(0deg); }
+  10%            { transform: rotate(12deg); }
+  20%            { transform: rotate(-10deg); }
+  30%            { transform: rotate(8deg); }
+  40%            { transform: rotate(-6deg); }
+  50%            { transform: rotate(0deg); }
+}
+
+/* Cloche grisée (notifications refusées) */
+.notif-bell__icon--faded {
+  opacity: 0.4;
+}
+
+/* État refusé */
+.notif-bell--denied {
+  color: rgba(255,255,255,0.25);
+  cursor: default;
+}
 
 /* Spinner — anneau CSS animé */
 .notif-bell__spinner {

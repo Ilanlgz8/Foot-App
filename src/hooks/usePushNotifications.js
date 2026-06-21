@@ -39,19 +39,16 @@ export function usePushNotifications() {
 
   // ── Vérification au montage ───────────────────────────────────────────────
   useEffect(() => {
-    // Navigateur sans Service Worker ou PushManager (ex: iOS < 16.4, vieux Firefox)
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setStatus('unsupported')
       return
     }
 
-    // Permission déjà refusée → pas la peine d'afficher le bouton
     if (Notification.permission === 'denied') {
       setStatus('denied')
       return
     }
 
-    // Vérifier si une subscription existe déjà dans le navigateur
     navigator.serviceWorker.ready
       .then(reg => reg.pushManager.getSubscription())
       .then(sub => {
@@ -59,7 +56,6 @@ export function usePushNotifications() {
           setStatus('subscribed')
           localStorage.setItem(LS_KEY, '1')
         } else {
-          // Pas de subscription active → repartir de zéro même si on pensait être abonné
           localStorage.removeItem(LS_KEY)
           setStatus('idle')
         }
@@ -134,6 +130,18 @@ export function usePushNotifications() {
       console.error('[usePushNotifications] unsubscribe error:', err)
     }
   }, [])
+
+  // ── Auto-prompt première visite ──────────────────────────────────────────
+  // Si l'utilisateur n'a jamais été invité ET le statut est idle → demander auto
+  useEffect(() => {
+    if (status !== 'idle') return
+    const alreadyPrompted = localStorage.getItem('push_prompted')
+    if (alreadyPrompted) return
+    localStorage.setItem('push_prompted', '1')
+    // Petit délai pour que l'app soit chargée avant d'afficher la demande
+    const t = setTimeout(() => subscribe(), 1_500)
+    return () => clearTimeout(t)
+  }, [status, subscribe])
 
   return { status, subscribe, unsubscribe }
 }
