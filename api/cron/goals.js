@@ -222,6 +222,44 @@ export default async function handler(req, res) {
       if (sent > 0) notifsSent++
     }
 
+    // ── 🔴 Reprise 2ème MT ────────────────────────────────────────────────
+    if (
+      prevStatus === 'STATUS_HALFTIME' &&
+      status === 'STATUS_IN_PROGRESS' &&
+      period === 2
+    ) {
+      log.push(`[${eventId}] reprise 2ème MT`)
+      const sent = await sendDeduped(
+        `push:cron:2h:${eventId}`,
+        {
+          title:   '🔴 Reprise !',
+          body:    `2ème mi-temps · ${homeTeam} ${scoreStr} ${awayTeam}`,
+          matchId: eventId,
+          url:     '/',
+        }
+      )
+      if (sent > 0) notifsSent++
+    }
+
+    // ── 🔴 Prolongations ──────────────────────────────────────────────────
+    if (
+      LIVE_STATUSES.has(prevStatus) &&
+      (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME') &&
+      prevStatus !== 'STATUS_EXTRA_TIME' && prevStatus !== 'STATUS_OVERTIME'
+    ) {
+      log.push(`[${eventId}] prolongations`)
+      const sent = await sendDeduped(
+        `push:cron:et:${eventId}`,
+        {
+          title:   '🔴 Prolongations !',
+          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
+          matchId: eventId,
+          url:     '/',
+        }
+      )
+      if (sent > 0) notifsSent++
+    }
+
     // ── 🔴 Fin de match ───────────────────────────────────────────────────
     if (
       LIVE_STATUSES.has(prevStatus) &&
