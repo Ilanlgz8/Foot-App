@@ -20,16 +20,29 @@ function extractImage(itemXml) {
   return null
 }
 
+// Valide qu'une URL est bien https:// (protection XSS javascript: dans les liens)
+function safeUrl(url) {
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' ? url : null
+  } catch { return null }
+}
+
 function parseRSS(xml, sourceName) {
   const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? []
-  return items.map(item => ({
-    title:       extractTag(item, 'title'),
-    url:         extractTag(item, 'link') || extractTag(item, 'guid'),
-    description: extractTag(item, 'description').replace(/<[^>]+>/g, '').slice(0, 200),
-    image:       extractImage(item),
-    publishedAt: new Date(extractTag(item, 'pubDate')).toISOString(),
-    source:      sourceName,
-  })).filter(a => a.title && a.url)
+  return items.map(item => {
+    const url = safeUrl(extractTag(item, 'link') || extractTag(item, 'guid'))
+    const img = safeUrl(extractImage(item))
+    return {
+      title:       extractTag(item, 'title'),
+      url,
+      description: extractTag(item, 'description').replace(/<[^>]+>/g, '').slice(0, 200),
+      image:       img,
+      publishedAt: new Date(extractTag(item, 'pubDate')).toISOString(),
+      source:      sourceName,
+    }
+  }).filter(a => a.title && a.url)
 }
 
 function fetchWithTimeout(url, options, ms = 6000) {

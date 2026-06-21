@@ -15,18 +15,17 @@ const kv = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 })
 
-// Domaines autorisés — production + previews Vercel
+// Domaines autorisés — production + previews Vercel propres au projet
 const ALLOWED_ORIGINS = new Set([
   'https://statfootix.vercel.app',
 ])
 
-// Accepter aussi tous les previews Vercel (foot-app-*.vercel.app) et domaines custom
 function isAllowedOrigin(origin) {
-  if (!origin) return true // pas d'origin = requête serveur ou curl
+  if (!origin) return true // pas d'origin = requête serveur (curl, cron)
   if (ALLOWED_ORIGINS.has(origin)) return true
   if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true
-  // Previews Vercel automatiques (ex: foot-app-git-main-xxx.vercel.app)
-  if (origin.endsWith('.vercel.app')) return true
+  // Previews Vercel du projet uniquement (préfixe foot-app-)
+  if (/^https:\/\/foot-app(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return true
   return false
 }
 

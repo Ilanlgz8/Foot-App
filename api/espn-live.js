@@ -168,8 +168,20 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end()
 
+  // Rate limiting : 60 req / IP / minute (poll client = 15s, max ~4 req/min légitimes)
+  const ip     = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+  const rlKey  = `ratelimit:espnlive:${ip}`
+  try {
+    const count = await kv.incr(rlKey)
+    if (count === 1) await kv.expire(rlKey, 60)
+    if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
+  } catch { /* Redis down → continuer */ }
+
   const { matches } = req.body ?? {}
   if (!Array.isArray(matches) || !matches.length) return res.json({})
+
+  // Limite : max 20 matchs par requête (anti-abus payload oversized)
+  if (matches.length > 20) return res.status(400).json({ error: 'Trop de matchs (max 20)' })
 
   // Dates ESPN : J et J-1 pour couvrir les matchs après minuit UTC
   const now  = new Date()

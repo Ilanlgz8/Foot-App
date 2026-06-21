@@ -34,6 +34,14 @@ const ALLOWED_ORIGINS = new Set([
   'https://statfootix.vercel.app',
 ])
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true
+  if (ALLOWED_ORIGINS.has(origin)) return true
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true
+  if (/^https:\/\/foot-app(-[a-z0-9-]+)?\.vercel\.app$/.test(origin)) return true
+  return false
+}
+
 // Configure webpush avec les clés VAPID (stockées en env vars Vercel)
 // Appelé une fois au démarrage de la fonction (warm start)
 function setupVapid() {
@@ -79,9 +87,8 @@ async function verifyScoreOnEspn(espnSlug, home, away) {
 
 export default async function handler(req, res) {
   // ── Origin ────────────────────────────────────────────────────────────────
-  const origin    = req.headers.origin ?? ''
-  const isDevLocal = !origin || origin.includes('localhost') || origin.includes('127.0.0.1')
-  if (!isDevLocal && !ALLOWED_ORIGINS.has(origin)) {
+  const origin = req.headers.origin ?? ''
+  if (origin && !isAllowedOrigin(origin)) {
     return res.status(403).json({ error: 'Origine non autorisée' })
   }
 

@@ -1,6 +1,11 @@
 // Proxy football-data.org
 // Appelé via /api/football?apiPath=/v4/PATH&...query params...
 export default async function handler(req, res) {
+  // GET uniquement — on ne proxifie pas de mutations vers FD.org avec notre clé API
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Méthode non autorisée' })
+  }
+
   try {
     const { apiPath } = req.query
     const fdPath = apiPath ?? '/'

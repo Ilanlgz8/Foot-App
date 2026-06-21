@@ -1,5 +1,10 @@
 // Proxy football-data.org — catch-all Vercel pour /api/v4/**
 export default async function handler(req, res) {
+  // GET uniquement — pas de proxying de mutations vers FD.org avec notre clé API
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Méthode non autorisée' })
+  }
+
   try {
     const { path: segments } = req.query
     const parts   = Array.isArray(segments) ? segments : [segments]
@@ -11,11 +16,6 @@ export default async function handler(req, res) {
     const qs      = qsStart >= 0 ? req.url.slice(qsStart) : ''
     const url     = `https://api.football-data.org${apiPath}${qs}`
 
-    console.log('[fd-proxy] req.url:', req.url)
-    console.log('[fd-proxy] apiPath:', apiPath, '| qs:', qs)
-    console.log('[fd-proxy] API_KEY set:', !!process.env.API_KEY)
-    console.log('[fd-proxy] target:', url)
-
     if (!process.env.API_KEY) {
       return res.status(500).json({ error: 'API_KEY not configured on Vercel' })
     }
@@ -24,14 +24,11 @@ export default async function handler(req, res) {
       headers: { 'X-Auth-Token': process.env.API_KEY },
     })
 
-    console.log('[fd-proxy] status:', response.status)
-
     const body = await response.text()
     res.status(response.status)
        .setHeader('Content-Type', 'application/json')
        .send(body)
   } catch (err) {
-    console.error('[fd-proxy] ERROR:', err)
     res.status(500).json({ error: err.message })
   }
 }
