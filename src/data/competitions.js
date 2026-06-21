@@ -12,7 +12,7 @@ import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 export const COMPETITIONS = [
   {
     id: ‘FL1’,
-    name: ‘Ligue 1 McDonald’s’,
+    name: "Ligue 1 McDonald’s",
     shortName: ‘Ligue 1’,
     emblem: ligue1Logo,
   },
