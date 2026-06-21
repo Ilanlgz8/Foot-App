@@ -419,7 +419,12 @@ async function pollESPN(matches, queryClient) {
         const espnClock  = st?.displayClock
         if (!espnStatus) continue
 
-        const match = findMatchESPN(comp.competitors ?? [], allMatches)
+        // ── Trouver le match FD.org correspondant ──
+        // 1. Chercher directement par ESPN event ID (si déjà connu) → fiable à 100%
+        //    Évite les ratés de fuzzy matching mid-match (noms équipes CdM changeants)
+        // 2. Fallback : fuzzy matching sur les noms d'équipes
+        let match = allMatches.find(m => espnScoresCache[m.id]?.espnEventId === evt.id) ?? null
+        if (!match) match = findMatchESPN(comp.competitors ?? [], allMatches)
         if (!match) continue
 
         // Mémoriser que ce match est encore visible dans le scoreboard ESPN
