@@ -50,8 +50,13 @@ export default defineConfig(({ mode }) => {
               handler: 'NetworkOnly',
             },
             // API internes (/api, /espn, /apifootball, /news, /sofascore) — NetworkOnly
+            // ⚠️  urlPattern reçoit l'URL complète en prod (https://domain.com/api/...)
+            //     → utiliser une fonction qui teste pathname plutôt qu'un regex ^/
             {
-              urlPattern: /^\/(api|espn|apifootball|news|sofascore)(\/|\?|$)/,
+              urlPattern: ({ url }) =>
+                ['/api', '/espn', '/apifootball', '/news', '/sofascore'].some(p =>
+                  url.pathname.startsWith(p)
+                ),
               handler: 'NetworkOnly',
             },
           ],

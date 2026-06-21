@@ -6,8 +6,9 @@
 //     ESPN n'est appelé que si le cache est expiré
 //   • eventId → fdMatchId stocké Redis 6h → survit aux rechargements iOS
 //   • Scorer preservation côté serveur → plus de perte de noms au reload
-//   • Stats summary cachées 55s → un seul fetch ESPN/min par match live
+//   • Stats summary cachées 20s → buteur visible dans les 20s après un but
 //   • Si ESPN est down → Redis renvoie les dernières données connues
+//   • Fetch tous les slugs ESPN en parallèle → max 3.5s peu importe le nombre
 
 import { Redis } from '@upstash/redis'
 
@@ -232,41 +233,48 @@ export default async function handler(req, res) {
   })
 
   // ── Fetch scoreboards ESPN (avec cache Redis 12s) ──
-  // { slug, evt }[] — tous les events ESPN des slugs requis
+  // Tous les slugs en PARALLÈLE → max 3.5s peu importe le nombre de compétitions
+  // (avant : boucle séquentielle → N × 3.5s, risque de dépasser la limite Vercel 10s)
   const allEvents = []
 
-  for (const slug of slugSet) {
-    const cKey = `espn:sb:${slug}`
-    let events = null
+  const slugResults = await Promise.allSettled(
+    [...slugSet].map(async slug => {
+      const cKey = `espn:sb:${slug}`
+      let events = null
 
-    try {
-      const cached = await kv.get(cKey)
-      if (cached) events = safeJson(cached)
-    } catch {}
-
-    if (!events) {
-      // Cache expiré ou absent → fetch ESPN
       try {
-        const [rT, rY] = await Promise.all([
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
-        ])
-        const [jT, jY] = await Promise.all([
-          rT.ok ? rT.json() : { events: [] },
-          rY.ok ? rY.json() : { events: [] },
-        ])
-        events = [...(jT.events ?? []), ...(jY.events ?? [])]
-        // Stocker en cache Redis
-        try { await kv.setex(cKey, SB_TTL, JSON.stringify(events)) } catch {}
-      } catch {
-        // ESPN injoignable — on n'a pas d'events pour ce slug
-        events = null
-      }
-    }
+        const cached = await kv.get(cKey)
+        if (cached) events = safeJson(cached)
+      } catch {}
 
-    if (Array.isArray(events)) {
-      for (const evt of events) allEvents.push({ slug, evt })
-    }
+      if (!events) {
+        // Cache expiré ou absent → fetch ESPN
+        try {
+          const [rT, rY] = await Promise.all([
+            fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
+            fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(SB_TIMEOUT) }),
+          ])
+          const [jT, jY] = await Promise.all([
+            rT.ok ? rT.json() : { events: [] },
+            rY.ok ? rY.json() : { events: [] },
+          ])
+          events = [...(jT.events ?? []), ...(jY.events ?? [])]
+          // Stocker en cache Redis
+          try { await kv.setex(cKey, SB_TTL, JSON.stringify(events)) } catch {}
+        } catch {
+          // ESPN injoignable — on n'a pas d'events pour ce slug
+          events = null
+        }
+      }
+
+      return { slug, events: Array.isArray(events) ? events : [] }
+    })
+  )
+
+  for (const r of slugResults) {
+    if (r.status !== 'fulfilled') continue
+    const { slug, events } = r.value
+    for (const evt of events) allEvents.push({ slug, evt })
   }
 
   // ── Matching ESPN events → matchs FD.org ──
