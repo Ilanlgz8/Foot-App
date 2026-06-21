@@ -13,9 +13,9 @@
 import { getMatchState } from './matchStateTracker'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
-// Au-delà de 30s depuis le dernier poll ESPN, on ne tente plus d'interpoler
-// (sécurité si l'onglet était en veille / intervals throttlés par le navigateur)
-const ESPN_INTERP_CAP = 30_000
+// Au-delà de 90s depuis le dernier poll ESPN, on ne tente plus d'interpoler
+// (iOS peut throttler les Web Workers jusqu'à ~60-90s en arrière-plan)
+const ESPN_INTERP_CAP = 90_000
 
 /**
  * Parse un displayClock ESPN en { base, extra }.

@@ -72,18 +72,21 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
     liveMinute !== null
   )
 
-  // Countdown mi-temps : remplace "MT" par "~8 min" ou "Imminente"
+  // Countdown mi-temps : "15 min" → "1 min" → "Reprise immédiate"
   const [htLabel, setHtLabel] = useState(null)
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
     const compute = () => {
-      const state  = getMatchState(match.id)
+      const state = getMatchState(match.id)
+      // Arrêter le décompte si la 2ème MT a démarré
       if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
-      const remMin = Math.max(0, Math.ceil((15 * 60_000 - (Date.now() - state.pausedAt)) / 60_000))
-      setHtLabel(remMin > 0 ? `~${remMin} min` : 'Imminente')
+      const elapsed = Date.now() - state.pausedAt
+      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
+      setHtLabel(remMin > 0 ? `${remMin} min` : 'Reprise immédiate')
     }
     compute()
-    const id = setInterval(compute, 30_000)
+    // Mise à jour chaque minute (le décompte est en minutes)
+    const id = setInterval(compute, 60_000)
     return () => clearInterval(id)
   }, [liveMinute, match.id])
 

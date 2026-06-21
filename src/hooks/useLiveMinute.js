@@ -23,51 +23,8 @@ import {
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
 
-// ─────────────────────────────────────────────
-// Push notifications — envoi serveur
-// ─────────────────────────────────────────────
-
-/**
- * Appelle /api/push (Vercel) pour notifier tous les abonnés d'un but.
- * Fire-and-forget : les erreurs sont silencieuses, la notification est optionnelle.
- *
- * Sécurité côté serveur : le serveur re-fetch ESPN pour vérifier le score avant
- * d'envoyer la moindre notification (voir api/push.js).
- */
-function _sendPushGoal(match, home, away, scorers, slug) {
-  // Si l'app est au premier plan → notifyGoal() gère déjà la notif locale,
-  // inutile d'envoyer un push serveur en doublon
-  if (document.visibilityState === 'visible') return
-
-  const homeTeam = match.homeTeam?.shortName ?? match.homeTeam?.name ?? ''
-  const awayTeam = match.awayTeam?.shortName ?? match.awayTeam?.name ?? ''
-
-  // Détecter but contre son camp
-  const lastScorer = scorers?.[scorers.length - 1]
-  const isOwnGoal  = lastScorer?.ownGoal === true
-  const scorer     = isOwnGoal ? null : scorers?.find(s => !s.ownGoal && s.minute)
-
-  const title = isOwnGoal
-    ? '⚽ But contre son camp !'
-    : scorer
-      ? `⚽ But ! — ${scorer.name}`
-      : '⚽ But !'
-
-  const message = `${homeTeam} ${home} – ${away} ${awayTeam}`
-
-  fetch('/api/push', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      matchId:  match.id,
-      espnSlug: slug,
-      home,
-      away,
-      title,
-      message,
-    }),
-  }).catch(() => { /* silencieux — push est un bonus, pas critique */ })
-}
+// Push côté client supprimé — le cron /api/cron/goals gère toutes les notifs
+// (buts, KO, MT, reprise, prolongations, FT) pour éviter les doublons.
 
 // ─────────────────────────────────────────────
 // Constantes
@@ -512,8 +469,6 @@ async function pollESPN(matches, queryClient) {
             const newTotal  = data.home + data.away
             if (prevCache && newTotal > prevTotal) {
               notifyGoal(match, data.home, data.away, data.scorers)
-              // Push server-side → notifie tous les abonnés, même app fermée
-              _sendPushGoal(match, data.home, data.away, data.scorers, slug)
             }
             espnScoresCache[match.id] = {
               home:       data.home,
@@ -951,7 +906,8 @@ export function useLiveMinute(matches) {
       apiFbRef.current()
     }
     // Cold start : matches[] vient de se charger (0 → N) → re-poll ESPN immédiatement
-    if (prevMatchesLen.current === 0 && matches.length > 0 && getLiveMatches().length > 0) {
+    // (même sans live en cours — pour détecter les pending kickoffs au bon moment)
+    if (prevMatchesLen.current === 0 && matches.length > 0) {
       pollESPN(matches, queryClient)
     }
     prevMatchesLen.current = matches.length

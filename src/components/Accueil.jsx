@@ -121,15 +121,33 @@ function Accueil() {
     return () => { cancelled = true }
   }, [dayOffset, matchesLoading, queryClient])
 
-  // ── Ticker 30s pour faire avancer calcMinute() ──
+  // ── Ticker 10s pour faire avancer calcMinute() et détecter pending kickoffs ──
   const [, setTick] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    const id = setInterval(() => setTick(t => t + 1), 10_000)
     return () => clearInterval(id)
   }, [])
 
   const wcComp   = COMPETITIONS.find(c => c.id === 'WC')
   const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  // ── Pending kickoffs : matchs dont l'heure est atteinte mais ESPN pas encore confirmé ──
+  // Détection directe depuis todayMatches (ne dépend pas du liveTracker).
+  // Le widget s'affiche dès l'heure H avec "Débute" — max 10s de délai (ticker).
+  const nowMs = Date.now()
+  const pendingMatches = dayOffset === 0
+    ? matches.filter(m => {
+        if (m.status !== 'SCHEDULED') return false
+        if (liveMatches.some(l => l.id === m.id)) return false
+        const utcMs = new Date(m.utcDate).getTime()
+        return nowMs >= utcMs && nowMs - utcMs < 30 * 60_000
+      })
+    : []
+
+  // widgetMatches = live confirmés + pending kickoffs
+  const widgetMatches = pendingMatches.length > 0
+    ? [...liveMatches, ...pendingMatches]
+    : liveMatches
 
   return (
     <>
@@ -145,7 +163,7 @@ function Accueil() {
         <p className="accueil__heroSub">stats &amp; live</p>
 
         {/* Bouton DIRECT — coin haut-droit du hero, mobile uniquement */}
-        {liveMatches.length > 0 && (
+        {widgetMatches.length > 0 && (
           <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
             <span className="accueil__livePageBtnDot" />
             DIRECT
@@ -157,7 +175,7 @@ function Accueil() {
       <div className="accueil__inner">
 
         {/* ── Grille principale ── */}
-        <div className={`accueil__mainGrid${liveMatches.length > 0 ? ' accueil__mainGrid--live' : ''}`}>
+        <div className={`accueil__mainGrid${widgetMatches.length > 0 ? ' accueil__mainGrid--live' : ''}`}>
 
           {/* Col gauche : Matchs */}
           <div className="accueil__dashPanel">
@@ -171,7 +189,7 @@ function Accueil() {
               matches={dayOffset === 0
                 ? matches.filter(m =>
                     m.status !== 'FINISHED' &&
-                    !liveMatches.some(l => l.id === m.id) &&
+                    !widgetMatches.some(l => l.id === m.id) &&
                     !getMatchState(m.id).ft
                   )
                 : matches}
@@ -187,11 +205,11 @@ function Accueil() {
           <div className="accueil__rightCol">
 
             {/* Live widget — desktop : dans la col droite | mobile : toujours visible */}
-            {liveMatches.length > 0 && (
+            {widgetMatches.length > 0 && (
               <div className="accueil__liveWidgetWrap">
                 <p className="accueil__heroDate">{todayStr}</p>
                 <LiveWidget
-                  liveMatches={liveMatches}
+                  liveMatches={widgetMatches}
                   espnScores={espnScores}
                   trackedIds={trackedIds}
                   onRecalibrate={recalibrate}
