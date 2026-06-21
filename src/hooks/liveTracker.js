@@ -84,6 +84,32 @@ export function markLive(match) {
 }
 
 /**
+ * Marque un match comme "coup d'envoi imminent" (heure atteinte, ESPN pas encore confirmé).
+ * Affiche le widget avec "Débute" au lieu de la minute.
+ * Remplacé par markLive() dès qu'ESPN confirme STATUS_IN_PROGRESS.
+ */
+export function markPendingKickoff(match) {
+  if (!match?.id) return
+  // Ne pas écraser une entrée existante (markLive a priorité)
+  if (_tracker[match.id]) return
+  _tracker[match.id] = {
+    match: {
+      id:          match.id,
+      utcDate:     match.utcDate,
+      status:      'SCHEDULED',
+      homeTeam:    match.homeTeam,
+      awayTeam:    match.awayTeam,
+      competition: match.competition,
+      score:       match.score,
+    },
+    ts:      Date.now(),
+    pending: true,
+  }
+  _persist()
+  _notify()
+}
+
+/**
  * Retire un match du tracker (fin de match confirmée).
  */
 export function markEnded(matchId) {

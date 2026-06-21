@@ -20,7 +20,7 @@ import {
   clearAllMatchStates, setEspnData, setEspnWorking,
   getLiveState, setLiveState,
 } from '../utils/matchStateTracker'
-import { markLive, markEnded, isTrackedLive, getLiveMatches } from './liveTracker'
+import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
 
 // ─────────────────────────────────────────────
@@ -268,6 +268,52 @@ function confirmFt(match, now, queryClient) {
 }
 
 // ─────────────────────────────────────────────
+// Pending kickoff — affichage immédiat à l'heure prévue
+// ─────────────────────────────────────────────
+
+/**
+ * Détecte les matchs SCHEDULED dont l'heure de KO est atteinte.
+ * Appelle markPendingKickoff() → widget s'affiche avec "Débute".
+ * Pré-seed espnScoresCache avec des 0 pour que les stats s'affichent dès le départ.
+ * Dès qu'ESPN confirme STATUS_IN_PROGRESS, markLive() écrase l'entrée pending.
+ */
+function _checkPendingKickoffs(matches, queryClient) {
+  const now = Date.now()
+  let changed = false
+
+  for (const match of matches) {
+    if (match.status !== 'SCHEDULED') continue
+    if (isTrackedLive(match.id)) continue
+
+    const slug = COMP_ESPN[match.competition?.id]
+    if (!slug) continue // compétition non suivie → skip
+
+    const utcMs = new Date(match.utcDate).getTime()
+    // Fenêtre : entre l'heure prévue et +30min (sécurité si ESPN tarde ou match annulé)
+    if (now < utcMs || now - utcMs > 30 * 60_000) continue
+
+    markPendingKickoff(match)
+
+    // Pré-seeder le cache à 0 si rien encore
+    if (!espnScoresCache[match.id]) {
+      espnScoresCache[match.id] = {
+        home: 0, away: 0, scorers: [],
+        stats: {
+          home: { poss: 0, shots: 0, shotsOnTarget: 0, corners: 0 },
+          away: { poss: 0, shots: 0, shotsOnTarget: 0, corners: 0 },
+        },
+      }
+      changed = true
+    }
+  }
+
+  if (changed) {
+    queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
+    try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
+  }
+}
+
+// ─────────────────────────────────────────────
 // ESPN — couche primaire
 // ─────────────────────────────────────────────
 
@@ -352,6 +398,9 @@ function _runFtSafeguards(matches, now, queryClient) {
 
 async function pollESPN(matches, queryClient) {
   const now = Date.now()
+
+  // ── Pending kickoff : afficher le widget dès l'heure prévue ──
+  _checkPendingKickoffs(matches, queryClient)
 
   // Étendre matches avec les matchs persistés dans liveTracker
   // → fix cold start PWA : matches[] vide pendant 1-2s au chargement

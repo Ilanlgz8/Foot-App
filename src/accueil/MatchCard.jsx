@@ -65,7 +65,12 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
   const isFinished = match.status === 'FINISHED' || getMatchState(match.id).ft === true
   const liveMinute = isFinished ? null : calcMinute(match)
-  const isLive     = !isFinished && (match.status === 'IN_PLAY' || match.status === 'PAUSED' || liveMinute !== null)
+  // isLive inclut "Débute" (pending kickoff) pour déclencher le style live dès l'heure du KO
+  const isLive     = !isFinished && (
+    match.status === 'IN_PLAY' ||
+    match.status === 'PAUSED'  ||
+    liveMinute !== null
+  )
 
   // Countdown mi-temps : remplace "MT" par "~8 min" ou "Imminente"
   const [htLabel, setHtLabel] = useState(null)
@@ -192,6 +197,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           {/* Match en cours ou terminé → score | À venir → heure */}
           {(isLive || isFinished) ? `${hs ?? 0} – ${as_ ?? 0}` : formatHour(match.utcDate)}
         </span>
+
       </div>
 
       {/* Équipe extérieure */}

@@ -188,8 +188,8 @@ function StatsBar({ stats }) {
   return (
     <div className="accueil__liveWidgetStats">
       {rows.map((row, i) => {
-        const total = (row.hNum + row.aNum) || 1
-        const homePct = (row.hNum / total) * 100
+        const total = row.hNum + row.aNum
+        const homePct = total === 0 ? 50 : (row.hNum / total) * 100
         return (
           <div key={i} className="accueil__liveWidgetStatRow">
             <div className="accueil__liveWidgetStatHeader">
@@ -210,9 +210,18 @@ function StatsBar({ stats }) {
 
 // ── Widget principal ─────────────────────────────────────────────────────────
 export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRecalibrate, onMatchClick }) {
-  const live = liveMatches.filter(m =>
-    m.status === 'IN_PLAY' || m.status === 'PAUSED' || getMatchState(m.id).ft === true
-  )
+  const now = Date.now()
+  const live = liveMatches.filter(m => {
+    const state = getMatchState(m.id)
+    if (state.ft === true) return true
+    if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
+    // Pending kickoff : heure atteinte, ESPN pas encore confirmé
+    if (m.status === 'SCHEDULED') {
+      const utcMs = new Date(m.utcDate).getTime()
+      if (now >= utcMs && now - utcMs < 30 * 60_000) return true
+    }
+    return false
+  })
 
   const [activeIdx, setActiveIdx] = useState(0)
   const matchesRef = useRef(null)

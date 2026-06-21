@@ -71,6 +71,19 @@ export function calcMinute(match) {
   // calcMinute retombe sur l'heuristique utcDate → 90+X' continue de tourner.
   if (state.ft) return null
 
+  // ── Pending kickoff : heure atteinte, ESPN pas encore confirmé ──
+  // Afficher "Débute" pendant les ~30-60s entre l'heure prévue et la confirmation ESPN.
+  if (
+    match.status === 'SCHEDULED' &&
+    !state.espnStatus &&
+    !state.kickoffAt
+  ) {
+    const nowMs   = Date.now()
+    const utcMs   = new Date(match.utcDate).getTime()
+    if (nowMs >= utcMs && nowMs - utcMs < 30 * 60_000) return 'Débute'
+    return null
+  }
+
   // ── Tirs au but (period 5 / STATUS_SHOOTOUT) ──
   if (state.espnPeriod === 5 || state.espnStatus === 'STATUS_SHOOTOUT') return 'TAB'
 
