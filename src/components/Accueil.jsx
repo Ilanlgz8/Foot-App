@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
@@ -13,6 +13,31 @@ import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import MatchModal from './MatchModal'
 import '../accueil.css'
+
+/** Chips de filtre par compétition */
+function CompFilter({ competitions, active, onChange }) {
+  if (competitions.length <= 1) return null
+  return (
+    <div className="accueil__compFilter">
+      <button
+        className={`accueil__compChip${active === null ? ' accueil__compChip--active' : ''}`}
+        onClick={() => onChange(null)}
+      >
+        Tous
+      </button>
+      {competitions.map(c => (
+        <button
+          key={c.id}
+          className={`accueil__compChip${active === c.id ? ' accueil__compChip--active' : ''}`}
+          onClick={() => onChange(c.id)}
+        >
+          {c.emblem && <img src={c.emblem} alt="" />}
+          {c.shortName}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 const MAX_TRACKED = 5
 
@@ -50,11 +75,33 @@ function Accueil() {
   const [dayOffset, setDayOffset] = useState(_savedDayOffset)
   const [minDayOffset, setMinDayOffset] = useState(_savedMinDayOffset)
   const targetDate   = getTargetDate(dayOffset)
+
+  // ── Filtres compétition ──
+  const [compFilterMatch,  setCompFilterMatch]  = useState(null)
+  const [compFilterResult, setCompFilterResult] = useState(null)
   const queryClient  = useQueryClient()
 
   // Sync les valeurs dans les variables module à chaque changement
   useEffect(() => { _savedDayOffset = dayOffset; _savedDate = getTargetDate(0) }, [dayOffset])
   useEffect(() => { _savedMinDayOffset = minDayOffset }, [minDayOffset])
+
+  // Détecter le passage de minuit → réinitialiser dayOffset au nouveau "aujourd'hui"
+  // (le module-level check ne suffit pas car useState ignore les changements de sa valeur initiale)
+  useEffect(() => {
+    let lastDate = getTargetDate(0)
+    const id = setInterval(() => {
+      const newDate = getTargetDate(0)
+      if (newDate !== lastDate) {
+        lastDate = newDate
+        _savedDayOffset    = 0
+        _savedMinDayOffset = 0
+        _savedDate         = newDate
+        setDayOffset(0)
+        setMinDayOffset(0)
+      }
+    }, 30_000) // vérifie toutes les 30s — suffisant pour ne pas rater minuit
+    return () => clearInterval(id)
+  }, [])
 
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()
@@ -128,6 +175,46 @@ function Accueil() {
     return () => clearInterval(id)
   }, [])
 
+  // ── Compétitions disponibles dans les données actuelles ──
+  const matchCompetitions = useMemo(() => {
+    const seen = new Set()
+    const out  = []
+    for (const m of matches) {
+      const id = m.competition?.id
+      if (id && !seen.has(id)) {
+        seen.add(id)
+        const meta = COMPETITIONS.find(c => c.id === id)
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+      }
+    }
+    return out
+  }, [matches])
+
+  const resultCompetitions = useMemo(() => {
+    const seen = new Set()
+    const out  = []
+    for (const m of results) {
+      const id = m.competition?.id
+      if (id && !seen.has(id)) {
+        seen.add(id)
+        const meta = COMPETITIONS.find(c => c.id === id)
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+      }
+    }
+    return out
+  }, [results])
+
+  // Réinitialiser le filtre matchs si la compétition disparaît des données (changement de jour)
+  useEffect(() => {
+    if (compFilterMatch && !matchCompetitions.some(c => c.id === compFilterMatch)) {
+      setCompFilterMatch(null)
+    }
+  }, [matchCompetitions, compFilterMatch])
+
+  // Matchs + résultats filtrés
+  const filteredMatches = compFilterMatch  ? matches.filter(m => m.competition?.id === compFilterMatch)  : matches
+  const filteredResults = compFilterResult ? results.filter(r => r.competition?.id === compFilterResult) : results
+
   const wcComp   = COMPETITIONS.find(c => c.id === 'WC')
   const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -184,20 +271,25 @@ function Accueil() {
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
             </div>
+            <CompFilter
+              competitions={matchCompetitions}
+              active={compFilterMatch}
+              onChange={setCompFilterMatch}
+            />
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
               matches={dayOffset === 0
-                ? matches.filter(m =>
+                ? filteredMatches.filter(m =>
                     m.status !== 'FINISHED' &&
                     !widgetMatches.some(l => l.id === m.id) &&
                     !getMatchState(m.id).ft
                   )
-                : matches}
+                : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
               trackedIds={trackedIds}
               onTrack={trackHandler}
-              totalMatchCount={matches.length}
+              totalMatchCount={filteredMatches.length}
             />
           </div>
 
@@ -222,13 +314,12 @@ function Accueil() {
             <div className="accueil__dashPanel">
               <div className="accueil__dashPanelHeader">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
-                {wcComp?.emblem && (
-                  <span className="accueil__dashPanelSub accueil__dashPanelSub--comp">
-                    <img src={wcComp.emblem} alt="" className="accueil__dashPanelCompLogo" />
-                    Coupe du monde
-                  </span>
-                )}
               </div>
+              <CompFilter
+                competitions={resultCompetitions}
+                active={compFilterResult}
+                onChange={setCompFilterResult}
+              />
               <div className="accueil__dashPanelDivider" />
               {(() => {
                 const todayFt = matches.filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
@@ -243,12 +334,13 @@ function Accueil() {
                   },
                   status: 'FINISHED',
                 }))
+                const allResults = [
+                  ...todayFtMapped,
+                  ...filteredResults.filter(r => !todayFtIds.has(r.id)),
+                ]
                 return (
                   <ResultPanel
-                    results={[
-                      ...todayFtMapped,
-                      ...results.filter(r => !todayFtIds.has(r.id)),
-                    ]}
+                    results={allResults}
                     loading={resultsLoading}
                   />
                 )

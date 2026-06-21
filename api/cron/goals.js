@@ -197,7 +197,7 @@ export default async function handler(req, res) {
           title:   '🔴 Coup d\'envoi !',
           body:    `${homeTeam} – ${awayTeam}`,
           matchId: eventId,
-          url:     '/',
+          url:     '/live',
         }
       )
       if (sent > 0) notifsSent++
@@ -216,7 +216,7 @@ export default async function handler(req, res) {
           title:   '🔴 Mi-temps',
           body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url:     '/',
+          url:     '/live',
         }
       )
       if (sent > 0) notifsSent++
@@ -235,7 +235,7 @@ export default async function handler(req, res) {
           title:   '🔴 Reprise !',
           body:    `2ème mi-temps · ${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url:     '/',
+          url:     '/live',
         }
       )
       if (sent > 0) notifsSent++
@@ -254,7 +254,7 @@ export default async function handler(req, res) {
           title:   '🔴 Prolongations !',
           body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url:     '/',
+          url:     '/live',
         }
       )
       if (sent > 0) notifsSent++
@@ -272,7 +272,7 @@ export default async function handler(req, res) {
           title:   '🔴 Fin de match',
           body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url:     '/',
+          url:     '/live',
         }
       )
       if (sent > 0) notifsSent++

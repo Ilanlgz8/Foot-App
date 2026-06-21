@@ -11,9 +11,12 @@ import Live from './components/Live.jsx'
 import { LiveProvider } from './context/LiveProvider.jsx'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
+import { useOnline } from './hooks/useOnline'
+import { OfflineBanner } from './components/OfflineBanner'
 
 function App() {
   const location = useLocation()
+  const online   = useOnline()
 
   // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
   useEffect(() => {
@@ -29,6 +32,7 @@ function App() {
     // + Web Worker ESPN continue de tourner même si l'utilisateur est sur Classement etc.
     <LiveProvider>
       <Navbar />
+      {!online && <OfflineBanner />}
       <div key={location.pathname} className="page-transition">
         <Routes location={location}>
           <Route path="/" element={<Accueil />} />

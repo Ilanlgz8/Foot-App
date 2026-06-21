@@ -56,19 +56,22 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close()
 
-  const target = event.notification.data?.url ?? '/'
+  const target = event.notification.data?.url ?? '/live'
 
   event.waitUntil(
     clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then(clientList => {
-        // Si l'app est déjà ouverte → la mettre au premier plan
+        // Si l'app est déjà ouverte → focus + navigation vers la cible
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
-            return client.focus()
+            return client.focus().then(() => {
+              // navigate() redirige l'onglet existant vers /live
+              if ('navigate' in client) return client.navigate(target)
+            })
           }
         }
-        // Sinon ouvrir une nouvelle fenêtre
+        // Sinon ouvrir une nouvelle fenêtre directement sur /live
         if (clients.openWindow) {
           return clients.openWindow(target)
         }
