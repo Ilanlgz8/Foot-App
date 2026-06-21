@@ -50,7 +50,8 @@ function Resultats() {
                 <img src={comp.emblem} alt=""
                   className="resultats__competitionLogo resultats__competitionLogo--sidebar"
                   onError={e => e.currentTarget.style.display = 'none'} />
-                <span className="resultats__sidebarName">{comp.name}</span>
+                <span className="resultats__sidebarName resultats__sidebarName--full">{comp.name}</span>
+                <span className="resultats__sidebarName resultats__sidebarName--short">{comp.shortName ?? comp.name}</span>
                 {selectedComp === comp.id && <span className="resultats__sidebarDot" />}
               </button>
             ))}

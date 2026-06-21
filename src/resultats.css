@@ -389,7 +389,6 @@
   }
 
   .resultats__sidebarLabel { display: none; }
-  .resultats__sidebarName  { display: none; }
 
   .resultats__sidebarNav {
     flex-direction: row;
@@ -405,10 +404,30 @@
   .resultats__sidebarItem {
     flex: 0 0 auto;
     width: auto;
-    padding: 0.35rem 0.5rem;
-    border-radius: 0.65rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 0.75rem;
+    border-color: rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
     transform: none !important;
+    min-width: 3.6rem;
   }
+
+  .resultats__sidebarName--full { display: none; }
+  .resultats__sidebarName--short {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+  .resultats__sidebarItem--active .resultats__sidebarName--short {
+    color: rgba(255,255,255,0.9);
+  }
+  .resultats__sidebarDot { display: none; }
 
   .resultats__competitionLogo--sidebar { width: 1.9rem; height: 1.9rem; }
 }

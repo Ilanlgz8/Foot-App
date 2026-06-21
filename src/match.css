@@ -1059,10 +1059,30 @@
   .matchs__sidebarItem {
     flex: 0 0 auto;
     width: auto;
-    padding: 0.35rem 0.5rem;
-    border-radius: 0.65rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 0.75rem;
+    border-color: rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
     transform: none !important;
+    min-width: 3.6rem;
   }
+
+  .matchs__sidebarName--full { display: none; }
+  .matchs__sidebarName--short {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+  .matchs__sidebarItem--active .matchs__sidebarName--short {
+    color: rgba(255,255,255,0.9);
+  }
+  .matchs__sidebarDot { display: none; }
 
   .matchs__competitionLogo--sidebar { width: 1.9rem; height: 1.9rem; }
 }

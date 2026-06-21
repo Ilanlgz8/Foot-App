@@ -232,7 +232,8 @@ function Classement() {
                 <img src={comp.emblem} alt=""
                   className="classement__sidebarLogo"
                   onError={e => e.currentTarget.style.display = 'none'} />
-                <span className="classement__sidebarName">{comp.name}</span>
+                <span className="classement__sidebarName classement__sidebarName--full">{comp.name}</span>
+                <span className="classement__sidebarName classement__sidebarName--short">{comp.shortName ?? comp.name}</span>
                 {selectedComp === comp.id && <span className="classement__sidebarDot" />}
               </button>
             ))}

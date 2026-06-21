@@ -383,7 +383,8 @@ function Matchs() {
                 <img src={comp.emblem} alt=""
                   className="matchs__competitionLogo matchs__competitionLogo--sidebar"
                   onError={e => e.currentTarget.style.display = 'none'} />
-                <span className="matchs__sidebarName">{comp.name}</span>
+                <span className="matchs__sidebarName matchs__sidebarName--full">{comp.name}</span>
+                <span className="matchs__sidebarName matchs__sidebarName--short">{comp.shortName ?? comp.name}</span>
                 {selectedComp === comp.id && <span className="matchs__sidebarDot" />}
               </button>
             ))}
