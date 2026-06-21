@@ -259,8 +259,8 @@ export default async function handler(req, res) {
       const scorer    = lastGoal?.athletesInvolved?.[0]?.displayName ?? null
       const clockLabel = clock ? ` ${clock}'` : ''
 
-      const title = scorer ? `🔴 But ! ${scorer}` : '🔴 But !'
-      const body  = `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`
+      const title = scorer ? `🔴 But ! ${scorer}${clockLabel}` : `🔴 But !${clockLabel}`
+      const body  = `${homeTeam} ${scoreStr} ${awayTeam}`
 
       const sent = await sendDeduped(
         `push:goal:cron:${eventId}:${score}`,
