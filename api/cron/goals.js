@@ -154,6 +154,7 @@ export default async function handler(req, res) {
 
     const status  = comp.status?.type?.name ?? ''
     const period  = comp.status?.period ?? 1
+    const clock   = comp.status?.displayClock ?? ''
     const homeC   = comp.competitors?.find(c => c.homeAway === 'home')
     const awayC   = comp.competitors?.find(c => c.homeAway === 'away')
     if (!homeC || !awayC) continue
@@ -163,6 +164,7 @@ export default async function handler(req, res) {
     const away     = parseInt(awayC.score ?? '0', 10)
     const homeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
     const awayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
+    const scoreStr = `${home} – ${away}`
     const score    = `${home}-${away}`
 
     // ── Lire l'état précédent depuis KV ───────────────────────────────────
@@ -182,64 +184,63 @@ export default async function handler(req, res) {
       continue
     }
 
-    // ── 🟢 Coup d'envoi ───────────────────────────────────────────────────
-    // SCHEDULED (ou absent) → IN_PROGRESS period 1
+    // ── 🔴 Coup d'envoi ───────────────────────────────────────────────────
     if (
       !LIVE_STATUSES.has(prevStatus) &&
       status === 'STATUS_IN_PROGRESS' &&
       period === 1
     ) {
-      log.push(`[${eventId}] KO détecté`)
+      log.push(`[${eventId}] KO`)
       const sent = await sendDeduped(
         `push:cron:ko:${eventId}`,
         {
-          title: `🟢 Coup d'envoi !`,
-          body:  `${homeTeam} vs ${awayTeam}`,
+          title:   '🔴 Coup d\'envoi !',
+          body:    `${homeTeam} – ${awayTeam}`,
           matchId: eventId,
-          url: '/',
+          url:     '/',
         }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ── ⏸ Mi-temps ────────────────────────────────────────────────────────
+    // ── 🔴 Mi-temps ───────────────────────────────────────────────────────
     if (
       LIVE_STATUSES.has(prevStatus) &&
       prevStatus !== 'STATUS_HALFTIME' &&
       status === 'STATUS_HALFTIME'
     ) {
-      log.push(`[${eventId}] mi-temps détectée`)
+      log.push(`[${eventId}] mi-temps`)
       const sent = await sendDeduped(
         `push:cron:ht:${eventId}`,
         {
-          title: `⏸ Mi-temps`,
-          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          title:   '🔴 Mi-temps',
+          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url: '/',
+          url:     '/',
         }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ── 🏁 Fin de match ───────────────────────────────────────────────────
+    // ── 🔴 Fin de match ───────────────────────────────────────────────────
     if (
       LIVE_STATUSES.has(prevStatus) &&
       FINAL_STATUSES.has(status)
     ) {
-      log.push(`[${eventId}] fin de match détectée`)
+      log.push(`[${eventId}] fin de match`)
       const sent = await sendDeduped(
         `push:cron:ft:${eventId}`,
         {
-          title: `🏁 Fin de match`,
-          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          title:   '🔴 Fin de match',
+          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
           matchId: eventId,
-          url: '/',
+          url:     '/',
         }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ── ⚽ But ─────────────────────────────────────────────────────────────
+    // ── 🔴 But ────────────────────────────────────────────────────────────
     if (
       LIVE_STATUSES.has(status) &&
       status !== 'STATUS_HALFTIME' &&
@@ -247,13 +248,14 @@ export default async function handler(req, res) {
       prevScore !== score
     ) {
       log.push(`[${eventId}] but ${prevScore} → ${score}`)
+      const clockLabel = clock ? ` · ${clock}` : ''
       const sent = await sendDeduped(
         `push:goal:cron:${eventId}:${score}`,
         {
-          title: `⚽ But !`,
-          body:  `${homeTeam} ${home} – ${away} ${awayTeam}`,
+          title:   '🔴 But !',
+          body:    `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`,
           matchId: eventId,
-          url: '/',
+          url:     '/',
         }
       )
       if (sent > 0) notifsSent++
