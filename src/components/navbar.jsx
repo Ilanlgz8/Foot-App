@@ -121,16 +121,16 @@ function Navbar() {
 
             {/* Bouton hard refresh — mobile uniquement, visible si données gelées > 45s */}
             {isStale && <button
-              className={`navbar__refreshBtn navbar__refreshBtn--stale${spinning ? ' navbar__refreshBtn--spinning' : ''}`}
+              className={`navbar__refreshBtn${spinning ? ' navbar__refreshBtn--spinning' : ''}`}
               onClick={handleHardRefresh}
               aria-label="Rafraîchir les données"
-              title="Rafraîchir les données live"
             >
-              <svg className="navbar__refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 4v6h-6"/>
-                <path d="M1 20v-6h6"/>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-              </svg>
+              {spinning ? (
+                <svg className="navbar__refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              ) : 'Recharger'}
             </button>}
           </div>
 
