@@ -229,6 +229,87 @@ const LIVE_FM_STATUSES = new Set([
   'STATUS_SHOOTOUT',
 ])
 
+// ── Fallback ESPN (si FotMob down) ────────────────────────────────────────────
+// ESPN fonctionne pour les ligues club (Ligue 1, PL, Liga…)
+// mais PAS pour la CM 2026 (cache CDN statique côté ESPN).
+// On skip fifa.world dans le fallback ESPN — les matchs WC restent en Redis last-known.
+
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
+const ESPN_TTL  = 15   // cache Redis pour ESPN fallback (s)
+const ESPN_TIMEOUT = 5_000
+
+// competition FD.org → slug ESPN (sans fifa.world — ESPN ne retourne pas le live WC)
+const COMP_ESPN_FALLBACK = {
+  2015: 'fra.1',
+  2021: 'eng.1',
+  2014: 'esp.1',
+  2002: 'ger.1',
+  2019: 'ita.1',
+  2001: 'uefa.champions',
+  2146: 'uefa.europa',
+  2048: 'uefa.europa.conf',
+}
+
+function parseEspnScore(raw) {
+  if (raw == null) return 0
+  if (typeof raw === 'number') return Math.round(raw)
+  if (typeof raw === 'string') return parseInt(raw, 10) || 0
+  if (typeof raw === 'object') return parseInt(raw.displayValue ?? raw.value ?? '0', 10) || 0
+  return 0
+}
+
+function extractEspnScorers(comp, homeTeamId) {
+  return (comp.details ?? [])
+    .filter(d => {
+      const txt = (d.type?.text ?? '').toLowerCase()
+      const id  = String(d.type?.id ?? '')
+      return txt.includes('goal') || txt === 'penaltykick' || id === '57' || id === '58' || id === '72'
+    })
+    .map(d => {
+      const ath = d.athletesInvolved?.[0]
+      const txt = (d.type?.text ?? '').toLowerCase()
+      return {
+        name:        ath?.shortName ?? ath?.displayName ?? '?',
+        minute:      d.clock?.displayValue ?? '',
+        team:        d.team?.id === homeTeamId ? 'home' : 'away',
+        ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
+        penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
+      }
+    })
+}
+
+async function fetchEspnEvents(slugSet, today, yesterday) {
+  const allEvents = []
+
+  await Promise.allSettled([...slugSet].map(async slug => {
+    const cKey = `espn:fb:${slug}`
+    let events = null
+    try {
+      const cached = await kv.get(cKey)
+      if (cached) { events = safeJson(cached); }
+    } catch {}
+
+    if (!events) {
+      try {
+        const [rT, rY] = await Promise.all([
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
+        ])
+        const [jT, jY] = await Promise.all([
+          rT.ok ? rT.json() : { events: [] },
+          rY.ok ? rY.json() : { events: [] },
+        ])
+        events = [...(jT.events ?? []), ...(jY.events ?? [])]
+        try { await kv.set(cKey, JSON.stringify(events), { ex: ESPN_TTL }) } catch {}
+      } catch { events = [] }
+    }
+
+    for (const evt of (events ?? [])) allEvents.push({ slug, evt })
+  }))
+
+  return allEvents
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -326,6 +407,64 @@ export default async function handler(req, res) {
       scorers: prevScorers,  // sera enrichi par matchDetails ci-dessous
       stats:   prevData?.stats ?? null,
       fromCache: resT.fromCache && resY.fromCache,
+    }
+  }
+
+  // ── Fallback ESPN (si FotMob down — 0 matchs retournés) ───────────────────
+  // Couvre les ligues club (Ligue 1, PL, Liga…) mais pas la WC.
+  // Les matchs WC non couverts tomberont en Redis last-known ci-dessous.
+  if (allFmMatches.length === 0) {
+    const slugSet = new Set()
+    for (const m of matches) {
+      const s = COMP_ESPN_FALLBACK[m.competition?.id]
+      if (s) slugSet.add(s)
+    }
+
+    if (slugSet.size > 0) {
+      const espnEvents = await fetchEspnEvents(slugSet, today, yesterday)
+
+      for (const { slug, evt } of espnEvents) {
+        const comp = evt.competitions?.[0]
+        if (!comp) continue
+        const st         = comp.status
+        const espnStatus = st?.type?.name
+        if (!espnStatus) continue
+
+        const homeC = (comp.competitors ?? []).find(c => c.homeAway === 'home')
+        const awayC = (comp.competitors ?? []).find(c => c.homeAway === 'away')
+        if (!homeC || !awayC) continue
+
+        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+
+        const fdMatch = matches.find(m => {
+          if (result[m.id]) return false
+          const h = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
+          const a = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
+          return fuzzyTeam(h, espnHome) && fuzzyTeam(a, espnAway)
+        })
+        if (!fdMatch) continue
+
+        const home    = parseEspnScore(homeC.score)
+        const away    = parseEspnScore(awayC.score)
+        const scorers = extractEspnScorers(comp, homeC.team?.id)
+        const prevData = storedData[fdMatch.id]
+        const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
+          ? scorers : (prevData?.scorers ?? [])
+
+        result[fdMatch.id] = {
+          espnEventId: evt.id,
+          espnSlug:    slug,
+          espnStatus,
+          espnClock:   st.displayClock ?? '',
+          espnPeriod:  st.period ?? null,
+          home,
+          away,
+          scorers: bestScorers,
+          stats:   prevData?.stats ?? null,
+          source:  'espn-fallback',
+        }
+      }
     }
   }
 

@@ -78,6 +78,31 @@ function fmScore(fm) {
   return { home: parts[0] || 0, away: parts[1] || 0 }
 }
 
+// ── Fallback ESPN (si FotMob down) ────────────────────────────────────────────
+// ESPN ne couvre pas la WC 2026 en live → on skip fifa.world
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
+const ESPN_SLUGS = ['fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1', 'uefa.champions', 'uefa.europa', 'uefa.europa.conf']
+
+const LIVE_ESPN = new Set(['STATUS_IN_PROGRESS','STATUS_HALFTIME','STATUS_END_PERIOD','STATUS_EXTRA_TIME','STATUS_OVERTIME','STATUS_SHOOTOUT'])
+const FINAL_ESPN = new Set(['STATUS_FINAL','STATUS_FULL_TIME'])
+
+async function fetchEspnEvents(date) {
+  const results = await Promise.allSettled(
+    ESPN_SLUGS.map(async slug => {
+      try {
+        const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}`, {
+          headers: { 'Cache-Control': 'no-cache' },
+          signal: AbortSignal.timeout(5_000),
+        })
+        if (!r.ok) return []
+        const j = await r.json()
+        return (j.events ?? []).map(e => ({ slug, evt: e }))
+      } catch { return [] }
+    })
+  )
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+}
+
 function fmIsHalftime(fm) {
   return fm.status?.started && !fm.status?.finished &&
     (fm.status?.liveTime?.short === 'HT')
@@ -242,10 +267,65 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Fallback ESPN si FotMob down (0 matchs récupérés) ────────────────────
+  const liveCount = [...matchMap.values()].filter(fmIsLive).length
+  if (matchMap.size === 0) {
+    log.push('[fallback] FotMob vide → ESPN')
+    const espnEventsT = await fetchEspnEvents(today)
+    const espnEventsY = await fetchEspnEvents(yesterday)
+
+    for (const { slug, evt } of [...espnEventsT, ...espnEventsY]) {
+      const comp = evt.competitions?.[0]
+      if (!comp) continue
+      const status  = comp.status?.type?.name ?? ''
+      const homeC   = comp.competitors?.find(c => c.homeAway === 'home')
+      const awayC   = comp.competitors?.find(c => c.homeAway === 'away')
+      if (!homeC || !awayC) continue
+
+      const home     = parseInt(homeC.score ?? '0', 10) || 0
+      const away     = parseInt(awayC.score ?? '0', 10) || 0
+      const homeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
+      const awayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
+      const score    = `${home}-${away}`
+      const scoreStr = `${home} – ${away}`
+      const eventId  = evt.id
+
+      const stateKey  = `cron:state:${eventId}`
+      let   prevState = null
+      try { prevState = await kv.get(stateKey) } catch {}
+      const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+      try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
+
+      if (prevState === null) { log.push(`[espn:${eventId}] baseline`); continue }
+
+      // KO
+      if (!LIVE_ESPN.has(prevStatus) && status === 'STATUS_IN_PROGRESS') {
+        const sent = await sendDeduped(`push:cron:ko:${eventId}`, { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' })
+        if (sent > 0) notifsSent++
+      }
+      // Mi-temps
+      if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
+        const sent = await sendDeduped(`push:cron:ht:${eventId}`, { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+        if (sent > 0) notifsSent++
+      }
+      // FT
+      if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
+        const sent = await sendDeduped(`push:cron:ft:${eventId}`, { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+        if (sent > 0) notifsSent++
+      }
+      // But
+      if (LIVE_ESPN.has(status) && status !== 'STATUS_HALFTIME' && prevScore !== null && prevScore !== score) {
+        log.push(`[espn:${eventId}] but ${prevScore} → ${score}`)
+        const sent = await sendDeduped(`push:goal:cron:${eventId}:${score}`, { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/' })
+        if (sent > 0) notifsSent++
+      }
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     matches: matchMap.size,
-    live: [...matchMap.values()].filter(fmIsLive).length,
+    live: liveCount,
     notifsSent,
     log,
   })
