@@ -73,9 +73,12 @@ export function calcMinute(match) {
 
   // ── Pending kickoff : heure atteinte, ESPN pas encore confirmé ──
   // Afficher "Débute" pendant les ~30-60s entre l'heure prévue et la confirmation ESPN.
+  // ⚠️ 'STATUS_SCHEDULED' (string truthy) = FIFA/ESPN n'a pas encore confirmé le KO.
+  // Sans le test sur STATUS_SCHEDULED, la condition !state.espnStatus serait fausse
+  // même si le match n'est pas encore officiellement en cours → '–' affiché au lieu de 'Débute'.
   if (
     match.status === 'SCHEDULED' &&
-    !state.espnStatus &&
+    (!state.espnStatus || state.espnStatus === 'STATUS_SCHEDULED') &&
     !state.kickoffAt
   ) {
     const nowMs   = Date.now()

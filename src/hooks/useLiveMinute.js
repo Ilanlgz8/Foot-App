@@ -287,10 +287,13 @@ async function pollESPN(matches, queryClient) {
     if (!allMatches.some(m => m.id === lm.id)) allMatches.push(lm)
   }
 
-  // Filtrer les matchs dans la fenêtre de poll (-5min → +150min)
+  // Filtrer les matchs dans la fenêtre de poll (0min → +150min)
+  // ⚠️ NE PAS commencer avant l'heure prévue : ESPN/FIFA peut retourner
+  // STATUS_IN_PROGRESS en pré-match (Period=0), ce qui déclencherait un faux KO.
+  // _checkPendingKickoffs() (appelé juste avant) gère l'affichage "Débute" dès l'heure H.
   const toTrack = allMatches.filter(m => {
     const elapsed = (now - new Date(m.utcDate)) / 60_000
-    return (elapsed >= -5 && elapsed <= 150) || isTrackedLive(m.id)
+    return (elapsed >= 0 && elapsed <= 150) || isTrackedLive(m.id)
   })
 
   if (toTrack.length === 0) {
@@ -435,9 +438,13 @@ async function pollESPN(matches, queryClient) {
           continue
         }
 
-        // DÉTECTION FT : horloge >= 85min + score inchangé → FT
+        // DÉTECTION FT : source FIFA = toujours fiable (Period=8/MatchStatus=3)
+        // Source ESPN : horloge >= 85min requise pour filtrer les faux STATUS_FINAL.
+        // ⚠️ quand source=FIFA, MatchTime='FT' → fifaToClock renvoie '' → mins=null
+        //    mais c'est un vrai FT → isFifaSource lève le garde.
+        const isFifaSource = data.espnSlug === 'fifa'
         const mins = parseClockMins(espnClock)
-        const timePlausible = mins !== null && mins >= 85
+        const timePlausible = isFifaSource || (mins !== null && mins >= 85)
 
         if (!timePlausible) {
           delete pendingFt[mid]

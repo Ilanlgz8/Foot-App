@@ -80,7 +80,10 @@ async function fetchFifaLive() {
 function fifaToEspnStatus(m) {
   const s = m.MatchStatus, p = m.Period
   if (s === 3 || p === 8) return 'STATUS_FINAL'
-  if (s !== 1)            return 'STATUS_SCHEDULED'
+  // Period=0 = pré-match : FIFA inclut le match avec MatchStatus=1 avant le vrai KO.
+  // Traiter comme SCHEDULED pour éviter un faux STATUS_IN_PROGRESS qui déclencherait
+  // markLive() + notifyKickoff() 5min avant l'heure.
+  if (s !== 1 || p === 0) return 'STATUS_SCHEDULED'
   if (p === 3 || p === 5) return 'STATUS_HALFTIME'
   if (p === 4 || p === 6) return 'STATUS_EXTRA_TIME'
   if (p === 7)            return 'STATUS_SHOOTOUT'
@@ -112,13 +115,31 @@ function fifaTeamName(team) {
     ?? '?'
 }
 
+function fifaPlayerName(goal) {
+  // FIFA WC API peut utiliser différents formats selon la compétition / version API.
+  // On essaie tous les champs connus dans l'ordre de préférence.
+  return (
+    // Format standard : tableau { Locale, Description }
+    goal.PlayerName?.find(n => /^en/i.test(n.Locale))?.Description
+    ?? goal.PlayerName?.[0]?.Description
+    // Format alternatif parfois utilisé en WC
+    ?? goal.ShortPlayerName?.find(n => /^en/i.test(n.Locale))?.Description
+    ?? goal.ShortPlayerName?.[0]?.Description
+    // Champs plats éventuels
+    ?? goal.PlayerShortName
+    ?? goal.Name
+    ?? null  // null = pas de nom connu → le widget cachera le scorer
+  )
+}
+
 function extractFifaScorers(m) {
   const scorers = []
   try {
     for (const goal of (m.HomeTeam?.Goals ?? [])) {
+      const name = fifaPlayerName(goal)
+      if (!name) continue  // but sans nom connu → ne pas afficher '?'
       scorers.push({
-        name: goal.PlayerName?.find(n => /^en/i.test(n.Locale))?.Description
-          ?? goal.PlayerName?.[0]?.Description ?? '?',
+        name,
         minute:      goal.Minute != null ? `${goal.Minute}'` : '',
         team:        'home',
         ownGoal:     goal.OwnGoal === true,
@@ -126,9 +147,10 @@ function extractFifaScorers(m) {
       })
     }
     for (const goal of (m.AwayTeam?.Goals ?? [])) {
+      const name = fifaPlayerName(goal)
+      if (!name) continue
       scorers.push({
-        name: goal.PlayerName?.find(n => /^en/i.test(n.Locale))?.Description
-          ?? goal.PlayerName?.[0]?.Description ?? '?',
+        name,
         minute:      goal.Minute != null ? `${goal.Minute}'` : '',
         team:        'away',
         ownGoal:     goal.OwnGoal === true,

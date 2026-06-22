@@ -53,10 +53,12 @@ function fifaScore(m) {
 }
 
 // MatchStatus: 0=pas commencé, 1=en cours, 3=terminé
-// Period:      1=1erMT, 2=2èmeMT, 3=pause MT, 4=Prol MT1, 5=pause Prol, 6=Prol MT2, 7=TAB, 8=FT
+// Period:      0=pré-match, 1=1erMT, 2=2èmeMT, 3=pause MT, 4=Prol MT1, 5=pause Prol, 6=Prol MT2, 7=TAB, 8=FT
 function fifaState(m) {
   if (m.MatchStatus === 3 || m.Period === 8) return 'finished'
-  if (m.MatchStatus !== 1)                   return 'scheduled'
+  // Period=0 = pré-match : FIFA inclut le match dans /live avec MatchStatus=1 avant le coup d'envoi.
+  // Sans ce garde, on enverrait un faux KO et potentiellement une fausse "fin de match".
+  if (m.MatchStatus !== 1 || m.Period === 0) return 'scheduled'
   if (m.Period === 3 || m.Period === 5)       return 'ht'
   return 'live'
 }
@@ -203,10 +205,21 @@ export default async function handler(req, res) {
 
       // 🏁 Fin de match
       if ((prevSt === 'live' || prevSt === 'ht') && state === 'finished') {
-        log.push(`[fifa:${matchId}] FT`)
-        const sent = await sendDeduped(`push:fifa:ft:${matchId}`,
-          { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
-        if (sent > 0) notifsSent++
+        // Garde anti-faux-FT : vérifier que le match a vraiment eu lieu au moins ~85 min.
+        // FIFA peut brièvement montrer MatchStatus=3 pendant la transition pré-match → 1erMT.
+        // MatchTime='FT' ou '90+X' = FT réel. MatchTime vide ou '0' = faux FT.
+        const rawTime  = (m.MatchTime ?? '').replace(/[^0-9+]/g, '').trim()
+        const isFakeFt = rawTime === '' || rawTime === '0'
+        if (isFakeFt) {
+          // Remettre à 'scheduled' pour pouvoir détecter le vrai KO ensuite
+          try { await kv.set(stateKey, `scheduled|${score}`, { ex: 12 * 3600 }) } catch {}
+          log.push(`[fifa:${matchId}] faux FT ignoré (MatchTime='${m.MatchTime ?? ''}') → reset scheduled`)
+        } else {
+          log.push(`[fifa:${matchId}] FT`)
+          const sent = await sendDeduped(`push:fifa:ft:${matchId}`,
+            { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+          if (sent > 0) notifsSent++
+        }
       }
 
       // ⚽ But
