@@ -9,7 +9,10 @@
  * MAX_RPM = 9 (1 de marge sur la limite officielle de 10 req/min)
  */
 
-const MAX_RPM    = 9
+// Avec le cache Vercel edge sur api/football.js, la plupart des requêtes sont
+// servies par le CDN et n'atteignent pas FD.org. On peut monter la limite client
+// à 25 sans risquer de 429 côté FD.org (quota réel protégé par le CDN).
+const MAX_RPM    = 25
 const WINDOW     = 60_000
 const STORAGE_KEY = 'fd_req_log'
 
