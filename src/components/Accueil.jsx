@@ -323,18 +323,38 @@ function Accueil() {
               />
               <div className="accueil__dashPanelDivider" />
               {(() => {
-                const todayFt = matches.filter(m => getMatchState(m.id).ft && !liveMatches.some(l => l.id === m.id))
+                const now4h = Date.now() - 4 * 60 * 60_000
+                // todayFt = matchs terminés récemment :
+                //   • ft:true  → encore dans la grace period (< 5min post-FT)
+                //   • liveState:'ended' + endedAt < 4h → après l'éviction, pour forcer
+                //     le score ESPN (FD.org peut être encore à l'ancien score)
+                const todayFt = matches.filter(m => {
+                  if (liveMatches.some(l => l.id === m.id)) return false
+                  const st = getMatchState(m.id)
+                  if (st.ft) return true
+                  if (st.liveState === 'ended' && st.endedAt > now4h) return true
+                  return false
+                })
                 const todayFtIds = new Set(todayFt.map(m => m.id))
-                const todayFtMapped = todayFt.map(m => ({
-                  ...m,
-                  score: {
-                    fullTime: {
-                      home: espnScores[m.id]?.home ?? m.score?.fullTime?.home,
-                      away: espnScores[m.id]?.away ?? m.score?.fullTime?.away,
-                    }
-                  },
-                  status: 'FINISHED',
-                }))
+                const todayFtMapped = todayFt.map(m => {
+                  // Fallback : score ESPN persisté dans localStorage (écrit par confirmFt)
+                  // → plus fiable que FD.org dans les ~30min post-FT (FD.org est lent à maj)
+                  let lsHome = null, lsAway = null
+                  try {
+                    const lsScore = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
+                    if (lsScore && lsScore.home != null) { lsHome = lsScore.home; lsAway = lsScore.away }
+                  } catch {}
+                  return {
+                    ...m,
+                    score: {
+                      fullTime: {
+                        home: espnScores[m.id]?.home ?? lsHome ?? m.score?.fullTime?.home,
+                        away: espnScores[m.id]?.away ?? lsAway ?? m.score?.fullTime?.away,
+                      }
+                    },
+                    status: 'FINISHED',
+                  }
+                })
                 const allResults = [
                   ...todayFtMapped,
                   ...filteredResults.filter(r => !todayFtIds.has(r.id)),
