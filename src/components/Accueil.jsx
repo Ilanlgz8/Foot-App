@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
-import { useMatches } from '../hooks/useMatchs'
 import { useLiveData } from '../context/LiveProvider'
 import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/matchStateTracker'
 import { COMPETITIONS } from '../data/competitions'
@@ -106,8 +105,10 @@ function Accueil() {
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
-  // Même hook + même clé cache que la page Résultats (WC FINISHED) → requête partagée, synchro instantanée
-  const { matches: results, loading: resultsLoading }    = useMatches('WC', 'FINISHED', 'desc')
+  // Résultats récents = matchs terminés de J-1+J (useTodayMatches couvre les deux jours)
+  // Pas de requête FD.org supplémentaire — derived from matches
+  const results        = useMemo(() => matches.filter(m => m.status === 'FINISHED'), [matches])
+  const resultsLoading = matchesLoading
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
