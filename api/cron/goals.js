@@ -1,42 +1,59 @@
 // api/cron/goals.js
-// Appelé par cron-job.org toutes les minutes (Vercel Hobby = pas de crons natifs).
+// Appelé par cron-job.org toutes les minutes.
+// Source : FotMob (remplace ESPN + FD.org WC — near real-time, toutes compétitions)
 //
 // Détecte et notifie :
-//   ⚽ But         — score change pendant STATUS_IN_PROGRESS
-//   🟢 Coup d'envoi — STATUS_SCHEDULED → STATUS_IN_PROGRESS (period 1)
-//   ⏸  Mi-temps    — STATUS_IN_PROGRESS → STATUS_HALFTIME
-//   🏁 Fin de match — statut live → STATUS_FINAL / STATUS_FULL_TIME
+//   ⚽ But         — score change pendant un match en cours
+//   🔴 Coup d'envoi — match démarre (started passe à true)
+//   ⏸  Mi-temps    — liveTime.short === 'HT'
+//   ▶️  Reprise     — HT → IN_PROGRESS
+//   🏁 Fin de match — finished passe à true
 //
 // Sécurité : header "x-cron-secret" ou param ?secret= doit matcher CRON_SECRET.
 
 import { Redis } from '@upstash/redis'
-import webpush    from 'web-push'
-import { translateESPN } from '../../lib/teamNamesFr.js'
+import webpush   from 'web-push'
+import crypto    from 'crypto'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 })
 
-const SLUGS = [
-  'fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1',
-  'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
-  'fifa.world',
-]
+// ── Auth FotMob ───────────────────────────────────────────────────────────────
+function generateFotmobToken(path) {
+  const secret = (process.env.FOTMOB_SECRET ?? '').replace(/\r\n/g, '\n').trimEnd()
+  if (!secret) return null
+  const code = Date.now()
+  const body = { url: path, code }
+  const sig = crypto
+    .createHash('md5')
+    .update(JSON.stringify(body) + secret)
+    .digest('hex')
+    .toUpperCase()
+  return Buffer.from(JSON.stringify({ body, signature: sig })).toString('base64')
+}
 
-const LIVE_STATUSES = new Set([
-  'STATUS_IN_PROGRESS',
-  'STATUS_HALFTIME',
-  'STATUS_END_PERIOD',
-  'STATUS_EXTRA_TIME',
-  'STATUS_OVERTIME',
-  'STATUS_SHOOTOUT',
-])
-
-const FINAL_STATUSES = new Set([
-  'STATUS_FINAL',
-  'STATUS_FULL_TIME',
-])
+async function fetchFotmobMatches(date) {
+  const path = `/api/matches?date=${date}`
+  const token = generateFotmobToken(path)
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
+    'Accept': 'application/json',
+  }
+  if (token) headers['X-Fm-Req'] = token
+  try {
+    const res = await fetch(`https://www.fotmob.com${path}`, {
+      headers,
+      signal: AbortSignal.timeout(7_000),
+    })
+    if (!res.ok) return []
+    const json = await res.json()
+    return (json.leagues ?? []).flatMap(l => l.matches ?? [])
+  } catch {
+    return []
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,20 +70,21 @@ function setupVapid() {
   } catch { return false }
 }
 
-async function fetchEvents(slug, dates) {
-  try {
-    const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
-    const url  = dates ? `${base}?dates=${dates}` : base
-    const res  = await fetch(url, {
-      headers: { 'Cache-Control': 'no-cache' },
-      signal:  AbortSignal.timeout(5_000),
-    })
-    if (!res.ok) return []
-    const json = await res.json()
-    return json.events ?? []
-  } catch {
-    return []
-  }
+function fmScore(fm) {
+  const h = fm.home?.score
+  const a = fm.away?.score
+  if (typeof h === 'number' && typeof a === 'number') return { home: h, away: a }
+  const parts = (fm.status?.scoreStr ?? '0 - 0').split(/\s*-\s*/).map(Number)
+  return { home: parts[0] || 0, away: parts[1] || 0 }
+}
+
+function fmIsHalftime(fm) {
+  return fm.status?.started && !fm.status?.finished &&
+    (fm.status?.liveTime?.short === 'HT')
+}
+
+function fmIsLive(fm) {
+  return fm.status?.started === true && fm.status?.finished !== true && !fm.status?.cancelled
 }
 
 async function sendPushToAll(payload) {
@@ -103,31 +121,6 @@ async function sendPushToAll(payload) {
   return sent
 }
 
-// ── FD.org : matchs WC en cours (ESPN dated endpoint ne retourne pas les statuts live) ──
-async function fetchFdWCLive() {
-  const key = process.env.API_KEY
-  if (!key) return []
-  try {
-    const [rLive, rPaused] = await Promise.all([
-      fetch('https://api.football-data.org/v4/competitions/2000/matches?status=IN_PLAY', {
-        headers: { 'X-Auth-Token': key },
-        signal: AbortSignal.timeout(5_000),
-      }),
-      fetch('https://api.football-data.org/v4/competitions/2000/matches?status=PAUSED', {
-        headers: { 'X-Auth-Token': key },
-        signal: AbortSignal.timeout(5_000),
-      }),
-    ])
-    const [jL, jP] = await Promise.all([
-      rLive.ok   ? rLive.json()   : { matches: [] },
-      rPaused.ok ? rPaused.json() : { matches: [] },
-    ])
-    return [...(jL.matches ?? []), ...(jP.matches ?? [])]
-  } catch {
-    return []
-  }
-}
-
 async function sendDeduped(dedupKey, payload, ttl = 3 * 3600) {
   try {
     const already = await kv.get(dedupKey)
@@ -150,266 +143,99 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'VAPID non configuré' })
   }
 
-  // ── Dates ESPN : J + J-1 ─────────────────────────────────────────────────
   const now       = new Date()
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
 
-  // Fetch ESPN : today + yesterday pour chaque ligue
-  // Note : l'endpoint daté ESPN ne retourne PAS les statuts live pour la CM 2026
-  // (le CDN ESPN sert du cache statique STATUS_SCHEDULED).
-  // → La WC est gérée séparément via FD.org ci-dessous.
-  const fetches = await Promise.allSettled(
-    SLUGS.flatMap(slug => [
-      fetchEvents(slug, today),     // aujourd'hui
-      fetchEvents(slug, yesterday), // hier — matchs après minuit UTC
-    ])
-  )
+  // ── Fetch FotMob (today + yesterday en parallèle) ─────────────────────────
+  const [matchesToday, matchesYesterday] = await Promise.all([
+    fetchFotmobMatches(today),
+    fetchFotmobMatches(yesterday),
+  ])
 
-  // Dédupliquer les events par ID
-  const eventsById = new Map()
-  for (const result of fetches) {
-    if (result.status !== 'fulfilled') continue
-    for (const evt of result.value) {
-      if (!eventsById.has(evt.id)) eventsById.set(evt.id, evt)
-    }
+  // Dédupliquer par ID FotMob (un match peut apparaître dans les deux si minuit UTC)
+  const matchMap = new Map()
+  for (const fm of [...matchesToday, ...matchesYesterday]) {
+    if (!matchMap.has(fm.id)) matchMap.set(fm.id, fm)
   }
 
   let notifsSent = 0
   const log = []
 
-  for (const evt of eventsById.values()) {
-    const comp    = evt.competitions?.[0]
-    if (!comp) continue
-
-    const status  = comp.status?.type?.name ?? ''
-    const period  = comp.status?.period ?? 1
-    const clock   = comp.status?.displayClock ?? ''
-    const homeC   = comp.competitors?.find(c => c.homeAway === 'home')
-    const awayC   = comp.competitors?.find(c => c.homeAway === 'away')
-    if (!homeC || !awayC) continue
-
-    const eventId  = evt.id
-    const home     = parseInt(homeC.score ?? '0', 10)
-    const away     = parseInt(awayC.score ?? '0', 10)
-    const homeTeam = translateESPN(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
-    const awayTeam = translateESPN(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
-    const scoreStr = `${home} – ${away}`
+  for (const fm of matchMap.values()) {
+    const fmId     = fm.id
+    const homeTeam = fm.home?.name ?? '?'
+    const awayTeam = fm.away?.name ?? '?'
+    const { home, away } = fmScore(fm)
     const score    = `${home}-${away}`
+    const scoreStr = `${home} – ${away}`
+    const isLive   = fmIsLive(fm)
+    const isHT     = fmIsHalftime(fm)
+    const isFinished = fm.status?.finished === true
 
     // ── Lire l'état précédent depuis KV ───────────────────────────────────
-    const stateKey   = `cron:state:${eventId}`
-    let   prevState  = null
+    const stateKey  = `cron:fm:${fmId}`
+    let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
-    // prevState = "STATUS_XXX|score" ex: "STATUS_IN_PROGRESS|1-0"
+    // prevState = "live|0-0" | "ht|1-0" | "finished|2-1" | "scheduled|0-0"
 
-    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+    const stateNow = isFinished ? 'finished' : isHT ? 'ht' : isLive ? 'live' : 'scheduled'
+    const [prevSt = null, prevScore = null] = prevState ? prevState.split('|') : []
 
     // Sauvegarder l'état actuel (TTL 12h)
-    try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
+    try { await kv.set(stateKey, `${stateNow}|${score}`, { ex: 12 * 3600 }) } catch {}
 
     // Premier poll pour ce match → baseline, pas de notif
     if (prevState === null) {
-      log.push(`[${eventId}] baseline ${status}|${score}`)
+      log.push(`[fm:${fmId}] baseline ${stateNow}|${score}`)
       continue
     }
 
-    // ── 🔴 Coup d'envoi ───────────────────────────────────────────────────
-    if (
-      !LIVE_STATUSES.has(prevStatus) &&
-      status === 'STATUS_IN_PROGRESS' &&
-      period === 1
-    ) {
-      log.push(`[${eventId}] KO`)
+    // ── 🔴 Coup d'envoi ──────────────────────────────────────────────────
+    if (prevSt === 'scheduled' && isLive && !isHT) {
+      log.push(`[fm:${fmId}] KO`)
       const sent = await sendDeduped(
-        `push:cron:ko:${eventId}`,
-        {
-          title:   '🔴 Coup d\'envoi !',
-          body:    `${homeTeam} – ${awayTeam}`,
-          matchId: eventId,
-          url:     '/live',
-        }
-      )
-      if (sent > 0) notifsSent++
-    }
-
-    // ── 🔴 Mi-temps ───────────────────────────────────────────────────────
-    if (
-      LIVE_STATUSES.has(prevStatus) &&
-      prevStatus !== 'STATUS_HALFTIME' &&
-      status === 'STATUS_HALFTIME'
-    ) {
-      log.push(`[${eventId}] mi-temps`)
-      const sent = await sendDeduped(
-        `push:cron:ht:${eventId}`,
-        {
-          title:   '🔴 Mi-temps',
-          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
-          matchId: eventId,
-          url:     '/live',
-        }
-      )
-      if (sent > 0) notifsSent++
-    }
-
-    // ── 🔴 Reprise 2ème MT ────────────────────────────────────────────────
-    if (
-      prevStatus === 'STATUS_HALFTIME' &&
-      status === 'STATUS_IN_PROGRESS' &&
-      period === 2
-    ) {
-      log.push(`[${eventId}] reprise 2ème MT`)
-      const sent = await sendDeduped(
-        `push:cron:2h:${eventId}`,
-        {
-          title:   '🔴 Reprise !',
-          body:    `2ème mi-temps · ${homeTeam} ${scoreStr} ${awayTeam}`,
-          matchId: eventId,
-          url:     '/live',
-        }
-      )
-      if (sent > 0) notifsSent++
-    }
-
-    // ── 🔴 Prolongations ──────────────────────────────────────────────────
-    if (
-      LIVE_STATUSES.has(prevStatus) &&
-      (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME') &&
-      prevStatus !== 'STATUS_EXTRA_TIME' && prevStatus !== 'STATUS_OVERTIME'
-    ) {
-      log.push(`[${eventId}] prolongations`)
-      const sent = await sendDeduped(
-        `push:cron:et:${eventId}`,
-        {
-          title:   '🔴 Prolongations !',
-          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
-          matchId: eventId,
-          url:     '/live',
-        }
-      )
-      if (sent > 0) notifsSent++
-    }
-
-    // ── 🔴 Fin de match ───────────────────────────────────────────────────
-    if (
-      LIVE_STATUSES.has(prevStatus) &&
-      FINAL_STATUSES.has(status)
-    ) {
-      log.push(`[${eventId}] fin de match`)
-      const sent = await sendDeduped(
-        `push:cron:ft:${eventId}`,
-        {
-          title:   '🔴 Fin de match',
-          body:    `${homeTeam} ${scoreStr} ${awayTeam}`,
-          matchId: eventId,
-          url:     '/live',
-        }
-      )
-      if (sent > 0) notifsSent++
-    }
-
-    // ── 🔴 But ────────────────────────────────────────────────────────────
-    if (
-      LIVE_STATUSES.has(status) &&
-      status !== 'STATUS_HALFTIME' &&
-      prevScore !== null &&
-      prevScore !== score
-    ) {
-      log.push(`[${eventId}] but ${prevScore} → ${score}`)
-
-      // Chercher le buteur dans comp.details (scoring plays ESPN)
-      const details   = comp.details ?? []
-      const goalTypes = new Set(['Goal', 'goal', 'PenaltyKick', 'penalty'])
-      // Prendre le dernier événement de type but (le plus récent)
-      const lastGoal  = [...details].reverse().find(d =>
-        goalTypes.has(d.type?.text) || goalTypes.has(d.type?.name)
-      )
-      const scorer    = lastGoal?.athletesInvolved?.[0]?.displayName ?? null
-      const clockLabel = clock ? ` ${clock}'` : ''
-
-      // Identifier quelle équipe a marqué
-      const scoringTeamId = lastGoal?.team?.id
-      const scoringTeam   = scoringTeamId === homeC.team?.id ? homeTeam : awayTeam
-
-      const title = `🔴 But pour ${scoringTeam} !`
-      const body  = scorer
-        ? `${scorer}${clockLabel} · ${homeTeam} ${scoreStr} ${awayTeam}`
-        : `${homeTeam} ${scoreStr} ${awayTeam}${clockLabel}`
-
-      const sent = await sendDeduped(
-        `push:goal:cron:${eventId}:${score}`,
-        { title, body, matchId: eventId, url: '/' }
-      )
-      if (sent > 0) notifsSent++
-    }
-  }
-
-  // ── Coupe du Monde via FD.org ─────────────────────────────────────────────
-  // ESPN ne retourne jamais STATUS_IN_PROGRESS pour les matchs WC 2026 via l'endpoint
-  // daté (cache CDN statique). FD.org (competition 2000) est la seule source fiable.
-  // On traite IN_PLAY + PAUSED (mi-temps) séparément avec clés cron:fdstate:*.
-  const fdMatches = await fetchFdWCLive()
-  log.push(`[fd] ${fdMatches.length} matchs WC live/paused`)
-
-  for (const match of fdMatches) {
-    const fdId    = match.id
-    const status  = match.status           // 'IN_PLAY' | 'PAUSED'
-    const home    = match.score?.fullTime?.home ?? match.score?.halfTime?.home ?? 0
-    const away    = match.score?.fullTime?.away ?? match.score?.halfTime?.away ?? 0
-    const homeTeam = match.homeTeam?.shortName ?? match.homeTeam?.name ?? '?'
-    const awayTeam = match.awayTeam?.shortName ?? match.awayTeam?.name ?? '?'
-    const score    = `${home}-${away}`
-    const scoreStr = `${home} – ${away}`
-
-    const stateKey  = `cron:fdstate:${fdId}`
-    let   prevState = null
-    try { prevState = await kv.get(stateKey) } catch {}
-
-    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
-
-    try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
-
-    // Premier poll → baseline
-    if (prevState === null) {
-      log.push(`[fd:${fdId}] baseline ${status}|${score}`)
-      continue
-    }
-
-    // 🔴 Coup d'envoi
-    if (prevStatus !== 'IN_PLAY' && prevStatus !== 'PAUSED' && status === 'IN_PLAY') {
-      log.push(`[fd:${fdId}] KO`)
-      const sent = await sendDeduped(
-        `push:fd:ko:${fdId}`,
+        `push:fm:ko:${fmId}`,
         { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ⏸ Mi-temps (IN_PLAY → PAUSED)
-    if (prevStatus === 'IN_PLAY' && status === 'PAUSED') {
-      log.push(`[fd:${fdId}] mi-temps`)
+    // ── ⏸ Mi-temps ───────────────────────────────────────────────────────
+    if (prevSt === 'live' && isHT) {
+      log.push(`[fm:${fmId}] mi-temps`)
       const sent = await sendDeduped(
-        `push:fd:ht:${fdId}`,
+        `push:fm:ht:${fmId}`,
         { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ▶️ Reprise 2ème MT (PAUSED → IN_PLAY)
-    if (prevStatus === 'PAUSED' && status === 'IN_PLAY') {
-      log.push(`[fd:${fdId}] reprise 2ème MT`)
+    // ── ▶️ Reprise 2ème MT ────────────────────────────────────────────────
+    if (prevSt === 'ht' && isLive && !isHT) {
+      log.push(`[fm:${fmId}] reprise`)
       const sent = await sendDeduped(
-        `push:fd:2h:${fdId}`,
+        `push:fm:2h:${fmId}`,
         { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }
       )
       if (sent > 0) notifsSent++
     }
 
-    // ⚽ But (score change pendant IN_PLAY)
-    if (status === 'IN_PLAY' && prevScore !== null && prevScore !== score) {
-      log.push(`[fd:${fdId}] but ${prevScore} → ${score}`)
+    // ── 🏁 Fin de match ───────────────────────────────────────────────────
+    if ((prevSt === 'live' || prevSt === 'ht') && isFinished) {
+      log.push(`[fm:${fmId}] FT`)
       const sent = await sendDeduped(
-        `push:fd:goal:${fdId}:${score}`,
+        `push:fm:ft:${fmId}`,
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }
+      )
+      if (sent > 0) notifsSent++
+    }
+
+    // ── ⚽ But ─────────────────────────────────────────────────────────────
+    if (isLive && !isHT && prevScore !== null && prevScore !== score) {
+      log.push(`[fm:${fmId}] but ${prevScore} → ${score}`)
+      const sent = await sendDeduped(
+        `push:fm:goal:${fmId}:${score}`,
         { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/' }
       )
       if (sent > 0) notifsSent++
@@ -418,8 +244,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
-    events: eventsById.size,
-    fdMatches: fdMatches.length,
+    matches: matchMap.size,
+    live: [...matchMap.values()].filter(fmIsLive).length,
     notifsSent,
     log,
   })
