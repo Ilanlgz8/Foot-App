@@ -1,6 +1,6 @@
 // Suivi live en deux couches :
 //
-// ── PRIMAIRE : /api/espn-live (Vercel function → ESPN + Redis cache) ──
+// ── PRIMAIRE : /api/fifa-live (Vercel function → ESPN + Redis cache) ──
 //   • Fetch server-side : scoreboard ESPN mis en cache Redis 12s
 //   • eventId → fdMatchId stocké Redis 6h → survit aux rechargements iOS
 //   • Scorer preservation + stats summary côté serveur
@@ -260,7 +260,7 @@ function _runFtSafeguards(matches, now, queryClient) {
 }
 
 // ─────────────────────────────────────────────
-// ESPN — couche primaire (via /api/espn-live)
+// ESPN — couche primaire (via /api/fifa-live)
 // ─────────────────────────────────────────────
 
 async function pollESPN(matches, queryClient) {
@@ -290,7 +290,7 @@ async function pollESPN(matches, queryClient) {
   try {
     // ── Appel au nouvel endpoint server-side ──
     // Fetch ESPN + Redis cache + matching + stats → retourne { [fdMatchId]: { ... } }
-    const res = await fetch('/api/espn-live', {
+    const res = await fetch('/api/fifa-live', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ matches: toTrack }),
@@ -470,7 +470,7 @@ async function pollESPN(matches, queryClient) {
       }
     }
   } catch (err) {
-    console.warn('[useLiveMinute] /api/espn-live erreur :', err.message)
+    console.warn('[useLiveMinute] /api/fifa-live erreur :', err.message)
     espnFailStreak++
     if (espnFailStreak >= 3) setEspnWorking(false)
   }

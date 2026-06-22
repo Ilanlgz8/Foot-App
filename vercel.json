@@ -4,7 +4,7 @@
     { "source": "/espn",           "destination": "/api/espn" },
     { "source": "/sofascore",      "destination": "/api/sofascore" },
     { "source": "/apifootball",    "destination": "/api/apifootball" },
-    { "source": "/api/espn-live",  "destination": "/api/espn-live" },
+    { "source": "/api/fifa-live",   "destination": "/api/fifa-live" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
