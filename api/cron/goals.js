@@ -48,6 +48,36 @@ function fifaTeamName(team) {
     ?? '?'
 }
 
+// ── Filtre compétitions suivies (source FIFA) ──────────────────────────────────
+// L'API FIFA /live/football renvoie TOUTES compétitions FIFA (U20 WC, Club WC,
+// qualifications olympiques, etc.). On ne notifie que celles couvertes par l'app.
+// Principalement : FIFA World Cup 2026.
+// Si le champ CompetitionName est absent → on laisse passer (safe default).
+const FIFA_COMP_WHITELIST = [
+  /world\s*cup/i,        // FIFA World Cup
+  /coupe\s*du\s*monde/i, // traduction FR éventuelle
+]
+
+function isFifaTrackedComp(m) {
+  // Essai sur le nom de la compétition (champ localisé)
+  const compArr = m.CompetitionName ?? m.Competition?.Name ?? []
+  if (Array.isArray(compArr) && compArr.length > 0) {
+    const name = compArr.find(n => /^en/i.test(n.Locale))?.Description
+      ?? compArr[0]?.Description
+      ?? ''
+    return FIFA_COMP_WHITELIST.some(re => re.test(name))
+  }
+  // Essai sur IdCompetition (FIFA World Cup 2026 = '43' historiquement)
+  // À ajuster si l'ID réel diffère — le champ CompetitionName est plus fiable.
+  if (m.IdCompetition != null) {
+    const id = String(m.IdCompetition)
+    const TRACKED_IDS = new Set(['43', '17'])  // WC + valeurs alternatives connues
+    return TRACKED_IDS.has(id)
+  }
+  // Pas d'info de compétition → laisser passer pour ne pas bloquer les notifs WC
+  return true
+}
+
 function fifaScore(m) {
   return { home: m.HomeTeam?.Score ?? 0, away: m.AwayTeam?.Score ?? 0 }
 }
@@ -160,6 +190,12 @@ export default async function handler(req, res) {
 
   if (fifaOk) {
     for (const m of fifaMatches) {
+      // Filtrer les compétitions non suivies (U20 WC, Club WC qualifs, etc.)
+      if (!isFifaTrackedComp(m)) {
+        log.push(`[fifa:${m.IdMatch}] compétition ignorée (${m.CompetitionName?.[0]?.Description ?? m.IdCompetition ?? '?'})`)
+        continue
+      }
+
       const matchId  = m.IdMatch
       const homeTeam = fifaTeamName(m.HomeTeam)
       const awayTeam = fifaTeamName(m.AwayTeam)
