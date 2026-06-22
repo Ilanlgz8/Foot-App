@@ -183,6 +183,8 @@ export default async function handler(req, res) {
   const now       = new Date()
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
+  let notifsSent  = 0
+  const log       = []
 
   // ── Fetch FotMob (today + yesterday en parallèle) ─────────────────────────
   const [matchesToday, matchesYesterday] = await Promise.all([
@@ -195,9 +197,6 @@ export default async function handler(req, res) {
   for (const fm of [...matchesToday, ...matchesYesterday]) {
     if (!matchMap.has(fm.id)) matchMap.set(fm.id, fm)
   }
-
-  let notifsSent = 0
-  const log = []
 
   for (const fm of matchMap.values()) {
     const fmId     = fm.id
