@@ -23,17 +23,11 @@ async function fetchTodayMatches(date) {
   prevD.setDate(prevD.getDate() - 1)
   const prevDate = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
 
-  // Requête 1 : ligues européennes sur J-1 et J (une seule requête, plage élargie)
-  const euroMatches = await safeFetch(
-    `/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`
-  )
-
-  // Pas de délai artificiel — le cache Vercel edge absorbe les requêtes simultanées sans risque de 429
-
-  // Requête 2 : WC sur J-1 et J
-  const wcMatches = await safeFetch(
-    `/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`
-  )
+  // Les 2 requêtes partent en parallèle — MAX_RPM=25 + cache Vercel edge = aucun risque de 429
+  const [euroMatches, wcMatches] = await Promise.all([
+    safeFetch(`/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`),
+    safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
+  ])
 
   // Dédupliquer par id et filtrer par date LOCALE
   // → un match à 00:00 local (= 22:00 UTC J-1) apparaît bien dans J local seulement
