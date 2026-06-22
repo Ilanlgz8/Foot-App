@@ -287,13 +287,15 @@ async function pollESPN(matches, queryClient) {
     if (!allMatches.some(m => m.id === lm.id)) allMatches.push(lm)
   }
 
-  // Filtrer les matchs dans la fenêtre de poll (0min → +150min)
-  // ⚠️ NE PAS commencer avant l'heure prévue : ESPN/FIFA peut retourner
-  // STATUS_IN_PROGRESS en pré-match (Period=0), ce qui déclencherait un faux KO.
-  // _checkPendingKickoffs() (appelé juste avant) gère l'affichage "Débute" dès l'heure H.
+  // Filtrer les matchs dans la fenêtre de poll (0min → +150min).
+  // Exception WC (FIFA, compId=2000) : on commence 60min avant le KO pour récupérer
+  // les IDs FIFA (IdCompetition/Season/Stage) en cache Redis avant le coup d'envoi.
+  // Cela permet d'afficher les compos dès que FIFA les publie (~1h avant).
+  // ⚠️ Sûr : fifaToEspnStatus() retourne STATUS_SCHEDULED pour Period=0 → pas de faux KO.
   const toTrack = allMatches.filter(m => {
-    const elapsed = (now - new Date(m.utcDate)) / 60_000
-    return (elapsed >= 0 && elapsed <= 150) || isTrackedLive(m.id)
+    const elapsed   = (now - new Date(m.utcDate)) / 60_000
+    const preBuffer = m.competition?.id === 2000 ? -60 : 0   // WC : poll 60min avant
+    return (elapsed >= preBuffer && elapsed <= 150) || isTrackedLive(m.id)
   })
 
   if (toTrack.length === 0) {
