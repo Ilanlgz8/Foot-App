@@ -93,6 +93,14 @@ function fifaToEspnStatus(m) {
 function fifaToClock(m) {
   const t = (m.MatchTime ?? '').replace(/'/g, '').trim()
   if (!t || t === 'HT' || t === 'FT') return ''
+  // Préserver le temps additionnel : "45+2" → "45:00+2:00"
+  // (sans ça, parseInt("45+2") = 45 → perd l'info stoppage, affiche "45'" figé)
+  const plusIdx = t.indexOf('+')
+  if (plusIdx !== -1) {
+    const base  = parseInt(t.slice(0, plusIdx), 10)
+    const extra = parseInt(t.slice(plusIdx + 1), 10)
+    if (!isNaN(base) && !isNaN(extra) && extra > 0) return `${base}:00+${extra}:00`
+  }
   const mins = parseInt(t, 10)
   return isNaN(mins) ? '' : `${mins}:00`
 }
@@ -109,10 +117,19 @@ function fifaScore(m) {
   return { home: m.HomeTeam?.Score ?? 0, away: m.AwayTeam?.Score ?? 0 }
 }
 
-function fifaTeamName(team) {
-  return team?.TeamName?.find(t => /^en/i.test(t.Locale))?.Description
-    ?? team?.TeamName?.[0]?.Description
-    ?? '?'
+// Retourne TOUS les noms d'équipe disponibles dans toutes les locales.
+// Permet de faire matcher "Iraq" (FD.org) avec "Irak" (FIFA locale fr), etc.
+function fifaTeamNames(team) {
+  const names = (team?.TeamName ?? [])
+    .map(t => t.Description)
+    .filter(Boolean)
+  // Mettre l'anglais en premier si dispo
+  const enIdx = (team?.TeamName ?? []).findIndex(t => /^en/i.test(t.Locale))
+  if (enIdx > 0) {
+    const en = names.splice(enIdx, 1)[0]
+    names.unshift(en)
+  }
+  return names.length ? names : ['?']
 }
 
 function fifaPlayerName(goal) {
@@ -285,8 +302,10 @@ export default async function handler(req, res) {
 
       const fifaMatch = fifaLive.find(m => {
         if (matchedIds.has(m.IdMatch)) return false
-        return fuzzyTeam(fdHome, fifaTeamName(m.HomeTeam))
-          && fuzzyTeam(fdAway, fifaTeamName(m.AwayTeam))
+        const homeNames = fifaTeamNames(m.HomeTeam)
+        const awayNames = fifaTeamNames(m.AwayTeam)
+        return homeNames.some(n => fuzzyTeam(fdHome, n))
+          && awayNames.some(n => fuzzyTeam(fdAway, n))
       })
       if (!fifaMatch) continue
 

@@ -17,7 +17,8 @@ const kv = new Redis({
 })
 
 const FIFA_BASE  = 'https://api.fifa.com/api/v3'
-const LINEUP_TTL = 20 * 60   // 20min cache Redis
+const LINEUP_TTL = 20 * 60   // 20min cache Redis (compos — ne changent pas en match)
+const STATS_TTL  = 60        // 60s cache Redis (stats live — mises à jour chaque minute)
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -222,43 +223,65 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Match FIFA introuvable (pas encore en cache — ouvrir pendant le match)' })
   }
 
-  // ── 2. Cache lineup Redis ──────────────────────────────────────────────────
-  const cacheKey = `fifa:lineup:${fifaMatchId}`
+  // ── 2. Cache séparé lineup (20min) et stats (60s) ─────────────────────────
+  // Les compos ne changent pas → cache long.
+  // Les stats changent chaque minute → cache court pour ne pas bloquer les updates live.
+  const lineupCacheKey = `fifa:lineup:${fifaMatchId}`
+  const statsCacheKey  = `fifa:stats:${fifaMatchId}`
+
+  let cachedLineup = null, cachedStats = undefined
   try {
-    const cached = safeJson(await kv.get(cacheKey))
-    if (cached) return res.json(cached)
+    [cachedLineup, cachedStats] = await Promise.all([
+      kv.get(lineupCacheKey).then(safeJson),
+      kv.get(statsCacheKey).then(v => v !== null ? safeJson(v) : undefined),
+    ])
   } catch {}
 
-  // ── 3. Fetch lineup + stats en parallèle ──────────────────────────────────
+  // Si les deux sont en cache → retourner immédiatement
+  if (cachedLineup && cachedStats !== undefined) {
+    return res.json({ ...cachedLineup, stats: cachedStats })
+  }
+
+  // ── 3. Fetch ce qui manque ────────────────────────────────────────────────
   const { lineup: lineupUrls, stats: statsUrls } = buildFifaUrls(
     fifaMatchId, fifaCompId, fifaSeasonId, fifaStageId
   )
 
-  const [lineupData, statsData] = await Promise.all([
-    fetchFirst(lineupUrls),
-    fetchFirst(statsUrls),
-  ])
+  let lineupData = null, statsData = null
 
-  if (!lineupData) {
-    return res.status(404).json({ error: 'Compositions FIFA introuvables' })
+  if (!cachedLineup) {
+    // Lineup manquant → fetch les deux en parallèle
+    ;[lineupData, statsData] = await Promise.all([
+      fetchFirst(lineupUrls),
+      fetchFirst(statsUrls),
+    ])
+  } else {
+    // Lineup en cache, seulement les stats manquent → fetch stats seulement
+    statsData = await fetchFirst(statsUrls)
   }
 
-  // ── 4. Parser ─────────────────────────────────────────────────────────────
-  const home = parseFifaTeam(lineupData.HomeTeam, fdHome)
-  const away = parseFifaTeam(lineupData.AwayTeam, fdAway)
+  // ── 4. Parser la lineup si nécessaire ────────────────────────────────────
+  let lineupResult = cachedLineup
+  if (!lineupResult) {
+    if (!lineupData) {
+      return res.status(404).json({ error: 'Compositions FIFA introuvables' })
+    }
+    const home = parseFifaTeam(lineupData.HomeTeam, fdHome)
+    const away = parseFifaTeam(lineupData.AwayTeam, fdAway)
 
-  if (!home?.starters?.length) {
-    return res.status(404).json({ error: 'Lineup FIFA vide (pas encore publiée)' })
+    if (!home?.starters?.length) {
+      return res.status(404).json({ error: 'Lineup FIFA vide (pas encore publiée)' })
+    }
+
+    lineupResult = { home, away }
+    // Cacher la lineup 20min (ne change pas pendant le match)
+    try { await kv.set(lineupCacheKey, JSON.stringify(lineupResult), { ex: LINEUP_TTL }) } catch {}
   }
 
-  const result = {
-    home,
-    away,
-    stats: parseFifaStats(statsData),
-  }
+  // ── 5. Parser les stats ───────────────────────────────────────────────────
+  const parsedStats = statsData ? parseFifaStats(statsData) : null
+  // Cacher les stats 60s (se mettent à jour chaque minute pendant le match)
+  try { await kv.set(statsCacheKey, JSON.stringify(parsedStats), { ex: STATS_TTL }) } catch {}
 
-  // Cache 20min
-  try { await kv.set(cacheKey, JSON.stringify(result), { ex: LINEUP_TTL }) } catch {}
-
-  return res.json(result)
+  return res.json({ ...lineupResult, stats: parsedStats })
 }

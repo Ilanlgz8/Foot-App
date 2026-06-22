@@ -162,9 +162,10 @@ export function useFifaStats(match, enabled = true) {
   return useQuery({
     queryKey: ['fifaStats', match?.id],
     enabled:  enabled && !!match?.id,
-    staleTime: 60_000,            // stats live → re-fetch après 1min
-    refetchInterval: enabled ? 90_000 : false,
-    retry: false,
+    staleTime: 30_000,            // stats live → re-fetch après 30s
+    refetchInterval: enabled ? 45_000 : false,  // poll plus fréquent (était 90s)
+    retry: 2,
+    retryDelay: 3_000,
     queryFn: async () => {
       const url = `/api/fifa-lineups?fdMatchId=${match.id}`
         + `&home=${encodeURIComponent(fdHome)}`

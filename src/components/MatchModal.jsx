@@ -6,7 +6,7 @@ import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import LineupPitch             from './LineupPitch'
 import { translateTeam }       from '../data/teamNames'
-import { getMatchState }       from '../utils/matchStateTracker'
+import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import './../matchModal.css'
 
@@ -257,7 +257,10 @@ const STAT_FR = {
 }
 
 function LiveStatsTab({ match, espnScore }) {
+  // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
+  // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
+    || getLiveState(match.id).state === 'live'
   // WC 2026 = competition.id 2000 → toujours traiter comme FIFA même si espnSlug
   // pas encore rempli (cas FD.org fallback avant le premier poll FIFA réussi)
   const isFifaMatch = espnScore?.espnSlug === 'fifa' || match.competition?.id === 2000
