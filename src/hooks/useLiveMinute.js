@@ -487,7 +487,33 @@ async function pollESPN(matches, queryClient) {
             espnSlug:    data.espnSlug,
           }
         }
+        // FD.org confirme IN_PLAY mais FIFA/ESPN retourne encore SCHEDULED
+        // (lag FIFA ou fuzzy-match partiel) → marquer comme live quand même
+        if (match.status === 'IN_PLAY' || match.status === 'PAUSED') {
+          markLive(match)
+        }
       }
+    }
+
+    // ── FD.org fallback global : match IN_PLAY selon FD.org mais absent de liveData ──
+    // Peut arriver si fuzzy-match FIFA échoue côté serveur ou si FIFA API lag.
+    // isEspnWorking()=true bloque useLiveMatches → ce fallback prend le relais.
+    for (const match of toTrack) {
+      const mid = match.id
+      if (match.status !== 'IN_PLAY' && match.status !== 'PAUSED') continue
+      if (isTrackedLive(mid)) continue          // déjà suivi → ok
+      if (getLiveState(mid).state === 'ended') continue
+      // Initialiser avec le score FD.org si disponible (visible dans le panel)
+      if (!espnScoresCache[mid]) {
+        espnScoresCache[mid] = {
+          home:    match.score?.fullTime?.home ?? null,
+          away:    match.score?.fullTime?.away ?? null,
+          scorers: [],
+          stats:   null,
+        }
+      }
+      console.log(`[useLiveMinute] FD.org fallback → markLive match ${mid} (${match.homeTeam?.name} vs ${match.awayTeam?.name})`)
+      markLive(match)
     }
   } catch (err) {
     console.warn('[useLiveMinute] /api/fifa-live erreur :', err.message)
