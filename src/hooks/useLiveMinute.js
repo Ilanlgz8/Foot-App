@@ -386,7 +386,10 @@ async function pollESPN(matches, queryClient) {
         const mins = parseClockMins(espnClock)
         if (mins != null && mins > 0) setKickoffAt(mid, now - mins * 60_000)
         notifyKickoff(match)
-        playWhistleKO()
+        // Ne siffler que si on détecte le KO dans les 5 premières minutes
+        // (évite le sifflet intempestif si on détecte un match déjà en cours)
+        const minsFromKickoff = (now - new Date(match.utcDate)) / 60_000
+        if (minsFromKickoff <= 5) playWhistleKO()
       }
 
       // ── HT détecté ──
@@ -440,13 +443,17 @@ async function pollESPN(matches, queryClient) {
           continue
         }
 
-        // DÉTECTION FT : source FIFA = toujours fiable (Period=8/MatchStatus=3)
-        // Source ESPN : horloge >= 85min requise pour filtrer les faux STATUS_FINAL.
-        // ⚠️ quand source=FIFA, MatchTime='FT' → fifaToClock renvoie '' → mins=null
-        //    mais c'est un vrai FT → isFifaSource lève le garde.
-        const isFifaSource = data.espnSlug === 'fifa'
+        // DÉTECTION FT : horloge >= 85min OU match vieux de >= 85min depuis le KO prévu.
+        // Source FIFA : MatchTime='FT' → fifaToClock renvoie '' → mins=null.
+        //   Dans ce cas, on se rabat sur l'âge du match (utcDate + 85min).
+        // ⚠️ isFifaSource ne lève PAS le garde à lui seul : FIFA peut retourner
+        //   MatchStatus=3/Period=8 lors d'une transition (but, VAR) même à la 21ème min.
         const mins = parseClockMins(espnClock)
-        const timePlausible = isFifaSource || (mins !== null && mins >= 85)
+        const matchAge = (now - new Date(match.utcDate)) / 60_000
+        // timePlausible : horloge >= 85min OU match vieux >= 85min depuis le KO prévu
+        // ⚠️ ne pas bypass avec isFifaSource seul : FIFA peut retourner Status=3/Period=8
+        //    lors de transitions (but, VAR) même à la 21ème min → faux FT.
+        const timePlausible = (mins !== null && mins >= 85) || matchAge >= 85
 
         if (!timePlausible) {
           delete pendingFt[mid]
