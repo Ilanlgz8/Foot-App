@@ -1,7 +1,7 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail, useLineups } from '../hooks/useMatchDetail'
+import { useMatchDetail, useLineups, useFifaStats } from '../hooks/useMatchDetail'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import LineupPitch             from './LineupPitch'
@@ -86,9 +86,12 @@ function ESPNStats({ stats }) {
   if (!stats) return null
   const { home: h, away: a } = stats
   const rows = [
-    { label: 'Possession', hv: h.poss    != null ? `${h.poss}%`    : null, av: a.poss    != null ? `${a.poss}%`    : null },
-    { label: 'Tirs',       hv: h.shots   != null ? `${h.shots}`    : null, av: a.shots   != null ? `${a.shots}`    : null },
-    { label: 'Corners',    hv: h.corners != null ? `${h.corners}`  : null, av: a.corners != null ? `${a.corners}`  : null },
+    { label: 'Possession',    hv: h.poss          != null ? `${h.poss}%`         : null, av: a.poss          != null ? `${a.poss}%`         : null },
+    { label: 'Tirs',          hv: h.shots         != null ? `${h.shots}`         : null, av: a.shots         != null ? `${a.shots}`         : null },
+    { label: 'Tirs cadrés',   hv: h.shotsOnTarget != null ? `${h.shotsOnTarget}` : null, av: a.shotsOnTarget != null ? `${a.shotsOnTarget}` : null },
+    { label: 'Corners',       hv: h.corners       != null ? `${h.corners}`       : null, av: a.corners       != null ? `${a.corners}`       : null },
+    { label: 'Fautes',        hv: h.fouls         != null ? `${h.fouls}`         : null, av: a.fouls         != null ? `${a.fouls}`         : null },
+    { label: 'Hors-jeu',      hv: h.offside       != null ? `${h.offside}`       : null, av: a.offside       != null ? `${a.offside}`       : null },
   ].filter(r => r.hv != null || r.av != null)
 
   if (rows.length === 0) return null
@@ -254,9 +257,18 @@ const STAT_FR = {
 }
 
 function LiveStatsTab({ match, espnScore }) {
-  const isLive    = match.status === 'IN_PLAY' || match.status === 'PAUSED'
-  const hasEspn   = !!(espnScore?.stats)
-  const hasEspnId = !!(espnScore?.espnEventId && espnScore?.espnSlug)
+  const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
+  const isFifaMatch = espnScore?.espnSlug === 'fifa'
+  const hasEspn     = !!(espnScore?.stats)
+  // Pour les matchs FIFA, espnEventId est un FIFA IdMatch (pas un event ESPN) →
+  // ne pas appeler useEspnSummaryStats qui ferait une req ESPN inutile
+  const hasEspnId   = !isFifaMatch && !!(espnScore?.espnEventId && espnScore?.espnSlug)
+
+  // ── Stats FIFA (WC 2026 uniquement) ──
+  // Fetché depuis /api/fifa-lineups qui lit le cache Redis du match FIFA live.
+  const { data: fifaStats, isLoading: fifaStatsLoading } = useFifaStats(
+    match, isFifaMatch && isLive
+  )
 
   // ESPN summary — fetché si on a l'event ID mais pas encore les stats du scoreboard
   const { data: summaryStats, isLoading: summaryLoading } = useEspnSummaryStats(
@@ -265,10 +277,10 @@ function LiveStatsTab({ match, espnScore }) {
     isLive && !hasEspn && hasEspnId
   )
 
-  // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary)
+  // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary) et pas FIFA
   const espnSummaryFailed = !summaryLoading && !summaryStats
   const { data: statsData, isLoading: aflLoading } = useSofaLiveStats(
-    match, isLive && !hasEspn && (!hasEspnId || espnSummaryFailed)
+    match, isLive && !isFifaMatch && !hasEspn && (!hasEspnId || espnSummaryFailed)
   )
 
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
@@ -284,7 +296,23 @@ function LiveStatsTab({ match, espnScore }) {
     )
   }
 
-  // ── Priorité 2 : ESPN summary stats (via /espn?eventId=) ──
+  // ── Priorité 2 : Stats FIFA live (WC 2026) ──
+  if (isFifaMatch) {
+    if (fifaStatsLoading) {
+      return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+    }
+    return (
+      <div>
+        {fifaStats
+          ? <ESPNStats stats={fifaStats} />
+          : <p className="modal__noEvents">Stats non disponibles</p>
+        }
+        {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+      </div>
+    )
+  }
+
+  // ── Priorité 3 : ESPN summary stats (via /espn?eventId=) ──
   if (summaryStats) {
     return (
       <div>

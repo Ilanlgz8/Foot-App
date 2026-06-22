@@ -300,11 +300,14 @@ export default async function handler(req, res) {
         ? scorers : (prevData?.scorers ?? [])
 
       result[fdMatch.id] = {
-        espnEventId: fifaMatch.IdMatch,
-        espnSlug:    'fifa',
+        espnEventId:  fifaMatch.IdMatch,
+        fifaCompId:   fifaMatch.IdCompetition   ?? null,
+        fifaSeasonId: fifaMatch.IdSeason        ?? null,
+        fifaStageId:  fifaMatch.IdStage         ?? null,
+        espnSlug:     'fifa',
         espnStatus,
-        espnClock:   fifaToClock(fifaMatch),
-        espnPeriod:  fifaToPeriod(fifaMatch),
+        espnClock:    fifaToClock(fifaMatch),
+        espnPeriod:   fifaToPeriod(fifaMatch),
         home,
         away,
         scorers:   bestScorers,

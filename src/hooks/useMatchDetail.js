@@ -34,7 +34,8 @@ export function useMatchDetail(matchId) {
 }
 
 // ── useLineups ─────────────────────────────────────────────────────────────────
-// Source : ESPN summary (scoreboard → summary?event=)
+// Source : ESPN summary pour les ligues club.
+//          FIFA API (/api/fifa-lineups) pour WC 2026 (espnSlug='fifa', compId=2000).
 // Disponible pour les compétitions dans COMP_ESPN uniquement.
 
 function matchDateStr(match) {
@@ -72,11 +73,12 @@ function parseEspnRoster(roster) {
 }
 
 export function useLineups(match) {
-  const compId = match?.competition?.id
-  const slug   = COMP_ESPN[compId]
-  const date   = matchDateStr(match)
-  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
-  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  const compId     = match?.competition?.id
+  const slug       = COMP_ESPN[compId]
+  const date       = matchDateStr(match)
+  const fdHome     = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  const isFifaComp = slug === 'fifa.world'   // WC 2026 → source FIFA directement
 
   return useQuery({
     queryKey: ['lineups', match?.id, slug, date],
@@ -84,6 +86,25 @@ export function useLineups(match) {
     staleTime: 30 * 60_000,
     retry: 1,
     queryFn: async () => {
+
+      // ── WC 2026 : compositions via API FIFA ──────────────────────────────────
+      // ESPN ne retourne pas les rosters pour les matchs WC via son summary endpoint.
+      // On utilise /api/fifa-lineups qui lit les IDs FIFA depuis Redis et fetch
+      // https://api.fifa.com/api/v3/matchlineup/{comp}/{season}/{stage}/{match}.
+      if (isFifaComp) {
+        const url = `/api/fifa-lineups?fdMatchId=${match.id}`
+          + `&home=${encodeURIComponent(fdHome)}`
+          + `&away=${encodeURIComponent(fdAway)}`
+        const res = await fetch(url)
+        if (!res.ok) return null
+        const data = await res.json()
+        // Valider que les starters existent avant de retourner
+        if (!data?.home?.starters?.length) return null
+        return { home: data.home, away: data.away }
+      }
+
+      // ── Autres compétitions : source ESPN (existant) ─────────────────────────
+
       // Étape 1 : trouver l'event ID via le scoreboard
       const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
       if (!sbRes.ok) return null
@@ -125,6 +146,45 @@ export function useLineups(match) {
       if (!home?.starters?.length) return null
 
       return { home, away }
+    },
+  })
+}
+
+// ── useFifaStats ───────────────────────────────────────────────────────────────
+// Statistiques live FIFA pour WC 2026.
+// Appelle /api/fifa-lineups (même endpoint que useLineups) — React Query déduplique.
+// Retourne { home, away } au format ESPNStats : { poss, shots, shotsOnTarget, corners, fouls, offside }
+
+export function useFifaStats(match, enabled = true) {
+  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+
+  return useQuery({
+    queryKey: ['fifaStats', match?.id],
+    enabled:  enabled && !!match?.id,
+    staleTime: 60_000,            // stats live → re-fetch après 1min
+    refetchInterval: enabled ? 90_000 : false,
+    retry: false,
+    queryFn: async () => {
+      const url = `/api/fifa-lineups?fdMatchId=${match.id}`
+        + `&home=${encodeURIComponent(fdHome)}`
+        + `&away=${encodeURIComponent(fdAway)}`
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const data = await res.json()
+      const s = data?.stats
+      if (!s?.home && !s?.away) return null
+
+      // Mapper vers le format attendu par ESPNStats
+      const mapTeam = (t) => ({
+        poss:          t?.possession       ?? null,
+        shots:         t?.shots            ?? null,
+        shotsOnTarget: t?.shotsOnTarget    ?? null,
+        corners:       t?.corners          ?? null,
+        fouls:         t?.fouls            ?? null,
+        offside:       t?.offside          ?? null,
+      })
+      return { home: mapTeam(s.home), away: mapTeam(s.away) }
     },
   })
 }
