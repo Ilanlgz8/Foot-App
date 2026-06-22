@@ -103,6 +103,31 @@ async function sendPushToAll(payload) {
   return sent
 }
 
+// ── FD.org : matchs WC en cours (ESPN dated endpoint ne retourne pas les statuts live) ──
+async function fetchFdWCLive() {
+  const key = process.env.API_KEY
+  if (!key) return []
+  try {
+    const [rLive, rPaused] = await Promise.all([
+      fetch('https://api.football-data.org/v4/competitions/2000/matches?status=IN_PLAY', {
+        headers: { 'X-Auth-Token': key },
+        signal: AbortSignal.timeout(5_000),
+      }),
+      fetch('https://api.football-data.org/v4/competitions/2000/matches?status=PAUSED', {
+        headers: { 'X-Auth-Token': key },
+        signal: AbortSignal.timeout(5_000),
+      }),
+    ])
+    const [jL, jP] = await Promise.all([
+      rLive.ok   ? rLive.json()   : { matches: [] },
+      rPaused.ok ? rPaused.json() : { matches: [] },
+    ])
+    return [...(jL.matches ?? []), ...(jP.matches ?? [])]
+  } catch {
+    return []
+  }
+}
+
 async function sendDeduped(dedupKey, payload, ttl = 3 * 3600) {
   try {
     const already = await kv.get(dedupKey)
@@ -130,13 +155,13 @@ export default async function handler(req, res) {
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
 
-  // Fetch l'endpoint par défaut (sans dates) EN PREMIER :
-  // pendant les périodes de fort trafic (CM 2026), l'endpoint ?dates= peut servir
-  // du cache stale côté CDN ESPN → les matchs restent STATUS_SCHEDULED.
-  // L'endpoint défaut est rafraîchi quasi temps réel.
+  // Fetch ESPN : today + yesterday pour chaque ligue
+  // Note : l'endpoint daté ESPN ne retourne PAS les statuts live pour la CM 2026
+  // (le CDN ESPN sert du cache statique STATUS_SCHEDULED).
+  // → La WC est gérée séparément via FD.org ci-dessous.
   const fetches = await Promise.allSettled(
     SLUGS.flatMap(slug => [
-      fetchEvents(slug, null),      // défaut — matchs du jour en temps réel
+      fetchEvents(slug, today),     // aujourd'hui
       fetchEvents(slug, yesterday), // hier — matchs après minuit UTC
     ])
   )
@@ -319,9 +344,82 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Coupe du Monde via FD.org ─────────────────────────────────────────────
+  // ESPN ne retourne jamais STATUS_IN_PROGRESS pour les matchs WC 2026 via l'endpoint
+  // daté (cache CDN statique). FD.org (competition 2000) est la seule source fiable.
+  // On traite IN_PLAY + PAUSED (mi-temps) séparément avec clés cron:fdstate:*.
+  const fdMatches = await fetchFdWCLive()
+  log.push(`[fd] ${fdMatches.length} matchs WC live/paused`)
+
+  for (const match of fdMatches) {
+    const fdId    = match.id
+    const status  = match.status           // 'IN_PLAY' | 'PAUSED'
+    const home    = match.score?.fullTime?.home ?? match.score?.halfTime?.home ?? 0
+    const away    = match.score?.fullTime?.away ?? match.score?.halfTime?.away ?? 0
+    const homeTeam = match.homeTeam?.shortName ?? match.homeTeam?.name ?? '?'
+    const awayTeam = match.awayTeam?.shortName ?? match.awayTeam?.name ?? '?'
+    const score    = `${home}-${away}`
+    const scoreStr = `${home} – ${away}`
+
+    const stateKey  = `cron:fdstate:${fdId}`
+    let   prevState = null
+    try { prevState = await kv.get(stateKey) } catch {}
+
+    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+
+    try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
+
+    // Premier poll → baseline
+    if (prevState === null) {
+      log.push(`[fd:${fdId}] baseline ${status}|${score}`)
+      continue
+    }
+
+    // 🔴 Coup d'envoi
+    if (prevStatus !== 'IN_PLAY' && prevStatus !== 'PAUSED' && status === 'IN_PLAY') {
+      log.push(`[fd:${fdId}] KO`)
+      const sent = await sendDeduped(
+        `push:fd:ko:${fdId}`,
+        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }
+      )
+      if (sent > 0) notifsSent++
+    }
+
+    // ⏸ Mi-temps (IN_PLAY → PAUSED)
+    if (prevStatus === 'IN_PLAY' && status === 'PAUSED') {
+      log.push(`[fd:${fdId}] mi-temps`)
+      const sent = await sendDeduped(
+        `push:fd:ht:${fdId}`,
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }
+      )
+      if (sent > 0) notifsSent++
+    }
+
+    // ▶️ Reprise 2ème MT (PAUSED → IN_PLAY)
+    if (prevStatus === 'PAUSED' && status === 'IN_PLAY') {
+      log.push(`[fd:${fdId}] reprise 2ème MT`)
+      const sent = await sendDeduped(
+        `push:fd:2h:${fdId}`,
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }
+      )
+      if (sent > 0) notifsSent++
+    }
+
+    // ⚽ But (score change pendant IN_PLAY)
+    if (status === 'IN_PLAY' && prevScore !== null && prevScore !== score) {
+      log.push(`[fd:${fdId}] but ${prevScore} → ${score}`)
+      const sent = await sendDeduped(
+        `push:fd:goal:${fdId}:${score}`,
+        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/' }
+      )
+      if (sent > 0) notifsSent++
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     events: eventsById.size,
+    fdMatches: fdMatches.length,
     notifsSent,
     log,
   })
