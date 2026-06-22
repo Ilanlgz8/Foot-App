@@ -341,31 +341,33 @@ async function pollESPN(matches, queryClient) {
 
       // ── Correction statuts FIFA implausibles ─────────────────────────────────
       // FIFA retourne parfois STATUS_EXTRA_TIME/OVERTIME lors de transitions normales
-      // (halftime, début 2e MT) bien avant 90min — même bug que le faux STATUS_FINAL.
-      // Si matchAge < 90, impossible d'être en prolongations → corriger.
+      // (halftime, début 2e MT) — même bug que le faux STATUS_FINAL à la 21e min.
+      // Condition : clock < 90' ET matchAge < 90min → impossible d'être en prolongations.
       let safeStatus = espnStatus
       let safePeriod = espnPeriod ?? null
-      if (
-        (safeStatus === 'STATUS_EXTRA_TIME' || safeStatus === 'STATUS_OVERTIME') &&
-        matchAge < 90
-      ) {
-        safeStatus = 'STATUS_IN_PROGRESS'
-        safePeriod = matchAge < 50 ? 1 : 2  // 1re MT avant 50min, 2e MT après
+      if (safeStatus === 'STATUS_EXTRA_TIME' || safeStatus === 'STATUS_OVERTIME') {
+        const clockMins = parseClockMins(espnClock)
+        const etImplausible = (clockMins === null || clockMins < 90) && matchAge < 90
+        if (etImplausible) {
+          safeStatus = 'STATUS_IN_PROGRESS'
+          // Période estimée depuis matchAge (1re MT si < 50min depuis utcDate, 2e MT sinon)
+          safePeriod = matchAge < 50 ? 1 : 2
+        }
       }
 
       // Toujours écrire les données ESPN (pour calcMinute + interpolation)
       setEspnData(mid, { espnClock, espnStatus: safeStatus, espnPeriod: safePeriod })
 
       // ════════════════════════════════════════════════════════════════════
-      // CAS 1 : Match EN COURS (IN_PROGRESS, HALFTIME, prolongations…)
+      // CAS 1 : Match EN COURS — utilise safeStatus (statuts corrigés inclus)
       // ════════════════════════════════════════════════════════════════════
       if (
-        espnStatus === 'STATUS_IN_PROGRESS' ||
-        espnStatus === 'STATUS_HALFTIME'    ||
-        espnStatus === 'STATUS_END_PERIOD'  ||
-        espnStatus === 'STATUS_EXTRA_TIME'  ||
-        espnStatus === 'STATUS_OVERTIME'    ||
-        espnStatus === 'STATUS_SHOOTOUT'
+        safeStatus === 'STATUS_IN_PROGRESS' ||
+        safeStatus === 'STATUS_HALFTIME'    ||
+        safeStatus === 'STATUS_END_PERIOD'  ||
+        safeStatus === 'STATUS_EXTRA_TIME'  ||
+        safeStatus === 'STATUS_OVERTIME'    ||
+        safeStatus === 'STATUS_SHOOTOUT'
       ) {
         if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
         delete pendingFt[mid]
@@ -394,8 +396,8 @@ async function pollESPN(matches, queryClient) {
 
       // ── KO détecté (1ère MT, kickoffAt pas encore connu) ──
       if (
-        espnStatus === 'STATUS_IN_PROGRESS' &&
-        (espnPeriod ?? 1) === 1 &&
+        safeStatus === 'STATUS_IN_PROGRESS' &&
+        (safePeriod ?? 1) === 1 &&
         !prevState.kickoffAt
       ) {
         const mins = parseClockMins(espnClock)
@@ -417,8 +419,8 @@ async function pollESPN(matches, queryClient) {
 
       // ── 2H détecté ──
       if (
-        espnStatus === 'STATUS_IN_PROGRESS' &&
-        (espnPeriod ?? 1) === 2 &&
+        safeStatus === 'STATUS_IN_PROGRESS' &&
+        (safePeriod ?? 1) === 2 &&
         prevState.pausedAt &&
         !prevState.half2Start
       ) {
