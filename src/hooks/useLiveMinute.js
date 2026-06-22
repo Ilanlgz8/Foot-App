@@ -459,6 +459,16 @@ async function pollESPN(matches, queryClient) {
           delete pendingFt[mid]
           markLive(match)
           clearFtFlags(mid)
+          // Override espnStatus → STATUS_IN_PROGRESS pour que calcMinute ne retourne
+          // pas null (STATUS_FINAL → null). Si espnClock est vide, on dérive depuis utcDate.
+          const ftMins = espnClock ? parseClockMins(espnClock) : null
+          const safeClock = ftMins != null && ftMins > 0
+            ? espnClock
+            : `${Math.max(1, Math.floor((now - new Date(match.utcDate)) / 60_000))}:00`
+          setEspnData(mid, { espnClock: safeClock, espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: espnPeriod ?? 1 })
+          // Initialiser kickoffAt si absent (effacé après clearMatchState post-FT)
+          const safeMins = parseClockMins(safeClock)
+          if (safeMins) setKickoffAt(mid, now - safeMins * 60_000)
           continue
         }
 
