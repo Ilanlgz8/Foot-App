@@ -133,22 +133,33 @@ function confirmFt(match, now, queryClient) {
   } catch {}
 
   queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-  setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
-  if (match.competition?.code) {
-    // La clé localCache utilise le préfixe foot_
-    try { localStorage.removeItem(`foot_matches_${match.competition.code}_FINISHED`) } catch {}
-  }
+
+  const code = match.competition?.code
+
+  // À 2s : mise à jour immédiate Accueil (recent results) + page Résultats
+  setTimeout(() => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    // Invalider React Query
+    queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+    if (code) {
+      queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
+    }
+    // Effacer les caches localStorage pour forcer un refetch propre
+    try { localStorage.removeItem(`foot_matches_${todayStr}`) } catch {}
+    if (code) {
+      try { localStorage.removeItem(`foot_matches_${code}_FINISHED`) } catch {}
+    }
+  }, 2_000)
 
   // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
-  const code = match.competition?.code
   setTimeout(() => {
     markEnded(id)
     delete espnScoresCache[id]
     clearMatchState(id, { preserveEnded: true })
     queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
+    queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
-      queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
     }
   }, 5 * 60_000)
 }

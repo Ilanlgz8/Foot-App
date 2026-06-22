@@ -5,7 +5,6 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA' // EL/ECL non couverts par FD.org free tier
 
-const delay = (ms) => new Promise(r => setTimeout(r, ms))
 
 async function safeFetch(url) {
   const res = await fdFetch(fdUrl(url))
@@ -29,7 +28,7 @@ async function fetchTodayMatches(date) {
     `/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`
   )
 
-  await delay(700)
+  // Pas de délai artificiel — le cache Vercel edge absorbe les requêtes simultanées sans risque de 429
 
   // Requête 2 : WC sur J-1 et J
   const wcMatches = await safeFetch(
