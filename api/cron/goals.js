@@ -34,23 +34,35 @@ function generateFotmobToken(path) {
   return Buffer.from(JSON.stringify({ body, signature: sig })).toString('base64')
 }
 
-async function fetchFotmobMatches(date) {
+async function fetchFotmobMatches(date, debugLog = []) {
   const path = `/api/matches?date=${date}`
   const token = generateFotmobToken(path)
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
-    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.fotmob.com/',
+    'Origin': 'https://www.fotmob.com',
   }
   if (token) headers['X-Fm-Req'] = token
+  debugLog.push(`[fm] token=${token ? 'ok' : 'MISSING'} secret=${process.env.FOTMOB_SECRET ? 'ok' : 'MISSING'}`)
   try {
     const res = await fetch(`https://www.fotmob.com${path}`, {
       headers,
       signal: AbortSignal.timeout(7_000),
     })
-    if (!res.ok) return []
+    debugLog.push(`[fm] status=${res.status} date=${date}`)
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      debugLog.push(`[fm] body=${txt.slice(0, 120)}`)
+      return []
+    }
     const json = await res.json()
-    return (json.leagues ?? []).flatMap(l => l.matches ?? [])
-  } catch {
+    const matches = (json.leagues ?? []).flatMap(l => l.matches ?? [])
+    debugLog.push(`[fm] leagues=${json.leagues?.length ?? 0} matches=${matches.length}`)
+    return matches
+  } catch (e) {
+    debugLog.push(`[fm] error=${e.message}`)
     return []
   }
 }
@@ -174,8 +186,8 @@ export default async function handler(req, res) {
 
   // ── Fetch FotMob (today + yesterday en parallèle) ─────────────────────────
   const [matchesToday, matchesYesterday] = await Promise.all([
-    fetchFotmobMatches(today),
-    fetchFotmobMatches(yesterday),
+    fetchFotmobMatches(today, log),
+    fetchFotmobMatches(yesterday, log),
   ])
 
   // Dédupliquer par ID FotMob (un match peut apparaître dans les deux si minuit UTC)
