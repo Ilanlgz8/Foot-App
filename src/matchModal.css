@@ -911,32 +911,32 @@
    MATCH MODAL — RESPONSIVE
    ========================================================= */
 
-/* Tablette (< 640px) : quasiment plein écran */
+/* Mobile (< 640px) : modal centrée, scrollable si contenu long */
 @media (max-width: 640px) {
   .modal__overlay {
-    padding: 0;
-    align-items: flex-end;
+    padding: 1rem;
+    align-items: center;
   }
 
   .modal__panel {
     max-width: 100%;
     width: 100%;
-    border-radius: 1.5rem 1.5rem 0 0;
-    padding: 1.5rem 1.25rem 2rem;
-    max-height: 92dvh;
+    border-radius: 1.25rem;
+    padding: 1.4rem 1.2rem 1.75rem;
+    max-height: 88dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
-  /* Barre de drag en haut — override complet du gradient desktop */
+  /* Barre de drag supprimée — gradient haut rétabli */
   .modal__panel::before {
     content: '';
     position: absolute;
-    top: 0.55rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2.5rem;
-    height: 4px;
+    top: 0;
+    left: 0; right: 0;
+    height: 2px;
+    width: auto;
+    transform: none;
     background: rgba(255,255,255,0.22);
     border-radius: 999px;
     box-shadow: none;

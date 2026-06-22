@@ -258,7 +258,9 @@ const STAT_FR = {
 
 function LiveStatsTab({ match, espnScore }) {
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
-  const isFifaMatch = espnScore?.espnSlug === 'fifa'
+  // WC 2026 = competition.id 2000 → toujours traiter comme FIFA même si espnSlug
+  // pas encore rempli (cas FD.org fallback avant le premier poll FIFA réussi)
+  const isFifaMatch = espnScore?.espnSlug === 'fifa' || match.competition?.id === 2000
   const hasEspn     = !!(espnScore?.stats)
   // Pour les matchs FIFA, espnEventId est un FIFA IdMatch (pas un event ESPN) →
   // ne pas appeler useEspnSummaryStats qui ferait une req ESPN inutile
