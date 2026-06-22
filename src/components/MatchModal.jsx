@@ -1,9 +1,10 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail }      from '../hooks/useMatchDetail'
+import { useMatchDetail, useLineups } from '../hooks/useMatchDetail'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
-import { useSofaLineups, useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
+import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
+import LineupPitch             from './LineupPitch'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState }       from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
@@ -330,84 +331,29 @@ function LiveStatsTab({ match, espnScore }) {
   )
 }
 
-// ── Onglet Compos (SofaScore) ─────────────────────────────────────────────────
-const POS_COLOR = { G: '#f59e0b', D: '#3b82f6', M: '#22c55e', F: '#ef4444' }
-const POS_FR    = { G: 'GB', D: 'DEF', M: 'MIL', F: 'ATT', GK: 'GB' }
-
-function PlayerRow({ player, side, sub = false }) {
-  const name   = player.player?.shortName ?? player.player?.name ?? '?'
-  const pos    = (player.position ?? player.player?.position ?? '').toUpperCase()
-  const posKey = pos === 'GK' ? 'G' : pos.charAt(0)
-  const num    = player.shirtNumber ?? player.player?.jerseyNumber ?? ''
-  const color  = POS_COLOR[posKey] ?? '#64748b'
-  const label  = POS_FR[posKey] ?? pos.slice(0, 3)
-
-  if (side === 'home') {
-    return (
-      <div className={`modal__composPlayer${sub ? ' modal__composPlayer--sub' : ''}`}>
-        <span className="modal__composNum">{num}</span>
-        <span className="modal__composName">{name}</span>
-        <span className="modal__composPos" style={{ color }}>{label}</span>
-      </div>
-    )
-  }
-  return (
-    <div className={`modal__composPlayer modal__composPlayer--away${sub ? ' modal__composPlayer--sub' : ''}`}>
-      <span className="modal__composPos" style={{ color }}>{label}</span>
-      <span className="modal__composName">{name}</span>
-      <span className="modal__composNum">{num}</span>
-    </div>
-  )
-}
+// ── Onglet Compos — terrain + maillots (ESPN) ─────────────────────────────────
 
 function ComposTab({ match }) {
-  const { data: lineups, isLoading, isError } = useSofaLineups(match)
+  const { data: lineups, isLoading, isError } = useLineups(match)
 
   if (isLoading) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
   }
-  if (isError || !lineups?.home?.players) {
-    return <div className="modal__state">Compos non disponibles</div>
+  if (isError || !lineups?.home?.starters?.length) {
+    return (
+      <div className="modal__state" style={{ flexDirection: 'column', gap: '6px' }}>
+        <span style={{ fontSize: '22px' }}>📋</span>
+        <span>Compos non disponibles</span>
+        <span style={{ fontSize: '12px', opacity: 0.55 }}>
+          Disponibles ~1h avant le coup d'envoi
+        </span>
+      </div>
+    )
   }
 
-  const { home, away } = lineups
-  const starters = (side) => (side.players ?? []).filter(p => !p.substitute)
-  const subs     = (side) => (side.players ?? []).filter(p => p.substitute)
-
   return (
-    <div className="modal__compos">
-      {/* Formations */}
-      <div className="modal__composFormations">
-        <span className="modal__composFormation">{home.formation ?? '?'}</span>
-        <span className="modal__composFormation modal__composFormation--away">{away.formation ?? '?'}</span>
-      </div>
-
-      {/* Titulaires */}
-      <div className="modal__composGrid">
-        <div className="modal__composCol">
-          {starters(home).map((p, i) => <PlayerRow key={i} player={p} side="home" />)}
-        </div>
-        <div className="modal__composDivider" />
-        <div className="modal__composCol">
-          {starters(away).map((p, i) => <PlayerRow key={i} player={p} side="away" />)}
-        </div>
-      </div>
-
-      {/* Remplaçants */}
-      {(subs(home).length > 0 || subs(away).length > 0) && (
-        <div className="modal__composSubs">
-          <p className="modal__composSubsTitle">Remplaçants</p>
-          <div className="modal__composGrid">
-            <div className="modal__composCol">
-              {subs(home).map((p, i) => <PlayerRow key={i} player={p} side="home" sub />)}
-            </div>
-            <div className="modal__composDivider" />
-            <div className="modal__composCol">
-              {subs(away).map((p, i) => <PlayerRow key={i} player={p} side="away" sub />)}
-            </div>
-          </div>
-        </div>
-      )}
+    <div style={{ padding: '12px 8px 8px' }}>
+      <LineupPitch home={lineups.home} away={lineups.away} />
     </div>
   )
 }
