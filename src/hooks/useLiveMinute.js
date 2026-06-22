@@ -337,9 +337,24 @@ async function pollESPN(matches, queryClient) {
       if (!fromCache) lastSeenInEspn[mid] = now
 
       const prevState = getMatchState(mid)
+      const matchAge  = (now - new Date(match.utcDate)) / 60_000
 
-      // Toujours écrire les données ESPN brutes (pour calcMinute + interpolation)
-      setEspnData(mid, { espnClock, espnStatus, espnPeriod: espnPeriod ?? null })
+      // ── Correction statuts FIFA implausibles ─────────────────────────────────
+      // FIFA retourne parfois STATUS_EXTRA_TIME/OVERTIME lors de transitions normales
+      // (halftime, début 2e MT) bien avant 90min — même bug que le faux STATUS_FINAL.
+      // Si matchAge < 90, impossible d'être en prolongations → corriger.
+      let safeStatus = espnStatus
+      let safePeriod = espnPeriod ?? null
+      if (
+        (safeStatus === 'STATUS_EXTRA_TIME' || safeStatus === 'STATUS_OVERTIME') &&
+        matchAge < 90
+      ) {
+        safeStatus = 'STATUS_IN_PROGRESS'
+        safePeriod = matchAge < 50 ? 1 : 2  // 1re MT avant 50min, 2e MT après
+      }
+
+      // Toujours écrire les données ESPN (pour calcMinute + interpolation)
+      setEspnData(mid, { espnClock, espnStatus: safeStatus, espnPeriod: safePeriod })
 
       // ════════════════════════════════════════════════════════════════════
       // CAS 1 : Match EN COURS (IN_PROGRESS, HALFTIME, prolongations…)
@@ -449,7 +464,7 @@ async function pollESPN(matches, queryClient) {
         // ⚠️ isFifaSource ne lève PAS le garde à lui seul : FIFA peut retourner
         //   MatchStatus=3/Period=8 lors d'une transition (but, VAR) même à la 21ème min.
         const mins = parseClockMins(espnClock)
-        const matchAge = (now - new Date(match.utcDate)) / 60_000
+        // matchAge déjà calculé en haut du bloc (réutilisé ici)
         // timePlausible : horloge >= 85min OU match vieux >= 85min depuis le KO prévu
         // ⚠️ ne pas bypass avec isFifaSource seul : FIFA peut retourner Status=3/Period=8
         //    lors de transitions (but, VAR) même à la 21ème min → faux FT.
