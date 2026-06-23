@@ -192,27 +192,52 @@ function Classement() {
     }
 
     function MatchRow({ m, showScore }) {
-      const hn = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
-      const an = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
-      const sh = m.score?.fullTime?.home ?? m.score?.halfTime?.home
-      const sa = m.score?.fullTime?.away ?? m.score?.halfTime?.away
+      const hn  = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
+      const an  = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
+      const sh  = m.score?.fullTime?.home ?? m.score?.halfTime?.home
+      const sa  = m.score?.fullTime?.away ?? m.score?.halfTime?.away
       const live = ['IN_PLAY','PAUSED'].includes(m.status)
+      const isFinished = m.status === 'FINISHED'
+      const homeWin = isFinished && sh != null && sh > sa
+      const awayWin = isFinished && sa != null && sa > sh
+
+      const label = live ? (m.minute ? `${m.minute}'` : 'LIVE')
+                  : isFinished ? 'FT'
+                  : formatDate(m.utcDate)
+
+      const value = (showScore || live) && sh != null
+        ? `${sh} – ${sa}`
+        : formatTime(m.utcDate)
+
       return (
-        <div className="gm__matchRow">
-          <span className="gm__matchDate">{formatDate(m.utcDate)}</span>
-          <div className="gm__matchTeams">
-            <span className="gm__teamName gm__teamName--home">
-              {m.homeTeam?.crest && <img src={m.homeTeam.crest} alt="" className="gm__crest" />}
-              {hn}
-            </span>
-            {showScore && sh != null
-              ? <span className={`gm__score${live ? ' gm__score--live' : ''}`}>{sh} – {sa}</span>
-              : <span className="gm__scoreTime">{formatTime(m.utcDate)}</span>
-            }
-            <span className="gm__teamName gm__teamName--away">
-              {an}
-              {m.awayTeam?.crest && <img src={m.awayTeam.crest} alt="" className="gm__crest" />}
-            </span>
+        <div className={`accueil__matchCard${live ? ' accueil__matchCard--live' : ''}`}>
+          {/* Équipe domicile */}
+          <div className="accueil__matchCardTeam">
+            <div className="accueil__matchCardCrestWrap">
+              {m.homeTeam?.crest
+                ? <img src={m.homeTeam.crest} alt="" className={`accueil__matchCardCrest${awayWin ? ' accueil__matchCardCrest--loser' : ''}`} />
+                : <div className="accueil__matchCardCrestEmpty" />}
+            </div>
+            <span className={`accueil__matchCardName${homeWin ? ' accueil__matchCardName--winner' : awayWin ? ' accueil__matchCardName--loser' : ''}`}>{hn}</span>
+          </div>
+
+          {/* Centre */}
+          <div className="accueil__matchCardCenter">
+            <div className="accueil__matchCardLabelRow">
+              {live && <span className="accueil__matchCardLiveDot" />}
+              <span className={`accueil__matchCardLabel${live ? ' accueil__matchCardLabel--live' : ''}`}>{label}</span>
+            </div>
+            <span className={`accueil__matchCardValue${live ? ' accueil__matchCardValue--live' : ''}`}>{value}</span>
+          </div>
+
+          {/* Équipe extérieur */}
+          <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
+            <div className="accueil__matchCardCrestWrap">
+              {m.awayTeam?.crest
+                ? <img src={m.awayTeam.crest} alt="" className={`accueil__matchCardCrest${homeWin ? ' accueil__matchCardCrest--loser' : ''}`} />
+                : <div className="accueil__matchCardCrestEmpty" />}
+            </div>
+            <span className={`accueil__matchCardName${awayWin ? ' accueil__matchCardName--winner' : homeWin ? ' accueil__matchCardName--loser' : ''}`}>{an}</span>
           </div>
         </div>
       )
@@ -221,7 +246,7 @@ function Classement() {
     function MatchList({ list, showScore, empty }) {
       if (loadingM) return <div className="gm__loading">Chargement…</div>
       if (!list.length) return <div className="gm__empty">{empty}</div>
-      return <div className="gm__matchList">{list.map(m => <MatchRow key={m.id} m={m} showScore={showScore} />)}</div>
+      return <div className="accueil__matchCards">{list.map(m => <MatchRow key={m.id} m={m} showScore={showScore} />)}</div>
     }
 
     return createPortal(
