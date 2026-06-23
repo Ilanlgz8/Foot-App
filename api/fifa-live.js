@@ -14,9 +14,9 @@ const kv = new Redis({
 })
 
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
-const FIFA_TTL      = 12          // Cache Redis FIFA live (s)
+const FIFA_TTL      = 6           // Cache Redis FIFA live (s)
 const ESPN_BASE     = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-const ESPN_TTL      = 15          // Cache Redis ESPN (s)
+const ESPN_TTL      = 8           // Cache Redis ESPN (s)
 const MATCH_TTL     = 6 * 3600   // Données match persistées (s)
 const ESPN_TIMEOUT  = 5_000
 const FIFA_TIMEOUT  = 7_000
@@ -488,10 +488,14 @@ export default async function handler(req, res) {
     }
 
     // Score : FIFA si WC (plus réactif sur les buts), ESPN sinon
+    // Pour WC : max(FIFA, ESPN) → le premier à détecter le but gagne
+    // Évite d'attendre FIFA si ESPN a déjà mis à jour (ou inversement)
     let home, away, scorers
     if (fifaD) {
-      home    = fifaD.home
-      away    = fifaD.away
+      const espnHome = parseEspnScore(homeC?.score) ?? 0
+      const espnAway = parseEspnScore(awayC?.score) ?? 0
+      home    = Math.max(fifaD.home ?? 0, espnHome)
+      away    = Math.max(fifaD.away ?? 0, espnAway)
       // FIFA scorers en priorité, fallback ESPN si FIFA n'a pas trouvé les noms
       scorers = fifaD.scorers.length > 0
         ? fifaD.scorers
