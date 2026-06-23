@@ -178,7 +178,9 @@ export function getMatchPeriod(match) {
   // FD.org PAUSED override — prioritaire sur espnPeriod potentiellement stale.
   // Cas : FIFA laisse period=3 en localStorage pendant la transition mi-temps
   // alors que FD.org a déjà passé le match en PAUSED → évite badge 'Prolongations'.
-  if (match.status === 'PAUSED') return 'Mi-temps'
+  // ⚠ Ne pas appliquer si ESPN a déjà confirmé period=2 (2ème MT démarrée) :
+  //   FD.org peut rester PAUSED une ~poll de retard après la reprise.
+  if (match.status === 'PAUSED' && period !== 2) return 'Mi-temps'
   if (status === 'STATUS_SHOOTOUT' || period === 5) return 'T.A.B.'
   if (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME' || period === 3 || period === 4) return 'Prolongations'
   if (period === 2) return '2ème MT'

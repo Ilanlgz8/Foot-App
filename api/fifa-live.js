@@ -102,7 +102,18 @@ function fifaToClock(m) {
     if (!isNaN(base) && !isNaN(extra) && extra > 0) return `${base}:00+${extra}:00`
   }
   const mins = parseInt(t, 10)
-  return isNaN(mins) ? '' : `${mins}:00`
+  if (isNaN(mins)) return ''
+
+  // FIFA envoie parfois les minutes en comptage linéaire pendant le temps additionnel
+  // (ex: "49" pour la 4ème min de stoppage de la 1ère MT au lieu de "45+4").
+  // Convertir en format "base:00+extra:00" selon la période en cours.
+  const p = m.Period
+  if (p === 1 && mins > 45 && mins <= 60)  return `45:00+${mins - 45}:00`
+  if (p === 2 && mins > 90 && mins <= 105) return `90:00+${mins - 90}:00`
+  if (p === 4 && mins > 105 && mins <= 125) return `105:00+${mins - 105}:00`
+  if (p === 6 && mins > 120 && mins <= 140) return `120:00+${mins - 120}:00`
+
+  return `${mins}:00`
 }
 
 function fifaToPeriod(m) {

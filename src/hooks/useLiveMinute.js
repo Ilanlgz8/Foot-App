@@ -482,7 +482,11 @@ async function pollESPN(matches, queryClient) {
           const safeClock = ftMins != null && ftMins > 0
             ? espnClock
             : `${Math.max(1, Math.floor((now - new Date(match.utcDate)) / 60_000))}:00`
-          setEspnData(mid, { espnClock: safeClock, espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: espnPeriod ?? 1 })
+          // Corriger aussi espnPeriod : espnPeriod peut valoir 3 si FIFA envoie Period=4
+          // (faux STATUS_EXTRA_TIME) en même temps que Status=3 (faux FT) → "Prolongations".
+          // Estimation depuis matchAge : < 50min = 1ère MT, ≥ 50min = 2ème MT.
+          const implausiblePeriod = matchAge < 50 ? 1 : 2
+          setEspnData(mid, { espnClock: safeClock, espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: implausiblePeriod })
           // Initialiser kickoffAt si absent (effacé après clearMatchState post-FT)
           const safeMins = parseClockMins(safeClock)
           if (safeMins) setKickoffAt(mid, now - safeMins * 60_000)
