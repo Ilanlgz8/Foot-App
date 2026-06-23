@@ -6,6 +6,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 
 
 function Classement() {
@@ -172,12 +173,17 @@ function Classement() {
     }, [onClose])
 
     // Fetch matchs du groupe au premier clic sur Programme ou Résultats
+    // — passe par fdFetch/fdUrl (api/football.js) comme tous les appels FD.org
+    // — filtre côté client par m.group car FD.org ne supporte pas ?group= en filtre
     useEffect(() => {
       if (tab === 'classement' || matches.length > 0) return
       setLoadingM(true)
-      fetch(`/api/v4/competitions/WC/matches?group=${group.name}`)
+      fdFetch(fdUrl('/api/v4/competitions/WC/matches'))
         .then(r => r.ok ? r.json() : Promise.reject(r.status))
-        .then(data => setMatches(data.matches ?? []))
+        .then(data => {
+          const all = data.matches ?? []
+          setMatches(all.filter(m => m.group === group.name))
+        })
         .catch(() => setMatches([]))
         .finally(() => setLoadingM(false))
     }, [tab])
