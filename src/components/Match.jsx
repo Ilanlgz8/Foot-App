@@ -310,13 +310,13 @@ function Matchs() {
           {prono && (
             <div className="matchs__pronoBar">
               <div className="matchs__pronoSeg matchs__pronoSeg--home" style={{ width: `${prono.home}%` }}>
-                {prono.home >= 18 && <span>{prono.home}%</span>}
+                <span>{prono.home}%</span>
               </div>
               <div className="matchs__pronoSeg matchs__pronoSeg--draw" style={{ width: `${prono.draw}%` }}>
-                {prono.draw >= 14 && <span>{prono.draw}%</span>}
+                <span>{prono.draw}%</span>
               </div>
               <div className="matchs__pronoSeg matchs__pronoSeg--away" style={{ width: `${prono.away}%` }}>
-                {prono.away >= 18 && <span>{prono.away}%</span>}
+                <span>{prono.away}%</span>
               </div>
             </div>
           )}
