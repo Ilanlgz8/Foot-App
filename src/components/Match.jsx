@@ -5,7 +5,9 @@ import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
 import { useWcKnockout } from '../hooks/useWcKnockout'
+import { useTeamForm } from '../hooks/useTeamForm'
 import { calcMinute } from '../utils/matchUtils'
+import { calcProno } from '../utils/calcProno'
 import MatchModal from './MatchModal'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -186,6 +188,7 @@ function Matchs() {
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
+  const { formMap } = useTeamForm(selectedComp)
   const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout()
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
@@ -283,11 +286,16 @@ function Matchs() {
 
   /* ── Ligne de match (poules + journée) ── */
   function MatchRow({ match, index, inModal = false }) {
+    const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
+    const hForm = formMap[match.homeTeam?.id]
+    const aForm = formMap[match.awayTeam?.id]
+    const prono = isUpcoming && (hForm || aForm) ? calcProno(hForm, aForm) : null
+
     return (
       <div
         className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}`}
         style={{ borderTop: index === 0 ? 'none' : undefined }}
-        onClick={() => { if (match.status !== "SCHEDULED" && match.status !== "TIMED") setSelectedMatch(match) }}
+        onClick={() => { if (!isUpcoming) setSelectedMatch(match) }}
       >
         <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
         <div className="matchs__team matchs__team--home">
@@ -299,6 +307,19 @@ function Matchs() {
         </div>
         <div className="matchs__score">
           <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
+          {prono && (
+            <div className="matchs__pronoBar">
+              <div className="matchs__pronoSeg matchs__pronoSeg--home" style={{ width: `${prono.home}%` }}>
+                {prono.home >= 18 && <span>{prono.home}%</span>}
+              </div>
+              <div className="matchs__pronoSeg matchs__pronoSeg--draw" style={{ width: `${prono.draw}%` }}>
+                {prono.draw >= 14 && <span>{prono.draw}%</span>}
+              </div>
+              <div className="matchs__pronoSeg matchs__pronoSeg--away" style={{ width: `${prono.away}%` }}>
+                {prono.away >= 18 && <span>{prono.away}%</span>}
+              </div>
+            </div>
+          )}
         </div>
         <div className="matchs__team matchs__team--away">
           {match.awayTeam.crest && (
@@ -589,7 +610,7 @@ function Matchs() {
       )}
       {selectedMatch && (
         <MatchModal match={selectedMatch} compId={selectedComp}
-          onClose={() => setSelectedMatch(null)} />
+          onClose={() => setSelectedMatch(null)} formMap={formMap} />
       )}
     </section>
   )

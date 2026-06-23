@@ -985,3 +985,72 @@
   .modal__teams { gap: 0.35rem; }
   .modal__tab   { padding: 0.45rem 0.6rem; font-size: 0.65rem; }
 }
+
+/* ── Section Prono dans MatchModal ── */
+.modal__prono {
+  padding: 1.5rem 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.modal__pronoTitle {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.4);
+}
+.modal__pronoRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.modal__pronoLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.6);
+  white-space: nowrap;
+  min-width: 3rem;
+}
+.modal__pronoLabel:last-child { text-align: right; }
+.modal__pronoBar {
+  flex: 1;
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.modal__pronoSeg { transition: width 0.5s ease; }
+.modal__pronoSeg--home { background: #3b82f6; }
+.modal__pronoSeg--draw { background: rgba(255,255,255,0.15); }
+.modal__pronoSeg--away { background: #ef4444; }
+.modal__pronoNums {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.1rem;
+}
+.modal__pronoNum {
+  font-size: 1rem;
+  font-weight: 900;
+}
+.modal__pronoNum--home { color: #3b82f6; }
+.modal__pronoNum--draw { color: rgba(255,255,255,0.4); }
+.modal__pronoNum--away { color: #ef4444; }
+.modal__pronoKeys {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.25);
+  padding: 0 0.1rem;
+  margin-top: -0.3rem;
+}
+.modal__pronoDisclaimer {
+  text-align: center;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.2);
+  margin-top: 0.4rem;
+}

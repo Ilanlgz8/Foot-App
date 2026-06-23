@@ -8,6 +8,7 @@ import LineupPitch             from './LineupPitch'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
+import { calcProno } from '../utils/calcProno'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -478,7 +479,36 @@ function FinishedDetails({ match, espnData, detail, loading }) {
 
 
 // ── Modal principale ─────────────────────────────────────────────────────────
-function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore }) {
+function PronoSection({ prono, homeShort, awayShort }) {
+  if (!prono) return null
+  return (
+    <div className="modal__prono">
+      <p className="modal__pronoTitle">Probabilités estimées</p>
+      <div className="modal__pronoRow">
+        <span className="modal__pronoLabel">{homeShort}</span>
+        <div className="modal__pronoBar">
+          <div className="modal__pronoSeg modal__pronoSeg--home" style={{ width: `${prono.home}%` }} />
+          <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ width: `${prono.draw}%` }} />
+          <div className="modal__pronoSeg modal__pronoSeg--away" style={{ width: `${prono.away}%` }} />
+        </div>
+        <span className="modal__pronoLabel">{awayShort}</span>
+      </div>
+      <div className="modal__pronoNums">
+        <span className="modal__pronoNum modal__pronoNum--home">{prono.home}%</span>
+        <span className="modal__pronoNum modal__pronoNum--draw">{prono.draw}%</span>
+        <span className="modal__pronoNum modal__pronoNum--away">{prono.away}%</span>
+      </div>
+      <div className="modal__pronoKeys">
+        <span>Victoire</span>
+        <span>Nul</span>
+        <span>Défaite</span>
+      </div>
+      <p className="modal__pronoDisclaimer">Basé sur la forme des 5 derniers matchs</p>
+    </div>
+  )
+}
+
+function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, formMap }) {
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
   const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
   const [tab, setTab] = useState(defaultTab)
@@ -517,6 +547,11 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore })
   }, [])
 
   if (!match) return null
+
+  // Prono basé sur la forme FD.org (passée depuis Match.jsx / Accueil)
+  const hForm = formMap?.[match.homeTeam?.id]
+  const aForm = formMap?.[match.awayTeam?.id]
+  const prono = !isFinished && (hForm || aForm) ? calcProno(hForm, aForm) : null
 
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away
@@ -631,11 +666,31 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore })
                 className={`modal__tab${tab === 'compos' ? ' modal__tab--active' : ''}`}
                 onClick={() => setTab('compos')}
               >Compos</button>
+              {prono && (
+                <button
+                  className={`modal__tab${tab === 'prono' ? ' modal__tab--active' : ''}`}
+                  onClick={() => setTab('prono')}
+                >Prono</button>
+              )}
             </div>
             {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
             {tab === 'compos'    && <ComposTab match={match} />}
+            {tab === 'prono'     && (
+              <PronoSection
+                prono={prono}
+                homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+                awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+              />
+            )}
           </>
-        ) : null}
+        ) : (
+          /* Match à venir — prono affiché directement */
+          <PronoSection
+            prono={prono}
+            homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+            awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+          />
+        )}
 
       </div>
     </div>
