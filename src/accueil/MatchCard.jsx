@@ -59,7 +59,7 @@ export function PanelSkeleton() {
 //   tracked       → si ce match est suivi avec minutes précises
 //   onTrack       → callback pour activer/désactiver le suivi (null = bouton caché)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
-export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false }) {
+export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false, noLive = false }) {
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
@@ -74,8 +74,8 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   )
   const isFinished = _ms.ft === true || (match.status === 'FINISHED' && !_espnLive)
   const liveMinute = isFinished ? null : calcMinute(match)
-  // isLive inclut "Débute" (pending kickoff) pour déclencher le style live dès l'heure du KO
-  const isLive     = !isFinished && (
+  // noLive = true → jamais de mode live (MatchPanel). isLive uniquement dans LiveWidget.
+  const isLive     = !noLive && !isFinished && (
     match.status === 'IN_PLAY' ||
     match.status === 'PAUSED'  ||
     liveMinute !== null
@@ -261,6 +261,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {} }) {
               match={match}
               espnScore={espnScores[match.id] ?? null}
               noAnimation
+              noLive
             />
           ))}
         </div>

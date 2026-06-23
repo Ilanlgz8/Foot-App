@@ -327,7 +327,8 @@ function Accueil() {
             )}
 
             {/* Résultats récents */}
-            <div className="accueil__dashPanel">
+            {/* Résultats récents — masqué pour les jours futurs (pas de résultats possibles) */}
+            {dayOffset <= 0 && <div className="accueil__dashPanel">
               <div className="accueil__dashPanelHeader">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
               </div>
@@ -381,7 +382,7 @@ function Accueil() {
                   />
                 )
               })()}
-            </div>
+            </div>}
 
           </div>
         </div>
