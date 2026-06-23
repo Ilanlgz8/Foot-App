@@ -17,6 +17,11 @@ function Classement() {
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
 
+  // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
+  // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
+  const { matches: wcSched, loading: wcSchedLoading } = useMatches('WC', 'SCHEDULED')
+  const { matches: wcFin,   loading: wcFinLoading   } = useMatches('WC', 'FINISHED')
+
   const selectedCompetition = competitions.find((c) => c.id === selectedComp)
 
   const competitionRules = {
@@ -147,13 +152,8 @@ function Classement() {
   }
 
   /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
-  function GroupModal({ group, onClose }) {
+  function GroupModal({ group, onClose, schedMatches, finMatches, loadingM }) {
     const [tab, setTab] = useState('classement') // 'classement' | 'programme' | 'resultats'
-
-    // Réutilise useMatches (même cache que la page Programme/Résultats — 0 requête supplémentaire)
-    const { matches: sched, loading: loadingSched } = useMatches('WC', 'SCHEDULED')
-    const { matches: fin,   loading: loadingFin   } = useMatches('WC', 'FINISHED')
-    const loadingM = loadingSched || loadingFin
 
     useEffect(() => {
       const handler = e => { if (e.key === 'Escape') onClose() }
@@ -175,8 +175,8 @@ function Classement() {
       }
     }, [onClose])
 
-    const upcoming = sched.filter(m => m.group === group.name && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
-    const finished = fin.filter(m => m.group === group.name)
+    const upcoming = schedMatches.filter(m => m.group === group.name && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
+    const finished = finMatches.filter(m => m.group === group.name)
 
     function formatDate(utcDate) {
       if (!utcDate) return ''
@@ -287,7 +287,13 @@ function Classement() {
           ))}
         </div>
         {selectedGroup && (
-          <GroupModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />
+          <GroupModal
+            group={selectedGroup}
+            onClose={() => setSelectedGroup(null)}
+            schedMatches={wcSched}
+            finMatches={wcFin}
+            loadingM={wcSchedLoading || wcFinLoading}
+          />
         )}
       </>
     )
