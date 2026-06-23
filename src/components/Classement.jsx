@@ -5,7 +5,7 @@ import { COMPETITIONS as competitions } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { useScorersAFL } from '../hooks/useScorersAFL'
+import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 
 
@@ -15,7 +15,7 @@ function Classement() {
 
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorersAFL(selectedComp)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
 
   // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
@@ -440,7 +440,7 @@ function Classement() {
                 {scorers.map((s, i) => {
                   const playerName = s.player?.name ?? '?'
                   const initials   = playerName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-                  const hue        = (playerName.charCodeAt(0) * 37 + playerName.charCodeAt(1) * 13) % 360
+                  const hue        = (playerName.charCodeAt(0) * 37 + (playerName.charCodeAt(1) || 0) * 13) % 360
                   const isTop3     = i < 3
 
                   return (
@@ -453,19 +453,9 @@ function Classement() {
                         <span className="classement__scorerRank">{i + 1}</span>
                       </div>
 
-                      {/* Avatar (photo ou initiales) */}
-                      <div
-                        className="classement__scorerAvatar"
-                        style={{ '--av-hue': hue }}
-                      >
-                        {s.player?.photo ? (
-                          <img
-                            src={s.player.photo}
-                            alt={playerName}
-                            className="classement__scorerAvatarImg"
-                            onError={e => { e.currentTarget.style.display = 'none' }}
-                          />
-                        ) : initials}
+                      {/* Avatar initiales */}
+                      <div className="classement__scorerAvatar" style={{ '--av-hue': hue }}>
+                        {initials}
                       </div>
 
                       {/* Nom + équipe */}
@@ -492,12 +482,6 @@ function Classement() {
                           <span className="classement__scorerAssists">{s.assists ?? '—'}</span>
                           <span className="classement__scorerStatLabel">A</span>
                         </div>
-                        {s.games != null && (
-                          <div className="classement__scorerStatItem">
-                            <span className="classement__scorerAssists">{s.games}</span>
-                            <span className="classement__scorerStatLabel">MJ</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )
