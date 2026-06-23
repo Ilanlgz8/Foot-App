@@ -492,7 +492,10 @@ export default async function handler(req, res) {
     if (fifaD) {
       home    = fifaD.home
       away    = fifaD.away
-      scorers = fifaD.scorers
+      // FIFA scorers en priorité, fallback ESPN si FIFA n'a pas trouvé les noms
+      scorers = fifaD.scorers.length > 0
+        ? fifaD.scorers
+        : extractEspnScorers(comp, homeC?.team?.id)
     } else {
       home    = parseEspnScore(homeC?.score)
       away    = parseEspnScore(awayC?.score)

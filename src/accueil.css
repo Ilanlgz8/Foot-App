@@ -2263,7 +2263,8 @@
    GOAL ANIMATION — TYPOGRAPHIE
    ========================================================= */
 
-.accueil__matchCard--goal {
+.accueil__matchCard--goal,
+.accueil__liveWidgetMatchBlock--goal {
   animation: goalCardGlow 1.1s ease-in-out infinite alternate;
 }
 @keyframes goalCardGlow {

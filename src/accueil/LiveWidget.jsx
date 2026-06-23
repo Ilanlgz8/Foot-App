@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
-import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
+import { COMPETITIONS } from '../data/competitions'
 
 // Map abréviations — clés = sortie de translateTeam (ou nom brut API si pas traduit)
 const TEAM_SHORT = {
   // ── Ligue 1 ──
-  'Union Saint-Gilloise':    'Union SG',      // translateTeam('Union SG') → trop long
-  'Paris Saint-Germain':     'Paris SG',      // si API renvoie nom complet
+  'Union Saint-Gilloise':    'Union SG',
+  'Paris Saint-Germain':     'Paris SG',
   'Paris Saint-Germain FC':  'Paris SG',
 
   // ── Premier League ──
@@ -26,22 +26,22 @@ const TEAM_SHORT = {
   'Leeds United':            'Leeds',
 
   // ── La Liga ──
-  'Atlético Madrid':         'Atl. Madrid',   // translateTeam('Atleti') → Atlético Madrid
-  'Athletic Bilbao':         'Ath. Bilbao',   // translateTeam('Athletic') → Athletic Bilbao
+  'Atlético Madrid':         'Atl. Madrid',
+  'Athletic Bilbao':         'Ath. Bilbao',
   'Real Sociedad':           'R. Sociedad',
   'Deportivo Alavés':        'Alavés',
   'Rayo Vallecano':          'Rayo',
 
   // ── Bundesliga ──
-  'Bayern Munich':           'Bayern',        // translateTeam('Bayern') → Bayern Munich
+  'Bayern Munich':           'Bayern',
   'Eintracht Frankfurt':     'Frankfurt',
-  'Werder Brême':            'Werder',        // translateTeam('Bremen') → Werder Brême
+  'Werder Brême':            'Werder',
   'Werder Bremen':           'Werder',
   'Borussia Dortmund':       'Dortmund',
 
   // ── Serie A ──
-  'Inter Milan':             'Inter',         // translateTeam('Inter') → Inter Milan
-  'Milan AC':                'Milan',         // translateTeam('Milan') → Milan AC
+  'Inter Milan':             'Inter',
+  'Milan AC':                'Milan',
   'Hellas Verona':           'Verona',
 
   // ── Ligue des Champions ──
@@ -51,16 +51,15 @@ const TEAM_SHORT = {
   'Slavia Praha':            'Slavia',
 
   // ── Coupe du Monde / Nations ──
-  'Bosnie-Herzégovine':      'Bosnie-H.',     // translateTeam('Bosnia-H.') → Bosnie-Herzégovine
+  'Bosnie-Herzégovine':      'Bosnie-H.',
   'Arabie Saoudite':         'Arabie S.',
   'Nouvelle-Zélande':        'N.-Zélande',
-  "Côte d'Ivoire":           'Côte d\'Ivoire', // 13 chars, ok tel quel
+  "Côte d'Ivoire":           'Côte d\'Ivoire',
   'Corée du Sud':            'Corée du Sud',
   'États-Unis':              'États-Unis',
   'Afrique du Sud':          'Afrique S.',
 }
 
-// Fallback générique si > 13 caractères et pas dans la map
 function shortenName(name) {
   if (!name) return name
   if (TEAM_SHORT[name]) return TEAM_SHORT[name]
@@ -68,6 +67,18 @@ function shortenName(name) {
   const words = name.trim().split(/\s+/)
   if (words.length < 2) return name
   return `${words[0][0]}. ${words.slice(1).join(' ')}`
+}
+
+// ── Animation BUT ────────────────────────────────────────────────────────────
+function GoalCelebration({ teamName, scoreStr }) {
+  return (
+    <div className="goal__overlay" aria-hidden="true">
+      <span className="goal__text">BUT !</span>
+      <div className="goal__line" />
+      {teamName && <span className="goal__team">{teamName}</span>}
+      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
+    </div>
+  )
 }
 
 // ── Badge compétition ────────────────────────────────────────────────────────
@@ -93,7 +104,7 @@ function PeriodBadge({ match }) {
   )
 }
 
-// ── Rang score custom : pills Chakra Petch + barre verticale ────────────────
+// ── Score display ────────────────────────────────────────────────────────────
 function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, repriseDans }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
@@ -108,7 +119,6 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
 
   return (
     <div className="accueil__liveWidgetScoreWrap">
-      {/* Minute au-dessus du score */}
       <div className="accueil__liveWidgetMinuteWrap">
         <span className="accueil__liveWidgetMinute">{label}</span>
       </div>
@@ -117,7 +127,6 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
         <div className="accueil__liveWidgetPillBar" />
         <div className={awayCls}>{a}</div>
       </div>
-      {/* Infos mi-temps sous le score */}
       {repriseImminente && (
         <span className="accueil__liveWidgetReprise">reprise imminente</span>
       )}
@@ -159,7 +168,7 @@ function ScorerColumns({ scorers = [] }) {
   )
 }
 
-// ── Stats grille : home val | barre | label | barre | away val ───────────────
+// ── Stats grille ─────────────────────────────────────────────────────────────
 function StatsBar({ stats }) {
   if (!stats) return null
   const { home, away } = stats
@@ -217,6 +226,142 @@ function StatsBar({ stats }) {
   )
 }
 
+// ── Carte de match individuelle avec détection de but ────────────────────────
+// Composant séparé pour pouvoir utiliser useRef/useState par match
+function LiveMatchBlock({ match, espn, onMatchClick }) {
+  const matchSt    = getMatchState(match.id)
+  const isTermine  = matchSt.ft === true
+
+  const nowPending   = Date.now()
+  const utcMsPending = new Date(match.utcDate).getTime()
+  const isPendingKO  = !isTermine
+    && (match.status === 'SCHEDULED' || match.status === 'TIMED')
+    && nowPending >= utcMsPending
+    && nowPending - utcMsPending < 30 * 60_000
+
+  const minute = isTermine ? null : isPendingKO ? 'Débute' : calcMinute(match)
+
+  const isHalftime       = matchSt.espnStatus === 'STATUS_HALFTIME' || match.status === 'PAUSED'
+  const pauseElapsed     = isHalftime && matchSt.pausedAt && !matchSt.half2Start
+    ? Date.now() - matchSt.pausedAt : null
+  const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
+  const repriseDans      = pauseElapsed != null && pauseElapsed < 15 * 60_000
+    ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
+
+  const hs       = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
+  const as_      = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
+  const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
+  const clickable = !!onMatchClick
+
+  // ── Détection de but ──
+  const scoreKey = `foot_score_${match.id}`
+  const prevHs   = useRef(null)
+  const prevAs   = useRef(null)
+  const timerRef = useRef(null)
+  const [goal, setGoal] = useState(null) // { team: string, scoreStr: string } | null
+
+  // Init one-shot depuis localStorage pour éviter les fausses animations au reload
+  const initDone = useRef(false)
+  if (!initDone.current) {
+    initDone.current = true
+    try {
+      const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
+      if (s?.home != null) prevHs.current = s.home
+      if (s?.away != null) prevAs.current = s.away
+    } catch {}
+  }
+
+  const isLive = !isTermine && (
+    match.status === 'IN_PLAY' ||
+    match.status === 'PAUSED'  ||
+    isPendingKO ||
+    minute !== null
+  )
+
+  useEffect(() => {
+    if (!isLive) {
+      prevHs.current = null
+      prevAs.current = null
+      try { localStorage.removeItem(scoreKey) } catch {}
+      return
+    }
+    if (prevHs.current !== null && hs != null && hs > prevHs.current) {
+      const team  = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
+      const score = `${hs} – ${as_ ?? 0}`
+      setGoal({ team, scoreStr: score })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setGoal(null), 5200)
+    } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
+      const team  = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
+      const score = `${hs ?? 0} – ${as_}`
+      setGoal({ team, scoreStr: score })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setGoal(null), 5200)
+    }
+    if (hs  != null) prevHs.current = hs
+    if (as_ != null) prevAs.current = as_
+    if (hs != null && as_ != null) {
+      try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
+    }
+  }, [hs, as_, isLive])
+
+  useEffect(() => () => clearTimeout(timerRef.current), [])
+
+  const blockCls = [
+    'accueil__liveWidgetMatchBlock',
+    clickable ? 'accueil__liveWidgetMatchBlock--clickable' : '',
+    goal      ? 'accueil__liveWidgetMatchBlock--goal'      : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <div
+      className={blockCls}
+      onClick={clickable ? () => onMatchClick(match) : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? e => e.key === 'Enter' && onMatchClick(match) : undefined}
+    >
+      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
+
+      <div className="accueil__liveWidgetMeta">
+        <PeriodBadge match={match} />
+      </div>
+
+      <div className="accueil__liveWidgetMatchRow">
+        {/* Équipe domicile */}
+        <div className="accueil__liveWidgetTeam">
+          {match.homeTeam?.crest
+            ? <img src={match.homeTeam.crest} alt="" className="accueil__liveWidgetCrest" />
+            : <div className="accueil__liveWidgetCrestFallback" />}
+          <span className="accueil__liveWidgetTeamName">{homeName}</span>
+        </div>
+
+        <ScoreDisplay
+          homeScore={hs}
+          awayScore={as_}
+          minute={minute}
+          isTermine={isTermine}
+          repriseImminente={repriseImminente}
+          repriseDans={repriseDans}
+        />
+
+        {/* Équipe extérieur */}
+        <div className="accueil__liveWidgetTeam accueil__liveWidgetTeam--away">
+          {match.awayTeam?.crest
+            ? <img src={match.awayTeam.crest} alt="" className="accueil__liveWidgetCrest" />
+            : <div className="accueil__liveWidgetCrestFallback" />}
+          <span className="accueil__liveWidgetTeamName">{awayName}</span>
+        </div>
+      </div>
+
+      {(espn?.scorers?.length > 0) && <div className="accueil__liveWidgetDivider" />}
+      <ScorerColumns scorers={espn?.scorers ?? []} />
+      <StatsBar stats={espn?.stats ?? null} />
+    </div>
+  )
+}
+
 // ── Widget principal ─────────────────────────────────────────────────────────
 export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRecalibrate, onMatchClick }) {
   const now = Date.now()
@@ -224,8 +369,6 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
     const state = getMatchState(m.id)
     if (state.ft === true) return true
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
-    // Pending kickoff : heure atteinte, ESPN pas encore confirmé
-    // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'
     if (m.status === 'SCHEDULED' || m.status === 'TIMED') {
       const utcMs = new Date(m.utcDate).getTime()
       if (now >= utcMs && now - utcMs < 30 * 60_000) return true
@@ -257,9 +400,7 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
   return (
     <div className="accueil__liveWidget">
       <div className="accueil__liveWidgetHeader">
-        {/* Compétition à gauche */}
         <CompBadge match={sliced[activeIdx] ?? sliced[0]} />
-        {/* EN DIRECT à droite */}
         <div className="accueil__liveWidgetHeaderRight">
           <span className="accueil__liveWidgetDot" />
           <span className="accueil__liveWidgetTitle">EN DIRECT</span>
@@ -271,80 +412,16 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
       </div>
 
       <div className="accueil__liveWidgetMatches" ref={matchesRef} onScroll={onScroll}>
-        {sliced.map(match => {
-          const espn      = espnScores[match.id] ?? null
-          const matchSt   = getMatchState(match.id)
-          const isTermine = matchSt.ft === true
-          // Pending kickoff : heure atteinte mais ESPN pas encore confirmé → "Débute"
-          const nowPending = Date.now()
-          const utcMsPending = new Date(match.utcDate).getTime()
-          const isPendingKO = !isTermine
-            && (match.status === 'SCHEDULED' || match.status === 'TIMED')
-            && nowPending >= utcMsPending
-            && nowPending - utcMsPending < 30 * 60_000
-          const minute    = isTermine ? null : isPendingKO ? 'Débute' : calcMinute(match)
-          // Détecter la mi-temps via ESPN (rapide) OU FD.org (lent) — les deux peuvent marcher
-          const isHalftime = matchSt.espnStatus === 'STATUS_HALFTIME' || match.status === 'PAUSED'
-          const pauseElapsed = isHalftime && matchSt.pausedAt && !matchSt.half2Start
-            ? Date.now() - matchSt.pausedAt : null
-          const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
-          const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
-            ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
-          const hs        = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-          const as_       = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
-          const homeName  = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
-          const awayName  = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
-          const clickable = !!onMatchClick
-
-          return (
-            <div
-              key={match.id}
-              className={`accueil__liveWidgetMatchBlock${clickable ? ' accueil__liveWidgetMatchBlock--clickable' : ''}`}
-              onClick={clickable ? () => onMatchClick(match) : undefined}
-              role={clickable ? 'button' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onKeyDown={clickable ? e => e.key === 'Enter' && onMatchClick(match) : undefined}
-            >
-              <div className="accueil__liveWidgetMeta">
-                <PeriodBadge match={match} />
-              </div>
-
-              <div className="accueil__liveWidgetMatchRow">
-                {/* Équipe domicile */}
-                <div className="accueil__liveWidgetTeam">
-                  {match.homeTeam?.crest
-                    ? <img src={match.homeTeam.crest} alt="" className="accueil__liveWidgetCrest" />
-                    : <div className="accueil__liveWidgetCrestFallback" />}
-                  <span className="accueil__liveWidgetTeamName">{homeName}</span>
-                </div>
-
-                <ScoreDisplay
-                  homeScore={hs}
-                  awayScore={as_}
-                  minute={minute}
-                  isTermine={isTermine}
-                  repriseImminente={repriseImminente}
-                  repriseDans={repriseDans}
-                />
-
-                {/* Équipe extérieur */}
-                <div className="accueil__liveWidgetTeam accueil__liveWidgetTeam--away">
-                  {match.awayTeam?.crest
-                    ? <img src={match.awayTeam.crest} alt="" className="accueil__liveWidgetCrest" />
-                    : <div className="accueil__liveWidgetCrestFallback" />}
-                  <span className="accueil__liveWidgetTeamName">{awayName}</span>
-                </div>
-              </div>
-
-              {(espn?.scorers?.length > 0) && <div className="accueil__liveWidgetDivider" />}
-              <ScorerColumns scorers={espn?.scorers ?? []} />
-              <StatsBar stats={espn?.stats ?? null} />
-            </div>
-          )
-        })}
+        {sliced.map(match => (
+          <LiveMatchBlock
+            key={match.id}
+            match={match}
+            espn={espnScores[match.id] ?? null}
+            onMatchClick={onMatchClick}
+          />
+        ))}
       </div>
 
-      {/* Dots indicateurs — visibles seulement si plusieurs matchs */}
       {sliced.length > 1 && (
         <div className="accueil__liveWidgetDots">
           {sliced.map((_, i) => (
