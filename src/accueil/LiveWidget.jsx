@@ -181,7 +181,16 @@ function StatsBar({ stats }) {
     rows.push({ h: hs, label: 'tirs', a: as_, hNum: home.shots ?? 0, aNum: away.shots ?? 0 })
 
   if (home.corners != null)
-    rows.push({ h: `${home.corners}`, label: 'crs', a: `${away.corners}`, hNum: home.corners, aNum: away.corners })
+    rows.push({ h: `${home.corners}`, label: 'crs', a: `${away.corners ?? 0}`, hNum: home.corners, aNum: away.corners ?? 0 })
+
+  if (home.fouls != null)
+    rows.push({ h: `${home.fouls}`, label: 'fautes', a: `${away.fouls ?? 0}`, hNum: home.fouls, aNum: away.fouls ?? 0 })
+
+  if (home.offsides != null)
+    rows.push({ h: `${home.offsides}`, label: 'hors-jeu', a: `${away.offsides ?? 0}`, hNum: home.offsides, aNum: away.offsides ?? 0 })
+
+  if (home.yellow != null)
+    rows.push({ h: `${home.yellow}`, label: '🟨', a: `${away.yellow ?? 0}`, hNum: home.yellow, aNum: away.yellow ?? 0 })
 
   if (rows.length === 0) return null
 

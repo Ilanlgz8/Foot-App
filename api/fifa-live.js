@@ -274,6 +274,9 @@ async function fetchEspnSummaryStats(slug, espnEventId) {
 function extractBoxscoreStats(hArr, aArr) {
   if (!hArr?.length && !aArr?.length) return null
 
+  // Log temporaire — voir tous les noms de stats ESPN disponibles
+  if (hArr?.length) console.log('[espn:stats] home fields:', hArr.map(s => s.name).join(', '))
+
   function find(arr, ...names) {
     if (!arr) return null
     for (const name of names) {
@@ -291,14 +294,20 @@ function extractBoxscoreStats(hArr, aArr) {
   const aShots   = find(aArr, 'totalShots', 'shotsTotal', 'shots')
   const hSOT     = find(hArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
   const aSOT     = find(aArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
-  const hCorners = find(hArr, 'cornerKicks', 'cornersTotal', 'corners')
-  const aCorners = find(aArr, 'cornerKicks', 'cornersTotal', 'corners')
+  const hCorners = find(hArr, 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
+  const aCorners = find(aArr, 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
+  const hFouls   = find(hArr, 'foulsCommitted', 'totalFouls', 'fouls', 'foulCommitted')
+  const aFouls   = find(aArr, 'foulsCommitted', 'totalFouls', 'fouls', 'foulCommitted')
+  const hYellow  = find(hArr, 'yellowCards', 'yellowCard')
+  const aYellow  = find(aArr, 'yellowCards', 'yellowCard')
+  const hOffside = find(hArr, 'offsides', 'offside')
+  const aOffside = find(aArr, 'offsides', 'offside')
 
   if (hPoss == null && hShots == null && hCorners == null) return null
 
   return {
-    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners },
-    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners },
+    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside },
+    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside },
   }
 }
 
