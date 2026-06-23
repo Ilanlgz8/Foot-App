@@ -190,10 +190,12 @@ function extractFifaScorers(m) {
   return scorers
 }
 
-// ── ESPN fallback (ligues club) ────────────────────────────────────────────────
-
-// competition FD.org → slug ESPN (WC 2026 exclu — FIFA couvre le WC)
-const COMP_ESPN_FALLBACK = {
+// ── ESPN (source primaire pour statuts/clock) ──────────────────────────────────
+// ESPN est la source principale pour espnStatus / espnClock / espnPeriod.
+// WC 2026 : slug 'fifa.world' → ESPN couvre aussi la WC, statuts fiables.
+// FIFA sert UNIQUEMENT pour le score + buteurs WC (plus réactif sur les buts).
+const COMP_ESPN = {
+  2000: 'fifa.world',       // WC 2026
   2015: 'fra.1',
   2021: 'eng.1',
   2014: 'esp.1',
@@ -300,107 +302,166 @@ export default async function handler(req, res) {
 
   const result = {}
 
-  // ── FIFA live ──────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 : FIFA live → score + buteurs + IDs (WC uniquement)
+  // FIFA est UNIQUEMENT utilisé pour les données de score/buteurs WC.
+  // Les statuts (espnStatus/espnClock/espnPeriod) viennent d'ESPN — plus fiables.
+  // ══════════════════════════════════════════════════════════════════════════
   const { data: fifaLive, fromCache: fifaCached } = await fetchFifaLive()
 
-  if (fifaLive && fifaLive.length > 0) {
-    const matchedIds = new Set()
-
+  // Index FIFA par fdMatchId : score + buteurs + IDs FIFA pour les compos/stats
+  const fifaByFdId = {}
+  if (fifaLive?.length > 0) {
+    const usedFifaIds = new Set()
     for (const fdMatch of matches) {
+      if (fdMatch.competition?.id !== 2000) continue   // WC seulement
+
       const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
       const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
       if (!fdHome || !fdAway) continue
 
       const fifaMatch = fifaLive.find(m => {
-        if (matchedIds.has(m.IdMatch)) return false
+        if (usedFifaIds.has(m.IdMatch)) return false
         const homeNames = fifaTeamNames(m.HomeTeam)
         const awayNames = fifaTeamNames(m.AwayTeam)
         return homeNames.some(n => fuzzyTeam(fdHome, n))
-          && awayNames.some(n => fuzzyTeam(fdAway, n))
+            && awayNames.some(n => fuzzyTeam(fdAway, n))
       })
       if (!fifaMatch) continue
 
-      matchedIds.add(fifaMatch.IdMatch)
-
-      const espnStatus = fifaToEspnStatus(fifaMatch)
+      usedFifaIds.add(fifaMatch.IdMatch)
       const { home, away } = fifaScore(fifaMatch)
-      const scorers   = extractFifaScorers(fifaMatch)
-      const prevData  = storedData[fdMatch.id]
-      const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
-        ? scorers : (prevData?.scorers ?? [])
 
-      result[fdMatch.id] = {
-        espnEventId:  fifaMatch.IdMatch,
-        fifaCompId:   fifaMatch.IdCompetition   ?? null,
-        fifaSeasonId: fifaMatch.IdSeason        ?? null,
-        fifaStageId:  fifaMatch.IdStage         ?? null,
-        espnSlug:     'fifa',
-        espnStatus,
-        espnClock:    fifaToClock(fifaMatch),
-        espnPeriod:   fifaToPeriod(fifaMatch),
-        home,
-        away,
-        scorers:   bestScorers,
-        stats:     prevData?.stats ?? null,
-        fromCache: fifaCached,
+      fifaByFdId[fdMatch.id] = {
+        home, away,
+        scorers:      extractFifaScorers(fifaMatch),
+        fifaMatchId:  fifaMatch.IdMatch,
+        fifaCompId:   fifaMatch.IdCompetition ?? null,
+        fifaSeasonId: fifaMatch.IdSeason      ?? null,
+        fifaStageId:  fifaMatch.IdStage       ?? null,
+        fifaRaw:      fifaMatch,              // gardé pour fallback statut
+        fromCache:    fifaCached,
       }
     }
   }
 
-  // ── ESPN fallback pour matchs pas dans FIFA live ───────────────────────────
-  const needsEspn = matches.filter(m => !result[m.id])
-  if (needsEspn.length > 0) {
-    const slugSet = new Set()
-    for (const m of needsEspn) {
-      const s = COMP_ESPN_FALLBACK[m.competition?.id]
-      if (s) slugSet.add(s)
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 2 : ESPN → statuts + clock + period (source primaire pour TOUS)
+  // WC inclus via slug 'fifa.world'. Pas de faux STATUS_FINAL / STATUS_EXTRA_TIME.
+  // ══════════════════════════════════════════════════════════════════════════
+  const slugSet = new Set()
+  for (const m of matches) {
+    const s = COMP_ESPN[m.competition?.id]
+    if (s) slugSet.add(s)
+  }
+
+  const espnEvents = slugSet.size > 0
+    ? await fetchEspnEvents(slugSet, today, yesterday)
+    : []
+
+  // Matcher chaque match FD.org avec un event ESPN
+  const usedEspnIds = new Set()
+  for (const fdMatch of matches) {
+    const slug = COMP_ESPN[fdMatch.competition?.id]
+    if (!slug) continue
+
+    const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
+    const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
+    if (!fdHome || !fdAway) continue
+
+    const found = espnEvents.find(({ slug: s, evt }) => {
+      if (s !== slug) return false
+      if (usedEspnIds.has(evt.id)) return false
+      const comp  = evt.competitions?.[0]
+      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+      const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
+      const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
+      return fuzzyTeam(fdHome, eHome) && fuzzyTeam(fdAway, eAway)
+    })
+    if (!found) continue
+
+    usedEspnIds.add(found.evt.id)
+    const comp     = found.evt.competitions[0]
+    const st       = comp.status
+    const espnStatus = st?.type?.name ?? 'STATUS_SCHEDULED'
+    const espnClock  = st?.displayClock ?? ''
+    const espnPeriod = st?.period ?? null
+
+    const homeC = comp.competitors?.find(c => c.homeAway === 'home')
+    const awayC = comp.competitors?.find(c => c.homeAway === 'away')
+
+    const isWC    = fdMatch.competition?.id === 2000
+    const fifaD   = isWC ? fifaByFdId[fdMatch.id] : null
+    const prevData = storedData[fdMatch.id]
+
+    // Score : FIFA si WC (plus réactif sur les buts), ESPN sinon
+    let home, away, scorers
+    if (fifaD) {
+      home    = fifaD.home
+      away    = fifaD.away
+      scorers = fifaD.scorers
+    } else {
+      home    = parseEspnScore(homeC?.score)
+      away    = parseEspnScore(awayC?.score)
+      scorers = extractEspnScorers(comp, homeC?.team?.id)
     }
 
-    if (slugSet.size > 0) {
-      const espnEvents = await fetchEspnEvents(slugSet, today, yesterday)
+    const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
+      ? scorers : (prevData?.scorers ?? [])
 
-      for (const { slug, evt } of espnEvents) {
-        const comp = evt.competitions?.[0]
-        if (!comp) continue
-        const st         = comp.status
-        const espnStatus = st?.type?.name
-        if (!espnStatus) continue
+    result[fdMatch.id] = {
+      // IDs : FIFA match ID pour WC (nécessaire pour les compos), ESPN sinon
+      espnEventId:  fifaD?.fifaMatchId ?? found.evt.id,
+      espnSlug:     isWC ? 'fifa' : found.slug,
+      // Statut ESPN (source primaire — pas de faux FT/ET)
+      espnStatus,
+      espnClock,
+      espnPeriod,
+      // Score FIFA (WC) ou ESPN (club)
+      home,
+      away,
+      scorers:      bestScorers,
+      stats:        prevData?.stats ?? null,
+      // IDs FIFA pour api/fifa-lineups.js
+      ...(fifaD ? {
+        fifaCompId:   fifaD.fifaCompId,
+        fifaSeasonId: fifaD.fifaSeasonId,
+        fifaStageId:  fifaD.fifaStageId,
+      } : {}),
+    }
+  }
 
-        const homeC = (comp.competitors ?? []).find(c => c.homeAway === 'home')
-        const awayC = (comp.competitors ?? []).find(c => c.homeAway === 'away')
-        if (!homeC || !awayC) continue
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 3 : Fallback FIFA pour matchs WC non trouvés dans ESPN
+  // Si ESPN ne retourne pas encore le match (lag ou match tout juste commencé)
+  // → utiliser FIFA status en dernier recours (plutôt que rien).
+  // ══════════════════════════════════════════════════════════════════════════
+  for (const fdMatch of matches) {
+    if (result[fdMatch.id]) continue
+    const fifaD = fifaByFdId[fdMatch.id]
+    if (!fifaD?.fifaRaw) continue
 
-        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+    const fm       = fifaD.fifaRaw
+    const prevData = storedData[fdMatch.id]
+    const bestScorers = fifaD.scorers.length >= (prevData?.scorers?.length ?? 0)
+      ? fifaD.scorers : (prevData?.scorers ?? [])
 
-        const fdMatch = needsEspn.find(m => {
-          if (result[m.id]) return false
-          const h = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
-          const a = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
-          return fuzzyTeam(h, espnHome) && fuzzyTeam(a, espnAway)
-        })
-        if (!fdMatch) continue
-
-        const home    = parseEspnScore(homeC.score)
-        const away    = parseEspnScore(awayC.score)
-        const scorers = extractEspnScorers(comp, homeC.team?.id)
-        const prevData = storedData[fdMatch.id]
-        const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
-          ? scorers : (prevData?.scorers ?? [])
-
-        result[fdMatch.id] = {
-          espnEventId: evt.id,
-          espnSlug:    slug,
-          espnStatus,
-          espnClock:   st.displayClock ?? '',
-          espnPeriod:  st.period ?? null,
-          home,
-          away,
-          scorers:   bestScorers,
-          stats:     prevData?.stats ?? null,
-          source:    'espn',
-        }
-      }
+    result[fdMatch.id] = {
+      espnEventId:  fifaD.fifaMatchId,
+      espnSlug:     'fifa',
+      espnStatus:   fifaToEspnStatus(fm),
+      espnClock:    fifaToClock(fm),
+      espnPeriod:   fifaToPeriod(fm),
+      home:         fifaD.home,
+      away:         fifaD.away,
+      scorers:      bestScorers,
+      stats:        prevData?.stats ?? null,
+      fifaCompId:   fifaD.fifaCompId,
+      fifaSeasonId: fifaD.fifaSeasonId,
+      fifaStageId:  fifaD.fifaStageId,
+      fromCache:    fifaD.fromCache,
+      source:       'fifa_fallback',
     }
   }
 
