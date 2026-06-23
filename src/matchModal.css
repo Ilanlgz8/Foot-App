@@ -885,13 +885,13 @@
 }
 
 .modal__statBarFill--home {
-  background: linear-gradient(90deg, #1d4ed8, #38bdf8);
+  background: linear-gradient(90deg, #334155, #94a3b8);
   border-radius: 999px 0 0 999px;
   transition: width 0.6s ease;
 }
 
 .modal__statBarFill--away {
-  background: linear-gradient(90deg, #f97316, #ef4444);
+  background: linear-gradient(90deg, #991b1b, #ef4444);
   border-radius: 0 999px 999px 0;
   transition: width 0.6s ease;
 }
@@ -1025,16 +1025,16 @@
 .modal__pronoSeg { transition: flex 0.5s ease; }
 .modal__pronoSeg--home {
   flex: var(--prono-home);
-  background: linear-gradient(135deg, #1d4ed8, #38bdf8);
+  background: linear-gradient(135deg, #334155, #94a3b8);
   border-radius: 6px 0 0 6px;
 }
 .modal__pronoSeg--draw {
   flex: var(--prono-draw);
-  background: linear-gradient(135deg, #334155, #475569);
+  background: rgba(255,255,255,0.08);
 }
 .modal__pronoSeg--away {
   flex: var(--prono-away);
-  background: linear-gradient(135deg, #f97316, #ef4444);
+  background: linear-gradient(135deg, #991b1b, #ef4444);
   border-radius: 0 6px 6px 0;
 }
 .modal__pronoNums {

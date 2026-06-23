@@ -433,24 +433,12 @@ function FinishedDetails({ match, espnData, detail, loading }) {
   const homeId     = match.homeTeam?.id
   const totalGoals = (match.score?.fullTime?.home ?? 0) + (match.score?.fullTime?.away ?? 0)
 
-  // ── ESPN : données disponibles (match suivi en live dans cette session ou précédente) ──
-  if (espnData) {
-    const scorers = espnData.scorers ?? []
-    return (
-      <>
-        {scorers.length > 0
-          ? <ESPNScorers scorers={scorers} />
-          : <p className="modal__noEvents">
-              {totalGoals > 0 ? 'Buteurs non disponibles' : 'Match sans but (0 – 0)'}
-            </p>
-        }
-        <ESPNStats stats={espnData.stats} />
-      </>
-    )
-  }
+  const fdGoals    = detail?.goals    ?? []
+  const fdBookings = detail?.bookings ?? []
+  const espnScorers = espnData?.scorers ?? []
 
-  // ── FD.org fallback ──
-  if (loading) {
+  // Chargement : on attend au moins FD.org (ESPN peut prendre plus de temps)
+  if (loading && !detail && !espnData) {
     return (
       <div className="modal__state">
         <div className="modal__spinner" />
@@ -458,21 +446,24 @@ function FinishedDetails({ match, espnData, detail, loading }) {
       </div>
     )
   }
-  if (!detail) {
-    return <div className="modal__state">Statistiques non disponibles</div>
-  }
 
-  const goals    = detail.goals    ?? []
-  const bookings = detail.bookings ?? []
   return (
     <>
-      {goals.length > 0
-        ? <GoalTimeline goals={goals} homeId={homeId} />
-        : <p className="modal__noEvents">
-            {totalGoals > 0 ? 'Détail des buts non disponible' : 'Match sans but (0 – 0)'}
-          </p>
+      {/* ── Buteurs : ESPN en priorité, FD.org en fallback ── */}
+      {espnScorers.length > 0
+        ? <ESPNScorers scorers={espnScorers} />
+        : fdGoals.length > 0
+          ? <GoalTimeline goals={fdGoals} homeId={homeId} />
+          : <p className="modal__noEvents">
+              {totalGoals > 0 ? 'Buteurs non disponibles' : 'Match sans but (0 – 0)'}
+            </p>
       }
-      {bookings.length > 0 && <Bookings bookings={bookings} homeId={homeId} />}
+
+      {/* ── Stats ESPN si disponibles ── */}
+      {espnData?.stats && <ESPNStats stats={espnData.stats} />}
+
+      {/* ── Cartons FD.org ── */}
+      {fdBookings.length > 0 && <Bookings bookings={fdBookings} homeId={homeId} />}
     </>
   )
 }
@@ -525,8 +516,9 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, f
   const espnData = cachedEspn ?? fetchedEspn
 
   // FD.org uniquement si pas de données ESPN (fallback matchs anciens)
+  // FD.org fetch en parallèle (pas conditionné à ESPN) — fallback buteurs + cartons
   const { detail, loading: detailLoading } = useMatchDetail(
-    isFinished && !espnData && !espnLoading ? match?.id : null
+    isFinished ? match?.id : null
   )
 
   useEffect(() => {

@@ -785,16 +785,16 @@
   transition: flex 0.4s ease;
 }
 .matchs__pronoSeg--home {
-  background: linear-gradient(135deg, #1d4ed8, #38bdf8);
+  background: linear-gradient(135deg, #334155, #94a3b8);
   border-radius: 5px 0 0 5px;
   flex: var(--prono-home);
 }
 .matchs__pronoSeg--draw {
-  background: linear-gradient(135deg, #334155, #475569);
+  background: rgba(255,255,255,0.08);
   flex: var(--prono-draw);
 }
 .matchs__pronoSeg--away {
-  background: linear-gradient(135deg, #f97316, #ef4444);
+  background: linear-gradient(135deg, #991b1b, #ef4444);
   border-radius: 0 5px 5px 0;
   flex: var(--prono-away);
 }
