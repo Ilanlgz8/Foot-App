@@ -4,7 +4,7 @@ import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import MatchModal from './MatchModal'
 import '../live.css'
 
@@ -140,6 +140,18 @@ function StatsBar({ stats }) {
   )
 }
 
+// ── Animation BUT ────────────────────────────────────────────────────────────
+function GoalCelebration({ teamName, scoreStr }) {
+  return (
+    <div className="goal__overlay" aria-hidden="true">
+      <span className="goal__text">BUT !</span>
+      <div className="goal__line" />
+      {teamName && <span className="goal__team">{teamName}</span>}
+      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
+    </div>
+  )
+}
+
 // ── Card match individuelle ───────────────────────────────────────────────────
 function LiveCard({ match, espn, onClick }) {
   const matchSt = getMatchState(match.id)
@@ -153,9 +165,54 @@ function LiveCard({ match, espn, onClick }) {
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
 
+  // ── Détection de but ──
+  const scoreKey = `foot_lv_score_${match.id}` // clé séparée de MatchCard et LiveWidget
+  const prevHs   = useRef(null)
+  const prevAs   = useRef(null)
+  const timerRef = useRef(null)
+  const [goal, setGoal] = useState(null)
+
+  const initDone = useRef(false)
+  if (!initDone.current) {
+    initDone.current = true
+    try {
+      const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
+      if (s?.home != null) prevHs.current = s.home
+      if (s?.away != null) prevAs.current = s.away
+    } catch {}
+  }
+
+  const isLive = !isTermine && (match.status === 'IN_PLAY' || match.status === 'PAUSED' || minute !== null)
+
+  useEffect(() => {
+    if (!isLive) { prevHs.current = null; prevAs.current = null; return }
+    if (prevHs.current !== null && hs != null && hs > prevHs.current) {
+      const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
+      setGoal({ team, scoreStr: `${hs} – ${as_ ?? 0}` })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setGoal(null), 5200)
+    } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
+      const team = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
+      setGoal({ team, scoreStr: `${hs ?? 0} – ${as_}` })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setGoal(null), 5200)
+    }
+    if (hs  != null) prevHs.current = hs
+    if (as_ != null) prevAs.current = as_
+    if (hs != null && as_ != null) {
+      try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
+    }
+  }, [hs, as_, isLive])
+
+  useEffect(() => () => clearTimeout(timerRef.current), [])
+
   return (
-    <div className="live__card" onClick={onClick} role="button" tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick()}>
+    <div
+      className={`live__card${goal ? ' live__card--goal' : ''}`}
+      onClick={onClick} role="button" tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onClick()}
+    >
+      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 
       {/* Header : compétition + période */}
       <div className="live__cardHeader">
