@@ -6,6 +6,7 @@
     { "source": "/apifootball",    "destination": "/api/apifootball" },
     { "source": "/api/fifa-live",     "destination": "/api/fifa-live" },
     { "source": "/api/fifa-lineups", "destination": "/api/fifa-lineups" },
+    { "source": "/api/cron-goals",    "destination": "/api/cron-goals" },
     { "source": "/api/cron/goals",   "destination": "/api/cron/goals" },
     { "source": "/api/cron/:path*",  "destination": "/api/cron/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
