@@ -234,9 +234,44 @@ function extractEspnScorers(comp, homeTeamId) {
     })
 }
 
-function extractEspnStats(homeC, awayC) {
-  const hArr = homeC?.statistics
-  const aArr = awayC?.statistics
+// ── ESPN summary → stats live (possession, tirs, corners) ─────────────────────
+// Le scoreboard ESPN n'inclut pas statistics[] pour le soccer.
+// Les stats réelles sont dans l'endpoint /summary?event={espnEventId}.
+const SUMMARY_TTL = 30   // Cache Redis summary (s)
+
+async function fetchEspnSummaryStats(slug, espnEventId) {
+  if (!slug || !espnEventId) return null
+  const cKey = `espn:sum:${espnEventId}`
+  try {
+    const cached = await kv.get(cKey)
+    if (cached) {
+      const d = safeJson(cached)
+      return d  // peut être null si match pas encore de stats
+    }
+  } catch {}
+
+  try {
+    const r = await fetch(
+      `${ESPN_BASE}/${slug}/summary?event=${espnEventId}`,
+      { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }
+    )
+    if (!r.ok) return null
+    const j = await r.json()
+
+    // Les stats sont dans boxscore.teams[]
+    const teams = j.boxscore?.teams ?? []
+    const homeT = teams.find(t => t.homeAway === 'home')
+    const awayT = teams.find(t => t.homeAway === 'away')
+    const stats = extractBoxscoreStats(homeT?.statistics, awayT?.statistics)
+    // Stocker même si null pour éviter de re-fetcher inutilement
+    try { await kv.set(cKey, JSON.stringify(stats), { ex: SUMMARY_TTL }) } catch {}
+    return stats
+  } catch {
+    return null
+  }
+}
+
+function extractBoxscoreStats(hArr, aArr) {
   if (!hArr?.length && !aArr?.length) return null
 
   function find(arr, ...names) {
@@ -476,7 +511,7 @@ export default async function handler(req, res) {
       scorers:      bestScorers,
       // Stats : extraites du scoreboard ESPN (possession, tirs, corners)
       // Fallback sur Redis last-known si le scoreboard ne les inclut pas encore
-      stats:        extractEspnStats(homeC, awayC) ?? prevData?.stats ?? null,
+      stats:        extractBoxscoreStats(homeC?.statistics, awayC?.statistics) ?? prevData?.stats ?? null,
       // IDs FIFA pour api/fifa-lineups.js — préserver depuis prevData si fifaD absent
       ...(fifaD ? {
         fifaCompId:   fifaD.fifaCompId,
