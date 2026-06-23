@@ -1254,7 +1254,8 @@
 /* ── GroupModal — onglets + liste matchs ─────────────────────────────────── */
 
 .classement__modalBox--tabs {
-  max-width: 680px;
+  max-width: 860px;
+  min-height: 70vh;
 }
 
 /* Onglets */
