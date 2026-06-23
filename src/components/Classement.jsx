@@ -215,10 +215,10 @@ function Classement() {
           <div className="accueil__matchCardTeam">
             <div className="accueil__matchCardCrestWrap">
               {m.homeTeam?.crest
-                ? <img src={m.homeTeam.crest} alt="" className={`accueil__matchCardCrest${awayWin ? ' accueil__matchCardCrest--loser' : ''}`} />
+                ? <img src={m.homeTeam.crest} alt="" className="accueil__matchCardCrest" />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
-            <span className={`accueil__matchCardName${homeWin ? ' accueil__matchCardName--winner' : awayWin ? ' accueil__matchCardName--loser' : ''}`}>{hn}</span>
+            <span className="accueil__matchCardName">{hn}</span>
           </div>
 
           {/* Centre */}
@@ -234,10 +234,10 @@ function Classement() {
           <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
             <div className="accueil__matchCardCrestWrap">
               {m.awayTeam?.crest
-                ? <img src={m.awayTeam.crest} alt="" className={`accueil__matchCardCrest${homeWin ? ' accueil__matchCardCrest--loser' : ''}`} />
+                ? <img src={m.awayTeam.crest} alt="" className="accueil__matchCardCrest" />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
-            <span className={`accueil__matchCardName${awayWin ? ' accueil__matchCardName--winner' : homeWin ? ' accueil__matchCardName--loser' : ''}`}>{an}</span>
+            <span className="accueil__matchCardName">{an}</span>
           </div>
         </div>
       )
