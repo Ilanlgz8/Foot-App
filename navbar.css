@@ -447,53 +447,32 @@
   .navbar__container { padding: 0 2rem; }
 }
 
-/* ── Bouton DIRECT dans la navbar ── */
-/* Mobile : visible, compact, remonté de 8px */
+/* ── Bouton DIRECT dans la navbar (desktop uniquement) ── */
 .navbar__liveBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-left: auto;
-  margin-right: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  background: #dc2626;
-  border: none;
-  border-radius: 0.2rem;
-  cursor: pointer;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.62rem;
-  font-weight: 900;
-  color: #fff;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  box-shadow: 0 2px 8px rgba(220,38,38,0.45);
-  flex-shrink: 0;
-  transform: translateY(-8px);
-}
-.navbar__liveBtnDot {
-  width: 0.32rem;
-  height: 0.32rem;
-  border-radius: 50%;
-  background: #fff;
-  animation: pulse 1.2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-.navbar__liveBtnArrow {
-  font-size: 0.85rem;
-  opacity: 0.75;
-  line-height: 1;
+  display: none;
 }
 
 @media (min-width: 640px) {
   .navbar__liveBtn {
+    display: inline-flex;
+    align-items: center;
     gap: 0.45rem;
+    margin-left: auto;
     margin-right: 0.75rem;
     padding: 0.45rem 1rem;
+    background: #dc2626;
+    border: none;
+    border-radius: 0.2rem;
+    cursor: pointer;
+    font-family: 'Chakra Petch', system-ui, sans-serif;
     font-size: 0.72rem;
+    font-weight: 900;
+    color: #fff;
     letter-spacing: 0.12em;
+    text-transform: uppercase;
     transition: background 0.15s, box-shadow 0.15s;
     box-shadow: 0 2px 10px rgba(220,38,38,0.5);
-    transform: none;
+    flex-shrink: 0;
   }
   .navbar__liveBtn:hover {
     background: #b91c1c;
@@ -502,10 +481,16 @@
   .navbar__liveBtnDot {
     width: 0.38rem;
     height: 0.38rem;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse 1.2s ease-in-out infinite;
     box-shadow: 0 0 4px rgba(255,255,255,0.9);
+    flex-shrink: 0;
   }
   .navbar__liveBtnArrow {
     font-size: 0.95rem;
+    opacity: 0.75;
+    line-height: 1;
   }
 }
 
