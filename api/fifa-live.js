@@ -234,6 +234,39 @@ function extractEspnScorers(comp, homeTeamId) {
     })
 }
 
+function extractEspnStats(homeC, awayC) {
+  const hArr = homeC?.statistics
+  const aArr = awayC?.statistics
+  if (!hArr?.length && !aArr?.length) return null
+
+  function find(arr, ...names) {
+    if (!arr) return null
+    for (const name of names) {
+      const s = arr.find(s => s.name === name || s.abbreviation === name)
+      if (s == null) continue
+      const v = parseFloat(s.displayValue ?? String(s.value ?? ''))
+      if (!isNaN(v)) return v
+    }
+    return null
+  }
+
+  const hPoss    = find(hArr, 'possessionPct', 'possession')
+  const aPoss    = find(aArr, 'possessionPct', 'possession')
+  const hShots   = find(hArr, 'totalShots', 'shotsTotal', 'shots')
+  const aShots   = find(aArr, 'totalShots', 'shotsTotal', 'shots')
+  const hSOT     = find(hArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
+  const aSOT     = find(aArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
+  const hCorners = find(hArr, 'cornerKicks', 'cornersTotal', 'corners')
+  const aCorners = find(aArr, 'cornerKicks', 'cornersTotal', 'corners')
+
+  if (hPoss == null && hShots == null && hCorners == null) return null
+
+  return {
+    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners },
+    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners },
+  }
+}
+
 async function fetchEspnEvents(slugSet, today, yesterday) {
   const allEvents = []
   await Promise.allSettled([...slugSet].map(async slug => {
@@ -395,6 +428,21 @@ export default async function handler(req, res) {
     const fifaD   = isWC ? fifaByFdId[fdMatch.id] : null
     const prevData = storedData[fdMatch.id]
 
+    // WC : si ESPN retourne encore STATUS_SCHEDULED mais que FIFA confirme Period=1
+    // (match réellement commencé), utiliser le statut FIFA pour ne pas attendre
+    // le lag ESPN (~4min). Le garde Period=0 → SCHEDULED est déjà dans fifaToEspnStatus.
+    let finalEspnStatus = espnStatus
+    let finalEspnClock  = espnClock
+    let finalEspnPeriod = espnPeriod
+    if (isWC && espnStatus === 'STATUS_SCHEDULED' && fifaD?.fifaRaw) {
+      const fifaStatus = fifaToEspnStatus(fifaD.fifaRaw)
+      if (fifaStatus === 'STATUS_IN_PROGRESS' || fifaStatus === 'STATUS_HALFTIME') {
+        finalEspnStatus = fifaStatus
+        finalEspnClock  = fifaToClock(fifaD.fifaRaw)
+        finalEspnPeriod = fifaToPeriod(fifaD.fifaRaw)
+      }
+    }
+
     // Score : FIFA si WC (plus réactif sur les buts), ESPN sinon
     let home, away, scorers
     if (fifaD) {
@@ -418,15 +466,17 @@ export default async function handler(req, res) {
                       ?? (isWC ? prevData?.espnEventId : null)
                       ?? found.evt.id,
       espnSlug:     isWC ? 'fifa' : found.slug,
-      // Statut ESPN (source primaire — pas de faux FT/ET)
-      espnStatus,
-      espnClock,
-      espnPeriod,
+      // Statut : ESPN primaire, mais si ESPN lag au KO WC → FIFA Period=1 utilisé
+      espnStatus:   finalEspnStatus,
+      espnClock:    finalEspnClock,
+      espnPeriod:   finalEspnPeriod,
       // Score FIFA (WC) ou ESPN (club)
       home,
       away,
       scorers:      bestScorers,
-      stats:        prevData?.stats ?? null,
+      // Stats : extraites du scoreboard ESPN (possession, tirs, corners)
+      // Fallback sur Redis last-known si le scoreboard ne les inclut pas encore
+      stats:        extractEspnStats(homeC, awayC) ?? prevData?.stats ?? null,
       // IDs FIFA pour api/fifa-lineups.js — préserver depuis prevData si fifaD absent
       ...(fifaD ? {
         fifaCompId:   fifaD.fifaCompId,

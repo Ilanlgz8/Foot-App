@@ -179,7 +179,8 @@ function _checkPendingKickoffs(matches, queryClient) {
   let changed = false
 
   for (const match of matches) {
-    if (match.status !== 'SCHEDULED') continue
+    // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'
+    if (match.status !== 'SCHEDULED' && match.status !== 'TIMED') continue
     if (isTrackedLive(match.id)) continue
 
     const slug = COMP_ESPN[match.competition?.id]

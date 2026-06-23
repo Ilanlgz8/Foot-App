@@ -243,7 +243,8 @@ function Accueil() {
   const nowMs = Date.now()
   const pendingMatches = dayOffset === 0
     ? matches.filter(m => {
-        if (m.status !== 'SCHEDULED') return false
+        // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'
+        if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
         if (liveMatches.some(l => l.id === m.id)) return false
         const utcMs = new Date(m.utcDate).getTime()
         return nowMs >= utcMs && nowMs - utcMs < 30 * 60_000

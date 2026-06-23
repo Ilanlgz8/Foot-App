@@ -216,7 +216,8 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
     if (state.ft === true) return true
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
     // Pending kickoff : heure atteinte, ESPN pas encore confirmé
-    if (m.status === 'SCHEDULED') {
+    // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'
+    if (m.status === 'SCHEDULED' || m.status === 'TIMED') {
       const utcMs = new Date(m.utcDate).getTime()
       if (now >= utcMs && now - utcMs < 30 * 60_000) return true
     }
@@ -265,7 +266,14 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           const espn      = espnScores[match.id] ?? null
           const matchSt   = getMatchState(match.id)
           const isTermine = matchSt.ft === true
-          const minute    = isTermine ? null : calcMinute(match)
+          // Pending kickoff : heure atteinte mais ESPN pas encore confirmé → "Débute"
+          const nowPending = Date.now()
+          const utcMsPending = new Date(match.utcDate).getTime()
+          const isPendingKO = !isTermine
+            && (match.status === 'SCHEDULED' || match.status === 'TIMED')
+            && nowPending >= utcMsPending
+            && nowPending - utcMsPending < 30 * 60_000
+          const minute    = isTermine ? null : isPendingKO ? 'Débute' : calcMinute(match)
           // Détecter la mi-temps via ESPN (rapide) OU FD.org (lent) — les deux peuvent marcher
           const isHalftime = matchSt.espnStatus === 'STATUS_HALFTIME' || match.status === 'PAUSED'
           const pauseElapsed = isHalftime && matchSt.pausedAt && !matchSt.half2Start
