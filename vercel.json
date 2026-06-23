@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/goals",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     }
   ],
   "rewrites": [
