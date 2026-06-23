@@ -487,9 +487,9 @@ function PronoSection({ prono, homeShort, awayShort }) {
       <div className="modal__pronoRow">
         <span className="modal__pronoLabel">{homeShort}</span>
         <div className="modal__pronoBar">
-          <div className="modal__pronoSeg modal__pronoSeg--home" style={{ width: `${prono.home}%` }} />
-          <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ width: `${prono.draw}%` }} />
-          <div className="modal__pronoSeg modal__pronoSeg--away" style={{ width: `${prono.away}%` }} />
+          <div className="modal__pronoSeg modal__pronoSeg--home" style={{ '--prono-home': prono.home }} />
+          <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ '--prono-draw': prono.draw }} />
+          <div className="modal__pronoSeg modal__pronoSeg--away" style={{ '--prono-away': prono.away }} />
         </div>
         <span className="modal__pronoLabel">{awayShort}</span>
       </div>

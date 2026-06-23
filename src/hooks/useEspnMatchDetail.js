@@ -82,7 +82,9 @@ function extractEspnData(evt, match) {
  * @param {boolean}     enabled
  */
 export function useEspnMatchDetail(match, compId, enabled = true) {
-  const slug = COMP_ESPN[compId] ?? null
+  // compId peut être un code string ('PL') ou un ID numérique (2021)
+  // On essaie les deux pour couvrir les appels depuis Match.jsx (code) et Accueil (id numérique)
+  const slug = COMP_ESPN[compId] ?? COMP_ESPN[match?.competition?.id] ?? null
 
   const { data, isLoading } = useQuery({
     queryKey: ['espnMatchDetail', match?.id, slug],

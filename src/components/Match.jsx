@@ -309,14 +309,14 @@ function Matchs() {
           <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
           {prono && (
             <div className="matchs__pronoBar">
-              <div className="matchs__pronoSeg matchs__pronoSeg--home" style={{ width: `${prono.home}%` }}>
-                <span>{prono.home}%</span>
+              <div className="matchs__pronoSeg matchs__pronoSeg--home" style={{ '--prono-home': prono.home }}>
+                {prono.home}%
               </div>
-              <div className="matchs__pronoSeg matchs__pronoSeg--draw" style={{ width: `${prono.draw}%` }}>
-                <span>{prono.draw}%</span>
+              <div className="matchs__pronoSeg matchs__pronoSeg--draw" style={{ '--prono-draw': prono.draw }}>
+                {prono.draw}%
               </div>
-              <div className="matchs__pronoSeg matchs__pronoSeg--away" style={{ width: `${prono.away}%` }}>
-                <span>{prono.away}%</span>
+              <div className="matchs__pronoSeg matchs__pronoSeg--away" style={{ '--prono-away': prono.away }}>
+                {prono.away}%
               </div>
             </div>
           )}

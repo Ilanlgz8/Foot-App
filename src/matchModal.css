@@ -885,13 +885,13 @@
 }
 
 .modal__statBarFill--home {
-  background: linear-gradient(90deg, #ef4444, #f87171);
+  background: linear-gradient(90deg, #1d4ed8, #38bdf8);
   border-radius: 999px 0 0 999px;
   transition: width 0.6s ease;
 }
 
 .modal__statBarFill--away {
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  background: linear-gradient(90deg, #f97316, #ef4444);
   border-radius: 0 999px 999px 0;
   transition: width 0.6s ease;
 }
@@ -1017,14 +1017,26 @@
 .modal__pronoBar {
   flex: 1;
   display: flex;
-  height: 10px;
-  border-radius: 5px;
+  height: 14px;
+  border-radius: 7px;
   overflow: hidden;
+  gap: 2px;
 }
-.modal__pronoSeg { transition: width 0.5s ease; }
-.modal__pronoSeg--home { background: #3b82f6; }
-.modal__pronoSeg--draw { background: rgba(255,255,255,0.15); }
-.modal__pronoSeg--away { background: #ef4444; }
+.modal__pronoSeg { transition: flex 0.5s ease; }
+.modal__pronoSeg--home {
+  flex: var(--prono-home);
+  background: linear-gradient(135deg, #1d4ed8, #38bdf8);
+  border-radius: 6px 0 0 6px;
+}
+.modal__pronoSeg--draw {
+  flex: var(--prono-draw);
+  background: linear-gradient(135deg, #334155, #475569);
+}
+.modal__pronoSeg--away {
+  flex: var(--prono-away);
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  border-radius: 0 6px 6px 0;
+}
 .modal__pronoNums {
   display: flex;
   justify-content: space-between;
