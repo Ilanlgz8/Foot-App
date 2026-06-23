@@ -6,7 +6,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
-import { fdFetch, fdUrl } from '../utils/fdFetch'
+import { useMatches } from '../hooks/useMatchs'
 
 
 function Classement() {
@@ -148,9 +148,12 @@ function Classement() {
 
   /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
   function GroupModal({ group, onClose }) {
-    const [tab, setTab]           = useState('classement') // 'classement' | 'programme' | 'resultats'
-    const [matches, setMatches]   = useState([])
-    const [loadingM, setLoadingM] = useState(false)
+    const [tab, setTab] = useState('classement') // 'classement' | 'programme' | 'resultats'
+
+    // Réutilise useMatches (même cache que la page Programme/Résultats — 0 requête supplémentaire)
+    const { matches: sched, loading: loadingSched } = useMatches('WC', 'SCHEDULED')
+    const { matches: fin,   loading: loadingFin   } = useMatches('WC', 'FINISHED')
+    const loadingM = loadingSched || loadingFin
 
     useEffect(() => {
       const handler = e => { if (e.key === 'Escape') onClose() }
@@ -172,25 +175,8 @@ function Classement() {
       }
     }, [onClose])
 
-    // Fetch matchs du groupe au premier clic sur Programme ou Résultats
-    // — passe par fdFetch/fdUrl (api/football.js) comme tous les appels FD.org
-    // — filtre côté client par m.group car FD.org ne supporte pas ?group= en filtre
-    useEffect(() => {
-      if (tab === 'classement' || matches.length > 0) return
-      setLoadingM(true)
-      fdFetch(fdUrl('/api/v4/competitions/WC/matches'))
-        .then(r => r.ok ? r.json() : Promise.reject(r.status))
-        .then(data => {
-          const all = data.matches ?? []
-          setMatches(all.filter(m => m.group === group.name))
-        })
-        .catch(() => setMatches([]))
-        .finally(() => setLoadingM(false))
-    }, [tab])
-
-    const upcoming  = matches.filter(m => ['SCHEDULED','TIMED'].includes(m.status))
-    const finished  = matches.filter(m => m.status === 'FINISHED')
-    const inPlay    = matches.filter(m => ['IN_PLAY','PAUSED'].includes(m.status))
+    const upcoming = sched.filter(m => m.group === group.name && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
+    const finished = fin.filter(m => m.group === group.name)
 
     function formatDate(utcDate) {
       if (!utcDate) return ''
@@ -259,7 +245,7 @@ function Classement() {
             {tab === 'classement' && <StandingsTable rows={group.table} compact={false} />}
             {tab === 'programme'  && (
               <MatchList
-                list={[...inPlay, ...upcoming]}
+                list={upcoming}
                 showScore={false}
                 empty="Aucun match à venir dans ce groupe."
               />
