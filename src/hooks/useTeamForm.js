@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fdUrl } from '../utils/fdFetch'
+import { readCache, getCacheSavedAt, writeCache } from './localCache'
 
 // Retourne 'W', 'L' ou 'D' selon les buts marqués et encaissés
 function getResult(myGoals, theirGoals) {
@@ -8,7 +9,11 @@ function getResult(myGoals, theirGoals) {
   return 'D'
 }
 
+const FORM_STALE = 1000 * 60 * 30  // 30min
+
 export function useTeamForm(selectedComp) {
+  const cacheKey = `teamform_${selectedComp}`
+
   const { data } = useQuery({
     queryKey: ['teamForm', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: async () => {
@@ -47,10 +52,14 @@ export function useTeamForm(selectedComp) {
         formMap[id] = formMap[id].slice(-5)
       })
 
-      return { formMap, matches }
+      const result = { formMap, matches }
+      writeCache(cacheKey, result, FORM_STALE)
+      return result
     },
-    enabled:   !!selectedComp,
-    staleTime: 1000 * 60 * 30, // cache 30min
+    enabled:              !!selectedComp,
+    initialData:          readCache(cacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(cacheKey),
+    staleTime:            FORM_STALE,
     retry: false
   })
 

@@ -6,7 +6,7 @@
 //   useLineups(match) — compositions via ESPN summary
 //   useH2H(match)     — confrontations directes via FD.org
 import { useQuery } from '@tanstack/react-query'
-import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 
@@ -24,10 +24,13 @@ export function useMatchDetail(matchId) {
       return json
     },
     enabled:              !!matchId,
-    initialData:          readCacheStale(key) ?? undefined,
+    // readCache (pas readCacheStale) : on ignore les entrées expirées.
+    // Un match fetché en live avec goals:[] ne doit pas bloquer le re-fetch.
+    initialData:          readCache(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
-    staleTime:            24 * 60 * 60 * 1000,
-    retry:                false,
+    staleTime:            2 * 60 * 60 * 1000,   // 2h (pas 24h)
+    retry:                1,
+    retryDelay:           2_000,
   })
 
   return { detail: data ?? null, loading: isLoading }

@@ -437,8 +437,13 @@ function FinishedDetails({ match, espnData, detail, loading }) {
   const fdBookings = detail?.bookings ?? []
   const espnScorers = espnData?.scorers ?? []
 
-  // Chargement : on attend au moins FD.org (ESPN peut prendre plus de temps)
-  if (loading && !detail && !espnData) {
+  // ESPN scoreboard ne retourne pas toujours les détails de buts pour les matchs passés.
+  // On considère ESPN "utile" seulement s'il a des buteurs OU des stats.
+  const espnHasData = espnScorers.length > 0 || !!espnData?.stats
+
+  // Spinner : on attend si aucune source n'a encore répondu
+  const hasAnyData = espnHasData || fdGoals.length > 0 || !!detail
+  if (loading && !hasAnyData) {
     return (
       <div className="modal__state">
         <div className="modal__spinner" />
@@ -449,14 +454,16 @@ function FinishedDetails({ match, espnData, detail, loading }) {
 
   return (
     <>
-      {/* ── Buteurs : ESPN en priorité, FD.org en fallback ── */}
+      {/* ── Buteurs : ESPN en priorité si utile, FD.org sinon ── */}
       {espnScorers.length > 0
         ? <ESPNScorers scorers={espnScorers} />
         : fdGoals.length > 0
           ? <GoalTimeline goals={fdGoals} homeId={homeId} />
-          : <p className="modal__noEvents">
-              {totalGoals > 0 ? 'Buteurs non disponibles' : 'Match sans but (0 – 0)'}
-            </p>
+          : !loading
+            ? <p className="modal__noEvents">
+                {totalGoals > 0 ? 'Buteurs non disponibles' : 'Match sans but (0 – 0)'}
+              </p>
+            : null   // FD.org charge encore, on n'affiche pas le message trop tôt
       }
 
       {/* ── Stats ESPN si disponibles ── */}
