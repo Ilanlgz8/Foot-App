@@ -411,8 +411,12 @@ export default async function handler(req, res) {
       ? scorers : (prevData?.scorers ?? [])
 
     result[fdMatch.id] = {
-      // IDs : FIFA match ID pour WC (nécessaire pour les compos), ESPN sinon
-      espnEventId:  fifaD?.fifaMatchId ?? found.evt.id,
+      // IDs : FIFA match ID pour WC (nécessaire pour les compos), ESPN sinon.
+      // Si fifaD absent (FIFA live cache stale), on préserve l'ID FIFA depuis prevData
+      // pour ne pas écraser un bon espnEventId par un ID ESPN inutilisable.
+      espnEventId:  fifaD?.fifaMatchId
+                      ?? (isWC ? prevData?.espnEventId : null)
+                      ?? found.evt.id,
       espnSlug:     isWC ? 'fifa' : found.slug,
       // Statut ESPN (source primaire — pas de faux FT/ET)
       espnStatus,
@@ -423,11 +427,15 @@ export default async function handler(req, res) {
       away,
       scorers:      bestScorers,
       stats:        prevData?.stats ?? null,
-      // IDs FIFA pour api/fifa-lineups.js
+      // IDs FIFA pour api/fifa-lineups.js — préserver depuis prevData si fifaD absent
       ...(fifaD ? {
         fifaCompId:   fifaD.fifaCompId,
         fifaSeasonId: fifaD.fifaSeasonId,
         fifaStageId:  fifaD.fifaStageId,
+      } : isWC && prevData?.fifaCompId ? {
+        fifaCompId:   prevData.fifaCompId,
+        fifaSeasonId: prevData.fifaSeasonId,
+        fifaStageId:  prevData.fifaStageId,
       } : {}),
     }
   }
