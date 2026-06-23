@@ -255,7 +255,9 @@ function LiveMatchBlock({ match, espn, onMatchClick }) {
   const clickable = !!onMatchClick
 
   // ── Détection de but ──
-  const scoreKey = `foot_score_${match.id}`
+  // Clé séparée de MatchCard pour éviter que MatchCard écrase le score
+  // avant que LiveMatchBlock détecte le changement → fausse init → pas d'anim
+  const scoreKey = `foot_lw_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
   const timerRef = useRef(null)
