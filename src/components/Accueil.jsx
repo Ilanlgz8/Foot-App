@@ -306,9 +306,6 @@ function Accueil() {
                 : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
-              trackedIds={trackedIds}
-              onTrack={trackHandler}
-              totalMatchCount={filteredMatches.length}
             />
           </div>
 

@@ -241,7 +241,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, trackedIds, onTrack, totalMatchCount = 0 }) {
+export function MatchPanel({ matches: allMatches, loading, espnScores = {} }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -255,22 +255,14 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, trac
       )}
       {!loading && displayed.length > 0 && (
         <div className="accueil__matchCards">
-          {displayed.map(match => {
-            const isTracked     = trackedIds?.has(String(match.id)) ?? false
-            const limitAtteinte = !isTracked && (trackedIds?.size ?? 0) >= 5
-            // Bouton Suivre visible si : >5 matchs ce jour ET (déjà suivi OU limite pas atteinte)
-            const showTrack = totalMatchCount > 5 && onTrack && (isTracked || !limitAtteinte)
-            return (
-              <MatchCard
-                key={match.id}
-                match={match}
-                espnScore={espnScores[match.id] ?? null}
-                tracked={isTracked}
-                onTrack={showTrack ? () => onTrack(match.id) : null}
-                noAnimation
-              />
-            )
-          })}
+          {displayed.map(match => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              espnScore={espnScores[match.id] ?? null}
+              noAnimation
+            />
+          ))}
         </div>
       )}
     </div>
