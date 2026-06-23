@@ -243,6 +243,11 @@ function Classement() {
           {/* Contenu */}
           <div className="gm__body">
             {tab === 'classement' && <StandingsTable rows={group.table} compact={false} />}
+            {/* DEBUG TEMPORAIRE — à supprimer */}
+            {tab === 'programme' && <div style={{color:'lime',fontSize:'0.7rem',padding:'0.5rem'}}>
+              sched={schedMatches.length} fin={finMatches.length} | group.name={group.name} | loading={String(loadingM)}
+              | groupsInSched={[...new Set(schedMatches.slice(0,20).map(m=>m.group))].join(',')}
+            </div>}
             {tab === 'programme'  && (
               <MatchList
                 list={upcoming}
