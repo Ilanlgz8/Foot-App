@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//, /^\/cron-goals/, /^\/news$/, /^\/espn$/, /^\/sofascore$/, /^\/apifootball$/],
           // Nouveau SW prend le contrôle immédiatement → pas besoin de vider le cache Safari
           skipWaiting: true,
           clientsClaim: true,
