@@ -298,11 +298,15 @@ function Accueil() {
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
               matches={dayOffset === 0
-                ? filteredMatches.filter(m =>
-                    m.status !== 'FINISHED' &&
-                    !widgetMatches.some(l => l.id === m.id) &&
-                    !getMatchState(m.id).ft
-                  )
+                ? filteredMatches.filter(m => {
+                    // Masquer dès que le match est dans le widget (live ou pending KO)
+                    if (widgetMatches.some(l => l.id === m.id)) return false
+                    // Masquer si FD.org dit déjà IN_PLAY/PAUSED (widget pas encore à jour)
+                    if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return false
+                    // Masquer si terminé (FD.org ou flag local ESPN)
+                    if (m.status === 'FINISHED' || getMatchState(m.id).ft) return false
+                    return true
+                  })
                 : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
