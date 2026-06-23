@@ -766,21 +766,21 @@
 .matchs__pronoBar {
   display: flex;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
+  height: 18px;
+  border-radius: 4px;
   overflow: hidden;
 }
 .matchs__pronoSeg {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.9);
   transition: width 0.4s ease;
 }
 .matchs__pronoSeg--home { background: #3b82f6; }
-.matchs__pronoSeg--draw { background: rgba(255,255,255,0.18); }
+.matchs__pronoSeg--draw { background: rgba(255,255,255,0.15); }
 .matchs__pronoSeg--away { background: #ef4444; }
 
 .matchs__scoreHour {
