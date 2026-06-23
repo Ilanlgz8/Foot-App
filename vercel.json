@@ -6,6 +6,10 @@
     { "source": "/apifootball",    "destination": "/api/apifootball" },
     { "source": "/api/fifa-live",     "destination": "/api/fifa-live" },
     { "source": "/api/fifa-lineups", "destination": "/api/fifa-lineups" },
+    { "source": "/api/cron/goals",   "destination": "/api/cron/goals" },
+    { "source": "/api/subscribe",    "destination": "/api/subscribe" },
+    { "source": "/api/push",         "destination": "/api/push" },
+    { "source": "/api/vapid-key",    "destination": "/api/vapid-key" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
