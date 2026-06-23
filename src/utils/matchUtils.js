@@ -175,13 +175,16 @@ export function getMatchPeriod(match) {
   const period = state.espnPeriod
 
   if (status === 'STATUS_HALFTIME') return 'Mi-temps'
+  // FD.org PAUSED override — prioritaire sur espnPeriod potentiellement stale.
+  // Cas : FIFA laisse period=3 en localStorage pendant la transition mi-temps
+  // alors que FD.org a déjà passé le match en PAUSED → évite badge 'Prolongations'.
+  if (match.status === 'PAUSED') return 'Mi-temps'
   if (status === 'STATUS_SHOOTOUT' || period === 5) return 'T.A.B.'
   if (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME' || period === 3 || period === 4) return 'Prolongations'
   if (period === 2) return '2ème MT'
   if (period === 1) return '1ère MT'
 
   // Fallback FD.org sans ESPN
-  if (match.status === 'PAUSED')      return 'Mi-temps'
   if (match.status === 'EXTRA_TIME')  return 'Prolongations'
   return null
 }
