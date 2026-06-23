@@ -147,6 +147,10 @@ function Classement() {
 
   /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
   function GroupModal({ group, onClose }) {
+    const [tab, setTab]           = useState('classement') // 'classement' | 'programme' | 'resultats'
+    const [matches, setMatches]   = useState([])
+    const [loadingM, setLoadingM] = useState(false)
+
     useEffect(() => {
       const handler = e => { if (e.key === 'Escape') onClose() }
       window.addEventListener('keydown', handler)
@@ -167,14 +171,101 @@ function Classement() {
       }
     }, [onClose])
 
+    // Fetch matchs du groupe au premier clic sur Programme ou Résultats
+    useEffect(() => {
+      if (tab === 'classement' || matches.length > 0) return
+      setLoadingM(true)
+      fetch(`/api/v4/competitions/WC/matches?group=${group.name}`)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(data => setMatches(data.matches ?? []))
+        .catch(() => setMatches([]))
+        .finally(() => setLoadingM(false))
+    }, [tab])
+
+    const upcoming  = matches.filter(m => ['SCHEDULED','TIMED'].includes(m.status))
+    const finished  = matches.filter(m => m.status === 'FINISHED')
+    const inPlay    = matches.filter(m => ['IN_PLAY','PAUSED'].includes(m.status))
+
+    function formatDate(utcDate) {
+      if (!utcDate) return ''
+      const d = new Date(utcDate)
+      return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+    }
+    function formatTime(utcDate) {
+      if (!utcDate) return ''
+      return new Date(utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    }
+
+    function MatchRow({ m, showScore }) {
+      const hn = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
+      const an = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
+      const sh = m.score?.fullTime?.home ?? m.score?.halfTime?.home
+      const sa = m.score?.fullTime?.away ?? m.score?.halfTime?.away
+      const live = ['IN_PLAY','PAUSED'].includes(m.status)
+      return (
+        <div className="gm__matchRow">
+          <span className="gm__matchDate">{formatDate(m.utcDate)}</span>
+          <div className="gm__matchTeams">
+            <span className="gm__teamName gm__teamName--home">
+              {m.homeTeam?.crest && <img src={m.homeTeam.crest} alt="" className="gm__crest" />}
+              {hn}
+            </span>
+            {showScore && sh != null
+              ? <span className={`gm__score${live ? ' gm__score--live' : ''}`}>{sh} – {sa}</span>
+              : <span className="gm__scoreTime">{formatTime(m.utcDate)}</span>
+            }
+            <span className="gm__teamName gm__teamName--away">
+              {an}
+              {m.awayTeam?.crest && <img src={m.awayTeam.crest} alt="" className="gm__crest" />}
+            </span>
+          </div>
+        </div>
+      )
+    }
+
+    function MatchList({ list, showScore, empty }) {
+      if (loadingM) return <div className="gm__loading">Chargement…</div>
+      if (!list.length) return <div className="gm__empty">{empty}</div>
+      return <div className="gm__matchList">{list.map(m => <MatchRow key={m.id} m={m} showScore={showScore} />)}</div>
+    }
+
     return createPortal(
       <div className="classement__modalOverlay" onClick={onClose}>
-        <div className="classement__modalBox" onClick={e => e.stopPropagation()}>
+        <div className="classement__modalBox classement__modalBox--tabs" onClick={e => e.stopPropagation()}>
           <div className="classement__modalHeader">
             <h3 className="classement__modalTitle">{formatGroupName(group.name)}</h3>
             <button className="classement__modalClose" onClick={onClose} aria-label="Fermer">✕</button>
           </div>
-          <StandingsTable rows={group.table} compact={false} />
+
+          {/* Onglets */}
+          <div className="gm__tabs">
+            {[['classement','Classement'],['programme','Programme'],['resultats','Résultats']].map(([id, label]) => (
+              <button
+                key={id}
+                className={`gm__tab${tab === id ? ' gm__tab--active' : ''}`}
+                onClick={() => setTab(id)}
+              >{label}</button>
+            ))}
+          </div>
+
+          {/* Contenu */}
+          <div className="gm__body">
+            {tab === 'classement' && <StandingsTable rows={group.table} compact={false} />}
+            {tab === 'programme'  && (
+              <MatchList
+                list={[...inPlay, ...upcoming]}
+                showScore={false}
+                empty="Aucun match à venir dans ce groupe."
+              />
+            )}
+            {tab === 'resultats'  && (
+              <MatchList
+                list={[...finished].reverse()}
+                showScore={true}
+                empty="Aucun résultat disponible pour ce groupe."
+              />
+            )}
+          </div>
         </div>
       </div>,
       document.body

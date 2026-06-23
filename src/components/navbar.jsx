@@ -7,7 +7,7 @@ import '../../navbar.css'
 
 const navigation = [
   { name: 'Accueil',    href: '/' },
-  { name: 'Matchs',     href: '/matchs' },
+  { name: 'Programme',  href: '/matchs' },
   { name: 'Résultats',  href: '/resultats' },
   { name: 'Classement', href: '/classement' },
 ]

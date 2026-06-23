@@ -1250,3 +1250,141 @@
     box-shadow: 0 0 12px rgba(239,68,68,0.18);
   }
 }
+
+/* ── GroupModal — onglets + liste matchs ─────────────────────────────────── */
+
+.classement__modalBox--tabs {
+  max-width: 680px;
+}
+
+/* Onglets */
+.gm__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #1e1e1e;
+  padding: 0 1rem;
+  background: #0d0d0d;
+  position: sticky;
+  top: 3.5rem;
+  z-index: 1;
+}
+
+.gm__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.1rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.gm__tab:hover { color: rgba(255,255,255,0.75); }
+
+.gm__tab--active {
+  color: #ef4444;
+  border-bottom-color: #ef4444;
+}
+
+/* Corps */
+.gm__body {
+  padding: 0.25rem 0 0.75rem;
+}
+
+/* Liste matchs */
+.gm__matchList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.gm__matchRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s;
+}
+.gm__matchRow:last-child { border-bottom: none; }
+.gm__matchRow:hover { background: rgba(255,255,255,0.03); }
+
+.gm__matchDate {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gm__matchTeams {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gm__teamName {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.88);
+}
+.gm__teamName--home { justify-content: flex-end; text-align: right; }
+.gm__teamName--away { justify-content: flex-start; }
+
+.gm__crest {
+  width: 1.2rem;
+  height: 1.2rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.gm__score {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f0d0d0;
+  text-align: center;
+  min-width: 3rem;
+  background: linear-gradient(135deg, rgba(80,15,15,0.7), rgba(35,6,6,0.9));
+  border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.5rem;
+}
+
+.gm__score--live {
+  color: #ef4444;
+  border-color: rgba(239,68,68,0.4);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.gm__scoreTime {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  min-width: 3rem;
+}
+
+.gm__loading,
+.gm__empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .classement__modalBox--tabs { max-width: 100%; }
+  .gm__tab { font-size: 0.7rem; padding: 0.6rem 0.8rem; }
+  .gm__teamName { font-size: 0.75rem; }
+  .gm__score { font-size: 0.9rem; min-width: 2.6rem; }
+}
