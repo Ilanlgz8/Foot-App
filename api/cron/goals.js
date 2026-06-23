@@ -242,10 +242,20 @@ export default async function handler(req, res) {
       // 🏁 Fin de match
       if ((prevSt === 'live' || prevSt === 'ht') && state === 'finished') {
         // Garde anti-faux-FT : vérifier que le match a vraiment eu lieu au moins ~85 min.
-        // FIFA peut brièvement montrer MatchStatus=3 pendant la transition pré-match → 1erMT.
-        // MatchTime='FT' ou '90+X' = FT réel. MatchTime vide ou '0' = faux FT.
-        const rawTime  = (m.MatchTime ?? '').replace(/[^0-9+]/g, '').trim()
-        const isFakeFt = rawTime === '' || rawTime === '0'
+        // FIFA peut brièvement montrer MatchStatus=3 lors de transitions (but, VAR, 72e min…).
+        // On extrait les minutes de base depuis MatchTime et on rejette si < 85.
+        // MatchTime='FT' → 90min (réel). MatchTime='90+3' → base=90 (réel). MatchTime='72' → faux.
+        const rawTime = (m.MatchTime ?? '').replace(/'/g, '').trim()
+        const ftMins  = (() => {
+          if (!rawTime || rawTime === '0') return 0
+          if (rawTime === 'FT')           return 90
+          const plusIdx = rawTime.indexOf('+')
+          const base = plusIdx !== -1
+            ? parseInt(rawTime.slice(0, plusIdx), 10)
+            : parseInt(rawTime, 10)
+          return isNaN(base) ? 0 : base
+        })()
+        const isFakeFt = ftMins < 85
         if (isFakeFt) {
           // Remettre à 'scheduled' pour pouvoir détecter le vrai KO ensuite
           try { await kv.set(stateKey, `scheduled|${score}`, { ex: 12 * 3600 }) } catch {}

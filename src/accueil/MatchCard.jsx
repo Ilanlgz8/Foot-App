@@ -63,7 +63,16 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
-  const isFinished = match.status === 'FINISHED' || getMatchState(match.id).ft === true
+  // isFinished : ft local (confirmé par ESPN) OU FD.org FINISHED, SAUF si ESPN confirme
+  // toujours un match en cours (STATUS_IN_PROGRESS/HALFTIME) → priorité ESPN pour éviter
+  // d'afficher "FT" sur un faux STATUS_FINAL FIFA propagé à FD.org en cours de match.
+  const _ms      = getMatchState(match.id)
+  const _espnLive = (
+    _ms.espnStatus === 'STATUS_IN_PROGRESS' ||
+    _ms.espnStatus === 'STATUS_HALFTIME'    ||
+    _ms.espnStatus === 'STATUS_END_PERIOD'
+  )
+  const isFinished = _ms.ft === true || (match.status === 'FINISHED' && !_espnLive)
   const liveMinute = isFinished ? null : calcMinute(match)
   // isLive inclut "Débute" (pending kickoff) pour déclencher le style live dès l'heure du KO
   const isLive     = !isFinished && (

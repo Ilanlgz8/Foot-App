@@ -245,13 +245,31 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 3 : FD.org confirme FINISHED mais match encore dans liveTracker
+  // ⚠️ FD.org réplique parfois les faux STATUS_FINAL de FIFA (ex: "FINISHED" à 72').
+  //   Double garde : âge plausible (>= 85min) ET ESPN ne dit pas encore IN_PROGRESS.
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
     if (pendingFt[mid]) continue
     const fdMatch = allLive.find(m => m.id === mid)
     if (!fdMatch || fdMatch.status !== 'FINISHED') continue
-    console.log(`[useLiveMinute] match ${mid} FINISHED (FD.org) → FT`)
+    // Garde âge : ignorer si le match a moins de 85min (faux FT de transition FIFA/FD.org)
+    const ageMin3 = (now - new Date(lm.utcDate)) / 60_000
+    if (ageMin3 < 85) {
+      console.log(`[useLiveMinute] Safeguard 3 ignoré — FD.org FINISHED mais ${Math.round(ageMin3)}min < 85 (faux FT ?)`)
+      continue
+    }
+    // Garde ESPN : si ESPN confirme toujours que le match est en cours, on lui fait confiance
+    const ms3 = getMatchState(mid)
+    if (
+      ms3.espnStatus === 'STATUS_IN_PROGRESS' ||
+      ms3.espnStatus === 'STATUS_HALFTIME'    ||
+      ms3.espnStatus === 'STATUS_END_PERIOD'
+    ) {
+      console.log(`[useLiveMinute] Safeguard 3 ignoré — FD.org FINISHED mais ESPN=${ms3.espnStatus} (priorité ESPN)`)
+      continue
+    }
+    console.log(`[useLiveMinute] match ${mid} FINISHED (FD.org, ${Math.round(ageMin3)}min) → FT`)
     confirmFt(lm, now, queryClient)
   }
 

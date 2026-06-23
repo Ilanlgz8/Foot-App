@@ -105,9 +105,27 @@ function Accueil() {
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
-  // Résultats récents = matchs terminés de J-1+J (useTodayMatches couvre les deux jours)
-  // Pas de requête FD.org supplémentaire — derived from matches
-  const results        = useMemo(() => matches.filter(m => m.status === 'FINISHED'), [matches])
+
+  // Résultats récents : matchs terminés d'aujourd'hui + d'hier.
+  // useTodayMatches filtre strictement par date locale → les matchs d'hier (locale)
+  // ne sont pas inclus dans la requête du jour courant. On fetch J-1 séparément.
+  const yesterdayDate = useMemo(() => {
+    const d = new Date(targetDate + 'T12:00:00')
+    d.setDate(d.getDate() - 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [targetDate])
+  const { matches: yesterdayMatches } = useTodayMatches(yesterdayDate)
+
+  const results = useMemo(() => {
+    const seen = new Set()
+    return [...matches, ...yesterdayMatches]
+      .filter(m => {
+        if (m.status !== 'FINISHED') return false
+        if (seen.has(m.id)) return false
+        seen.add(m.id)
+        return true
+      })
+  }, [matches, yesterdayMatches])
   const resultsLoading = matchesLoading
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
