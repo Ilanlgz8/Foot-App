@@ -175,8 +175,11 @@ function Classement() {
       }
     }, [onClose])
 
-    const upcoming = schedMatches.filter(m => m.group === group.name && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
-    const finished = finMatches.filter(m => m.group === group.name)
+    // standings: "Group A" / matches: "GROUP_A" → normaliser pour comparer
+    const normGroup = g => (g ?? '').toUpperCase().replace(/\s+/g, '_')
+    const gn = normGroup(group.name)
+    const upcoming = schedMatches.filter(m => normGroup(m.group) === gn && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
+    const finished = finMatches.filter(m => normGroup(m.group) === gn)
 
     function formatDate(utcDate) {
       if (!utcDate) return ''
@@ -243,11 +246,7 @@ function Classement() {
           {/* Contenu */}
           <div className="gm__body">
             {tab === 'classement' && <StandingsTable rows={group.table} compact={false} />}
-            {/* DEBUG TEMPORAIRE — à supprimer */}
-            {tab === 'programme' && <div style={{color:'lime',fontSize:'0.7rem',padding:'0.5rem'}}>
-              sched={schedMatches.length} fin={finMatches.length} | group.name={group.name} | loading={String(loadingM)}
-              | groupsInSched={[...new Set(schedMatches.slice(0,20).map(m=>m.group))].join(',')}
-            </div>}
+
             {tab === 'programme'  && (
               <MatchList
                 list={upcoming}
