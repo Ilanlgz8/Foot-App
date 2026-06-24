@@ -12,22 +12,25 @@ function getResult(myGoals, theirGoals) {
 const FORM_STALE = 1000 * 60 * 30  // 30min
 
 export function useTeamForm(selectedComp) {
-  const cacheKey = `teamform_${selectedComp}`
+  const cacheKey = `teamform2_${selectedComp}`
 
   const { data, isLoading } = useQuery({
-    queryKey: ['teamForm', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
+    queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: async () => {
-      // WC 2026 : sans filtre saison FD.org renvoie WC 2022 → forme incorrecte
-      const seasonParam = selectedComp === 'WC' ? '&season=2026' : ''
+      // WC 2026 : forcer season=2026 sinon FD.org renvoie WC 2022
+      // On NE filtre PAS status=FINISHED côté serveur (non supporté par le free tier FD.org
+      // sur certains endpoints) → on filtre côté client
+      const seasonParam = selectedComp === 'WC' ? '?season=2026' : ''
       const res = await fdFetch(
-        fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED${seasonParam}`)
+        fdUrl(`/api/v4/competitions/${selectedComp}/matches${seasonParam}`)
       )
       // 429 → throw pour que React Query retente (rate limit temporaire)
       if (res.status === 429) throw new Error('rate_limit')
       if (!res.ok) return { formMap: {}, matches: [] }
 
       const json = await res.json()
-      const matches = json.matches ?? []
+      // Filtrer les matchs terminés côté client
+      const matches = (json.matches ?? []).filter(m => m.status === 'FINISHED')
 
       const formMap = {}
 
