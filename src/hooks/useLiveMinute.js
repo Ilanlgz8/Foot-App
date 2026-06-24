@@ -829,6 +829,10 @@ export function useLiveMinute(matches) {
   useEffect(() => {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
+      // Marquer les données ESPN comme périmées : empêche l'interpolation stale
+      // (ex : app fermée à 49', rouverte 6min plus tard → 49+6=55' sans ce guard)
+      // interpolateEspnMinute lit ce timestamp et refuse d'interpoler si capuredAt < lui.
+      window.__espnNeedsRefresh = Date.now()
       // Poll immédiat
       await pollESPN(matchesRef.current, queryClient)
       // 2ème poll : si réseau pas encore disponible → attendre l'event 'online'

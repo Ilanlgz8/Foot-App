@@ -43,6 +43,15 @@ function interpolateEspnMinute(state) {
   const parsed = parseEspnClock(state.espnClock)
   if (!parsed || !state.espnCapturedAt) return null
 
+  // Si l'app vient de revenir en foreground (visibilitychange), refuser d'interpoler
+  // des données capturées AVANT le retour : évite le saut "49'+Δ = 55'" dû aux données stales.
+  // window.__espnNeedsRefresh est posé par useLiveMinute au retour visible,
+  // et devient obsolète dès que setEspnData repose espnCapturedAt = Date.now() (poll frais).
+  if (
+    typeof window.__espnNeedsRefresh === 'number' &&
+    state.espnCapturedAt < window.__espnNeedsRefresh
+  ) return null
+
   const elapsedMs = Date.now() - state.espnCapturedAt
   const elapsedMins = elapsedMs / 60_000
 
