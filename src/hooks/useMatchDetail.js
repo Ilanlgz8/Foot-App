@@ -153,6 +153,146 @@ export function useLineups(match) {
   })
 }
 
+// ── useEspnMatchStats ──────────────────────────────────────────────────────────
+// Stats d'un match terminé via ESPN : scoreboard (date) → event ID → summary.
+// Ne nécessite pas Redis. Couvre toutes les compétitions dans COMP_ESPN.
+// Retourne le même format que useFifaStats : { home, away } avec poss/shots/etc.
+
+export function useEspnMatchStats(match) {
+  const compId = match?.competition?.id
+  const slug   = COMP_ESPN[compId]
+  const date   = matchDateStr(match)
+  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+
+  return useQuery({
+    queryKey:  ['espnMatchStats', match?.id],
+    enabled:   !!match?.id && !!slug && !!date,
+    staleTime: 30 * 60_000,
+    retry: 1,
+    queryFn: async () => {
+      // 1. Scoreboard → event ID
+      const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
+      if (!sbRes.ok) return null
+      const sb = await sbRes.json()
+
+      let eventId = null
+      for (const evt of sb.events ?? []) {
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        if (!homeC || !awayC) continue
+        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+        if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+          eventId = evt.id
+          break
+        }
+      }
+      if (!eventId) return null
+
+      // 2. Summary complet
+      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
+      if (!sumRes.ok) return null
+      const summary = await sumRes.json()
+
+      // 3. Stats depuis boxscore.teams
+      const teams    = summary.boxscore?.teams ?? []
+      const homeTeam = teams.find(t => t.homeAway === 'home')
+      const awayTeam = teams.find(t => t.homeAway === 'away')
+
+      const getStat = (team, ...names) => {
+        for (const n of names) {
+          const s = (team?.statistics ?? []).find(st => st.name === n)
+          if (s) { const v = parseFloat(s.displayValue); return isNaN(v) ? null : v }
+        }
+        return null
+      }
+      const mapStats = (team) => ({
+        poss:          getStat(team, 'possessionPct'),
+        shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
+        shotsOnTarget: getStat(team, 'shotsOnTarget', 'shotsOnGoal', 'onGoal'),
+        corners:       getStat(team, 'cornerKicks', 'corners'),
+        fouls:         getStat(team, 'fouls', 'foulsCommitted'),
+        offside:       getStat(team, 'offsides', 'offside'),
+        yellowCards:   getStat(team, 'yellowCards'),
+      })
+
+      const stats = { home: mapStats(homeTeam), away: mapStats(awayTeam) }
+      const hasData = Object.values(stats.home ?? {}).some(v => v != null)
+      if (!hasData) return null
+
+      // 4. Lineups depuis rosters si disponibles (ESPN ne les retourne pas toujours pour WC)
+      let lineups = null
+      const rosters = summary.rosters ?? []
+      if (rosters.length >= 1) {
+        const name0 = rosters[0]?.team?.displayName ?? ''
+        const homeIdx = fuzzyTeam(fdHome, name0) ? 0 : 1
+        const home = parseEspnRoster(rosters[homeIdx])
+        const away = parseEspnRoster(rosters[1 - homeIdx] ?? rosters[0])
+        if (home?.starters?.length) lineups = { home, away }
+      }
+
+      return { stats, lineups }
+    },
+  })
+}
+
+// ── useProbableLineups ─────────────────────────────────────────────────────────
+// Compos probables pour un match à venir : dernier XI connu de chaque équipe
+// depuis leur match précédent dans compMatches (via /api/fifa-lineups → Redis).
+
+export function useProbableLineups(match, compMatches) {
+  const homeId = match?.homeTeam?.id
+  const awayId = match?.awayTeam?.id
+
+  return useQuery({
+    queryKey:  ['probableLineups', match?.id, (compMatches ?? []).length],
+    enabled:   !!match?.id && !!(compMatches?.length),
+    staleTime: 10 * 60_000,
+    retry: 1,
+    queryFn: async () => {
+      // Derniers matchs terminés pour chaque équipe
+      const sorted = [...compMatches].sort(
+        (a, b) => new Date(b.utcDate) - new Date(a.utcDate)
+      )
+      const lastHomeMatch = sorted.find(m =>
+        m.homeTeam?.id === homeId || m.awayTeam?.id === homeId
+      )
+      const lastAwayMatch = sorted.find(m =>
+        m.homeTeam?.id === awayId || m.awayTeam?.id === awayId
+      )
+
+      const fetchTeamLineup = async (lastMatch, teamId) => {
+        if (!lastMatch) return null
+        const h = lastMatch.homeTeam?.name ?? lastMatch.homeTeam?.shortName ?? ''
+        const a = lastMatch.awayTeam?.name ?? lastMatch.awayTeam?.shortName ?? ''
+        try {
+          const res = await fetch(
+            `/api/fifa-lineups?fdMatchId=${lastMatch.id}&home=${encodeURIComponent(h)}&away=${encodeURIComponent(a)}`
+          )
+          if (!res.ok) return null
+          const data = await res.json()
+          const wasHome   = lastMatch.homeTeam?.id === teamId
+          const lineup    = wasHome ? data.home : data.away
+          if (!lineup?.starters?.length) return null
+          const opponent  = wasHome
+            ? (lastMatch.awayTeam?.shortName ?? lastMatch.awayTeam?.name ?? '?')
+            : (lastMatch.homeTeam?.shortName ?? lastMatch.homeTeam?.name ?? '?')
+          return { ...lineup, fromMatch: { date: lastMatch.utcDate, opponent } }
+        } catch { return null }
+      }
+
+      const [homeLineup, awayLineup] = await Promise.all([
+        fetchTeamLineup(lastHomeMatch, homeId),
+        fetchTeamLineup(lastAwayMatch, awayId),
+      ])
+      if (!homeLineup && !awayLineup) return null
+      return { home: homeLineup, away: awayLineup }
+    },
+  })
+}
+
 // ── useFifaStats ───────────────────────────────────────────────────────────────
 // Statistiques live FIFA pour WC 2026.
 // Appelle /api/fifa-lineups (même endpoint que useLineups) — React Query déduplique.

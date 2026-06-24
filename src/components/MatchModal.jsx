@@ -1,7 +1,7 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
+import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups, useAflMatchStats } from '../hooks/useApiFootball'
@@ -330,7 +330,10 @@ export function LiveStatsTab({ match, espnScore }) {
 
 // ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
-export function ComposTab({ match }) {
+export function ComposTab({ match, compMatches }) {
+  const isFinished = match?.status === 'FINISHED'
+  const isUpcoming = !isFinished
+
   // Source 1 : api-football (couvre clubs + WC, dispo ~1h avant)
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(match)
 
@@ -338,29 +341,96 @@ export function ComposTab({ match }) {
   const espnEnabled = !aflLoading && !aflLineups?.home?.starters?.length
   const { data: espnLineups, isLoading: espnLoading } = useLineups(espnEnabled ? match : null)
 
-  const isLoading = aflLoading || (espnEnabled && espnLoading)
-  const lineups   = aflLineups?.home?.starters?.length ? aflLineups
-                  : espnLineups?.home?.starters?.length ? espnLineups
-                  : null
+  // Source 3 : compos probables (dernier XI connu — uniquement matchs à venir)
+  const realLineupsLoaded = !aflLoading && !espnLoading
+  const { data: probableData, isLoading: probableLoading } = useProbableLineups(
+    isUpcoming && realLineupsLoaded && !aflLineups?.home?.starters?.length && !espnLineups?.home?.starters?.length
+      ? match : null,
+    compMatches
+  )
+
+  const isLoading = aflLoading || (espnEnabled && espnLoading) ||
+    (isUpcoming && realLineupsLoaded && probableLoading)
+
+  const lineups = aflLineups?.home?.starters?.length ? aflLineups
+               : espnLineups?.home?.starters?.length ? espnLineups
+               : null
+
+  const probable = !lineups && probableData?.home?.starters?.length ? probableData : null
 
   if (isLoading) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
   }
-  if (!lineups) {
+
+  if (lineups) {
     return (
-      <div className="modal__state" style={{ flexDirection: 'column', gap: '6px' }}>
-        <span style={{ fontSize: '22px' }}>📋</span>
-        <span>Compos non disponibles</span>
-        <span style={{ fontSize: '12px', opacity: 0.55 }}>
-          Disponibles ~1h avant le coup d'envoi
-        </span>
+      <div style={{ padding: '12px 8px 8px' }}>
+        <LineupPitch home={lineups.home} away={lineups.away} />
+      </div>
+    )
+  }
+
+  if (probable) {
+    const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
+    const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
+    const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : ''
+    return (
+      <div>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          padding: '0.6rem 1rem', margin: '0 0 0.75rem',
+          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.18)',
+          borderRadius: '0.6rem', fontSize: '0.75rem', color: 'rgba(251,191,36,0.85)',
+        }}>
+          ⚡ Compositions probables · dernier XI connu
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', padding: '0 8px 8px' }}>
+          {[
+            { name: homeName, lineup: probable.home },
+            { name: awayName, lineup: probable.away ?? probable.home },
+          ].map(({ name, lineup }) => (
+            lineup?.starters?.length ? (
+              <div key={name}>
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
+                  textAlign: 'center', letterSpacing: '0.06em', textTransform: 'uppercase',
+                  marginBottom: '0.4rem' }}>
+                  {name}
+                  {lineup.fromMatch && (
+                    <span style={{ display: 'block', fontSize: '0.6rem', opacity: 0.6, fontWeight: 400 }}>
+                      vs {translateTeam(lineup.fromMatch.opponent)} · {fmtDate(lineup.fromMatch.date)}
+                    </span>
+                  )}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {lineup.starters.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.2rem 0.5rem', borderRadius: '0.3rem',
+                      background: 'rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                      <span style={{ width: '1.2rem', textAlign: 'center', fontSize: '0.65rem',
+                        color: 'rgba(255,255,255,0.35)', fontFamily: 'Chakra Petch, sans-serif' }}>
+                        {p.number || (i + 1)}
+                      </span>
+                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.82)' }}>{p.shortName || p.name}</span>
+                      <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)',
+                        letterSpacing: '0.04em' }}>{p.position}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '12px 8px 8px' }}>
-      <LineupPitch home={lineups.home} away={lineups.away} />
+    <div className="modal__state" style={{ flexDirection: 'column', gap: '6px' }}>
+      <span style={{ fontSize: '22px' }}>📋</span>
+      <span>Compos non disponibles</span>
+      <span style={{ fontSize: '12px', opacity: 0.55 }}>
+        {isUpcoming ? 'Disponibles ~1h avant le coup d\'envoi' : 'Compos non publiées'}
+      </span>
     </div>
   )
 }
@@ -746,24 +816,29 @@ function aflStatsToRows(statsData) {
 export function MatchStatsSection({ match }) {
   const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
 
-  // Source primaire WC : API FIFA (via /api/fifa-lineups → Redis)
-  // live=false : one-shot, pas de polling sur un match terminé
+  // Source 1 — FIFA (Redis, WC uniquement, one-shot)
   const { data: fifaData, isLoading: fifaLoading } = useFifaStats(
     isWC ? match : null, isWC, false
   )
 
-  // Source api-football : tous les matchs (fallback WC, primaire non-WC)
+  // Source 2 — ESPN scoreboard → summary (tous les matchs COMP_ESPN, sans Redis)
+  const { data: espnData, isLoading: espnLoading } = useEspnMatchStats(match)
+
+  // Source 3 — api-football (fallback universel)
   const { data: aflStats, isLoading: aflLoading } = useAflMatchStats(match)
 
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
   const fifaRows = fifaStatsToRows(fifaData)
+  const espnRows = fifaStatsToRows(espnData?.stats)   // même format { poss, shots, … }
   const aflRows  = aflStatsToRows(aflStats)
-  const rows     = fifaRows.length ? fifaRows : aflRows   // FIFA prioritaire pour WC
+  // Priorité : FIFA → ESPN → api-football
+  const rows = fifaRows.length ? fifaRows : espnRows.length ? espnRows : aflRows
 
-  // Spinner tant qu'on n'a pas de données et que l'une des sources charge encore
-  const isLoading = !rows.length && ((isWC && fifaLoading) || aflLoading)
+  const isLoading = !rows.length && (
+    (isWC && fifaLoading) || espnLoading || aflLoading
+  )
 
   if (isLoading) return (
     <div className="pm__section">

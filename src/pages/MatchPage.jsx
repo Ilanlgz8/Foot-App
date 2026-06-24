@@ -205,7 +205,7 @@ export default function MatchPage() {
                       compMatches={compMatches}
                     />
             )}
-            {activeTab === 'compos'     && <ComposTab match={match} />}
+            {activeTab === 'compos'     && <ComposTab match={match} compMatches={isFinished ? [] : compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>
