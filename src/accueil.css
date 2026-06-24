@@ -2456,3 +2456,52 @@
 .accueil__matchCardClickable .accueil__matchCard {
   cursor: pointer;
 }
+
+/* ── Onglets résultats ── */
+.accueil__resultTabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem 0;
+}
+.accueil__resultTab {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: none;
+  color: rgba(255,255,255,0.38);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.accueil__resultTab:hover {
+  color: rgba(255,255,255,0.7);
+  border-color: rgba(255,255,255,0.2);
+}
+.accueil__resultTab--active {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.35);
+  color: #f87171;
+}
+
+/* ── Groupes par compétition ── */
+.accueil__compGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.accueil__compGroup {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding-bottom: 0.4rem;
+}
+.accueil__compGroup:last-child { border-bottom: none; }
+.accueil__compGroupTitle {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(239,68,68,0.6);
+  padding: 0.3rem 0.4rem 0.2rem;
+  margin: 0;
+}

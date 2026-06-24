@@ -519,7 +519,7 @@ function ResultBadge({ result }) {
   return <span className={`pm__badge ${cls}`}>{label}</span>
 }
 
-function TeamFormTable({ teamId, compMatches, isHome }) {
+function TeamFormTable({ teamId, compMatches }) {
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
     .slice(-5)
@@ -529,19 +529,23 @@ function TeamFormTable({ teamId, compMatches, isHome }) {
   return (
     <div className="pm__formTable">
       {matches.map((m, i) => {
-        const myHome = m.homeTeam?.id === teamId
-        const myGoals  = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
-        const oppGoals = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
-        const oppName  = translateTeam(myHome
-          ? (m.awayTeam?.shortName || m.awayTeam?.name || '?')
-          : (m.homeTeam?.shortName || m.homeTeam?.name || '?'))
-        const result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
-        const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+        const myHome  = m.homeTeam?.id === teamId
+        const hs      = m.score?.fullTime?.home ?? '-'
+        const as_     = m.score?.fullTime?.away ?? '-'
+        const myGoals  = myHome ? hs : as_
+        const oppGoals = myHome ? as_ : hs
+        const result  = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+        const hName   = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
+        const aName   = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
+        const date    = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
         return (
           <div key={i} className="pm__formRow">
             <ResultBadge result={result} />
-            <span className="pm__formOpp">{isHome ? '' : ''}{myHome ? 'D' : 'E'} {oppName}</span>
-            <span className="pm__formScore">{myGoals}-{oppGoals}</span>
+            <span className="pm__formMatchup">
+              <span className={`pm__formTeam${myHome ? ' pm__formTeam--me' : ''}`}>{hName}</span>
+              <span className="pm__formScore">{hs}:{as_}</span>
+              <span className={`pm__formTeam${!myHome ? ' pm__formTeam--me' : ''}`}>{aName}</span>
+            </span>
             <span className="pm__formDate">{date}</span>
           </div>
         )
@@ -607,7 +611,6 @@ function PreMatchSection({ match, prono, formMap, compMatches }) {
         <div className="pm__section">
           <h3 className="pm__sectionTitle">Probabilités estimées</h3>
           <div className="pm__pronoRow">
-            <span className="pm__pronoLabel">{homeName}</span>
             <div className="pm__pronoBar">
               <div className={`pm__pronoSeg pm__pronoSeg--home${winner === 'home' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.home }}>
                 {prono.home}%
@@ -619,7 +622,6 @@ function PreMatchSection({ match, prono, formMap, compMatches }) {
                 {prono.away}%
               </div>
             </div>
-            <span className="pm__pronoLabel">{awayName}</span>
           </div>
           <div className="pm__pronoNums">
             <span className={`pm__pronoNum${winner === 'home' ? ' pm__pronoNum--winner' : ''}`}>{prono.home}%<br /><small>Victoire</small></span>
