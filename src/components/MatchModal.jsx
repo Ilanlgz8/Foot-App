@@ -693,21 +693,27 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
   const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
   const isUpcoming = !isFinished && !isLive
-  const [tab, setTab]       = useState(defaultTab)
-  const [preTab, setPreTab] = useState('avant-match')
+  const [tab, setTab]           = useState(defaultTab)
+  const [preTab, setPreTab]     = useState('avant-match')
+  const [tabDir, setTabDir]     = useState(null)   // 'left' | 'right' | null
+
+  // Wrappers qui enregistrent la direction avant de changer d'onglet
+  const goTab    = (t, dir)  => { setTabDir(dir);  setTab(t) }
+  const goPreTab = (t, dir)  => { setTabDir(dir);  setPreTab(t) }
+  const pickTab    = (t) => goTab(t, null)
+  const pickPreTab = (t) => goPreTab(t, null)
 
   // ── Swipe entre onglets (mobile) ──────────────────────────────────────────
-  // LIVE_TABS inclut 'prono' — si prono est null l'onglet affichera simplement rien
   const LIVE_TABS = ['livestats','compos','prono','classement']
   const PRE_TABS  = ['avant-match','compos','classement']
 
   const swipeLive = useSwipe(
-    () => { const i = LIVE_TABS.indexOf(tab);   if (i < LIVE_TABS.length - 1) setTab(LIVE_TABS[i + 1]) },
-    () => { const i = LIVE_TABS.indexOf(tab);   if (i > 0) setTab(LIVE_TABS[i - 1]) }
+    () => { const i = LIVE_TABS.indexOf(tab);   if (i < LIVE_TABS.length - 1) goTab(LIVE_TABS[i + 1], 'left') },
+    () => { const i = LIVE_TABS.indexOf(tab);   if (i > 0) goTab(LIVE_TABS[i - 1], 'right') }
   )
   const swipePre = useSwipe(
-    () => { const i = PRE_TABS.indexOf(preTab); if (i < PRE_TABS.length - 1) setPreTab(PRE_TABS[i + 1]) },
-    () => { const i = PRE_TABS.indexOf(preTab); if (i > 0) setPreTab(PRE_TABS[i - 1]) }
+    () => { const i = PRE_TABS.indexOf(preTab); if (i < PRE_TABS.length - 1) goPreTab(PRE_TABS[i + 1], 'left') },
+    () => { const i = PRE_TABS.indexOf(preTab); if (i > 0) goPreTab(PRE_TABS[i - 1], 'right') }
   )
 
   // Déduire compId depuis la prop ou depuis match.competition.code
@@ -868,33 +874,35 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             <div className="modal__tabs">
               <button
                 className={`modal__tab${tab === 'livestats' ? ' modal__tab--active' : ''}`}
-                onClick={() => setTab('livestats')}
+                onClick={() => pickTab('livestats')}
               >Stats Live</button>
               <button
                 className={`modal__tab${tab === 'compos' ? ' modal__tab--active' : ''}`}
-                onClick={() => setTab('compos')}
+                onClick={() => pickTab('compos')}
               >Compos</button>
               {prono && (
                 <button
                   className={`modal__tab${tab === 'prono' ? ' modal__tab--active' : ''}`}
-                  onClick={() => setTab('prono')}
+                  onClick={() => pickTab('prono')}
                 >Prono</button>
               )}
               <button
                 className={`modal__tab${tab === 'classement' ? ' modal__tab--active' : ''}`}
-                onClick={() => setTab('classement')}
+                onClick={() => pickTab('classement')}
               >Classement</button>
             </div>
-            {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
-            {tab === 'compos'      && <ComposTab match={match} />}
-            {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
-            {tab === 'prono'       && (
-              <PronoSection
-                prono={prono}
-                homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-                awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-              />
-            )}
+            <div key={tab} className={`modal__tabContent${tabDir === 'left' ? ' modal__tabContent--fromRight' : tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}>
+              {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
+              {tab === 'compos'      && <ComposTab match={match} />}
+              {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
+              {tab === 'prono'       && (
+                <PronoSection
+                  prono={prono}
+                  homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+                  awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+                />
+              )}
+            </div>
           </div>
         ) : (
           <div {...swipePre}>
@@ -902,27 +910,29 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             <div className="modal__tabs">
               <button
                 className={`modal__tab${preTab === 'avant-match' ? ' modal__tab--active' : ''}`}
-                onClick={() => setPreTab('avant-match')}
+                onClick={() => pickPreTab('avant-match')}
               >Avant-match</button>
               <button
                 className={`modal__tab${preTab === 'compos' ? ' modal__tab--active' : ''}`}
-                onClick={() => setPreTab('compos')}
+                onClick={() => pickPreTab('compos')}
               >Compos</button>
               <button
                 className={`modal__tab${preTab === 'classement' ? ' modal__tab--active' : ''}`}
-                onClick={() => setPreTab('classement')}
+                onClick={() => pickPreTab('classement')}
               >Classement</button>
             </div>
-            {preTab === 'avant-match' && (
-              <PreMatchSection
-                match={match}
-                prono={prono}
-                formMap={formMap}
-                compMatches={compMatches}
-              />
-            )}
-            {preTab === 'compos'      && <ComposTab match={match} />}
-            {preTab === 'classement'  && <ClassementTab match={match} compId={compId} />}
+            <div key={preTab} className={`modal__tabContent${tabDir === 'left' ? ' modal__tabContent--fromRight' : tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}>
+              {preTab === 'avant-match' && (
+                <PreMatchSection
+                  match={match}
+                  prono={prono}
+                  formMap={formMap}
+                  compMatches={compMatches}
+                />
+              )}
+              {preTab === 'compos'      && <ComposTab match={match} />}
+              {preTab === 'classement'  && <ClassementTab match={match} compId={compId} />}
+            </div>
           </div>
         )}
 

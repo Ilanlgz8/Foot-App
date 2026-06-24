@@ -547,6 +547,25 @@
   box-shadow: 0 0 10px rgba(239,68,68,0.08);
 }
 
+/* ── Transition fluide entre onglets ── */
+.modal__tabContent {
+  will-change: transform, opacity;
+}
+.modal__tabContent--fromRight {
+  animation: tabSlideFromRight 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.modal__tabContent--fromLeft {
+  animation: tabSlideFromLeft 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+@keyframes tabSlideFromRight {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes tabSlideFromLeft {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
 
 /* ── Compos ── */
 .modal__compos {
