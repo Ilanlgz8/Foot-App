@@ -6,6 +6,7 @@ import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useState, useRef, useEffect } from 'react'
 import MatchModal from './MatchModal'
+import { useFotmobXG } from '../hooks/useFotmobXG'
 import '../live.css'
 
 // ── Helpers (copie depuis LiveWidget) ────────────────────────────────────────
@@ -154,6 +155,7 @@ function GoalCelebration({ teamName, scoreStr }) {
 
 // ── Card match individuelle ───────────────────────────────────────────────────
 function LiveCard({ match, espn, onClick }) {
+  const xg = useFotmobXG(match)
   const matchSt = getMatchState(match.id)
   const isTermine = matchSt.ft === true
   const minute = isTermine ? null : calcMinute(match)
@@ -222,6 +224,13 @@ function LiveCard({ match, espn, onClick }) {
 
       {/* Score principal */}
       <div className="live__matchRow">
+        {xg?.home != null && (
+          <div className="live__xgCol">
+            <span className="live__xgNum">{xg.home.toFixed(2)}</span>
+            <span className="live__xgLabel">xG</span>
+          </div>
+        )}
+
         <div className="live__team">
           {match.homeTeam?.crest
             ? <img src={match.homeTeam.crest} alt="" className="live__crest" />
@@ -241,6 +250,13 @@ function LiveCard({ match, espn, onClick }) {
             : <div className="live__crestFallback" />}
           <span className="live__teamName">{awayName}</span>
         </div>
+
+        {xg?.away != null && (
+          <div className="live__xgCol">
+            <span className="live__xgNum">{xg.away.toFixed(2)}</span>
+            <span className="live__xgLabel">xG</span>
+          </div>
+        )}
       </div>
 
       {/* Buteurs */}

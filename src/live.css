@@ -184,6 +184,30 @@
   text-align: center;
 }
 
+.live__xgCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.live__xgNum {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(239, 68, 68, 0.9);
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.live__xgLabel {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: rgba(239, 68, 68, 0.5);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 /* Score */
 .live__scoreWrap {
   display: flex;

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import { COMPETITIONS as competitions } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
@@ -10,8 +11,14 @@ import { useMatches } from '../hooks/useMatchs'
 
 
 function Classement() {
-  const [selectedComp, setSelectedComp] = useState('WC')
+  const location = useLocation()
+  const initCompId  = location.state?.compId  ?? 'WC'
+  const initGroup   = location.state?.group   ?? null   // ex: "GROUP_A"
+
+  const [selectedComp, setSelectedComp] = useState(initCompId)
   const [view, setView] = useState('classement') // 'classement' | 'buteurs'
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const didAutoOpen = useRef(false)
 
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
@@ -23,6 +30,17 @@ function Classement() {
   const { matches: wcFin,   loading: wcFinLoading   } = useMatches('WC', 'FINISHED')
 
   const selectedCompetition = competitions.find((c) => c.id === selectedComp)
+
+  // Auto-ouvre le groupe si on vient d'une modal match (ex: GROUP_A depuis WC)
+  useEffect(() => {
+    if (didAutoOpen.current || !initGroup || groups.length === 0) return
+    const normG = g => (g ?? '').toUpperCase().replace(/\s+/g, '_')
+    const found = groups.find(g => normG(g.name) === initGroup)
+    if (found) {
+      setSelectedGroup(found)
+      didAutoOpen.current = true
+    }
+  }, [groups, initGroup])
 
   const competitionRules = {
     FL1: [
@@ -295,8 +313,6 @@ function Classement() {
 
   /* Affichage multi-groupes (CdM, etc.) */
   function MultiGroupView() {
-    const [selectedGroup, setSelectedGroup] = useState(null)
-
     return (
       <>
         <div className="classement__groups">

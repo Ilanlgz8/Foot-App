@@ -1,5 +1,6 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
+import { useNavigate }             from 'react-router-dom'
 import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
@@ -660,7 +661,19 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
   const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
   const isUpcoming = !isFinished && !isLive
-  const [tab, setTab] = useState(defaultTab)
+  const [tab, setTab]       = useState(defaultTab)
+  const [preTab, setPreTab] = useState('avant-match')
+  const navigate = useNavigate()
+
+  function goToClassement() {
+    onClose()
+    navigate('/classement', {
+      state: {
+        compId: match?.competition?.code ?? compIdProp,
+        group:  match?.group ?? null,
+      }
+    })
+  }
 
   // Déduire compId depuis la prop ou depuis match.competition.code
   const compId = compIdProp ?? match?.competition?.code ?? null
@@ -832,6 +845,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                   onClick={() => setTab('prono')}
                 >Prono</button>
               )}
+              <button className="modal__tab modal__tab--nav" onClick={goToClassement}>
+                Classement ›
+              </button>
             </div>
             {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
             {tab === 'compos'    && <ComposTab match={match} />}
@@ -844,13 +860,31 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             )}
           </>
         ) : (
-          /* Match à venir — section pré-match complète */
-          <PreMatchSection
-            match={match}
-            prono={prono}
-            formMap={formMap}
-            compMatches={compMatches}
-          />
+          <>
+            {/* Onglets match à venir */}
+            <div className="modal__tabs">
+              <button
+                className={`modal__tab${preTab === 'avant-match' ? ' modal__tab--active' : ''}`}
+                onClick={() => setPreTab('avant-match')}
+              >Avant-match</button>
+              <button
+                className={`modal__tab${preTab === 'compos' ? ' modal__tab--active' : ''}`}
+                onClick={() => setPreTab('compos')}
+              >Compos</button>
+              <button className="modal__tab modal__tab--nav" onClick={goToClassement}>
+                Classement ›
+              </button>
+            </div>
+            {preTab === 'avant-match' && (
+              <PreMatchSection
+                match={match}
+                prono={prono}
+                formMap={formMap}
+                compMatches={compMatches}
+              />
+            )}
+            {preTab === 'compos' && <ComposTab match={match} />}
+          </>
         )}
 
       </div>
