@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fdUrl } from '../utils/fdFetch'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCache, getCacheSavedAt, writeCache } from './localCache'
 
 // Retourne 'W', 'L' ou 'D' selon les buts marqués et encaissés
@@ -19,9 +19,11 @@ export function useTeamForm(selectedComp) {
     queryFn: async () => {
       // WC 2026 : sans filtre saison FD.org renvoie WC 2022 → forme incorrecte
       const seasonParam = selectedComp === 'WC' ? '&season=2026' : ''
-      const res = await fetch(
+      const res = await fdFetch(
         fdUrl(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED${seasonParam}`)
       )
+      // 429 → throw pour que React Query retente (rate limit temporaire)
+      if (res.status === 429) throw new Error('rate_limit')
       if (!res.ok) return { formMap: {}, matches: [] }
 
       const json = await res.json()
@@ -60,7 +62,8 @@ export function useTeamForm(selectedComp) {
     initialData:          readCache(cacheKey) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(cacheKey),
     staleTime:            FORM_STALE,
-    retry: false
+    retry:                2,
+    retryDelay:           attempt => Math.min(1000 * 2 ** attempt, 15_000)
   })
 
   return {

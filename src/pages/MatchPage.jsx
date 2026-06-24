@@ -191,20 +191,12 @@ export default function MatchPage() {
           {activeTab === 'statistiques' && (
             formLoading
               ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
-              : <>
-                  {/* DEBUG — retirer après vérification */}
-                  <pre style={{fontSize:'0.6rem',color:'lime',padding:'0.5rem',overflowX:'auto',maxHeight:'120px',background:'#111'}}>
-                    compId={compId} | hId={match?.homeTeam?.id} | aId={match?.awayTeam?.id}
-                    {'\n'}formKeys={JSON.stringify(Object.keys(formMap).slice(0,5))}
-                    {'\n'}compMatches={compMatches.length} | prono={JSON.stringify(prono)}
-                  </pre>
-                  <PreMatchSection
-                    match={match}
-                    prono={prono}
-                    formMap={formMap}
-                    compMatches={compMatches}
-                  />
-                </>
+              : <PreMatchSection
+                  match={match}
+                  prono={prono}
+                  formMap={formMap}
+                  compMatches={compMatches}
+                />
           )}
           {activeTab === 'compos'     && <ComposTab match={match} />}
           {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
