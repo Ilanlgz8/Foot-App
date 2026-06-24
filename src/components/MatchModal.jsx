@@ -5,7 +5,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
-import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
+import { useSofaLiveStats, useSofaMomentum, useSofaLineups } from '../hooks/useSofaScore'
 import LineupPitch             from './LineupPitch'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
@@ -367,15 +367,25 @@ function LiveStatsTab({ match, espnScore }) {
   )
 }
 
-// ── Onglet Compos — terrain + maillots (ESPN) ─────────────────────────────────
+// ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
 function ComposTab({ match }) {
-  const { data: lineups, isLoading, isError } = useLineups(match)
+  // Source 1 : api-football via useSofaLineups (couvre clubs + WC, dispo ~1h avant)
+  const { data: aflLineups, isLoading: aflLoading } = useSofaLineups(match)
+
+  // Source 2 : ESPN/FIFA (fallback si api-football n'a rien)
+  const espnEnabled = !aflLoading && !aflLineups?.home?.starters?.length
+  const { data: espnLineups, isLoading: espnLoading } = useLineups(espnEnabled ? match : null)
+
+  const isLoading = aflLoading || (espnEnabled && espnLoading)
+  const lineups   = aflLineups?.home?.starters?.length ? aflLineups
+                  : espnLineups?.home?.starters?.length ? espnLineups
+                  : null
 
   if (isLoading) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
   }
-  if (isError || !lineups?.home?.starters?.length) {
+  if (!lineups) {
     return (
       <div className="modal__state" style={{ flexDirection: 'column', gap: '6px' }}>
         <span style={{ fontSize: '22px' }}>📋</span>
