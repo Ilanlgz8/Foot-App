@@ -2505,3 +2505,24 @@
   padding: 0.3rem 0.4rem 0.2rem;
   margin: 0;
 }
+
+/* CompFilter inline dans le header résultats */
+.accueil__dashPanelHeader--withFilter {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.accueil__dashPanelHeader--withFilter .accueil__compFilter {
+  padding: 0;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.accueil__dashPanelHeader--withFilter .accueil__compChip {
+  padding: 3px 7px;
+  font-size: 0.62rem;
+}
+.accueil__dashPanelHeader--withFilter .accueil__compChip img {
+  width: 14px;
+  height: 14px;
+}

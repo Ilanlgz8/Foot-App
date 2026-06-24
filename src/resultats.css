@@ -460,3 +460,61 @@
   .resultats__card { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.55rem 0.5rem; }
   .resultats__teamName { font-size: 0.68rem; }
 }
+
+/* ── Onglets vue (par journée / par poule) ── */
+.resultats__titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.resultats__viewTabs {
+  display: flex;
+  gap: 0.4rem;
+}
+.resultats__viewTab {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: none;
+  color: rgba(255,255,255,0.38);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.resultats__viewTab:hover {
+  color: rgba(255,255,255,0.7);
+  border-color: rgba(255,255,255,0.2);
+}
+.resultats__viewTab--active {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.35);
+  color: #f87171;
+}
+
+/* ── Vue par poule ── */
+.resultats__pouleGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+.resultats__pouleGroup {}
+.resultats__pouleGroupTitle {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(239,68,68,0.7);
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(239,68,68,0.12);
+}
+.resultats__list--poule {
+  border-radius: 0.8rem;
+  overflow: hidden;
+}

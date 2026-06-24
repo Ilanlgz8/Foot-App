@@ -340,14 +340,14 @@ function Accueil() {
 
             {/* Résultats récents — toujours visible (données toujours basées sur aujourd'hui/hier) */}
             {<div className="accueil__dashPanel">
-              <div className="accueil__dashPanelHeader">
+              <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
+                <CompFilter
+                  competitions={resultCompetitions}
+                  active={compFilterResult}
+                  onChange={setCompFilterResult}
+                />
               </div>
-              <CompFilter
-                competitions={resultCompetitions}
-                active={compFilterResult}
-                onChange={setCompFilterResult}
-              />
               <div className="accueil__dashPanelDivider" />
               {(() => {
                 const now4h = Date.now() - 4 * 60 * 60_000
