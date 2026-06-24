@@ -1306,3 +1306,48 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Pré-match : responsive mobile ── */
+@media (max-width: 480px) {
+  /* Prono : masquer labels équipe à côté de la barre — déjà dans le header */
+  .pm__pronoLabel { display: none; }
+  .pm__pronoBar   { border-radius: 8px; height: 20px; }
+
+  /* Grands chiffres un peu plus petits */
+  .pm__pronoNum { font-size: 0.95rem; }
+
+  /* Forme : passer en colonne au lieu de 2 colonnes côte à côte */
+  .pm__formGrid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem 0;
+  }
+  .pm__formDivider {
+    height: 1px;
+    width: 100%;
+    background: rgba(255,255,255,0.07);
+    border-radius: 1px;
+  }
+  /* Nom d'équipe en titre de colonne plus visible */
+  .pm__formTeamName {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.06em;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* H2H : date + home + score + away sur 4 col, badge caché ou compact */
+  .pm__h2hRow {
+    grid-template-columns: 2rem 1fr auto 1fr;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem;
+  }
+  /* Masquer le badge résultat sur mobile H2H (trop serré) */
+  .pm__h2hRow > .pm__badge { display: none; }
+
+  /* Réduire légèrement les textes H2H */
+  .pm__h2hHome,
+  .pm__h2hAway { font-size: 0.62rem; }
+  .pm__h2hScore { font-size: 0.68rem; }
+  .pm__h2hDate  { font-size: 0.54rem; }
+}

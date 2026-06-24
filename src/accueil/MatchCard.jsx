@@ -241,7 +241,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
-export function MatchPanel({ matches: allMatches, loading, espnScores = {} }) {
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -255,15 +255,23 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {} }) {
       )}
       {!loading && displayed.length > 0 && (
         <div className="accueil__matchCards">
-          {displayed.map(match => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              espnScore={espnScores[match.id] ?? null}
-              noAnimation
-              noLive
-            />
-          ))}
+          {displayed.map(match => {
+            const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
+            return (
+              <div
+                key={match.id}
+                className={isUpcoming && onMatchClick ? 'accueil__matchCardClickable' : undefined}
+                onClick={isUpcoming && onMatchClick ? () => onMatchClick(match) : undefined}
+              >
+                <MatchCard
+                  match={match}
+                  espnScore={espnScores[match.id] ?? null}
+                  noAnimation
+                  noLive
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

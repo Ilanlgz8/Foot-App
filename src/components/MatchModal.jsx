@@ -2,6 +2,7 @@ import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
+import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import LineupPitch             from './LineupPitch'
@@ -653,10 +654,21 @@ function PreMatchSection({ match, prono, formMap, compMatches }) {
   )
 }
 
-function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, formMap, compMatches }) {
+function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', espnScore, formMap: formMapProp, compMatches: compMatchesProp }) {
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
   const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
+  const isUpcoming = !isFinished && !isLive
   const [tab, setTab] = useState(defaultTab)
+
+  // Déduire compId depuis la prop ou depuis match.competition.code
+  const compId = compIdProp ?? match?.competition?.code ?? null
+
+  // Pour les matchs à venir : charger formMap + compMatches en interne si non fournis
+  const { formMap: internalFormMap, compMatches: internalCompMatches } = useTeamForm(
+    isUpcoming && !formMapProp ? compId : null
+  )
+  const formMap     = formMapProp     ?? internalFormMap
+  const compMatches = compMatchesProp ?? internalCompMatches
 
   // 1. Données ESPN déjà persistées en localStorage (match suivi en live)
   const cachedEspn = isFinished ? getEspnData(match?.id) : null
@@ -694,7 +706,7 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, f
 
   if (!match) return null
 
-  // Prono basé sur la forme FD.org (passée depuis Match.jsx / Accueil)
+  // Prono basé sur la forme FD.org
   const hForm = formMap?.[match.homeTeam?.id]
   const aForm = formMap?.[match.awayTeam?.id]
   const prono = !isFinished && (hForm || aForm) ? calcProno(hForm, aForm) : null

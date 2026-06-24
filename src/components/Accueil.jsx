@@ -139,6 +139,9 @@ function Accueil() {
   // liveModal = { match, espnScore } | null
   const [liveModal, setLiveModal] = useState(null)
 
+  // ── Modal pré-match (clic sur match à venir dans MatchPanel) ──
+  const [upcomingModal, setUpcomingModal] = useState(null)
+
   // ── Suivi précis ──
   const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())
 
@@ -314,6 +317,7 @@ function Accueil() {
                 : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
+              onMatchClick={m => setUpcomingModal(m)}
             />
           </div>
 
@@ -407,6 +411,14 @@ function Accueil() {
         espnScore={liveModal.espnScore}
         onClose={() => setLiveModal(null)}
         defaultTab="livestats"
+      />
+    )}
+
+    {/* ── Modal pré-match (clic sur match à venir dans MatchPanel) ── */}
+    {upcomingModal && (
+      <MatchModal
+        match={upcomingModal}
+        onClose={() => setUpcomingModal(null)}
       />
     )}
     </>

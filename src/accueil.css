@@ -2440,3 +2440,19 @@
   /* Groupes 1 colonne sur très petits écrans */
   .accueil__groupsGrid { grid-template-columns: 1fr; }
 }
+
+/* Wrapper clic pour matchs à venir dans MatchPanel */
+.accueil__matchCardClickable {
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: background 0.15s;
+}
+.accueil__matchCardClickable:hover {
+  background: rgba(239,68,68,0.06);
+}
+.accueil__matchCardClickable:hover .accueil__matchCard {
+  background: transparent;
+}
+.accueil__matchCardClickable .accueil__matchCard {
+  cursor: pointer;
+}

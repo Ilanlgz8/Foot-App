@@ -1030,33 +1030,26 @@
   .classement__teamCrest { width: 1.2rem; height: 1.2rem; }
   .classement__formeBadge { width: 1.1rem; height: 1.1rem; font-size: 0.5rem; }
 
-  /* ── Table normale (non-compact) : masquer V/N/D/Diff/BM, taille compacte ── */
+  /* ── Table normale (non-compact) : scroll horizontal, toutes colonnes visibles ── */
+  /* Le tableWrap a déjà overflow-x: auto — on force un min-width pour que tout tienne */
+  .classement__table:not(.classement__table--compact) {
+    min-width: 520px; /* force le scroll pour que aucune colonne ne soit masquée */
+  }
   .classement__table:not(.classement__table--compact) thead th,
   .classement__table:not(.classement__table--compact) tbody td {
-    padding: 0.42rem 0.35rem;
-    font-size: 0.67rem;
+    padding: 0.38rem 0.4rem;
+    font-size: 0.68rem;
   }
   .classement__table:not(.classement__table--compact) thead th { font-size: 0.56rem; }
 
-  /* Masquer V, N, D, Diff, BM — garder Pos, Équipe, Pts, MJ, Forme */
-  .classement__table:not(.classement__table--compact) thead th:nth-child(5),
-  .classement__table:not(.classement__table--compact) thead th:nth-child(6),
-  .classement__table:not(.classement__table--compact) thead th:nth-child(7),
-  .classement__table:not(.classement__table--compact) thead th:nth-child(8),
-  .classement__table:not(.classement__table--compact) thead th:nth-child(9),
-  .classement__table:not(.classement__table--compact) tbody td:nth-child(5),
-  .classement__table:not(.classement__table--compact) tbody td:nth-child(6),
-  .classement__table:not(.classement__table--compact) tbody td:nth-child(7),
-  .classement__table:not(.classement__table--compact) tbody td:nth-child(8),
-  .classement__table:not(.classement__table--compact) tbody td:nth-child(9) { display: none; }
+  /* Toutes les colonnes restent visibles (on scrolle) */
+  .classement__table:not(.classement__table--compact) thead th,
+  .classement__table:not(.classement__table--compact) tbody td { display: table-cell; }
 
-  /* Pas de min-width qui force le scroll horizontal */
-  .classement__table:not(.classement__table--compact) { min-width: 0; }
-
-  /* Équipe : nom plus court */
+  /* Équipe : nom raisonnablement court */
   .classement__table:not(.classement__table--compact) .classement__teamName {
     font-size: 0.7rem;
-    max-width: 8rem;
+    max-width: 7rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
