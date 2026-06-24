@@ -8,6 +8,7 @@ import { useAflLiveStats, useAflLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
+import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
@@ -695,6 +696,20 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const [tab, setTab]       = useState(defaultTab)
   const [preTab, setPreTab] = useState('avant-match')
 
+  // ── Swipe entre onglets (mobile) ──────────────────────────────────────────
+  // LIVE_TABS inclut 'prono' — si prono est null l'onglet affichera simplement rien
+  const LIVE_TABS = ['livestats','compos','prono','classement']
+  const PRE_TABS  = ['avant-match','compos','classement']
+
+  const swipeLive = useSwipe(
+    () => { const i = LIVE_TABS.indexOf(tab);   if (i < LIVE_TABS.length - 1) setTab(LIVE_TABS[i + 1]) },
+    () => { const i = LIVE_TABS.indexOf(tab);   if (i > 0) setTab(LIVE_TABS[i - 1]) }
+  )
+  const swipePre = useSwipe(
+    () => { const i = PRE_TABS.indexOf(preTab); if (i < PRE_TABS.length - 1) setPreTab(PRE_TABS[i + 1]) },
+    () => { const i = PRE_TABS.indexOf(preTab); if (i > 0) setPreTab(PRE_TABS[i - 1]) }
+  )
+
   // Déduire compId depuis la prop ou depuis match.competition.code
   const compId = compIdProp ?? match?.competition?.code ?? null
 
@@ -848,7 +863,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             loading={espnLoading || detailLoading}
           />
         ) : isLive ? (
-          <>
+          <div {...swipeLive}>
             {/* Onglets match en cours */}
             <div className="modal__tabs">
               <button
@@ -880,9 +895,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
               />
             )}
-          </>
+          </div>
         ) : (
-          <>
+          <div {...swipePre}>
             {/* Onglets match à venir */}
             <div className="modal__tabs">
               <button
@@ -908,7 +923,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             )}
             {preTab === 'compos'      && <ComposTab match={match} />}
             {preTab === 'classement'  && <ClassementTab match={match} compId={compId} />}
-          </>
+          </div>
         )}
 
       </div>

@@ -264,6 +264,16 @@
   background: linear-gradient(135deg, rgba(18,18,18,0.95), rgba(8,8,8,0.98));
   border-color: rgba(255,255,255,0.09);
 }
+/* Animation BUT — le chiffre pulse en blanc/rouge */
+.live__pill--scored {
+  animation: pillGoal 1.4s ease-out forwards;
+}
+@keyframes pillGoal {
+  0%   { transform: scale(1);    background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95)); color: #f0d0d0; }
+  15%  { transform: scale(1.28); background: linear-gradient(135deg, rgba(239,68,68,0.9), rgba(185,28,28,0.95)); color: #fff; border-color: rgba(239,68,68,0.8); box-shadow: 0 0 20px rgba(239,68,68,0.6); }
+  45%  { transform: scale(1.12); background: linear-gradient(135deg, rgba(220,38,38,0.7), rgba(153,27,27,0.8)); color: #fff; }
+  100% { transform: scale(1);    background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95)); color: #f0d0d0; border-color: rgba(220,38,38,0.22); }
+}
 .live__pillBar {
   width: 1.5px;
   height: 2rem;

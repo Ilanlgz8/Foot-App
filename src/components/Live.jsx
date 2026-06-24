@@ -56,7 +56,7 @@ function PeriodBadge({ match }) {
   return <span className="live__period">{period}</span>
 }
 
-function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente }) {
+function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, goalSide }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
   const label = isTermine ? 'FT' : (minute ?? '–')
@@ -68,9 +68,9 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
         {repriseImminente && <span className="live__reprise">reprise imminente</span>}
       </div>
       <div className="live__pills">
-        <div className={pillCls}>{h}</div>
+        <div className={`${pillCls}${goalSide === 'home' ? ' live__pill--scored' : ''}`} key={`h${h}`}>{h}</div>
         <div className="live__pillBar" />
-        <div className={pillCls}>{a}</div>
+        <div className={`${pillCls}${goalSide === 'away' ? ' live__pill--scored' : ''}`} key={`a${a}`}>{a}</div>
       </div>
     </div>
   )
@@ -190,12 +190,12 @@ function LiveCard({ match, espn, onClick }) {
     if (!isLive) { prevHs.current = null; prevAs.current = null; return }
     if (prevHs.current !== null && hs != null && hs > prevHs.current) {
       const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
-      setGoal({ team, scoreStr: `${hs} – ${as_ ?? 0}` })
+      setGoal({ team, scoreStr: `${hs} – ${as_ ?? 0}`, side: 'home' })
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setGoal(null), 5200)
     } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
       const team = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
-      setGoal({ team, scoreStr: `${hs ?? 0} – ${as_}` })
+      setGoal({ team, scoreStr: `${hs ?? 0} – ${as_}`, side: 'away' })
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setGoal(null), 5200)
     }
@@ -242,6 +242,7 @@ function LiveCard({ match, espn, onClick }) {
           homeScore={hs} awayScore={as_}
           minute={minute} isTermine={isTermine}
           repriseImminente={repriseImminente}
+          goalSide={goal?.side ?? null}
         />
 
         <div className="live__team live__team--away">
