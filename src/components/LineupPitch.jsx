@@ -93,21 +93,19 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── Jersey SVG path (centré sur 0,0) ──────────────────────────────────────────
-// Col V (−4,−13) → (0,−6) → (4,−13)
-// Manchons : gauche jusqu'à x=−17, droit jusqu'à x=17
-// Corps : x=−10 à x=10, y=−6 à y=13
+// ── Jersey SVG path ×1.2 (centré sur 0,0) ─────────────────────────────────────
+// Corps : x=−12 à x=12, y=−7 à y=16 | manchons jusqu'à x=±20
 const JERSEY_PATH =
-  'M -4,-13 L -11,-10 L -17,-5 L -16,-2 L -10,-6 L -10,13 L 10,13 L 10,-6 L 16,-2 L 17,-5 L 11,-10 L 4,-13 L 0,-6 Z'
+  'M -5,-16 L -13,-12 L -20,-6 L -19,-2.4 L -12,-7 L -12,16 L 12,16 L 12,-7 L 19,-2.4 L 20,-6 L 13,-12 L 5,-16 L 0,-7 Z'
 
 // ── Icône joueur (maillot) ────────────────────────────────────────────────────
 function PlayerIcon({ x, y, player, color }) {
   if (!player) return null
-  const c    = safeColor(color) ?? '#ef4444'
-  const isGK = ['GK', 'G', 'GB'].includes((player.position ?? '').toUpperCase())
-  const fc   = isGK ? GK_COLOR : c
-  const textC = isDark(fc) ? '#fff' : '#111'
-  const num  = player.number ?? ''
+  const isGK  = ['GK', 'G', 'GB'].includes((player.position ?? '').toUpperCase())
+  // Maillots blancs (lisibles sur mobile) — gardien en ambre pour le différencier
+  const fc    = isGK ? GK_COLOR : '#f5f5f5'
+  const numC  = isGK ? '#fff' : '#111'
+  const num   = player.number ?? ''
   const label = (() => {
     const nm = formatName(player.name, player.shortName)
     return nm.length > 12 ? nm.slice(0, 11) + '.' : nm
@@ -116,29 +114,27 @@ function PlayerIcon({ x, y, player, color }) {
   return (
     <g transform={`translate(${x},${y})`}>
       {/* Ombre portée */}
-      <path d={JERSEY_PATH} fill="rgba(0,0,0,0.35)" transform="translate(1.5,2)" />
+      <path d={JERSEY_PATH} fill="rgba(0,0,0,0.3)" transform="translate(1.8,2.4)" />
       {/* Corps du maillot */}
-      <path d={JERSEY_PATH} fill={fc} stroke="rgba(0,0,0,0.7)" strokeWidth="1" />
+      <path d={JERSEY_PATH} fill={fc} stroke="rgba(0,0,0,0.55)" strokeWidth="1" />
       {/* Col V */}
-      <path d="M -4,-13 L 0,-6 L 4,-13" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.1" />
+      <path d="M -5,-16 L 0,-7 L 5,-16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1.1" />
       {/* Liseré poitrine */}
-      <line x1="-8" y1="-2" x2="8" y2="-2" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-      {/* Numéro — grand et lisible */}
+      <line x1="-10" y1="-2.4" x2="10" y2="-2.4" stroke="rgba(0,0,0,0.06)" strokeWidth="4.5" />
+      {/* Numéro */}
       <text
-        x="0" y="5.5" textAnchor="middle" dominantBaseline="middle"
-        fill={textC} fontSize="14" fontWeight="700"
+        x="0" y="6.5" textAnchor="middle" dominantBaseline="middle"
+        fill={numC} fontSize="15" fontWeight="700"
         fontFamily="'Chakra Petch',monospace,Arial"
-        stroke={isDark(fc) ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)'}
-        strokeWidth="1.5" paintOrder="stroke"
       >
         {num}
       </text>
       {/* Nom sous le maillot */}
       <text
-        x="0" y="24" textAnchor="middle" dominantBaseline="middle"
-        fill="rgba(255,255,255,0.9)" fontSize="6.2"
+        x="0" y="28" textAnchor="middle" dominantBaseline="middle"
+        fill="rgba(255,255,255,0.92)" fontSize="8.5"
         fontFamily="'Chakra Petch',monospace,Arial"
-        stroke="rgba(0,0,0,0.85)" strokeWidth="2" paintOrder="stroke"
+        stroke="rgba(0,0,0,0.9)" strokeWidth="2.5" paintOrder="stroke"
       >
         {label}
       </text>

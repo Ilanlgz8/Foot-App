@@ -859,8 +859,16 @@ export function useLiveMinute(matches) {
   }, [queryClient])
 
   // Recalibration manuelle
+  // ─ Force un refetch FD.org pour récupérer les statuts IN_PLAY à jour,
+  //   puis repoll ESPN → réaffiche les widgets live même après vidage de cache.
+  // ─ Sans impact si pas de match en cours (refetch FD.org silencieux via cache Redis 2min).
   const recalibrate = useRef(async () => {
     clearAllMatchStates()
+    // 1. Forcer un refetch FD.org → matchesRef se met à jour avec statuts IN_PLAY réels
+    try { await queryClient.refetchQueries({ queryKey: ['todayMatches'] }) } catch {}
+    // 2. Attendre un tick que matchesRef.current soit mis à jour par le re-render React
+    await new Promise(r => setTimeout(r, 200))
+    // 3. Repoll ESPN + api-football avec les données fraîches
     await Promise.all([
       pollESPN(matchesRef.current, queryClient),
       pollApiFootball(matchesRef.current, queryClient),
