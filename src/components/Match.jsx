@@ -188,7 +188,7 @@ function Matchs() {
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
-  const { formMap } = useTeamForm(selectedComp)
+  const { formMap, compMatches } = useTeamForm(selectedComp)
   const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout()
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
@@ -287,21 +287,12 @@ function Matchs() {
   /* ── Ligne de match (poules + journée) ── */
   function MatchRow({ match, index, inModal = false }) {
     const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
-    const hForm = formMap[match.homeTeam?.id]
-    const aForm = formMap[match.awayTeam?.id]
-    const prono = isUpcoming && (hForm || aForm) ? calcProno(hForm, aForm) : null
-    // Segment favori = couleur argenté champion
-    const pronoWinner = prono
-      ? (prono.home >= prono.away && prono.home >= prono.draw ? 'home'
-        : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
-        : 'draw')
-      : null
 
     return (
       <div
-        className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${prono ? ' matchs__match--prono' : ''}`}
+        className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${isUpcoming ? ' matchs__match--upcoming' : ''}`}
         style={{ borderTop: index === 0 ? 'none' : undefined }}
-        onClick={() => { if (!isUpcoming) setSelectedMatch(match) }}
+        onClick={() => setSelectedMatch(match)}
       >
         <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
         <div className="matchs__team matchs__team--home">
@@ -313,6 +304,7 @@ function Matchs() {
         </div>
         <div className="matchs__score">
           <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
+          {isUpcoming && <span className="matchs__upcomingHint">›</span>}
         </div>
         <div className="matchs__team matchs__team--away">
           {match.awayTeam.crest && (
@@ -321,20 +313,6 @@ function Matchs() {
           )}
           <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
         </div>
-        {/* Barre prono pleine largeur — en dehors des colonnes équipe/score */}
-        {prono && (
-          <div className="matchs__pronoBar">
-            <div className={`matchs__pronoSeg matchs__pronoSeg--home${pronoWinner === 'home' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-home': prono.home }}>
-              {prono.home}%
-            </div>
-            <div className={`matchs__pronoSeg matchs__pronoSeg--draw${pronoWinner === 'draw' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-draw': prono.draw }}>
-              {prono.draw}%
-            </div>
-            <div className={`matchs__pronoSeg matchs__pronoSeg--away${pronoWinner === 'away' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-away': prono.away }}>
-              {prono.away}%
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -617,7 +595,7 @@ function Matchs() {
       )}
       {selectedMatch && (
         <MatchModal match={selectedMatch} compId={selectedComp}
-          onClose={() => setSelectedMatch(null)} formMap={formMap} />
+          onClose={() => setSelectedMatch(null)} formMap={formMap} compMatches={compMatches} />
       )}
     </section>
   )

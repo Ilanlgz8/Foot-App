@@ -1,7 +1,7 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail, useLineups, useFifaStats } from '../hooks/useMatchDetail'
+import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useSofaLiveStats, useSofaMomentum } from '../hooks/useSofaScore'
 import LineupPitch             from './LineupPitch'
@@ -509,7 +509,151 @@ function PronoSection({ prono, homeShort, awayShort }) {
   )
 }
 
-function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, formMap }) {
+// ── Section pré-match ────────────────────────────────────────────────────────
+// Affichée pour les matchs à venir : prono + forme 5 derniers + H2H
+
+function ResultBadge({ result }) {
+  const cls = result === 'W' ? 'pm__badge--w' : result === 'D' ? 'pm__badge--d' : 'pm__badge--l'
+  const label = result === 'W' ? 'V' : result === 'D' ? 'N' : 'D'
+  return <span className={`pm__badge ${cls}`}>{label}</span>
+}
+
+function TeamFormTable({ teamId, compMatches, isHome }) {
+  const matches = (compMatches ?? [])
+    .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
+    .slice(-5)
+
+  if (!matches.length) return <p className="pm__noData">Pas de données</p>
+
+  return (
+    <div className="pm__formTable">
+      {matches.map((m, i) => {
+        const myHome = m.homeTeam?.id === teamId
+        const myGoals  = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
+        const oppGoals = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
+        const oppName  = translateTeam(myHome
+          ? (m.awayTeam?.shortName || m.awayTeam?.name || '?')
+          : (m.homeTeam?.shortName || m.homeTeam?.name || '?'))
+        const result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+        const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+        return (
+          <div key={i} className="pm__formRow">
+            <ResultBadge result={result} />
+            <span className="pm__formOpp">{isHome ? '' : ''}{myHome ? 'D' : 'E'} {oppName}</span>
+            <span className="pm__formScore">{myGoals}-{oppGoals}</span>
+            <span className="pm__formDate">{date}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function H2HSection({ match }) {
+  const { data: h2hMatches, isLoading } = useH2H(match)
+
+  if (isLoading) return <p className="pm__noData">Chargement H2H…</p>
+  if (!h2hMatches?.length) return null
+
+  const recent = h2hMatches.filter(m => m.status === 'FINISHED').slice(-5)
+  if (!recent.length) return null
+
+  const homeId = match.homeTeam?.id
+
+  return (
+    <div className="pm__section">
+      <h3 className="pm__sectionTitle">Confrontations directes</h3>
+      <div className="pm__h2hList">
+        {recent.map((m, i) => {
+          const isHomeTeam = m.homeTeam?.id === homeId
+          const hs = m.score?.fullTime?.home ?? '-'
+          const as_ = m.score?.fullTime?.away ?? '-'
+          const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+          const homeGoals = isHomeTeam ? hs : as_
+          const awayGoals = isHomeTeam ? as_ : hs
+          const result = homeGoals > awayGoals ? 'W' : homeGoals < awayGoals ? 'L' : 'D'
+          return (
+            <div key={i} className="pm__h2hRow">
+              <span className="pm__h2hDate">{date}</span>
+              <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
+              <span className="pm__h2hScore">{hs} – {as_}</span>
+              <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
+              <ResultBadge result={result} />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PreMatchSection({ match, prono, formMap, compMatches }) {
+  const homeId = match.homeTeam?.id
+  const awayId = match.awayTeam?.id
+  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+  const winner = prono
+    ? (prono.home >= prono.away && prono.home >= prono.draw ? 'home'
+      : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
+      : 'draw')
+    : null
+
+  return (
+    <div className="pm__wrap">
+
+      {/* Prono */}
+      {prono && (
+        <div className="pm__section">
+          <h3 className="pm__sectionTitle">Probabilités estimées</h3>
+          <div className="pm__pronoRow">
+            <span className="pm__pronoLabel">{homeName}</span>
+            <div className="pm__pronoBar">
+              <div className={`pm__pronoSeg pm__pronoSeg--home${winner === 'home' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.home }}>
+                {prono.home}%
+              </div>
+              <div className={`pm__pronoSeg pm__pronoSeg--draw${winner === 'draw' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.draw }}>
+                {prono.draw}%
+              </div>
+              <div className={`pm__pronoSeg pm__pronoSeg--away${winner === 'away' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.away }}>
+                {prono.away}%
+              </div>
+            </div>
+            <span className="pm__pronoLabel">{awayName}</span>
+          </div>
+          <div className="pm__pronoNums">
+            <span className={`pm__pronoNum${winner === 'home' ? ' pm__pronoNum--winner' : ''}`}>{prono.home}%<br /><small>Victoire</small></span>
+            <span className={`pm__pronoNum pm__pronoNum--draw${winner === 'draw' ? ' pm__pronoNum--winner' : ''}`}>{prono.draw}%<br /><small>Nul</small></span>
+            <span className={`pm__pronoNum${winner === 'away' ? ' pm__pronoNum--winner' : ''}`}>{prono.away}%<br /><small>Victoire</small></span>
+          </div>
+          <p className="pm__disclaimer">Basé sur la forme des 5 derniers matchs</p>
+        </div>
+      )}
+
+      {/* Forme récente */}
+      {compMatches?.length > 0 && (
+        <div className="pm__section">
+          <h3 className="pm__sectionTitle">Forme récente</h3>
+          <div className="pm__formGrid">
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{homeName}</p>
+              <TeamFormTable teamId={homeId} compMatches={compMatches} isHome={true} />
+            </div>
+            <div className="pm__formDivider" />
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{awayName}</p>
+              <TeamFormTable teamId={awayId} compMatches={compMatches} isHome={false} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* H2H */}
+      <H2HSection match={match} />
+    </div>
+  )
+}
+
+function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, formMap, compMatches }) {
   const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id).ft === true
   const isLive     = !isFinished && (match?.status === 'IN_PLAY' || match?.status === 'PAUSED')
   const [tab, setTab] = useState(defaultTab)
@@ -686,11 +830,12 @@ function MatchModal({ match, compId, onClose, defaultTab = 'stats', espnScore, f
             )}
           </>
         ) : (
-          /* Match à venir — prono affiché directement */
-          <PronoSection
+          /* Match à venir — section pré-match complète */
+          <PreMatchSection
+            match={match}
             prono={prono}
-            homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-            awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+            formMap={formMap}
+            compMatches={compMatches}
           />
         )}
 
