@@ -750,6 +750,9 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
         </div>
       )}
 
+      {/* H2H */}
+      <H2HSection match={match} />
+
       {/* Stats saison */}
       {compMatches?.length > 0 && (
         <SeasonStatsSection
@@ -758,9 +761,6 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
           compMatches={compMatches}
         />
       )}
-
-      {/* H2H */}
-      <H2HSection match={match} />
     </div>
   )
 }
