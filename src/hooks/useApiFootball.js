@@ -158,40 +158,37 @@ function useFixtureInfo(match) {
 }
 
 // ── Transformations ───────────────────────────────────────────────────────────
+const AFL_POS_MAP = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' }
+
 function transformLineups(data, homeTeamId) {
   const teams = data.response ?? []
-  if (teams.length < 2) return null
+  if (teams.length < 1) return null
 
   const homeData = teams.find(t => t.team?.id === homeTeamId) ?? teams[0]
-  const awayData = teams.find(t => t.team?.id !== homeTeamId) ?? teams[1]
+  const awayData = teams.find(t => t.team?.id !== homeTeamId) ?? teams[1] ?? teams[0]
 
-  const mapPlayer = (entry, isSub) => ({
-    player: {
-      name:      entry.player?.name ?? '?',
-      shortName: (entry.player?.name ?? '?').split(' ').pop(),
-      position:  entry.player?.pos ?? '',
-    },
-    shirtNumber: entry.player?.number ?? '',
-    substitute:  isSub,
-    position:    entry.player?.pos ?? '',
+  const mapPlayer = (entry, i) => ({
+    name:      entry.player?.name ?? '?',
+    shortName: (entry.player?.name ?? '?').split(' ').pop(),
+    number:    entry.player?.number ?? '',
+    position:  AFL_POS_MAP[entry.player?.pos] ?? entry.player?.pos ?? '',
+    order:     i,
   })
 
-  return {
-    home: {
-      formation: homeData.formation ?? '',
-      players: [
-        ...(homeData.startXI    ?? []).map(p => mapPlayer(p, false)),
-        ...(homeData.substitutes ?? []).map(p => mapPlayer(p, true)),
-      ],
-    },
-    away: {
-      formation: awayData.formation ?? '',
-      players: [
-        ...(awayData.startXI    ?? []).map(p => mapPlayer(p, false)),
-        ...(awayData.substitutes ?? []).map(p => mapPlayer(p, true)),
-      ],
-    },
-  }
+  const build = (teamData) => ({
+    name:      teamData.team?.name ?? '',
+    shortName: teamData.team?.name ?? '',
+    color:     '#1e293b',
+    altColor:  '#ffffff',
+    formation: teamData.formation ?? '',
+    starters:  (teamData.startXI     ?? []).map((p, i) => mapPlayer(p, i)),
+    subs:      (teamData.substitutes ?? []).map((p, i) => mapPlayer(p, i)),
+  })
+
+  const home = build(homeData)
+  const away = build(awayData)
+  if (!home.starters.length) return null
+  return { home, away }
 }
 
 function transformStats(data, homeTeamId) {

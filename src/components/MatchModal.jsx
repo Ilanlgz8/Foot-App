@@ -379,54 +379,26 @@ export function ComposTab({ match, compMatches }) {
   }
 
   if (probable) {
-    const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
-    const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
-    const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : ''
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : ''
+    const homeFrom = probable.home?.fromMatch
+    const awayFrom = probable.away?.fromMatch
     return (
       <div>
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-          padding: '0.6rem 1rem', margin: '0 0 0.75rem',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '2px', padding: '0.5rem 1rem', margin: '8px 8px 0',
           background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.18)',
           borderRadius: '0.6rem', fontSize: '0.75rem', color: 'rgba(251,191,36,0.85)',
         }}>
-          ⚡ Compositions probables · dernier XI connu
+          <span>⚡ Compositions probables · dernier XI connu</span>
+          {(homeFrom || awayFrom) && (
+            <span style={{ fontSize: '0.65rem', opacity: 0.65 }}>
+              {homeFrom ? `Basé sur match du ${fmtDate(homeFrom.date)}` : ''}
+            </span>
+          )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', padding: '0 8px 8px' }}>
-          {[
-            { name: homeName, lineup: probable.home },
-            { name: awayName, lineup: probable.away ?? probable.home },
-          ].map(({ name, lineup }) => (
-            lineup?.starters?.length ? (
-              <div key={name}>
-                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
-                  textAlign: 'center', letterSpacing: '0.06em', textTransform: 'uppercase',
-                  marginBottom: '0.4rem' }}>
-                  {name}
-                  {lineup.fromMatch && (
-                    <span style={{ display: 'block', fontSize: '0.6rem', opacity: 0.6, fontWeight: 400 }}>
-                      vs {translateTeam(lineup.fromMatch.opponent)} · {fmtDate(lineup.fromMatch.date)}
-                    </span>
-                  )}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {lineup.starters.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem',
-                      padding: '0.2rem 0.5rem', borderRadius: '0.3rem',
-                      background: 'rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
-                      <span style={{ width: '1.2rem', textAlign: 'center', fontSize: '0.65rem',
-                        color: 'rgba(255,255,255,0.35)', fontFamily: 'Chakra Petch, sans-serif' }}>
-                        {p.number || (i + 1)}
-                      </span>
-                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.82)' }}>{p.shortName || p.name}</span>
-                      <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)',
-                        letterSpacing: '0.04em' }}>{p.position}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null
-          ))}
+        <div style={{ padding: '8px 8px 8px' }}>
+          <LineupPitch home={probable.home} away={probable.away ?? probable.home} />
         </div>
       </div>
     )
@@ -835,6 +807,20 @@ export function MatchStatsSection({ match }) {
   // Source 3 — api-football (fallback universel)
   const { data: aflStats, isLoading: aflLoading } = useAflMatchStats(match)
 
+  // ── Buteurs : match.goals (FD.org) ou fetch full match si absent ─────────────
+  const needGoalsFetch = !!match?.id && !(match?.goals?.length > 0)
+  const { data: fullMatch } = useQuery({
+    queryKey: ['matchFull', match?.id],
+    queryFn:  async () => {
+      const res = await fetch(`/api/football?apiPath=/v4/matches/${match.id}`)
+      if (!res.ok) return null
+      return res.json()
+    },
+    enabled:   needGoalsFetch,
+    staleTime: 60 * 60_000,   // 1h — goals ne changent pas
+  })
+  const goals = match?.goals?.length ? match.goals : fullMatch?.goals ?? []
+
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
@@ -848,22 +834,6 @@ export function MatchStatsSection({ match }) {
     (isWC && fifaLoading) || espnLoading || aflLoading
   )
 
-  if (isLoading) return (
-    <div className="pm__section">
-      <h3 className="pm__sectionTitle">Statistiques du match</h3>
-      <div style={{ display:'flex', justifyContent:'center', padding:'1.5rem 0' }}>
-        <div className="modal__spinner" />
-      </div>
-    </div>
-  )
-
-  if (!rows.length) return (
-    <div className="pm__section">
-      <h3 className="pm__sectionTitle">Statistiques du match</h3>
-      <p className="pm__noData">Stats non disponibles</p>
-    </div>
-  )
-
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away
 
@@ -875,15 +845,30 @@ export function MatchStatsSection({ match }) {
         <span />
         <span className="pm__statTeam pm__statTeam--away">{as_ != null ? `${as_} ` : ''}{awayName}</span>
       </div>
-      <div className="pm__statTable">
-        {rows.map(({ label, hv, av, hBetter, aBetter }) => (
-          <div key={label} className="pm__statRow">
-            <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv}</span>
-            <span className="pm__statName">{label}</span>
-            <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better' : ''}`}>{av}</span>
-          </div>
-        ))}
-      </div>
+
+      {/* Buteurs */}
+      {goals.length > 0 && (
+        <GoalTimeline goals={goals} homeId={match.homeTeam?.id} />
+      )}
+
+      {/* Stats du match */}
+      {isLoading ? (
+        <div style={{ display:'flex', justifyContent:'center', padding:'1.5rem 0' }}>
+          <div className="modal__spinner" />
+        </div>
+      ) : rows.length > 0 ? (
+        <div className="pm__statTable">
+          {rows.map(({ label, hv, av, hBetter, aBetter }) => (
+            <div key={label} className="pm__statRow">
+              <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv}</span>
+              <span className="pm__statName">{label}</span>
+              <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better' : ''}`}>{av}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="pm__noData">Stats non disponibles</p>
+      )}
     </div>
   )
 }
