@@ -732,6 +732,15 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
         </div>
       )}
 
+      {/* Stats saison */}
+      {compMatches?.length > 0 && (
+        <SeasonStatsSection
+          homeId={homeId} awayId={awayId}
+          homeName={homeName} awayName={awayName}
+          compMatches={compMatches}
+        />
+      )}
+
       {/* Forme récente */}
       {compMatches?.length > 0 && (
         <div className="pm__section">
@@ -752,15 +761,6 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
 
       {/* H2H */}
       <H2HSection match={match} />
-
-      {/* Stats saison */}
-      {compMatches?.length > 0 && (
-        <SeasonStatsSection
-          homeId={homeId} awayId={awayId}
-          homeName={homeName} awayName={awayName}
-          compMatches={compMatches}
-        />
-      )}
     </div>
   )
 }
