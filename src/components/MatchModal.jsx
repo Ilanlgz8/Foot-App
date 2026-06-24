@@ -220,7 +220,7 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-function LiveStatsTab({ match, espnScore }) {
+export function LiveStatsTab({ match, espnScore }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -330,7 +330,7 @@ function LiveStatsTab({ match, espnScore }) {
 
 // ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
-function ComposTab({ match }) {
+export function ComposTab({ match }) {
   // Source 1 : api-football (couvre clubs + WC, dispo ~1h avant)
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(match)
 
@@ -415,7 +415,7 @@ const DEFAULT_RULES = [
 ]
 const COMP_RULES = { WC: WC_RULES, FL1: DEFAULT_RULES, PL: DEFAULT_RULES, PD: DEFAULT_RULES, BL1: DEFAULT_RULES, SA: DEFAULT_RULES }
 
-function ClassementTab({ match, compId }) {
+export function ClassementTab({ match, compId }) {
   const { standings, groups, loading } = useStandings(compId)
   const { formMap } = useTeamForm(compId)
 
@@ -511,7 +511,7 @@ function FinishedDetails({ match, espnData, detail, loading }) {
 
 
 // ── Modal principale ─────────────────────────────────────────────────────────
-function PronoSection({ prono, homeShort, awayShort }) {
+export function PronoSection({ prono, homeShort, awayShort }) {
   if (!prono) return null
   const winner = prono.home >= prono.away && prono.home >= prono.draw ? 'home'
     : prono.away >= prono.home && prono.away >= prono.draw ? 'away'

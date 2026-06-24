@@ -5,7 +5,6 @@ import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useState, useRef, useEffect } from 'react'
-import MatchModal from './MatchModal'
 import { useFotmobXG } from '../hooks/useFotmobXG'
 import '../live.css'
 
@@ -274,7 +273,6 @@ function LiveCard({ match, espn, onClick }) {
 export default function Live() {
   const navigate = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
-  const [modal, setModal] = useState(null)
 
   const live = liveMatches.filter(m =>
     m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || getMatchState(m.id).ft === true
@@ -306,21 +304,12 @@ export default function Live() {
                 key={match.id}
                 match={match}
                 espn={espnScores[match.id] ?? null}
-                onClick={() => setModal({ match, espnScore: espnScores[match.id] ?? null })}
+                onClick={() => navigate(`/live/${match.id}`)}
               />
             ))}
           </div>
         )}
       </div>
-
-      {modal && (
-        <MatchModal
-          match={modal.match}
-          espnScore={modal.espnScore}
-          onClose={() => setModal(null)}
-          defaultTab="livestats"
-        />
-      )}
     </section>
   )
 }
