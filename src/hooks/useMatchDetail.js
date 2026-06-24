@@ -239,20 +239,57 @@ export function useEspnMatchStats(match) {
 }
 
 // ── useProbableLineups ─────────────────────────────────────────────────────────
-// Compos probables pour un match à venir : dernier XI connu de chaque équipe
-// depuis leur match précédent dans compMatches (via /api/fifa-lineups → Redis).
+// Compos probables : dernier XI connu de chaque équipe via api-football.
+// Utilise /apifootball (pas de Redis) → fixtures par date → lineups du match.
+
+// Mapping FD.org competition ID → api-football league + season
+const COMP_AFL_ID = {
+  2000: { league: 1,   season: 2026 }, // WC 2026
+  2015: { league: 61,  season: 2025 }, // Ligue 1
+  2021: { league: 39,  season: 2025 }, // Premier League
+  2014: { league: 140, season: 2025 }, // La Liga
+  2002: { league: 78,  season: 2025 }, // Bundesliga
+  2019: { league: 135, season: 2025 }, // Serie A
+  2001: { league: 2,   season: 2025 }, // Champions League
+  2146: { league: 3,   season: 2025 }, // Europa League
+}
+
+const POS_MAP = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' }
+
+function parseAflLineup(teamEntry, opponent, matchDate) {
+  if (!teamEntry) return null
+  const mapPlayer = (p, i) => ({
+    name:      p.player?.name ?? '?',
+    shortName: (p.player?.name ?? '?').split(' ').slice(-1)[0],
+    number:    p.player?.number ?? '',
+    position:  POS_MAP[p.player?.pos] ?? p.player?.pos ?? '',
+    order:     i,
+  })
+  const starters = (teamEntry.startXI ?? []).map(mapPlayer)
+  if (!starters.length) return null
+  return {
+    name:      teamEntry.team?.name ?? '',
+    shortName: teamEntry.team?.name ?? '',
+    color:     '#1e40af',
+    altColor:  '#ffffff',
+    formation: teamEntry.formation ?? '',
+    starters,
+    subs: (teamEntry.substitutes ?? []).map(mapPlayer),
+    fromMatch: { date: matchDate, opponent },
+  }
+}
 
 export function useProbableLineups(match, compMatches) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
+  const aflInfo = COMP_AFL_ID[match?.competition?.id]
 
   return useQuery({
-    queryKey:  ['probableLineups', match?.id, (compMatches ?? []).length],
-    enabled:   !!match?.id && !!(compMatches?.length),
+    queryKey:  ['probableLineups2', match?.id, (compMatches ?? []).length],
+    enabled:   !!match?.id && !!(compMatches?.length) && !!aflInfo,
     staleTime: 10 * 60_000,
     retry: 1,
     queryFn: async () => {
-      // Derniers matchs terminés pour chaque équipe
       const sorted = [...compMatches].sort(
         (a, b) => new Date(b.utcDate) - new Date(a.utcDate)
       )
@@ -263,29 +300,54 @@ export function useProbableLineups(match, compMatches) {
         m.homeTeam?.id === awayId || m.awayTeam?.id === awayId
       )
 
-      const fetchTeamLineup = async (lastMatch, teamId) => {
-        if (!lastMatch) return null
-        const h = lastMatch.homeTeam?.name ?? lastMatch.homeTeam?.shortName ?? ''
-        const a = lastMatch.awayTeam?.name ?? lastMatch.awayTeam?.shortName ?? ''
+      // Résolution fixture api-football pour un match FD.org passé
+      const resolveFixture = async (fdMatch) => {
+        if (!fdMatch) return null
+        const date  = fdMatch.utcDate.slice(0, 10)
+        const fdH   = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
+        const fdA   = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
+        const p     = new URLSearchParams({ date, league: aflInfo.league, season: aflInfo.season })
         try {
-          const res = await fetch(
-            `/api/fifa-lineups?fdMatchId=${lastMatch.id}&home=${encodeURIComponent(h)}&away=${encodeURIComponent(a)}`
-          )
+          const res  = await fetch(`/apifootball?${p}`)
           if (!res.ok) return null
           const data = await res.json()
-          const wasHome   = lastMatch.homeTeam?.id === teamId
-          const lineup    = wasHome ? data.home : data.away
-          if (!lineup?.starters?.length) return null
-          const opponent  = wasHome
-            ? (lastMatch.awayTeam?.shortName ?? lastMatch.awayTeam?.name ?? '?')
-            : (lastMatch.homeTeam?.shortName ?? lastMatch.homeTeam?.name ?? '?')
-          return { ...lineup, fromMatch: { date: lastMatch.utcDate, opponent } }
+          let best = null, bestScore = 0
+          for (const f of data.response ?? []) {
+            const hn = f.teams?.home?.name ?? ''
+            const an = f.teams?.away?.name ?? ''
+            const s  = (fuzzyTeam(fdH, hn) ? 1 : 0) + (fuzzyTeam(fdA, an) ? 1 : 0)
+            if (s > bestScore) { bestScore = s; best = f }
+          }
+          return bestScore >= 1 ? best?.fixture?.id : null
+        } catch { return null }
+      }
+
+      // Fetch lineup d'un match via api-football
+      const fetchLineup = async (fdMatch, teamId) => {
+        if (!fdMatch) return null
+        const fixtureId = await resolveFixture(fdMatch)
+        if (!fixtureId) return null
+        try {
+          const res  = await fetch(`/apifootball?_ep=fixtures%2Flineups&fixture=${fixtureId}`)
+          if (!res.ok) return null
+          const data = await res.json()
+          const teams = data.response ?? []
+          const wasHome  = fdMatch.homeTeam?.id === teamId
+          const teamName = wasHome
+            ? (fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? '')
+            : (fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? '')
+          const opponent = wasHome
+            ? (fdMatch.awayTeam?.shortName ?? fdMatch.awayTeam?.name ?? '?')
+            : (fdMatch.homeTeam?.shortName ?? fdMatch.homeTeam?.name ?? '?')
+          // Trouver l'équipe dans la réponse
+          const entry = teams.find(t => fuzzyTeam(teamName, t.team?.name ?? '')) ?? teams[wasHome ? 0 : 1]
+          return parseAflLineup(entry, opponent, fdMatch.utcDate)
         } catch { return null }
       }
 
       const [homeLineup, awayLineup] = await Promise.all([
-        fetchTeamLineup(lastHomeMatch, homeId),
-        fetchTeamLineup(lastAwayMatch, awayId),
+        fetchLineup(lastHomeMatch, homeId),
+        fetchLineup(lastAwayMatch, awayId),
       ])
       if (!homeLineup && !awayLineup) return null
       return { home: homeLineup, away: awayLineup }
