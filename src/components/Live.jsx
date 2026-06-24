@@ -221,14 +221,12 @@ function LiveCard({ match, espn, onClick }) {
         <PeriodBadge match={match} />
       </div>
 
-      {/* Score principal */}
+      {/* Score principal — toujours 5 colonnes: xgHome | home | score | away | xgAway */}
       <div className="live__matchRow">
-        {xg?.home != null && (
-          <div className="live__xgCol">
-            <span className="live__xgNum">{xg.home.toFixed(2)}</span>
-            <span className="live__xgLabel">xG</span>
-          </div>
-        )}
+        <div className="live__xgCol" style={xg?.home == null ? { visibility: 'hidden' } : {}}>
+          <span className="live__xgNum">{xg?.home?.toFixed(2)}</span>
+          <span className="live__xgLabel">xG</span>
+        </div>
 
         <div className="live__team">
           {match.homeTeam?.crest
@@ -251,12 +249,10 @@ function LiveCard({ match, espn, onClick }) {
           <span className="live__teamName">{awayName}</span>
         </div>
 
-        {xg?.away != null && (
-          <div className="live__xgCol">
-            <span className="live__xgNum">{xg.away.toFixed(2)}</span>
-            <span className="live__xgLabel">xG</span>
-          </div>
-        )}
+        <div className="live__xgCol" style={xg?.away == null ? { visibility: 'hidden' } : {}}>
+          <span className="live__xgNum">{xg?.away?.toFixed(2)}</span>
+          <span className="live__xgLabel">xG</span>
+        </div>
       </div>
 
       {/* Buteurs */}
