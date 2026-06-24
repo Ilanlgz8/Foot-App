@@ -5,7 +5,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
-import { useSofaLiveStats, useSofaMomentum, useSofaLineups } from '../hooks/useSofaScore'
+import { useAflLiveStats, useAflLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
@@ -154,47 +154,6 @@ function GoalTimeline({ goals = [], homeId }) {
   )
 }
 
-// ── Graphique momentum ───────────────────────────────────────────────────────
-function MomentumChart({ points, homeName, awayName }) {
-  if (!points || points.length === 0) return null
-  const W = 400, H = 72
-  const maxAbs = Math.max(...points.map(p => Math.abs(p.value ?? 0)), 0.01)
-  const barW = W / points.length
-
-  return (
-    <div className="modal__momentum">
-      <p className="modal__momentumTitle">Momentum</p>
-      <div className="modal__momentumLegend">
-        <span className="modal__momentumLegendHome">■ {homeName}</span>
-        <span className="modal__momentumLegendAway">■ {awayName}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="modal__momentumSvg" preserveAspectRatio="none">
-        {/* Ligne centrale */}
-        <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-        {points.map((p, i) => {
-          const v         = p.value ?? 0
-          const norm      = v / maxAbs
-          const isHome    = norm >= 0
-          const barH      = Math.max(Math.abs(norm) * (H / 2 - 2), 1)
-          const x         = i * barW
-          const y         = isHome ? H / 2 - barH : H / 2
-          return (
-            <rect
-              key={i}
-              x={x + 0.2}
-              y={y}
-              width={Math.max(barW - 0.4, 0.8)}
-              height={barH}
-              fill={isHome ? 'rgba(239,68,68,0.65)' : 'rgba(59,130,246,0.65)'}
-              rx="0.5"
-            />
-          )
-        })}
-      </svg>
-    </div>
-  )
-}
-
 // ── Stats ESPN summary (possession, tirs, corners — endpoint summary) ─────────
 // Fetché à la demande quand espnEventId est connu mais le scoreboard n'a pas les stats.
 function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
@@ -287,7 +246,7 @@ function LiveStatsTab({ match, espnScore }) {
 
   // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary) et pas FIFA
   const espnSummaryFailed = !summaryLoading && !summaryStats
-  const { data: statsData, isLoading: aflLoading } = useSofaLiveStats(
+  const { data: statsData, isLoading: aflLoading } = useAflLiveStats(
     match, isLive && !isFifaMatch && !hasEspn && (!hasEspnId || espnSummaryFailed)
   )
 
@@ -370,8 +329,8 @@ function LiveStatsTab({ match, espnScore }) {
 // ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
 function ComposTab({ match }) {
-  // Source 1 : api-football via useSofaLineups (couvre clubs + WC, dispo ~1h avant)
-  const { data: aflLineups, isLoading: aflLoading } = useSofaLineups(match)
+  // Source 1 : api-football (couvre clubs + WC, dispo ~1h avant)
+  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(match)
 
   // Source 2 : ESPN/FIFA (fallback si api-football n'a rien)
   const espnEnabled = !aflLoading && !aflLineups?.home?.starters?.length
