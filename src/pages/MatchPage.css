@@ -6,11 +6,18 @@
   background: var(--bg, #0a0a0f);
 }
 
+/* Conteneur centré — max 960px sur desktop */
+.mp__wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
 .mp__backBtn {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin: 1rem 1rem 0;
+  margin: 1rem 0 0;
   padding: 0.4rem 0.85rem;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
@@ -27,7 +34,7 @@
 
 /* ── Header ── */
 .mp__header {
-  margin: 1rem;
+  margin: 1rem 0;
   padding: 1.4rem 1rem 1.2rem;
   background: linear-gradient(160deg, rgba(15,15,30,0.97), rgba(10,10,20,0.99));
   border: 1px solid rgba(255,255,255,0.07);
@@ -69,7 +76,6 @@
   flex: 1;
   min-width: 0;
 }
-.mp__team--away { align-items: center; }
 
 .mp__crest {
   width: 52px;
@@ -137,12 +143,18 @@
   text-transform: uppercase;
 }
 
-/* ── Onglets ── */
+/* ── Body : tabs + contenu ── */
+.mp__body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Onglets (mobile : barre horizontale) ── */
 .mp__tabs {
   display: flex;
   gap: 0.4rem;
-  padding: 0 1rem;
-  margin: 1.2rem 0 0;
+  padding: 0;
+  margin: 0 0 0.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 
@@ -169,7 +181,8 @@
 
 /* ── Contenu onglet ── */
 .mp__tabContent {
-  padding: 0 1rem;
+  flex: 1;
+  padding: 1rem 0 0;
   will-change: transform, opacity;
   transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
@@ -205,4 +218,70 @@
   justify-content: center;
   align-items: center;
   padding: 3rem 0;
+}
+
+/* ── Desktop (≥ 768px) ── */
+@media (min-width: 768px) {
+  .mp__body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Sidebar tabs verticaux */
+  .mp__tabs {
+    flex-direction: column;
+    flex: 0 0 160px;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    padding-right: 1rem;
+  }
+
+  .mp__tab {
+    flex: none;
+    text-align: left;
+    padding: 0.65rem 0.9rem;
+    border-bottom: none;
+    border-right: 2px solid transparent;
+    border-radius: 0.5rem 0 0 0.5rem;
+    font-size: 0.85rem;
+  }
+  .mp__tab:hover {
+    background: rgba(255,255,255,0.04);
+  }
+  .mp__tab--active {
+    color: #f87171;
+    border-right-color: #ef4444;
+    background: rgba(239,68,68,0.06);
+  }
+
+  .mp__tabContent {
+    flex: 1;
+    padding: 0;
+    min-width: 0;
+  }
+
+  /* Header desktop : crests plus grands */
+  .mp__crest {
+    width: 68px;
+    height: 68px;
+  }
+  .mp__crestFallback {
+    width: 68px;
+    height: 68px;
+  }
+  .mp__teamName {
+    font-size: 0.95rem;
+    max-width: 130px;
+  }
+  .mp__time {
+    font-size: 2.6rem;
+  }
+  .mp__scoreFinished {
+    font-size: 2.8rem;
+  }
 }

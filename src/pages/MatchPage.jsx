@@ -154,52 +154,54 @@ export default function MatchPage() {
 
   return (
     <div className="mp__page">
-      <button className="mp__backBtn" onClick={() => navigate(-1)}>
-        ‹ Retour
-      </button>
+      <div className="mp__wrap">
+        <button className="mp__backBtn" onClick={() => navigate(-1)}>
+          ‹ Retour
+        </button>
 
-      <MatchPageHeader match={match} />
+        <MatchPageHeader match={match} />
 
-      <div ref={swipe.ref}>
-        {/* Onglets */}
-        <div className="mp__tabs">
-          {TABS.map(t => (
-            <button
-              key={t}
-              className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
-              onClick={() => goTab(t, null)}
-            >
-              {t === 'statistiques' ? 'Statistiques'
-             : t === 'compos'      ? 'Compos'
-             :                       'Classement'}
-            </button>
-          ))}
-        </div>
+        <div className="mp__body" ref={swipe.ref}>
+          {/* Sidebar tabs (desktop) / barre horizontale (mobile) */}
+          <div className="mp__tabs">
+            {TABS.map(t => (
+              <button
+                key={t}
+                className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
+                onClick={() => goTab(t, null)}
+              >
+                {t === 'statistiques' ? 'Statistiques'
+               : t === 'compos'      ? 'Compos'
+               :                       'Classement'}
+              </button>
+            ))}
+          </div>
 
-        {/* Contenu */}
-        <div
-          key={activeTab}
-          className={`mp__tabContent${
-            !swipe.isDragging && tabDir === 'left'  ? ' mp__tabContent--fromRight' :
-            !swipe.isDragging && tabDir === 'right' ? ' mp__tabContent--fromLeft'  : ''
-          }`}
-          style={{
-            transform:  swipe.isDragging ? `translateX(${swipe.dragOffset}px)` : undefined,
-            transition: swipe.isDragging ? 'none' : undefined,
-          }}
-        >
-          {activeTab === 'statistiques' && (
-            formLoading
-              ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
-              : <PreMatchSection
-                  match={match}
-                  prono={prono}
-                  formMap={formMap}
-                  compMatches={compMatches}
-                />
-          )}
-          {activeTab === 'compos'     && <ComposTab match={match} />}
-          {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+          {/* Contenu */}
+          <div
+            key={activeTab}
+            className={`mp__tabContent${
+              !swipe.isDragging && tabDir === 'left'  ? ' mp__tabContent--fromRight' :
+              !swipe.isDragging && tabDir === 'right' ? ' mp__tabContent--fromLeft'  : ''
+            }`}
+            style={{
+              transform:  swipe.isDragging ? `translateX(${swipe.dragOffset}px)` : undefined,
+              transition: swipe.isDragging ? 'none' : undefined,
+            }}
+          >
+            {activeTab === 'statistiques' && (
+              formLoading
+                ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
+                : <PreMatchSection
+                    match={match}
+                    prono={prono}
+                    formMap={formMap}
+                    compMatches={compMatches}
+                  />
+            )}
+            {activeTab === 'compos'     && <ComposTab match={match} />}
+            {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+          </div>
         </div>
       </div>
     </div>
