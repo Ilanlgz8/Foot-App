@@ -41,9 +41,11 @@ function MatchHeader({ match, espn }) {
   const period   = getMatchPeriod(match)
   const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
 
-  const repriseImminente = match.status === 'PAUSED'
-    && matchSt.pausedAt && !matchSt.half2Start
-    && (Date.now() - matchSt.pausedAt) >= 15 * 60_000
+  const pauseElapsed = (match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start)
+    ? Date.now() - matchSt.pausedAt : null
+  const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
+  const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
+    ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
 
   const hs  = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
@@ -112,6 +114,8 @@ function MatchHeader({ match, espn }) {
           <div className="lmp__minute">
             {repriseImminente
               ? <span className="lmp__repriseLabel">Reprise imminente</span>
+              : repriseDans != null
+              ? <span className="lmp__repriseLabel">Reprise dans {repriseDans} min</span>
               : <span className={isTermine ? 'lmp__minuteFt' : 'lmp__minuteLive'}>{periodLabel}</span>
             }
           </div>
@@ -170,7 +174,7 @@ function MatchHeader({ match, espn }) {
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-const TABS = ['stats', 'compos', 'classement', 'prono']
+const TABS = ['stats', 'compos', 'classement']
 
 export default function LiveMatchPage() {
   const { matchId }            = useParams()
@@ -187,7 +191,7 @@ export default function LiveMatchPage() {
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
 
-  const visibleTabs = prono ? TABS : TABS.filter(t => t !== 'prono')
+  const visibleTabs = TABS
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -246,16 +250,9 @@ export default function LiveMatchPage() {
             transition: swipe.isDragging ? 'none' : undefined,
           }}
         >
-          {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} />}
+          {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} prono={prono} homeShort={match.homeTeam?.shortName || match.homeTeam?.name} awayShort={match.awayTeam?.shortName || match.awayTeam?.name} />}
           {activeTab === 'compos'     && <ComposTab match={match} />}
           {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
-          {activeTab === 'prono'      && (
-            <PronoSection
-              prono={prono}
-              homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-              awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-            />
-          )}
         </div>
       </div>
     </div>

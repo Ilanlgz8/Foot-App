@@ -2118,7 +2118,7 @@
 /* Stats — barre pleine largeur style A */
 .accueil__liveWidgetStats {
   padding: 0.1rem 0.9rem 0.85rem;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 0.6rem;
 }

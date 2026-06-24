@@ -55,7 +55,7 @@ function PeriodBadge({ match }) {
   return <span className="live__period">{period}</span>
 }
 
-function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, goalSide }) {
+function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, repriseDans, goalSide }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
   const label = isTermine ? 'FT' : (minute ?? '–')
@@ -65,6 +65,9 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
       <div className="live__minuteWrap">
         <span className="live__minute">{label}</span>
         {repriseImminente && <span className="live__reprise">reprise imminente</span>}
+        {!repriseImminente && repriseDans != null && (
+          <span className="live__reprise">reprise dans {repriseDans} min</span>
+        )}
       </div>
       <div className="live__pills">
         <div className={`${pillCls}${goalSide === 'home' ? ' live__pill--scored' : ''}`} key={`h${h}`}>{h}</div>
@@ -168,9 +171,11 @@ function LiveCard({ match, espn, onClick }) {
   }, [isTermine])
 
   const minute = isTermine ? null : calcMinute(match)
-  const repriseImminente = match.status === 'PAUSED'
-    && matchSt.pausedAt && !matchSt.half2Start
-    && (Date.now() - matchSt.pausedAt) >= 15 * 60_000
+  const pauseElapsed = (match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start)
+    ? Date.now() - matchSt.pausedAt : null
+  const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
+  const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
+    ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
   const hs = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
@@ -249,6 +254,7 @@ function LiveCard({ match, espn, onClick }) {
           homeScore={hs} awayScore={as_}
           minute={minute} isTermine={isTermine}
           repriseImminente={repriseImminente}
+          repriseDans={repriseDans}
           goalSide={goal?.side ?? null}
         />
 

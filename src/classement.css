@@ -1037,10 +1037,10 @@
   }
   .classement__table:not(.classement__table--compact) thead th,
   .classement__table:not(.classement__table--compact) tbody td {
-    padding: 0.38rem 0.4rem;
-    font-size: 0.68rem;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.8rem;
   }
-  .classement__table:not(.classement__table--compact) thead th { font-size: 0.56rem; }
+  .classement__table:not(.classement__table--compact) thead th { font-size: 0.65rem; }
 
   /* Toutes les colonnes restent visibles (on scrolle) */
   .classement__table:not(.classement__table--compact) thead th,
@@ -1048,14 +1048,14 @@
 
   /* Équipe : nom raisonnablement court */
   .classement__table:not(.classement__table--compact) .classement__teamName {
-    font-size: 0.7rem;
-    max-width: 7rem;
+    font-size: 0.82rem;
+    max-width: 8rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .classement__table:not(.classement__table--compact) .classement__row td strong {
-    font-size: 0.78rem;
+    font-size: 0.88rem;
   }
 
   /* ── Table compact (groupes WC) : layout auto sur mobile, padding serré ── */
@@ -1071,12 +1071,12 @@
   /* Padding serré pour que tout rentre sans scroll */
   .classement__table--compact thead th,
   .classement__table--compact tbody td {
-    padding: 0.5rem 0.22rem;
-    font-size: 0.73rem;
+    padding: 0.55rem 0.3rem;
+    font-size: 0.82rem;
   }
-  .classement__table--compact thead th { font-size: 0.55rem; }
-  .classement__table--compact .classement__teamName { max-width: 7rem; font-size: 0.73rem; }
-  .classement__table--compact .classement__teamCrest { width: 1.1rem; height: 1.1rem; }
+  .classement__table--compact thead th { font-size: 0.62rem; }
+  .classement__table--compact .classement__teamName { max-width: 7rem; font-size: 0.82rem; }
+  .classement__table--compact .classement__teamCrest { width: 1.2rem; height: 1.2rem; }
 
   /* Grille groupes */
   .classement__groups { grid-template-columns: 1fr; gap: 1rem; }

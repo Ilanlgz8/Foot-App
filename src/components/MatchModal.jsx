@@ -220,7 +220,7 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-export function LiveStatsTab({ match, espnScore }) {
+export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -255,10 +255,18 @@ export function LiveStatsTab({ match, espnScore }) {
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
+  // Barre de prono affichée en haut du tab stats
+  const pronoBar = prono ? (
+    <div style={{ marginBottom: '0.25rem' }}>
+      <PronoSection prono={prono} homeShort={homeShort || homeName} awayShort={awayShort || awayName} />
+    </div>
+  ) : null
+
   // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
     return (
       <div>
+        {pronoBar}
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
       </div>
@@ -272,6 +280,7 @@ export function LiveStatsTab({ match, espnScore }) {
     }
     return (
       <div>
+        {pronoBar}
         {fifaStats
           ? <ESPNStats stats={fifaStats} />
           : <p className="modal__noEvents">Stats non disponibles</p>
@@ -285,6 +294,7 @@ export function LiveStatsTab({ match, espnScore }) {
   if (summaryStats) {
     return (
       <div>
+        {pronoBar}
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
       </div>
@@ -296,7 +306,7 @@ export function LiveStatsTab({ match, espnScore }) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
   }
 
-  // ── Priorité 3 : Fallback api-football ──
+  // ── Priorité 4 : Fallback api-football ──
   const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
   const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
   const rows      = STAT_KEYS
@@ -309,6 +319,7 @@ export function LiveStatsTab({ match, espnScore }) {
 
   return (
     <div>
+      {pronoBar}
       {rows.length > 0 ? (
         <div className="modal__espnStats">
           <p className="modal__espnStatsTitle">Statistiques live</p>
