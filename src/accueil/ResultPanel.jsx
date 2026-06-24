@@ -33,11 +33,10 @@ function formatDayLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function ResultPanel({ results, loading }) {
+export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped = groupByDay(results)
   const [dayIndex, setDayIndex]      = useState(0)
   const [selectedMatch, setSelected] = useState(null)
-  const [view, setView]              = useState('chrono') // 'chrono' | 'comp'
 
   const currentDay     = grouped[dayIndex]
   const dayLabel       = currentDay ? formatDayLabel(currentDay[0]) : null
@@ -57,18 +56,6 @@ export function ResultPanel({ results, loading }) {
         <button className="accueil__dayArrow" onClick={() => setDayIndex(i => i - 1)} disabled={!canGoForward} aria-label="Jour suivant">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
-      </div>
-
-      {/* Onglets */}
-      <div className="accueil__resultTabs">
-        <button
-          className={"accueil__resultTab" + (view === 'chrono' ? ' accueil__resultTab--active' : '')}
-          onClick={() => setView('chrono')}
-        >Tous</button>
-        <button
-          className={"accueil__resultTab" + (view === 'comp' ? ' accueil__resultTab--active' : '')}
-          onClick={() => setView('comp')}
-        >Par compétition</button>
       </div>
 
       <div className="accueil__dashPanelDivider" />

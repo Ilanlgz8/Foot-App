@@ -2526,3 +2526,14 @@
   width: 14px;
   height: 14px;
 }
+
+/* Header résultats : titre à gauche, filter+tabs à droite */
+.accueil__resultHeaderRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+.accueil__resultTabs--header {
+  padding: 0;
+}

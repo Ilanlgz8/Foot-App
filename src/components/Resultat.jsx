@@ -1,84 +1,81 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import './../resultats.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
 import MatchModal        from './MatchModal'
 
-// GROUP_A → Groupe A, GROUP_B → Groupe B …
-function groupLabel(g) {
-  if (!g) return 'Autre'
-  const letter = g.replace('GROUP_', '')
-  return `Groupe ${letter}`
-}
+const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
 function Resultats() {
   const [selectedComp, setSelectedComp] = useState('WC')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedMatch, setSelected]    = useState(null)
   const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
+  const [openedGroup, setOpenedGroup]   = useState(null)
 
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'FINISHED', 'desc')
 
-  const currentComp     = COMPETITIONS.find(c => c.id === selectedComp)
-  const isWC            = selectedComp === 'WC'
+  const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
+  const isWC        = selectedComp === 'WC'
 
-  // Groupes WC détectés dans les résultats
+  // Groupes WC détectés
   const wcGroups = useMemo(() => {
     if (!isWC) return []
-    const seen = new Set()
-    const groups = []
+    const seen = new Set(); const groups = []
     for (const m of matches) {
       const g = m.group ?? null
-      if (g && g.startsWith('GROUP_') && !seen.has(g)) {
-        seen.add(g)
-        groups.push(g)
-      }
+      if (g && g.startsWith('GROUP_') && !seen.has(g)) { seen.add(g); groups.push(g) }
     }
     return groups.sort()
   }, [matches, isWC])
 
-  // Matchs groupés par poule (WC uniquement)
-  const matchesByPoule = useMemo(() => {
-    if (!isWC || wcGroups.length === 0) return []
-    return wcGroups.map(g => ({
-      group: g,
-      label: groupLabel(g),
-      matches: matches.filter(m => m.group === g)
-                      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate)),
-    }))
-  }, [matches, wcGroups, isWC])
+  // Map groupe → matchs
+  const matchesByGroup = useMemo(() => {
+    const map = new Map()
+    for (const g of wcGroups) map.set(g, [])
+    for (const m of matches) {
+      const g = m.group ?? null
+      if (g && map.has(g)) map.get(g).push(m)
+    }
+    return map
+  }, [matches, wcGroups])
+
+  // Équipes d'un groupe
+  const groupTeams = (gMatches) => {
+    const seen = new Set(); const teams = []
+    for (const m of gMatches) {
+      if (!seen.has(m.homeTeam.id)) { seen.add(m.homeTeam.id); teams.push(m.homeTeam) }
+      if (!seen.has(m.awayTeam.id)) { seen.add(m.awayTeam.id); teams.push(m.awayTeam) }
+    }
+    return teams
+  }
 
   const currentGroup    = grouped[currentIndex]
   const currentMatchday = currentGroup?.[0]
   const currentMatches  = currentGroup?.[1] ?? []
   const total           = grouped.length
 
-  const fmtHour = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   const fmtDate = (d) => {
-    const today    = new Date(); today.setHours(0,0,0,0)
-    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
-    const date     = new Date(d); date.setHours(0,0,0,0)
-    if (date.getTime() === today.getTime())    return `Aujourd'hui`
-    if (date.getTime() === tomorrow.getTime()) return `Demain`
+    const today = new Date(); today.setHours(0,0,0,0)
+    const date  = new Date(d); date.setHours(0,0,0,0)
+    if (date.getTime() === today.getTime()) return `Aujourd'hui`
     return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
   }
-
   const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
 
   // Carte de match réutilisable
   function MatchCard({ match }) {
     const hs   = match.score?.fullTime?.home ?? 0
     const as_  = match.score?.fullTime?.away ?? 0
-    const hWin = hs > as_
-    const aWin = as_ > hs
-    const draw = hs === as_
+    const hWin = hs > as_; const aWin = as_ > hs; const draw = hs === as_
     return (
       <div className="resultats__card" onClick={() => setSelected(match)} style={{ cursor: 'pointer' }}>
         <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
             {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display = 'none'} />
+              ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display='none'} />
               : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.homeTeam)}</span>
@@ -95,12 +92,56 @@ function Resultats() {
         <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
             {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display = 'none'} />
+              ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display='none'} />
               : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.awayTeam)}</span>
         </div>
       </div>
+    )
+  }
+
+  // Modal résultats d'un groupe (réutilise les classes wcModal de match.css)
+  function GroupModal({ groupKey, onClose }) {
+    const gMatches = (matchesByGroup.get(groupKey) ?? [])
+      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+
+    useEffect(() => {
+      const handler = e => { if (e.key === 'Escape') onClose() }
+      window.addEventListener('keydown', handler)
+      const scrollY = window.scrollY
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.left = '0'; document.body.style.right = '0'
+      return () => {
+        window.removeEventListener('keydown', handler)
+        document.body.style.overflow = ''; document.body.style.position = ''
+        document.body.style.top = ''; document.body.style.left = ''; document.body.style.right = ''
+        window.scrollTo(0, scrollY)
+      }
+    }, [onClose])
+
+    return createPortal(
+      <div className="wcModal__overlay" onClick={onClose}>
+        <div className="wcModal__panel" onClick={e => e.stopPropagation()}>
+          <div className="wcModal__topBar" />
+          <div className="wcModal__header">
+            <div className="wcModal__titleRow">
+              <h2 className="wcModal__title">{formatGroupName(groupKey)}</h2>
+              <span className="wcModal__count">{gMatches.length} match{gMatches.length !== 1 ? 's' : ''}</span>
+            </div>
+            <button className="wcModal__close" onClick={onClose}>✕</button>
+          </div>
+          <div className="wcModal__body">
+            {gMatches.length === 0
+              ? <p style={{ textAlign: 'center', color: '#475569', padding: '2rem 0' }}>Aucun résultat.</p>
+              : gMatches.map(m => <MatchCard key={m.id} match={m} />)
+            }
+          </div>
+        </div>
+      </div>,
+      document.body
     )
   }
 
@@ -116,9 +157,8 @@ function Resultats() {
           <p className="resultats__sidebarLabel">Championnats</p>
           <nav className="resultats__sidebarNav">
             {COMPETITIONS.map(comp => (
-              <button
-                key={comp.id}
-                onClick={() => { setSelectedComp(comp.id); setCurrentIndex(0); setViewMode('journee') }}
+              <button key={comp.id}
+                onClick={() => { setSelectedComp(comp.id); setCurrentIndex(0); setViewMode('journee'); setOpenedGroup(null) }}
                 className={`resultats__sidebarItem ${selectedComp === comp.id ? 'resultats__sidebarItem--active' : ''}`}
               >
                 <img src={comp.emblem} alt=""
@@ -146,17 +186,10 @@ function Resultats() {
                 )}
                 {currentComp?.name}
               </h1>
-              {/* Onglets par poule — WC uniquement */}
               {isWC && wcGroups.length > 0 && (
                 <div className="resultats__viewTabs">
-                  <button
-                    className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')}
-                    onClick={() => setViewMode('journee')}
-                  >Par journée</button>
-                  <button
-                    className={'resultats__viewTab' + (viewMode === 'poule' ? ' resultats__viewTab--active' : '')}
-                    onClick={() => setViewMode('poule')}
-                  >Par poule</button>
+                  <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
+                  <button className={'resultats__viewTab' + (viewMode === 'poule' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('poule')}>Par poule</button>
                 </div>
               )}
             </div>
@@ -166,18 +199,18 @@ function Resultats() {
             <div className="resultats__list">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="resultats__card" style={{ pointerEvents: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', justifyContent: 'flex-end' }}>
-                    <div className="sk" style={{ width: '5rem', height: '0.85rem' }} />
-                    <div className="sk" style={{ width: '2.6rem', height: '2.6rem', borderRadius: '50%' }} />
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.7rem', justifyContent:'flex-end' }}>
+                    <div className="sk" style={{ width:'5rem', height:'0.85rem' }} />
+                    <div className="sk" style={{ width:'2.6rem', height:'2.6rem', borderRadius:'50%' }} />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                    <div className="sk" style={{ width: '1rem', height: '0.6rem' }} />
-                    <div className="sk" style={{ width: '3.5rem', height: '1.4rem' }} />
-                    <div className="sk" style={{ width: '1.2rem', height: '0.5rem' }} />
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'0.35rem' }}>
+                    <div className="sk" style={{ width:'1rem', height:'0.6rem' }} />
+                    <div className="sk" style={{ width:'3.5rem', height:'1.4rem' }} />
+                    <div className="sk" style={{ width:'1.2rem', height:'0.5rem' }} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                    <div className="sk" style={{ width: '2.6rem', height: '2.6rem', borderRadius: '50%' }} />
-                    <div className="sk" style={{ width: '5rem', height: '0.85rem' }} />
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.7rem' }}>
+                    <div className="sk" style={{ width:'2.6rem', height:'2.6rem', borderRadius:'50%' }} />
+                    <div className="sk" style={{ width:'5rem', height:'0.85rem' }} />
                   </div>
                 </div>
               ))}
@@ -187,16 +220,12 @@ function Resultats() {
           {error && <p className="resultats__state resultats__state--error">{error}</p>}
 
           {/* Vue par journée */}
-          {!loading && !error && grouped.length > 0 && viewMode === 'journee' && (
+          {!loading && !error && viewMode === 'journee' && grouped.length > 0 && (
             <>
               <div className="resultats__nav">
-                <button className="resultats__navBtn"
-                  onClick={() => setCurrentIndex(i => i + 1)}
-                  disabled={currentIndex >= total - 1}>←</button>
+                <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i + 1)} disabled={currentIndex >= total - 1}>←</button>
                 <span className="resultats__navLabel">Journée {currentMatchday}</span>
-                <button className="resultats__navBtn"
-                  onClick={() => setCurrentIndex(i => i - 1)}
-                  disabled={currentIndex <= 0}>→</button>
+                <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i - 1)} disabled={currentIndex <= 0}>→</button>
               </div>
               <div className="resultats__list">
                 {currentMatches.map(match => <MatchCard key={match.id} match={match} />)}
@@ -204,35 +233,51 @@ function Resultats() {
             </>
           )}
 
-          {/* Vue par poule (WC) */}
-          {!loading && !error && viewMode === 'poule' && matchesByPoule.length > 0 && (
-            <div className="resultats__pouleGroups">
-              {matchesByPoule.map(({ group, label, matches: gMatches }) => (
-                <div key={group} className="resultats__pouleGroup">
-                  <h2 className="resultats__pouleGroupTitle">{label}</h2>
-                  <div className="resultats__list resultats__list--poule">
-                    {gMatches.map(match => <MatchCard key={match.id} match={match} />)}
-                  </div>
-                </div>
-              ))}
+          {/* Vue par poule — board de cartes comme dans Programme */}
+          {!loading && !error && viewMode === 'poule' && wcGroups.length > 0 && (
+            <div className="matchs__wcBoard">
+              {wcGroups.map(g => {
+                const gMatches = matchesByGroup.get(g) ?? []
+                const teams    = groupTeams(gMatches)
+                const letter   = g.replace('GROUP_', '')
+                return (
+                  <button key={g} className="matchs__wcGroupCard" onClick={() => setOpenedGroup(g)}>
+                    <div className="matchs__wcGroupCard__top">
+                      <span className="matchs__wcGroupCard__label">Groupe</span>
+                      <span className="matchs__wcGroupCard__name">{letter}</span>
+                    </div>
+                    <ul className="matchs__wcGroupCard__teams">
+                      {teams.map(t => (
+                        <li key={t.id} className="matchs__wcGroupCard__team">
+                          {t.crest
+                            ? <img src={t.crest} alt="" className="matchs__wcGroupCard__crest" onError={e => e.currentTarget.style.display='none'} />
+                            : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>}
+                          <span className="matchs__wcGroupCard__teamName">{translateTeam(t.shortName || t.name)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="matchs__wcGroupCard__footer">
+                      <span>{gMatches.length} résultat{gMatches.length !== 1 ? 's' : ''}</span>
+                      <span className="matchs__wcGroupCard__cta">Voir →</span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
 
           {!loading && !error && matches.length === 0 && (
             <p className="resultats__state">Aucun résultat disponible.</p>
           )}
-
         </main>
       </div>
 
-      {selectedMatch && (
-        <MatchModal
-          match={selectedMatch}
-          compId={selectedMatch.competition?.id}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      {/* Modal résultats d'un groupe */}
+      {openedGroup && <GroupModal groupKey={openedGroup} onClose={() => setOpenedGroup(null)} />}
 
+      {selectedMatch && (
+        <MatchModal match={selectedMatch} compId={selectedMatch.competition?.id} onClose={() => setSelected(null)} />
+      )}
     </section>
   )
 }

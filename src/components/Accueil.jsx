@@ -78,6 +78,7 @@ function Accueil() {
   // ── Filtres compétition ──
   const [compFilterMatch,  setCompFilterMatch]  = useState(null)
   const [compFilterResult, setCompFilterResult] = useState(null)
+  const [resultView, setResultView] = useState('chrono') // 'chrono' | 'comp'
   const queryClient  = useQueryClient()
 
   // Sync les valeurs dans les variables module à chaque changement
@@ -342,11 +343,17 @@ function Accueil() {
             {<div className="accueil__dashPanel">
               <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
-                <CompFilter
-                  competitions={resultCompetitions}
-                  active={compFilterResult}
-                  onChange={setCompFilterResult}
-                />
+                <div className="accueil__resultHeaderRight">
+                  <CompFilter
+                    competitions={resultCompetitions}
+                    active={compFilterResult}
+                    onChange={setCompFilterResult}
+                  />
+                  <div className="accueil__resultTabs accueil__resultTabs--header">
+                    <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
+                    <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
+                  </div>
+                </div>
               </div>
               <div className="accueil__dashPanelDivider" />
               {(() => {
@@ -390,6 +397,7 @@ function Accueil() {
                   <ResultPanel
                     results={allResults}
                     loading={resultsLoading}
+                    view={resultView}
                   />
                 )
               })()}
