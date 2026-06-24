@@ -625,7 +625,7 @@ function H2HSection({ match }) {
   )
 }
 
-function PreMatchSection({ match, prono, formMap, compMatches }) {
+export function PreMatchSection({ match, prono, formMap, compMatches }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')

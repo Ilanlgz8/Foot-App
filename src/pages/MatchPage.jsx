@@ -2,25 +2,25 @@
  * MatchPage — page dédiée à un match à venir / terminé
  * Route : /match/:matchId
  *
- * Reçoit les données du match via location.state (navigation depuis la liste)
- * ou les recharge depuis football-data.org si accès direct par URL.
+ * Même contenu que la MatchModal pré-match, mais en page entière.
+ * Données passées via location.state.match (navigation) ou fetchées si accès direct.
  */
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { useQuery }       from '@tanstack/react-query'
-import { translateTeam }  from '../data/teamNames'
-import { COMPETITIONS }   from '../data/competitions'
-import { calcProno }      from '../utils/calcProno'
-import { useTeamForm }    from '../hooks/useTeamForm'
-import { useSwipe }       from '../hooks/useSwipe'
+import { useQuery }         from '@tanstack/react-query'
+import { translateTeam }    from '../data/teamNames'
+import { COMPETITIONS }     from '../data/competitions'
+import { calcProno }        from '../utils/calcProno'
+import { useTeamForm }      from '../hooks/useTeamForm'
+import { useSwipe }         from '../hooks/useSwipe'
 import {
+  PreMatchSection,
   ComposTab,
   ClassementTab,
-  PronoSection,
 } from '../components/MatchModal'
 import './MatchPage.css'
 
-// ── Fetch match depuis football-data.org (fallback accès direct) ──────────────
+// ── Fetch fallback si accès direct par URL ────────────────────────────────────
 function useMatchData(matchId, initialMatch) {
   return useQuery({
     queryKey:  ['match', matchId],
@@ -34,28 +34,25 @@ function useMatchData(matchId, initialMatch) {
   })
 }
 
-// ── Formatage date ─────────────────────────────────────────────────────────────
-function formatMatchDate(utcDate) {
+// ── Formatage date / heure ────────────────────────────────────────────────────
+function formatDate(utcDate) {
   if (!utcDate) return '–'
-  const d = new Date(utcDate)
-  return d.toLocaleDateString('fr-FR', {
+  return new Date(utcDate).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
-
-function formatMatchTime(utcDate) {
+function formatTime(utcDate) {
   if (!utcDate) return '–'
-  const d = new Date(utcDate)
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return new Date(utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
 // ── Header match ──────────────────────────────────────────────────────────────
 function MatchPageHeader({ match }) {
-  const comp      = COMPETITIONS.find(c => c.id === match.competition?.code)
-  const homeName  = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayName  = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+  const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const isFinished = match.status === 'FINISHED'
-  const hs = match.score?.fullTime?.home ?? match.score?.halfTime?.home
+  const hs  = match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = match.score?.fullTime?.away ?? match.score?.halfTime?.away
 
   return (
@@ -70,7 +67,8 @@ function MatchPageHeader({ match }) {
 
       {/* Teams + score / date */}
       <div className="mp__scoreRow">
-        {/* Domicile */}
+
+        {/* Domicile : crest en haut, nom en bas */}
         <div className="mp__team">
           {match.homeTeam?.crest
             ? <img src={match.homeTeam.crest} alt="" className="mp__crest" />
@@ -78,7 +76,7 @@ function MatchPageHeader({ match }) {
           <span className="mp__teamName">{homeName}</span>
         </div>
 
-        {/* Centre : score ou date */}
+        {/* Centre : score ou heure */}
         <div className="mp__center">
           {isFinished && hs != null ? (
             <>
@@ -87,66 +85,58 @@ function MatchPageHeader({ match }) {
             </>
           ) : (
             <>
-              <div className="mp__time">{formatMatchTime(match.utcDate)}</div>
-              <div className="mp__date">{formatMatchDate(match.utcDate)}</div>
+              <div className="mp__time">{formatTime(match.utcDate)}</div>
+              <div className="mp__date">{formatDate(match.utcDate)}</div>
             </>
           )}
         </div>
 
-        {/* Extérieur */}
-        <div className="mp__team mp__team--away">
-          <span className="mp__teamName">{awayName}</span>
+        {/* Extérieur : crest en haut, nom en bas (même ordre que domicile) */}
+        <div className="mp__team">
           {match.awayTeam?.crest
             ? <img src={match.awayTeam.crest} alt="" className="mp__crest" />
             : <div className="mp__crestFallback" />}
+          <span className="mp__teamName">{awayName}</span>
         </div>
+
       </div>
     </div>
   )
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-const TABS = ['prono', 'compos', 'classement']
+const TABS = ['avant-match', 'compos', 'classement']
 
 export default function MatchPage() {
-  const { matchId }  = useParams()
-  const navigate     = useNavigate()
-  const location     = useLocation()
+  const { matchId } = useParams()
+  const navigate    = useNavigate()
+  const location    = useLocation()
 
-  // Données passées via navigate state (navigation normale)
   const stateMatch = location.state?.match ?? null
-
-  // Fallback si accès direct par URL
   const { data: fetchedMatch, isLoading } = useMatchData(matchId, stateMatch)
   const match = stateMatch ?? fetchedMatch
 
-  const compId  = match?.competition?.code ?? null
-  const { formMap } = useTeamForm(compId)
+  const compId = match?.competition?.code ?? null
+  const { formMap, compMatches } = useTeamForm(compId)
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
 
-  const visibleTabs = prono ? TABS : TABS.filter(t => t !== 'prono')
-  const [activeTab, setActiveTab] = useState(() => prono ? 'prono' : 'compos')
+  const [activeTab, setActiveTab] = useState('avant-match')
   const [tabDir, setTabDir]       = useState(null)
-
-  // Recalcule l'onglet par défaut quand le prono arrive
-  useEffect(() => {
-    if (prono && activeTab === 'compos' && !location.state?.tab) setActiveTab('prono')
-  }, [!!prono])
 
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
 
-  // Swipe gauche → onglet suivant, swipe droite → retour
   const swipe = useSwipe(
     () => {
-      const i = visibleTabs.indexOf(activeTab)
-      if (i < visibleTabs.length - 1) goTab(visibleTabs[i + 1], 'left')
+      const i = TABS.indexOf(activeTab)
+      if (i < TABS.length - 1) goTab(TABS[i + 1], 'left')
     },
     () => {
-      const i = visibleTabs.indexOf(activeTab)
-      if (i > 0) goTab(visibleTabs[i - 1], 'right')
-      else navigate(-1) // premier onglet → retour page précédente
+      const i = TABS.indexOf(activeTab)
+      if (i > 0) goTab(TABS[i - 1], 'right')
+      else navigate(-1) // premier onglet + swipe droite = retour
     }
   )
 
@@ -163,30 +153,29 @@ export default function MatchPage() {
 
   return (
     <div className="mp__page">
-      {/* Bouton retour */}
       <button className="mp__backBtn" onClick={() => navigate(-1)}>
         ‹ Retour
       </button>
 
-      {/* Header */}
       <MatchPageHeader match={match} />
 
-      {/* Onglets + contenu */}
       <div ref={swipe.ref}>
+        {/* Onglets */}
         <div className="mp__tabs">
-          {visibleTabs.map(t => (
+          {TABS.map(t => (
             <button
               key={t}
               className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
               onClick={() => goTab(t, null)}
             >
-              {t === 'prono'      ? 'Prono'
-             : t === 'compos'    ? 'Compos'
-             :                     'Classement'}
+              {t === 'avant-match' ? 'Avant-match'
+             : t === 'compos'     ? 'Compos'
+             :                      'Classement'}
             </button>
           ))}
         </div>
 
+        {/* Contenu */}
         <div
           key={activeTab}
           className={`mp__tabContent${
@@ -198,11 +187,12 @@ export default function MatchPage() {
             transition: swipe.isDragging ? 'none' : undefined,
           }}
         >
-          {activeTab === 'prono' && (
-            <PronoSection
+          {activeTab === 'avant-match' && (
+            <PreMatchSection
+              match={match}
               prono={prono}
-              homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-              awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+              formMap={formMap}
+              compMatches={compMatches}
             />
           )}
           {activeTab === 'compos'     && <ComposTab match={match} />}
