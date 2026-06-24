@@ -55,23 +55,38 @@ function parseEspnRoster(roster) {
   const altColor = /^[0-9a-fA-F]{6}$/.test(rawAlt) ? `#${rawAlt}` : '#ffffff'
 
   const mapAthlete = a => ({
-    name:         a.athlete?.displayName ?? '?',
-    shortName:    a.athlete?.shortName ?? a.athlete?.displayName ?? '?',
-    number:       a.athlete?.jersey ?? '',
-    position:     (a.athlete?.position?.abbreviation ?? '').toUpperCase(),
-    positionName: a.athlete?.position?.name ?? '',
+    name:         a.athlete?.displayName ?? a.displayName ?? '?',
+    shortName:    a.athlete?.shortName ?? a.shortName ?? a.athlete?.displayName ?? '?',
+    number:       a.athlete?.jersey ?? a.jersey ?? '',
+    position:     (a.athlete?.position?.abbreviation ?? a.position?.abbreviation ?? '').toUpperCase(),
+    positionName: a.athlete?.position?.name ?? a.position?.name ?? '',
     order:        a.order ?? 99,
   })
 
   const all = roster.athletes ?? []
+
+  // ESPN utilise `a.starter` (boolean) pour clubs, mais pour certains tournois
+  // le champ peut être absent. Si aucun starter explicite, on prend les 11 premiers
+  // triés par order (ils sont déjà ordonnés titulaires en premier dans l'API).
+  const explicitStarters = all.filter(a => a.starter === true)
+  const hasExplicit = explicitStarters.length > 0
+
+  const sorted = [...all].sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+  const starters = hasExplicit
+    ? explicitStarters.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete)
+    : sorted.slice(0, 11).map(mapAthlete)
+  const subs = hasExplicit
+    ? all.filter(a => !a.starter).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete)
+    : sorted.slice(11).map(mapAthlete)
+
   return {
     name:      roster.team?.displayName ?? '?',
     shortName: roster.team?.abbreviation ?? roster.team?.displayName ?? '?',
     color,
     altColor,
     formation: roster.formation ?? '',
-    starters:  all.filter(a => a.starter).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete),
-    subs:      all.filter(a => !a.starter).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete),
+    starters,
+    subs,
   }
 }
 
@@ -81,32 +96,31 @@ export function useLineups(match) {
   const date       = matchDateStr(match)
   const fdHome     = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
-  const isFifaComp = slug === 'fifa.world'   // WC 2026 → source FIFA directement
+  const isFifaComp = slug === 'fifa.world'   // WC 2026
 
   return useQuery({
-    queryKey: ['lineups', match?.id, slug, date],
+    queryKey: ['lineups2', match?.id, slug, date],
     enabled:  !!match?.id && !!slug && !!date,
     staleTime: 30 * 60_000,
     retry: 1,
     queryFn: async () => {
 
-      // ── WC 2026 : compositions via API FIFA ──────────────────────────────────
-      // ESPN ne retourne pas les rosters pour les matchs WC via son summary endpoint.
-      // On utilise /api/fifa-lineups qui lit les IDs FIFA depuis Redis et fetch
-      // https://api.fifa.com/api/v3/matchlineup/{comp}/{season}/{stage}/{match}.
+      // ── WC 2026 : essayer FIFA Redis en premier ──────────────────────────────
       if (isFifaComp) {
-        const url = `/api/fifa-lineups?fdMatchId=${match.id}`
-          + `&home=${encodeURIComponent(fdHome)}`
-          + `&away=${encodeURIComponent(fdAway)}`
-        const res = await fetch(url)
-        if (!res.ok) return null
-        const data = await res.json()
-        // Valider que les starters existent avant de retourner
-        if (!data?.home?.starters?.length) return null
-        return { home: data.home, away: data.away }
+        try {
+          const url = `/api/fifa-lineups?fdMatchId=${match.id}`
+            + `&home=${encodeURIComponent(fdHome)}`
+            + `&away=${encodeURIComponent(fdAway)}`
+          const res = await fetch(url)
+          if (res.ok) {
+            const data = await res.json()
+            if (data?.home?.starters?.length) return { home: data.home, away: data.away }
+          }
+        } catch {}
+        // FIFA Redis vide/absent → on tombe sur ESPN ci-dessous
       }
 
-      // ── Autres compétitions : source ESPN (existant) ─────────────────────────
+      // ── ESPN (toutes compétitions, WC en fallback après FIFA) ─────────────────
 
       // Étape 1 : trouver l'event ID via le scoreboard
       const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
@@ -166,7 +180,7 @@ export function useEspnMatchStats(match) {
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   return useQuery({
-    queryKey:  ['espnMatchStats', match?.id],
+    queryKey:  ['espnMatchStats2', match?.id],
     enabled:   !!match?.id && !!slug && !!date,
     staleTime: 30 * 60_000,
     retry: 1,
