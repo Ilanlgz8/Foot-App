@@ -162,6 +162,7 @@ export default function MatchPage() {
         <MatchPageHeader match={match} />
 
         <div className="mp__body" ref={swipe.ref}>
+
           {/* Sidebar tabs (desktop) / barre horizontale (mobile) */}
           <div className="mp__tabs">
             {TABS.map(t => (
