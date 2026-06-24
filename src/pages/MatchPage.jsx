@@ -19,6 +19,7 @@ import {
   ClassementTab,
 } from '../components/MatchModal'
 import './MatchPage.css'
+import '../matchModal.css'
 
 // ── Fetch fallback si accès direct par URL ────────────────────────────────────
 function useMatchData(matchId, initialMatch) {
@@ -105,7 +106,7 @@ function MatchPageHeader({ match }) {
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-const TABS = ['avant-match', 'compos', 'classement']
+const TABS = ['statistiques', 'compos', 'classement']
 
 export default function MatchPage() {
   const { matchId } = useParams()
@@ -123,7 +124,7 @@ export default function MatchPage() {
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
 
-  const [activeTab, setActiveTab] = useState('avant-match')
+  const [activeTab, setActiveTab] = useState('statistiques')
   const [tabDir, setTabDir]       = useState(null)
 
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
@@ -168,9 +169,9 @@ export default function MatchPage() {
               className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
               onClick={() => goTab(t, null)}
             >
-              {t === 'avant-match' ? 'Avant-match'
-             : t === 'compos'     ? 'Compos'
-             :                      'Classement'}
+              {t === 'statistiques' ? 'Statistiques'
+             : t === 'compos'      ? 'Compos'
+             :                       'Classement'}
             </button>
           ))}
         </div>
@@ -187,7 +188,7 @@ export default function MatchPage() {
             transition: swipe.isDragging ? 'none' : undefined,
           }}
         >
-          {activeTab === 'avant-match' && (
+          {activeTab === 'statistiques' && (
             <PreMatchSection
               match={match}
               prono={prono}
