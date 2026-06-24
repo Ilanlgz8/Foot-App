@@ -118,7 +118,7 @@ export default function MatchPage() {
   const match = stateMatch ?? fetchedMatch
 
   const compId = match?.competition?.code ?? null
-  const { formMap, compMatches } = useTeamForm(compId)
+  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
 
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
@@ -189,12 +189,14 @@ export default function MatchPage() {
           }}
         >
           {activeTab === 'statistiques' && (
-            <PreMatchSection
-              match={match}
-              prono={prono}
-              formMap={formMap}
-              compMatches={compMatches}
-            />
+            formLoading
+              ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
+              : <PreMatchSection
+                  match={match}
+                  prono={prono}
+                  formMap={formMap}
+                  compMatches={compMatches}
+                />
           )}
           {activeTab === 'compos'     && <ComposTab match={match} />}
           {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}

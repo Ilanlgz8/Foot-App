@@ -203,7 +203,7 @@ export function useH2H(match) {
     staleTime: 60 * 60_000,
     retry: 1,
     queryFn: async () => {
-      const res = await fetch(`/api/football?path=matches/${match.id}/head2head&limit=10`)
+      const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=10`)
       if (!res.ok) return null
       const json = await res.json()
       return json.matches ?? []

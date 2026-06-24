@@ -14,7 +14,7 @@ const FORM_STALE = 1000 * 60 * 30  // 30min
 export function useTeamForm(selectedComp) {
   const cacheKey = `teamform_${selectedComp}`
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['teamForm', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: async () => {
       // WC 2026 : sans filtre saison FD.org renvoie WC 2022 → forme incorrecte
@@ -64,8 +64,9 @@ export function useTeamForm(selectedComp) {
   })
 
   return {
-    formMap:  data?.formMap  ?? {},
+    formMap:     data?.formMap  ?? {},
     // Matches bruts — utilisés pour extraire le H2H en modal
     compMatches: data?.matches ?? [],
+    isLoading,
   }
 }
