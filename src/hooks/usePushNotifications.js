@@ -150,14 +150,19 @@ export function usePushNotifications() {
   }, [])
 
   // ── Auto-prompt première visite ──────────────────────────────────────────
-  // Si l'utilisateur n'a jamais été invité ET le statut est idle → demander auto
+  // Si l'utilisateur n'a jamais été invité ET le statut est idle → demander auto.
+  // ⚠️ push_prompted est posé AVANT subscribe() pour éviter d'envoyer plusieurs
+  //    requêtes si l'effet se re-exécute. Si subscribe() échoue par erreur réseau,
+  //    l'utilisateur peut re-tenter via la cloche dans la navbar.
   useEffect(() => {
     if (status !== 'idle') return
     const alreadyPrompted = localStorage.getItem('push_prompted')
     if (alreadyPrompted) return
-    localStorage.setItem('push_prompted', '1')
     // Petit délai pour que l'app soit chargée avant d'afficher la demande
-    const t = setTimeout(() => subscribe(), 1_500)
+    const t = setTimeout(() => {
+      localStorage.setItem('push_prompted', '1')
+      subscribe()
+    }, 1_500)
     return () => clearTimeout(t)
   }, [status, subscribe])
 

@@ -153,8 +153,16 @@ async function sendDeduped(dedupKey, payload, ttl = 3 * 3600) {
 // ── Handler ────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  const secret = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET)
+  const secret     = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
+  const bearerAuth = req.headers['authorization'] ?? ''
+  // Accepte : header x-cron-secret (cron-job.org), ?secret= (debug),
+  //           ou Authorization: Bearer <CRON_SECRET> (Vercel Cron natif)
+  const authorized =
+    process.env.CRON_SECRET && (
+      secret        === process.env.CRON_SECRET ||
+      bearerAuth    === `Bearer ${process.env.CRON_SECRET}`
+    )
+  if (!authorized)
     return res.status(401).json({ error: 'Non autorisé' })
 
   if (!setupVapid())

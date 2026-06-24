@@ -366,10 +366,18 @@ export function ComposTab({ match, compMatches }) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
   }
 
+  // Enrichit les objets lineup avec les crests du match (non inclus dans l'API ESPN roster)
+  const homeCrest = match?.homeTeam?.crest ?? null
+  const awayCrest = match?.awayTeam?.crest ?? null
+  const withCrest = (obj, crest) => obj ? { ...obj, crest } : obj
+
   if (lineups) {
     return (
-      <div style={{ padding: '12px 8px 8px' }}>
-        <LineupPitch home={lineups.home} away={lineups.away} />
+      <div style={{ padding: '8px 0 0' }}>
+        <LineupPitch
+          home={withCrest(lineups.home, homeCrest)}
+          away={withCrest(lineups.away, awayCrest)}
+        />
       </div>
     )
   }
@@ -377,24 +385,26 @@ export function ComposTab({ match, compMatches }) {
   if (probable) {
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : ''
     const homeFrom = probable.home?.fromMatch
-    const awayFrom = probable.away?.fromMatch
     return (
       <div>
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '2px', padding: '0.5rem 1rem', margin: '8px 8px 0',
-          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.18)',
-          borderRadius: '0.6rem', fontSize: '0.75rem', color: 'rgba(251,191,36,0.85)',
+          gap: '2px', padding: '0.45rem 1rem', margin: '8px 8px 0',
+          background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)',
+          borderRadius: '0.6rem', fontSize: '0.72rem', color: 'rgba(251,191,36,0.85)',
         }}>
           <span>⚡ Compositions probables · dernier XI connu</span>
-          {(homeFrom || awayFrom) && (
-            <span style={{ fontSize: '0.65rem', opacity: 0.65 }}>
-              {homeFrom ? `Basé sur match du ${fmtDate(homeFrom.date)}` : ''}
+          {homeFrom && (
+            <span style={{ fontSize: '0.62rem', opacity: 0.6 }}>
+              Basé sur match du {fmtDate(homeFrom.date)}
             </span>
           )}
         </div>
-        <div style={{ padding: '8px 8px 8px' }}>
-          <LineupPitch home={probable.home} away={probable.away ?? probable.home} />
+        <div style={{ padding: '8px 0 0' }}>
+          <LineupPitch
+            home={withCrest(probable.home, homeCrest)}
+            away={withCrest(probable.away ?? probable.home, awayCrest)}
+          />
         </div>
       </div>
     )

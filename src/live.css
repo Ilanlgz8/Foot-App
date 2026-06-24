@@ -215,6 +215,7 @@
   align-items: center;
   gap: 0.2rem;
   margin-top: -2.2rem;
+  padding: 0 2.2rem; /* ~35px entre le score et chaque équipe */
 }
 .live__minuteWrap {
   display: flex;

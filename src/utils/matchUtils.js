@@ -13,9 +13,8 @@
 import { getMatchState } from './matchStateTracker'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
-// Au-delà de 90s depuis le dernier poll ESPN, on ne tente plus d'interpoler
-// (iOS peut throttler les Web Workers jusqu'à ~60-90s en arrière-plan)
-const ESPN_INTERP_CAP = 90_000
+// Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
+// donc interpoler sans limite évite les minutes gelées après un long arrière-plan iOS.
 
 /**
  * Parse un displayClock ESPN en { base, extra }.
@@ -45,9 +44,6 @@ function interpolateEspnMinute(state) {
   if (!parsed || !state.espnCapturedAt) return null
 
   const elapsedMs = Date.now() - state.espnCapturedAt
-  // Sécurité : si le poll est trop vieux (veille d'onglet, etc.), on ne tente pas
-  if (elapsedMs > ESPN_INTERP_CAP) return null
-
   const elapsedMins = elapsedMs / 60_000
 
   if (parsed.extra > 0) {

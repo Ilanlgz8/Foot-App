@@ -70,12 +70,14 @@ function MatchHeader({ match, espn }) {
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
+  // calcMinute() retourne déjà des strings avec apostrophe ("67'", "45+2'")
+  // → ne pas en rajouter une deuxième
   const periodLabel = isTermine ? 'FT'
     : period === 'HT'   ? 'MT'
     : period === 'ET1'  ? 'Prol. 1'
     : period === 'ET2'  ? 'Prol. 2'
     : period === 'PEN'  ? 'Tirs au but'
-    : minute ? `${minute}'` : '–'
+    : minute != null    ? String(minute) : '–'
 
   return (
     <div className="lmp__header">

@@ -157,6 +157,16 @@ function LiveCard({ match, espn, onClick }) {
   const xg = useFotmobXG(match)
   const matchSt = getMatchState(match.id)
   const isTermine = matchSt.ft === true
+
+  // Ticker : force un re-render toutes les 5s pour que calcMinute() avance
+  // en temps réel entre les polls ESPN (interpolation sans limite après background)
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (isTermine) return
+    const id = setInterval(() => setTick(t => t + 1), 5_000)
+    return () => clearInterval(id)
+  }, [isTermine])
+
   const minute = isTermine ? null : calcMinute(match)
   const repriseImminente = match.status === 'PAUSED'
     && matchSt.pausedAt && !matchSt.half2Start

@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MatchCard, PanelSkeleton } from './MatchCard'
-import MatchModal from '../components/MatchModal'
 
 function groupByDay(matches) {
   const groups = {}
@@ -34,9 +33,9 @@ function formatDayLabel(dateStr) {
 }
 
 export function ResultPanel({ results, loading, view = 'chrono' }) {
-  const grouped = groupByDay(results)
-  const [dayIndex, setDayIndex]      = useState(0)
-  const [selectedMatch, setSelected] = useState(null)
+  const grouped  = groupByDay(results)
+  const navigate = useNavigate()
+  const [dayIndex, setDayIndex] = useState(0)
 
   const currentDay     = grouped[dayIndex]
   const dayLabel       = currentDay ? formatDayLabel(currentDay[0]) : null
@@ -69,7 +68,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
-              <div key={match.id ?? i} onClick={() => setSelected(match)} style={{ cursor: 'pointer' }}>
+              <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
                 <MatchCard match={match} noWinnerLoser />
               </div>
             ))}
@@ -84,7 +83,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
                 <p className="accueil__compGroupTitle">{name}</p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
-                    <div key={match.id ?? i} onClick={() => setSelected(match)} style={{ cursor: 'pointer' }}>
+                    <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
                       <MatchCard match={match} noWinnerLoser />
                     </div>
                   ))}
@@ -95,13 +94,6 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
         )}
       </div>
 
-      {selectedMatch && (
-        <MatchModal
-          match={selectedMatch}
-          compId={selectedMatch.competition?.id}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </>
   )
 }
