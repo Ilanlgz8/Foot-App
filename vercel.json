@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron-goals",
-      "schedule": "* * * * *"
-    }
-  ],
   "rewrites": [
     { "source": "/news",           "destination": "/api/news" },
     { "source": "/espn",           "destination": "/api/espn" },
