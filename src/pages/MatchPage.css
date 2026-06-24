@@ -267,6 +267,13 @@
   .mp__tabContent .pm__formDate    { font-size: 0.72rem; }
   .mp__tabContent .pm__noData      { font-size: 0.8rem; }
 
+  /* Stats saison */
+  .mp__tabContent .pm__statHeader  { margin-bottom: 0.5rem; }
+  .mp__tabContent .pm__statTeam    { font-size: 0.75rem; }
+  .mp__tabContent .pm__statRow     { padding: 0.45rem 0.75rem; border-radius: 0.5rem; gap: 0 1rem; }
+  .mp__tabContent .pm__statVal     { font-size: 1rem; }
+  .mp__tabContent .pm__statName    { font-size: 0.7rem; }
+
   /* H2H */
   .mp__tabContent .pm__h2hList     { gap: 0.45rem; }
   .mp__tabContent .pm__h2hRow {

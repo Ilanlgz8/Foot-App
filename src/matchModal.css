@@ -1302,6 +1302,60 @@
   margin: 0;
 }
 
+/* ── Stats saison ── */
+.pm__statHeader {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0 0.5rem;
+  margin-bottom: 0.3rem;
+}
+.pm__statTeam {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+.pm__statTeam--away { text-align: right; }
+
+.pm__statTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pm__statRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  background: rgba(255,255,255,0.02);
+}
+.pm__statRow:nth-child(odd) { background: rgba(255,255,255,0.04); }
+
+.pm__statVal {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.45);
+  font-variant-numeric: tabular-nums;
+}
+.pm__statVal--right { text-align: right; }
+.pm__statVal--better { color: #f1f5f9; }
+
+.pm__statName {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.28);
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 /* ── H2H ── */
 .pm__h2hList {
   display: flex;
