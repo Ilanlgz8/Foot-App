@@ -1,12 +1,13 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
-import { useNavigate }             from 'react-router-dom'
 import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
+import { StandingsTable }     from './StandingsTable'
+import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
@@ -398,6 +399,67 @@ function Bookings({ bookings = [], homeId }) {
   )
 }
 
+// ── Onglet Classement — classement du championnat en cours ────────────────────
+// WC : affiche uniquement le(s) groupe(s) contenant les deux équipes
+// Autres : affiche le classement complet
+
+const WC_RULES = [
+  { label: 'Qualifié', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl' },
+  { label: 'Éliminé',  start: 3, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--elimine' },
+]
+const DEFAULT_RULES = [
+  { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl' },
+  { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel' },
+  { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl' },
+]
+const COMP_RULES = { WC: WC_RULES, FL1: DEFAULT_RULES, PL: DEFAULT_RULES, PD: DEFAULT_RULES, BL1: DEFAULT_RULES, SA: DEFAULT_RULES }
+
+function ClassementTab({ match, compId }) {
+  const { standings, groups, loading } = useStandings(compId)
+  const { formMap } = useTeamForm(compId)
+
+  if (loading) {
+    return <div className="modal__state"><div className="modal__spinner" />Chargement du classement…</div>
+  }
+
+  const rules = COMP_RULES[compId] ?? DEFAULT_RULES
+  const homeId = match?.homeTeam?.id
+  const awayId = match?.awayTeam?.id
+
+  // WC → filtrer les groupes contenant les deux équipes
+  if (groups.length > 0) {
+    const relevantGroups = groups.filter(g =>
+      g.table.some(r => r.team?.id === homeId || r.team?.id === awayId)
+    )
+    const toShow = relevantGroups.length > 0 ? relevantGroups : groups.slice(0, 1)
+    return (
+      <div style={{ padding: '4px 0' }}>
+        {toShow.map(g => (
+          <div key={g.name}>
+            {toShow.length > 1 && (
+              <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginBottom: '6px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {g.name.replace('GROUP_', 'Groupe ')}
+              </p>
+            )}
+            <StandingsTable rows={g.table} compact={false} formMap={formMap} qualificationRules={rules} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Autres championnats → classement complet
+  if (standings.length === 0) {
+    return <p className="modal__noEvents">Classement non disponible</p>
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      <StandingsTable rows={standings} formMap={formMap} qualificationRules={rules} />
+    </div>
+  )
+}
+
 // ── Section détails match terminé ────────────────────────────────────────────
 // Priorité ESPN (persisté en localStorage au FT) → fallback FD.org
 function FinishedDetails({ match, espnData, detail, loading }) {
@@ -632,17 +694,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const isUpcoming = !isFinished && !isLive
   const [tab, setTab]       = useState(defaultTab)
   const [preTab, setPreTab] = useState('avant-match')
-  const navigate = useNavigate()
-
-  function goToClassement() {
-    onClose()
-    navigate('/classement', {
-      state: {
-        compId: match?.competition?.code ?? compIdProp,
-        group:  match?.group ?? null,
-      }
-    })
-  }
 
   // Déduire compId depuis la prop ou depuis match.competition.code
   const compId = compIdProp ?? match?.competition?.code ?? null
@@ -814,13 +865,15 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                   onClick={() => setTab('prono')}
                 >Prono</button>
               )}
-              <button className="modal__tab modal__tab--nav" onClick={goToClassement}>
-                Classement ›
-              </button>
+              <button
+                className={`modal__tab${tab === 'classement' ? ' modal__tab--active' : ''}`}
+                onClick={() => setTab('classement')}
+              >Classement</button>
             </div>
             {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
-            {tab === 'compos'    && <ComposTab match={match} />}
-            {tab === 'prono'     && (
+            {tab === 'compos'      && <ComposTab match={match} />}
+            {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
+            {tab === 'prono'       && (
               <PronoSection
                 prono={prono}
                 homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
@@ -840,9 +893,10 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 className={`modal__tab${preTab === 'compos' ? ' modal__tab--active' : ''}`}
                 onClick={() => setPreTab('compos')}
               >Compos</button>
-              <button className="modal__tab modal__tab--nav" onClick={goToClassement}>
-                Classement ›
-              </button>
+              <button
+                className={`modal__tab${preTab === 'classement' ? ' modal__tab--active' : ''}`}
+                onClick={() => setPreTab('classement')}
+              >Classement</button>
             </div>
             {preTab === 'avant-match' && (
               <PreMatchSection
@@ -852,7 +906,8 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 compMatches={compMatches}
               />
             )}
-            {preTab === 'compos' && <ComposTab match={match} />}
+            {preTab === 'compos'      && <ComposTab match={match} />}
+            {preTab === 'classement'  && <ClassementTab match={match} compId={compId} />}
           </>
         )}
 

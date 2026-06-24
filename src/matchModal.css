@@ -547,15 +547,6 @@
   box-shadow: 0 0 10px rgba(239,68,68,0.08);
 }
 
-.modal__tab--nav {
-  margin-left: auto;
-  color: rgba(255,255,255,0.45);
-  border-color: rgba(255,255,255,0.08);
-}
-.modal__tab--nav:hover {
-  color: rgba(255,255,255,0.8);
-  background: rgba(255,255,255,0.05);
-}
 
 /* ── Compos ── */
 .modal__compos {

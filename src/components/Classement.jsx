@@ -8,6 +8,7 @@ import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
+import { StandingsTable } from './StandingsTable'
 
 
 function Classement() {
@@ -75,99 +76,11 @@ function Classement() {
     ],
   }
 
-  // Traduction des codes API (W/D/L) vers le français (V/N/D)
-  const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
-
-  function Forme({ results }) {
-    if (!results || results.length === 0)
-      return <span style={{ color: '#3d4d60', fontSize: '0.75rem' }}>—</span>
-    return (
-      <div className="classement__forme">
-        {results.map((result, i) => (
-          <span key={i} className={`classement__formeBadge classement__formeBadge--${result}`}>
-            {RESULT_LABEL[result] ?? result}
-          </span>
-        ))}
-      </div>
-    )
-  }
-
   /* Formate "GROUP_A" → "Groupe A" */
   const formatGroupName = (raw = '') =>
     raw.replace('GROUP_', 'Groupe ')
 
   const qualificationRules = competitionRules[selectedComp] ?? competitionRules.default
-  const getQualificationZone = (position) =>
-    qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
-
-  /* Tableau générique — compact=true pour la vue multi-groupes WC */
-  function StandingsTable({ rows, compact = false }) {
-    return (
-      <div className={`classement__tableWrap${compact ? ' classement__tableWrap--compact' : ''}`}>
-        <table className={`classement__table${compact ? ' classement__table--compact' : ''}`}>
-          <thead>
-            <tr>
-              <th>Pos</th>
-              <th>Équipe</th>
-              <th>Pts</th>
-              <th>MJ</th>
-              <th>V</th>
-              <th>N</th>
-              <th>D</th>
-              <th>Diff</th>
-              {!compact && <th>BM</th>}
-              <th>Forme</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((team) => {
-              const topRank           = team.position <= 3
-              const qualificationZone = getQualificationZone(team.position)
-              const forme             = formMap[team.team.id]
-              // En compact : garder seulement les 3 derniers matchs
-              const formeSlice        = compact && forme ? forme.slice(-3) : forme
-
-              return (
-                <tr
-                  key={team.team.id}
-                  className={topRank ? `classement__row classement__row--top${team.position}` : 'classement__row'}
-                >
-                  <td>
-                    <span className="classement__position">{team.position}</span>
-                  </td>
-                  <td>
-                    <div className="classement__teamCell">
-                      <div className="classement__teamTopLine">
-                        {qualificationZone
-                          ? <span className={qualificationZone.dotClassName} aria-hidden="true" />
-                          : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
-                        }
-                        {team.team.crest && (
-                          <img src={team.team.crest} alt="" className="classement__teamCrest"
-                            onError={e => e.currentTarget.style.display = 'none'} />
-                        )}
-                        <span className="classement__teamName">
-                          {translateTeam(team.team.shortName || team.team.name)}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td><strong>{team.points}</strong></td>
-                  <td>{team.playedGames}</td>
-                  <td>{team.won}</td>
-                  <td>{team.draw}</td>
-                  <td>{team.lost}</td>
-                  <td>{team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}</td>
-                  {!compact && <td>{team.goalsFor}</td>}
-                  <td><Forme results={formeSlice} /></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    )
-  }
 
   /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
   function GroupModal({ group, onClose, schedMatches, finMatches, loadingM }) {
@@ -288,7 +201,7 @@ function Classement() {
 
           {/* Contenu */}
           <div className="gm__body">
-            {tab === 'classement' && <StandingsTable rows={group.table} compact={false} />}
+            {tab === 'classement' && <StandingsTable rows={group.table} compact={false} formMap={formMap} qualificationRules={qualificationRules} />}
 
             {tab === 'programme'  && (
               <MatchList
@@ -327,7 +240,7 @@ function Classement() {
                 <h3 className="classement__groupTitle">{formatGroupName(group.name)}</h3>
                 <span className="classement__groupExpandHint">↗</span>
               </div>
-              <StandingsTable rows={group.table} compact />
+              <StandingsTable rows={group.table} compact formMap={formMap} qualificationRules={qualificationRules} />
             </div>
           ))}
         </div>
@@ -549,7 +462,7 @@ function Classement() {
 
         {/* Tableau(x) */}
         {view === 'classement' && !loading && !error && standings.length > 0 && (
-          isMultiGroup ? <MultiGroupView /> : <StandingsTable rows={standings} />
+          isMultiGroup ? <MultiGroupView /> : <StandingsTable rows={standings} formMap={formMap} qualificationRules={qualificationRules} />
         )}
 
         {view === 'classement' && !loading && !error && standings.length === 0 && (
