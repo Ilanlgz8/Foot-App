@@ -40,13 +40,13 @@ export default async function handler(req, res) {
     }
   } catch { /* Redis down → continue */ }
 
-  // ── 2. Rate limiting IP (protège le quota api-football) ──────────────────────
+  // ── 2. Rate limiting IP (cache Redis protège le quota, limite haute) ─────────
   const ip  = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
-  const rlKey = `ratelimit:apifb:${ip}`
+  const rlKey = `ratelimit:apifb:v2:${ip}`   // v2 = reset les anciens compteurs
   try {
     const count = await kv.incr(rlKey)
     if (count === 1) await kv.expire(rlKey, 3600)
-    if (count > 30) return res.status(429).json({ error: 'Trop de requêtes — réessayez dans 1h' })
+    if (count > 200) return res.status(429).json({ error: 'Trop de requêtes — réessayez dans 1h' })
   } catch { /* Redis down → laisser passer */ }
 
   // ── 3. Fetch api-football ─────────────────────────────────────────────────────
