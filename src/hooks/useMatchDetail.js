@@ -147,7 +147,18 @@ export function useLineups(match) {
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 
-      const rosters = summary.rosters ?? []
+      let rosters = summary.rosters ?? []
+      // WC ESPN : rosters parfois absents de summary.rosters, présents dans header.competitions
+      if (rosters.length === 0) {
+        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
+        if (competitors.length >= 1) {
+          rosters = competitors.map(c => ({
+            team:       c.team,
+            athletes:   c.roster ?? c.athletes ?? [],
+            formation:  c.formation ?? '',
+          }))
+        }
+      }
       if (rosters.length < 1) return null
 
       // Identifier home/away

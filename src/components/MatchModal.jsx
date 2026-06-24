@@ -566,13 +566,11 @@ export function PronoSection({ prono, homeShort, awayShort }) {
     <div className="modal__prono">
       <p className="modal__pronoTitle">Probabilités estimées</p>
       <div className="modal__pronoRow">
-        <span className="modal__pronoLabel">{homeShort}</span>
         <div className="modal__pronoBar">
           <div className={`modal__pronoSeg modal__pronoSeg--home${winner === 'home' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-home': prono.home }} />
           <div className={`modal__pronoSeg modal__pronoSeg--draw${winner === 'draw' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-draw': prono.draw }} />
           <div className={`modal__pronoSeg modal__pronoSeg--away${winner === 'away' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-away': prono.away }} />
         </div>
-        <span className="modal__pronoLabel">{awayShort}</span>
       </div>
       <div className="modal__pronoNums">
         <span className={`modal__pronoNum modal__pronoNum--home${winner === 'home' ? ' modal__pronoNum--winner' : ''}`}>{prono.home}%</span>
@@ -582,7 +580,7 @@ export function PronoSection({ prono, homeShort, awayShort }) {
       <div className="modal__pronoKeys">
         <span>Victoire</span>
         <span>Nul</span>
-        <span>Défaite</span>
+        <span>Victoire</span>
       </div>
       <p className="modal__pronoDisclaimer">Basé sur la forme des 5 derniers matchs</p>
     </div>

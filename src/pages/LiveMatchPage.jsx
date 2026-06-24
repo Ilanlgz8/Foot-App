@@ -26,6 +26,13 @@ import './LiveMatchPage.css'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
 
+// Formate une minute de buteur : "67:00" → "67'" | "67'" → "67'" | "67" → "67'"
+const fmtMin = m => {
+  if (!m) return ''
+  const clean = String(m).replace(/'$/, '').split(':')[0]
+  return clean ? `${clean}'` : ''
+}
+
 function MatchHeader({ match, espn }) {
   const xg       = useFotmobXG(match)
   const matchSt  = getMatchState(match.id)
@@ -119,10 +126,10 @@ function MatchHeader({ match, espn }) {
 
         {/* Extérieur */}
         <div className="lmp__team lmp__team--away">
-          <span className="lmp__teamName">{awayName}</span>
           {match.awayTeam?.crest
             ? <img src={match.awayTeam.crest} alt="" className="lmp__crest" />
             : <div className="lmp__crestFallback" />}
+          <span className="lmp__teamName">{awayName}</span>
         </div>
 
         {/* xG extérieur */}
@@ -137,19 +144,23 @@ function MatchHeader({ match, espn }) {
       {/* Buteurs */}
       {espn?.scorers?.length > 0 && (
         <div className="lmp__scorers">
-          {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
-            <div key={i} className="lmp__scorer lmp__scorer--home">
-              <span>{s.name}</span>
-              {s.minute && <span className="lmp__scorerMin">{s.minute}'</span>}
-            </div>
-          ))}
+          <div className="lmp__scorersHome">
+            {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
+              <div key={i} className="lmp__scorer lmp__scorer--home">
+                <span>{s.name}</span>
+                {s.minute && <span className="lmp__scorerMin">{fmtMin(s.minute)}</span>}
+              </div>
+            ))}
+          </div>
           <div className="lmp__scorersGap" />
-          {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
-            <div key={i} className="lmp__scorer lmp__scorer--away">
-              {s.minute && <span className="lmp__scorerMin">{s.minute}'</span>}
-              <span>{s.name}</span>
-            </div>
-          ))}
+          <div className="lmp__scorersAway">
+            {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
+              <div key={i} className="lmp__scorer lmp__scorer--away">
+                {s.minute && <span className="lmp__scorerMin">{fmtMin(s.minute)}</span>}
+                <span>{s.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
