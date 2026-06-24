@@ -214,3 +214,66 @@
   /* Contenu plus aéré sur desktop */
   .mp__tabContent { padding-top: 2rem; }
 }
+
+/* ── Overrides pm__* dans la page (desktop) ─────────────────────────────────
+   La modal utilise des tailles compactes (~0.6rem).
+   Sur la page pleine on scale tout up à partir de 768px.
+──────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 768px) {
+  /* Tabs mieux espacés */
+  .mp__tabs { gap: 0.5rem; padding-bottom: 0; }
+  .mp__tab  { padding: 0.85rem 2.5rem; font-size: 0.95rem; letter-spacing: 0.04em; }
+
+  /* Sections */
+  .mp__tabContent .pm__wrap        { gap: 2.5rem; }
+  .mp__tabContent .pm__section     { gap: 1rem; }
+  .mp__tabContent .pm__sectionTitle {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+  }
+
+  /* Barre prono */
+  .mp__tabContent .pm__pronoBar    { height: 32px; border-radius: 8px; }
+  .mp__tabContent .pm__pronoSeg    { font-size: 0.82rem; }
+  .mp__tabContent .pm__pronoNums   { padding: 0 0.5rem; }
+  .mp__tabContent .pm__pronoNum    { font-size: 1.5rem; }
+  .mp__tabContent .pm__pronoNum small { font-size: 0.65rem; }
+  .mp__tabContent .pm__disclaimer  { font-size: 0.7rem; }
+
+  /* Forme récente */
+  .mp__tabContent .pm__formGrid    { gap: 0 2rem; }
+  .mp__tabContent .pm__formCol     { gap: 0.6rem; }
+  .mp__tabContent .pm__formTeamName {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.06em;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 0.2rem;
+  }
+  .mp__tabContent .pm__formTable   { gap: 0.45rem; }
+  .mp__tabContent .pm__formRow     { gap: 0.6rem; font-size: 0.92rem; padding: 0.25rem 0; }
+  .mp__tabContent .pm__badge {
+    font-size: 0.72rem;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 0.4rem;
+  }
+  .mp__tabContent .pm__formMatchup { gap: 0.5rem; }
+  .mp__tabContent .pm__formTeam    { font-size: 0.85rem; }
+  .mp__tabContent .pm__formScore   { font-size: 0.9rem; }
+  .mp__tabContent .pm__formDate    { font-size: 0.72rem; }
+  .mp__tabContent .pm__noData      { font-size: 0.8rem; }
+
+  /* H2H */
+  .mp__tabContent .pm__h2hList     { gap: 0.45rem; }
+  .mp__tabContent .pm__h2hRow {
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.6rem;
+    gap: 0.6rem;
+  }
+  .mp__tabContent .pm__h2hDate     { font-size: 0.72rem; }
+  .mp__tabContent .pm__h2hHome,
+  .mp__tabContent .pm__h2hAway     { font-size: 0.88rem; }
+  .mp__tabContent .pm__h2hScore    { font-size: 0.95rem; }
+}
