@@ -334,12 +334,16 @@ export function ComposTab({ match, compMatches }) {
   const isFinished = match?.status === 'FINISHED'
   const isUpcoming = !isFinished
 
-  // Source 1 : api-football (quand quota disponible)
-  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(match)
+  // Source 1 : ESPN/FIFA — toujours en premier (zéro quota)
+  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
+  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match)
 
-  // Source 2 : ESPN/FIFA — fire immédiatement en parallèle (pas besoin d'attendre AFL)
-  const { data: espnLineups,    isLoading: espnLoading    } = useLineups(match)
-  const { data: espnMatchData,  isLoading: espnMatchLoading } = useEspnMatchStats(match)
+  // Source 2 : api-football — SEULEMENT si ESPN n'a rien (protège le quota 10req/min)
+  const espnDone    = !espnLoading && !espnMatchLoading
+  const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
+  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(
+    espnDone && !espnHasData ? match : null
+  )
 
   // Source 3 (matchs à venir) : compos probables via ESPN (dernier XI connu, zéro quota)
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
@@ -347,12 +351,13 @@ export function ComposTab({ match, compMatches }) {
     compMatches
   )
 
-  const isLoading = aflLoading || espnLoading || espnMatchLoading
+  const isLoading = espnLoading || espnMatchLoading
+    || (!espnHasData && aflLoading)
     || (isUpcoming && probableLoading)
 
-  const lineups = aflLineups?.home?.starters?.length          ? aflLineups
-               : espnLineups?.home?.starters?.length          ? espnLineups
-               : espnMatchData?.lineups?.home?.starters?.length ? espnMatchData.lineups
+  const lineups = espnLineups?.home?.starters?.length             ? espnLineups
+               : espnMatchData?.lineups?.home?.starters?.length   ? espnMatchData.lineups
+               : aflLineups?.home?.starters?.length               ? aflLineups
                : null
 
   const probable = !lineups && probableData?.home?.starters?.length ? probableData : null
