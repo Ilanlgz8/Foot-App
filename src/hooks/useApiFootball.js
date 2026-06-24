@@ -101,18 +101,28 @@ async function resolveFixtureInfo(match) {
 
   const leagueInfo = FD_TO_AFL[match.competition?.code]
   const date  = match.utcDate.slice(0, 10)
-  const d     = new Date(date)
-  const prev  = new Date(d); prev.setUTCDate(d.getUTCDate() - 1)
-  const next  = new Date(d); next.setUTCDate(d.getUTCDate() + 1)
-  const dates = [date, prev.toISOString().slice(0, 10), next.toISOString().slice(0, 10)]
   const home  = match.homeTeam?.name ?? match.homeTeam?.shortName ?? ''
   const away  = match.awayTeam?.name ?? match.awayTeam?.shortName ?? ''
 
   let best = null, bestScore = 0
 
-  // Passe 1 : filtré par league + season (économise le quota)
+  // Passe 1 : date exacte + league (1 requête, cache Redis 6h → quasi gratuit)
   if (leagueInfo) {
-    for (const tryDate of dates) {
+    try {
+      const data = await afetch('fixtures', { date, league: leagueInfo.league, season: leagueInfo.season })
+      for (const f of data.response ?? []) {
+        const score = (teamSimilarity(home, f.teams?.home?.name ?? '') + teamSimilarity(away, f.teams?.away?.name ?? '')) / 2
+        if (score > bestScore) { bestScore = score; best = f }
+      }
+    } catch {}
+  }
+
+  // Passe 2 : ±1 jour si le match est à cheval sur minuit UTC (rare)
+  if (bestScore < 0.8 && leagueInfo) {
+    const d    = new Date(date)
+    const prev = new Date(d); prev.setUTCDate(d.getUTCDate() - 1)
+    const next = new Date(d); next.setUTCDate(d.getUTCDate() + 1)
+    for (const tryDate of [prev.toISOString().slice(0, 10), next.toISOString().slice(0, 10)]) {
       try {
         const data = await afetch('fixtures', { date: tryDate, league: leagueInfo.league, season: leagueInfo.season })
         for (const f of data.response ?? []) {
@@ -124,7 +134,7 @@ async function resolveFixtureInfo(match) {
     }
   }
 
-  // Passe 2 : fallback sans filtre league si rien trouvé
+  // Passe 3 : fallback sans filtre league si toujours rien
   if (bestScore < 0.4) {
     try {
       const data = await afetch('fixtures', { date })
