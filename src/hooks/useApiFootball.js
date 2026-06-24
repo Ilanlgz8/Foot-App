@@ -235,8 +235,8 @@ function transformStats(data, homeTeamId) {
 
 /** Compos des deux équipes. Disponible ~1h avant le KO. */
 export function useAflLineups(match) {
-  const { data: info } = useFixtureInfo(match)
-  return useQuery({
+  const { data: info, isLoading: infoLoading } = useFixtureInfo(match)
+  const query = useQuery({
     queryKey:  ['aflLineups', info?.fixtureId],
     queryFn:   async () => {
       const data = await afetch('fixtures/lineups', { fixture: info.fixtureId })
@@ -247,6 +247,7 @@ export function useAflLineups(match) {
     gcTime:    2  * 60 * 60_000,
     retry: 1,
   })
+  return { ...query, isLoading: infoLoading || query.isLoading }
 }
 
 /**
@@ -271,8 +272,8 @@ export function useAflLiveStats(match, isLive = true) {
 
 // Stats d'un match terminé — même source mais sans polling
 export function useAflMatchStats(match) {
-  const { data: info } = useFixtureInfo(match)
-  return useQuery({
+  const { data: info, isLoading: infoLoading } = useFixtureInfo(match)
+  const query = useQuery({
     queryKey: ['aflMatchStats', info?.fixtureId],
     queryFn:  async () => {
       const data = await afetch('fixtures/statistics', { fixture: info.fixtureId })
@@ -282,4 +283,5 @@ export function useAflMatchStats(match) {
     staleTime: 30 * 60_000,
     retry: 1,
   })
+  return { ...query, isLoading: infoLoading || query.isLoading }
 }
