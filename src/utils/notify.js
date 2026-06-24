@@ -1,14 +1,39 @@
 /**
  * notify.js — Notifications PWA pour les événements live
  *
- * Fonctionne quand l'app est ouverte OU en arrière-plan (PWA installée).
- * Utilise serviceWorker.showNotification() pour les notifications background-safe.
- *
- * Événements couverts : KO · Mi-temps · But · Fin de match
+ * Utilisé uniquement comme fallback si le cron VAPID n'est pas configuré.
+ * Le cron /api/cron-goals est la source principale des notifications.
  */
 
-// Set des événements déjà notifiés → évite les doublons entre polls
+import { translateTeam } from '../data/teamNames'
+
+// ── Persistance _notified (survit aux rechargements) ─────────────────────────
+const NOTIF_KEY = 'foot_notified_v1'
+const NOTIF_TTL = 4 * 60 * 60_000 // 4h
+
 const _notified = new Set()
+
+// Restaurer depuis localStorage au chargement du module
+try {
+  const raw = localStorage.getItem(NOTIF_KEY)
+  if (raw) {
+    const { ts, keys } = JSON.parse(raw)
+    if (Date.now() - ts < NOTIF_TTL) {
+      keys.forEach(k => _notified.add(k))
+    } else {
+      localStorage.removeItem(NOTIF_KEY)
+    }
+  }
+} catch { /* silently ignore */ }
+
+function _persistNotified() {
+  try {
+    localStorage.setItem(NOTIF_KEY, JSON.stringify({
+      ts:   Date.now(),
+      keys: [..._notified],
+    }))
+  } catch { /* silently ignore */ }
+}
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
@@ -37,11 +62,11 @@ async function _show(title, body, tag) {
   if (!canNotify()) return
   const opts = {
     body,
-    icon:  '/icon-192.png',
-    badge: '/icon-192.png',
-    tag,                      // tag identique → remplace la notif précédente du même match
+    icon:     '/icon-192.png',
+    badge:    '/icon-192.png',
+    tag,
     renotify: true,
-    silent: false,
+    silent:   false,
   }
   try {
     if ('serviceWorker' in navigator) {
@@ -50,15 +75,13 @@ async function _show(title, body, tag) {
     } else {
       new Notification(title, opts)
     }
-  } catch {
-    // Pas de permission ou contexte non supporté
-  }
+  } catch { /* pas de permission ou contexte non supporté */ }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function _teamName(team) {
-  return team?.shortName || team?.name || '?'
+  return translateTeam(team?.shortName || team?.name || '?')
 }
 
 // ── API publique ──────────────────────────────────────────────────────────────
@@ -68,9 +91,10 @@ export function notifyKickoff(match) {
   const key = `ko_${match.id}`
   if (_notified.has(key)) return
   _notified.add(key)
+  _persistNotified()
   const h = _teamName(match.homeTeam)
   const a = _teamName(match.awayTeam)
-  _show('⚽ Coup d\'envoi !', `${h} – ${a}`, `match_${match.id}`)
+  _show('🔴 Coup d\'envoi !', `${h} – ${a}`, `match_${match.id}`)
 }
 
 /** Mi-temps */
@@ -78,9 +102,10 @@ export function notifyHalfTime(match, home, away) {
   const key = `ht_${match.id}`
   if (_notified.has(key)) return
   _notified.add(key)
+  _persistNotified()
   const h = _teamName(match.homeTeam)
   const a = _teamName(match.awayTeam)
-  _show('🕐 Mi-temps', `${h} ${home} – ${away} ${a}`, `match_${match.id}`)
+  _show('⏸ Mi-temps', `${h} ${home} – ${away} ${a}`, `match_${match.id}`)
 }
 
 /** But marqué */
@@ -88,10 +113,10 @@ export function notifyGoal(match, home, away, scorers) {
   const key = `goal_${match.id}_${home}-${away}`
   if (_notified.has(key)) return
   _notified.add(key)
+  _persistNotified()
   const h = _teamName(match.homeTeam)
   const a = _teamName(match.awayTeam)
-  // Dernier buteur connu
-  const last = scorers?.[scorers.length - 1]
+  const last   = scorers?.[scorers.length - 1]
   const scorer = last?.name ? ` · ${last.name}` : ''
   _show(`⚽ BUT !${scorer}`, `${h} ${home} – ${away} ${a}`, `match_${match.id}`)
 }
@@ -101,6 +126,7 @@ export function notifyFullTime(match, home, away) {
   const key = `ft_${match.id}`
   if (_notified.has(key)) return
   _notified.add(key)
+  _persistNotified()
   const h = _teamName(match.homeTeam)
   const a = _teamName(match.awayTeam)
   _show('🏁 Fin du match', `${h} ${home} – ${away} ${a}`, `match_${match.id}`)

@@ -60,14 +60,15 @@ export default async function handler(req, res) {
     return res.status(415).json({ error: 'Content-Type application/json requis' })
   }
 
-  // ── Rate limiting par IP — 5 tentatives / heure ───────────────────────────
+  // ── Rate limiting par IP — 20 tentatives / heure ──────────────────────────
+  // Augmenté à 20 car la re-sync automatique à chaque ouverture d'app consomme des slots.
   const ip = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
   const rateLimitKey = `ratelimit:subscribe:${ip}`
   try {
     const count = await kv.incr(rateLimitKey)
     // TTL seulement à la 1ère incrémentation (évite de reset à chaque appel)
     if (count === 1) await kv.expire(rateLimitKey, 3600)
-    if (count > 5) {
+    if (count > 20) {
       return res.status(429).json({ error: 'Trop de tentatives — réessayez dans 1 heure' })
     }
   } catch (kvErr) {

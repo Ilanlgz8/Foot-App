@@ -21,11 +21,10 @@ import {
   getLiveState, setLiveState,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
-import { notifyKickoff, notifyHalfTime, notifyGoal, notifyFullTime } from '../utils/notify'
 import { playGoalSound, playWhistleKO, playWhistleHT, playWhistleFT } from '../utils/sounds'
 
-// Push côté client supprimé — le cron /api/cron/goals gère toutes les notifs
-// (buts, KO, MT, reprise, prolongations, FT) pour éviter les doublons.
+// Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
+// → fonctionne même quand l'app est fermée, sans doublons.
 
 // ─────────────────────────────────────────────
 // Constantes
@@ -115,7 +114,6 @@ function parseClockMins(clock) {
 function confirmFt(match, now, queryClient) {
   const id    = match.id
   const cache = espnScoresCache[id]
-  notifyFullTime(match, cache?.home ?? 0, cache?.away ?? 0)
   setLiveState(id, 'ended', { endedAt: now })
 
   // Persister le score ESPN pour MatchModal post-match
@@ -399,7 +397,6 @@ async function pollESPN(matches, queryClient) {
 
         // Détection but : score total augmente
         if (prevCache && newTotal > prevTotal) {
-          notifyGoal(match, home, away, scorers)
           playGoalSound()
         }
 
@@ -421,7 +418,6 @@ async function pollESPN(matches, queryClient) {
       ) {
         const mins = parseClockMins(espnClock)
         if (mins != null && mins > 0) setKickoffAt(mid, now - mins * 60_000)
-        notifyKickoff(match)
         // Ne siffler que si on détecte le KO dans les 5 premières minutes
         // (évite le sifflet intempestif si on détecte un match déjà en cours)
         const minsFromKickoff = (now - new Date(match.utcDate)) / 60_000
@@ -431,8 +427,6 @@ async function pollESPN(matches, queryClient) {
       // ── HT détecté ──
       if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
         trackMatchState({ ...match, status: 'PAUSED' })
-        const cache = espnScoresCache[mid]
-        notifyHalfTime(match, cache?.home ?? 0, cache?.away ?? 0)
         playWhistleHT()
       }
 

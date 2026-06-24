@@ -55,23 +55,21 @@ export function usePushNotifications() {
         if (sub) {
           setStatus('subscribed')
           localStorage.setItem(LS_KEY, '1')
-          // Re-sync silencieuse toutes les 4h : si Redis a été vidé, ou la subscription
-          // supprimée suite à un 410, le cron n'aurait plus rien à qui envoyer.
+          // Re-sync à chaque lancement : si Redis a été vidé (Vercel KV flush, TTL expiré…)
+          // ou si la première subscription n'a pas été stockée, on la renvoie silencieusement.
           // L'endpoint /subscribe est idempotent (sadd ignore les doublons).
-          const SYNC_INTERVAL = 4 * 60 * 60 * 1000
+          // Throttle : on attend au moins 5 min entre deux re-sync pour ne pas spammer.
+          const SYNC_INTERVAL = 5 * 60 * 1000 // 5 min
           const lastSync = parseInt(localStorage.getItem('push_last_sync') || '0', 10)
           if (Date.now() - lastSync > SYNC_INTERVAL) {
             try {
-              const keyRes = await fetch('/api/vapid-key')
-              if (keyRes.ok) {
-                const storeRes = await fetch('/api/subscribe', {
-                  method:  'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body:    JSON.stringify(sub.toJSON()),
-                })
-                if (storeRes.ok || storeRes.status === 201) {
-                  localStorage.setItem('push_last_sync', String(Date.now()))
-                }
+              const storeRes = await fetch('/api/subscribe', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(sub.toJSON()),
+              })
+              if (storeRes.ok || storeRes.status === 201) {
+                localStorage.setItem('push_last_sync', String(Date.now()))
               }
             } catch { /* silently fail — pas critique */ }
           }
