@@ -17,7 +17,7 @@ const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 const FIFA_TTL      = 6           // Cache Redis FIFA live (s)
 const ESPN_BASE     = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const ESPN_TTL      = 8           // Cache Redis ESPN (s)
-const MATCH_TTL     = 6 * 3600   // Données match persistées (s)
+const MATCH_TTL     = 90 * 24 * 3600   // Données match persistées 90 jours (WC 2026)
 const ESPN_TIMEOUT  = 5_000
 const FIFA_TIMEOUT  = 7_000
 

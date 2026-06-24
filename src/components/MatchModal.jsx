@@ -703,10 +703,67 @@ const MATCH_STAT_KEYS = [
   { key: 'Yellow Cards',     label: 'Cartons jaunes', higher: false },
 ]
 
+// ── Helpers stats match terminé ───────────────────────────────────────────────
+
+function makeStatRow(label, hv, av, higher) {
+  if (hv == null && av == null) return null
+  const hvStr = hv != null ? String(hv) : '–'
+  const avStr = av != null ? String(av) : '–'
+  const hNum  = parseFloat(hvStr.replace('%',''))
+  const aNum  = parseFloat(avStr.replace('%',''))
+  const hBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? hNum > aNum : hNum < aNum)
+  const aBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? aNum > hNum : aNum < hNum)
+  return { label, hv: hvStr, av: avStr, hBetter, aBetter }
+}
+
+// Convertit les stats FIFA (useFifaStats) en lignes d'affichage
+function fifaStatsToRows(data) {
+  if (!data?.home && !data?.away) return []
+  const h = data.home ?? {}
+  const a = data.away ?? {}
+  return [
+    makeStatRow('Possession',   h.poss  != null ? `${h.poss}%` : null,  a.poss  != null ? `${a.poss}%` : null,  true),
+    makeStatRow('Tirs',         h.shots,          a.shots,          true),
+    makeStatRow('Tirs cadrés',  h.shotsOnTarget,  a.shotsOnTarget,  true),
+    makeStatRow('Corners',      h.corners,        a.corners,        true),
+    makeStatRow('Fautes',       h.fouls,          a.fouls,          false),
+    makeStatRow('Hors-jeux',    h.offside,        a.offside,        false),
+  ].filter(Boolean)
+}
+
+// Convertit les stats api-football (useAflMatchStats) en lignes d'affichage
+function aflStatsToRows(statsData) {
+  if (!statsData) return []
+  const allPeriod = statsData.statistics?.find(s => s.period === 'ALL')
+  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
+  return MATCH_STAT_KEYS.map(({ key, label, higher }) => {
+    const item = items.find(i => i.name === key)
+    if (!item) return null
+    return makeStatRow(label, item.home ?? null, item.away ?? null, higher)
+  }).filter(Boolean)
+}
+
 export function MatchStatsSection({ match }) {
-  const { data: statsData, isLoading } = useAflMatchStats(match)
+  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
+
+  // Source primaire WC : API FIFA (via /api/fifa-lineups → Redis)
+  // live=false : one-shot, pas de polling sur un match terminé
+  const { data: fifaData, isLoading: fifaLoading } = useFifaStats(
+    isWC ? match : null, isWC, false
+  )
+
+  // Source api-football : tous les matchs (fallback WC, primaire non-WC)
+  const { data: aflStats, isLoading: aflLoading } = useAflMatchStats(match)
+
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+
+  const fifaRows = fifaStatsToRows(fifaData)
+  const aflRows  = aflStatsToRows(aflStats)
+  const rows     = fifaRows.length ? fifaRows : aflRows   // FIFA prioritaire pour WC
+
+  // Spinner tant qu'on n'a pas de données et que l'une des sources charge encore
+  const isLoading = !rows.length && ((isWC && fifaLoading) || aflLoading)
 
   if (isLoading) return (
     <div className="pm__section">
@@ -717,23 +774,6 @@ export function MatchStatsSection({ match }) {
     </div>
   )
 
-  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
-  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
-
-  const rows = MATCH_STAT_KEYS
-    .map(({ key, label, higher }) => {
-      const item = items.find(i => i.name === key)
-      if (!item) return null
-      const hv = item.home ?? '–'
-      const av = item.away ?? '–'
-      const hNum = parseFloat(String(hv).replace('%',''))
-      const aNum = parseFloat(String(av).replace('%',''))
-      const hBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? hNum > aNum : hNum < aNum)
-      const aBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? aNum > hNum : aNum < hNum)
-      return { label, hv, av, hBetter, aBetter }
-    })
-    .filter(Boolean)
-
   if (!rows.length) return (
     <div className="pm__section">
       <h3 className="pm__sectionTitle">Statistiques du match</h3>
@@ -741,8 +781,7 @@ export function MatchStatsSection({ match }) {
     </div>
   )
 
-  // Score du match
-  const hs = match.score?.fullTime?.home
+  const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away
 
   return (

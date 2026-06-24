@@ -158,15 +158,15 @@ export function useLineups(match) {
 // Appelle /api/fifa-lineups (même endpoint que useLineups) — React Query déduplique.
 // Retourne { home, away } au format ESPNStats : { poss, shots, shotsOnTarget, corners, fouls, offside }
 
-export function useFifaStats(match, enabled = true) {
+export function useFifaStats(match, enabled = true, live = true) {
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   return useQuery({
     queryKey: ['fifaStats', match?.id],
     enabled:  enabled && !!match?.id,
-    staleTime: 30_000,            // stats live → re-fetch après 30s
-    refetchInterval: enabled ? 45_000 : false,  // poll plus fréquent (était 90s)
+    staleTime: live ? 30_000 : 30 * 60_000,   // live: 30s, fini: 30min
+    refetchInterval: (enabled && live) ? 45_000 : false,
     retry: 2,
     retryDelay: 3_000,
     queryFn: async () => {
