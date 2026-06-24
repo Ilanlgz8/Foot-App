@@ -290,10 +290,16 @@ function Matchs() {
     const hForm = formMap[match.homeTeam?.id]
     const aForm = formMap[match.awayTeam?.id]
     const prono = isUpcoming && (hForm || aForm) ? calcProno(hForm, aForm) : null
+    // Segment favori = couleur argenté champion
+    const pronoWinner = prono
+      ? (prono.home >= prono.away && prono.home >= prono.draw ? 'home'
+        : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
+        : 'draw')
+      : null
 
     return (
       <div
-        className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}`}
+        className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${prono ? ' matchs__match--prono' : ''}`}
         style={{ borderTop: index === 0 ? 'none' : undefined }}
         onClick={() => { if (!isUpcoming) setSelectedMatch(match) }}
       >
@@ -307,19 +313,6 @@ function Matchs() {
         </div>
         <div className="matchs__score">
           <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
-          {prono && (
-            <div className="matchs__pronoBar">
-              <div className="matchs__pronoSeg matchs__pronoSeg--home" style={{ '--prono-home': prono.home }}>
-                {prono.home}%
-              </div>
-              <div className="matchs__pronoSeg matchs__pronoSeg--draw" style={{ '--prono-draw': prono.draw }}>
-                {prono.draw}%
-              </div>
-              <div className="matchs__pronoSeg matchs__pronoSeg--away" style={{ '--prono-away': prono.away }}>
-                {prono.away}%
-              </div>
-            </div>
-          )}
         </div>
         <div className="matchs__team matchs__team--away">
           {match.awayTeam.crest && (
@@ -328,6 +321,20 @@ function Matchs() {
           )}
           <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
         </div>
+        {/* Barre prono pleine largeur — en dehors des colonnes équipe/score */}
+        {prono && (
+          <div className="matchs__pronoBar">
+            <div className={`matchs__pronoSeg matchs__pronoSeg--home${pronoWinner === 'home' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-home': prono.home }}>
+              {prono.home}%
+            </div>
+            <div className={`matchs__pronoSeg matchs__pronoSeg--draw${pronoWinner === 'draw' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-draw': prono.draw }}>
+              {prono.draw}%
+            </div>
+            <div className={`matchs__pronoSeg matchs__pronoSeg--away${pronoWinner === 'away' ? ' matchs__pronoSeg--winner' : ''}`} style={{ '--prono-away': prono.away }}>
+              {prono.away}%
+            </div>
+          </div>
+        )}
       </div>
     )
   }

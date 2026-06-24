@@ -106,26 +106,29 @@ function Accueil() {
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
 
-  // Résultats récents : matchs terminés d'aujourd'hui + d'hier.
-  // useTodayMatches filtre strictement par date locale → les matchs d'hier (locale)
-  // ne sont pas inclus dans la requête du jour courant. On fetch J-1 séparément.
-  const yesterdayDate = useMemo(() => {
-    const d = new Date(targetDate + 'T12:00:00')
+  // Résultats récents : toujours basés sur aujourd'hui (absolu) + hier.
+  // Indépendant de dayOffset — le panneau résultats affiche toujours les matchs
+  // terminés du jour courant et de la veille, même quand on consulte un jour futur.
+  const absoluteToday = todayDateStr
+  const absoluteYesterday = useMemo(() => {
+    const d = new Date(absoluteToday + 'T12:00:00')
     d.setDate(d.getDate() - 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }, [targetDate])
-  const { matches: yesterdayMatches } = useTodayMatches(yesterdayDate)
+  }, [absoluteToday])
+  // React Query déduplique : si dayOffset=0, absoluteToday === targetDate → pas de double fetch
+  const { matches: todayMatchesForResults }     = useTodayMatches(absoluteToday)
+  const { matches: yesterdayMatchesForResults } = useTodayMatches(absoluteYesterday)
 
   const results = useMemo(() => {
     const seen = new Set()
-    return [...matches, ...yesterdayMatches]
+    return [...todayMatchesForResults, ...yesterdayMatchesForResults]
       .filter(m => {
         if (m.status !== 'FINISHED') return false
         if (seen.has(m.id)) return false
         seen.add(m.id)
         return true
       })
-  }, [matches, yesterdayMatches])
+  }, [todayMatchesForResults, yesterdayMatchesForResults])
   const resultsLoading = matchesLoading
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
@@ -331,9 +334,8 @@ function Accueil() {
               </div>
             )}
 
-            {/* Résultats récents */}
-            {/* Résultats récents — masqué pour les jours futurs (pas de résultats possibles) */}
-            {dayOffset <= 0 && <div className="accueil__dashPanel">
+            {/* Résultats récents — toujours visible (données toujours basées sur aujourd'hui/hier) */}
+            {<div className="accueil__dashPanel">
               <div className="accueil__dashPanelHeader">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
               </div>

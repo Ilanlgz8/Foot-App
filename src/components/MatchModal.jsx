@@ -479,22 +479,25 @@ function FinishedDetails({ match, espnData, detail, loading }) {
 // ── Modal principale ─────────────────────────────────────────────────────────
 function PronoSection({ prono, homeShort, awayShort }) {
   if (!prono) return null
+  const winner = prono.home >= prono.away && prono.home >= prono.draw ? 'home'
+    : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
+    : 'draw'
   return (
     <div className="modal__prono">
       <p className="modal__pronoTitle">Probabilités estimées</p>
       <div className="modal__pronoRow">
         <span className="modal__pronoLabel">{homeShort}</span>
         <div className="modal__pronoBar">
-          <div className="modal__pronoSeg modal__pronoSeg--home" style={{ '--prono-home': prono.home }} />
-          <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ '--prono-draw': prono.draw }} />
-          <div className="modal__pronoSeg modal__pronoSeg--away" style={{ '--prono-away': prono.away }} />
+          <div className={`modal__pronoSeg modal__pronoSeg--home${winner === 'home' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-home': prono.home }} />
+          <div className={`modal__pronoSeg modal__pronoSeg--draw${winner === 'draw' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-draw': prono.draw }} />
+          <div className={`modal__pronoSeg modal__pronoSeg--away${winner === 'away' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-away': prono.away }} />
         </div>
         <span className="modal__pronoLabel">{awayShort}</span>
       </div>
       <div className="modal__pronoNums">
-        <span className="modal__pronoNum modal__pronoNum--home">{prono.home}%</span>
-        <span className="modal__pronoNum modal__pronoNum--draw">{prono.draw}%</span>
-        <span className="modal__pronoNum modal__pronoNum--away">{prono.away}%</span>
+        <span className={`modal__pronoNum modal__pronoNum--home${winner === 'home' ? ' modal__pronoNum--winner' : ''}`}>{prono.home}%</span>
+        <span className={`modal__pronoNum modal__pronoNum--draw${winner === 'draw' ? ' modal__pronoNum--winner' : ''}`}>{prono.draw}%</span>
+        <span className={`modal__pronoNum modal__pronoNum--away${winner === 'away' ? ' modal__pronoNum--winner' : ''}`}>{prono.away}%</span>
       </div>
       <div className="modal__pronoKeys">
         <span>Victoire</span>

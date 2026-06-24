@@ -260,7 +260,7 @@ export default function Live() {
   const [modal, setModal] = useState(null)
 
   const live = liveMatches.filter(m =>
-    m.status === 'IN_PLAY' || m.status === 'PAUSED' || getMatchState(m.id).ft === true
+    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || getMatchState(m.id).ft === true
   )
 
   return (

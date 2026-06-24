@@ -444,7 +444,9 @@ async function pollESPN(matches, queryClient) {
         !prevState.half2Start
       ) {
         const mins = parseClockMins(espnClock)
-        if (mins != null) setHalf2Start(mid, now - Math.max(0, mins - 45) * 60_000)
+        // mins - 46 : la 2ème MT commence à 46', donc half2Start = now - (mins-46)min en arrière
+        // (mins-45 donnait un décalage systématique de +1')
+        if (mins != null) setHalf2Start(mid, now - Math.max(0, mins - 46) * 60_000)
       }
 
       // ════════════════════════════════════════════════════════════════════
