@@ -869,7 +869,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             loading={espnLoading || detailLoading}
           />
         ) : isLive ? (
-          <div {...swipeLive}>
+          <div ref={swipeLive.ref}>
             {/* Onglets match en cours */}
             <div className="modal__tabs">
               <button
@@ -891,7 +891,14 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 onClick={() => pickTab('classement')}
               >Classement</button>
             </div>
-            <div key={tab} className={`modal__tabContent${tabDir === 'left' ? ' modal__tabContent--fromRight' : tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}>
+            <div
+              key={tab}
+              className={`modal__tabContent${!swipeLive.isDragging && tabDir === 'left' ? ' modal__tabContent--fromRight' : !swipeLive.isDragging && tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}
+              style={{
+                transform: swipeLive.isDragging ? `translateX(${swipeLive.dragOffset}px)` : undefined,
+                transition: swipeLive.isDragging ? 'none' : undefined,
+              }}
+            >
               {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
               {tab === 'compos'      && <ComposTab match={match} />}
               {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
@@ -905,7 +912,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             </div>
           </div>
         ) : (
-          <div {...swipePre}>
+          <div ref={swipePre.ref}>
             {/* Onglets match à venir */}
             <div className="modal__tabs">
               <button
@@ -921,7 +928,14 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 onClick={() => pickPreTab('classement')}
               >Classement</button>
             </div>
-            <div key={preTab} className={`modal__tabContent${tabDir === 'left' ? ' modal__tabContent--fromRight' : tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}>
+            <div
+              key={preTab}
+              className={`modal__tabContent${!swipePre.isDragging && tabDir === 'left' ? ' modal__tabContent--fromRight' : !swipePre.isDragging && tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}
+              style={{
+                transform: swipePre.isDragging ? `translateX(${swipePre.dragOffset}px)` : undefined,
+                transition: swipePre.isDragging ? 'none' : undefined,
+              }}
+            >
               {preTab === 'avant-match' && (
                 <PreMatchSection
                   match={match}
