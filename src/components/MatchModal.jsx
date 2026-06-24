@@ -4,7 +4,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
-import { useAflLiveStats, useAflLineups } from '../hooks/useApiFootball'
+import { useAflLiveStats, useAflLineups, useAflMatchStats } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
@@ -687,6 +687,80 @@ function H2HSection({ match }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ── Stats d'un match terminé (api-football) ──────────────────────────────────
+const MATCH_STAT_KEYS = [
+  { key: 'Ball possession',  label: 'Possession',     higher: true  },
+  { key: 'Total shots',      label: 'Tirs',           higher: true  },
+  { key: 'Shots on target',  label: 'Tirs cadrés',    higher: true  },
+  { key: 'Corner kicks',     label: 'Corners',        higher: true  },
+  { key: 'Fouls',            label: 'Fautes',         higher: false },
+  { key: 'Offsides',         label: 'Hors-jeux',      higher: false },
+  { key: 'Yellow Cards',     label: 'Cartons jaunes', higher: false },
+]
+
+export function MatchStatsSection({ match }) {
+  const { data: statsData, isLoading } = useAflMatchStats(match)
+  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+
+  if (isLoading) return (
+    <div className="pm__section">
+      <h3 className="pm__sectionTitle">Statistiques du match</h3>
+      <div style={{ display:'flex', justifyContent:'center', padding:'1.5rem 0' }}>
+        <div className="modal__spinner" />
+      </div>
+    </div>
+  )
+
+  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
+  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
+
+  const rows = MATCH_STAT_KEYS
+    .map(({ key, label, higher }) => {
+      const item = items.find(i => i.name === key)
+      if (!item) return null
+      const hv = item.home ?? '–'
+      const av = item.away ?? '–'
+      const hNum = parseFloat(String(hv).replace('%',''))
+      const aNum = parseFloat(String(av).replace('%',''))
+      const hBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? hNum > aNum : hNum < aNum)
+      const aBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? aNum > hNum : aNum < hNum)
+      return { label, hv, av, hBetter, aBetter }
+    })
+    .filter(Boolean)
+
+  if (!rows.length) return (
+    <div className="pm__section">
+      <h3 className="pm__sectionTitle">Statistiques du match</h3>
+      <p className="pm__noData">Stats non disponibles</p>
+    </div>
+  )
+
+  // Score du match
+  const hs = match.score?.fullTime?.home
+  const as_ = match.score?.fullTime?.away
+
+  return (
+    <div className="pm__section">
+      <h3 className="pm__sectionTitle">Statistiques du match</h3>
+      <div className="pm__statHeader">
+        <span className="pm__statTeam">{homeName}{hs != null ? ` ${hs}` : ''}</span>
+        <span />
+        <span className="pm__statTeam pm__statTeam--away">{as_ != null ? `${as_} ` : ''}{awayName}</span>
+      </div>
+      <div className="pm__statTable">
+        {rows.map(({ label, hv, av, hBetter, aBetter }) => (
+          <div key={label} className="pm__statRow">
+            <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv}</span>
+            <span className="pm__statName">{label}</span>
+            <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better' : ''}`}>{av}</span>
+          </div>
+        ))}
       </div>
     </div>
   )

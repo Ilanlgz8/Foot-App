@@ -268,3 +268,18 @@ export function useAflLiveStats(match, isLive = true) {
     retry: 1,
   })
 }
+
+// Stats d'un match terminé — même source mais sans polling
+export function useAflMatchStats(match) {
+  const { data: info } = useFixtureInfo(match)
+  return useQuery({
+    queryKey: ['aflMatchStats', info?.fixtureId],
+    queryFn:  async () => {
+      const data = await afetch('fixtures/statistics', { fixture: info.fixtureId })
+      return transformStats(data, info.homeTeamId)
+    },
+    enabled:   !!info?.fixtureId,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  })
+}

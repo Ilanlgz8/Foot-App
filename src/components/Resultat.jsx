@@ -1,17 +1,17 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
-import MatchModal        from './MatchModal'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
 function Resultats() {
+  const navigate = useNavigate()
   const [selectedComp, setSelectedComp] = useState('WC')
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [selectedMatch, setSelected]    = useState(null)
   const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
 
@@ -71,7 +71,7 @@ function Resultats() {
     const as_  = match.score?.fullTime?.away ?? 0
     const hWin = hs > as_; const aWin = as_ > hs; const draw = hs === as_
     return (
-      <div className="resultats__card" onClick={() => setSelected(match)} style={{ cursor: 'pointer' }}>
+      <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
         <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
             {match.homeTeam?.crest
@@ -275,9 +275,6 @@ function Resultats() {
       {/* Modal résultats d'un groupe */}
       {openedGroup && <GroupModal groupKey={openedGroup} onClose={() => setOpenedGroup(null)} />}
 
-      {selectedMatch && (
-        <MatchModal match={selectedMatch} compId={selectedMatch.competition?.id} onClose={() => setSelected(null)} />
-      )}
     </section>
   )
 }

@@ -15,6 +15,7 @@ import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import {
   PreMatchSection,
+  MatchStatsSection,
   ComposTab,
   ClassementTab,
 } from '../components/MatchModal'
@@ -117,9 +118,11 @@ export default function MatchPage() {
   const { data: fetchedMatch, isLoading } = useMatchData(matchId, stateMatch)
   const match = stateMatch ?? fetchedMatch
 
+  const isFinished = match?.status === 'FINISHED'
   const compId = match?.competition?.code ?? null
-  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
 
+  // Stats saison uniquement pour les matchs à venir
+  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(isFinished ? null : compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
@@ -191,14 +194,16 @@ export default function MatchPage() {
             }}
           >
             {activeTab === 'statistiques' && (
-              formLoading
-                ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
-                : <PreMatchSection
-                    match={match}
-                    prono={prono}
-                    formMap={formMap}
-                    compMatches={compMatches}
-                  />
+              isFinished
+                ? <MatchStatsSection match={match} />
+                : formLoading
+                  ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
+                  : <PreMatchSection
+                      match={match}
+                      prono={prono}
+                      formMap={formMap}
+                      compMatches={compMatches}
+                    />
             )}
             {activeTab === 'compos'     && <ComposTab match={match} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
