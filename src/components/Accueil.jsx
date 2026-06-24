@@ -10,7 +10,6 @@ import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
-import MatchModal from './MatchModal'
 import '../accueil.css'
 
 /** Chips de filtre par compétition */
@@ -137,11 +136,9 @@ function Accueil() {
   const navigate = useNavigate()
 
   // ── Modal live (clic sur carte LiveWidget) ──
-  // liveModal = { match, espnScore } | null
-  const [liveModal, setLiveModal] = useState(null)
+  // live → navigate('/live/:matchId'), pas de modal
 
-  // ── Modal pré-match (clic sur match à venir dans MatchPanel) ──
-  const [upcomingModal, setUpcomingModal] = useState(null)
+  // pré-match → navigation vers /match/:matchId (plus de modal)
 
   // ── Suivi précis ──
   const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())
@@ -318,7 +315,7 @@ function Accueil() {
                 : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
-              onMatchClick={m => setUpcomingModal(m)}
+              onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
             />
           </div>
 
@@ -334,7 +331,7 @@ function Accueil() {
                   espnScores={espnScores}
                   trackedIds={trackedIds}
                   onRecalibrate={recalibrate}
-                  onMatchClick={(m) => setLiveModal({ match: m, espnScore: espnScores?.[m.id] })}
+                  onMatchClick={(m) => navigate(`/live/${m.id}`)}
                 />
               </div>
             )}
@@ -412,24 +409,8 @@ function Accueil() {
       </div>
     </section>
 
-    {/* ── Modal stats live (clic sur carte LiveWidget) ── */}
-    {liveModal && (
-      <MatchModal
-        match={liveModal.match}
-        espnScore={liveModal.espnScore}
-        onClose={() => setLiveModal(null)}
-        defaultTab="livestats"
-      />
-    )}
 
-    {/* ── Modal pré-match (clic sur match à venir dans MatchPanel) ── */}
-    {upcomingModal && (
-      <MatchModal
-        match={upcomingModal}
-        onClose={() => setUpcomingModal(null)}
-      />
-    )}
-    </>
+</>
   )
 }
 

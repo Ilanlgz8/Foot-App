@@ -9,6 +9,7 @@ import Classement from './components/Classement.jsx'
 import MentionsLegales from './components/MentionsLegales.jsx'
 import Live from './components/Live.jsx'
 import LiveMatchPage from './pages/LiveMatchPage.jsx'
+import MatchPage     from './pages/MatchPage.jsx'
 import { LiveProvider } from './context/LiveProvider.jsx'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
@@ -46,6 +47,7 @@ function App() {
           <Route path="/classement" element={<Classement />} />
           <Route path="/live" element={<Live />} />
           <Route path="/live/:matchId" element={<LiveMatchPage />} />
+          <Route path="/match/:matchId" element={<MatchPage />} />
           <Route path="/mentions-legales" element={<MentionsLegales />} />
         </Routes>
       </div>

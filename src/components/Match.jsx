@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
@@ -8,7 +9,6 @@ import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { calcMinute } from '../utils/matchUtils'
 import { calcProno } from '../utils/calcProno'
-import MatchModal from './MatchModal'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -180,15 +180,15 @@ function BracketSvgView({ rounds, onSelect }) {
 
 function Matchs() {
   /* ── State ── */
+  const navigate = useNavigate()
   const [selectedComp,  setSelectedComp]  = useState('WC')
-  const [selectedMatch, setSelectedMatch] = useState(null)
   const [currentIndex,  setCurrentIndex]  = useState(0)
   const [wcView,        setWcView]        = useState('poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
-  const { formMap, compMatches } = useTeamForm(selectedComp)
+  const { formMap } = useTeamForm(selectedComp)
   const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout()
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
@@ -292,7 +292,7 @@ function Matchs() {
       <div
         className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${isUpcoming ? ' matchs__match--upcoming' : ''}`}
         style={{ borderTop: index === 0 ? 'none' : undefined }}
-        onClick={() => setSelectedMatch(match)}
+        onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
       >
         <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
         <div className="matchs__team matchs__team--home">
@@ -559,7 +559,7 @@ function Matchs() {
               )}
               {!bracketLoading && !bracketError && rounds.length > 0 && (
                 <div className="bracket__container">
-                  <BracketSvgView rounds={rounds} onSelect={setSelectedMatch} />
+                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} />
                 </div>
               )}
             </>
@@ -592,10 +592,6 @@ function Matchs() {
 
       {openedGroup && (
         <GroupModal groupKey={openedGroup} onClose={() => setOpenedGroup(null)} />
-      )}
-      {selectedMatch && (
-        <MatchModal match={selectedMatch} compId={selectedComp}
-          onClose={() => setSelectedMatch(null)} formMap={formMap} compMatches={compMatches} />
       )}
     </section>
   )

@@ -1,0 +1,201 @@
+/* ── MatchPage — page dédiée match à venir / terminé ── */
+
+.mp__page {
+  min-height: 100vh;
+  padding: 0 0 4rem;
+  background: var(--bg, #0a0a0f);
+}
+
+.mp__backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 1rem 1rem 0;
+  padding: 0.4rem 0.85rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0.5rem;
+  color: rgba(255,255,255,0.55);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.mp__backBtn:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.09);
+}
+
+/* ── Header ── */
+.mp__header {
+  margin: 1rem;
+  padding: 1.4rem 1rem 1.2rem;
+  background: linear-gradient(160deg, rgba(15,15,30,0.97), rgba(10,10,20,0.99));
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1.1rem;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.45);
+}
+
+.mp__comp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+}
+.mp__compEmb {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.mp__scoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.mp__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+.mp__team--away { align-items: center; }
+
+.mp__crest {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+}
+.mp__crestFallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+
+.mp__teamName {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  text-align: center;
+  word-break: break-word;
+  hyphens: auto;
+  max-width: 90px;
+}
+
+/* Centre — date ou score */
+.mp__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.mp__time {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.mp__date {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.mp__scoreFinished {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.mp__statusLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Onglets ── */
+.mp__tabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0 1rem;
+  margin: 1.2rem 0 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.mp__tab {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  text-align: center;
+}
+.mp__tab:hover { color: rgba(255,255,255,0.7); }
+.mp__tab--active {
+  color: #f87171;
+  border-bottom-color: #ef4444;
+}
+
+/* ── Contenu onglet ── */
+.mp__tabContent {
+  padding: 0 1rem;
+  will-change: transform, opacity;
+  transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.mp__tabContent--fromRight {
+  animation: mpSlideFromRight 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.mp__tabContent--fromLeft {
+  animation: mpSlideFromLeft 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+@keyframes mpSlideFromRight {
+  from { transform: translateX(22px); opacity: 0.4; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes mpSlideFromLeft {
+  from { transform: translateX(-22px); opacity: 0.4; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+/* Loading */
+.mp__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 60vh;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.9rem;
+}
