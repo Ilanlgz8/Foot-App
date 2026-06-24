@@ -239,115 +239,88 @@ export function useEspnMatchStats(match) {
 }
 
 // ── useProbableLineups ─────────────────────────────────────────────────────────
-// Compos probables : dernier XI connu de chaque équipe via api-football.
-// Utilise /apifootball (pas de Redis) → fixtures par date → lineups du match.
-
-// Mapping FD.org competition ID → api-football league + season
-const COMP_AFL_ID = {
-  2000: { league: 1,   season: 2026 }, // WC 2026
-  2015: { league: 61,  season: 2025 }, // Ligue 1
-  2021: { league: 39,  season: 2025 }, // Premier League
-  2014: { league: 140, season: 2025 }, // La Liga
-  2002: { league: 78,  season: 2025 }, // Bundesliga
-  2019: { league: 135, season: 2025 }, // Serie A
-  2001: { league: 2,   season: 2025 }, // Champions League
-  2146: { league: 3,   season: 2025 }, // Europa League
-}
-
-const POS_MAP = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' }
-
-function parseAflLineup(teamEntry, opponent, matchDate) {
-  if (!teamEntry) return null
-  const mapPlayer = (p, i) => ({
-    name:      p.player?.name ?? '?',
-    shortName: (p.player?.name ?? '?').split(' ').slice(-1)[0],
-    number:    p.player?.number ?? '',
-    position:  POS_MAP[p.player?.pos] ?? p.player?.pos ?? '',
-    order:     i,
-  })
-  const starters = (teamEntry.startXI ?? []).map(mapPlayer)
-  if (!starters.length) return null
-  return {
-    name:      teamEntry.team?.name ?? '',
-    shortName: teamEntry.team?.name ?? '',
-    color:     '#1e40af',
-    altColor:  '#ffffff',
-    formation: teamEntry.formation ?? '',
-    starters,
-    subs: (teamEntry.substitutes ?? []).map(mapPlayer),
-    fromMatch: { date: matchDate, opponent },
-  }
-}
+// Compos probables : dernier XI connu de chaque équipe via ESPN summary.
+// Zéro quota — ESPN est gratuit et illimité.
+// Fonctionne pour toutes les compétitions dans COMP_ESPN.
 
 export function useProbableLineups(match, compMatches) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
-  const aflInfo = COMP_AFL_ID[match?.competition?.id]
+  const slug   = COMP_ESPN[match?.competition?.id]   // ex: 'fifa.world'
 
   return useQuery({
-    queryKey:  ['probableLineups2', match?.id, (compMatches ?? []).length],
-    enabled:   !!match?.id && !!(compMatches?.length) && !!aflInfo,
-    staleTime: 10 * 60_000,
-    retry: 1,
+    queryKey:  ['probableLineups3', match?.id, (compMatches ?? []).length],
+    enabled:   !!match?.id && !!(compMatches?.length) && !!slug,
+    staleTime: 30 * 60_000,
+    retry: 0,
     queryFn: async () => {
-      const sorted = [...compMatches].sort(
-        (a, b) => new Date(b.utcDate) - new Date(a.utcDate)
-      )
-      const lastHomeMatch = sorted.find(m =>
+      // Trouver le dernier match terminé de chaque équipe dans les données FD.org
+      const sorted = [...compMatches]
+        .filter(m => m.status === 'FINISHED')
+        .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+
+      const lastHome = sorted.find(m =>
         m.homeTeam?.id === homeId || m.awayTeam?.id === homeId
       )
-      const lastAwayMatch = sorted.find(m =>
+      const lastAway = sorted.find(m =>
         m.homeTeam?.id === awayId || m.awayTeam?.id === awayId
       )
 
-      // Résolution fixture api-football pour un match FD.org passé
-      const resolveFixture = async (fdMatch) => {
-        if (!fdMatch) return null
-        const date  = fdMatch.utcDate.slice(0, 10)
-        const fdH   = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
-        const fdA   = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
-        const p     = new URLSearchParams({ date, league: aflInfo.league, season: aflInfo.season })
-        try {
-          const res  = await fetch(`/apifootball?${p}`)
-          if (!res.ok) return null
-          const data = await res.json()
-          let best = null, bestScore = 0
-          for (const f of data.response ?? []) {
-            const hn = f.teams?.home?.name ?? ''
-            const an = f.teams?.away?.name ?? ''
-            const s  = (fuzzyTeam(fdH, hn) ? 1 : 0) + (fuzzyTeam(fdA, an) ? 1 : 0)
-            if (s > bestScore) { bestScore = s; best = f }
-          }
-          return bestScore >= 1 ? best?.fixture?.id : null
-        } catch { return null }
-      }
+      // Fetch rosters ESPN pour un match précédent
+      const fetchEspnLineup = async (prevMatch, teamId) => {
+        if (!prevMatch) return null
+        const date = matchDateStr(prevMatch)
+        const fdH  = prevMatch.homeTeam?.name ?? prevMatch.homeTeam?.shortName ?? ''
+        const fdA  = prevMatch.awayTeam?.name ?? prevMatch.awayTeam?.shortName ?? ''
 
-      // Fetch lineup d'un match via api-football
-      const fetchLineup = async (fdMatch, teamId) => {
-        if (!fdMatch) return null
-        const fixtureId = await resolveFixture(fdMatch)
-        if (!fixtureId) return null
         try {
-          const res  = await fetch(`/apifootball?_ep=fixtures%2Flineups&fixture=${fixtureId}`)
-          if (!res.ok) return null
-          const data = await res.json()
-          const teams = data.response ?? []
-          const wasHome  = fdMatch.homeTeam?.id === teamId
-          const teamName = wasHome
-            ? (fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? '')
-            : (fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? '')
+          // 1. Scoreboard ESPN → trouver l'event ID du match précédent
+          const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
+          if (!sbRes.ok) return null
+          const sb = await sbRes.json()
+
+          let eventId = null
+          for (const evt of sb.events ?? []) {
+            const comp  = evt.competitions?.[0]
+            const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+            const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+            if (!homeC || !awayC) continue
+            const espnH = homeC.team?.displayName ?? homeC.team?.name ?? ''
+            const espnA = awayC.team?.displayName ?? awayC.team?.name ?? ''
+            if (fuzzyTeam(fdH, espnH) && fuzzyTeam(fdA, espnA)) {
+              eventId = evt.id
+              break
+            }
+          }
+          if (!eventId) return null
+
+          // 2. Summary ESPN → rosters du match précédent
+          const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
+          if (!sumRes.ok) return null
+          const summary = await sumRes.json()
+
+          const rosters = summary.rosters ?? []
+          if (!rosters.length) return null
+
+          // 3. Extraire le roster de l'équipe concernée
+          const wasHome  = prevMatch.homeTeam?.id === teamId
+          const teamName = wasHome ? fdH : fdA
+          const name0    = rosters[0]?.team?.displayName ?? ''
+          const idx      = fuzzyTeam(teamName, name0) ? 0 : 1
+          const roster   = parseEspnRoster(rosters[idx] ?? rosters[0])
+          if (!roster?.starters?.length) return null
+
           const opponent = wasHome
-            ? (fdMatch.awayTeam?.shortName ?? fdMatch.awayTeam?.name ?? '?')
-            : (fdMatch.homeTeam?.shortName ?? fdMatch.homeTeam?.name ?? '?')
-          // Trouver l'équipe dans la réponse
-          const entry = teams.find(t => fuzzyTeam(teamName, t.team?.name ?? '')) ?? teams[wasHome ? 0 : 1]
-          return parseAflLineup(entry, opponent, fdMatch.utcDate)
+            ? (prevMatch.awayTeam?.shortName ?? prevMatch.awayTeam?.name ?? '?')
+            : (prevMatch.homeTeam?.shortName ?? prevMatch.homeTeam?.name ?? '?')
+
+          return { ...roster, fromMatch: { date: prevMatch.utcDate, opponent } }
         } catch { return null }
       }
 
       const [homeLineup, awayLineup] = await Promise.all([
-        fetchLineup(lastHomeMatch, homeId),
-        fetchLineup(lastAwayMatch, awayId),
+        fetchEspnLineup(lastHome, homeId),
+        fetchEspnLineup(lastAway, awayId),
       ])
       if (!homeLineup && !awayLineup) return null
       return { home: homeLineup, away: awayLineup }
