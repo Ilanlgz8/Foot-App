@@ -25,15 +25,18 @@ async function searchCommonsPhoto(queries) {
 
       const pages = Object.values(data.query.pages)
 
-      // Filtres : uniquement JPEG/PNG, largeur > 600px, pas de logo/badge/flag
+      // Filtres stricts : uniquement JPEG de match/action, largeur > 700px
+      const EXCLUDE = ['flag','logo','badge','crest','kit','jersey','shirt','drapeau','coat','emblem','stamp','icon','symbol','map','uniform','portrait','headshot']
       const photos = pages.filter(p => {
         const info = p.imageinfo?.[0]
         if (!info) return false
         if (info.mediatype !== 'BITMAP') return false
-        if ((info.width ?? 0) < 600) return false
+        if ((info.width ?? 0) < 700) return false
+        // Les photos de match sont presque toujours en format paysage
+        if ((info.height ?? 0) > (info.width ?? 1)) return false
         const title = (p.title ?? '').toLowerCase()
-        if (title.endsWith('.svg') || title.endsWith('.gif') || title.endsWith('.png') && title.includes('flag')) return false
-        if (title.includes('logo') || title.includes('badge') || title.includes('crest') || title.includes('kit')) return false
+        if (!title.endsWith('.jpg') && !title.endsWith('.jpeg')) return false
+        if (EXCLUDE.some(word => title.includes(word))) return false
         return true
       })
 
@@ -53,21 +56,18 @@ async function searchCommonsPhoto(queries) {
   return null
 }
 
-// Map équipe → requêtes de recherche du plus précis au plus général
-// On cherche en priorité des photos WC 2026 (en cours), puis récentes
+// Requêtes par ordre de précision — on exclut explicitement drapeaux/logos
 function getQueries(teamName) {
-  const q = encodeURIComponent(teamName)
   return [
-    `${teamName} football 2026 FIFA World Cup match`,
-    `${teamName} national football team 2026`,
-    `${teamName} football 2024 match players`,
-    `${teamName} national football team match celebration`,
-    `${teamName} football match action`,
+    `${teamName} football 2026 FIFA World Cup players match -flag -logo -badge`,
+    `${teamName} football 2026 match action players`,
+    `${teamName} national football team 2024 match -flag -logo`,
+    `${teamName} football players celebration match action`,
   ]
 }
 
 const CACHE_TTL     = 7 * 24 * 3600 * 1000
-const CACHE_VERSION = 'v5-commons'
+const CACHE_VERSION = 'v6-commons'
 
 function getCached(key) {
   try {
@@ -87,7 +87,7 @@ function setCached(key, url) {
 
 export function useTeamPhoto(teamName) {
   return useQuery({
-    queryKey: ['teamPhoto-v5', teamName],
+    queryKey: ['teamPhoto-v6', teamName],
     queryFn: async () => {
       if (!teamName) return null
 

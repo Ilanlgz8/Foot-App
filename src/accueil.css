@@ -2744,16 +2744,25 @@
   50%       { opacity: 0.35; transform: scale(0.7); }
 }
 
-/* ── Centre : "Coup d'envoi" + heure/score — centré, vers le milieu de la card ── */
+/* ── Bloc central 3 colonnes : [équipe] | [temps] | [équipe] ── */
+.poster__middle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex: 1;
+  gap: 4px;
+}
+
+/* Centre : label + heure/score */
 .poster__center {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 6px 0 4px;
-  text-align: center;
+  gap: 2px;
   flex: 1;
+  text-align: center;
 }
 
 /* Label au-dessus (Coup d'envoi / Terminé / Mi-temps) */
@@ -2800,48 +2809,43 @@
   text-shadow: 0 0 22px rgba(239,68,68,0.45);
 }
 
-/* ── Teams row : drapeau au-dessus du nom, G/D écartés ── */
-.poster__teams-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding: 0 18px 10px;
-}
+/* ── Colonnes équipe (gauche & droite) ── */
 .poster__team-col {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  max-width: 42%;
+  width: 68px;
+  flex-shrink: 0;
 }
 .poster__team-col--home { align-items: flex-start; }
 .poster__team-col--away { align-items: flex-end; }
 
 .poster__crest {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.65));
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.7));
 }
 .poster__crest-empty {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: rgba(255,255,255,0.08);
 }
 .poster__name {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.9);
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+  max-width: 68px;
 }
-.poster__team-col--home .poster__name { text-align: left; }
-.poster__team-col--away .poster__name { text-align: right; }
+.poster__name--home { text-align: left; }
+.poster__name--away { text-align: right; }
 
 /* ── Footer : barre prono ── */
 .poster__footer {

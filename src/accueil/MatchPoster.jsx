@@ -73,39 +73,44 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
         }
       </div>
 
-      {/* ── Centre : "Coup d'envoi" + heure/score — centré ── */}
-      <div className="poster__center">
-        {isLive && minute && (
-          <div className="poster__min-label">
-            {minute === 'MT' ? 'Mi-temps' : `${minute}'`}
-          </div>
-        )}
-        {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
-        {isFinished  && <div className="poster__env-label">Terminé</div>}
-        {(isLive || isFinished)
-          ? <div className="poster__score">{homeScore ?? 0} – {awayScore ?? 0}</div>
-          : <div className="poster__time">{formatHour(match.utcDate)}</div>
-        }
-      </div>
+      {/* ── Bloc central : [crest+nom] | [label+temps] | [crest+nom] ── */}
+      <div className="poster__middle">
 
-      {/* ── Teams : drapeau juste au-dessus du nom, écartés G/D ── */}
-      <div className="poster__teams-row">
+        {/* Équipe domicile — gauche */}
         <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest
             ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
                 onError={e => { e.currentTarget.style.display = 'none' }} />
             : <div className="poster__crest-empty" />
           }
-          <span className="poster__name">{homeShort}</span>
+          <span className="poster__name poster__name--home">{homeShort}</span>
         </div>
+
+        {/* Centre : label + temps/score */}
+        <div className="poster__center">
+          {isLive && minute && (
+            <div className="poster__min-label">
+              {minute === 'MT' ? 'Mi-temps' : `${minute}'`}
+            </div>
+          )}
+          {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
+          {isFinished  && <div className="poster__env-label">Terminé</div>}
+          {(isLive || isFinished)
+            ? <div className="poster__score">{homeScore ?? 0} – {awayScore ?? 0}</div>
+            : <div className="poster__time">{formatHour(match.utcDate)}</div>
+          }
+        </div>
+
+        {/* Équipe extérieure — droite */}
         <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest
             ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
                 onError={e => { e.currentTarget.style.display = 'none' }} />
             : <div className="poster__crest-empty" />
           }
-          <span className="poster__name">{awayShort}</span>
+          <span className="poster__name poster__name--away">{awayShort}</span>
         </div>
+
       </div>
 
       {/* ── Barre prono ── */}
