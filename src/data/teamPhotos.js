@@ -302,6 +302,115 @@ export const TEAM_COLORS_FULL = {
   'Slavia Prague':         { p: '#CC0000', s: '#FFFFFF' },
   'Sparta Prague':         { p: '#AC162C', s: '#FFFFFF' },
   'Legia Warsaw':          { p: '#007C3B', s: '#FFFFFF' },
+  // Premier League — manquants
+  'Brighton & Hove Albion':{ p: '#0057B8', s: '#FFFFFF' },
+  'Brighton':              { p: '#0057B8', s: '#FFFFFF' },
+  'Aston Villa':           { p: '#670E36', s: '#95BFE5' },
+  'Newcastle United':      { p: '#241F20', s: '#FFFFFF' },
+  'Newcastle':             { p: '#241F20', s: '#FFFFFF' },
+  'West Ham United':       { p: '#7A263A', s: '#1BB1E7' },
+  'West Ham':              { p: '#7A263A', s: '#1BB1E7' },
+  'Leicester City':        { p: '#003090', s: '#FDBE11' },
+  'Leicester':             { p: '#003090', s: '#FDBE11' },
+  'Wolverhampton Wanderers':{ p: '#FDB913', s: '#231F20' },
+  'Wolves':                { p: '#FDB913', s: '#231F20' },
+  'Crystal Palace':        { p: '#1B458F', s: '#C4122E' },
+  'Everton':               { p: '#003399', s: '#FFFFFF' },
+  'Brentford':             { p: '#E30613', s: '#FFFFFF' },
+  'Fulham':                { p: '#CC0000', s: '#FFFFFF' },
+  'Nottingham Forest':     { p: '#DD0000', s: '#FFFFFF' },
+  'Nottm Forest':          { p: '#DD0000', s: '#FFFFFF' },
+  'Bournemouth':           { p: '#DA291C', s: '#000000' },
+  'Southampton':           { p: '#D71920', s: '#130C0E' },
+  'Ipswich Town':          { p: '#0057B8', s: '#FFFFFF' },
+  'Ipswich':               { p: '#0057B8', s: '#FFFFFF' },
+  'Sunderland':            { p: '#EB172B', s: '#1A1A1A' },
+  'Sheffield United':      { p: '#EE2737', s: '#1A1A1A' },
+  'Sheffield Wednesday':   { p: '#0033A0', s: '#FFFFFF' },
+  'Leeds United':          { p: '#FFCD00', s: '#1A1A1A' },
+  'Leeds':                 { p: '#FFCD00', s: '#1A1A1A' },
+  'Burnley':               { p: '#6C1D45', s: '#99D6EA' },
+  'Luton Town':            { p: '#F78F1E', s: '#FFFFFF' },
+  'Middlesbrough':         { p: '#E8282D', s: '#FFFFFF' },
+  'Blackburn Rovers':      { p: '#009EE0', s: '#FFFFFF' },
+  'Stoke City':            { p: '#E03A3E', s: '#1B2A4A' },
+  'Derby County':          { p: '#FFFFFF', s: '#000000' },
+  'Queens Park Rangers':   { p: '#1D5BA4', s: '#FFFFFF' },
+  'QPR':                   { p: '#1D5BA4', s: '#FFFFFF' },
+  'Swansea City':          { p: '#121212', s: '#FFFFFF' },
+  'Cardiff City':          { p: '#0070B5', s: '#D31245' },
+  'Watford':               { p: '#FBEE23', s: '#ED2127' },
+  'Norwich City':          { p: '#00A650', s: '#FFF200' },
+  // Ligue 1 — manquants
+  'Toulouse FC':           { p: '#6B0B8C', s: '#FFFFFF' },
+  'Toulouse':              { p: '#6B0B8C', s: '#FFFFFF' },
+  'Le Havre':              { p: '#7FC6E4', s: '#FFFFFF' },
+  'Montpellier HSC':       { p: '#F4911B', s: '#1D3C6B' },
+  'Montpellier':           { p: '#F4911B', s: '#1D3C6B' },
+  'Lorient':               { p: '#F76A12', s: '#E2A02A' },
+  'Metz':                  { p: '#8C1D40', s: '#F0E000' },
+  'Angers SCO':            { p: '#000000', s: '#FFFFFF' },
+  'Angers':                { p: '#000000', s: '#FFFFFF' },
+  'Stade Brestois 29':     { p: '#C41230', s: '#FFFFFF' },
+  'Stade de Reims':        { p: '#DC002F', s: '#FFFFFF' },
+  'Havre AC':              { p: '#7FC6E4', s: '#FFFFFF' },
+  'Clermont Foot':         { p: '#EE2A25', s: '#5E3E94' },
+  'Clermont':              { p: '#EE2A25', s: '#5E3E94' },
+  // Bundesliga — manquants
+  'FC Union Berlin':       { p: '#DC4422', s: '#FFFFFF' },
+  'Union Berlin':          { p: '#DC4422', s: '#FFFFFF' },
+  '1. FC Heidenheim 1846': { p: '#E2001A', s: '#003A7E' },
+  'Heidenheim':            { p: '#E2001A', s: '#003A7E' },
+  'SV Darmstadt 98':       { p: '#005CA9', s: '#FFFFFF' },
+  'Darmstadt':             { p: '#005CA9', s: '#FFFFFF' },
+  '1. FC Köln':            { p: '#FF0000', s: '#FFFFFF' },
+  'Cologne':               { p: '#FF0000', s: '#FFFFFF' },
+  'Hamburger SV':          { p: '#0B4FBC', s: '#FFFFFF' },
+  'HSV':                   { p: '#0B4FBC', s: '#FFFFFF' },
+  'Schalke 04':            { p: '#004D9D', s: '#FFFFFF' },
+  'Hertha BSC':            { p: '#003DA5', s: '#FFFFFF' },
+  'Greuther Fürth':        { p: '#006633', s: '#FFFFFF' },
+  'Fortuna Düsseldorf':    { p: '#E30613', s: '#FFFFFF' },
+  // Serie A — manquants
+  'Monza':                 { p: '#EF3340', s: '#FFFFFF' },
+  'Frosinone Calcio':      { p: '#FCD116', s: '#003082' },
+  'Frosinone':             { p: '#FCD116', s: '#003082' },
+  'Lecce':                 { p: '#FFD700', s: '#CC0000' },
+  'Salernitana':           { p: '#8B0000', s: '#1A1A1A' },
+  'Spezia':                { p: '#001F7C', s: '#FFFFFF' },
+  'Venezia':               { p: '#FF8800', s: '#006600' },
+  'Empoli':                { p: '#003080', s: '#FFFFFF' },
+  'Sassuolo':              { p: '#00632B', s: '#000000' },
+  'Hellas Verona':         { p: '#FFD700', s: '#003DA5' },
+  'Cremonese':             { p: '#DA121A', s: '#8B0000' },
+  'Parma':                 { p: '#FFCC00', s: '#003DA5' },
+  'Como':                  { p: '#004D9D', s: '#FFFFFF' },
+  // LaLiga — manquants
+  'Girona':                { p: '#CC0000', s: '#FFFFFF' },
+  'Getafe':                { p: '#005DA6', s: '#FFFFFF' },
+  'Rayo Vallecano':        { p: '#CC0000', s: '#FFFFFF' },
+  'Deportivo Alavés':      { p: '#0063A6', s: '#FFFFFF' },
+  'Alaves':                { p: '#0063A6', s: '#FFFFFF' },
+  'Mallorca':              { p: '#DD0000', s: '#000000' },
+  'Valladolid':            { p: '#6B2D8B', s: '#FFFFFF' },
+  'Leganés':               { p: '#004E9A', s: '#FFFFFF' },
+  'Las Palmas':            { p: '#FFD700', s: '#002147' },
+  'Espanyol':              { p: '#003DA5', s: '#FFFFFF' },
+  'Osasuna':               { p: '#CC0000', s: '#003DA5' },
+  'Granada':               { p: '#CC0000', s: '#FFFFFF' },
+  'Cadiz':                 { p: '#FFD700', s: '#003DA5' },
+  // Autres
+  'Besiktaş JK':           { p: '#000000', s: '#FFFFFF' },
+  'Trabzonspor':           { p: '#810000', s: '#F6EBCF' },
+  'Lille OSC':             { p: '#DC001A', s: '#002A64' },
+  'Stade Rennais FC':      { p: '#DA291C', s: '#000000' },
+  'RC Strasbourg Alsace':  { p: '#003087', s: '#C0C0C0' },
+  'FC Nantes':             { p: '#FEDF00', s: '#1A4B83' },
+  'OGC Nice':              { p: '#000000', s: '#D00B10' },
+  'RC Lens':               { p: '#FFCC00', s: '#C00000' },
+  'AS Monaco FC':          { p: '#EE1921', s: '#FFFFFF' },
+  'Olympique Lyonnais':    { p: '#1A5EA2', s: '#D00000' },
+  'Olympique de Marseille':{ p: '#009BDE', s: '#1a1a1a' },
 }
 
 // Mots-clés → couleurs pour le fuzzy match
@@ -397,6 +506,74 @@ const KEYWORD_COLORS = [
   [['eritrea'],                  { p: '#4189DD', s: '#4DBB6D' }],
   [['djibouti'],                 { p: '#6AB2E7', s: '#12AD2B' }],
   [['lesotho'],                  { p: '#009A44', s: '#FFFFFF' }],
+  // Premier League clubs fuzzy
+  [['brighton'],                 { p: '#0057B8', s: '#FFFFFF' }],
+  [['aston villa'],              { p: '#670E36', s: '#95BFE5' }],
+  [['newcastle'],                { p: '#241F20', s: '#FFFFFF' }],
+  [['west ham'],                 { p: '#7A263A', s: '#1BB1E7' }],
+  [['leicester'],                { p: '#003090', s: '#FDBE11' }],
+  [['wolverhampton','wolves'],   { p: '#FDB913', s: '#231F20' }],
+  [['crystal palace'],           { p: '#1B458F', s: '#C4122E' }],
+  [['everton'],                  { p: '#003399', s: '#FFFFFF' }],
+  [['brentford'],                { p: '#E30613', s: '#FFFFFF' }],
+  [['fulham'],                   { p: '#CC0000', s: '#FFFFFF' }],
+  [['nottingham','nottm'],       { p: '#DD0000', s: '#FFFFFF' }],
+  [['bournemouth'],              { p: '#DA291C', s: '#000000' }],
+  [['southampton'],              { p: '#D71920', s: '#130C0E' }],
+  [['ipswich'],                  { p: '#0057B8', s: '#FFFFFF' }],
+  [['sunderland'],               { p: '#EB172B', s: '#1A1A1A' }],
+  [['leeds'],                    { p: '#FFCD00', s: '#1A1A1A' }],
+  [['burnley'],                  { p: '#6C1D45', s: '#99D6EA' }],
+  [['luton'],                    { p: '#F78F1E', s: '#FFFFFF' }],
+  [['watford'],                  { p: '#FBEE23', s: '#ED2127' }],
+  [['norwich'],                  { p: '#00A650', s: '#FFF200' }],
+  [['swansea'],                  { p: '#121212', s: '#FFFFFF' }],
+  [['cardiff'],                  { p: '#0070B5', s: '#D31245' }],
+  [['sheffield'],                { p: '#EE2737', s: '#1A1A1A' }],
+  [['middlesbrough'],            { p: '#E8282D', s: '#FFFFFF' }],
+  [['blackburn'],                { p: '#009EE0', s: '#FFFFFF' }],
+  [['stoke'],                    { p: '#E03A3E', s: '#1B2A4A' }],
+  // Ligue 1 fuzzy
+  [['toulouse'],                 { p: '#6B0B8C', s: '#FFFFFF' }],
+  [['havre','le havre'],         { p: '#7FC6E4', s: '#FFFFFF' }],
+  [['montpellier'],              { p: '#F4911B', s: '#1D3C6B' }],
+  [['lorient'],                  { p: '#F76A12', s: '#E2A02A' }],
+  [['metz'],                     { p: '#8C1D40', s: '#F0E000' }],
+  [['angers'],                   { p: '#000000', s: '#FFFFFF' }],
+  [['clermont'],                 { p: '#EE2A25', s: '#5E3E94' }],
+  // Bundesliga fuzzy
+  [['union berlin'],             { p: '#DC4422', s: '#FFFFFF' }],
+  [['heidenheim'],               { p: '#E2001A', s: '#003A7E' }],
+  [['darmstadt'],                { p: '#005CA9', s: '#FFFFFF' }],
+  [['köln','cologne','koeln'],   { p: '#FF0000', s: '#FFFFFF' }],
+  [['hamburger','hsv'],          { p: '#0B4FBC', s: '#FFFFFF' }],
+  [['schalke'],                  { p: '#004D9D', s: '#FFFFFF' }],
+  [['hertha'],                   { p: '#003DA5', s: '#FFFFFF' }],
+  [['fortuna'],                  { p: '#E30613', s: '#FFFFFF' }],
+  // Serie A fuzzy
+  [['monza'],                    { p: '#EF3340', s: '#FFFFFF' }],
+  [['frosinone'],                { p: '#FCD116', s: '#003082' }],
+  [['lecce'],                    { p: '#FFD700', s: '#CC0000' }],
+  [['salernitana'],              { p: '#8B0000', s: '#1A1A1A' }],
+  [['venezia'],                  { p: '#FF8800', s: '#006600' }],
+  [['empoli'],                   { p: '#003080', s: '#FFFFFF' }],
+  [['sassuolo'],                 { p: '#00632B', s: '#000000' }],
+  [['cremonese'],                { p: '#DA121A', s: '#8B0000' }],
+  [['parma'],                    { p: '#FFCC00', s: '#003DA5' }],
+  [['como'],                     { p: '#004D9D', s: '#FFFFFF' }],
+  // LaLiga fuzzy
+  [['girona'],                   { p: '#CC0000', s: '#FFFFFF' }],
+  [['getafe'],                   { p: '#005DA6', s: '#FFFFFF' }],
+  [['rayo'],                     { p: '#CC0000', s: '#FFFFFF' }],
+  [['alav'],                     { p: '#0063A6', s: '#FFFFFF' }],
+  [['mallorca'],                 { p: '#DD0000', s: '#000000' }],
+  [['valladolid'],               { p: '#6B2D8B', s: '#FFFFFF' }],
+  [['leganes','leganés'],        { p: '#004E9A', s: '#FFFFFF' }],
+  [['las palmas'],               { p: '#FFD700', s: '#002147' }],
+  [['espanyol'],                 { p: '#003DA5', s: '#FFFFFF' }],
+  [['osasuna'],                  { p: '#CC0000', s: '#003DA5' }],
+  [['granada'],                  { p: '#CC0000', s: '#FFFFFF' }],
+  [['cadiz','cádiz'],            { p: '#FFD700', s: '#003DA5' }],
 ]
 
 // Cherche la couleur d'une équipe : exact → fuzzy → null
@@ -417,9 +594,30 @@ function lookupColor(name) {
 
 // Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
 export function getMatchGradient(homeName, awayName) {
-  const home = lookupColor(homeName) ?? { p: '#1e3a5f', s: '#0d2137' }
-  const away = lookupColor(awayName) ?? { p: '#2d1b4e', s: '#1a0d2e' }
+  // Fallbacks distincts et non-noirs selon le nom (hash simple pour varier)
+  const fallbackHome = fallbackColor(homeName, 0)
+  const fallbackAway = fallbackColor(awayName, 1)
+  const home = lookupColor(homeName) ?? fallbackHome
+  const away = lookupColor(awayName) ?? fallbackAway
   return `linear-gradient(135deg, ${home.p} 0%, ${darken(home.p)} 38%, ${darken(away.p)} 62%, ${away.p} 100%)`
+}
+
+// Génère une couleur de fallback non-noire, unique par nom d'équipe
+const FALLBACK_PALETTES = [
+  { p: '#1a4a8a', s: '#2d7dd2' }, // bleu
+  { p: '#1a6b3c', s: '#2d9e5e' }, // vert
+  { p: '#7a1a1a', s: '#c4352e' }, // rouge foncé
+  { p: '#4a1a7a', s: '#7b2fbf' }, // violet
+  { p: '#7a4a1a', s: '#c47a30' }, // orange foncé
+  { p: '#1a5a6b', s: '#2e8fa0' }, // teal
+  { p: '#6b1a4a', s: '#a03070' }, // rose
+  { p: '#2a4a1a', s: '#4a8a30' }, // vert foncé
+]
+function fallbackColor(name, seed) {
+  if (!name) return FALLBACK_PALETTES[seed % FALLBACK_PALETTES.length]
+  let h = seed
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xff
+  return FALLBACK_PALETTES[h % FALLBACK_PALETTES.length]
 }
 
 // Assombrit légèrement une couleur hex pour le centre du dégradé

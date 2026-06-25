@@ -3,7 +3,9 @@
    ========================================================= */
 
 .navbar {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 50;
   overflow: hidden;
   color: #fff;
   background:
@@ -499,4 +501,104 @@
   background: rgba(239,68,68,0.12);
   color: #fff;
   border-left: 2px solid #ef4444;
+}
+
+/* ── Quick nav bar — mobile uniquement ─────────────────────────────────────── */
+.navbar__quickNav {
+  display: none; /* caché par défaut, activé sur mobile ci-dessous */
+}
+
+@media (max-width: 639px) {
+  .navbar__quickNav {
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid rgba(239,68,68,0.14);
+    background:
+      linear-gradient(90deg,
+        rgba(4,7,12,0.98) 0%,
+        rgba(10,15,26,0.98) 55%,
+        rgba(12,3,8,0.98) 100%
+      );
+    padding: 0 4px 4px;
+  }
+
+  .navbar__qnLink {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px 5px;
+    text-decoration: none;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    transition: color 0.15s;
+    position: relative;
+    border-radius: 8px;
+    margin: 4px 2px 0;
+  }
+  .navbar__qnLink:hover {
+    color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.04);
+  }
+  .navbar__qnLink--active {
+    color: #ef4444;
+  }
+  .navbar__qnLink--active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.5rem;
+    height: 2px;
+    background: #ef4444;
+    border-radius: 999px;
+    box-shadow: 0 0 6px rgba(239,68,68,0.6);
+  }
+
+  .navbar__qnIcon {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  .navbar__qnLabel {
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .navbar__qnLive {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px 5px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #ef4444;
+    font-size: 0.55rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 4px 2px 0;
+    border-radius: 8px;
+  }
+  .navbar__qnLiveDot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: pulse 1.2s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(239,68,68,0.85);
+    flex-shrink: 0;
+  }
 }
