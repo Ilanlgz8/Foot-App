@@ -60,7 +60,7 @@ function formatTime(utcDate) {
   return new Date(utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Header match ──────────────────────────────────────────────────────────────
+// ── Header match — même structure que LiveMatchPage ───────────────────────────
 function MatchPageHeader({ match }) {
   const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -68,57 +68,66 @@ function MatchPageHeader({ match }) {
   const isFinished = match.status === 'FINISHED'
   const hs  = match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const emblem   = comp?.emblem ?? match.competition?.emblem
+  const compName = match.competition?.name ?? comp?.name ?? ''
 
   return (
     <div className="mp__header">
-      {/* Compétition — à gauche */}
-      {comp && (
-        <div className="mp__comp mp__comp--left">
-          {comp.emblem && <img src={comp.emblem} alt="" className="mp__compEmb" />}
-          <span>{comp.name}</span>
-        </div>
-      )}
-
-      {/* Teams + score / date */}
-      <div className="mp__scoreRow">
-
-        {/* Domicile : crest en haut, nom en bas */}
-        <div className="mp__team">
-          {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="mp__crest" />
-            : <div className="mp__crestFallback" />}
-          <span className="mp__teamName">{homeName}</span>
+      <div className="live__card mp__headerCard">
+        {/* Header card : comp à gauche + badge statut à droite */}
+        <div className="live__cardHeader">
+          <div className="live__compBadge">
+            {emblem && <img src={emblem} alt="" className="live__compLogo" />}
+            <span className="live__compName">{compName}</span>
+          </div>
+          {isFinished
+            ? <span className="live__period">TERMINÉ</span>
+            : <span className="live__period mp__dateBadge">{formatDate(match.utcDate)}</span>
+          }
         </div>
 
-        {/* Centre : score pills ou date+heure */}
-        <div className="mp__center">
-          {isFinished && hs != null ? (
-            <>
-              <div className="mp__statusLabel">Terminé</div>
-              <div className="live__pills">
-                <div className="live__pill live__pill--ft">{hs}</div>
-                <div className="live__pillBar" />
-                <div className="live__pill live__pill--ft">{as_}</div>
+        {/* Score — 3 colonnes : home | centre | away */}
+        <div className="live__matchRow">
+
+          {/* Domicile */}
+          <div className="live__team">
+            {match.homeTeam?.crest
+              ? <img src={match.homeTeam.crest} alt="" className="live__crest" />
+              : <div className="live__crestFallback" />}
+            <span className="live__teamName">{homeName}</span>
+          </div>
+
+          {/* Centre : score FT ou heure */}
+          <div className="live__scoreWrap">
+            {isFinished && hs != null ? (
+              <>
+                <div className="live__minuteWrap">
+                  <span className="live__minute mp__minuteFt">FT</span>
+                </div>
+                <div className="live__pills">
+                  <div className="live__pill live__pill--ft">{hs}</div>
+                  <div className="live__pillBar" />
+                  <div className="live__pill live__pill--ft">{as_}</div>
+                </div>
+              </>
+            ) : (
+              <div className="live__minuteWrap">
+                <span className="mp__upcomingTime">{formatTime(match.utcDate)}</span>
               </div>
-            </>
-          ) : (
-            <>
-              <div className="mp__date">{formatDate(match.utcDate)}</div>
-              <div className="mp__time">{formatTime(match.utcDate)}</div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Extérieur */}
-        <div className="mp__team">
-          {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="mp__crest" />
-            : <div className="mp__crestFallback" />}
-          <span className="mp__teamName">{awayName}</span>
-        </div>
+          {/* Extérieur */}
+          <div className="live__team live__team--away">
+            {match.awayTeam?.crest
+              ? <img src={match.awayTeam.crest} alt="" className="live__crest" />
+              : <div className="live__crestFallback" />}
+            <span className="live__teamName">{awayName}</span>
+          </div>
 
-      </div>
-    </div>
+        </div>{/* live__matchRow */}
+      </div>{/* live__card */}
+    </div>{/* mp__header */}
   )
 }
 

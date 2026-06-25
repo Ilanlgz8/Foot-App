@@ -31,108 +31,43 @@
 }
 .mp__backBtn:hover { color: #fff; background: rgba(255,255,255,0.09); }
 
-/* ── Header ── */
+/* ── Header — wrapper minimal (live__card gère le visuel) ── */
 .mp__header {
   margin: 1rem 0;
-  padding: 1.8rem 2rem;
-  background: linear-gradient(160deg, rgba(15,15,30,0.97), rgba(10,10,20,0.99));
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 1.1rem;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.45);
 }
 
-.mp__comp {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 1.4rem;
+/* Désactiver le hover/cursor de la card dans le header */
+.mp__headerCard {
+  cursor: default !important;
+  pointer-events: none;
 }
-.mp__comp--left {
-  justify-content: flex-start;
-}
-.mp__compEmb { width: 16px; height: 16px; object-fit: contain; opacity: 0.7; }
-
-.mp__scoreRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.mp__headerCard:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: rgba(255,255,255,0.07) !important;
 }
 
-.mp__team {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.mp__crest {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
-}
-.mp__crestFallback {
-  width: 64px; height: 64px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.06);
-}
-
-.mp__teamName {
-  font-size: 0.9rem;
+/* Heure pour matchs à venir */
+.mp__upcomingTime {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2rem;
   font-weight: 700;
   color: rgba(255,255,255,0.85);
-  text-align: center;
-  word-break: break-word;
-  hyphens: auto;
-}
-
-.mp__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-
-.mp__time {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.4rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.9);
   letter-spacing: 0.04em;
   line-height: 1;
 }
-.mp__date {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.55);
+
+/* FT label au-dessus des pills */
+.mp__minuteFt {
+  color: rgba(255,255,255,0.42) !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.14em !important;
+}
+
+/* Badge date dans live__period (matchs à venir) */
+.mp__dateBadge {
   text-transform: capitalize;
-  text-align: center;
-  letter-spacing: 0.03em;
-}
-.mp__scoreFinished {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.6rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.9);
-  letter-spacing: 0.06em;
-  line-height: 1;
-}
-.mp__statusLabel {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin-bottom: 0.3rem;
+  font-size: 0.6rem;
 }
 
 /* ── Body ── */
@@ -209,11 +144,11 @@
 
 /* ── Desktop ── */
 @media (min-width: 768px) {
-  .mp__crest { width: 80px; height: 80px; }
-  .mp__crestFallback { width: 80px; height: 80px; }
-  .mp__teamName { font-size: 1.1rem; }
-  .mp__time { font-size: 3rem; }
-  .mp__scoreFinished { font-size: 3.2rem; }
+  /* Header card — crests et noms plus grands sur desktop */
+  .mp__headerCard .live__crest        { width: 80px; height: 80px; }
+  .mp__headerCard .live__crestFallback{ width: 80px; height: 80px; }
+  .mp__headerCard .live__teamName     { font-size: 1.1rem; max-width: 8rem; }
+  .mp__upcomingTime                   { font-size: 2.8rem; }
 
   .mp__tab { padding: 0.75rem 2rem; font-size: 0.9rem; }
 
