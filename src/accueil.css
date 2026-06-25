@@ -2662,24 +2662,21 @@
   background: #0e0e0e;
 }
 
-/* Fond : photo Wikipedia (priorité) ou crest flouté (fallback) */
+/* Fond de base */
 .poster__bg {
   position: absolute;
-  inset: -20%;
-  background-size: 80%;
-  background-position: center;
-  background-repeat: no-repeat;
-  filter: blur(28px) saturate(1.6) brightness(0.55);
-  z-index: 0;
-  transform: scale(1.1);
-}
-/* Quand on a une vraie photo : cover plein format, SANS blur */
-.poster__bg--photo {
   inset: 0;
+  z-index: 0;
+}
+/* Photo de match : cover + légèrement assombrie */
+.poster__bg--photo {
   background-size: cover;
   background-position: center 25%;
   filter: brightness(0.38) saturate(1.15);
-  transform: none;
+}
+/* Dégradé couleurs équipes (fallback) — aucun filtre nécessaire */
+.poster__bg--gradient {
+  /* le background est défini inline via JS */
 }
 
 /* Overlay sombre + dégradé directional */

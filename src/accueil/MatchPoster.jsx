@@ -1,9 +1,8 @@
-import { translateTeam }             from '../data/teamNames'
-import { calcMinute }                from '../utils/matchUtils'
+import { translateTeam }              from '../data/teamNames'
+import { calcMinute }                 from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
-import { getTeamColor }               from '../data/teamPhotos'
-import { useTeamPhoto }               from '../hooks/useTeamPhoto'
+import { getTeamColor, getTeamPhoto, getMatchGradient } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 
 function formatHour(dateStr) {
@@ -11,8 +10,7 @@ function formatHour(dateStr) {
 }
 
 export function MatchPoster({ match, espnScore = null, onClick }) {
-  // Charger le formMap de la compétition de CE match
-  // React Query déduplique : N posters de la même compét → 1 seule requête
+  // Vrai formMap depuis football-data.org pour cette compétition
   const compCode = match.competition?.code ?? null
   const { formMap } = useTeamForm(compCode)
 
@@ -41,14 +39,11 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const aForm     = formMap?.[match.awayTeam?.id] ?? []
   const prono     = calcProno(hForm, aForm)
 
-  // Photo Wikipedia de chaque équipe (API REST, cache 7j localStorage)
-  const { data: homePhoto } = useTeamPhoto(homeName)
-  const { data: awayPhoto } = useTeamPhoto(awayName)
-
-  // Favori → on met sa photo en fond. Fallback = crest flouté
-  const isFavHome = prono.home >= prono.away
-  const wikiPhoto  = isFavHome ? homePhoto : awayPhoto
-  const favCrest   = isFavHome ? match.homeTeam?.crest : match.awayTeam?.crest
+  // Fond : photo hardcodée de l'équipe favorite si dispo, sinon dégradé couleurs des deux équipes
+  const isFavHome  = prono.home >= prono.away
+  const favName    = isFavHome ? homeName : awayName
+  const hardPhoto  = getTeamPhoto(favName)
+  const gradient   = getMatchGradient(homeName, awayName)
 
   // Couleurs barre prono
   const hColor    = getTeamColor(homeName)
@@ -62,14 +57,16 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   return (
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
-      {/* ── Fond : photo Wikipedia si dispo, sinon crest flouté ── */}
-      <div
-        className={'poster__bg' + (wikiPhoto ? ' poster__bg--photo' : '')}
-        style={{ backgroundImage: `url('${wikiPhoto ?? favCrest ?? ''}')` }}
-      />
+      {/* ── Fond : photo de match si dispo, sinon dégradé couleurs des équipes ── */}
+      {hardPhoto
+        ? <div className="poster__bg poster__bg--photo"
+               style={{ backgroundImage: `url('${hardPhoto}')` }} />
+        : <div className="poster__bg poster__bg--gradient"
+               style={{ background: gradient }} />
+      }
       <div className="poster__overlay" />
 
-      {/* ── Badge compét / live (haut gauche) ── */}
+      {/* ── Badge compét / live ── */}
       <div className="poster__topbar">
         {isLive
           ? <div className="poster__live-pill">
@@ -82,7 +79,6 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       {/* ── Bloc central : [crest+nom] | [label+temps] | [crest+nom] ── */}
       <div className="poster__middle">
 
-        {/* Équipe domicile — gauche */}
         <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest
             ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
@@ -92,7 +88,6 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           <span className="poster__name poster__name--home">{homeShort}</span>
         </div>
 
-        {/* Centre : label + temps/score */}
         <div className="poster__center">
           {isLive && minute && (
             <div className="poster__min-label">
@@ -107,7 +102,6 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           }
         </div>
 
-        {/* Équipe extérieure — droite */}
         <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest
             ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
