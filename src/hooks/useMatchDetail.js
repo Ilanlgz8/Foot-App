@@ -160,6 +160,24 @@ export function useLineups(match) {
           }))
         }
       }
+
+      // DEBUG WC — à retirer après diagnostic
+      if (isFifaComp) {
+        const topKeys = Object.keys(summary)
+        const hComp = summary.header?.competitions?.[0]
+        const comp0 = hComp?.competitors?.[0] ?? {}
+        console.log('[ESPN WC DEBUG]', {
+          topKeys,
+          rostersLen: rosters.length,
+          roster0athletes: rosters[0]?.athletes?.length,
+          comp0keys: Object.keys(comp0),
+          comp0rosterLen: comp0.roster?.length,
+          comp0athletesLen: comp0.athletes?.length,
+          boxscorePlayers: summary.boxscore?.players?.length,
+          boxscoreTeams: summary.boxscore?.teams?.length,
+        })
+      }
+
       if (rosters.length < 1) return null
 
       // Identifier home/away
