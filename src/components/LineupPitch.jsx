@@ -1,38 +1,31 @@
 /**
- * LineupPitch — composition futuriste
- * • Un onglet par équipe — chaque équipe occupe tout le terrain
- * • GK en bas, ATT en haut (sens d'attaque)
- * • Maillots SVG avec numéro (gros) + nom "P. Nom" en dessous
- * • Liste joueurs : postes en français, remplaçants en blanc estompé
+ * LineupPitch — Concept A
+ * • Un onglet par équipe (home / away)
+ * • Terrain SVG pleine largeur, GK en bas, ATT en haut
+ * • Schéma tactique "4-3-3" affiché sur le terrain (haut gauche)
+ * • Maillots SVG blancs (gardien ambre), numéro visible, nom "P. Nom"
+ * • Liste 2 colonnes compacte dessous — remplaçants estompés
  */
 import { useState } from 'react'
 
 // ── Dimensions SVG ─────────────────────────────────────────────────────────────
-const PW = 300, PH = 420
-const L = 10, R = 290, T = 10, B = 410
+const PW = 300, PH = 400
+const L = 10, R = 290, T = 10, B = 390
 const IW = R - L, IH = B - T
 const CX = (L + R) / 2
 const CY = (T + B) / 2
 
 // ── Fractions Y (GK bas → ATT haut) ───────────────────────────────────────────
 const LINE_Y = {
-  4: [0.92, 0.67, 0.44, 0.20],
-  5: [0.92, 0.73, 0.54, 0.35, 0.16],
-  6: [0.92, 0.76, 0.60, 0.44, 0.28, 0.12],
+  4: [0.91, 0.66, 0.43, 0.19],
+  5: [0.91, 0.73, 0.54, 0.34, 0.15],
+  6: [0.91, 0.76, 0.60, 0.44, 0.28, 0.12],
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function safeColor(raw) {
   if (!raw) return null
   return raw.startsWith('#') ? raw : `#${raw}`
-}
-
-function isDark(hex) {
-  if (!hex || hex.length < 7) return true
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return 0.299 * r + 0.587 * g + 0.114 * b < 148
 }
 
 function formatName(name, sname) {
@@ -42,17 +35,15 @@ function formatName(name, sname) {
   return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
 }
 
-// ── Catégorie poste ────────────────────────────────────────────────────────────
 function posCat(pos) {
   const p = (pos ?? '').toUpperCase()
-  if (['GK', 'G', 'GB'].includes(p))                                                           return 0
-  if (['CB','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p))        return 1
+  if (['GK','G','GB'].includes(p)) return 0
+  if (['CB','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
   if (['CM','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
-  if (['ST','CF','LW','RW','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p))         return 3
+  if (['ST','CF','LW','RW','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
   return 2
 }
 
-// ── Poste → libellé français ───────────────────────────────────────────────────
 const POS_FR = {
   GK:'GB',  G:'GB',   GB:'GB',
   CB:'DC',  DC:'DC',  DL:'DG', DR:'DD',
@@ -67,7 +58,7 @@ const POS_FR = {
 const CAT_COLOR = { 0: '#f59e0b', 1: '#3b82f6', 2: '#10b981', 3: '#ef4444' }
 const GK_COLOR  = '#b45309'
 
-// ── Positionnement joueurs ─────────────────────────────────────────────────────
+// ── Positionnement ────────────────────────────────────────────────────────────
 function fallbackLines(starters) {
   const g = [0, 0, 0, 0]
   for (const p of starters) g[posCat(p.position)]++
@@ -75,11 +66,10 @@ function fallbackLines(starters) {
 }
 
 function getPositions(starters, formation) {
-  const parts  = (formation ?? '').split('-').map(Number).filter(n => n > 0)
-  const valid  = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
-  const lines  = valid ? [1, ...parts] : fallbackLines(starters)
-  const yPcts  = LINE_Y[lines.length] ?? LINE_Y[4]
-
+  const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
+  const valid = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
+  const lines = valid ? [1, ...parts] : fallbackLines(starters)
+  const yPcts = LINE_Y[lines.length] ?? LINE_Y[4]
   const out = []
   let idx = 0
   for (let li = 0; li < lines.length; li++) {
@@ -93,19 +83,16 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── Jersey SVG path ×1.2 (centré sur 0,0) ─────────────────────────────────────
-// Corps : x=−12 à x=12, y=−7 à y=16 | manchons jusqu'à x=±20
+// ── Jersey SVG ────────────────────────────────────────────────────────────────
 const JERSEY_PATH =
   'M -5,-16 L -13,-12 L -20,-6 L -19,-2.4 L -12,-7 L -12,16 L 12,16 L 12,-7 L 19,-2.4 L 20,-6 L 13,-12 L 5,-16 L 0,-7 Z'
 
-// ── Icône joueur (maillot) ────────────────────────────────────────────────────
-function PlayerIcon({ x, y, player, color }) {
+function PlayerIcon({ x, y, player }) {
   if (!player) return null
-  const isGK  = ['GK', 'G', 'GB'].includes((player.position ?? '').toUpperCase())
-  // Maillots blancs (lisibles sur mobile) — gardien en ambre pour le différencier
-  const fc    = isGK ? GK_COLOR : '#f5f5f5'
-  const numC  = isGK ? '#fff' : '#111'
-  const num   = player.number ?? ''
+  const isGK = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
+  const fc   = isGK ? GK_COLOR : '#f5f5f5'
+  const numC = isGK ? '#fff' : '#111'
+  const num  = player.number ?? ''
   const label = (() => {
     const nm = formatName(player.name, player.shortName)
     return nm.length > 12 ? nm.slice(0, 11) + '.' : nm
@@ -113,37 +100,23 @@ function PlayerIcon({ x, y, player, color }) {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      {/* Ombre portée */}
       <path d={JERSEY_PATH} fill="rgba(0,0,0,0.3)" transform="translate(1.8,2.4)" />
-      {/* Corps du maillot */}
       <path d={JERSEY_PATH} fill={fc} stroke="rgba(0,0,0,0.55)" strokeWidth="1" />
-      {/* Col V */}
       <path d="M -5,-16 L 0,-7 L 5,-16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1.1" />
-      {/* Liseré poitrine */}
       <line x1="-10" y1="-2.4" x2="10" y2="-2.4" stroke="rgba(0,0,0,0.06)" strokeWidth="4.5" />
-      {/* Numéro */}
-      <text
-        x="0" y="6.5" textAnchor="middle" dominantBaseline="middle"
+      <text x="0" y="6.5" textAnchor="middle" dominantBaseline="middle"
         fill={numC} fontSize="15" fontWeight="700"
-        fontFamily="'Chakra Petch',monospace,Arial"
-      >
-        {num}
-      </text>
-      {/* Nom sous le maillot */}
-      <text
-        x="0" y="28" textAnchor="middle" dominantBaseline="middle"
+        fontFamily="'Chakra Petch',monospace,Arial">{num}</text>
+      <text x="0" y="28" textAnchor="middle" dominantBaseline="middle"
         fill="rgba(255,255,255,0.92)" fontSize="8.5"
         fontFamily="'Chakra Petch',monospace,Arial"
-        stroke="rgba(0,0,0,0.9)" strokeWidth="2.5" paintOrder="stroke"
-      >
-        {label}
-      </text>
+        stroke="rgba(0,0,0,0.9)" strokeWidth="2.5" paintOrder="stroke">{label}</text>
     </g>
   )
 }
 
-// ── Marquages terrain ─────────────────────────────────────────────────────────
-function PitchMarkings() {
+// ── Terrain ───────────────────────────────────────────────────────────────────
+function PitchMarkings({ formation }) {
   const S   = 'rgba(255,255,255,0.55)'
   const PAH = 78, PAW = 176, GAH = 30, GAW = 92, GW = 52
   const pxL = CX - PAW / 2, pxR = CX + PAW / 2
@@ -157,43 +130,82 @@ function PitchMarkings() {
         <rect key={i} x={L} y={T + i * (IH / 8)} width={IW} height={IH / 8}
           fill={i % 2 === 0 ? 'rgba(0,0,0,0.13)' : 'rgba(0,0,0,0)'} />
       ))}
-      {/* Cadre */}
       <rect x={L} y={T} width={IW} height={IH} fill="none" stroke={S} strokeWidth="1.5" />
-      {/* Ligne médiane */}
       <line x1={L} y1={CY} x2={R} y2={CY} stroke={S} strokeWidth="1.5" />
-      {/* Rond central */}
       <circle cx={CX} cy={CY} r={38} fill="none" stroke={S} strokeWidth="1.5" />
       <circle cx={CX} cy={CY} r={3} fill={S} />
-      {/* Surface haut */}
       <rect x={pxL} y={T} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1.3" />
       <rect x={gxL} y={T} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="1.1" />
       <rect x={glL} y={T - 8} width={GW} height={8} fill="rgba(255,255,255,0.08)" stroke={S} strokeWidth="1.2" />
       <circle cx={CX} cy={T + 52} r={2.5} fill={S} />
       <path d={`M ${pxL},${T + PAH} A 38,38 0 0 1 ${pxR},${T + PAH}`} fill="none" stroke={S} strokeWidth="1.1" />
-      {/* Surface bas */}
       <rect x={pxL} y={B - PAH} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1.3" />
       <rect x={gxL} y={B - GAH} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="1.1" />
       <rect x={glL} y={B} width={GW} height={8} fill="rgba(255,255,255,0.08)" stroke={S} strokeWidth="1.2" />
       <circle cx={CX} cy={B - 52} r={2.5} fill={S} />
       <path d={`M ${pxL},${B - PAH} A 38,38 0 0 0 ${pxR},${B - PAH}`} fill="none" stroke={S} strokeWidth="1.1" />
-      {/* Arcs de coin */}
-      {[
-        [L + 8, T,     0],
-        [R - 8, T,     1],
-        [L + 8, B,     0],
-        [R - 8, B,     1],
-      ].map(([cx2, cy2, sw], i) => (
+      {[[L + 8, T, 0],[R - 8, T, 1],[L + 8, B, 0],[R - 8, B, 1]].map(([cx2, cy2, sw], i) => (
         <path key={i}
           d={`M ${cx2},${cy2} A 8,8 0 0,${sw} ${cx2 < CX ? L : R},${cy2 < CY ? T + 8 : B - 8}`}
           fill="none" stroke={S} strokeWidth="1" />
       ))}
+      {/* Formation label sur le terrain */}
+      {formation && (
+        <text x={L + 6} y={T + 13} fontSize="10" fontWeight="700"
+          fill="rgba(255,255,255,0.32)" fontFamily="'Chakra Petch',monospace,Arial"
+          letterSpacing="1">{formation}</text>
+      )}
     </g>
   )
 }
 
-// ── Ligne joueur (liste) ───────────────────────────────────────────────────────
-function PlayerRow({ player, color, isSub }) {
-  const c        = safeColor(color) ?? '#ef4444'
+// ── Liste 2 colonnes ──────────────────────────────────────────────────────────
+function PlayerGrid({ starters, subs, color }) {
+  const all = [
+    ...starters.map(p => ({ ...p, isSub: false })),
+    ...( subs ?? []).map(p => ({ ...p, isSub: true  })),
+  ]
+
+  return (
+    <div>
+      {/* Header titulaires */}
+      <div style={{
+        padding: '6px 12px 3px',
+        fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase',
+        color: 'rgba(255,255,255,0.28)',
+        fontFamily: "'Chakra Petch',monospace,Arial",
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        Titulaires
+      </div>
+
+      {/* Grille 2 colonnes — titulaires */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+        {starters.map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
+      </div>
+
+      {/* Remplaçants */}
+      {subs?.length > 0 && (
+        <>
+          <div style={{
+            padding: '6px 12px 3px', marginTop: 2,
+            fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.18)',
+            fontFamily: "'Chakra Petch',monospace,Arial",
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+          }}>
+            ⇄ Remplaçants
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+            {subs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function PlayerCell({ player, isSub }) {
   const cat      = posCat(player.position)
   const catC     = CAT_COLOR[cat]
   const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? ''
@@ -201,73 +213,35 @@ function PlayerRow({ player, color, isSub }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 9,
-      padding: '7px 12px',
+      display: 'flex', alignItems: 'center', gap: 7,
+      padding: '6px 10px',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
+      minWidth: 0,
+      opacity: isSub ? 0.45 : 1,
     }}>
-      {/* Numéro */}
+      {/* Badge poste */}
       <span style={{
-        width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, fontFamily: "'Chakra Petch',sans-serif",
-        background: isSub ? 'rgba(255,255,255,0.06)' : `${c}22`,
-        border:     `1px solid ${isSub ? 'rgba(255,255,255,0.12)' : c + '50'}`,
-        color:      isSub ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.95)',
+        fontSize: 9, fontWeight: 700, flexShrink: 0,
+        fontFamily: "'Chakra Petch',monospace,Arial",
+        letterSpacing: '0.04em',
+        color:      isSub ? 'rgba(255,255,255,0.4)' : catC,
+        background: isSub ? 'rgba(255,255,255,0.05)' : `${catC}18`,
+        border:     `1px solid ${isSub ? 'rgba(255,255,255,0.12)' : catC + '44'}`,
+        borderRadius: 4, padding: '2px 5px',
+        minWidth: 28, textAlign: 'center',
       }}>
-        {player.number}
+        {posLabel || '—'}
       </span>
       {/* Nom */}
       <span style={{
-        flex: 1, fontSize: 13,
-        fontWeight: isSub ? 400 : 600,
-        color: isSub ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.92)',
+        flex: 1, fontSize: 12,
+        fontWeight: isSub ? 400 : 500,
+        color: isSub ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.9)',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        minWidth: 0,
       }}>
         {nm}
       </span>
-      {/* Poste */}
-      {posLabel && (
-        <span style={{
-          fontSize: 9.5, fontWeight: 700,
-          fontFamily: "'Chakra Petch',sans-serif",
-          letterSpacing: '0.06em',
-          borderRadius: 5, padding: '2px 6px', flexShrink: 0,
-          color:      isSub ? 'rgba(255,255,255,0.28)' : catC,
-          background: isSub ? 'rgba(255,255,255,0.05)' : `${catC}18`,
-          border:     `1px solid ${isSub ? 'rgba(255,255,255,0.1)' : catC + '44'}`,
-        }}>
-          {posLabel}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function PlayerList({ starters, subs, color }) {
-  return (
-    <div>
-      <div style={{
-        padding: '6px 12px 2px', fontSize: 9,
-        color: 'rgba(255,255,255,0.3)', letterSpacing: '1px',
-        fontFamily: "'Chakra Petch',sans-serif",
-      }}>
-        TITULAIRES
-      </div>
-      {starters.map((p, i) => <PlayerRow key={i} player={p} color={color} isSub={false} />)}
-
-      {subs?.length > 0 && (
-        <>
-          <div style={{
-            padding: '8px 12px 2px', fontSize: 9,
-            color: 'rgba(255,255,255,0.22)', letterSpacing: '1px',
-            fontFamily: "'Chakra Petch',sans-serif",
-            borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4,
-          }}>
-            ⇄ REMPLAÇANTS
-          </div>
-          {subs.map((p, i) => <PlayerRow key={i} player={p} color={color} isSub={true} />)}
-        </>
-      )}
     </div>
   )
 }
@@ -281,8 +255,8 @@ export default function LineupPitch({ home, away }) {
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
-  const team    = activeTeam === 'home' ? home : away
-  const color   = activeTeam === 'home' ? hColor : aColor
+  const team      = activeTeam === 'home' ? home : away
+  const color     = activeTeam === 'home' ? hColor : aColor
   const positions = getPositions(team.starters ?? [], team.formation)
 
   return (
@@ -295,8 +269,8 @@ export default function LineupPitch({ home, away }) {
       {/* ── Onglets équipes ── */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         {[
-          { key: 'home', t: home, c: hColor },
-          { key: 'away', t: away, c: aColor },
+          { key: 'home', t: home,  c: hColor },
+          { key: 'away', t: away,  c: aColor },
         ].map(({ key, t, c }) => {
           const act = activeTeam === key
           return (
@@ -316,7 +290,7 @@ export default function LineupPitch({ home, away }) {
               )}
               <span style={{
                 fontSize: 11, fontWeight: 700,
-                fontFamily: "'Chakra Petch',sans-serif",
+                fontFamily: "'Chakra Petch',monospace,Arial",
                 textTransform: 'uppercase', letterSpacing: '0.04em',
                 color: act ? c : 'rgba(255,255,255,0.38)',
               }}>
@@ -324,8 +298,8 @@ export default function LineupPitch({ home, away }) {
               </span>
               {t?.formation && (
                 <span style={{
-                  fontSize: 10, fontFamily: "'Chakra Petch',sans-serif",
-                  color:      act ? c : 'rgba(255,255,255,0.2)',
+                  fontSize: 10, fontFamily: "'Chakra Petch',monospace,Arial",
+                  color:      act ? c : 'rgba(255,255,255,0.22)',
                   background: act ? `${c}18` : 'transparent',
                   border:     `1px solid ${act ? c + '40' : 'transparent'}`,
                   borderRadius: 4, padding: '1px 6px',
@@ -338,18 +312,20 @@ export default function LineupPitch({ home, away }) {
         })}
       </div>
 
-      {/* ── Terrain SVG ── */}
+      {/* ── Terrain SVG pleine largeur ── */}
       <svg viewBox={`0 0 ${PW} ${PH}`} width="100%" style={{ display: 'block' }} aria-label="Composition">
-        <PitchMarkings />
+        <PitchMarkings formation={team.formation} />
         {positions.map(({ x, y, player }, i) =>
-          player ? <PlayerIcon key={i} x={x} y={y} player={player} color={team.color} /> : null
+          player ? <PlayerIcon key={i} x={x} y={y} player={player} /> : null
         )}
       </svg>
 
-      {/* ── Liste joueurs ── */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <PlayerList starters={team.starters ?? []} subs={team.subs ?? []} color={color} />
-      </div>
+      {/* ── Liste 2 colonnes ── */}
+      <PlayerGrid
+        starters={team.starters ?? []}
+        subs={team.subs ?? []}
+        color={color}
+      />
     </div>
   )
 }
