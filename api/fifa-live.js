@@ -512,6 +512,21 @@ export default async function handler(req, res) {
     const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
       ? scorers : (prevData?.scorers ?? [])
 
+    // Stats : scoreboard ESPN d'abord
+    // Si scoreboard vide (WC et beaucoup de ligues club) ET match en cours
+    // → appel summary endpoint ESPN (cached 30s Redis) qui contient boxscore complet
+    let matchStats = extractBoxscoreStats(homeC?.statistics, awayC?.statistics)
+    if (
+      !matchStats &&
+      (finalEspnStatus === 'STATUS_IN_PROGRESS' ||
+       finalEspnStatus === 'STATUS_HALFTIME'    ||
+       finalEspnStatus === 'STATUS_END_PERIOD')
+    ) {
+      // found.slug = 'fifa.world' pour WC, 'fra.1' etc pour club
+      matchStats = await fetchEspnSummaryStats(found.slug, found.evt.id)
+    }
+    matchStats = matchStats ?? prevData?.stats ?? null
+
     result[fdMatch.id] = {
       // IDs : FIFA match ID pour WC (nécessaire pour les compos), ESPN sinon.
       // Si fifaD absent (FIFA live cache stale), on préserve l'ID FIFA depuis prevData
@@ -528,9 +543,8 @@ export default async function handler(req, res) {
       home,
       away,
       scorers:      bestScorers,
-      // Stats : extraites du scoreboard ESPN (possession, tirs, corners)
-      // Fallback sur Redis last-known si le scoreboard ne les inclut pas encore
-      stats:        extractBoxscoreStats(homeC?.statistics, awayC?.statistics) ?? prevData?.stats ?? null,
+      // Stats : summary ESPN (possession, tirs, corners) — scoreboard souvent vide en soccer
+      stats:        matchStats,
       // IDs FIFA pour api/fifa-lineups.js — préserver depuis prevData si fifaD absent
       ...(fifaD ? {
         fifaCompId:   fifaD.fifaCompId,

@@ -2,28 +2,31 @@
  * LiveMatchPage — page dédiée à un match en direct
  * Route : /live/:matchId
  *
- * Affiche le widget match en grand + onglets (Stats, Compos, Classement, Prono)
+ * Style : même visuel que MatchPage (hero gradient plein-écran + onglets)
+ * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
-import { useLiveData }   from '../context/LiveProvider'
-import { getMatchState } from '../utils/matchStateTracker'
+import { useLiveData }      from '../context/LiveProvider'
+import { getMatchState }    from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
-import { COMPETITIONS }  from '../data/competitions'
-import { translateTeam } from '../data/teamNames'
-import { calcProno }     from '../utils/calcProno'
-import { useTeamForm }   from '../hooks/useTeamForm'
-import { useSwipe }      from '../hooks/useSwipe'
+import { COMPETITIONS }     from '../data/competitions'
+import { translateTeam }    from '../data/teamNames'
+import { getMatchGradient } from '../data/teamPhotos'
+import { calcProno }        from '../utils/calcProno'
+import { useTeamForm }      from '../hooks/useTeamForm'
+import { useSwipe }         from '../hooks/useSwipe'
 import {
   LiveStatsTab,
   ComposTab,
   ClassementTab,
-  PronoSection,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
+import './MatchPage.css'
 import '../live.css'
+import '../matchModal.css'
 
-// ── Raccourcis noms (même logique que Live.jsx) ───────────────────────────────
+// ── Raccourcis noms ───────────────────────────────────────────────────────────
 const TEAM_SHORT = {
   'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
   'Paris Saint-Germain FC': 'Paris SG', 'Crystal Palace': 'C. Palace',
@@ -50,9 +53,7 @@ function shortenName(name) {
   return `${words[0][0].toUpperCase()}. ${words.slice(1).join(' ')}`
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
-
+// ── Hero live (style MatchPage + éléments live) ───────────────────────────────
 function MatchHeader({ match, espn, onBack }) {
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
@@ -87,27 +88,27 @@ function MatchHeader({ match, espn, onBack }) {
   const xgAway   = espn?.stats?.away?.xg ?? null
 
   const h = hs ?? '–', a = as_ ?? '–'
-  const label = isTermine ? 'FT'
+
+  // Label minute (badge rouge au-dessus du score)
+  const minuteLabel = isTermine ? 'FT'
     : period === 'HT'  ? 'MT'
     : period === 'ET1' ? 'Prol. 1'
     : period === 'ET2' ? 'Prol. 2'
     : period === 'PEN' ? 'TAB'
-    : minute != null   ? String(minute) : '–'
-  const pillCls = `live__pill${isTermine ? ' live__pill--ft' : ''}`
+    : minute != null   ? `${minute}'` : '–'
 
+  // Badge période (MI-TEMPS, TERMINÉ…)
   const periodBadge = period === 'HT' ? 'MI-TEMPS'
-    : period === 'FT'            ? 'TERMINÉ'
-    : (period === 'ET1' || period === 'ET2') ? 'PROLONG.'
-    : period === 'PEN'           ? 'T.A.B.'
-    : period ?? ''
+    : period === 'FT'              ? 'TERMINÉ'
+    : (period === 'ET1' || period === 'ET2') ? 'PROLONGATIONS'
+    : period === 'PEN'             ? 'T.A.B.'
+    : null
 
-  // ── Tracking score (localStorage partagé avec Live.jsx) ─────────────────────
-  // Pas d'animation ici — l'animation BUT est réservée aux widgets Live.jsx
+  // Score localStorage (partagé avec Live.jsx)
   const scoreKey = `foot_lv_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
   const initDone = useRef(false)
-
   if (!initDone.current) {
     initDone.current = true
     try {
@@ -116,7 +117,6 @@ function MatchHeader({ match, espn, onBack }) {
       if (s?.away != null) prevAs.current = s.away
     } catch {}
   }
-
   useEffect(() => {
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
@@ -125,82 +125,83 @@ function MatchHeader({ match, espn, onBack }) {
     }
   }, [hs, as_])
 
+  const gradient = getMatchGradient(
+    match.homeTeam?.name || match.homeTeam?.shortName || '',
+    match.awayTeam?.name || match.awayTeam?.shortName || ''
+  )
+
   return (
-    <>
-      <button className="lmp__backBtn" onClick={onBack}>‹ En Direct</button>
-      <div className="live__card lmp__headerCard">
+    <div className="mp__hero lmp__hero" style={{ background: gradient }}>
+      <div className="mp__hero__overlay" />
 
-        {/* Header : comp + badge période */}
-        <div className="live__cardHeader">
-          <div className="live__compBadge">
-            {emblem && <img src={emblem} alt="" className="live__compLogo" />}
-            <span className="live__compName">{compName}</span>
-          </div>
-          {periodBadge && <span className="live__period">{periodBadge}</span>}
+      {/* Top bar : retour + badge compétition */}
+      <div className="mp__hero__top">
+        <button className="mp__hero__back" onClick={onBack}>‹ En Direct</button>
+        <div className="mp__hero__comp">
+          {emblem && <img src={emblem} alt="" className="mp__hero__compLogo" />}
+          <span className="mp__hero__compName">{compName}</span>
         </div>
+      </div>
 
-        {/* Score — même structure 3 colonnes que Live.jsx */}
-        <div className="live__matchRow">
-          <div className="live__team">
-            {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" className="live__crest" />
-              : <div className="live__crestFallback" />}
-            <span className="live__teamName">{homeName}</span>
-            {xgHome != null && <span className="live__teamXg">{xgHome.toFixed(2)} xG</span>}
-          </div>
-
-          <div className="live__scoreWrap">
-            <div className="live__minuteWrap">
-              <span className="live__minute">{label}</span>
-            </div>
-            {(repriseImminente || repriseDans != null) && (
-              <span className="live__reprise">
-                {repriseImminente ? 'Reprise imm.' : `Reprise ${repriseDans}min`}
-              </span>
-            )}
-            <div className="live__pills">
-              <div className={pillCls} key={`h${h}`}>{h}</div>
-              <div className="live__pillBar" />
-              <div className={pillCls} key={`a${a}`}>{a}</div>
-            </div>
-          </div>
-
-          <div className="live__team live__team--away">
-            {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" className="live__crest" />
-              : <div className="live__crestFallback" />}
-            <span className="live__teamName">{awayName}</span>
-            {xgAway != null && <span className="live__teamXg">{xgAway.toFixed(2)} xG</span>}
-          </div>
-        </div>
-
-        {/* Buteurs */}
-        {espn?.scorers?.length > 0 && (
-          <>
-            <div className="live__divider" />
-            <div className="live__scorers">
-              <div className="live__scorersHome">
-                {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
-                  <div key={i} className="live__scorerItem">
-                    <span className="live__scorerName">{s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}</span>
-                    {s.minute && <span className="live__scorerMin">{s.minute}</span>}
-                  </div>
-                ))}
-              </div>
-              <div className="live__scorersGap" />
-              <div className="live__scorersAway">
-                {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
-                  <div key={i} className="live__scorerItem">
-                    <span className="live__scorerName">{s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}</span>
-                    {s.minute && <span className="live__scorerMin">{s.minute}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
+      {/* Badge minute live + reprise */}
+      <div className="lmp__heroBadgeRow">
+        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
+          {minuteLabel}
+        </span>
+        {(repriseImminente || repriseDans != null) && (
+          <span className="lmp__heroReprise">
+            {repriseImminente ? 'Reprise imm.' : `Reprise ${repriseDans}min`}
+          </span>
         )}
       </div>
-    </>
+
+      {/* Centre : crests + score */}
+      <div className="mp__hero__mid">
+        <div className="mp__hero__team">
+          {match.homeTeam?.crest
+            ? <img src={match.homeTeam.crest} alt="" className="mp__hero__crest" />
+            : <div className="mp__hero__crestFb" />}
+          <span className="mp__hero__name">{homeName}</span>
+          {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
+        </div>
+
+        <div className="mp__hero__center">
+          <span className="mp__hero__score">{h} – {a}</span>
+          {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
+        </div>
+
+        <div className="mp__hero__team mp__hero__team--away">
+          {match.awayTeam?.crest
+            ? <img src={match.awayTeam.crest} alt="" className="mp__hero__crest" />
+            : <div className="mp__hero__crestFb" />}
+          <span className="mp__hero__name">{awayName}</span>
+          {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}
+        </div>
+      </div>
+
+      {/* Buteurs */}
+      {espn?.scorers?.length > 0 && (
+        <div className="lmp__heroScorers">
+          <div className="lmp__heroScorersHome">
+            {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
+              <span key={i} className="lmp__heroScorerItem">
+                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
+                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+              </span>
+            ))}
+          </div>
+          <div className="lmp__heroScorersDiv" />
+          <div className="lmp__heroScorersAway">
+            {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
+              <span key={i} className="lmp__heroScorerItem">
+                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
+                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -216,13 +217,10 @@ export default function LiveMatchPage() {
   const espn    = match ? (espnScores[match.id] ?? null) : null
   const compId  = match?.competition?.code ?? null
 
-  // Prono + compMatches (utilisés pour H2H et stats)
   const { formMap, compMatches } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
-
-  const visibleTabs = TABS
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -230,15 +228,14 @@ export default function LiveMatchPage() {
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
 
   const swipe = useSwipe(
-    () => { const i = visibleTabs.indexOf(activeTab); if (i < visibleTabs.length - 1) goTab(visibleTabs[i + 1], 'left') },
-    () => { const i = visibleTabs.indexOf(activeTab); if (i > 0) goTab(visibleTabs[i - 1], 'right') }
+    () => { const i = TABS.indexOf(activeTab); if (i < TABS.length - 1) goTab(TABS[i + 1], 'left') },
+    () => { const i = TABS.indexOf(activeTab); if (i > 0) goTab(TABS[i - 1], 'right') }
   )
 
-  // Match introuvable (rechargement de page, pas encore chargé)
   if (!match) {
     return (
-      <div className="lmp__page">
-        <div className="lmp__loading">
+      <div className="mp__page">
+        <div className="mp__loading">
           <div className="modal__spinner" />
           <p>Chargement du match…</p>
         </div>
@@ -247,43 +244,57 @@ export default function LiveMatchPage() {
   }
 
   return (
-    <div className="lmp__page">
-      {/* Header compact : backBtn + score intégrés */}
+    <div className="mp__page">
+
+      {/* Hero gradient avec score live */}
       <MatchHeader match={match} espn={espn} onBack={() => {
-        // Si on a un historique de navigation dans l'app, revenir en arrière
-        // (évite le push '/live' qui cassait le bouton arrière natif iOS)
         if (window.history.length > 1) navigate(-1)
         else navigate('/live')
       }} />
 
-      {/* Onglets */}
-      <div ref={swipe.ref}>
-        <div className="lmp__tabs">
-          {visibleTabs.map(t => (
-            <button
-              key={t}
-              className={`lmp__tab${activeTab === t ? ' lmp__tab--active' : ''}`}
-              onClick={() => goTab(t, null)}
-            >
-              {t === 'stats'      ? 'Stats Live'
-             : t === 'compos'    ? 'Compos'
-             : t === 'classement'? 'Classement'
-             :                     'Prono'}
-            </button>
-          ))}
-        </div>
+      <div className="mp__wrap">
+        <div className="mp__body" ref={swipe.ref}>
 
-        <div
-          key={activeTab}
-          className={`lmp__tabContent${!swipe.isDragging && tabDir === 'left' ? ' lmp__tabContent--fromRight' : !swipe.isDragging && tabDir === 'right' ? ' lmp__tabContent--fromLeft' : ''}`}
-          style={{
-            transform: swipe.isDragging ? `translateX(${swipe.dragOffset}px)` : undefined,
-            transition: swipe.isDragging ? 'none' : undefined,
-          }}
-        >
-          {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} prono={prono} homeShort={match.homeTeam?.shortName || match.homeTeam?.name} awayShort={match.awayTeam?.shortName || match.awayTeam?.name} compMatches={compMatches} />}
-          {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
-          {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+          {/* Onglets */}
+          <div className="mp__tabs">
+            {TABS.map(t => (
+              <button
+                key={t}
+                className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
+                onClick={() => goTab(t, null)}
+              >
+                {t === 'stats'       ? 'Stats Live'
+               : t === 'compos'     ? 'Compos'
+               :                      'Classement'}
+              </button>
+            ))}
+          </div>
+
+          {/* Contenu */}
+          <div
+            key={activeTab}
+            className={`mp__tabContent${
+              !swipe.isDragging && tabDir === 'left'  ? ' mp__tabContent--fromRight' :
+              !swipe.isDragging && tabDir === 'right' ? ' mp__tabContent--fromLeft'  : ''
+            }`}
+            style={{
+              transform:  swipe.isDragging ? `translateX(${swipe.dragOffset}px)` : undefined,
+              transition: swipe.isDragging ? 'none' : undefined,
+            }}
+          >
+            {activeTab === 'stats' && (
+              <LiveStatsTab
+                match={match}
+                espnScore={espn}
+                prono={prono}
+                homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+                awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+                compMatches={compMatches}
+              />
+            )}
+            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
+            {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+          </div>
         </div>
       </div>
     </div>

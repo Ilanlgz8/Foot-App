@@ -197,6 +197,14 @@ function _checkPendingKickoffs(matches, queryClient) {
 
     markPendingKickoff(match)
 
+    // Fix : seed kickoffAt dès l'heure prévue → le compteur de minutes démarre
+    // immédiatement sans attendre la confirmation ESPN (peut prendre jusqu'à 5min).
+    // Priorité : si ESPN confirme plus tard, setKickoffAt(mid, now - mins*60s) corrige finement.
+    const pendingState = getMatchState(match.id)
+    if (!pendingState.kickoffAt) {
+      setKickoffAt(match.id, utcMs)
+    }
+
     // Pré-seeder le cache à 0 si rien encore
     if (!espnScoresCache[match.id]) {
       espnScoresCache[match.id] = {

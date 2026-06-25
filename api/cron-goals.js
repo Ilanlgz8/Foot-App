@@ -210,8 +210,20 @@ export default async function handler(req, res) {
     // Sauvegarder état courant (TTL 12h)
     try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
 
-    // Premier poll → baseline, pas de notif
+    // Premier poll → baseline, pas de notif.
+    // Exception : si le match est déjà en cours ET a démarré il y a < 5min
+    // (2 matchs simultanés : le 2ème n'avait pas de baseline au 1er cron → KO manqué)
     if (prevState === null) {
+      if (LIVE_ESPN.has(status) && !FINAL_ESPN.has(status)) {
+        const matchStart = evt.date ? new Date(evt.date).getTime() : null
+        const freshKickoff = matchStart && (Date.now() - matchStart < 5 * 60_000)
+        if (freshKickoff) {
+          log.push(`[espn:${slug}:${eventId}] KO catch-up (~${Math.round((Date.now() - matchStart) / 60_000)}min)`)
+          const sent = await sendDeduped(`push:espn:ko:${eventId}`,
+            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' })
+          if (sent > 0) notifsSent++
+        }
+      }
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
       continue
     }
