@@ -81,8 +81,29 @@ function parseName(arr) {
 
 // ── Autodiscovery FIFA ─────────────────────────────────────────────────────────
 
-async function discoverFifaMatch(utcDate, homeTeam, awayTeam) {
+// Découvre l'idSeason WC 2026 depuis l'API FIFA puis cherche le match par date
+async function discoverFifaMatch(kv, utcDate, homeTeam, awayTeam) {
   if (!utcDate) return null
+
+  // 1. Obtenir l'idSeason WC 2026 (cache Redis 30j)
+  let seasonId = null
+  try { seasonId = await kv.get('fifa:wc2026:seasonId') } catch {}
+
+  if (!seasonId) {
+    // Chercher la saison 2026 dans les saisons de la compétition WC
+    const { ok, data } = await fifaFetch(`${FIFA_BASE}/competitions/${WC_COMP_ID}/seasons?language=en&count=20`)
+    if (ok && data) {
+      const seasons = data.Results ?? data.results ?? []
+      const s2026 = seasons.find(s =>
+        String(s.CalendarYear ?? s.Year ?? s.Name ?? '').includes('2026')
+        || String(s.StartDate ?? '').startsWith('2026')
+      )
+      if (s2026?.IdSeason) {
+        seasonId = s2026.IdSeason
+        try { await kv.set('fifa:wc2026:seasonId', seasonId, { ex: 30 * 24 * 3600 }) } catch {}
+      }
+    }
+  }
 
   const d = utcDate.slice(0, 10)  // YYYY-MM-DD
   const prev = new Date(d); prev.setUTCDate(prev.getUTCDate() - 1)
@@ -90,27 +111,32 @@ async function discoverFifaMatch(utcDate, homeTeam, awayTeam) {
   const datesToTry = [d, prev.toISOString().slice(0, 10), next.toISOString().slice(0, 10)]
 
   for (const tryDate of datesToTry) {
-    const url = `${FIFA_BASE}/calendar/matches`
-      + `?idCompetition=${WC_COMP_ID}`
-      + `&dateFrom=${tryDate}&dateTo=${tryDate}`
-      + `&language=en&count=20`
+    // Essaie avec et sans seasonId
+    const urlsToTry = []
+    if (seasonId) {
+      urlsToTry.push(`${FIFA_BASE}/calendar/matches?idCompetition=${WC_COMP_ID}&idSeason=${seasonId}&dateFrom=${tryDate}&dateTo=${tryDate}&language=en&count=20`)
+    }
+    urlsToTry.push(`${FIFA_BASE}/calendar/matches?idCompetition=${WC_COMP_ID}&dateFrom=${tryDate}&dateTo=${tryDate}&language=en&count=20`)
 
-    const { ok, data } = await fifaFetch(url)
-    if (!ok || !data) continue
+    for (const url of urlsToTry) {
+      const { ok, data } = await fifaFetch(url)
+      if (!ok || !data) continue
 
-    const matches = data.Results ?? data.results ?? []
-    for (const m of matches) {
-      const fifaHome = parseName(m.Home?.TeamName) ?? m.Home?.ShortClubName ?? ''
-      const fifaAway = parseName(m.Away?.TeamName) ?? m.Away?.ShortClubName ?? ''
+      const matches = data.Results ?? data.results ?? []
+      for (const m of matches) {
+        const fifaHome = parseName(m.Home?.TeamName) ?? m.Home?.ShortClubName ?? ''
+        const fifaAway = parseName(m.Away?.TeamName) ?? m.Away?.ShortClubName ?? ''
 
-      if (fuzzyMatch(homeTeam, fifaHome) && fuzzyMatch(awayTeam, fifaAway)) {
-        return {
-          fifaMatchId:  m.IdMatch,
-          fifaCompId:   m.IdCompetition ?? WC_COMP_ID,
-          fifaSeasonId: m.IdSeason   ?? null,
-          fifaStageId:  m.IdStage    ?? null,
+        if (fuzzyMatch(homeTeam, fifaHome) && fuzzyMatch(awayTeam, fifaAway)) {
+          return {
+            fifaMatchId:  m.IdMatch,
+            fifaCompId:   m.IdCompetition ?? WC_COMP_ID,
+            fifaSeasonId: m.IdSeason   ?? seasonId ?? null,
+            fifaStageId:  m.IdStage    ?? null,
+          }
         }
       }
+      if (matches.length > 0) break  // On a eu une réponse valide, inutile de retry sans seasonId
     }
   }
 
@@ -247,7 +273,7 @@ export default async function handler(req, res) {
 
   // ── 3. Autodiscovery via FIFA API ──────────────────────────────────────────
   if (!ids?.fifaMatchId && utcDate) {
-    ids = await discoverFifaMatch(utcDate, fdHome, fdAway)
+    ids = await discoverFifaMatch(kv, utcDate, fdHome, fdAway)
     if (ids?.fifaMatchId) {
       try { await kv.set(idsKey, JSON.stringify(ids), { ex: 7 * 24 * 3600 }) } catch {}
     }
@@ -269,7 +295,20 @@ export default async function handler(req, res) {
   }
 
   if (!ids?.fifaMatchId) {
-    return res.status(404).json({ error: 'Match FIFA introuvable (API FIFA indisponible ou hors WC 2026)' })
+    // Diagnostic : tester directement l'accessibilité de l'API FIFA
+    let fifaDiag = 'non testé'
+    try {
+      const r = await fetch(`${FIFA_BASE}/competitions/${WC_COMP_ID}/seasons?language=en&count=5`, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(5_000),
+      })
+      fifaDiag = `status=${r.status}`
+    } catch (e) { fifaDiag = `error=${e.message}` }
+
+    return res.status(404).json({
+      error: 'Match FIFA introuvable',
+      diag: { utcDate, fdHome, fdAway, fifaApi: fifaDiag },
+    })
   }
 
   // ── 5. Fetch lineup FIFA ───────────────────────────────────────────────────
