@@ -977,7 +977,7 @@ export function MatchStatsSection({ match }) {
   )
 }
 
-export function PreMatchSection({ match, prono, formMap, compMatches }) {
+export function PreMatchSection({ match, prono, formMap, compMatches, hideStats = false }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -1021,7 +1021,7 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
       <H2HSection match={match} compMatches={compMatches} />
 
       {/* Stats saison */}
-      {compMatches?.length > 0 && (
+      {!hideStats && compMatches?.length > 0 && (
         <SeasonStatsSection
           homeId={homeId} awayId={awayId}
           homeName={homeName} awayName={awayName}

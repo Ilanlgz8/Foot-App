@@ -131,11 +131,63 @@ export const TEAM_COLORS_FULL = {
   'PSG':                   { p: '#004170', s: '#DA020E' },
 }
 
-// Normalise le nom pour chercher dans TEAM_COLORS_FULL
+// Mots-clés → couleurs pour le fuzzy match
+const KEYWORD_COLORS = [
+  [['korea'],                    { p: '#003478', s: '#CD2E3A' }],
+  [['ivory','ivoire'],           { p: '#F77F00', s: '#009A44' }],
+  [['united states','usa'],      { p: '#002868', s: '#B22234' }],
+  [['iran'],                     { p: '#239F40', s: '#006B2B' }],
+  [['türk','turk'],              { p: '#E30A17', s: '#1a1a1a' }],
+  [['czech','tchèque'],          { p: '#D7141A', s: '#003366' }],
+  [['congo'],                    { p: '#007FFF', s: '#CE1126' }],
+  [['saudi'],                    { p: '#006C35', s: '#1a1a1a' }],
+  [['new zealand','nouvelle-zélande'],{ p: '#1a1a1a', s: '#CC0000' }],
+  [['south africa','afrique du sud'],  { p: '#007A4D', s: '#FFB81C' }],
+  [['costa rica'],               { p: '#002B7F', s: '#CE1126' }],
+  [['trinidad'],                 { p: '#CE1126', s: '#000000' }],
+  [['el salvador'],              { p: '#1560BD', s: '#FFFFFF' }],
+  [['paraguay'],                 { p: '#D52B1E', s: '#0038A8' }],
+  [['iraq'],                     { p: '#CE1126', s: '#007A3D' }],
+  [['uzbek'],                    { p: '#1EB53A', s: '#0099B5' }],
+  [['bahrain'],                  { p: '#CE1126', s: '#FFFFFF' }],
+  [['oman'],                     { p: '#DB161B', s: '#FFFFFF' }],
+  [['jordan'],                   { p: '#007A3D', s: '#CE1126' }],
+  [['philippines'],              { p: '#0038A8', s: '#CE1126' }],
+  [['vietnam'],                  { p: '#DA251D', s: '#FFCD00' }],
+  [['thailand','thaïlande'],     { p: '#A51931', s: '#2D2A4A' }],
+  [['myanmar'],                  { p: '#FECB00', s: '#34B233' }],
+  [['indonesia'],                { p: '#CE1126', s: '#1a1a1a' }],
+  [['malaysia'],                 { p: '#CC0001', s: '#003893' }],
+  [['guatemala'],                { p: '#4997D0', s: '#FFFFFF' }],
+  [['honduras'],                 { p: '#0073CF', s: '#1a1a1a' }],
+  [['cuba'],                     { p: '#002A8F', s: '#CF142B' }],
+  [['haiti'],                    { p: '#00209F', s: '#D21034' }],
+  [['suriname'],                 { p: '#377E3F', s: '#B40A2D' }],
+  [['zimbabwe'],                 { p: '#006400', s: '#FFD200' }],
+  [['zambia'],                   { p: '#198A00', s: '#EF7D00' }],
+  [['tanzania'],                 { p: '#1EB53A', s: '#FCD116' }],
+  [['mali'],                     { p: '#14B53A', s: '#FCD116' }],
+  [['guinea'],                   { p: '#CE1126', s: '#FCD116' }],
+  [['libya'],                    { p: '#000000', s: '#FFFFFF' }],
+  [['comoros'],                  { p: '#3A75C4', s: '#3D9A00' }],
+  [['mauritania'],               { p: '#006233', s: '#FFD700' }],
+  [['mozambique'],               { p: '#009A44', s: '#FCE100' }],
+]
+
+// Cherche la couleur d'une équipe : exact → fuzzy → null
 function lookupColor(name) {
-  return TEAM_COLORS_FULL[name]
-      ?? TEAM_COLORS_FULL[name?.replace(/^FC |^AS |^AC |^SSC /i, '')]
-      ?? null
+  if (!name) return null
+  // 1. Exact
+  if (TEAM_COLORS_FULL[name]) return TEAM_COLORS_FULL[name]
+  // 2. Strip préfixe club (FC, AS, AC...)
+  const stripped = name.replace(/^(FC|AS|AC|SSC|SL|RC|SC|CD|CF|UD|RCD|GD|NK|FK|SK|BK|IK|HNK|CA|CF|SD|UD)\s+/i, '')
+  if (TEAM_COLORS_FULL[stripped]) return TEAM_COLORS_FULL[stripped]
+  // 3. Fuzzy : un des mots-clés contenu dans le nom
+  const n = name.toLowerCase()
+  for (const [keywords, colors] of KEYWORD_COLORS) {
+    if (keywords.some(kw => n.includes(kw))) return colors
+  }
+  return null
 }
 
 // Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
