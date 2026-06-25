@@ -25,79 +25,111 @@
   background: rgba(255,255,255,0.09);
 }
 
-/* ── Header match ── */
+/* ── Header compact ── */
 .lmp__header {
   position: relative;
   overflow: hidden;
-  margin: 1rem;
-  padding: 0.5rem 1rem 1.1rem;
-  background: linear-gradient(160deg, rgba(25,10,10,0.95), rgba(10,10,18,0.98));
-  border: 1px solid rgba(220,38,38,0.18);
-  border-radius: 1.1rem;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.45);
+  padding: 0.5rem 0.75rem 0.4rem;
+  background: rgba(10,8,8,0.92);
+  border-bottom: 1px solid rgba(220,38,38,0.14);
 }
 
-.lmp__comp {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 0.7rem;
-}
-.lmp__compEmb {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-  opacity: 0.7;
-}
-
-/* Score row */
-.lmp__scoreRow {
+/* Top bar : backBtn à gauche, score compact à droite */
+.lmp__topBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+.lmp__topRight {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.lmp__backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0.5rem;
+  color: rgba(255,255,255,0.55);
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.lmp__backBtn:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.09);
+}
+
+.lmp__compEmb {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+/* Score row compact */
+.lmp__scoreRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
 .lmp__team {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  flex: 1;
+  gap: 0.2rem;
   min-width: 0;
+  flex-shrink: 1;
 }
 .lmp__team--away {
   align-items: center;
 }
 
 .lmp__crest {
-  width: 4rem;
-  height: 4rem;
+  width: 2.5rem;
+  height: 2.5rem;
   object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
 }
 .lmp__crestFallback {
-  width: 4rem;
-  height: 4rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.06);
 }
 
 .lmp__teamName {
-  font-size: 0.82rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.8);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 90px;
+  max-width: 70px;
+}
+
+.lmp__teamXg {
+  font-size: 0.52rem;
+  font-weight: 600;
+  color: rgba(239,68,68,0.6);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
 }
 
 /* Score central */
@@ -105,67 +137,67 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.15rem;
   flex-shrink: 0;
-  margin-top: -2.2rem;
 }
 
 .lmp__minute {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.2rem;
+  min-height: 0.9rem;
 }
 .lmp__minuteLive {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #ef4444;
   letter-spacing: 0.08em;
 }
 .lmp__minuteFt {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: rgba(255,255,255,0.4);
   letter-spacing: 0.08em;
 }
 .lmp__repriseLabel {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: rgba(255,200,50,0.9);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: rgba(255,200,50,0.95);
   letter-spacing: 0.05em;
+  white-space: nowrap;
   animation: pulse 1.8s ease-in-out infinite;
 }
 
 .lmp__pills {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.25rem;
 }
 .lmp__pill {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: #f0d0d0;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  min-width: 3rem;
-  height: 3rem;
+  min-width: 2rem;
+  height: 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95));
   border: 1px solid rgba(220,38,38,0.22);
-  border-radius: 0.6rem;
+  border-radius: 0.45rem;
 }
 .lmp__pill--scored {
   animation: pillGoal 1.4s ease-out forwards;
 }
 .lmp__pillBar {
   width: 2px;
-  height: 2.4rem;
-  background: rgba(255,255,255,0.4);
+  height: 1.6rem;
+  background: rgba(255,255,255,0.35);
   border-radius: 1px;
 }
 

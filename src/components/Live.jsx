@@ -5,7 +5,6 @@ import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useState, useRef, useEffect } from 'react'
-import { useFotmobXG } from '../hooks/useFotmobXG'
 import '../live.css'
 
 // ── Helpers (copie depuis LiveWidget) ────────────────────────────────────────
@@ -64,11 +63,12 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
     <div className="live__scoreWrap">
       <div className="live__minuteWrap">
         <span className="live__minute">{label}</span>
-        {repriseImminente && <span className="live__reprise">reprise imminente</span>}
-        {!repriseImminente && repriseDans != null && (
-          <span className="live__reprise">reprise dans {repriseDans} min</span>
-        )}
       </div>
+      {(repriseImminente || repriseDans != null) && (
+        <span className="live__reprise">
+          {repriseImminente ? 'Reprise imm.' : `Reprise ${repriseDans}min`}
+        </span>
+      )}
       <div className="live__pills">
         <div className={`${pillCls}${goalSide === 'home' ? ' live__pill--scored' : ''}`} key={`h${h}`}>{h}</div>
         <div className="live__pillBar" />
@@ -157,7 +157,6 @@ function GoalCelebration({ teamName, scoreStr }) {
 
 // ── Card match individuelle ───────────────────────────────────────────────────
 function LiveCard({ match, espn, onClick }) {
-  const xg = useFotmobXG(match)
   const matchSt = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 
@@ -171,7 +170,9 @@ function LiveCard({ match, espn, onClick }) {
   }, [isTermine])
 
   const minute = isTermine ? null : calcMinute(match)
-  const pauseElapsed = (match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start)
+  // Reprise : match en pause selon FD.org OU ESPN → déclenche le compte à rebours
+  const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
+  const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
     ? Date.now() - matchSt.pausedAt : null
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
@@ -247,18 +248,16 @@ function LiveCard({ match, espn, onClick }) {
         <PeriodBadge match={match} />
       </div>
 
-      {/* Score principal — toujours 5 colonnes: xgHome | home | score | away | xgAway */}
+      {/* Score principal — 3 colonnes: home | score | away */}
       <div className="live__matchRow">
-        <div className="live__xgCol" style={xg?.home == null ? { visibility: 'hidden' } : {}}>
-          <span className="live__xgNum">{xg?.home?.toFixed(2)}</span>
-          <span className="live__xgLabel">xG</span>
-        </div>
-
         <div className="live__team">
           {match.homeTeam?.crest
             ? <img src={match.homeTeam.crest} alt="" className="live__crest" />
             : <div className="live__crestFallback" />}
           <span className="live__teamName">{homeName}</span>
+          {espn?.stats?.home?.xg != null && (
+            <span className="live__teamXg">{espn.stats.home.xg.toFixed(2)} xG</span>
+          )}
         </div>
 
         <ScoreDisplay
@@ -274,11 +273,9 @@ function LiveCard({ match, espn, onClick }) {
             ? <img src={match.awayTeam.crest} alt="" className="live__crest" />
             : <div className="live__crestFallback" />}
           <span className="live__teamName">{awayName}</span>
-        </div>
-
-        <div className="live__xgCol" style={xg?.away == null ? { visibility: 'hidden' } : {}}>
-          <span className="live__xgNum">{xg?.away?.toFixed(2)}</span>
-          <span className="live__xgLabel">xG</span>
+          {espn?.stats?.away?.xg != null && (
+            <span className="live__teamXg">{espn.stats.away.xg.toFixed(2)} xG</span>
+          )}
         </div>
       </div>
 

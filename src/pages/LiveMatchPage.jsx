@@ -13,7 +13,6 @@ import { COMPETITIONS }  from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { calcProno }     from '../utils/calcProno'
 import { useTeamForm }   from '../hooks/useTeamForm'
-import { useFotmobXG }   from '../hooks/useFotmobXG'
 import { useSwipe }      from '../hooks/useSwipe'
 import {
   LiveStatsTab,
@@ -45,15 +44,18 @@ const fmtMin = m => {
   return clean ? `${clean}'` : ''
 }
 
-function MatchHeader({ match, espn }) {
-  const xg       = useFotmobXG(match)
+function MatchHeader({ match, espn, onBack }) {
   const matchSt  = getMatchState(match.id)
   const isTermine = matchSt.ft === true
   const minute   = isTermine ? null : calcMinute(match)
   const period   = getMatchPeriod(match)
   const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
+  // xG depuis les stats ESPN (FotMob bloqué sur Vercel)
+  const xgHome   = espn?.stats?.home?.xg ?? null
+  const xgAway   = espn?.stats?.away?.xg ?? null
 
-  const pauseElapsed = (match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start)
+  const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
+  const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
     ? Date.now() - matchSt.pausedAt : null
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
@@ -110,68 +112,57 @@ function MatchHeader({ match, espn }) {
   return (
     <div className="lmp__header">
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
-      {/* Compétition */}
-      {comp && (
-        <div className="lmp__comp">
-          {comp.emblem && <img src={comp.emblem} alt="" className="lmp__compEmb" />}
-          <span>{comp.name}</span>
-        </div>
-      )}
 
-      {/* Teams + Score */}
-      <div className="lmp__scoreRow">
-        {/* xG domicile */}
-        {xg?.home != null && (
-          <div className="lmp__xg lmp__xg--home">
-            <span className="lmp__xgNum">{xg.home.toFixed(2)}</span>
-            <span className="lmp__xgLabel">xG</span>
-          </div>
-        )}
+      {/* ── Top bar : backBtn gauche + score compact droite ── */}
+      <div className="lmp__topBar">
+        <button className="lmp__backBtn" onClick={onBack}>‹ En Direct</button>
 
-        {/* Domicile */}
-        <div className="lmp__team">
-          {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="lmp__crest" />
-            : <div className="lmp__crestFallback" />}
-          <span className="lmp__teamName">{homeName}</span>
-        </div>
+        <div className="lmp__topRight">
+          {/* Compétition (icône seule) */}
+          {comp?.emblem && <img src={comp.emblem} alt="" className="lmp__compEmb" />}
 
-        {/* Score central */}
-        <div className="lmp__scoreCenter">
-          <div className="lmp__minute">
-            {repriseImminente
-              ? <span className="lmp__repriseLabel">Reprise imminente</span>
-              : repriseDans != null
-              ? <span className="lmp__repriseLabel">Reprise dans {repriseDans} min</span>
-              : <span className={isTermine ? 'lmp__minuteFt' : 'lmp__minuteLive'}>{periodLabel}</span>
-            }
-          </div>
-          <div className="lmp__pills">
-            <div className={`lmp__pill${goalSide === 'home' ? ' lmp__pill--scored' : ''}`} key={`h${hs}`}>
-              {hs ?? '–'}
+          {/* Score inline compact */}
+          <div className="lmp__scoreRow">
+            {/* Domicile */}
+            <div className="lmp__team">
+              {match.homeTeam?.crest
+                ? <img src={match.homeTeam.crest} alt="" className="lmp__crest" />
+                : <div className="lmp__crestFallback" />}
+              <span className="lmp__teamName">{homeName}</span>
+              {xgHome != null && <span className="lmp__teamXg">{xgHome.toFixed(2)} xG</span>}
             </div>
-            <div className="lmp__pillBar" />
-            <div className={`lmp__pill${goalSide === 'away' ? ' lmp__pill--scored' : ''}`} key={`a${as_}`}>
-              {as_ ?? '–'}
+
+            {/* Score + minute */}
+            <div className="lmp__scoreCenter">
+              <div className="lmp__minute">
+                {repriseImminente
+                  ? <span className="lmp__repriseLabel">Reprise imm.</span>
+                  : repriseDans != null
+                  ? <span className="lmp__repriseLabel">Reprise {repriseDans}min</span>
+                  : <span className={isTermine ? 'lmp__minuteFt' : 'lmp__minuteLive'}>{periodLabel}</span>
+                }
+              </div>
+              <div className="lmp__pills">
+                <div className={`lmp__pill${goalSide === 'home' ? ' lmp__pill--scored' : ''}`} key={`h${hs}`}>
+                  {hs ?? '–'}
+                </div>
+                <div className="lmp__pillBar" />
+                <div className={`lmp__pill${goalSide === 'away' ? ' lmp__pill--scored' : ''}`} key={`a${as_}`}>
+                  {as_ ?? '–'}
+                </div>
+              </div>
+            </div>
+
+            {/* Extérieur */}
+            <div className="lmp__team lmp__team--away">
+              {match.awayTeam?.crest
+                ? <img src={match.awayTeam.crest} alt="" className="lmp__crest" />
+                : <div className="lmp__crestFallback" />}
+              <span className="lmp__teamName">{awayName}</span>
+              {xgAway != null && <span className="lmp__teamXg">{xgAway.toFixed(2)} xG</span>}
             </div>
           </div>
         </div>
-
-        {/* Extérieur */}
-        <div className="lmp__team lmp__team--away">
-          {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="lmp__crest" />
-            : <div className="lmp__crestFallback" />}
-          <span className="lmp__teamName">{awayName}</span>
-        </div>
-
-        {/* xG extérieur */}
-        {xg?.away != null && (
-          <div className="lmp__xg lmp__xg--away">
-            <span className="lmp__xgNum">{xg.away.toFixed(2)}</span>
-            <span className="lmp__xgLabel">xG</span>
-          </div>
-        )}
       </div>
 
       {/* Buteurs */}
@@ -244,13 +235,8 @@ export default function LiveMatchPage() {
 
   return (
     <div className="lmp__page">
-      {/* Bouton retour */}
-      <button className="lmp__backBtn" onClick={() => navigate('/live')}>
-        ‹ En Direct
-      </button>
-
-      {/* Widget match en grand */}
-      <MatchHeader match={match} espn={espn} />
+      {/* Header compact : backBtn + score intégrés */}
+      <MatchHeader match={match} espn={espn} onBack={() => navigate('/live')} />
 
       {/* Onglets */}
       <div ref={swipe.ref}>

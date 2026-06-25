@@ -302,12 +302,15 @@ function extractBoxscoreStats(hArr, aArr) {
   const aYellow  = find(aArr, 'yellowCards', 'yellowCard')
   const hOffside = find(hArr, 'offsides', 'offside')
   const aOffside = find(aArr, 'offsides', 'offside')
+  // xG — ESPN l'inclut pour certaines ligues/compétitions (WC inclus)
+  const hXG      = find(hArr, 'expectedGoals', 'xg', 'xG', 'expectedGoalsTotal', 'expectedGoal')
+  const aXG      = find(aArr, 'expectedGoals', 'xg', 'xG', 'expectedGoalsTotal', 'expectedGoal')
 
   if (hPoss == null && hShots == null && hCorners == null) return null
 
   return {
-    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside },
-    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside },
+    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside, xg: hXG },
+    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside, xg: aXG },
   }
 }
 
