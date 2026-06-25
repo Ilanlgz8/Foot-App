@@ -5,7 +5,6 @@ import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, us
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
-import { useFotmobLineup, useFotmobProbableLineups } from '../hooks/useFotmobXG'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
@@ -353,47 +352,48 @@ export function ComposTab({ match, compMatches }) {
   const isFinished = match?.status === 'FINISHED'
   const isUpcoming = !isFinished
 
-  // WC 2026 : ESPN ne retourne pas les rosters de manière fiable (requiert FIFA Redis
-  // populé pendant le match live). On lance api-football en parallèle immédiatement.
+  // WC 2026 : useLineups gère FIFA API en interne (redis fm:match:) puis ESPN fallback.
+  // Pour WC on lance api-football EN PARALLÈLE d'ESPN (ESPN/FIFA souvent vides si hors cron).
+  // Pour non-WC, api-football attend qu'ESPN échoue (économie de quota 100 req/jour).
   const isWC = match?.competition?.id === 2000 || match?.competition?.code === 'WC'
 
-  // Source 1 : ESPN/FIFA — non-WC uniquement (WC roster ESPN peu fiable)
-  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(isWC ? null : match)
-  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(isWC ? null : match)
+  // Source 1 : ESPN/FIFA (useLineups essaie FIFA Redis puis ESPN — gère WC en interne)
+  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
+  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match)
 
-  // Source 2 : api-football (non-WC : fallback ESPN; WC : ignoré — quota 100/j insuffisant)
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
+
+  // Source 2 : api-football
+  // WC : en parallèle (ESPN/FIFA souvent vides sans cron)
+  // Non-WC : seulement après échec ESPN (économie quota)
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(
-    !isWC && espnDone && !espnHasData ? match : null
+    isWC ? match : (espnDone && !espnHasData ? match : null)
   )
 
-  // Source 3 : FotMob — SOURCE PRINCIPALE pour WC (pas de quota, données fiables)
-  const { data: fotLineups, isLoading: fotLoading } = useFotmobLineup(isWC ? match : null)
-
-  // Source 4a (matchs à venir, non-WC) : compos probables via ESPN
+  // Source 3a (matchs à venir) : probables via ESPN (fonctionne WC avec header.competitions)
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
-    isUpcoming && !isWC ? match : null,
+    isUpcoming ? match : null,
     compMatches
   )
 
-  // Source 4b (matchs à venir WC) : compos probables via FotMob (dernier XI connu)
-  const { data: fotProbableData, isLoading: fotProbableLoading } = useFotmobProbableLineups(
-    isUpcoming && isWC ? match : null,
+  // Source 3b (matchs à venir) : probables via api-football (fallback si ESPN vide)
+  const { data: aflProbableData, isLoading: aflProbableLoading } = useAflProbableLineups(
+    isUpcoming ? match : null,
     compMatches
   )
 
-  const isLoading = isWC
-    ? (fotLoading || (isUpcoming && fotProbableLoading))
-    : (espnLoading || espnMatchLoading || (!espnHasData && aflLoading) || (isUpcoming && probableLoading))
+  const isLoading = espnLoading || espnMatchLoading
+    || (!espnHasData && aflLoading)
+    || (isUpcoming && probableLoading)
+    || (isUpcoming && !probableData && aflProbableLoading)
 
-  const lineups = espnLineups?.home?.starters?.length             ? espnLineups
-               : espnMatchData?.lineups?.home?.starters?.length   ? espnMatchData.lineups
-               : aflLineups?.home?.starters?.length               ? aflLineups
-               : fotLineups?.home?.starters?.length               ? fotLineups
+  const lineups = espnLineups?.home?.starters?.length           ? espnLineups
+               : espnMatchData?.lineups?.home?.starters?.length ? espnMatchData.lineups
+               : aflLineups?.home?.starters?.length             ? aflLineups
                : null
 
-  const probSource = probableData ?? fotProbableData ?? null
+  const probSource = probableData ?? aflProbableData ?? null
   const probable = !lineups && probSource?.home?.starters?.length ? probSource : null
 
   if (isLoading) {
