@@ -1,109 +1,111 @@
 import { useQuery } from '@tanstack/react-query'
 
-// Map nom football-data.org → article Wikipedia de la star nationale
-// Les pages joueurs Wikipedia ont des photos d'action en match
+// Map nom football-data.org → article Wikipedia
+// On cible des articles de TOURNOIS / MATCHS qui ont des photos d'action
+// multi-joueurs (célébrations, duels en match) — pas des portraits individuels.
 const WIKI = {
   // ── Europe ──
-  'France':          'Kylian_Mbappé',
-  'Germany':         'Florian_Wirtz',
-  'Spain':           'Lamine_Yamal',
-  'England':         'Jude_Bellingham',
-  'Portugal':        'Cristiano_Ronaldo',
-  'Netherlands':     'Virgil_van_Dijk',
-  'Belgium':         'Romelu_Lukaku',
-  'Croatia':         'Luka_Modrić',
-  'Switzerland':     'Granit_Xhaka',
-  'Poland':          'Robert_Lewandowski',
-  'Denmark':         'Christian_Eriksen',
-  'Sweden':          'Alexander_Isak',
-  'Norway':          'Erling_Haaland',
-  'Austria':         'Marcel_Sabitzer',
-  'Hungary':         'Dominik_Szoboszlai',
-  'Turkey':          'Hakan_Çalhanoğlu',
-  'Ukraine':         'Mykhailo_Mudryk',
-  'Serbia':          'Dušan_Vlahović',
-  'Romania':         'Ianis_Hagi',
-  'Scotland':        'Andy_Robertson',
-  'Wales':           'Gareth_Bale',
-  'Slovakia':        'Marek_Hamšík',
-  'Slovenia':        'Jan_Oblak',
-  'Albania':         'Armando_Broja',
-  'Czech Republic':  'Tomáš_Souček',
-  'Czechia':         'Tomáš_Souček',
-  'Italy':           'Federico_Chiesa',
-  'Greece':          'Kostas_Tsimikas',
-  'Finland':         'Teemu_Pukki',
-  'Israel':          'Eran_Zahavi',
-  'Georgia':         'Khvicha_Kvaratskhelia',
-  'Bosnia-H.':       'Edin_Džeko',
+  'France':          '2022_FIFA_World_Cup_Final',        // célébration finale WC22
+  'Argentina':       '2022_FIFA_World_Cup',              // Messi + équipe trophée
+  'Spain':           'UEFA_Euro_2024_Final',              // Espagne célébrant
+  'England':         'UEFA_Euro_2024_Final',              // Angleterre en finale
+  'Germany':         'UEFA_Euro_2024',                    // Allemagne tournoi domicile
+  'Portugal':        'UEFA_Euro_2016',                    // Portugal champion
+  'Netherlands':     'UEFA_Euro_2024',                    // Pays-Bas demi-finales
+  'Belgium':         '2018_FIFA_World_Cup',               // Belgique 3e place WC18
+  'Croatia':         '2022_FIFA_World_Cup_third_place_play-off', // Croatie 3e WC22
+  'Italy':           'UEFA_Euro_2020',                    // Italie champion Euro
+  'Switzerland':     'UEFA_Euro_2024',                    // Suisse quarts
+  'Poland':          'UEFA_Euro_2024',
+  'Denmark':         'UEFA_Euro_2020',
+  'Sweden':          'UEFA_Euro_2020',
+  'Norway':          'Erling_Haaland',                    // pas de tournoi récent, star
+  'Austria':         'UEFA_Euro_2024',
+  'Hungary':         'UEFA_Euro_2024',
+  'Turkey':          'UEFA_Euro_2024',                    // Turquie quarts
+  'Ukraine':         'UEFA_Euro_2020',
+  'Serbia':          'UEFA_Euro_2024',
+  'Romania':         'UEFA_Euro_2024',
+  'Scotland':        'UEFA_Euro_2024',
+  'Wales':           'UEFA_Euro_2020',
+  'Slovakia':        'UEFA_Euro_2024',
+  'Slovenia':        'UEFA_Euro_2024',
+  'Albania':         'UEFA_Euro_2024',
+  'Czech Republic':  'UEFA_Euro_2020',
+  'Czechia':         'UEFA_Euro_2020',
+  'Georgia':         'UEFA_Euro_2024',                    // première qualification historique
+  'Bosnia-H.':       'Bosnia_and_Herzegovina_national_football_team',
+  'Greece':          'UEFA_Euro_2004',                    // champion surprise
+  'Finland':         'UEFA_Euro_2020',
+  'Israel':          'Israel_national_football_team',
 
   // ── Amérique du Sud ──
-  'Brazil':          'Vinícius_Júnior',
-  'Argentina':       'Lionel_Messi',
-  'Colombia':        'James_Rodríguez',
-  'Uruguay':         'Federico_Valverde',
-  'Ecuador':         'Enner_Valencia',
-  'Chile':           'Alexis_Sánchez',
-  'Paraguay':        'Miguel_Almirón',
-  'Venezuela':       'Yeferson_Soteldo',
-  'Peru':            'Paolo_Guerrero',
-  'Bolivia':         'Marcelo_Martins',
+  'Brazil':          'Brazil_at_the_2022_FIFA_World_Cup',
+  'Colombia':        'Copa_América_2024',                 // Colombia en Copa
+  'Uruguay':         'Copa_América_2024',
+  'Ecuador':         '2022_FIFA_World_Cup',
+  'Chile':           'Copa_América_2015',                 // Chile champion
+  'Paraguay':        'Copa_América',
+  'Venezuela':       'Copa_América_2024',
+  'Peru':            'Copa_América_2019',
+  'Bolivia':         'Copa_América',
 
-  // ── Amérique du Nord / Centrale ──
-  'Mexico':          'Hirving_Lozano',
-  'United States':   'Christian_Pulisic',
-  'Canada':          'Alphonso_Davies',
-  'Costa Rica':      'Keylor_Navas',
-  'Panama':          'Rolando_Blackburn',
-  'Honduras':        'Alberth_Elis',
-  'Jamaica':         'Michail_Antonio',
-  'Haiti':           'Naïco_Évans',
-  'Curaçao':         'Leandro_Bacuna',
+  // ── Amérique du Nord / Centrale / Caraïbes ──
+  'Mexico':          'Mexico_national_football_team',
+  'United States':   'United_States_at_the_2022_FIFA_World_Cup',
+  'Canada':          'Canada_at_the_2022_FIFA_World_Cup',
+  'Costa Rica':      'Costa_Rica_at_the_2022_FIFA_World_Cup',
+  'Panama':          'Panama_national_football_team',
+  'Honduras':        'Honduras_national_football_team',
+  'Jamaica':         'Jamaica_national_football_team',
+  'Haiti':           'Haiti_national_football_team',
+  'Curaçao':         'Curaçao_national_football_team',
 
   // ── Afrique ──
-  'Morocco':         'Achraf_Hakimi',
-  'Senegal':         'Sadio_Mané',
-  'Ivory Coast':     'Sébastien_Haller',
-  'Nigeria':         'Victor_Osimhen',
-  'Ghana':           'Mohammed_Kudus',
-  'Cameroon':        'Vincent_Aboubakar',
-  'Egypt':           'Mohamed_Salah',
-  'Algeria':         'Riyad_Mahrez',
-  'Tunisia':         'Wahbi_Khazri',
-  'South Africa':    'Percy_Tau',
-  'Cape Verde':      'Gelson_Martins',
-  'Congo DR':        'Yannick_Carrasco',
-  'Mali':            'Yves_Bissouma',
-  'Burkina Faso':    'Bertrand_Traoré',
-  'Guinea':          'Naby_Keïta',
-  'Zambia':          'Patson_Daka',
-  'Zimbabwe':        'Knowledge_Musona',
-  'Tanzania':        'Mbwana_Samatta',
-  'Uganda':          'Emmanuel_Okwi',
-  'Mozambique':      'Reinildo',
+  'Morocco':         'Morocco_at_the_2022_FIFA_World_Cup', // célébrations épiques
+  'Senegal':         '2021_Africa_Cup_of_Nations_Final',   // 1er trophée Sénégal
+  'Ivory Coast':     '2023_Africa_Cup_of_Nations_Final',   // CAN 2023 vainqueur
+  'Nigeria':         'Nigeria_at_the_FIFA_World_Cup',
+  'Ghana':           'Ghana_at_the_FIFA_World_Cup',
+  'Cameroon':        'Cameroon_at_the_FIFA_World_Cup',
+  'Egypt':           'Africa_Cup_of_Nations',
+  'Algeria':         '2019_Africa_Cup_of_Nations_Final',   // Algérie champion CAN 2019
+  'Tunisia':         'Tunisia_at_the_FIFA_World_Cup',
+  'South Africa':    '2010_FIFA_World_Cup',                 // Afrique du Sud hôte WC10
+  'Cape Verde':      'Cape_Verde_national_football_team',
+  'Congo DR':        'DR_Congo_national_football_team',
+  'Mali':            'Mali_national_football_team',
+  'Burkina Faso':    'Burkina_Faso_national_football_team',
+  'Guinea':          'Guinea_national_football_team',
+  'Zambia':          'Zambia_national_football_team',
+  'Zimbabwe':        'Zimbabwe_national_football_team',
+  'Tanzania':        'Tanzania_national_football_team',
+  'Uganda':          'Uganda_national_football_team',
+  'Mozambique':      'Mozambique_national_football_team',
 
   // ── Asie ──
-  'Japan':           'Takumi_Minamino',
-  'South Korea':     'Heung-min_Son',
-  'Korea Republic':  'Heung-min_Son',
-  'Australia':       'Mat_Ryan',
-  'Saudi Arabia':    'Salem_Al-Dawsari',
-  'Iran':            'Mehdi_Taremi',
-  'Qatar':           'Akram_Afif',
-  'Iraq':            'Amjad_Attwan',
-  'Jordan':          'Baha_Faisal',
-  'Uzbekistan':      'Eldor_Shomurodov',
-  'New Zealand':     'Chris_Wood_(footballer)',
+  'Japan':           'Japan_at_the_2022_FIFA_World_Cup',   // victoire Allemagne
+  'South Korea':     'South_Korea_at_the_2022_FIFA_World_Cup',
+  'Korea Republic':  'South_Korea_at_the_2022_FIFA_World_Cup',
+  'Australia':       'Australia_at_the_2022_FIFA_World_Cup',
+  'Saudi Arabia':    'Saudi_Arabia_at_the_2022_FIFA_World_Cup', // victoire Argentine !
+  'Iran':            'Iran_at_the_FIFA_World_Cup',
+  'Qatar':           '2022_FIFA_World_Cup',
+  'Iraq':            'Iraq_national_football_team',
+  'Jordan':          'Jordan_national_football_team',
+  'Uzbekistan':      'Uzbekistan_national_football_team',
+  'New Zealand':     'New_Zealand_national_football_team',
 
-  // ── Fallback générique ──
-  '__default__':     'FIFA_World_Cup',
+  // ── Fallback universel ──
+  '__default__':     '2022_FIFA_World_Cup',
 }
 
 const CACHE_TTL = 7 * 24 * 3600 * 1000  // 7 jours
+const CACHE_VERSION = 'v3'               // incrémenter pour invalider l'ancien cache
 
 function getCached(key) {
   try {
-    const raw = localStorage.getItem(`wiki_photo_${key}`)
+    const raw = localStorage.getItem(`wiki_photo_${CACHE_VERSION}_${key}`)
     if (!raw) return null
     const { url, ts } = JSON.parse(raw)
     if (Date.now() - ts > CACHE_TTL) return null
@@ -113,7 +115,7 @@ function getCached(key) {
 
 function setCached(key, url) {
   try {
-    localStorage.setItem(`wiki_photo_${key}`, JSON.stringify({ url, ts: Date.now() }))
+    localStorage.setItem(`wiki_photo_${CACHE_VERSION}_${key}`, JSON.stringify({ url, ts: Date.now() }))
   } catch {}
 }
 
@@ -146,7 +148,7 @@ export function useTeamPhoto(teamName) {
     initialData:          () => getCached(teamName) ?? undefined,
     initialDataUpdatedAt: () => {
       try {
-        const raw = localStorage.getItem(`wiki_photo_${teamName}`)
+        const raw = localStorage.getItem(`wiki_photo_${CACHE_VERSION}_${teamName}`)
         return raw ? JSON.parse(raw).ts : 0
       } catch { return 0 }
     },

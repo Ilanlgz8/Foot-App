@@ -2673,12 +2673,12 @@
   z-index: 0;
   transform: scale(1.1);
 }
-/* Quand on a une vraie photo : cover plein format, peu de blur */
+/* Quand on a une vraie photo : cover plein format, SANS blur */
 .poster__bg--photo {
   inset: 0;
   background-size: cover;
-  background-position: center 20%;
-  filter: blur(2px) brightness(0.45) saturate(1.2);
+  background-position: center 25%;
+  filter: brightness(0.38) saturate(1.15);
   transform: none;
 }
 
