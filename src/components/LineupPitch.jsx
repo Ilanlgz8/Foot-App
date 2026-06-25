@@ -55,8 +55,8 @@ const POS_FR = {
   F:'ATT',  FW:'ATT', ATT:'ATT', FWD:'ATT', SS:'ATT', BU:'ATT',
 }
 
-const CAT_COLOR = { 0: '#f59e0b', 1: '#3b82f6', 2: '#10b981', 3: '#ef4444' }
-const GK_COLOR  = '#b45309'
+// couleurs par catégorie de poste (utilisées dans PlayerCell)
+const CAT_COLOR = { 0: '#f59e0b', 1: '#60a5fa', 2: '#34d399', 3: '#ef4444' }
 
 // ── Positionnement ────────────────────────────────────────────────────────────
 function fallbackLines(starters) {
@@ -83,32 +83,29 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── Jersey SVG ────────────────────────────────────────────────────────────────
+// ── Jersey SVG — Style E (flat modern, fond sombre, numéro haut) ──────────────
 const JERSEY_PATH =
-  'M -5,-16 L -13,-12 L -20,-6 L -19,-2.4 L -12,-7 L -12,16 L 12,16 L 12,-7 L 19,-2.4 L 20,-6 L 13,-12 L 5,-16 L 0,-7 Z'
+  'M -4,-22 L -12,-20 L -24,-10 L -24,-3 L -14,-6 L -14,20 L 14,20 L 14,-6 L 24,-3 L 24,-10 L 14,-20 L 4,-22 Q 0,-18 -4,-22 Z'
 
 function PlayerIcon({ x, y, player }) {
   if (!player) return null
-  const isGK = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
-  const fc   = isGK ? GK_COLOR : '#f5f5f5'
-  const numC = isGK ? '#fff' : '#111'
-  const num  = player.number ?? ''
-  const label = (() => {
+  const isGK   = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
+  const stroke = isGK ? '#f59e0b' : '#ef4444'
+  const bgFill = isGK ? 'rgba(6,4,0,0.97)' : 'rgba(8,3,3,0.97)'
+  const num    = player.number ?? ''
+  const label  = (() => {
     const nm = formatName(player.name, player.shortName)
     return nm.length > 12 ? nm.slice(0, 11) + '.' : nm
   })()
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <path d={JERSEY_PATH} fill="rgba(0,0,0,0.3)" transform="translate(1.8,2.4)" />
-      <path d={JERSEY_PATH} fill={fc} stroke="rgba(0,0,0,0.55)" strokeWidth="1" />
-      <path d="M -5,-16 L 0,-7 L 5,-16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1.1" />
-      <line x1="-10" y1="-2.4" x2="10" y2="-2.4" stroke="rgba(0,0,0,0.06)" strokeWidth="4.5" />
-      <text x="0" y="6.5" textAnchor="middle" dominantBaseline="middle"
-        fill={numC} fontSize="15" fontWeight="700"
+      <path d={JERSEY_PATH} fill={bgFill} stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" />
+      <text x="0" y="-4" textAnchor="middle" dominantBaseline="middle"
+        fill={stroke} fontSize="13" fontWeight="800"
         fontFamily="'Chakra Petch',monospace,Arial">{num}</text>
-      <text x="0" y="28" textAnchor="middle" dominantBaseline="middle"
-        fill="rgba(255,255,255,0.92)" fontSize="8.5"
+      <text x="0" y="30" textAnchor="middle" dominantBaseline="middle"
+        fill="rgba(255,255,255,0.65)" fontSize="8"
         fontFamily="'Chakra Petch',monospace,Arial"
         stroke="rgba(0,0,0,0.9)" strokeWidth="2.5" paintOrder="stroke">{label}</text>
     </g>
@@ -117,7 +114,7 @@ function PlayerIcon({ x, y, player }) {
 
 // ── Terrain ───────────────────────────────────────────────────────────────────
 function PitchMarkings({ formation }) {
-  const S   = 'rgba(255,255,255,0.55)'
+  const S   = 'rgba(255,255,255,0.14)'
   const PAH = 78, PAW = 176, GAH = 30, GAW = 92, GW = 52
   const pxL = CX - PAW / 2, pxR = CX + PAW / 2
   const gxL = CX - GAW / 2
@@ -125,34 +122,34 @@ function PitchMarkings({ formation }) {
 
   return (
     <g>
-      <rect x={0} y={0} width={PW} height={PH} fill="#122012" />
+      <rect x={0} y={0} width={PW} height={PH} fill="#06060d" />
+      {/* Bandes alternées très subtiles */}
       {Array.from({ length: 8 }, (_, i) => (
         <rect key={i} x={L} y={T + i * (IH / 8)} width={IW} height={IH / 8}
-          fill={i % 2 === 0 ? 'rgba(0,0,0,0.13)' : 'rgba(0,0,0,0)'} />
+          fill={i % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0)'} />
       ))}
-      <rect x={L} y={T} width={IW} height={IH} fill="none" stroke={S} strokeWidth="1.5" />
-      <line x1={L} y1={CY} x2={R} y2={CY} stroke={S} strokeWidth="1.5" />
-      <circle cx={CX} cy={CY} r={38} fill="none" stroke={S} strokeWidth="1.5" />
+      <rect x={L} y={T} width={IW} height={IH} fill="none" stroke={S} strokeWidth="1.2" />
+      <line x1={L} y1={CY} x2={R} y2={CY} stroke={S} strokeWidth="1.2" />
+      <circle cx={CX} cy={CY} r={38} fill="none" stroke={S} strokeWidth="1.2" />
       <circle cx={CX} cy={CY} r={3} fill={S} />
-      <rect x={pxL} y={T} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1.3" />
-      <rect x={gxL} y={T} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="1.1" />
-      <rect x={glL} y={T - 8} width={GW} height={8} fill="rgba(255,255,255,0.08)" stroke={S} strokeWidth="1.2" />
-      <circle cx={CX} cy={T + 52} r={2.5} fill={S} />
-      <path d={`M ${pxL},${T + PAH} A 38,38 0 0 1 ${pxR},${T + PAH}`} fill="none" stroke={S} strokeWidth="1.1" />
-      <rect x={pxL} y={B - PAH} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1.3" />
-      <rect x={gxL} y={B - GAH} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="1.1" />
-      <rect x={glL} y={B} width={GW} height={8} fill="rgba(255,255,255,0.08)" stroke={S} strokeWidth="1.2" />
-      <circle cx={CX} cy={B - 52} r={2.5} fill={S} />
-      <path d={`M ${pxL},${B - PAH} A 38,38 0 0 0 ${pxR},${B - PAH}`} fill="none" stroke={S} strokeWidth="1.1" />
+      <rect x={pxL} y={T} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1" />
+      <rect x={gxL} y={T} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="0.9" />
+      <rect x={glL} y={T - 8} width={GW} height={8} fill="rgba(255,255,255,0.04)" stroke={S} strokeWidth="0.9" />
+      <circle cx={CX} cy={T + 52} r={2} fill={S} />
+      <path d={`M ${pxL},${T + PAH} A 38,38 0 0 1 ${pxR},${T + PAH}`} fill="none" stroke={S} strokeWidth="0.9" />
+      <rect x={pxL} y={B - PAH} width={PAW} height={PAH} fill="none" stroke={S} strokeWidth="1" />
+      <rect x={gxL} y={B - GAH} width={GAW} height={GAH} fill="none" stroke={S} strokeWidth="0.9" />
+      <rect x={glL} y={B} width={GW} height={8} fill="rgba(255,255,255,0.04)" stroke={S} strokeWidth="0.9" />
+      <circle cx={CX} cy={B - 52} r={2} fill={S} />
+      <path d={`M ${pxL},${B - PAH} A 38,38 0 0 0 ${pxR},${B - PAH}`} fill="none" stroke={S} strokeWidth="0.9" />
       {[[L + 8, T, 0],[R - 8, T, 1],[L + 8, B, 0],[R - 8, B, 1]].map(([cx2, cy2, sw], i) => (
         <path key={i}
           d={`M ${cx2},${cy2} A 8,8 0 0,${sw} ${cx2 < CX ? L : R},${cy2 < CY ? T + 8 : B - 8}`}
-          fill="none" stroke={S} strokeWidth="1" />
+          fill="none" stroke={S} strokeWidth="0.8" />
       ))}
-      {/* Formation label sur le terrain */}
       {formation && (
         <text x={L + 6} y={T + 13} fontSize="10" fontWeight="700"
-          fill="rgba(255,255,255,0.32)" fontFamily="'Chakra Petch',monospace,Arial"
+          fill="rgba(239,68,68,0.4)" fontFamily="'Chakra Petch',monospace,Arial"
           letterSpacing="1">{formation}</text>
       )}
     </g>
@@ -245,7 +242,7 @@ export default function LineupPitch({ home, away }) {
 
   return (
     <div style={{
-      background: '#0d0d0d',
+      background: '#06060d',
       borderRadius: '1rem', overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.07)',
     }}>
