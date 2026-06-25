@@ -365,7 +365,7 @@ export function ComposTab({ match, compMatches }) {
   // — Autres : SEULEMENT si ESPN n'a rien (protège le quota 100 req/jour)
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
-  const aflEnabled  = isWC ? !!match : (espnDone && !espnHasData ? match : null)
+  const aflEnabled  = isWC ? match : (espnDone && !espnHasData ? match : null)
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(aflEnabled)
 
   // Source 3 (matchs à venir) : compos probables via ESPN (dernier XI connu, zéro quota)
