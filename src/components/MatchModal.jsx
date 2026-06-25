@@ -718,7 +718,7 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
     return (
       <span style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
         {Array.from({ length: count }).map((_, i) => (
-          <span key={i} style={{ color, fontSize: '2.25rem', lineHeight: 1 }}>◆</span>
+          <span key={i} style={{ color, fontSize: 'clamp(1.1rem, 5vw, 2.25rem)', lineHeight: 1 }}>◆</span>
         ))}
       </span>
     )

@@ -1216,11 +1216,13 @@
   min-width: 0;
 }
 .pm__formTeamName {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.5);
-  margin: 0 0 0.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.92);
+  text-align: center;
+  margin: 0 0 0.25rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1228,20 +1230,20 @@
 .pm__formTable {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 .pm__formRow {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
+  gap: 0.4rem;
+  font-size: 0.82rem;
   min-width: 0;
 }
 .pm__badge {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 900;
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 0.3rem;
   display: inline-flex;
   align-items: center;
@@ -1249,22 +1251,22 @@
   flex-shrink: 0;
 }
 .pm__badge--w { background: #166534; color: #fff; }
-.pm__badge--d { background: #334155; color: #94a3b8; }
+.pm__badge--d { background: #334155; color: #e2e8f0; }
 .pm__badge--l { background: #7f1d1d; color: #fca5a5; }
 
-/* Nouveau format "Home 2:0 Away" */
+/* Format "Home 2:0 Away" */
 .pm__formMatchup {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   min-width: 0;
   overflow: hidden;
 }
 .pm__formTeam {
-  font-size: 0.63rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.75);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1272,28 +1274,28 @@
   min-width: 0;
 }
 .pm__formTeam--me {
-  color: rgba(255,255,255,0.85);
-  font-weight: 700;
+  color: rgba(255,255,255,0.97);
+  font-weight: 800;
 }
 .pm__formTeam:first-child { text-align: right; }
 .pm__formTeam:last-child  { text-align: left; }
 .pm__formScore {
-  font-size: 0.69rem;
+  font-size: 0.82rem;
   font-weight: 900;
-  color: #f1f5f9;
+  color: #fff;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   white-space: nowrap;
 }
 .pm__formDate {
-  font-size: 0.56rem;
-  color: rgba(255,255,255,0.25);
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.6);
   flex-shrink: 0;
   white-space: nowrap;
 }
 .pm__noData {
-  font-size: 0.65rem;
-  color: rgba(255,255,255,0.25);
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.45);
   margin: 0;
 }
 
@@ -1432,13 +1434,13 @@
     background: rgba(255,255,255,0.07);
     border-radius: 1px;
   }
-  /* Nom d'équipe en titre de colonne plus visible */
+  /* Nom d'équipe en titre de colonne */
   .pm__formTeamName {
-    font-size: 0.7rem;
-    color: rgba(255,255,255,0.7);
-    letter-spacing: 0.06em;
-    padding-bottom: 0.2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.92);
+    letter-spacing: 0.08em;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
   }
 
   /* H2H : date + home + score + away sur 4 col, badge caché ou compact */
