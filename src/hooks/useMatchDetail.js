@@ -407,6 +407,52 @@ export function useFifaStats(match, enabled = true, live = true) {
   })
 }
 
+// ── useFdLineups ───────────────────────────────────────────────────────────────
+// Extrait les compositions depuis les données football-data.org déjà fetchées
+// par useMatchDetail (/v4/matches/{id}). Zéro appel supplémentaire — React Query
+// déduplique la requête si useMatchDetail est déjà monté avec le même matchId.
+// Retourne null si le match n'a pas encore de lineup (à venir ou non publié).
+
+const FD_POS = {
+  Goalkeeper: 'GK',
+  Defender:   'DEF',
+  Midfielder: 'MID',
+  Offence:    'FWD',  // football-data.org utilise "Offence" pour les attaquants
+  Forward:    'FWD',
+  Attacker:   'FWD',
+}
+
+export function useFdLineups(match) {
+  const { detail, loading } = useMatchDetail(match?.id)
+
+  const mapPlayer = (p, i) => ({
+    name:         p.name ?? '?',
+    shortName:    p.name ?? '?',
+    number:       p.shirtNumber ?? '',
+    position:     FD_POS[p.position] ?? '',
+    positionName: p.position ?? '',
+    order:        i,
+  })
+
+  const mapTeam = (team) => {
+    if (!team?.lineup?.length) return null
+    return {
+      name:      team.name ?? '?',
+      shortName: team.tla ?? team.name ?? '?',
+      color:     '#1e40af',
+      altColor:  '#ffffff',
+      formation: team.formation ?? '',
+      starters:  (team.lineup ?? []).map(mapPlayer),
+      subs:      (team.bench  ?? []).map(mapPlayer),
+    }
+  }
+
+  const home = mapTeam(detail?.homeTeam)
+  const away = mapTeam(detail?.awayTeam)
+  const data = home?.starters?.length ? { home, away } : null
+  return { data, isLoading: loading }
+}
+
 // ── useH2H ─────────────────────────────────────────────────────────────────────
 // Source : FD.org /matches/{id}/head2head
 

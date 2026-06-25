@@ -1,7 +1,7 @@
 import { useEffect, useState }      from 'react'
 import { createPortal }            from 'react-dom'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups } from '../hooks/useMatchDetail'
+import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
@@ -364,11 +364,16 @@ export function ComposTab({ match, compMatches }) {
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
 
-  // Source 2 : api-football
+  // Source 2 : football-data.org (via useMatchDetail déjà fetchée — zéro quota)
+  // /v4/matches/{id} retourne homeTeam.lineup + awayTeam.lineup + formation
+  const { data: fdLineups, isLoading: fdLoading } = useFdLineups(isFinished ? match : null)
+
+  // Source 3 : api-football
   // WC : en parallèle (ESPN/FIFA souvent vides sans cron)
   // Non-WC : seulement après échec ESPN (économie quota)
+  const espnOrFdHasData = espnHasData || fdLineups?.home?.starters?.length
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(
-    isWC ? match : (espnDone && !espnHasData ? match : null)
+    isWC ? match : (espnDone && !espnOrFdHasData ? match : null)
   )
 
   // Source 3a (matchs à venir) : probables via ESPN (fonctionne WC avec header.competitions)
@@ -384,12 +389,14 @@ export function ComposTab({ match, compMatches }) {
   )
 
   const isLoading = espnLoading || espnMatchLoading
-    || (!espnHasData && aflLoading)
+    || (isFinished && !espnHasData && fdLoading)
+    || (!espnHasData && !fdLineups?.home?.starters?.length && aflLoading)
     || (isUpcoming && probableLoading)
     || (isUpcoming && !probableData && aflProbableLoading)
 
   const lineups = espnLineups?.home?.starters?.length           ? espnLineups
                : espnMatchData?.lineups?.home?.starters?.length ? espnMatchData.lineups
+               : fdLineups?.home?.starters?.length              ? fdLineups
                : aflLineups?.home?.starters?.length             ? aflLineups
                : null
 
