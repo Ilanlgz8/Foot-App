@@ -2842,12 +2842,10 @@
 .poster__crest {
   width: 44px;
   height: 44px;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: 50%;
   border: 1.5px solid rgba(200,210,225,0.28);
   box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 3px 10px rgba(0,0,0,0.6);
-  background: rgba(255,255,255,0.05);
-  padding: 3px;
 }
 .poster__crest-empty {
   width: 44px;
