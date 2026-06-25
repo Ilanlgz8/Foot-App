@@ -4,7 +4,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
-import { useAflLiveStats, useAflLineups, useAflMatchStats } from '../hooks/useApiFootball'
+import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
@@ -368,21 +368,30 @@ export function ComposTab({ match, compMatches }) {
   const aflEnabled  = isWC ? match : (espnDone && !espnHasData ? match : null)
   const { data: aflLineups, isLoading: aflLoading } = useAflLineups(aflEnabled)
 
-  // Source 3 (matchs à venir) : compos probables via ESPN (dernier XI connu, zéro quota)
+  // Source 3a (matchs à venir, non-WC) : compos probables via ESPN (dernier XI connu)
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
-    isUpcoming ? match : null,
+    isUpcoming && !isWC ? match : null,
     compMatches
   )
 
-  const isLoading = (isWC ? aflLoading : (espnLoading || espnMatchLoading || (!espnHasData && aflLoading)))
-    || (isUpcoming && probableLoading)
+  // Source 3b (matchs à venir WC) : compos probables via api-football (ESPN WC sans roster fiable)
+  const { data: aflProbableData, isLoading: aflProbableLoading } = useAflProbableLineups(
+    isUpcoming && isWC ? match : null,
+    compMatches
+  )
+
+  const isLoading = (isWC
+    ? (aflLoading || (isUpcoming && aflProbableLoading))
+    : (espnLoading || espnMatchLoading || (!espnHasData && aflLoading) || (isUpcoming && probableLoading))
+  )
 
   const lineups = espnLineups?.home?.starters?.length             ? espnLineups
                : espnMatchData?.lineups?.home?.starters?.length   ? espnMatchData.lineups
                : aflLineups?.home?.starters?.length               ? aflLineups
                : null
 
-  const probable = !lineups && probableData?.home?.starters?.length ? probableData : null
+  const probSource = probableData ?? aflProbableData ?? null
+  const probable = !lineups && probSource?.home?.starters?.length ? probSource : null
 
   if (isLoading) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
@@ -1242,7 +1251,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               }}
             >
               {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} compMatches={compMatches} />}
-              {tab === 'compos'      && <ComposTab match={match} />}
+              {tab === 'compos'      && <ComposTab match={match} compMatches={compMatches} />}
               {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
               {tab === 'prono'       && (
                 <PronoSection

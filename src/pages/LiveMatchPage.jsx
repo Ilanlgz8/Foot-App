@@ -277,7 +277,7 @@ export default function LiveMatchPage() {
           }}
         >
           {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} prono={prono} homeShort={match.homeTeam?.shortName || match.homeTeam?.name} awayShort={match.awayTeam?.shortName || match.awayTeam?.name} compMatches={compMatches} />}
-          {activeTab === 'compos'     && <ComposTab match={match} />}
+          {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
           {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
         </div>
       </div>

@@ -6,6 +6,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 // ── Mapping FD.org competition code → api-football league + season ─────────────
 const FD_TO_AFL = {
@@ -275,6 +276,59 @@ export function useAflLiveStats(match, isLive = true) {
     staleTime:       85_000,
     retry: 1,
   })
+}
+
+/**
+ * Compositions probables via api-football — fallback WC quand ESPN n'a pas les rosters.
+ * Trouve le dernier XI connu de chaque équipe via leur dernier match dans compMatches.
+ * Zéro quota supplémentaire grâce au cache Redis 7j sur les lineups.
+ */
+export function useAflProbableLineups(match, compMatches) {
+  const homeId = match?.homeTeam?.id
+  const awayId = match?.awayTeam?.id
+
+  // Dernier match terminé de chaque équipe (calcul synchrone via useMemo)
+  const [lastHomeMatch, lastAwayMatch] = useMemo(() => {
+    if (!compMatches?.length || !homeId || !awayId) return [null, null]
+    const sorted = [...compMatches]
+      .filter(m => m.status === 'FINISHED')
+      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+    return [
+      sorted.find(m => m.homeTeam?.id === homeId || m.awayTeam?.id === homeId) ?? null,
+      sorted.find(m => m.homeTeam?.id === awayId || m.awayTeam?.id === awayId) ?? null,
+    ]
+  }, [compMatches, homeId, awayId])
+
+  // Récupère les compos des deux matchs précédents via api-football
+  const { data: homeMatchLineups, isLoading: homeLoading } = useAflLineups(lastHomeMatch)
+  const { data: awayMatchLineups, isLoading: awayLoading } = useAflLineups(lastAwayMatch)
+
+  const isLoading = homeLoading || awayLoading
+
+  const home = useMemo(() => {
+    if (!homeMatchLineups || !lastHomeMatch) return null
+    const wasHome = lastHomeMatch.homeTeam?.id === homeId
+    const roster  = wasHome ? homeMatchLineups.home : homeMatchLineups.away
+    if (!roster?.starters?.length) return null
+    const opponent = wasHome
+      ? (lastHomeMatch.awayTeam?.shortName ?? lastHomeMatch.awayTeam?.name ?? '?')
+      : (lastHomeMatch.homeTeam?.shortName ?? lastHomeMatch.homeTeam?.name ?? '?')
+    return { ...roster, fromMatch: { date: lastHomeMatch.utcDate, opponent } }
+  }, [homeMatchLineups, lastHomeMatch, homeId])
+
+  const away = useMemo(() => {
+    if (!awayMatchLineups || !lastAwayMatch) return null
+    const wasHome = lastAwayMatch.homeTeam?.id === awayId
+    const roster  = wasHome ? awayMatchLineups.home : awayMatchLineups.away
+    if (!roster?.starters?.length) return null
+    const opponent = wasHome
+      ? (lastAwayMatch.awayTeam?.shortName ?? lastAwayMatch.awayTeam?.name ?? '?')
+      : (lastAwayMatch.homeTeam?.shortName ?? lastAwayMatch.homeTeam?.name ?? '?')
+    return { ...roster, fromMatch: { date: lastAwayMatch.utcDate, opponent } }
+  }, [awayMatchLineups, lastAwayMatch, awayId])
+
+  const data = (home || away) ? { home, away } : null
+  return { data, isLoading }
 }
 
 // Stats d'un match terminé — même source mais sans polling
