@@ -1,8 +1,9 @@
-import { translateTeam }            from '../data/teamNames'
-import { calcMinute }               from '../utils/matchUtils'
-import { getMatchState }             from '../utils/matchStateTracker'
-import { calcProno }                 from '../utils/calcProno'
-import { getTeamPhoto, getTeamColor } from '../data/teamPhotos'
+import { translateTeam }             from '../data/teamNames'
+import { calcMinute }                from '../utils/matchUtils'
+import { getMatchState }              from '../utils/matchStateTracker'
+import { calcProno }                  from '../utils/calcProno'
+import { getTeamColor }               from '../data/teamPhotos'
+import { useTeamPhoto }               from '../hooks/useTeamPhoto'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -28,98 +29,94 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
   const awayScore = espnScore?.away ?? match.score?.fullTime?.away
   const minute    = isLive ? calcMinute(match) : null
 
-  const homeName = match.homeTeam?.name ?? ''
-  const awayName = match.awayTeam?.name ?? ''
-  const hForm    = formMap?.[match.homeTeam?.id] ?? []
-  const aForm    = formMap?.[match.awayTeam?.id] ?? []
-  const prono    = calcProno(hForm, aForm)
+  const homeName  = match.homeTeam?.name ?? ''
+  const awayName  = match.awayTeam?.name ?? ''
+  const hForm     = formMap?.[match.homeTeam?.id] ?? []
+  const aForm     = formMap?.[match.awayTeam?.id] ?? []
+  const prono     = calcProno(hForm, aForm)
 
-  // Photo de fond : favori (team avec le plus haut % win)
-  const favName  = prono.home >= prono.away ? homeName : awayName
-  const photo    = getTeamPhoto(favName) ?? getTeamPhoto(homeName) ?? null
+  // Photo Wikipedia de chaque équipe (API REST, cache 7j localStorage)
+  const { data: homePhoto } = useTeamPhoto(homeName)
+  const { data: awayPhoto } = useTeamPhoto(awayName)
+
+  // Favori → on met sa photo en fond. Fallback = crest flouté
+  const isFavHome = prono.home >= prono.away
+  const wikiPhoto  = isFavHome ? homePhoto : awayPhoto
+  const favCrest   = isFavHome ? match.homeTeam?.crest : match.awayTeam?.crest
 
   // Couleurs barre prono
-  const hColor   = getTeamColor(homeName)
-  const aColor   = getTeamColor(awayName)
+  const hColor    = getTeamColor(homeName)
+  const aColor    = getTeamColor(awayName)
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
 
-  return (
-    <div
-      className={'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')}
-      onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
-    >
-      {/* ── Fond ── */}
-      {photo
-        ? <div className="poster__photo" style={{ backgroundImage: `url('${photo}')` }} />
-        : <div className="poster__photo poster__photo--nogradient" />
-      }
-      <div className="poster__fog" />
-      <div className="poster__vignette" />
+  const cls = 'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
 
-      {/* ── Badge compét (haut gauche) ── */}
-      <div className="poster__comp-row">
+  return (
+    <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+
+      {/* ── Fond : photo Wikipedia si dispo, sinon crest flouté ── */}
+      <div
+        className={'poster__bg' + (wikiPhoto ? ' poster__bg--photo' : '')}
+        style={{ backgroundImage: `url('${wikiPhoto ?? favCrest ?? ''}')` }}
+      />
+      <div className="poster__overlay" />
+
+      {/* ── Badge compét / live (haut gauche) ── */}
+      <div className="poster__topbar">
         {isLive
-          ? <div className="poster__live-pill"><span className="poster__live-dot" />En direct</div>
+          ? <div className="poster__live-pill">
+              <span className="poster__live-dot" />En direct
+            </div>
           : <span className="poster__comp-name">{match.competition?.name ?? ''}</span>
         }
       </div>
 
-      {/* ── Corps ── */}
-      <div className="poster__body">
+      {/* ── Crests (grands, écartés) ── */}
+      <div className="poster__crests">
+        <div className="poster__crest-wrap poster__crest-wrap--home">
+          {match.homeTeam?.crest
+            ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <div className="poster__crest-empty" />
+          }
+        </div>
+        <div className="poster__crest-wrap poster__crest-wrap--away">
+          {match.awayTeam?.crest
+            ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <div className="poster__crest-empty" />
+          }
+        </div>
+      </div>
 
-        {/* Minute AU-DESSUS du score (live uniquement) */}
+      {/* ── Centre : label + heure/score ── */}
+      <div className="poster__center">
+        {/* Minute (live) ou "Coup d'envoi" / "Terminé" (au-dessus) */}
         {isLive && minute && (
-          <div className="poster__minute-top">
+          <div className="poster__min-label">
             {minute === 'MT' ? 'Mi-temps' : `${minute}'`}
           </div>
         )}
+        {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
+        {isFinished  && <div className="poster__env-label">Terminé</div>}
 
-        {/* Score / Heure */}
+        {/* Score / Heure — gros, en dessous du label */}
         {(isLive || isFinished)
           ? <div className="poster__score">{homeScore ?? 0} – {awayScore ?? 0}</div>
           : <div className="poster__time">{formatHour(match.utcDate)}</div>
         }
-
-        {/* Équipes : crest + nom */}
-        <div className="poster__teams">
-          <div className="poster__team poster__team--home">
-            {match.homeTeam?.crest && (
-              <img
-                className="poster__crest"
-                src={match.homeTeam.crest}
-                alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }}
-              />
-            )}
-            <span className="poster__team-name">{homeShort}</span>
-          </div>
-          <div className="poster__team poster__team--away">
-            {match.awayTeam?.crest && (
-              <img
-                className="poster__crest"
-                src={match.awayTeam.crest}
-                alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }}
-              />
-            )}
-            <span className="poster__team-name">{awayShort}</span>
-          </div>
-        </div>
-
-        {/* Sous-label */}
-        <div className="poster__sub-label">
-          {isFinished ? 'Terminé'
-           : isLive   ? ''
-           : "Coup d'envoi"}
-        </div>
       </div>
 
-      {/* ── Barre prono (footer) ── */}
+      {/* ── Noms équipes (écartés, sous le centre) ── */}
+      <div className="poster__names">
+        <span className="poster__name poster__name--home">{homeShort}</span>
+        <span className="poster__name poster__name--away">{awayShort}</span>
+      </div>
+
+      {/* ── Barre prono ── */}
       <div className="poster__footer">
-        {/* Labels alignés sur les segments */}
         <div className="poster__prono-labels">
           <span className="poster__lbl poster__lbl--h" style={{ width: `${prono.home}%` }}>
             {homeShort} {prono.home}%
@@ -131,7 +128,6 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
             {awayShort} {prono.away}%
           </span>
         </div>
-        {/* Barre */}
         <div className="poster__prono-bar">
           <div className="poster__seg poster__seg--h" style={{ width: `${prono.home}%`, background: hColor }} />
           <div className="poster__seg poster__seg--d"  style={{ width: `${prono.draw}%` }} />

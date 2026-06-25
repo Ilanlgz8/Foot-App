@@ -2635,93 +2635,96 @@
     padding: 0;
   }
 
-  /* Sur mobile : posters visibles, cards normales cachées */
+  /* Sur mobile : posters visibles, cards normales cachées
+     ⚠️ Cibler uniquement le matchPanel, pas le ResultPanel */
   .accueil__posterList {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-  .accueil__dashPanelBody .accueil__matchCards {
+  .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__matchCards {
     display: none;
   }
 }
 
-/* ── Poster ── */
+/* =========================================================
+   POSTER — structure et couches
+   ========================================================= */
+
 .poster {
   position: relative;
   width: 100%;
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  min-height: 220px;
+  min-height: 210px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  background: #111;
+  background: #0e0e0e;
 }
 
-/* Photo de fond */
-.poster__photo {
+/* Fond : photo Wikipedia (priorité) ou crest flouté (fallback) */
+.poster__bg {
   position: absolute;
+  inset: -20%;
+  background-size: 80%;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(28px) saturate(1.6) brightness(0.55);
+  z-index: 0;
+  transform: scale(1.1);
+}
+/* Quand on a une vraie photo : cover plein format, peu de blur */
+.poster__bg--photo {
   inset: 0;
   background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  z-index: 0;
-}
-.poster__photo--nogradient {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background-position: center 20%;
+  filter: blur(2px) brightness(0.45) saturate(1.2);
+  transform: none;
 }
 
-/* Couches d'obscurcissement empilées */
-.poster__fog {
+/* Overlay sombre + dégradé directional */
+.poster__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.48);
+  background:
+    linear-gradient(to bottom,
+      rgba(0,0,0,0.55) 0%,
+      rgba(0,0,0,0.25) 45%,
+      rgba(0,0,0,0.70) 100%);
   z-index: 1;
 }
-.poster__vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%);
+
+/* Tout le contenu passe au-dessus des calques de fond */
+.poster__topbar,
+.poster__crests,
+.poster__center,
+.poster__names,
+.poster__footer {
+  position: relative;
   z-index: 2;
 }
 
-/* Dégradé bas plus sombre pour le footer */
-.poster::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 70px;
-  background: linear-gradient(to top, rgba(0,0,0,0.82), transparent);
-  z-index: 3;
-  pointer-events: none;
-}
-
-/* ── Badge compét / live ── */
-.poster__comp-row {
-  position: relative;
-  z-index: 10;
-  padding: 10px 12px 0;
+/* ── Barre du haut : badge compét / live ── */
+.poster__topbar {
   display: flex;
   align-items: center;
+  padding: 10px 14px 0;
 }
 .poster__comp-name {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.5);
 }
 .poster__live-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   background: rgba(239,68,68,0.18);
-  border: 1px solid rgba(239,68,68,0.45);
+  border: 1px solid rgba(239,68,68,0.5);
   border-radius: 20px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -2733,107 +2736,116 @@
   height: 6px;
   border-radius: 50%;
   background: #ef4444;
+  flex-shrink: 0;
   animation: posterLivePulse 1.2s ease-in-out infinite;
 }
 @keyframes posterLivePulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.8); }
+  50%       { opacity: 0.35; transform: scale(0.7); }
 }
 
-/* ── Corps : minute + score + équipes + sous-label ── */
-.poster__body {
-  position: relative;
-  z-index: 10;
+/* ── Crests : grands, un à gauche, un à droite ── */
+.poster__crests {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px 0;
+}
+.poster__crest-wrap {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.poster__crest {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7));
+}
+.poster__crest-empty {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Centre : label + heure ou score ── */
+.poster__center {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 4px;
+  gap: 2px;
+  padding: 10px 0 6px;
 }
 
-/* Minute AU-DESSUS du score (live) */
-.poster__minute-top {
+/* "Coup d'envoi" / "Terminé" / minute live — AU-DESSUS du score */
+.poster__env-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  line-height: 1;
+}
+.poster__min-label {
   font-size: 0.9rem;
   font-weight: 900;
   color: #f87171;
   letter-spacing: 0.05em;
-  text-shadow: 0 0 12px rgba(239,68,68,0.6);
+  text-shadow: 0 0 14px rgba(239,68,68,0.55);
   line-height: 1;
 }
 
-/* Score */
+/* Heure (upcoming) */
+.poster__time {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.6);
+}
+
+/* Score (live / terminé) */
 .poster__score {
-  font-size: 2.2rem;
+  font-size: 2.4rem;
   font-weight: 900;
   letter-spacing: 0.04em;
   color: #fff;
-  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
   line-height: 1;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.5);
 }
 .poster--live .poster__score {
   color: #f87171;
-  text-shadow: 0 0 20px rgba(239,68,68,0.5);
+  text-shadow: 0 0 22px rgba(239,68,68,0.45);
 }
 
-/* Heure (à venir) */
-.poster__time {
-  font-size: 2rem;
-  font-weight: 900;
-  color: rgba(255,255,255,0.92);
-  letter-spacing: 0.06em;
-  line-height: 1;
-}
-
-/* Équipes côte à côte */
-.poster__teams {
+/* ── Noms d'équipe : écartés gauche / droite ── */
+.poster__names {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 32px;
-  width: 100%;
-}
-.poster__team {
-  display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 5px;
-  flex: 1;
-  max-width: 120px;
+  padding: 0 20px 12px;
 }
-.poster__crest {
-  width: 34px;
-  height: 34px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
-}
-.poster__team-name {
-  font-size: 0.72rem;
+.poster__name {
+  font-size: 0.78rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.9);
-  text-align: center;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  color: rgba(255,255,255,0.88);
   letter-spacing: 0.02em;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  max-width: 38%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
 }
-
-/* Sous-label ("Coup d'envoi", "Terminé") */
-.poster__sub-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.45);
-  min-height: 0.8em;
-}
+.poster__name--home { text-align: left; }
+.poster__name--away { text-align: right; }
 
 /* ── Footer : barre prono ── */
 .poster__footer {
-  position: relative;
-  z-index: 10;
-  padding: 0 12px 12px;
+  padding: 0 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -2847,9 +2859,9 @@
   overflow: hidden;
 }
 .poster__lbl {
-  font-size: 0.54rem;
+  font-size: 0.52rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.65);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2864,7 +2876,7 @@
 .poster__prono-bar {
   display: flex;
   width: 100%;
-  height: 6px;
+  height: 5px;
   border-radius: 4px;
   overflow: hidden;
   gap: 2px;
@@ -2872,8 +2884,12 @@
 .poster__seg {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.3s ease;
 }
 .poster__seg--d {
   background: rgba(255,255,255,0.18);
 }
+
+/* ── Variante live ── */
+.poster--live .poster__env-label { color: rgba(239,68,68,0.6); }
+
+/* (anciennes classes poster supprimées — cf. nouveau bloc POSTER ci-dessus) */
