@@ -352,16 +352,21 @@ export function ComposTab({ match, compMatches }) {
   const isFinished = match?.status === 'FINISHED'
   const isUpcoming = !isFinished
 
+  // WC 2026 : ESPN ne retourne pas les rosters de manière fiable (requiert FIFA Redis
+  // populé pendant le match live). On lance api-football en parallèle immédiatement.
+  const isWC = match?.competition?.id === 2000 || match?.competition?.code === 'WC'
+
   // Source 1 : ESPN/FIFA — toujours en premier (zéro quota)
   const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
   const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match)
 
-  // Source 2 : api-football — SEULEMENT si ESPN n'a rien (protège le quota 10req/min)
+  // Source 2 : api-football
+  // — WC : lance immédiatement en parallèle (ESPN WC fiable seulement si match passé en live)
+  // — Autres : SEULEMENT si ESPN n'a rien (protège le quota 100 req/jour)
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
-  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(
-    espnDone && !espnHasData ? match : null
-  )
+  const aflEnabled  = isWC ? !!match : (espnDone && !espnHasData ? match : null)
+  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(aflEnabled)
 
   // Source 3 (matchs à venir) : compos probables via ESPN (dernier XI connu, zéro quota)
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
@@ -369,8 +374,7 @@ export function ComposTab({ match, compMatches }) {
     compMatches
   )
 
-  const isLoading = espnLoading || espnMatchLoading
-    || (!espnHasData && aflLoading)
+  const isLoading = (isWC ? aflLoading : (espnLoading || espnMatchLoading || (!espnHasData && aflLoading)))
     || (isUpcoming && probableLoading)
 
   const lineups = espnLineups?.home?.starters?.length             ? espnLineups
