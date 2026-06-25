@@ -260,55 +260,84 @@ function Accueil() {
     ? [...liveMatches, ...pendingMatches]
     : liveMatches
 
+  // Résultats récents partagés (utilisés dans le panneau résultats)
+  const resultPanel = (() => {
+    const now4h = Date.now() - 4 * 60 * 60_000
+    const todayFt = matches.filter(m => {
+      if (liveMatches.some(l => l.id === m.id)) return false
+      const st = getMatchState(m.id)
+      if (st.ft) return true
+      if (st.liveState === 'ended' && st.endedAt > now4h) return true
+      return false
+    })
+    const todayFtIds = new Set(todayFt.map(m => m.id))
+    const todayFtMapped = todayFt.map(m => {
+      let lsHome = null, lsAway = null
+      try {
+        const lsScore = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
+        if (lsScore && lsScore.home != null) { lsHome = lsScore.home; lsAway = lsScore.away }
+      } catch {}
+      return {
+        ...m,
+        score: { fullTime: { home: espnScores[m.id]?.home ?? lsHome ?? m.score?.fullTime?.home, away: espnScores[m.id]?.away ?? lsAway ?? m.score?.fullTime?.away } },
+        status: 'FINISHED',
+      }
+    })
+    return [...todayFtMapped, ...filteredResults.filter(r => !todayFtIds.has(r.id))]
+  })()
+
   return (
-    <>
     <section className="accueil">
       <div className="accueil__backdrop accueil__backdrop--one" />
       <div className="accueil__backdrop accueil__backdrop--two" />
 
-      {/* ── Hero — titre pleine largeur sous la navbar ── */}
-      <div className="accueil__hero">
-        <h1 className="accueil__heroTitle">
-          <span className="accueil__heroStat">Stat</span>Footix
-        </h1>
-        <p className="accueil__heroSub">stats &amp; live</p>
-
-        {/* Bouton DIRECT — coin haut-droit du hero, mobile uniquement */}
-        {widgetMatches.length > 0 && (
-          <button className="accueil__livePageBtn" onClick={() => navigate('/live')}>
-            <span className="accueil__livePageBtnDot" />
-            DIRECT
-            <span className="accueil__livePageBtnArrow">›</span>
-          </button>
-        )}
-      </div>
-
       <div className="accueil__inner">
 
-        {/* ── Grille principale ── */}
-        <div className={`accueil__mainGrid${widgetMatches.length > 0 ? ' accueil__mainGrid--live' : ''}`}>
+        {/* ── Mini header ── */}
+        <div className="accueil__miniHeader">
+          <h1 className="accueil__miniTitle">
+            <span className="accueil__heroStat">Stat</span>Footix
+          </h1>
+          <span className="accueil__miniDate">{todayStr}</span>
+        </div>
 
-          {/* Col gauche : Matchs */}
+        {/* ── Live — pleine largeur, priorité absolue ── */}
+        {widgetMatches.length > 0 && (
+          <div className="accueil__liveSection">
+            <div className="accueil__liveSectionHeader">
+              <span className="accueil__liveDot" />
+              <span className="accueil__liveSectionTitle">EN DIRECT</span>
+              <button className="accueil__liveDirectBtn" onClick={() => navigate('/live')}>
+                Voir tout <span className="accueil__livePageBtnArrow">›</span>
+              </button>
+            </div>
+            <LiveWidget
+              liveMatches={widgetMatches}
+              espnScores={espnScores}
+              trackedIds={trackedIds}
+              onRecalibrate={recalibrate}
+              onMatchClick={(m) => navigate(`/live/${m.id}`)}
+            />
+          </div>
+        )}
+
+        {/* ── Grille matchs / résultats — toujours 2 colonnes sur desktop ── */}
+        <div className="accueil__mainGrid">
+
+          {/* Matchs à venir */}
           <div className="accueil__dashPanel">
             <div className="accueil__dashPanelHeader">
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
             </div>
-            <CompFilter
-              competitions={matchCompetitions}
-              active={compFilterMatch}
-              onChange={setCompFilterMatch}
-            />
+            <CompFilter competitions={matchCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
               matches={dayOffset === 0
                 ? filteredMatches.filter(m => {
-                    // Masquer dès que le match est dans le widget (live ou pending KO)
                     if (widgetMatches.some(l => l.id === m.id)) return false
-                    // Masquer si FD.org dit déjà IN_PLAY/PAUSED (widget pas encore à jour)
                     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return false
-                    // Masquer si terminé (FD.org ou flag local ESPN)
                     if (m.status === 'FINISHED' || getMatchState(m.id).ft) return false
                     return true
                   })
@@ -319,98 +348,29 @@ function Accueil() {
             />
           </div>
 
-          {/* Col droite : Live widget (si live) + Résultats récents */}
-          <div className="accueil__rightCol">
-
-            {/* Live widget — desktop : dans la col droite | mobile : toujours visible */}
-            {widgetMatches.length > 0 && (
-              <div className="accueil__liveWidgetWrap">
-                <p className="accueil__heroDate">{todayStr}</p>
-                <LiveWidget
-                  liveMatches={widgetMatches}
-                  espnScores={espnScores}
-                  trackedIds={trackedIds}
-                  onRecalibrate={recalibrate}
-                  onMatchClick={(m) => navigate(`/live/${m.id}`)}
-                />
-              </div>
-            )}
-
-            {/* Résultats récents — toujours visible (données toujours basées sur aujourd'hui/hier) */}
-            {<div className="accueil__dashPanel">
-              <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
-                <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
-                <div className="accueil__resultHeaderRight">
-                  <CompFilter
-                    competitions={resultCompetitions}
-                    active={compFilterResult}
-                    onChange={setCompFilterResult}
-                  />
-                  <div className="accueil__resultTabs accueil__resultTabs--header">
-                    <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
-                    <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
-                  </div>
+          {/* Résultats récents */}
+          <div className="accueil__dashPanel">
+            <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
+              <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
+              <div className="accueil__resultHeaderRight">
+                <CompFilter competitions={resultCompetitions} active={compFilterResult} onChange={setCompFilterResult} />
+                <div className="accueil__resultTabs accueil__resultTabs--header">
+                  <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
+                  <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
                 </div>
               </div>
-              <div className="accueil__dashPanelDivider" />
-              {(() => {
-                const now4h = Date.now() - 4 * 60 * 60_000
-                // todayFt = matchs terminés récemment :
-                //   • ft:true  → encore dans la grace period (< 5min post-FT)
-                //   • liveState:'ended' + endedAt < 4h → après l'éviction, pour forcer
-                //     le score ESPN (FD.org peut être encore à l'ancien score)
-                const todayFt = matches.filter(m => {
-                  if (liveMatches.some(l => l.id === m.id)) return false
-                  const st = getMatchState(m.id)
-                  if (st.ft) return true
-                  if (st.liveState === 'ended' && st.endedAt > now4h) return true
-                  return false
-                })
-                const todayFtIds = new Set(todayFt.map(m => m.id))
-                const todayFtMapped = todayFt.map(m => {
-                  // Fallback : score ESPN persisté dans localStorage (écrit par confirmFt)
-                  // → plus fiable que FD.org dans les ~30min post-FT (FD.org est lent à maj)
-                  let lsHome = null, lsAway = null
-                  try {
-                    const lsScore = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
-                    if (lsScore && lsScore.home != null) { lsHome = lsScore.home; lsAway = lsScore.away }
-                  } catch {}
-                  return {
-                    ...m,
-                    score: {
-                      fullTime: {
-                        home: espnScores[m.id]?.home ?? lsHome ?? m.score?.fullTime?.home,
-                        away: espnScores[m.id]?.away ?? lsAway ?? m.score?.fullTime?.away,
-                      }
-                    },
-                    status: 'FINISHED',
-                  }
-                })
-                const allResults = [
-                  ...todayFtMapped,
-                  ...filteredResults.filter(r => !todayFtIds.has(r.id)),
-                ]
-                return (
-                  <ResultPanel
-                    results={allResults}
-                    loading={resultsLoading}
-                    view={resultView}
-                  />
-                )
-              })()}
-            </div>}
-
+            </div>
+            <div className="accueil__dashPanelDivider" />
+            <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} />
           </div>
+
         </div>
 
-        {/* ── Actualités ── */}
+        {/* ── Actualités — inchangé ── */}
         <NewsCarousel news={news} loading={newsLoading} error={newsError} />
 
       </div>
     </section>
-
-
-</>
   )
 }
 

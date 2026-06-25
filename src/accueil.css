@@ -6,7 +6,7 @@
   position: relative;
   isolation: isolate;
   min-height: calc(100vh - 4.2rem);
-  padding: 0.35rem 1.25rem 4rem;
+  padding: 0 1.25rem 4rem;
   color: #e5e7eb;
   overflow: hidden;
   background: #060606;
@@ -47,35 +47,100 @@
   animation: float 10s ease-in-out infinite reverse;
 }
 
-/* ── Hero banner — titre pleine largeur sous la navbar ── */
-.accueil__hero {
+/* ── Mini header ── */
+.accueil__miniHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0 0.9rem;
   position: relative;
   z-index: 1;
-  width: 100%;
-  text-align: center;
-  padding: 2.2rem 1rem 1.4rem;
 }
 
-.accueil__heroTitle {
-  font-size: clamp(2.8rem, 7vw, 4rem);
+.accueil__miniTitle {
+  font-size: 1.35rem;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   color: #fff;
   margin: 0;
   line-height: 1;
-  text-shadow: 0 4px 32px rgba(0,0,0,0.6), 0 0 60px rgba(192,24,24,0.15);
 }
 
 .accueil__heroStat {
   color: #ef4444;
 }
 
-.accueil__heroSub {
-  font-size: clamp(0.75rem, 2.8vw, 1rem);
-  color: rgba(255,255,255,0.38);
-  letter-spacing: 0.45em;
+.accueil__miniDate {
+  font-size: 0.72rem;
+  color: #3a3a3a;
+  text-transform: capitalize;
+}
+
+/* ── Section live — pleine largeur ── */
+.accueil__liveSection {
+  background: linear-gradient(160deg, #0f0f0f 0%, #0a0a0a 100%);
+  border: 1px solid rgba(239,68,68,0.18);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 1rem;
+  animation: fadeUp 0.4s ease both;
+}
+
+.accueil__liveSection::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #dc2626 0%, rgba(220,38,38,0.3) 55%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 1.25rem 1.25rem 0 0;
+}
+
+.accueil__liveSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.85rem 1.2rem 0.4rem;
+}
+
+.accueil__liveDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.accueil__liveSectionTitle {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #ef4444;
   text-transform: uppercase;
-  margin: 0.55rem 0 0;
+  flex: 1;
+}
+
+.accueil__liveDirectBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.7rem;
+  background: rgba(220,38,38,0.12);
+  border: 1px solid rgba(220,38,38,0.25);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f87171;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+
+.accueil__liveDirectBtn:hover {
+  background: rgba(220,38,38,0.22);
 }
 
 .accueil__inner {
@@ -86,8 +151,7 @@
 }
 
 
-/* ── GRILLE PRINCIPALE ── */
-/* Pas de live : 50/50 */
+/* ── GRILLE PRINCIPALE — toujours 50/50 ── */
 .accueil__mainGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -96,25 +160,11 @@
   margin-bottom: 1.2rem;
   animation: fadeUp 0.5s ease both;
 }
-/* Avec live : 60/40 */
-.accueil__mainGrid--live {
-  grid-template-columns: 3fr 2fr;
-}
 
-/* Mobile : 1 colonne — matchs à venir en premier, résultats en second */
 @media (max-width: 640px) {
-  .accueil__mainGrid,
-  .accueil__mainGrid--live {
+  .accueil__mainGrid {
     grid-template-columns: 1fr;
   }
-}
-
-/* Col droite : live widget + résultats empilés */
-.accueil__rightCol {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-width: 0;
 }
 
 /* Wrapper live widget desktop */
