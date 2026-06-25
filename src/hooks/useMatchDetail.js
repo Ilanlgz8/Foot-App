@@ -112,6 +112,7 @@ export function useLineups(match) {
           const url = `/api/fifa-lineups?fdMatchId=${match.id}`
             + `&home=${encodeURIComponent(fdHome)}`
             + `&away=${encodeURIComponent(fdAway)}`
+            + `&utcDate=${encodeURIComponent(match.utcDate ?? '')}`
           const res = await fetch(url)
           if (res.ok) {
             const data = await res.json()
@@ -159,18 +160,6 @@ export function useLineups(match) {
             formation:  c.formation ?? '',
           }))
         }
-      }
-
-      // DEBUG WC — à retirer après diagnostic
-      if (isFifaComp) {
-        const r0 = rosters[0] ?? {}
-        console.log('[ESPN WC DEBUG]', {
-          rostersLen: rosters.length,
-          roster0keys: Object.keys(r0),
-          roster0athletesLen: r0.athletes?.length,
-          roster0rosterLen: r0.roster?.length,
-          roster0playersLen: r0.players?.length,
-        })
       }
 
       if (rosters.length < 1) return null
