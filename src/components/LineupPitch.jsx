@@ -312,8 +312,8 @@ export default function LineupPitch({ home, away }) {
         })}
       </div>
 
-      {/* ── Terrain SVG pleine largeur ── */}
-      <svg viewBox={`0 0 ${PW} ${PH}`} width="100%" style={{ display: 'block' }} aria-label="Composition">
+      {/* ── Terrain SVG — capé à 380px pour éviter un rendu géant sur desktop ── */}
+      <svg viewBox={`0 0 ${PW} ${PH}`} width="100%" style={{ display: 'block', maxWidth: 380, margin: '0 auto' }} aria-label="Composition">
         <PitchMarkings formation={team.formation} />
         {positions.map(({ x, y, player }, i) =>
           player ? <PlayerIcon key={i} x={x} y={y} player={player} /> : null

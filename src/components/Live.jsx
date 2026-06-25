@@ -202,6 +202,17 @@ function LiveCard({ match, espn, onClick }) {
 
   useEffect(() => {
     if (!isLive) { prevHs.current = null; prevAs.current = null; return }
+    // But annulé (VAR/hors-jeu) → score redescend → effacer l'animation immédiatement
+    if (
+      (prevHs.current !== null && hs != null && hs < prevHs.current) ||
+      (prevAs.current !== null && as_ != null && as_ < prevAs.current)
+    ) {
+      clearTimeout(timerRef.current)
+      setGoal(null)
+      if (hs  != null) prevHs.current = hs
+      if (as_ != null) prevAs.current = as_
+      return
+    }
     if (prevHs.current !== null && hs != null && hs > prevHs.current) {
       const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
       setGoal({ team, scoreStr: `${hs} – ${as_ ?? 0}`, side: 'home' })

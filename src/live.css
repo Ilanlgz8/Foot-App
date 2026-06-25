@@ -80,7 +80,7 @@
 /* Card match */
 .live__card {
   position: relative;
-  background: linear-gradient(145deg, rgba(18,24,38,0.96), rgba(10,14,24,0.98));
+  background: linear-gradient(145deg, rgba(8,8,8,0.98), rgba(4,4,4,0.99));
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 1rem;
   overflow: hidden;
@@ -158,15 +158,15 @@
 }
 
 .live__crest {
-  width: 3rem;
-  height: 3rem;
+  width: 4rem;
+  height: 4rem;
   object-fit: contain;
   flex-shrink: 0;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
 }
 .live__crestFallback {
-  width: 3rem;
-  height: 3rem;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.07);
   flex-shrink: 0;

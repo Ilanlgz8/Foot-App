@@ -197,8 +197,8 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
       }
     },
     enabled:         enabled && !!espnEventId && !!espnSlug,
-    staleTime:       60_000,
-    refetchInterval: enabled ? 90_000 : false,
+    staleTime:       30_000,
+    refetchInterval: enabled ? 60_000 : false,
     retry:           false,
   })
 }

@@ -23,6 +23,18 @@ import {
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
 
+// ── Animation BUT ─────────────────────────────────────────────────────────────
+function GoalCelebration({ teamName, scoreStr }) {
+  return (
+    <div className="goal__overlay" aria-hidden="true">
+      <span className="goal__text">BUT !</span>
+      <div className="goal__line" />
+      {teamName && <span className="goal__team">{teamName}</span>}
+      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
+    </div>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
 
@@ -55,14 +67,28 @@ function MatchHeader({ match, espn }) {
   const prevAs   = useRef(null)
   const timerRef = useRef(null)
   const [goalSide, setGoalSide] = useState(null)
+  const [goal, setGoal] = useState(null)
 
   useEffect(() => {
+    // But annulé (VAR/hors-jeu) → score redescend → effacer immédiatement
+    if (
+      (prevHs.current !== null && hs != null && hs < prevHs.current) ||
+      (prevAs.current !== null && as_ != null && as_ < prevAs.current)
+    ) {
+      clearTimeout(timerRef.current)
+      setGoalSide(null); setGoal(null)
+      if (hs  != null) prevHs.current = hs
+      if (as_ != null) prevAs.current = as_
+      return
+    }
     if (hs != null && prevHs.current != null && hs > prevHs.current) {
-      setGoalSide('home'); clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoalSide(null), 5200)
+      setGoalSide('home'); setGoal({ team: homeName, scoreStr: `${hs} – ${as_ ?? 0}` })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
     } else if (as_ != null && prevAs.current != null && as_ > prevAs.current) {
-      setGoalSide('away'); clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoalSide(null), 5200)
+      setGoalSide('away'); setGoal({ team: awayName, scoreStr: `${hs ?? 0} – ${as_}` })
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
     }
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
@@ -83,6 +109,7 @@ function MatchHeader({ match, espn }) {
 
   return (
     <div className="lmp__header">
+      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
       {/* Compétition */}
       {comp && (
         <div className="lmp__comp">

@@ -27,6 +27,8 @@
 
 /* ── Header match ── */
 .lmp__header {
+  position: relative;
+  overflow: hidden;
   margin: 1rem;
   padding: 0.5rem 1rem 1.1rem;
   background: linear-gradient(160deg, rgba(25,10,10,0.95), rgba(10,10,18,0.98));
