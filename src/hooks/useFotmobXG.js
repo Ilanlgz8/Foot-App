@@ -78,31 +78,56 @@ const FOT_POS_MAP = { 1:'GK', 2:'DEF', 3:'MID', 4:'FWD' }
 
 function extractFotmobLineup(data) {
   if (!data) return null
-  const lup = data.content?.lineup
+
+  // FotMob change parfois la structure — on essaie plusieurs chemins
+  const rawLup = data.content?.lineup
+
+  // Chemin A : content.lineup.homeTeam / awayTeam (structure commune)
+  // Chemin B : content.lineup.lineup.homeTeam / awayTeam (double imbrication)
+  const lup = rawLup?.homeTeam ? rawLup : (rawLup?.lineup ?? null)
   if (!lup) return null
+
+  // Aplatir les joueurs selon la structure retournée
+  // Cas 1 : td.players = [{isFirstEleven, name, shirt, role, ...}]
+  // Cas 2 : td.lineup  = [[player, ...], [...], ...] (lignes de jeu) — flatten
+  // Cas 3 : td.players = {starters:[], bench:[]} — objet pas tableau
+  const flatPlayers = (td) => {
+    if (!td) return []
+    const src = td.players ?? td.lineup ?? td.starters ?? []
+    if (Array.isArray(src) && src.length > 0) {
+      if (Array.isArray(src[0])) return src.flat()  // tableau de tableaux (lignes)
+      return src
+    }
+    // starters séparés des remplaçants dans deux tableaux distincts
+    const starters = td.startXI ?? td.starters ?? []
+    const bench    = td.bench ?? td.substitutes ?? []
+    return [...starters.map(p => ({...p, isFirstEleven: true})), ...bench]
+  }
 
   const mapTeam = (td) => {
     if (!td) return null
-    const all = td.players ?? td.lineup ?? []
+    const all = flatPlayers(td)
     if (!all.length) return null
-    const starters = all.filter(p => p.isFirstEleven || p.starter)
-    const subs     = all.filter(p => !(p.isFirstEleven || p.starter))
+    const starters = all.filter(p => p.isFirstEleven || p.starter || p.positionId != null && p.positionRowIndex != null)
+    // Si aucun marqueur starter, prendre les 11 premiers
+    const finalStart = starters.length >= 7 ? starters : all.slice(0, 11)
+    const finalSubs  = starters.length >= 7 ? all.filter(p => !(p.isFirstEleven || p.starter)) : all.slice(11)
     const mapP = (p, i) => ({
-      name:      p.name ?? p.shortName ?? '?',
-      shortName: p.shortName ?? (p.name ?? '?').split(' ').pop(),
-      number:    p.shirt ?? p.number ?? '',
-      position:  FOT_POS_MAP[FOT_POS[p.role ?? ''] ?? 0] ?? p.role ?? '',
+      name:      p.name ?? p.fullName ?? p.shortName ?? '?',
+      shortName: p.shortName ?? p.usualName ?? (p.name ?? '?').split(' ').pop(),
+      number:    p.shirt ?? p.number ?? p.jerseyNumber ?? '',
+      position:  FOT_POS_MAP[FOT_POS[p.role ?? p.positionId ?? ''] ?? 0] ?? p.role ?? '',
       order:     i,
     })
-    if (!starters.length) return null
+    if (!finalStart.length) return null
     return {
-      name:      td.title ?? td.name ?? '',
-      shortName: td.shortTitle ?? td.title ?? '',
+      name:      td.title ?? td.name ?? td.teamName ?? '',
+      shortName: td.shortTitle ?? td.shortName ?? td.title ?? '',
       color:     '#1e293b',
       altColor:  '#ffffff',
-      formation: td.formation ?? '',
-      starters:  starters.map(mapP),
-      subs:      subs.map(mapP),
+      formation: td.formation ?? td.tacticalFormation ?? '',
+      starters:  finalStart.map(mapP),
+      subs:      finalSubs.map(mapP),
     }
   }
 
@@ -155,6 +180,10 @@ export function useFotmobLineup(match) {
       const res = await fetch(`/api/fotmob?matchId=${fotmobId}`)
       if (!res.ok) return null
       const data = await res.json()
+      // DEBUG temporaire — vérifier la structure FotMob dans la console
+      console.log('[FotmobLineup] keys:', Object.keys(data?.content ?? {}))
+      const lup = data?.content?.lineup
+      if (lup) console.log('[FotmobLineup] lineup keys:', Object.keys(lup), '| homeTeam keys:', Object.keys(lup.homeTeam ?? lup.home ?? lup.lineup?.homeTeam ?? {}))
       return extractFotmobLineup(data)
     },
   })
