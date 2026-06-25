@@ -77,14 +77,14 @@
 }
 
 .lmp__crest {
-  width: 52px;
-  height: 52px;
+  width: 4rem;
+  height: 4rem;
   object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
 }
 .lmp__crestFallback {
-  width: 52px;
-  height: 52px;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.06);
 }
@@ -94,8 +94,9 @@
   font-weight: 700;
   color: rgba(255,255,255,0.85);
   text-align: center;
-  word-break: break-word;
-  hyphens: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 90px;
 }
 
