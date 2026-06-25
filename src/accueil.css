@@ -2744,15 +2744,16 @@
   50%       { opacity: 0.35; transform: scale(0.7); }
 }
 
-/* ── Centre : "Coup d'envoi" + heure/score — bloc centré, prioritaire ── */
+/* ── Centre : "Coup d'envoi" + heure/score — centré, vers le milieu de la card ── */
 .poster__center {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 14px 0 8px;
+  padding: 6px 0 4px;
   text-align: center;
+  flex: 1;
 }
 
 /* Label au-dessus (Coup d'envoi / Terminé / Mi-temps) */
@@ -2799,53 +2800,48 @@
   text-shadow: 0 0 22px rgba(239,68,68,0.45);
 }
 
-/* ── Noms d'équipe : remontés, juste sous le centre ── */
-.poster__names {
+/* ── Teams row : drapeau au-dessus du nom, G/D écartés ── */
+.poster__teams-row {
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 18px 10px;
+}
+.poster__team-col {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 0 18px 6px;
+  gap: 5px;
+  max-width: 42%;
+}
+.poster__team-col--home { align-items: flex-start; }
+.poster__team-col--away { align-items: flex-end; }
+
+.poster__crest {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.65));
+}
+.poster__crest-empty {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
 }
 .poster__name {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 800;
   color: rgba(255,255,255,0.9);
   letter-spacing: 0.02em;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
-  max-width: 40%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
-.poster__name--home { text-align: left; }
-.poster__name--away { text-align: right; }
-
-/* ── Crests : un à gauche, un à droite — plus bas, sous les noms ── */
-.poster__crests {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px 10px;
-}
-.poster__crest-wrap {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.poster__crest {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.65));
-}
-.poster__crest-empty {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-}
+.poster__team-col--home .poster__name { text-align: left; }
+.poster__team-col--away .poster__name { text-align: right; }
 
 /* ── Footer : barre prono ── */
 .poster__footer {

@@ -88,27 +88,23 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
         }
       </div>
 
-      {/* ── Noms équipes — juste sous le centre ── */}
-      <div className="poster__names">
-        <span className="poster__name poster__name--home">{homeShort}</span>
-        <span className="poster__name poster__name--away">{awayShort}</span>
-      </div>
-
-      {/* ── Crests — en bas, au-dessus de la barre prono ── */}
-      <div className="poster__crests">
-        <div className="poster__crest-wrap">
+      {/* ── Teams : drapeau juste au-dessus du nom, écartés G/D ── */}
+      <div className="poster__teams-row">
+        <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest
             ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
                 onError={e => { e.currentTarget.style.display = 'none' }} />
             : <div className="poster__crest-empty" />
           }
+          <span className="poster__name">{homeShort}</span>
         </div>
-        <div className="poster__crest-wrap">
+        <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest
             ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
                 onError={e => { e.currentTarget.style.display = 'none' }} />
             : <div className="poster__crest-empty" />
           }
+          <span className="poster__name">{awayShort}</span>
         </div>
       </div>
 
