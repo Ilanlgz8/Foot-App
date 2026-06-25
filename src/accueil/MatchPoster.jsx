@@ -4,12 +4,18 @@ import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
 import { getTeamColor }               from '../data/teamPhotos'
 import { useTeamPhoto }               from '../hooks/useTeamPhoto'
+import { useTeamForm }                from '../hooks/useTeamForm'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) {
+export function MatchPoster({ match, espnScore = null, onClick }) {
+  // Charger le formMap de la compétition de CE match
+  // React Query déduplique : N posters de la même compét → 1 seule requête
+  const compCode = match.competition?.code ?? null
+  const { formMap } = useTeamForm(compCode)
+
   const _ms       = getMatchState(match.id)
   const _espnLive = (
     _ms.espnStatus === 'STATUS_IN_PROGRESS' ||
