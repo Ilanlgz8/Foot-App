@@ -5,6 +5,7 @@ import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, us
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
+import { useFotmobLineup, useFotmobProbableLineups } from '../hooks/useFotmobXG'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
@@ -356,41 +357,43 @@ export function ComposTab({ match, compMatches }) {
   // populé pendant le match live). On lance api-football en parallèle immédiatement.
   const isWC = match?.competition?.id === 2000 || match?.competition?.code === 'WC'
 
-  // Source 1 : ESPN/FIFA — toujours en premier (zéro quota)
-  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
-  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match)
+  // Source 1 : ESPN/FIFA — non-WC uniquement (WC roster ESPN peu fiable)
+  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(isWC ? null : match)
+  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(isWC ? null : match)
 
-  // Source 2 : api-football
-  // — WC : lance immédiatement en parallèle (ESPN WC fiable seulement si match passé en live)
-  // — Autres : SEULEMENT si ESPN n'a rien (protège le quota 100 req/jour)
+  // Source 2 : api-football (non-WC : fallback ESPN; WC : ignoré — quota 100/j insuffisant)
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
-  const aflEnabled  = isWC ? match : (espnDone && !espnHasData ? match : null)
-  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(aflEnabled)
+  const { data: aflLineups, isLoading: aflLoading } = useAflLineups(
+    !isWC && espnDone && !espnHasData ? match : null
+  )
 
-  // Source 3a (matchs à venir, non-WC) : compos probables via ESPN (dernier XI connu)
+  // Source 3 : FotMob — SOURCE PRINCIPALE pour WC (pas de quota, données fiables)
+  const { data: fotLineups, isLoading: fotLoading } = useFotmobLineup(isWC ? match : null)
+
+  // Source 4a (matchs à venir, non-WC) : compos probables via ESPN
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
     isUpcoming && !isWC ? match : null,
     compMatches
   )
 
-  // Source 3b (matchs à venir WC) : compos probables via api-football (ESPN WC sans roster fiable)
-  const { data: aflProbableData, isLoading: aflProbableLoading } = useAflProbableLineups(
+  // Source 4b (matchs à venir WC) : compos probables via FotMob (dernier XI connu)
+  const { data: fotProbableData, isLoading: fotProbableLoading } = useFotmobProbableLineups(
     isUpcoming && isWC ? match : null,
     compMatches
   )
 
-  const isLoading = (isWC
-    ? (aflLoading || (isUpcoming && aflProbableLoading))
+  const isLoading = isWC
+    ? (fotLoading || (isUpcoming && fotProbableLoading))
     : (espnLoading || espnMatchLoading || (!espnHasData && aflLoading) || (isUpcoming && probableLoading))
-  )
 
   const lineups = espnLineups?.home?.starters?.length             ? espnLineups
                : espnMatchData?.lineups?.home?.starters?.length   ? espnMatchData.lineups
                : aflLineups?.home?.starters?.length               ? aflLineups
+               : fotLineups?.home?.starters?.length               ? fotLineups
                : null
 
-  const probSource = probableData ?? aflProbableData ?? null
+  const probSource = probableData ?? fotProbableData ?? null
   const probable = !lineups && probSource?.home?.starters?.length ? probSource : null
 
   if (isLoading) {
