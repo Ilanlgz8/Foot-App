@@ -326,7 +326,7 @@
   flex-direction: column;
   gap: 0.55rem;
 }
-.live__statRow { display: flex; flex-direction: column; gap: 0.2rem; }
+.live__statRow { display: flex; flex-direction: column; gap: 0.25rem; }
 .live__statHeader {
   display: flex;
   justify-content: space-between;
@@ -334,18 +334,19 @@
 }
 .live__statNum {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.75);
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
   min-width: 2.5rem;
 }
-.live__statNum:last-child { text-align: right; }
+.live__statNum--right { text-align: right; }
 .live__statLabel {
   font-size: 0.6rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.3);
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-align: center;
 }
 .live__statTrack {
   height: 3px;

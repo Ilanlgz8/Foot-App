@@ -36,6 +36,13 @@ let espnFailStreak = 0
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
+// ── Poll lock ─────────────────────────────────────────────────────────────────
+// Un seul pollESPN à la fois. Si un poll est en cours quand le visibilitychange
+// ou le Worker déclenche un autre tick, on l'ignore plutôt que de créer une race
+// condition (stale Redis cache vs fresh ESPN data → régression de score).
+let _pollInProgress = false
+let _pollQueued     = false   // au plus un poll en attente
+
 // "FT potentiel" — STATUS_FINAL vu une 1ère fois, en attente de confirmation
 // { [matchId]: { since: number, score: string } }
 const pendingFt = {}
@@ -291,7 +298,7 @@ function _runFtSafeguards(matches, now, queryClient) {
 // ESPN — couche primaire (via /api/fifa-live)
 // ─────────────────────────────────────────────
 
-async function pollESPN(matches, queryClient) {
+async function _doPollESPN(matches, queryClient) {
   const now = Date.now()
 
   // ── Pending kickoff : afficher le widget dès l'heure prévue ──
@@ -400,10 +407,28 @@ async function pollESPN(matches, queryClient) {
           playGoalSound()
         }
 
+        // ── Regression guard ─────────────────────────────────────────────────
+        // Pendant un match live, on ne descend jamais un score déjà connu.
+        // Fix : si deux polls concurrent ont des données différentes (Redis stale
+        // vs ESPN frais), on garde le score le plus haut pour éviter la régression
+        // qui reset prevHs via la détection VAR et fait rater le but suivant.
+        const safeHome = (prevCache?.home != null && home != null)
+          ? Math.max(home, prevCache.home)
+          : (home ?? prevCache?.home)
+        const safeAway = (prevCache?.away != null && away != null)
+          ? Math.max(away, prevCache.away)
+          : (away ?? prevCache?.away)
+        // Scorers : garder la liste la plus longue entre Redis et localStorage
+        const safeScorers = (() => {
+          const fresh = scorers ?? []
+          const cached = prevCache?.scorers ?? []
+          return fresh.length >= cached.length ? fresh : cached
+        })()
+
         espnScoresCache[mid] = {
-          home,
-          away,
-          scorers:     scorers ?? prevCache?.scorers ?? [],
+          home:        safeHome,
+          away:        safeAway,
+          scorers:     safeScorers,
           stats:       stats   ?? prevCache?.stats   ?? null,
           espnEventId: data.espnEventId,
           espnSlug:    data.espnSlug,
@@ -459,11 +484,15 @@ async function pollESPN(matches, queryClient) {
         const prevStats = prevCache?.stats ?? null
 
         // Toujours mettre à jour le score (le but est peut-être dans ce poll)
+        // Regression guard : on ne descend jamais un score déjà connu
+        const ftSafeHome = (prevCache?.home != null && home != null) ? Math.max(home, prevCache.home) : (home ?? prevCache?.home)
+        const ftSafeAway = (prevCache?.away != null && away != null) ? Math.max(away, prevCache.away) : (away ?? prevCache?.away)
+        const ftScorers  = (() => { const f = scorers ?? []; const c = prevCache?.scorers ?? []; return f.length >= c.length ? f : c })()
         espnScoresCache[mid] = {
           ...(prevCache ?? {}),
-          home,
-          away,
-          scorers:     scorers ?? prevCache?.scorers ?? [],
+          home:        ftSafeHome,
+          away:        ftSafeAway,
+          scorers:     ftScorers,
           stats:       stats   ?? prevStats,
           espnEventId: data.espnEventId,
           espnSlug:    data.espnSlug,
@@ -580,6 +609,30 @@ async function pollESPN(matches, queryClient) {
   // Pousser les scores dans React Query
   queryClient.setQueryData(['espnScores'], { ...espnScoresCache })
   try { localStorage.setItem('espn_scores_cache', JSON.stringify(espnScoresCache)) } catch {}
+}
+
+// ── Wrapper avec poll lock ─────────────────────────────────────────────────────
+// Empêche deux appels simultanés à _doPollESPN (race condition visibilitychange + Worker).
+// Si un poll est déjà en cours, on mémorise qu'un nouveau poll est souhaité (_pollQueued)
+// et on le lancera dès que le poll courant se termine.
+async function pollESPN(matches, queryClient) {
+  if (_pollInProgress) {
+    _pollQueued = true
+    return
+  }
+  _pollInProgress = true
+  _pollQueued     = false
+  try {
+    await _doPollESPN(matches, queryClient)
+  } finally {
+    _pollInProgress = false
+    // Si un poll était en attente pendant qu'on était occupé, on le lance maintenant
+    if (_pollQueued) {
+      _pollQueued = false
+      // Léger délai pour laisser React traiter le setQueryData précédent
+      setTimeout(() => pollESPN(matches, queryClient), 150)
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -830,17 +883,14 @@ export function useLiveMinute(matches) {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
       // Marquer les données ESPN comme périmées : empêche l'interpolation stale
-      // (ex : app fermée à 49', rouverte 6min plus tard → 49+6=55' sans ce guard)
-      // interpolateEspnMinute lit ce timestamp et refuse d'interpoler si capuredAt < lui.
       window.__espnNeedsRefresh = Date.now()
-      // Poll immédiat
+      // Poll immédiat — le lock garantit qu'un tick Worker concurrent est mis en file
+      // d'attente plutôt que de créer une race condition avec des données Redis décalées
       await pollESPN(matchesRef.current, queryClient)
-      // 2ème poll : si réseau pas encore disponible → attendre l'event 'online'
-      // (plus précis qu'un timeout fixe — iOS fire 'online' exactement quand le réseau est prêt)
+      // 2ème poll uniquement si réseau non disponible au premier poll
+      // (éviter le double poll qui était à l'origine de la race condition)
       if (!navigator.onLine) {
         window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient), { once: true })
-      } else {
-        setTimeout(() => pollESPN(matchesRef.current, queryClient), 3_000)
       }
       const now = Date.now()
       // Invalider todayMatches si données > 2min

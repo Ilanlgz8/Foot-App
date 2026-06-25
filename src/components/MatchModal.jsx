@@ -76,13 +76,15 @@ function StatBar({ homeVal, awayVal, label }) {
   const homePct = total === 0 ? 50 : Math.round((hNum / total) * 100)
   return (
     <div className="modal__statBar">
-      <span className="modal__statBarVal">{homeVal ?? '–'}</span>
-      <div className="modal__statBarTrack">
-        <div className="modal__statBarFill modal__statBarFill--home" style={{ width: `${homePct}%` }} />
-        <div className="modal__statBarFill modal__statBarFill--away" style={{ width: `${100 - homePct}%` }} />
-      </div>
-      <span className="modal__statBarVal modal__statBarVal--away">{awayVal ?? '–'}</span>
       <span className="modal__statBarLabel">{label}</span>
+      <div className="modal__statBarRow">
+        <span className="modal__statBarVal">{homeVal ?? '–'}</span>
+        <div className="modal__statBarTrack">
+          <div className="modal__statBarFill modal__statBarFill--home" style={{ width: `${homePct}%` }} />
+          <div className="modal__statBarFill modal__statBarFill--away" style={{ width: `${100 - homePct}%` }} />
+        </div>
+        <span className="modal__statBarVal modal__statBarVal--away">{awayVal ?? '–'}</span>
+      </div>
     </div>
   )
 }
@@ -103,7 +105,6 @@ function ESPNStats({ stats }) {
 
   return (
     <div className="modal__espnStats">
-      <p className="modal__espnStatsTitle">Statistiques</p>
       {rows.map(({ label, hv, av }) => (
         <StatBar key={label} label={label} homeVal={hv} awayVal={av} />
       ))}
@@ -220,7 +221,7 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) {
+export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, compMatches }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -263,7 +264,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
   ) : null
 
   // H2H affiché en bas pour matchs terminés (pas en live pour ne pas alourdir)
-  const h2hBlock = !isLive ? <H2HSection match={match} /> : null
+  const h2hBlock = !isLive ? <H2HSection match={match} compMatches={compMatches} /> : null
 
   // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
@@ -328,7 +329,6 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
       {pronoBar}
       {rows.length > 0 ? (
         <div className="modal__espnStats">
-          <p className="modal__espnStatsTitle">Statistiques live</p>
           {rows.map(item => (
             <StatBar
               key={item.name}
@@ -709,14 +709,22 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
   const a = calcTeamStats(awayId, compMatches)
   if (!h && !a) return null
 
-  // Série en cours : couleur selon le type
+  // Série en cours : losanges colorés (◆ vert=V, jaune=N, rouge=D)
   const streakColor = type => type === 'W' ? '#4ade80' : type === 'D' ? '#facc15' : '#f87171'
-  const hStreakEl = h?.streak
-    ? <span style={{ color: streakColor(h.streakType), fontWeight: 700 }}>{h.streak}</span>
-    : '–'
-  const aStreakEl = a?.streak
-    ? <span style={{ color: streakColor(a.streakType), fontWeight: 700 }}>{a.streak}</span>
-    : '–'
+  const makeStreakEl = (stats) => {
+    if (!stats?.streak) return '–'
+    const count = parseInt(stats.streak, 10)
+    const color = streakColor(stats.streakType)
+    return (
+      <span style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
+        {Array.from({ length: count }).map((_, i) => (
+          <span key={i} style={{ color, fontSize: '0.75rem' }}>◆</span>
+        ))}
+      </span>
+    )
+  }
+  const hStreakEl = makeStreakEl(h)
+  const aStreakEl = makeStreakEl(a)
 
   const rows = [
     { label: 'Matchs joués',         hv: h?.played,                av: a?.played,                higher: true  },
@@ -759,40 +767,58 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
   )
 }
 
-function H2HSection({ match }) {
+function H2HSection({ match, compMatches }) {
   const { data: h2hMatches, isLoading } = useH2H(match)
 
-  if (isLoading) return <p className="pm__noData">Chargement H2H…</p>
-  if (!h2hMatches?.length) return null
-
-  const recent = h2hMatches.filter(m => m.status === 'FINISHED').slice(-5)
-  if (!recent.length) return null
-
   const homeId = match.homeTeam?.id
+  const awayId = match.awayTeam?.id
+
+  // Données FD.org (du plus récent au plus vieux)
+  const fdRecent = (h2hMatches ?? [])
+    .filter(m => m.status === 'FINISHED')
+    .slice(-8)
+    .reverse()
+
+  // Fallback : confrontations dans la compétition en cours (si FD.org vide)
+  const compH2H = !fdRecent.length && compMatches?.length
+    ? (compMatches).filter(m =>
+        m.status === 'FINISHED' &&
+        ((m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
+         (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId))
+      ).slice().reverse()
+    : []
+
+  const rows = fdRecent.length ? fdRecent : compH2H
 
   return (
     <div className="pm__section">
-      <h3 className="pm__sectionTitle">Confrontations directes</h3>
-      <div className="pm__h2hList">
-        {recent.map((m, i) => {
-          const isHomeTeam = m.homeTeam?.id === homeId
-          const hs = m.score?.fullTime?.home ?? '-'
-          const as_ = m.score?.fullTime?.away ?? '-'
-          const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-          const homeGoals = isHomeTeam ? hs : as_
-          const awayGoals = isHomeTeam ? as_ : hs
-          const result = homeGoals > awayGoals ? 'W' : homeGoals < awayGoals ? 'L' : 'D'
-          return (
-            <div key={i} className="pm__h2hRow">
-              <span className="pm__h2hDate">{date}</span>
-              <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
-              <span className="pm__h2hScore">{hs} – {as_}</span>
-              <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
-              <ResultBadge result={result} />
-            </div>
-          )
-        })}
-      </div>
+      <h3 className="pm__sectionTitle">Derniers résultats entre les deux équipes</h3>
+      {isLoading ? (
+        <p className="pm__noData">Chargement…</p>
+      ) : !rows.length ? (
+        <p className="pm__noData">Aucune confrontation disponible</p>
+      ) : (
+        <div className="pm__h2hList">
+          {rows.map((m, i) => {
+            const isHomeTeam = m.homeTeam?.id === homeId
+            const hs = m.score?.fullTime?.home ?? '-'
+            const as_ = m.score?.fullTime?.away ?? '-'
+            const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+            const myGoals  = isHomeTeam ? hs : as_
+            const oppGoals = isHomeTeam ? as_ : hs
+            const result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+            return (
+              <div key={i} className="pm__h2hRow">
+                <span className="pm__h2hDate">{date}</span>
+                <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
+                <span className="pm__h2hScore">{hs} – {as_}</span>
+                <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
+                <ResultBadge result={result} />
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -969,7 +995,7 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
       )}
 
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
-      <H2HSection match={match} />
+      <H2HSection match={match} compMatches={compMatches} />
 
       {/* Stats saison */}
       {compMatches?.length > 0 && (
@@ -1211,7 +1237,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 transition: swipeLive.isDragging ? 'none' : undefined,
               }}
             >
-              {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} />}
+              {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} compMatches={compMatches} />}
               {tab === 'compos'      && <ComposTab match={match} />}
               {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
               {tab === 'prono'       && (

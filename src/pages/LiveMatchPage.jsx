@@ -216,8 +216,8 @@ export default function LiveMatchPage() {
   const espn    = match ? (espnScores[match.id] ?? null) : null
   const compId  = match?.competition?.code ?? null
 
-  // Prono
-  const { formMap } = useTeamForm(compId)
+  // Prono + compMatches (utilisés pour H2H et stats)
+  const { formMap, compMatches } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
@@ -276,7 +276,7 @@ export default function LiveMatchPage() {
             transition: swipe.isDragging ? 'none' : undefined,
           }}
         >
-          {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} prono={prono} homeShort={match.homeTeam?.shortName || match.homeTeam?.name} awayShort={match.awayTeam?.shortName || match.awayTeam?.name} />}
+          {activeTab === 'stats'      && <LiveStatsTab match={match} espnScore={espn} prono={prono} homeShort={match.homeTeam?.shortName || match.homeTeam?.name} awayShort={match.awayTeam?.shortName || match.awayTeam?.name} compMatches={compMatches} />}
           {activeTab === 'compos'     && <ComposTab match={match} />}
           {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
         </div>

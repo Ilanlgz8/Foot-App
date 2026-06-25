@@ -130,7 +130,7 @@ function StatsBar({ stats }) {
             <div className="live__statHeader">
               <span className="live__statNum">{row.h}</span>
               <span className="live__statLabel">{row.label}</span>
-              <span className="live__statNum">{row.a}</span>
+              <span className="live__statNum live__statNum--right">{row.a}</span>
             </div>
             <div className="live__statTrack">
               <div className="live__statFill" style={{ width: `${homePct}%` }} />
