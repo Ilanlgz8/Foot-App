@@ -1,97 +1,73 @@
 import { useQuery } from '@tanstack/react-query'
 
-// Map nom football-data.org → article Wikipedia (photos 2024-2026 uniquement)
-// WC 2026 en cours (juin 2026) → articles frais avec photos d'action actuelles
-// Format Wikipedia standard : "[Country]_at_the_2026_FIFA_World_Cup"
-const WIKI = {
-  // ── WC 2026 — articles en cours (photos fraîches du tournoi) ──
-  'France':          'France_at_the_2026_FIFA_World_Cup',
-  'Brazil':          'Brazil_at_the_2026_FIFA_World_Cup',
-  'Argentina':       'Argentina_at_the_2026_FIFA_World_Cup',
-  'Spain':           'Spain_at_the_2026_FIFA_World_Cup',
-  'England':         'England_at_the_2026_FIFA_World_Cup',
-  'Germany':         'Germany_at_the_2026_FIFA_World_Cup',
-  'Portugal':        'Portugal_at_the_2026_FIFA_World_Cup',
-  'Netherlands':     'Netherlands_at_the_2026_FIFA_World_Cup',
-  'Morocco':         'Morocco_at_the_2026_FIFA_World_Cup',
-  'Senegal':         'Senegal_at_the_2026_FIFA_World_Cup',
-  'Ivory Coast':     'Ivory_Coast_at_the_2026_FIFA_World_Cup',
-  'Nigeria':         'Nigeria_at_the_2026_FIFA_World_Cup',
-  'Ghana':           'Ghana_at_the_2026_FIFA_World_Cup',
-  'Cameroon':        'Cameroon_at_the_2026_FIFA_World_Cup',
-  'Egypt':           'Egypt_at_the_2026_FIFA_World_Cup',
-  'Algeria':         'Algeria_at_the_2026_FIFA_World_Cup',
-  'Tunisia':         'Tunisia_at_the_2026_FIFA_World_Cup',
-  'South Africa':    'South_Africa_at_the_2026_FIFA_World_Cup',
-  'Mexico':          'Mexico_at_the_2026_FIFA_World_Cup',
-  'United States':   'United_States_at_the_2026_FIFA_World_Cup',
-  'Canada':          'Canada_at_the_2026_FIFA_World_Cup',
-  'Japan':           'Japan_at_the_2026_FIFA_World_Cup',
-  'South Korea':     'South_Korea_at_the_2026_FIFA_World_Cup',
-  'Korea Republic':  'South_Korea_at_the_2026_FIFA_World_Cup',
-  'Australia':       'Australia_at_the_2026_FIFA_World_Cup',
-  'Saudi Arabia':    'Saudi_Arabia_at_the_2026_FIFA_World_Cup',
-  'Iran':            'Iran_at_the_2026_FIFA_World_Cup',
-  'Colombia':        'Colombia_at_the_2026_FIFA_World_Cup',
-  'Uruguay':         'Uruguay_at_the_2026_FIFA_World_Cup',
-  'Ecuador':         'Ecuador_at_the_2026_FIFA_World_Cup',
-  'Croatia':         'Croatia_at_the_2026_FIFA_World_Cup',
-  'Belgium':         'Belgium_at_the_2026_FIFA_World_Cup',
-  'Switzerland':     'Switzerland_at_the_2026_FIFA_World_Cup',
-  'Poland':          'Poland_at_the_2026_FIFA_World_Cup',
-  'Serbia':          'Serbia_at_the_2026_FIFA_World_Cup',
-  'Turkey':          'Turkey_at_the_2026_FIFA_World_Cup',
-  'Ukraine':         'Ukraine_at_the_2026_FIFA_World_Cup',
-  'Romania':         'Romania_at_the_2026_FIFA_World_Cup',
-  'Austria':         'Austria_at_the_2026_FIFA_World_Cup',
-  'Hungary':         'Hungary_at_the_2026_FIFA_World_Cup',
-  'Slovakia':        'Slovakia_at_the_2026_FIFA_World_Cup',
-  'Slovenia':        'Slovenia_at_the_2026_FIFA_World_Cup',
-  'Albania':         'Albania_at_the_2026_FIFA_World_Cup',
-  'Georgia':         'Georgia_at_the_2026_FIFA_World_Cup',
-  'Costa Rica':      'Costa_Rica_at_the_2026_FIFA_World_Cup',
-  'Panama':          'Panama_at_the_2026_FIFA_World_Cup',
-  'Jamaica':         'Jamaica_at_the_2026_FIFA_World_Cup',
-  'Honduras':        'Honduras_at_the_2026_FIFA_World_Cup',
-  'Venezuela':       'Venezuela_at_the_2026_FIFA_World_Cup',
-  'Paraguay':        'Paraguay_at_the_2026_FIFA_World_Cup',
-  'Bolivia':         'Bolivia_at_the_2026_FIFA_World_Cup',
-  'Chile':           'Chile_at_the_2026_FIFA_World_Cup',
-  'New Zealand':     'New_Zealand_at_the_2026_FIFA_World_Cup',
-  'Qatar':           'Qatar_at_the_2026_FIFA_World_Cup',
-  'Iraq':            'Iraq_at_the_2026_FIFA_World_Cup',
-  'Uzbekistan':      'Uzbekistan_at_the_2026_FIFA_World_Cup',
+// Wikimedia Commons Search API — public, no key, CORS ok
+// Cherche des vraies photos de match pour chaque équipe
+async function searchCommonsPhoto(queries) {
+  for (const q of queries) {
+    const params = new URLSearchParams({
+      action:       'query',
+      generator:    'search',
+      gsrsearch:    q,
+      gsrnamespace: '6',       // File namespace uniquement
+      gsrlimit:     '10',
+      prop:         'imageinfo',
+      iiprop:       'url|mediatype|width|height|mime',
+      iiurlwidth:   '1200',    // thumbnail 1200px → bonne qualité sans télécharger l'original
+      format:       'json',
+      origin:       '*',
+    })
 
-  // ── Non qualifiés WC2026 → tournois 2024 ──
-  'Italy':           'UEFA_Euro_2024',
-  'Denmark':         'UEFA_Euro_2024',
-  'Scotland':        'UEFA_Euro_2024',
-  'Wales':           'UEFA_Euro_2024',
-  'Czech Republic':  'UEFA_Euro_2024',
-  'Czechia':         'UEFA_Euro_2024',
-  'Norway':          'UEFA_Euro_2024',
-  'Sweden':          'UEFA_Euro_2024',
-  'Finland':         'UEFA_Euro_2024',
-  'Israel':          'UEFA_Euro_2024',
-  'Bosnia-H.':       'UEFA_Euro_2024',
-  'Cape Verde':      '2023_Africa_Cup_of_Nations',
-  'Congo DR':        '2023_Africa_Cup_of_Nations',
-  'Mali':            '2023_Africa_Cup_of_Nations',
-  'Burkina Faso':    '2023_Africa_Cup_of_Nations',
-  'Guinea':          '2023_Africa_Cup_of_Nations',
-  'Peru':            'Copa_América_2024',
-  'Haiti':           'Copa_América_2024',
-  'Curaçao':         'Copa_América_2024',
-  'Jordan':          '2023_AFC_Asian_Cup',
-  'Saudi Arabia':    '2023_AFC_Asian_Cup',
+    try {
+      const res = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`)
+      if (!res.ok) continue
+      const data = await res.json()
+      if (!data.query?.pages) continue
 
-  // ── Fallback universel ──
-  '__default__':     '2026_FIFA_World_Cup',
+      const pages = Object.values(data.query.pages)
+
+      // Filtres : uniquement JPEG/PNG, largeur > 600px, pas de logo/badge/flag
+      const photos = pages.filter(p => {
+        const info = p.imageinfo?.[0]
+        if (!info) return false
+        if (info.mediatype !== 'BITMAP') return false
+        if ((info.width ?? 0) < 600) return false
+        const title = (p.title ?? '').toLowerCase()
+        if (title.endsWith('.svg') || title.endsWith('.gif') || title.endsWith('.png') && title.includes('flag')) return false
+        if (title.includes('logo') || title.includes('badge') || title.includes('crest') || title.includes('kit')) return false
+        return true
+      })
+
+      if (!photos.length) continue
+
+      // Trier par largeur décroissante → photo la plus grande en premier
+      photos.sort((a, b) => (b.imageinfo[0].width ?? 0) - (a.imageinfo[0].width ?? 0))
+
+      const info = photos[0].imageinfo[0]
+      // Préférer thumburl (redimensionné à 1200px) sinon url originale
+      const url = info.thumburl ?? info.url
+      if (url) return url
+    } catch {
+      continue
+    }
+  }
+  return null
 }
 
-const CACHE_VERSION = 'v4'  // v4 = photos WC2026
+// Map équipe → requêtes de recherche du plus précis au plus général
+// On cherche en priorité des photos WC 2026 (en cours), puis récentes
+function getQueries(teamName) {
+  const q = encodeURIComponent(teamName)
+  return [
+    `${teamName} football 2026 FIFA World Cup match`,
+    `${teamName} national football team 2026`,
+    `${teamName} football 2024 match players`,
+    `${teamName} national football team match celebration`,
+    `${teamName} football match action`,
+  ]
+}
 
-const CACHE_TTL = 7 * 24 * 3600 * 1000  // 7 jours
+const CACHE_TTL     = 7 * 24 * 3600 * 1000
+const CACHE_VERSION = 'v5-commons'
 
 function getCached(key) {
   try {
@@ -110,32 +86,29 @@ function setCached(key, url) {
 }
 
 export function useTeamPhoto(teamName) {
-  // Fallback générique si l'équipe n'est pas dans la map
-  const article = WIKI[teamName] ?? WIKI['__default__']
-
   return useQuery({
-    queryKey: ['teamPhoto', teamName],
+    queryKey: ['teamPhoto-v5', teamName],
     queryFn: async () => {
-      if (!article) return null
-      // Cache localStorage (7 jours)
+      if (!teamName) return null
+
+      // Cache localStorage 7 jours
       const cached = getCached(teamName)
       if (cached) return cached
 
-      const res = await fetch(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${article}`
-      )
-      if (!res.ok) return null
-      const data = await res.json()
-      // Préfère l'image originale, sinon le thumbnail
-      const url = data.originalimage?.source ?? data.thumbnail?.source ?? null
-      if (url) setCached(teamName, url)
-      return url
+      const queries = getQueries(teamName)
+      const url = await searchCommonsPhoto(queries)
+
+      // Toujours mettre en cache même si null (évite de re-fetcher inutilement)
+      setCached(teamName, url ?? '')
+      return url ?? null
     },
-    enabled:   !!article,
+    enabled:   !!teamName,
     staleTime: CACHE_TTL,
     retry:     1,
-    // Initialiser depuis le cache localStorage directement
-    initialData:          () => getCached(teamName) ?? undefined,
+    initialData:          () => {
+      const c = getCached(teamName)
+      return c === '' ? null : c ?? undefined
+    },
     initialDataUpdatedAt: () => {
       try {
         const raw = localStorage.getItem(`wiki_photo_${CACHE_VERSION}_${teamName}`)
