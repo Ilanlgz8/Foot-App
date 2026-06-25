@@ -325,7 +325,7 @@ function Accueil() {
         <div className="accueil__mainGrid">
 
           {/* Matchs à venir */}
-          <div className="accueil__dashPanel">
+          <div className="accueil__dashPanel accueil__dashPanel--matchPanel">
             <div className="accueil__dashPanelHeader">
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>

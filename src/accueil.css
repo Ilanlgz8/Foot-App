@@ -2611,13 +2611,36 @@
 }
 
 @media (max-width: 640px) {
-  /* Sur mobile : posters visibles, cards normales cachées dans MatchPanel */
+  /* Panel matchs : retire la box sur mobile, posters sortent libres */
+  .accueil__dashPanel--matchPanel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .accueil__dashPanel--matchPanel::before {
+    display: none !important;
+  }
+  .accueil__dashPanel--matchPanel .accueil__dashPanelHeader {
+    padding: 0 0 0.5rem 0;
+    background: transparent;
+  }
+  .accueil__dashPanel--matchPanel .accueil__dashPanelDivider {
+    display: none;
+  }
+  .accueil__dashPanel--matchPanel .accueil__dashPanelBody {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0;
+  }
+
+  /* Sur mobile : posters visibles, cards normales cachées */
   .accueil__posterList {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-  /* Cache la grille de cards régulières sur mobile */
   .accueil__dashPanelBody .accueil__matchCards {
     display: none;
   }
