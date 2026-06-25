@@ -21,6 +21,7 @@ import {
 } from '../components/MatchModal'
 import './MatchPage.css'
 import '../matchModal.css'
+import '../live.css'
 
 // ── Fetch fallback si accès direct par URL ────────────────────────────────────
 function useMatchData(matchId, initialMatch) {
@@ -37,9 +38,20 @@ function useMatchData(matchId, initialMatch) {
 }
 
 // ── Formatage date / heure ────────────────────────────────────────────────────
+function isSameDay(a, b) {
+  return a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear()
+}
 function formatDate(utcDate) {
   if (!utcDate) return '–'
-  return new Date(utcDate).toLocaleDateString('fr-FR', {
+  const d = new Date(utcDate)
+  const today    = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  if (isSameDay(d, today))    return "Aujourd'hui"
+  if (isSameDay(d, tomorrow)) return 'Demain'
+  return d.toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 }
@@ -59,9 +71,9 @@ function MatchPageHeader({ match }) {
 
   return (
     <div className="mp__header">
-      {/* Compétition */}
+      {/* Compétition — à gauche */}
       {comp && (
-        <div className="mp__comp">
+        <div className="mp__comp mp__comp--left">
           {comp.emblem && <img src={comp.emblem} alt="" className="mp__compEmb" />}
           <span>{comp.name}</span>
         </div>
@@ -78,22 +90,26 @@ function MatchPageHeader({ match }) {
           <span className="mp__teamName">{homeName}</span>
         </div>
 
-        {/* Centre : score ou heure */}
+        {/* Centre : score pills ou date+heure */}
         <div className="mp__center">
           {isFinished && hs != null ? (
             <>
-              <div className="mp__scoreFinished">{hs} – {as_}</div>
               <div className="mp__statusLabel">Terminé</div>
+              <div className="live__pills">
+                <div className="live__pill live__pill--ft">{hs}</div>
+                <div className="live__pillBar" />
+                <div className="live__pill live__pill--ft">{as_}</div>
+              </div>
             </>
           ) : (
             <>
-              <div className="mp__time">{formatTime(match.utcDate)}</div>
               <div className="mp__date">{formatDate(match.utcDate)}</div>
+              <div className="mp__time">{formatTime(match.utcDate)}</div>
             </>
           )}
         </div>
 
-        {/* Extérieur : crest en haut, nom en bas (même ordre que domicile) */}
+        {/* Extérieur */}
         <div className="mp__team">
           {match.awayTeam?.crest
             ? <img src={match.awayTeam.crest} alt="" className="mp__crest" />

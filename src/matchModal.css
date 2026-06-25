@@ -1117,7 +1117,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(239,68,68,0.7);
-  margin: 0;
+  margin: 0 0 0.6rem;
 }
 
 /* ── Barre prono ── */
@@ -1220,7 +1220,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255,255,255,0.6);
   text-align: center;
   margin: 0 0 0.25rem;
   white-space: nowrap;
@@ -1437,7 +1437,7 @@
   /* Nom d'équipe en titre de colonne */
   .pm__formTeamName {
     font-size: 0.72rem;
-    color: rgba(255,255,255,0.92);
+    color: rgba(255,255,255,0.6);
     letter-spacing: 0.08em;
     padding-bottom: 0.25rem;
     border-bottom: 1px solid rgba(255,255,255,0.08);

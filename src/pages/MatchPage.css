@@ -44,7 +44,6 @@
 .mp__comp {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.45rem;
   font-size: 0.74rem;
   font-weight: 600;
@@ -52,6 +51,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 1.4rem;
+}
+.mp__comp--left {
+  justify-content: flex-start;
 }
 .mp__compEmb { width: 16px; height: 16px; object-fit: contain; opacity: 0.7; }
 
@@ -109,11 +111,12 @@
   line-height: 1;
 }
 .mp__date {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: rgba(255,255,255,0.4);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
   text-transform: capitalize;
   text-align: center;
+  letter-spacing: 0.03em;
 }
 .mp__scoreFinished {
   font-family: 'Chakra Petch', system-ui, sans-serif;
@@ -124,11 +127,12 @@
   line-height: 1;
 }
 .mp__statusLabel {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.08em;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  margin-bottom: 0.3rem;
 }
 
 /* ── Body ── */
@@ -247,7 +251,7 @@
   .mp__tabContent .pm__formCol     { gap: 0.6rem; }
   .mp__tabContent .pm__formTeamName {
     font-size: 0.85rem;
-    color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.6);
     letter-spacing: 0.06em;
     padding-bottom: 0.3rem;
     border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -285,4 +289,17 @@
   .mp__tabContent .pm__h2hHome,
   .mp__tabContent .pm__h2hAway     { font-size: 0.88rem; }
   .mp__tabContent .pm__h2hScore    { font-size: 0.95rem; }
+}
+
+/* ── Classement — taille augmentée sur mobile ─────────────────────────────── */
+@media (max-width: 640px) {
+  .mp__tabContent .classement__teamName    { font-size: 0.88rem; }
+  .mp__tabContent .classement__row td      { font-size: 0.92rem; padding: 0.7rem 0.6rem; }
+  .mp__tabContent .classement__row td strong { font-size: 1rem; }
+  .mp__tabContent .classement__table:not(.classement__table--compact) { min-width: 560px; }
+  .mp__tabContent .classement__table:not(.classement__table--compact) thead th,
+  .mp__tabContent .classement__table:not(.classement__table--compact) tbody td { font-size: 0.9rem; }
+  .mp__tabContent .classement__table:not(.classement__table--compact) thead th { font-size: 0.68rem; }
+  .mp__tabContent .classement__formeBadge  { width: 1.35rem; height: 1.35rem; font-size: 0.58rem; }
+  .mp__tabContent .classement__position    { font-size: 0.92rem; }
 }
