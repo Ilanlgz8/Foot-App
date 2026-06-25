@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
+import './../compHeader.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
@@ -14,6 +15,7 @@ function Resultats() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
+  const [compOpen, setCompOpen]         = useState(false)
 
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'FINISHED', 'desc')
 
@@ -152,7 +154,42 @@ function Resultats() {
 
       <div className="resultats__layout">
 
-        {/* Sidebar */}
+        {/* ── Mobile : header compétition vedette (Option B) ── */}
+        <div className={`compHeader${compOpen ? ' compHeader--open' : ''}`}>
+          <div className="compHeader__hero" onClick={() => setCompOpen(o => !o)}>
+            {currentComp?.emblem && (
+              <img src={currentComp.emblem} alt="" className="compHeader__logo"
+                onError={e => e.currentTarget.style.display = 'none'} />
+            )}
+            <div className="compHeader__info">
+              <span className="compHeader__name">{currentComp?.name ?? 'Compétition'}</span>
+              <span className="compHeader__sub">Saison 2025–26</span>
+            </div>
+            <button className="compHeader__btn" aria-label="Changer de compétition">
+              {compOpen ? 'Fermer ✕' : 'Changer ›'}
+            </button>
+          </div>
+          <div className="compHeader__dots">
+            {COMPETITIONS.map(c => (
+              <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
+            ))}
+          </div>
+          <div className={`compHeader__picker${compOpen ? ' compHeader__picker--open' : ''}`}>
+            {COMPETITIONS.map(comp => (
+              <button
+                key={comp.id}
+                className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
+                onClick={() => { setSelectedComp(comp.id); setCurrentIndex(0); setViewMode('journee'); setOpenedGroup(null); setCompOpen(false) }}
+              >
+                <img src={comp.emblem} alt="" className="compHeader__itemLogo"
+                  onError={e => e.currentTarget.style.display = 'none'} />
+                <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Desktop : sidebar liste ── */}
         <aside className="resultats__sidebar">
           <p className="resultats__sidebarLabel">Championnats</p>
           <nav className="resultats__sidebarNav">

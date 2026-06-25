@@ -1,0 +1,221 @@
+/* ── CompetitionHeader — Option B (mobile ≤ 639px) ────────────────────────── */
+
+/* Masqué sur desktop, affiché sur mobile uniquement */
+.compHeader { display: none; }
+
+@media (max-width: 952px) {
+  /* Sur tablette / mobile on remplace la sidebar par le header compétition */
+  .compHeader {
+    display: block;
+    position: relative;
+    background: #000;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden;
+  }
+
+  /* Halo rouge en fond, lié à la comp active */
+  .compHeader::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 120% at 0% 50%, rgba(239,68,68,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Bloc principal ── */
+  .compHeader__hero {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px 9px;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+  }
+
+  .compHeader__logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 50%;
+    background: rgba(239,68,68,0.08);
+    border: 1.5px solid rgba(239,68,68,0.3);
+    padding: 4px;
+    box-shadow: 0 0 18px rgba(239,68,68,0.18);
+    flex-shrink: 0;
+    transition: box-shadow 0.2s;
+  }
+
+  .compHeader__hero:hover .compHeader__logo,
+  .compHeader--open .compHeader__logo {
+    box-shadow: 0 0 28px rgba(239,68,68,0.35);
+    border-color: rgba(239,68,68,0.55);
+  }
+
+  .compHeader__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .compHeader__name {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  .compHeader__sub {
+    display: block;
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.32);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  .compHeader__btn {
+    font-size: 9px;
+    font-weight: 800;
+    color: rgba(239,68,68,0.85);
+    background: none;
+    border: 1px solid rgba(239,68,68,0.28);
+    border-radius: 7px;
+    padding: 5px 9px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    font-family: inherit;
+  }
+
+  .compHeader--open .compHeader__btn,
+  .compHeader__btn:hover {
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.5);
+    color: #ef4444;
+  }
+
+  /* ── Points indicateurs ── */
+  .compHeader__dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 14px 8px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .compHeader__dot {
+    width: 16px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    transition: all 0.2s;
+  }
+
+  .compHeader__dot--active {
+    width: 24px;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239,68,68,0.7);
+  }
+
+  /* ── Picker (liste déroulante) ── */
+  .compHeader__picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    border-top: 0 solid rgba(255,255,255,0.05);
+  }
+
+  .compHeader__picker--open {
+    max-height: 200px;
+    border-top-width: 1px;
+  }
+
+  .compHeader__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 4px 9px;
+    background: none;
+    border: none;
+    border-right: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .compHeader__item:last-child { border-right: none; }
+
+  .compHeader__item:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .compHeader__item--active {
+    background: rgba(239,68,68,0.08);
+  }
+
+  .compHeader__item--active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 15%;
+    right: 15%;
+    height: 2px;
+    background: #ef4444;
+    border-radius: 2px 2px 0 0;
+    box-shadow: 0 0 6px rgba(239,68,68,0.7);
+  }
+
+  .compHeader__itemLogo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 50%;
+    padding: 3px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: border-color 0.15s;
+  }
+
+  .compHeader__item--active .compHeader__itemLogo {
+    border-color: rgba(239,68,68,0.4);
+    background: rgba(239,68,68,0.06);
+  }
+
+  .compHeader__itemName {
+    font-size: 8.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.38);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .compHeader__item--active .compHeader__itemName {
+    color: rgba(255,255,255,0.9);
+  }
+}
+
+/* Sur grand écran, la sidebar desktop reprend le dessus */
+@media (min-width: 953px) {
+  .compHeader { display: none !important; }
+}

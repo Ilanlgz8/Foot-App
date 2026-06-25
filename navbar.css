@@ -78,28 +78,25 @@
     radial-gradient(ellipse 70% 100% at 50% -10%, rgba(239,68,68,0.07) 0%, transparent 70%);
 }
 
-/* ── Ligne scanning en bas ── */
+/* ── Ligne rouge subtile en bas du navbar complet (desktop) ── */
 .navbar::after {
   content: '';
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(239,68,68,0.8) 30%,
-    rgba(255,100,100,1) 50%,
-    rgba(239,68,68,0.8) 70%,
+    rgba(239,68,68,0.5) 25%,
+    rgba(239,68,68,0.5) 75%,
     transparent 100%
   );
-  background-size: 200% 100%;
-  box-shadow: 0 0 16px rgba(239,68,68,0.6);
-  animation: navLineScan 3s ease-in-out infinite;
 }
 
+/* ── Ligne scanning entre barre principale et quick nav (mobile) ── */
 @keyframes navLineScan {
-  0%   { background-position: -100% 0; opacity: 0.6; }
+  0%   { background-position: -100% 0; opacity: 0.5; }
   50%  { background-position: 0% 0;    opacity: 1; }
-  100% { background-position: 100% 0;  opacity: 0.6; }
+  100% { background-position: 100% 0;  opacity: 0.5; }
 }
 
 .navbar__overlay,
@@ -109,16 +106,14 @@
   inset: 0;
 }
 
-/* Motif hexagone ballon en fond de navbar */
+/* Overlay et glow désactivés — fond noir pur */
 .navbar__overlay {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='57'%3E%3Cpolygon points='25,2 48,14 48,43 25,55 2,43 2,14' fill='none' stroke='%23ffffff' stroke-width='.6' opacity='.08'/%3E%3C/svg%3E");
-  background-size: 50px 57px;
+  background-image: none;
+  background: none;
 }
 
 .navbar__glow {
-  right: 0; left: auto;
-  width: 18rem;
-  background: linear-gradient(270deg, rgba(239,68,68,0.07), transparent);
+  background: none;
 }
 
 .navbar__container {
@@ -566,9 +561,29 @@
   .navbar__quickNav {
     display: flex;
     align-items: stretch;
-    border-top: 1px solid rgba(239,68,68,0.2);
-    background: rgba(0,0,0,0.96);
+    position: relative;
+    border-top: none;
+    background: #000;
     padding: 0 4px 4px;
+  }
+
+  /* Ligne scanning entre navbar principale et quick nav */
+  .navbar__quickNav::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1.5px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(239,68,68,0.9) 30%,
+      rgba(255,80,80,1) 50%,
+      rgba(239,68,68,0.9) 70%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    box-shadow: 0 0 12px rgba(239,68,68,0.7), 0 0 4px rgba(255,80,80,0.5);
+    animation: navLineScan 3s ease-in-out infinite;
+    pointer-events: none;
   }
 
   .navbar__qnLink {
@@ -577,44 +592,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 6px 2px 5px;
+    padding: 10px 4px 8px;
     text-decoration: none;
-    color: rgba(200,215,240,0.45);
-    font-size: 0.55rem;
+    color: rgba(180,190,210,0.5);
+    font-size: 0.62rem;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    transition: color 0.15s;
+    transition: color 0.18s;
     position: relative;
-    border-radius: 8px;
-    margin: 4px 2px 0;
+    border-radius: 6px;
   }
   .navbar__qnLink:hover {
-    color: rgba(255,255,255,0.7);
-    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.75);
   }
   .navbar__qnLink--active {
-    color: #ef4444;
+    color: #fff;
   }
+  /* Trait rouge actif en haut (sous la ligne scanning) */
   .navbar__qnLink--active::after {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 1.5rem;
+    top: 0;
+    left: 20%;
+    right: 20%;
     height: 2px;
     background: #ef4444;
-    border-radius: 999px;
-    box-shadow: 0 0 6px rgba(239,68,68,0.6);
-  }
-
-  .navbar__qnIcon {
-    width: 1.15rem;
-    height: 1.15rem;
-    flex-shrink: 0;
-    stroke: currentColor;
+    border-radius: 0 0 3px 3px;
+    box-shadow: 0 0 8px rgba(239,68,68,0.7);
   }
 
   .navbar__qnLabel {
@@ -625,29 +630,29 @@
   .navbar__qnLive {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 6px 2px 5px;
+    gap: 5px;
+    padding: 10px 4px 8px;
     border: none;
     background: none;
     cursor: pointer;
     color: #ef4444;
-    font-size: 0.55rem;
+    font-size: 0.62rem;
     font-weight: 900;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin: 4px 2px 0;
-    border-radius: 8px;
+    border-radius: 6px;
+    transition: color 0.18s;
   }
   .navbar__qnLiveDot {
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.42rem;
+    height: 0.42rem;
     border-radius: 50%;
     background: #ef4444;
     animation: pulse 1.2s ease-in-out infinite;
-    box-shadow: 0 0 8px rgba(239,68,68,0.85);
+    box-shadow: 0 0 6px rgba(239,68,68,0.9);
     flex-shrink: 0;
   }
 }
