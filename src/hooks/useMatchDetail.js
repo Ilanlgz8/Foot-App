@@ -63,7 +63,7 @@ function parseEspnRoster(roster) {
     order:        a.order ?? 99,
   })
 
-  const all = roster.athletes ?? []
+  const all = roster.athletes ?? roster.roster ?? []
 
   // ESPN utilise `a.starter` (boolean) pour clubs, mais pour certains tournois
   // le champ peut être absent. Si aucun starter explicite, on prend les 11 premiers
@@ -163,18 +163,13 @@ export function useLineups(match) {
 
       // DEBUG WC — à retirer après diagnostic
       if (isFifaComp) {
-        const topKeys = Object.keys(summary)
-        const hComp = summary.header?.competitions?.[0]
-        const comp0 = hComp?.competitors?.[0] ?? {}
+        const r0 = rosters[0] ?? {}
         console.log('[ESPN WC DEBUG]', {
-          topKeys,
           rostersLen: rosters.length,
-          roster0athletes: rosters[0]?.athletes?.length,
-          comp0keys: Object.keys(comp0),
-          comp0rosterLen: comp0.roster?.length,
-          comp0athletesLen: comp0.athletes?.length,
-          boxscorePlayers: summary.boxscore?.players?.length,
-          boxscoreTeams: summary.boxscore?.teams?.length,
+          roster0keys: Object.keys(r0),
+          roster0athletesLen: r0.athletes?.length,
+          roster0rosterLen: r0.roster?.length,
+          roster0playersLen: r0.players?.length,
         })
       }
 
