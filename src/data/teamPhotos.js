@@ -111,13 +111,38 @@ export const TEAM_COLORS_FULL = {
   'Inter Milan':      { p: '#010E80', s: '#000000' },
   'Atlético de Madrid':{ p: '#C12325', s: '#2C3E86' },
   'AS Roma':          { p: '#8E1F2F', s: '#F5CF01' },
+  // Aliases football-data.org
+  'USA':                   { p: '#002868', s: '#B22234' },
+  'Ivory Coast':           { p: '#F77F00', s: '#009A44' },
+  'Korea Republic':        { p: '#003478', s: '#CD2E3A' },
+  'Republic of Ireland':   { p: '#169B62', s: '#FF883E' },
+  'DR Congo':              { p: '#007FFF', s: '#CE1126' },
+  'Congo DR':              { p: '#007FFF', s: '#CE1126' },
+  'Türkiye':               { p: '#E30A17', s: '#1a1a1a' },
+  'Czechia':               { p: '#D7141A', s: '#003366' },
+  'Czech Republic':        { p: '#D7141A', s: '#003366' },
+  'Atlético Madrid':       { p: '#C12325', s: '#2C3E86' },
+  'Inter':                 { p: '#010E80', s: '#000000' },
+  'Milan':                 { p: '#FB090B', s: '#000000' },
+  'Tottenham':             { p: '#132257', s: '#FFFFFF' },
+  'Dortmund':              { p: '#FDE100', s: '#000000' },
+  'Marseille':             { p: '#009BDE', s: '#1a1a1a' },
+  'Lyon':                  { p: '#1A5EA2', s: '#D00000' },
+  'PSG':                   { p: '#004170', s: '#DA020E' },
+}
+
+// Normalise le nom pour chercher dans TEAM_COLORS_FULL
+function lookupColor(name) {
+  return TEAM_COLORS_FULL[name]
+      ?? TEAM_COLORS_FULL[name?.replace(/^FC |^AS |^AC |^SSC /i, '')]
+      ?? null
 }
 
 // Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
 export function getMatchGradient(homeName, awayName) {
-  const home = TEAM_COLORS_FULL[homeName] ?? { p: '#1a2a3a', s: '#2a3a4a' }
-  const away = TEAM_COLORS_FULL[awayName] ?? { p: '#2a3a4a', s: '#1a2a3a' }
-  return `linear-gradient(135deg, ${home.p} 0%, ${darken(home.p)} 35%, ${darken(away.p)} 65%, ${away.p} 100%)`
+  const home = lookupColor(homeName) ?? { p: '#1e3a5f', s: '#0d2137' }
+  const away = lookupColor(awayName) ?? { p: '#2d1b4e', s: '#1a0d2e' }
+  return `linear-gradient(135deg, ${home.p} 0%, ${darken(home.p)} 38%, ${darken(away.p)} 62%, ${away.p} 100%)`
 }
 
 // Assombrit légèrement une couleur hex pour le centre du dégradé
@@ -135,5 +160,5 @@ export function getTeamPhoto(name) {
 }
 
 export function getTeamColor(name) {
-  return TEAM_COLORS_FULL[name]?.p ?? '#6b7280'
+  return lookupColor(name)?.p ?? '#6b7280'
 }
