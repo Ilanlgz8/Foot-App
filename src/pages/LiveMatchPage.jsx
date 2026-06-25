@@ -23,18 +23,6 @@ import {
 import './LiveMatchPage.css'
 import '../live.css'
 
-// ── Animation BUT ─────────────────────────────────────────────────────────────
-function GoalCelebration({ teamName, scoreStr }) {
-  return (
-    <div className="goal__overlay" aria-hidden="true">
-      <span className="goal__text">BUT !</span>
-      <div className="goal__line" />
-      {teamName && <span className="goal__team">{teamName}</span>}
-      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
-    </div>
-  )
-}
-
 // ── Raccourcis noms (même logique que Live.jsx) ───────────────────────────────
 const TEAM_SHORT = {
   'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
@@ -113,17 +101,13 @@ function MatchHeader({ match, espn, onBack }) {
     : period === 'PEN'           ? 'T.A.B.'
     : period ?? ''
 
-  // ── Détection but — même logique que LiveCard + localStorage partagé ────────
-  // Même clé que Live.jsx pour partager l'état si l'user navigue depuis la grille
+  // ── Tracking score (localStorage partagé avec Live.jsx) ─────────────────────
+  // Pas d'animation ici — l'animation BUT est réservée aux widgets Live.jsx
   const scoreKey = `foot_lv_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
-  const timerRef = useRef(null)
   const initDone = useRef(false)
-  const [goalSide, setGoalSide] = useState(null)
-  const [goal, setGoal]         = useState(null)
 
-  // Init depuis localStorage (reprend où LiveCard s'était arrêté)
   if (!initDone.current) {
     initDone.current = true
     try {
@@ -134,60 +118,17 @@ function MatchHeader({ match, espn, onBack }) {
   }
 
   useEffect(() => {
-    // But annulé (VAR) → score redescend → effacer immédiatement
-    if (
-      (prevHs.current !== null && hs != null && hs < prevHs.current) ||
-      (prevAs.current !== null && as_ != null && as_ < prevAs.current)
-    ) {
-      clearTimeout(timerRef.current)
-      setGoalSide(null); setGoal(null)
-      if (hs  != null) prevHs.current = hs
-      if (as_ != null) prevAs.current = as_
-      return
-    }
-
-    // But(s) détecté(s) — si +2 buts d'un coup : deux animations enchaînées
-    const homeGoals = (prevHs.current != null && hs != null) ? hs - prevHs.current : 0
-    const awayGoals = (prevAs.current != null && as_ != null) ? as_ - prevAs.current : 0
-
-    const fireGoal = (side, scoreStr, delay = 0) => {
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => {
-        const team = side === 'home' ? homeName : awayName
-        setGoalSide(side); setGoal({ team, scoreStr })
-        timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
-      }, delay)
-    }
-
-    if (homeGoals > 0 && prevHs.current != null) {
-      // Score intermédiaire si double but (0→2 → montre 1-0 puis 2-0)
-      const firstScore = homeGoals >= 2
-        ? `${prevHs.current + 1} – ${as_ ?? prevAs.current ?? 0}`
-        : `${hs} – ${as_ ?? prevAs.current ?? 0}`
-      fireGoal('home', firstScore)
-      if (homeGoals >= 2) fireGoal('home', `${hs} – ${as_ ?? prevAs.current ?? 0}`, 5400)
-    } else if (awayGoals > 0 && prevAs.current != null) {
-      const firstScore = awayGoals >= 2
-        ? `${hs ?? prevHs.current ?? 0} – ${prevAs.current + 1}`
-        : `${hs ?? prevHs.current ?? 0} – ${as_}`
-      fireGoal('away', firstScore)
-      if (awayGoals >= 2) fireGoal('away', `${hs ?? prevHs.current ?? 0} – ${as_}`, 5400)
-    }
-
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
-    // Persister pour les prochains montages
     if (hs != null && as_ != null) {
       try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
     }
   }, [hs, as_])
-  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   return (
     <>
       <button className="lmp__backBtn" onClick={onBack}>‹ En Direct</button>
-      <div className={`live__card lmp__headerCard${goal ? ' live__card--goal' : ''}`}>
-        {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
+      <div className="live__card lmp__headerCard">
 
         {/* Header : comp + badge période */}
         <div className="live__cardHeader">
@@ -218,9 +159,9 @@ function MatchHeader({ match, espn, onBack }) {
               </span>
             )}
             <div className="live__pills">
-              <div className={`${pillCls}${goalSide === 'home' ? ' live__pill--scored' : ''}`} key={`h${h}`}>{h}</div>
+              <div className={pillCls} key={`h${h}`}>{h}</div>
               <div className="live__pillBar" />
-              <div className={`${pillCls}${goalSide === 'away' ? ' live__pill--scored' : ''}`} key={`a${a}`}>{a}</div>
+              <div className={pillCls} key={`a${a}`}>{a}</div>
             </div>
           </div>
 

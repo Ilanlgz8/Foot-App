@@ -262,6 +262,9 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
     </div>
   ) : null
 
+  // H2H affiché en bas pour matchs terminés (pas en live pour ne pas alourdir)
+  const h2hBlock = !isLive ? <H2HSection match={match} /> : null
+
   // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
     return (
@@ -269,6 +272,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
         {pronoBar}
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        {h2hBlock}
       </div>
     )
   }
@@ -286,6 +290,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
           : <p className="modal__noEvents">Stats non disponibles</p>
         }
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        {h2hBlock}
       </div>
     )
   }
@@ -297,6 +302,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
         {pronoBar}
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        {h2hBlock}
       </div>
     )
   }
@@ -335,6 +341,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort }) 
       ) : (
         <p className="modal__noEvents">Stats non disponibles</p>
       )}
+      {h2hBlock}
     </div>
   )
 }
@@ -658,7 +665,8 @@ function calcTeamStats(teamId, compMatches) {
     m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId)
   )
   if (!matches.length) return null
-  let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0
+  let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
+  const results = []
   matches.forEach(m => {
     const myHome = m.homeTeam?.id === teamId
     const f = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
@@ -666,15 +674,33 @@ function calcTeamStats(teamId, compMatches) {
     if (f == null || a == null) return
     gf += f; ga += a
     if (a === 0) cs++
-    if (f > a) wins++; else if (f === a) draws++; else losses++
+    if (f > 0 && a > 0) btts++
+    if (f + a >= 3) over25++
+    if (f > a) { wins++; results.push('W') }
+    else if (f === a) { draws++; results.push('D') }
+    else { losses++; results.push('L') }
   })
   const played = wins + draws + losses
   if (!played) return null
+
+  // Série en cours : compte les derniers résultats identiques consécutifs
+  let streak = 0, streakType = null
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (streakType === null) { streakType = results[i]; streak = 1 }
+    else if (results[i] === streakType) streak++
+    else break
+  }
+  const streakLabel = streakType === 'W' ? `${streak}V` : streakType === 'D' ? `${streak}N` : `${streak}D`
+
   return {
     played, wins, draws, losses, gf, ga, cs,
     avgFor:     (gf / played).toFixed(1),
     avgAgainst: (ga / played).toFixed(1),
     winPct:     Math.round((wins / played) * 100),
+    bttsPct:    Math.round((btts / played) * 100),
+    over25Pct:  Math.round((over25 / played) * 100),
+    streak: streakLabel,
+    streakType,
   }
 }
 
@@ -683,13 +709,27 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
   const a = calcTeamStats(awayId, compMatches)
   if (!h && !a) return null
 
+  // Série en cours : couleur selon le type
+  const streakColor = type => type === 'W' ? '#4ade80' : type === 'D' ? '#facc15' : '#f87171'
+  const hStreakEl = h?.streak
+    ? <span style={{ color: streakColor(h.streakType), fontWeight: 700 }}>{h.streak}</span>
+    : '–'
+  const aStreakEl = a?.streak
+    ? <span style={{ color: streakColor(a.streakType), fontWeight: 700 }}>{a.streak}</span>
+    : '–'
+
   const rows = [
-    { label: 'Matchs joués',      hv: h?.played,     av: a?.played,     higher: true  },
-    { label: 'Buts marqués / match', hv: h?.avgFor,  av: a?.avgFor,     higher: true  },
-    { label: 'Buts encaissés / match', hv: h?.avgAgainst, av: a?.avgAgainst, higher: false },
-    { label: '% Victoires',        hv: h ? `${h.winPct}%` : '–', av: a ? `${a.winPct}%` : '–',
+    { label: 'Matchs joués',         hv: h?.played,                av: a?.played,                higher: true  },
+    { label: 'Buts marqués / match',  hv: h?.avgFor,                av: a?.avgFor,                higher: true  },
+    { label: 'Buts encaissés / match',hv: h?.avgAgainst,            av: a?.avgAgainst,            higher: false },
+    { label: '% Victoires',           hv: h ? `${h.winPct}%` : '–', av: a ? `${a.winPct}%` : '–',
       hRaw: h?.winPct, aRaw: a?.winPct, higher: true },
-    { label: 'Clean sheets',       hv: h?.cs,         av: a?.cs,         higher: true  },
+    { label: 'Clean sheets',          hv: h?.cs,                    av: a?.cs,                    higher: true  },
+    { label: 'Les deux marquent %',   hv: h ? `${h.bttsPct}%` : '–', av: a ? `${a.bttsPct}%` : '–',
+      hRaw: h?.bttsPct, aRaw: a?.bttsPct, higher: true },
+    { label: '+2.5 buts %',           hv: h ? `${h.over25Pct}%` : '–', av: a ? `${a.over25Pct}%` : '–',
+      hRaw: h?.over25Pct, aRaw: a?.over25Pct, higher: true },
+    { label: 'Série en cours',        hv: hStreakEl, av: aStreakEl, noCompare: true },
   ]
 
   return (
@@ -701,11 +741,11 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
         <span className="pm__statTeam pm__statTeam--away">{awayName}</span>
       </div>
       <div className="pm__statTable">
-        {rows.map(({ label, hv, av, hRaw, aRaw, higher }) => {
+        {rows.map(({ label, hv, av, hRaw, aRaw, higher, noCompare }) => {
           const hNum = hRaw !== undefined ? hRaw : parseFloat(hv)
           const aNum = hRaw !== undefined ? aRaw : parseFloat(av)
-          const hBetter = higher ? hNum > aNum : hNum < aNum
-          const aBetter = higher ? aNum > hNum : aNum < hNum
+          const hBetter = !noCompare && (higher ? hNum > aNum : hNum < aNum)
+          const aBetter = !noCompare && (higher ? aNum > hNum : aNum < hNum)
           return (
             <div key={label} className="pm__statRow">
               <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv ?? '–'}</span>
@@ -928,6 +968,9 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
         </div>
       )}
 
+      {/* Dernières confrontations — en premier pour voir l'historique direct */}
+      <H2HSection match={match} />
+
       {/* Stats saison */}
       {compMatches?.length > 0 && (
         <SeasonStatsSection
@@ -954,9 +997,6 @@ export function PreMatchSection({ match, prono, formMap, compMatches }) {
           </div>
         </div>
       )}
-
-      {/* H2H */}
-      <H2HSection match={match} />
     </div>
   )
 }
