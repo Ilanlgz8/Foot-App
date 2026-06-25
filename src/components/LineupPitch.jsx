@@ -353,10 +353,9 @@ function PlayerGrid({ starters, subs }) {
 export default function LineupPitch({ home, away }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
-  // On n'utilise pas la couleur ESPN (souvent incorrecte/inattendue)
-  // Couleurs fixes cohérentes avec le thème de l'app
+  // Rouge app pour les deux équipes — cohérent avec le thème
   const hColor = '#ef4444'
-  const aColor = '#3b82f6'
+  const aColor = '#ef4444'
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
