@@ -288,18 +288,20 @@ function Classement() {
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
-          <div className={`compHeader__picker${compOpen ? ' compHeader__picker--open' : ''}`}>
-            {competitions.map(comp => (
-              <button
-                key={comp.id}
-                className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
-                onClick={() => { setSelectedComp(comp.id); setCompOpen(false) }}
-              >
-                <img src={comp.emblem} alt="" className="compHeader__itemLogo"
-                  onError={e => e.currentTarget.style.display = 'none'} />
-                <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
-              </button>
-            ))}
+          <div className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}>
+            <div className="compHeader__picker">
+              {competitions.map(comp => (
+                <button
+                  key={comp.id}
+                  className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
+                  onClick={() => { setSelectedComp(comp.id); setCompOpen(false) }}
+                >
+                  <img src={comp.emblem} alt="" className="compHeader__itemLogo"
+                    onError={e => e.currentTarget.style.display = 'none'} />
+                  <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

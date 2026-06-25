@@ -89,7 +89,7 @@ export const TEAM_COLORS_FULL = {
   'Turkey':           { p: '#E30A17', s: '#1a1a1a' },
   'Austria':          { p: '#ED2939', s: '#1a1a1a' },
   'Slovakia':         { p: '#003F9E', s: '#CE1126' },
-  'New Zealand':      { p: '#1a1a1a', s: '#CC0000' },
+  'New Zealand':      { p: '#CC0000', s: '#1a1a1a' }, // rouge fougère argentée
   'Indonesia':        { p: '#CE1126', s: '#1a1a1a' },
   'Thailand':         { p: '#A51931', s: '#2D2A4A' },
   // Clubs (Ligue 1, PL, etc.)
@@ -210,7 +210,7 @@ export const TEAM_COLORS_FULL = {
   'UAE':                   { p: '#00732F', s: '#FF0000' },
   'United Arab Emirates':  { p: '#00732F', s: '#FF0000' },
   'Kuwait':                { p: '#007A3D', s: '#000000' },
-  'Palestine':             { p: '#000000', s: '#CE1126' },
+  'Palestine':             { p: '#CE1126', s: '#000000' }, // rouge en primaire
   'Kyrgyzstan':            { p: '#E8112D', s: '#FCE300' },
   'Tajikistan':            { p: '#CC0000', s: '#006600' },
   'Turkmenistan':          { p: '#2FA862', s: '#FFFFFF' },
@@ -685,26 +685,42 @@ function lookupColor(name) {
   return null
 }
 
+// S'assure qu'une couleur hex n'est pas trop sombre pour être visible dans un dégradé
+function ensureVisible(hex, fallbackHex) {
+  try {
+    const r = parseInt(hex.slice(1,3),16)
+    const g = parseInt(hex.slice(3,5),16)
+    const b = parseInt(hex.slice(5,7),16)
+    // Luminance perceptive (0-255)
+    const lum = (r * 299 + g * 587 + b * 114) / 1000
+    if (lum < 40) return fallbackHex // trop sombre → utiliser le fallback
+    return hex
+  } catch { return fallbackHex }
+}
+
 // Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
 export function getMatchGradient(homeName, awayName) {
   // Fallbacks distincts et non-noirs selon le nom (hash simple pour varier)
   const fallbackHome = fallbackColor(homeName, 0)
   const fallbackAway = fallbackColor(awayName, 1)
-  const home = lookupColor(homeName) ?? fallbackHome
-  const away = lookupColor(awayName) ?? fallbackAway
-  return `linear-gradient(135deg, ${home.p} 0%, ${darken(home.p)} 38%, ${darken(away.p)} 62%, ${away.p} 100%)`
+  const rawHome = lookupColor(homeName) ?? fallbackHome
+  const rawAway = lookupColor(awayName) ?? fallbackAway
+  // Garantit une couleur primaire visible (luminance suffisante)
+  const hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
+  const ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
+  return `linear-gradient(135deg, ${hp} 0%, ${darken(hp)} 38%, ${darken(ap)} 62%, ${ap} 100%)`
 }
 
 // Génère une couleur de fallback non-noire, unique par nom d'équipe
 const FALLBACK_PALETTES = [
-  { p: '#1a4a8a', s: '#2d7dd2' }, // bleu
-  { p: '#1a6b3c', s: '#2d9e5e' }, // vert
-  { p: '#7a1a1a', s: '#c4352e' }, // rouge foncé
-  { p: '#4a1a7a', s: '#7b2fbf' }, // violet
-  { p: '#7a4a1a', s: '#c47a30' }, // orange foncé
-  { p: '#1a5a6b', s: '#2e8fa0' }, // teal
-  { p: '#6b1a4a', s: '#a03070' }, // rose
-  { p: '#2a4a1a', s: '#4a8a30' }, // vert foncé
+  { p: '#1a5fc8', s: '#4a9ef5' }, // bleu vif
+  { p: '#0e9e4a', s: '#28d972' }, // vert vif
+  { p: '#c8221a', s: '#f04a42' }, // rouge vif
+  { p: '#7a22c8', s: '#b04af5' }, // violet vif
+  { p: '#c87818', s: '#f0a840' }, // orange vif
+  { p: '#0e96a0', s: '#28ccd8' }, // teal vif
+  { p: '#c8246e', s: '#f04aa0' }, // rose vif
+  { p: '#2a8c18', s: '#50d030' }, // vert clair
 ]
 function fallbackColor(name, seed) {
   if (!name) return FALLBACK_PALETTES[seed % FALLBACK_PALETTES.length]
@@ -714,13 +730,14 @@ function fallbackColor(name, seed) {
 }
 
 // Assombrit légèrement une couleur hex pour le centre du dégradé
+// Plancher à 30 sur chaque canal pour éviter le noir quasi-total sur couleurs sombres
 function darken(hex) {
   try {
-    const r = Math.max(0, parseInt(hex.slice(1,3),16) - 40)
-    const g = Math.max(0, parseInt(hex.slice(3,5),16) - 40)
-    const b = Math.max(0, parseInt(hex.slice(5,7),16) - 40)
+    const r = Math.max(30, parseInt(hex.slice(1,3),16) - 22)
+    const g = Math.max(30, parseInt(hex.slice(3,5),16) - 22)
+    const b = Math.max(30, parseInt(hex.slice(5,7),16) - 22)
     return `rgb(${r},${g},${b})`
-  } catch { return '#111' }
+  } catch { return '#1a1a2e' }
 }
 
 export function getTeamPhoto(name) {

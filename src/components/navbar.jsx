@@ -12,6 +12,38 @@ const navigation = [
   { name: 'Classement', href: '/classement' },
 ]
 
+// Icônes SVG pour la barre de nav mobile
+const QN_ICONS = {
+  '/': (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1h-3.5v-4.5H7.5V18H4a1 1 0 01-1-1V9.5z"/>
+    </svg>
+  ),
+  '/matchs': (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="3.5" width="15" height="14" rx="2"/>
+      <path d="M2.5 8h15M7 1.5v4M13 1.5v4"/>
+      <circle cx="7" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+      <circle cx="10" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+      <circle cx="13" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  '/resultats': (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h8v5.5c0 2.5-1.5 4.5-4 5.5-2.5-1-4-3-4-5.5V3z"/>
+      <path d="M10 14v3M7 17h6"/>
+      <path d="M7.5 7l1.8 1.8L12 6"/>
+    </svg>
+  ),
+  '/classement': (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="11.5" width="4" height="7" rx="0.75"/>
+      <rect x="7.5" y="6.5" width="4" height="12" rx="0.75"/>
+      <rect x="13.5" y="2.5" width="4" height="16" rx="0.75"/>
+    </svg>
+  ),
+}
+
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isStale, setIsStale]       = useState(false)
@@ -172,13 +204,14 @@ function Navbar() {
               isActive ? 'navbar__qnLink navbar__qnLink--active' : 'navbar__qnLink'
             }
           >
+            {QN_ICONS[item.href]}
             <span className="navbar__qnLabel">{item.name}</span>
           </NavLink>
         ))}
         {liveMatches.length > 0 && (
           <button className="navbar__qnLive" onClick={() => navigate('/live')}>
             <span className="navbar__qnLiveDot" />
-            <span className="navbar__qnLabel">Direct</span>
+            <span className="navbar__qnLabel">Live</span>
           </button>
         )}
       </div>
