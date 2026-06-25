@@ -952,17 +952,13 @@
   .classement__sidebar {
     flex: none;
     width: 100%;
-    position: sticky;
-    top: 4.2rem; /* navbar height — overridé à 7rem sur < 640px (+ quick nav) */
-    z-index: 20;
-    padding: 0.55rem 0.75rem;
+    position: static;
+    padding: 0.55rem 0;
     border-radius: 0;
-    background: linear-gradient(90deg, #04070c 0%, #0a0f1a 55%, #120308 100%);
+    background: transparent;
     border-bottom: 1px solid rgba(239,68,68,0.13);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-    margin-left: -0.75rem;
-    margin-right: -0.75rem;
-    width: calc(100% + 1.5rem);
+    box-shadow: none;
+    margin: 0;
   }
 
   .classement__sidebarLabel { display: none; }
@@ -1026,10 +1022,6 @@
   .classement__panelTitle { font-size: 1rem; }
 }
 
-/* Mobile (< 640px) : sidebar plus haute car quick nav navbar */
-@media (max-width: 639px) {
-  .classement__sidebar { top: 7rem; }
-}
 
 /* Mobile (< 640px) */
 @media (max-width: 640px) {

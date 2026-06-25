@@ -8,31 +8,77 @@
   z-index: 50;
   overflow: hidden;
   color: #fff;
-  background:
-    linear-gradient(90deg,
-      #04070c 0%,
-      #0a0f1a 45%,
-      #120308 100%
-    );
-  border-bottom: 1px solid rgba(239,68,68,0.18);
+  background: #000;
+  border-bottom: 1px solid rgba(239,68,68,0.22);
   box-shadow:
-    0 1px 0 rgba(239,68,68,0.08),
-    0 8px 32px rgba(0,0,0,0.5);
-  z-index: 50;
+    0 0 0 1px rgba(239,68,68,0.08),
+    0 8px 40px rgba(0,0,0,0.85),
+    0 0 60px rgba(239,68,68,0.06);
+  animation: navGlow 4s ease-in-out infinite;
 }
 
-/* ── Lumière de stade (effet projecteur) ── */
+@keyframes navGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(239,68,68,0.1),
+      0 8px 32px rgba(0,0,0,0.8),
+      0 0 30px rgba(239,68,68,0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(239,68,68,0.35),
+      0 8px 40px rgba(0,0,0,0.9),
+      0 0 70px rgba(239,68,68,0.12);
+  }
+}
+
+/* ── Bordure conic-gradient tournante ── */
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.navbar__border {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  background:
+    conic-gradient(
+      from var(--border-angle),
+      rgba(239,68,68,0.9) 0deg,
+      rgba(255,100,100,0.3) 60deg,
+      transparent 120deg,
+      transparent 240deg,
+      rgba(255,100,100,0.3) 300deg,
+      rgba(239,68,68,0.9) 360deg
+    )
+    border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  animation: borderSpin 6s linear infinite;
+}
+
+@keyframes borderSpin {
+  to { --border-angle: 360deg; }
+}
+
+/* ── Projecteur rouge subtil ── */
 .navbar::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 80% at 50% -20%, rgba(239,68,68,0.1) 0%, transparent 70%),
-    radial-gradient(ellipse 30% 60% at 15% 50%, rgba(255,255,255,0.03) 0%, transparent 60%);
+    radial-gradient(ellipse 70% 100% at 50% -10%, rgba(239,68,68,0.07) 0%, transparent 70%);
 }
 
-/* ── Ligne de pelouse en bas ── */
+/* ── Ligne scanning en bas ── */
 .navbar::after {
   content: '';
   position: absolute;
@@ -40,12 +86,20 @@
   height: 2px;
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(239,68,68,0.6) 20%,
-    rgba(255,80,80,0.9) 50%,
-    rgba(239,68,68,0.6) 80%,
+    rgba(239,68,68,0.8) 30%,
+    rgba(255,100,100,1) 50%,
+    rgba(239,68,68,0.8) 70%,
     transparent 100%
   );
-  box-shadow: 0 0 12px rgba(239,68,68,0.4);
+  background-size: 200% 100%;
+  box-shadow: 0 0 16px rgba(239,68,68,0.6);
+  animation: navLineScan 3s ease-in-out infinite;
+}
+
+@keyframes navLineScan {
+  0%   { background-position: -100% 0; opacity: 0.6; }
+  50%  { background-position: 0% 0;    opacity: 1; }
+  100% { background-position: 100% 0;  opacity: 0.6; }
 }
 
 .navbar__overlay,
@@ -198,7 +252,7 @@
   padding: 0.48rem 1.1rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.6);
+  color: rgba(210,220,240,0.75);
   text-decoration: none;
   letter-spacing: 0.02em;
   transition: color 0.2s, background 0.2s;
@@ -332,7 +386,7 @@
   padding: 0.8rem 0.85rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.65);
+  color: rgba(210,220,240,0.82);
   text-decoration: none;
   transition: all 0.15s;
 }
@@ -512,13 +566,8 @@
   .navbar__quickNav {
     display: flex;
     align-items: stretch;
-    border-top: 1px solid rgba(239,68,68,0.14);
-    background:
-      linear-gradient(90deg,
-        rgba(4,7,12,0.98) 0%,
-        rgba(10,15,26,0.98) 55%,
-        rgba(12,3,8,0.98) 100%
-      );
+    border-top: 1px solid rgba(239,68,68,0.2);
+    background: rgba(0,0,0,0.96);
     padding: 0 4px 4px;
   }
 
@@ -531,7 +580,7 @@
     gap: 2px;
     padding: 6px 2px 5px;
     text-decoration: none;
-    color: rgba(255,255,255,0.4);
+    color: rgba(200,215,240,0.45);
     font-size: 0.55rem;
     font-weight: 700;
     letter-spacing: 0.03em;

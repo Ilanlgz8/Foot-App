@@ -411,6 +411,69 @@ export const TEAM_COLORS_FULL = {
   'AS Monaco FC':          { p: '#EE1921', s: '#FFFFFF' },
   'Olympique Lyonnais':    { p: '#1A5EA2', s: '#D00000' },
   'Olympique de Marseille':{ p: '#009BDE', s: '#1a1a1a' },
+  // ── WC 2026 — tous les pays qualifiés (variantes de noms football-data.org) ──
+  // CONCACAF
+  'Trinidad and Tobago':   { p: '#CE1126', s: '#000000' },
+  'Trinidad & Tobago':     { p: '#CE1126', s: '#000000' },
+  'Curaçao':               { p: '#003087', s: '#FFFFFF' },
+  'Curacao':               { p: '#003087', s: '#FFFFFF' },
+  'Jamaica':               { p: '#000000', s: '#FED100' },
+  'Cuba':                  { p: '#002A8F', s: '#CF142B' },
+  'Haiti':                 { p: '#00209F', s: '#D21034' },
+  'Haïti':                 { p: '#00209F', s: '#D21034' },
+  'Suriname':              { p: '#377E3F', s: '#B40A2D' },
+  'Guyana':                { p: '#009E49', s: '#CE1126' },
+  'Belize':                { p: '#003F87', s: '#CE1126' },
+  'Bermuda':               { p: '#CC0000', s: '#000000' },
+  'Cayman Islands':        { p: '#000000', s: '#FFFFFF' },
+  'Martinique':            { p: '#003087', s: '#FFFFFF' },
+  'Guadeloupe':            { p: '#003DA5', s: '#FFFFFF' },
+  // CONMEBOL
+  'Bolivia':               { p: '#D52B1E', s: '#F9E300' },
+  'Paraguay':              { p: '#D52B1E', s: '#0038A8' },
+  'Venezuela':             { p: '#CF142B', s: '#003082' },
+  'Peru':                  { p: '#D91023', s: '#1a1a1a' },
+  // CAF WC 2026
+  'Mali':                  { p: '#14B53A', s: '#FCD116' },
+  'Guinea':                { p: '#CE1126', s: '#009A44' },
+  'Guinée':                { p: '#CE1126', s: '#009A44' },
+  'Équatorial Guinea':     { p: '#3E9A00', s: '#E32118' },
+  'Ivory Coast':           { p: '#F77F00', s: '#009A44' },
+  'Kenya':                 { p: '#006600', s: '#CC0000' },
+  'Sierra Leone':          { p: '#1EB53A', s: '#0000CD' },
+  'Liberia':               { p: '#BF0A30', s: '#002868' },
+  'Niger':                 { p: '#E05206', s: '#009A44' },
+  'Burkina Faso':          { p: '#EF2B2D', s: '#009A3B' },
+  'Congo':                 { p: '#009A44', s: '#FBDE4A' },
+  'Republic of Congo':     { p: '#009A44', s: '#FBDE4A' },
+  'Sénégal':               { p: '#00853F', s: '#FDEF42' },
+  'Maroc':                 { p: '#C1272D', s: '#006233' },
+  // AFC WC 2026
+  'Oman':                  { p: '#DB161B', s: '#FFFFFF' },
+  'Bahrain':               { p: '#CE1126', s: '#FFFFFF' },
+  'Bahreïn':               { p: '#CE1126', s: '#FFFFFF' },
+  'Syria':                 { p: '#007A3D', s: '#CE1126' },
+  'Syrie':                 { p: '#007A3D', s: '#CE1126' },
+  'Lebanon':               { p: '#CE1126', s: '#FFFFFF' },
+  'Liban':                 { p: '#CE1126', s: '#FFFFFF' },
+  'Tajikistan':            { p: '#CC0000', s: '#006600' },
+  'Kirghizistan':          { p: '#E8112D', s: '#FCE300' },
+  // Noms football-data.org alternatifs
+  'Islamic Republic of Iran':{ p: '#239F40', s: '#FFFFFF' },
+  'Republic of Ireland':   { p: '#169B62', s: '#FF883E' },
+  'Northern Ireland':      { p: '#003DA5', s: '#FFFFFF' },
+  'Faroe Islands':         { p: '#003F87', s: '#EF3340' },
+  'Liechtenstein':         { p: '#002B7F', s: '#CE1126' },
+  'Andorra':               { p: '#003DA5', s: '#FEDF00' },
+  'Malta':                 { p: '#FFFFFF', s: '#CE1126' },
+  'San Marino':            { p: '#003DA5', s: '#FFFFFF' },
+  'Gibraltar':             { p: '#FFFFFF', s: '#CE1126' },
+  'Kosovo':                { p: '#003DA5', s: '#FFD700' },
+  // Aliases supplémentaires
+  'Türkiye':               { p: '#E30A17', s: '#1a1a1a' },
+  'Turkey':                { p: '#E30A17', s: '#1a1a1a' },
+  'Netherlands':           { p: '#FF6200', s: '#003580' },
+  'Holland':               { p: '#FF6200', s: '#003580' },
 }
 
 // Mots-clés → couleurs pour le fuzzy match
@@ -506,6 +569,36 @@ const KEYWORD_COLORS = [
   [['eritrea'],                  { p: '#4189DD', s: '#4DBB6D' }],
   [['djibouti'],                 { p: '#6AB2E7', s: '#12AD2B' }],
   [['lesotho'],                  { p: '#009A44', s: '#FFFFFF' }],
+  // WC 2026 CONCACAF — noms spéciaux football-data.org
+  [['cura'],                     { p: '#003087', s: '#FFFFFF' }],  // Curaçao
+  [['guyana'],                   { p: '#009E49', s: '#CE1126' }],
+  [['jamaica'],                  { p: '#000000', s: '#FED100' }],
+  [['belize'],                   { p: '#003F87', s: '#CE1126' }],
+  [['bermuda'],                  { p: '#CC0000', s: '#000000' }],
+  [['martinique'],               { p: '#003087', s: '#FFFFFF' }],
+  [['guadeloupe'],               { p: '#003DA5', s: '#FFFFFF' }],
+  [['barbados','barbade'],       { p: '#00267F', s: '#FFC726' }],
+  [['montserrat'],               { p: '#002868', s: '#000000' }],
+  [['st. lucia','saint lucia'],  { p: '#65CFFF', s: '#FCD116' }],
+  [['grenada','grenade'],        { p: '#CE1126', s: '#009E60' }],
+  [['antigua'],                  { p: '#CE1126', s: '#000000' }],
+  [['saint kitts'],              { p: '#009E60', s: '#FFD700' }],
+  [['st. kitts'],                { p: '#009E60', s: '#FFD700' }],
+  [['dominican'],                { p: '#002D62', s: '#CF142B' }],
+  // WC 2026 AFC
+  [['syria','syrie'],            { p: '#007A3D', s: '#CE1126' }],
+  [['lebanon','liban'],          { p: '#CE1126', s: '#FFFFFF' }],
+  [['tajik'],                    { p: '#CC0000', s: '#006600' }],
+  [['kyrgyz','kirghiz'],         { p: '#E8112D', s: '#FCE300' }],
+  // WC 2026 CAF — noms alternatifs
+  [['maroc'],                    { p: '#C1272D', s: '#006233' }],
+  [['sénégal','senegal'],        { p: '#00853F', s: '#FDEF42' }],
+  [['liberia'],                  { p: '#BF0A30', s: '#002868' }],
+  [['kenya'],                    { p: '#006600', s: '#CC0000' }],
+  [['sierra leone'],             { p: '#1EB53A', s: '#0000CD' }],
+  [['niger'],                    { p: '#E05206', s: '#009A44' }],
+  // Netherlands variants
+  [['netherlands','holland','pays-bas'], { p: '#FF6200', s: '#003580' }],
   // Premier League clubs fuzzy
   [['brighton'],                 { p: '#0057B8', s: '#FFFFFF' }],
   [['aston villa'],              { p: '#670E36', s: '#95BFE5' }],
@@ -635,5 +728,5 @@ export function getTeamPhoto(name) {
 }
 
 export function getTeamColor(name) {
-  return lookupColor(name)?.p ?? '#6b7280'
+  return lookupColor(name)?.p ?? fallbackColor(name, 0).p
 }
