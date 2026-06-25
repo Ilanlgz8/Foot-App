@@ -2656,7 +2656,7 @@
   width: 100%;
   border-radius: 16px;
   overflow: hidden;
-  min-height: 210px;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
   background: #0e0e0e;
@@ -2744,77 +2744,54 @@
   50%       { opacity: 0.35; transform: scale(0.7); }
 }
 
-/* ── Crests : grands, un à gauche, un à droite ── */
-.poster__crests {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 24px 0;
-}
-.poster__crest-wrap {
-  width: 54px;
-  height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.poster__crest {
-  width: 54px;
-  height: 54px;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7));
-}
-.poster__crest-empty {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-}
-
-/* ── Centre : label + heure ou score ── */
+/* ── Centre : "Coup d'envoi" + heure/score — bloc centré, prioritaire ── */
 .poster__center {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 0 6px;
+  justify-content: center;
+  gap: 3px;
+  padding: 14px 0 8px;
+  text-align: center;
 }
 
-/* "Coup d'envoi" / "Terminé" / minute live — AU-DESSUS du score */
+/* Label au-dessus (Coup d'envoi / Terminé / Mi-temps) */
 .poster__env-label {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.5);
   line-height: 1;
 }
 .poster__min-label {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 900;
   color: #f87171;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-shadow: 0 0 14px rgba(239,68,68,0.55);
   line-height: 1;
 }
 
-/* Heure (upcoming) */
+/* Heure (upcoming) — bien centrée, grosse */
 .poster__time {
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 900;
-  color: rgba(255,255,255,0.95);
+  color: rgba(255,255,255,0.97);
   letter-spacing: 0.04em;
   line-height: 1;
-  text-shadow: 0 2px 20px rgba(0,0,0,0.6);
+  text-align: center;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.7);
 }
 
 /* Score (live / terminé) */
 .poster__score {
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 900;
   letter-spacing: 0.04em;
   color: #fff;
   line-height: 1;
+  text-align: center;
   text-shadow: 0 2px 16px rgba(0,0,0,0.5);
 }
 .poster--live .poster__score {
@@ -2822,20 +2799,20 @@
   text-shadow: 0 0 22px rgba(239,68,68,0.45);
 }
 
-/* ── Noms d'équipe : écartés gauche / droite ── */
+/* ── Noms d'équipe : remontés, juste sous le centre ── */
 .poster__names {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px 12px;
+  padding: 0 18px 6px;
 }
 .poster__name {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.88);
+  color: rgba(255,255,255,0.9);
   letter-spacing: 0.02em;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
-  max-width: 38%;
+  max-width: 40%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2843,9 +2820,36 @@
 .poster__name--home { text-align: left; }
 .poster__name--away { text-align: right; }
 
+/* ── Crests : un à gauche, un à droite — plus bas, sous les noms ── */
+.poster__crests {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px 10px;
+}
+.poster__crest-wrap {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.poster__crest {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.65));
+}
+.poster__crest-empty {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+
 /* ── Footer : barre prono ── */
 .poster__footer {
-  padding: 0 14px 12px;
+  padding: 0 14px 13px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -2859,31 +2863,31 @@
   overflow: hidden;
 }
 .poster__lbl {
-  font-size: 0.52rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255,255,255,0.78);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
+  line-height: 1.3;
   flex-shrink: 0;
 }
 .poster__lbl--h { text-align: left; }
 .poster__lbl--d { text-align: center; }
 .poster__lbl--a { text-align: right; }
 
-/* Barre */
+/* Barre — légèrement plus haute */
 .poster__prono-bar {
   display: flex;
   width: 100%;
-  height: 5px;
-  border-radius: 4px;
+  height: 7px;
+  border-radius: 5px;
   overflow: hidden;
   gap: 2px;
 }
 .poster__seg {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 .poster__seg--d {
   background: rgba(255,255,255,0.18);

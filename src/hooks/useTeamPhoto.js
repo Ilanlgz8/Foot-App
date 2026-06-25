@@ -1,107 +1,97 @@
 import { useQuery } from '@tanstack/react-query'
 
-// Map nom football-data.org → article Wikipedia
-// On cible des articles de TOURNOIS / MATCHS qui ont des photos d'action
-// multi-joueurs (célébrations, duels en match) — pas des portraits individuels.
+// Map nom football-data.org → article Wikipedia (photos 2024-2026 uniquement)
+// WC 2026 en cours (juin 2026) → articles frais avec photos d'action actuelles
+// Format Wikipedia standard : "[Country]_at_the_2026_FIFA_World_Cup"
 const WIKI = {
-  // ── Europe ──
-  'France':          '2022_FIFA_World_Cup_Final',        // célébration finale WC22
-  'Argentina':       '2022_FIFA_World_Cup',              // Messi + équipe trophée
-  'Spain':           'UEFA_Euro_2024_Final',              // Espagne célébrant
-  'England':         'UEFA_Euro_2024_Final',              // Angleterre en finale
-  'Germany':         'UEFA_Euro_2024',                    // Allemagne tournoi domicile
-  'Portugal':        'UEFA_Euro_2016',                    // Portugal champion
-  'Netherlands':     'UEFA_Euro_2024',                    // Pays-Bas demi-finales
-  'Belgium':         '2018_FIFA_World_Cup',               // Belgique 3e place WC18
-  'Croatia':         '2022_FIFA_World_Cup_third_place_play-off', // Croatie 3e WC22
-  'Italy':           'UEFA_Euro_2020',                    // Italie champion Euro
-  'Switzerland':     'UEFA_Euro_2024',                    // Suisse quarts
-  'Poland':          'UEFA_Euro_2024',
-  'Denmark':         'UEFA_Euro_2020',
-  'Sweden':          'UEFA_Euro_2020',
-  'Norway':          'Erling_Haaland',                    // pas de tournoi récent, star
-  'Austria':         'UEFA_Euro_2024',
-  'Hungary':         'UEFA_Euro_2024',
-  'Turkey':          'UEFA_Euro_2024',                    // Turquie quarts
-  'Ukraine':         'UEFA_Euro_2020',
-  'Serbia':          'UEFA_Euro_2024',
-  'Romania':         'UEFA_Euro_2024',
+  // ── WC 2026 — articles en cours (photos fraîches du tournoi) ──
+  'France':          'France_at_the_2026_FIFA_World_Cup',
+  'Brazil':          'Brazil_at_the_2026_FIFA_World_Cup',
+  'Argentina':       'Argentina_at_the_2026_FIFA_World_Cup',
+  'Spain':           'Spain_at_the_2026_FIFA_World_Cup',
+  'England':         'England_at_the_2026_FIFA_World_Cup',
+  'Germany':         'Germany_at_the_2026_FIFA_World_Cup',
+  'Portugal':        'Portugal_at_the_2026_FIFA_World_Cup',
+  'Netherlands':     'Netherlands_at_the_2026_FIFA_World_Cup',
+  'Morocco':         'Morocco_at_the_2026_FIFA_World_Cup',
+  'Senegal':         'Senegal_at_the_2026_FIFA_World_Cup',
+  'Ivory Coast':     'Ivory_Coast_at_the_2026_FIFA_World_Cup',
+  'Nigeria':         'Nigeria_at_the_2026_FIFA_World_Cup',
+  'Ghana':           'Ghana_at_the_2026_FIFA_World_Cup',
+  'Cameroon':        'Cameroon_at_the_2026_FIFA_World_Cup',
+  'Egypt':           'Egypt_at_the_2026_FIFA_World_Cup',
+  'Algeria':         'Algeria_at_the_2026_FIFA_World_Cup',
+  'Tunisia':         'Tunisia_at_the_2026_FIFA_World_Cup',
+  'South Africa':    'South_Africa_at_the_2026_FIFA_World_Cup',
+  'Mexico':          'Mexico_at_the_2026_FIFA_World_Cup',
+  'United States':   'United_States_at_the_2026_FIFA_World_Cup',
+  'Canada':          'Canada_at_the_2026_FIFA_World_Cup',
+  'Japan':           'Japan_at_the_2026_FIFA_World_Cup',
+  'South Korea':     'South_Korea_at_the_2026_FIFA_World_Cup',
+  'Korea Republic':  'South_Korea_at_the_2026_FIFA_World_Cup',
+  'Australia':       'Australia_at_the_2026_FIFA_World_Cup',
+  'Saudi Arabia':    'Saudi_Arabia_at_the_2026_FIFA_World_Cup',
+  'Iran':            'Iran_at_the_2026_FIFA_World_Cup',
+  'Colombia':        'Colombia_at_the_2026_FIFA_World_Cup',
+  'Uruguay':         'Uruguay_at_the_2026_FIFA_World_Cup',
+  'Ecuador':         'Ecuador_at_the_2026_FIFA_World_Cup',
+  'Croatia':         'Croatia_at_the_2026_FIFA_World_Cup',
+  'Belgium':         'Belgium_at_the_2026_FIFA_World_Cup',
+  'Switzerland':     'Switzerland_at_the_2026_FIFA_World_Cup',
+  'Poland':          'Poland_at_the_2026_FIFA_World_Cup',
+  'Serbia':          'Serbia_at_the_2026_FIFA_World_Cup',
+  'Turkey':          'Turkey_at_the_2026_FIFA_World_Cup',
+  'Ukraine':         'Ukraine_at_the_2026_FIFA_World_Cup',
+  'Romania':         'Romania_at_the_2026_FIFA_World_Cup',
+  'Austria':         'Austria_at_the_2026_FIFA_World_Cup',
+  'Hungary':         'Hungary_at_the_2026_FIFA_World_Cup',
+  'Slovakia':        'Slovakia_at_the_2026_FIFA_World_Cup',
+  'Slovenia':        'Slovenia_at_the_2026_FIFA_World_Cup',
+  'Albania':         'Albania_at_the_2026_FIFA_World_Cup',
+  'Georgia':         'Georgia_at_the_2026_FIFA_World_Cup',
+  'Costa Rica':      'Costa_Rica_at_the_2026_FIFA_World_Cup',
+  'Panama':          'Panama_at_the_2026_FIFA_World_Cup',
+  'Jamaica':         'Jamaica_at_the_2026_FIFA_World_Cup',
+  'Honduras':        'Honduras_at_the_2026_FIFA_World_Cup',
+  'Venezuela':       'Venezuela_at_the_2026_FIFA_World_Cup',
+  'Paraguay':        'Paraguay_at_the_2026_FIFA_World_Cup',
+  'Bolivia':         'Bolivia_at_the_2026_FIFA_World_Cup',
+  'Chile':           'Chile_at_the_2026_FIFA_World_Cup',
+  'New Zealand':     'New_Zealand_at_the_2026_FIFA_World_Cup',
+  'Qatar':           'Qatar_at_the_2026_FIFA_World_Cup',
+  'Iraq':            'Iraq_at_the_2026_FIFA_World_Cup',
+  'Uzbekistan':      'Uzbekistan_at_the_2026_FIFA_World_Cup',
+
+  // ── Non qualifiés WC2026 → tournois 2024 ──
+  'Italy':           'UEFA_Euro_2024',
+  'Denmark':         'UEFA_Euro_2024',
   'Scotland':        'UEFA_Euro_2024',
-  'Wales':           'UEFA_Euro_2020',
-  'Slovakia':        'UEFA_Euro_2024',
-  'Slovenia':        'UEFA_Euro_2024',
-  'Albania':         'UEFA_Euro_2024',
-  'Czech Republic':  'UEFA_Euro_2020',
-  'Czechia':         'UEFA_Euro_2020',
-  'Georgia':         'UEFA_Euro_2024',                    // première qualification historique
-  'Bosnia-H.':       'Bosnia_and_Herzegovina_national_football_team',
-  'Greece':          'UEFA_Euro_2004',                    // champion surprise
-  'Finland':         'UEFA_Euro_2020',
-  'Israel':          'Israel_national_football_team',
-
-  // ── Amérique du Sud ──
-  'Brazil':          'Brazil_at_the_2022_FIFA_World_Cup',
-  'Colombia':        'Copa_América_2024',                 // Colombia en Copa
-  'Uruguay':         'Copa_América_2024',
-  'Ecuador':         '2022_FIFA_World_Cup',
-  'Chile':           'Copa_América_2015',                 // Chile champion
-  'Paraguay':        'Copa_América',
-  'Venezuela':       'Copa_América_2024',
-  'Peru':            'Copa_América_2019',
-  'Bolivia':         'Copa_América',
-
-  // ── Amérique du Nord / Centrale / Caraïbes ──
-  'Mexico':          'Mexico_national_football_team',
-  'United States':   'United_States_at_the_2022_FIFA_World_Cup',
-  'Canada':          'Canada_at_the_2022_FIFA_World_Cup',
-  'Costa Rica':      'Costa_Rica_at_the_2022_FIFA_World_Cup',
-  'Panama':          'Panama_national_football_team',
-  'Honduras':        'Honduras_national_football_team',
-  'Jamaica':         'Jamaica_national_football_team',
-  'Haiti':           'Haiti_national_football_team',
-  'Curaçao':         'Curaçao_national_football_team',
-
-  // ── Afrique ──
-  'Morocco':         'Morocco_at_the_2022_FIFA_World_Cup', // célébrations épiques
-  'Senegal':         '2021_Africa_Cup_of_Nations_Final',   // 1er trophée Sénégal
-  'Ivory Coast':     '2023_Africa_Cup_of_Nations_Final',   // CAN 2023 vainqueur
-  'Nigeria':         'Nigeria_at_the_FIFA_World_Cup',
-  'Ghana':           'Ghana_at_the_FIFA_World_Cup',
-  'Cameroon':        'Cameroon_at_the_FIFA_World_Cup',
-  'Egypt':           'Africa_Cup_of_Nations',
-  'Algeria':         '2019_Africa_Cup_of_Nations_Final',   // Algérie champion CAN 2019
-  'Tunisia':         'Tunisia_at_the_FIFA_World_Cup',
-  'South Africa':    '2010_FIFA_World_Cup',                 // Afrique du Sud hôte WC10
-  'Cape Verde':      'Cape_Verde_national_football_team',
-  'Congo DR':        'DR_Congo_national_football_team',
-  'Mali':            'Mali_national_football_team',
-  'Burkina Faso':    'Burkina_Faso_national_football_team',
-  'Guinea':          'Guinea_national_football_team',
-  'Zambia':          'Zambia_national_football_team',
-  'Zimbabwe':        'Zimbabwe_national_football_team',
-  'Tanzania':        'Tanzania_national_football_team',
-  'Uganda':          'Uganda_national_football_team',
-  'Mozambique':      'Mozambique_national_football_team',
-
-  // ── Asie ──
-  'Japan':           'Japan_at_the_2022_FIFA_World_Cup',   // victoire Allemagne
-  'South Korea':     'South_Korea_at_the_2022_FIFA_World_Cup',
-  'Korea Republic':  'South_Korea_at_the_2022_FIFA_World_Cup',
-  'Australia':       'Australia_at_the_2022_FIFA_World_Cup',
-  'Saudi Arabia':    'Saudi_Arabia_at_the_2022_FIFA_World_Cup', // victoire Argentine !
-  'Iran':            'Iran_at_the_FIFA_World_Cup',
-  'Qatar':           '2022_FIFA_World_Cup',
-  'Iraq':            'Iraq_national_football_team',
-  'Jordan':          'Jordan_national_football_team',
-  'Uzbekistan':      'Uzbekistan_national_football_team',
-  'New Zealand':     'New_Zealand_national_football_team',
+  'Wales':           'UEFA_Euro_2024',
+  'Czech Republic':  'UEFA_Euro_2024',
+  'Czechia':         'UEFA_Euro_2024',
+  'Norway':          'UEFA_Euro_2024',
+  'Sweden':          'UEFA_Euro_2024',
+  'Finland':         'UEFA_Euro_2024',
+  'Israel':          'UEFA_Euro_2024',
+  'Bosnia-H.':       'UEFA_Euro_2024',
+  'Cape Verde':      '2023_Africa_Cup_of_Nations',
+  'Congo DR':        '2023_Africa_Cup_of_Nations',
+  'Mali':            '2023_Africa_Cup_of_Nations',
+  'Burkina Faso':    '2023_Africa_Cup_of_Nations',
+  'Guinea':          '2023_Africa_Cup_of_Nations',
+  'Peru':            'Copa_América_2024',
+  'Haiti':           'Copa_América_2024',
+  'Curaçao':         'Copa_América_2024',
+  'Jordan':          '2023_AFC_Asian_Cup',
+  'Saudi Arabia':    '2023_AFC_Asian_Cup',
 
   // ── Fallback universel ──
-  '__default__':     '2022_FIFA_World_Cup',
+  '__default__':     '2026_FIFA_World_Cup',
 }
 
+const CACHE_VERSION = 'v4'  // v4 = photos WC2026
+
 const CACHE_TTL = 7 * 24 * 3600 * 1000  // 7 jours
-const CACHE_VERSION = 'v3'               // incrémenter pour invalider l'ancien cache
 
 function getCached(key) {
   try {

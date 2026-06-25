@@ -73,27 +73,8 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
         }
       </div>
 
-      {/* ── Crests (grands, écartés) ── */}
-      <div className="poster__crests">
-        <div className="poster__crest-wrap poster__crest-wrap--home">
-          {match.homeTeam?.crest
-            ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} />
-            : <div className="poster__crest-empty" />
-          }
-        </div>
-        <div className="poster__crest-wrap poster__crest-wrap--away">
-          {match.awayTeam?.crest
-            ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} />
-            : <div className="poster__crest-empty" />
-          }
-        </div>
-      </div>
-
-      {/* ── Centre : label + heure/score ── */}
+      {/* ── Centre : "Coup d'envoi" + heure/score — centré ── */}
       <div className="poster__center">
-        {/* Minute (live) ou "Coup d'envoi" / "Terminé" (au-dessus) */}
         {isLive && minute && (
           <div className="poster__min-label">
             {minute === 'MT' ? 'Mi-temps' : `${minute}'`}
@@ -101,18 +82,34 @@ export function MatchPoster({ match, espnScore = null, formMap = {}, onClick }) 
         )}
         {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
         {isFinished  && <div className="poster__env-label">Terminé</div>}
-
-        {/* Score / Heure — gros, en dessous du label */}
         {(isLive || isFinished)
           ? <div className="poster__score">{homeScore ?? 0} – {awayScore ?? 0}</div>
           : <div className="poster__time">{formatHour(match.utcDate)}</div>
         }
       </div>
 
-      {/* ── Noms équipes (écartés, sous le centre) ── */}
+      {/* ── Noms équipes — juste sous le centre ── */}
       <div className="poster__names">
         <span className="poster__name poster__name--home">{homeShort}</span>
         <span className="poster__name poster__name--away">{awayShort}</span>
+      </div>
+
+      {/* ── Crests — en bas, au-dessus de la barre prono ── */}
+      <div className="poster__crests">
+        <div className="poster__crest-wrap">
+          {match.homeTeam?.crest
+            ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <div className="poster__crest-empty" />
+          }
+        </div>
+        <div className="poster__crest-wrap">
+          {match.awayTeam?.crest
+            ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} />
+            : <div className="poster__crest-empty" />
+          }
+        </div>
       </div>
 
       {/* ── Barre prono ── */}
