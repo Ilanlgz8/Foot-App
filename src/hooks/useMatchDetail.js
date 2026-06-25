@@ -325,7 +325,18 @@ export function useProbableLineups(match, compMatches) {
           if (!sumRes.ok) return null
           const summary = await sumRes.json()
 
-          const rosters = summary.rosters ?? []
+          let rosters = summary.rosters ?? []
+          // WC fallback : rosters dans header.competitions (pas dans summary.rosters)
+          if (rosters.length === 0) {
+            const competitors = summary.header?.competitions?.[0]?.competitors ?? []
+            if (competitors.length >= 1) {
+              rosters = competitors.map(c => ({
+                team:      c.team,
+                athletes:  c.roster ?? c.athletes ?? [],
+                formation: c.formation ?? '',
+              }))
+            }
+          }
           if (!rosters.length) return null
 
           // 3. Extraire le roster de l'équipe concernée
