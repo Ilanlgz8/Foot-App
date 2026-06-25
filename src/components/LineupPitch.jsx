@@ -353,8 +353,10 @@ function PlayerGrid({ starters, subs }) {
 export default function LineupPitch({ home, away }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
-  const hColor = safeColor(home?.color) ?? '#ef4444'
-  const aColor = safeColor(away?.color) ?? '#3b82f6'
+  // On n'utilise pas la couleur ESPN (souvent incorrecte/inattendue)
+  // Couleurs fixes cohérentes avec le thème de l'app
+  const hColor = '#ef4444'
+  const aColor = '#3b82f6'
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
