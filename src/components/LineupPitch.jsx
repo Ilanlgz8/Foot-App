@@ -369,6 +369,8 @@ export default function LineupPitch({ home, away }) {
       borderRadius: '1rem',
       overflow:     'hidden',
       border:       '1px solid rgba(255,255,255,0.07)',
+      maxWidth:     '480px',
+      margin:       '0 auto',
     }}>
       {/* Onglets équipes */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>

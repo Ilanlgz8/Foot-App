@@ -1282,7 +1282,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                   compMatches={compMatches}
                 />
               )}
-              {preTab === 'compos'      && <ComposTab match={match} />}
+              {preTab === 'compos'      && <ComposTab match={match} compMatches={compMatches} />}
               {preTab === 'classement'  && <ClassementTab match={match} compId={compId} />}
             </div>
           </div>
