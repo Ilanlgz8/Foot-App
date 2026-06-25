@@ -125,9 +125,9 @@ function MatchPageHeader({ match }) {
             <span className="live__teamName">{awayName}</span>
           </div>
 
-        </div>{/* live__matchRow */}
-      </div>{/* live__card */}
-    </div>{/* mp__header */}
+        </div>
+      </div>
+    </div>
   )
 }
 
