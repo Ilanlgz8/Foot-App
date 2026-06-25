@@ -3,6 +3,7 @@ import { translateTeam } from '../data/teamNames'
 import { calcMinute } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
+import { MatchPoster } from './MatchPoster'
 
 function GoalCelebration({ teamName, scoreStr }) {
   return (
@@ -241,6 +242,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
+// Sur mobile : posters Betclic-style. Sur desktop : cards classiques.
 export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
@@ -254,25 +256,40 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
         <p className="accueil__tickerEmpty">Aucun match aujourd'hui.</p>
       )}
       {!loading && displayed.length > 0 && (
-        <div className="accueil__matchCards">
-          {displayed.map(match => {
-            const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
-            return (
-              <div
+        <>
+          {/* Mobile : affiches poster */}
+          <div className="accueil__posterList">
+            {displayed.map(match => (
+              <MatchPoster
                 key={match.id}
-                className={isUpcoming && onMatchClick ? 'accueil__matchCardClickable' : undefined}
-                onClick={isUpcoming && onMatchClick ? () => onMatchClick(match) : undefined}
-              >
-                <MatchCard
-                  match={match}
-                  espnScore={espnScores[match.id] ?? null}
-                  noAnimation
-                  noLive
-                />
-              </div>
-            )
-          })}
-        </div>
+                match={match}
+                espnScore={espnScores[match.id] ?? null}
+                onClick={onMatchClick ? () => onMatchClick(match) : undefined}
+              />
+            ))}
+          </div>
+
+          {/* Desktop : cards classiques */}
+          <div className="accueil__matchCards">
+            {displayed.map(match => {
+              const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
+              return (
+                <div
+                  key={match.id}
+                  className={isUpcoming && onMatchClick ? 'accueil__matchCardClickable' : undefined}
+                  onClick={isUpcoming && onMatchClick ? () => onMatchClick(match) : undefined}
+                >
+                  <MatchCard
+                    match={match}
+                    espnScore={espnScores[match.id] ?? null}
+                    noAnimation
+                    noLive
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )

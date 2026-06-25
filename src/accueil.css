@@ -2600,3 +2600,257 @@
 .accueil__resultTabs--header {
   padding: 0;
 }
+
+/* =========================================================
+   POSTER CARDS — affiches match mobile uniquement
+   ========================================================= */
+
+/* Conteneur de la liste de posters — visible uniquement sur mobile */
+.accueil__posterList {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* Sur mobile : posters visibles, cards normales cachées dans MatchPanel */
+  .accueil__posterList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  /* Cache la grille de cards régulières sur mobile */
+  .accueil__dashPanelBody .accueil__matchCards {
+    display: none;
+  }
+}
+
+/* ── Poster ── */
+.poster {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #111;
+}
+
+/* Photo de fond */
+.poster__photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+.poster__photo--nogradient {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+/* Couches d'obscurcissement empilées */
+.poster__fog {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.48);
+  z-index: 1;
+}
+.poster__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%);
+  z-index: 2;
+}
+
+/* Dégradé bas plus sombre pour le footer */
+.poster::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: linear-gradient(to top, rgba(0,0,0,0.82), transparent);
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ── Badge compét / live ── */
+.poster__comp-row {
+  position: relative;
+  z-index: 10;
+  padding: 10px 12px 0;
+  display: flex;
+  align-items: center;
+}
+.poster__comp-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+}
+.poster__live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239,68,68,0.18);
+  border: 1px solid rgba(239,68,68,0.45);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f87171;
+}
+.poster__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: posterLivePulse 1.2s ease-in-out infinite;
+}
+@keyframes posterLivePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* ── Corps : minute + score + équipes + sous-label ── */
+.poster__body {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 4px;
+}
+
+/* Minute AU-DESSUS du score (live) */
+.poster__minute-top {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #f87171;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px rgba(239,68,68,0.6);
+  line-height: 1;
+}
+
+/* Score */
+.poster__score {
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  line-height: 1;
+}
+.poster--live .poster__score {
+  color: #f87171;
+  text-shadow: 0 0 20px rgba(239,68,68,0.5);
+}
+
+/* Heure (à venir) */
+.poster__time {
+  font-size: 2rem;
+  font-weight: 900;
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+/* Équipes côte à côte */
+.poster__teams {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 32px;
+  width: 100%;
+}
+.poster__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  max-width: 120px;
+}
+.poster__crest {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+}
+.poster__team-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.9);
+  text-align: center;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Sous-label ("Coup d'envoi", "Terminé") */
+.poster__sub-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  min-height: 0.8em;
+}
+
+/* ── Footer : barre prono ── */
+.poster__footer {
+  position: relative;
+  z-index: 10;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Labels alignés sur les segments */
+.poster__prono-labels {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  overflow: hidden;
+}
+.poster__lbl {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.poster__lbl--h { text-align: left; }
+.poster__lbl--d { text-align: center; }
+.poster__lbl--a { text-align: right; }
+
+/* Barre */
+.poster__prono-bar {
+  display: flex;
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+}
+.poster__seg {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.poster__seg--d {
+  background: rgba(255,255,255,0.18);
+}
