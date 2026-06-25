@@ -159,47 +159,32 @@ function PitchMarkings({ formation }) {
   )
 }
 
-// ── Liste 2 colonnes ──────────────────────────────────────────────────────────
+// ── Titulaires gauche / Remplaçants droite ────────────────────────────────────
 function PlayerGrid({ starters, subs, color }) {
-  const all = [
-    ...starters.map(p => ({ ...p, isSub: false })),
-    ...( subs ?? []).map(p => ({ ...p, isSub: true  })),
-  ]
+  const headerStyle = {
+    padding: '5px 8px 4px',
+    fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.32)',
+    fontFamily: "'Chakra Petch',monospace,Arial",
+  }
 
   return (
-    <div>
-      {/* Header titulaires */}
-      <div style={{
-        padding: '6px 12px 3px',
-        fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase',
-        color: 'rgba(255,255,255,0.28)',
-        fontFamily: "'Chakra Petch',monospace,Arial",
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        Titulaires
-      </div>
-
-      {/* Grille 2 colonnes — titulaires */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+    <div style={{
+      display: 'flex',
+      borderTop: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      {/* ── Titulaires — colonne gauche ── */}
+      <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={headerStyle}>Titulaires</div>
         {starters.map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
       </div>
 
-      {/* Remplaçants */}
+      {/* ── Remplaçants — colonne droite ── */}
       {subs?.length > 0 && (
-        <>
-          <div style={{
-            padding: '6px 12px 3px', marginTop: 2,
-            fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.18)',
-            fontFamily: "'Chakra Petch',monospace,Arial",
-            borderTop: '1px solid rgba(255,255,255,0.05)',
-          }}>
-            ⇄ Remplaçants
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-            {subs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
-          </div>
-        </>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={headerStyle}>⇄ Rempl.</div>
+          {subs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
+        </div>
       )}
     </div>
   )
@@ -213,30 +198,29 @@ function PlayerCell({ player, isSub }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 7,
-      padding: '6px 10px',
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '5px 8px',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
       minWidth: 0,
-      opacity: isSub ? 0.45 : 1,
     }}>
       {/* Badge poste */}
       <span style={{
         fontSize: 9, fontWeight: 700, flexShrink: 0,
         fontFamily: "'Chakra Petch',monospace,Arial",
         letterSpacing: '0.04em',
-        color:      isSub ? 'rgba(255,255,255,0.4)' : catC,
-        background: isSub ? 'rgba(255,255,255,0.05)' : `${catC}18`,
-        border:     `1px solid ${isSub ? 'rgba(255,255,255,0.12)' : catC + '44'}`,
-        borderRadius: 4, padding: '2px 5px',
-        minWidth: 28, textAlign: 'center',
+        color:      isSub ? 'rgba(255,255,255,0.55)' : catC,
+        background: isSub ? 'rgba(255,255,255,0.07)' : `${catC}18`,
+        border:     `1px solid ${isSub ? 'rgba(255,255,255,0.16)' : catC + '44'}`,
+        borderRadius: 4, padding: '2px 4px',
+        minWidth: 26, textAlign: 'center',
       }}>
         {posLabel || '—'}
       </span>
       {/* Nom */}
       <span style={{
-        flex: 1, fontSize: 12,
+        flex: 1, fontSize: 11,
         fontWeight: isSub ? 400 : 500,
-        color: isSub ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.9)',
+        color: isSub ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.9)',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         minWidth: 0,
       }}>

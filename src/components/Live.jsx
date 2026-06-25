@@ -203,7 +203,7 @@ function LiveCard({ match, espn, onClick }) {
 
   useEffect(() => {
     if (!isLive) { prevHs.current = null; prevAs.current = null; return }
-    // But annulé (VAR/hors-jeu) → score redescend → effacer l'animation immédiatement
+    // But annulé (VAR/hors-jeu) → score redescend → effacer immédiatement
     if (
       (prevHs.current !== null && hs != null && hs < prevHs.current) ||
       (prevAs.current !== null && as_ != null && as_ < prevAs.current)
@@ -214,17 +214,35 @@ function LiveCard({ match, espn, onClick }) {
       if (as_ != null) prevAs.current = as_
       return
     }
-    if (prevHs.current !== null && hs != null && hs > prevHs.current) {
-      const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
-      setGoal({ team, scoreStr: `${hs} – ${as_ ?? 0}`, side: 'home' })
+
+    const homeGoals = (prevHs.current != null && hs != null) ? hs - prevHs.current : 0
+    const awayGoals = (prevAs.current != null && as_ != null) ? as_ - prevAs.current : 0
+
+    const fireGoal = (side, scoreStr, delay = 0) => {
       clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoal(null), 5200)
-    } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
-      const team = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
-      setGoal({ team, scoreStr: `${hs ?? 0} – ${as_}`, side: 'away' })
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setGoal(null), 5200)
+      timerRef.current = setTimeout(() => {
+        const team = side === 'home'
+          ? translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
+          : translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
+        setGoal({ team, scoreStr, side })
+        timerRef.current = setTimeout(() => setGoal(null), 5200)
+      }, delay)
     }
+
+    if (homeGoals > 0 && prevHs.current != null) {
+      const firstScore = homeGoals >= 2
+        ? `${prevHs.current + 1} – ${as_ ?? prevAs.current ?? 0}`
+        : `${hs} – ${as_ ?? 0}`
+      fireGoal('home', firstScore)
+      if (homeGoals >= 2) fireGoal('home', `${hs} – ${as_ ?? 0}`, 5400)
+    } else if (awayGoals > 0 && prevAs.current != null) {
+      const firstScore = awayGoals >= 2
+        ? `${hs ?? prevHs.current ?? 0} – ${prevAs.current + 1}`
+        : `${hs ?? 0} – ${as_}`
+      fireGoal('away', firstScore)
+      if (awayGoals >= 2) fireGoal('away', `${hs ?? 0} – ${as_}`, 5400)
+    }
+
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
     if (hs != null && as_ != null) {

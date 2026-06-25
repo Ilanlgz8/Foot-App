@@ -21,6 +21,7 @@ import {
   PronoSection,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
+import '../live.css'
 
 // ── Animation BUT ─────────────────────────────────────────────────────────────
 function GoalCelebration({ teamName, scoreStr }) {
@@ -34,25 +35,53 @@ function GoalCelebration({ teamName, scoreStr }) {
   )
 }
 
+// ── Raccourcis noms (même logique que Live.jsx) ───────────────────────────────
+const TEAM_SHORT = {
+  'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
+  'Paris Saint-Germain FC': 'Paris SG', 'Crystal Palace': 'C. Palace',
+  'Wolverhampton': 'Wolves', 'Wolverhampton Wanderers': 'Wolves',
+  'Nottingham Forest': 'Nott. Forest', 'Brighton & Hove Albion': 'Brighton',
+  'Brighton Hove Albion': 'Brighton', 'Newcastle United': 'Newcastle',
+  'Tottenham Hotspur': 'Tottenham', 'West Ham United': 'West Ham',
+  'Manchester City': 'Man. City', 'Manchester United': 'Man. United',
+  'Leeds United': 'Leeds', 'Atlético Madrid': 'Atl. Madrid',
+  'Athletic Bilbao': 'Ath. Bilbao', 'Real Sociedad': 'R. Sociedad',
+  'Deportivo Alavés': 'Alavés', 'Rayo Vallecano': 'Rayo',
+  'Bayern Munich': 'Bayern', 'Eintracht Frankfurt': 'Frankfurt',
+  'Werder Brême': 'Werder', 'Werder Bremen': 'Werder',
+  'Borussia Dortmund': 'Dortmund', 'Inter Milan': 'Inter',
+  'Milan AC': 'Milan', 'Hellas Verona': 'Verona',
+  'PSV Eindhoven': 'PSV', 'Club Brugge': 'Bruges', 'Slavia Prague': 'Slavia',
+}
+function shortenName(name) {
+  if (!name) return name
+  if (TEAM_SHORT[name]) return TEAM_SHORT[name]
+  if (name.length <= 13) return name
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2) return name
+  return `${words[0][0].toUpperCase()}. ${words.slice(1).join(' ')}`
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
 
-// Formate une minute de buteur : "67:00" → "67'" | "67'" → "67'" | "67" → "67'"
-const fmtMin = m => {
-  if (!m) return ''
-  const clean = String(m).replace(/'$/, '').split(':')[0]
-  return clean ? `${clean}'` : ''
-}
-
 function MatchHeader({ match, espn, onBack }) {
-  const matchSt  = getMatchState(match.id)
+  const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
-  const minute   = isTermine ? null : calcMinute(match)
-  const period   = getMatchPeriod(match)
-  const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
-  // xG depuis les stats ESPN (FotMob bloqué sur Vercel)
-  const xgHome   = espn?.stats?.home?.xg ?? null
-  const xgAway   = espn?.stats?.away?.xg ?? null
+
+  // Ticker 5s pour interpolation de minute en temps réel
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (isTermine) return
+    const id = setInterval(() => setTick(t => t + 1), 5_000)
+    return () => clearInterval(id)
+  }, [isTermine])
+
+  const minute  = isTermine ? null : calcMinute(match)
+  const period  = getMatchPeriod(match)
+  const comp    = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const emblem  = comp?.emblem ?? match.competition?.emblem
+  const compName = match.competition?.name ?? comp?.name ?? ''
 
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
   const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
@@ -64,15 +93,48 @@ function MatchHeader({ match, espn, onBack }) {
   const hs  = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_ = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
 
-  // Détection but → flash score
+  const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
+  const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
+  const xgHome   = espn?.stats?.home?.xg ?? null
+  const xgAway   = espn?.stats?.away?.xg ?? null
+
+  const h = hs ?? '–', a = as_ ?? '–'
+  const label = isTermine ? 'FT'
+    : period === 'HT'  ? 'MT'
+    : period === 'ET1' ? 'Prol. 1'
+    : period === 'ET2' ? 'Prol. 2'
+    : period === 'PEN' ? 'TAB'
+    : minute != null   ? String(minute) : '–'
+  const pillCls = `live__pill${isTermine ? ' live__pill--ft' : ''}`
+
+  const periodBadge = period === 'HT' ? 'MI-TEMPS'
+    : period === 'FT'            ? 'TERMINÉ'
+    : (period === 'ET1' || period === 'ET2') ? 'PROLONG.'
+    : period === 'PEN'           ? 'T.A.B.'
+    : period ?? ''
+
+  // ── Détection but — même logique que LiveCard + localStorage partagé ────────
+  // Même clé que Live.jsx pour partager l'état si l'user navigue depuis la grille
+  const scoreKey = `foot_lv_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
   const timerRef = useRef(null)
+  const initDone = useRef(false)
   const [goalSide, setGoalSide] = useState(null)
-  const [goal, setGoal] = useState(null)
+  const [goal, setGoal]         = useState(null)
+
+  // Init depuis localStorage (reprend où LiveCard s'était arrêté)
+  if (!initDone.current) {
+    initDone.current = true
+    try {
+      const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
+      if (s?.home != null) prevHs.current = s.home
+      if (s?.away != null) prevAs.current = s.away
+    } catch {}
+  }
 
   useEffect(() => {
-    // But annulé (VAR/hors-jeu) → score redescend → effacer immédiatement
+    // But annulé (VAR) → score redescend → effacer immédiatement
     if (
       (prevHs.current !== null && hs != null && hs < prevHs.current) ||
       (prevAs.current !== null && as_ != null && as_ < prevAs.current)
@@ -83,111 +145,120 @@ function MatchHeader({ match, espn, onBack }) {
       if (as_ != null) prevAs.current = as_
       return
     }
-    if (hs != null && prevHs.current != null && hs > prevHs.current) {
-      setGoalSide('home'); setGoal({ team: homeName, scoreStr: `${hs} – ${as_ ?? 0}` })
+
+    // But(s) détecté(s) — si +2 buts d'un coup : deux animations enchaînées
+    const homeGoals = (prevHs.current != null && hs != null) ? hs - prevHs.current : 0
+    const awayGoals = (prevAs.current != null && as_ != null) ? as_ - prevAs.current : 0
+
+    const fireGoal = (side, scoreStr, delay = 0) => {
       clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
-    } else if (as_ != null && prevAs.current != null && as_ > prevAs.current) {
-      setGoalSide('away'); setGoal({ team: awayName, scoreStr: `${hs ?? 0} – ${as_}` })
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
+      timerRef.current = setTimeout(() => {
+        const team = side === 'home' ? homeName : awayName
+        setGoalSide(side); setGoal({ team, scoreStr })
+        timerRef.current = setTimeout(() => { setGoalSide(null); setGoal(null) }, 5200)
+      }, delay)
     }
+
+    if (homeGoals > 0 && prevHs.current != null) {
+      // Score intermédiaire si double but (0→2 → montre 1-0 puis 2-0)
+      const firstScore = homeGoals >= 2
+        ? `${prevHs.current + 1} – ${as_ ?? prevAs.current ?? 0}`
+        : `${hs} – ${as_ ?? prevAs.current ?? 0}`
+      fireGoal('home', firstScore)
+      if (homeGoals >= 2) fireGoal('home', `${hs} – ${as_ ?? prevAs.current ?? 0}`, 5400)
+    } else if (awayGoals > 0 && prevAs.current != null) {
+      const firstScore = awayGoals >= 2
+        ? `${hs ?? prevHs.current ?? 0} – ${prevAs.current + 1}`
+        : `${hs ?? prevHs.current ?? 0} – ${as_}`
+      fireGoal('away', firstScore)
+      if (awayGoals >= 2) fireGoal('away', `${hs ?? prevHs.current ?? 0} – ${as_}`, 5400)
+    }
+
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_
+    // Persister pour les prochains montages
+    if (hs != null && as_ != null) {
+      try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
+    }
   }, [hs, as_])
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
-  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-
-  // calcMinute() retourne déjà des strings avec apostrophe ("67'", "45+2'")
-  // → ne pas en rajouter une deuxième
-  const periodLabel = isTermine ? 'FT'
-    : period === 'HT'   ? 'MT'
-    : period === 'ET1'  ? 'Prol. 1'
-    : period === 'ET2'  ? 'Prol. 2'
-    : period === 'PEN'  ? 'Tirs au but'
-    : minute != null    ? String(minute) : '–'
-
   return (
     <>
-    <button className="lmp__backBtn" onClick={onBack}>‹ En Direct</button>
-    <div className="lmp__header">
-      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
+      <button className="lmp__backBtn" onClick={onBack}>‹ En Direct</button>
+      <div className={`live__card lmp__headerCard${goal ? ' live__card--goal' : ''}`}>
+        {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 
-      {/* Compétition */}
-      {comp && (
-        <div className="lmp__comp">
-          {comp.emblem && <img src={comp.emblem} alt="" className="lmp__compEmb" />}
-          <span>{comp.name}</span>
-        </div>
-      )}
-
-      {/* Teams + Score */}
-      <div className="lmp__scoreRow">
-        {/* Domicile */}
-        <div className="lmp__team">
-          {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="lmp__crest" />
-            : <div className="lmp__crestFallback" />}
-          <span className="lmp__teamName">{homeName}</span>
-          {xgHome != null && <span className="lmp__teamXg">{xgHome.toFixed(2)} xG</span>}
-        </div>
-
-        {/* Score central */}
-        <div className="lmp__scoreCenter">
-          <div className="lmp__minute">
-            {repriseImminente
-              ? <span className="lmp__repriseLabel">Reprise imminente</span>
-              : repriseDans != null
-              ? <span className="lmp__repriseLabel">Reprise dans {repriseDans} min</span>
-              : <span className={isTermine ? 'lmp__minuteFt' : 'lmp__minuteLive'}>{periodLabel}</span>
-            }
+        {/* Header : comp + badge période */}
+        <div className="live__cardHeader">
+          <div className="live__compBadge">
+            {emblem && <img src={emblem} alt="" className="live__compLogo" />}
+            <span className="live__compName">{compName}</span>
           </div>
-          <div className="lmp__pills">
-            <div className={`lmp__pill${goalSide === 'home' ? ' lmp__pill--scored' : ''}`} key={`h${hs}`}>
-              {hs ?? '–'}
+          {periodBadge && <span className="live__period">{periodBadge}</span>}
+        </div>
+
+        {/* Score — même structure 3 colonnes que Live.jsx */}
+        <div className="live__matchRow">
+          <div className="live__team">
+            {match.homeTeam?.crest
+              ? <img src={match.homeTeam.crest} alt="" className="live__crest" />
+              : <div className="live__crestFallback" />}
+            <span className="live__teamName">{homeName}</span>
+            {xgHome != null && <span className="live__teamXg">{xgHome.toFixed(2)} xG</span>}
+          </div>
+
+          <div className="live__scoreWrap">
+            <div className="live__minuteWrap">
+              <span className="live__minute">{label}</span>
             </div>
-            <div className="lmp__pillBar" />
-            <div className={`lmp__pill${goalSide === 'away' ? ' lmp__pill--scored' : ''}`} key={`a${as_}`}>
-              {as_ ?? '–'}
+            {(repriseImminente || repriseDans != null) && (
+              <span className="live__reprise">
+                {repriseImminente ? 'Reprise imm.' : `Reprise ${repriseDans}min`}
+              </span>
+            )}
+            <div className="live__pills">
+              <div className={`${pillCls}${goalSide === 'home' ? ' live__pill--scored' : ''}`} key={`h${h}`}>{h}</div>
+              <div className="live__pillBar" />
+              <div className={`${pillCls}${goalSide === 'away' ? ' live__pill--scored' : ''}`} key={`a${a}`}>{a}</div>
             </div>
           </div>
+
+          <div className="live__team live__team--away">
+            {match.awayTeam?.crest
+              ? <img src={match.awayTeam.crest} alt="" className="live__crest" />
+              : <div className="live__crestFallback" />}
+            <span className="live__teamName">{awayName}</span>
+            {xgAway != null && <span className="live__teamXg">{xgAway.toFixed(2)} xG</span>}
+          </div>
         </div>
 
-        {/* Extérieur */}
-        <div className="lmp__team lmp__team--away">
-          {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="lmp__crest" />
-            : <div className="lmp__crestFallback" />}
-          <span className="lmp__teamName">{awayName}</span>
-          {xgAway != null && <span className="lmp__teamXg">{xgAway.toFixed(2)} xG</span>}
-        </div>
+        {/* Buteurs */}
+        {espn?.scorers?.length > 0 && (
+          <>
+            <div className="live__divider" />
+            <div className="live__scorers">
+              <div className="live__scorersHome">
+                {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
+                  <div key={i} className="live__scorerItem">
+                    <span className="live__scorerName">{s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}</span>
+                    {s.minute && <span className="live__scorerMin">{s.minute}</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="live__scorersGap" />
+              <div className="live__scorersAway">
+                {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
+                  <div key={i} className="live__scorerItem">
+                    <span className="live__scorerName">{s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}</span>
+                    {s.minute && <span className="live__scorerMin">{s.minute}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Buteurs */}
-      {espn?.scorers?.length > 0 && (
-        <div className="lmp__scorers">
-          <div className="lmp__scorersHome">
-            {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
-              <div key={i} className="lmp__scorer lmp__scorer--home">
-                <span>{s.name}</span>
-                {s.minute && <span className="lmp__scorerMin">{fmtMin(s.minute)}</span>}
-              </div>
-            ))}
-          </div>
-          <div className="lmp__scorersGap" />
-          <div className="lmp__scorersAway">
-            {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
-              <div key={i} className="lmp__scorer lmp__scorer--away">
-                {s.minute && <span className="lmp__scorerMin">{fmtMin(s.minute)}</span>}
-                <span>{s.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
     </>
   )
 }

@@ -101,8 +101,9 @@ export function useLineups(match) {
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
     enabled:  !!match?.id && !!slug && !!date,
-    staleTime: 30 * 60_000,
-    retry: 1,
+    staleTime: 2 * 60_000,        // retry rapide si données absentes (live)
+    refetchInterval: q => !q.state.data?.home?.starters?.length ? 90_000 : false,
+    retry: 2,
     queryFn: async () => {
 
       // ── WC 2026 : essayer FIFA Redis en premier ──────────────────────────────
