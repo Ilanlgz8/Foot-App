@@ -884,14 +884,24 @@ export function useLiveMinute(matches) {
       if (document.visibilityState !== 'visible') return
       // Marquer les données ESPN comme périmées : empêche l'interpolation stale
       window.__espnNeedsRefresh = Date.now()
+
+      if (!navigator.onLine) {
+        window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient), { once: true })
+        return
+      }
+
       // Poll immédiat — le lock garantit qu'un tick Worker concurrent est mis en file
       // d'attente plutôt que de créer une race condition avec des données Redis décalées
       await pollESPN(matchesRef.current, queryClient)
-      // 2ème poll uniquement si réseau non disponible au premier poll
-      // (éviter le double poll qui était à l'origine de la race condition)
-      if (!navigator.onLine) {
-        window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient), { once: true })
-      }
+
+      // 2ème poll après 3s pour rattraper les buts marqués pendant l'arrière-plan iOS.
+      // Redis peut retourner un cache stale sur le 1er poll (lag ~12s) → 2ème poll
+      // force une réponse ESPN fraîche et met à jour le score manqué.
+      setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          pollESPN(matchesRef.current, queryClient)
+        }
+      }, 3_000)
       const now = Date.now()
       // Invalider todayMatches si données > 2min
       const todayState = queryClient.getQueryState(['todayMatches'])

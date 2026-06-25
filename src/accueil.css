@@ -127,20 +127,25 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.28rem 0.7rem;
-  background: rgba(220,38,38,0.12);
-  border: 1px solid rgba(220,38,38,0.25);
+  padding: 0.32rem 0.85rem;
+  background: #ef4444;
+  border: none;
   border-radius: 0.4rem;
   cursor: pointer;
   font-size: 0.68rem;
-  font-weight: 700;
-  color: #f87171;
-  letter-spacing: 0.04em;
-  transition: background 0.15s;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(239,68,68,0.45);
 }
-
 .accueil__liveDirectBtn:hover {
-  background: rgba(220,38,38,0.22);
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+.accueil__liveDirectBtn:active {
+  transform: translateY(0);
 }
 
 .accueil__inner {
@@ -319,29 +324,31 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 0.35rem 0.75rem;
-  border-radius: 0.55rem;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #475569;
-  font-size: 0.72rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.38);
+  font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: all 0.15s;
   white-space: nowrap;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .accueil__compChip:hover:not(.accueil__compChip--active) {
-  color: #94a3b8;
-  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
 }
 
 .accueil__compChip--active {
-  background: rgba(239,68,68,0.14);
-  border-color: rgba(239,68,68,0.3);
-  color: #f9fafb;
-  box-shadow: 0 2px 8px rgba(239,68,68,0.12);
+  background: rgba(239,68,68,0.18);
+  border-color: rgba(239,68,68,0.45);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.08), 0 2px 6px rgba(239,68,68,0.2);
 }
 
 .accueil__compChip img {
@@ -349,6 +356,10 @@
   height: 14px;
   object-fit: contain;
   flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  padding: 1px;
 }
 
 .accueil__dashPanelBody {
@@ -2651,10 +2662,19 @@
    POSTER — structure et couches
    ========================================================= */
 
+/* Wrapper gradient border (1px padding = contour dégradé) */
+.poster__frame {
+  border-radius: 17px;
+  padding: 1.5px;
+  background: linear-gradient(135deg, var(--hc, #2a3a4a) 0%, var(--ac, #2a3a4a) 100%);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  width: 100%;
+}
+
 .poster {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  border-radius: 15.5px;
   overflow: hidden;
   min-height: 240px;
   display: flex;
@@ -2823,12 +2843,17 @@
   width: 44px;
   height: 44px;
   object-fit: contain;
-  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.7));
+  border-radius: 50%;
+  border: 1.5px solid rgba(200,210,225,0.28);
+  box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 3px 10px rgba(0,0,0,0.6);
+  background: rgba(255,255,255,0.05);
+  padding: 3px;
 }
 .poster__crest-empty {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  border: 1.5px solid rgba(200,210,225,0.18);
   background: rgba(255,255,255,0.08);
 }
 .poster__name {

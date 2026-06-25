@@ -249,7 +249,12 @@ export default function LiveMatchPage() {
   return (
     <div className="lmp__page">
       {/* Header compact : backBtn + score intégrés */}
-      <MatchHeader match={match} espn={espn} onBack={() => navigate('/live')} />
+      <MatchHeader match={match} espn={espn} onBack={() => {
+        // Si on a un historique de navigation dans l'app, revenir en arrière
+        // (évite le push '/live' qui cassait le bouton arrière natif iOS)
+        if (window.history.length > 1) navigate(-1)
+        else navigate('/live')
+      }} />
 
       {/* Onglets */}
       <div ref={swipe.ref}>

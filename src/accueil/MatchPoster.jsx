@@ -55,6 +55,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const cls = 'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
 
   return (
+    <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
       {/* ── Fond : photo de match si dispo, sinon dégradé couleurs des équipes ── */}
@@ -132,6 +133,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           <div className="poster__seg poster__seg--a" style={{ width: `${prono.away}%`, background: aColor, opacity: 0.75 }} />
         </div>
       </div>
+    </div>
     </div>
   )
 }
