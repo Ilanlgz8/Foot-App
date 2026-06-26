@@ -1,76 +1,98 @@
 /**
- * LineupPitch — Alignement Absolu Terrain / Liste
+ * LineupPitch — Version Finale Fixée (Mappage AML/AMR/ATG/ATD complet)
  */
 import { useState } from 'react'
 
 const PW = 300, PH = 400
 
-// Dictionnaire de traduction et de nettoyage des postes
+// Dictionnaire étendu pour couvrir toutes les variantes d'API possibles
 const POS_FR = {
   GK:'G', G:'G', GB:'G', GOAL:'G',
   CB:'DC', DC:'DC', LCB:'DC', RCB:'DC', 'CD-L':'DC', 'CD-R':'DC',
   LB:'DG', RB:'DD', DL:'DG', DR:'DD', DG:'DG', DD:'DD', LWB:'LG', RWB:'LD',
   CM:'MC', 'CM-L':'MC', 'CM-R':'MC', MC:'MC', CDM:'MDC', CAM:'MOC', DM:'MD', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC',
   LM:'MG', RM:'MD', MG:'MG', MD:'MD', M:'MC', MF:'MC', MIL:'MC',
-  ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', LF:'AG', RF:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT',
+  ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', 'AM-L':'AG', 'AM-R':'AD', LF:'AG', RF:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT',
 }
 
-// 1. Placement Vertical (Y) strict par rapport au poste de la liste
+// Hauteur (Y) ultra-précise par poste avec marge de sécurité basse pour le Gardien
 function getVerticalPct(pos) {
   const p = (pos ?? '').toUpperCase()
-  // Gardien
-  if (['GK','G','GB','GOAL'].includes(p)) return 0.90
-  
-  // Défenseurs
-  if (['LB','LWB','DL','DG'].includes(p)) return 0.72 // Latéraux légèrement plus hauts
-  if (['RB','RWB','DR','DD'].includes(p)) return 0.72
-  if (['CB','LCB','RCB','CD-L','CD-R','DC','D','SW','DEF'].includes(p)) return 0.74
-  
-  // Milieux Défensifs / Centraux
+  if (['GK','G','GB','GOAL'].includes(p)) return 0.84
+  if (['LB','LWB','DL','DG','RB','RWB','DR','DD'].includes(p)) return 0.70
+  if (['CB','LCB','RCB','CD-L','CD-R','DC','D','SW','DEF'].includes(p)) return 0.72
   if (['CDM','MDC'].includes(p)) return 0.54
   if (['CM','CM-L','CM-R','MC','M','MF','MIL'].includes(p)) return 0.44
   if (['LM','MG','RM','MD','DM'].includes(p)) return 0.42
-  
-  // Milieux Offensifs / Attaquants
   if (['CAM','MOC','MOF','AM'].includes(p)) return 0.32
-  if (['LW','RW','AML','AMR','LF','RF','AG','AD'].includes(p)) return 0.20
-  if (['ST','CF','BU','AC','F','FW','ATT','FWD','SS'].includes(p)) return 0.16
-  
+  if (['LW','RW','AML','AMR','AM-L','AM-R','LF','RF','AG','AD'].includes(p)) return 0.20 // Ligne des ailiers / milieux offensifs excentrés
+  if (['ST','CF','BU','AC','F','FW','ATT','FWD','SS'].includes(p)) return 0.16 // Pointe pure
   return 0.50
 }
 
-// 2. Placement Horizontal (X) strict par rapport au poste de la liste
-function getHorizontalPct(pos) {
+// Attribution stricte du couloir de 1 (Gauche) à 5 (Droite) pour le tri
+function getHorizontalZone(pos) {
   const p = (pos ?? '').toUpperCase()
-  
-  // Couloir Gauche Écarté
-  if (['LB','LWB','DL','DG','LW','AML','AG','LM','MG','LF'].includes(p)) return 0.15
-  
-  // Axe Gauche (ex: DC gauche ou Milieu gauche dans un duo)
-  if (['LCB','CD-L','CM-L'].includes(p)) return 0.35
-  
-  // Plein Centre Équilibré
-  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 0.50
-  
-  // Axe Droit (ex: DC droit ou Milieu droit dans un duo)
-  if (['RCB','CD-R','CM-R'].includes(p)) return 0.65
-  
-  // Couloir Droit Écarté
-  if (['RB','RWB','DR','DD','RW','AMR','AD','RM','MD','RF'].includes(p)) return 0.85
-  
-  return 0.50
+  // 1. Extrême Gauche
+  if (['LB','LWB','DL','DG','LW','AML','AM-L','AG','LM','MG','LF'].includes(p)) return 1 
+  // 2. Axe Gauche
+  if (['LCB','CD-L','CM-L'].includes(p)) return 2 
+  // 3. Centre Pur
+  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 3 
+  // 4. Axe Droit
+  if (['RCB','CD-R','CM-R'].includes(p)) return 4 
+  // 5. Extrême Droit
+  if (['RB','RWB','DR','DD','RW','AMR','AM-R','AD','RM','MD','RF'].includes(p)) return 5 
+  return 3
 }
 
-// Génération des positions basée uniquement sur le modèle des postes de la liste
+// Algorithme anti-chevauchement et répartition dynamique par ligne
 function getPositions(starters) {
-  return starters.map(player => {
+  const rows = {}
+  
+  const initialPositions = starters.map(player => {
     const pos = player.position ?? ''
-    return {
-      leftPct: getHorizontalPct(pos) * 100,
-      topPct: getVerticalPct(pos) * 100,
-      player
-    }
+    const y = getVerticalPct(pos)
+    const zone = getHorizontalZone(pos)
+    return { player, y, zone }
   })
+
+  initialPositions.forEach(p => {
+    const key = p.y.toFixed(2)
+    if (!rows[key]) rows[key] = []
+    rows[key].push(p)
+  })
+
+  const out = []
+
+  Object.keys(rows).forEach(key => {
+    const playersInRow = rows[key]
+    playersInRow.sort((a, b) => a.zone - b.zone)
+    const count = playersInRow.length
+    
+    playersInRow.forEach((p, index) => {
+      let xPct = 0.50
+
+      if (count === 1) {
+        if (p.zone === 1) xPct = 0.15
+        if (p.zone === 2) xPct = 0.35
+        if (p.zone === 3) xPct = 0.50
+        if (p.zone === 4) xPct = 0.65
+        if (p.zone === 5) xPct = 0.85
+      } else {
+        // Aligne proprement les joueurs sur la largeur s'ils partagent la même ligne Y
+        xPct = 0.15 + (index / (count - 1)) * 0.70
+      }
+
+      out.push({
+        leftPct: xPct * 100,
+        topPct: p.y * 100,
+        player: p.player
+      })
+    })
+  })
+
+  return out
 }
 
 function alpha(hex, a) {
@@ -168,7 +190,6 @@ function PlayerCell({ player, isSub }) {
 function PlayerGrid({ starters, subs }) {
   const headerStyle = { padding: '8px 12px', fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontFamily: "'Chakra Petch', monospace", fontWeight: 700, background: '#0d111b', borderBottom: '1px solid rgba(255,255,255,0.03)' }
   
-  // Ordre logique d'affichage dans la liste des titulaires (du Gardien à l'Attaque)
   const getSortOrder = (p) => {
     const pFr = POS_FR[(p.position ?? '').toUpperCase()] ?? ''
     if (pFr === 'G') return 0
