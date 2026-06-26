@@ -1,12 +1,12 @@
 /**
- * LineupPitch — Version Mobile Sécurisée, Postes Fixés et Noms Défilants
+ * LineupPitch — Version Mobile Sécurisée, Marquee Calibré et Postes Fixés
  */
 import { useState } from 'react'
 
 // ── Dimensions et marges de sécurité PWA (Anti-coupure Gardien) ──────────────
 const PW = 300, PH = 400
 const L = 16, R = 284
-const T = 35, B = 365 // Plus d'espace en haut et en bas pour éviter les rognages mobiles
+const T = 35, B = 365 
 const IW = R - L, IH = B - T
 
 const LINE_Y = {
@@ -31,37 +31,45 @@ function formatName(name, sname) {
   return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
 }
 
-// ── Traduction et normalisation complète des postes bizarres de l'API ───────
+// ── Dictionnaire chirurgical pour la traduction des libellés de l'API ───────
 const POS_FR = {
   // Gardiens
   GK:'G', G:'G', GB:'G', GOAL:'G',
-  // Défenseurs
-  CB:'DC', DC:'DC', LCB:'DCG', RCB:'DCD', 'CD-L':'DCG', 'CD-R':'DCD',
-  LB:'DG', RB:'DD', LWB:'LG', RWB:'LD', D:'DEF', SW:'LIB', DEF:'DEF', DL:'DG', DR:'DD', DG:'DG', DD:'DD',
-  // Milieux
-  CM:'MC', CDM:'MDC', CAM:'MOC', DM:'MD', AM:'MOC', MC:'MC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD',
-  LM:'MG', RM:'MD', M:'MC', MF:'MC', MIL:'MC',
+  // Défenseurs Centraux
+  CB:'DC', DC:'DC', LCB:'DC', RCB:'DC', 'CD-L':'DC', 'CD-R':'DC',
+  // Défenseurs Latéraux
+  LB:'DG', RB:'DD', DL:'DG', DR:'DD', DG:'DG', DD:'DD', LWB:'LG', RWB:'LD',
+  // Milieux Centraux / Défensifs / Offensifs
+  CM:'MC', 'CM-L':'MC', 'CM-R':'MC', MC:'MC', CDM:'MDC', CAM:'MOC', DM:'MD', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC',
+  // Milieux Latéraux
+  LM:'MG', RM:'MD', MG:'MG', MD:'MD', M:'MC', MF:'MC', MIL:'MC',
   // Attaquants / Ailiers
-  ST:'BU', CF:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD',
-  F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT', BU:'BU',
+  ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT',
 }
 
-// Détermination de la ligne (0 = Gardien, 1 = Défense, 2 = Milieu, 3 = Attaque)
+// Détermination stricte de la ligne (0 = Gardien, 1 = Défense, 2 = Milieu, 3 = Attaque)
 function posCat(pos) {
   const p = (pos ?? '').toUpperCase()
   if (['GK','G','GB','GOAL'].includes(p)) return 0
   if (['CB','LCB','RCB','CD-L','CD-R','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
-  if (['CM','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
+  if (['CM','CM-L','CM-R','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
   if (['ST','CF','LW','RW','AML','AMR','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
   return 2
 }
 
-// Poids horizontal pour éviter les inversions (Gauche -> Droite)
+// Attribution précise du poids horizontal (De gauche à droite) pour éliminer les inversions
 function getHorizontalWeight(pos) {
   const p = (pos ?? '').toUpperCase()
-  if (['LB','LWB','DL','DG','LW','AML','AG','LCB','CD-L'].includes(p)) return 1 // Côté Gauche
-  if (['CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 2 // Centre
-  if (['RB','RWB','DR','DD','RW','AMR','AD','RCB','CD-R'].includes(p)) return 3 // Côté Droit
+  // Latéraux Gauches / Ailiers Gauches / Milieux Gauches
+  if (['LB','LWB','DL','DG','LW','AML','AG','LM','MG'].includes(p)) return 1 
+  // Axiaux Gauches (Défenseur central gauche ou milieu central gauche)
+  if (['LCB','CD-L','CM-L'].includes(p)) return 1.5
+  // Plein Centre (Axe pur)
+  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 2 
+  // Axiaux Droits (Défenseur central droit ou milieu central droit)
+  if (['RCB','CD-R','CM-R'].includes(p)) return 2.5
+  // Latéraux Droits / Ailiers Droits / Milieux Droits
+  if (['RB','RWB','DR','DD','RW','AMR','AD','RM','MD'].includes(p)) return 3 
   return 2
 }
 
@@ -73,20 +81,16 @@ function fallbackLines(starters) {
   return g.filter(n => n > 0)
 }
 
-// Génération et correction du positionnement des joueurs
 function getPositions(starters, formation) {
   const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
   const valid = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
   const lines = valid ? [1, ...parts] : fallbackLines(starters)
   const yPcts = LINE_Y[lines.length] ?? LINE_Y[4]
   
-  // Organiser les joueurs par ligne tactique
   const playersByLine = Array.from({ length: lines.length }, () => [])
-  
-  // Copie des titulaires pour manipulation
   const pool = [...starters]
   
-  // Placer d'abord le Gardien en ligne 0
+  // Isoler le Gardien
   const gkIdx = pool.findIndex(p => posCat(p.position) === 0)
   if (gkIdx !== -1) {
     playersByLine[0].push(pool.splice(gkIdx, 1)[0])
@@ -94,7 +98,7 @@ function getPositions(starters, formation) {
     playersByLine[0].push(pool.splice(0, 1)[0])
   }
 
-  // Distribuer le reste des joueurs dans les lignes supérieures
+  // Distribuer les joueurs ligne par ligne
   for (let li = 1; li < lines.length; li++) {
     const targetCount = lines[li]
     for (let c = 0; c < targetCount; c++) {
@@ -102,11 +106,10 @@ function getPositions(starters, formation) {
         playersByLine[li].push(pool.splice(0, 1)[0])
       }
     }
-    // TRI DE SÉCURITÉ : Évite l'inversion (ex: place le DG avant le DCD horizontalement)
+    // FIX INVERSION : Tri horizontal mathématique strict de la gauche vers la droite
     playersByLine[li].sort((a, b) => getHorizontalWeight(a.position) - getHorizontalWeight(b.position))
   }
 
-  // Convertir en coordonnées réelles sur l'écran
   const out = []
   for (let li = 0; li < lines.length; li++) {
     const rowPlayers = playersByLine[li]
@@ -124,7 +127,7 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── COMPOSANT DU JOUEUR (Avec effet défilement automatique si nom long) ──────
+// ── COMPOSANT DU JOUEUR (Marquee calibré au pixel près pour commencer au début) ──
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
   const isGK = posCat(player.position) === 0
@@ -132,7 +135,6 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
   const label = formatName(player.name, player.shortName)
   const num = player.number ?? ''
 
-  // Déclenche l'effet défilant (Marquee) si le texte est long
   const isLongName = label.length > 10
 
   return (
@@ -146,18 +148,18 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       alignItems: 'center',
       zIndex: 2,
     }}>
-      {/* Balise style locale pour gérer l'animation du nom défilant */}
+      {/* Recalibrage parfait de la boucle infinie pour commencer à la première lettre */}
       <style>{`
-        @keyframes marquee {
-          0% { transform: translate3d(0, 0, 0); }
+        @keyframes marqueePerfect {
+          0%, 25% { transform: translate3d(0, 0, 0); }
           100% { transform: translate3d(-50%, 0, 0); }
         }
         .scroll-container {
           overflow: hidden;
           white-space: nowrap;
-          width: 68px;
+          width: 70px;
           display: flex;
-          justify-content: center;
+          justify-content: flex-start;
         }
         .scroll-text {
           display: inline-block;
@@ -165,17 +167,17 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
           font-size: 10px;
           font-weight: 700;
           color: #ffffff;
+          padding-left: 2px;
         }
         .scrolling {
-          animation: marquee 6s linear infinite;
-          padding-left: 50%;
+          animation: marqueePerfect 7s linear infinite;
         }
       `}</style>
 
-      {/* Ombre portée */}
+      {/* Ombre */}
       <div style={{ position: 'absolute', bottom: '-4px', width: '26px', height: '6px', background: 'rgba(0,0,0,0.4)', borderRadius: '50%', filter: 'blur(2px)', transform: 'scaleY(0.4)', pointerEvents: 'none' }} />
 
-      {/* Badge du Joueur */}
+      {/* Badge Numéro */}
       <div style={{
         width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '14px', fontWeight: 800, fontFamily: "'Chakra Petch', monospace", color: '#ffffff',
@@ -185,14 +187,14 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
         {num}
       </div>
 
-      {/* Capsule Nom avec Auto-Scroll intelligent */}
+      {/* Capsule Nom */}
       <div style={{
-        marginTop: '3px', background: 'rgba(10, 16, 30, 0.85)', border: '1px solid rgba(255, 255, 255, 0.12)',
+        marginTop: '3px', background: 'rgba(10, 16, 30, 0.9)', border: '1px solid rgba(255, 255, 255, 0.12)',
         borderTop: `2px solid ${color}`, padding: '2px 4px', borderRadius: '4px', boxShadow: '0 4px 8px rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)'
       }}>
         <div className="scroll-container">
           <span className={`scroll-text ${isLongName ? 'scrolling' : ''}`}>
-            {isLongName ? `${label} \u00a0\u00a0 ${label} \u00a0\u00a0` : label}
+            {isLongName ? `${label} \u00a0\u00a0\u00a0\u00a0 ${label} \u00a0\u00a0\u00a0\u00a0` : label}
           </span>
         </div>
       </div>
@@ -215,14 +217,11 @@ function Pitch({ formation, positions, teamColor }) {
         position: 'absolute', inset: '-10% -6%', transform: 'rotateX(20deg)', transformOrigin: 'bottom center',
         background: 'radial-gradient(circle at 50% 35%, #194420 0%, #0b220f 65%, #051207 100%)',
       }}>
-        {/* Pelouse */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 35px, transparent 35px, transparent 70px)' }} />
-        {/* Lignes tactiques fines */}
         <div style={{ position: 'absolute', top: 12, left: 12, right: 12, bottom: 12, border: '1px solid rgba(255,255,255,0.15)' }} />
         <div style={{ position: 'absolute', left: 12, right: 12, top: '50%', height: 1, background: 'rgba(255,255,255,0.15)' }} />
         <div style={{ position: 'absolute', left: '50%', top: '50%', width: '26%', aspectRatio: '1', transform: 'translate(-50%, -50%)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50%' }} />
         
-        {/* Surfaces de réparation */}
         <div style={{ position: 'absolute', left: '50%', top: 12, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderTop: 'none' }} />
         <div style={{ position: 'absolute', left: '50%', bottom: 12, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderBottom: 'none' }} />
 
@@ -234,7 +233,7 @@ function Pitch({ formation, positions, teamColor }) {
   )
 }
 
-// ── CELLULE ET GRILLE DE BASE (Rafraîchie) ───────────────────────────────────
+// ── GRILLE DE LISTE DES JOUEURS TRADUITE ─────────────────────────────────────
 function PlayerCell({ player, isSub }) {
   const cat = posCat(player.position)
   const catC = CAT_COLOR[cat]
