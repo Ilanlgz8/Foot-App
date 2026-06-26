@@ -1,5 +1,5 @@
 /**
- * LineupPitch — Version Statique Ultra-Précise (Priorité Pointe BU)
+ * LineupPitch — Version Finale Sans Inversion (Tri strict par couloirs)
  */
 import { useState } from 'react'
 
@@ -51,20 +51,26 @@ function posCat(pos) {
   return 2
 }
 
-// Poids horizontal pour l'alignement gauche / centre / droite
+// Classement horizontal ultra-strict par couloir pour éviter tout croisement
 function getHorizontalWeight(pos) {
   const p = (pos ?? '').toUpperCase()
-  // Côté gauche pur
-  if (['LB','LWB','DL','DG','LW','AML','AG','LM','MG','LF'].includes(p)) return 1 
-  // Axiaux gauches
-  if (['LCB','CD-L','CM-L'].includes(p)) return 1.5
-  // Plein centre / Pointes (Priorité absolue au centre pour les BU)
-  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 2 
-  // Axiaux droits
-  if (['RCB','CD-R','CM-R'].includes(p)) return 2.5
-  // Côté droit pur
-  if (['RB','RWB','DR','DD','RW','AMR','AD','RM','MD','RF'].includes(p)) return 3 
-  return 2
+  
+  // 1. Extrême Gauche (Latéraux / Ailiers / Milieux Gauches excentrés)
+  if (['LB', 'LWB', 'DL', 'DG', 'LW', 'AML', 'AG', 'LM', 'MG', 'LF'].includes(p)) return 1 
+  
+  // 2. Axe Gauche (Défenseur central gauche, Milieu central gauche)
+  if (['LCB', 'CD-L', 'CM-L'].includes(p)) return 2
+  
+  // 3. Axe Pur (Gardiens, DC centraux, Milieux défensifs/centraux/offensifs axiaux, Buteurs)
+  if (['GK', 'G', 'GB', 'GOAL', 'CB', 'DC', 'CM', 'MC', 'CDM', 'MDC', 'CAM', 'MOC', 'ST', 'BU', 'CF', 'AC'].includes(p)) return 3 
+  
+  // 4. Axe Droit (Défenseur central droit, Milieu central droit)
+  if (['RCB', 'CD-R', 'CM-R'].includes(p)) return 4
+  
+  // 5. Extrême Droit (Latéraux / Ailiers / Milieux Droits excentrés)
+  if (['RB', 'RWB', 'DR', 'DD', 'RW', 'AMR', 'AD', 'RM', 'MD', 'RF'].includes(p)) return 5 
+  
+  return 3
 }
 
 function fallbackLines(starters) {
@@ -73,7 +79,6 @@ function fallbackLines(starters) {
   return g.filter(n => n > 0)
 }
 
-// Distribution intelligente avec ancrage du BU en pointe
 function getPositions(starters, formation) {
   const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
   const valid = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
@@ -83,7 +88,7 @@ function getPositions(starters, formation) {
   const playersByLine = Array.from({ length: lines.length }, () => [])
   const pool = [...starters]
   
-  // 1. Placer le Gardien (Ligne 0)
+  // 1. Positionnement prioritaire du Gardien
   const gkIdx = pool.findIndex(p => posCat(p.position) === 0)
   if (gkIdx !== -1) {
     playersByLine[0].push(pool.splice(gkIdx, 1)[0])
@@ -91,29 +96,27 @@ function getPositions(starters, formation) {
     playersByLine[0].push(pool.splice(0, 1)[0])
   }
 
-  // 2. Extraire d'abord le BU / ST pour le mettre tout en haut (Ligne d'attaque finale)
+  // 2. Positionnement prioritaire du BU / ST en pointe sur la ligne d'attaque
   const attackLineIndex = lines.length - 1
   const buIdx = pool.findIndex(p => ['BU', 'ST'].includes((p.position ?? '').toUpperCase()))
-  
   if (buIdx !== -1 && lines[attackLineIndex] > 0) {
     playersByLine[attackLineIndex].push(pool.splice(buIdx, 1)[0])
   }
 
-  // 3. Répartir le reste des joueurs normalement sur les places restantes
+  // 3. Répartition globale sur les lignes tactiques
   for (let li = 1; li < lines.length; li++) {
     const currentLineArray = playersByLine[li]
     const targetCount = lines[li]
     
-    // Remplir jusqu'au nombre prévu par la formation tactique
     while (currentLineArray.length < targetCount && pool.length > 0) {
       currentLineArray.push(pool.splice(0, 1)[0])
     }
     
-    // Tri horizontal strict (DG -> DC -> DD ou AG -> BU -> AD)
+    // TRI ULTRA-STRICT DE GAUCHE À DROITE (Élimine les inversions DC/DD et MDC/MD)
     currentLineArray.sort((a, b) => getHorizontalWeight(a.position) - getHorizontalWeight(b.position))
   }
 
-  // Coordonnées finales
+  // Conversion en pourcentages de coordonnées pour le rendu sur le pitch
   const out = []
   for (let li = 0; li < lines.length; li++) {
     const rowPlayers = playersByLine[li]
