@@ -115,9 +115,16 @@ function Navbar() {
             )}
           </button>
 
+           {/* ── Mini header ── */}
+
           {/* Brand — centré sur mobile, à gauche sur desktop */}
           <NavLink to="/" className="navbar__brand" onClick={close}>
-            <img src="/icon-192.png" alt="StatFootix" className="navbar__brandIcon" />
+            <div className="accueil__miniHeader">
+              <h1 className="accueil__miniTitle">
+                <span className="accueil__heroStat">Stat</span>Footix
+              </h1>
+                <span className="accueil__miniDate">{todayStr}</span>
+            </div>
           </NavLink>
 
           {/* Desktop nav — caché sur mobile via CSS */}
