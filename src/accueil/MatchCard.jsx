@@ -233,17 +233,6 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')}
         </span>
       </div>
-
-      {/* Bouton "Suivre" — visible uniquement si onTrack est fourni et match pas terminé */}
-      {onTrack && !isFinished && (
-        <button
-          className={`accueil__matchCardTrack${tracked ? ' accueil__matchCardTrack--on' : ''}`}
-          onClick={e => { e.stopPropagation(); onTrack() }}
-          title={tracked ? 'Désactiver le suivi précis' : 'Suivre avec minutes précises'}
-        >
-          {tracked ? '📍 Suivi' : '📍 Suivre'}
-        </button>
-      )}
     </div>
   )
 }

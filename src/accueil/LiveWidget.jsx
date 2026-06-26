@@ -413,9 +413,6 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, trackedIds, onRe
           <span className="accueil__liveWidgetDot" />
           <span className="accueil__liveWidgetTitle">EN DIRECT</span>
           {sliced.length > 1 && <span className="accueil__liveWidgetCount">{sliced.length}</span>}
-          {onRecalibrate && (
-            <button className="accueil__liveWidgetRecal" onClick={onRecalibrate} title="Recalibrer les minutes">⟳</button>
-          )}
         </div>
       </div>
 

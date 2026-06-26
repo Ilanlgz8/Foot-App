@@ -26,7 +26,7 @@ self.addEventListener('push', event => {
   }
 
   const {
-    title   = 'But !',
+    title   = 'But ! ${matchId}',
     body    = '',
     matchId = null,
     url     = '/',
