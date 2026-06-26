@@ -1,37 +1,11 @@
 /**
- * LineupPitch — Version Finale Sans Inversion (Tri strict par couloirs)
+ * LineupPitch — Alignement Absolu Terrain / Liste
  */
 import { useState } from 'react'
 
-// ── Dimensions et marges de sécurité PWA (Anti-coupure Gardien) ──────────────
 const PW = 300, PH = 400
-const L = 16, R = 284
-const T = 35, B = 365 
-const IW = R - L, IH = B - T
 
-const LINE_Y = {
-  4: [0.92, 0.68, 0.44, 0.18],
-  5: [0.92, 0.74, 0.55, 0.36, 0.16],
-  6: [0.92, 0.78, 0.62, 0.46, 0.30, 0.14],
-}
-
-// ── Helpers de conversion de couleurs ────────────────────────────────────────
-function alpha(hex, a) {
-  if (!hex || !hex.startsWith('#')) return `rgba(239,68,68,${a})`
-  const full = hex.length === 4 ? '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3] : hex
-  const r = parseInt(full.slice(1,3), 16), g = parseInt(full.slice(3,5), 16), b = parseInt(full.slice(5,7), 16)
-  return isNaN(r) ? `rgba(239,68,68,${a})` : `rgba(${r},${g},${b},${a})`
-}
-
-// Format strict demandé : I. NomDeFamille
-function formatName(name, sname) {
-  const n = (name || sname || '?').trim()
-  const parts = n.split(/\s+/)
-  if (parts.length === 1) return parts[0]
-  return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
-}
-
-// ── Dictionnaire de traduction des libellés de l'API ────────────────────────
+// Dictionnaire de traduction et de nettoyage des postes
 const POS_FR = {
   GK:'G', G:'G', GB:'G', GOAL:'G',
   CB:'DC', DC:'DC', LCB:'DC', RCB:'DC', 'CD-L':'DC', 'CD-R':'DC',
@@ -41,103 +15,81 @@ const POS_FR = {
   ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', LF:'AG', RF:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT',
 }
 
-// Détermination de la ligne (0 = Gardien, 1 = Défense, 2 = Milieu, 3 = Attaque)
-function posCat(pos) {
+// 1. Placement Vertical (Y) strict par rapport au poste de la liste
+function getVerticalPct(pos) {
   const p = (pos ?? '').toUpperCase()
-  if (['GK','G','GB','GOAL'].includes(p)) return 0
-  if (['CB','LCB','RCB','CD-L','CD-R','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
-  if (['CM','CM-L','CM-R','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
-  if (['ST','CF','LW','RW','AML','AMR','LF','RF','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
-  return 2
+  // Gardien
+  if (['GK','G','GB','GOAL'].includes(p)) return 0.90
+  
+  // Défenseurs
+  if (['LB','LWB','DL','DG'].includes(p)) return 0.72 // Latéraux légèrement plus hauts
+  if (['RB','RWB','DR','DD'].includes(p)) return 0.72
+  if (['CB','LCB','RCB','CD-L','CD-R','DC','D','SW','DEF'].includes(p)) return 0.74
+  
+  // Milieux Défensifs / Centraux
+  if (['CDM','MDC'].includes(p)) return 0.54
+  if (['CM','CM-L','CM-R','MC','M','MF','MIL'].includes(p)) return 0.44
+  if (['LM','MG','RM','MD','DM'].includes(p)) return 0.42
+  
+  // Milieux Offensifs / Attaquants
+  if (['CAM','MOC','MOF','AM'].includes(p)) return 0.32
+  if (['LW','RW','AML','AMR','LF','RF','AG','AD'].includes(p)) return 0.20
+  if (['ST','CF','BU','AC','F','FW','ATT','FWD','SS'].includes(p)) return 0.16
+  
+  return 0.50
 }
 
-// Classement horizontal ultra-strict par couloir pour éviter tout croisement
-function getHorizontalWeight(pos) {
+// 2. Placement Horizontal (X) strict par rapport au poste de la liste
+function getHorizontalPct(pos) {
   const p = (pos ?? '').toUpperCase()
   
-  // 1. Extrême Gauche (Latéraux / Ailiers / Milieux Gauches excentrés)
-  if (['LB', 'LWB', 'DL', 'DG', 'LW', 'AML', 'AG', 'LM', 'MG', 'LF'].includes(p)) return 1 
+  // Couloir Gauche Écarté
+  if (['LB','LWB','DL','DG','LW','AML','AG','LM','MG','LF'].includes(p)) return 0.15
   
-  // 2. Axe Gauche (Défenseur central gauche, Milieu central gauche)
-  if (['LCB', 'CD-L', 'CM-L'].includes(p)) return 2
+  // Axe Gauche (ex: DC gauche ou Milieu gauche dans un duo)
+  if (['LCB','CD-L','CM-L'].includes(p)) return 0.35
   
-  // 3. Axe Pur (Gardiens, DC centraux, Milieux défensifs/centraux/offensifs axiaux, Buteurs)
-  if (['GK', 'G', 'GB', 'GOAL', 'CB', 'DC', 'CM', 'MC', 'CDM', 'MDC', 'CAM', 'MOC', 'ST', 'BU', 'CF', 'AC'].includes(p)) return 3 
+  // Plein Centre Équilibré
+  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 0.50
   
-  // 4. Axe Droit (Défenseur central droit, Milieu central droit)
-  if (['RCB', 'CD-R', 'CM-R'].includes(p)) return 4
+  // Axe Droit (ex: DC droit ou Milieu droit dans un duo)
+  if (['RCB','CD-R','CM-R'].includes(p)) return 0.65
   
-  // 5. Extrême Droit (Latéraux / Ailiers / Milieux Droits excentrés)
-  if (['RB', 'RWB', 'DR', 'DD', 'RW', 'AMR', 'AD', 'RM', 'MD', 'RF'].includes(p)) return 5 
+  // Couloir Droit Écarté
+  if (['RB','RWB','DR','DD','RW','AMR','AD','RM','MD','RF'].includes(p)) return 0.85
   
-  return 3
+  return 0.50
 }
 
-function fallbackLines(starters) {
-  const g = [0, 0, 0, 0]
-  for (const p of starters) g[posCat(p.position)]++
-  return g.filter(n => n > 0)
-}
-
-function getPositions(starters, formation) {
-  const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
-  const valid = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
-  const lines = valid ? [1, ...parts] : fallbackLines(starters)
-  const yPcts = LINE_Y[lines.length] ?? LINE_Y[4]
-  
-  const playersByLine = Array.from({ length: lines.length }, () => [])
-  const pool = [...starters]
-  
-  // 1. Positionnement prioritaire du Gardien
-  const gkIdx = pool.findIndex(p => posCat(p.position) === 0)
-  if (gkIdx !== -1) {
-    playersByLine[0].push(pool.splice(gkIdx, 1)[0])
-  } else if (pool.length > 0) {
-    playersByLine[0].push(pool.splice(0, 1)[0])
-  }
-
-  // 2. Positionnement prioritaire du BU / ST en pointe sur la ligne d'attaque
-  const attackLineIndex = lines.length - 1
-  const buIdx = pool.findIndex(p => ['BU', 'ST'].includes((p.position ?? '').toUpperCase()))
-  if (buIdx !== -1 && lines[attackLineIndex] > 0) {
-    playersByLine[attackLineIndex].push(pool.splice(buIdx, 1)[0])
-  }
-
-  // 3. Répartition globale sur les lignes tactiques
-  for (let li = 1; li < lines.length; li++) {
-    const currentLineArray = playersByLine[li]
-    const targetCount = lines[li]
-    
-    while (currentLineArray.length < targetCount && pool.length > 0) {
-      currentLineArray.push(pool.splice(0, 1)[0])
+// Génération des positions basée uniquement sur le modèle des postes de la liste
+function getPositions(starters) {
+  return starters.map(player => {
+    const pos = player.position ?? ''
+    return {
+      leftPct: getHorizontalPct(pos) * 100,
+      topPct: getVerticalPct(pos) * 100,
+      player
     }
-    
-    // TRI ULTRA-STRICT DE GAUCHE À DROITE (Élimine les inversions DC/DD et MDC/MD)
-    currentLineArray.sort((a, b) => getHorizontalWeight(a.position) - getHorizontalWeight(b.position))
-  }
-
-  // Conversion en pourcentages de coordonnées pour le rendu sur le pitch
-  const out = []
-  for (let li = 0; li < lines.length; li++) {
-    const rowPlayers = playersByLine[li]
-    const n = rowPlayers.length
-    const y = T + yPcts[li] * IH
-    for (let j = 0; j < n; j++) {
-      const x = L + (j + 0.5) * IW / n
-      out.push({
-        leftPct: (x / PW) * 100,
-        topPct:  (y / PH) * 100,
-        player:  rowPlayers[j] ?? null,
-      })
-    }
-  }
-  return out
+  })
 }
 
-// ── COMPOSANT DU JOUEUR (Entièrement fixe et centré au pixel près) ────────────
+function alpha(hex, a) {
+  if (!hex || !hex.startsWith('#')) return `rgba(239,68,68,${a})`
+  const full = hex.length === 4 ? '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3] : hex
+  const r = parseInt(full.slice(1,3), 16), g = parseInt(full.slice(3,5), 16), b = parseInt(full.slice(5,7), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
+
+function formatName(name, sname) {
+  const n = (name || sname || '?').trim()
+  const parts = n.split(/\s+/)
+  if (parts.length === 1) return parts[0]
+  return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
+}
+
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
-  const isGK = posCat(player.position) === 0
+  const isGK = ['GK','G','GB','GOAL'].includes((player.position ?? '').toUpperCase())
   const color = isGK ? '#f59e0b' : teamColor
   const label = formatName(player.name, player.shortName)
   const num = player.number ?? ''
@@ -153,10 +105,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       alignItems: 'center',
       zIndex: 2,
     }}>
-      {/* Ombre au sol */}
       <div style={{ position: 'absolute', bottom: '-4px', width: '26px', height: '6px', background: 'rgba(0,0,0,0.4)', borderRadius: '50%', filter: 'blur(2px)', transform: 'scaleY(0.4)', pointerEvents: 'none' }} />
-
-      {/* Rond Maillot Pro */}
       <div style={{
         width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '14px', fontWeight: 800, fontFamily: "'Chakra Petch', monospace", color: '#ffffff',
@@ -165,17 +114,12 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       }}>
         {num}
       </div>
-
-      {/* Capsule Nom Statique - Parfaitement Centrée */}
       <div style={{
         marginTop: '3px', background: 'rgba(10, 16, 30, 0.92)', border: '1px solid rgba(255, 255, 255, 0.12)',
         borderTop: `2px solid ${color}`, padding: '2px 8px', borderRadius: '4px', boxShadow: '0 4px 8px rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)',
         maxWidth: '85px', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'
       }}>
-        <span style={{
-          fontFamily: "'Chakra Petch', sans-serif", fontSize: '10px', fontWeight: 700, color: '#ffffff',
-          textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden'
-        }}>
+        <span style={{ fontFamily: "'Chakra Petch', sans-serif", fontSize: '10px', fontWeight: 700, color: '#ffffff', textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
           {label}
         </span>
       </div>
@@ -183,44 +127,27 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
   )
 }
 
-// ── COMPOSANT DU TERRAIN ─────────────────────────────────────────────────────
-function Pitch({ formation, positions, teamColor }) {
+function Pitch({ positions, teamColor }) {
   return (
-    <div style={{
-      width: '100%',
-      aspectRatio: '3 / 4',
-      background: '#061409',
-      perspective: '700px',
-      overflow: 'hidden',
-      position: 'relative',
-    }}>
-      <div style={{
-        position: 'absolute', inset: '-10% -6%', transform: 'rotateX(20deg)', transformOrigin: 'bottom center',
-        background: 'radial-gradient(circle at 50% 35%, #194420 0%, #0b220f 65%, #051207 100%)',
-      }}>
+    <div style={{ width: '100%', aspectRatio: '3 / 4', background: '#061409', perspective: '700px', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ position: 'absolute', inset: '-10% -6%', transform: 'rotateX(20deg)', transformOrigin: 'bottom center', background: 'radial-gradient(circle at 50% 35%, #194420 0%, #0b220f 65%, #051207 100%)' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 35px, transparent 35px, transparent 70px)' }} />
         <div style={{ position: 'absolute', top: 12, left: 12, right: 12, bottom: 12, border: '1px solid rgba(255,255,255,0.15)' }} />
         <div style={{ position: 'absolute', left: 12, right: 12, top: '50%', height: 1, background: 'rgba(255,255,255,0.15)' }} />
         <div style={{ position: 'absolute', left: '50%', top: '50%', width: '26%', aspectRatio: '1', transform: 'translate(-50%, -50%)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50%' }} />
-        
         <div style={{ position: 'absolute', left: '50%', top: 12, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderTop: 'none' }} />
         <div style={{ position: 'absolute', left: '50%', bottom: 12, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderBottom: 'none' }} />
-
-        {positions.map(({ leftPct, topPct, player }, i) =>
-          player ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} /> : null
-        )}
+        {positions.map(({ leftPct, topPct, player }, i) => player ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} /> : null)}
       </div>
     </div>
   )
 }
 
-// ── LISTE COMPLÈTE SOUS LE TERRAIN ───────────────────────────────────────────
-const CAT_COLOR = { 0: '#f59e0b', 1: '#60a5fa', 2: '#34d399', 3: '#ef4444' }
+const CAT_COLOR = { G: '#f59e0b', DC: '#60a5fa', DG: '#60a5fa', DD: '#60a5fa', MC: '#34d399', MDC: '#34d399', MOC: '#34d399', MG: '#34d399', MD: '#34d399', BU: '#ef4444', AG: '#ef4444', AD: '#ef4444', AC: '#ef4444' }
 
 function PlayerCell({ player, isSub }) {
-  const cat = posCat(player.position)
-  const catC = CAT_COLOR[cat]
   const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? '—'
+  const catC = CAT_COLOR[posLabel] ?? '#60a5fa'
   const nm = formatName(player.name, player.shortName)
 
   return (
@@ -240,11 +167,21 @@ function PlayerCell({ player, isSub }) {
 
 function PlayerGrid({ starters, subs }) {
   const headerStyle = { padding: '8px 12px', fontSize: 9, letterSpacing: '1px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontFamily: "'Chakra Petch', monospace", fontWeight: 700, background: '#0d111b', borderBottom: '1px solid rgba(255,255,255,0.03)' }
+  
+  // Ordre logique d'affichage dans la liste des titulaires (du Gardien à l'Attaque)
+  const getSortOrder = (p) => {
+    const pFr = POS_FR[(p.position ?? '').toUpperCase()] ?? ''
+    if (pFr === 'G') return 0
+    if (['DG','DC','DD'].includes(pFr)) return 1
+    if (['MDC','MC','MG','MD','MOC'].includes(pFr)) return 2
+    return 3
+  }
+
   return (
     <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={headerStyle}>Titulaires</div>
-        {[...starters].sort((a,b) => posCat(a.position) - posCat(b.position)).map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
+        {[...starters].sort((a,b) => getSortOrder(a) - getSortOrder(b)).map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
       </div>
       {subs?.length > 0 && (
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -265,7 +202,7 @@ export default function LineupPitch({ home, away }) {
 
   const team = activeTeam === 'home' ? home : away
   const teamColor = activeTeam === 'home' ? hColor : aColor
-  const positions = getPositions(team.starters ?? [], team.formation)
+  const positions = getPositions(team.starters ?? [])
 
   return (
     <div style={{ background: '#07090e', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 24px 48px rgba(0,0,0,0.6)', maxWidth: '480px', margin: '0 auto' }}>
@@ -285,7 +222,7 @@ export default function LineupPitch({ home, away }) {
           )
         })}
       </div>
-      <Pitch formation={team.formation} positions={positions} teamColor={teamColor} />
+      <Pitch positions={positions} teamColor={teamColor} />
       <PlayerGrid starters={team.starters ?? []} subs={team.subs ?? []} />
     </div>
   )
