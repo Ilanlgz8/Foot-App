@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useLiveData } from '../context/LiveProvider'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
+import '../accueil.css'
 
 const navigation = [
   { name: 'Accueil',    href: '/' },
@@ -123,7 +124,6 @@ function Navbar() {
               <h1 className="accueil__miniTitle">
                 <span className="accueil__heroStat">Stat</span>Footix
               </h1>
-                <span className="accueil__miniDate">{todayStr}</span>
             </div>
           </NavLink>
 
