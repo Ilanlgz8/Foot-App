@@ -1,6 +1,6 @@
 /**
- * LineupPitch — HTML/CSS version
- * Terrain en div CSS propre, joueurs en divs absolus avec glow dynamique.
+ * LineupPitch — HTML/CSS version MODERNISÉE
+ * Terrain en div CSS propre, joueurs en divs absolus avec design moderne type EA Sports/eFootball.
  * Couleur d'équipe tirée du champ `color` de l'API.
  */
 import { useState } from 'react'
@@ -51,14 +51,14 @@ function posCat(pos) {
 }
 
 const POS_FR = {
-  GK:'GB',  G:'GB',   GB:'GB',
+  GK:'G',  G:'G',   GB:'G',
   CB:'DC',  DC:'DC',  DL:'DG', DR:'DD',
-  LB:'DG',  RB:'DD',  LWB:'PG', RWB:'PD',
+  LB:'DG',  RB:'DD',  LWB:'LG', RWB:'LD',
   D:'DEF',  SW:'LIB', DEF:'DEF',
-  CM:'MC',  CDM:'MDC', CAM:'MOF', DM:'MDC', AM:'MOF',
-  LM:'MG',  RM:'MD',  M:'MIL',  MF:'MIL', MIL:'MIL',
+  CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MD', AM:'MOC', MC:'MC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
+  LM:'MG',  RM:'MD',  M:'MC',  MF:'MC', MIL:'MC',
   ST:'ATT', CF:'AC',  LW:'AG',  RW:'AD',
-  F:'ATT',  FW:'ATT', ATT:'ATT', FWD:'ATT', SS:'ATT', BU:'ATT',
+  F:'BU',  FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT', BU:'BU',
 }
 
 const CAT_COLOR = { 0: '#f59e0b', 1: '#60a5fa', 2: '#34d399', 3: '#ef4444' }
@@ -93,7 +93,7 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── Dot joueur ────────────────────────────────────────────────────────────────
+// ── Dot joueur (Modernisé en Capsule Glassmorphism) ──────────────────────────
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
   const isGK  = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
@@ -111,39 +111,47 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       display:       'flex',
       flexDirection: 'column',
       alignItems:    'center',
-      gap:           'clamp(3px, 1vw, 5px)',
+      gap:           '6px',
       zIndex:        2,
     }}>
+      {/* Badge Numéro Épuré */}
       <div style={{
-        width:          'clamp(32px, 9.5vw, 42px)',
-        height:         'clamp(32px, 9.5vw, 42px)',
+        width:          'clamp(34px, 9.8vw, 44px)',
+        height:         'clamp(34px, 9.8vw, 44px)',
         borderRadius:   '50%',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
-        fontSize:       'clamp(12px, 3.4vw, 16px)',
-        fontWeight:     800,
+        fontSize:       'clamp(12px, 3.5vw, 15px)',
+        fontWeight:     700,
         fontFamily:     "'Chakra Petch', monospace",
-        color,
-        background:     alpha(color, 0.13),
-        border:         `1.5px solid ${color}`,
-        boxShadow:      `0 0 12px ${alpha(color, 0.4)}, inset 0 0 6px ${alpha(color, 0.1)}`,
+        color:          '#ffffff',
+        background:     `linear-gradient(135deg, ${alpha(color, 0.6)} 0%, ${alpha(color, 0.2)} 100%)`,
+        border:         `1.5px solid ${alpha(color, 0.8)}`,
+        boxShadow:      `0 4px 12px ${alpha(color, 0.35)}, inset 0 1px 1px rgba(255,255,255,0.2)`,
         lineHeight:     1,
         flexShrink:     0,
+        backdropFilter: 'blur(3px)',
       }}>
         {num}
       </div>
+      {/* Étiquette Nom Type "Glass" */}
       <span style={{
-        fontSize:      'clamp(8.5px, 2.6vw, 11px)',
+        fontSize:      'clamp(9px, 2.6vw, 11px)',
         fontWeight:    600,
-        color:         isGK ? alpha('#f59e0b', 0.65) : 'rgba(255,255,255,0.52)',
+        color:         '#ffffff',
         whiteSpace:    'nowrap',
         fontFamily:    "'Chakra Petch', monospace",
-        textShadow:    '0 1px 5px rgba(0,0,0,0.95)',
-        letterSpacing: '0.01em',
-        maxWidth:      'clamp(52px, 15vw, 64px)',
+        background:    'rgba(10, 15, 30, 0.75)',
+        border:        '1px solid rgba(255, 255, 255, 0.15)',
+        padding:       '2px 8px',
+        borderRadius:  '12px',
+        boxShadow:     '0 2px 6px rgba(0,0,0,0.4)',
+        letterSpacing: '0.02em',
+        maxWidth:      'clamp(60px, 18vw, 80px)',
         overflow:      'hidden',
         textOverflow:  'ellipsis',
+        backdropFilter: 'blur(4px)',
       }}>
         {label}
       </span>
@@ -151,38 +159,39 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
   )
 }
 
-// ── Terrain HTML/CSS ──────────────────────────────────────────────────────────
+// ── Terrain HTML/CSS (Look Réaliste Pro) ──────────────────────────────────────
 function Pitch({ formation, positions, teamColor }) {
   return (
     <div style={{
       position:    'relative',
       width:       '100%',
       aspectRatio: '3 / 4',
-      background:  'linear-gradient(180deg, #0f2214 0%, #0d1e11 50%, #0b1a0e 100%)',
+      background:  'linear-gradient(180deg, #112918 0%, #0d1f12 50%, #09170c 100%)',
       overflow:    'hidden',
     }}>
-      {/* Bandes gazon alternées */}
+      {/* Bandes de pelouse ultra subtiles */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage:
           'repeating-linear-gradient(to bottom,' +
-          'rgba(255,255,255,0.022) 0px,' +
-          'rgba(255,255,255,0.022) 46px,' +
-          'transparent 46px,' +
-          'transparent 92px)',
+          'rgba(255,255,255,0.015) 0px,' +
+          'rgba(255,255,255,0.015) 35px,' +
+          'transparent 35px,' +
+          'transparent 70px)',
       }} />
 
-      {/* Bordure terrain */}
+      {/* Lignes du terrain affinées */}
+      {/* Bordure externe */}
       <div style={{
-        position: 'absolute', top: 8, left: 8, right: 8, bottom: 8,
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 2, pointerEvents: 'none',
+        position: 'absolute', top: 12, left: 12, right: 12, bottom: 12,
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 1, pointerEvents: 'none',
       }} />
 
       {/* Ligne médiane */}
       <div style={{
-        position: 'absolute', left: 8, right: 8, top: '50%',
-        height: 1, background: 'rgba(255,255,255,0.09)',
+        position: 'absolute', left: 12, right: 12, top: '50%',
+        height: 1, background: 'rgba(255,255,255,0.12)',
         pointerEvents: 'none',
       }} />
 
@@ -191,68 +200,55 @@ function Pitch({ formation, positions, teamColor }) {
         position:     'absolute', left: '50%', top: '50%',
         width:        '25%', aspectRatio: '1',
         transform:    'translate(-50%, -50%)',
-        border:       '1px solid rgba(255,255,255,0.07)',
+        border:       '1px solid rgba(255,255,255,0.12)',
         borderRadius: '50%', pointerEvents: 'none',
       }} />
 
       {/* Point central */}
       <div style={{
         position:     'absolute', left: '50%', top: '50%',
-        width: 5, height: 5,
-        background:   'rgba(255,255,255,0.2)',
+        width: 4, height: 4,
+        background:   'rgba(255,255,255,0.4)',
         borderRadius: '50%',
         transform:    'translate(-50%, -50%)',
         pointerEvents:'none',
       }} />
 
-      {/* Surface de réparation haute */}
+      {/* Surface haute */}
       <div style={{
-        position:  'absolute', left: '50%', top: 8,
-        width: '49%', height: '14%',
+        position:  'absolute', left: '50%', top: 12,
+        width: '48%', height: '15%',
         transform: 'translateX(-50%)',
-        border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none',
+        border: '1px solid rgba(255,255,255,0.12)', borderTop: 'none',
         pointerEvents: 'none',
       }} />
 
-      {/* Surface de réparation basse */}
+      {/* Surface basse */}
       <div style={{
-        position:  'absolute', left: '50%', bottom: 8,
-        width: '49%', height: '14%',
+        position:  'absolute', left: '50%', bottom: 12,
+        width: '48%', height: '15%',
         transform: 'translateX(-50%)',
-        border: '1px solid rgba(255,255,255,0.07)', borderBottom: 'none',
+        border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none',
         pointerEvents: 'none',
       }} />
 
-      {/* But haut */}
-      <div style={{
-        position:  'absolute', left: '50%', top: 8,
-        width: '22%', height: '5%',
-        transform: 'translateX(-50%)',
-        border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none',
-        background: 'rgba(255,255,255,0.025)',
-        pointerEvents: 'none',
-      }} />
+      {/* Corners (Petits détails pro) */}
+      <div style={{ position: 'absolute', top: 12, left: 12, width: 8, height: 8, borderRight: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)', borderRadius: '0 0 100% 0' }} />
+      <div style={{ position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderLeft: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)', borderRadius: '0 0 0 100%' }} />
+      <div style={{ position: 'absolute', bottom: 12, left: 12, width: 8, height: 8, borderRight: '1px solid rgba(255,255,255,0.15)', borderTop: '1px solid rgba(255,255,255,0.15)', borderRadius: '0 100% 0 0' }} />
+      <div style={{ position: 'absolute', bottom: 12, right: 12, width: 8, height: 8, borderLeft: '1px solid rgba(255,255,255,0.15)', borderTop: '1px solid rgba(255,255,255,0.15)', borderRadius: '100% 0 0 0' }} />
 
-      {/* But bas */}
-      <div style={{
-        position:  'absolute', left: '50%', bottom: 8,
-        width: '22%', height: '5%',
-        transform: 'translateX(-50%)',
-        border: '1px solid rgba(255,255,255,0.07)', borderBottom: 'none',
-        background: 'rgba(255,255,255,0.025)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Label formation */}
+      {/* Filigranne Formation */}
       {formation && (
         <div style={{
-          position:      'absolute', top: 13, left: 14,
-          fontSize:      9,
-          fontWeight:    700,
-          letterSpacing: '0.12em',
-          color:         'rgba(255,255,255,0.15)',
+          position:      'absolute', top: 18, left: 20,
+          fontSize:      10,
+          fontWeight:    800,
+          letterSpacing: '0.15em',
+          color:         'rgba(255,255,255,0.25)',
           fontFamily:    "'Chakra Petch', monospace",
           pointerEvents: 'none',
+          textShadow:    '0 1px 2px rgba(0,0,0,0.2)',
         }}>
           {formation}
         </div>
@@ -277,32 +273,32 @@ function PlayerCell({ player, isSub }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      padding: '5px 10px',
-      borderTop: '1px solid rgba(255,255,255,0.035)',
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '7px 12px',
+      borderTop: '1px solid rgba(255,255,255,0.02)',
       minWidth: 0,
     }}>
       <span style={{
-        fontSize:      8,
+        fontSize:      9,
         fontWeight:    700,
         flexShrink:    0,
         fontFamily:    "'Chakra Petch', monospace",
-        letterSpacing: '0.03em',
-        color:         isSub ? 'rgba(255,255,255,0.38)' : catC,
-        background:    isSub ? 'rgba(255,255,255,0.05)' : alpha(catC, 0.1),
-        border:        `1px solid ${isSub ? 'rgba(255,255,255,0.1)' : alpha(catC, 0.28)}`,
-        borderRadius:  3,
-        padding:       '2px 5px',
-        minWidth:      28,
+        letterSpacing: '0.02em',
+        color:         isSub ? 'rgba(255,255,255,0.4)' : catC,
+        background:    isSub ? 'rgba(255,255,255,0.03)' : alpha(catC, 0.08),
+        border:        `1px solid ${isSub ? 'rgba(255,255,255,0.08)' : alpha(catC, 0.2)}`,
+        borderRadius:  4,
+        padding:       '1px 4px',
+        minWidth:      26,
         textAlign:     'center',
       }}>
         {posLabel}
       </span>
       <span style={{
         flex:          1,
-        fontSize:      10.5,
+        fontSize:      11,
         fontWeight:    isSub ? 400 : 500,
-        color:         isSub ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.85)',
+        color:         isSub ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)',
         whiteSpace:    'nowrap',
         overflow:      'hidden',
         textOverflow:  'ellipsis',
@@ -311,9 +307,9 @@ function PlayerCell({ player, isSub }) {
         {nm}
       </span>
       <span style={{
-        fontSize:   9,
+        fontSize:   10,
         fontWeight: 700,
-        color:      'rgba(255,255,255,0.2)',
+        color:      'rgba(255,255,255,0.25)',
         flexShrink: 0,
         fontFamily: "'Chakra Petch', monospace",
       }}>
@@ -326,22 +322,24 @@ function PlayerCell({ player, isSub }) {
 // ── Grille titulaires / remplaçants ──────────────────────────────────────────
 function PlayerGrid({ starters, subs }) {
   const headerStyle = {
-    padding:       '5px 10px 4px',
-    fontSize:      8,
-    letterSpacing: '1.2px',
+    padding:       '8px 12px 6px',
+    fontSize:      8.5,
+    letterSpacing: '1px',
     textTransform: 'uppercase',
-    color:         'rgba(255,255,255,0.22)',
+    color:         'rgba(255,255,255,0.3)',
     fontFamily:    "'Chakra Petch', monospace",
+    fontWeight:    700,
+    background:    'rgba(255,255,255,0.01)',
   }
   return (
-    <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#0e111a' }}>
+      <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={headerStyle}>Titulaires</div>
         {starters.map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
       </div>
       {subs?.length > 0 && (
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={headerStyle}>⇄ Rempl.</div>
+          <div style={headerStyle}>⇄ Remplaçants</div>
           {subs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
         </div>
       )}
@@ -349,13 +347,12 @@ function PlayerGrid({ starters, subs }) {
   )
 }
 
-// ── Composant principal ───────────────────────────────────────────────────────
+// ── Composant principal (Header Clean & Pro) ──────────────────────────────────
 export default function LineupPitch({ home, away }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
-  // Rouge app pour les deux équipes — cohérent avec le thème
   const hColor = '#ef4444'
-  const aColor = '#ef4444'
+  const aColor = '#f3f4f6' // Un blanc/gris cassé plus éclatant que l'ancien hexadécimal invalide
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
@@ -365,15 +362,21 @@ export default function LineupPitch({ home, away }) {
 
   return (
     <div style={{
-      background:   '#0a0c14',
-      borderRadius: '1rem',
+      background:   '#090b11',
+      borderRadius: '14px',
       overflow:     'hidden',
-      border:       '1px solid rgba(255,255,255,0.07)',
+      border:       '1px solid rgba(255,255,255,0.06)',
+      boxShadow:    '0 20px 40px rgba(0,0,0,0.5)',
       maxWidth:     '480px',
       margin:       '0 auto',
     }}>
-      {/* Onglets équipes */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      {/* Navigation Onglets Épurée */}
+      <div style={{ 
+        display: 'flex', 
+        background: '#0c0f17',
+        padding: '6px',
+        gap: '4px',
+      }}>
         {[
           { key: 'home', t: home, c: hColor },
           { key: 'away', t: away, c: aColor },
@@ -385,43 +388,58 @@ export default function LineupPitch({ home, away }) {
               onClick={() => setActiveTeam(key)}
               style={{
                 flex:          1,
-                padding:       '10px 8px',
+                padding:       '10px 12px',
                 cursor:        'pointer',
-                background:    act ? alpha(c, 0.08) : 'transparent',
+                background:    act ? 'rgba(255,255,255,0.04)' : 'transparent',
+                borderRadius:  '8px',
                 border:        'none',
-                borderBottom:  `2px solid ${act ? c : 'transparent'}`,
                 display:       'flex',
                 flexDirection: 'column',
                 alignItems:    'center',
-                gap:           3,
-                transition:    'all .15s',
+                gap:           4,
+                transition:    'all 0.2s ease',
+                boxShadow:     act ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
+                position:      'relative',
               }}
             >
               {t?.crest && (
-                <img src={t.crest} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                <img src={t.crest} alt="" style={{ width: 26, height: 26, objectFit: 'contain', filter: act ? 'none' : 'grayscale(30%)' }} />
               )}
               <span style={{
-                fontSize:      10,
+                fontSize:      11,
                 fontWeight:    700,
                 fontFamily:    "'Chakra Petch', monospace",
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color:         act ? c : 'rgba(255,255,255,0.35)',
+                letterSpacing: '0.03em',
+                color:         act ? '#ffffff' : 'rgba(255,255,255,0.4)',
               }}>
                 {t?.name ?? key}
               </span>
+              
+              {/* Petite pillule de formation */}
               {t?.formation && (
                 <span style={{
-                  fontSize:     9.5,
+                  fontSize:     9,
+                  fontWeight:   600,
                   fontFamily:   "'Chakra Petch', monospace",
-                  color:        act ? c : 'rgba(255,255,255,0.2)',
-                  background:   act ? alpha(c, 0.1) : 'transparent',
-                  border:       `1px solid ${act ? alpha(c, 0.3) : 'transparent'}`,
-                  borderRadius: 4,
-                  padding:      '1px 6px',
+                  color:        act ? c : 'rgba(255,255,255,0.3)',
+                  background:   act ? alpha(c, 0.12) : 'rgba(255,255,255,0.02)',
+                  border:       `1px solid ${act ? alpha(c, 0.3) : 'rgba(255,255,255,0.05)'}`,
+                  borderRadius: '4px',
+                  padding:      '1px 5px',
+                  marginTop:    '2px',
                 }}>
                   {t.formation}
                 </span>
+              )}
+
+              {/* Ligne lumineuse active */}
+              {act && (
+                <div style={{
+                  position: 'absolute', bottom: 0, left: '30%', right: '30%',
+                  height: '2px', background: c, borderRadius: '2px 2px 0 0',
+                  boxShadow: `0 -2px 6px ${c}`
+                }} />
               )}
             </button>
           )
