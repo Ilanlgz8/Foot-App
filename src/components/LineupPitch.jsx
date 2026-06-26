@@ -1,12 +1,12 @@
 /**
- * LineupPitch — Version Maillots Premium & PWA Friendly
- * Correction du bug de rognage mobile, noms lisibles en entier et maillots stylisés.
+ * LineupPitch — Version Premium Tactique & PWA Friendly
+ * Prénoms raccourcis (Initiale.), design de carte haut de gamme, et sécurité mobile.
  */
 import { useState } from 'react'
 
 // ── Dimensions logiques pour calcul des positions ─────────────────────────────
 const PW = 300, PH = 400
-const L = 15, R = 285, T = 25, B = 375 // Marges augmentées pour éviter que le GK ou l'ATT collent aux bords
+const L = 15, R = 285, T = 28, B = 372 // Marges parfaites pour sécuriser le GK et l'ATT sur mobile
 const IW = R - L, IH = B - T
 
 const LINE_Y = {
@@ -33,8 +33,12 @@ function alpha(hex, a) {
   return `rgba(${r},${g},${b},${a})`
 }
 
+// Format strict demandé : I. Nomfamille
 function formatName(name, sname) {
-  return (name || sname || '?').trim()
+  const n = (name || sname || '?').trim()
+  const parts = n.split(/\s+/)
+  if (parts.length === 1) return parts[0]
+  return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
 }
 
 function posCat(pos) {
@@ -88,60 +92,11 @@ function getPositions(starters, formation) {
   return out
 }
 
-// ── COMPOSANT MAILLOT CSS PREMIUM ───────────────────────────────────────────
-function JerseyIcon({ color, isGK }) {
-  const mainColor = isGK ? '#f59e0b' : color
-  const detailColor = isGK ? '#78350f' : '#ffffff'
-
-  return (
-    <div style={{
-      position: 'relative',
-      width: '42px',
-      height: '38px',
-      filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.4))',
-    }}>
-      {/* Corps du maillot */}
-      <div style={{
-        position: 'absolute', left: '7px', top: '4px',
-        width: '28px', height: '34px',
-        background: `linear-gradient(135deg, ${mainColor} 0%, ${alpha(mainColor, 0.85)} 100%)`,
-        borderRadius: '4px 4px 2px 2px',
-        border: '1px solid rgba(255,255,255,0.15)',
-      }} />
-      {/* Manche Gauche */}
-      <div style={{
-        position: 'absolute', left: '0px', top: '4px',
-        width: '9px', height: '16px',
-        background: mainColor,
-        borderRadius: '3px 0 0 2px',
-        transform: 'rotate(15deg)',
-        borderLeft: '1px solid rgba(255,255,255,0.1)',
-      }} />
-      {/* Manche Droite */}
-      <div style={{
-        position: 'absolute', right: '0px', top: '4px',
-        width: '9px', height: '16px',
-        background: mainColor,
-        borderRadius: '0 3px 2px 0',
-        transform: 'rotate(-15deg)',
-        borderRight: '1px solid rgba(255,255,255,0.1)',
-      }} />
-      {/* Détail Col / Design V */}
-      <div style={{
-        position: 'absolute', left: '16px', top: '4px',
-        width: '10px', height: '6px',
-        background: detailColor,
-        clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
-        opacity: 0.8,
-      }} />
-    </div>
-  )
-}
-
-// ── JOUEUR REFAIT (Maillot + Vrais Noms) ─────────────────────────────────────
+// ── DESIGN PREMIUM : BADGE JOUEUR TYPE COMPOSITION TV ────────────────────────
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
   const isGK  = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
+  const color = isGK ? '#f59e0b' : teamColor
   const label = formatName(player.name, player.shortName)
   const num   = player.number ?? ''
 
@@ -156,39 +111,41 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       alignItems:    'center',
       zIndex:        2,
     }}>
-      {/* Zone Maillot + Numéro superposé */}
-      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <JerseyIcon color={teamColor} isGK={isGK} />
-        <div style={{
-          position:   'absolute',
-          top:        '11px',
-          fontSize:   '13px',
-          fontWeight: 800,
-          fontFamily: "'Chakra Petch', monospace",
-          color:      isGK ? '#000000' : '#ffffff',
-          textShadow: isGK ? 'none' : '0px 1px 3px rgba(0,0,0,0.8)',
-          lineHeight: 1,
+      {/* Conteneur principal de la carte du joueur */}
+      <div style={{
+        display:       'flex',
+        alignItems:    'center',
+        background:    'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
+        border:        `1px solid rgba(255, 255, 255, 0.15)`,
+        borderLeft:    `3px solid ${color}`, // Rappel de la couleur d'équipe ultra élégant
+        borderRadius:  '6px',
+        padding:       '3px 8px 3px 6px',
+        boxShadow:     '0 4px 14px rgba(0,0,0,0.45)',
+        gap:           '6px',
+        backdropFilter:'blur(6px)',
+      }}>
+        {/* Numéro du joueur stylisé */}
+        <span style={{
+          fontSize:      'clamp(11px, 3.2vw, 13px)',
+          fontWeight:    800,
+          fontFamily:    "'Chakra Petch', monospace",
+          color:         '#ffffff',
+          minWidth:      '14px',
+          textAlign:     'center',
         }}>
           {num}
-        </div>
-      </div>
+        </span>
 
-      {/* Conteneur Nom Propre et Entier (Sans coupure brutale) */}
-      <div style={{
-        marginTop:     '4px',
-        background:    'rgba(4, 7, 15, 0.75)',
-        border:        '1px solid rgba(255,255,255,0.12)',
-        borderRadius:  '4px',
-        padding:       '2px 8px',
-        boxShadow:     '0 2px 6px rgba(0,0,0,0.5)',
-        backdropFilter:'blur(4px)',
-        whiteSpace:    'nowrap',
-      }}>
+        {/* Ligne verticale de séparation interne */}
+        <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.15)' }} />
+
+        {/* Nom au format "I. Nom" */}
         <span style={{
-          fontSize:      '10px',
-          fontWeight:    600,
+          fontSize:      'clamp(9.5px, 2.7vw, 11px)',
+          fontWeight:    700,
           color:         '#ffffff',
-          fontFamily:    "'Chakra Petch', monospace",
+          fontFamily:    "'Chakra Petch', sans-serif",
+          whiteSpace:    'nowrap',
           letterSpacing: '0.01em',
         }}>
           {label}
@@ -198,46 +155,44 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
   )
 }
 
-// ── TERRAIN ANTI-ROGNEUR MOBILE ──────────────────────────────────────────────
+// ── TERRAIN ROBUSTE POUR ÉCRANS MOBILES PWA ──────────────────────────────────
 function Pitch({ formation, positions, teamColor }) {
   return (
     <div style={{
       position:    'relative',
       width:       '100%',
-      // Suppression de l'aspect ratio rigide qui coupait le bas sur certains écrans PWA
-      paddingTop:  '125%', // Équivalent propre à un ratio 3:4 adaptatif sécurisé
-      background:  'linear-gradient(180deg, #122416 0%, #0d1a10 100%)',
+      paddingTop:  '130%', // Ratio vertical sécurisé : empêche le gardien d'être coupé sur mobile
+      background:  'linear-gradient(180deg, #0e1e12 0%, #0a140c 100%)',
       overflow:    'hidden',
     }}>
-      {/* Conteneur interne absolu pour caler les éléments du terrain */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        {/* Gazon tonte premium */}
+        {/* Tonte de pelouse premium et réaliste */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 40px, transparent 40px, transparent 80px)',
+          backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 35px, transparent 35px, transparent 70px)',
         }} />
 
-        {/* Lignes Blanches Fines Tactiques */}
-        <div style={{ position: 'absolute', top: 15, left: 15, right: 15, bottom: 15, border: '1px solid rgba(255,255,255,0.15)' }} />
-        <div style={{ position: 'absolute', left: 15, right: 15, top: '50%', height: 1, background: 'rgba(255,255,255,0.15)' }} />
-        <div style={{ position: 'absolute', left: '50%', top: '50%', width: '25%', aspectRatio: '1', transform: 'translate(-50%, -50%)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50%' }} />
+        {/* Lignes du terrain épurées (Blanche transparentes) */}
+        <div style={{ position: 'absolute', top: 16, left: 16, right: 16, bottom: 16, border: '1px solid rgba(255,255,255,0.14)' }} />
+        <div style={{ position: 'absolute', left: 16, right: 16, top: '50%', height: 1, background: 'rgba(255,255,255,0.14)' }} />
+        <div style={{ position: 'absolute', left: '50%', top: '50%', width: '24%', aspectRatio: '1', transform: 'translate(-50%, -50%)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '50%' }} />
         <div style={{ position: 'absolute', left: '50%', top: '50%', width: 4, height: 4, background: 'rgba(255,255,255,0.3)', borderRadius: '50%', transform: 'translate(-50%, -50%)' }} />
 
-        {/* Surfaces de Réparation Haut / Bas */}
-        <div style={{ position: 'absolute', left: '50%', top: 15, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderTop: 'none' }} />
-        <div style={{ position: 'absolute', left: '50%', bottom: 15, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.15)', borderBottom: 'none' }} />
+        {/* Surfaces de Réparation */}
+        <div style={{ position: 'absolute', left: '50%', top: 16, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.14)', borderTop: 'none' }} />
+        <div style={{ position: 'absolute', left: '50%', bottom: 16, width: '46%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.14)', borderBottom: 'none' }} />
 
-        {/* Label tactique discret */}
+        {/* Filigrane tactique moderne */}
         {formation && (
           <div style={{
-            position: 'absolute', top: 22, left: 25, fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.1em', color: 'rgba(255,255,255,0.2)', fontFamily: "'Chakra Petch', monospace",
+            position: 'absolute', top: 24, left: 26, fontSize: 10, fontWeight: 800,
+            letterSpacing: '0.12em', color: 'rgba(255,255,255,0.25)', fontFamily: "'Chakra Petch', monospace",
           }}>
             {formation}
           </div>
         )}
 
-        {/* Rendu des Joueurs */}
+        {/* Injection des Joueurs */}
         {positions.map(({ leftPct, topPct, player }, i) =>
           player ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} /> : null
         )}
@@ -246,7 +201,7 @@ function Pitch({ formation, positions, teamColor }) {
   )
 }
 
-// ── Liste des Joueurs (Inchangé) ──────────────────────────────────────────────
+// ── Liste des Joueurs bas de page ─────────────────────────────────────────────
 function PlayerCell({ player, isSub }) {
   const cat      = posCat(player.position)
   const catC     = CAT_COLOR[cat]
@@ -255,15 +210,15 @@ function PlayerCell({ player, isSub }) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
       borderTop: '1px solid rgba(255,255,255,0.03)', minWidth: 0,
     }}>
       <span style={{
-        fontSize: 8, fontWeight: 700, fontFamily: "'Chakra Petch', monospace",
+        fontSize: 8.5, fontWeight: 700, fontFamily: "'Chakra Petch', monospace",
         color: isSub ? 'rgba(255,255,255,0.35)' : catC,
-        background: isSub ? 'rgba(255,255,255,0.04)' : alpha(catC, 0.1),
-        border: `1px solid ${isSub ? 'rgba(255,255,255,0.1)' : alpha(catC, 0.25)}`,
-        borderRadius: 3, padding: '2px 5px', minWidth: 26, textAlign: 'center',
+        background: isSub ? 'rgba(255,255,255,0.03)' : alpha(catC, 0.08),
+        border: `1px solid ${isSub ? 'rgba(255,255,255,0.08)' : alpha(catC, 0.22)}`,
+        borderRadius: 4, padding: '1px 4px', minWidth: 26, textAlign: 'center',
       }}>
         {posLabel}
       </span>
@@ -274,7 +229,7 @@ function PlayerCell({ player, isSub }) {
       }}>
         {nm}
       </span>
-      <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.2)', fontFamily: "'Chakra Petch', monospace" }}>
+      <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.2)', fontFamily: "'Chakra Petch', monospace" }}>
         {player.number ?? ''}
       </span>
     </div>
@@ -283,12 +238,12 @@ function PlayerCell({ player, isSub }) {
 
 function PlayerGrid({ starters, subs }) {
   const headerStyle = {
-    padding: '6px 10px', fontSize: 8, letterSpacing: '1.2px', textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.25)', fontFamily: "'Chakra Petch', monospace",
+    padding: '7px 12px', fontSize: 8.5, letterSpacing: '1.2px', textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.25)', fontFamily: "'Chakra Petch', monospace", fontWeight: 700
   }
   return (
     <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#090b11' }}>
-      <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={headerStyle}>Titulaires</div>
         {starters.map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
       </div>
@@ -302,12 +257,12 @@ function PlayerGrid({ starters, subs }) {
   )
 }
 
-// ── Composant Principal Épuré ─────────────────────────────────────────────────
+// ── Composant Principal Final Pro ─────────────────────────────────────────────
 export default function LineupPitch({ home, away }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
   const hColor = '#ef4444'
-  const aColor = '#e2e8f0' // Gris/blanc propre ultra-lisible pour les maillots extérieurs
+  const aColor = '#cbd5e1' // Gris métal clair ultra pro pour l'extérieur
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
@@ -317,16 +272,16 @@ export default function LineupPitch({ home, away }) {
 
   return (
     <div style={{
-      background:   '#05070c',
-      borderRadius: '12px',
+      background:   '#05060a',
+      borderRadius: '14px',
       overflow:     'hidden',
-      border:       '1px solid rgba(255,255,255,0.08)',
+      border:       '1px solid rgba(255,255,255,0.07)',
       maxWidth:     '450px',
       margin:       '0 auto',
-      boxShadow:    '0 12px 32px rgba(0,0,0,0.5)',
+      boxShadow:    '0 16px 40px rgba(0,0,0,0.6)',
     }}>
       {/* Onglets Équipes */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', background: '#0a0d14' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#090c12' }}>
         {[
           { key: 'home', t: home, c: hColor },
           { key: 'away', t: away, c: aColor },
@@ -340,7 +295,7 @@ export default function LineupPitch({ home, away }) {
                 flex:          1,
                 padding:       '12px 8px',
                 cursor:        'pointer',
-                background:    act ? alpha(c, 0.05) : 'transparent',
+                background:    act ? alpha(c, 0.04) : 'transparent',
                 border:        'none',
                 borderBottom:  `2px solid ${act ? c : 'transparent'}`,
                 display:       'flex',
@@ -351,14 +306,14 @@ export default function LineupPitch({ home, away }) {
               }}
             >
               {t?.crest && (
-                <img src={t.crest} alt="" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+                <img src={t.crest} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
               )}
               <span style={{
-                fontSize:      10.5,
+                fontSize:      11,
                 fontWeight:    700,
                 fontFamily:    "'Chakra Petch', monospace",
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                letterSpacing: '0.04em',
                 color:         act ? '#ffffff' : 'rgba(255,255,255,0.4)',
               }}>
                 {t?.name ?? key}
@@ -381,10 +336,10 @@ export default function LineupPitch({ home, away }) {
         })}
       </div>
 
-      {/* Terrain Adaptatif */}
+      {/* Terrain Adaptatif Mobile / PWA */}
       <Pitch formation={team.formation} positions={positions} teamColor={teamColor} />
 
-      {/* Grille Joueurs */}
+      {/* Liste joueurs */}
       <PlayerGrid starters={team.starters ?? []} subs={team.subs ?? []} />
     </div>
   )
