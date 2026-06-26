@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
+        includeAssets: ['favicon.svg', 'statfootix.png', 'statfootix.png'],
         manifest: {
           name: 'StatFootix',
           short_name: 'StatFootix',
@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => {
           scope: '/',
           start_url: '/',
           icons: [
-            { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+            { src: '/statfootix.png', sizes: '192x192', type: 'image/png' },
+            { src: '/statfootix.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
           ],
         },
         workbox: {
