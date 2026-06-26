@@ -293,14 +293,6 @@ function Accueil() {
 
       <div className="accueil__inner">
 
-        {/* ── Mini header ── */}
-        <div className="accueil__miniHeader">
-          <h1 className="accueil__miniTitle">
-            <span className="accueil__heroStat">Stat</span>Footix
-          </h1>
-          <span className="accueil__miniDate">{todayStr}</span>
-        </div>
-
         {/* ── Live — pleine largeur, priorité absolue ── */}
         {widgetMatches.length > 0 && (
           <div className="accueil__liveSection">
