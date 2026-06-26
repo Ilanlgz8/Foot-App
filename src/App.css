@@ -8,6 +8,13 @@
   animation: pageIn 0.22s ease both;
 }
 
+.routeFallback {
+  min-height: 45vh;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(239,68,68,0.08), transparent 42%),
+    #050505;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

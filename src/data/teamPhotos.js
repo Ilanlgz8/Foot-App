@@ -669,18 +669,42 @@ const KEYWORD_COLORS = [
   [['cadiz','cádiz'],            { p: '#FFD700', s: '#003DA5' }],
 ]
 
-// Cherche la couleur d'une équipe : exact → fuzzy → null
+function normalizeTeamKey(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\b(fc|cf|afc|sc|ac|as|rc|cd|ud|rcd|ssc|sl|sv|vfb|olympique|stade)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(the|de|du|des|la|le|los|las|club|football|calcio)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const NORMALIZED_TEAM_COLORS = Object.entries(TEAM_COLORS_FULL).reduce((acc, [name, colors]) => {
+  const key = normalizeTeamKey(name)
+  if (key && !acc[key]) acc[key] = colors
+  return acc
+}, {})
+
+// Cherche la couleur d'une équipe : exact → normalisé → fuzzy → null
 function lookupColor(name) {
   if (!name) return null
   // 1. Exact
   if (TEAM_COLORS_FULL[name]) return TEAM_COLORS_FULL[name]
-  // 2. Strip préfixe club (FC, AS, AC...)
+  // 2. Normalisé : accents, ponctuation, préfixes clubs, articles.
+  const normalized = normalizeTeamKey(name)
+  if (NORMALIZED_TEAM_COLORS[normalized]) return NORMALIZED_TEAM_COLORS[normalized]
+  // 3. Strip préfixe club (FC, AS, AC...)
   const stripped = name.replace(/^(FC|AS|AC|SSC|SL|RC|SC|CD|CF|UD|RCD|GD|NK|FK|SK|BK|IK|HNK|CA|CF|SD|UD)\s+/i, '')
   if (TEAM_COLORS_FULL[stripped]) return TEAM_COLORS_FULL[stripped]
-  // 3. Fuzzy : un des mots-clés contenu dans le nom
-  const n = name.toLowerCase()
+  const normalizedStripped = normalizeTeamKey(stripped)
+  if (NORMALIZED_TEAM_COLORS[normalizedStripped]) return NORMALIZED_TEAM_COLORS[normalizedStripped]
+  // 4. Fuzzy : un des mots-clés contenu dans le nom
+  const n = normalizeTeamKey(name)
   for (const [keywords, colors] of KEYWORD_COLORS) {
-    if (keywords.some(kw => n.includes(kw))) return colors
+    if (keywords.some(kw => n.includes(normalizeTeamKey(kw)))) return colors
   }
   return null
 }

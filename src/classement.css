@@ -183,10 +183,16 @@
 .classement__panelHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.classement__panelHeader > div:first-child {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .classement__panelKicker {
@@ -204,10 +210,11 @@
   align-items: center;
   gap: 0.75rem;
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  color: #f9fafb;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #ef4444;
 }
 
 .classement__competitionLogo {
@@ -1031,7 +1038,7 @@
 
   .classement__panelHeader {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.6rem;
     margin-bottom: 0.75rem;
   }

@@ -3,6 +3,7 @@ import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
 import { COMPETITIONS } from '../data/competitions'
+import { getMatchGradient } from '../data/teamPhotos'
 
 // Map abréviations — clés = sortie de translateTeam (ou nom brut API si pas traduit)
 const TEAM_SHORT = {
@@ -315,10 +316,15 @@ function LiveMatchBlock({ match, espn, onMatchClick }) {
     clickable ? 'accueil__liveWidgetMatchBlock--clickable' : '',
     goal      ? 'accueil__liveWidgetMatchBlock--goal'      : '',
   ].filter(Boolean).join(' ')
+  const blockGradient = getMatchGradient(
+    match.homeTeam?.name || match.homeTeam?.shortName || '',
+    match.awayTeam?.name || match.awayTeam?.shortName || ''
+  )
 
   return (
     <div
       className={blockCls}
+      style={{ '--match-card-gradient': blockGradient }}
       onClick={clickable ? () => onMatchClick(match) : undefined}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}

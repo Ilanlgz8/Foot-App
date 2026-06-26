@@ -4,6 +4,7 @@ import { calcMinute } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
+import { getMatchGradient } from '../data/teamPhotos'
 
 function GoalCelebration({ teamName, scoreStr }) {
   return (
@@ -177,9 +178,16 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   const awayNameCls  = matchClass('accueil__matchCardName',  awayWins, homeWins)
   const homeCrestCls = matchClass('accueil__matchCardCrest', false,    awayWins)  // blason perdant → grisé
   const awayCrestCls = matchClass('accueil__matchCardCrest', false,    homeWins)
+  const cardGradient = getMatchGradient(
+    match.homeTeam?.name || match.homeTeam?.shortName || '',
+    match.awayTeam?.name || match.awayTeam?.shortName || ''
+  )
 
   return (
-    <div className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}${goal ? ' accueil__matchCard--goal' : ''}`}>
+    <div
+      className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}${goal ? ' accueil__matchCard--goal' : ''}`}
+      style={{ '--match-card-gradient': cardGradient }}
+    >
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 
       {/* Équipe domicile */}

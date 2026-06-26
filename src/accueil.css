@@ -1188,11 +1188,27 @@
   align-items: start;
   column-gap: 1rem;
   padding: 0.7rem 0.4rem;
-  background: linear-gradient(90deg, rgba(255,255,255,0.026), rgba(255,255,255,0.012));
+  background: var(--match-card-gradient, linear-gradient(90deg, rgba(255,255,255,0.026), rgba(255,255,255,0.012)));
   border: 1px solid rgba(255,255,255,0.045);
   border-radius: 0.6rem;
   transition: background 0.15s, border-color 0.15s;
   cursor: default;
+}
+
+.accueil__matchCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.72), rgba(0,0,0,0.5) 48%, rgba(0,0,0,0.72)),
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
+}
+
+.accueil__matchCard > * {
+  position: relative;
+  z-index: 1;
 }
 
 .accueil__matchCard:last-child {
@@ -1200,7 +1216,6 @@
 }
 
 .accueil__matchCard:hover {
-  background: linear-gradient(90deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
   border-color: rgba(255,255,255,0.075);
 }
 
@@ -1793,6 +1808,7 @@
 
 /* ── Layout match custom (remplace MatchCard dans le widget) ── */
 .accueil__liveWidgetMatchRow {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: start;
@@ -2102,7 +2118,23 @@
 /* ── LiveWidget — bloc par match (card + buteurs + stats) ── */
 .accueil__liveWidgetMatchBlock {
   position: relative;
-  transition: background 0.15s;
+  overflow: hidden;
+  background: var(--match-card-gradient, transparent);
+  transition: border-color 0.15s;
+}
+.accueil__liveWidgetMatchBlock::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.8), rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.8)),
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0));
+}
+.accueil__liveWidgetMatchBlock > * {
+  position: relative;
+  z-index: 1;
 }
 .accueil__liveWidgetMatchBlock:not(:last-child)::before {
   content: '';
@@ -2124,16 +2156,20 @@
   cursor: pointer;
 }
 .accueil__liveWidgetMatchBlock--clickable:hover {
-  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
 }
-.accueil__liveWidgetMatchBlock--clickable:hover::after {
-  content: '📊';
+.accueil__liveWidgetMatchBlock--clickable:hover .accueil__liveWidgetMatchRow::after {
+  content: '';
   position: absolute;
   right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.75rem;
-  opacity: 0.5;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-top: 2px solid rgba(255,255,255,0.5);
+  border-right: 2px solid rgba(255,255,255,0.5);
+  rotate: 45deg;
+  opacity: 0.75;
 }
 
 /* Buteurs — même grille 3 colonnes que le score */
