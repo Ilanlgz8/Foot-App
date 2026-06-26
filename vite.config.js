@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.svg', 'statfootix.png', 'statfootix.png'],
+        includeAssets: ['statfootix.png', 'statfootix.png', 'statfootix.png'],
         manifest: {
           name: 'StatFootix',
           short_name: 'StatFootix',
