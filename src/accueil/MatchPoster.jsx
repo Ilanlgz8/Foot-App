@@ -4,10 +4,9 @@ import { getMatchState } from '../utils/matchStateTracker'
 import { calcProno } from '../utils/calcProno'
 import {
   getTeamColor,
-  getTeamSecondaryColor,
   getTeamPhoto,
   getMatchGradient
-} from '../data/teamPhotos'
+} from "../data/teamPhotos";
 import { useTeamForm } from '../hooks/useTeamForm'
 
 /* ─────────────────────────────
