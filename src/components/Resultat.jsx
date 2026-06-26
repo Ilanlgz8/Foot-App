@@ -215,16 +215,8 @@ function Resultats() {
         <main className="resultats__main">
 
           <div className="resultats__header">
-            <p className="resultats__kicker">Résultats</p>
+            <h1 className="resultats__kicker">Résultats</h1>
             <div className="resultats__titleRow">
-              <h1 className="resultats__title">
-                {currentComp?.emblem && (
-                  <img src={currentComp.emblem} alt=""
-                    className="resultats__competitionLogo resultats__competitionLogo--title"
-                    onError={e => e.currentTarget.style.display = 'none'} />
-                )}
-                {currentComp?.name}
-              </h1>
               {isWC && wcGroups.length > 0 && (
                 <div className="resultats__viewTabs">
                   <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>

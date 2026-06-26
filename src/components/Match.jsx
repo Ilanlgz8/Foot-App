@@ -441,17 +441,8 @@ function Matchs() {
 
           {/* Header */}
           <div className="matchs__header">
-            <p className="matchs__kicker">Matchs à venir</p>
+            <h1 className="matchs__kicker">Matchs à venir</h1>
             <div className="matchs__headerRow">
-              <h1 className="matchs__title">
-                {currentComp?.emblem && (
-                  <img src={currentComp.emblem} alt=""
-                    className="matchs__competitionLogo matchs__competitionLogo--title"
-                    onError={e => e.currentTarget.style.display = 'none'} />
-                )}
-                {currentComp?.name}
-              </h1>
-
               {/* Toggle vues CdM */}
               {isWC && (
                 <div className="matchs__wcToggle">

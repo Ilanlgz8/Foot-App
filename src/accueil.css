@@ -1176,8 +1176,8 @@
 .accueil__matchCards {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0.2rem 0;
+  gap: 0.45rem;
+  padding: 0.45rem 0.55rem;
 }
 
 .accueil__matchCard {
@@ -1188,20 +1188,20 @@
   align-items: start;
   column-gap: 1rem;
   padding: 0.7rem 0.4rem;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid #121212;
-  border-radius: 0;
-  transition: background 0.15s;
+  background: linear-gradient(90deg, rgba(255,255,255,0.026), rgba(255,255,255,0.012));
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 0.6rem;
+  transition: background 0.15s, border-color 0.15s;
   cursor: default;
 }
 
 .accueil__matchCard:last-child {
-  border-bottom: none;
+  border-bottom: 1px solid rgba(255,255,255,0.045);
 }
 
 .accueil__matchCard:hover {
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(90deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
+  border-color: rgba(255,255,255,0.075);
 }
 
 .accueil__matchCard--live {
@@ -1261,7 +1261,7 @@
 .accueil__matchCardName {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #d0d0d0;
+  color: rgba(245,247,250,0.78);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1275,10 +1275,11 @@
 .accueil__matchCardName--winner {
   color: #ffffff;
   font-weight: 800;
+  text-shadow: 0 0 12px rgba(34,197,94,0.28);
 }
 
 .accueil__matchCardName--loser {
-  color: #3a3a3a;
+  color: rgba(148,163,184,0.46);
   font-weight: 500;
 }
 
@@ -1407,19 +1408,19 @@
   column-gap: 1.4rem;
   row-gap: 0.15rem;
   padding: 0.55rem 1rem 0.6rem;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid #141414;
-  border-radius: 0;
-  transition: background 0.12s;
+  background: linear-gradient(90deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 0.6rem;
+  transition: background 0.12s, border-color 0.12s;
 }
 
 .accueil__resultCard:last-child {
-  border-bottom: none;
+  border-bottom: 1px solid rgba(255,255,255,0.045);
 }
 
 .accueil__resultCard:hover {
-  background: rgba(255,255,255,0.02);
+  background: linear-gradient(90deg, rgba(255,255,255,0.044), rgba(255,255,255,0.018));
+  border-color: rgba(255,255,255,0.075);
 }
 
 /* Score central */
@@ -2189,9 +2190,10 @@
   gap: 0.28rem;
 }
 .accueil__liveWidgetStatHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: minmax(2.6rem, 1fr) minmax(4.6rem, auto) minmax(2.6rem, 1fr);
+  align-items: center;
+  gap: 0.45rem;
 }
 .accueil__liveWidgetStatNum {
   font-size: 0.76rem;
@@ -2199,6 +2201,12 @@
   color: #a8b8c8;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.accueil__liveWidgetStatNum:last-child {
+  text-align: right;
 }
 .accueil__liveWidgetStatLabel {
   font-size: 0.5rem;
@@ -2207,11 +2215,12 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   text-align: center;
+  white-space: nowrap;
 }
 .accueil__liveWidgetStatTrack {
-  height: 4px;
+  height: 5px;
   background: rgba(255,255,255,0.05);
-  border-radius: 2px;
+  border-radius: 999px;
   overflow: hidden;
   position: relative;
   display: flex;
@@ -2219,12 +2228,12 @@
 .accueil__liveWidgetStatFill {
   height: 100%;
   background: rgba(220,38,38,0.55);
-  border-radius: 2px 0 0 2px;
+  border-radius: 999px 0 0 999px;
   transition: width 0.8s ease;
 }
 .accueil__liveWidgetStatFill--away {
   background: rgba(100,116,139,0.28);
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 999px 999px 0;
 }
 .accueil__liveWidgetHT {
   text-align: center;

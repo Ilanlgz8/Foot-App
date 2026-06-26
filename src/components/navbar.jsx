@@ -15,31 +15,32 @@ const navigation = [
 // Icônes SVG pour la barre de nav mobile
 const QN_ICONS = {
   '/': (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1h-3.5v-4.5H7.5V18H4a1 1 0 01-1-1V9.5z"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10.5 12 3l9 7.5"/>
+      <path d="M5.5 9.5V20h13V9.5"/>
+      <path d="M9.5 20v-6h5v6"/>
     </svg>
   ),
   '/matchs': (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2.5" y="3.5" width="15" height="14" rx="2"/>
-      <path d="M2.5 8h15M7 1.5v4M13 1.5v4"/>
-      <circle cx="7" cy="12" r="0.8" fill="currentColor" stroke="none"/>
-      <circle cx="10" cy="12" r="0.8" fill="currentColor" stroke="none"/>
-      <circle cx="13" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="5" width="16" height="15" rx="2.5"/>
+      <path d="M8 3v4M16 3v4M4 10h16"/>
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/>
     </svg>
   ),
   '/resultats': (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 3h8v5.5c0 2.5-1.5 4.5-4 5.5-2.5-1-4-3-4-5.5V3z"/>
-      <path d="M10 14v3M7 17h6"/>
-      <path d="M7.5 7l1.8 1.8L12 6"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="5" width="17" height="14" rx="2.5"/>
+      <path d="M8 9h3M13 9h3M8 15h3M13 15h3"/>
+      <path d="M11 12h2"/>
     </svg>
   ),
   '/classement': (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1.5" y="11.5" width="4" height="7" rx="0.75"/>
-      <rect x="7.5" y="6.5" width="4" height="12" rx="0.75"/>
-      <rect x="13.5" y="2.5" width="4" height="16" rx="0.75"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 20h14"/>
+      <path d="M7 20v-7h4v7"/>
+      <path d="M13 20V8h4v12"/>
+      <path d="M9 9l3-5 3 5"/>
     </svg>
   ),
 }

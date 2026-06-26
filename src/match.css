@@ -164,7 +164,10 @@
 /* ── Contenu principal ── */
 .matchs__main { flex: 1; min-width: 0; }
 
-.matchs__header { margin-bottom: 1.5rem; }
+.matchs__header {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
 
 .matchs__kicker {
   margin: 0 0 0.35rem;
@@ -277,7 +280,7 @@
 .matchs__headerRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 0.75rem;
 }

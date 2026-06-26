@@ -333,18 +333,7 @@ function Classement() {
         {/* Header */}
         <div className="classement__panelHeader">
           <div>
-            <p className="classement__panelKicker">Compétition sélectionnée</p>
-            <h2 className="classement__panelTitle">
-              {selectedCompetition?.emblem && (
-                <img
-                  src={selectedCompetition.emblem}
-                  alt=""
-                  className="classement__competitionLogo"
-                  onError={e => e.currentTarget.style.display = 'none'}
-                />
-              )}
-              {selectedCompetition?.name ?? 'Championnat'}
-            </h2>
+            <h1 className="classement__panelTitle">Classement</h1>
           </div>
 
           {/* Toggle classement / buteurs */}

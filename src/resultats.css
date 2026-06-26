@@ -154,7 +154,10 @@
 /* ── Contenu principal ── */
 .resultats__main { flex: 1; min-width: 0; }
 
-.resultats__header { margin-bottom: 1.5rem; }
+.resultats__header {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
 
 .resultats__kicker {
   margin: 0 0 0.35rem;
@@ -473,7 +476,7 @@
 .resultats__titleRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 0.75rem;
 }

@@ -8,8 +8,8 @@
   .compHeader {
     display: block;
     position: relative;
-    background: #000;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: linear-gradient(180deg, #050505 0%, #000 100%);
+    border-bottom: 1px solid rgba(239,68,68,0.18);
     overflow: hidden;
   }
 
@@ -18,7 +18,9 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 60% 120% at 0% 50%, rgba(239,68,68,0.1) 0%, transparent 70%);
+    background:
+      radial-gradient(ellipse 70% 130% at 0% 50%, rgba(239,68,68,0.14) 0%, transparent 72%),
+      linear-gradient(90deg, rgba(255,255,255,0.035), transparent 42%);
     pointer-events: none;
   }
 
@@ -27,7 +29,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 11px 14px 9px;
+    padding: 10px 14px 8px;
     cursor: pointer;
     position: relative;
     z-index: 1;
@@ -38,8 +40,8 @@
     height: 40px;
     object-fit: contain;
     border-radius: 50%;
-    background: rgba(239,68,68,0.08);
-    border: 1.5px solid rgba(239,68,68,0.3);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(239,68,68,0.28);
     padding: 4px;
     box-shadow: 0 0 18px rgba(239,68,68,0.18);
     flex-shrink: 0;
@@ -73,7 +75,7 @@
     display: block;
     font-size: 9px;
     font-weight: 600;
-    color: rgba(255,255,255,0.32);
+    color: rgba(255,255,255,0.52);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-top: 2px;
@@ -82,11 +84,11 @@
   .compHeader__btn {
     font-size: 9px;
     font-weight: 800;
-    color: rgba(239,68,68,0.85);
-    background: none;
-    border: 1px solid rgba(239,68,68,0.28);
-    border-radius: 7px;
-    padding: 5px 9px;
+    color: rgba(255,255,255,0.84);
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.34);
+    border-radius: 999px;
+    padding: 6px 10px;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.07em;
@@ -98,9 +100,9 @@
 
   .compHeader--open .compHeader__btn,
   .compHeader__btn:hover {
-    background: rgba(239,68,68,0.12);
+    background: rgba(239,68,68,0.2);
     border-color: rgba(239,68,68,0.5);
-    color: #ef4444;
+    color: #fff;
   }
 
   /* ── Points indicateurs ── */
@@ -108,22 +110,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    padding: 0 14px 8px;
+    gap: 4px;
+    padding: 0 14px 7px;
     position: relative;
     z-index: 1;
   }
 
   .compHeader__dot {
-    width: 16px;
-    height: 3px;
+    width: 11px;
+    height: 2px;
     border-radius: 999px;
     background: rgba(255,255,255,0.12);
     transition: all 0.2s;
   }
 
   .compHeader__dot--active {
-    width: 24px;
+    width: 22px;
     background: #ef4444;
     box-shadow: 0 0 8px rgba(239,68,68,0.7);
   }
@@ -137,15 +139,15 @@
   }
 
   .compHeader__pickerWrap--open {
-    max-height: 110px;
+    max-height: 96px;
     border-top-width: 1px;
   }
 
   .compHeader__picker {
     display: flex;
     flex-direction: row;
-    gap: 8px;
-    padding: 10px 14px 12px;
+    gap: 7px;
+    padding: 9px 12px 11px;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
@@ -158,34 +160,34 @@
 
   .compHeader__item {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 10px 14px 9px;
-    min-width: 68px;
+    gap: 7px;
+    padding: 7px 10px;
+    min-width: max-content;
     flex-shrink: 0;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid transparent;
+    border-radius: 999px;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.18s;
   }
 
   .compHeader__item:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.08);
   }
 
   .compHeader__item--active {
-    background: rgba(239,68,68,0.1);
-    border-color: rgba(239,68,68,0.45);
-    box-shadow: 0 0 16px rgba(239,68,68,0.1) inset, 0 0 12px rgba(239,68,68,0.08);
+    background: rgba(239,68,68,0.18);
+    border-color: rgba(239,68,68,0.48);
+    box-shadow: 0 0 14px rgba(239,68,68,0.13);
   }
 
   .compHeader__itemLogo {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     object-fit: contain;
     border-radius: 6px;
     transition: transform 0.18s;
@@ -200,9 +202,9 @@
   }
 
   .compHeader__itemName {
-    font-size: 9.5px;
+    font-size: 9px;
     font-weight: 700;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     text-align: center;
@@ -210,7 +212,7 @@
   }
 
   .compHeader__item--active .compHeader__itemName {
-    color: rgba(255,255,255,0.95);
+    color: rgba(255,255,255,0.96);
   }
 }
 

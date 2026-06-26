@@ -332,8 +332,9 @@
 }
 .live__statRow { display: flex; flex-direction: column; gap: 0.25rem; }
 .live__statHeader {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(2.75rem, 1fr) minmax(5.5rem, auto) minmax(2.75rem, 1fr);
+  gap: 0.5rem;
   align-items: center;
 }
 .live__statNum {
@@ -342,6 +343,9 @@
   font-weight: 800;
   color: rgba(255,255,255,0.92);
   min-width: 2.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .live__statNum--right { text-align: right; }
 .live__statLabel {
@@ -351,11 +355,12 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
+  white-space: nowrap;
 }
 .live__statTrack {
-  height: 3px;
+  height: 5px;
   background: rgba(255,255,255,0.06);
-  border-radius: 2px;
+  border-radius: 999px;
   display: flex;
   overflow: hidden;
 }
