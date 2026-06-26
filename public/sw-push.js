@@ -26,7 +26,7 @@ self.addEventListener('push', event => {
   }
 
   const {
-    title   = 'StatFootix — But !',
+    title   = 'But !',
     body    = '',
     matchId = null,
     url     = '/',
@@ -36,8 +36,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon:     '/icon-192.png',   // icône app
-      badge:    '/icon-192.png',   // badge (barre de notifs Android)
+      icon:     '/statfootix.png',   // icône app
+      badge:    '/statfootix.png',   // badge (barre de notifs Android)
       // tag identique pour le même match → remplace la notif précédente
       // au lieu d'en empiler plusieurs pour le même match
       tag:      `statfootix-goal-${matchId ?? Date.now()}`,
