@@ -1,11 +1,10 @@
 /**
- * LineupPitch — Version Finale Fixée (Mappage AML/AMR/ATG/ATD complet)
+ * LineupPitch — Version Grille Stricte Fixe (Zéro chevauchement possible)
  */
 import { useState } from 'react'
 
 const PW = 300, PH = 400
 
-// Dictionnaire étendu pour couvrir toutes les variantes d'API possibles
 const POS_FR = {
   GK:'G', G:'G', GB:'G', GOAL:'G',
   CB:'DC', DC:'DC', LCB:'DC', RCB:'DC', 'CD-L':'DC', 'CD-R':'DC',
@@ -15,84 +14,68 @@ const POS_FR = {
   ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', 'AM-L':'AG', 'AM-R':'AD', LF:'AG', RF:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT',
 }
 
-// Hauteur (Y) ultra-précise par poste avec marge de sécurité basse pour le Gardien
-function getVerticalPct(pos) {
+// Coordonnées X et Y absolues selon l'intitulé exact de l'API pour éviter toute collision
+function getPlayerCoords(pos, indexInMatch) {
   const p = (pos ?? '').toUpperCase()
-  if (['GK','G','GB','GOAL'].includes(p)) return 0.84
-  if (['LB','LWB','DL','DG','RB','RWB','DR','DD'].includes(p)) return 0.70
-  if (['CB','LCB','RCB','CD-L','CD-R','DC','D','SW','DEF'].includes(p)) return 0.72
-  if (['CDM','MDC'].includes(p)) return 0.54
-  if (['CM','CM-L','CM-R','MC','M','MF','MIL'].includes(p)) return 0.44
-  if (['LM','MG','RM','MD','DM'].includes(p)) return 0.42
-  if (['CAM','MOC','MOF','AM'].includes(p)) return 0.32
-  if (['LW','RW','AML','AMR','AM-L','AM-R','LF','RF','AG','AD'].includes(p)) return 0.20 // Ligne des ailiers / milieux offensifs excentrés
-  if (['ST','CF','BU','AC','F','FW','ATT','FWD','SS'].includes(p)) return 0.16 // Pointe pure
-  return 0.50
+
+  // GARDIEN
+  if (['GK', 'G', 'GB', 'GOAL'].includes(p)) return { x: 0.50, y: 0.84 }
+
+  // DÉFENSEURS LATÉRAUX / PISTONS
+  if (['LB', 'LWB', 'DL', 'DG'].includes(p)) return { x: 0.15, y: 0.70 }
+  if (['RB', 'RWB', 'DR', 'DD'].includes(p)) return { x: 0.85, y: 0.70 }
+
+  // DÉFENSEURS CENTRAUX
+  if (p === 'LCB' || p === 'CD-L') return { x: 0.35, y: 0.74 }
+  if (p === 'RCB' || p === 'CD-R') return { x: 0.65, y: 0.74 }
+  if (['CB', 'DC', 'D', 'SW', 'DEF'].includes(p)) {
+    // Si l'API donne juste "DC" sans précision, on sépare selon l'index pour pas qu'ils se touchent
+    return indexInMatch % 2 === 0 ? { x: 0.38, y: 0.74 } : { x: 0.62, y: 0.74 }
+  }
+
+  // MILIEUX DÉFENSIFS (MDC)
+  if (['CDM', 'MDC'].includes(p)) {
+    return indexInMatch % 2 === 0 ? { x: 0.44, y: 0.56 } : { x: 0.56, y: 0.56 }
+  }
+
+  // MILIEUX CENTRAUX (MC)
+  if (p === 'CM-L') return { x: 0.33, y: 0.44 }
+  if (p === 'CM-R') return { x: 0.67, y: 0.44 }
+  if (['CM', 'MC', 'M', 'MF', 'MIL'].includes(p)) {
+    return indexInMatch % 2 === 0 ? { x: 0.36, y: 0.44 } : { x: 0.64, y: 0.44 }
+  }
+
+  // MILIEUX EXCENTRÉS (MG / MD)
+  if (['LM', 'MG'].includes(p)) return { x: 0.16, y: 0.44 }
+  if (['RM', 'MD', 'DM'].includes(p)) return { x: 0.84, y: 0.44 }
+
+  // MILIEUX OFFENSIFS (MOC)
+  if (['CAM', 'MOC', 'MOF', 'AM'].includes(p)) {
+    return indexInMatch % 2 === 0 ? { x: 0.46, y: 0.32 } : { x: 0.54, y: 0.32 }
+  }
+
+  // AILIERS / ATTAQUANTS EXCENTRÉS (AG / AD / AML / AMR)
+  if (['LW', 'AML', 'AM-L', 'AG', 'LF'].includes(p)) return { x: 0.18, y: 0.20 }
+  if (['RW', 'AMR', 'AM-R', 'AD', 'RF'].includes(p)) return { x: 0.82, y: 0.20 }
+
+  // BUTEURS / POINTES (BU)
+  if (['ST', 'CF', 'BU', 'AC', 'F', 'FW', 'ATT', 'FWD', 'SS'].includes(p)) {
+    return indexInMatch % 2 === 0 ? { x: 0.50, y: 0.15 } : { x: 0.38, y: 0.17 }
+  }
+
+  // Fallback de sécurité au cas où
+  return { x: 0.50, y: 0.50 }
 }
 
-// Attribution stricte du couloir de 1 (Gauche) à 5 (Droite) pour le tri
-function getHorizontalZone(pos) {
-  const p = (pos ?? '').toUpperCase()
-  // 1. Extrême Gauche
-  if (['LB','LWB','DL','DG','LW','AML','AM-L','AG','LM','MG','LF'].includes(p)) return 1 
-  // 2. Axe Gauche
-  if (['LCB','CD-L','CM-L'].includes(p)) return 2 
-  // 3. Centre Pur
-  if (['GK','G','GB','GOAL','CB','DC','CM','MC','CDM','MDC','CAM','MOC','ST','BU','CF','AC'].includes(p)) return 3 
-  // 4. Axe Droit
-  if (['RCB','CD-R','CM-R'].includes(p)) return 4 
-  // 5. Extrême Droit
-  if (['RB','RWB','DR','DD','RW','AMR','AM-R','AD','RM','MD','RF'].includes(p)) return 5 
-  return 3
-}
-
-// Algorithme anti-chevauchement et répartition dynamique par ligne
 function getPositions(starters) {
-  const rows = {}
-  
-  const initialPositions = starters.map(player => {
-    const pos = player.position ?? ''
-    const y = getVerticalPct(pos)
-    const zone = getHorizontalZone(pos)
-    return { player, y, zone }
+  return starters.map((player, index) => {
+    const coords = getPlayerCoords(player.position, index)
+    return {
+      leftPct: coords.x * 100,
+      topPct: coords.y * 100,
+      player
+    }
   })
-
-  initialPositions.forEach(p => {
-    const key = p.y.toFixed(2)
-    if (!rows[key]) rows[key] = []
-    rows[key].push(p)
-  })
-
-  const out = []
-
-  Object.keys(rows).forEach(key => {
-    const playersInRow = rows[key]
-    playersInRow.sort((a, b) => a.zone - b.zone)
-    const count = playersInRow.length
-    
-    playersInRow.forEach((p, index) => {
-      let xPct = 0.50
-
-      if (count === 1) {
-        if (p.zone === 1) xPct = 0.15
-        if (p.zone === 2) xPct = 0.35
-        if (p.zone === 3) xPct = 0.50
-        if (p.zone === 4) xPct = 0.65
-        if (p.zone === 5) xPct = 0.85
-      } else {
-        // Aligne proprement les joueurs sur la largeur s'ils partagent la même ligne Y
-        xPct = 0.15 + (index / (count - 1)) * 0.70
-      }
-
-      out.push({
-        leftPct: xPct * 100,
-        topPct: p.y * 100,
-        player: p.player
-      })
-    })
-  })
-
-  return out
 }
 
 function alpha(hex, a) {
