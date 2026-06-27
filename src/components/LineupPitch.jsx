@@ -1,5 +1,5 @@
 /**
- * LineupPitch — Version Corrigée (Anti-chevauchement & Placement Strict)
+ * LineupPitch — Version Anti-Crash Ultra Sécurisée
  */
 import { useState } from 'react'
 
@@ -7,16 +7,17 @@ const PW = 300, PH = 400
 const L = 10, R = 290, T = 10, B = 390
 const IW = R - L, IH = B - T
 
-function safeColor(raw) {
-  if (!raw) return null
-  return raw.startsWith('#') ? raw : `#${raw}`
-}
-
+// Sécurité sur la conversion de couleur pour éviter les plantages
 function alpha(hex, a) {
-  if (!hex || !hex.startsWith('#')) return `rgba(239,68,68,${a})`
-  const full = hex.length === 4 ? '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3] : hex
-  const r = parseInt(full.slice(1,3), 16), g = parseInt(full.slice(3,5), 16), b = parseInt(full.slice(5,7), 16)
-  return `rgba(${r},${g},${b},${a})`
+  try {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(239,68,68,${a})`;
+    const full = hex.length === 4 ? '#' + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3] : hex;
+    const r = parseInt(full.slice(1,3), 16), g = parseInt(full.slice(3,5), 16), b = parseInt(full.slice(5,7), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return `rgba(239,68,68,${a})`;
+    return `rgba(${r},${g},${b},${a})`;
+  } catch (e) {
+    return `rgba(239,68,68,${a})`;
+  }
 }
 
 function formatName(name, sname) {
@@ -46,42 +47,38 @@ function posCat(pos) {
   return 2
 }
 
-// Calcule les coordonnées exactes en gérant intelligemment le nombre de joueurs par ligne
 function getPositions(starters) {
-  // On compte combien on a de joueurs par grande ligne pour adapter l'écartement
-  const counts = [0, 0, 0, 0] // [G, DEF, MIL, ATT]
-  starters.forEach(p => counts[posCat(p.position)]++)
+  if (!Array.isArray(starters)) return [];
+  
+  const counts = [0, 0, 0, 0]
+  starters.forEach(p => counts[posCat(p?.position)]++)
 
-  // Suivi de l'index du joueur sur sa propre ligne pour le dispatcher de gauche à droite
   const currentIndices = [0, 0, 0, 0]
 
   return starters.map((player) => {
+    if (!player) return { leftPct: 50, topPct: 50, player: null };
+    
     const cat = posCat(player.position)
     const totalOnLine = counts[cat]
     const myIndex = currentIndices[cat]
-    currentIndices[cat]++ // On incrémente pour le prochain joueur de cette ligne
+    currentIndices[cat]++
 
-    // Hauteur de la ligne (Y)
     let yPct = 0.50
-    if (cat === 0) yPct = 0.88 // Gardien bien au fond
-    if (cat === 1) yPct = 0.72 // Défense
+    if (cat === 0) yPct = 0.88
+    if (cat === 1) yPct = 0.72
     if (cat === 2) {
-      // Si c'est un pur MDC, on le descend un poil par rapport aux MC/MOC
       const p = (player.position ?? '').toUpperCase()
       yPct = ['CDM', 'MDC', 'DM'].includes(p) ? 0.56 : (['CAM', 'MOC', 'AM'].includes(p) ? 0.35 : 0.46)
     }
-    if (cat === 3) yPct = 0.16 // Attaque
+    if (cat === 3) yPct = 0.16
 
-    // Largeur (X) calculée dynamiquement selon le nombre de mecs sur la ligne (Fini le chevauchement !)
     let xPct = 0.50
     if (totalOnLine > 1) {
-      // Répartition fluide de gauche à droite sans jamais dépasser sur les lignes de touche
       const minX = cat === 1 ? 0.15 : 0.18
       const maxX = cat === 1 ? 0.85 : 0.82
       xPct = minX + (myIndex / (totalOnLine - 1)) * (maxX - minX)
     }
 
-    // Cas particulier : si le mec est tout seul sur sa ligne (ex: un seul BU ou un seul MDC), il va au centre (0.50)
     return {
       leftPct: xPct * 100,
       topPct: yPct * 100,
@@ -93,47 +90,20 @@ function getPositions(starters) {
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
   const isGK = posCat(player.position) === 0
-  const color = isGK ? '#f59e0b' : teamColor
+  const color = isGK ? '#f59e0b' : (teamColor || '#ef4444')
   const nm = formatName(player.name, player.shortName)
   const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? ''
   const num = player.number ?? ''
 
   return (
-    <div style={{
-      position: 'absolute',
-      left: `${leftPct}%`,
-      top: `${topPct}%`,
-      transform: 'translate(-50%, -50%)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      zIndex: 2,
-    }}>
-      {/* Ombre du joueur au sol */}
+    <div style={{ position: 'absolute', left: `${leftPct}%`, top: `${topPct}%`, transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
       <div style={{ position: 'absolute', bottom: '-4px', width: '24px', height: '5px', background: 'rgba(0,0,0,0.5)', borderRadius: '50%', filter: 'blur(2px)', transform: 'scaleY(0.4)', pointerEvents: 'none' }} />
-
-      {/* Rond du Maillot */}
-      <div style={{
-        width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '13px', fontWeight: 800, fontFamily: "'Chakra Petch', monospace", color: '#ffffff',
-        background: `radial-gradient(circle at top, ${color} 0%, ${alpha(color, 0.6)} 100%)`,
-        border: '2px solid #ffffff', boxShadow: '0 4px 10px rgba(0,0,0,0.4)', transform: 'translateY(-2px)'
-      }}>
+      <div style={{ width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, fontFamily: "'Chakra Petch', monospace", color: '#ffffff', background: `radial-gradient(circle at top, ${color} 0%, ${alpha(color, 0.6)} 100%)`, border: '2px solid #ffffff', boxShadow: '0 4px 10px rgba(0,0,0,0.4)', transform: 'translateY(-2px)' }}>
         {num}
       </div>
-
-      {/* Capsule Nom + Poste */}
-      <div style={{
-        marginTop: '2px', background: 'rgba(10, 16, 30, 0.95)', border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderTop: `2px solid ${color}`, padding: '2px 6px', borderRadius: '4px', boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
-        display: 'flex', gap: '4px', alignItems: 'center', whiteSpace: 'nowrap'
-      }}>
-        <span style={{ fontFamily: "'Chakra Petch', monospace", fontSize: '8.5px', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
-          {posLabel}
-        </span>
-        <span style={{ fontFamily: "'Chakra Petch', sans-serif", fontSize: '10px', fontWeight: 700, color: '#ffffff', maxWidth: '65px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {nm}
-        </span>
+      <div style={{ marginTop: '2px', background: 'rgba(10, 16, 30, 0.95)', border: '1px solid rgba(255, 255, 255, 0.12)', borderTop: `2px solid ${color}`, padding: '2px 6px', borderRadius: '4px', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', display: 'flex', gap: '4px', alignItems: 'center', whiteSpace: 'nowrap' }}>
+        <span style={{ fontFamily: "'Chakra Petch', monospace", fontSize: '8.5px', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>{posLabel}</span>
+        <span style={{ fontFamily: "'Chakra Petch', sans-serif", fontSize: '10px', fontWeight: 700, color: '#ffffff', maxWidth: '65px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nm}</span>
       </div>
     </div>
   )
@@ -149,45 +119,35 @@ function Pitch({ formation, positions, teamColor }) {
       <div style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', transform: 'translate(-50%, -50%)', pointerEvents:'none' }} />
       <div style={{ position: 'absolute', left: '50%', top: 8, width: '49%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', left: '50%', bottom: 8, width: '49%', height: '14%', transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,0.07)', borderBottom: 'none', pointerEvents: 'none' }} />
-      
-      {formation && (
-        <div style={{ position: 'absolute', top: 13, left: 14, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.15)', fontFamily: "'Chakra Petch', monospace", pointerEvents: 'none' }}>
-          {formation}
-        </div>
-      )}
-
-      {positions.map(({ leftPct, topPct, player }, i) =>
-        player ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} /> : null
-      )}
+      {formation && <div style={{ position: 'absolute', top: 13, left: 14, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.15)', fontFamily: "'Chakra Petch', monospace", pointerEvents: 'none' }}>{formation}</div>}
+      {positions.map(({ leftPct, topPct, player }, i) => player ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} /> : null)}
     </div>
   )
 }
 
 function PlayerCell({ player, isSub }) {
+  if (!player) return null;
   const cat = posCat(player.position)
-  const catC = CAT_COLOR[cat]
+  const catC = CAT_COLOR[cat] ?? '#60a5fa'
   const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? '—'
   const nm = formatName(player.name, player.shortName)
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderTop: '1px solid rgba(255,255,255,0.035)', minWidth: 0 }}>
-      <span style={{ fontSize: 8, fontWeight: 700, flexShrink: 0, fontFamily: "'Chakra Petch', monospace", letterSpacing: '0.03em', color: isSub ? 'rgba(255,255,255,0.38)' : catC, background: isSub ? 'rgba(255,255,255,0.05)' : alpha(catC, 0.1), border: `1px solid ${isSub ? 'rgba(255,255,255,0.1)' : alpha(catC, 0.28)}`, borderRadius: 3, padding: '2px 5px', minWidth: 28, textAlign: 'center' }}>
-        {posLabel}
-      </span>
-      <span style={{ flex: 1, fontSize: 10.5, fontWeight: isSub ? 400 : 500, color: isSub ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-        {nm}
-      </span>
-      <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: "'Chakra Petch', monospace" }}>
-        {player.number ?? ''}
-      </span>
+      <span style={{ fontSize: 8, fontWeight: 700, flexShrink: 0, fontFamily: "'Chakra Petch', monospace", letterSpacing: '0.03em', color: isSub ? 'rgba(255,255,255,0.38)' : catC, background: isSub ? 'rgba(255,255,255,0.05)' : alpha(catC, 0.1), border: `1px solid ${isSub ? 'rgba(255,255,255,0.1)' : alpha(catC, 0.28)}`, borderRadius: 3, padding: '2px 5px', minWidth: 28, textAlign: 'center' }}>{posLabel}</span>
+      <span style={{ flex: 1, fontSize: 10.5, fontWeight: isSub ? 400 : 500, color: isSub ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{nm}</span>
+      <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: "'Chakra Petch', monospace" }}>{player.number ?? ''}</span>
     </div>
   )
 }
 
 function PlayerGrid({ starters, subs }) {
   const headerStyle = { padding: '5px 10px 4px', fontSize: 8, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', fontFamily: "'Chakra Petch', monospace" }
-  
+  const validStarters = Array.isArray(starters) ? starters : []
+  const validSubs = Array.isArray(subs) ? subs : []
+
   const getSortOrder = (p) => {
+    if (!p) return 4;
     const cat = posCat(p.position)
     return cat === 0 ? 0 : cat === 1 ? 1 : cat === 2 ? 2 : 3
   }
@@ -196,12 +156,12 @@ function PlayerGrid({ starters, subs }) {
     <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={headerStyle}>Titulaires</div>
-        {[...starters].sort((a,b) => getSortOrder(a) - getSortOrder(b)).map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
+        {[...validStarters].sort((a,b) => getSortOrder(a) - getSortOrder(b)).map((p, i) => <PlayerCell key={i} player={p} isSub={false} />)}
       </div>
-      {subs?.length > 0 && (
+      {validSubs.length > 0 && (
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={headerStyle}>⇄ Remplaçants</div>
-          {subs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
+          {validSubs.map((p, i) => <PlayerCell key={i} player={p} isSub={true} />)}
         </div>
       )}
     </div>
@@ -217,7 +177,7 @@ export default function LineupPitch({ home, away }) {
 
   const team = activeTeam === 'home' ? home : away
   const teamColor = activeTeam === 'home' ? hColor : aColor
-  const positions = getPositions(team.starters ?? [])
+  const positions = getPositions(team?.starters ?? [])
 
   return (
     <div style={{ background: '#0a0c14', borderRadius: '1rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', maxWidth: '480px', margin: '0 auto' }}>
@@ -236,8 +196,8 @@ export default function LineupPitch({ home, away }) {
           )
         })}
       </div>
-      <Pitch formation={team.formation} positions={positions} teamColor={teamColor} />
-      <PlayerGrid starters={team.starters ?? []} subs={team.subs ?? []} />
+      <Pitch formation={team?.formation} positions={positions} teamColor={teamColor} />
+      <PlayerGrid starters={team?.starters ?? []} subs={team?.subs ?? []} />
     </div>
   )
 }
