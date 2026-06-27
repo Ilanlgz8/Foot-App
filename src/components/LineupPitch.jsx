@@ -1,5 +1,5 @@
 /**
- * LineupPitch — Version Placement Strict par Rôle Individuel
+ * LineupPitch — Version Axe Resserré (MDC / MC bien au centre)
  */
 import { useState } from 'react'
 
@@ -14,37 +14,36 @@ const POS_FR = {
   ST:'BU', BU:'BU', CF:'AC', AC:'AC', LW:'AG', RW:'AD', AML:'AG', AMR:'AD', 'AM-L':'AG', 'AM-R':'AD', LF:'AG', RF:'AD', AG:'AG', AD:'AD', F:'BU', FW:'BU', ATT:'BU', FWD:'BU', SS:'AC',
 }
 
-// Assigne des coordonnées fixes sur le terrain selon le VRAI poste du joueur
 function getExactCoords(pos, index) {
   const p = (pos ?? '').toUpperCase()
 
-  // Gardien (bien au fond dans sa cage)
+  // Gardien
   if (['GK', 'G', 'GB', 'GOAL'].includes(p)) return { x: 0.50, y: 0.88 }
 
-  // Défenseurs Latéraux / Pistons
+  // Défenseurs Latéraux / Pistons (Bien sur les côtés)
   if (['LB', 'LWB', 'DL', 'DG'].includes(p)) return { x: 0.15, y: 0.72 }
   if (['RB', 'RWB', 'DR', 'DD'].includes(p)) return { x: 0.85, y: 0.72 }
 
-  // Défenseurs Centraux
-  if (p === 'LCB' || p === 'CD-L') return { x: 0.35, y: 0.74 }
-  if (p === 'RCB' || p === 'CD-R') return { x: 0.65, y: 0.74 }
+  // Défenseurs Centraux (Axe resserré pour pas coller les latéraux)
+  if (p === 'LCB' || p === 'CD-L') return { x: 0.38, y: 0.74 }
+  if (p === 'RCB' || p === 'CD-R') return { x: 0.62, y: 0.74 }
   if (['CB', 'DC', 'D', 'SW', 'DEF'].includes(p)) {
-    return index % 2 === 0 ? { x: 0.36, y: 0.74 } : { x: 0.64, y: 0.74 }
+    return index % 2 === 0 ? { x: 0.38, y: 0.74 } : { x: 0.62, y: 0.74 }
   }
 
-  // Milieux Défensifs (MDC - ex: Tchouaméni, Koné)
+  // Milieux Défensifs (MDC - ex: Tchouaméni, Koné — Bien dans l'axe)
   if (['CDM', 'MDC', 'DM'].includes(p)) {
-    return index % 2 === 0 ? { x: 0.35, y: 0.56 } : { x: 0.65, y: 0.56 }
+    return index % 2 === 0 ? { x: 0.41, y: 0.56 } : { x: 0.59, y: 0.56 }
   }
 
   // Milieux Centraux (MC)
-  if (p === 'CM-L') return { x: 0.33, y: 0.46 }
-  if (p === 'CM-R') return { x: 0.67, y: 0.46 }
+  if (p === 'CM-L') return { x: 0.40, y: 0.46 }
+  if (p === 'CM-R') return { x: 0.60, y: 0.46 }
   if (['CM', 'MC', 'M', 'MF', 'MIL'].includes(p)) {
-    return index % 2 === 0 ? { x: 0.35, y: 0.46 } : { x: 0.64, y: 0.46 }
+    return index % 2 === 0 ? { x: 0.40, y: 0.46 } : { x: 0.60, y: 0.46 }
   }
 
-  // Milieux / Ailiers Excentrés (MG / MD / Milieu Droit / Milieu Gauche)
+  // Vrais Milieux Excentrés / Latéraux (MG / MD)
   if (['LM', 'MG'].includes(p)) return { x: 0.16, y: 0.42 }
   if (['RM', 'MD'].includes(p)) return { x: 0.84, y: 0.42 }
 
@@ -53,7 +52,7 @@ function getExactCoords(pos, index) {
     return { x: 0.50, y: 0.34 }
   }
 
-  // Ailiers Purs / Attaquants Droite et Gauche (AG / AD / ex: Dembélé à droite)
+  // Ailiers Purs / Attaquants Droite et Gauche (AG / AD - ex: Dembélé)
   if (['LW', 'AML', 'AM-L', 'AG', 'LF'].includes(p)) return { x: 0.18, y: 0.22 }
   if (['RW', 'AMR', 'AM-R', 'AD', 'RF'].includes(p)) return { x: 0.82, y: 0.22 }
 
@@ -62,7 +61,6 @@ function getExactCoords(pos, index) {
     return { x: 0.50, y: 0.14 }
   }
 
-  // Sécurité au centre au cas où le poste est inconnu
   return { x: 0.50, y: 0.50 }
 }
 
@@ -96,8 +94,6 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
   const isGK = ['GK','G','GB','GOAL'].includes((player.position ?? '').toUpperCase())
   const color = isGK ? '#f59e0b' : teamColor
   const label = formatName(player.name, player.shortName)
-  
-  // Affiche TOUJOURS le vrai poste écrit dans l'objet du joueur
   const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? ''
   const num = player.number ?? ''
 
