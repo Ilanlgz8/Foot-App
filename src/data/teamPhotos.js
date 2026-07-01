@@ -722,6 +722,19 @@ function ensureVisible(hex, fallbackHex) {
   } catch { return fallbackHex }
 }
 
+// '#1a1a1a' est utilisé dans TEAM_COLORS_FULL comme repli générique quand une
+// équipe n'a pas de vraie 2e couleur identitaire (ex: Pérou, Canada, Danemark,
+// Suisse — tous rouge/blanc, aucun noir dans leur drapeau/maillot). Ce n'est
+// jamais un vrai choix curé : l'afficher comme ton de dégradé n'a aucun sens.
+// À l'inverse, '#000000' (noir pur) EST un choix volontaire dans ce fichier
+// pour les équipes dont le noir fait vraiment partie de l'identité (Belgique,
+// Jamaïque, Juventus, Udinese...) — celui-là doit être respecté tel quel.
+const GENERIC_DARK_FILLER = '#1a1a1a'
+function ensureAccentVisible(hex, fallbackHex) {
+  if (!hex) return fallbackHex
+  return hex.toLowerCase() === GENERIC_DARK_FILLER ? fallbackHex : hex
+}
+
 // ── Anti-collision de couleurs ─────────────────────────────────────────────────
 // Si les 2 équipes ont la même couleur "famille" (ex: rouge vs rouge), le dégradé/
 // la barre prono devient illisible (on ne distingue plus qui est qui). On classe
@@ -791,8 +804,8 @@ export function getMatchTeamColors(homeName, awayName) {
   // clairs. On applique le même filtre de luminance que sur "main", avec repli blanc
   // (le blanc est un vrai ton de drapeau très fréquent, cohérent avec l'objectif
   // initial de refléter les vraies couleurs des drapeaux).
-  let hAccent = ensureVisible((hp === rawHome.p ? rawHome.s : rawHome.p) ?? fallbackHome.s, '#eef2f7')
-  let aAccent = ensureVisible((ap === rawAway.p ? rawAway.s : rawAway.p) ?? fallbackAway.s, '#eef2f7')
+  let hAccent = ensureAccentVisible((hp === rawHome.p ? rawHome.s : rawHome.p) ?? fallbackHome.s, '#eef2f7')
+  let aAccent = ensureAccentVisible((ap === rawAway.p ? rawAway.s : rawAway.p) ?? fallbackAway.s, '#eef2f7')
 
   const famHome = colorFamily(hp)
   const famAway = colorFamily(ap)
@@ -804,11 +817,11 @@ export function getMatchTeamColors(homeName, awayName) {
     if (satAway > satHome) {
       const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
       hp = colorFamily(alt) !== famAway ? alt : fallbackHome.p
-      hAccent = ensureVisible(rawHome.p ?? fallbackHome.p, '#eef2f7')
+      hAccent = ensureAccentVisible(rawHome.p ?? fallbackHome.p, '#eef2f7')
     } else {
       const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
       ap = colorFamily(alt) !== famHome ? alt : fallbackAway.p
-      aAccent = ensureVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
+      aAccent = ensureAccentVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
     }
   }
 

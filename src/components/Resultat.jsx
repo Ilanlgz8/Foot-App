@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
@@ -21,6 +21,13 @@ function Resultats() {
   const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
+  // Hauteur réelle du picker de compétitions (voir Classement.jsx pour l'explication
+  // du pourquoi : évite l'animation saccadée d'un max-height statique surdimensionné).
+  const pickerRef = useRef(null)
+  const [pickerHeight, setPickerHeight] = useState(0)
+  useLayoutEffect(() => {
+    if (pickerRef.current) setPickerHeight(pickerRef.current.scrollHeight)
+  }, [])
 
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'FINISHED', 'desc')
 
@@ -175,8 +182,11 @@ function Resultats() {
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
-          <div className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}>
-            <div className="compHeader__picker">
+          <div
+            className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}
+            style={{ maxHeight: compOpen ? `${pickerHeight || 220}px` : '0px' }}
+          >
+            <div className="compHeader__picker" ref={pickerRef}>
               {COMPETITIONS.map(comp => (
                 <button
                   key={comp.id}

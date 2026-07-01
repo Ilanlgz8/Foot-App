@@ -112,12 +112,32 @@ export function calcMinute(match) {
   // ── ESPN (primaire) ──
   // Poll toutes les 20s + interpolation temps réel → retard résiduel ~2-3s.
   if (state.espnStatus) {
-    if (state.espnStatus === 'STATUS_HALFTIME') return 'MT'
-    if (state.espnStatus === 'STATUS_FINAL') return null
+    if (state.espnStatus === 'STATUS_HALFTIME') {
+      // Deux pauses distinctes partagent ce statut : la vraie mi-temps (45') ET la
+      // pause avant/pendant les prolongations (juste après 90+arrêts, et entre les
+      // 2 mi-temps de prolongation à 105'). On les distingue via la période déjà
+      // connue (3/4 = prolongations) ou, à défaut, le dernier clock connu (≥ 90min
+      // = on a dépassé le temps réglementaire, donc forcément une pause de prolong).
+      const pastRegulation =
+        state.espnPeriod === 3 || state.espnPeriod === 4 ||
+        (() => { const p = parseEspnClock(state.espnClock); return p ? p.base >= 90 : false })()
+      return pastRegulation ? 'Pause' : 'MT'
+    }
+    if (
+      state.espnStatus === 'STATUS_FINAL'     ||
+      state.espnStatus === 'STATUS_FULL_TIME' ||
+      state.espnStatus === 'STATUS_FINAL_AET' ||
+      state.espnStatus === 'STATUS_FINAL_PEN'
+    ) return null
     if (
       state.espnStatus === 'STATUS_IN_PROGRESS' ||
-      state.espnStatus === 'STATUS_END_PERIOD'
+      state.espnStatus === 'STATUS_END_PERIOD'  ||
+      state.espnStatus === 'STATUS_EXTRA_TIME'  ||
+      state.espnStatus === 'STATUS_OVERTIME'
     ) {
+      // Le clock ESPN continue naturellement de compter en prolongations
+      // (91'…105', pause, 106'…120', +arrêts éventuels) : même logique
+      // d'interpolation que le temps réglementaire, pas de calcul spécial requis.
       const interpolated = interpolateEspnMinute(state)
       if (interpolated) return interpolated
       // Fallback si interpolation non disponible (capturedAt absent ou trop vieux)

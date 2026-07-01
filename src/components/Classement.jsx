@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
@@ -22,6 +22,15 @@ function Classement() {
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [compOpen, setCompOpen] = useState(false)
   const didAutoOpen = useRef(false)
+  // Hauteur réelle du picker de compétitions, mesurée une fois : permet d'animer
+  // le menu "Changer" sur sa vraie taille (~44px) au lieu d'un max-height statique
+  // surdimensionné (220px), qui rendait l'ouverture visuellement instantanée puis
+  // figée (pas fluide) au lieu d'une vraie transition progressive.
+  const pickerRef = useRef(null)
+  const [pickerHeight, setPickerHeight] = useState(0)
+  useLayoutEffect(() => {
+    if (pickerRef.current) setPickerHeight(pickerRef.current.scrollHeight)
+  }, [])
 
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
@@ -291,8 +300,11 @@ function Classement() {
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
-          <div className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}>
-            <div className="compHeader__picker">
+          <div
+            className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}
+            style={{ maxHeight: compOpen ? `${pickerHeight || 220}px` : '0px' }}
+          >
+            <div className="compHeader__picker" ref={pickerRef}>
               {competitions.map(comp => (
                 <button
                   key={comp.id}

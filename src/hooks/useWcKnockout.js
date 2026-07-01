@@ -4,8 +4,16 @@ import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
+// football-data.org v4 n'utilise PAS "ROUND_OF_32" (cette valeur n'existe pas
+// dans leur enum `stage`) : la bonne valeur est "LAST_32". Avec l'ancienne
+// constante, les 32es de finale (nouveau tour propre au format à 48 équipes
+// de la CM 2026) étaient silencieusement filtrés hors du bracket — le tableau
+// démarrait directement aux 8es, et comme les 8es affichés dans l'API restent
+// des places provisoires tant que les 32es ne sont pas joués/actés, l'affiche
+// pouvait rester fausse (ex: "Canada-Paraguay" au lieu de "Paraguay-France")
+// jusqu'à ce que football-data.org mette à jour les vrais qualifiés.
 export const KNOCKOUT_ORDER = [
-  'ROUND_OF_32',
+  'LAST_32',
   'LAST_16',
   'QUARTER_FINALS',
   'SEMI_FINALS',
@@ -14,7 +22,7 @@ export const KNOCKOUT_ORDER = [
 ]
 
 export const KNOCKOUT_LABELS = {
-  ROUND_OF_32:    'Huitièmes de finale',
+  LAST_32:        'Seizièmes de finale',
   LAST_16:        'Huitièmes de finale',
   QUARTER_FINALS: 'Quarts de finale',
   SEMI_FINALS:    'Demi-finales',

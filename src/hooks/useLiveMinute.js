@@ -247,14 +247,26 @@ function _runFtSafeguards(matches, now, queryClient) {
     confirmFt(match, now, queryClient)
   }
 
-  // Safeguard 2 : durée max live (150min depuis utcDate)
+  // Safeguard 2 : durée max live — dernier filet de sécurité si ESPN ne confirme
+  // jamais le FT. ⚠️ 150min était trop court pour un match à prolongations + tirs
+  // au but (90min + arrêts + 15min pause + 30min ET + tab ≈ 160-180min) — pertinent
+  // maintenant qu'on est en phase à élimination directe. Si ESPN indique encore
+  // explicitement que le match est en cours (prolongations, tirs au but...), on ne
+  // force pas le FT et on relève le plafond à 200min au lieu de 150.
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
     if (pendingFt[mid]) continue
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
-    if (ageMin < 150) continue
-    console.log(`[useLiveMinute] match ${mid} > 150min → FT forcé`)
+    const espnStatus2 = getMatchState(mid).espnStatus
+    const stillGoingPerEspn = (
+      espnStatus2 === 'STATUS_IN_PROGRESS' || espnStatus2 === 'STATUS_HALFTIME' ||
+      espnStatus2 === 'STATUS_END_PERIOD'  || espnStatus2 === 'STATUS_EXTRA_TIME' ||
+      espnStatus2 === 'STATUS_OVERTIME'    || espnStatus2 === 'STATUS_SHOOTOUT'
+    )
+    const limit = stillGoingPerEspn ? 200 : 150
+    if (ageMin < limit) continue
+    console.log(`[useLiveMinute] match ${mid} > ${limit}min → FT forcé`)
     confirmFt(lm, now, queryClient)
   }
 
@@ -273,12 +285,19 @@ function _runFtSafeguards(matches, now, queryClient) {
       console.log(`[useLiveMinute] Safeguard 3 ignoré — FD.org FINISHED mais ${Math.round(ageMin3)}min < 85 (faux FT ?)`)
       continue
     }
-    // Garde ESPN : si ESPN confirme toujours que le match est en cours, on lui fait confiance
+    // Garde ESPN : si ESPN confirme toujours que le match est en cours, on lui fait confiance.
+    // ⚠️ Manquaient STATUS_EXTRA_TIME/OVERTIME/SHOOTOUT : un match en prolongations ou
+    // tirs au but (phase à élimination directe) pouvait être marqué "Terminé" à tort si
+    // FD.org renvoyait déjà FINISHED (souvent en avance/imprécis) pendant qu'ESPN
+    // indiquait encore le match en cours.
     const ms3 = getMatchState(mid)
     if (
       ms3.espnStatus === 'STATUS_IN_PROGRESS' ||
       ms3.espnStatus === 'STATUS_HALFTIME'    ||
-      ms3.espnStatus === 'STATUS_END_PERIOD'
+      ms3.espnStatus === 'STATUS_END_PERIOD'  ||
+      ms3.espnStatus === 'STATUS_EXTRA_TIME'  ||
+      ms3.espnStatus === 'STATUS_OVERTIME'    ||
+      ms3.espnStatus === 'STATUS_SHOOTOUT'
     ) {
       console.log(`[useLiveMinute] Safeguard 3 ignoré — FD.org FINISHED mais ESPN=${ms3.espnStatus} (priorité ESPN)`)
       continue
@@ -478,10 +497,19 @@ async function _doPollESPN(matches, queryClient) {
 
       // ════════════════════════════════════════════════════════════════════
       // CAS 2 : FT / ANNULÉ / REPORTÉ
+      // STATUS_FINAL_AET (après prolongations) et STATUS_FINAL_PEN (après tirs au
+      // but) sont les statuts réels renvoyés par ESPN pour un match de phase à
+      // élimination directe qui ne se termine pas en 90min — vérifiés sur de
+      // vrais matchs (finale CM 2022, CWC 2025). Sans eux, un match qui va en
+      // prolongations/tab n'atteignait JAMAIS ce bloc (ni CAS 1, qui ne les
+      // reconnaît pas non plus) : confirmFt() n'était jamais appelé par ce
+      // chemin, on dépendait uniquement des garde-fous de secours.
       // ════════════════════════════════════════════════════════════════════
       if (
         espnStatus === 'STATUS_FINAL'     ||
         espnStatus === 'STATUS_FULL_TIME' ||
+        espnStatus === 'STATUS_FINAL_AET' ||
+        espnStatus === 'STATUS_FINAL_PEN' ||
         espnStatus === 'STATUS_POSTPONED' ||
         espnStatus === 'STATUS_CANCELED'
       ) {

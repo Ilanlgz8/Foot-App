@@ -23,7 +23,11 @@ const _listeners = new Set()
 // Restauration immédiate depuis localStorage
 // Filtres au reload pour éviter d'afficher un match déjà terminé :
 //   1. ts trop vieux (> TTL 4h)
-//   2. utcDate + 3h dépassé → match forcément terminé même sans polling (PC en veille)
+//   2. utcDate + 3h30 dépassé → match forcément terminé même sans polling (PC en veille)
+//      (3h30 et non 3h : doit couvrir un match à prolongations + tirs au but, qui peut
+//      dépasser 3h depuis le coup d'envoi en phase à élimination directe — sinon ce
+//      cutoff "bête" purgeait le match avant même que useLiveMinute puisse confirmer
+//      un vrai FT via ESPN)
 //   3. liveState='ended' confirmé en localStorage
 try {
   const raw = localStorage.getItem(STORAGE_KEY)
@@ -33,10 +37,10 @@ try {
     for (const [id, entry] of Object.entries(saved)) {
       // Trop vieux
       if (entry.ts <= now - TTL) continue
-      // utcDate + 3h dépassé → match forcément terminé
+      // utcDate + 3h30 dépassé → match forcément terminé
       if (entry.match?.utcDate) {
         const kickoff = new Date(entry.match.utcDate).getTime()
-        if (now - kickoff > 3 * 60 * 60_000) continue
+        if (now - kickoff > 3.5 * 60 * 60_000) continue
       }
       // liveState='ended' confirmé → grace period passée
       try {
@@ -128,7 +132,7 @@ export function isTrackedLive(matchId) {
 }
 
 /**
- * Purge les matchs périmés du tracker (TTL ou utcDate+3h dépassé).
+ * Purge les matchs périmés du tracker (TTL ou utcDate+3h30 dépassé).
  * Appelé au réveil du PC (visibilitychange) pour nettoyer sans reload.
  */
 function _purgeStale() {
@@ -137,7 +141,7 @@ function _purgeStale() {
   for (const [id, entry] of Object.entries(_tracker)) {
     const staleTs      = entry.ts <= now - TTL
     const kickoff      = entry.match?.utcDate ? new Date(entry.match.utcDate).getTime() : null
-    const staleKickoff = kickoff && now - kickoff > 3 * 60 * 60_000
+    const staleKickoff = kickoff && now - kickoff > 3.5 * 60 * 60_000
     if (staleTs || staleKickoff) {
       delete _tracker[id]
       changed = true
