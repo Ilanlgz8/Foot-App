@@ -50,9 +50,13 @@ const BK_CARD_H_SAFETY = 4
 // commentaire BK_CARD_W). Reste plus généreuse que la toute 1ère version
 // compacte (8) : un compromis, pas un simple retour en arrière.
 const BK_CARD_GAP = 16
-// Largeur de la zone connecteur entre rounds — assez pour que les chips de
-// titre de tour (16èmes/8èmes/Quarts/Demies) aient de l'air entre elles.
-const BK_CONN_W = 12
+// Largeur de la zone connecteur entre rounds. Réduite (12→8) : les libellés
+// de tour sont maintenant très courts (16e/8e/4e/2e, voir BK_SHORT_LABELS)
+// donc beaucoup moins de risque de chevauchement entre chips voisines — cet
+// espace récupéré réduit TOTAL_W, ce qui fait mécaniquement grandir le zoom
+// fit-to-screen (donc les cards/drapeaux) puisque le zoom est bloquant en
+// LARGEUR (voir commentaire BK_CARD_W).
+const BK_CONN_W = 8
 // Hauteur de l'en-tête de round (titre) — libellés courts (voir
 // BK_SHORT_LABELS), tiennent sur 1 ligne. Le titre de la finale n'est PLUS
 // dans cette rangée (voir BK_FINAL_LABEL_H) : demande explicite de le
@@ -70,11 +74,14 @@ const BK_PAD_X = 3
 // mêmes que KNOCKOUT_LABELS (useWcKnockout.js), qui restent complets partout
 // ailleurs dans l'app (navigation "Par journée", badges, etc.). Ici la
 // colonne ne fait que 44px de large : "Seizièmes de finale" n'y tient pas.
+// Raccourcis encore plus (16èmes/8èmes/Quarts/Demies → 16e/8e/4e/2e, sur le
+// modèle "8e/4e/2e" demandé) : libère de la largeur dans chaque colonne pour
+// pouvoir réduire BK_CONN_W (voir plus haut) et donc grossir le reste.
 const BK_SHORT_LABELS = {
-  LAST_32:        '16èmes',
-  LAST_16:        '8èmes',
-  QUARTER_FINALS: 'Quarts',
-  SEMI_FINALS:    'Demies',
+  LAST_32:        '16e',
+  LAST_16:        '8e',
+  QUARTER_FINALS: '4e',
+  SEMI_FINALS:    '2e',
   FINAL:          'Finale',
   THIRD_PLACE:    '3e place',
 }
@@ -288,11 +295,12 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     lvhProbe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:100lvh; visibility:hidden; pointer-events:none;'
     document.body.appendChild(lvhProbe)
 
-    // Aligner le conteneur en haut du viewport UNE SEULE FOIS, avant la
-    // mesure, pour avoir une position de référence stable et maximale —
-    // indépendante de l'endroit où l'utilisateur était scrollé avant
-    // d'ouvrir cet onglet.
-    el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+    // Remonter tout en haut de LA PAGE (pas juste aligner le conteneur au
+    // ras du viewport, qui pouvait faire disparaître les onglets Poules/
+    // Matchs/Phase finale au-dessus du pli) UNE SEULE FOIS avant la mesure —
+    // référence stable et maximale, indépendante d'où l'utilisateur était
+    // scrollé avant d'ouvrir cet onglet.
+    window.scrollTo?.({ top: 0, behavior: 'instant' })
 
     const compute = () => {
       const rect   = el.getBoundingClientRect()
@@ -478,7 +486,14 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
         {/* Petite finale, sous la finale */}
         {third?.matches[0] && (
           <div style={{ position:'absolute', left:centerX, top:thirdTop, width:CENTER_W }}>
-            <div className="bracket__thirdLabel" style={{ textAlign:'center', marginBottom:'0.5rem' }}>🥉 {_shortLabel(third)}</div>
+            {/* BUG CORRIGÉ : text-align:center était posé sur le label lui-même
+                (inline-block, donc sans effet — il se contracte à la taille de
+                son texte) au lieu du conteneur. Le label n'était donc pas
+                centré par rapport à la card en dessous. Flexbox sur le
+                conteneur (même technique que le label de la finale ci-dessus). */}
+            <div style={{ display:'flex', justifyContent:'center', marginBottom:'0.5rem' }}>
+              <div className="bracket__thirdLabel">🥉 {_shortLabel(third)}</div>
+            </div>
             <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardHBig} big
               style={{ position:'static', width:CENTER_W }}
             />
