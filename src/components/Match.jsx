@@ -462,7 +462,10 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             dans la rangée des titres de tour avec tout le monde) : demande
             explicite pour la mettre en valeur, au niveau des finalistes. */}
         {finalRound && (
-          <div style={{ position:'absolute', left:centerX, top:finalTop - BK_FINAL_LABEL_H, width:CENTER_W, textAlign:'center' }}>
+          <div style={{
+            position:'absolute', left:centerX, top:finalTop - BK_FINAL_LABEL_H - 8, width:CENTER_W,
+            display:'flex', justifyContent:'center',
+          }}>
             <div className="bracket__finalLabel">🏆 {_shortLabel(finalRound)}</div>
           </div>
         )}

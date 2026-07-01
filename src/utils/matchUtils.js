@@ -82,6 +82,7 @@ export function mergeScore(a, b) {
 
 export function calcMinute(match) {
   const state = getMatchState(match.id)
+  const now   = Date.now()
 
   // ── FT détecté localement ──
   // Quand ESPN/api-football détecte la fin du match, il écrit { ft: true } dans
@@ -129,9 +130,21 @@ export function calcMinute(match) {
       state.espnStatus === 'STATUS_FINAL_AET' ||
       state.espnStatus === 'STATUS_FINAL_PEN'
     ) return null
+    if (state.espnStatus === 'STATUS_END_PERIOD') {
+      // STATUS_END_PERIOD = coup de sifflet de fin des 90min+arrêts, AVANT que
+      // la 1ère période de prolongation ne démarre vraiment (period passe à 3).
+      // BUG CONSTATÉ : ce statut était regroupé avec STATUS_IN_PROGRESS
+      // ci-dessous, donc l'horloge ESPN (encore sur "90:00+X:00" à ce moment)
+      // continuait d'être interpolée → le temps additionnel de la 90e minute
+      // continuait de tourner à l'écran pendant tout ce round de transition,
+      // alors que le match n'est plus vraiment "en jeu" (ni terminé). On
+      // affiche donc "Prolongation" ici, jusqu'à ce qu'ESPN confirme period=3
+      // (→ repasse par STATUS_IN_PROGRESS/EXTRA_TIME/OVERTIME ci-dessous, qui
+      // reprend alors normalement l'horloge ESPN à 91', 92'...).
+      return 'Prolongation'
+    }
     if (
       state.espnStatus === 'STATUS_IN_PROGRESS' ||
-      state.espnStatus === 'STATUS_END_PERIOD'  ||
       state.espnStatus === 'STATUS_EXTRA_TIME'  ||
       state.espnStatus === 'STATUS_OVERTIME'
     ) {
@@ -156,8 +169,6 @@ export function calcMinute(match) {
   const wasLive = state.kickoffAt || state.pausedAt
   if (match.status !== 'IN_PLAY' && match.status !== 'PAUSED' && !wasLive) return null
   if (match.status === 'FINISHED') return null
-
-  const now = Date.now()
 
   // ── MI-TEMPS & 2ème MT ──
   if (state.pausedAt) {
@@ -221,7 +232,7 @@ export function getMatchPeriod(match) {
   //   FD.org peut rester PAUSED une ~poll de retard après la reprise.
   if (match.status === 'PAUSED' && period !== 2) return 'Mi-temps'
   if (status === 'STATUS_SHOOTOUT' || period === 5) return 'T.A.B.'
-  if (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME' || period === 3 || period === 4) return 'Prolongations'
+  if (status === 'STATUS_EXTRA_TIME' || status === 'STATUS_OVERTIME' || status === 'STATUS_END_PERIOD' || period === 3 || period === 4) return 'Prolongations'
   if (period === 2) return '2ème MT'
   if (period === 1) return '1ère MT'
 
