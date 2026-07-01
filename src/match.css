@@ -867,12 +867,24 @@
    BracketSvgView via ResizeObserver — voir le commentaire associé dans
    Match.jsx) réduit le tableau logique pour qu'il tienne pile dans cet
    espace ; overflow:hidden est donc une sécurité, pas le mécanisme principal.
-   max-height borne l'espace dispo à ce qui reste sous la navbar/le header de
-   page/les boutons d'onglet (Poules/Bracket/Programme) au-dessus. */
+   IMPORTANT : `height` FIXE (pas `max-height`) — .bracket__container est
+   l'élément mesuré par le ResizeObserver de BracketSvgView pour calculer le
+   zoom, et .bracket__svgWrap (l'enfant zoomé) est DANS ce conteneur. Avec
+   `max-height`, sans hauteur explicite le conteneur se dimensionne sur son
+   contenu (shrink-to-fit) : si le contenu zoomé devient plus petit que la
+   limite, le conteneur rétrécit pour l'épouser → le ResizeObserver se
+   redéclenche avec une nouvelle hauteur → recalcule un nouveau zoom → boucle
+   de rétroaction (le zoom dépend de la taille du conteneur, qui dépend du
+   zoom) fragile et pouvant mal se comporter selon le navigateur (jusqu'à un
+   tableau qui s'effondre à une taille quasi nulle → page qui semble vide).
+   Une hauteur FIXE (bornée uniquement par le viewport, indépendante du
+   contenu) casse cette boucle : la taille observée ne dépend plus jamais du
+   zoom qu'elle sert à calculer. */
 .bracket__container {
   overflow: hidden;
-  max-height: calc(100dvh - 13rem);
+  height: calc(100dvh - 13rem);
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
