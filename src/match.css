@@ -939,7 +939,9 @@
    (modal__espnStats, statsSubTabs). */
 .bracket__card {
   background: linear-gradient(165deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008)), #0a0e17;
-  border: 1px solid rgba(255,255,255,0.08);
+  /* Contour rouge (au lieu d'un blanc quasi invisible à 0.08) pour mieux
+     distinguer chaque card — demande explicite. */
+  border: 1px solid rgba(239,68,68,0.4);
   border-radius: 0.55rem;
   overflow: hidden;
   cursor: pointer;
@@ -948,7 +950,7 @@
 }
 
 .bracket__card:hover {
-  border-color: rgba(239,68,68,0.3);
+  border-color: rgba(239,68,68,0.65);
 }
 
 .bracket__card:active {
@@ -956,7 +958,7 @@
 }
 
 .bracket__card--live {
-  border-color: rgba(239,68,68,0.45);
+  border-color: rgba(239,68,68,0.75);
   box-shadow: 0 0 10px rgba(239,68,68,0.18), 0 2px 8px rgba(0,0,0,0.35);
   animation: pulseRed 2s ease infinite;
 }

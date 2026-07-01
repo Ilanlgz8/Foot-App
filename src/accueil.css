@@ -2237,7 +2237,9 @@
 .accueil__liveWidgetStatNum {
   font-size: 0.76rem;
   font-weight: 700;
-  color: #a8b8c8;
+  /* #a8b8c8 (gris-bleu) → blanc quasi-plein : pas assez visible sur fond
+     sombre, demande explicite de rendre le contenu des stats plus lisible. */
+  color: rgba(255,255,255,0.92);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
@@ -2250,7 +2252,7 @@
 .accueil__liveWidgetStatLabel {
   font-size: 0.5rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.4);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   text-align: center;

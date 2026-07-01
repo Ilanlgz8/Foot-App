@@ -935,7 +935,7 @@
   text-align: center;
   font-size: 0.6rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.68);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1406,7 +1406,9 @@
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 0.88rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.75);
+  /* 0.75 → 0.95 : trop gris/peu visible sur fond sombre, demande explicite
+     de rendre le contenu des stats plus lisible. */
+  color: rgba(255,255,255,0.95);
   font-variant-numeric: tabular-nums;
 }
 .pm__statVal--right { text-align: right; }
@@ -1418,7 +1420,7 @@
 .pm__statName {
   font-size: 0.56rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.55);
   text-align: center;
   white-space: nowrap;
   letter-spacing: 0.08em;
