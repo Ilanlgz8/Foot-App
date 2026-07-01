@@ -2,7 +2,7 @@ import { translateTeam }              from '../data/teamNames'
 import { calcMinute, mergeScore }     from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
-import { getTeamPhoto, getMatchTeamColors, buildMatchGradient } from '../data/teamPhotos'
+import { getMatchTeamColors, buildMatchGradient } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 
 function formatHour(dateStr) {
@@ -39,12 +39,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const aForm     = formMap?.[match.awayTeam?.id] ?? []
   const prono     = calcProno(hForm, aForm)
 
-  // Fond : photo hardcodée de l'équipe favorite si dispo, sinon dégradé couleurs des deux équipes
-  const isFavHome  = prono.home >= prono.away
-  const favName    = isFavHome ? homeName : awayName
-  const hardPhoto  = getTeamPhoto(favName)
-  // Couleurs résolues une seule fois (anti-collision) : réutilisées pour le fond
-  // dégradé ET la barre prono, pour rester cohérentes entre les deux.
+  // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
+  // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine
+  // de pays "populaires" pré-photographiés (très fréquent en Coupe du Monde), ce qui
+  // donnait l'impression que "les couleurs ne s'affichent jamais".
   const { home: hColor, away: aColor } = getMatchTeamColors(homeName, awayName)
   const gradient   = buildMatchGradient(hColor, aColor)
 
@@ -57,13 +55,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
-      {/* ── Fond : photo de match si dispo, sinon dégradé couleurs des équipes ── */}
-      {hardPhoto
-        ? <div className="poster__bg poster__bg--photo"
-               style={{ backgroundImage: `url('${hardPhoto}')` }} />
-        : <div className="poster__bg poster__bg--gradient"
-               style={{ background: gradient }} />
-      }
+      {/* ── Fond : dégradé couleurs des équipes ── */}
+      <div className="poster__bg poster__bg--gradient" style={{ background: gradient }} />
       <div className="poster__overlay" />
 
       {/* ── Badge compét / live ── */}

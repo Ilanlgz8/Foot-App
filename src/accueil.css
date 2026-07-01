@@ -2890,11 +2890,9 @@
 .poster__crest {
   width: 44px;
   height: 44px;
-  /* contain (pas cover) : les drapeaux nationaux (CdM) ne sont pas carrés — cover
-     rognait les bords et rendait certains drapeaux méconnaissables une fois en cercle */
-  object-fit: contain;
-  padding: 3px;
-  box-sizing: border-box;
+  /* cover : remplit tout le cercle sans jamais laisser de vide sur les côtés */
+  object-fit: cover;
+  object-position: center;
   border-radius: 50%;
   border: 1.5px solid rgba(200,210,225,0.28);
   box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 3px 10px rgba(0,0,0,0.6);

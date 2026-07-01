@@ -257,21 +257,13 @@ export default async function handler(req, res) {
   const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '' } = req.query
   if (!fdMatchId) return res.status(400).json({ error: 'fdMatchId requis' })
 
-  // ── 1. Lineup déjà en cache Redis (7j) ─────────────────────────────────────
-  const lineupKey = `fifa:lineup:${fdMatchId}`
-  let lineupResult = null
-  try { lineupResult = safeJson(await kv.get(lineupKey)) } catch {}
-
-  if (lineupResult?.home?.starters?.length) {
-    return res.json({ ...lineupResult, stats: null })
-  }
-
-  // ── 2. IDs FIFA en cache Redis (7j) ────────────────────────────────────────
+  // ── 1. IDs FIFA : cache Redis (7j) → autodiscovery → fallback legacy ───────
+  // ⚠️ Résolu AVANT le lineup (contrairement à avant) : les stats en ont besoin
+  // même quand le lineup est déjà en cache (voir fix plus bas).
   const idsKey = `fifa:ids:${fdMatchId}`
   let ids = null
   try { ids = safeJson(await kv.get(idsKey)) } catch {}
 
-  // ── 3. Autodiscovery via FIFA API ──────────────────────────────────────────
   if (!ids?.fifaMatchId && utcDate) {
     ids = await discoverFifaMatch(kv, utcDate, fdHome, fdAway)
     if (ids?.fifaMatchId) {
@@ -279,7 +271,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── 4. Fallback : ancienne clé fm:match: (stockée par cron legacy) ─────────
   if (!ids?.fifaMatchId) {
     try {
       const stored = safeJson(await kv.get(`fm:match:${fdMatchId}`))
@@ -294,46 +285,63 @@ export default async function handler(req, res) {
     } catch {}
   }
 
-  if (!ids?.fifaMatchId) {
-    // Diagnostic : tester directement l'accessibilité de l'API FIFA
-    let fifaDiag = 'non testé'
-    try {
-      const r = await fetch(`${FIFA_BASE}/competitions/${WC_COMP_ID}/seasons?language=en&count=5`, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(5_000),
-      })
-      fifaDiag = `status=${r.status}`
-    } catch (e) { fifaDiag = `error=${e.message}` }
-
-    return res.status(404).json({
-      error: 'Match FIFA introuvable',
-      diag: { utcDate, fdHome, fdAway, fifaApi: fifaDiag },
-    })
-  }
-
-  // ── 5. Fetch lineup FIFA ───────────────────────────────────────────────────
-  lineupResult = await fetchFifaLineup(ids)
+  // ── 2. Lineup : cache Redis (7j) sinon fetch FIFA ───────────────────────────
+  const lineupKey = `fifa:lineup:${fdMatchId}`
+  let lineupResult = null
+  try { lineupResult = safeJson(await kv.get(lineupKey)) } catch {}
 
   if (!lineupResult?.home?.starters?.length) {
-    return res.status(404).json({ error: 'Compositions FIFA introuvables (pas encore publiées)' })
+    if (!ids?.fifaMatchId) {
+      // Diagnostic : tester directement l'accessibilité de l'API FIFA
+      let fifaDiag = 'non testé'
+      try {
+        const r = await fetch(`${FIFA_BASE}/competitions/${WC_COMP_ID}/seasons?language=en&count=5`, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(5_000),
+        })
+        fifaDiag = `status=${r.status}`
+      } catch (e) { fifaDiag = `error=${e.message}` }
+
+      return res.status(404).json({
+        error: 'Match FIFA introuvable',
+        diag: { utcDate, fdHome, fdAway, fifaApi: fifaDiag },
+      })
+    }
+
+    lineupResult = await fetchFifaLineup(ids)
+    if (!lineupResult?.home?.starters?.length) {
+      return res.status(404).json({ error: 'Compositions FIFA introuvables (pas encore publiées)' })
+    }
+
+    // Cache 7 jours — lineup d'un match terminé est définitive
+    try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: 7 * 24 * 3600 }) } catch {}
   }
 
-  // Cache 7 jours — lineup d'un match terminé est définitive
-  try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: 7 * 24 * 3600 }) } catch {}
-
-  // ── 6. Stats (best-effort, TTL 2min) ─────────────────────────────────────
+  // ── 3. Stats — TOUJOURS tentées, indépendamment du cache lineup ────────────
+  // ⚠️ FIX : avant, dès que le lineup était en cache (quasi toujours vrai : les
+  // compos sont publiées ~1h avant le KO et mises en cache 7j), la route
+  // retournait "stats: null" sans même essayer de les récupérer. Résultat :
+  // aucune statistique pour la quasi-totalité des matchs de Coupe du Monde
+  // dès qu'ils n'étaient plus "tout frais". Cache court (2min) pour rester léger.
   let stats = null
-  try {
-    const urlsToTry = []
-    if (ids.fifaCompId && ids.fifaSeasonId && ids.fifaStageId)
-      urlsToTry.push(`${FIFA_BASE}/matchstatistics/${ids.fifaCompId}/${ids.fifaSeasonId}/${ids.fifaStageId}/${ids.fifaMatchId}`)
-    urlsToTry.push(`${FIFA_BASE}/matchstatistics/${ids.fifaMatchId}`)
-    for (const url of urlsToTry) {
-      const { ok, data } = await fifaFetch(url)
-      if (ok && data) { stats = parseFifaStats(data); break }
-    }
-    if (stats) await kv.set(`fifa:stats:${fdMatchId}`, JSON.stringify(stats), { ex: 120 })
-  } catch {}
+  if (ids?.fifaMatchId) {
+    try {
+      const cachedStats = safeJson(await kv.get(`fifa:stats:${fdMatchId}`))
+      if (cachedStats) {
+        stats = cachedStats
+      } else {
+        const urlsToTry = []
+        if (ids.fifaCompId && ids.fifaSeasonId && ids.fifaStageId)
+          urlsToTry.push(`${FIFA_BASE}/matchstatistics/${ids.fifaCompId}/${ids.fifaSeasonId}/${ids.fifaStageId}/${ids.fifaMatchId}`)
+        urlsToTry.push(`${FIFA_BASE}/matchstatistics/${ids.fifaMatchId}`)
+        for (const url of urlsToTry) {
+          const { ok, data } = await fifaFetch(url)
+          if (ok && data) { stats = parseFifaStats(data); break }
+        }
+        if (stats) { try { await kv.set(`fifa:stats:${fdMatchId}`, JSON.stringify(stats), { ex: 120 }) } catch {} }
+      }
+    } catch {}
+  }
 
   return res.json({ ...lineupResult, stats })
 }

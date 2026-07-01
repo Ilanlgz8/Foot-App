@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
 import './../compHeader.css'
+// La vue "Par poule" réutilise les classes matchs__wc* définies dans match.css
+// (celui de la page Programme). Comme Programme est chargée en lazy et que
+// Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
+// tant qu'on n'avait pas visité Programme au moins une fois dans la session.
+import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
