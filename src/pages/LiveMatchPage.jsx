@@ -159,7 +159,7 @@ function MatchHeader({ match, espn, onBack }) {
       <div className="mp__hero__mid">
         <div className="mp__hero__team">
           {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="mp__hero__crest" />
+            ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb" />}
           <span className="mp__hero__name">{homeName}</span>
           {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
@@ -172,7 +172,7 @@ function MatchHeader({ match, espn, onBack }) {
 
         <div className="mp__hero__team mp__hero__team--away">
           {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="mp__hero__crest" />
+            ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb" />}
           <span className="mp__hero__name">{awayName}</span>
           {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}

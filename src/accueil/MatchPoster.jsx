@@ -43,8 +43,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine
   // de pays "populaires" pré-photographiés (très fréquent en Coupe du Monde), ce qui
   // donnait l'impression que "les couleurs ne s'affichent jamais".
-  const { home: hColor, away: aColor } = getMatchTeamColors(homeName, awayName)
-  const gradient   = buildMatchGradient(hColor, aColor)
+  const { home: homeColors, away: awayColors } = getMatchTeamColors(homeName, awayName)
+  const hColor     = homeColors.main
+  const aColor     = awayColors.main
+  const gradient   = buildMatchGradient(homeColors, awayColors)
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -74,8 +76,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest
-            ? <img className="poster__crest" src={match.homeTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} />
+            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.homeTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} /></div>
             : <div className="poster__crest-empty" />
           }
           <span className="poster__name poster__name--home">{homeShort}</span>
@@ -97,8 +99,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest
-            ? <img className="poster__crest" src={match.awayTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} />
+            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.awayTeam.crest} alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }} /></div>
             : <div className="poster__crest-empty" />
           }
           <span className="poster__name poster__name--away">{awayShort}</span>

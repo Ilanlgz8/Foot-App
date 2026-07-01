@@ -768,8 +768,13 @@ function colorFamily(hex) {
 
 /**
  * Résout les couleurs "dom"/"ext" d'un match en évitant qu'elles tombent dans
- * la même famille de couleur (ex: rouge vs rouge). Retourne toujours 2 couleurs
- * visibles (luminance garantie par ensureVisible).
+ * la même famille de couleur (ex: rouge vs rouge). Retourne pour chaque équipe
+ * { main, accent } :
+ *   main   → couleur mise en avant (celle utilisée pour la barre prono, la bordure…)
+ *   accent → l'autre couleur curée de l'équipe (utilisée en 2ème ton dans le dégradé,
+ *            pour refléter le vrai drapeau au lieu d'un aplat unique — ex: une équipe
+ *            rouge/blanc affichera un vrai dégradé rouge→blanc→rouge plutôt que du
+ *            rouge plat, ce qui limite l'effet "tout se ressemble en rouge/vert").
  */
 export function getMatchTeamColors(homeName, awayName) {
   const fallbackHome = fallbackColor(homeName, 0)
@@ -779,6 +784,9 @@ export function getMatchTeamColors(homeName, awayName) {
 
   let hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
   let ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
+  // Accent = l'autre couleur curée de l'équipe (celle qui n'est pas devenue "main")
+  let hAccent = (hp === rawHome.p ? rawHome.s : rawHome.p) ?? fallbackHome.s
+  let aAccent = (ap === rawAway.p ? rawAway.s : rawAway.p) ?? fallbackAway.s
 
   const famHome = colorFamily(hp)
   const famAway = colorFamily(ap)
@@ -790,26 +798,35 @@ export function getMatchTeamColors(homeName, awayName) {
     if (satAway > satHome) {
       const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
       hp = colorFamily(alt) !== famAway ? alt : fallbackHome.p
+      hAccent = rawHome.p ?? fallbackHome.p
     } else {
       const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
       ap = colorFamily(alt) !== famHome ? alt : fallbackAway.p
+      aAccent = rawAway.p ?? fallbackAway.p
     }
   }
 
-  return { home: hp, away: ap }
+  return {
+    home: { main: hp, accent: hAccent ?? hp },
+    away: { main: ap, accent: aAccent ?? ap },
+  }
 }
 
-// Construit le dégradé CSS à partir de 2 couleurs déjà résolues (anti-collision).
-// Exporté pour que les composants qui ont besoin des couleurs individuelles
-// (ex: barre de pronostic) restent visuellement cohérents avec le fond dégradé.
-export function buildMatchGradient(hp, ap) {
-  return `linear-gradient(135deg, ${hp} 0%, ${darken(hp)} 38%, ${darken(ap)} 62%, ${ap} 100%)`
+// Construit le dégradé CSS à partir des couleurs résolues (main + accent par équipe).
+// 6 arrêts : accent dom → dom → assombri dom → assombri ext → ext → accent ext.
+// Donne un vrai dégradé "2 tons par équipe" fidèle aux couleurs curées de chacune,
+// plutôt qu'un aplat unique — accepte aussi l'ancien format (chaîne hex simple)
+// pour rester compatible avec un appel direct.
+export function buildMatchGradient(home, away) {
+  const h = typeof home === 'string' ? { main: home, accent: home } : home
+  const a = typeof away === 'string' ? { main: away, accent: away } : away
+  return `linear-gradient(135deg, ${h.accent} 0%, ${h.main} 24%, ${darken(h.main)} 42%, ${darken(a.main)} 58%, ${a.main} 76%, ${a.accent} 100%)`
 }
 
-// Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
+// Dégradé unique pour chaque match : couleurs des deux équipes (main + accent)
 export function getMatchGradient(homeName, awayName) {
-  const { home: hp, away: ap } = getMatchTeamColors(homeName, awayName)
-  return buildMatchGradient(hp, ap)
+  const { home, away } = getMatchTeamColors(homeName, awayName)
+  return buildMatchGradient(home, away)
 }
 
 // Génère une couleur de fallback non-noire, unique par nom d'équipe

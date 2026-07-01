@@ -75,9 +75,16 @@ function fifaTeamNamesAll(team) {
   return (team?.TeamName ?? []).map(t => t.Description).filter(Boolean)
 }
 
-// MatchStatus : 0=pas commencé 1=en cours 3=terminé — Period : 0=pré-match
-function fifaIsLive(m) {
-  return m.MatchStatus === 1 && m.Period !== 0
+// MatchStatus : 0=pas commencé 1=en cours 3=terminé
+// Period      : 0=pré-match 1=1èreMT 2=2èmeMT 3=pause MT 4=Prol MT1 5=pause Prol 6=Prol MT2 7=TAB 8=FT
+// ⚠️ Volontairement PAS de mapping vers STATUS_FINAL ici : FIFA peut retourner un
+// faux statut "terminé" lors de transitions normales (VAR, mi-temps) — même limite
+// documentée côté client (useLiveMinute.js) contre les faux FT. On ne l'utilise donc
+// que pour accélérer la détection du coup d'envoi et de la mi-temps, jamais la fin.
+function fifaEffectiveStatus(m) {
+  if (m.MatchStatus !== 1 || m.Period === 0) return null
+  if (m.Period === 3 || m.Period === 5) return 'STATUS_HALFTIME'
+  return 'STATUS_IN_PROGRESS'
 }
 
 async function fetchFifaLiveMatches(log) {
@@ -277,9 +284,16 @@ export default async function handler(req, res) {
         return homeNames.some(n => fuzzyTeamFifa(rawHome, n)) && awayNames.some(n => fuzzyTeamFifa(rawAway, n))
       })
       if (fifaMatch) {
-        if (status === 'STATUS_SCHEDULED' && fifaIsLive(fifaMatch)) {
-          status = 'STATUS_IN_PROGRESS'
-          log.push(`[fifa-override:${eventId}] ESPN=SCHEDULED mais FIFA en cours → KO anticipé`)
+        const fifaStatus = fifaEffectiveStatus(fifaMatch)
+        if (status === 'STATUS_SCHEDULED' && fifaStatus) {
+          status = fifaStatus
+          log.push(`[fifa-override:${eventId}] ESPN=SCHEDULED → FIFA=${fifaStatus} (KO anticipé)`)
+        } else if (status === 'STATUS_IN_PROGRESS' && fifaStatus === 'STATUS_HALFTIME') {
+          // ESPN n'a pas encore basculé sur la pause → FIFA la confirme plus vite.
+          // (Jamais l'inverse : on ne fait pas confiance à FIFA pour repasser
+          // HALFTIME → IN_PROGRESS ni pour déclarer une fin de match.)
+          status = 'STATUS_HALFTIME'
+          log.push(`[fifa-override:${eventId}] ESPN=IN_PROGRESS → FIFA=HALFTIME (mi-temps anticipée)`)
         }
         const fh = fifaMatch.HomeTeam?.Score
         const fa = fifaMatch.AwayTeam?.Score

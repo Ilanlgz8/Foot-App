@@ -156,6 +156,10 @@
   .compHeader__pickerWrap {
     display: grid;
     grid-template-rows: 0fr;
+    /* overflow:hidden sur le conteneur grid est indispensable à la technique
+       0fr → 1fr : sans lui, le contenu peut rester visible même piste à 0 (c'était
+       le bug — la liste des championnats apparaissait sans cliquer sur "Changer"). */
+    overflow: hidden;
     transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-top: 0 solid rgba(255,255,255,0.06);
   }
