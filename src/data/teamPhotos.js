@@ -48,7 +48,7 @@ export const TEAM_COLORS_FULL = {
   'Germany':          { p: '#1a1a1a', s: '#DD0000' },
   'Spain':            { p: '#AA151B', s: '#F1BF00' },
   'Portugal':         { p: '#006600', s: '#FF0000' },
-  'England':          { p: '#CF081F', s: '#003080' },
+  'England':          { p: '#CF081F', s: '#1a1a1a' },
   'Netherlands':      { p: '#FF6200', s: '#003580' },
   'Belgium':          { p: '#000000', s: '#ED2939' },
   'Croatia':          { p: '#C8102E', s: '#003DA5' },
@@ -842,34 +842,17 @@ export function buildMatchGradient(home, away) {
   return `linear-gradient(135deg, ${h.accent} 0%, ${h.main} 24%, ${darken(h.main)} 42%, ${darken(a.main)} 58%, ${a.main} 76%, ${a.accent} 100%)`
 }
 
-// Variables CSS pour l'animation "morph de couleur en place" d'une card poster
-// (voir MatchPoster.jsx + accueil.css .poster__bg--gradient) : un seul calque
-// dont les 6 arrêts du dégradé sont animés entre la couleur "main" et la
-// couleur "accent" de chaque équipe via @property (interpolation de couleur
-// native), au lieu de faire un fondu enchaîné entre deux dégradés superposés
-// (plus lourd : 2 calques qui repaint chacun leur background-position).
-// --stop1..6 reçoivent aussi une valeur de base (= état "main dominant",
-// identique à buildMatchGradient) pour un rendu correct même si l'animation
-// est coupée (prefers-reduced-motion).
-export function buildMatchGradientVars(home, away) {
+// Variante "inversée" : les rôles main/accent sont échangés pour chaque équipe.
+// Utilisée en crossfade STATIQUE avec buildMatchGradient (voir MatchPoster.jsx) :
+// les deux dégradés sont peints une seule fois, seule leur opacity + leur
+// transform sont animées ensuite — ce sont les 2 SEULES propriétés qu'un
+// navigateur peut animer sur le compositeur GPU sans jamais redéclencher de
+// repaint (contrairement à background-position ou à une couleur de dégradé
+// qui change dans le temps, qui repaint à chaque frame même sur 1 seul calque).
+export function buildMatchGradientAlt(home, away) {
   const h = typeof home === 'string' ? { main: home, accent: home } : home
   const a = typeof away === 'string' ? { main: away, accent: away } : away
-  return {
-    '--h-main':        h.main,
-    '--h-accent':      h.accent,
-    '--h-main-dark':   darken(h.main),
-    '--h-accent-dark': darken(h.accent),
-    '--a-main':        a.main,
-    '--a-accent':      a.accent,
-    '--a-main-dark':   darken(a.main),
-    '--a-accent-dark': darken(a.accent),
-    '--stop1': h.accent,
-    '--stop2': h.main,
-    '--stop3': darken(h.main),
-    '--stop4': darken(a.main),
-    '--stop5': a.main,
-    '--stop6': a.accent,
-  }
+  return `linear-gradient(135deg, ${h.main} 0%, ${h.accent} 24%, ${darken(h.accent)} 42%, ${darken(a.accent)} 58%, ${a.accent} 76%, ${a.main} 100%)`
 }
 
 // Dégradé unique pour chaque match : couleurs des deux équipes (main + accent)

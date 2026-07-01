@@ -2757,48 +2757,31 @@
   background-position: center 25%;
   filter: brightness(0.38) saturate(1.15);
 }
-/* Dégradé couleurs équipes — UN SEUL calque, morph de couleur "en place".
-   Les 6 arrêts du dégradé sont des variables CSS enregistrées (@property,
-   syntax <color>) qui s'animent en douceur entre la couleur "main" et la
-   couleur "accent" de chaque équipe — interpolation de couleur native du
-   navigateur. Bien plus léger que l'ancienne version à 2 calques superposés
-   qui faisaient chacun leur propre fondu enchaîné (2x plus de repaint).
-   Le mouvement ("drift") est fait à part via transform (scale/translate),
-   accéléré GPU et quasi gratuit — contrairement à background-position qui
-   force un repaint à chaque frame.
-   Toutes les variables (--h-*, --a-*, --stop1..6) sont posées inline via JS
-   (MatchPoster.jsx / teamPhotos.js buildMatchGradientVars) — --stop1..6 y
-   reçoivent aussi une valeur de base statique (état "main dominant"), pour
-   un rendu correct même si l'animation est coupée (prefers-reduced-motion). */
-@property --stop1 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-@property --stop2 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-@property --stop3 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-@property --stop4 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-@property --stop5 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-@property --stop6 { syntax: '<color>'; inherits: false; initial-value: #2a3a4a; }
-
+/* Dégradé couleurs équipes — 2 calques STATIQUES (peints une seule fois,
+   jamais réanimés eux-mêmes) qui se fondent l'un dans l'autre :
+     - .poster__bg--gradient    : couleur "main" de chaque équipe, toujours
+       visible, léger mouvement de zoom/pan.
+     - .poster__bg--gradientAlt : couleur "accent" de chaque équipe,
+       apparaît/disparaît en fondu par-dessus, mouvement en sens inverse.
+   Les DEUX calques n'animent QUE transform et opacity — ce sont les 2 seules
+   propriétés qu'un navigateur peut composer sur le GPU sans jamais
+   redéclencher de repaint (contrairement à background-position ou à une
+   couleur de dégradé qui change dans le temps, qui repaint à chaque frame
+   même sur un seul calque). Le background (couleurs) est posé une seule
+   fois inline via JS (MatchPoster.jsx) et ne bouge plus jamais ensuite. */
 .poster__bg--gradient {
-  background: linear-gradient(135deg,
-    var(--stop1) 0%, var(--stop2) 24%, var(--stop3) 42%,
-    var(--stop4) 58%, var(--stop5) 76%, var(--stop6) 100%);
   transform-origin: center;
   will-change: transform;
-  animation:
-    posterStop1 9s ease-in-out infinite,
-    posterStop2 9s ease-in-out infinite,
-    posterStop3 9s ease-in-out infinite,
-    posterStop4 9s ease-in-out infinite,
-    posterStop5 9s ease-in-out infinite,
-    posterStop6 9s ease-in-out infinite,
-    posterDrift 16s ease-in-out infinite;
+  animation: posterDrift 18s ease-in-out infinite;
 }
-
-@keyframes posterStop1 { 0%, 100% { --stop1: var(--h-accent); }      50% { --stop1: var(--h-main); } }
-@keyframes posterStop2 { 0%, 100% { --stop2: var(--h-main); }        50% { --stop2: var(--h-accent); } }
-@keyframes posterStop3 { 0%, 100% { --stop3: var(--h-main-dark); }   50% { --stop3: var(--h-accent-dark); } }
-@keyframes posterStop4 { 0%, 100% { --stop4: var(--a-main-dark); }   50% { --stop4: var(--a-accent-dark); } }
-@keyframes posterStop5 { 0%, 100% { --stop5: var(--a-main); }        50% { --stop5: var(--a-accent); } }
-@keyframes posterStop6 { 0%, 100% { --stop6: var(--a-accent); }      50% { --stop6: var(--a-main); } }
+.poster__bg--gradientAlt {
+  transform-origin: center;
+  will-change: transform, opacity;
+  opacity: 0;
+  animation:
+    posterDrift 18s ease-in-out infinite reverse,
+    posterMorph  9s ease-in-out infinite;
+}
 
 /* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
 @keyframes posterDrift {
@@ -2806,8 +2789,16 @@
   50%      { transform: scale(1.18) translate(-2%, 2%); }
 }
 
+/* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle */
+@keyframes posterMorph {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.9; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .poster__bg--gradient { animation: none; }
+  .poster__bg--gradient,
+  .poster__bg--gradientAlt { animation: none; }
+  .poster__bg--gradientAlt { opacity: 0; }
 }
 
 /* Overlay sombre + dégradé directional */
