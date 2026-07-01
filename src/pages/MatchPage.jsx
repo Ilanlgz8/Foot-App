@@ -14,12 +14,17 @@ import { getMatchGradient }        from '../data/teamPhotos'
 import {
   useEspnMatchStats,
   useFifaStats,
+  useMatchDetail,
 } from '../hooks/useMatchDetail'
+import { useEspnMatchDetail } from '../hooks/useEspnMatchDetail'
 import { useAflMatchStats } from '../hooks/useApiFootball'
 import {
   PreMatchSection,
   ComposTab,
   ClassementTab,
+  MatchTimeline,
+  getEspnData,
+  TabDots,
 } from '../components/MatchModal'
 import './MatchPage.css'
 import '../matchModal.css'
@@ -93,7 +98,7 @@ function MatchPageHero({ match, navigate }) {
         <div className="mp__hero__team">
           {match.homeTeam?.crest
             ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" /></div>
-            : <div className="mp__hero__crestFb" />}
+            : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
         </div>
 
@@ -114,7 +119,7 @@ function MatchPageHero({ match, navigate }) {
         <div className="mp__hero__team mp__hero__team--away">
           {match.awayTeam?.crest
             ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" /></div>
-            : <div className="mp__hero__crestFb" />}
+            : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
         </div>
       </div>
@@ -211,11 +216,34 @@ function aflStatsToRows(statsData) {
 function MpMatchStats({ match }) {
   const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
   const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? match : null, isWC, false)
-  const { data: espnData,  isLoading: espnLoading  } = useEspnMatchStats(match)
+  const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match)
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)
 
+  // ── Fil du match : buts + cartons (ESPN) + remplacements (FD.org) ──────────
+  // Même logique que FinishedDetails dans MatchModal.jsx : données ESPN déjà
+  // persistées en localStorage si le match a été suivi en live, sinon fetch à
+  // la demande. FD.org (useMatchDetail) fournit le fallback buteurs/cartons et
+  // l'unique source des remplacements (ESPN ne les expose pas).
+  const cachedEspn = getEspnData(match?.id)
+  const { espnData: fetchedEspn, loading: espnDetailLoading } = useEspnMatchDetail(
+    !cachedEspn ? match : null,
+    match?.competition?.id,
+    !cachedEspn
+  )
+  const espnData = cachedEspn ?? fetchedEspn
+  const { detail, loading: detailLoading } = useMatchDetail(match?.id)
+
+  const fdGoals     = detail?.goals         ?? []
+  const fdBookings  = detail?.bookings      ?? []
+  const fdSubs      = detail?.substitutions ?? []
+  const espnScorers = espnData?.scorers ?? []
+  const espnCards   = espnData?.cards   ?? []
+  const hasEvents   = espnScorers.length > 0 || espnCards.length > 0 ||
+    fdGoals.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
+  const eventsLoading = (!cachedEspn && espnDetailLoading) || detailLoading
+
   const fifaRows = fifaStatsToRows(fifaData)
-  const espnRows = fifaStatsToRows(espnData?.stats)
+  const espnRows = fifaStatsToRows(espnStatsData?.stats)
   const aflRows  = aflStatsToRows(aflStats)
   const rows     = fifaRows.length ? fifaRows : espnRows.length ? espnRows : aflRows
 
@@ -223,6 +251,7 @@ function MpMatchStats({ match }) {
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const hs       = match.score?.fullTime?.home
   const as_      = match.score?.fullTime?.away
+  const totalGoals = (hs ?? 0) + (as_ ?? 0)
 
   const isLoading = !rows.length && ((isWC && fifaLoading) || espnLoading || aflLoading)
 
@@ -233,6 +262,20 @@ function MpMatchStats({ match }) {
         <span className="mp__statsCenter">Match</span>
         <span className="mp__statsTeam mp__statsTeam--r">{as_ != null ? `${as_} ` : ''}{awayName}</span>
       </div>
+
+      {/* Fil du match */}
+      {hasEvents
+        ? <MatchTimeline
+            espnScorers={espnScorers} espnCards={espnCards}
+            fdGoals={fdGoals} fdBookings={fdBookings} fdSubs={fdSubs}
+            homeId={match.homeTeam?.id}
+          />
+        : !eventsLoading
+          ? <p className="pm__noData">
+              {totalGoals > 0 ? 'Événements non disponibles' : 'Match sans but (0 – 0)'}
+            </p>
+          : null
+      }
 
       {isLoading ? (
         <div className="mp__tabLoading"><div className="modal__spinner" /></div>
@@ -398,6 +441,7 @@ export default function MatchPage() {
               </button>
             ))}
           </div>
+          <TabDots count={TABS.length} active={TABS.indexOf(activeTab)} />
 
           {/* Contenu */}
           <div

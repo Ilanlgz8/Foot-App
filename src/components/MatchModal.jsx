@@ -17,7 +17,7 @@ import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
 // Sauvegardées par useLiveMinute dans foot_espn_{matchId} lors de la détection FT.
-function getEspnData(matchId) {
+export function getEspnData(matchId) {
   if (!matchId) return null
   try {
     const raw = localStorage.getItem(`foot_espn_${matchId}`)
@@ -33,7 +33,7 @@ function FormBadge({ result }) {
 
 // ── Buteurs ESPN (format espnScoresCache.scorers) ────────────────────────────
 // ESPN scorers : { name, minute (ex "24:00"), team ('home'|'away'), ownGoal, penaltyKick }
-function ESPNScorers({ scorers = [] }) {
+export function ESPNScorers({ scorers = [] }) {
   if (scorers.length === 0) return null
 
   const homeGoals = scorers.filter(s => s.team === 'home')
@@ -113,7 +113,7 @@ function ESPNStats({ stats }) {
 }
 
 // ── Timeline des buts FD.org (fallback) ──────────────────────────────────────
-function GoalTimeline({ goals = [], homeId }) {
+export function GoalTimeline({ goals = [], homeId }) {
   if (goals.length === 0) return null
 
   const homeGoals = goals.filter(g => g.team?.id === homeId)
@@ -152,6 +152,107 @@ function GoalTimeline({ goals = [], homeId }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ── Fil du match : buts + cartons + remplacements, triés par minute ──────────
+// Buts/cartons : ESPN en priorité (matchs suivis en live ou re-fetchés à la
+// demande — voir useEspnMatchDetail.js/api/fifa-live.js), fallback FD.org.
+// Remplacements : FD.org uniquement — ESPN n'expose aucune donnée de
+// remplacement dans son scoreboard/summary soccer (vérifié, aucune occurrence
+// avec 2+ athlètes dans details[]/plays[] sur plusieurs matchs réels testés).
+function minuteSort(raw) {
+  if (raw == null) return 9999
+  const m = String(raw).match(/(\d+)(?:[+:](\d+))?/)
+  if (!m) return 9999
+  return parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) / 100 : 0)
+}
+
+function espnMinuteLabel(raw) {
+  const base = String(raw ?? '').split(':')[0]
+  return base ? `${base}'` : (raw || '')
+}
+
+function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], homeId }) {
+  const events = { home: [], away: [] }
+  let k = 0
+
+  if (espnScorers.length > 0) {
+    espnScorers.forEach(s => {
+      const suffix = s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+      events[s.team === 'home' ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(s.minute), minute: espnMinuteLabel(s.minute),
+        icon: '⚽', name: `${s.name}${suffix}`,
+      })
+    })
+  } else {
+    fdGoals.forEach(g => {
+      const isHome = g.team?.id === homeId
+      const suffix = g.type === 'OWN_GOAL' ? ' (csc)' : g.type === 'PENALTY' ? ' (pen)' : ''
+      events[isHome ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(g.minute), minute: g.minute ? `${g.minute}'` : '',
+        icon: '⚽', name: `${g.scorer?.shortName ?? g.scorer?.name ?? '?'}${suffix}`,
+      })
+    })
+  }
+
+  if (espnCards.length > 0) {
+    espnCards.forEach(c => {
+      events[c.team === 'home' ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(c.minute), minute: espnMinuteLabel(c.minute),
+        icon: c.red ? '🟥' : '🟨', name: c.name,
+      })
+    })
+  } else {
+    fdBookings.forEach(b => {
+      const isHome = b.team?.id === homeId
+      const isRed  = b.card === 'RED_CARD' || b.card === 'YELLOW_RED_CARD'
+      events[isHome ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(b.minute), minute: b.minute ? `${b.minute}'` : '',
+        icon: isRed ? '🟥' : '🟨', name: b.player?.shortName ?? b.player?.name ?? '?',
+      })
+    })
+  }
+
+  fdSubs.forEach(s => {
+    const isHome = s.team?.id === homeId
+    events[isHome ? 'home' : 'away'].push({
+      key: `e${k++}`, sort: minuteSort(s.minute), minute: s.minute ? `${s.minute}'` : '',
+      icon: '🔁', name: `${s.playerIn?.shortName ?? s.playerIn?.name ?? '?'} ↔ ${s.playerOut?.shortName ?? s.playerOut?.name ?? '?'}`,
+    })
+  })
+
+  events.home.sort((a, b) => a.sort - b.sort)
+  events.away.sort((a, b) => a.sort - b.sort)
+  return events
+}
+
+export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, homeId }) {
+  const { home, away } = buildMatchEvents({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, homeId })
+  if (home.length === 0 && away.length === 0) return null
+
+  return (
+    <div className="modal__stats">
+      <div className="modal__statsCol modal__statsCol--home">
+        {home.map(e => (
+          <div key={e.key} className="modal__goalRow">
+            <span className="modal__goalName">{e.name}</span>
+            <span className="modal__goalMeta">{e.minute}</span>
+            <span className="modal__goalIcon" aria-hidden="true">{e.icon}</span>
+          </div>
+        ))}
+      </div>
+      <div className="modal__statsDivider" />
+      <div className="modal__statsCol modal__statsCol--away">
+        {away.map(e => (
+          <div key={e.key} className="modal__goalRow modal__goalRow--away">
+            <span className="modal__goalIcon" aria-hidden="true">{e.icon}</span>
+            <span className="modal__goalMeta">{e.minute}</span>
+            <span className="modal__goalName">{e.name}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -564,9 +665,11 @@ function FinishedDetails({ match, espnData, detail, loading }) {
   const homeId     = match.homeTeam?.id
   const totalGoals = (match.score?.fullTime?.home ?? 0) + (match.score?.fullTime?.away ?? 0)
 
-  const fdGoals    = detail?.goals    ?? []
-  const fdBookings = detail?.bookings ?? []
+  const fdGoals     = detail?.goals         ?? []
+  const fdBookings  = detail?.bookings      ?? []
+  const fdSubs      = detail?.substitutions ?? []
   const espnScorers = espnData?.scorers ?? []
+  const espnCards   = espnData?.cards   ?? []
 
   // ESPN scoreboard ne retourne pas toujours les détails de buts pour les matchs passés.
   // On considère ESPN "utile" seulement s'il a des buteurs OU des stats.
@@ -583,29 +686,44 @@ function FinishedDetails({ match, espnData, detail, loading }) {
     )
   }
 
+  const hasEvents = espnScorers.length > 0 || espnCards.length > 0 ||
+    fdGoals.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
+
   return (
     <>
-      {/* ── Buteurs : ESPN en priorité si utile, FD.org sinon ── */}
-      {espnScorers.length > 0
-        ? <ESPNScorers scorers={espnScorers} />
-        : fdGoals.length > 0
-          ? <GoalTimeline goals={fdGoals} homeId={homeId} />
-          : !loading
-            ? <p className="modal__noEvents">
-                {totalGoals > 0 ? 'Buteurs non disponibles' : 'Match sans but (0 – 0)'}
-              </p>
-            : null   // FD.org charge encore, on n'affiche pas le message trop tôt
+      {/* ── Fil du match : buts + cartons + remplacements ── */}
+      {hasEvents
+        ? <MatchTimeline
+            espnScorers={espnScorers} espnCards={espnCards}
+            fdGoals={fdGoals} fdBookings={fdBookings} fdSubs={fdSubs}
+            homeId={homeId}
+          />
+        : !loading
+          ? <p className="modal__noEvents">
+              {totalGoals > 0 ? 'Événements non disponibles' : 'Match sans but (0 – 0)'}
+            </p>
+          : null   // FD.org charge encore, on n'affiche pas le message trop tôt
       }
 
       {/* ── Stats ESPN si disponibles ── */}
       {espnData?.stats && <ESPNStats stats={espnData.stats} />}
-
-      {/* ── Cartons FD.org ── */}
-      {fdBookings.length > 0 && <Bookings bookings={fdBookings} homeId={homeId} />}
     </>
   )
 }
 
+
+// ── Indicateur de pages (dots) sous les onglets swipables ────────────────────
+// Signale visuellement que l'onglet actif fait partie d'un groupe swipable.
+export function TabDots({ count, active }) {
+  if (!count || count <= 1) return null
+  return (
+    <div className="tabDots">
+      {Array.from({ length: count }).map((_, i) => (
+        <span key={i} className={`tabDots__dot${i === active ? ' tabDots__dot--active' : ''}`} />
+      ))}
+    </div>
+  )
+}
 
 // ── Modal principale ─────────────────────────────────────────────────────────
 export function PronoSection({ prono, homeShort, awayShort }) {
@@ -1310,6 +1428,10 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 onClick={() => pickTab('classement')}
               >Classement</button>
             </div>
+            <TabDots
+              count={LIVE_TABS.filter(t => t !== 'prono' || prono).length}
+              active={LIVE_TABS.filter(t => t !== 'prono' || prono).indexOf(tab)}
+            />
             <div
               key={tab}
               className={`modal__tabContent${!swipeLive.isDragging && tabDir === 'left' ? ' modal__tabContent--fromRight' : !swipeLive.isDragging && tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}
@@ -1347,6 +1469,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 onClick={() => pickPreTab('classement')}
               >Classement</button>
             </div>
+            <TabDots count={PRE_TABS.length} active={PRE_TABS.indexOf(preTab)} />
             <div
               key={preTab}
               className={`modal__tabContent${!swipePre.isDragging && tabDir === 'left' ? ' modal__tabContent--fromRight' : !swipePre.isDragging && tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}

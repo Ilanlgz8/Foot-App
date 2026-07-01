@@ -1,3 +1,4 @@
+import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, mergeScore }     from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
@@ -13,6 +14,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // Vrai formMap depuis football-data.org pour cette compétition
   const compCode = match.competition?.code ?? null
   const { formMap } = useTeamForm(compCode)
+
+  // Fallback initiale si le crest ne charge pas (404, image cassée)
+  const [homeCrestError, setHomeCrestError] = useState(false)
+  const [awayCrestError, setAwayCrestError] = useState(false)
 
   const _ms       = getMatchState(match.id)
   const _espnLive = (
@@ -75,10 +80,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       <div className="poster__middle">
 
         <div className="poster__team-col poster__team-col--home">
-          {match.homeTeam?.crest
+          {match.homeTeam?.crest && !homeCrestError
             ? <div className="poster__crestWrap"><img className="poster__crest" src={match.homeTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} /></div>
-            : <div className="poster__crest-empty" />
+                onError={() => setHomeCrestError(true)} /></div>
+            : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
           }
           <span className="poster__name poster__name--home">{homeShort}</span>
         </div>
@@ -101,10 +106,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         </div>
 
         <div className="poster__team-col poster__team-col--away">
-          {match.awayTeam?.crest
+          {match.awayTeam?.crest && !awayCrestError
             ? <div className="poster__crestWrap"><img className="poster__crest" src={match.awayTeam.crest} alt=""
-                onError={e => { e.currentTarget.style.display = 'none' }} /></div>
-            : <div className="poster__crest-empty" />
+                onError={() => setAwayCrestError(true)} /></div>
+            : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
           }
           <span className="poster__name poster__name--away">{awayShort}</span>
         </div>

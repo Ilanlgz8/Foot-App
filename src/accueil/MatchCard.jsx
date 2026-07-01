@@ -53,6 +53,36 @@ export function PanelSkeleton() {
   )
 }
 
+// ── Skeleton posters (mobile) ── — .accueil__matchCards est caché sur mobile
+// (voir accueil.css), donc PanelSkeleton seul y est invisible pendant le
+// chargement. Ce skeleton reprend la structure de MatchPoster pour combler
+// ce trou et éviter un vide pendant le chargement initial sur mobile.
+export function PosterSkeleton() {
+  return (
+    <div className="accueil__posterSkList">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="poster__frame poster__frame--sk">
+          <div className="poster poster--sk">
+            <div className="poster__middle">
+              <div className="poster__team-col poster__team-col--home">
+                <div className="sk" style={{ width: '44px', height: '44px', borderRadius: '50%' }} />
+                <div className="sk" style={{ width: '3rem', height: '0.7rem' }} />
+              </div>
+              <div className="poster__center">
+                <div className="sk" style={{ width: '3.5rem', height: '1.3rem', borderRadius: '0.4rem' }} />
+              </div>
+              <div className="poster__team-col poster__team-col--away">
+                <div className="sk" style={{ width: '44px', height: '44px', borderRadius: '50%' }} />
+                <div className="sk" style={{ width: '3rem', height: '0.7rem' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Carte d'un match ──
 // Affiche : logo + nom équipe dom | score/heure/minute | logo + nom équipe ext
 // Props :
@@ -250,6 +280,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
 
   return (
     <div className="accueil__dashPanelBody">
+      {loading && <PosterSkeleton />}
       {loading && <PanelSkeleton />}
       {!loading && displayed.length === 0 && (
         <p className="accueil__tickerEmpty">Aucun match aujourd'hui.</p>

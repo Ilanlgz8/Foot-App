@@ -79,6 +79,21 @@ function extractFromSummary(json, homeTeamId) {
     }
   }
 
+  // ── Cartons (jaune/rouge) — mêmes ids ESPN vérifiés (93=Red Card, 94=Yellow Card).
+  // Pas d'équivalent dans json.plays pour le soccer, uniquement dans comp.details.
+  const cards = []
+  for (const d of (comp?.details ?? [])) {
+    const id = String(d.type?.id ?? '')
+    if (id !== '93' && id !== '94') continue
+    const ath = d.athletesInvolved?.[0]
+    cards.push({
+      name:   ath?.shortName ?? ath?.displayName ?? '?',
+      minute: d.clock?.displayValue ?? '',
+      team:   d.team?.id === homeC?.team?.id ? 'home' : 'away',
+      red:    d.redCard === true || id === '93',
+    })
+  }
+
   // ── Stats ──
   const getStat = (c, name) => {
     if (!c) return null
@@ -90,6 +105,7 @@ function extractFromSummary(json, homeTeamId) {
 
   return {
     scorers,
+    cards,
     stats: (homePoss !== null || awayPoss !== null) ? {
       home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners'), fouls: getStat(homeC, 'fouls'), offside: getStat(homeC, 'offsides') },
       away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners'), fouls: getStat(awayC, 'fouls'), offside: getStat(awayC, 'offsides') },

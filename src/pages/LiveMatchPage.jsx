@@ -20,6 +20,7 @@ import {
   LiveStatsTab,
   ComposTab,
   ClassementTab,
+  TabDots,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
 import './MatchPage.css'
@@ -159,7 +160,7 @@ function MatchHeader({ match, espn, onBack }) {
         <div className="mp__hero__team">
           {match.homeTeam?.crest
             ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" /></div>
-            : <div className="mp__hero__crestFb" />}
+            : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
           {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
         </div>
@@ -172,7 +173,7 @@ function MatchHeader({ match, espn, onBack }) {
         <div className="mp__hero__team mp__hero__team--away">
           {match.awayTeam?.crest
             ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" /></div>
-            : <div className="mp__hero__crestFb" />}
+            : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
           {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}
         </div>
@@ -268,6 +269,7 @@ export default function LiveMatchPage() {
               </button>
             ))}
           </div>
+          <TabDots count={TABS.length} active={TABS.indexOf(activeTab)} />
 
           {/* Contenu */}
           <div

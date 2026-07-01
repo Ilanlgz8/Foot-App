@@ -234,6 +234,26 @@ function extractEspnScorers(comp, homeTeamId) {
     })
 }
 
+// Cartons (jaune/rouge) — mêmes ids ESPN que ceux vérifiés en direct sur de vrais
+// matchs (type.id "94"="Yellow Card", "93"="Red Card"). Pas d'équivalent FIFA
+// fiable pour les cartons (contrairement aux buts) → ESPN uniquement.
+function extractEspnCards(comp, homeTeamId) {
+  return (comp.details ?? [])
+    .filter(d => {
+      const id = String(d.type?.id ?? '')
+      return id === '93' || id === '94'
+    })
+    .map(d => {
+      const ath = d.athletesInvolved?.[0]
+      return {
+        name:   ath?.shortName ?? ath?.displayName ?? '?',
+        minute: d.clock?.displayValue ?? '',
+        team:   d.team?.id === homeTeamId ? 'home' : 'away',
+        red:    d.redCard === true || String(d.type?.id) === '93',
+      }
+    })
+}
+
 // ── ESPN summary → stats live (possession, tirs, corners) ─────────────────────
 // Le scoreboard ESPN n'inclut pas statistics[] pour le soccer.
 // Les stats réelles sont dans l'endpoint /summary?event={espnEventId}.
@@ -561,6 +581,11 @@ export default async function handler(req, res) {
     const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
       ? scorers : (prevData?.scorers ?? [])
 
+    // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus)
+    const cards = extractEspnCards(comp, homeC?.team?.id)
+    const bestCards = cards.length >= (prevData?.cards?.length ?? 0)
+      ? cards : (prevData?.cards ?? [])
+
     // ── Score des tirs au but ────────────────────────────────────────────────
     // ESPN expose un champ dédié `shootoutScore` sur chaque compétiteur (vérifié
     // sur un vrai match : finale CM 2022, Argentine 4 - France 2). FIFA n'a pas
@@ -615,6 +640,7 @@ export default async function handler(req, res) {
       home,
       away,
       scorers:      bestScorers,
+      cards:        bestCards,
       // Tirs au but (ESPN uniquement — voir commentaire ci-dessus)
       homeShootout,
       awayShootout,
@@ -657,6 +683,9 @@ export default async function handler(req, res) {
       home:         fifaD.home,
       away:         fifaD.away,
       scorers:      bestScorers,
+      // Pas de source fiable pour les cartons ici (fallback FIFA sans ESPN) →
+      // on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.
+      cards:        prevData?.cards ?? [],
       stats:        prevData?.stats ?? null,
       // Pas de source fiable pour le score des tab ici (fallback FIFA sans ESPN)
       // → on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.

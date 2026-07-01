@@ -382,7 +382,7 @@ async function _doPollESPN(matches, queryClient) {
       const match = allMatches.find(m => m.id === mid)
       if (!match) continue
 
-      const { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache, homeShootout, awayShootout } = data
+      const { espnStatus, espnClock, espnPeriod, home, away, scorers, cards, stats, fromCache, homeShootout, awayShootout } = data
 
       // Mémoriser que ce match est visible dans le scoreboard ESPN (sauf si fromCache)
       if (!fromCache) lastSeenInEspn[mid] = now
@@ -459,6 +459,12 @@ async function _doPollESPN(matches, queryClient) {
           const cached = prevCache?.scorers ?? []
           return fresh.length >= cached.length ? fresh : cached
         })()
+        // Cartons : même garde que les scorers
+        const safeCards = (() => {
+          const fresh = cards ?? []
+          const cached = prevCache?.cards ?? []
+          return fresh.length >= cached.length ? fresh : cached
+        })()
 
         // Tirs au but : même garde anti-régression que le score (ESPN uniquement,
         // voir api/fifa-live.js — jamais redescendre un compteur déjà connu).
@@ -473,6 +479,7 @@ async function _doPollESPN(matches, queryClient) {
           home:         safeHome,
           away:         safeAway,
           scorers:      safeScorers,
+          cards:        safeCards,
           stats:        stats   ?? prevCache?.stats   ?? null,
           homeShootout: safeHomeShootout,
           awayShootout: safeAwayShootout,
@@ -543,6 +550,7 @@ async function _doPollESPN(matches, queryClient) {
         const ftSafeHome = (prevCache?.home != null && home != null) ? Math.max(home, prevCache.home) : (home ?? prevCache?.home)
         const ftSafeAway = (prevCache?.away != null && away != null) ? Math.max(away, prevCache.away) : (away ?? prevCache?.away)
         const ftScorers  = (() => { const f = scorers ?? []; const c = prevCache?.scorers ?? []; return f.length >= c.length ? f : c })()
+        const ftCards    = (() => { const f = cards   ?? []; const c = prevCache?.cards   ?? []; return f.length >= c.length ? f : c })()
         // Même garde anti-régression pour le score des tab (dernier tir décisif
         // pouvant arriver dans le même poll que la confirmation STATUS_FINAL_PEN).
         const ftSafeHomeShootout = (prevCache?.homeShootout != null && homeShootout != null)
@@ -556,6 +564,7 @@ async function _doPollESPN(matches, queryClient) {
           home:         ftSafeHome,
           away:         ftSafeAway,
           scorers:      ftScorers,
+          cards:        ftCards,
           stats:        stats   ?? prevStats,
           homeShootout: ftSafeHomeShootout,
           awayShootout: ftSafeAwayShootout,

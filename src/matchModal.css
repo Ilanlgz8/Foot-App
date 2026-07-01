@@ -1467,3 +1467,24 @@
   .pm__h2hScore { font-size: 0.68rem; }
   .pm__h2hDate  { font-size: 0.54rem; }
 }
+
+/* ── Indicateur de pages (dots) sous les onglets swipables ────────────────── */
+.tabDots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0 0.25rem;
+}
+.tabDots__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  transition: background 0.2s, transform 0.2s, width 0.2s;
+}
+.tabDots__dot--active {
+  background: #ef4444;
+  width: 14px;
+  border-radius: 3px;
+}
