@@ -33,6 +33,75 @@ export const KNOCKOUT_LABELS = {
 const EMPTY_ROUNDS = []
 const CACHE_KEY = 'wc_knockout'
 
+// football-data.org ne fournit aucun "index de position dans le bracket" —
+// l'ordre du tableau pour un tour donné suit l'ordre de création/planification
+// des matchs côté API, PAS forcément l'ordre d'adjacence de l'arbre (les 2
+// matchs qui alimentent le même match du tour suivant ne sont pas garantis
+// consécutifs). Ça se voit peu sur les tours à peu de matchs (huitièmes,
+// quarts...) mais beaucoup sur les 32es (16 matchs) → lignes de connexion et
+// positions du SVG qui ne correspondent plus aux vrais vainqueurs qualifiés.
+// On reconstruit le vrai ordre en remontant les résultats réels : pour
+// chaque match du tour N+1, on cherche quels 2 matchs du tour N ont produit
+// ses 2 équipes (home/away), et on les replace côte à côte dans cet ordre.
+function getWinnerTeamId(m) {
+  const hs  = m.score?.fullTime?.home
+  const as_ = m.score?.fullTime?.away
+  if (hs == null || as_ == null) return null
+  if (m.score?.duration === 'PENALTY_SHOOTOUT') {
+    const hp = m.score?.penalties?.home
+    const ap = m.score?.penalties?.away
+    if (hp == null || ap == null || hp === ap) return null
+    return hp > ap ? m.homeTeam?.id : m.awayTeam?.id
+  }
+  if (hs > as_) return m.homeTeam?.id
+  if (as_ > hs) return m.awayTeam?.id
+  return null
+}
+
+function reorderRoundsByTopology(rounds) {
+  // La Petite Finale n'a pas de "tour suivant" dans l'arbre (elle est
+  // alimentée par les perdants des demies, pas par un tour adjacent dans la
+  // même chaîne) → on la sort de la chaîne de réordonnancement.
+  const chain = rounds.filter(r => r.stage !== 'THIRD_PLACE')
+
+  // On part de la fin vers le début : pour réordonner le tour N, il faut
+  // déjà connaître l'ordre définitif (corrigé) du tour N+1.
+  for (let ri = chain.length - 2; ri >= 0; ri--) {
+    const round     = chain[ri]
+    const nextRound = chain[ri + 1]
+    const used       = new Set()
+    const reordered  = new Array(round.matches.length).fill(null)
+
+    nextRound.matches.forEach((nm, ni) => {
+      const needHome = nm.homeTeam?.id
+      const needAway = nm.awayTeam?.id
+      let slotHome = null, slotAway = null
+      round.matches.forEach((m, mi) => {
+        if (used.has(mi)) return
+        const w = getWinnerTeamId(m)
+        if (w == null) return
+        if (needHome != null && w === needHome) slotHome = mi
+        else if (needAway != null && w === needAway) slotAway = mi
+      })
+      if (slotHome != null) { reordered[ni * 2]     = round.matches[slotHome]; used.add(slotHome) }
+      if (slotAway != null) { reordered[ni * 2 + 1] = round.matches[slotAway]; used.add(slotAway) }
+    })
+
+    // Matchs pas encore joués/appariés (pas de vainqueur connu, ou pas encore
+    // affecté à un tour suivant tbd) : replacés dans les trous restants, dans
+    // leur ordre d'origine — on ne perd jamais un match, on améliore juste
+    // l'ordre de ceux qu'on peut tracer.
+    const leftovers = []
+    round.matches.forEach((m, mi) => { if (!used.has(mi)) leftovers.push(m) })
+    for (let i = 0; i < reordered.length; i++) {
+      if (reordered[i] == null) reordered[i] = leftovers.shift() ?? null
+    }
+    round.matches = reordered.filter(Boolean)
+  }
+
+  return rounds
+}
+
 export function useWcKnockout() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['wc-knockout'],
@@ -66,6 +135,8 @@ export function useWcKnockout() {
           rounds.push({ stage, label: KNOCKOUT_LABELS[stage], matches: stageMatches })
         }
       }
+
+      reorderRoundsByTopology(rounds)
 
       writeCache(CACHE_KEY, rounds, STALE_MS)
       return rounds

@@ -147,7 +147,12 @@ function Resultats() {
         document.body.style.top = ''; document.body.style.left = ''; document.body.style.right = ''
         window.scrollTo(0, scrollY)
       }
-    }, [onClose])
+      // Même bug que dans Match.jsx : `onClose` est une arrow function
+      // recréée à chaque render du parent → dépendre d'elle démonte/remonte
+      // cet effect en boucle pendant que la modale est ouverte, déverrouillant
+      // puis reverrouillant le scroll du body à chaque re-render du parent.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     return createPortal(
       <div className="wcModal__overlay" onClick={onClose}>

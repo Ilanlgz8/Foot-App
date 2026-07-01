@@ -848,10 +848,21 @@
    BRACKET — Phase finale
    ═══════════════════════════════════════════ */
 
-/* Conteneur avec scroll horizontal si besoin */
+/* Conteneur avec scroll horizontal si besoin.
+   overflow-y: hidden (et non "visible") : en CSS, dès qu'un axe a une valeur
+   de overflow non-visible, l'autre axe calcule "visible" comme "auto" quand
+   même (spec Overflow) — donc "visible" ici était en réalité traité comme
+   "auto", un axe de scroll vertical fantôme sur ce conteneur. Combiné à
+   l'absence de touch-action, ça pouvait faire capter le geste de scroll
+   vertical de la page par ce conteneur horizontal en PWA (arbitrage tactile
+   plus strict qu'un onglet de navigateur classique) → scroll bloqué en bas.
+   touch-action: pan-x indique explicitement qu'on ne gère que le swipe
+   horizontal ici, laissant le swipe vertical remonter à la page. */
 .bracket__container {
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(239,68,68,0.25) transparent;
   padding-bottom: 1rem;

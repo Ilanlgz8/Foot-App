@@ -17,14 +17,29 @@ import { calcProno } from '../utils/calcProno'
    Défini AU NIVEAU MODULE pour éviter tout remount inutile.
    ═══════════════════════════════════════════════════════════════ */
 const BK_CARD_W = 200   // largeur d'une card (px)
-// Hauteur mini d'une card : 2 lignes équipe (~45px chacune, padding inclus)
-// + séparateur central (~33px avec date+heure sur 2 lignes, ou tab/live).
-// 110px était trop juste (~123px de contenu réel) → le score de l'équipe du
-// bas se retrouvait rogné par overflow:hidden. 130px laisse une marge de sécu.
-const BK_CARD_H = 130   // hauteur MINI d'une card (px) — le contenu peut grandir sans être coupé
-const BK_SLOT_H = 158   // hauteur de slot = card + marge verticale
+// Hauteur de card : plutôt que de deviner une constante (raté 2 fois — le
+// contenu réel sur PWA est plus haut que l'estimation, notamment pour les
+// matchs à venir avec date+heure sur 2 lignes dans le séparateur central),
+// on la MESURE via une card-sonde invisible identique au pire cas réel
+// (match à venir, cf BK_PROBE_MATCH) rendue avec BkCard lui-même — voir
+// useLayoutEffect dans BracketSvgView. BK_CARD_H_FALLBACK ne sert que le
+// temps du tout premier render, avant que la mesure soit disponible.
+const BK_CARD_H_FALLBACK = 140
+const BK_CARD_GAP = 28  // marge verticale entre le bas d'une card et le haut de la suivante
 const BK_CONN_W = 56    // largeur de la zone connecteur entre rounds
 const BK_HDR_H  = 40    // hauteur de l'en-tête de round (titre)
+
+// Card-sonde : le pire cas de contenu réel (match à venir → séparateur
+// date+heure sur 2 lignes, la variante la plus haute observée). Rendue avec
+// le VRAI composant BkCard pour garantir une mesure pixel-perfect, jamais
+// une estimation à la main.
+const BK_PROBE_MATCH = {
+  status: 'SCHEDULED',
+  utcDate: new Date().toISOString(),
+  homeTeam: { name: 'Argentine', shortName: 'Argentine' },
+  awayTeam: { name: 'Allemagne', shortName: 'Allemagne' },
+  score: { fullTime: { home: null, away: null } },
+}
 
 const _fmtH = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
 const _fmtD = (d) => {
@@ -37,7 +52,10 @@ const _fmtD = (d) => {
 }
 const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
 
-function BkCard({ m, style, onSelect }) {
+// cardH: hauteur mini imposée (px). `null` = mode sonde → aucune contrainte,
+// on laisse le contenu prendre sa hauteur naturelle pour la mesurer telle
+// quelle (sinon une minHeight fausserait la mesure vers le haut).
+function BkCard({ m, style, onSelect, cardH }) {
   const fin  = m.status === 'FINISHED'
   const live = m.status === 'IN_PLAY' || m.status === 'PAUSED'
   const tbd  = !m.homeTeam?.name && !m.awayTeam?.name
@@ -54,7 +72,7 @@ function BkCard({ m, style, onSelect }) {
   return (
     <div
       className={`bracket__card ${live ? 'bracket__card--live' : ''}`}
-      style={{ ...style, minHeight: BK_CARD_H, display:'flex', flexDirection:'column' }}
+      style={{ ...style, ...(cardH != null ? { minHeight: cardH } : {}), display:'flex', flexDirection:'column' }}
       onClick={() => !tbd && onSelect(m)}
     >
       <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}>
@@ -95,6 +113,23 @@ function BkCard({ m, style, onSelect }) {
 }
 
 function BracketSvgView({ rounds, onSelect }) {
+  // ── Mesure de la hauteur réelle de card via une sonde invisible ──
+  // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
+  // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
+  // donc la mesure reflète exactement ce qui sera rendu (fonte, padding,
+  // line-height PWA réels), plus jamais une constante devinée à la main.
+  // Hooks appelés avant tout retour anticipé (règle des Hooks React).
+  const probeRef = useRef(null)
+  const [cardH, setCardH] = useState(BK_CARD_H_FALLBACK)
+
+  useLayoutEffect(() => {
+    const h = probeRef.current?.getBoundingClientRect().height
+    if (h && h > 0) setCardH(Math.ceil(h))
+    // Contenu-sonde fixe (jamais lié aux données réelles) → une seule mesure
+    // au montage suffit, pas besoin de re-mesurer à chaque render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (!rounds?.length) return null
 
   // THIRD_PLACE casse l'alignement → on le sépare du bracket principal
@@ -103,8 +138,9 @@ function BracketSvgView({ rounds, onSelect }) {
 
   if (!main.length) return null
 
+  const slotH   = cardH + BK_CARD_GAP
   const firstN  = main[0].matches.length
-  const GRID_H  = firstN * BK_SLOT_H
+  const GRID_H  = firstN * slotH
   const TOTAL_H = BK_HDR_H + GRID_H
   const TOTAL_W = main.length * BK_CARD_W + Math.max(0, main.length - 1) * BK_CONN_W
 
@@ -143,6 +179,16 @@ function BracketSvgView({ rounds, onSelect }) {
 
   return (
     <div className="bracket__svgWrap">
+      {/* Card-sonde invisible : ne sert qu'à mesurer la hauteur réelle du
+          pire cas de contenu (voir commentaire plus haut). Ne participe
+          jamais au layout visible (hors-écran + visibility:hidden, donc
+          toujours "layout-able" pour une mesure correcte mais invisible). */}
+      <div ref={probeRef} aria-hidden="true"
+        style={{ position:'absolute', top:-9999, left:-9999, width:BK_CARD_W,
+                 visibility:'hidden', pointerEvents:'none' }}>
+        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
+      </div>
+
       {/* ── Tableau principal ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
 
@@ -174,10 +220,10 @@ function BracketSvgView({ rounds, onSelect }) {
         {main.map((round, ri) =>
           round.matches.map((m, mi) => {
             const n       = round.matches.length
-            const slotH   = GRID_H / n
-            const cardTop = BK_HDR_H + slotH * mi + (slotH - BK_CARD_H) / 2
+            const sH      = GRID_H / n
+            const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
-              <BkCard key={m.id} m={m} onSelect={onSelect}
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH}
                 style={{ position:'absolute', left:rX(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
@@ -401,7 +447,15 @@ function Matchs() {
         document.body.style.right = ''
         window.scrollTo(0, scrollY)
       }
-    }, [onClose])
+      // `onClose` est une arrow function recréée à chaque render du parent
+      // (`onClose={() => setOpenedGroup(null)}`) : la mettre en dépendance
+      // faisait démonter/remonter cet effect à CHAQUE re-render du parent
+      // (ex: toutes les 30s via le polling `hasLiveRound`), ce qui déverrouille
+      // puis reverrouille le scroll du body en boucle — cause probable du
+      // scroll bloqué en PWA. `setOpenedGroup` est stable, pas besoin de
+      // dépendre de ce wrapper inline.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     return createPortal(
       <div className="wcModal__overlay" onClick={onClose}>
