@@ -295,12 +295,16 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     lvhProbe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:100lvh; visibility:hidden; pointer-events:none;'
     document.body.appendChild(lvhProbe)
 
-    // Remonter tout en haut de LA PAGE (pas juste aligner le conteneur au
-    // ras du viewport, qui pouvait faire disparaître les onglets Poules/
-    // Matchs/Phase finale au-dessus du pli) UNE SEULE FOIS avant la mesure —
-    // référence stable et maximale, indépendante d'où l'utilisateur était
-    // scrollé avant d'ouvrir cet onglet.
-    window.scrollTo?.({ top: 0, behavior: 'instant' })
+    // ERREUR CORRIGÉE : window.scrollTo(0,0) remontait à l'ABSOLU tout en
+    // haut de la page — donc au-dessus du header/sidebar/onglets Poules-
+    // Matchs-Phase finale, qui prennent eux-mêmes de la place. rect.top du
+    // conteneur restait alors grand (tout ce chrome au-dessus), et comme
+    // availH = hauteur écran − rect.top, le zoom calculé s'effondrait →
+    // tableau minuscule. On aligne donc plutôt le conteneur lui-même au ras
+    // du haut du viewport (scrollIntoView) : rect.top devient ~0, availH
+    // redevient maximal, tout en restant UNE SEULE FOIS avant la mesure
+    // (donc toujours indépendant d'où l'utilisateur était scrollé avant).
+    el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
 
     const compute = () => {
       const rect   = el.getBoundingClientRect()
