@@ -26,35 +26,43 @@ import { calcProno } from '../utils/calcProno'
 // card au lieu de partager la place avec du texte → rendu final nettement
 // plus grand malgré un zoom similaire. Un drapeau seul reste identifiable
 // (c'est déjà le repère visuel principal), contrairement à 3 lettres minuscules.
-const BK_CARD_W = 38
+// Rétréci encore (38→34) : moins de largeur "carte" au profit du drapeau
+// lui-même (voir bracket__crestWrap dans match.css, agrandi en retour) —
+// le zoom fit-to-screen dépend de TOTAL_W, donc réduire les colonnes permet
+// mécaniquement un zoom plus généreux malgré un tableau à 9 colonnes.
+const BK_CARD_W = 34
 // Card de la FINALE (et de la petite finale) : volontairement plus large que
 // les cards de tour normal — c'est le point de convergence du tableau, elle
 // doit se voir davantage (demande explicite : la finale "en plus gros").
-const BK_FINAL_W = 54
+const BK_FINAL_W = 58
 // Hauteur de card : mesurée via sonde (fiable, gère les variations de
 // métriques de fonte/rendu d'image selon l'appareil) plutôt que devinée à la
 // main — même principe que précédemment. Fallback plus généreux qu'avant
 // car le drapeau occupe maintenant plus de place dans la card.
 const BK_CARD_H_FALLBACK = 44
 const BK_CARD_H_SAFETY = 4
-// Marge verticale entre le bas d'une card et le haut de la suivante. Le zoom
-// "fit-to-screen" reste généralement bloquant en LARGEUR (9 colonnes) plutôt
-// qu'en hauteur — un gap généreux "détend" le tableau verticalement sans
-// changer le zoom, tant que TOTAL_H ne dépasse pas le budget dispo.
-const BK_CARD_GAP = 18
-const BK_CONN_W = 10    // largeur de la zone connecteur entre rounds
+// Marge verticale entre le bas d'une card et le haut de la suivante. Constaté
+// à l'usage (capture d'écran) : beaucoup d'espace vertical inutilisé sous le
+// tableau une fois le zoom fit-to-screen appliqué (le zoom reste souvent
+// bloquant en LARGEUR, pas en hauteur) → gap généreux pour utiliser cet
+// espace, "détendre" le tableau, sans jamais changer le zoom lui-même.
+const BK_CARD_GAP = 30
+// Largeur de la zone connecteur entre rounds — élargie un peu pour que les
+// chips de titre de tour (16èmes/8èmes/Quarts/Demies) aient de l'air entre
+// elles au lieu de se toucher (elles étaient collées, illisibles).
+const BK_CONN_W = 12
 // Hauteur de l'en-tête de round (titre) — libellés courts (voir
 // BK_SHORT_LABELS), tiennent sur 1 ligne. Le titre de la finale n'est PLUS
 // dans cette rangée (voir BK_FINAL_LABEL_H) : demande explicite de le
 // mettre au niveau de la card de la finale plutôt que tout en haut.
 const BK_HDR_H  = 16
 // Espace réservé au-dessus de la card de la finale pour son propre label
-// "🏆 FINALE" (plus grand que les titres de tour normaux — voir
-// bracket__finalLabel dans match.css).
-const BK_FINAL_LABEL_H = 20
+// "🏆 FINALE" — resserré pour que le label reste visuellement "accroché" à
+// sa card plutôt que de flotter avec un grand vide entre les deux.
+const BK_FINAL_LABEL_H = 16
 // Marge horizontale de sécu de part et d'autre du tableau (débordement du
 // titre de tour centré — voir bracket__roundTitle).
-const BK_PAD_X = 4
+const BK_PAD_X = 3
 
 // Libellés COURTS pour les en-têtes de colonne du bracket compact — pas les
 // mêmes que KNOCKOUT_LABELS (useWcKnockout.js), qui restent complets partout

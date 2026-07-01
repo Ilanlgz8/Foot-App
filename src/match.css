@@ -905,16 +905,16 @@
 .bracket__roundTitle {
   display: inline-block;
   margin: 0;
-  font-size: 0.44rem;
+  font-size: 0.38rem;
   line-height: 1;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #fca5a5;
   background: rgba(239,68,68,0.1);
   border: 1px solid rgba(239,68,68,0.2);
   border-radius: 999px;
-  padding: 0.16rem 0.42rem;
+  padding: 0.15rem 0.3rem;
   white-space: nowrap;
 }
 
@@ -922,7 +922,7 @@
   display: inline-block;
   font-size: 0.44rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #f3b673;
   background: rgba(217,119,6,0.12);
@@ -976,7 +976,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem;
+  padding: 0.14rem;
   min-width: 0;
 }
 
@@ -992,58 +992,52 @@
   opacity: 0.42;
 }
 
-/* Badge autour du drapeau — fond légèrement dégradé + fine bordure + ombre
-   interne, façon "pastille" d'appli sportive plutôt qu'un logo qui flotte
-   nu sur le fond de la card. Volontairement pas un cercle parfait (les
-   drapeaux rectangulaires y seraient recadrés/déformés, cf. le bug connu
-   sur les cards détaillées) — un carré arrondi évite ce problème. */
+/* Pas de badge/bordure autour du drapeau (demande explicite) : le drapeau
+   flotte directement sur le fond de la card, juste une légère ombre portée
+   pour le détacher visuellement. Le seul "contour" restant est l'anneau vert
+   de l'équipe qui gagne/mène (repère utile, différent d'une bordure
+   décorative systématique). Pas de cercle parfait pour ne pas recadrer les
+   drapeaux rectangulaires (cf. bug connu sur les cards détaillées). */
 .bracket__crestWrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.3rem;
-  height: 1.3rem;
-  border-radius: 0.4rem;
-  background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255,255,255,0.09);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.35);
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.35rem;
   flex-shrink: 0;
 }
 
-/* Anneau vert autour du badge de l'équipe qui gagne/mène — repère visuel
-   plus élégant qu'un simple fond teinté (gardé en plus, cf. .bracket__team--winner). */
+/* Anneau vert autour du drapeau de l'équipe qui gagne/mène. */
 .bracket__team--winner .bracket__crestWrap {
-  box-shadow: 0 0 0 1.5px rgba(34,197,94,0.65), 0 0 6px rgba(34,197,94,0.25);
+  box-shadow: 0 0 0 1.5px rgba(34,197,94,0.7), 0 0 6px rgba(34,197,94,0.3);
+  border-radius: 0.35rem;
 }
 
 .bracket__crest {
-  width: 1rem; height: 1rem;
+  width: 1.8rem; height: 1.8rem;
   object-fit: contain;
-  border-radius: 0.15rem;
+  border-radius: 0.2rem;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
 }
 
 .bracket__crestTbd {
-  width: 1rem; height: 1rem;
+  width: 1.8rem; height: 1.8rem;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.46rem; color: #3d4d60; font-weight: 800;
+  font-size: 0.7rem; color: #3d4d60; font-weight: 800;
 }
 
-/* Drapeaux + badge plus grands dans la card de la finale/petite finale. */
-.bracket__card--big .bracket__crestWrap {
-  width: 1.95rem; height: 1.95rem;
-  border-radius: 0.55rem;
-  background: linear-gradient(160deg, rgba(251,191,36,0.16), rgba(255,255,255,0.02));
-  border-color: rgba(251,191,36,0.22);
-}
+/* Drapeaux encore plus grands dans la card de la finale/petite finale. */
+.bracket__card--big .bracket__crestWrap,
 .bracket__card--big .bracket__crest,
 .bracket__card--big .bracket__crestTbd {
-  width: 1.5rem; height: 1.5rem;
+  width: 2.7rem; height: 2.7rem;
 }
 .bracket__card--big .bracket__crestTbd {
-  font-size: 0.66rem;
+  font-size: 1rem;
 }
 .bracket__card--big .bracket__team {
-  padding: 0.34rem;
+  padding: 0.22rem;
 }
 
 /* Label "🏆 FINALE" — positionné juste au-dessus de la card de la finale
@@ -1052,7 +1046,8 @@
    valeur comme point de convergence du tableau. */
 .bracket__finalLabel {
   display: inline-block;
-  font-size: 0.56rem;
+  font-size: 0.5rem;
+  line-height: 1;
   font-weight: 900;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1060,7 +1055,8 @@
   background: linear-gradient(135deg, rgba(251,191,36,0.2), rgba(251,191,36,0.05));
   border: 1px solid rgba(251,191,36,0.4);
   border-radius: 999px;
-  padding: 0.18rem 0.6rem;
+  padding: 0.13rem 0.5rem;
+  margin-bottom: 0.15rem;
   text-shadow: 0 0 8px rgba(251,191,36,0.5);
   white-space: nowrap;
   animation: bracketGoldPulse 2.6s ease-in-out infinite;
