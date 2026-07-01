@@ -23,6 +23,7 @@ import {
   ComposTab,
   ClassementTab,
   MatchTimeline,
+  StatsSubTabs,
   getEspnData,
   TabDots,
 } from '../components/MatchModal'
@@ -385,13 +386,19 @@ export default function MatchPage() {
   const isFinished = match?.status === 'FINISHED'
   const compId = match?.competition?.code ?? null
 
-  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(isFinished ? null : compId)
+  // compMatches est nécessaire même pour un match terminé désormais : le
+  // sous-onglet "Stats saison" en a besoin (avant, seuls les matchs à venir
+  // le fetchaient, ce qui rendait "Stats saison" impossible pour un match FT).
+  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
 
   const [activeTab, setActiveTab] = useState('statistiques')
   const [tabDir, setTabDir]       = useState(null)
+  // Sous-onglet dans "Statistiques" pour un match terminé : Stats live (le
+  // récap du match, par défaut) / Stats saison (nouveau).
+  const [statsView, setStatsView] = useState('live')
 
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
 
@@ -457,7 +464,13 @@ export default function MatchPage() {
           >
             {activeTab === 'statistiques' && (
               isFinished
-                ? <MpMatchStats match={match} />
+                ? <>
+                    <StatsSubTabs view={statsView} onChange={setStatsView} />
+                    {statsView === 'live'
+                      ? <MpMatchStats match={match} />
+                      : <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
+                    }
+                  </>
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>

@@ -447,6 +447,92 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
   )
 }
 
+// ── Stats saison — agrégées depuis les matchs terminés de la compétition ─────
+// Partagé entre LiveMatchPage (sous-onglet "Stats saison") et MatchPage pour
+// un match terminé (même sous-onglet). Logique identique à MpSeasonStats
+// (MatchPage.jsx, utilisé pour les matchs à venir) mais exportée ici pour
+// être réutilisable sans dupliquer le calcul dans LiveMatchPage.
+function calcSeasonTeamStats(teamId, compMatches) {
+  const matches = (compMatches ?? []).filter(
+    m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId)
+  )
+  if (!matches.length) return null
+  let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
+  matches.forEach(m => {
+    const myHome = m.homeTeam?.id === teamId
+    const f = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
+    const a = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
+    if (f == null || a == null) return
+    gf += f; ga += a
+    if (a === 0) cs++
+    if (f > 0 && a > 0) btts++
+    if (f + a >= 3) over25++
+    if (f > a) wins++
+    else if (f === a) draws++
+    else losses++
+  })
+  const played = wins + draws + losses
+  if (!played) return null
+  return {
+    played,
+    avgFor:     (gf / played).toFixed(1),
+    avgAgainst: (ga / played).toFixed(1),
+    winPct:     Math.round((wins  / played) * 100),
+    bttsPct:    Math.round((btts  / played) * 100),
+    over25Pct:  Math.round((over25 / played) * 100),
+    cs,
+  }
+}
+
+export function SeasonStatsTab({ match, compMatches }) {
+  const homeId = match?.homeTeam?.id
+  const awayId = match?.awayTeam?.id
+  const h = calcSeasonTeamStats(homeId, compMatches)
+  const a = calcSeasonTeamStats(awayId, compMatches)
+
+  if (!h && !a) {
+    return <p className="modal__noEvents">Stats saison non disponibles</p>
+  }
+
+  const rows = [
+    { label: 'Buts marqués / match',    hv: h?.avgFor,                 av: a?.avgFor },
+    { label: 'Buts encaissés / match',  hv: h?.avgAgainst,             av: a?.avgAgainst },
+    { label: '% Victoires',             hv: h ? `${h.winPct}%` : null, av: a ? `${a.winPct}%` : null },
+    { label: 'Clean sheets',            hv: h?.cs,                     av: a?.cs },
+    { label: 'Les 2 équipes marquent %',hv: h ? `${h.bttsPct}%` : null,av: a ? `${a.bttsPct}%` : null },
+    { label: '+2.5 buts %',             hv: h ? `${h.over25Pct}%` : null, av: a ? `${a.over25Pct}%` : null },
+  ].filter(r => r.hv != null || r.av != null)
+
+  return (
+    <div className="modal__espnStats">
+      {rows.map(r => (
+        <StatBar key={r.label} label={r.label} homeVal={r.hv ?? '–'} awayVal={r.av ?? '–'} />
+      ))}
+    </div>
+  )
+}
+
+// ── Sous-onglets "Stats live" / "Stats saison" — utilisé dans LiveMatchPage
+// et MatchPage (match terminé) au sein de l'onglet principal "Statistiques".
+export function StatsSubTabs({ view, onChange }) {
+  return (
+    <div className="statsSubTabs">
+      <button
+        className={`statsSubTabs__btn${view === 'live' ? ' statsSubTabs__btn--active' : ''}`}
+        onClick={() => onChange('live')}
+      >
+        Stats live
+      </button>
+      <button
+        className={`statsSubTabs__btn${view === 'saison' ? ' statsSubTabs__btn--active' : ''}`}
+        onClick={() => onChange('saison')}
+      >
+        Stats saison
+      </button>
+    </div>
+  )
+}
+
 // ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
 export function ComposTab({ match, compMatches }) {

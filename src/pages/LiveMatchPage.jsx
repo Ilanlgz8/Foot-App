@@ -18,6 +18,8 @@ import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import {
   LiveStatsTab,
+  SeasonStatsTab,
+  StatsSubTabs,
   ComposTab,
   ClassementTab,
   TabDots,
@@ -143,16 +145,18 @@ function MatchHeader({ match, espn, onBack }) {
         </div>
       </div>
 
-      {/* Badge minute live + reprise */}
-      <div className="lmp__heroBadgeRow">
-        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
-          {minuteLabel}
-        </span>
+      {/* Badge minute live + reprise (reprise AU-DESSUS de la minute, pas à côté :
+          plus lisible, et la minute reste seule au centre le reste du temps) */}
+      <div className="lmp__heroBadgeCol">
         {(repriseImminente || repriseDans != null) && (
           <span className="lmp__heroReprise">
-            {repriseImminente ? 'Reprise imm.' : `Reprise ${repriseDans}min`}
+            {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}
           </span>
         )}
+        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
+          {!isTermine && <span className="lmp__heroLiveDot" />}
+          {minuteLabel}
+        </span>
       </div>
 
       {/* Centre : crests + score */}
@@ -224,6 +228,8 @@ export default function LiveMatchPage() {
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
+  // Sous-onglet dans "Stats Live" : Stats live (par défaut) / Stats saison
+  const [statsView, setStatsView] = useState('live')
 
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
 
@@ -263,7 +269,7 @@ export default function LiveMatchPage() {
                 className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
                 onClick={() => goTab(t, null)}
               >
-                {t === 'stats'       ? 'Stats Live'
+                {t === 'stats'       ? 'Statistiques'
                : t === 'compos'     ? 'Compos'
                :                      'Classement'}
               </button>
@@ -284,14 +290,21 @@ export default function LiveMatchPage() {
             }}
           >
             {activeTab === 'stats' && (
-              <LiveStatsTab
-                match={match}
-                espnScore={espn}
-                prono={prono}
-                homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-                awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-                compMatches={compMatches}
-              />
+              <>
+                <StatsSubTabs view={statsView} onChange={setStatsView} />
+                {statsView === 'live' ? (
+                  <LiveStatsTab
+                    match={match}
+                    espnScore={espn}
+                    prono={prono}
+                    homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+                    awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+                    compMatches={compMatches}
+                  />
+                ) : (
+                  <SeasonStatsTab match={match} compMatches={compMatches} />
+                )}
+              </>
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}

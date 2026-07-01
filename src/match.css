@@ -890,6 +890,14 @@
   white-space: nowrap;
 }
 
+/* Titre de la finale, au centre du tableau symétrique — légèrement mis en
+   avant (couleur or) puisque c'est le point de convergence des 2 branches. */
+.bracket__roundTitle--final {
+  color: #fbbf24;
+  font-size: 0.68rem;
+  text-shadow: 0 0 12px rgba(251,191,36,0.35);
+}
+
 /* ── Petite finale (séparée du bracket principal) ── */
 .bracket__thirdWrap {
   display: flex;

@@ -128,7 +128,21 @@ function BkCard({ m, style, onSelect, cardH }) {
   )
 }
 
-export function BracketSvgView({ rounds, onSelect }) {
+// Découpe un tour en 2 moitiés (gauche/droite). Grâce au réordonnancement par
+// topologie fait dans useWcKnockout.js (chaque paire d'index consécutifs
+// (2k, 2k+1) d'un tour alimente toujours l'index k du tour suivant), la 1ère
+// moitié d'un tour alimente TOUJOURS la 1ère moitié du tour suivant (et pareil
+// pour la 2e moitié) — on peut donc couper chaque tableau en 2 sans jamais
+// mélanger les deux branches de l'arbre. Vérifié par le calcul : pour un tour
+// de 16 matchs → 8 au tour suivant, les index 0-7 (1ère moitié) sont fondés
+// sur les paires (0,1)...(6,7) → indices 0-3 du tour suivant (1ère moitié),
+// et 8-15 → indices 4-7 (2e moitié). Ça se vérifie à chaque niveau de l'arbre.
+function splitHalf(matches) {
+  const half = Math.ceil(matches.length / 2)
+  return [matches.slice(0, half), matches.slice(half)]
+}
+
+function BracketSvgView({ rounds, onSelect }) {
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
   // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
@@ -160,55 +174,94 @@ export function BracketSvgView({ rounds, onSelect }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (!rounds?.length) return null
+  const probe = createPortal(
+    <div ref={probeRef} aria-hidden="true"
+      style={{ position:'fixed', top:-9999, left:-9999, width:BK_CARD_W,
+               visibility:'hidden', pointerEvents:'none' }}>
+      <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
+    </div>,
+    document.body
+  )
 
-  // THIRD_PLACE casse l'alignement → on le sépare du bracket principal
-  const main  = rounds.filter(r => r.stage !== 'THIRD_PLACE')
-  const third = rounds.find(r => r.stage === 'THIRD_PLACE')
+  if (!rounds?.length) return probe
 
-  if (!main.length) return null
+  // THIRD_PLACE et FINAL sortent des 2 "branches" gauche/droite : la finale
+  // se joue au centre (1 seul match, alimenté par les 2 demies), la petite
+  // finale est affichée à part sous la finale — comme sur une affiche de
+  // Coupe du Monde classique (voir la maquette fournie par l'utilisateur).
+  const main       = rounds.filter(r => r.stage !== 'THIRD_PLACE' && r.stage !== 'FINAL')
+  const finalRound = rounds.find(r => r.stage === 'FINAL')
+  const third       = rounds.find(r => r.stage === 'THIRD_PLACE')
 
-  const slotH   = cardH + BK_CARD_GAP
-  const firstN  = main[0].matches.length
-  const GRID_H  = firstN * slotH
-  const TOTAL_H = BK_HDR_H + GRID_H
-  // + 2*BK_PAD_X : marge gauche/droite pour que rien (titre de tour centré
-  // qui déborde légèrement de sa card, ombre au survol...) ne se fasse
-  // clipper par le bord du scroll horizontal — voir commentaire sur BK_PAD_X.
-  const TOTAL_W = main.length * BK_CARD_W + Math.max(0, main.length - 1) * BK_CONN_W + 2 * BK_PAD_X
+  if (!main.length) return probe
 
-  // X gauche d'un round (décalé de BK_PAD_X pour la marge de sécu gauche)
-  const rX = (ri) => BK_PAD_X + ri * (BK_CARD_W + BK_CONN_W)
+  // 2 branches, chacune avec la moitié des matchs de chaque tour.
+  const leftRounds  = main.map(r => ({ ...r, matches: splitHalf(r.matches)[0] }))
+  const rightRounds = main.map(r => ({ ...r, matches: splitHalf(r.matches)[1] }))
 
-  // Centre Y d'un match dans sa grille (y absolu depuis le haut du conteneur)
-  const mCY = (ri, mi) => {
-    const n = main[ri].matches.length
+  const slotH    = cardH + BK_CARD_GAP
+  const firstN   = Math.max(leftRounds[0]?.matches.length ?? 0, rightRounds[0]?.matches.length ?? 0)
+  const GRID_H   = firstN * slotH
+  const nSides   = main.length   // nb de tours par branche (hors finale)
+  const sideW    = nSides * BK_CARD_W + Math.max(0, nSides - 1) * BK_CONN_W
+  const CENTER_W = BK_CARD_W
+  const TOTAL_W  = 2 * BK_PAD_X + 2 * sideW + 2 * BK_CONN_W + CENTER_W
+  const TOTAL_H  = BK_HDR_H + GRID_H + (third ? 180 : 0)
+
+  // X gauche d'un tour, branche GAUCHE (croissant vers la droite)
+  const rXLeft  = (ri) => BK_PAD_X + ri * (BK_CARD_W + BK_CONN_W)
+  // X gauche d'un tour, branche DROITE (miroir : décroissant vers la gauche
+  // à mesure qu'on se rapproche du centre, comme sur l'affiche)
+  const rXRight = (ri) => TOTAL_W - BK_PAD_X - BK_CARD_W - ri * (BK_CARD_W + BK_CONN_W)
+  const centerX = (TOTAL_W - CENTER_W) / 2
+
+  // Centre Y d'un match dans sa grille, pour une branche donnée
+  const mCY = (sideRounds, ri, mi) => {
+    const n = sideRounds[ri].matches.length
     return BK_HDR_H + GRID_H / n * (mi + 0.5)
   }
 
-  // ── Chemins SVG ──
-  // Pour chaque paire (mi, mi+1) du round ri, on trace :
-  //   stub droit M1 → midX, trait vertical M1cy→M2cy, stub droit M2 → midX,
-  //   puis trait horizontal midX → card suivante (midpoint vertical)
-  const svgPaths = []
-  for (let ri = 0; ri < main.length - 1; ri++) {
-    const curr = main[ri]
-    for (let mi = 0; mi + 1 < curr.matches.length; mi += 2) {
-      const y1   = mCY(ri, mi)
-      const y2   = mCY(ri, mi + 1)
-      const yN   = mCY(ri + 1, Math.floor(mi / 2))
-      const x1   = rX(ri) + BK_CARD_W          // bord droit du round courant
-      const x2   = rX(ri + 1)                   // bord gauche du round suivant
-      const xMid = (x1 + x2) / 2
-      const yMid = (y1 + y2) / 2
-
-      svgPaths.push(
-        /* stub M1 → midX + vertical M1→M2 */ `M ${x1} ${y1} H ${xMid} V ${y2} ` +
-        /* stub M2 → midX                  */ `M ${x1} ${y2} H ${xMid} ` +
-        /* sortie midpoint → card suivante */ `M ${xMid} ${yMid} H ${x2}`
-      )
+  // ── Chemins SVG d'une branche ──
+  // xOut = bord de départ (côté "extérieur", d'où sort la ligne du tour ri)
+  // xIn  = bord d'arrivée (côté "intérieur", où la ligne entre dans ri+1)
+  function buildConnectors(sideRounds, xOfRound, outEdge, inEdge) {
+    const paths = []
+    for (let ri = 0; ri < sideRounds.length - 1; ri++) {
+      const curr = sideRounds[ri]
+      for (let mi = 0; mi + 1 < curr.matches.length; mi += 2) {
+        const y1   = mCY(sideRounds, ri, mi)
+        const y2   = mCY(sideRounds, ri, mi + 1)
+        const yMid = (y1 + y2) / 2
+        const x1   = xOfRound(ri) + outEdge
+        const x2   = xOfRound(ri + 1) + inEdge
+        const xMid = (x1 + x2) / 2
+        paths.push(
+          `M ${x1} ${y1} H ${xMid} V ${y2} ` +
+          `M ${x1} ${y2} H ${xMid} ` +
+          `M ${xMid} ${yMid} H ${x2}`
+        )
+      }
     }
+    return paths
   }
+  const svgPathsLeft  = buildConnectors(leftRounds,  rXLeft,  BK_CARD_W, 0)
+  const svgPathsRight = buildConnectors(rightRounds, rXRight, 0, BK_CARD_W)
+
+  // ── Connecteurs demi-finale → finale (centre) ──
+  const lastLi     = leftRounds.length - 1
+  const lastRi     = rightRounds.length - 1
+  const finalCY    = BK_HDR_H + GRID_H / 2
+  const finalTop   = finalCY - cardH / 2
+  const leftFeedX  = rXLeft(lastLi) + BK_CARD_W
+  const leftFeedY  = mCY(leftRounds, lastLi, 0)
+  const rightFeedX = rXRight(lastRi)
+  const rightFeedY = mCY(rightRounds, lastRi, 0)
+  const finalPaths = finalRound ? [
+    `M ${leftFeedX} ${leftFeedY} H ${(leftFeedX + centerX) / 2} V ${finalCY} H ${centerX}`,
+    `M ${rightFeedX} ${rightFeedY} H ${(rightFeedX + centerX + CENTER_W) / 2} V ${finalCY} H ${centerX + CENTER_W}`,
+  ] : []
+
+  const thirdTop = finalTop + cardH + 56
 
   return (
     <>
@@ -218,25 +271,19 @@ export function BracketSvgView({ rounds, onSelect }) {
           .bracket__svgWrap — pour ne jamais hériter du `zoom` mobile et
           fausser la mesure. position:fixed + hors-écran + visibility:hidden :
           toujours "layout-able" (donc mesurable) mais jamais visible. */}
-      {createPortal(
-        <div ref={probeRef} aria-hidden="true"
-          style={{ position:'fixed', top:-9999, left:-9999, width:BK_CARD_W,
-                   visibility:'hidden', pointerEvents:'none' }}>
-          <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
-        </div>,
-        document.body
-      )}
+      {probe}
 
     <div className="bracket__svgWrap">
-      {/* ── Tableau principal ── */}
+      {/* ── Tableau symétrique : 2 branches convergent vers la finale au
+          centre, comme une affiche classique de Coupe du Monde. ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
 
-        {/* Traits SVG */}
+        {/* Traits SVG des 2 branches + finale */}
         <svg
           style={{ position:'absolute', top:0, left:0, width:TOTAL_W, height:TOTAL_H,
                    overflow:'visible', pointerEvents:'none', zIndex:0 }}
         >
-          {svgPaths.map((d, i) => (
+          {[...svgPathsLeft, ...svgPathsRight, ...finalPaths].map((d, i) => (
             <path key={i} d={d} fill="none"
               stroke="rgba(239,68,68,0.45)" strokeWidth="1.5"
               strokeLinecap="round" strokeLinejoin="round"
@@ -244,29 +291,79 @@ export function BracketSvgView({ rounds, onSelect }) {
           ))}
         </svg>
 
-        {/* Titres des rounds */}
-        {main.map((round, ri) => (
-          <div key={`hdr-${round.stage}`} style={{
-            position:'absolute', left:rX(ri), top:0,
+        {/* Titres des tours — branche gauche */}
+        {leftRounds.map((round, ri) => (
+          <div key={`hdr-l-${round.stage}`} style={{
+            position:'absolute', left:rXLeft(ri), top:0,
             width:BK_CARD_W, height:BK_HDR_H,
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>
             <span className="bracket__roundTitle">{round.label}</span>
           </div>
         ))}
+        {/* Titres des tours — branche droite */}
+        {rightRounds.map((round, ri) => (
+          <div key={`hdr-r-${round.stage}`} style={{
+            position:'absolute', left:rXRight(ri), top:0,
+            width:BK_CARD_W, height:BK_HDR_H,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <span className="bracket__roundTitle">{round.label}</span>
+          </div>
+        ))}
+        {/* Titre finale, au centre */}
+        {finalRound && (
+          <div style={{
+            position:'absolute', left:centerX, top:0,
+            width:CENTER_W, height:BK_HDR_H,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <span className="bracket__roundTitle bracket__roundTitle--final">🏆 {finalRound.label}</span>
+          </div>
+        )}
 
-        {/* Cards absolument positionnées */}
-        {main.map((round, ri) =>
+        {/* Cards branche gauche */}
+        {leftRounds.map((round, ri) =>
           round.matches.map((m, mi) => {
             const n       = round.matches.length
             const sH      = GRID_H / n
             const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
               <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH}
-                style={{ position:'absolute', left:rX(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
+                style={{ position:'absolute', left:rXLeft(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
           })
+        )}
+        {/* Cards branche droite */}
+        {rightRounds.map((round, ri) =>
+          round.matches.map((m, mi) => {
+            const n       = round.matches.length
+            const sH      = GRID_H / n
+            const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
+            return (
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH}
+                style={{ position:'absolute', left:rXRight(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
+              />
+            )
+          })
+        )}
+
+        {/* Card finale, au centre */}
+        {finalRound?.matches[0] && (
+          <BkCard key={finalRound.matches[0].id} m={finalRound.matches[0]} onSelect={onSelect} cardH={cardH}
+            style={{ position:'absolute', left:centerX, top:finalTop, width:CENTER_W, zIndex:2 }}
+          />
+        )}
+
+        {/* Petite finale, sous la finale */}
+        {third?.matches[0] && (
+          <div style={{ position:'absolute', left:centerX, top:thirdTop, width:CENTER_W }}>
+            <div className="bracket__thirdLabel" style={{ textAlign:'center', marginBottom:'0.5rem' }}>🥉 {third.label}</div>
+            <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardH}
+              style={{ position:'static', width:CENTER_W }}
+            />
+          </div>
         )}
       </div>
 
