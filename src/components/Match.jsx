@@ -134,14 +134,18 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
       onClick={() => !tbd && onSelect(m)}
     >
       <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`} title={_name(m.homeTeam)}>
-        {m.homeTeam?.crest
-          ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
-          : <span className="bracket__crestTbd">?</span>}
+        <span className="bracket__crestWrap">
+          {m.homeTeam?.crest
+            ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+            : <span className="bracket__crestTbd">?</span>}
+        </span>
       </div>
       <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`} title={_name(m.awayTeam)}>
-        {m.awayTeam?.crest
-          ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
-          : <span className="bracket__crestTbd">?</span>}
+        <span className="bracket__crestWrap">
+          {m.awayTeam?.crest
+            ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+            : <span className="bracket__crestTbd">?</span>}
+        </span>
       </div>
     </div>
   )
@@ -346,14 +350,17 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
           centre, comme une affiche classique de Coupe du Monde. ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
 
-        {/* Traits SVG des 2 branches + finale */}
+        {/* Traits SVG des 2 branches + finale — léger glow (filter sur le
+            <svg> global, pas besoin de <defs>/<filter> par path) pour un
+            rendu plus "app moderne" que des traits plats. */}
         <svg
           style={{ position:'absolute', top:0, left:0, width:TOTAL_W, height:TOTAL_H,
-                   overflow:'visible', pointerEvents:'none', zIndex:0 }}
+                   overflow:'visible', pointerEvents:'none', zIndex:0,
+                   filter:'drop-shadow(0 0 2px rgba(239,68,68,0.35))' }}
         >
           {[...svgPathsLeft, ...svgPathsRight, ...finalPaths].map((d, i) => (
             <path key={i} d={d} fill="none"
-              stroke="rgba(239,68,68,0.45)" strokeWidth="1.5"
+              stroke="rgba(239,68,68,0.55)" strokeWidth="1.75"
               strokeLinecap="round" strokeLinejoin="round"
             />
           ))}
@@ -411,7 +418,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             dans la rangée des titres de tour avec tout le monde) : demande
             explicite pour la mettre en valeur, au niveau des finalistes. */}
         {finalRound && (
-          <div style={{ position:'absolute', left:centerX, top:finalTop - BK_FINAL_LABEL_H, width:CENTER_W }}>
+          <div style={{ position:'absolute', left:centerX, top:finalTop - BK_FINAL_LABEL_H, width:CENTER_W, textAlign:'center' }}>
             <div className="bracket__finalLabel">🏆 {_shortLabel(finalRound)}</div>
           </div>
         )}

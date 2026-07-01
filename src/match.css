@@ -897,66 +897,76 @@
   display: flex;
 }
 
-/* ── Titre du round ──
-   Libellés COURTS (16èmes, 8èmes, Quarts, Demies... voir BK_SHORT_LABELS
-   dans Match.jsx) — contrairement aux noms complets ("Seizièmes de finale"),
-   ils tiennent sur une seule ligne dans une colonne de 44px (BK_CARD_W),
-   d'où white-space:nowrap (BK_HDR_H réduit en conséquence dans Match.jsx). */
+/* ── Titre du round : "chip" arrondi plutôt que du texte brut, plus dans
+   l'esprit "app moderne" du reste de StatFootix (cf. statsSubTabs,
+   compHeader...). Libellés COURTS (16èmes, 8èmes, Quarts, Demies... voir
+   BK_SHORT_LABELS dans Match.jsx) : ils tiennent sur une seule ligne dans
+   une colonne de 44px, d'où white-space:nowrap. ── */
 .bracket__roundTitle {
+  display: inline-block;
   margin: 0;
-  font-size: 0.5rem;
+  font-size: 0.44rem;
   line-height: 1;
-  font-weight: 900;
-  letter-spacing: 0.01em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #ef4444;
+  color: #fca5a5;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 999px;
+  padding: 0.16rem 0.42rem;
   white-space: nowrap;
-  text-align: center;
-}
-
-/* Titre de la finale, au centre du tableau symétrique — légèrement mis en
-   avant (couleur or) puisque c'est le point de convergence des 2 branches. */
-.bracket__roundTitle--final {
-  color: #fbbf24;
-  font-size: 0.54rem;
-  text-shadow: 0 0 8px rgba(251,191,36,0.35);
 }
 
 .bracket__thirdLabel {
-  font-size: 0.5rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
+  display: inline-block;
+  font-size: 0.44rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #ef4444;
+  color: #f3b673;
+  background: rgba(217,119,6,0.12);
+  border: 1px solid rgba(217,119,6,0.24);
+  border-radius: 999px;
+  padding: 0.16rem 0.45rem;
   white-space: nowrap;
 }
 
 /* ── Card d'un match bracket (compacte : DRAPEAU SEUL, plus aucun texte —
-   voir commentaire sur BkCard dans Match.jsx pour l'historique du choix) ── */
+   voir commentaire sur BkCard dans Match.jsx pour l'historique du choix) ──
+   Fond en léger dégradé + ombre portée : moins "plat" qu'une couleur unie,
+   même traitement que les autres cards modernisées cette session
+   (modal__espnStats, statsSubTabs). */
 .bracket__card {
-  background: rgba(8,12,20,0.97);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 0.45rem;
+  background: linear-gradient(165deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008)), #0a0e17;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0.55rem;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
 }
 
 .bracket__card:hover {
-  border-color: rgba(239,68,68,0.25);
+  border-color: rgba(239,68,68,0.3);
+}
+
+.bracket__card:active {
+  transform: scale(0.97);
 }
 
 .bracket__card--live {
-  border-color: rgba(239,68,68,0.4);
-  box-shadow: 0 0 8px rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.45);
+  box-shadow: 0 0 10px rgba(239,68,68,0.18), 0 2px 8px rgba(0,0,0,0.35);
   animation: pulseRed 2s ease infinite;
 }
 
-/* Card de la finale/petite finale — mise en avant (bordure dorée légère),
-   drapeaux plus grands via .bracket__card--big .bracket__crest ci-dessous. */
+/* Card de la finale/petite finale — mise en avant (dégradé doré + glow),
+   drapeaux plus grands via .bracket__card--big .bracket__crestWrap. */
 .bracket__card--big {
-  border-color: rgba(251,191,36,0.25);
-  background: rgba(12,14,22,0.97);
+  background: linear-gradient(165deg, rgba(251,191,36,0.1), rgba(251,191,36,0.02)), #0c0e16;
+  border-color: rgba(251,191,36,0.3);
+  box-shadow: 0 0 16px rgba(251,191,36,0.12), 0 3px 10px rgba(0,0,0,0.4);
 }
 
 /* ── Équipe dans la card bracket — un seul enfant direct désormais (le
@@ -971,59 +981,94 @@
 }
 
 .bracket__team + .bracket__team {
-  border-top: 1px solid rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .bracket__team--winner {
-  background: rgba(34,197,94,0.06);
+  background: rgba(34,197,94,0.07);
 }
 
 .bracket__team--loser {
-  opacity: 0.45;
+  opacity: 0.42;
+}
+
+/* Badge autour du drapeau — fond légèrement dégradé + fine bordure + ombre
+   interne, façon "pastille" d'appli sportive plutôt qu'un logo qui flotte
+   nu sur le fond de la card. Volontairement pas un cercle parfait (les
+   drapeaux rectangulaires y seraient recadrés/déformés, cf. le bug connu
+   sur les cards détaillées) — un carré arrondi évite ce problème. */
+.bracket__crestWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.35);
+  flex-shrink: 0;
+}
+
+/* Anneau vert autour du badge de l'équipe qui gagne/mène — repère visuel
+   plus élégant qu'un simple fond teinté (gardé en plus, cf. .bracket__team--winner). */
+.bracket__team--winner .bracket__crestWrap {
+  box-shadow: 0 0 0 1.5px rgba(34,197,94,0.65), 0 0 6px rgba(34,197,94,0.25);
 }
 
 .bracket__crest {
-  width: 1.15rem; height: 1.15rem;
+  width: 1rem; height: 1rem;
   object-fit: contain;
-  flex-shrink: 0;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  border-radius: 0.15rem;
 }
 
 .bracket__crestTbd {
-  width: 1.15rem; height: 1.15rem;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  width: 1rem; height: 1rem;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.52rem; color: #3d4d60; font-weight: 800;
-  flex-shrink: 0;
+  font-size: 0.46rem; color: #3d4d60; font-weight: 800;
 }
 
-/* Drapeaux plus grands dans la card de la finale/petite finale. */
+/* Drapeaux + badge plus grands dans la card de la finale/petite finale. */
+.bracket__card--big .bracket__crestWrap {
+  width: 1.95rem; height: 1.95rem;
+  border-radius: 0.55rem;
+  background: linear-gradient(160deg, rgba(251,191,36,0.16), rgba(255,255,255,0.02));
+  border-color: rgba(251,191,36,0.22);
+}
 .bracket__card--big .bracket__crest,
 .bracket__card--big .bracket__crestTbd {
-  width: 1.7rem; height: 1.7rem;
+  width: 1.5rem; height: 1.5rem;
 }
 .bracket__card--big .bracket__crestTbd {
-  font-size: 0.7rem;
+  font-size: 0.66rem;
 }
 .bracket__card--big .bracket__team {
-  padding: 0.32rem;
+  padding: 0.34rem;
 }
 
 /* Label "🏆 FINALE" — positionné juste au-dessus de la card de la finale
    (pas dans la rangée commune des titres de tour tout en haut, voir
-   commentaire JSX) : plus grand, doré, avec lueur, pour la mettre en valeur
-   comme point de convergence du tableau. */
+   commentaire JSX) : chip doré avec glow pulsant doux, pour la mettre en
+   valeur comme point de convergence du tableau. */
 .bracket__finalLabel {
-  text-align: center;
-  font-size: 0.62rem;
+  display: inline-block;
+  font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #fbbf24;
-  text-shadow: 0 0 10px rgba(251,191,36,0.4);
+  color: #fde68a;
+  background: linear-gradient(135deg, rgba(251,191,36,0.2), rgba(251,191,36,0.05));
+  border: 1px solid rgba(251,191,36,0.4);
+  border-radius: 999px;
+  padding: 0.18rem 0.6rem;
+  text-shadow: 0 0 8px rgba(251,191,36,0.5);
   white-space: nowrap;
+  animation: bracketGoldPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes bracketGoldPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(251,191,36,0.15); }
+  50%      { box-shadow: 0 0 16px rgba(251,191,36,0.4); }
 }
 
 /* ── Écran vide (phase finale pas encore dispo) ── */
