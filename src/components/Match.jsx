@@ -386,10 +386,6 @@ function Matchs() {
               <img src={currentComp.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
-            <div className="compHeader__info">
-              <span className="compHeader__name">{currentComp?.name ?? 'Compétition'}</span>
-              <span className="compHeader__sub">Saison 2025–26</span>
-            </div>
             <button className="compHeader__btn" aria-label="Changer de compétition">
               {compOpen ? 'Fermer ✕' : 'Changer ›'}
             </button>

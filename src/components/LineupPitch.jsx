@@ -50,15 +50,26 @@ function posCat(pos) {
   return 2
 }
 
+// ⚠️ ESPN, FIFA, api-football et football-data.org (les 4 sources de compos utilisées
+// dans l'app) ne renvoient QUE des catégories génériques : GK/DEF/MID/FWD (jamais de
+// détail gauche/droite/central). Les codes détaillés ci-dessous (CB, LB, RB, CDM…)
+// sont conservés en prévision d'une source plus précise, mais dans les faits c'est
+// toujours GK/DEF/MID/FWD qui est traduit ci-dessous — d'où l'importance de bien
+// mapper ces 4 valeurs (avant : 'MID'/'FWD' n'étaient pas traduits → affichés en anglais).
 const POS_FR = {
+  // ── Catégories réellement fournies par les APIs ──
   GK:'G',  G:'G',   GB:'G',
+  DEF:'DÉF', D:'DÉF',
+  MID:'MIL', M:'MIL', MF:'MIL',
+  FWD:'ATT', F:'ATT', FW:'ATT',
+  // ── Codes détaillés (gardés si une source plus précise est branchée un jour) ──
   CB:'DC',  DC:'DC',  DL:'DG', DR:'DD',
   LB:'DG',  RB:'DD',  LWB:'LG', RWB:'LD',
-  D:'DEF',  SW:'LIB', DEF:'DEF',
-  CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MD', AM:'MOC', MC:'MC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
-  LM:'MG',  RM:'MD',  M:'MC',  MF:'MC', MIL:'MC',
+  SW:'LIB',
+  CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MDC', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
+  LM:'MG',  RM:'MD',
   ST:'ATT', CF:'AC',  LW:'AG',  RW:'AD',
-  F:'BU',  FW:'BU', ATT:'BU', FWD:'ATD', SS:'ATT', BU:'BU',
+  SS:'ATT', BU:'ATT', AC:'AC', AG:'AG', AD:'AD',
 }
 
 const CAT_COLOR = { 0: '#f59e0b', 1: '#60a5fa', 2: '#34d399', 3: '#ef4444' }
@@ -70,11 +81,36 @@ function fallbackLines(starters) {
   return g.filter(n => n > 0)
 }
 
+// Regroupe les titulaires par ligne RÉELLE (gardien / défense / milieu / attaque),
+// via posCat() qui lit le poste renvoyé par l'API (fiable : GK/DEF/MID/FWD).
+// Fix : avant, les joueurs étaient simplement tranchés dans l'ordre du tableau
+// starters[] pour remplir les lignes de la formation (ex: "4-3-3" → 4 premiers =
+// défense, 3 suivants = milieu, etc.), en supposant que l'API renvoie déjà les
+// joueurs triés dans cet ordre tactique. Ce n'est pas garanti pour toutes les
+// sources (FIFA, football-data.org, api-football) → un attaquant pouvait finir
+// affiché au milieu, ou un défenseur du mauvais côté.
+function groupByRealLine(starters, lines) {
+  const byCat = [[], [], [], []]
+  for (const p of starters) byCat[posCat(p.position)].push(p)
+
+  // On ne fait confiance au regroupement par catégorie que si les effectifs
+  // correspondent exactement aux lignes de la formation détectée (sécurité :
+  // si posCat ne matche pas, on retombe sur l'ordre brut plutôt que de casser
+  // l'affichage).
+  const matches =
+    byCat[1].length === (lines[1] ?? -1) &&
+    (lines.length < 3 || byCat[2].length === lines[2]) &&
+    (lines.length < 4 || byCat[3].length === lines[3])
+
+  return matches ? [...byCat[0], ...byCat[1], ...byCat[2], ...byCat[3]] : starters
+}
+
 function getPositions(starters, formation) {
   const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
   const valid  = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
   const lines  = valid ? [1, ...parts] : fallbackLines(starters)
   const yPcts  = LINE_Y[lines.length] ?? LINE_Y[4]
+  const ordered = groupByRealLine(starters, lines)
   const out    = []
   let idx = 0
   for (let li = 0; li < lines.length; li++) {
@@ -85,7 +121,7 @@ function getPositions(starters, formation) {
       out.push({
         leftPct: x / PW * 100,
         topPct:  y / PH * 100,
-        player:  starters[idx] ?? null,
+        player:  ordered[idx] ?? null,
       })
       idx++
     }

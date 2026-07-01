@@ -564,8 +564,8 @@
     position: relative;
     border-top: none;
     background: #000;
-    padding: 0 7px 5px;
-    gap: 4px;
+    padding: 0 4px 5px;
+    gap: 8px;
   }
 
   /* Ligne scanning entre navbar principale et quick nav */
@@ -594,9 +594,9 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 7px 4px 8px;
+    padding: 7px 6px 8px;
     text-decoration: none;
-    color: rgba(245,247,250,0.66);
+    color: rgba(255,255,255,0.80);
     font-size: 0.585rem;
     font-weight: 700;
     letter-spacing: 0.05em;

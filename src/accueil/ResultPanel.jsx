@@ -70,7 +70,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
               <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-                <MatchCard match={match} noWinnerLoser />
+                <MatchCard match={match} noWinnerLoser noGradient />
               </div>
             ))}
           </div>
@@ -85,7 +85,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
                     <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-                      <MatchCard match={match} noWinnerLoser />
+                      <MatchCard match={match} noWinnerLoser noGradient />
                     </div>
                   ))}
                 </div>

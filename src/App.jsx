@@ -25,6 +25,14 @@ function App() {
   // Débloquer l'AudioContext au premier geste (requis par Chrome/Safari)
   useEffect(() => { unlockAudio() }, [])
 
+  // Remonter en haut de page à chaque changement de route.
+  // Sans ça, le navigateur conserve la position de scroll précédente : si on clique
+  // sur une card (MatchPage/LiveMatchPage/Résultats) après avoir scrollé plus bas,
+  // on atterrit au milieu/bas de la nouvelle page au lieu du haut.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
   // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
   useEffect(() => {
     if (typeof Notification === 'undefined') return

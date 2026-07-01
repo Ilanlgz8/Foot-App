@@ -1201,9 +1201,10 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  /* Allégé (était 0.40/0.18/0.40) : le dégradé couleurs équipes était quasi invisible
+     sur beaucoup de paires d'équipes, contrairement à MatchPage qui l'affiche bien net. */
   background:
-    linear-gradient(90deg, rgba(0,0,0,0.72), rgba(0,0,0,0.5) 48%, rgba(0,0,0,0.72)),
-    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
+    linear-gradient(90deg, rgba(0,0,0,0.26), rgba(0,0,0,0.10) 48%, rgba(0,0,0,0.26));
 }
 
 .accueil__matchCard > * {
@@ -1284,6 +1285,8 @@
   width: 100%;
   line-height: 1;
   transition: color 0.2s;
+  /* Garantit la lisibilité maintenant que le fond couleur équipe est plus visible */
+  text-shadow: 0 1px 3px rgba(0,0,0,0.85);
 }
 
 /* Winner / loser */
@@ -2887,7 +2890,11 @@
 .poster__crest {
   width: 44px;
   height: 44px;
-  object-fit: cover;
+  /* contain (pas cover) : les drapeaux nationaux (CdM) ne sont pas carrés — cover
+     rognait les bords et rendait certains drapeaux méconnaissables une fois en cercle */
+  object-fit: contain;
+  padding: 3px;
+  box-sizing: border-box;
   border-radius: 50%;
   border: 1.5px solid rgba(200,210,225,0.28);
   box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 3px 10px rgba(0,0,0,0.6);

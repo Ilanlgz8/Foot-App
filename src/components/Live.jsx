@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useState, useRef, useEffect } from 'react'
@@ -57,7 +57,7 @@ function PeriodBadge({ match }) {
 function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, repriseDans, goalSide }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
-  const label = isTermine ? 'FT' : (minute ?? '–')
+  const label = isTermine ? 'Terminé' : (minute ?? '–')
   const pillCls = `live__pill${isTermine ? ' live__pill--ft' : ''}`
   return (
     <div className="live__scoreWrap">
@@ -177,8 +177,8 @@ function LiveCard({ match, espn, onClick }) {
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
     ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
-  const hs = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-  const as_ = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
 

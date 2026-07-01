@@ -5,6 +5,7 @@ import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
 import { useLiveData } from '../context/LiveProvider'
 import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/matchStateTracker'
+import { mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchPanel } from '../accueil/MatchCard'
@@ -279,7 +280,10 @@ function Accueil() {
       } catch {}
       return {
         ...m,
-        score: { fullTime: { home: espnScores[m.id]?.home ?? lsHome ?? m.score?.fullTime?.home, away: espnScores[m.id]?.away ?? lsAway ?? m.score?.fullTime?.away } },
+        score: { fullTime: {
+          home: mergeScore(espnScores[m.id]?.home, lsHome ?? m.score?.fullTime?.home),
+          away: mergeScore(espnScores[m.id]?.away, lsAway ?? m.score?.fullTime?.away),
+        } },
         status: 'FINISHED',
       }
     })

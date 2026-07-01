@@ -722,17 +722,94 @@ function ensureVisible(hex, fallbackHex) {
   } catch { return fallbackHex }
 }
 
-// Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
-export function getMatchGradient(homeName, awayName) {
-  // Fallbacks distincts et non-noirs selon le nom (hash simple pour varier)
+// ── Anti-collision de couleurs ─────────────────────────────────────────────────
+// Si les 2 équipes ont la même couleur "famille" (ex: rouge vs rouge), le dégradé/
+// la barre prono devient illisible (on ne distingue plus qui est qui). On classe
+// chaque couleur dans une famille (rouge, bleu, vert…) et, en cas de collision,
+// on garde la couleur principale à l'équipe qui l'a la plus dominante (saturation
+// la plus forte = couleur la plus "pure"/vive) et on bascule l'autre équipe sur
+// sa couleur secondaire (ou un repli distinct si la secondaire collisionne aussi).
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  let h = 0, s = 0
+  const l = (max + min) / 2
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break
+      case g: h = (b - r) / d + 2; break
+      default: h = (r - g) / d + 4; break
+    }
+    h *= 60
+  }
+  return { h, s, l }
+}
+
+function colorFamily(hex) {
+  try {
+    const { h, s, l } = hexToHsl(hex)
+    if (l < 0.16) return 'black'
+    if (l > 0.88 && s < 0.25) return 'white'
+    if (s < 0.15) return 'gray'
+    if (h < 15 || h >= 345) return 'red'
+    if (h < 45)  return 'orange'
+    if (h < 70)  return 'yellow'
+    if (h < 170) return 'green'
+    if (h < 200) return 'cyan'
+    if (h < 255) return 'blue'
+    if (h < 290) return 'purple'
+    return 'pink'
+  } catch { return null }
+}
+
+/**
+ * Résout les couleurs "dom"/"ext" d'un match en évitant qu'elles tombent dans
+ * la même famille de couleur (ex: rouge vs rouge). Retourne toujours 2 couleurs
+ * visibles (luminance garantie par ensureVisible).
+ */
+export function getMatchTeamColors(homeName, awayName) {
   const fallbackHome = fallbackColor(homeName, 0)
   const fallbackAway = fallbackColor(awayName, 1)
   const rawHome = lookupColor(homeName) ?? fallbackHome
   const rawAway = lookupColor(awayName) ?? fallbackAway
-  // Garantit une couleur primaire visible (luminance suffisante)
-  const hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
-  const ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
+
+  let hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
+  let ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
+
+  const famHome = colorFamily(hp)
+  const famAway = colorFamily(ap)
+
+  if (famHome && famHome === famAway) {
+    // La couleur la moins saturée (moins "pure") cède la place à sa secondaire
+    const satHome = hexToHsl(hp).s
+    const satAway = hexToHsl(ap).s
+    if (satAway > satHome) {
+      const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
+      hp = colorFamily(alt) !== famAway ? alt : fallbackHome.p
+    } else {
+      const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
+      ap = colorFamily(alt) !== famHome ? alt : fallbackAway.p
+    }
+  }
+
+  return { home: hp, away: ap }
+}
+
+// Construit le dégradé CSS à partir de 2 couleurs déjà résolues (anti-collision).
+// Exporté pour que les composants qui ont besoin des couleurs individuelles
+// (ex: barre de pronostic) restent visuellement cohérents avec le fond dégradé.
+export function buildMatchGradient(hp, ap) {
   return `linear-gradient(135deg, ${hp} 0%, ${darken(hp)} 38%, ${darken(ap)} 62%, ${ap} 100%)`
+}
+
+// Dégradé unique pour chaque match : couleur équipe dom → couleur équipe ext
+export function getMatchGradient(homeName, awayName) {
+  const { home: hp, away: ap } = getMatchTeamColors(homeName, awayName)
+  return buildMatchGradient(hp, ap)
 }
 
 // Génère une couleur de fallback non-noire, unique par nom d'équipe

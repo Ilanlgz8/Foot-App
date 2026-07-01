@@ -160,7 +160,11 @@
 .live__crest {
   width: 3.5rem;
   height: 3.5rem;
-  object-fit: cover;
+  /* contain (pas cover) : les drapeaux nationaux (CdM) ne sont pas carrés — cover
+     rognait les bords et rendait certains drapeaux méconnaissables une fois en cercle */
+  object-fit: contain;
+  padding: 0.2rem;
+  box-sizing: border-box;
   flex-shrink: 0;
   border-radius: 50%;
   border: 1.5px solid rgba(200,210,225,0.28);

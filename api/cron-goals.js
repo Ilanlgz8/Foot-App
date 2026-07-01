@@ -1,6 +1,7 @@
 // api/cron/goals.js
 // Appelé par cron-job.org toutes les minutes.
 // Source : ESPN (primaire — couvre WC 2026 via 'fifa.world' + toutes ligues club)
+//          FIFA live (couche rapide additionnelle, WC uniquement — voir plus bas)
 //
 // Détecte et notifie :
 //   ⚽ But         — score change pendant un match en cours
@@ -8,6 +9,13 @@
 //   ⏸  Mi-temps    — pause mi-temps
 //   ▶️  Reprise     — reprise 2ème MT
 //   🏁 Fin de match — match terminé
+//
+// ⚠️ FIX retard notif WC (~10min) : ESPN a un lag connu sur le slug 'fifa.world'
+// (le statut scoreboard ESPN met du temps à passer SCHEDULED → IN_PROGRESS).
+// api/fifa-live.js contourne déjà ça côté affichage live en croisant avec l'API
+// FIFA officielle. On applique la même logique ici, uniquement pour les matchs WC :
+// si ESPN dit encore SCHEDULED mais que FIFA confirme Period=1 (match démarré),
+// on utilise le statut FIFA → notif coup d'envoi immédiate au lieu d'attendre ESPN.
 //
 // Sécurité : header "x-cron-secret" ou param ?secret= doit matcher CRON_SECRET.
 
@@ -43,6 +51,58 @@ const LIVE_ESPN  = new Set([
   'STATUS_SHOOTOUT',
 ])
 const FINAL_ESPN = new Set(['STATUS_FINAL', 'STATUS_FULL_TIME'])
+
+// ── FIFA live — couche rapide WC (même cache Redis que api/fifa-live.js) ───────
+const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
+
+function normalizeFifa(name = '') {
+  return name.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+function fuzzyTeamFifa(a, b) {
+  const na = normalizeFifa(a), nb = normalizeFifa(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.startsWith(nb.slice(0, 5)) || nb.startsWith(na.slice(0, 5))) return true
+  const wa = na.match(/[a-z]{4,}/g) ?? []
+  const wb = nb.match(/[a-z]{4,}/g) ?? []
+  return wa.some(x => wb.some(y => x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4))))
+}
+
+function fifaTeamNamesAll(team) {
+  return (team?.TeamName ?? []).map(t => t.Description).filter(Boolean)
+}
+
+// MatchStatus : 0=pas commencé 1=en cours 3=terminé — Period : 0=pré-match
+function fifaIsLive(m) {
+  return m.MatchStatus === 1 && m.Period !== 0
+}
+
+async function fetchFifaLiveMatches(log) {
+  try {
+    const cached = await kv.get('fifa:live')
+    if (cached) {
+      const data = typeof cached === 'string' ? JSON.parse(cached) : cached
+      return data ?? []
+    }
+  } catch {}
+  try {
+    const res = await fetch(FIFA_LIVE_URL, {
+      headers: { Accept: 'application/json' },
+      signal:  AbortSignal.timeout(6_000),
+    })
+    if (!res.ok) return []
+    const json = await res.json()
+    const data = json.Results ?? []
+    try { await kv.set('fifa:live', JSON.stringify(data), { ex: 6 }) } catch {}
+    return data
+  } catch (e) {
+    log.push(`[fifa:live] error=${e.message}`)
+    return []
+  }
+}
 
 // ── Traduction noms ESPN → français ───────────────────────────────────────────
 const TEAM_FR = {
@@ -185,22 +245,51 @@ export default async function handler(req, res) {
   const allEvents = allResults.flatMap(r => r.status === 'fulfilled' ? r.value : [])
   log.push(`[espn] total events=${allEvents.length}`)
 
+  // FIFA live — fetché une seule fois, utilisé pour accélérer la détection WC (voir plus bas)
+  const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
+  const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(log) : []
+
   for (const { slug, evt } of allEvents) {
     const comp = evt.competitions?.[0]
     if (!comp) continue
 
-    const status   = comp.status?.type?.name ?? ''
+    let   status   = comp.status?.type?.name ?? ''
     const homeC    = comp.competitors?.find(c => c.homeAway === 'home')
     const awayC    = comp.competitors?.find(c => c.homeAway === 'away')
     if (!homeC || !awayC) continue
 
-    const home     = parseInt(homeC.score ?? '0', 10) || 0
-    const away     = parseInt(awayC.score ?? '0', 10) || 0
+    let   home     = parseInt(homeC.score ?? '0', 10) || 0
+    let   away     = parseInt(awayC.score ?? '0', 10) || 0
     const homeTeam = t(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
+    const eventId  = evt.id
+
+    // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
+    // Si ESPN dit encore SCHEDULED mais que l'API FIFA officielle confirme que le
+    // match a commencé (Period != 0), on bascule immédiatement en IN_PROGRESS →
+    // notif coup d'envoi (et détection de buts) sans attendre ESPN.
+    if (slug === 'fifa.world' && fifaLiveMatches.length > 0) {
+      const rawHome = homeC.team?.displayName ?? homeC.team?.shortDisplayName ?? ''
+      const rawAway = awayC.team?.displayName ?? awayC.team?.shortDisplayName ?? ''
+      const fifaMatch = fifaLiveMatches.find(m => {
+        const homeNames = fifaTeamNamesAll(m.HomeTeam)
+        const awayNames = fifaTeamNamesAll(m.AwayTeam)
+        return homeNames.some(n => fuzzyTeamFifa(rawHome, n)) && awayNames.some(n => fuzzyTeamFifa(rawAway, n))
+      })
+      if (fifaMatch) {
+        if (status === 'STATUS_SCHEDULED' && fifaIsLive(fifaMatch)) {
+          status = 'STATUS_IN_PROGRESS'
+          log.push(`[fifa-override:${eventId}] ESPN=SCHEDULED mais FIFA en cours → KO anticipé`)
+        }
+        const fh = fifaMatch.HomeTeam?.Score
+        const fa = fifaMatch.AwayTeam?.Score
+        if (typeof fh === 'number') home = Math.max(home, fh)
+        if (typeof fa === 'number') away = Math.max(away, fa)
+      }
+    }
+
     const score    = `${home}-${away}`
     const scoreStr = `${home} – ${away}`
-    const eventId  = evt.id
 
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null

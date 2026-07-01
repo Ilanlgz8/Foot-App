@@ -89,7 +89,7 @@ function Resultats() {
             <span className="resultats__scoreDash">–</span>
             <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
           </div>
-          <span className="resultats__ftBadge">FT</span>
+          <span className="resultats__ftBadge">Terminé</span>
         </div>
         <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
@@ -161,10 +161,6 @@ function Resultats() {
               <img src={currentComp.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
-            <div className="compHeader__info">
-              <span className="compHeader__name">{currentComp?.name ?? 'Compétition'}</span>
-              <span className="compHeader__sub">Saison 2025–26</span>
-            </div>
             <button className="compHeader__btn" aria-label="Changer de compétition">
               {compOpen ? 'Fermer ✕' : 'Changer ›'}
             </button>

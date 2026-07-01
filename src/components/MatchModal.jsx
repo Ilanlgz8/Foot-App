@@ -11,7 +11,7 @@ import { useStandings }       from '../hooks/useStandings'
 import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { calcProno } from '../utils/calcProno'
 import './../matchModal.css'
 
@@ -1178,8 +1178,8 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               </>
             ) : isLive ? (() => {
               const matchSt = getMatchState(match.id)
-              const liveHs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-              const liveAs  = espnScore?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+              const liveHs  = mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+              const liveAs  = mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
               const minute  = calcMinute(match)
               const period  = getMatchPeriod(match)
               const pauseElapsed = match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start

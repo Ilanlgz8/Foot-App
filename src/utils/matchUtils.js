@@ -66,6 +66,20 @@ function interpolateEspnMinute(state) {
   return `${Math.max(1, currentMins)}'`
 }
 
+/**
+ * Fusionne deux valeurs de score (ESPN/FIFA vs football-data.org) : garde toujours
+ * la plus élevée des deux sources non-nulles.
+ * Fix score périmé : chaque source (ESPN, FIFA, FD.org) peut avoir du retard
+ * indépendamment (fuzzy-match raté, cache Redis, lag API). Sans fusion, l'UI
+ * privilégiait toujours ESPN même quand il était en retard sur FD.org (ou l'inverse)
+ * → score affiché figé (ex: 1-0 affiché alors que FD.org ou ESPN sait déjà 3-0).
+ */
+export function mergeScore(a, b) {
+  if (a == null) return b ?? null
+  if (b == null) return a
+  return Math.max(a, b)
+}
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
 

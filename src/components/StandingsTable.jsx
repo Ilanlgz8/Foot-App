@@ -1,5 +1,11 @@
 // Composant partagé — utilisé dans Classement.jsx et MatchModal.jsx (onglet Classement)
 import { translateTeam } from '../data/teamNames'
+// Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
+// pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
+// visitée au moins une fois (chunk lazy pas encore chargé), l'onglet Classement de
+// MatchPage/LiveMatchPage/ResultatPage (via MatchModal → StandingsTable) s'affiche
+// sans style — d'où le besoin de "d'abord aller sur Classement" pour "activer" le CSS.
+import '../classement.css'
 
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
 

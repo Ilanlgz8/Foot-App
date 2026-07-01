@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState }    from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
@@ -79,8 +79,8 @@ function MatchHeader({ match, espn, onBack }) {
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
     ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
 
-  const hs  = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-  const as_ = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const hs  = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
 
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
@@ -90,7 +90,7 @@ function MatchHeader({ match, espn, onBack }) {
   const h = hs ?? '–', a = as_ ?? '–'
 
   // Label minute (badge rouge au-dessus du score)
-  const minuteLabel = isTermine ? 'FT'
+  const minuteLabel = isTermine ? 'Terminé'
     : period === 'HT'  ? 'MT'
     : period === 'ET1' ? 'Prol. 1'
     : period === 'ET2' ? 'Prol. 2'

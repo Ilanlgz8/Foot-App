@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute } from '../utils/matchUtils'
+import { calcMinute, mergeScore } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -61,7 +61,8 @@ export function PanelSkeleton() {
 //   tracked       → si ce match est suivi avec minutes précises
 //   onTrack       → callback pour activer/désactiver le suivi (null = bouton caché)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
-export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false, noLive = false }) {
+//   noGradient    → si true, pas de dégradé couleurs équipes en fond (ex: panel Résultats)
+export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false, noLive = false, noGradient = false }) {
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
@@ -101,9 +102,10 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
     return () => clearInterval(id)
   }, [liveMinute, match.id])
 
-  // Score : ESPN en priorité (quasi temps réel), sinon football-data.org (~1min de délai)
-  const hs  = espnScore?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-  const as_ = espnScore?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  // Score : fusion ESPN + football-data.org, on garde toujours le plus à jour des deux
+  // (évite d'afficher un score ESPN périmé alors que FD.org a déjà la bonne valeur, ou l'inverse)
+  const hs  = mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
 
   // ── Détection de but ──
   // scoreKey : clé localStorage pour mémoriser le dernier score connu.
@@ -171,14 +173,14 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   //   - Match terminé   → "FT"
   //   - Match en cours  → minute calculée (ex: "73'" ou "MT") via calcMinute()
   // Dans le widget live, pendant les 5min post-FT : "Terminé" au lieu de "FT"
-  const label     = isFinished ? (isTermine ? 'Terminé' : 'FT') : !isLive ? formatHour(match.utcDate) : null
+  const label     = isFinished ? 'Terminé' : !isLive ? formatHour(match.utcDate) : null
 
   // Classes CSS avec modificateur gagnant/perdant sur les noms et blasons
   const homeNameCls  = matchClass('accueil__matchCardName',  homeWins, awayWins)
   const awayNameCls  = matchClass('accueil__matchCardName',  awayWins, homeWins)
   const homeCrestCls = matchClass('accueil__matchCardCrest', false,    awayWins)  // blason perdant → grisé
   const awayCrestCls = matchClass('accueil__matchCardCrest', false,    homeWins)
-  const cardGradient = getMatchGradient(
+  const cardGradient = noGradient ? null : getMatchGradient(
     match.homeTeam?.name || match.homeTeam?.shortName || '',
     match.awayTeam?.name || match.awayTeam?.shortName || ''
   )
@@ -186,7 +188,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   return (
     <div
       className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}${goal ? ' accueil__matchCard--goal' : ''}`}
-      style={{ '--match-card-gradient': cardGradient }}
+      style={cardGradient ? { '--match-card-gradient': cardGradient } : undefined}
     >
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 

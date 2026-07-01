@@ -1,8 +1,8 @@
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute }                 from '../utils/matchUtils'
+import { calcMinute, mergeScore }     from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
-import { getTeamColor, getTeamPhoto, getMatchGradient } from '../data/teamPhotos'
+import { getTeamPhoto, getMatchTeamColors, buildMatchGradient } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 
 function formatHour(dateStr) {
@@ -29,8 +29,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   )
   const isUpcoming = !isFinished && !isLive
 
-  const homeScore = espnScore?.home ?? match.score?.fullTime?.home
-  const awayScore = espnScore?.away ?? match.score?.fullTime?.away
+  const homeScore = mergeScore(espnScore?.home, match.score?.fullTime?.home)
+  const awayScore = mergeScore(espnScore?.away, match.score?.fullTime?.away)
   const minute    = isLive ? calcMinute(match) : null
 
   const homeName  = match.homeTeam?.name ?? ''
@@ -43,11 +43,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const isFavHome  = prono.home >= prono.away
   const favName    = isFavHome ? homeName : awayName
   const hardPhoto  = getTeamPhoto(favName)
-  const gradient   = getMatchGradient(homeName, awayName)
-
-  // Couleurs barre prono
-  const hColor    = getTeamColor(homeName)
-  const aColor    = getTeamColor(awayName)
+  // Couleurs résolues une seule fois (anti-collision) : réutilisées pour le fond
+  // dégradé ET la barre prono, pour rester cohérentes entre les deux.
+  const { home: hColor, away: aColor } = getMatchTeamColors(homeName, awayName)
+  const gradient   = buildMatchGradient(hColor, aColor)
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)

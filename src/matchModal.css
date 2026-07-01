@@ -890,7 +890,7 @@
 
 .modal__statBarRow {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+  grid-template-columns: 3.6rem minmax(0, 1fr) 3.6rem;
   align-items: center;
   gap: 0 0.5rem;
 }

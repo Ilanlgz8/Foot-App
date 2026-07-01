@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
 import { COMPETITIONS } from '../data/competitions'
 import { getMatchGradient } from '../data/teamPhotos'
@@ -109,7 +109,7 @@ function PeriodBadge({ match }) {
 function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminente, repriseDans }) {
   const h = homeScore ?? '-'
   const a = awayScore ?? '-'
-  const label = isTermine ? 'FT' : (minute ?? '–')
+  const label = isTermine ? 'Terminé' : (minute ?? '–')
 
   let homeCls = 'accueil__liveWidgetPill'
   let awayCls = 'accueil__liveWidgetPill'
@@ -249,8 +249,8 @@ function LiveMatchBlock({ match, espn, onMatchClick }) {
   const repriseDans      = pauseElapsed != null && pauseElapsed < 15 * 60_000
     ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
 
-  const hs       = espn?.home ?? match.score?.fullTime?.home ?? match.score?.halfTime?.home
-  const as_      = espn?.away ?? match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const hs       = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_      = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
   const clickable = !!onMatchClick

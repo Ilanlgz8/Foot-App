@@ -135,7 +135,7 @@ function Classement() {
       const awayWin = isFinished && sa != null && sa > sh
 
       const label = live ? (m.minute ? `${m.minute}'` : 'LIVE')
-                  : isFinished ? 'FT'
+                  : isFinished ? 'Terminé'
                   : formatDate(m.utcDate)
 
       const value = (showScore || live) && sh != null
@@ -275,12 +275,15 @@ function Classement() {
               <img src={selectedCompetition.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
-            <div className="compHeader__info">
-              <span className="compHeader__name">{selectedCompetition?.name ?? 'Compétition'}</span>
-              <span className="compHeader__sub">Saison 2025–26</span>
-            </div>
-            <button className="compHeader__btn" aria-label="Changer de compétition">
-              {compOpen ? 'Fermer ✕' : 'Changer ›'}
+            <button className="compHeader__btn" aria-label={compOpen ? 'Fermer la liste des compétitions' : 'Changer de compétition'}>
+              {compOpen ? 'Fermer' : 'Changer'}
+              <svg
+                className={`compHeader__btnChevron${compOpen ? ' compHeader__btnChevron--open' : ''}`}
+                width="10" height="10" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
           <div className="compHeader__dots">
