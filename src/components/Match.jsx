@@ -30,16 +30,34 @@ const BK_CARD_W = 44
 // devinée à la main — même principe que précédemment.
 const BK_CARD_H_FALLBACK = 36
 const BK_CARD_H_SAFETY = 4
-const BK_CARD_GAP = 8   // marge verticale entre le bas d'une card et le haut de la suivante
+// Marge verticale entre le bas d'une card et le haut de la suivante. Le zoom
+// "fit-to-screen" est bloquant en LARGEUR (9 colonnes), pas en hauteur — il
+// reste donc de la place verticale inutilisée une fois le zoom appliqué.
+// Un gap plus généreux ici "détend" le tableau verticalement sans jamais
+// changer le zoom (qui ne dépend que de TOTAL_W/TOTAL_H, pas de la
+// distribution interne) tant que TOTAL_H ne dépasse pas ce budget dispo.
+const BK_CARD_GAP = 28
 const BK_CONN_W = 10    // largeur de la zone connecteur entre rounds
-// Hauteur de l'en-tête de round (titre). Des libellés comme "Seizièmes de
-// finale" ne tiennent pas sur 1 ligne dans une colonne de 44px — le CSS les
-// fait donc passer sur 2 lignes (white-space:normal), d'où une hauteur un
-// peu plus généreuse que la version 1 ligne précédente.
-const BK_HDR_H  = 24
+// Hauteur de l'en-tête de round (titre) — libellés courts (voir
+// BK_SHORT_LABELS), tiennent sur 1 ligne dans une colonne de 44px.
+const BK_HDR_H  = 16
 // Marge horizontale de sécu de part et d'autre du tableau (débordement du
 // titre de tour centré — voir bracket__roundTitle).
 const BK_PAD_X = 4
+
+// Libellés COURTS pour les en-têtes de colonne du bracket compact — pas les
+// mêmes que KNOCKOUT_LABELS (useWcKnockout.js), qui restent complets partout
+// ailleurs dans l'app (navigation "Par journée", badges, etc.). Ici la
+// colonne ne fait que 44px de large : "Seizièmes de finale" n'y tient pas.
+const BK_SHORT_LABELS = {
+  LAST_32:        '16èmes',
+  LAST_16:        '8èmes',
+  QUARTER_FINALS: 'Quarts',
+  SEMI_FINALS:    'Demies',
+  FINAL:          'Finale',
+  THIRD_PLACE:    '3e place',
+}
+const _shortLabel = (round) => BK_SHORT_LABELS[round.stage] ?? round.label
 
 // Card-sonde : mesure la hauteur réelle du composant BkCard (2 lignes
 // drapeau+code) tel qu'il sera vraiment rendu (fonte/padding PWA réels).
@@ -327,7 +345,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             width:BK_CARD_W, height:BK_HDR_H,
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>
-            <span className="bracket__roundTitle">{round.label}</span>
+            <span className="bracket__roundTitle">{_shortLabel(round)}</span>
           </div>
         ))}
         {/* Titres des tours — branche droite */}
@@ -337,7 +355,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             width:BK_CARD_W, height:BK_HDR_H,
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>
-            <span className="bracket__roundTitle">{round.label}</span>
+            <span className="bracket__roundTitle">{_shortLabel(round)}</span>
           </div>
         ))}
         {/* Titre finale, au centre */}
@@ -347,7 +365,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             width:CENTER_W, height:BK_HDR_H,
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>
-            <span className="bracket__roundTitle bracket__roundTitle--final">🏆 {finalRound.label}</span>
+            <span className="bracket__roundTitle bracket__roundTitle--final">🏆 {_shortLabel(finalRound)}</span>
           </div>
         )}
 
@@ -388,7 +406,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
         {/* Petite finale, sous la finale */}
         {third?.matches[0] && (
           <div style={{ position:'absolute', left:centerX, top:thirdTop, width:CENTER_W }}>
-            <div className="bracket__thirdLabel" style={{ textAlign:'center', marginBottom:'0.5rem' }}>🥉 {third.label}</div>
+            <div className="bracket__thirdLabel" style={{ textAlign:'center', marginBottom:'0.5rem' }}>🥉 {_shortLabel(third)}</div>
             <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardH}
               style={{ position:'static', width:CENTER_W }}
             />

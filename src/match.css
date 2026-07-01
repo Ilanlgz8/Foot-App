@@ -898,19 +898,19 @@
 }
 
 /* ── Titre du round ──
-   Des libellés comme "Seizièmes de finale" ne tiennent pas sur une seule
-   ligne dans une colonne de 92px (BK_CARD_W) : white-space normal les laisse
-   passer sur 2 lignes plutôt que de les couper ou les faire déborder sur les
-   colonnes voisines (BK_HDR_H a été élargi en conséquence dans Match.jsx). */
+   Libellés COURTS (16èmes, 8èmes, Quarts, Demies... voir BK_SHORT_LABELS
+   dans Match.jsx) — contrairement aux noms complets ("Seizièmes de finale"),
+   ils tiennent sur une seule ligne dans une colonne de 44px (BK_CARD_W),
+   d'où white-space:nowrap (BK_HDR_H réduit en conséquence dans Match.jsx). */
 .bracket__roundTitle {
   margin: 0;
-  font-size: 0.42rem;
-  line-height: 1.15;
+  font-size: 0.5rem;
+  line-height: 1;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #ef4444;
-  white-space: normal;
+  white-space: nowrap;
   text-align: center;
 }
 
@@ -918,16 +918,17 @@
    avant (couleur or) puisque c'est le point de convergence des 2 branches. */
 .bracket__roundTitle--final {
   color: #fbbf24;
-  font-size: 0.46rem;
+  font-size: 0.54rem;
   text-shadow: 0 0 8px rgba(251,191,36,0.35);
 }
 
 .bracket__thirdLabel {
-  font-size: 0.44rem;
+  font-size: 0.5rem;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #ef4444;
+  white-space: nowrap;
 }
 
 /* ── Card d'un match bracket (compacte : drapeau + nom d'équipe uniquement,
