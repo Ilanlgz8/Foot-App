@@ -931,8 +931,8 @@
   white-space: nowrap;
 }
 
-/* ── Card d'un match bracket (compacte : drapeau + nom d'équipe uniquement,
-   voir commentaire sur BkCard dans Match.jsx pour le pourquoi) ── */
+/* ── Card d'un match bracket (compacte : DRAPEAU SEUL, plus aucun texte —
+   voir commentaire sur BkCard dans Match.jsx pour l'historique du choix) ── */
 .bracket__card {
   background: rgba(8,12,20,0.97);
   border: 1px solid rgba(255,255,255,0.07);
@@ -952,16 +952,21 @@
   animation: pulseRed 2s ease infinite;
 }
 
-/* ── Équipe dans la card bracket ──
-   Crest + code pays sont des enfants directs de .bracket__team (le wrapper
-   .bracket__teamInfo a été retiré du JSX avec le score/l'heure) — c'est donc
-   directement .bracket__team qui gère leur alignement flex. Le nom complet
-   reste dispo via l'attribut title (survol / tap-maintenu). */
+/* Card de la finale/petite finale — mise en avant (bordure dorée légère),
+   drapeaux plus grands via .bracket__card--big .bracket__crest ci-dessous. */
+.bracket__card--big {
+  border-color: rgba(251,191,36,0.25);
+  background: rgba(12,14,22,0.97);
+}
+
+/* ── Équipe dans la card bracket — un seul enfant direct désormais (le
+   drapeau), donc centré plutôt qu'aligné à gauche avec du texte à côté. Le
+   nom complet reste dispo via l'attribut title (survol / tap-maintenu). ── */
 .bracket__team {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.14rem 0.22rem;
+  justify-content: center;
+  padding: 0.2rem;
   min-width: 0;
 }
 
@@ -978,33 +983,47 @@
 }
 
 .bracket__crest {
-  width: 0.8rem; height: 0.8rem;
+  width: 1.15rem; height: 1.15rem;
   object-fit: contain;
   flex-shrink: 0;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
 }
 
 .bracket__crestTbd {
-  width: 0.8rem; height: 0.8rem;
+  width: 1.15rem; height: 1.15rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.38rem; color: #3d4d60; font-weight: 800;
+  font-size: 0.52rem; color: #3d4d60; font-weight: 800;
   flex-shrink: 0;
 }
 
-/* Code pays 3 lettres (ex "ARG") — pas le nom complet, voir BK_CARD_W dans
-   Match.jsx pour le pourquoi. */
-.bracket__teamName {
-  font-size: 0.58rem;
-  font-weight: 800;
+/* Drapeaux plus grands dans la card de la finale/petite finale. */
+.bracket__card--big .bracket__crest,
+.bracket__card--big .bracket__crestTbd {
+  width: 1.7rem; height: 1.7rem;
+}
+.bracket__card--big .bracket__crestTbd {
+  font-size: 0.7rem;
+}
+.bracket__card--big .bracket__team {
+  padding: 0.32rem;
+}
+
+/* Label "🏆 FINALE" — positionné juste au-dessus de la card de la finale
+   (pas dans la rangée commune des titres de tour tout en haut, voir
+   commentaire JSX) : plus grand, doré, avec lueur, pour la mettre en valeur
+   comme point de convergence du tableau. */
+.bracket__finalLabel {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 900;
   letter-spacing: 0.02em;
-  color: #e2e8f0;
+  text-transform: uppercase;
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251,191,36,0.4);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
 }
 
 /* ── Écran vide (phase finale pas encore dispo) ── */
