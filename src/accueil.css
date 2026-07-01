@@ -2757,7 +2757,13 @@
   background-position: center 25%;
   filter: brightness(0.38) saturate(1.15);
 }
-/* Dégradé couleurs équipes (fallback) — aucun filtre nécessaire.
+/* Dégradé couleurs équipes — 2 calques superposés qui se fondent l'un dans
+   l'autre (voir MatchPoster.jsx) plutôt qu'un simple panoramique :
+     - .poster__bg--gradient    : couleur "main" de chaque équipe, toujours
+       visible, drift lent.
+     - .poster__bg--gradientAlt : couleur "accent" de chaque équipe, drift en
+       sens inverse, apparaît/disparaît en fondu par-dessus → la palette
+       dominante change vraiment au lieu de juste glisser.
    Le background (couleurs) ET background-size sont posés inline via JS
    (MatchPoster.jsx) — ⚠️ NE PAS remettre background-size ici seul : la
    propriété raccourcie "background" posée en inline réinitialise ses
@@ -2766,7 +2772,13 @@
    (c'était le bug initial : l'animation ne faisait strictement rien car
    background-size restait "auto" = plein cadre, aucun mouvement possible). */
 .poster__bg--gradient {
-  animation: posterGradientDrift 14s ease-in-out infinite;
+  animation: posterGradientDrift 16s ease-in-out infinite;
+}
+.poster__bg--gradientAlt {
+  opacity: 0;
+  animation:
+    posterGradientDrift 16s ease-in-out infinite reverse,
+    posterGradientMorph  9s ease-in-out infinite;
 }
 
 @keyframes posterGradientDrift {
@@ -2775,8 +2787,16 @@
   100% { background-position: 15% 15%; }
 }
 
+/* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle */
+@keyframes posterGradientMorph {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.85; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .poster__bg--gradient { animation: none; }
+  .poster__bg--gradient,
+  .poster__bg--gradientAlt { animation: none; }
+  .poster__bg--gradientAlt { opacity: 0; }
 }
 
 /* Overlay sombre + dégradé directional */

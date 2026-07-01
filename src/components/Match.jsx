@@ -17,8 +17,12 @@ import { calcProno } from '../utils/calcProno'
    Défini AU NIVEAU MODULE pour éviter tout remount inutile.
    ═══════════════════════════════════════════════════════════════ */
 const BK_CARD_W = 200   // largeur d'une card (px)
-const BK_CARD_H = 110   // hauteur fixe d'une card (px)
-const BK_SLOT_H = 138   // hauteur de slot = card + marge verticale
+// Hauteur mini d'une card : 2 lignes équipe (~45px chacune, padding inclus)
+// + séparateur central (~33px avec date+heure sur 2 lignes, ou tab/live).
+// 110px était trop juste (~123px de contenu réel) → le score de l'équipe du
+// bas se retrouvait rogné par overflow:hidden. 130px laisse une marge de sécu.
+const BK_CARD_H = 130   // hauteur MINI d'une card (px) — le contenu peut grandir sans être coupé
+const BK_SLOT_H = 158   // hauteur de slot = card + marge verticale
 const BK_CONN_W = 56    // largeur de la zone connecteur entre rounds
 const BK_HDR_H  = 40    // hauteur de l'en-tête de round (titre)
 
@@ -50,7 +54,7 @@ function BkCard({ m, style, onSelect }) {
   return (
     <div
       className={`bracket__card ${live ? 'bracket__card--live' : ''}`}
-      style={{ ...style, height: BK_CARD_H, display:'flex', flexDirection:'column' }}
+      style={{ ...style, minHeight: BK_CARD_H, display:'flex', flexDirection:'column' }}
       onClick={() => !tbd && onSelect(m)}
     >
       <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}>

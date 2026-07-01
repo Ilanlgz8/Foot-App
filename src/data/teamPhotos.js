@@ -842,6 +842,18 @@ export function buildMatchGradient(home, away) {
   return `linear-gradient(135deg, ${h.accent} 0%, ${h.main} 24%, ${darken(h.main)} 42%, ${darken(a.main)} 58%, ${a.main} 76%, ${a.accent} 100%)`
 }
 
+// Variante "inversée" : les rôles main/accent sont échangés pour chaque équipe.
+// Utilisée en crossfade avec buildMatchGradient (voir MatchPoster.jsx) pour
+// faire "vivre" le fond d'une carte : au lieu de simplement faire glisser le
+// même dégradé, on fait apparaître/disparaître en fondu une 2e composition qui
+// met en avant l'autre couleur curée de chaque équipe — un vrai changement de
+// palette dominante, pas juste un panoramique.
+export function buildMatchGradientAlt(home, away) {
+  const h = typeof home === 'string' ? { main: home, accent: home } : home
+  const a = typeof away === 'string' ? { main: away, accent: away } : away
+  return `linear-gradient(135deg, ${h.main} 0%, ${h.accent} 24%, ${darken(h.accent)} 42%, ${darken(a.accent)} 58%, ${a.accent} 76%, ${a.main} 100%)`
+}
+
 // Dégradé unique pour chaque match : couleurs des deux équipes (main + accent)
 export function getMatchGradient(homeName, awayName) {
   const { home, away } = getMatchTeamColors(homeName, awayName)
