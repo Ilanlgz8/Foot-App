@@ -51,6 +51,22 @@ const BK_PROBE_MATCH = {
   score: { fullTime: { home: null, away: null } },
 }
 
+// Formatage date/heure — utilisé par MatchRow (vue "Par journée"), PAS par
+// BkCard (qui n'affiche plus ni date ni heure depuis son passage en version
+// compacte). Supprimées par erreur lors de ce passage en compact — elles
+// étaient encore utilisées ailleurs dans ce fichier, d'où le crash
+// "_fmtD is not defined" qui faisait planter toute l'appli au chargement de
+// Programme (aucune Error Boundary dans App.jsx → un throw ici démonte tout
+// l'arbre React, navbar comprise). Restaurées à l'identique.
+const _fmtH = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
+const _fmtD = (d) => {
+  const today    = new Date(); today.setHours(0,0,0,0)
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
+  const date     = new Date(d); date.setHours(0,0,0,0)
+  if (date.getTime() === today.getTime())    return `Aujourd'hui`
+  if (date.getTime() === tomorrow.getTime()) return `Demain`
+  return new Date(d).toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'short' })
+}
 const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
 // Code 3 lettres affiché dans la card compacte (voir commentaire BK_CARD_W).
 // `tla` vient directement de football-data.org (déjà utilisé comme fallback
