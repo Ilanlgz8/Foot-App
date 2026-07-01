@@ -901,7 +901,11 @@
 .bracket__roundTitle {
   display: inline-block;
   margin: 0;
-  font-size: 0.38rem;
+  /* Libellés désormais très courts (16e/8e/4e/2e, voir BK_SHORT_LABELS dans
+     Match.jsx) → largement la place de grossir dans la colonne de 36px
+     (vérifié par calcul : ~27px de chip max pour "16e" à cette taille,
+     contre 36px dispo — pas de débordement). 0.38rem → 0.58rem. */
+  font-size: 0.58rem;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -910,7 +914,7 @@
   background: rgba(239,68,68,0.1);
   border: 1px solid rgba(239,68,68,0.2);
   border-radius: 999px;
-  padding: 0.15rem 0.3rem;
+  padding: 0.18rem 0.36rem;
   white-space: nowrap;
 }
 

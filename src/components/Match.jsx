@@ -61,7 +61,9 @@ const BK_CONN_W = 8
 // BK_SHORT_LABELS), tiennent sur 1 ligne. Le titre de la finale n'est PLUS
 // dans cette rangée (voir BK_FINAL_LABEL_H) : demande explicite de le
 // mettre au niveau de la card de la finale plutôt que tout en haut.
-const BK_HDR_H  = 16
+// 16→18 : suit l'agrandissement du texte des chips (bracket__roundTitle
+// 0.38rem→0.58rem dans match.css), pour ne pas les couper verticalement.
+const BK_HDR_H  = 18
 // Espace réservé au-dessus de la card de la finale pour son propre label
 // "🏆 FINALE" — resserré pour que le label reste visuellement "accroché" à
 // sa card plutôt que de flotter avec un grand vide entre les deux.
