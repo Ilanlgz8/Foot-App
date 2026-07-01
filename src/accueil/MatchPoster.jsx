@@ -86,7 +86,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         <div className="poster__center">
           {isLive && minute && (
             <div className="poster__min-label">
-              {minute === 'MT' ? 'Mi-temps' : `${minute}'`}
+              {/* calcMinute() renvoie déjà des libellés complets pour les états
+                  spéciaux (MT/Pause/TAB/Débute) et inclut déjà l'apostrophe pour
+                  les minutes chiffrées ("91'") — ne jamais en rajouter une. */}
+              {minute === 'MT' ? 'Mi-temps' : minute}
             </div>
           )}
           {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}

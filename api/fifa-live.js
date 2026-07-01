@@ -449,16 +449,65 @@ export default async function handler(req, res) {
     const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
     if (!fdHome || !fdAway) continue
 
-    const found = espnEvents.find(({ slug: s, evt }) => {
-      if (s !== slug) return false
-      if (usedEspnIds.has(evt.id)) return false
-      const comp  = evt.competitions?.[0]
-      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-      const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
-      const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
-      return fuzzyTeam(fdHome, eHome) && fuzzyTeam(fdAway, eAway)
-    })
+    // ── Raccourci : ré-utiliser l'ID ESPN déjà résolu lors d'un poll précédent ──
+    // Root cause d'une bonne partie des bugs "intermittents" déjà corrigés cette
+    // session (matchs simultanés, noms légèrement différents...) : le fuzzy-match
+    // par NOM était re-exécuté à chaque poll (~toutes les 15-20s), pour CHAQUE
+    // match, y compris ceux déjà identifiés avec certitude auparavant. Ré-tenter
+    // un pari probabiliste en boucle indéfiniment, c'est mathématiquement
+    // garanti de finir par tomber sur le mauvais tirage tôt ou tard. On ne
+    // devrait avoir à "deviner" qu'UNE SEULE FOIS par match (à son apparition),
+    // puis se souvenir du bon ID ESPN et le réutiliser directement tant qu'il
+    // reste valide — beaucoup plus fiable ET moins de travail à chaque poll.
+    // (espnRealEventId ≠ le champ espnEventId du résultat final, qui contient
+    // l'ID FIFA pour la CM — deux systèmes d'ID différents, à ne pas confondre.)
+    const prevRealId = storedData[fdMatch.id]?.espnRealEventId ?? null
+    let found = prevRealId != null
+      ? espnEvents.find(({ slug: s, evt }) =>
+          s === slug && evt.id === prevRealId && !usedEspnIds.has(evt.id))
+      : null
+
+    // Si l'ID connu n'est plus dans le scoreboard actuel (rare — event retiré,
+    // changement de jour...), on retombe sur le fuzzy-match par nom comme avant.
+    if (!found) {
+      found = espnEvents.find(({ slug: s, evt }) => {
+        if (s !== slug) return false
+        if (usedEspnIds.has(evt.id)) return false
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
+        const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
+        return fuzzyTeam(fdHome, eHome) && fuzzyTeam(fdAway, eAway)
+      })
+    }
+
+    // Repli : le fuzzy-match strict (2 côtés) peut échouer sur un des deux
+    // matchs quand plusieurs commencent à la même minute — situation garantie
+    // pour les derniers matchs de poule (kickoff simultané obligatoire), pas
+    // juste un hasard. Dans ce cas un match restait bloqué sur "Débute" sans
+    // jamais se raccrocher à son event ESPN. Repli : n'exiger qu'UN des deux
+    // côtés + un coup d'envoi ESPN à ±10min du nôtre (assez précis pour ne pas
+    // accrocher un mauvais match, assez large pour couvrir les petits écarts
+    // de synchro d'horloge entre FD.org et ESPN).
+    if (!found) {
+      const fdKickoff = new Date(fdMatch.utcDate).getTime()
+      found = espnEvents.find(({ slug: s, evt }) => {
+        if (s !== slug) return false
+        if (usedEspnIds.has(evt.id)) return false
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
+        const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
+        if (!fuzzyTeam(fdHome, eHome) && !fuzzyTeam(fdAway, eAway)) return false
+        const rawKickoff = evt.date ?? comp?.date
+        if (!rawKickoff) return false
+        const evtKickoff = new Date(rawKickoff).getTime()
+        return Math.abs(evtKickoff - fdKickoff) <= 10 * 60_000
+      })
+    }
+
     if (!found) continue
 
     usedEspnIds.add(found.evt.id)
@@ -512,6 +561,25 @@ export default async function handler(req, res) {
     const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
       ? scorers : (prevData?.scorers ?? [])
 
+    // ── Score des tirs au but ────────────────────────────────────────────────
+    // ESPN expose un champ dédié `shootoutScore` sur chaque compétiteur (vérifié
+    // sur un vrai match : finale CM 2022, Argentine 4 - France 2). FIFA n'a pas
+    // d'équivalent confirmé pour ce champ précis (contrairement au score/buteurs
+    // où FIFA est privilégié) — et ses transitions de période sont déjà connues
+    // pour avoir des ratés (cf plus haut STATUS_EXTRA_TIME/STATUS_FINAL foireux).
+    // Donc ESPN uniquement ici, avec le même garde anti-régression que le score
+    // (le compteur de tab ne peut que monter, jamais redescendre).
+    const rawHomeShootout = homeC?.shootoutScore ?? null
+    const rawAwayShootout = awayC?.shootoutScore ?? null
+    const prevHomeShootout = prevData?.homeShootout ?? null
+    const prevAwayShootout = prevData?.awayShootout ?? null
+    const homeShootout = (rawHomeShootout != null && prevHomeShootout != null)
+      ? Math.max(rawHomeShootout, prevHomeShootout)
+      : (rawHomeShootout ?? prevHomeShootout)
+    const awayShootout = (rawAwayShootout != null && prevAwayShootout != null)
+      ? Math.max(rawAwayShootout, prevAwayShootout)
+      : (rawAwayShootout ?? prevAwayShootout)
+
     // Stats : scoreboard ESPN d'abord
     // Si scoreboard vide (WC et beaucoup de ligues club) ET match en cours
     // → appel summary endpoint ESPN (cached 30s Redis) qui contient boxscore complet
@@ -535,6 +603,10 @@ export default async function handler(req, res) {
                       ?? (isWC ? prevData?.espnEventId : null)
                       ?? found.evt.id,
       espnSlug:     isWC ? 'fifa' : found.slug,
+      // ID ESPN "brut" — distinct de espnEventId ci-dessus (qui est l'ID FIFA
+      // pour la CM) — mémorisé pour éviter de re-fuzzy-matcher ce match par nom
+      // à chaque poll (voir commentaire plus haut sur le raccourci de matching).
+      espnRealEventId: found.evt.id,
       // Statut : ESPN primaire, mais si ESPN lag au KO WC → FIFA Period=1 utilisé
       espnStatus:   finalEspnStatus,
       espnClock:    finalEspnClock,
@@ -543,6 +615,9 @@ export default async function handler(req, res) {
       home,
       away,
       scorers:      bestScorers,
+      // Tirs au but (ESPN uniquement — voir commentaire ci-dessus)
+      homeShootout,
+      awayShootout,
       // Stats : summary ESPN (possession, tirs, corners) — scoreboard souvent vide en soccer
       stats:        matchStats,
       // IDs FIFA pour api/fifa-lineups.js — préserver depuis prevData si fifaD absent
@@ -583,6 +658,14 @@ export default async function handler(req, res) {
       away:         fifaD.away,
       scorers:      bestScorers,
       stats:        prevData?.stats ?? null,
+      // Pas de source fiable pour le score des tab ici (fallback FIFA sans ESPN)
+      // → on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.
+      homeShootout: prevData?.homeShootout ?? null,
+      awayShootout: prevData?.awayShootout ?? null,
+      // Préserver l'ID ESPN déjà résolu (voir raccourci de matching plus haut) —
+      // sinon un aller-retour en fallback FIFA (ex: fetch ESPN temporairement en
+      // échec) ferait perdre le raccourci et forcerait un nouveau fuzzy-match.
+      espnRealEventId: prevData?.espnRealEventId ?? null,
       fifaCompId:   fifaD.fifaCompId,
       fifaSeasonId: fifaD.fifaSeasonId,
       fifaStageId:  fifaD.fifaStageId,

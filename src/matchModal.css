@@ -247,6 +247,13 @@
   margin-top: 0.2rem;
 }
 
+.modal__pens {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.02em;
+}
+
 /* ── Score live dans la modal ── */
 .modal__liveMinuteRow {
   display: flex;

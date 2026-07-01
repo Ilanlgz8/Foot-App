@@ -662,7 +662,19 @@ function TeamFormTable({ teamId, compMatches }) {
         const as_     = m.score?.fullTime?.away ?? '-'
         const myGoals  = myHome ? hs : as_
         const oppGoals = myHome ? as_ : hs
-        const result  = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+        // fullTime inclut déjà les buts de prolongations — un match décidé aux
+        // tirs au but y est TOUJOURS à égalité, le vrai W/D/L vient de penalties.
+        const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
+        const hp = m.score?.penalties?.home ?? null
+        const ap = m.score?.penalties?.away ?? null
+        let result
+        if (wentToPens && hp != null && ap != null) {
+          const myPens  = myHome ? hp : ap
+          const oppPens = myHome ? ap : hp
+          result = myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D'
+        } else {
+          result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+        }
         const hName   = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
         const aName   = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
         const date    = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
@@ -671,7 +683,9 @@ function TeamFormTable({ teamId, compMatches }) {
             <ResultBadge result={result} />
             <span className="pm__formMatchup">
               <span className={`pm__formTeam${myHome ? ' pm__formTeam--me' : ''}`}>{hName}</span>
-              <span className="pm__formScore">{hs}:{as_}</span>
+              <span className="pm__formScore">
+                {hs}:{as_}{wentToPens && hp != null && ap != null ? ` (${hp}-${ap} tab)` : ''}
+              </span>
               <span className={`pm__formTeam${!myHome ? ' pm__formTeam--me' : ''}`}>{aName}</span>
             </span>
             <span className="pm__formDate">{date}</span>
@@ -699,8 +713,23 @@ function calcTeamStats(teamId, compMatches) {
     if (a === 0) cs++
     if (f > 0 && a > 0) btts++
     if (f + a >= 3) over25++
-    if (f > a) { wins++; results.push('W') }
-    else if (f === a) { draws++; results.push('D') }
+    // fullTime inclut déjà les buts de prolongations — un match décidé aux tirs
+    // au but y est TOUJOURS à égalité, le vrai W/D/L vient de score.penalties
+    // (sans ça, une victoire aux tab comptait comme un nul dans les stats/série).
+    let outcome
+    if (m.score?.duration === 'PENALTY_SHOOTOUT') {
+      const hp = m.score?.penalties?.home ?? null
+      const ap = m.score?.penalties?.away ?? null
+      const myPens  = hp != null && ap != null ? (myHome ? hp : ap) : null
+      const oppPens = hp != null && ap != null ? (myHome ? ap : hp) : null
+      outcome = myPens != null && oppPens != null
+        ? (myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D')
+        : (f > a ? 'W' : f === a ? 'D' : 'L')
+    } else {
+      outcome = f > a ? 'W' : f === a ? 'D' : 'L'
+    }
+    if (outcome === 'W') { wins++; results.push('W') }
+    else if (outcome === 'D') { draws++; results.push('D') }
     else { losses++; results.push('L') }
   })
   const played = wins + draws + losses
@@ -829,12 +858,25 @@ function H2HSection({ match, compMatches }) {
             const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
             const myGoals  = isHomeTeam ? hs : as_
             const oppGoals = isHomeTeam ? as_ : hs
-            const result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+            // fullTime est à égalité par définition si le match est allé aux tab.
+            const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
+            const hp = m.score?.penalties?.home ?? null
+            const ap = m.score?.penalties?.away ?? null
+            let result
+            if (wentToPens && hp != null && ap != null) {
+              const myPens  = isHomeTeam ? hp : ap
+              const oppPens = isHomeTeam ? ap : hp
+              result = myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D'
+            } else {
+              result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+            }
             return (
               <div key={i} className="pm__h2hRow">
                 <span className="pm__h2hDate">{date}</span>
                 <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
-                <span className="pm__h2hScore">{hs} – {as_}</span>
+                <span className="pm__h2hScore">
+                  {hs} – {as_}{wentToPens && hp != null && ap != null ? ` (${hp}-${ap} tab)` : ''}
+                </span>
                 <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
                 <ResultBadge result={result} />
               </div>
@@ -1130,8 +1172,13 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
 
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away
-  const hWin = isFinished && hs > as_
-  const aWin = isFinished && as_ > hs
+  // fullTime inclut déjà les buts de prolongations — un match décidé aux tirs
+  // au but y est TOUJOURS à égalité, le vrai vainqueur vient de score.penalties.
+  const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+  const hPens = match.score?.penalties?.home ?? null
+  const aPens = match.score?.penalties?.away ?? null
+  const hWin = isFinished && (wentToPens ? (hPens != null && aPens != null && hPens > aPens) : hs > as_)
+  const aWin = isFinished && (wentToPens ? (hPens != null && aPens != null && aPens > hPens) : as_ > hs)
 
   const formatHour = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   const formatDate = (d) => {
@@ -1174,6 +1221,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                   <span className="modal__scoreSep">–</span>
                   <span className={`modal__scoreNum ${aWin ? 'modal__scoreNum--win' : ''}`}>{as_}</span>
                 </div>
+                {wentToPens && hPens != null && aPens != null && (
+                  <span className="modal__pens">({hPens}-{aPens} tab)</span>
+                )}
                 <span className="modal__ftLabel">Terminé</span>
               </>
             ) : isLive ? (() => {
@@ -1182,6 +1232,11 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               const liveAs  = mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
               const minute  = calcMinute(match)
               const period  = getMatchPeriod(match)
+              // Score des tab en direct — ESPN uniquement (champ confirmé fiable,
+              // voir api/fifa-live.js). Ne s'affiche que si les tab ont commencé.
+              const liveHomePens = espnScore?.homeShootout ?? null
+              const liveAwayPens = espnScore?.awayShootout ?? null
+              const showLivePens = period === 'T.A.B.' && (liveHomePens != null || liveAwayPens != null)
               const pauseElapsed = match.status === 'PAUSED' && matchSt.pausedAt && !matchSt.half2Start
                 ? Date.now() - matchSt.pausedAt : null
               const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
@@ -1198,6 +1253,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                     <span className="modal__scoreSep">–</span>
                     <span className="modal__scoreNum">{liveAs ?? '–'}</span>
                   </div>
+                  {showLivePens && (
+                    <span className="modal__pens">({liveHomePens ?? 0}-{liveAwayPens ?? 0} tab)</span>
+                  )}
                   {repriseImminente && <span className="modal__repriseLabel">reprise imminente</span>}
                   {repriseDans != null && !repriseImminente && <span className="modal__repriseLabel">reprise dans {repriseDans} min</span>}
                 </>

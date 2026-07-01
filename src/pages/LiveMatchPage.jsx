@@ -90,18 +90,17 @@ function MatchHeader({ match, espn, onBack }) {
   const h = hs ?? '–', a = as_ ?? '–'
 
   // Label minute (badge rouge au-dessus du score)
-  const minuteLabel = isTermine ? 'Terminé'
-    : period === 'HT'  ? 'MT'
-    : period === 'ET1' ? 'Prol. 1'
-    : period === 'ET2' ? 'Prol. 2'
-    : period === 'PEN' ? 'TAB'
-    : minute != null   ? `${minute}'` : '–'
+  // ⚠️ getMatchPeriod() renvoie 'Mi-temps'/'Prolongations'/'T.A.B.'/'2ème MT'/
+  // '1ère MT'/null (pas 'HT'/'ET1'/'ET2'/'PEN'/'FT') — ces comparaisons ne
+  // matchaient donc jamais, et calcMinute() inclut déjà l'apostrophe pour les
+  // minutes chiffrées ("91'") + des libellés complets pour MT/Pause/TAB/Débute,
+  // donc ${minute}' ajoutait une 2e apostrophe en trop dans tous les cas.
+  const minuteLabel = isTermine ? 'Terminé' : (minute ?? '–')
 
-  // Badge période (MI-TEMPS, TERMINÉ…)
-  const periodBadge = period === 'HT' ? 'MI-TEMPS'
-    : period === 'FT'              ? 'TERMINÉ'
-    : (period === 'ET1' || period === 'ET2') ? 'PROLONGATIONS'
-    : period === 'PEN'             ? 'T.A.B.'
+  // Badge période (MI-TEMPS, PROLONGATIONS, T.A.B.…)
+  const periodBadge = period === 'Mi-temps'      ? 'MI-TEMPS'
+    : period === 'Prolongations' ? 'PROLONGATIONS'
+    : period === 'T.A.B.'        ? 'T.A.B.'
     : null
 
   // Score localStorage (partagé avec Live.jsx)

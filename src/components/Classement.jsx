@@ -140,8 +140,16 @@ function Classement() {
       const sa  = m.score?.fullTime?.away ?? m.score?.halfTime?.away
       const live = ['IN_PLAY','PAUSED'].includes(m.status)
       const isFinished = m.status === 'FINISHED'
-      const homeWin = isFinished && sh != null && sh > sa
-      const awayWin = isFinished && sa != null && sa > sh
+      // fullTime est à égalité par définition si le match est allé aux tab.
+      const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
+      const pH = m.score?.penalties?.home ?? null
+      const pA = m.score?.penalties?.away ?? null
+      const homeWin = isFinished && (wentToPens
+        ? (pH != null && pA != null && pH > pA)
+        : (sh != null && sh > sa))
+      const awayWin = isFinished && (wentToPens
+        ? (pH != null && pA != null && pA > pH)
+        : (sa != null && sa > sh))
 
       const label = live ? (m.minute ? `${m.minute}'` : 'LIVE')
                   : isFinished ? 'Terminé'

@@ -382,7 +382,7 @@ async function _doPollESPN(matches, queryClient) {
       const match = allMatches.find(m => m.id === mid)
       if (!match) continue
 
-      const { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache } = data
+      const { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache, homeShootout, awayShootout } = data
 
       // Mémoriser que ce match est visible dans le scoreboard ESPN (sauf si fromCache)
       if (!fromCache) lastSeenInEspn[mid] = now
@@ -434,6 +434,14 @@ async function _doPollESPN(matches, queryClient) {
           playGoalSound()
         }
 
+        // Détection tir au but marqué : le total tab augmente (le score
+        // principal, lui, ne bouge plus une fois en tab — cf home/away ci-dessus).
+        const prevShootoutTotal = (prevCache?.homeShootout ?? -1) + (prevCache?.awayShootout ?? -1)
+        const newShootoutTotal  = (homeShootout ?? -1) + (awayShootout ?? -1)
+        if (prevCache && newShootoutTotal > prevShootoutTotal && newShootoutTotal >= 0) {
+          playGoalSound()
+        }
+
         // ── Regression guard ─────────────────────────────────────────────────
         // Pendant un match live, on ne descend jamais un score déjà connu.
         // Fix : si deux polls concurrent ont des données différentes (Redis stale
@@ -452,13 +460,24 @@ async function _doPollESPN(matches, queryClient) {
           return fresh.length >= cached.length ? fresh : cached
         })()
 
+        // Tirs au but : même garde anti-régression que le score (ESPN uniquement,
+        // voir api/fifa-live.js — jamais redescendre un compteur déjà connu).
+        const safeHomeShootout = (prevCache?.homeShootout != null && homeShootout != null)
+          ? Math.max(homeShootout, prevCache.homeShootout)
+          : (homeShootout ?? prevCache?.homeShootout ?? null)
+        const safeAwayShootout = (prevCache?.awayShootout != null && awayShootout != null)
+          ? Math.max(awayShootout, prevCache.awayShootout)
+          : (awayShootout ?? prevCache?.awayShootout ?? null)
+
         espnScoresCache[mid] = {
-          home:        safeHome,
-          away:        safeAway,
-          scorers:     safeScorers,
-          stats:       stats   ?? prevCache?.stats   ?? null,
-          espnEventId: data.espnEventId,
-          espnSlug:    data.espnSlug,
+          home:         safeHome,
+          away:         safeAway,
+          scorers:      safeScorers,
+          stats:        stats   ?? prevCache?.stats   ?? null,
+          homeShootout: safeHomeShootout,
+          awayShootout: safeAwayShootout,
+          espnEventId:  data.espnEventId,
+          espnSlug:     data.espnSlug,
         }
       }
 
@@ -524,14 +543,24 @@ async function _doPollESPN(matches, queryClient) {
         const ftSafeHome = (prevCache?.home != null && home != null) ? Math.max(home, prevCache.home) : (home ?? prevCache?.home)
         const ftSafeAway = (prevCache?.away != null && away != null) ? Math.max(away, prevCache.away) : (away ?? prevCache?.away)
         const ftScorers  = (() => { const f = scorers ?? []; const c = prevCache?.scorers ?? []; return f.length >= c.length ? f : c })()
+        // Même garde anti-régression pour le score des tab (dernier tir décisif
+        // pouvant arriver dans le même poll que la confirmation STATUS_FINAL_PEN).
+        const ftSafeHomeShootout = (prevCache?.homeShootout != null && homeShootout != null)
+          ? Math.max(homeShootout, prevCache.homeShootout)
+          : (homeShootout ?? prevCache?.homeShootout ?? null)
+        const ftSafeAwayShootout = (prevCache?.awayShootout != null && awayShootout != null)
+          ? Math.max(awayShootout, prevCache.awayShootout)
+          : (awayShootout ?? prevCache?.awayShootout ?? null)
         espnScoresCache[mid] = {
           ...(prevCache ?? {}),
-          home:        ftSafeHome,
-          away:        ftSafeAway,
-          scorers:     ftScorers,
-          stats:       stats   ?? prevStats,
-          espnEventId: data.espnEventId,
-          espnSlug:    data.espnSlug,
+          home:         ftSafeHome,
+          away:         ftSafeAway,
+          scorers:      ftScorers,
+          stats:        stats   ?? prevStats,
+          homeShootout: ftSafeHomeShootout,
+          awayShootout: ftSafeAwayShootout,
+          espnEventId:  data.espnEventId,
+          espnSlug:     data.espnSlug,
         }
 
         if (espnStatus === 'STATUS_POSTPONED' || espnStatus === 'STATUS_CANCELED') {
