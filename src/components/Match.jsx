@@ -267,6 +267,12 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
   // fixe (voir .bracket__container dans match.css) : on mesure la position
   // RÉELLE du conteneur à l'écran via getBoundingClientRect().top et on en
   // déduit l'espace dispo jusqu'au bas du viewport — aucun chiffre deviné.
+  // CORRECTION : la version précédente recalculait le zoom À CHAQUE SCROLL
+  // (rect.top change quand la page défile), donc la taille du bracket
+  // variait selon où l'utilisateur était scrollé — trop petit en haut de
+  // page, correct plus bas. Comportement jugé non voulu : la taille doit
+  // être FIXE, calculée une seule fois à l'ouverture de l'onglet, à sa
+  // valeur MAXIMALE, peu importe où l'utilisateur scrolle ensuite.
   const [fitZoom, setFitZoom] = useState(1)
   useLayoutEffect(() => {
     const el = containerRef?.current
@@ -275,15 +281,19 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     // un peu d'air pour ne pas coller au tout dernier pixel de l'écran).
     const BOTTOM_SAFETY = 12
     // Sonde cachée mesurant 100lvh ("largest viewport height" — hauteur une
-    // fois la barre d'adresse mobile rétractée). Sur mobile, window.innerHeight
-    // reflète la hauteur RÉDUITE tant que la barre d'adresse est visible, et
-    // ne grandit qu'après un scroll (le navigateur la rétracte alors) — d'où
-    // le zoom trop petit au premier affichage, corrigé seulement après scroll.
-    // 100lvh donne la hauteur "barre rétractée" dès le premier rendu. Fallback
-    // sur innerHeight si lvh n'est pas supporté (Safari < 15.4, vieux Android).
+    // fois la barre d'adresse mobile rétractée), pour ne pas dépendre de
+    // l'état actuel de cette barre. Fallback sur innerHeight si lvh non
+    // supporté (Safari < 15.4, vieux Android).
     const lvhProbe = document.createElement('div')
     lvhProbe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:100lvh; visibility:hidden; pointer-events:none;'
     document.body.appendChild(lvhProbe)
+
+    // Aligner le conteneur en haut du viewport UNE SEULE FOIS, avant la
+    // mesure, pour avoir une position de référence stable et maximale —
+    // indépendante de l'endroit où l'utilisateur était scrollé avant
+    // d'ouvrir cet onglet.
+    el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+
     const compute = () => {
       const rect   = el.getBoundingClientRect()
       const availW = el.clientWidth
@@ -296,15 +306,13 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     compute()
     const ro = new ResizeObserver(compute)
     ro.observe(el)
-    // En plus du ResizeObserver (taille du conteneur) : un scroll ou un
-    // redimensionnement de fenêtre peut changer rect.top / innerHeight sans
-    // changer la taille du conteneur lui-même.
+    // Seul un vrai changement de taille de fenêtre (rotation, redimensionnement)
+    // redéclenche le calcul. PAS de listener 'scroll' : la taille reste FIXE
+    // quel que soit l'endroit où l'utilisateur scrolle ensuite sur la page.
     window.addEventListener('resize', compute)
-    window.addEventListener('scroll', compute, { passive: true })
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', compute)
-      window.removeEventListener('scroll', compute)
       lvhProbe.remove()
     }
   }, [containerRef, TOTAL_W, TOTAL_H])
@@ -507,22 +515,6 @@ function Matchs() {
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   const isWC        = selectedComp === 'WC'
-
-  // Aligner le conteneur du bracket en haut du viewport dès qu'on bascule
-  // sur l'onglet "Phase finale". Sans ça, le zoom "fit-to-screen" (calculé
-  // dans BracketSvgView via getBoundingClientRect().top) reste basé sur la
-  // position de scroll d'AVANT le changement d'onglet — typiquement en haut
-  // de page, sous le header/sidebar — ce qui donne un zoom plus petit que
-  // nécessaire tant que l'utilisateur n'a pas scrollé lui-même pour
-  // rapprocher le conteneur du haut de l'écran. C'était exactement le
-  // symptôme rapporté : "la bonne taille" seulement après un scroll manuel.
-  // `behavior:'instant'` court-circuite le `scroll-behavior:smooth` global
-  // (index.css) pour éviter un effet de zoom qui grandit visiblement.
-  useLayoutEffect(() => {
-    if (isWC && wcView === 'bracket' && !bracketLoading && rounds.length > 0 && bracketWrapRef.current) {
-      bracketWrapRef.current.scrollIntoView({ block: 'start', behavior: 'instant' })
-    }
-  }, [isWC, wcView, bracketLoading, rounds.length])
 
   // Note : plus de ticker de minute ici — les cards du bracket sont
   // maintenant compactes (drapeau + nom uniquement, plus de texte "minute
