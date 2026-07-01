@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
+import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)
@@ -14,25 +15,45 @@ function cacheKey(comp, status) {
   return `matches_${comp}_${status}`
 }
 
-function groupByMatchday(matches, order = 'asc') {
-  const groups = {}
-  matches.forEach(match => {
-    const day = match.matchday
-    if (!groups[day]) groups[day] = []
-    groups[day].push(match)
-  })
-  Object.values(groups).forEach(g =>
-    g.sort((a, b) =>
-      order === 'desc'
-        ? new Date(b.utcDate) - new Date(a.utcDate)
-        : new Date(a.utcDate) - new Date(b.utcDate)
-    )
-  )
-  return Object.entries(groups).sort((pairA, pairB) => {
-    const dayA = Number(pairA[0])
-    const dayB = Number(pairB[0])
-    return order === 'asc' ? dayA - dayB : dayB - dayA
-  })
+// Regroupe les matchs pour la navigation "par journée" :
+//   - phase de poules → par match.matchday (1, 2, 3…), comme avant
+//   - phase à élimination directe → match.matchday est TOUJOURS null pour ces
+//     matchs (vérifié : c'est ce qui provoquait l'affichage "Journée null" en
+//     Résultats/Programme dès la fin de la phase de groupes). On les regroupe
+//     alors par match.stage, avec les libellés français déjà définis dans
+//     useWcKnockout.js (Seizièmes, Huitièmes, Quarts, Demies, Finale…).
+// Retourne un tableau de { key, label, matches } dans l'ordre chronologique
+// (poules d'abord, puis tours à élimination directe dans l'ordre du tableau),
+// inversé si order === 'desc' (utilisé par Résultats : le plus récent d'abord).
+function groupRounds(matches, order = 'asc') {
+  const groupStage = matches.filter(m => m.matchday != null)
+  const knockout    = matches.filter(m => m.matchday == null && m.stage)
+
+  const mdMap = {}
+  groupStage.forEach(m => { (mdMap[m.matchday] ??= []).push(m) })
+  const mdEntries = Object.keys(mdMap)
+    .map(Number).sort((a, b) => a - b)
+    .map(day => ({
+      key: `md-${day}`,
+      label: `Journée ${day}`,
+      matches: [...mdMap[day]].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
+    }))
+
+  const koEntries = KNOCKOUT_ORDER
+    .map(stage => ({ stage, ms: knockout.filter(m => m.stage === stage) }))
+    .filter(({ ms }) => ms.length > 0)
+    .map(({ stage, ms }) => ({
+      key: stage,
+      label: KNOCKOUT_LABELS[stage] ?? stage,
+      matches: [...ms].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
+    }))
+
+  const chrono   = [...mdEntries, ...koEntries]
+  const ordered  = order === 'desc' ? [...chrono].reverse() : chrono
+  return ordered.map(g => ({
+    ...g,
+    matches: order === 'desc' ? [...g.matches].reverse() : g.matches,
+  }))
 }
 
 // Calcule l'année de saison pour les ligues clubs (ex: juin 2026 → 2025)
@@ -130,6 +151,6 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
     matches: data ?? [],
     loading: isLoading,
     error: error?.message === '429' ? null : (error?.message ?? null), // 429 silencieux
-    grouped: groupByMatchday(data ?? [], order),
+    grouped: groupRounds(data ?? [], order),
   }
 }

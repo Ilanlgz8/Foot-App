@@ -323,6 +323,23 @@
   min-width: 0;
 }
 
+/* Buteurs, juste sous le nom de l'équipe — même esprit que le widget live */
+.resultats__scorers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  max-width: 100%;
+}
+.resultats__scorerLine {
+  font-size: 0.68rem;
+  color: rgba(226,232,240,0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 /* ── Score central ── */
 .resultats__scoreCenter {
   display: flex;

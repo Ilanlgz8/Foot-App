@@ -2760,15 +2760,19 @@
 /* Dégradé couleurs équipes (fallback) — aucun filtre nécessaire */
 .poster__bg--gradient {
   /* le background (couleurs) est défini inline via JS */
-  /* Drift très lent pour donner un peu de vie au fond sans distraire */
-  background-size: 200% 200%;
-  animation: posterGradientDrift 22s ease-in-out infinite;
+  /* Drift lent pour donner un peu de vie au fond sans distraire.
+     background-size plus large (320%) + déplacement en diagonale (x ET y,
+     dans le sens du gradient 135deg) pour que le mouvement soit perceptible
+     — un simple aller-retour horizontal sur un dégradé à 2 couleurs bougeait
+     à peine visuellement. */
+  background-size: 320% 320%;
+  animation: posterGradientDrift 14s ease-in-out infinite;
 }
 
 @keyframes posterGradientDrift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0%   { background-position: 15% 15%; }
+  50%  { background-position: 85% 85%; }
+  100% { background-position: 15% 15%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -11,6 +11,7 @@ import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
+import { getEspnData }   from './MatchModal'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
@@ -67,8 +68,8 @@ function Resultats() {
   }
 
   const currentGroup    = grouped[currentIndex]
-  const currentMatchday = currentGroup?.[0]
-  const currentMatches  = currentGroup?.[1] ?? []
+  const currentRoundLabel = currentGroup?.label ?? ''
+  const currentMatches  = currentGroup?.matches ?? []
   const total           = grouped.length
 
   const fmtDate = (d) => {
@@ -93,6 +94,15 @@ function Resultats() {
     const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
     const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
     const draw = !wentToPens && hs === as_
+
+    // Buteurs — depuis le cache ESPN local (persisté au FT par useLiveMinute
+    // pour tout match suivi en live sur cet appareil). Rien de fatal si absent
+    // (vieux match jamais suivi en live) : simplement pas de buteurs affichés.
+    const scorers   = getEspnData(match.id)?.scorers ?? []
+    const homeGoals = scorers.filter(s => s.team === 'home')
+    const awayGoals = scorers.filter(s => s.team === 'away')
+    const scorerSuffix = s => s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+
     return (
       <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
         <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
@@ -102,6 +112,15 @@ function Resultats() {
               : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.homeTeam)}</span>
+          {homeGoals.length > 0 && (
+            <div className="resultats__scorers">
+              {homeGoals.map((s, i) => (
+                <span key={i} className="resultats__scorerLine">
+                  {s.name}{scorerSuffix(s)}{s.minute ? ` ${(s.minute).split(':')[0]}'` : ''}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="resultats__scoreCenter">
           <span className="resultats__cardDate">{fmtDate(match.utcDate)}</span>
@@ -122,6 +141,15 @@ function Resultats() {
               : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.awayTeam)}</span>
+          {awayGoals.length > 0 && (
+            <div className="resultats__scorers">
+              {awayGoals.map((s, i) => (
+                <span key={i} className="resultats__scorerLine">
+                  {s.name}{scorerSuffix(s)}{s.minute ? ` ${(s.minute).split(':')[0]}'` : ''}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -278,7 +306,7 @@ function Resultats() {
             <>
               <div className="resultats__nav">
                 <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i + 1)} disabled={currentIndex >= total - 1}>←</button>
-                <span className="resultats__navLabel">Journée {currentMatchday}</span>
+                <span className="resultats__navLabel">{currentRoundLabel}</span>
                 <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i - 1)} disabled={currentIndex <= 0}>→</button>
               </div>
               <div className="resultats__list">

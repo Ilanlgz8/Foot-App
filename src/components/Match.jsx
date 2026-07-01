@@ -275,20 +275,36 @@ function Matchs() {
     }
   }, [isWC, wcView, loading, matches.length, wcGroups.length])
 
+  /* Auto-switch (2e garde-fou, plus fiable) : si un match à élimination directe
+     est déjà TERMINÉ, on est forcément après la phase de poules — inutile
+     d'attendre que le cache "SCHEDULED" (qui peut rester périmé un moment,
+     ex: rate-limit 429 silencieux → fallback sur un vieux cache local) le
+     confirme. useWcKnockout() fetch les matchs sans filtre de statut, donc
+     un match FINISHED y apparaît immédiatement dès qu'il est joué. */
+  const hasPlayedKnockout = (rounds ?? []).some(r => r.matches?.some(m => m.status === 'FINISHED'))
+  useEffect(() => {
+    if (isWC && wcView === 'poules' && !bracketLoading && hasPlayedKnockout) {
+      setWcView('matchs')
+      setCurrentIndex(0)
+    }
+  }, [isWC, wcView, bracketLoading, hasPlayedKnockout])
+
   /* Pour "matchs à venir" WC en vue par journée : on ne montre que les TIMED/SCHEDULED/live */
   const filteredGrouped = useMemo(() => {
     if (!isWC || wcView !== 'matchs') return grouped
-    return grouped.map(([day, dayMatches]) => [
-      day,
-      dayMatches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED' || m.status === 'IN_PLAY' || m.status === 'PAUSED')
-    ]).filter(([, ms]) => ms.length > 0)
+    return grouped
+      .map(g => ({
+        ...g,
+        matches: g.matches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED' || m.status === 'IN_PLAY' || m.status === 'PAUSED'),
+      }))
+      .filter(g => g.matches.length > 0)
   }, [isWC, wcView, grouped])
 
   /* Navigation journées */
-  const currentGroup    = filteredGrouped[currentIndex]
-  const currentMatchday = currentGroup?.[0]
-  const currentMatches  = currentGroup?.[1] ?? []
-  const total           = filteredGrouped.length
+  const currentGroup      = filteredGrouped[currentIndex]
+  const currentRoundLabel = currentGroup?.label ?? ''
+  const currentMatches    = currentGroup?.matches ?? []
+  const total             = filteredGrouped.length
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {
@@ -615,7 +631,7 @@ function Matchs() {
                 <button className="matchs__navBtn"
                   onClick={() => setCurrentIndex(i => i - 1)}
                   disabled={currentIndex <= 0}>←</button>
-                <span className="matchs__navLabel">Journée {currentMatchday}</span>
+                <span className="matchs__navLabel">{currentRoundLabel}</span>
                 <button className="matchs__navBtn"
                   onClick={() => setCurrentIndex(i => i + 1)}
                   disabled={currentIndex >= total - 1}>→</button>

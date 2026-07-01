@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useLiveData } from '../context/LiveProvider'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
@@ -50,46 +49,10 @@ const QN_ICONS = {
 
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [isStale, setIsStale]       = useState(false)
-  const [spinning, setSpinning]     = useState(false)
   const close = () => setMobileOpen(false)
 
-  const { liveMatches, recalibrate } = useLiveData()
-  const queryClient = useQueryClient()
-  const navigate    = useNavigate()
-
-  // Détection données gelées : si ESPN n'a pas été pollé depuis > 45s
-  useEffect(() => {
-    const check = () => {
-      const last = parseInt(localStorage.getItem('foot_espn_last_poll') ?? '0', 10)
-      // Ne considérer comme gelé que si on a déjà pollé au moins une fois ET > 45s
-      setIsStale(last > 0 && Date.now() - last > 45_000)
-    }
-    check()
-    const id = setInterval(check, 10_000)
-    return () => clearInterval(id)
-  }, [])
-
-  // Hard refresh : recalibrer ESPN + vider tous les caches gelés
-  const handleHardRefresh = useCallback(async () => {
-    if (spinning) return
-    setSpinning(true)
-    try {
-      await recalibrate()
-      // Invalider toutes les requêtes pour forcer un re-fetch propre
-      queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
-      queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-      queryClient.invalidateQueries({
-        predicate: q =>
-          Array.isArray(q.queryKey) &&
-          q.queryKey[0] === 'matches' &&
-          q.queryKey[2] === 'FINISHED',
-      })
-      setIsStale(false)
-    } finally {
-      setTimeout(() => setSpinning(false), 1_500)
-    }
-  }, [recalibrate, queryClient, spinning])
+  const { liveMatches } = useLiveData()
+  const navigate        = useNavigate()
 
   return (
     <nav className="navbar">
@@ -156,24 +119,10 @@ function Navbar() {
             </button>
           )}
 
-          {/* ── Groupe droit : cloche + refresh ── */}
+          {/* ── Groupe droit : cloche ── */}
           <div className="navbar__mobileRight">
             {/* Cloche notifications — desktop + mobile */}
             <NotificationBell />
-
-            {/* Bouton hard refresh — mobile uniquement, visible si données gelées > 45s */}
-            {isStale && <button
-              className={`navbar__refreshBtn${spinning ? ' navbar__refreshBtn--spinning' : ''}`}
-              onClick={handleHardRefresh}
-              aria-label="Rafraîchir les données"
-            >
-              {spinning ? (
-                <svg className="navbar__refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                </svg>
-              ) : 'Recharger'}
-            </button>}
           </div>
 
         </div>

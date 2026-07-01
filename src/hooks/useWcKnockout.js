@@ -37,11 +37,25 @@ export function useWcKnockout() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['wc-knockout'],
     queryFn: async () => {
-      const res = await fdFetch(fdUrl(`/api/v4/competitions/WC/matches`))
-      if (res.status === 403 || res.status === 429) throw new Error(String(res.status))
-      if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
-      const json = await res.json()
-      const all = json.matches ?? []
+      // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :
+      // football-data.org résout la "saison courante" comme "celle qui a la
+      // date de début la plus récente", une règle ambiguë pour une compétition
+      // non-annuelle comme la CM. Sans ?season= explicite, l'endpoint peut
+      // silencieusement retourner un jeu de données obsolète/incomplet — vu en
+      // pratique : seuls 3 matchs de phase finale au lieu de tous ceux déjà joués.
+      const wcSeason = new Date().getFullYear()
+      async function tryFetch(url) {
+        const r = await fdFetch(fdUrl(url))
+        if (r.status === 403 || r.status === 429) throw new Error(String(r.status))
+        if (!r.ok) return null
+        const j = await r.json()
+        return j.matches ?? null
+      }
+      let all = await tryFetch(`/api/v4/competitions/WC/matches?season=${wcSeason}`)
+      if (!all || all.length === 0) {
+        all = await tryFetch(`/api/v4/competitions/WC/matches`)
+      }
+      all = all ?? []
 
       const knockout = all.filter(m => KNOCKOUT_ORDER.includes(m.stage))
 
