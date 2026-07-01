@@ -58,7 +58,12 @@ export const TEAM_COLORS_FULL = {
   'United States':    { p: '#002868', s: '#B22234' },
   'Japan':            { p: '#BC002D', s: '#1a1a1a' },
   'South Korea':      { p: '#003478', s: '#CD2E3A' },
-  'Australia':        { p: '#00843D', s: '#FFB81C' },
+  // Vert/or (#00843D/#FFB81C) étaient les couleurs SPORTIVES traditionnelles de
+  // l'Australie (maillots, symboles nationaux), pas celles du DRAPEAU — même
+  // erreur de principe que pour l'Angleterre (voir fix Angleterre) : le drapeau
+  // australien est un "Blue Ensign" (bleu marine + Union Jack rouge/blanc +
+  // étoiles blanches), aucun vert ni or dedans.
+  'Australia':        { p: '#00247D', s: '#FFFFFF' },
   'Iran':             { p: '#239F40', s: '#FFFFFF' },
   'Saudi Arabia':     { p: '#006C35', s: '#1a1a1a' },
   'Qatar':            { p: '#8D153A', s: '#1a1a1a' },
@@ -790,10 +795,21 @@ function colorFamily(hex) {
  *            rouge plat, ce qui limite l'effet "tout se ressemble en rouge/vert").
  */
 export function getMatchTeamColors(homeName, awayName) {
+  // On distingue "équipe vraiment inconnue" (aucune entrée curée trouvée par
+  // lookupColor, ex: petite sélection absente du dico) de "équipe connue" —
+  // c'est le repli fabriqué (fallbackColor, une couleur choisie par hash du
+  // nom, sans AUCUN rapport avec le vrai drapeau) qui ne doit servir QUE dans
+  // le 1er cas. Bug corrigé : plus bas, en cas de double collision (main ET
+  // secondaire de l'équipe dans la même famille que l'adversaire), l'ancien
+  // code retombait sur ce repli inventé même pour une équipe dont on a les
+  // vraies couleurs (ex: Argentine, bleu/bleu face à une autre équipe bleue)
+  // → un pays sans vert dans son drapeau pouvait afficher du vert au hasard.
+  const knownHome = lookupColor(homeName)
+  const knownAway = lookupColor(awayName)
   const fallbackHome = fallbackColor(homeName, 0)
   const fallbackAway = fallbackColor(awayName, 1)
-  const rawHome = lookupColor(homeName) ?? fallbackHome
-  const rawAway = lookupColor(awayName) ?? fallbackAway
+  const rawHome = knownHome ?? fallbackHome
+  const rawAway = knownAway ?? fallbackAway
 
   let hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
   let ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
@@ -816,11 +832,15 @@ export function getMatchTeamColors(homeName, awayName) {
     const satAway = hexToHsl(ap).s
     if (satAway > satHome) {
       const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
-      hp = colorFamily(alt) !== famAway ? alt : fallbackHome.p
+      // Équipe connue : même si "alt" reste dans la même famille que l'adversaire
+      // (double collision, cas rare), on garde une vraie couleur de cette équipe
+      // plutôt que d'inventer une teinte au hasard. Le repli aléatoire ne
+      // s'applique qu'aux équipes réellement absentes du dico de couleurs.
+      hp = (colorFamily(alt) !== famAway || knownHome) ? alt : fallbackHome.p
       hAccent = ensureAccentVisible(rawHome.p ?? fallbackHome.p, '#eef2f7')
     } else {
       const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
-      ap = colorFamily(alt) !== famHome ? alt : fallbackAway.p
+      ap = (colorFamily(alt) !== famHome || knownAway) ? alt : fallbackAway.p
       aAccent = ensureAccentVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
     }
   }

@@ -25,9 +25,25 @@ const BK_CARD_W = 200   // largeur d'une card (px)
 // useLayoutEffect dans BracketSvgView. BK_CARD_H_FALLBACK ne sert que le
 // temps du tout premier render, avant que la mesure soit disponible.
 const BK_CARD_H_FALLBACK = 140
-const BK_CARD_GAP = 28  // marge verticale entre le bas d'une card et le haut de la suivante
+// +8px de marge de sécu ajoutés à la mesure brute (voir useLayoutEffect) : le
+// rendu réel des polices peut varier légèrement d'un appareil à l'autre
+// (métriques de fonte système différentes) par rapport à l'environnement où
+// la mesure a été vérifiée — cette marge absorbe cet écart sans réintroduire
+// une constante devinée à l'aveugle.
+const BK_CARD_H_SAFETY = 8
+const BK_CARD_GAP = 32  // marge verticale entre le bas d'une card et le haut de la suivante
 const BK_CONN_W = 56    // largeur de la zone connecteur entre rounds
 const BK_HDR_H  = 40    // hauteur de l'en-tête de round (titre)
+// Marge horizontale de sécu de part et d'autre du tableau : sans elle, le
+// titre du 1er tour (le plus long, "Seizièmes de finale") peut légèrement
+// déborder de sa card (200px) des deux côtés via le centrage flex — pour
+// TOUS les autres tours ce débordement se fond dans la zone connecteur
+// voisine (56px, jamais utilisée), mais pour le tout premier tour, sans
+// marge, le débordement gauche dépasse x=0 et se fait clipper par le
+// scroll horizontal du conteneur (overflow-x:auto clippe tout ce qui est
+// avant le point de départ du scroll) → titre "coupé" uniquement sur ce
+// 1er tour, jamais vu sur les suivants qui ont de la marge à revendre.
+const BK_PAD_X = 24
 
 // Card-sonde : le pire cas de contenu réel (match à venir → séparateur
 // date+heure sur 2 lignes, la variante la plus haute observée). Rendue avec
@@ -112,7 +128,7 @@ function BkCard({ m, style, onSelect, cardH }) {
   )
 }
 
-function BracketSvgView({ rounds, onSelect }) {
+export function BracketSvgView({ rounds, onSelect }) {
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
   // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
@@ -138,7 +154,7 @@ function BracketSvgView({ rounds, onSelect }) {
 
   useLayoutEffect(() => {
     const h = probeRef.current?.getBoundingClientRect().height
-    if (h && h > 0) setCardH(Math.ceil(h))
+    if (h && h > 0) setCardH(Math.ceil(h) + BK_CARD_H_SAFETY)
     // Contenu-sonde fixe (jamais lié aux données réelles) → une seule mesure
     // au montage suffit, pas besoin de re-mesurer à chaque render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,10 +172,13 @@ function BracketSvgView({ rounds, onSelect }) {
   const firstN  = main[0].matches.length
   const GRID_H  = firstN * slotH
   const TOTAL_H = BK_HDR_H + GRID_H
-  const TOTAL_W = main.length * BK_CARD_W + Math.max(0, main.length - 1) * BK_CONN_W
+  // + 2*BK_PAD_X : marge gauche/droite pour que rien (titre de tour centré
+  // qui déborde légèrement de sa card, ombre au survol...) ne se fasse
+  // clipper par le bord du scroll horizontal — voir commentaire sur BK_PAD_X.
+  const TOTAL_W = main.length * BK_CARD_W + Math.max(0, main.length - 1) * BK_CONN_W + 2 * BK_PAD_X
 
-  // X gauche d'un round
-  const rX = (ri) => ri * (BK_CARD_W + BK_CONN_W)
+  // X gauche d'un round (décalé de BK_PAD_X pour la marge de sécu gauche)
+  const rX = (ri) => BK_PAD_X + ri * (BK_CARD_W + BK_CONN_W)
 
   // Centre Y d'un match dans sa grille (y absolu depuis le haut du conteneur)
   const mCY = (ri, mi) => {
