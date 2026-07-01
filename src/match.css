@@ -976,7 +976,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.14rem;
+  padding: 0.09rem;
   min-width: 0;
 }
 
@@ -992,52 +992,60 @@
   opacity: 0.42;
 }
 
-/* Pas de badge/bordure autour du drapeau (demande explicite) : le drapeau
-   flotte directement sur le fond de la card, juste une légère ombre portée
-   pour le détacher visuellement. Le seul "contour" restant est l'anneau vert
-   de l'équipe qui gagne/mène (repère utile, différent d'une bordure
-   décorative systématique). Pas de cercle parfait pour ne pas recadrer les
-   drapeaux rectangulaires (cf. bug connu sur les cards détaillées). */
+/* Drapeau en CERCLE (comme sur la maquette envoyée par l'utilisateur), sans
+   bordure décorative — juste le drapeau détouré en rond. object-fit:cover
+   + léger scale (au lieu de contain) : même technique déjà utilisée et
+   éprouvée ailleurs dans l'app pour ce problème précis (voir
+   .poster__crestWrap/.poster__crest dans accueil.css) — "cover" remplit
+   tout le cercle au lieu de laisser des bandes vides sur les drapeaux qui ne
+   sont pas carrés (le bug historique des "drapeaux qui ne remplissent pas
+   le cercle"), et le scale(1.18) compense la marge blanche intégrée à
+   certaines images crest/drapeau de l'API. */
 .bracket__crestWrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 0.35rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255,255,255,0.04);
   flex-shrink: 0;
 }
 
-/* Anneau vert autour du drapeau de l'équipe qui gagne/mène. */
+/* Anneau vert autour du drapeau de l'équipe qui gagne/mène — seul "contour"
+   volontaire, sert de repère fonctionnel plutôt que décoratif. */
 .bracket__team--winner .bracket__crestWrap {
   box-shadow: 0 0 0 1.5px rgba(34,197,94,0.7), 0 0 6px rgba(34,197,94,0.3);
-  border-radius: 0.35rem;
 }
 
 .bracket__crest {
-  width: 1.8rem; height: 1.8rem;
-  object-fit: contain;
-  border-radius: 0.2rem;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.18);
 }
 
 .bracket__crestTbd {
-  width: 1.8rem; height: 1.8rem;
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; color: #3d4d60; font-weight: 800;
+  font-size: 0.78rem; color: #3d4d60; font-weight: 800;
 }
 
-/* Drapeaux encore plus grands dans la card de la finale/petite finale. */
+/* Drapeaux encore plus grands dans la card de la finale/petite finale — le
+   crest suit automatiquement (width/height:100% de son wrap). */
 .bracket__card--big .bracket__crestWrap,
-.bracket__card--big .bracket__crest,
 .bracket__card--big .bracket__crestTbd {
-  width: 2.7rem; height: 2.7rem;
+  width: 2.9rem; height: 2.9rem;
 }
 .bracket__card--big .bracket__crestTbd {
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 .bracket__card--big .bracket__team {
-  padding: 0.22rem;
+  padding: 0.2rem;
 }
 
 /* Label "🏆 FINALE" — positionné juste au-dessus de la card de la finale

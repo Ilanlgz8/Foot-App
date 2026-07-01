@@ -26,30 +26,32 @@ import { calcProno } from '../utils/calcProno'
 // card au lieu de partager la place avec du texte → rendu final nettement
 // plus grand malgré un zoom similaire. Un drapeau seul reste identifiable
 // (c'est déjà le repère visuel principal), contrairement à 3 lettres minuscules.
-// Rétréci encore (38→34) : moins de largeur "carte" au profit du drapeau
-// lui-même (voir bracket__crestWrap dans match.css, agrandi en retour) —
-// le zoom fit-to-screen dépend de TOTAL_W, donc réduire les colonnes permet
-// mécaniquement un zoom plus généreux malgré un tableau à 9 colonnes.
-const BK_CARD_W = 34
+// Largeur de card : ATTENTION à l'équilibre largeur/hauteur du zoom
+// fit-to-screen (voir plus bas) — au tour précédent, BK_CARD_GAP=30 avait
+// rendu le tableau bloquant en HAUTEUR plutôt qu'en largeur, ce qui laissait
+// une marge inutilisée sur les côtés (signalé par l'utilisateur : "on a de
+// la place sur les côtés"). En rééquilibrant (gap vertical réduit + cards un
+// peu plus larges), le zoom redevient bloquant en LARGEUR → le tableau
+// utilise vraiment toute la largeur dispo à l'écran, ET les drapeaux (qui
+// scalent avec BK_CARD_W) en profitent aussi.
+const BK_CARD_W = 36
 // Card de la FINALE (et de la petite finale) : volontairement plus large que
 // les cards de tour normal — c'est le point de convergence du tableau, elle
 // doit se voir davantage (demande explicite : la finale "en plus gros").
-const BK_FINAL_W = 58
+const BK_FINAL_W = 62
 // Hauteur de card : mesurée via sonde (fiable, gère les variations de
 // métriques de fonte/rendu d'image selon l'appareil) plutôt que devinée à la
 // main — même principe que précédemment. Fallback plus généreux qu'avant
 // car le drapeau occupe maintenant plus de place dans la card.
-const BK_CARD_H_FALLBACK = 44
+const BK_CARD_H_FALLBACK = 50
 const BK_CARD_H_SAFETY = 4
-// Marge verticale entre le bas d'une card et le haut de la suivante. Constaté
-// à l'usage (capture d'écran) : beaucoup d'espace vertical inutilisé sous le
-// tableau une fois le zoom fit-to-screen appliqué (le zoom reste souvent
-// bloquant en LARGEUR, pas en hauteur) → gap généreux pour utiliser cet
-// espace, "détendre" le tableau, sans jamais changer le zoom lui-même.
-const BK_CARD_GAP = 30
-// Largeur de la zone connecteur entre rounds — élargie un peu pour que les
-// chips de titre de tour (16èmes/8èmes/Quarts/Demies) aient de l'air entre
-// elles au lieu de se toucher (elles étaient collées, illisibles).
+// Marge verticale entre le bas d'une card et le haut de la suivante —
+// réduite (30→16) pour rester bloquant en LARGEUR plutôt qu'en hauteur (voir
+// commentaire BK_CARD_W). Reste plus généreuse que la toute 1ère version
+// compacte (8) : un compromis, pas un simple retour en arrière.
+const BK_CARD_GAP = 16
+// Largeur de la zone connecteur entre rounds — assez pour que les chips de
+// titre de tour (16èmes/8èmes/Quarts/Demies) aient de l'air entre elles.
 const BK_CONN_W = 12
 // Hauteur de l'en-tête de round (titre) — libellés courts (voir
 // BK_SHORT_LABELS), tiennent sur 1 ligne. Le titre de la finale n'est PLUS
