@@ -274,10 +274,21 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     // Petite marge de sécurité en bas (pas une estimation de chrome, juste
     // un peu d'air pour ne pas coller au tout dernier pixel de l'écran).
     const BOTTOM_SAFETY = 12
+    // Sonde cachée mesurant 100lvh ("largest viewport height" — hauteur une
+    // fois la barre d'adresse mobile rétractée). Sur mobile, window.innerHeight
+    // reflète la hauteur RÉDUITE tant que la barre d'adresse est visible, et
+    // ne grandit qu'après un scroll (le navigateur la rétracte alors) — d'où
+    // le zoom trop petit au premier affichage, corrigé seulement après scroll.
+    // 100lvh donne la hauteur "barre rétractée" dès le premier rendu. Fallback
+    // sur innerHeight si lvh n'est pas supporté (Safari < 15.4, vieux Android).
+    const lvhProbe = document.createElement('div')
+    lvhProbe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:100lvh; visibility:hidden; pointer-events:none;'
+    document.body.appendChild(lvhProbe)
     const compute = () => {
       const rect   = el.getBoundingClientRect()
       const availW = el.clientWidth
-      const availH = Math.max(0, window.innerHeight - rect.top - BOTTOM_SAFETY)
+      const maxVH  = lvhProbe.getBoundingClientRect().height || window.innerHeight
+      const availH = Math.max(0, maxVH - rect.top - BOTTOM_SAFETY)
       if (!availW || !availH) return
       const z = Math.min(1, availW / TOTAL_W, availH / TOTAL_H)
       setFitZoom(z > 0 ? z : 1)
@@ -294,6 +305,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
       ro.disconnect()
       window.removeEventListener('resize', compute)
       window.removeEventListener('scroll', compute)
+      lvhProbe.remove()
     }
   }, [containerRef, TOTAL_W, TOTAL_H])
 
@@ -495,6 +507,22 @@ function Matchs() {
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   const isWC        = selectedComp === 'WC'
+
+  // Aligner le conteneur du bracket en haut du viewport dès qu'on bascule
+  // sur l'onglet "Phase finale". Sans ça, le zoom "fit-to-screen" (calculé
+  // dans BracketSvgView via getBoundingClientRect().top) reste basé sur la
+  // position de scroll d'AVANT le changement d'onglet — typiquement en haut
+  // de page, sous le header/sidebar — ce qui donne un zoom plus petit que
+  // nécessaire tant que l'utilisateur n'a pas scrollé lui-même pour
+  // rapprocher le conteneur du haut de l'écran. C'était exactement le
+  // symptôme rapporté : "la bonne taille" seulement après un scroll manuel.
+  // `behavior:'instant'` court-circuite le `scroll-behavior:smooth` global
+  // (index.css) pour éviter un effet de zoom qui grandit visiblement.
+  useLayoutEffect(() => {
+    if (isWC && wcView === 'bracket' && !bracketLoading && rounds.length > 0 && bracketWrapRef.current) {
+      bracketWrapRef.current.scrollIntoView({ block: 'start', behavior: 'instant' })
+    }
+  }, [isWC, wcView, bracketLoading, rounds.length])
 
   // Note : plus de ticker de minute ici — les cards du bracket sont
   // maintenant compactes (drapeau + nom uniquement, plus de texte "minute
