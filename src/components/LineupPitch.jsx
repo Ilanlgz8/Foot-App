@@ -56,20 +56,25 @@ function posCat(pos) {
 // sont conservés en prévision d'une source plus précise, mais dans les faits c'est
 // toujours GK/DEF/MID/FWD qui est traduit ci-dessous — d'où l'importance de bien
 // mapper ces 4 valeurs (avant : 'MID'/'FWD' n'étaient pas traduits → affichés en anglais).
-const POS_FR = {
+// Labels en FRANÇAIS, façon FIFA/FC26 en version française (G, DC, DG, DD, MDC,
+// MC, MOC, MG, MD, BU, AC, AG, AD... — ce sont exactement les abréviations du
+// jeu quand la langue est réglée sur français). Les codes détaillés restent
+// prêts pour le jour où une source plus précise sera branchée, mais aujourd'hui
+// seules les 4 entrées génériques (GK/DEF/MID/FWD) sont réellement utilisées.
+const POS_LABEL = {
   // ── Catégories réellement fournies par les APIs ──
   GK:'G',  G:'G',   GB:'G',
   DEF:'DÉF', D:'DÉF',
   MID:'MIL', M:'MIL', MF:'MIL',
   FWD:'ATT', F:'ATT', FW:'ATT',
-  // ── Codes détaillés (gardés si une source plus précise est branchée un jour) ──
+  // ── Codes détaillés FIFA/FC26 FR (gardés si une source plus précise est branchée un jour) ──
   CB:'DC',  DC:'DC',  DL:'DG', DR:'DD',
-  LB:'DG',  RB:'DD',  LWB:'LG', RWB:'LD',
+  LB:'DG',  RB:'DD',  LWB:'DLG', RWB:'DLD',
   SW:'LIB',
   CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MDC', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
   LM:'MG',  RM:'MD',
-  ST:'ATT', CF:'AC',  LW:'AG',  RW:'AD',
-  SS:'ATT', BU:'ATT', AC:'AC', AG:'AG', AD:'AD',
+  ST:'BU',  CF:'AC',  LW:'AG',  RW:'AD',
+  SS:'BU',  BU:'BU', AC:'AC', AG:'AG', AD:'AD',
 }
 
 const CAT_COLOR = { 0: '#f59e0b', 1: '#60a5fa', 2: '#34d399', 3: '#ef4444' }
@@ -83,26 +88,58 @@ function fallbackLines(starters) {
 
 // Regroupe les titulaires par ligne RÉELLE (gardien / défense / milieu / attaque),
 // via posCat() qui lit le poste renvoyé par l'API (fiable : GK/DEF/MID/FWD).
-// Fix : avant, les joueurs étaient simplement tranchés dans l'ordre du tableau
-// starters[] pour remplir les lignes de la formation (ex: "4-3-3" → 4 premiers =
-// défense, 3 suivants = milieu, etc.), en supposant que l'API renvoie déjà les
-// joueurs triés dans cet ordre tactique. Ce n'est pas garanti pour toutes les
-// sources (FIFA, football-data.org, api-football) → un attaquant pouvait finir
-// affiché au milieu, ou un défenseur du mauvais côté.
+// Fix historique : avant, les joueurs étaient simplement tranchés dans l'ordre du
+// tableau starters[] pour remplir les lignes de la formation, en supposant que
+// l'API renvoie déjà les joueurs triés dans cet ordre tactique — pas garanti.
+//
+// BUG CORRIGÉ (2e passe) : la version précédente exigeait que le nombre de
+// lignes de la formation corresponde EXACTEMENT au nombre de catégories
+// dispo (GK/DEF/MID/FWD, 4 max) — sinon elle abandonnait et retombait sur
+// l'ordre brut de l'API (donc un joueur pouvait atterrir n'importe où). Or
+// une formation à 4 lignes de champ (ex: 4-2-3-1 = DEF/MDéf/MOff/ATT, ou
+// 3-4-2-1, 4-1-2-1-2…) est extrêmement courante — et comme les 4 sources de
+// données (ESPN/FIFA/api-football/football-data.org) ne distinguent JAMAIS
+// milieu défensif de milieu offensif (tout est "MID" générique), cette
+// condition d'égalité échouait très souvent → écran cassé sur ces formations,
+// probablement la cause principale du "pas toujours bien placé" observé.
+//
+// Nouvelle règle, basée sur la convention football standard des notations de
+// formation (X-Y-Z…) : la 1ère ligne de champ = défenseurs, la DERNIÈRE =
+// attaquants, TOUTES les lignes intermédiaires (il peut y en avoir 1, 2 ou 3)
+// = milieux, répartis dans l'ordre où l'API les renvoie. On ne peut toujours
+// pas savoir PRÉCISÉMENT qui est sentinelle vs meneur de jeu (donnée absente
+// des 4 sources), mais chaque joueur atterrit désormais toujours dans la
+// bonne zone du terrain (jamais un défenseur en ligne d'attaque ou l'inverse),
+// au lieu de dépendre d'un ordre d'API non garanti.
 function groupByRealLine(starters, lines) {
-  const byCat = [[], [], [], []]
+  const byCat = [[], [], [], []]  // 0=GK, 1=DEF, 2=MID, 3=FWD
   for (const p of starters) byCat[posCat(p.position)].push(p)
 
-  // On ne fait confiance au regroupement par catégorie que si les effectifs
-  // correspondent exactement aux lignes de la formation détectée (sécurité :
-  // si posCat ne matche pas, on retombe sur l'ordre brut plutôt que de casser
-  // l'affichage).
-  const matches =
-    byCat[1].length === (lines[1] ?? -1) &&
-    (lines.length < 3 || byCat[2].length === lines[2]) &&
-    (lines.length < 4 || byCat[3].length === lines[3])
+  const nOutfield = lines.length - 1  // hors ligne gardien (lines[0])
+  const ordered = []
 
-  return matches ? [...byCat[0], ...byCat[1], ...byCat[2], ...byCat[3]] : starters
+  if (nOutfield <= 1) {
+    // Formation dégénérée (une seule ligne de champ) : tout regrouper.
+    ordered.push(...byCat[0], ...byCat[1], ...byCat[2], ...byCat[3])
+  } else {
+    let midIdx = 0
+    for (let li = 0; li < lines.length; li++) {
+      if (li === 0)                    { ordered.push(...byCat[0]); continue }        // GK
+      if (li === 1)                    { ordered.push(...byCat[1]); continue }        // 1ère ligne = DEF
+      if (li === lines.length - 1)     { ordered.push(...byCat[3]); continue }        // dernière ligne = FWD
+      // ligne(s) intermédiaire(s) = MID, réparti dans l'ordre API
+      const n = lines[li]
+      ordered.push(...byCat[2].slice(midIdx, midIdx + n))
+      midIdx += n
+    }
+  }
+
+  // Reliquat (mismatch de comptage entre la formation déclarée et les
+  // catégories réellement reçues) : rattaché à la fin plutôt que perdu.
+  const placed = new Set(ordered)
+  for (const p of starters) if (!placed.has(p)) ordered.push(p)
+
+  return ordered
 }
 
 function getPositions(starters, formation) {
@@ -308,7 +345,7 @@ function Pitch({ formation, positions, teamColor }) {
 function PlayerCell({ player, isSub }) {
   const cat      = posCat(player.position)
   const catC     = CAT_COLOR[cat]
-  const posLabel = POS_FR[(player.position ?? '').toUpperCase()] ?? player.position ?? '—'
+  const posLabel = POS_LABEL[(player.position ?? '').toUpperCase()] ?? player.position ?? '—'
   const nm       = formatName(player.name, player.shortName)
 
   return (

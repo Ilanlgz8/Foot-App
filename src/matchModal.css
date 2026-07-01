@@ -935,7 +935,7 @@
   text-align: center;
   font-size: 0.6rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.68);
+  color: rgba(255,255,255,0.92);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1420,7 +1420,7 @@
 .pm__statName {
   font-size: 0.56rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.9);
   text-align: center;
   white-space: nowrap;
   letter-spacing: 0.08em;
