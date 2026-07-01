@@ -982,6 +982,11 @@
 
 .bracket__team + .bracket__team {
   border-top: 1px solid rgba(255,255,255,0.05);
+  /* Léger espace en plus pour le drapeau du bas (2ème équipe) — évite qu'il
+     soit trop collé à celui du haut, juste sous le trait séparateur. La
+     hauteur de card est mesurée dynamiquement (sonde), donc ce padding en
+     plus est automatiquement pris en compte, pas besoin d'ajuster ailleurs. */
+  padding-top: 0.24rem;
 }
 
 .bracket__team--winner {
@@ -1046,6 +1051,9 @@
 }
 .bracket__card--big .bracket__team {
   padding: 0.2rem;
+}
+.bracket__card--big .bracket__team + .bracket__team {
+  padding-top: 0.38rem;
 }
 
 /* Label "🏆 FINALE" — positionné juste au-dessus de la card de la finale
