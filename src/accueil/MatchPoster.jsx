@@ -62,8 +62,15 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
-      {/* ── Fond : dégradé couleurs des équipes ── */}
-      <div className="poster__bg poster__bg--gradient" style={{ background: gradient }} />
+      {/* ── Fond : dégradé couleurs des équipes ──
+          ⚠️ background-size DOIT être fixé ici en inline, pas seulement en CSS :
+          la propriété raccourcie "background" posée en style inline réinitialise
+          silencieusement ses sous-propriétés (background-size, -position…) à leur
+          valeur initiale avec la priorité la plus haute, ce qui annulait purement
+          et simplement l'animation de drift définie sur .poster__bg--gradient
+          (background-size restait à "auto" = plein cadre → aucun mouvement
+          possible, quelle que soit l'amplitude choisie dans le CSS). */}
+      <div className="poster__bg poster__bg--gradient" style={{ background: gradient, backgroundSize: '320% 320%' }} />
       <div className="poster__overlay" />
 
       {/* ── Badge compét / live ── */}

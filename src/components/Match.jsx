@@ -267,11 +267,22 @@ function Matchs() {
     return teams
   }
 
+  /* Les 2 auto-switch ci-dessous ne doivent corriger la vue par défaut QU'UNE
+     FOIS par compétition sélectionnée — sinon ils re-déclenchent à chaque fois
+     que wcView repasse à 'poules' (dépendance de leurs deux useEffect), y
+     compris quand l'utilisateur clique lui-même sur le bouton "Poules", ce qui
+     le renvoyait aussitôt sur "Par journée" et rendait le bouton inutilisable.
+     autoSwitchDone est remis à zéro à chaque changement de compétition
+     (handleSelectComp) et marqué dès qu'un clic manuel a lieu (pickWcView). */
+  const autoSwitchDone = useRef(false)
+
   /* Auto-switch : si des matchs existent mais aucun groupe détecté → vue par journée */
   useEffect(() => {
+    if (autoSwitchDone.current) return
     if (isWC && wcView === 'poules' && !loading && matches.length > 0 && wcGroups.length === 0) {
       setWcView('matchs')
       setCurrentIndex(0)
+      autoSwitchDone.current = true
     }
   }, [isWC, wcView, loading, matches.length, wcGroups.length])
 
@@ -283,11 +294,20 @@ function Matchs() {
      un match FINISHED y apparaît immédiatement dès qu'il est joué. */
   const hasPlayedKnockout = (rounds ?? []).some(r => r.matches?.some(m => m.status === 'FINISHED'))
   useEffect(() => {
+    if (autoSwitchDone.current) return
     if (isWC && wcView === 'poules' && !bracketLoading && hasPlayedKnockout) {
       setWcView('matchs')
       setCurrentIndex(0)
+      autoSwitchDone.current = true
     }
   }, [isWC, wcView, bracketLoading, hasPlayedKnockout])
+
+  /* Changement manuel de vue (clics utilisateur) → on considère l'auto-switch
+     "consommé" pour cette compétition, il ne doit plus jamais forcer la vue. */
+  const pickWcView = (v) => {
+    autoSwitchDone.current = true
+    setWcView(v)
+  }
 
   /* Pour "matchs à venir" WC en vue par journée : on ne montre que les TIMED/SCHEDULED/live */
   const filteredGrouped = useMemo(() => {
@@ -308,6 +328,7 @@ function Matchs() {
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {
+    autoSwitchDone.current = false
     setSelectedComp(id); setCurrentIndex(0); setWcView('poules'); setOpenedGroup(null)
   }
 
@@ -478,7 +499,7 @@ function Matchs() {
                   {/* ── Poules : terrain de foot vu du dessus ── */}
                   <button
                     className={`matchs__wcToggleBtn ${wcView === 'poules' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => setWcView('poules')}
+                    onClick={() => pickWcView('poules')}
                   >
                     <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       {/* Terrain */}
@@ -500,7 +521,7 @@ function Matchs() {
                   {/* ── Par journée : liste de matchs ── */}
                   <button
                     className={`matchs__wcToggleBtn ${wcView === 'matchs' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => { setWcView('matchs'); setCurrentIndex(0) }}
+                    onClick={() => { pickWcView('matchs'); setCurrentIndex(0) }}
                   >
                     <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       {/* Fond carte */}
@@ -519,7 +540,7 @@ function Matchs() {
                   {/* ── Phase finale : arbre de tournoi ── */}
                   <button
                     className={`matchs__wcToggleBtn ${wcView === 'bracket' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => setWcView('bracket')}
+                    onClick={() => pickWcView('bracket')}
                   >
                     <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       {/* Matchs 1er tour */}

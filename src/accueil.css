@@ -2757,15 +2757,15 @@
   background-position: center 25%;
   filter: brightness(0.38) saturate(1.15);
 }
-/* Dégradé couleurs équipes (fallback) — aucun filtre nécessaire */
+/* Dégradé couleurs équipes (fallback) — aucun filtre nécessaire.
+   Le background (couleurs) ET background-size sont posés inline via JS
+   (MatchPoster.jsx) — ⚠️ NE PAS remettre background-size ici seul : la
+   propriété raccourcie "background" posée en inline réinitialise ses
+   sous-propriétés à leur valeur initiale avec la priorité la plus haute,
+   ce qui annule toute valeur de background-size définie seulement en CSS
+   (c'était le bug initial : l'animation ne faisait strictement rien car
+   background-size restait "auto" = plein cadre, aucun mouvement possible). */
 .poster__bg--gradient {
-  /* le background (couleurs) est défini inline via JS */
-  /* Drift lent pour donner un peu de vie au fond sans distraire.
-     background-size plus large (320%) + déplacement en diagonale (x ET y,
-     dans le sens du gradient 135deg) pour que le mouvement soit perceptible
-     — un simple aller-retour horizontal sur un dégradé à 2 couleurs bougeait
-     à peine visuellement. */
-  background-size: 320% 320%;
   animation: posterGradientDrift 14s ease-in-out infinite;
 }
 
