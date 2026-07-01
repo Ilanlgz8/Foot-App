@@ -307,13 +307,12 @@
 .mp__statVal {
   font-size: 0.78rem;
   font-weight: 900;
-  /* 0.6 → 0.95 : c'était la vraie cause du "gris sur tout sauf les matchs
-     live" — MatchPage.jsx (matchs à venir ET terminés, via MpSeasonStats/
-     MpMatchStats) a son propre CSS (mp__stat*, ce fichier) complètement
-     séparé de matchModal.css (modal__statBar*/pm__stat*, déjà corrigé) —
-     donc corriger l'un ne touchait pas l'autre. Un match live passe par
-     LiveMatchPage.jsx qui réutilise matchModal.css, d'où la différence
-     observée. */
+  /* 0.6 to 0.95 : c'était la vraie cause du "gris sur tout sauf les matchs
+     live" - MatchPage.jsx (matchs a venir ET termines, via MpSeasonStats et
+     MpMatchStats) a son propre CSS (classes mp__stat, ce fichier) separe de
+     matchModal.css (classes modal__statBar et pm__stat, deja corrige) - donc
+     corriger l'un ne touchait pas l'autre. Un match live passe par
+     LiveMatchPage.jsx qui reutilise matchModal.css, d'ou la difference. */
   color: rgba(255,255,255,.95);
   min-width: 0;
   line-height: 1;
