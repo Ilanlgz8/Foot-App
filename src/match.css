@@ -862,88 +862,94 @@
    moyen de scroller. En laissant `touch-action` à sa valeur par défaut
    (`auto`), le navigateur arbitre correctement lui-même : swipe horizontal
    → scroll ce conteneur, swipe vertical → bubble vers le scroll de la page. */
+/* Conteneur du bracket : doit tenir ENTIÈREMENT dans l'écran, sans scroll
+   dans aucune direction. Le zoom "fit-to-screen" (calculé dynamiquement dans
+   BracketSvgView via ResizeObserver — voir le commentaire associé dans
+   Match.jsx) réduit le tableau logique pour qu'il tienne pile dans cet
+   espace ; overflow:hidden est donc une sécurité, pas le mécanisme principal.
+   max-height borne l'espace dispo à ce qui reste sous la navbar/le header de
+   page/les boutons d'onglet (Poules/Bracket/Programme) au-dessus. */
 .bracket__container {
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(239,68,68,0.25) transparent;
-  padding-bottom: 1rem;
+  overflow: hidden;
+  max-height: calc(100dvh - 13rem);
+  display: flex;
+  justify-content: center;
 }
 
-/* Wrap du SVG mathématique — positionne le tout */
+/* Wrap du SVG mathématique — le zoom fit-to-screen (style inline zoom:fitZoom
+   calculé en JS) est appliqué directement sur cet élément par BracketSvgView.
+   `zoom` (contrairement à transform:scale) réduit vraiment la boîte de
+   layout, donc .bracket__container peut se fier à sa taille finale pour
+   l'overflow:hidden ci-dessus. */
 .bracket__svgWrap {
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 0.5rem 0;
 }
 
-/* ── Titre du round ── */
+/* ── Titre du round ──
+   Des libellés comme "Seizièmes de finale" ne tiennent pas sur une seule
+   ligne dans une colonne de 92px (BK_CARD_W) : white-space normal les laisse
+   passer sur 2 lignes plutôt que de les couper ou les faire déborder sur les
+   colonnes voisines (BK_HDR_H a été élargi en conséquence dans Match.jsx). */
 .bracket__roundTitle {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: 0.42rem;
+  line-height: 1.15;
   font-weight: 900;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #ef4444;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 /* Titre de la finale, au centre du tableau symétrique — légèrement mis en
    avant (couleur or) puisque c'est le point de convergence des 2 branches. */
 .bracket__roundTitle--final {
   color: #fbbf24;
-  font-size: 0.68rem;
-  text-shadow: 0 0 12px rgba(251,191,36,0.35);
-}
-
-/* ── Petite finale (séparée du bracket principal) ── */
-.bracket__thirdWrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.46rem;
+  text-shadow: 0 0 8px rgba(251,191,36,0.35);
 }
 
 .bracket__thirdLabel {
-  font-size: 0.62rem;
+  font-size: 0.44rem;
   font-weight: 900;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #ef4444;
 }
 
-/* ── Card d'un match bracket ── */
+/* ── Card d'un match bracket (compacte : drapeau + nom d'équipe uniquement,
+   voir commentaire sur BkCard dans Match.jsx pour le pourquoi) ── */
 .bracket__card {
   background: rgba(8,12,20,0.97);
   border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 1rem;
+  border-radius: 0.45rem;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.18s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .bracket__card:hover {
   border-color: rgba(239,68,68,0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 36px rgba(0,0,0,0.4);
 }
 
 .bracket__card--live {
   border-color: rgba(239,68,68,0.4);
-  box-shadow: 0 0 20px rgba(239,68,68,0.12);
+  box-shadow: 0 0 8px rgba(239,68,68,0.12);
   animation: pulseRed 2s ease infinite;
 }
 
-/* ── Équipe dans la card bracket ── */
+/* ── Équipe dans la card bracket ──
+   Crest + code pays sont des enfants directs de .bracket__team (le wrapper
+   .bracket__teamInfo a été retiré du JSX avec le score/l'heure) — c'est donc
+   directement .bracket__team qui gère leur alignement flex. Le nom complet
+   reste dispo via l'attribut title (survol / tap-maintenu). */
 .bracket__team {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.65rem 0.9rem;
-  transition: background 0.15s;
+  gap: 0.2rem;
+  padding: 0.14rem 0.22rem;
+  min-width: 0;
 }
 
 .bracket__team + .bracket__team {
@@ -958,103 +964,34 @@
   opacity: 0.45;
 }
 
-.bracket__teamInfo {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-width: 0;
-}
-
 .bracket__crest {
-  width: 1.5rem; height: 1.5rem;
+  width: 0.8rem; height: 0.8rem;
   object-fit: contain;
   flex-shrink: 0;
-  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.4));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
 }
 
 .bracket__crestTbd {
-  width: 1.5rem; height: 1.5rem;
+  width: 0.8rem; height: 0.8rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; color: #3d4d60; font-weight: 800;
+  font-size: 0.38rem; color: #3d4d60; font-weight: 800;
   flex-shrink: 0;
 }
 
+/* Code pays 3 lettres (ex "ARG") — pas le nom complet, voir BK_CARD_W dans
+   Match.jsx pour le pourquoi. */
 .bracket__teamName {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   color: #e2e8f0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.bracket__score {
-  font-size: 1rem;
-  font-weight: 900;
-  color: #94a3b8;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
-.bracket__score--win { color: #22c55e; }
-
-/* ── Séparateur central (heure / vs) ── */
-.bracket__sep {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.2rem 0.9rem;
-  background: rgba(255,255,255,0.015);
-  border-top: 1px solid rgba(255,255,255,0.04);
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-}
-
-.bracket__vs {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.15em;
-  color: #3d4d60;
-  text-transform: uppercase;
-}
-
-.bracket__live {
-  font-size: 0.62rem;
-  font-weight: 800;
-  color: #ef4444;
-  letter-spacing: 0.08em;
-  animation: pulseRed 1.5s ease infinite;
-}
-
-.bracket__time {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.05rem;
-}
-
-.bracket__pens {
-  font-size: 0.58rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.02em;
-}
-
-.bracket__timeDate {
-  font-size: 0.58rem;
-  font-weight: 700;
-  color: #3d4d60;
-  text-transform: capitalize;
-  letter-spacing: 0.06em;
-}
-
-.bracket__timeHour {
-  font-size: 0.78rem;
-  font-weight: 900;
-  color: #64748b;
-  font-variant-numeric: tabular-nums;
+  min-width: 0;
 }
 
 /* ── Écran vide (phase finale pas encore dispo) ── */
@@ -1115,7 +1052,6 @@
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
   .matchs__wcToggle { flex-wrap: wrap; }
-  .bracket__card { min-width: 200px; }
   .matchs__wcToggleBtn { font-size: 0.75rem; padding: 0.35rem 0.75rem; }
   .matchs__headerRow { flex-direction: column; align-items: flex-start; }
 }
@@ -1214,18 +1150,6 @@
   .matchs__title { font-size: clamp(1.2rem, 5vw, 1.6rem); }
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
-  .bracket__card   { min-width: 170px; }
-
-  /* Bracket : zoom pour réduire l'empreinte horizontale */
-  .bracket__container {
-    -webkit-overflow-scrolling: touch;
-    /* Fondu droit pour indiquer qu'il y a du contenu à scroller */
-    -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
-    mask-image: linear-gradient(to right, black 80%, transparent 100%);
-  }
-  .bracket__svgWrap {
-    zoom: 0.68;
-  }
 
   /* wcModal : meilleur fit sur petit écran */
   .wcModal__overlay { padding: 0.5rem; }
@@ -1240,7 +1164,4 @@
   .matchs__match { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.6rem 0.5rem; }
   .matchs__teamName { font-size: 0.68rem; }
   .matchs__sidebarLogo { width: 1.9rem; height: 1.9rem; }
-
-  /* Bracket encore plus petit sur 375px */
-  .bracket__svgWrap { zoom: 0.55; }
 }

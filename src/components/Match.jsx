@@ -8,7 +8,6 @@ import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
 import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { calcMinute } from '../utils/matchUtils'
 import { calcProno } from '../utils/calcProno'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -16,61 +15,64 @@ import { calcProno } from '../utils/calcProno'
    Les positions sont calculées depuis des constantes fixes.
    Défini AU NIVEAU MODULE pour éviter tout remount inutile.
    ═══════════════════════════════════════════════════════════════ */
-const BK_CARD_W = 200   // largeur d'une card (px)
-// Hauteur de card : plutôt que de deviner une constante (raté 2 fois — le
-// contenu réel sur PWA est plus haut que l'estimation, notamment pour les
-// matchs à venir avec date+heure sur 2 lignes dans le séparateur central),
-// on la MESURE via une card-sonde invisible identique au pire cas réel
-// (match à venir, cf BK_PROBE_MATCH) rendue avec BkCard lui-même — voir
-// useLayoutEffect dans BracketSvgView. BK_CARD_H_FALLBACK ne sert que le
-// temps du tout premier render, avant que la mesure soit disponible.
-const BK_CARD_H_FALLBACK = 140
-// +8px de marge de sécu ajoutés à la mesure brute (voir useLayoutEffect) : le
-// rendu réel des polices peut varier légèrement d'un appareil à l'autre
-// (métriques de fonte système différentes) par rapport à l'environnement où
-// la mesure a été vérifiée — cette marge absorbe cet écart sans réintroduire
-// une constante devinée à l'aveugle.
-const BK_CARD_H_SAFETY = 8
-const BK_CARD_GAP = 32  // marge verticale entre le bas d'une card et le haut de la suivante
-const BK_CONN_W = 56    // largeur de la zone connecteur entre rounds
-const BK_HDR_H  = 40    // hauteur de l'en-tête de round (titre)
-// Marge horizontale de sécu de part et d'autre du tableau : sans elle, le
-// titre du 1er tour (le plus long, "Seizièmes de finale") peut légèrement
-// déborder de sa card (200px) des deux côtés via le centrage flex — pour
-// TOUS les autres tours ce débordement se fond dans la zone connecteur
-// voisine (56px, jamais utilisée), mais pour le tout premier tour, sans
-// marge, le débordement gauche dépasse x=0 et se fait clipper par le
-// scroll horizontal du conteneur (overflow-x:auto clippe tout ce qui est
-// avant le point de départ du scroll) → titre "coupé" uniquement sur ce
-// 1er tour, jamais vu sur les suivants qui ont de la marge à revendre.
-const BK_PAD_X = 24
+// Largeur de card compacte : drapeau + CODE PAYS 3 lettres (pas le nom
+// complet). Choix fait avec l'utilisateur après calcul : avec le nom complet
+// ("Seizièmes de finale" × 9 colonnes = ~1000px logiques), le zoom
+// nécessaire pour tenir sur un écran de téléphone sans AUCUN scroll
+// descendait à ~0.35-0.4x → texte à 2.6-3px, illisible. En passant au code
+// 3 lettres (comme ESPN/FlashScore en vue compacte), le tableau logique
+// tombe à ~484px de large → zoom réel ~0.7-0.8x sur un iPhone → texte ~7px,
+// nettement plus lisible, tout en gardant zéro scroll.
+const BK_CARD_W = 44
+// Hauteur de card : contenu FIXE par construction (2 lignes drapeau+code,
+// plus de séparateur variable score/date/live) → mesurée via sonde (fiable,
+// gère les variations de métriques de fonte selon l'appareil) plutôt que
+// devinée à la main — même principe que précédemment.
+const BK_CARD_H_FALLBACK = 36
+const BK_CARD_H_SAFETY = 4
+const BK_CARD_GAP = 8   // marge verticale entre le bas d'une card et le haut de la suivante
+const BK_CONN_W = 10    // largeur de la zone connecteur entre rounds
+// Hauteur de l'en-tête de round (titre). Des libellés comme "Seizièmes de
+// finale" ne tiennent pas sur 1 ligne dans une colonne de 44px — le CSS les
+// fait donc passer sur 2 lignes (white-space:normal), d'où une hauteur un
+// peu plus généreuse que la version 1 ligne précédente.
+const BK_HDR_H  = 24
+// Marge horizontale de sécu de part et d'autre du tableau (débordement du
+// titre de tour centré — voir bracket__roundTitle).
+const BK_PAD_X = 4
 
-// Card-sonde : le pire cas de contenu réel (match à venir → séparateur
-// date+heure sur 2 lignes, la variante la plus haute observée). Rendue avec
-// le VRAI composant BkCard pour garantir une mesure pixel-perfect, jamais
-// une estimation à la main.
+// Card-sonde : mesure la hauteur réelle du composant BkCard (2 lignes
+// drapeau+code) tel qu'il sera vraiment rendu (fonte/padding PWA réels).
 const BK_PROBE_MATCH = {
   status: 'SCHEDULED',
   utcDate: new Date().toISOString(),
-  homeTeam: { name: 'Argentine', shortName: 'Argentine' },
-  awayTeam: { name: 'Allemagne', shortName: 'Allemagne' },
+  homeTeam: { name: 'Argentine', shortName: 'Argentine', tla: 'ARG' },
+  awayTeam: { name: 'Allemagne', shortName: 'Allemagne', tla: 'GER' },
   score: { fullTime: { home: null, away: null } },
 }
 
-const _fmtH = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
-const _fmtD = (d) => {
-  const today    = new Date(); today.setHours(0,0,0,0)
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
-  const date     = new Date(d); date.setHours(0,0,0,0)
-  if (date.getTime() === today.getTime())    return `Aujourd'hui`
-  if (date.getTime() === tomorrow.getTime()) return `Demain`
-  return new Date(d).toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'short' })
-}
 const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
+// Code 3 lettres affiché dans la card compacte (voir commentaire BK_CARD_W).
+// `tla` vient directement de football-data.org (déjà utilisé comme fallback
+// de shortName ailleurs dans le code, ex. useMatchDetail.js) — donnée réelle
+// de l'API, pas inventée. Fallback sur les 3 premières lettres du nom
+// traduit si `tla` est absent (cas rare, ex. équipe pas encore résolue).
+const _code = (t) => {
+  if (!t?.name) return '—'
+  if (t.tla) return t.tla.toUpperCase()
+  return translateTeam(t.shortName || t.name).slice(0, 3).toUpperCase()
+}
 
-// cardH: hauteur mini imposée (px). `null` = mode sonde → aucune contrainte,
-// on laisse le contenu prendre sa hauteur naturelle pour la mesurer telle
-// quelle (sinon une minHeight fausserait la mesure vers le haut).
+// Card compacte pour le bracket : drapeau + code pays 3 lettres (plus de
+// nom complet, score ni date/heure — l'objectif est de tenir sur un écran de
+// téléphone entier sans scroll, donc on retire tout ce qui n'est pas
+// essentiel à l'identification des 2 équipes ; le nom complet reste
+// accessible via l'attribut title au survol/tap-maintenu). Le vainqueur/
+// perdant reste visible via la même mise en avant (fond vert / opacité
+// réduite) que dans les cards détaillées, et un match en cours garde son
+// liseré rouge pulsant (bracket__card--live) — juste sans texte de minute
+// superflu ici.
+// cardH: hauteur mini imposée (px). `null` = mode sonde → contenu naturel.
 function BkCard({ m, style, onSelect, cardH }) {
   const fin  = m.status === 'FINISHED'
   const live = m.status === 'IN_PLAY' || m.status === 'PAUSED'
@@ -87,42 +89,21 @@ function BkCard({ m, style, onSelect, cardH }) {
 
   return (
     <div
-      className={`bracket__card ${live ? 'bracket__card--live' : ''}`}
+      className={`bracket__card bracket__card--compact ${live ? 'bracket__card--live' : ''}`}
       style={{ ...style, ...(cardH != null ? { minHeight: cardH } : {}), display:'flex', flexDirection:'column' }}
       onClick={() => !tbd && onSelect(m)}
     >
-      <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}>
-        <div className="bracket__teamInfo">
-          {m.homeTeam?.crest
-            ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
-            : <span className="bracket__crestTbd">?</span>}
-          <span className="bracket__teamName">{_name(m.homeTeam)}</span>
-        </div>
-        {(fin||live) && <span className={`bracket__score ${hW?'bracket__score--win':''}`}>{hs??0}</span>}
+      <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`} title={_name(m.homeTeam)}>
+        {m.homeTeam?.crest
+          ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+          : <span className="bracket__crestTbd">?</span>}
+        <span className="bracket__teamName">{_code(m.homeTeam)}</span>
       </div>
-
-      <div className="bracket__sep" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
-        {live && <span className="bracket__live">● {calcMinute(m) ?? 'Live'}</span>}
-        {!fin && !live && !tbd && (
-          <span className="bracket__time">
-            <span className="bracket__timeDate">{_fmtD(m.utcDate)}</span>
-            <span className="bracket__timeHour">{_fmtH(m.utcDate)}</span>
-          </span>
-        )}
-        {fin && wentToPens && hp != null && ap != null && (
-          <span className="bracket__pens">({hp}-{ap} tab)</span>
-        )}
-        {tbd && <span className="bracket__vs">vs</span>}
-      </div>
-
-      <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`}>
-        <div className="bracket__teamInfo">
-          {m.awayTeam?.crest
-            ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
-            : <span className="bracket__crestTbd">?</span>}
-          <span className="bracket__teamName">{_name(m.awayTeam)}</span>
-        </div>
-        {(fin||live) && <span className={`bracket__score ${aW?'bracket__score--win':''}`}>{as_??0}</span>}
+      <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`} title={_name(m.awayTeam)}>
+        {m.awayTeam?.crest
+          ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+          : <span className="bracket__crestTbd">?</span>}
+        <span className="bracket__teamName">{_code(m.awayTeam)}</span>
       </div>
     </div>
   )
@@ -142,7 +123,7 @@ function splitHalf(matches) {
   return [matches.slice(0, half), matches.slice(half)]
 }
 
-function BracketSvgView({ rounds, onSelect }) {
+function BracketSvgView({ rounds, onSelect, containerRef }) {
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
   // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
@@ -151,7 +132,7 @@ function BracketSvgView({ rounds, onSelect }) {
   //
   // IMPORTANT : la sonde est portée dans document.body (hors de
   // .bracket__svgWrap) et PAS rendue comme enfant direct ici. Raison : sur
-  // mobile, .bracket__svgWrap a `zoom: 0.68` (voire 0.55 <400px).
+  // mobile, .bracket__svgWrap est zoomé dynamiquement (voir plus bas).
   // getBoundingClientRect() renvoie toujours la taille APRÈS zoom — si on
   // mesure une sonde qui est déjà dans ce sous-arbre zoomé, on récupère une
   // valeur déjà réduite, puis on la réinjecte comme minHeight/position DANS
@@ -183,17 +164,16 @@ function BracketSvgView({ rounds, onSelect }) {
     document.body
   )
 
-  if (!rounds?.length) return probe
-
   // THIRD_PLACE et FINAL sortent des 2 "branches" gauche/droite : la finale
   // se joue au centre (1 seul match, alimenté par les 2 demies), la petite
   // finale est affichée à part sous la finale — comme sur une affiche de
   // Coupe du Monde classique (voir la maquette fournie par l'utilisateur).
-  const main       = rounds.filter(r => r.stage !== 'THIRD_PLACE' && r.stage !== 'FINAL')
-  const finalRound = rounds.find(r => r.stage === 'FINAL')
-  const third       = rounds.find(r => r.stage === 'THIRD_PLACE')
-
-  if (!main.length) return probe
+  // Calculé sans early-return AVANT les hooks suivants (règle des Hooks) —
+  // tableaux vides si `rounds` est vide, ce qui donne des tailles à 0, sans
+  // planter — le vrai "rien à afficher" est géré tout en bas, au retour JSX.
+  const main       = (rounds ?? []).filter(r => r.stage !== 'THIRD_PLACE' && r.stage !== 'FINAL')
+  const finalRound = (rounds ?? []).find(r => r.stage === 'FINAL')
+  const third       = (rounds ?? []).find(r => r.stage === 'THIRD_PLACE')
 
   // 2 branches, chacune avec la moitié des matchs de chaque tour.
   const leftRounds  = main.map(r => ({ ...r, matches: splitHalf(r.matches)[0] }))
@@ -207,6 +187,34 @@ function BracketSvgView({ rounds, onSelect }) {
   const CENTER_W = BK_CARD_W
   const TOTAL_W  = 2 * BK_PAD_X + 2 * sideW + 2 * BK_CONN_W + CENTER_W
   const TOTAL_H  = BK_HDR_H + GRID_H + (third ? 180 : 0)
+
+  // ── Zoom "fit-to-screen" calculé dynamiquement ──
+  // Plutôt que des paliers CSS fixes (0.68 / 0.55 à des largeurs devinées —
+  // même erreur de principe que les hauteurs de card avant leur mesure), on
+  // mesure l'espace RÉELLEMENT disponible (le conteneur .bracket__container,
+  // dont la hauteur est elle-même bornée par CSS à l'espace visible sous la
+  // barre de titres/onglets — voir match.css) et on calcule le zoom exact
+  // pour que le tableau logique (TOTAL_W × TOTAL_H) y tienne pile, largeur ET
+  // hauteur, sans jamais avoir besoin de scroller. useLayoutEffect (pas
+  // useEffect) : s'exécute avant la peinture, donc aucun flash au 1er zoom
+  // "trop grand" avant correction. ResizeObserver : réagit aussi à une
+  // rotation d'écran ou un redimensionnement de fenêtre.
+  const [fitZoom, setFitZoom] = useState(1)
+  useLayoutEffect(() => {
+    const el = containerRef?.current
+    if (!el || !TOTAL_W || !TOTAL_H) return
+    const compute = () => {
+      const availW = el.clientWidth
+      const availH = el.clientHeight
+      if (!availW || !availH) return
+      const z = Math.min(1, availW / TOTAL_W, availH / TOTAL_H)
+      setFitZoom(z > 0 ? z : 1)
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [containerRef, TOTAL_W, TOTAL_H])
 
   // X gauche d'un tour, branche GAUCHE (croissant vers la droite)
   const rXLeft  = (ri) => BK_PAD_X + ri * (BK_CARD_W + BK_CONN_W)
@@ -263,6 +271,11 @@ function BracketSvgView({ rounds, onSelect }) {
 
   const thirdTop = finalTop + cardH + 56
 
+  // Garde défensive : le call site (Matchs()) ne monte déjà ce composant que
+  // si rounds.length > 0, mais on la garde ici aussi (défense en profondeur,
+  // ex. futur appelant) — après tous les hooks, donc sans violer leur règle.
+  if (main.length === 0) return probe
+
   return (
     <>
       {/* Card-sonde invisible : ne sert qu'à mesurer la hauteur réelle du
@@ -273,7 +286,7 @@ function BracketSvgView({ rounds, onSelect }) {
           toujours "layout-able" (donc mesurable) mais jamais visible. */}
       {probe}
 
-    <div className="bracket__svgWrap">
+    <div className="bracket__svgWrap" style={{ zoom: fitZoom }}>
       {/* ── Tableau symétrique : 2 branches convergent vers la finale au
           centre, comme une affiche classique de Coupe du Monde. ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
@@ -388,6 +401,9 @@ function Matchs() {
   useLayoutEffect(() => {
     if (pickerRef.current) setPickerHeight(pickerRef.current.scrollHeight)
   }, [])
+  // Conteneur du bracket — mesuré par BracketSvgView pour calculer le zoom
+  // "fit-to-screen" (voir commentaire dans BracketSvgView).
+  const bracketWrapRef = useRef(null)
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
@@ -397,16 +413,9 @@ function Matchs() {
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   const isWC        = selectedComp === 'WC'
 
-  /* ── Ticker pour calcMinute() — bracket live ── */
-  const [, setTick] = useState(0)
-  const hasLiveRound = (rounds ?? []).some(r =>
-    r.matches?.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
-  )
-  useEffect(() => {
-    if (!hasLiveRound) return
-    const id = setInterval(() => setTick(t => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [hasLiveRound])
+  // Note : plus de ticker de minute ici — les cards du bracket sont
+  // maintenant compactes (drapeau + nom uniquement, plus de texte "minute
+  // live"), donc plus besoin de re-render périodique pour ça.
 
   /* ── Groupes CdM (uniquement GROUP_X, pas les stades) ── */
   const wcGroups = useMemo(() => {
@@ -833,8 +842,8 @@ function Matchs() {
                 </div>
               )}
               {!bracketLoading && !bracketError && rounds.length > 0 && (
-                <div className="bracket__container">
-                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} />
+                <div className="bracket__container" ref={bracketWrapRef}>
+                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} containerRef={bracketWrapRef} />
                 </div>
               )}
             </>
