@@ -150,22 +150,24 @@
   }
 
   /* ── Picker (liste déroulante) ── */
-  /* Technique grid-template-rows 0fr → 1fr : s'adapte automatiquement à la vraie
-     hauteur du contenu (avant : max-height fixe à 60px pouvait couper les logos/
-     noms selon la police/le device → animation qui "saute" au lieu d'être fluide). */
+  /* La technique grid-template-rows 0fr → 1fr n'est pas fiable sur toutes les
+     versions de WebKit/Safari (support de l'animation de fr sur les grid tracks
+     inégal, notamment en PWA installée) : la liste restait visible sans cliquer
+     sur "Changer" malgré overflow:hidden. On repasse sur max-height, technique
+     universellement supportée. 220px est largement suffisant pour une seule
+     rangée horizontale scrollable (logos 22px + padding), donc jamais de contenu
+     coupé, seulement une fin d'animation qui peut "s'arrêter" un peu avant que
+     le contenu réel (plus petit) ne soit atteint — compromis très mineur face à
+     la fiabilité. */
   .compHeader__pickerWrap {
-    display: grid;
-    grid-template-rows: 0fr;
-    /* overflow:hidden sur le conteneur grid est indispensable à la technique
-       0fr → 1fr : sans lui, le contenu peut rester visible même piste à 0 (c'était
-       le bug — la liste des championnats apparaissait sans cliquer sur "Changer"). */
+    max-height: 0;
     overflow: hidden;
-    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-top: 0 solid rgba(255,255,255,0.06);
   }
 
   .compHeader__pickerWrap--open {
-    grid-template-rows: 1fr;
+    max-height: 220px;
     border-top-width: 1px;
   }
 

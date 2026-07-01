@@ -784,9 +784,15 @@ export function getMatchTeamColors(homeName, awayName) {
 
   let hp = ensureVisible(rawHome.p, rawHome.s ?? fallbackHome.p)
   let ap = ensureVisible(rawAway.p, rawAway.s ?? fallbackAway.p)
-  // Accent = l'autre couleur curée de l'équipe (celle qui n'est pas devenue "main")
-  let hAccent = (hp === rawHome.p ? rawHome.s : rawHome.p) ?? fallbackHome.s
-  let aAccent = (ap === rawAway.p ? rawAway.s : rawAway.p) ?? fallbackAway.s
+  // Accent = l'autre couleur curée de l'équipe (celle qui n'est pas devenue "main").
+  // Beaucoup d'équipes ont une secondaire quasi-noire (#1a1a1a) utilisée comme neutre
+  // de remplissage dans TEAM_COLORS_FULL, jamais pensée pour être un ton de dégradé
+  // visible → sans ce garde-fou elle rendait des bords de dégradé noirs au lieu de
+  // clairs. On applique le même filtre de luminance que sur "main", avec repli blanc
+  // (le blanc est un vrai ton de drapeau très fréquent, cohérent avec l'objectif
+  // initial de refléter les vraies couleurs des drapeaux).
+  let hAccent = ensureVisible((hp === rawHome.p ? rawHome.s : rawHome.p) ?? fallbackHome.s, '#eef2f7')
+  let aAccent = ensureVisible((ap === rawAway.p ? rawAway.s : rawAway.p) ?? fallbackAway.s, '#eef2f7')
 
   const famHome = colorFamily(hp)
   const famAway = colorFamily(ap)
@@ -798,11 +804,11 @@ export function getMatchTeamColors(homeName, awayName) {
     if (satAway > satHome) {
       const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
       hp = colorFamily(alt) !== famAway ? alt : fallbackHome.p
-      hAccent = rawHome.p ?? fallbackHome.p
+      hAccent = ensureVisible(rawHome.p ?? fallbackHome.p, '#eef2f7')
     } else {
       const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
       ap = colorFamily(alt) !== famHome ? alt : fallbackAway.p
-      aAccent = rawAway.p ?? fallbackAway.p
+      aAccent = ensureVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
     }
   }
 
