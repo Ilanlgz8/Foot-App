@@ -118,6 +118,20 @@ function BracketSvgView({ rounds, onSelect }) {
   // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
   // donc la mesure reflète exactement ce qui sera rendu (fonte, padding,
   // line-height PWA réels), plus jamais une constante devinée à la main.
+  //
+  // IMPORTANT : la sonde est portée dans document.body (hors de
+  // .bracket__svgWrap) et PAS rendue comme enfant direct ici. Raison : sur
+  // mobile, .bracket__svgWrap a `zoom: 0.68` (voire 0.55 <400px).
+  // getBoundingClientRect() renvoie toujours la taille APRÈS zoom — si on
+  // mesure une sonde qui est déjà dans ce sous-arbre zoomé, on récupère une
+  // valeur déjà réduite, puis on la réinjecte comme minHeight/position DANS
+  // ce même sous-arbre zoomé → elle se retrouve zoomée UNE SECONDE FOIS au
+  // rendu final. Résultat : cardH sous-dimensionné sur mobile, cards plus
+  // hautes que leur slot alloué → chevauchement. En mesurant hors de toute
+  // ancêtre zoomée (portail vers document.body), on obtient la vraie taille
+  // logique, cohérente avec les valeurs qu'on réinjecte ensuite (elles ne
+  // sont zoomées qu'UNE fois, au même titre que toutes les autres valeurs
+  // de layout du bracket).
   // Hooks appelés avant tout retour anticipé (règle des Hooks React).
   const probeRef = useRef(null)
   const [cardH, setCardH] = useState(BK_CARD_H_FALLBACK)
@@ -178,17 +192,23 @@ function BracketSvgView({ rounds, onSelect }) {
   }
 
   return (
-    <div className="bracket__svgWrap">
+    <>
       {/* Card-sonde invisible : ne sert qu'à mesurer la hauteur réelle du
-          pire cas de contenu (voir commentaire plus haut). Ne participe
-          jamais au layout visible (hors-écran + visibility:hidden, donc
-          toujours "layout-able" pour une mesure correcte mais invisible). */}
-      <div ref={probeRef} aria-hidden="true"
-        style={{ position:'absolute', top:-9999, left:-9999, width:BK_CARD_W,
-                 visibility:'hidden', pointerEvents:'none' }}>
-        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
-      </div>
+          pire cas de contenu (voir commentaire plus haut). Portée dans
+          document.body via createPortal — surtout PAS à l'intérieur de
+          .bracket__svgWrap — pour ne jamais hériter du `zoom` mobile et
+          fausser la mesure. position:fixed + hors-écran + visibility:hidden :
+          toujours "layout-able" (donc mesurable) mais jamais visible. */}
+      {createPortal(
+        <div ref={probeRef} aria-hidden="true"
+          style={{ position:'fixed', top:-9999, left:-9999, width:BK_CARD_W,
+                   visibility:'hidden', pointerEvents:'none' }}>
+          <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
+        </div>,
+        document.body
+      )}
 
+    <div className="bracket__svgWrap">
       {/* ── Tableau principal ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
 
@@ -232,6 +252,7 @@ function BracketSvgView({ rounds, onSelect }) {
       </div>
 
     </div>
+    </>
   )
 }
 

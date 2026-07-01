@@ -852,16 +852,19 @@
    overflow-y: hidden (et non "visible") : en CSS, dès qu'un axe a une valeur
    de overflow non-visible, l'autre axe calcule "visible" comme "auto" quand
    même (spec Overflow) — donc "visible" ici était en réalité traité comme
-   "auto", un axe de scroll vertical fantôme sur ce conteneur. Combiné à
-   l'absence de touch-action, ça pouvait faire capter le geste de scroll
-   vertical de la page par ce conteneur horizontal en PWA (arbitrage tactile
-   plus strict qu'un onglet de navigateur classique) → scroll bloqué en bas.
-   touch-action: pan-x indique explicitement qu'on ne gère que le swipe
-   horizontal ici, laissant le swipe vertical remonter à la page. */
+   "auto", un axe de scroll vertical fantôme sur ce conteneur.
+   ATTENTION : ne PAS mettre `touch-action: pan-x` ici (erreur corrigée) —
+   ça a l'effet INVERSE de celui recherché : en déclarant explicitement
+   qu'on ne gère QUE le pan horizontal, le navigateur n'a plus le droit de
+   traiter la composante verticale du geste DU TOUT sur cet élément (pas de
+   scroll ici NI remontée vers la page) → c'est ça qui bloquait le scroll de
+   la page en PWA, forçant à utiliser la mini scrollbar visible comme seul
+   moyen de scroller. En laissant `touch-action` à sa valeur par défaut
+   (`auto`), le navigateur arbitre correctement lui-même : swipe horizontal
+   → scroll ce conteneur, swipe vertical → bubble vers le scroll de la page. */
 .bracket__container {
   overflow-x: auto;
   overflow-y: hidden;
-  touch-action: pan-x;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(239,68,68,0.25) transparent;
