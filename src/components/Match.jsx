@@ -256,23 +256,28 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
   const TOTAL_H  = BK_HDR_H + GRID_H + (third ? 180 : 0)
 
   // ── Zoom "fit-to-screen" calculé dynamiquement ──
-  // Plutôt que des paliers CSS fixes (0.68 / 0.55 à des largeurs devinées —
-  // même erreur de principe que les hauteurs de card avant leur mesure), on
-  // mesure l'espace RÉELLEMENT disponible (le conteneur .bracket__container,
-  // dont la hauteur est elle-même bornée par CSS à l'espace visible sous la
-  // barre de titres/onglets — voir match.css) et on calcule le zoom exact
-  // pour que le tableau logique (TOTAL_W × TOTAL_H) y tienne pile, largeur ET
-  // hauteur, sans jamais avoir besoin de scroller. useLayoutEffect (pas
-  // useEffect) : s'exécute avant la peinture, donc aucun flash au 1er zoom
-  // "trop grand" avant correction. ResizeObserver : réagit aussi à une
-  // rotation d'écran ou un redimensionnement de fenêtre.
+  // ERREUR CORRIGÉE : la version précédente donnait à .bracket__container un
+  // `height: calc(100dvh - 13rem)` en CSS — "13rem" était une ESTIMATION à la
+  // main de l'espace pris par la navbar/le header/les onglets au-dessus,
+  // jamais mesurée. Si cette estimation est trop généreuse (chrome réel
+  // < 13rem), le conteneur reçoit une hauteur plus grande que l'espace
+  // vraiment dispo → le zoom calculé dessus est plus petit que nécessaire →
+  // marge vide visible tout autour, sur LA LARGEUR ET LA HAUTEUR à la fois
+  // (symptôme observé). Le conteneur n'a maintenant PLUS AUCUNE hauteur CSS
+  // fixe (voir .bracket__container dans match.css) : on mesure la position
+  // RÉELLE du conteneur à l'écran via getBoundingClientRect().top et on en
+  // déduit l'espace dispo jusqu'au bas du viewport — aucun chiffre deviné.
   const [fitZoom, setFitZoom] = useState(1)
   useLayoutEffect(() => {
     const el = containerRef?.current
     if (!el || !TOTAL_W || !TOTAL_H) return
+    // Petite marge de sécurité en bas (pas une estimation de chrome, juste
+    // un peu d'air pour ne pas coller au tout dernier pixel de l'écran).
+    const BOTTOM_SAFETY = 12
     const compute = () => {
+      const rect   = el.getBoundingClientRect()
       const availW = el.clientWidth
-      const availH = el.clientHeight
+      const availH = Math.max(0, window.innerHeight - rect.top - BOTTOM_SAFETY)
       if (!availW || !availH) return
       const z = Math.min(1, availW / TOTAL_W, availH / TOTAL_H)
       setFitZoom(z > 0 ? z : 1)
@@ -280,7 +285,16 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
     compute()
     const ro = new ResizeObserver(compute)
     ro.observe(el)
-    return () => ro.disconnect()
+    // En plus du ResizeObserver (taille du conteneur) : un scroll ou un
+    // redimensionnement de fenêtre peut changer rect.top / innerHeight sans
+    // changer la taille du conteneur lui-même.
+    window.addEventListener('resize', compute)
+    window.addEventListener('scroll', compute, { passive: true })
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', compute)
+      window.removeEventListener('scroll', compute)
+    }
   }, [containerRef, TOTAL_W, TOTAL_H])
 
   // X gauche d'un tour, branche GAUCHE (croissant vers la droite)

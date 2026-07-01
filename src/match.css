@@ -864,25 +864,21 @@
    → scroll ce conteneur, swipe vertical → bubble vers le scroll de la page. */
 /* Conteneur du bracket : doit tenir ENTIÈREMENT dans l'écran, sans scroll
    dans aucune direction. Le zoom "fit-to-screen" (calculé dynamiquement dans
-   BracketSvgView via ResizeObserver — voir le commentaire associé dans
-   Match.jsx) réduit le tableau logique pour qu'il tienne pile dans cet
-   espace ; overflow:hidden est donc une sécurité, pas le mécanisme principal.
-   IMPORTANT : `height` FIXE (pas `max-height`) — .bracket__container est
-   l'élément mesuré par le ResizeObserver de BracketSvgView pour calculer le
-   zoom, et .bracket__svgWrap (l'enfant zoomé) est DANS ce conteneur. Avec
-   `max-height`, sans hauteur explicite le conteneur se dimensionne sur son
-   contenu (shrink-to-fit) : si le contenu zoomé devient plus petit que la
-   limite, le conteneur rétrécit pour l'épouser → le ResizeObserver se
-   redéclenche avec une nouvelle hauteur → recalcule un nouveau zoom → boucle
-   de rétroaction (le zoom dépend de la taille du conteneur, qui dépend du
-   zoom) fragile et pouvant mal se comporter selon le navigateur (jusqu'à un
-   tableau qui s'effondre à une taille quasi nulle → page qui semble vide).
-   Une hauteur FIXE (bornée uniquement par le viewport, indépendante du
-   contenu) casse cette boucle : la taille observée ne dépend plus jamais du
-   zoom qu'elle sert à calculer. */
+   BracketSvgView — voir le commentaire associé dans Match.jsx) réduit le
+   tableau logique pour qu'il tienne pile dans l'espace RÉELLEMENT dispo ;
+   overflow:hidden est une sécurité, pas le mécanisme principal.
+   PAS de height/max-height fixe ici (volontaire) : une ancienne version
+   utilisait `height: calc(100dvh - 13rem)`, où "13rem" était une estimation
+   à la main de l'espace pris par la navbar/le header au-dessus — jamais
+   mesurée, et fausse en pratique (trop généreuse), ce qui donnait un zoom
+   plus petit que nécessaire et une grande marge vide tout autour. Le calcul
+   JS mesure maintenant la vraie position du conteneur à l'écran
+   (getBoundingClientRect().top) pour déduire l'espace dispo jusqu'au bas du
+   viewport — le conteneur n'a donc plus besoin d'une hauteur CSS devinée,
+   il se dimensionne naturellement sur son contenu (déjà correctement zoomé
+   par le JS pour tenir dans l'espace mesuré). */
 .bracket__container {
   overflow: hidden;
-  height: calc(100dvh - 13rem);
   display: flex;
   align-items: center;
   justify-content: center;
