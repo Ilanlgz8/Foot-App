@@ -9,7 +9,10 @@ function getResult(myGoals, theirGoals) {
   return 'D'
 }
 
-const FORM_STALE = 1000 * 60 * 30  // 30min
+// Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
+// TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
+// pourtant déjà plus fraîche côté serveur.
+const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 
 export function useTeamForm(selectedComp) {
   const cacheKey = `teamform2_${selectedComp}`

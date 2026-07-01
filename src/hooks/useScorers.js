@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
-const STALE_MS = 1000 * 60 * 30  // 30min
+// Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
+// côté client que la donnée que le serveur peut réellement fournir.
+const STALE_MS = 1000 * 60 * 2  // 2min (était 30min)
 
 export function useScorers(compId) {
   const key = `scorers_${compId}`

@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 
-const STALE_MS = 1000 * 60 * 10  // 10min — se met à jour pendant les matchs live
+// Aligné sur le TTL du cache serveur (api/football.js).
+const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
 
 export function useStandings(selectedComp) {
   const key = `standings_${selectedComp}`

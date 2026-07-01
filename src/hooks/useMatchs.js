@@ -6,7 +6,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 // → évite les 429 (free tier football-data.org : 10 req/min)
 const TTL = {
   SCHEDULED: 60 * 60 * 1000,   // 1h — calendrier très stable
-  FINISHED:   5 * 60 * 1000,   // 5min — résultats peuvent changer après un match en live
+  FINISHED:   2 * 60 * 1000,   // 2min (était 5min) — aligné sur le cache serveur, résultats/classement/buteurs à jour plus vite
   IN_PLAY:    2 * 60 * 1000,   // 2min — géré ailleurs mais garde un fallback court
 }
 

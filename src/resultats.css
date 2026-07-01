@@ -374,6 +374,13 @@
   color: #334155;
 }
 
+.resultats__pens {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.02em;
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .resultats { padding: 1.75rem 1rem 3rem; }

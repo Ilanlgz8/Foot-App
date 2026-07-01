@@ -5,13 +5,23 @@
 //
 // TTL Redis par type d'endpoint :
 //   IN_PLAY/PAUSED    → pas de cache (ESPN gère le live)
-//   Résultats FINISHED → 5 min
-//   Classements        → 10 min
-//   Buteurs            → 30 min
+//   Résultats FINISHED → 2 min  (était 5min — buteurs/classement doivent suivre les matchs qui viennent de finir)
+//   Classements        → 2 min  (était 10min)
+//   Buteurs            → 2 min  (était 30min)
 //   Matchs du jour     → 2 min
 //   SCHEDULED/TIMED    → 5 min
 //   Détail match (FT)  → 1 h
 //   Autres             → 2 min
+//
+// ⚠️ Ce cache est PARTAGÉ (Redis, côté serveur) entre TOUS les utilisateurs pour
+// une même requête — le réduire à 2min ne multiplie donc pas les appels à
+// football-data.org par le nombre d'utilisateurs. Marge de sécurité calculée pour
+// rester sous le quota free tier (10 req/min) : en pratique seule la CM (WC) a du
+// trafic significatif actuellement (les ligues club sont en intersaison), soit
+// 3 endpoints (buteurs/classement/résultats) × 1 requête / 2min max = largement
+// sous la limite. Si beaucoup de compétitions club redeviennent actives en même
+// temps (rentrée août), surveiller les 429 via /api/debug-push et remonter ce TTL
+// si besoin plutôt que de descendre encore plus bas.
 
 import { Redis } from '@upstash/redis'
 
@@ -27,9 +37,9 @@ function getTtl(fdPath, qs) {
   if (qs.includes('status=IN_PLAY') || qs.includes('status=PAUSED')) return 0
   if (/^\/v4\/matches\/\d+$/.test(fdPath) && !qs) return 3600         // détail FT — 1h
   if (fdPath.includes('/head2head'))             return 3600           // H2H stable — 1h
-  if (qs.includes('status=FINISHED'))              return 300           // résultats — 5min
-  if (fdPath.includes('/standings'))               return 600           // classements — 10min
-  if (fdPath.includes('/scorers'))                 return 1800          // buteurs — 30min
+  if (qs.includes('status=FINISHED'))              return 120           // résultats — 2min
+  if (fdPath.includes('/standings'))               return 120           // classements — 2min
+  if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min
   if (qs.includes('dateFrom=') && qs.includes('dateTo=')) return 120   // matchs du jour — 2min
   if (qs.includes('status=SCHEDULED') || qs.includes('status=TIMED')) return 300 // calendrier — 5min
   return 120  // défaut — 2min

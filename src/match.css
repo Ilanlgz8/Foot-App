@@ -1013,6 +1013,13 @@
   gap: 0.05rem;
 }
 
+.bracket__pens {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.02em;
+}
+
 .bracket__timeDate {
   font-size: 0.58rem;
   font-weight: 700;

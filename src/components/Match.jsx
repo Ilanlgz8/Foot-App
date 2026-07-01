@@ -39,8 +39,13 @@ function BkCard({ m, style, onSelect }) {
   const tbd  = !m.homeTeam?.name && !m.awayTeam?.name
   const hs   = m.score?.fullTime?.home
   const as_  = m.score?.fullTime?.away
-  const hW   = fin && hs > as_
-  const aW   = fin && as_ > hs
+  // fullTime inclut déjà les buts de prolongations — un match décidé aux tirs au
+  // but y est TOUJOURS à égalité, le vrai vainqueur se lit dans score.penalties.
+  const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
+  const hp   = m.score?.penalties?.home ?? null
+  const ap   = m.score?.penalties?.away ?? null
+  const hW   = fin && (wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_)
+  const aW   = fin && (wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs)
 
   return (
     <div
@@ -65,6 +70,9 @@ function BkCard({ m, style, onSelect }) {
             <span className="bracket__timeDate">{_fmtD(m.utcDate)}</span>
             <span className="bracket__timeHour">{_fmtH(m.utcDate)}</span>
           </span>
+        )}
+        {fin && wentToPens && hp != null && ap != null && (
+          <span className="bracket__pens">({hp}-{ap} tab)</span>
         )}
         {tbd && <span className="bracket__vs">vs</span>}
       </div>

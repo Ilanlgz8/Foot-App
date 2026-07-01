@@ -81,9 +81,18 @@ function Resultats() {
 
   // Carte de match réutilisable
   function MatchCard({ match }) {
+    // score.fullTime = score après prolongations le cas échéant (football-data.org
+    // inclut les buts de prolong dedans, seuls les tirs au but sont à part dans
+    // score.penalties). Un match décidé aux tab est TOUJOURS à égalité en fullTime
+    // → le vainqueur doit se déterminer via le score des tab, pas via fullTime.
     const hs   = match.score?.fullTime?.home ?? 0
     const as_  = match.score?.fullTime?.away ?? 0
-    const hWin = hs > as_; const aWin = as_ > hs; const draw = hs === as_
+    const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+    const hp   = match.score?.penalties?.home ?? null
+    const ap   = match.score?.penalties?.away ?? null
+    const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
+    const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
+    const draw = !wentToPens && hs === as_
     return (
       <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
         <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
@@ -101,6 +110,9 @@ function Resultats() {
             <span className="resultats__scoreDash">–</span>
             <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
           </div>
+          {wentToPens && hp != null && ap != null && (
+            <span className="resultats__pens">({hp}-{ap} tab)</span>
+          )}
           <span className="resultats__ftBadge">Terminé</span>
         </div>
         <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
