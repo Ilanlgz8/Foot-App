@@ -939,18 +939,20 @@
    (modal__espnStats, statsSubTabs). */
 .bracket__card {
   background: linear-gradient(165deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008)), #0a0e17;
-  /* Contour rouge (au lieu d'un blanc quasi invisible à 0.08) pour mieux
-     distinguer chaque card — demande explicite. */
-  border: 1px solid rgba(239,68,68,0.4);
+  /* Argenté/blanc (au lieu de rouge) : meilleur contraste sur fond quasi-noir,
+     et laisse le rouge exclusivement au signal "live" (--live ci-dessous)
+     plutôt que de le diluer sur toutes les cards. #e2e8f0 (slate-200) déjà
+     utilisé ailleurs dans l'app pour ce ton "argenté". */
+  border: 1px solid rgba(226,232,240,0.5);
   border-radius: 0.55rem;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 5px rgba(226,232,240,0.06);
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
 }
 
 .bracket__card:hover {
-  border-color: rgba(239,68,68,0.65);
+  border-color: rgba(226,232,240,0.85);
 }
 
 .bracket__card:active {
