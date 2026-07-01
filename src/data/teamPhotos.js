@@ -842,16 +842,34 @@ export function buildMatchGradient(home, away) {
   return `linear-gradient(135deg, ${h.accent} 0%, ${h.main} 24%, ${darken(h.main)} 42%, ${darken(a.main)} 58%, ${a.main} 76%, ${a.accent} 100%)`
 }
 
-// Variante "inversée" : les rôles main/accent sont échangés pour chaque équipe.
-// Utilisée en crossfade avec buildMatchGradient (voir MatchPoster.jsx) pour
-// faire "vivre" le fond d'une carte : au lieu de simplement faire glisser le
-// même dégradé, on fait apparaître/disparaître en fondu une 2e composition qui
-// met en avant l'autre couleur curée de chaque équipe — un vrai changement de
-// palette dominante, pas juste un panoramique.
-export function buildMatchGradientAlt(home, away) {
+// Variables CSS pour l'animation "morph de couleur en place" d'une card poster
+// (voir MatchPoster.jsx + accueil.css .poster__bg--gradient) : un seul calque
+// dont les 6 arrêts du dégradé sont animés entre la couleur "main" et la
+// couleur "accent" de chaque équipe via @property (interpolation de couleur
+// native), au lieu de faire un fondu enchaîné entre deux dégradés superposés
+// (plus lourd : 2 calques qui repaint chacun leur background-position).
+// --stop1..6 reçoivent aussi une valeur de base (= état "main dominant",
+// identique à buildMatchGradient) pour un rendu correct même si l'animation
+// est coupée (prefers-reduced-motion).
+export function buildMatchGradientVars(home, away) {
   const h = typeof home === 'string' ? { main: home, accent: home } : home
   const a = typeof away === 'string' ? { main: away, accent: away } : away
-  return `linear-gradient(135deg, ${h.main} 0%, ${h.accent} 24%, ${darken(h.accent)} 42%, ${darken(a.accent)} 58%, ${a.accent} 76%, ${a.main} 100%)`
+  return {
+    '--h-main':        h.main,
+    '--h-accent':      h.accent,
+    '--h-main-dark':   darken(h.main),
+    '--h-accent-dark': darken(h.accent),
+    '--a-main':        a.main,
+    '--a-accent':      a.accent,
+    '--a-main-dark':   darken(a.main),
+    '--a-accent-dark': darken(a.accent),
+    '--stop1': h.accent,
+    '--stop2': h.main,
+    '--stop3': darken(h.main),
+    '--stop4': darken(a.main),
+    '--stop5': a.main,
+    '--stop6': a.accent,
+  }
 }
 
 // Dégradé unique pour chaque match : couleurs des deux équipes (main + accent)

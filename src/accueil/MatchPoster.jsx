@@ -3,7 +3,7 @@ import { translateTeam }              from '../data/teamNames'
 import { calcMinute, mergeScore }     from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
-import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
+import { getMatchTeamColors, buildMatchGradientVars } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 
 function formatHour(dateStr) {
@@ -49,10 +49,9 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // de pays "populaires" pré-photographiés (très fréquent en Coupe du Monde), ce qui
   // donnait l'impression que "les couleurs ne s'affichent jamais".
   const { home: homeColors, away: awayColors } = getMatchTeamColors(homeName, awayName)
-  const hColor     = homeColors.main
-  const aColor     = awayColors.main
-  const gradient    = buildMatchGradient(homeColors, awayColors)
-  const gradientAlt = buildMatchGradientAlt(homeColors, awayColors)
+  const hColor       = homeColors.main
+  const aColor       = awayColors.main
+  const gradientVars = buildMatchGradientVars(homeColors, awayColors)
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -63,22 +62,14 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
-      {/* ── Fond : dégradé couleurs des équipes, en 2 calques qui se fondent l'un
-          dans l'autre ──
-          Calque 1 (toujours visible) : couleur principale de chaque équipe en
-          dégradé, qui glisse lentement (drift).
-          Calque 2 (apparaît/disparaît en fondu par-dessus) : même dégradé mais
-          avec la couleur secondaire ("accent") de chaque équipe mise en avant —
-          au lieu d'un simple panoramique, la palette dominante change vraiment.
-          ⚠️ background-size DOIT être fixé ici en inline, pas seulement en CSS :
-          la propriété raccourcie "background" posée en style inline réinitialise
-          silencieusement ses sous-propriétés (background-size, -position…) à leur
-          valeur initiale avec la priorité la plus haute, ce qui annulait purement
-          et simplement toute animation de drift définie seulement en CSS
-          (background-size restait à "auto" = plein cadre → aucun mouvement
-          possible, quelle que soit l'amplitude choisie). */}
-      <div className="poster__bg poster__bg--gradient" style={{ background: gradient, backgroundSize: '320% 320%' }} />
-      <div className="poster__bg poster__bg--gradientAlt" style={{ background: gradientAlt, backgroundSize: '320% 320%' }} />
+      {/* ── Fond : dégradé couleurs des équipes, UN SEUL calque ──
+          Le morph de couleur (main ↔ accent de chaque équipe) et le mouvement
+          sont entièrement pilotés par CSS (voir .poster__bg--gradient dans
+          accueil.css) : les variables ci-dessous sont juste les "ingrédients"
+          (couleurs + valeur de base) posées inline via buildMatchGradientVars.
+          Plus léger que l'ancienne version à 2 calques superposés qui
+          faisaient chacun leur propre repaint. */}
+      <div className="poster__bg poster__bg--gradient" style={gradientVars} />
       <div className="poster__overlay" />
 
       {/* ── Badge compét / live ── */}
