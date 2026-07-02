@@ -266,6 +266,56 @@ export function useEspnMatchStats(match) {
   })
 }
 
+// ── useMatchRecap ────────────────────────────────────────────────────────────
+// Résumé auto d'un match terminé — texte généré côté serveur par cron-goals.js
+// juste après le FT, à partir des vrais events ESPN (moteur de phrases
+// déterministe, pas de LLM : gratuit, ne peut pas échouer). Ce hook ne fait
+// que LIRE le texte déjà en cache Redis (voir api/espn.js, param recap=1).
+// Si rien n'est encore caché (rattrapage cron en cours, ou match trop vieux),
+// retourne null → le composant appelant doit simplement ne rien afficher.
+
+export function useMatchRecap(match) {
+  const compId = match?.competition?.id
+  const slug   = COMP_ESPN[compId]
+  const date   = matchDateStr(match)
+  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+
+  return useQuery({
+    queryKey:  ['matchRecap', match?.id],
+    enabled:   !!match?.id && !!slug && !!date && match?.status === 'FINISHED',
+    staleTime: 30 * 60_000,
+    retry: 1,
+    queryFn: async () => {
+      // 1. Scoreboard → event ID (même logique que useEspnMatchStats)
+      const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
+      if (!sbRes.ok) return null
+      const sb = await sbRes.json()
+
+      let eventId = null
+      for (const evt of sb.events ?? []) {
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        if (!homeC || !awayC) continue
+        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+        if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+          eventId = evt.id
+          break
+        }
+      }
+      if (!eventId) return null
+
+      // 2. Lecture du recap caché (jamais généré à la volée ici)
+      const res = await fetch(`/espn?slug=${slug}&eventId=${eventId}&recap=1`)
+      if (!res.ok) return null
+      const data = await res.json()
+      return data?.recap ?? null
+    },
+  })
+}
+
 // ── useProbableLineups ─────────────────────────────────────────────────────────
 // Compos probables : dernier XI connu de chaque équipe via ESPN summary.
 // Zéro quota — ESPN est gratuit et illimité.

@@ -553,7 +553,14 @@ export function ComposTab({ match, compMatches }) {
 
   // Source 2 : football-data.org (via useMatchDetail déjà fetchée — zéro quota)
   // /v4/matches/{id} retourne homeTeam.lineup + awayTeam.lineup + formation
-  const { data: fdLineups, isLoading: fdLoading } = useFdLineups(isFinished ? match : null)
+  // ⚠️ Avant, limité aux matchs TERMINÉS (isFinished ? match : null) — or
+  // FD.org publie souvent la compo dès le coup d'envoi, pas seulement après.
+  // Ce gate privait les matchs EN DIRECT de cette source gratuite (déjà
+  // fetchée par useMatchDetail, zéro coût), alors que c'est justement en
+  // direct que FIFA (cache lazy, pas toujours peuplé) et ESPN (rosters
+  // incomplets pour la CM) peuvent être vides — probable cause du "pas de
+  // compo même en direct" : on perdait un filet de sécurité gratuit.
+  const { data: fdLineups, isLoading: fdLoading } = useFdLineups(match)
 
   // Source 3 : api-football
   // WC : en parallèle (ESPN/FIFA souvent vides sans cron)
@@ -576,7 +583,7 @@ export function ComposTab({ match, compMatches }) {
   )
 
   const isLoading = espnLoading || espnMatchLoading
-    || (isFinished && !espnHasData && fdLoading)
+    || (!espnHasData && fdLoading)
     || (!espnHasData && !fdLineups?.home?.starters?.length && aflLoading)
     || (isUpcoming && probableLoading)
     || (isUpcoming && !probableData && aflProbableLoading)
@@ -1058,13 +1065,15 @@ function H2HSection({ match, compMatches }) {
 
   const rows = fdRecent.length ? fdRecent : compH2H
 
+  // Aucune confrontation connue (une fois le chargement terminé) → on masque
+  // toute la section plutôt que d'afficher un titre suivi d'un texte "vide".
+  if (!isLoading && !rows.length) return null
+
   return (
     <div className="pm__section">
       <h3 className="pm__sectionTitle">Derniers résultats entre les deux équipes</h3>
       {isLoading ? (
         <p className="pm__noData">Chargement…</p>
-      ) : !rows.length ? (
-        <p className="pm__noData">Aucune confrontation disponible</p>
       ) : (
         <div className="pm__h2hList">
           {rows.map((m, i) => {

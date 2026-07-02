@@ -149,73 +149,67 @@
     box-shadow: 0 0 8px rgba(239,68,68,0.7);
   }
 
-  /* ── Picker (liste déroulante) ── */
-  /* La technique grid-template-rows 0fr → 1fr n'est pas fiable sur toutes les
-     versions de WebKit/Safari (support de l'animation de fr sur les grid tracks
-     inégal, notamment en PWA installée) : la liste restait visible sans cliquer
-     sur "Changer" malgré overflow:hidden. On repasse sur max-height, technique
-     universellement supportée. 220px est largement suffisant pour une seule
-     rangée horizontale scrollable (logos 22px + padding), donc jamais de contenu
-     coupé, seulement une fin d'animation qui peut "s'arrêter" un peu avant que
-     le contenu réel (plus petit) ne soit atteint — compromis très mineur face à
-     la fiabilité. */
+  /* ── Picker (dropdown flottant, façon cloche notifs) ── */
+  /* Avant : accordéon inline (max-height) qui poussait le contenu de la page
+     vers le bas, avec les championnats en rangée horizontale scrollable —
+     pas très lisible, obligeait à swiper pour voir tout. Remplacé par un
+     dropdown flottant (position:fixed, rendu via portail React dans <body>
+     — même technique que le panneau de la cloche notifs, pour échapper à
+     l'overflow:hidden de .compHeader) avec les championnats en LISTE
+     VERTICALE, un par ligne, tout visible d'un coup sans scroll ni swipe. */
   .compHeader__pickerWrap {
-    max-height: 0;
+    position: fixed;
+    z-index: 200;
+    background: #0f1218;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0.85rem;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
     overflow: hidden;
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border-top: 0 solid rgba(255,255,255,0.06);
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
   }
 
   .compHeader__pickerWrap--open {
-    max-height: 220px;
-    border-top-width: 1px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
   }
 
   .compHeader__picker {
     display: flex;
-    flex-direction: row;
-    gap: 6px;
-    padding: 8px 12px 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    min-height: 0;
-  }
-
-  .compHeader__picker::-webkit-scrollbar {
-    display: none;
+    flex-direction: column;
+    padding: 6px;
+    max-height: 60vh;
+    overflow-y: auto;
   }
 
   .compHeader__item {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 5px 11px 5px 6px;
-    min-width: max-content;
-    flex-shrink: 0;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 999px;
+    gap: 10px;
+    padding: 9px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 0.55rem;
     cursor: pointer;
     font-family: inherit;
-    transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
+    text-align: left;
+    transition: background 0.15s;
   }
 
   .compHeader__item:hover {
-    background: rgba(255,255,255,0.07);
-    border-color: rgba(255,255,255,0.22);
+    background: rgba(255,255,255,0.06);
   }
 
   .compHeader__item:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
   }
 
   .compHeader__item--active {
-    background: rgba(239,68,68,0.16);
-    border-color: rgba(239,68,68,0.55);
-    box-shadow: 0 0 0 1px rgba(239,68,68,0.12), 0 2px 10px rgba(239,68,68,0.18);
+    background: rgba(239,68,68,0.14);
   }
 
   .compHeader__itemLogo {
@@ -231,16 +225,15 @@
   }
 
   .compHeader__itemName {
-    font-size: 9px;
+    font-size: 12px;
     font-weight: 700;
-    color: rgba(255,255,255,0.58);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.01em;
     white-space: nowrap;
   }
 
   .compHeader__item--active .compHeader__itemName {
-    color: rgba(255,255,255,0.95);
+    color: #fff;
   }
 }
 

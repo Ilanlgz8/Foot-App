@@ -242,6 +242,152 @@ async function sendDeduped(dedupKey, payload, slug, ttl = 3 * 3600) {
   return sendPushToMatch(payload, slug)
 }
 
+// ── Capture proactive du summary ESPN (compos + stats + événements) ────────────
+// Root cause du "pas de compo/stats si je n'ai pas suivi le match en direct" :
+// avant, la donnée summary ESPN n'était récupérée QUE quand un utilisateur
+// ouvrait la page du match (via api/espn.js) — si personne ne l'a fait
+// pendant que ESPN avait encore la donnée dispo, elle n'était jamais
+// capturée. Ici, à CHAQUE match en direct détecté par le cron (donc pour
+// TOUS les matchs, suivis ou non par qui que ce soit), on la récupère et on
+// l'écrit dans le même cache Redis partagé que api/espn.js (même clé) — donc
+// n'importe quel utilisateur consultant "Résultats" plus tard la retrouve,
+// même s'il n'a jamais ouvert le match en direct.
+const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — même durée que api/espn.js
+
+function hasUsefulSummaryData(json) {
+  const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
+  const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
+  return hasRosters || hasBoxscore
+}
+
+async function cacheEspnSummary(slug, eventId, log) {
+  try {
+    const url = `${ESPN_BASE}/${slug}/summary?event=${eventId}`
+    const res = await fetch(url, {
+      headers: { 'Cache-Control': 'no-cache' },
+      signal:  AbortSignal.timeout(6_000),
+    })
+    if (!res.ok) return
+    const body = await res.text()
+    const parsed = JSON.parse(body)
+    if (!hasUsefulSummaryData(parsed)) return
+    await kv.set(`espn:summary:${slug}:${eventId}`, body, { ex: SUMMARY_CACHE_TTL })
+  } catch (e) {
+    log.push(`[espn-summary-cache:${slug}:${eventId}] error=${e.message}`)
+  }
+}
+
+// ── Résumé auto de match (recap) ────────────────────────────────────────────
+// Moteur de phrases déterministe (pas de LLM) : gratuit, ne peut jamais
+// échouer/timeout, toujours cohérent avec les vraies données du match.
+// Extraction identique à api/fifa-live.js (dupliquée volontairement — même
+// raison que hasUsefulData/hasUsefulSummaryData : fonctions Vercel séparées).
+//
+// comp.details vient directement du scoreboard ESPN (evt.competitions[0]),
+// déjà fetché dans la boucle principale — zéro appel réseau supplémentaire.
+function extractEspnScorers(comp, homeTeamId) {
+  return (comp.details ?? [])
+    .filter(d => {
+      const txt = (d.type?.text ?? '').toLowerCase()
+      const id  = String(d.type?.id ?? '')
+      return txt.includes('goal') || txt === 'penaltykick' || id === '57' || id === '58' || id === '72'
+    })
+    .map(d => {
+      const ath = d.athletesInvolved?.[0]
+      const txt = (d.type?.text ?? '').toLowerCase()
+      return {
+        name:        ath?.shortName ?? ath?.displayName ?? '?',
+        minute:      d.clock?.displayValue ?? '',
+        team:        d.team?.id === homeTeamId ? 'home' : 'away',
+        ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
+        penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
+      }
+    })
+}
+
+function extractEspnCards(comp, homeTeamId) {
+  return (comp.details ?? [])
+    .filter(d => {
+      const id = String(d.type?.id ?? '')
+      return id === '93' || id === '94'
+    })
+    .map(d => {
+      const ath = d.athletesInvolved?.[0]
+      return {
+        name:   ath?.shortName ?? ath?.displayName ?? '?',
+        minute: d.clock?.displayValue ?? '',
+        team:   d.team?.id === homeTeamId ? 'home' : 'away',
+        red:    d.redCard === true || String(d.type?.id) === '93',
+      }
+    })
+}
+
+const RECAP_TTL = 60 * 24 * 3600  // 60j — largement de quoi couvrir une compétition + consultation après coup
+
+function parseMin(m) { return parseInt(String(m ?? '').replace(/[^\d]/g, ''), 10) || 0 }
+
+/**
+ * Génère un résumé de 2-4 phrases en français à partir des events réels du match.
+ * Retourne null si les données sont trop incomplètes pour être fiables (aucun
+ * scénario inventé, aucune approximation présentée comme un fait).
+ */
+function generateRecap({ homeTeam, awayTeam, home, away, scorers, cards }) {
+  if (home == null || away == null) return null
+
+  const diff    = Math.abs(home - away)
+  const total   = home + away
+  const winner  = home > away ? 'home' : away > home ? 'away' : null
+  const winnerName = winner === 'home' ? homeTeam : winner === 'away' ? awayTeam : null
+  const loserName  = winner === 'home' ? awayTeam : winner === 'away' ? homeTeam : null
+
+  let intro
+  if (winner === null) {
+    intro = total === 0
+      ? `${homeTeam} et ${awayTeam} n'ont pas réussi à se départager (0-0).`
+      : `${homeTeam} et ${awayTeam} se quittent sur un match nul (${home}-${away}).`
+  } else if (diff >= 3) {
+    intro = `${winnerName} s'impose largement face à ${loserName} (${home}-${away}).`
+  } else if (diff === 2) {
+    intro = `${winnerName} prend le dessus sur ${loserName} (${home}-${away}).`
+  } else {
+    intro = `${winnerName} s'impose de justesse face à ${loserName} (${home}-${away}).`
+  }
+
+  const sortedGoals = [...(scorers ?? [])].sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
+
+  // But décisif tardif (>= 80e, dans une victoire à 1 but d'écart)
+  const lastGoal = sortedGoals[sortedGoals.length - 1]
+  if (winner && diff === 1 && lastGoal && parseMin(lastGoal.minute) >= 80 && lastGoal.team === winner) {
+    intro += ` Le but décisif est tombé tardivement, à la ${lastGoal.minute}.`
+  }
+
+  // Remontée : l'équipe qui a ouvert le score n'est pas celle qui gagne
+  if (winner && sortedGoals.length >= 2 && sortedGoals[0].team !== winner) {
+    intro += ` ${winnerName} a renversé la situation après avoir été mené.`
+  }
+
+  if (total >= 5) {
+    intro += ' Un match spectaculaire, riche en buts.'
+  }
+
+  let scorersLine = ''
+  if (sortedGoals.length) {
+    const label = g => `${g.name} (${g.minute}${g.ownGoal ? ', csc' : g.penaltyKick ? ', pen' : ''})`
+    scorersLine = `Buteurs : ${sortedGoals.map(label).join(', ')}.`
+  }
+
+  const reds = (cards ?? []).filter(c => c.red)
+  let cardsLine = ''
+  if (reds.length === 1) {
+    const teamName = reds[0].team === 'home' ? homeTeam : awayTeam
+    cardsLine = `${teamName} a terminé la rencontre à 10 après le carton rouge de ${reds[0].name} (${reds[0].minute}).`
+  } else if (reds.length > 1) {
+    cardsLine = `La rencontre a été marquée par ${reds.length} exclusions.`
+  }
+
+  return [intro, scorersLine, cardsLine].filter(Boolean).join(' ')
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -330,6 +476,13 @@ export default async function handler(req, res) {
     const score    = `${home}-${away}`
     const scoreStr = `${home} – ${away}`
 
+    // Capture proactive compos/stats/événements pendant que le match est en
+    // direct — voir cacheEspnSummary() plus haut. Tourne pour CHAQUE match
+    // live à CHAQUE poll (1/min), suivi ou non par un utilisateur.
+    if (LIVE_ESPN.has(status)) {
+      await cacheEspnSummary(slug, eventId, log)
+    }
+
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
@@ -386,6 +539,32 @@ export default async function handler(req, res) {
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
       if (sent > 0) notifsSent++
+      // Capture finale — le boxscore/évènements se stabilisent parfois
+      // quelques secondes après le sifflet final (corrections tardives).
+      await cacheEspnSummary(slug, eventId, log)
+    }
+
+    // 📝 Résumé auto — tant qu'aucun recap n'est stocké pour ce match terminé,
+    // on retente à chaque poll (1/min). Nécessaire car comp.details (buteurs/
+    // cartons) peut arriver quelques dizaines de secondes après le FT — un
+    // essai unique au moment exact de la transition manquerait parfois un but
+    // tardif. S'arrête naturellement quand cron:espn:${eventId} expire (12h,
+    // voir stateKey plus haut) : le match sort alors de la boucle de rattrapage.
+    if (FINAL_ESPN.has(status)) {
+      try {
+        const already = await kv.get(`recap:${eventId}`)
+        if (!already) {
+          const scorers = extractEspnScorers(comp, homeC.team?.id)
+          const cards   = extractEspnCards(comp, homeC.team?.id)
+          const recap   = generateRecap({ homeTeam, awayTeam, home, away, scorers, cards })
+          if (recap) {
+            await kv.set(`recap:${eventId}`, recap, { ex: RECAP_TTL })
+            log.push(`[recap:${eventId}] généré`)
+          }
+        }
+      } catch (e) {
+        log.push(`[recap:${eventId}] error=${e.message}`)
+      }
     }
 
     // ⚽ But — score change pendant un match en cours (pas pendant halftime)

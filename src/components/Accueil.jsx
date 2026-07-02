@@ -8,6 +8,8 @@ import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/m
 import { mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
+import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
+import { pickMatchDuJour } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
@@ -119,6 +121,11 @@ function Accueil() {
   // React Query déduplique : si dayOffset=0, absoluteToday === targetDate → pas de double fetch
   const { matches: todayMatchesForResults }     = useTodayMatches(absoluteToday)
   const { matches: yesterdayMatchesForResults } = useTodayMatches(absoluteYesterday)
+
+  // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
+  // dayOffset — comme le panneau résultats juste au-dessus, pour ne pas
+  // changer quand l'utilisateur navigue vers un autre jour dans "Matchs".
+  const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
 
   const results = useMemo(() => {
     const seen = new Set()
@@ -297,6 +304,14 @@ function Accueil() {
 
       <div className="accueil__inner">
 
+        {/* ── Match du jour — devant tout le reste, y compris le live ── */}
+        {matchDuJour && (
+          <MatchDuJourCard
+            match={matchDuJour}
+            onClick={() => navigate(`/match/${matchDuJour.id}`, { state: { match: matchDuJour } })}
+          />
+        )}
+
         {/* ── Live — pleine largeur, priorité absolue ── */}
         {widgetMatches.length > 0 && (
           <div className="accueil__liveSection">
@@ -310,8 +325,6 @@ function Accueil() {
             <LiveWidget
               liveMatches={widgetMatches}
               espnScores={espnScores}
-              trackedIds={trackedIds}
-              onRecalibrate={recalibrate}
               onMatchClick={(m) => navigate(`/live/${m.id}`)}
             />
           </div>

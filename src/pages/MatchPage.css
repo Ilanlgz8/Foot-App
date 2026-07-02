@@ -265,6 +265,19 @@
   color: rgba(255,255,255,.85);
 }
 .mp__statsTeam--r { text-align: right; }
+
+.mp__recap {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(255,255,255,.78);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(239,68,68,0.18);
+  border-left: 3px solid rgba(239,68,68,0.55);
+  border-radius: 0.6rem;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+}
+
 .mp__statsCenter {
   font-size: 0.6rem;
   font-weight: 700;

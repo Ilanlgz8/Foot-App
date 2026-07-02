@@ -22,15 +22,28 @@ function Classement() {
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [compOpen, setCompOpen] = useState(false)
   const didAutoOpen = useRef(false)
-  // Hauteur réelle du picker de compétitions, mesurée une fois : permet d'animer
-  // le menu "Changer" sur sa vraie taille (~44px) au lieu d'un max-height statique
-  // surdimensionné (220px), qui rendait l'ouverture visuellement instantanée puis
-  // figée (pas fluide) au lieu d'une vraie transition progressive.
-  const pickerRef = useRef(null)
-  const [pickerHeight, setPickerHeight] = useState(0)
+
+  // ── Dropdown "Changer" — même technique que le panneau de la cloche notifs :
+  // rendu via portail dans <body> (échappe à l'overflow:hidden de .compHeader)
+  // et positionné en `fixed` à partir des coordonnées réelles du bouton.
+  const compHeroRef = useRef(null)
+  const [compAnchor, setCompAnchor] = useState(null)
   useLayoutEffect(() => {
-    if (pickerRef.current) setPickerHeight(pickerRef.current.scrollHeight)
-  }, [])
+    if (!compOpen || !compHeroRef.current) return
+    const r = compHeroRef.current.getBoundingClientRect()
+    setCompAnchor({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, 220) })
+  }, [compOpen])
+
+  useEffect(() => {
+    if (!compOpen) return
+    const onClick = (e) => {
+      if (compHeroRef.current?.contains(e.target)) return
+      if (e.target.closest?.('.compHeader__pickerWrap')) return
+      setCompOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [compOpen])
 
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
@@ -287,7 +300,7 @@ function Classement() {
 
         {/* ── Mobile : header compétition vedette (Option B) ── */}
         <div className={`compHeader${compOpen ? ' compHeader--open' : ''}`}>
-          <div className="compHeader__hero" onClick={() => setCompOpen(o => !o)}>
+          <div className="compHeader__hero" ref={compHeroRef} onClick={() => setCompOpen(o => !o)}>
             {selectedCompetition?.emblem && (
               <img src={selectedCompetition.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
@@ -308,24 +321,27 @@ function Classement() {
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
-          <div
-            className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}
-            style={{ maxHeight: compOpen ? `${pickerHeight || 220}px` : '0px' }}
-          >
-            <div className="compHeader__picker" ref={pickerRef}>
-              {competitions.map(comp => (
-                <button
-                  key={comp.id}
-                  className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
-                  onClick={() => { setSelectedComp(comp.id); setCompOpen(false) }}
-                >
-                  <img src={comp.emblem} alt="" className="compHeader__itemLogo"
-                    onError={e => e.currentTarget.style.display = 'none'} />
-                  <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {compAnchor && createPortal(
+            <div
+              className={`compHeader__pickerWrap${compOpen ? ' compHeader__pickerWrap--open' : ''}`}
+              style={{ top: compAnchor.top, left: compAnchor.left, width: compAnchor.width }}
+            >
+              <div className="compHeader__picker">
+                {competitions.map(comp => (
+                  <button
+                    key={comp.id}
+                    className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
+                    onClick={() => { setSelectedComp(comp.id); setCompOpen(false) }}
+                  >
+                    <img src={comp.emblem} alt="" className="compHeader__itemLogo"
+                      onError={e => e.currentTarget.style.display = 'none'} />
+                    <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>,
+            document.body
+          )}
         </div>
 
         {/* ── Desktop : sidebar liste ── */}

@@ -15,6 +15,7 @@ import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
 import { calcProno }        from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
+import { useFotmobXG }      from '../hooks/useFotmobXG'
 import { useSwipe }         from '../hooks/useSwipe'
 import {
   LiveStatsTab,
@@ -87,8 +88,11 @@ function MatchHeader({ match, espn, onBack }) {
 
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
-  const xgHome   = espn?.stats?.home?.xg ?? null
-  const xgAway   = espn?.stats?.away?.xg ?? null
+  // Le xG ne vient jamais de espn.stats (ESPN ne fournit pas ce champ, useLiveMinute
+  // ne l'a jamais peuplé) — il vient de FotMob via ce hook dédié.
+  const fotmobXg = useFotmobXG(match)
+  const xgHome   = fotmobXg?.home ?? null
+  const xgAway   = fotmobXg?.away ?? null
 
   const h = hs ?? '–', a = as_ ?? '–'
 
