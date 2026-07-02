@@ -630,7 +630,15 @@ export function ComposTab({ match, compMatches }) {
                : null
 
   const probSource = probableData ?? aflProbableData ?? null
-  const probable = !lineups && probSource?.home?.starters?.length ? probSource : null
+  // Il faut que LES DEUX équipes aient un XI probable résolu — sinon (ex: le
+  // dernier match connu de l'équipe away n'a pas pu être retrouvé), l'ancien
+  // fallback `probable.away ?? probable.home` affichait l'équipe home des
+  // DEUX côtés (bug rapporté : "Suisse" ou "Maroc" affiché deux fois).
+  // Mieux vaut ne rien afficher (→ état "Compos non disponibles" plus bas)
+  // que d'afficher une compo fausse.
+  const probable = !lineups && probSource?.home?.starters?.length && probSource?.away?.starters?.length
+    ? probSource
+    : null
 
   if (isLoading) {
     return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
@@ -673,7 +681,7 @@ export function ComposTab({ match, compMatches }) {
         <div style={{ padding: '8px 0 0' }}>
           <LineupPitch
             home={withCrest(probable.home, homeCrest)}
-            away={withCrest(probable.away ?? probable.home, awayCrest)}
+            away={withCrest(probable.away, awayCrest)}
           />
         </div>
       </div>

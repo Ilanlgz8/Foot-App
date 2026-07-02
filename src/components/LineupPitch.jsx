@@ -53,8 +53,8 @@ function stripSide(pos) {
 function posCat(pos) {
   const p = stripSide(pos)
   if (['GK','G','GB'].includes(p)) return 0
-  if (['CB','CD','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
-  if (['CM','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
+  if (['CB','CD','LB','RB','LWB','RWB','LCB','RCB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
+  if (['CM','CDM','CAM','DM','AM','LM','RM','LDM','RDM','LAM','RAM','LWM','RWM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
   if (['ST','CF','LW','RW','LF','RF','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
   return 2
 }
@@ -95,8 +95,28 @@ function posCat(pos) {
 // exactement le swap BU/AG signalé (le seul attaquant correctement reconnu,
 // "F", atterrissait par défaut à gauche, les deux ailiers non reconnus
 // suivant dans un ordre non trié).
-const LEFT_WIDE   = new Set(['LB','LWB','LW','LF','LM','MG','AG','DL','DG'])
-const RIGHT_WIDE  = new Set(['RB','RWB','RW','RF','RM','MD','AD','DR','DD'])
+const LEFT_WIDE   = new Set(['LB','LWB','LW','LF','LM','LWM','MG','AG','DL','DG'])
+const RIGHT_WIDE  = new Set(['RB','RWB','RW','RF','RM','RWM','MD','AD','DR','DD'])
+
+// ⚠️ GÉNÉRALISATION (au lieu de corriger variante par variante à chaque
+// nouveau bug rapporté — 3 en une semaine, LB/DL, CD-L/CD-R, LF/RF...) :
+// filet de sécurité basé sur le PRÉFIXE du code, en plus des listes
+// explicites ci-dessus. Convention quasi universelle dans les données foot
+// (anglais) : un code non reconnu qui COMMENCE par "L" est un poste gauche,
+// par "R" un poste droit (ex: hypothétique "LCB"/"RCB", "LDM"/"RDM",
+// "LAM"/"RAM" jamais rencontrés mais plausibles chez une autre source/
+// compétition). Poids intermédiaire (1/3, comme le suffixe -L/-R) plutôt
+// qu'extrême (0/4) par prudence : on ne sait pas si ce nouveau code désigne
+// un vrai couloir ou un poste "de centre" comme CD-L — voir listes ci-dessus
+// pour les cas déjà confirmés méritant l'extrême. Aucun risque pour les
+// catégories génériques (GK/DEF/MID/FWD/G/D/M/F/MF/FW/MID/DEF...) : aucune
+// ne commence par L/R.
+function prefixLane(raw) {
+  if (raw.length < 2) return null
+  if (raw[0] === 'L') return 1
+  if (raw[0] === 'R') return 3
+  return null
+}
 
 function laneWeight(pos) {
   const raw = stripSide(pos)
@@ -105,6 +125,8 @@ function laneWeight(pos) {
   if (original.endsWith('-L'))    return 1   // "-de-gauche" générique (ex: CD-L), plus proche du centre
   if (RIGHT_WIDE.has(raw))        return 4   // latéral/couloir droit (le plus extérieur)
   if (original.endsWith('-R'))    return 3   // "-de-droite" générique (ex: CD-R), plus proche du centre
+  const fallback = prefixLane(raw)
+  if (fallback != null) return fallback      // code inconnu mais préfixe L/R explicite
   return 2                                   // aucune info de latéralité → centre
 }
 
@@ -126,6 +148,12 @@ function depthWeight(pos) {
   const raw = stripSide(pos)
   if (['DM','CDM','MDC','LM','RM','MG','MD'].includes(raw)) return 0   // ligne reculée
   if (['AM','CAM','MOC','MOF'].includes(raw))               return 2   // ligne avancée
+  // Filet générique (même logique que prefixLane ci-dessus) : tout code
+  // contenant "DM" (LDM/RDM, jamais rencontrés mais plausibles) = reculé,
+  // tout code contenant "AM" (LAM/RAM) = avancé — sans avoir à lister
+  // chaque variante gauche/droite au fil des sources rencontrées.
+  if (raw.includes('DM')) return 0
+  if (raw.includes('AM')) return 2
   return 1                                                              // pas d'info → neutre
 }
 
@@ -158,12 +186,12 @@ const POS_LABEL = {
   FWD:'ATT', F:'ATT', FW:'ATT',
   // ── Codes détaillés FIFA/FC26 FR (utilisés quand une source les fournit) ──
   CB:'DC',  CD:'DC',  DC:'DC',  DL:'DG', DR:'DD',
-  LB:'DG',  RB:'DD',  LWB:'DLG', RWB:'DLD',
+  LB:'DG',  RB:'DD',  LWB:'DLG', RWB:'DLD', LCB:'DC', RCB:'DC',
   SW:'LIB',
   // Milieu central : générique fiable → 'MC'. Défensif/offensif : voir note
   // ci-dessus, aplati sur 'MIL' générique (pas assez fiable pour un label précis).
   CM:'MC',  CDM:'MIL', CAM:'MIL', DM:'MIL', AM:'MIL', MDC:'MIL', MOC:'MIL', MOF:'MIL', MG:'MG', MD:'MD', MC:'MC',
-  LM:'MG',  RM:'MD',
+  LM:'MG',  RM:'MD',   LDM:'MIL', RDM:'MIL', LAM:'MIL', RAM:'MIL', LWM:'MG', RWM:'MD',
   ST:'BU',  CF:'AC',  LW:'AG',  RW:'AD',  LF:'AG',  RF:'AD',
   SS:'BU',  BU:'BU', AC:'AC', AG:'AG', AD:'AD',
 }

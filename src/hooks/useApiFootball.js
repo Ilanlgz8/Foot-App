@@ -173,10 +173,17 @@ const AFL_POS_MAP = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' }
 
 function transformLineups(data, homeTeamId) {
   const teams = data.response ?? []
-  if (teams.length < 1) return null
+  if (teams.length < 2) return null // il faut les 2 équipes, jamais une compo à moitié
 
-  const homeData = teams.find(t => t.team?.id === homeTeamId) ?? teams[0]
-  const awayData = teams.find(t => t.team?.id !== homeTeamId) ?? teams[1] ?? teams[0]
+  const homeData = teams.find(t => t.team?.id === homeTeamId)
+  const awayData = teams.find(t => t !== homeData)
+
+  // Si homeTeamId ne correspond à AUCUNE des 2 équipes renvoyées par l'API
+  // (mismatch d'id entre resolveFixtureInfo et /fixtures/lineups), l'ancien
+  // fallback (`?? teams[0]` des 2 côtés) affichait la MÊME équipe en home
+  // et en away (bug rapporté : "Suisse"/"Maroc" affiché deux fois). Mieux
+  // vaut ne rien afficher que d'afficher une compo fausse.
+  if (!homeData || !awayData) return null
 
   // `grid` (ex: "2:3" = ligne 2, colonne 3) : coordonnée exacte du joueur sur
   // le schéma tactique DE CE MATCH précis, fournie par api-football depuis
