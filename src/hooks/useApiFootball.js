@@ -178,11 +178,18 @@ function transformLineups(data, homeTeamId) {
   const homeData = teams.find(t => t.team?.id === homeTeamId) ?? teams[0]
   const awayData = teams.find(t => t.team?.id !== homeTeamId) ?? teams[1] ?? teams[0]
 
+  // `grid` (ex: "2:3" = ligne 2, colonne 3) : coordonnée exacte du joueur sur
+  // le schéma tactique DE CE MATCH précis, fournie par api-football depuis
+  // 2021. Contrairement au champ "pos" (G/D/M/F, catégorie générale du
+  // joueur, parfois périmée), le grid ne peut pas être faux : il décrit
+  // directement où le joueur a été placé pour cette compo — utilisé en
+  // priorité par LineupPitch.jsx pour le placement quand disponible.
   const mapPlayer = (entry, i) => ({
     name:      entry.player?.name ?? '?',
     shortName: (entry.player?.name ?? '?').split(' ').pop(),
     number:    entry.player?.number ?? '',
     position:  AFL_POS_MAP[entry.player?.pos] ?? entry.player?.pos ?? '',
+    grid:      entry.player?.grid ?? null,
     order:     i,
   })
 

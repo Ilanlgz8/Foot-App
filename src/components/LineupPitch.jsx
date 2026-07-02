@@ -88,6 +88,17 @@ function laneWeight(pos) {
 // Labels en FRANÇAIS, façon FIFA/FC26 en version française (G, DC, DG, DD, MDC,
 // MC, MOC, MG, MD, BU, AC, AG, AD... — ce sont exactement les abréviations du
 // jeu quand la langue est réglée sur français).
+// ⚠️ IMPORTANT : les codes/textes "défensif" vs "offensif" pour un milieu
+// (CDM/"Defensive Midfield" vs CAM/"Attacking Midfield") viennent d'un champ
+// "poste enregistré" en base chez la source (ESPN/FD.org/api-football) — une
+// classification GÉNÉRALE du profil du joueur, pas une info tactique propre
+// à CE match. Ce champ peut être obsolète/faux (constaté en pratique : un
+// joueur connu comme milieu défensif affiché "MOC", un autre affiché "MDC"
+// au lieu de son vrai poste). Contrairement à DEF/MID/FWD (toujours fiable)
+// ou à gauche/droite (LB/RB — fait géométrique, pas un jugement), le duel
+// défensif/offensif est un jugement de rôle trop incertain pour l'afficher
+// avec confiance → on l'aplati sur "MIL" générique plutôt que d'afficher un
+// rôle précis potentiellement faux.
 const POS_LABEL = {
   // ── Catégories génériques (le plus souvent fournies par les APIs) ──
   GK:'G',  G:'G',   GB:'G',
@@ -98,7 +109,9 @@ const POS_LABEL = {
   CB:'DC',  CD:'DC',  DC:'DC',  DL:'DG', DR:'DD',
   LB:'DG',  RB:'DD',  LWB:'DLG', RWB:'DLD',
   SW:'LIB',
-  CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MDC', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
+  // Milieu central : générique fiable → 'MC'. Défensif/offensif : voir note
+  // ci-dessus, aplati sur 'MIL' générique (pas assez fiable pour un label précis).
+  CM:'MC',  CDM:'MIL', CAM:'MIL', DM:'MIL', AM:'MIL', MDC:'MIL', MOC:'MIL', MOF:'MIL', MG:'MG', MD:'MD', MC:'MC',
   LM:'MG',  RM:'MD',
   ST:'BU',  CF:'AC',  LW:'AG',  RW:'AD',
   SS:'BU',  BU:'BU', AC:'AC', AG:'AG', AD:'AD',
@@ -173,7 +186,48 @@ function groupByRealLine(starters, lines) {
   return ordered
 }
 
+// Coordonnée "ligne:colonne" fournie par api-football (ex: "2:3"), propre à
+// CE match — voir commentaire dans useApiFootball.js. Contrairement au champ
+// "poste" (registre général du joueur, parfois périmé — cause des DC/DG
+// inversés constatés), le grid ne peut pas être faux : il décrit où le
+// joueur a réellement été placé sur le schéma tactique publié pour ce match.
+function parseGrid(g) {
+  if (typeof g !== 'string') return null
+  const m = g.match(/^(\d+):(\d+)$/)
+  if (!m) return null
+  return { row: Number(m[1]), col: Number(m[2]) }
+}
+
+// Placement par grid : fiable à 100% quand disponible (tous les titulaires
+// doivent l'avoir, sinon on abandonne et on retombe sur l'heuristique
+// posCat/formation ci-dessous — pas de mélange partiel, trop risqué).
+function getPositionsFromGrid(starters) {
+  const byRow = new Map()
+  for (const p of starters) {
+    const g = parseGrid(p.grid)
+    if (!g) return null
+    if (!byRow.has(g.row)) byRow.set(g.row, [])
+    byRow.get(g.row).push({ p, col: g.col })
+  }
+  const rows  = [...byRow.keys()].sort((a, b) => a - b)
+  const yPcts = LINE_Y[rows.length] ?? LINE_Y[4]
+  const out   = []
+  rows.forEach((r, li) => {
+    const arr = byRow.get(r).sort((a, b) => a.col - b.col)
+    const y   = T + (yPcts[li] ?? yPcts[yPcts.length - 1]) * IH
+    const n   = arr.length
+    arr.forEach((entry, j) => {
+      const x = L + (j + 0.5) * IW / n
+      out.push({ leftPct: x / PW * 100, topPct: y / PH * 100, player: entry.p })
+    })
+  })
+  return out
+}
+
 function getPositions(starters, formation) {
+  const fromGrid = getPositionsFromGrid(starters)
+  if (fromGrid) return fromGrid
+
   const parts = (formation ?? '').split('-').map(Number).filter(n => n > 0)
   const valid  = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === starters.length - 1
   const lines  = valid ? [1, ...parts] : fallbackLines(starters)

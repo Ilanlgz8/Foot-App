@@ -581,7 +581,19 @@ export function ComposTab({ match, compMatches }) {
     || (isUpcoming && probableLoading)
     || (isUpcoming && !probableData && aflProbableLoading)
 
-  const lineups = espnLineups?.home?.starters?.length           ? espnLineups
+  // api-football fournit un `grid` ("ligne:colonne") par titulaire — une
+  // coordonnée exacte propre à CE match (jamais périmée), contrairement au
+  // champ "poste" d'ESPN/FD.org qui reflète le profil général du joueur et
+  // peut être faux (cause des inversions DC/DG constatées). Quand ce grid
+  // est complet pour les deux équipes (WC uniquement, où api-football est
+  // fetché en parallèle), on le préfère à ESPN pour un placement fiable.
+  const gridRe   = /^\d+:\d+$/
+  const aflGridOk = isWC
+    && aflLineups?.home?.starters?.length && aflLineups?.away?.starters?.length
+    && [...aflLineups.home.starters, ...aflLineups.away.starters].every(p => gridRe.test(p.grid ?? ''))
+
+  const lineups = aflGridOk                                        ? aflLineups
+               : espnLineups?.home?.starters?.length           ? espnLineups
                : espnMatchData?.lineups?.home?.starters?.length ? espnMatchData.lineups
                : fdLineups?.home?.starters?.length              ? fdLineups
                : aflLineups?.home?.starters?.length             ? aflLineups
