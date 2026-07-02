@@ -59,7 +59,7 @@ export function groupRounds(matches, order = 'asc') {
 // Calcule l'année de saison pour les ligues clubs (ex: juin 2026 → 2025)
 // Les ligues club tournent Août-Mai, donc en juin/juillet on est en intersaison
 // WC 2026 : saison spéciale juin-juillet 2026
-function getClubSeason() {
+export function getClubSeason() {
   const now = new Date()
   const month = now.getMonth() + 1 // 1-12
   const year = now.getFullYear()
