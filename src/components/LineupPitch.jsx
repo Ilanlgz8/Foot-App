@@ -41,34 +41,61 @@ function formatName(name, sname) {
   return parts[0][0].toUpperCase() + '. ' + parts.slice(1).join(' ')
 }
 
+// Certaines sources renvoient des codes suffixés par le couloir plutôt qu'un
+// code simple — ex: "CD-L" / "CD-R" (défenseur central gauche/droit, observé
+// en pratique). On isole le suffixe -L/-R/-C AVANT toute recherche : sans ça,
+// "CD-L" ne correspond à aucune entrée connue (ni CB, ni DEF...) et retombait
+// sur le défaut MID par erreur — un défenseur pouvait s'afficher au milieu.
+function stripSide(pos) {
+  return (pos ?? '').toUpperCase().replace(/-[LRC]$/, '')
+}
+
 function posCat(pos) {
-  const p = (pos ?? '').toUpperCase()
+  const p = stripSide(pos)
   if (['GK','G','GB'].includes(p)) return 0
-  if (['CB','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
+  if (['CB','CD','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
   if (['CM','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
   if (['ST','CF','LW','RW','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
   return 2
 }
 
-// ⚠️ ESPN, FIFA, api-football et football-data.org (les 4 sources de compos utilisées
-// dans l'app) ne renvoient QUE des catégories génériques : GK/DEF/MID/FWD (jamais de
-// détail gauche/droite/central). Les codes détaillés ci-dessous (CB, LB, RB, CDM…)
-// sont conservés en prévision d'une source plus précise, mais dans les faits c'est
-// toujours GK/DEF/MID/FWD qui est traduit ci-dessous — d'où l'importance de bien
-// mapper ces 4 valeurs (avant : 'MID'/'FWD' n'étaient pas traduits → affichés en anglais).
+// Couloir gauche/centre/droite déduit du code de poste, quand l'info est
+// disponible (suffixe -L/-R, ou sigle explicite LB/RB/LM/RM/LW/RW/LWB/RWB).
+// Sert à ORDONNER les joueurs correctement au sein de leur ligne au lieu de
+// faire confiance à l'ordre brut renvoyé par l'API — c'est ce qui causait
+// l'inversion gauche/droite constatée (ex: DC gauche affiché à droite).
+// Tri STABLE : quand aucune info de latéralité n'existe (cas normal pour la
+// plupart des sources, qui ne donnent que GK/DEF/MID/FWD génériques), tous
+// les joueurs ont le même poids → l'ordre d'origine est conservé, donc aucun
+// changement de comportement pour les formations sans détail gauche/droite.
+function laneWeight(pos) {
+  const raw = stripSide(pos)
+  const original = (pos ?? '').toUpperCase()
+  if (original.endsWith('-L')) return 0
+  if (original.endsWith('-R')) return 2
+  if (['LB','LM','LW','LWB'].includes(raw)) return 0
+  if (['RB','RM','RW','RWB'].includes(raw)) return 2
+  return 1
+}
+
+// ⚠️ La plupart du temps, ESPN/FIFA/api-football/football-data.org ne renvoient
+// que des catégories génériques : GK/DEF/MID/FWD (jamais de détail gauche/
+// droite/central). MAIS certaines sources renvoient parfois des codes plus
+// détaillés suffixés par le couloir (ex: "CD-L"/"CD-R" observés en pratique
+// pour un défenseur central gauche/droit) — stripSide() retire ce suffixe
+// avant la recherche ici, donc "CD-L"/"CD-R" retombent bien sur l'entrée 'CD'
+// ci-dessous plutôt que d'afficher le code brut non traduit.
 // Labels en FRANÇAIS, façon FIFA/FC26 en version française (G, DC, DG, DD, MDC,
 // MC, MOC, MG, MD, BU, AC, AG, AD... — ce sont exactement les abréviations du
-// jeu quand la langue est réglée sur français). Les codes détaillés restent
-// prêts pour le jour où une source plus précise sera branchée, mais aujourd'hui
-// seules les 4 entrées génériques (GK/DEF/MID/FWD) sont réellement utilisées.
+// jeu quand la langue est réglée sur français).
 const POS_LABEL = {
-  // ── Catégories réellement fournies par les APIs ──
+  // ── Catégories génériques (le plus souvent fournies par les APIs) ──
   GK:'G',  G:'G',   GB:'G',
   DEF:'DÉF', D:'DÉF',
   MID:'MIL', M:'MIL', MF:'MIL',
   FWD:'ATT', F:'ATT', FW:'ATT',
-  // ── Codes détaillés FIFA/FC26 FR (gardés si une source plus précise est branchée un jour) ──
-  CB:'DC',  DC:'DC',  DL:'DG', DR:'DD',
+  // ── Codes détaillés FIFA/FC26 FR (utilisés quand une source les fournit) ──
+  CB:'DC',  CD:'DC',  DC:'DC',  DL:'DG', DR:'DD',
   LB:'DG',  RB:'DD',  LWB:'DLG', RWB:'DLD',
   SW:'LIB',
   CM:'MC',  CDM:'MDC', CAM:'MOC', DM:'MDC', AM:'MOC', MDC:'MDC', MOC:'MOC', MOF:'MOC', MG:'MG', MD:'MD', MC:'MC',
@@ -114,6 +141,10 @@ function fallbackLines(starters) {
 function groupByRealLine(starters, lines) {
   const byCat = [[], [], [], []]  // 0=GK, 1=DEF, 2=MID, 3=FWD
   for (const p of starters) byCat[posCat(p.position)].push(p)
+  // Tri stable gauche→droite (voir laneWeight) : corrige l'inversion gauche/
+  // droite constatée avec les codes de poste détaillés. Ne change rien pour
+  // les données génériques sans info de latéralité (tri stable = neutre).
+  for (const arr of byCat) arr.sort((a, b) => laneWeight(a.position) - laneWeight(b.position))
 
   const nOutfield = lines.length - 1  // hors ligne gardien (lines[0])
   const ordered = []
@@ -169,7 +200,7 @@ function getPositions(starters, formation) {
 // ── Dot joueur ────────────────────────────────────────────────────────────────
 function PlayerDot({ leftPct, topPct, player, teamColor }) {
   if (!player) return null
-  const isGK  = ['GK','G','GB'].includes((player.position ?? '').toUpperCase())
+  const isGK  = ['GK','G','GB'].includes(stripSide(player.position))
   const color = isGK ? '#f59e0b' : teamColor
   const nm    = formatName(player.name, player.shortName)
   const label = nm.length > 11 ? nm.slice(0, 10) + '.' : nm
@@ -345,7 +376,15 @@ function Pitch({ formation, positions, teamColor }) {
 function PlayerCell({ player, isSub }) {
   const cat      = posCat(player.position)
   const catC     = CAT_COLOR[cat]
-  const posLabel = POS_LABEL[(player.position ?? '').toUpperCase()] ?? player.position ?? '—'
+  // Si le code brut n'est pas reconnu, `player.position` peut être une chaîne
+  // vide (ex: source qui renvoie une catégorie non mappée) — dans ce cas
+  // `?? player.position` ne rattrape rien car '' n'est pas null/undefined,
+  // et le poste s'affichait invisible plutôt qu'incompréhensible. On retombe
+  // désormais sur positionName (texte brut de la source) puis sur '—'.
+  const posLabel = POS_LABEL[stripSide(player.position)]
+    || player.position
+    || player.positionName
+    || '—'
   const nm       = formatName(player.name, player.shortName)
 
   return (

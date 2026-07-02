@@ -413,13 +413,40 @@ export function useFifaStats(match, enabled = true, live = true) {
 // déduplique la requête si useMatchDetail est déjà monté avec le même matchId.
 // Retourne null si le match n'a pas encore de lineup (à venir ou non publié).
 
+// football-data.org renvoie parfois une catégorie générique (Goalkeeper/
+// Defender/Midfielder/Offence...) et parfois un poste précis (Centre-Back,
+// Left Winger, Defensive Midfield...) selon les données dispo pour le joueur.
+// On mappe aussi les postes précis vers les codes détaillés (CB/LB/RB/CDM...)
+// déjà reconnus par POS_LABEL/posCat/laneWeight dans LineupPitch.jsx — ainsi
+// ces postes profitent de la même traduction FR fine (et du bon placement
+// gauche/droite) que les autres sources, au lieu de rester vides et invisibles.
 const FD_POS = {
+  // ── Génériques ──
   Goalkeeper: 'GK',
   Defender:   'DEF',
+  Defence:    'DEF',
   Midfielder: 'MID',
+  Midfield:   'MID',
   Offence:    'FWD',  // football-data.org utilise "Offence" pour les attaquants
   Forward:    'FWD',
   Attacker:   'FWD',
+  // ── Détaillés (schéma connu de l'API football-data.org v4) ──
+  'Centre-Back':       'CB',
+  'Left-Back':          'LB',
+  'Right-Back':         'RB',
+  'Sweeper':            'SW',
+  'Central Midfield':   'CM',
+  'Defensive Midfield': 'CDM',
+  'Attacking Midfield': 'CAM',
+  'Left Midfield':      'LM',
+  'Right Midfield':     'RM',
+  'Left-Wing Back':     'LWB',
+  'Right-Wing Back':    'RWB',
+  'Left Winger':        'LW',
+  'Right Winger':       'RW',
+  'Centre-Forward':     'CF',
+  'Second Striker':     'SS',
+  'Striker':            'ST',
 }
 
 export function useFdLineups(match) {
