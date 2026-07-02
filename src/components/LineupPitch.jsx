@@ -69,27 +69,52 @@ function posCat(pos) {
 // les joueurs ont le même poids → l'ordre d'origine est conservé, donc aucun
 // changement de comportement pour les formations sans détail gauche/droite.
 //
-// ⚠️ BUG CORRIGÉ : cette liste ne couvrait que LB/RB/LM/RM/LW/RW/LWB/RWB,
-// alors que posCat()/POS_LABEL ci-dessus reconnaissent DÉJÀ d'autres codes
-// détaillés à connotation gauche/droite observés en pratique (ex: "DL" pour
-// un défenseur gauche via ESPN) — ces codes étaient bien catégorisés (DEF)
-// et bien labellisés ("DG"), mais PAS reconnus ici : ils retombaient sur le
-// poids neutre (centre), au même niveau qu'un vrai défenseur central, et
-// pouvaient donc être tranposés avec lui par le tri stable dès que l'ordre
-// brut de l'API les plaçait l'un après l'autre. C'est la cause confirmée de
-// l'inversion DC/DG signalée (le DG codé "DL" prenait la place du DC, et
-// inversement) — même chose possible côté milieu avec "MG"/"MD".
-const LEFT_CODES  = new Set(['LB','LM','LW','LWB','DL','DG','MG','AG'])
-const RIGHT_CODES = new Set(['RB','RM','RW','RWB','DR','DD','MD','AD'])
+// ⚠️ 2e BUG CORRIGÉ (confirmé sur une vraie compo, capture d'écran à l'appui) :
+// un poids UNIQUE pour "gauche" ne suffit pas — il existe DEUX niveaux de
+// gauche différents chez certaines sources : un code NOMMÉ explicitement
+// couloir/touche ("LB" = latéral gauche, la position la PLUS extérieure) et
+// un code générique SUFFIXÉ ("CD-L" = le défenseur central "de gauche" du
+// duo, qui reste plus proche du centre qu'un vrai latéral). Exemple réel
+// observé : Cucurella ("LB") affiché plus près du centre que Laporte
+// ("CD-L"), alors que le latéral doit être le PLUS extérieur des deux.
+// L'ancien code donnait le MÊME poids aux deux (0 pour "gauche" tout court)
+// → égalité → le tri stable gardait l'ordre brut de l'API, qui pouvait très
+// bien lister le défenseur central avant le latéral et donc l'afficher plus
+// à l'extérieur que lui. Échelle à 5 niveaux ci-dessous : latéral/couloir
+// nommé (le plus extrême) > suffixe -L/-R générique (gauche/droite "de
+// centre") > aucune info (centre).
+const LEFT_WIDE   = new Set(['LB','LWB','LW','LM','MG','AG','DL','DG'])
+const RIGHT_WIDE  = new Set(['RB','RWB','RW','RM','MD','AD','DR','DD'])
 
 function laneWeight(pos) {
   const raw = stripSide(pos)
   const original = (pos ?? '').toUpperCase()
-  if (original.endsWith('-L')) return 0
-  if (original.endsWith('-R')) return 2
-  if (LEFT_CODES.has(raw))  return 0
-  if (RIGHT_CODES.has(raw)) return 2
-  return 1
+  if (LEFT_WIDE.has(raw))         return 0   // latéral/couloir gauche (le plus extérieur)
+  if (original.endsWith('-L'))    return 1   // "-de-gauche" générique (ex: CD-L), plus proche du centre
+  if (RIGHT_WIDE.has(raw))        return 4   // latéral/couloir droit (le plus extérieur)
+  if (original.endsWith('-R'))    return 3   // "-de-droite" générique (ex: CD-R), plus proche du centre
+  return 2                                   // aucune info de latéralité → centre
+}
+
+// Profondeur (ligne reculée / avancée) déduite du code de poste, pour
+// scinder correctement un bloc milieu en 2 lignes (ex: double pivot MDC +
+// bloc offensif MOC dans un 4-2-3-1). BUG CORRIGÉ (confirmé sur compo réelle) :
+// avant, on tranchait le bloc milieu dans l'ordre BRUT de l'API en supposant
+// qu'il groupe déjà les joueurs par ligne — faux ici : Rodri ("RM", vrai
+// double pivot) et Pedri ("LM") étaient mélangés dans l'ordre API avec Baena/
+// Yamal ("AM-L"/"AM-R", vrai bloc offensif), et le tranchage aveugle par index
+// a fait atterrir les joueurs du double pivot dans la ligne offensive et
+// inversement. On utilise maintenant les codes DM/CDM/MDC (reculé) et AM/CAM/
+// MOC/MOF (avancé) comme signal fiable quand il existe, LM/RM/MG/MD étant
+// traités comme "reculé" par défaut car observés en pratique pour un pivot
+// (jamais vus utilisés pour le bloc offensif, qui a ses propres codes AM-L/
+// AM-R). Les codes sans aucune info de profondeur restent neutres (poids 1)
+// → tri stable → aucun changement pour les formations à 1 seule ligne de milieu.
+function depthWeight(pos) {
+  const raw = stripSide(pos)
+  if (['DM','CDM','MDC','LM','RM','MG','MD'].includes(raw)) return 0   // ligne reculée
+  if (['AM','CAM','MOC','MOF'].includes(raw))               return 2   // ligne avancée
+  return 1                                                              // pas d'info → neutre
 }
 
 // ⚠️ La plupart du temps, ESPN/FIFA/api-football/football-data.org ne renvoient
@@ -186,29 +211,30 @@ function groupByRealLine(starters, lines) {
     byCat[2].sort(byLane)
     ordered.push(...byCat[0], ...byCat[1], ...byCat[2], ...byCat[3])
   } else {
-    // ⚠️ BUG CORRIGÉ : le milieu (byCat[2]) est la SEULE catégorie qui peut se
-    // scinder en plusieurs lignes réelles (ex: 4-2-3-1 → ligne MDC à 2 +
-    // ligne MOC à 3). Avant, on triait TOUT byCat[2] par couloir (gauche→
-    // droite) AVANT de le trancher en sous-lignes par index — or trier par
-    // couloir mélange les joueurs des deux lignes entre eux (rien ne dit
-    // qu'un milieu couloir gauche appartient à la ligne reculée plutôt qu'à
-    // la ligne avancée). Résultat concret signalé : le milieu gauche (MG)
-    // atterrissait tranché dans la ligne MDC à la place d'un vrai récupérateur,
-    // et inversement un MC/MDC de droite se retrouvait tranché dans la ligne
-    // MOC affichée à la place du MG.
-    // Fix : trancher D'ABORD dans l'ordre BRUT de l'API (seule info dont on
-    // dispose pour deviner qui appartient à quelle ligne de profondeur — les
-    // sources ne distinguent jamais explicitement MDC/MOC, voir commentaire
-    // plus haut), PUIS trier chaque ligne résultante par couloir pour l'ordre
-    // gauche→droite à l'intérieur de CETTE ligne seulement.
+    // ⚠️ BUG CORRIGÉ (3e passe, confirmé sur compo réelle) : le milieu (byCat[2])
+    // est la SEULE catégorie qui peut se scinder en plusieurs lignes réelles
+    // (ex: 4-2-3-1 → ligne MDC à 2 + ligne MOC à 3). Trancher dans l'ordre BRUT
+    // de l'API (tentative précédente) supposait que l'API groupe déjà les
+    // joueurs par ligne de profondeur — faux dans les faits : un vrai double
+    // pivot ("RM"/"LM" utilisés par la source pour ce rôle) pouvait être
+    // mélangé, dans l'ordre API, avec le bloc offensif ("AM-L"/"AM-R"), et le
+    // tranchage par index faisait alors atterrir le double pivot dans la ligne
+    // offensive et inversement.
+    // Fix : trier D'ABORD tout le bloc milieu par PROFONDEUR (depthWeight —
+    // DM/CDM/MDC/LM/RM/MG/MD = reculé, AM/CAM/MOC/MOF = avancé, tri stable
+    // pour les codes sans info de profondeur), PUIS trancher en lignes dans cet
+    // ordre (la 1ère ligne du milieu, la plus proche de la défense, reçoit les
+    // profondeurs les plus reculées), et ENFIN trier chaque ligne résultante
+    // par couloir gauche→droite pour l'ordre à l'intérieur de CETTE ligne.
+    const midSorted = [...byCat[2]].sort((a, b) => depthWeight(a.position) - depthWeight(b.position))
     let midIdx = 0
     for (let li = 0; li < lines.length; li++) {
       if (li === 0)                    { ordered.push(...byCat[0]); continue }        // GK
       if (li === 1)                    { ordered.push(...byCat[1]); continue }        // 1ère ligne = DEF
       if (li === lines.length - 1)     { ordered.push(...byCat[3]); continue }        // dernière ligne = FWD
-      // ligne(s) intermédiaire(s) = MID, réparti dans l'ordre API puis trié par couloir
+      // ligne(s) intermédiaire(s) = MID, réparti par profondeur puis trié par couloir
       const n = lines[li]
-      const slice = byCat[2].slice(midIdx, midIdx + n)
+      const slice = midSorted.slice(midIdx, midIdx + n)
       slice.sort(byLane)
       ordered.push(...slice)
       midIdx += n
@@ -341,20 +367,6 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
         textOverflow:  'ellipsis',
       }}>
         {label}
-      </span>
-      {/* 🔧 DEBUG TEMPORAIRE — directement sur le graphique (là où l'inversion
-          se voit), pas dans la liste en dessous. Retirer une fois le vrai
-          bug identifié et corrigé. */}
-      <span style={{
-        fontSize:   7,
-        color:      '#f472b6',
-        fontFamily: 'monospace',
-        whiteSpace: 'nowrap',
-        background: 'rgba(0,0,0,0.55)',
-        padding:    '1px 3px',
-        borderRadius: 3,
-      }}>
-        {player.position || '?'}{player.grid ? `/${player.grid}` : ''}
       </span>
     </div>
   )
