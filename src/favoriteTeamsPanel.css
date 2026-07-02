@@ -3,9 +3,10 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 .fav-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  /* position: fixed + top/right posés en inline style (voir anchor dans
+     NotificationBell.jsx) — rendu via portail dans <body>, donc plus
+     contraint par l'overflow:hidden de la navbar. */
+  position: fixed;
   width: min(280px, 80vw);
   max-height: 60vh;
   display: flex;
@@ -14,7 +15,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.85rem;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  z-index: 50;
+  z-index: 200;
   overflow: hidden;
 }
 

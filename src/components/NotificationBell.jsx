@@ -11,7 +11,8 @@
  *   • Caché          → non supporté / refusé / vérification initiale
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import FavoriteTeamsPanel from './FavoriteTeamsPanel'
 import '../notificationBell.css'
@@ -49,13 +50,29 @@ function Spinner() {
 export default function NotificationBell() {
   const { status, subscribe, unsubscribe } = usePushNotifications()
   const [panelOpen, setPanelOpen] = useState(false)
-  const wrapRef = useRef(null)
+  const [anchor, setAnchor] = useState(null)
+  const wrapRef  = useRef(null)
+  const panelRef = useRef(null)
+
+  // ⚠️ La navbar a `overflow: hidden` (pour contenir ses effets de bordure
+  // animée) — un panneau positionné en `absolute` à l'intérieur serait donc
+  // coupé/invisible dès qu'il déborde de la navbar, quel que soit son
+  // z-index (overflow:hidden clippe peu importe le z-index). On rend le
+  // panneau via un portail dans <body>, positionné en `fixed` à partir des
+  // coordonnées réelles de la cloche — il échappe complètement au clipping.
+  useLayoutEffect(() => {
+    if (!panelOpen || !wrapRef.current) return
+    const r = wrapRef.current.getBoundingClientRect()
+    setAnchor({ top: r.bottom + 8, right: window.innerWidth - r.right })
+  }, [panelOpen])
 
   // Fermeture au clic en dehors du bouton/panneau
   useEffect(() => {
     if (!panelOpen) return
     const onClick = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setPanelOpen(false)
+      if (wrapRef.current?.contains(e.target)) return
+      if (panelRef.current?.contains(e.target)) return
+      setPanelOpen(false)
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
@@ -102,13 +119,16 @@ export default function NotificationBell() {
             : <BellMuted faded={isDenied} />}
       </button>
 
-      {panelOpen && (
+      {panelOpen && anchor && createPortal(
         <FavoriteTeamsPanel
+          ref={panelRef}
+          anchor={anchor}
           status={status}
           subscribe={subscribe}
           unsubscribe={unsubscribe}
           onClose={() => setPanelOpen(false)}
-        />
+        />,
+        document.body
       )}
     </div>
   )

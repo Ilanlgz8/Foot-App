@@ -7,12 +7,15 @@
  * serveur (resyncFavoriteTeams) à chaque changement, pour que le filtre
  * de cron-goals.js prenne effet tout de suite.
  */
+import { forwardRef } from 'react'
 import { useFavoriteTeams } from '../hooks/useFavoriteTeams'
 import { resyncFavoriteTeams } from '../hooks/usePushNotifications'
 import { NATIONAL_TEAMS_SORTED } from '../data/nationalTeams'
 import '../favoriteTeamsPanel.css'
 
-export default function FavoriteTeamsPanel({ status, subscribe, unsubscribe, onClose }) {
+const FavoriteTeamsPanel = forwardRef(function FavoriteTeamsPanel(
+  { status, subscribe, unsubscribe, onClose, anchor }, ref
+) {
   const { favorites, toggle } = useFavoriteTeams()
   const isSubscribed = status === 'subscribed'
   const isLoading    = status === 'loading'
@@ -22,8 +25,12 @@ export default function FavoriteTeamsPanel({ status, subscribe, unsubscribe, onC
     if (isSubscribed) resyncFavoriteTeams()
   }
 
+  // Positionné en `fixed` (portail dans <body>) à partir des coordonnées
+  // réelles de la cloche — voir commentaire dans NotificationBell.jsx.
+  const style = anchor ? { top: anchor.top, right: anchor.right } : undefined
+
   return (
-    <div className="fav-panel" onClick={e => e.stopPropagation()}>
+    <div ref={ref} className="fav-panel" style={style} onClick={e => e.stopPropagation()}>
       <div className="fav-panel__header">
         <span>Équipes suivies</span>
         <button className="fav-panel__close" onClick={onClose} aria-label="Fermer" type="button">×</button>
@@ -59,4 +66,6 @@ export default function FavoriteTeamsPanel({ status, subscribe, unsubscribe, onC
       </div>
     </div>
   )
-}
+})
+
+export default FavoriteTeamsPanel

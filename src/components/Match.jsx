@@ -80,10 +80,10 @@ const BK_PAD_X = 3
 // modèle "8e/4e/2e" demandé) : libère de la largeur dans chaque colonne pour
 // pouvoir réduire BK_CONN_W (voir plus haut) et donc grossir le reste.
 const BK_SHORT_LABELS = {
-  LAST_32:        '16e',
-  LAST_16:        '8e',
-  QUARTER_FINALS: '4e',
-  SEMI_FINALS:    '2e',
+  LAST_32:        '1/16',
+  LAST_16:        '1/8',
+  QUARTER_FINALS: '1/4',
+  SEMI_FINALS:    '1/2',
   FINAL:          'Finale',
   THIRD_PLACE:    '3e place',
 }
