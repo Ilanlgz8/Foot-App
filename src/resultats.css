@@ -159,6 +159,44 @@
   text-align: center;
 }
 
+/* ── Recherche équipe ── */
+.resultats__searchWrap {
+  position: relative;
+  max-width: 320px;
+  margin: 0 auto 1.25rem;
+}
+.resultats__searchInput {
+  width: 100%;
+  background: rgba(var(--white-rgb),0.04);
+  border: 1px solid rgba(var(--white-rgb),0.09);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 2.2rem 0.55rem 1rem;
+  font-size: 0.8rem;
+  color: #f5f5f5;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.resultats__searchInput::placeholder { color: rgba(var(--white-rgb),0.32); }
+.resultats__searchInput:focus {
+  outline: none;
+  border-color: rgba(var(--red-rgb),0.4);
+  background: rgba(var(--white-rgb),0.06);
+}
+.resultats__searchClear {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(var(--white-rgb),0.4);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  line-height: 1;
+}
+.resultats__searchClear:hover { color: var(--red-light); }
+
 .resultats__kicker {
   margin: 0 0 0.35rem;
   font-size: 0.68rem;

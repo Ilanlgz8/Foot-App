@@ -9,6 +9,7 @@ import { useMatches } from '../hooks/useMatchs'
 import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { calcProno } from '../utils/calcProno'
+import { GroupModal } from './GroupModal'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -706,66 +707,6 @@ function Matchs() {
     )
   }
 
-  /* ── Modal poule ── */
-  function GroupModal({ groupKey, onClose }) {
-    const allGroupMatches = matchesByGroup.get(groupKey) ?? []
-    // Dans "matchs à venir" : seulement les matchs pas encore joués
-    const groupMatches = allGroupMatches.filter(m =>
-      m.status === 'TIMED' || m.status === 'SCHEDULED' ||
-      m.status === 'IN_PLAY' || m.status === 'PAUSED'
-    )
-
-    useEffect(() => {
-      const handler = e => { if (e.key === 'Escape') onClose() }
-      window.addEventListener('keydown', handler)
-      const scrollY = window.scrollY
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.left = '0'
-      document.body.style.right = '0'
-      return () => {
-        window.removeEventListener('keydown', handler)
-        document.body.style.overflow = ''
-        document.body.style.position = ''
-        document.body.style.top = ''
-        document.body.style.left = ''
-        document.body.style.right = ''
-        window.scrollTo(0, scrollY)
-      }
-      // `onClose` est une arrow function recréée à chaque render du parent
-      // (`onClose={() => setOpenedGroup(null)}`) : la mettre en dépendance
-      // faisait démonter/remonter cet effect à CHAQUE re-render du parent
-      // (ex: toutes les 30s via le polling `hasLiveRound`), ce qui déverrouille
-      // puis reverrouille le scroll du body en boucle — cause probable du
-      // scroll bloqué en PWA. `setOpenedGroup` est stable, pas besoin de
-      // dépendre de ce wrapper inline.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    return createPortal(
-      <div className="wcModal__overlay" onClick={onClose}>
-        <div className="wcModal__panel" onClick={e => e.stopPropagation()}>
-          <div className="wcModal__topBar" />
-          <div className="wcModal__header">
-            <div className="wcModal__titleRow">
-              <h2 className="wcModal__title">{formatGroupName(groupKey)}</h2>
-              <span className="wcModal__count">{groupMatches.length} match{groupMatches.length > 1 ? 's' : ''}</span>
-            </div>
-            <button className="wcModal__close" onClick={onClose}>✕</button>
-          </div>
-          <div className="wcModal__body">
-            {groupMatches.length === 0
-              ? <p className="matchs__noMatch">Aucun match à venir dans ce groupe.</p>
-              : groupMatches.map((m, i) => <MatchRow key={m.id} match={m} index={i} inModal />)
-            }
-          </div>
-        </div>
-      </div>,
-      document.body
-    )
-  }
-
   /* ── Rendu ── */
   return (
     <section className="matchs">
@@ -1018,7 +959,16 @@ function Matchs() {
       </div>
 
       {openedGroup && (
-        <GroupModal groupKey={openedGroup} onClose={() => setOpenedGroup(null)} />
+        <GroupModal
+          title={formatGroupName(openedGroup)}
+          matches={(matchesByGroup.get(openedGroup) ?? []).filter(m =>
+            m.status === 'TIMED' || m.status === 'SCHEDULED' ||
+            m.status === 'IN_PLAY' || m.status === 'PAUSED'
+          )}
+          renderMatch={(m, i) => <MatchRow key={m.id} match={m} index={i} inModal />}
+          emptyMessage="Aucun match à venir dans ce groupe."
+          onClose={() => setOpenedGroup(null)}
+        />
       )}
     </section>
   )

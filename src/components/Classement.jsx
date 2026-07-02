@@ -20,6 +20,8 @@ function Classement() {
   const [selectedComp, setSelectedComp] = useState(initCompId)
   const [view, setView] = useState('classement') // 'classement' | 'buteurs'
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [search, setSearch] = useState('')
+  const searchNorm = search.trim().toLowerCase()
   const [compOpen, setCompOpen] = useState(false)
   const didAutoOpen = useRef(false)
 
@@ -48,6 +50,27 @@ function Classement() {
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
+
+  // Recherche — filtre côté client, ne nécessite aucune donnée supplémentaire.
+  function matchesTeamSearch(team) {
+    if (!searchNorm) return true
+    const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
+    const raw         = (team?.name ?? '').toLowerCase()
+    return translated.includes(searchNorm) || raw.includes(searchNorm)
+  }
+  function matchesScorerSearch(s) {
+    if (!searchNorm) return true
+    const player = (s.player?.name ?? '').toLowerCase()
+    return player.includes(searchNorm) || matchesTeamSearch(s.team)
+  }
+  const filteredStandings = standings.filter(row => matchesTeamSearch(row.team))
+  // _rank = position dans le classement buteurs NON filtré, pour que le badge
+  // affiché reste le vrai rang même quand la recherche réduit la liste
+  // (sinon un joueur classé 15e chercherait à s'afficher "#1" une fois seul
+  // dans la liste filtrée).
+  const filteredScorers = scorers
+    .map((s, i) => ({ ...s, _rank: i }))
+    .filter(matchesScorerSearch)
 
   // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
@@ -233,7 +256,15 @@ function Classement() {
 
           {/* Contenu */}
           <div className="gm__body">
-            {tab === 'classement' && <StandingsTable rows={group.table} compact={false} formMap={formMap} qualificationRules={qualificationRules} />}
+            {tab === 'classement' && (
+              <StandingsTable
+                rows={group.table}
+                compact={false}
+                formMap={formMap}
+                qualificationRules={qualificationRules}
+                snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
+              />
+            )}
 
             {tab === 'programme'  && (
               <MatchList
@@ -258,21 +289,38 @@ function Classement() {
 
   /* Affichage multi-groupes (CdM, etc.) */
   function MultiGroupView() {
+    // Recherche : ne garder que les groupes contenant une équipe correspondante,
+    // et filtrer leurs lignes — sinon chercher "Brésil" affiche quand même les
+    // 7 autres groupes vides de sens pour cette recherche.
+    const visibleGroups = groups
+      .map(group => ({ ...group, table: group.table.filter(row => matchesTeamSearch(row.team)) }))
+      .filter(group => !searchNorm || group.table.length > 0)
+
     return (
       <>
+        {searchNorm && visibleGroups.length === 0 && (
+          <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
+        )}
         <div className="classement__groups">
-          {groups.map(group => (
+          {visibleGroups.map(group => (
             <div
               key={group.name}
               className="classement__groupBlock classement__groupBlock--clickable"
-              onClick={() => setSelectedGroup(group)}
+              onClick={() => setSelectedGroup(groups.find(g => g.name === group.name) ?? group)}
               title="Voir le groupe en détail"
             >
               <div className="classement__groupHeader">
                 <h3 className="classement__groupTitle">{formatGroupName(group.name)}</h3>
                 <span className="classement__groupExpandHint">↗</span>
               </div>
-              <StandingsTable rows={group.table} compact formMap={formMap} qualificationRules={qualificationRules} />
+              <StandingsTable
+                rows={group.table}
+                compact
+                formMap={formMap}
+                qualificationRules={qualificationRules}
+                snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
+                snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
+              />
             </div>
           ))}
         </div>
@@ -392,6 +440,20 @@ function Classement() {
           </div>
         </div>
 
+        {/* Recherche équipe/buteur — filtre côté client */}
+        <div className="classement__searchWrap">
+          <input
+            type="text"
+            className="classement__searchInput"
+            placeholder={view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="classement__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
+          )}
+        </div>
+
         {/* Légende zones */}
         {view === 'classement' && (
           <div className="classement__zoneStrip">
@@ -431,9 +493,13 @@ function Classement() {
             {!scorersLoading && !scorersError && scorers.length === 0 && (
               <p className="classement__state">Aucun buteur disponible.</p>
             )}
-            {!scorersLoading && !scorersError && scorers.length > 0 && (
+            {!scorersLoading && !scorersError && scorers.length > 0 && filteredScorers.length === 0 && (
+              <p className="classement__state">Aucun buteur ne correspond à « {search} ».</p>
+            )}
+            {!scorersLoading && !scorersError && filteredScorers.length > 0 && (
               <div className="classement__scorersList">
-                {scorers.map((s, i) => {
+                {filteredScorers.map((s) => {
+                  const i = s._rank
                   const playerName = s.player?.name ?? '?'
                   const initials   = playerName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
                   const hue        = (playerName.charCodeAt(0) * 37 + (playerName.charCodeAt(1) || 0) * 13) % 360
@@ -529,7 +595,17 @@ function Classement() {
 
         {/* Tableau(x) */}
         {view === 'classement' && !loading && !error && standings.length > 0 && (
-          isMultiGroup ? <MultiGroupView /> : <StandingsTable rows={standings} formMap={formMap} qualificationRules={qualificationRules} />
+          isMultiGroup
+            ? <MultiGroupView />
+            : filteredStandings.length > 0
+              ? <StandingsTable
+                  rows={filteredStandings}
+                  formMap={formMap}
+                  qualificationRules={qualificationRules}
+                  snapshotKey={`standings_prev_${selectedComp}`}
+                  snapshotRows={standings}
+                />
+              : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
         )}
 
         {view === 'classement' && !loading && !error && standings.length === 0 && (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
+import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/matchStateTracker'
 import { mergeScore } from '../utils/matchUtils'
@@ -12,8 +13,14 @@ import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { pickMatchDuJour } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
+import { StandingsWidget } from '../accueil/StandingsWidget'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import '../accueil.css'
+
+// Même logique de priorité que pickMatchDuJour (Mondial > Ligue des Champions
+// > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
+// compétition montrer dans le mini widget classement de l'Accueil.
+const STANDINGS_PRIORITY = { WC: 0, CL: 1, PL: 2, PD: 2, BL1: 2, SA: 2, FL1: 2 }
 
 /** Chips de filtre par compétition */
 function CompFilter({ competitions, active, onChange }) {
@@ -125,12 +132,10 @@ function Accueil() {
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
   // dayOffset — comme le panneau résultats juste au-dessus, pour ne pas
   // changer quand l'utilisateur navigue vers un autre jour dans "Matchs".
-  // S'il n'y a qu'un seul match dans toute la journée, la carte ne sert à
-  // rien (c'est déjà le seul match visible partout ailleurs) → masquée.
-  const matchDuJour = useMemo(
-    () => todayMatchesForResults.length > 1 ? pickMatchDuJour(todayMatchesForResults) : null,
-    [todayMatchesForResults]
-  )
+  // Le garde-fou "un seul match = pas de carte" est dans pickMatchDuJour lui-
+  // même, basé sur le nombre de matchs À VENIR (pas le total de la journée,
+  // qui inclurait des matchs déjà terminés/live et fausserait le décompte).
+  const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
 
   const results = useMemo(() => {
     const seen = new Set()
@@ -143,6 +148,28 @@ function Accueil() {
       })
   }, [todayMatchesForResults, yesterdayMatchesForResults])
   const resultsLoading = matchesLoading
+
+  // Forme (5 derniers résultats) pour les losanges sous chaque nom d'équipe —
+  // fusion de toutes les compétitions présentes dans les 2 panneaux (matchs
+  // + résultats), puisqu'ils mélangent plusieurs championnats à la fois.
+  const formCompCodes = useMemo(() => {
+    const codes = new Set()
+    for (const m of matches) if (m.competition?.code) codes.add(m.competition.code)
+    for (const m of results) if (m.competition?.code) codes.add(m.competition.code)
+    return [...codes]
+  }, [matches, results])
+  const { formMap } = useTeamFormMulti(formCompCodes)
+
+  // Compétition à montrer dans le mini widget classement — la plus
+  // prioritaire parmi celles jouées aujourd'hui, WC par défaut sinon.
+  const standingsComp = useMemo(() => {
+    let best = null, bestP = Infinity
+    for (const m of matches) {
+      const p = STANDINGS_PRIORITY[m.competition?.code]
+      if (p != null && p < bestP) { bestP = p; best = m.competition.code }
+    }
+    return best ?? 'WC'
+  }, [matches])
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
@@ -359,6 +386,7 @@ function Accueil() {
               loading={matchesLoading}
               espnScores={espnScores}
               onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
+              formMap={formMap}
             />
           </div>
 
@@ -375,10 +403,14 @@ function Accueil() {
               </div>
             </div>
             <div className="accueil__dashPanelDivider" />
-            <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} />
+            <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
           </div>
 
         </div>
+
+        {/* ── Mini classement — comblait un vrai vide, l'Accueil ne montrait
+             rien du classement jusqu'ici ── */}
+        <StandingsWidget compId={standingsComp} />
 
         {/* ── Actualités — inchangé ── */}
         <NewsCarousel news={news} loading={newsLoading} error={newsError} />

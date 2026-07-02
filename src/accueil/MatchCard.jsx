@@ -4,6 +4,7 @@ import { calcMinute, mergeScore } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
+import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
 
 function GoalCelebration({ teamName, scoreStr }) {
@@ -92,7 +93,7 @@ export function PosterSkeleton() {
 //   onTrack       → callback pour activer/désactiver le suivi (null = bouton caché)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
 //   noGradient    → si true, pas de dégradé couleurs équipes en fond (ex: panel Résultats)
-export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false, noLive = false, noGradient = false }) {
+export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTrack = null, espnScore = null, noAnimation = false, isTermine = false, noLive = false, noGradient = false, formMap = null }) {
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
@@ -233,6 +234,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
         <span className={homeNameCls}>
           {translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')}
         </span>
+        <FormDiamonds form={formMap?.[match.homeTeam?.id]} />
       </div>
 
       {/* Centre : minute/heure/FT + score */}
@@ -264,6 +266,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
         <span className={awayNameCls}>
           {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')}
         </span>
+        <FormDiamonds form={formMap?.[match.awayTeam?.id]} />
       </div>
     </div>
   )
@@ -272,7 +275,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
 // Sur mobile : posters Betclic-style. Sur desktop : cards classiques.
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick }) {
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, formMap = null }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -314,6 +317,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                     espnScore={espnScores[match.id] ?? null}
                     noAnimation
                     noLive
+                    formMap={formMap}
                   />
                 </div>
               )

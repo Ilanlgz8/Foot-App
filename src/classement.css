@@ -195,6 +195,43 @@
   justify-content: center;
 }
 
+.classement__searchWrap {
+  position: relative;
+  max-width: 320px;
+  margin: 0 auto 1rem;
+}
+.classement__searchInput {
+  width: 100%;
+  background: rgba(var(--white-rgb),0.04);
+  border: 1px solid rgba(var(--white-rgb),0.09);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 2.2rem 0.55rem 1rem;
+  font-size: 0.8rem;
+  color: #f5f5f5;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.classement__searchInput::placeholder { color: rgba(var(--white-rgb),0.32); }
+.classement__searchInput:focus {
+  outline: none;
+  border-color: rgba(var(--red-rgb),0.4);
+  background: rgba(var(--white-rgb),0.06);
+}
+.classement__searchClear {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(var(--white-rgb),0.4);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  line-height: 1;
+}
+.classement__searchClear:hover { color: var(--red-light); }
+
 .classement__panelKicker {
   display: block;
   margin-bottom: 0.3rem;
@@ -419,6 +456,28 @@
   font-size: 0.82rem;
   font-weight: 800;
   color: #475569;
+}
+
+/* ── Indicateur de progression (flèche haut/bas ou barre grise stable) ── */
+.classement__positionWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.classement__rankChange {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  line-height: 1;
+}
+.classement__rankChange--up { color: #4ade80; }
+.classement__rankChange--down { color: var(--red); }
+.classement__rankChange--flat {
+  width: 7px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(var(--white-rgb), 0.22);
 }
 
 /* ── Cellule équipe ── */

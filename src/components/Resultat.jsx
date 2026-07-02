@@ -11,6 +11,7 @@ import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches }    from '../hooks/useMatchs'
+import { GroupModal }    from './GroupModal'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
@@ -21,6 +22,8 @@ function Resultats() {
   const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
+  const [search, setSearch]             = useState('')
+  const searchNorm = search.trim().toLowerCase()
   // Dropdown façon cloche notifs : rendu via portail dans <body> pour échapper
   // à l'overflow:hidden de .compHeader (voir NotificationBell.jsx / Match.jsx).
   const compHeroRef = useRef(null)
@@ -86,6 +89,25 @@ function Resultats() {
   const currentMatches  = currentGroup?.matches ?? []
   const total           = grouped.length
 
+  // Recherche — filtre côté client par nom d'équipe (traduit ou brut).
+  function matchesTeamSearch(team) {
+    if (!searchNorm) return true
+    const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
+    const raw         = (team?.name ?? '').toLowerCase()
+    return translated.includes(searchNorm) || raw.includes(searchNorm)
+  }
+  // En recherche, on ignore le découpage par journée : on cherche sur
+  // TOUS les résultats de la compétition (sinon une équipe absente de la
+  // journée affichée semblerait n'avoir aucun résultat).
+  const filteredMatches = useMemo(
+    () => matches.filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam)),
+    [matches, searchNorm]
+  )
+  const filteredWcGroups = useMemo(() => {
+    if (!searchNorm) return wcGroups
+    return wcGroups.filter(g => groupTeams(matchesByGroup.get(g) ?? []).some(matchesTeamSearch))
+  }, [wcGroups, searchNorm, matchesByGroup])
+
   const fmtDate = (d) => {
     const today = new Date(); today.setHours(0,0,0,0)
     const date  = new Date(d); date.setHours(0,0,0,0)
@@ -140,55 +162,6 @@ function Resultats() {
           <span className="resultats__teamName">{tName(match.awayTeam)}</span>
         </div>
       </div>
-    )
-  }
-
-  // Modal résultats d'un groupe (réutilise les classes wcModal de match.css)
-  function GroupModal({ groupKey, onClose }) {
-    const gMatches = (matchesByGroup.get(groupKey) ?? [])
-      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
-
-    useEffect(() => {
-      const handler = e => { if (e.key === 'Escape') onClose() }
-      window.addEventListener('keydown', handler)
-      const scrollY = window.scrollY
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.left = '0'; document.body.style.right = '0'
-      return () => {
-        window.removeEventListener('keydown', handler)
-        document.body.style.overflow = ''; document.body.style.position = ''
-        document.body.style.top = ''; document.body.style.left = ''; document.body.style.right = ''
-        window.scrollTo(0, scrollY)
-      }
-      // Même bug que dans Match.jsx : `onClose` est une arrow function
-      // recréée à chaque render du parent → dépendre d'elle démonte/remonte
-      // cet effect en boucle pendant que la modale est ouverte, déverrouillant
-      // puis reverrouillant le scroll du body à chaque re-render du parent.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    return createPortal(
-      <div className="wcModal__overlay" onClick={onClose}>
-        <div className="wcModal__panel" onClick={e => e.stopPropagation()}>
-          <div className="wcModal__topBar" />
-          <div className="wcModal__header">
-            <div className="wcModal__titleRow">
-              <h2 className="wcModal__title">{formatGroupName(groupKey)}</h2>
-              <span className="wcModal__count">{gMatches.length} match{gMatches.length !== 1 ? 's' : ''}</span>
-            </div>
-            <button className="wcModal__close" onClick={onClose}>✕</button>
-          </div>
-          <div className="wcModal__body">
-            {gMatches.length === 0
-              ? <p style={{ textAlign: 'center', color: '#475569', padding: '2rem 0' }}>Aucun résultat.</p>
-              : gMatches.map(m => <MatchCard key={m.id} match={m} />)
-            }
-          </div>
-        </div>
-      </div>,
-      document.body
     )
   }
 
@@ -273,6 +246,20 @@ function Resultats() {
             </div>
           </div>
 
+          {/* Recherche équipe — filtre côté client */}
+          <div className="resultats__searchWrap">
+            <input
+              type="text"
+              className="resultats__searchInput"
+              placeholder="Rechercher une équipe…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="resultats__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
+            )}
+          </div>
+
           {loading && (
             <div className="resultats__list">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -299,22 +286,35 @@ function Resultats() {
 
           {/* Vue par journée */}
           {!loading && !error && viewMode === 'journee' && grouped.length > 0 && (
-            <>
-              <div className="resultats__nav">
-                <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i + 1)} disabled={currentIndex >= total - 1}>←</button>
-                <span className="resultats__navLabel">{currentRoundLabel}</span>
-                <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i - 1)} disabled={currentIndex <= 0}>→</button>
-              </div>
-              <div className="resultats__list">
-                {currentMatches.map(match => <MatchCard key={match.id} match={match} />)}
-              </div>
-            </>
+            searchNorm ? (
+              filteredMatches.length === 0 ? (
+                <p className="resultats__state">Aucun résultat ne correspond à « {search} ».</p>
+              ) : (
+                <div className="resultats__list">
+                  {filteredMatches.map(match => <MatchCard key={match.id} match={match} />)}
+                </div>
+              )
+            ) : (
+              <>
+                <div className="resultats__nav">
+                  <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i + 1)} disabled={currentIndex >= total - 1}>←</button>
+                  <span className="resultats__navLabel">{currentRoundLabel}</span>
+                  <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i - 1)} disabled={currentIndex <= 0}>→</button>
+                </div>
+                <div className="resultats__list">
+                  {currentMatches.map(match => <MatchCard key={match.id} match={match} />)}
+                </div>
+              </>
+            )
           )}
 
           {/* Vue par poule — board de cartes comme dans Programme */}
+          {!loading && !error && viewMode === 'poule' && wcGroups.length > 0 && searchNorm && filteredWcGroups.length === 0 && (
+            <p className="resultats__state">Aucune équipe ne correspond à « {search} ».</p>
+          )}
           {!loading && !error && viewMode === 'poule' && wcGroups.length > 0 && (
             <div className="matchs__wcBoard">
-              {wcGroups.map(g => {
+              {filteredWcGroups.map(g => {
                 const gMatches = matchesByGroup.get(g) ?? []
                 const teams    = groupTeams(gMatches)
                 const letter   = g.replace('GROUP_', '')
@@ -351,7 +351,16 @@ function Resultats() {
       </div>
 
       {/* Modal résultats d'un groupe */}
-      {openedGroup && <GroupModal groupKey={openedGroup} onClose={() => setOpenedGroup(null)} />}
+      {openedGroup && (
+        <GroupModal
+          title={formatGroupName(openedGroup)}
+          matches={(matchesByGroup.get(openedGroup) ?? [])
+            .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))}
+          renderMatch={m => <MatchCard key={m.id} match={m} />}
+          emptyMessage="Aucun résultat."
+          onClose={() => setOpenedGroup(null)}
+        />
+      )}
 
     </section>
   )

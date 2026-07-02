@@ -12,11 +12,13 @@ const COMP_PRIORITY = { WC: 0, CL: 1, PL: 2, PD: 2, BL1: 2, SA: 2, FL1: 2 }
 
 /**
  * Retourne le match à mettre en avant parmi les matchs pas encore commencés
- * aujourd'hui, ou null s'il n'y en a aucun dans une compétition couverte.
+ * aujourd'hui, ou null s'il n'y en a aucun dans une compétition couverte, ou
+ * s'il n'y a qu'un seul match à venir (la carte n'a alors aucun intérêt :
+ * c'est déjà le seul match visible partout ailleurs sur la page).
  */
 export function pickMatchDuJour(matches) {
   const upcoming = (matches ?? []).filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
-  if (!upcoming.length) return null
+  if (upcoming.length < 2) return null
 
   let best = null
   let bestPriority = Infinity

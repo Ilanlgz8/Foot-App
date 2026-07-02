@@ -935,6 +935,11 @@
   flex-shrink: 0;
 }
 
+.accueil__standingsPanelBody {
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+.accueil__standingsPanelBody .classement__tableWrap { margin: 0; }
+
 .accueil__standingsGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3265,3 +3270,22 @@
 @media (prefers-reduced-motion: reduce) {
   .accueil__mdj { animation: none; }
 }
+
+/* ── Forme (5 derniers résultats) — losanges sous le nom d'équipe ──────────
+   Réutilisé à la fois dans MatchCard (desktop) et MatchPoster (mobile),
+   d'où des classes non préfixées par accueil__/poster__. */
+.formDiamonds {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.formDiamonds__item {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+.formDiamonds__item--w { background: #4ade80; }
+.formDiamonds__item--d { background: #facc15; }
+.formDiamonds__item--l { background: var(--red); }

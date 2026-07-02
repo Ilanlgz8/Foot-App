@@ -1,4 +1,5 @@
 // Composant partagé — utilisé dans Classement.jsx et MatchModal.jsx (onglet Classement)
+import { useEffect, useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 // Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
 // pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
@@ -8,6 +9,42 @@ import { translateTeam } from '../data/teamNames'
 import '../classement.css'
 
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
+
+// Flèche verte (monté), rouge (descendu) ou barre grise (stable / pas de donnée
+// de comparaison) par rapport à la dernière visite — comparaison faite via un
+// instantané localStorage (voir useStandingsSnapshot ci-dessous).
+function RankChange({ delta }) {
+  if (delta > 0) return <span className="classement__rankChange classement__rankChange--up" title={`+${delta}`}>▲</span>
+  if (delta < 0) return <span className="classement__rankChange classement__rankChange--down" title={delta}>▼</span>
+  return <span className="classement__rankChange classement__rankChange--flat" aria-hidden="true" />
+}
+
+// Lit l'instantané des positions (par équipe) enregistré lors de la dernière
+// visite sous `snapshotKey`, puis écrit le nouvel instantané (`snapshotRows`,
+// toujours la liste COMPLÈTE non filtrée par la recherche — sinon une
+// recherche active écraserait le snapshot avec seulement les équipes visibles).
+// La lecture (useMemo) ne se relance que si `snapshotKey` change, donc la
+// comparaison reste stable face à la donnée "avant cette session".
+function useStandingsSnapshot(snapshotKey, snapshotRows) {
+  const prevSnapshot = useMemo(() => {
+    if (!snapshotKey) return {}
+    try {
+      const raw = localStorage.getItem(snapshotKey)
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  }, [snapshotKey])
+
+  useEffect(() => {
+    if (!snapshotKey || !snapshotRows?.length) return
+    const snap = {}
+    snapshotRows.forEach(r => { snap[r.team.id] = r.position })
+    try { localStorage.setItem(snapshotKey, JSON.stringify(snap)) } catch {}
+  }, [snapshotKey, snapshotRows])
+
+  return prevSnapshot
+}
 
 function Forme({ results }) {
   if (!results || results.length === 0)
@@ -30,9 +67,11 @@ function Forme({ results }) {
  * @param {object[]} qualificationRules — règles de zones colorées (optionnel)
  *   Format : [{ start, end, dotClassName }]
  */
-export function StandingsTable({ rows, compact = false, formMap = {}, qualificationRules = [] }) {
+export function StandingsTable({ rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null }) {
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
+
+  const prevSnapshot = useStandingsSnapshot(snapshotKey, snapshotRows ?? rows)
 
   return (
     <div className={`classement__tableWrap${compact ? ' classement__tableWrap--compact' : ''}`}>
@@ -57,6 +96,8 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
             const zone    = getZone(team.position)
             const forme   = formMap[team.team.id]
             const formeSlice = compact && forme ? forme.slice(-3) : forme
+            const prevPos = prevSnapshot[team.team.id]
+            const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0
 
             return (
               <tr
@@ -64,7 +105,10 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
                 className={topRank ? `classement__row classement__row--top${team.position}` : 'classement__row'}
               >
                 <td>
-                  <span className="classement__position">{team.position}</span>
+                  <div className="classement__positionWrap">
+                    <span className="classement__position">{team.position}</span>
+                    {snapshotKey && <RankChange delta={delta} />}
+                  </div>
                 </td>
                 <td>
                   <div className="classement__teamCell">

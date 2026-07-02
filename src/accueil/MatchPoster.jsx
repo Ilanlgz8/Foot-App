@@ -5,6 +5,7 @@ import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
+import { FormDiamonds }               from './FormDiamonds'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -98,6 +99,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
             : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
           }
           <span className="poster__name poster__name--home">{homeShort}</span>
+          <FormDiamonds form={hForm} />
         </div>
 
         <div className="poster__center">
@@ -124,6 +126,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
             : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
           }
           <span className="poster__name poster__name--away">{awayShort}</span>
+          <FormDiamonds form={aForm} />
         </div>
 
       </div>
