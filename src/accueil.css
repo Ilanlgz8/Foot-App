@@ -77,32 +77,20 @@
 }
 
 /* ── Section live — pleine largeur ── */
+/* Plus de "card" (fond/bordure/coins arrondis) autour du live — jugé pas ouf
+   à l'usage : on garde le header + le contenu (chips/carte), juste sans le
+   cadre qui les enfermait. */
 .accueil__liveSection {
-  background: var(--bg-panel-grad);
-  border: 1px solid rgba(var(--red-rgb),0.18);
-  border-radius: 1.25rem;
-  overflow: hidden;
   position: relative;
   margin-bottom: 1rem;
   animation: fadeUp 0.4s ease both;
-}
-
-.accueil__liveSection::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--red-deep) 0%, rgba(var(--red-deep-rgb),0.3) 55%, transparent 100%);
-  z-index: 1;
-  pointer-events: none;
-  border-radius: 1.25rem 1.25rem 0 0;
 }
 
 .accueil__liveSectionHeader {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.85rem 1.2rem 0.4rem;
+  padding: 0 0 0.5rem;
 }
 
 .accueil__liveDot {
@@ -3127,13 +3115,81 @@
 .accueil__liveChipMinute--ft {
   color: rgba(var(--white-rgb),0.4);
 }
-.accueil__liveChipNames {
-  font-size: 0.55rem;
-  color: rgba(var(--white-rgb),0.4);
+
+/* ── Carte pleine largeur — un seul match en direct ── */
+.accueil__liveBig {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  background: rgba(var(--white-rgb),0.04);
+  border: 1px solid rgba(var(--red-rgb),0.2);
+  border-radius: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.accueil__liveBig:hover {
+  background: rgba(var(--red-rgb),0.08);
+  border-color: rgba(var(--red-rgb),0.4);
+}
+.accueil__liveBigTeam {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+.accueil__liveBigTeam--away {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.accueil__liveBigCrest {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.accueil__liveBigCrestFb {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(var(--white-rgb),0.08);
+  flex-shrink: 0;
+}
+.accueil__liveBigName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f5f5f5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100px;
+}
+.accueil__liveBigCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+.accueil__liveBigMinute {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--red);
+  letter-spacing: 0.04em;
+}
+.accueil__liveBigMinute--ft {
+  color: rgba(var(--white-rgb),0.4);
+}
+.accueil__liveBigScore {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ── Match du jour ──────────────────────────────────────────────────────────

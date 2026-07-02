@@ -13,14 +13,12 @@ import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { pickMatchDuJour } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
-import { StandingsWidget } from '../accueil/StandingsWidget'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import '../accueil.css'
 
 // Même logique de priorité que pickMatchDuJour (Mondial > Ligue des Champions
 // > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
 // compétition montrer dans le mini widget classement de l'Accueil.
-const STANDINGS_PRIORITY = { WC: 0, CL: 1, PL: 2, PD: 2, BL1: 2, SA: 2, FL1: 2 }
 
 /** Chips de filtre par compétition */
 function CompFilter({ competitions, active, onChange }) {
@@ -159,17 +157,6 @@ function Accueil() {
     return [...codes]
   }, [matches, results])
   const { formMap } = useTeamFormMulti(formCompCodes)
-
-  // Compétition à montrer dans le mini widget classement — la plus
-  // prioritaire parmi celles jouées aujourd'hui, WC par défaut sinon.
-  const standingsComp = useMemo(() => {
-    let best = null, bestP = Infinity
-    for (const m of matches) {
-      const p = STANDINGS_PRIORITY[m.competition?.code]
-      if (p != null && p < bestP) { bestP = p; best = m.competition.code }
-    }
-    return best ?? 'WC'
-  }, [matches])
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
@@ -407,10 +394,6 @@ function Accueil() {
           </div>
 
         </div>
-
-        {/* ── Mini classement — comblait un vrai vide, l'Accueil ne montrait
-             rien du classement jusqu'ici ── */}
-        <StandingsWidget compId={standingsComp} />
 
         {/* ── Actualités — inchangé ── */}
         <NewsCarousel news={news} loading={newsLoading} error={newsError} />

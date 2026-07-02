@@ -171,7 +171,9 @@
   border: 1px solid rgba(var(--white-rgb),0.09);
   border-radius: var(--radius-pill);
   padding: 0.55rem 2.2rem 0.55rem 1rem;
-  font-size: 0.8rem;
+  /* 16px minimum : en dessous, iOS Safari zoome automatiquement la page au
+     focus de l'input — comportement non voulu (signalé par l'utilisateur). */
+  font-size: 16px;
   color: #f5f5f5;
   font-family: inherit;
   transition: border-color 0.15s, background 0.15s;

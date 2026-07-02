@@ -14,6 +14,10 @@ function shortenName(name) {
   return name.slice(0, 9) + '.'
 }
 
+// Chip compacte — utilisée seulement s'il y a PLUSIEURS matchs en direct en
+// même temps. Volontairement réduite à logo + score + minute (pas de nom
+// d'équipe) : avec plusieurs matchs à caser sur une ligne, le nom rendait ça
+// chargé — le logo suffit à identifier l'équipe en un coup d'œil.
 function LiveChip({ match, espn, onMatchClick }) {
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
@@ -21,8 +25,6 @@ function LiveChip({ match, espn, onMatchClick }) {
 
   const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
   const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
-  const homeName = shortenName(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayName = shortenName(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
   return (
     <button
@@ -42,7 +44,49 @@ function LiveChip({ match, espn, onMatchClick }) {
       <span className={`accueil__liveChipMinute${isTermine ? ' accueil__liveChipMinute--ft' : ''}`}>
         {minute}
       </span>
-      <span className="accueil__liveChipNames">{homeName} – {awayName}</span>
+    </button>
+  )
+}
+
+// Carte pleine largeur — utilisée quand il n'y a QU'UN SEUL match en direct :
+// autant de place disponible, donc on affiche noms + logos + score + minute
+// en plus grand. Reste volontairement léger (pas de stats/buteurs/xG comme
+// LiveCard de la page /live — sinon on retombe dans le doublon déjà constaté
+// et corrigé : le widget ne doit pas dupliquer le détail de /live).
+function LiveBig({ match, espn, onMatchClick }) {
+  const matchSt   = getMatchState(match.id)
+  const isTermine = matchSt.ft === true
+  const minute    = isTermine ? 'Terminé' : (calcMinute(match) ?? '–')
+
+  const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+  const homeName = shortenName(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName = shortenName(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+
+  return (
+    <button
+      type="button"
+      className="accueil__liveBig"
+      onClick={() => onMatchClick?.(match)}
+    >
+      <div className="accueil__liveBigTeam">
+        {match.homeTeam?.crest
+          ? <img src={match.homeTeam.crest} alt="" className="accueil__liveBigCrest" />
+          : <div className="accueil__liveBigCrestFb" />}
+        <span className="accueil__liveBigName">{homeName}</span>
+      </div>
+
+      <div className="accueil__liveBigCenter">
+        <span className={`accueil__liveBigMinute${isTermine ? ' accueil__liveBigMinute--ft' : ''}`}>{minute}</span>
+        <span className="accueil__liveBigScore">{hs ?? '-'} – {as_ ?? '-'}</span>
+      </div>
+
+      <div className="accueil__liveBigTeam accueil__liveBigTeam--away">
+        {match.awayTeam?.crest
+          ? <img src={match.awayTeam.crest} alt="" className="accueil__liveBigCrest" />
+          : <div className="accueil__liveBigCrestFb" />}
+        <span className="accueil__liveBigName">{awayName}</span>
+      </div>
     </button>
   )
 }
@@ -68,6 +112,16 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) 
   }, [])
 
   if (live.length === 0) return null
+
+  if (live.length === 1) {
+    return (
+      <LiveBig
+        match={live[0]}
+        espn={espnScores[live[0].id] ?? null}
+        onMatchClick={onMatchClick}
+      />
+    )
+  }
 
   return (
     <div className="accueil__liveChips">
