@@ -10,8 +10,11 @@ import './../compHeader.css'
 import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
-import { useMatches }    from '../hooks/useMatchs'
+import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
+import { useLiveData }   from '../context/LiveProvider'
+import { getMatchState } from '../utils/matchStateTracker'
+import { mergeScore }    from '../utils/matchUtils'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
@@ -47,7 +50,42 @@ function Resultats() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [compOpen])
 
-  const { matches, loading, error, grouped } = useMatches(selectedComp, 'FINISHED', 'desc')
+  const { matches: fdMatches, loading, error } = useMatches(selectedComp, 'FINISHED', 'desc')
+
+  // ESPN détecte souvent la fin d'un match plusieurs minutes avant que
+  // football-data.org ne mette à jour son statut à FINISHED (retard connu,
+  // voir CLAUDE.md). Sans ça, un match terminé peut mettre du temps à
+  // apparaître ici alors qu'il est déjà fini pour de vrai. On complète donc
+  // la liste FD.org avec les matchs de CETTE compétition qu'ESPN (via
+  // liveMatches/matchStateTracker, alimentés globalement par LiveProvider)
+  // considère déjà terminés ("ft"), même si liveTracker les garde encore
+  // quelques minutes dans liveMatches et que FD.org n'a pas encore basculé.
+  const { liveMatches, espnScores } = useLiveData()
+  const matches = useMemo(() => {
+    const known = new Set(fdMatches.map(m => m.id))
+    const extra = liveMatches
+      .filter(m => m.competition?.code === selectedComp)
+      .filter(m => !known.has(m.id))
+      .filter(m => getMatchState(m.id).ft === true)
+      .map(m => {
+        let lsHome = null, lsAway = null
+        try {
+          const ls = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
+          if (ls && ls.home != null) { lsHome = ls.home; lsAway = ls.away }
+        } catch {}
+        return {
+          ...m,
+          score: { fullTime: {
+            home: mergeScore(espnScores[m.id]?.home, lsHome ?? m.score?.fullTime?.home),
+            away: mergeScore(espnScores[m.id]?.away, lsAway ?? m.score?.fullTime?.away),
+          } },
+          status: 'FINISHED',
+        }
+      })
+    return extra.length > 0 ? [...extra, ...fdMatches] : fdMatches
+  }, [fdMatches, liveMatches, espnScores, selectedComp])
+
+  const grouped = useMemo(() => groupRounds(matches, 'desc'), [matches])
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   const isWC        = selectedComp === 'WC'
@@ -179,6 +217,9 @@ function Resultats() {
               <img src={currentComp.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
+            <div className="compHeader__info">
+              <span className="compHeader__name">{currentComp?.name}</span>
+            </div>
             <button className="compHeader__btn" aria-label="Changer de compétition">
               {compOpen ? 'Fermer ✕' : 'Changer ›'}
             </button>

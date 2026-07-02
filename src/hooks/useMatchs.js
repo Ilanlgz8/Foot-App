@@ -25,7 +25,7 @@ function cacheKey(comp, status) {
 // Retourne un tableau de { key, label, matches } dans l'ordre chronologique
 // (poules d'abord, puis tours à élimination directe dans l'ordre du tableau),
 // inversé si order === 'desc' (utilisé par Résultats : le plus récent d'abord).
-function groupRounds(matches, order = 'asc') {
+export function groupRounds(matches, order = 'asc') {
   const groupStage = matches.filter(m => m.matchday != null)
   const knockout    = matches.filter(m => m.matchday == null && m.stage)
 

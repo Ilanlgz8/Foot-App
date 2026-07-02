@@ -646,16 +646,18 @@ function Matchs() {
     setWcView(v)
   }
 
-  /* Pour "matchs à venir" WC en vue par journée : on ne montre que les TIMED/SCHEDULED/live */
+  /* Vue "Par journée" (toutes compétitions) : seulement les matchs pas encore
+     joués (TIMED/SCHEDULED). Un match en direct (IN_PLAY/PAUSED) n'a plus sa
+     place ici — il est déjà visible dans le widget "EN DIRECT" de l'Accueil
+     et sur la page /live, pas besoin de le montrer aussi dans "Programme". */
   const filteredGrouped = useMemo(() => {
-    if (!isWC || wcView !== 'matchs') return grouped
     return grouped
       .map(g => ({
         ...g,
-        matches: g.matches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED' || m.status === 'IN_PLAY' || m.status === 'PAUSED'),
+        matches: g.matches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED'),
       }))
       .filter(g => g.matches.length > 0)
-  }, [isWC, wcView, grouped])
+  }, [grouped])
 
   /* Navigation journées */
   const currentGroup      = filteredGrouped[currentIndex]
@@ -722,6 +724,9 @@ function Matchs() {
               <img src={currentComp.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
+            <div className="compHeader__info">
+              <span className="compHeader__name">{currentComp?.name}</span>
+            </div>
             <button className="compHeader__btn" aria-label="Changer de compétition">
               {compOpen ? 'Fermer ✕' : 'Changer ›'}
             </button>

@@ -353,6 +353,9 @@ function Classement() {
               <img src={selectedCompetition.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
+            <div className="compHeader__info">
+              <span className="compHeader__name">{selectedCompetition?.name}</span>
+            </div>
             <button className="compHeader__btn" aria-label={compOpen ? 'Fermer la liste des compétitions' : 'Changer de compétition'}>
               {compOpen ? 'Fermer' : 'Changer'}
               <svg

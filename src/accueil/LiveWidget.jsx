@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore } from '../utils/matchUtils'
+import { MatchCard } from './MatchCard'
 
 // ── Widget live — version allégée ───────────────────────────────────────────
 // Volontairement minimal : juste "il y a un/des match(s) en direct" avec le
@@ -8,12 +9,6 @@ import { calcMinute, mergeScore } from '../utils/matchUtils'
 // période, reprise…) est sur la page /live — le garder ici en double faisait
 // doublon avec cette page (constat de l'utilisateur, confirmé : le widget
 // affichait quasiment autant de détail que la page dédiée).
-function shortenName(name) {
-  if (!name) return name
-  if (name.length <= 10) return name
-  return name.slice(0, 9) + '.'
-}
-
 // Chip compacte — utilisée seulement s'il y a PLUSIEURS matchs en direct en
 // même temps. Volontairement réduite à logo + score + minute (pas de nom
 // d'équipe) : avec plusieurs matchs à caser sur une ligne, le nom rendait ça
@@ -48,49 +43,6 @@ function LiveChip({ match, espn, onMatchClick }) {
   )
 }
 
-// Carte pleine largeur — utilisée quand il n'y a QU'UN SEUL match en direct :
-// autant de place disponible, donc on affiche noms + logos + score + minute
-// en plus grand. Reste volontairement léger (pas de stats/buteurs/xG comme
-// LiveCard de la page /live — sinon on retombe dans le doublon déjà constaté
-// et corrigé : le widget ne doit pas dupliquer le détail de /live).
-function LiveBig({ match, espn, onMatchClick }) {
-  const matchSt   = getMatchState(match.id)
-  const isTermine = matchSt.ft === true
-  const minute    = isTermine ? 'Terminé' : (calcMinute(match) ?? '–')
-
-  const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
-  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
-  const homeName = shortenName(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayName = shortenName(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-
-  return (
-    <button
-      type="button"
-      className="accueil__liveBig"
-      onClick={() => onMatchClick?.(match)}
-    >
-      <div className="accueil__liveBigTeam">
-        {match.homeTeam?.crest
-          ? <img src={match.homeTeam.crest} alt="" className="accueil__liveBigCrest" />
-          : <div className="accueil__liveBigCrestFb" />}
-        <span className="accueil__liveBigName">{homeName}</span>
-      </div>
-
-      <div className="accueil__liveBigCenter">
-        <span className={`accueil__liveBigMinute${isTermine ? ' accueil__liveBigMinute--ft' : ''}`}>{minute}</span>
-        <span className="accueil__liveBigScore">{hs ?? '-'} – {as_ ?? '-'}</span>
-      </div>
-
-      <div className="accueil__liveBigTeam accueil__liveBigTeam--away">
-        {match.awayTeam?.crest
-          ? <img src={match.awayTeam.crest} alt="" className="accueil__liveBigCrest" />
-          : <div className="accueil__liveBigCrestFb" />}
-        <span className="accueil__liveBigName">{awayName}</span>
-      </div>
-    </button>
-  )
-}
-
 export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) {
   const now = Date.now()
   const live = liveMatches.filter(m => {
@@ -113,13 +65,17 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) 
 
   if (live.length === 0) return null
 
+  // Un seul match en direct → on réutilise la MÊME carte que sur les autres
+  // pages (Programme, Résultats...) plutôt qu'un design maison : garantit un
+  // rendu identique (drapeaux ronds, nom sous le drapeau) partout dans l'app.
+  // noAnimation : la notif/animation de but reste gérée uniquement côté cron
+  // (voir CLAUDE.md — source unique des notifs), pas ici en double.
   if (live.length === 1) {
+    const m = live[0]
     return (
-      <LiveBig
-        match={live[0]}
-        espn={espnScores[live[0].id] ?? null}
-        onMatchClick={onMatchClick}
-      />
+      <div className="accueil__matchCardClickable" onClick={() => onMatchClick?.(m)}>
+        <MatchCard match={m} espnScore={espnScores[m.id] ?? null} noAnimation />
+      </div>
     )
   }
 

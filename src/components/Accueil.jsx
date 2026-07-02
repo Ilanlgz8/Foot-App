@@ -291,9 +291,13 @@ function Accueil() {
   const resultPanel = (() => {
     const now4h = Date.now() - 4 * 60 * 60_000
     const todayFt = matches.filter(m => {
-      if (liveMatches.some(l => l.id === m.id)) return false
       const st = getMatchState(m.id)
+      // ft (confirmé par ESPN) prime toujours, même si liveTracker garde encore
+      // le match dans liveMatches (grâce period de 5min avant éviction) — sinon
+      // le match reste invisible en Résultats pendant tout ce délai alors qu'il
+      // est déjà terminé (signalé par l'utilisateur : "ça met du temps à se mettre").
       if (st.ft) return true
+      if (liveMatches.some(l => l.id === m.id)) return false
       if (st.liveState === 'ended' && st.endedAt > now4h) return true
       return false
     })
