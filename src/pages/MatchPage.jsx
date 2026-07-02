@@ -28,6 +28,7 @@ import {
   StatsSubTabs,
   getEspnData,
   TabDots,
+  TeamFormTable,
 } from '../components/MatchModal'
 import './MatchPage.css'
 import '../matchModal.css'
@@ -417,6 +418,23 @@ function MpSeasonStats({ match, formMap, compMatches }) {
             />
           )
         })}
+      </div>
+
+      {/* Forme récente — dernier match joué de chaque équipe (score, W/D/L,
+          date), même bloc que l'onglet "Avant-match" — manquait ici avant. */}
+      <div className="pm__section modal__seasonForm">
+        <h3 className="pm__sectionTitle">Forme récente</h3>
+        <div className="pm__formGrid">
+          <div className="pm__formCol">
+            <p className="pm__formTeamName">{homeName}</p>
+            <TeamFormTable teamId={homeId} compMatches={compMatches} />
+          </div>
+          <div className="pm__formDivider" />
+          <div className="pm__formCol">
+            <p className="pm__formTeamName">{awayName}</p>
+            <TeamFormTable teamId={awayId} compMatches={compMatches} />
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -503,11 +503,34 @@ export function SeasonStatsTab({ match, compMatches }) {
     { label: '+2.5 buts %',             hv: h ? `${h.over25Pct}%` : null, av: a ? `${a.over25Pct}%` : null },
   ].filter(r => r.hv != null || r.av != null)
 
+  const homeName = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
+  const awayName = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
+
   return (
     <div className="modal__espnStats">
       {rows.map(r => (
         <StatBar key={r.label} label={r.label} homeVal={r.hv ?? '–'} awayVal={r.av ?? '–'} />
       ))}
+
+      {/* Forme récente — même bloc que l'onglet "Avant-match" (TeamFormTable),
+          manquant ici avant : dernier match joué de chaque équipe avec le score,
+          W/D/L et la date. */}
+      {compMatches?.length > 0 && (
+        <div className="pm__section modal__seasonForm">
+          <h3 className="pm__sectionTitle">Forme récente</h3>
+          <div className="pm__formGrid">
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{homeName}</p>
+              <TeamFormTable teamId={homeId} compMatches={compMatches} />
+            </div>
+            <div className="pm__formDivider" />
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{awayName}</p>
+              <TeamFormTable teamId={awayId} compMatches={compMatches} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -870,7 +893,7 @@ function ResultBadge({ result }) {
   return <span className={`pm__badge ${cls}`}>{label}</span>
 }
 
-function TeamFormTable({ teamId, compMatches }) {
+export function TeamFormTable({ teamId, compMatches }) {
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
     .slice(-5)

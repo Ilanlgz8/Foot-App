@@ -262,6 +262,13 @@
   padding: 0 0 1.2rem;
 }
 
+/* Forme récente (sous Stats saison) — .modal__seasonForm/.pm__section viennent
+   de matchModal.css (partagés avec l'onglet Avant-match), juste besoin d'un
+   espacement au-dessus puisque .mp__statsWrap n'est pas un flex avec gap. */
+.modal__seasonForm {
+  margin-top: 1.1rem;
+}
+
 .mp__statsHeader {
   display: flex;
   justify-content: space-between;
