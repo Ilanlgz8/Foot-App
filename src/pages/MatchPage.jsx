@@ -31,6 +31,13 @@ import {
 import './MatchPage.css'
 import '../matchModal.css'
 import '../live.css'
+// Réutilisé pour les classes .lmp__heroScorers* (buteurs sous les noms
+// d'équipe dans le hero) — même style qu'en direct, demande explicite de
+// l'utilisateur ("exactement pareil"). Import de la CSS de la page live
+// plutôt que dupliquer les règles, pour garantir un rendu identique sans
+// risque de dérive entre les deux (même pattern déjà utilisé ailleurs dans
+// l'app, ex: Resultat.jsx qui importe match.css).
+import './LiveMatchPage.css'
 
 // ── Fetch fallback si accès direct par URL ────────────────────────────────────
 function useMatchData(matchId, initialMatch) {
@@ -82,6 +89,18 @@ function MatchPageHero({ match, navigate }) {
     match.awayTeam?.name || awayName
   )
 
+  // Buteurs — même source/logique que MpMatchStats (cache localStorage
+  // persistant si le match a été suivi en live, sinon fetch ESPN à la
+  // demande). queryKey partagée avec MpMatchStats → pas de double fetch,
+  // React Query dédup les deux appels automatiquement.
+  const cachedEspn = isFinished ? getEspnData(match?.id) : null
+  const { espnData: fetchedEspn } = useEspnMatchDetail(
+    isFinished && !cachedEspn ? match : null,
+    match?.competition?.id,
+    isFinished && !cachedEspn
+  )
+  const espnScorers = (cachedEspn ?? fetchedEspn)?.scorers ?? []
+
   return (
     <div className="mp__hero" style={{ background: gradient }}>
       <div className="mp__hero__overlay" />
@@ -125,6 +144,29 @@ function MatchPageHero({ match, navigate }) {
           <span className="mp__hero__name">{awayName}</span>
         </div>
       </div>
+
+      {/* Buteurs — sous les noms d'équipe, même présentation qu'en direct */}
+      {espnScorers.length > 0 && (
+        <div className="lmp__heroScorers">
+          <div className="lmp__heroScorersHome">
+            {espnScorers.filter(s => s.team === 'home').map((s, i) => (
+              <span key={i} className="lmp__heroScorerItem">
+                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
+                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+              </span>
+            ))}
+          </div>
+          <div className="lmp__heroScorersDiv" />
+          <div className="lmp__heroScorersAway">
+            {espnScorers.filter(s => s.team === 'away').map((s, i) => (
+              <span key={i} className="lmp__heroScorerItem">
+                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
+                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

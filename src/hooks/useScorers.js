@@ -31,12 +31,22 @@ export function useScorers(compId) {
         return j.scorers ?? null
       }
 
+      // limit=100 (au lieu de 20) : le paramètre "limit" n'est pas documenté
+      // officiellement pour /scorers (seuls season/matchday le sont dans la
+      // doc FD.org), mais il fonctionne déjà en pratique avec 20, et la doc
+      // générale FD.org mentionne 100 comme plafond par défaut "overridable"
+      // pour les ressources de liste — 100 est donc une valeur raisonnable
+      // et sûre pour élargir la liste (utile pour la recherche par
+      // pays/équipe : un buteur peut exister au-delà du top 20 affiché).
+      // Non garanti de couvrir absolument TOUS les buteurs si l'API impose
+      // un plafond serveur plus bas — c'est une vraie limite de la source
+      // gratuite, pas quelque chose de contournable côté client.
       let scorers = null
       if (isAnnualIntl) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=20&season=${season}`)
+        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100&season=${season}`)
       }
       if (!scorers || scorers.length === 0) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=20`)
+        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
       }
       scorers = scorers ?? []
       writeCache(key, scorers, STALE_MS)
