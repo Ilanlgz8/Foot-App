@@ -57,7 +57,7 @@ export function MatchDuJourCard({ match, onClick }) {
         </div>
 
         <div className="accueil__mdjVs">
-          <span className="accueil__mdjVsLabel">VS</span>
+          <span className="accueil__mdjToday">Aujourd'hui</span>
           <span className="accueil__mdjTime">{kickoff}</span>
         </div>
 
