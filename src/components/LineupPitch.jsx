@@ -55,7 +55,7 @@ function posCat(pos) {
   if (['GK','G','GB'].includes(p)) return 0
   if (['CB','CD','LB','RB','LWB','RWB','D','SW','DC','DL','DR','DD','DG','DEF'].includes(p)) return 1
   if (['CM','CDM','CAM','DM','AM','LM','RM','M','MF','MIL','MDC','MOF','MG','MD','MC'].includes(p)) return 2
-  if (['ST','CF','LW','RW','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
+  if (['ST','CF','LW','RW','LF','RF','F','FW','ATT','FWD','SS','AC','AG','AD','BU'].includes(p)) return 3
   return 2
 }
 
@@ -83,8 +83,20 @@ function posCat(pos) {
 // à l'extérieur que lui. Échelle à 5 niveaux ci-dessous : latéral/couloir
 // nommé (le plus extrême) > suffixe -L/-R générique (gauche/droite "de
 // centre") > aucune info (centre).
-const LEFT_WIDE   = new Set(['LB','LWB','LW','LM','MG','AG','DL','DG'])
-const RIGHT_WIDE  = new Set(['RB','RWB','RW','RM','MD','AD','DR','DD'])
+// ⚠️ 3e BUG CORRIGÉ (confirmé sur une vraie compo 4-3-3, capture d'écran à
+// l'appui) : "LF"/"RF" (Left Forward/Right Forward — utilisés par au moins
+// une source pour les ailiers d'un front 3, ex: Mané="LF", Ndiaye="RF")
+// n'étaient reconnus NULLE PART : ni ici, ni dans posCat (où ils tombaient
+// par défaut en catégorie MID au lieu de FWD), ni dans POS_LABEL (d'où le
+// code brut "LF"/"RF" affiché tel quel dans la liste au lieu de "AG"/"AD").
+// Conséquence concrète : les 2 ailiers, mal catégorisés en MID, se
+// retrouvaient en surplus (non tranchés dans la ligne milieu) puis rajoutés
+// en bout de tableau par le repli "reliquat" SANS AUCUN tri gauche/droite —
+// exactement le swap BU/AG signalé (le seul attaquant correctement reconnu,
+// "F", atterrissait par défaut à gauche, les deux ailiers non reconnus
+// suivant dans un ordre non trié).
+const LEFT_WIDE   = new Set(['LB','LWB','LW','LF','LM','MG','AG','DL','DG'])
+const RIGHT_WIDE  = new Set(['RB','RWB','RW','RF','RM','MD','AD','DR','DD'])
 
 function laneWeight(pos) {
   const raw = stripSide(pos)
@@ -152,7 +164,7 @@ const POS_LABEL = {
   // ci-dessus, aplati sur 'MIL' générique (pas assez fiable pour un label précis).
   CM:'MC',  CDM:'MIL', CAM:'MIL', DM:'MIL', AM:'MIL', MDC:'MIL', MOC:'MIL', MOF:'MIL', MG:'MG', MD:'MD', MC:'MC',
   LM:'MG',  RM:'MD',
-  ST:'BU',  CF:'AC',  LW:'AG',  RW:'AD',
+  ST:'BU',  CF:'AC',  LW:'AG',  RW:'AD',  LF:'AG',  RF:'AD',
   SS:'BU',  BU:'BU', AC:'AC', AG:'AG', AD:'AD',
 }
 
@@ -367,19 +379,6 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
         textOverflow:  'ellipsis',
       }}>
         {label}
-      </span>
-      {/* 🔧 DEBUG TEMPORAIRE (2e round, ligne d'attaque 4-3-3) — retirer une
-          fois le code brut identifié et le fix vérifié. */}
-      <span style={{
-        fontSize:   7,
-        color:      '#f472b6',
-        fontFamily: 'monospace',
-        whiteSpace: 'nowrap',
-        background: 'rgba(0,0,0,0.55)',
-        padding:    '1px 3px',
-        borderRadius: 3,
-      }}>
-        {player.position || '?'}{player.grid ? `/${player.grid}` : ''}
       </span>
     </div>
   )
