@@ -8,6 +8,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
+import { useTeamScorers } from '../hooks/useTeamScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { StandingsTable } from './StandingsTable'
 
@@ -22,6 +23,8 @@ function Classement() {
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [search, setSearch] = useState('')
   const searchNorm = search.trim().toLowerCase()
+  const SCORERS_PER_PAGE = 20
+  const [scorerPage, setScorerPage] = useState(0)
   const [compOpen, setCompOpen] = useState(false)
   const didAutoOpen = useRef(false)
 
@@ -71,6 +74,32 @@ function Classement() {
   const filteredScorers = scorers
     .map((s, i) => ({ ...s, _rank: i }))
     .filter(matchesScorerSearch)
+
+  // Si la recherche correspond à EXACTEMENT une équipe des standings, on
+  // reconstruit TOUS ses buteurs match par match (useTeamScorers) au lieu de
+  // filtrer le classement buteurs officiel (limité au top 100, voir
+  // useScorers.js) — un joueur qui n'a marqué qu'une fois peut ne pas y
+  // figurer du tout. Ambiguïté (0 ou plusieurs équipes trouvées, ex:
+  // recherche d'un nom de joueur) → on retombe sur le filtrage classique.
+  const matchedSearchTeams = searchNorm ? standings.filter(row => matchesTeamSearch(row.team)) : []
+  const searchedTeamId = matchedSearchTeams.length === 1 ? matchedSearchTeams[0].team.id : null
+  const { scorers: teamScorers, loading: teamScorersLoading, error: teamScorersError } = useTeamScorers(searchedTeamId, selectedComp)
+
+  const isTeamScorerMode = !!searchedTeamId
+  const displayScorers = isTeamScorerMode
+    ? teamScorers.map((s, i) => ({ ...s, _rank: i }))
+    : (searchNorm ? filteredScorers : filteredScorers.slice(0, 25))
+  const scorersBusy = isTeamScorerMode ? teamScorersLoading : scorersLoading
+
+  // Pagination (20 par page) — reset à la page 1 si la recherche ou la
+  // compétition change, sinon on peut se retrouver sur une page vide/hors
+  // limites après un filtrage qui réduit le nombre total de pages.
+  useEffect(() => { setScorerPage(0) }, [searchNorm, selectedComp])
+  const scorerPageCount = Math.max(1, Math.ceil(displayScorers.length / SCORERS_PER_PAGE))
+  const pagedScorers = displayScorers.slice(
+    scorerPage * SCORERS_PER_PAGE,
+    scorerPage * SCORERS_PER_PAGE + SCORERS_PER_PAGE
+  )
 
   // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
@@ -472,7 +501,7 @@ function Classement() {
         {/* ── Vue Buteurs ── */}
         {view === 'buteurs' && (
           <>
-            {scorersLoading && (
+            {scorersBusy && (
               <div className="classement__scorersList">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="classement__scorerRow" style={{ pointerEvents: 'none' }}>
@@ -492,16 +521,26 @@ function Classement() {
                 ))}
               </div>
             )}
-            {scorersError && <p className="classement__state">Données non disponibles.</p>}
-            {!scorersLoading && !scorersError && scorers.length === 0 && (
+            {!scorersBusy && isTeamScorerMode && teamScorersError && (
+              <p className="classement__state">Données non disponibles.</p>
+            )}
+            {!scorersBusy && isTeamScorerMode && !teamScorersError && teamScorers.length === 0 && (
+              <p className="classement__state">
+                Aucun but marqué par {translateTeam(matchedSearchTeams[0]?.team?.shortName || matchedSearchTeams[0]?.team?.name || '')} dans cette compétition.
+              </p>
+            )}
+            {!scorersBusy && !isTeamScorerMode && scorersError && (
+              <p className="classement__state">Données non disponibles.</p>
+            )}
+            {!scorersBusy && !isTeamScorerMode && !scorersError && scorers.length === 0 && (
               <p className="classement__state">Aucun buteur disponible.</p>
             )}
-            {!scorersLoading && !scorersError && scorers.length > 0 && filteredScorers.length === 0 && (
+            {!scorersBusy && !isTeamScorerMode && !scorersError && scorers.length > 0 && displayScorers.length === 0 && (
               <p className="classement__state">Aucun buteur ne correspond à « {search} ».</p>
             )}
-            {!scorersLoading && !scorersError && filteredScorers.length > 0 && (
+            {!scorersBusy && displayScorers.length > 0 && (
               <div className="classement__scorersList">
-                {filteredScorers.map((s) => {
+                {pagedScorers.map((s) => {
                   const i = s._rank
                   const playerName = s.player?.name ?? '?'
                   const initials   = playerName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -551,6 +590,23 @@ function Classement() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+            {!scorersBusy && displayScorers.length > SCORERS_PER_PAGE && (
+              <div className="classement__scorersPageNav">
+                <button
+                  className="classement__scorersPageBtn"
+                  onClick={() => setScorerPage(p => Math.max(0, p - 1))}
+                  disabled={scorerPage <= 0}
+                >‹</button>
+                <span className="classement__scorersPageLabel">
+                  Page {scorerPage + 1} / {scorerPageCount}
+                </span>
+                <button
+                  className="classement__scorersPageBtn"
+                  onClick={() => setScorerPage(p => Math.min(scorerPageCount - 1, p + 1))}
+                  disabled={scorerPage >= scorerPageCount - 1}
+                >›</button>
               </div>
             )}
           </>

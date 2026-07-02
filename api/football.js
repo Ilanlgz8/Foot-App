@@ -65,8 +65,16 @@ export default async function handler(req, res) {
       .filter(p => p && !p.startsWith('apiPath='))
       .join('&')
 
+    // X-Unfold-Goals : demandé par le client (recherche "tous les buteurs
+    // d'une équipe", voir useTeamScorers.js) pour que football-data.org
+    // inclue le détail des buts (goals[]) dans la liste de matchs d'une
+    // équipe — masqué par défaut (voir "Automatic folding" dans leur doc).
+    // Clé de cache distincte : la réponse dépliée est différente de la
+    // réponse pliée pour la même URL.
+    const unfoldGoals = req.headers['x-unfold-goals'] === 'true'
+
     const ttl      = getTtl(fdPath, qs)
-    const cacheKey = `fd:${fdPath}${qs ? '?' + qs : ''}`
+    const cacheKey = `fd:${fdPath}${qs ? '?' + qs : ''}${unfoldGoals ? '|unfold=goals' : ''}`
     const redis    = getKv()
 
     // ── Tentative de lecture depuis Redis ────────────────────────────────────
@@ -87,7 +95,10 @@ export default async function handler(req, res) {
     // ── Fetch football-data.org ──────────────────────────────────────────────
     const url = `https://api.football-data.org${fdPath}${qs ? '?' + qs : ''}`
     const response = await fetch(url, {
-      headers: { 'X-Auth-Token': process.env.API_KEY ?? process.env.FOOTBALL_DATA_API_KEY ?? '' },
+      headers: {
+        'X-Auth-Token': process.env.API_KEY ?? process.env.FOOTBALL_DATA_API_KEY ?? '',
+        ...(unfoldGoals ? { 'X-Unfold-Goals': 'true' } : {}),
+      },
       signal: AbortSignal.timeout(8_000),
     })
 
