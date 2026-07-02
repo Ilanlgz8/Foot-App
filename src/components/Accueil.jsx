@@ -135,16 +135,22 @@ function Accueil() {
   // qui inclurait des matchs déjà terminés/live et fausserait le décompte).
   const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
 
-  const results = useMemo(() => {
+  // Base commune (aujourd'hui + hier, dédupliquée) pour tout ce qui doit
+  // rester indépendant de dayOffset dans le panneau résultats — `results`
+  // (FD.org FINISHED) ET `todayFt` plus bas (détection rapide via ESPN).
+  const resultsSourceMatches = useMemo(() => {
     const seen = new Set()
-    return [...todayMatchesForResults, ...yesterdayMatchesForResults]
-      .filter(m => {
-        if (m.status !== 'FINISHED') return false
-        if (seen.has(m.id)) return false
-        seen.add(m.id)
-        return true
-      })
+    return [...todayMatchesForResults, ...yesterdayMatchesForResults].filter(m => {
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    })
   }, [todayMatchesForResults, yesterdayMatchesForResults])
+
+  const results = useMemo(
+    () => resultsSourceMatches.filter(m => m.status === 'FINISHED'),
+    [resultsSourceMatches]
+  )
   const resultsLoading = matchesLoading
 
   // Forme (5 derniers résultats) pour les losanges sous chaque nom d'équipe —
@@ -290,7 +296,10 @@ function Accueil() {
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
     const now4h = Date.now() - 4 * 60 * 60_000
-    const todayFt = matches.filter(m => {
+    // resultsSourceMatches (aujourd'hui absolu + hier) — PAS `matches`, qui dépend
+    // de dayOffset : sinon ce panneau se vide/réapparaît selon le jour affiché
+    // dans "Matchs" (bug signalé : le match disparaît quand on va sur "Demain").
+    const todayFt = resultsSourceMatches.filter(m => {
       const st = getMatchState(m.id)
       // ft (confirmé par ESPN) prime toujours, même si liveTracker garde encore
       // le match dans liveMatches (grâce period de 5min avant éviction) — sinon

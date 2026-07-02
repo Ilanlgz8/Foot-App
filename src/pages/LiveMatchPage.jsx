@@ -17,6 +17,7 @@ import { calcProno }        from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useFotmobXG }      from '../hooks/useFotmobXG'
 import { useSwipe }         from '../hooks/useSwipe'
+import { FormDiamonds }     from '../accueil/FormDiamonds'
 import {
   LiveStatsTab,
   SeasonStatsTab,
@@ -58,7 +59,7 @@ function shortenName(name) {
 }
 
 // ── Hero live (style MatchPage + éléments live) ───────────────────────────────
-function MatchHeader({ match, espn, onBack }) {
+function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 
@@ -173,6 +174,7 @@ function MatchHeader({ match, espn, onBack }) {
             ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
+          <FormDiamonds form={hForm} />
           {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
         </div>
 
@@ -186,6 +188,7 @@ function MatchHeader({ match, espn, onBack }) {
             ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
+          <FormDiamonds form={aForm} />
           {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}
         </div>
       </div>
@@ -260,7 +263,7 @@ export default function LiveMatchPage() {
     <div className="mp__page">
 
       {/* Hero gradient avec score live */}
-      <MatchHeader match={match} espn={espn} onBack={() => {
+      <MatchHeader match={match} espn={espn} hForm={hForm} aForm={aForm} onBack={() => {
         if (window.history.length > 1) navigate(-1)
         else navigate('/live')
       }} />

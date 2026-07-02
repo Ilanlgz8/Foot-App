@@ -2945,6 +2945,15 @@
 .poster__team-col--home { align-items: flex-start; }
 .poster__team-col--away { align-items: flex-end; }
 
+/* Forme (losanges) — toujours centrée dans la colonne (comme le blason),
+   même quand le nom d'équipe est aligné vers le bord extérieur (design
+   "poster" home=gauche/away=droite) : un enfant peut s'auto-centrer via
+   align-self sans changer l'alignement du reste de la colonne. */
+.poster__team-col .formDiamonds {
+  align-self: center;
+  margin-top: 1px;
+}
+
 .poster__crestWrap {
   width: 44px;
   height: 44px;
@@ -3258,14 +3267,16 @@
 .formDiamonds {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  gap: 3.5px;
 }
 .formDiamonds__item {
   width: 6px;
   height: 6px;
-  border-radius: 1px;
+  border-radius: 1.5px;
   transform: rotate(45deg);
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(var(--black-rgb),0.35), 0 1px 2px rgba(var(--black-rgb),0.4);
 }
 .formDiamonds__item--w { background: #4ade80; }
 .formDiamonds__item--d { background: #facc15; }

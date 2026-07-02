@@ -31,22 +31,21 @@ export function useScorers(compId) {
         return j.scorers ?? null
       }
 
-      // limit=100 (au lieu de 20) : le paramètre "limit" n'est pas documenté
-      // officiellement pour /scorers (seuls season/matchday le sont dans la
-      // doc FD.org), mais il fonctionne déjà en pratique avec 20, et la doc
-      // générale FD.org mentionne 100 comme plafond par défaut "overridable"
-      // pour les ressources de liste — 100 est donc une valeur raisonnable
-      // et sûre pour élargir la liste (utile pour la recherche par
-      // pays/équipe : un buteur peut exister au-delà du top 20 affiché).
-      // Non garanti de couvrir absolument TOUS les buteurs si l'API impose
-      // un plafond serveur plus bas — c'est une vraie limite de la source
-      // gratuite, pas quelque chose de contournable côté client.
+      // limit=500 : le paramètre "limit" n'est pas documenté officiellement
+      // pour /scorers (seuls season/matchday le sont dans la doc FD.org),
+      // mais il fonctionne déjà en pratique (validé avec 20 puis 100), et la
+      // doc générale FD.org confirme un paramètre limit [1-500] sur d'autres
+      // ressources de liste de la même API — 500 couvre en pratique TOUTE
+      // compétition réelle (une Coupe du Monde n'a jamais plus de ~250
+      // buteurs différents), donc plus de raison de rater un joueur cherché
+      // par équipe/pays dans la barre de recherche. Si l'API plafonne quand
+      // même plus bas en interne, on récupère simplement moins — pas d'erreur.
       let scorers = null
       if (isAnnualIntl) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100&season=${season}`)
+        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
       }
       if (!scorers || scorers.length === 0) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
+        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
       }
       scorers = scorers ?? []
       writeCache(key, scorers, STALE_MS)

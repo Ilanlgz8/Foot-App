@@ -11,6 +11,7 @@ import { calcProno }               from '../utils/calcProno'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient }        from '../data/teamPhotos'
+import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -75,7 +76,7 @@ function formatTime(utcDate) {
 }
 
 // ── Hero gradient plein-écran ─────────────────────────────────────────────────
-function MatchPageHero({ match, navigate }) {
+function MatchPageHero({ match, navigate, hForm, aForm }) {
   const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -121,6 +122,7 @@ function MatchPageHero({ match, navigate }) {
             ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
+          <FormDiamonds form={hForm} />
         </div>
 
         <div className="mp__hero__center">
@@ -142,6 +144,7 @@ function MatchPageHero({ match, navigate }) {
             ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" /></div>
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
+          <FormDiamonds form={aForm} />
         </div>
       </div>
 
@@ -477,7 +480,7 @@ export default function MatchPage() {
     <div className="mp__page">
 
       {/* Hero plein-écran avec gradient */}
-      <MatchPageHero match={match} navigate={navigate} />
+      <MatchPageHero match={match} navigate={navigate} hForm={hForm} aForm={aForm} />
 
       <div className="mp__wrap">
         <div className="mp__body" ref={swipe.ref}>

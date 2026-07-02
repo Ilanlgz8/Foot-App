@@ -8,7 +8,6 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
-import { useTeamScorers } from '../hooks/useTeamScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { StandingsTable } from './StandingsTable'
 
@@ -75,21 +74,15 @@ function Classement() {
     .map((s, i) => ({ ...s, _rank: i }))
     .filter(matchesScorerSearch)
 
-  // Si la recherche correspond à EXACTEMENT une équipe des standings, on
-  // reconstruit TOUS ses buteurs match par match (useTeamScorers) au lieu de
-  // filtrer le classement buteurs officiel (limité au top 100, voir
-  // useScorers.js) — un joueur qui n'a marqué qu'une fois peut ne pas y
-  // figurer du tout. Ambiguïté (0 ou plusieurs équipes trouvées, ex:
-  // recherche d'un nom de joueur) → on retombe sur le filtrage classique.
-  const matchedSearchTeams = searchNorm ? standings.filter(row => matchesTeamSearch(row.team)) : []
-  const searchedTeamId = matchedSearchTeams.length === 1 ? matchedSearchTeams[0].team.id : null
-  const { scorers: teamScorers, loading: teamScorersLoading, error: teamScorersError } = useTeamScorers(searchedTeamId, selectedComp)
-
-  const isTeamScorerMode = !!searchedTeamId
-  const displayScorers = isTeamScorerMode
-    ? teamScorers.map((s, i) => ({ ...s, _rank: i }))
-    : (searchNorm ? filteredScorers : filteredScorers.slice(0, 25))
-  const scorersBusy = isTeamScorerMode ? teamScorersLoading : scorersLoading
+  // Par défaut (pas de recherche) : top 25 uniquement. En recherche : on
+  // cherche dans la liste complète déjà récupérée par useScorers (limit=500,
+  // voir useScorers.js) — pas de second appel réseau, pas de reconstruction
+  // match par match (tenté puis abandonné : trop d'incertitude sur l'accès
+  // aux données détaillées de but via l'API gratuite, deux endpoints
+  // différents testés sans succès). Cette liste plus large couvre déjà la
+  // quasi-totalité des cas réels de recherche par équipe.
+  const displayScorers = searchNorm ? filteredScorers : filteredScorers.slice(0, 25)
+  const scorersBusy = scorersLoading
 
   // Pagination (20 par page) — UNIQUEMENT en recherche (liste potentiellement
   // longue, ex: tous les buteurs d'une équipe). Le top 25 par défaut s'affiche
@@ -524,21 +517,13 @@ function Classement() {
                 ))}
               </div>
             )}
-            {!scorersBusy && isTeamScorerMode && teamScorersError && (
+            {!scorersBusy && scorersError && (
               <p className="classement__state">Données non disponibles.</p>
             )}
-            {!scorersBusy && isTeamScorerMode && !teamScorersError && teamScorers.length === 0 && (
-              <p className="classement__state">
-                Aucun but marqué par {translateTeam(matchedSearchTeams[0]?.team?.shortName || matchedSearchTeams[0]?.team?.name || '')} dans cette compétition.
-              </p>
-            )}
-            {!scorersBusy && !isTeamScorerMode && scorersError && (
-              <p className="classement__state">Données non disponibles.</p>
-            )}
-            {!scorersBusy && !isTeamScorerMode && !scorersError && scorers.length === 0 && (
+            {!scorersBusy && !scorersError && scorers.length === 0 && (
               <p className="classement__state">Aucun buteur disponible.</p>
             )}
-            {!scorersBusy && !isTeamScorerMode && !scorersError && scorers.length > 0 && displayScorers.length === 0 && (
+            {!scorersBusy && !scorersError && scorers.length > 0 && displayScorers.length === 0 && (
               <p className="classement__state">Aucun buteur ne correspond à « {search} ».</p>
             )}
             {!scorersBusy && displayScorers.length > 0 && (
