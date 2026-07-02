@@ -180,11 +180,33 @@ async function fetchEspnEvents(slug, date, log) {
 
 // ── Push helpers ───────────────────────────────────────────────────────────────
 
-async function sendPushToAll(payload) {
+// Un abonné sans `teams` (ou liste vide) = pas de filtre configuré → reçoit
+// tout, comportement historique préservé pour ne rien casser pour les
+// utilisateurs existants. Un abonné avec des équipes suivies ne reçoit que
+// les notifs des matchs qui les concernent.
+function matchesFavorite(subTeams, matchTeams) {
+  if (!Array.isArray(subTeams) || subTeams.length === 0) return true
+  if (!matchTeams) return true
+  return subTeams.some(team => matchTeams.includes(team))
+}
+
+// Variante stricte pour le ticker live : contrairement aux notifs classiques
+// (KO/mi-temps/but/FT, où l'absence de filtre = tout recevoir, comportement
+// historique préservé), un abonné SANS équipe suivie ne doit PAS recevoir de
+// ticker en direct pour chaque match — sinon ça spamme tout le monde à
+// chaque minute pour chaque match en cours dans le monde entier.
+function matchesFavoriteStrict(subTeams, matchTeams) {
+  if (!Array.isArray(subTeams) || subTeams.length === 0) return false
+  if (!matchTeams) return false
+  return subTeams.some(team => matchTeams.includes(team))
+}
+
+async function sendPushToMatch(payload, matchTeams, options = {}) {
   let subs = []
   try { subs = (await kv.smembers('push:subscriptions')) ?? [] } catch { return 0 }
   if (!subs.length) return 0
 
+  const matcher = options.onlyFavorites ? matchesFavoriteStrict : matchesFavorite
   const payloadStr = JSON.stringify(payload)
   const stale = []
   let sent = 0
@@ -193,8 +215,9 @@ async function sendPushToAll(payload) {
     let sub
     try { sub = typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw }
     catch { stale.push(subRaw); return }
+    if (!matcher(sub.teams, matchTeams)) return
     try {
-      await webpush.sendNotification(sub, payloadStr, { TTL: 3600 })
+      await webpush.sendNotification(sub, payloadStr, { TTL: options.ttl ?? 3600 })
       sent++
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404)
@@ -208,13 +231,13 @@ async function sendPushToAll(payload) {
   return sent
 }
 
-async function sendDeduped(dedupKey, payload, ttl = 3 * 3600) {
+async function sendDeduped(dedupKey, payload, matchTeams, ttl = 3 * 3600) {
   try {
     const already = await kv.get(dedupKey)
     if (already) return 0
     await kv.set(dedupKey, '1', { ex: ttl })
   } catch { return 0 }
-  return sendPushToAll(payload)
+  return sendPushToMatch(payload, matchTeams)
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────────
@@ -267,8 +290,14 @@ export default async function handler(req, res) {
 
     let   home     = parseInt(homeC.score ?? '0', 10) || 0
     let   away     = parseInt(awayC.score ?? '0', 10) || 0
-    const homeTeam = t(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
-    const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
+    // Noms bruts (pré-traduction) — utilisés pour le filtre par équipe suivie,
+    // car c'est sous ce nom (celui de teamNames.js / ESPN) que le favori est
+    // stocké côté abonné. Le nom traduit (homeTeam/awayTeam) reste pour l'affichage.
+    const rawHome  = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
+    const rawAway  = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
+    const homeTeam = t(rawHome)
+    const awayTeam = t(rawAway)
+    const matchTeams = [rawHome, rawAway]
     const eventId  = evt.id
 
     // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
@@ -323,7 +352,7 @@ export default async function handler(req, res) {
         if (freshKickoff) {
           log.push(`[espn:${slug}:${eventId}] KO catch-up (~${Math.round((Date.now() - matchStart) / 60_000)}min)`)
           const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' })
+            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, matchTeams)
           if (sent > 0) notifsSent++
         }
       }
@@ -335,7 +364,7 @@ export default async function handler(req, res) {
     if (!LIVE_ESPN.has(prevStatus) && !FINAL_ESPN.has(prevStatus) && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] KO`)
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' })
+        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, matchTeams)
       if (sent > 0) notifsSent++
     }
 
@@ -343,7 +372,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
       if (sent > 0) notifsSent++
     }
 
@@ -351,7 +380,7 @@ export default async function handler(req, res) {
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
       if (sent > 0) notifsSent++
     }
 
@@ -359,7 +388,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
       log.push(`[espn:${slug}:${eventId}] FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' })
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
       if (sent > 0) notifsSent++
     }
 
@@ -372,8 +401,30 @@ export default async function handler(req, res) {
     ) {
       log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
       const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId })
+        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, matchTeams)
       if (sent > 0) notifsSent++
+    }
+
+    // 📊 Ticker "score en direct" — uniquement pour les abonnés qui suivent
+    // une des deux équipes (jamais envoyé aux abonnés sans filtre configuré,
+    // pour ne pas transformer l'app en spam pour tout le monde). Même `tag`
+    // à chaque minute → remplace la notif précédente au lieu d'empiler
+    // (silent + renotify:false côté SW → pas de nouveau son/vibration).
+    if (LIVE_ESPN.has(status)) {
+      const minuteLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
+      await sendPushToMatch(
+        {
+          title: `${homeTeam} ${scoreStr} ${awayTeam}`,
+          body:  minuteLabel ? `⏱ ${minuteLabel}` : 'En direct',
+          url:   '/live',
+          matchId: eventId,
+          tag:     `live-${eventId}`,
+          silent:  true,
+          renotify: false,
+        },
+        matchTeams,
+        { onlyFavorites: true },
+      )
     }
   }
 

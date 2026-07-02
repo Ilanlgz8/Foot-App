@@ -11,7 +11,9 @@
  *   • Caché          → non supporté / refusé / vérification initiale
  */
 
+import { useState, useEffect, useRef } from 'react'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import FavoriteTeamsPanel from './FavoriteTeamsPanel'
 import '../notificationBell.css'
 
 // Cloche sonnante (abonné) — avec lignes de vibration
@@ -46,6 +48,18 @@ function Spinner() {
 
 export default function NotificationBell() {
   const { status, subscribe, unsubscribe } = usePushNotifications()
+  const [panelOpen, setPanelOpen] = useState(false)
+  const wrapRef = useRef(null)
+
+  // Fermeture au clic en dehors du bouton/panneau
+  useEffect(() => {
+    if (!panelOpen) return
+    const onClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setPanelOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [panelOpen])
 
   // Cacher seulement si navigateur incompatible ou vérification en cours
   if (status === 'unsupported' || status === 'checking') return null
@@ -60,29 +74,42 @@ export default function NotificationBell() {
       alert('Les notifications sont bloquées. Activez-les dans les réglages de votre navigateur.')
       return
     }
-    if (isSubscribed) unsubscribe()
-    else subscribe()
+    // La cloche ouvre désormais le panneau de réglages (équipes suivies +
+    // activer/désactiver) au lieu de basculer directement — un seul point
+    // d'entrée pour tout ce qui touche aux notifs.
+    setPanelOpen(o => !o)
   }
 
   const label = isLoading  ? 'Activation en cours…'
-    : isSubscribed         ? 'Désactiver les notifications'
+    : isSubscribed         ? 'Réglages des notifications'
     : isDenied             ? 'Notifications bloquées — voir les réglages'
     :                        'Activer les notifications'
 
   return (
-    <button
-      className={`notif-bell${isSubscribed ? ' notif-bell--active' : ''}${isLoading ? ' notif-bell--loading' : ''}${isDenied ? ' notif-bell--denied' : ''}`}
-      onClick={handleClick}
-      disabled={isLoading}
-      aria-label={label}
-      title={label}
-      type="button"
-    >
-      {isLoading
-        ? <Spinner />
-        : isSubscribed
-          ? <BellRinging />
-          : <BellMuted faded={isDenied} />}
-    </button>
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        className={`notif-bell${isSubscribed ? ' notif-bell--active' : ''}${isLoading ? ' notif-bell--loading' : ''}${isDenied ? ' notif-bell--denied' : ''}`}
+        onClick={handleClick}
+        disabled={isLoading}
+        aria-label={label}
+        title={label}
+        type="button"
+      >
+        {isLoading
+          ? <Spinner />
+          : isSubscribed
+            ? <BellRinging />
+            : <BellMuted faded={isDenied} />}
+      </button>
+
+      {panelOpen && (
+        <FavoriteTeamsPanel
+          status={status}
+          subscribe={subscribe}
+          unsubscribe={unsubscribe}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
+    </div>
   )
 }

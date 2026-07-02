@@ -52,6 +52,14 @@
   animation: lmpDotPulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
+/* Copie invisible du dot à droite du texte — purement pour équilibrer
+   l'espace pris par le dot visible à gauche, sinon le texte de la minute
+   paraît décalé par rapport au score centré en dessous. */
+.lmp__heroLiveDot--ghost {
+  visibility: hidden;
+  animation: none;
+  box-shadow: none;
+}
 @keyframes lmpDotPulse {
   0%, 100% { opacity: 1;    transform: scale(1); }
   50%      { opacity: 0.4;  transform: scale(0.75); }

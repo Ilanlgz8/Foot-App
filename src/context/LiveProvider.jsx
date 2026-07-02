@@ -65,6 +65,18 @@ export function LiveProvider({ children }) {
     prevLiveCount.current = liveMatches.length
   }, [liveMatches.length, queryClient])
 
+  // Badge sur l'icône PWA = nombre de matchs live en cours, visible sans
+  // ouvrir l'app (Badging API — supportée par Chrome/Edge desktop+Android,
+  // pas par Safari/iOS : feature-detect, dégradation silencieuse sinon).
+  useEffect(() => {
+    if (!('setAppBadge' in navigator)) return
+    if (liveMatches.length > 0) {
+      navigator.setAppBadge(liveMatches.length).catch(() => {})
+    } else {
+      navigator.clearAppBadge().catch(() => {})
+    }
+  }, [liveMatches.length])
+
   return (
     <LiveCtx.Provider value={{ liveMatches, espnScores, recalibrate }}>
       {children}

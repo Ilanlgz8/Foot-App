@@ -1,0 +1,107 @@
+/* ─── FavoriteTeamsPanel ──────────────────────────────────────────────────────
+   Popover de sélection des équipes suivies, ouvert depuis NotificationBell.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.fav-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(280px, 80vw);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f1218;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.85rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.fav-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fav-panel__close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+}
+
+.fav-panel__close:hover { color: rgba(255, 255, 255, 0.85); }
+
+.fav-panel__hint {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+}
+
+.fav-panel__list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 0.3rem 0.3rem;
+}
+
+.fav-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
+.fav-panel__item:hover { background: rgba(255, 255, 255, 0.05); }
+
+.fav-panel__item input {
+  accent-color: #ef4444;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.fav-panel__footer {
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fav-panel__sub, .fav-panel__unsub {
+  width: 100%;
+  padding: 0.55rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fav-panel__sub {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+.fav-panel__sub:hover:not(:disabled) { background: rgba(74, 222, 128, 0.25); }
+
+.fav-panel__unsub {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.fav-panel__unsub:hover:not(:disabled) { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+.fav-panel__sub:disabled, .fav-panel__unsub:disabled { opacity: 0.6; cursor: default; }

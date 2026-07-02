@@ -41,6 +41,15 @@ function isValidSubscription(sub) {
   return true
 }
 
+// `teams` (optionnel) : liste des équipes suivies pour filtrer les notifs
+// côté cron-goals.js. Absent/vide = comportement historique (tout reçoit).
+function sanitizeTeams(teams) {
+  if (!Array.isArray(teams)) return []
+  return teams
+    .filter(t => typeof t === 'string' && t.length > 0 && t.length <= 40)
+    .slice(0, 60)
+}
+
 export default async function handler(req, res) {
   // ── Vérification Origin (protection CSRF basique) ─────────────────────────
   // En dev local (origin undefined ou localhost), on laisse passer
@@ -95,9 +104,28 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Structure de subscription invalide' })
   }
 
-  // ── Stockage dans Vercel KV (Set Redis — dédupliqué automatiquement) ──────
+  // Reconstruit un objet propre (endpoint + keys + teams) plutôt que de stocker
+  // le body brut : évite qu'un champ superflu envoyé par le client change la
+  // chaîne JSON et empêche la déduplication/remplacement ci-dessous.
+  const teams = sanitizeTeams(body.teams)
+  const clean = { endpoint: body.endpoint, keys: body.keys, teams }
+  const cleanStr = JSON.stringify(clean)
+
+  // ── Stockage dans Vercel KV (Set Redis) ────────────────────────────────────
+  // Le Set est dédupliqué par CONTENU EXACT — si l'utilisateur change ses
+  // équipes suivies, le nouveau JSON diffère de l'ancien (même endpoint) et
+  // sadd() créerait un doublon au lieu de remplacer. On retire donc d'abord
+  // toute entrée existante avec le même endpoint avant d'ajouter la nouvelle.
   try {
-    await kv.sadd('push:subscriptions', bodyStr)
+    const existing = (await kv.smembers('push:subscriptions')) ?? []
+    const stale = existing.filter(raw => {
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        return parsed?.endpoint === body.endpoint
+      } catch { return false }
+    })
+    if (stale.length) await Promise.all(stale.map(s => kv.srem('push:subscriptions', s)))
+    await kv.sadd('push:subscriptions', cleanStr)
   } catch (kvErr) {
     console.error('[subscribe] KV store error:', kvErr.message)
     return res.status(503).json({ error: 'Stockage temporairement indisponible' })

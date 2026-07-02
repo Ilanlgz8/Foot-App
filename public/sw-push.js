@@ -26,23 +26,26 @@ self.addEventListener('push', event => {
   }
 
   const {
-    title   = 'But ! ${matchId}',
-    body    = '',
-    matchId = null,
-    url     = '/',
+    title    = 'But ! ${matchId}',
+    body     = '',
+    matchId  = null,
+    url      = '/',
+    // `tag`/`silent`/`renotify` pilotables depuis le payload serveur (ex: le
+    // ticker "score en direct" de cron-goals.js les fixe explicitement pour
+    // remplacer silencieusement sans re-notifier) — sinon comportement
+    // historique (notif de but : tag par match, toujours ré-alertée).
+    tag      = `statfootix-goal-${matchId ?? Date.now()}`,
+    silent   = false,
+    renotify = true,
   } = data
 
   // waitUntil garantit que le SW reste actif jusqu'à la fin de l'affichage
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon:     '/statfootix.png',   // icône app
-      badge:    '/statfootix.png',   // badge (barre de notifs Android)
-      // tag identique pour le même match → remplace la notif précédente
-      // au lieu d'en empiler plusieurs pour le même match
-      tag:      `statfootix-goal-${matchId ?? Date.now()}`,
-      renotify: true,              // vibre même si tag identique
-      silent:   false,
+      icon:  '/statfootix.png',   // icône app
+      badge: '/statfootix.png',   // badge (barre de notifs Android)
+      tag, silent, renotify,
       // Données transmises au click handler
       data: { url },
     })

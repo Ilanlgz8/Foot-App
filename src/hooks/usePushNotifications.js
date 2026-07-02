@@ -19,6 +19,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { getFavoriteTeams } from './useFavoriteTeams'
 
 // Clé localStorage pour mémoriser que l'utilisateur est abonné
 const LS_KEY = 'push_subscribed'
@@ -66,7 +67,7 @@ export function usePushNotifications() {
               const storeRes = await fetch('/api/subscribe', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(sub.toJSON()),
+                body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
               })
               if (storeRes.ok || storeRes.status === 201) {
                 localStorage.setItem('push_last_sync', String(Date.now()))
@@ -116,7 +117,7 @@ export function usePushNotifications() {
       const storeRes = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(sub.toJSON()),
+        body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
       })
       if (!storeRes.ok) {
         // Subscription créée côté navigateur mais pas stockée → annuler
@@ -167,4 +168,24 @@ export function usePushNotifications() {
   }, [status, subscribe])
 
   return { status, subscribe, unsubscribe }
+}
+
+/**
+ * Renvoie la subscription courante au serveur avec la liste de favoris à jour.
+ * À appeler quand l'utilisateur change ses équipes suivies, pour que le filtre
+ * prenne effet immédiatement (sans attendre le re-sync périodique de 5 min).
+ * Ne fait rien si l'utilisateur n'est pas abonné aux notifs.
+ */
+export async function resyncFavoriteTeams() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    if (!sub) return
+    await fetch('/api/subscribe', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
+    })
+  } catch { /* silencieux — pas critique, re-sync périodique rattrapera */ }
 }

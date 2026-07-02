@@ -145,18 +145,21 @@ function MatchHeader({ match, espn, onBack }) {
         </div>
       </div>
 
-      {/* Badge minute live + reprise (reprise AU-DESSUS de la minute, pas à côté :
-          plus lisible, et la minute reste seule au centre le reste du temps) */}
+      {/* Badge minute live + reprise (reprise SOUS "MT", pas au-dessus) */}
       <div className="lmp__heroBadgeCol">
+        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
+          {/* Dot fantôme symétrique à droite : sans lui, le point live à
+              gauche décale visuellement le texte de la minute par rapport
+              au score en dessous (qui, lui, n'a pas cet élément asymétrique). */}
+          {!isTermine && <span className="lmp__heroLiveDot" />}
+          <span className="lmp__heroMinuteText">{minuteLabel}</span>
+          {!isTermine && <span className="lmp__heroLiveDot lmp__heroLiveDot--ghost" aria-hidden="true" />}
+        </span>
         {(repriseImminente || repriseDans != null) && (
           <span className="lmp__heroReprise">
             {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}
           </span>
         )}
-        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
-          {!isTermine && <span className="lmp__heroLiveDot" />}
-          {minuteLabel}
-        </span>
       </div>
 
       {/* Centre : crests + score */}
