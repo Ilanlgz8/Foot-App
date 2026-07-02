@@ -342,6 +342,20 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       }}>
         {label}
       </span>
+      {/* 🔧 DEBUG TEMPORAIRE — directement sur le graphique (là où l'inversion
+          se voit), pas dans la liste en dessous. Retirer une fois le vrai
+          bug identifié et corrigé. */}
+      <span style={{
+        fontSize:   7,
+        color:      '#f472b6',
+        fontFamily: 'monospace',
+        whiteSpace: 'nowrap',
+        background: 'rgba(0,0,0,0.55)',
+        padding:    '1px 3px',
+        borderRadius: 3,
+      }}>
+        {player.position || '?'}{player.grid ? `/${player.grid}` : ''}
+      </span>
     </div>
   )
 }
