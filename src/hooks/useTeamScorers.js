@@ -27,15 +27,40 @@ export function useTeamScorers(teamId, compId) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['teamScorers', teamId, compId],
     queryFn: async () => {
-      const season = new Date().getFullYear()
-      const url = fdUrl(`/api/v4/teams/${teamId}/matches?season=${season}&status=FINISHED&limit=500`)
-      const res = await fdFetch(url, { headers: { 'X-Unfold-Goals': 'true' } })
-      if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-      if (!res.ok) return []
-      const json = await res.json()
-      const matches = (json.matches ?? []).filter(m =>
-        m.competition?.code === compId || m.competition?.id === compId
-      )
+      // Le paramètre "season" pour une sélection nationale (WC/EC) est
+      // incertain sur ce sous-endpoint (pas documenté explicitement pour
+      // Team/Matches, contrairement à Competition/Matches) — on part plutôt
+      // d'une fenêtre de dates large (méthode confirmée par l'exemple officiel
+      // de la doc FD.org pour ce endpoint précis), avec 2 filets de sécurité
+      // en cascade si la 1ère tentative ne remonte aucun match pour la
+      // compétition demandée (même logique défensive que useMatchs.js pour
+      // les compétitions annuelles WC/EC).
+      async function tryFetch(qs) {
+        const res = await fdFetch(
+          fdUrl(`/api/v4/teams/${teamId}/matches?${qs}`),
+          { headers: { 'X-Unfold-Goals': 'true' } }
+        )
+        if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+        if (!res.ok) return null
+        const json = await res.json()
+        return json.matches ?? null
+      }
+
+      const now = new Date()
+      const dateFrom = `${now.getFullYear() - 2}-01-01`
+      const dateTo   = `${now.getFullYear() + 1}-12-31`
+
+      let raw = await tryFetch(`dateFrom=${dateFrom}&dateTo=${dateTo}&status=FINISHED&limit=500`)
+      let matches = (raw ?? []).filter(m => m.competition?.code === compId || m.competition?.id === compId)
+
+      if (matches.length === 0) {
+        raw = await tryFetch(`season=${now.getFullYear()}&status=FINISHED&limit=500`)
+        matches = (raw ?? []).filter(m => m.competition?.code === compId || m.competition?.id === compId)
+      }
+      if (matches.length === 0) {
+        raw = await tryFetch(`status=FINISHED&limit=500`)
+        matches = (raw ?? []).filter(m => m.competition?.code === compId || m.competition?.id === compId)
+      }
 
       // Agrège les buts (et passes decisives) par joueur, à partir de
       // goals[] déplié sur chaque match.

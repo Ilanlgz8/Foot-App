@@ -91,15 +91,18 @@ function Classement() {
     : (searchNorm ? filteredScorers : filteredScorers.slice(0, 25))
   const scorersBusy = isTeamScorerMode ? teamScorersLoading : scorersLoading
 
-  // Pagination (20 par page) — reset à la page 1 si la recherche ou la
-  // compétition change, sinon on peut se retrouver sur une page vide/hors
-  // limites après un filtrage qui réduit le nombre total de pages.
+  // Pagination (20 par page) — UNIQUEMENT en recherche (liste potentiellement
+  // longue, ex: tous les buteurs d'une équipe). Le top 25 par défaut s'affiche
+  // toujours en une seule fois, sans pagination.
+  // Reset à la page 1 si la recherche ou la compétition change, sinon on peut
+  // se retrouver sur une page vide/hors limites après un filtrage qui réduit
+  // le nombre total de pages.
   useEffect(() => { setScorerPage(0) }, [searchNorm, selectedComp])
+  const paginationEnabled = !!searchNorm
   const scorerPageCount = Math.max(1, Math.ceil(displayScorers.length / SCORERS_PER_PAGE))
-  const pagedScorers = displayScorers.slice(
-    scorerPage * SCORERS_PER_PAGE,
-    scorerPage * SCORERS_PER_PAGE + SCORERS_PER_PAGE
-  )
+  const pagedScorers = paginationEnabled
+    ? displayScorers.slice(scorerPage * SCORERS_PER_PAGE, scorerPage * SCORERS_PER_PAGE + SCORERS_PER_PAGE)
+    : displayScorers
 
   // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
@@ -592,7 +595,7 @@ function Classement() {
                 })}
               </div>
             )}
-            {!scorersBusy && displayScorers.length > SCORERS_PER_PAGE && (
+            {!scorersBusy && paginationEnabled && displayScorers.length > SCORERS_PER_PAGE && (
               <div className="classement__scorersPageNav">
                 <button
                   className="classement__scorersPageBtn"
