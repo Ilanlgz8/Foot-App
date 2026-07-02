@@ -1,16 +1,16 @@
 /**
  * FavoriteTeamsPanel.jsx
  *
- * Popover ouvert depuis la cloche de notifications : choix des équipes
- * suivies (filtre des notifs push) + accès à l'activation/désactivation.
- * Les favoris sont stockés en local (useFavoriteTeams) et renvoyés au
- * serveur (resyncFavoriteTeams) à chaque changement, pour que le filtre
- * de cron-goals.js prenne effet tout de suite.
+ * Popover ouvert depuis la cloche de notifications : choix des CHAMPIONNATS
+ * suivis (filtre des notifs push) + accès à l'activation/désactivation.
+ * Les favoris sont stockés en local (useFavoriteTeams, valeur = slug ESPN de
+ * la compétition) et renvoyés au serveur (resyncFavoriteTeams) à chaque
+ * changement, pour que le filtre de cron-goals.js prenne effet tout de suite.
  */
 import { forwardRef } from 'react'
 import { useFavoriteTeams } from '../hooks/useFavoriteTeams'
 import { resyncFavoriteTeams } from '../hooks/usePushNotifications'
-import { NATIONAL_TEAMS_SORTED } from '../data/nationalTeams'
+import { COMPETITIONS, COMPETITION_ESPN_SLUG } from '../data/competitions'
 import '../favoriteTeamsPanel.css'
 
 const FavoriteTeamsPanel = forwardRef(function FavoriteTeamsPanel(
@@ -32,27 +32,32 @@ const FavoriteTeamsPanel = forwardRef(function FavoriteTeamsPanel(
   return (
     <div ref={ref} className="fav-panel" style={style} onClick={e => e.stopPropagation()}>
       <div className="fav-panel__header">
-        <span>Équipes suivies</span>
+        <span>Championnats suivis</span>
         <button className="fav-panel__close" onClick={onClose} aria-label="Fermer" type="button">×</button>
       </div>
 
       <p className="fav-panel__hint">
         {favorites.length === 0
-          ? "Aucune sélection = tu reçois les notifs de tous les matchs."
-          : `Tu ne recevras les notifs que pour ces ${favorites.length} équipe${favorites.length > 1 ? 's' : ''}.`}
+          ? "Aucune sélection = tu reçois les notifs de tous les championnats."
+          : `Tu ne recevras les notifs que pour ces ${favorites.length} championnat${favorites.length > 1 ? 's' : ''}.`}
       </p>
 
       <div className="fav-panel__list">
-        {NATIONAL_TEAMS_SORTED.map(({ key, label }) => (
-          <label key={key} className="fav-panel__item">
-            <input
-              type="checkbox"
-              checked={favorites.includes(key)}
-              onChange={() => handleToggle(key)}
-            />
-            <span>{label}</span>
-          </label>
-        ))}
+        {COMPETITIONS.map((comp) => {
+          const slug = COMPETITION_ESPN_SLUG[comp.id]
+          if (!slug) return null
+          return (
+            <label key={comp.id} className="fav-panel__item">
+              <input
+                type="checkbox"
+                checked={favorites.includes(slug)}
+                onChange={() => handleToggle(slug)}
+              />
+              {comp.emblem && <img src={comp.emblem} alt="" className="fav-panel__emblem" />}
+              <span>{comp.shortName}</span>
+            </label>
+          )
+        })}
       </div>
 
       <div className="fav-panel__footer">

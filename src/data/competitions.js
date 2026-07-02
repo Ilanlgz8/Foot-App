@@ -9,6 +9,20 @@ import europaLeagueLogo from '../assets/leagues/europa-league.png'
 import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 
 
+// Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
+// cron-goals.js utilise pour boucler sur les matchs (ESPN_SLUGS), donc c'est
+// ce qu'on stocke comme favori côté abonnement push (voir useFavoriteComps.js)
+// pour un filtre serveur simple, sans ambiguïté de nom d'équipe/traduction.
+export const COMPETITION_ESPN_SLUG = {
+  FL1: 'fra.1',
+  PL:  'eng.1',
+  PD:  'esp.1',
+  BL1: 'ger.1',
+  SA:  'ita.1',
+  CL:  'uefa.champions',
+  WC:  'fifa.world',
+}
+
 export const COMPETITIONS = [
   {
     id: 'FL1',

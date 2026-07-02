@@ -69,6 +69,13 @@
 
 .fav-panel__item:hover { background: rgba(255, 255, 255, 0.05); }
 
+.fav-panel__emblem {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .fav-panel__item input {
   accent-color: #ef4444;
   width: 1rem;

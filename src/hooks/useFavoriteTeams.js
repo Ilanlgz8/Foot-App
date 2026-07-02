@@ -1,13 +1,15 @@
 /**
  * useFavoriteTeams.js
  *
- * Équipes suivies par l'utilisateur (pour filtrer les notifs push).
+ * Championnats suivis par l'utilisateur (pour filtrer les notifs push).
  * Stocké en localStorage — pas besoin de backend pour la préférence elle-même,
- * seule la LISTE est envoyée au serveur via /api/subscribe (champ `teams`).
+ * seule la LISTE est envoyée au serveur via /api/subscribe (champ `comps`).
+ * Valeur stockée = slug ESPN (voir COMPETITION_ESPN_SLUG dans competitions.js),
+ * directement comparable au `slug` que cron-goals.js utilise déjà en interne.
  */
 import { useState, useCallback, useEffect } from 'react'
 
-const LS_KEY = 'fav_teams'
+const LS_KEY = 'fav_comps'
 
 export function getFavoriteTeams() {
   try {
@@ -19,8 +21,8 @@ export function getFavoriteTeams() {
   }
 }
 
-function setFavoriteTeams(teams) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(teams)) } catch {}
+function setFavoriteComps(comps) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(comps)) } catch {}
 }
 
 export function useFavoriteTeams() {
@@ -33,15 +35,15 @@ export function useFavoriteTeams() {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const toggle = useCallback((teamKey) => {
+  const toggle = useCallback((slug) => {
     setFavorites(prev => {
-      const next = prev.includes(teamKey) ? prev.filter(k => k !== teamKey) : [...prev, teamKey]
-      setFavoriteTeams(next)
+      const next = prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]
+      setFavoriteComps(next)
       return next
     })
   }, [])
 
-  const isFavorite = useCallback((teamKey) => favorites.includes(teamKey), [favorites])
+  const isFavorite = useCallback((slug) => favorites.includes(slug), [favorites])
 
   return { favorites, toggle, isFavorite }
 }

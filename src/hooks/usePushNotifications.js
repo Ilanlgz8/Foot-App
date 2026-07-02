@@ -67,7 +67,7 @@ export function usePushNotifications() {
               const storeRes = await fetch('/api/subscribe', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
+                body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
               })
               if (storeRes.ok || storeRes.status === 201) {
                 localStorage.setItem('push_last_sync', String(Date.now()))
@@ -117,7 +117,7 @@ export function usePushNotifications() {
       const storeRes = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
+        body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
       })
       if (!storeRes.ok) {
         // Subscription créée côté navigateur mais pas stockée → annuler
@@ -185,7 +185,7 @@ export async function resyncFavoriteTeams() {
     await fetch('/api/subscribe', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ...sub.toJSON(), teams: getFavoriteTeams() }),
+      body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
     })
   } catch { /* silencieux — pas critique, re-sync périodique rattrapera */ }
 }

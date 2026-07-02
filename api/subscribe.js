@@ -41,13 +41,14 @@ function isValidSubscription(sub) {
   return true
 }
 
-// `teams` (optionnel) : liste des équipes suivies pour filtrer les notifs
-// côté cron-goals.js. Absent/vide = comportement historique (tout reçoit).
-function sanitizeTeams(teams) {
-  if (!Array.isArray(teams)) return []
-  return teams
-    .filter(t => typeof t === 'string' && t.length > 0 && t.length <= 40)
-    .slice(0, 60)
+// `comps` (optionnel) : liste des slugs ESPN de championnats suivis (voir
+// COMPETITION_ESPN_SLUG côté client), pour filtrer les notifs dans
+// cron-goals.js. Absent/vide = comportement historique (tout reçoit).
+function sanitizeComps(comps) {
+  if (!Array.isArray(comps)) return []
+  return comps
+    .filter(c => typeof c === 'string' && c.length > 0 && c.length <= 40)
+    .slice(0, 20)
 }
 
 export default async function handler(req, res) {
@@ -104,11 +105,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Structure de subscription invalide' })
   }
 
-  // Reconstruit un objet propre (endpoint + keys + teams) plutôt que de stocker
+  // Reconstruit un objet propre (endpoint + keys + comps) plutôt que de stocker
   // le body brut : évite qu'un champ superflu envoyé par le client change la
   // chaîne JSON et empêche la déduplication/remplacement ci-dessous.
-  const teams = sanitizeTeams(body.teams)
-  const clean = { endpoint: body.endpoint, keys: body.keys, teams }
+  const comps = sanitizeComps(body.comps)
+  const clean = { endpoint: body.endpoint, keys: body.keys, comps }
   const cleanStr = JSON.stringify(clean)
 
   // ── Stockage dans Vercel KV (Set Redis) ────────────────────────────────────

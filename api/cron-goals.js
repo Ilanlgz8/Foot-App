@@ -180,28 +180,30 @@ async function fetchEspnEvents(slug, date, log) {
 
 // ── Push helpers ───────────────────────────────────────────────────────────────
 
-// Un abonné sans `teams` (ou liste vide) = pas de filtre configuré → reçoit
+// Un abonné sans `comps` (ou liste vide) = pas de filtre configuré → reçoit
 // tout, comportement historique préservé pour ne rien casser pour les
-// utilisateurs existants. Un abonné avec des équipes suivies ne reçoit que
-// les notifs des matchs qui les concernent.
-function matchesFavorite(subTeams, matchTeams) {
-  if (!Array.isArray(subTeams) || subTeams.length === 0) return true
-  if (!matchTeams) return true
-  return subTeams.some(team => matchTeams.includes(team))
+// utilisateurs existants. Un abonné avec des championnats suivis ne reçoit
+// que les notifs des matchs de ces championnats (comparaison sur le slug
+// ESPN, identique à celui utilisé pour boucler sur les matchs ci-dessous —
+// plus simple et plus fiable qu'un matching par nom d'équipe/traduction).
+function matchesFavorite(subComps, slug) {
+  if (!Array.isArray(subComps) || subComps.length === 0) return true
+  if (!slug) return true
+  return subComps.includes(slug)
 }
 
 // Variante stricte pour le ticker live : contrairement aux notifs classiques
 // (KO/mi-temps/but/FT, où l'absence de filtre = tout recevoir, comportement
-// historique préservé), un abonné SANS équipe suivie ne doit PAS recevoir de
-// ticker en direct pour chaque match — sinon ça spamme tout le monde à
+// historique préservé), un abonné SANS championnat suivi ne doit PAS recevoir
+// de ticker en direct pour chaque match — sinon ça spamme tout le monde à
 // chaque minute pour chaque match en cours dans le monde entier.
-function matchesFavoriteStrict(subTeams, matchTeams) {
-  if (!Array.isArray(subTeams) || subTeams.length === 0) return false
-  if (!matchTeams) return false
-  return subTeams.some(team => matchTeams.includes(team))
+function matchesFavoriteStrict(subComps, slug) {
+  if (!Array.isArray(subComps) || subComps.length === 0) return false
+  if (!slug) return false
+  return subComps.includes(slug)
 }
 
-async function sendPushToMatch(payload, matchTeams, options = {}) {
+async function sendPushToMatch(payload, slug, options = {}) {
   let subs = []
   try { subs = (await kv.smembers('push:subscriptions')) ?? [] } catch { return 0 }
   if (!subs.length) return 0
@@ -215,7 +217,7 @@ async function sendPushToMatch(payload, matchTeams, options = {}) {
     let sub
     try { sub = typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw }
     catch { stale.push(subRaw); return }
-    if (!matcher(sub.teams, matchTeams)) return
+    if (!matcher(sub.comps, slug)) return
     try {
       await webpush.sendNotification(sub, payloadStr, { TTL: options.ttl ?? 3600 })
       sent++
@@ -231,13 +233,13 @@ async function sendPushToMatch(payload, matchTeams, options = {}) {
   return sent
 }
 
-async function sendDeduped(dedupKey, payload, matchTeams, ttl = 3 * 3600) {
+async function sendDeduped(dedupKey, payload, slug, ttl = 3 * 3600) {
   try {
     const already = await kv.get(dedupKey)
     if (already) return 0
     await kv.set(dedupKey, '1', { ex: ttl })
   } catch { return 0 }
-  return sendPushToMatch(payload, matchTeams)
+  return sendPushToMatch(payload, slug)
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────────
@@ -290,14 +292,8 @@ export default async function handler(req, res) {
 
     let   home     = parseInt(homeC.score ?? '0', 10) || 0
     let   away     = parseInt(awayC.score ?? '0', 10) || 0
-    // Noms bruts (pré-traduction) — utilisés pour le filtre par équipe suivie,
-    // car c'est sous ce nom (celui de teamNames.js / ESPN) que le favori est
-    // stocké côté abonné. Le nom traduit (homeTeam/awayTeam) reste pour l'affichage.
-    const rawHome  = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?'
-    const rawAway  = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?'
-    const homeTeam = t(rawHome)
-    const awayTeam = t(rawAway)
-    const matchTeams = [rawHome, rawAway]
+    const homeTeam = t(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
+    const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
     const eventId  = evt.id
 
     // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
@@ -352,7 +348,7 @@ export default async function handler(req, res) {
         if (freshKickoff) {
           log.push(`[espn:${slug}:${eventId}] KO catch-up (~${Math.round((Date.now() - matchStart) / 60_000)}min)`)
           const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, matchTeams)
+            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug)
           if (sent > 0) notifsSent++
         }
       }
@@ -364,7 +360,7 @@ export default async function handler(req, res) {
     if (!LIVE_ESPN.has(prevStatus) && !FINAL_ESPN.has(prevStatus) && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] KO`)
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, matchTeams)
+        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug)
       if (sent > 0) notifsSent++
     }
 
@@ -372,7 +368,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
       if (sent > 0) notifsSent++
     }
 
@@ -380,7 +376,7 @@ export default async function handler(req, res) {
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
       if (sent > 0) notifsSent++
     }
 
@@ -388,7 +384,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
       log.push(`[espn:${slug}:${eventId}] FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, matchTeams)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
       if (sent > 0) notifsSent++
     }
 
@@ -401,7 +397,7 @@ export default async function handler(req, res) {
     ) {
       log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
       const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, matchTeams)
+        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, slug)
       if (sent > 0) notifsSent++
     }
 
@@ -422,7 +418,7 @@ export default async function handler(req, res) {
           silent:  true,
           renotify: false,
         },
-        matchTeams,
+        slug,
         { onlyFavorites: true },
       )
     }
