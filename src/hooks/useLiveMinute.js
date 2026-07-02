@@ -357,10 +357,22 @@ async function _doPollESPN(matches, queryClient) {
   try {
     // ── Appel au nouvel endpoint server-side ──
     // Fetch ESPN + Redis cache + matching + stats → retourne { [fdMatchId]: { ... } }
+    // ⚠️ Timeout obligatoire : sans lui, une requête réseau qui traîne (connexion
+    // mobile instable, cellulaire faible signal...) reste "pending" indéfiniment.
+    // Or pollESPN() pose un verrou (_pollInProgress) tant que ce fetch n'est pas
+    // résolu — TOUS les polls suivants (Worker toutes les ~15-20s, retour au
+    // premier plan, etc.) sont alors simplement mis en file d'attente sans jamais
+    // s'exécuter → le score en direct reste figé jusqu'à ce que CE fetch finisse
+    // par aboutir (potentiellement plusieurs minutes sans limite côté navigateur).
+    // Root cause identifiée d'un gel de score signalé (~10min, appli pourtant au
+    // premier plan) : ce fetch n'avait aucune limite de temps. Avec le timeout,
+    // il échoue proprement en 10s max → le catch ci-dessous relâche le verrou via
+    // le finally de pollESPN(), et le tick suivant peut repartir sur un fetch frais.
     const res = await fetch('/api/fifa-live', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ matches: toTrack }),
+      signal:  AbortSignal.timeout(10_000),
     })
 
     if (!res.ok) {

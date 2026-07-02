@@ -203,7 +203,7 @@ function matchesFavoriteStrict(subComps, slug) {
   return subComps.includes(slug)
 }
 
-async function sendPushToMatch(payload, slug, options = {}) {
+async function sendPushToMatch(payload, slug, options = {}, log = null) {
   let subs = []
   try { subs = (await kv.smembers('push:subscriptions')) ?? [] } catch { return 0 }
   if (!subs.length) return 0
@@ -212,6 +212,7 @@ async function sendPushToMatch(payload, slug, options = {}) {
   const payloadStr = JSON.stringify(payload)
   const stale = []
   let sent = 0
+  let failed = 0
 
   await Promise.allSettled(subs.map(async subRaw => {
     let sub
@@ -222,24 +223,33 @@ async function sendPushToMatch(payload, slug, options = {}) {
       await webpush.sendNotification(sub, payloadStr, { TTL: options.ttl ?? 3600 })
       sent++
     } catch (err) {
-      if (err.statusCode === 410 || err.statusCode === 404)
+      if (err.statusCode === 410 || err.statusCode === 404) {
         stale.push(typeof subRaw === 'string' ? subRaw : JSON.stringify(subRaw))
+      } else {
+        // Avant : erreur silencieusement ignorée (aucune trace) → impossible de
+        // savoir pourquoi une notif n'arrive pas chez un abonné donné. On log
+        // désormais le statusCode/message pour pouvoir diagnostiquer via le log
+        // renvoyé par ce endpoint (visible dans les logs Vercel du cron).
+        failed++
+        log?.push(`[push:fail] status=${err.statusCode ?? '?'} msg=${err.message ?? err}`)
+      }
     }
   }))
 
   if (stale.length) {
     try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
   }
+  if (failed) log?.push(`[push] sent=${sent} failed=${failed} stale=${stale.length} total=${subs.length}`)
   return sent
 }
 
-async function sendDeduped(dedupKey, payload, slug, ttl = 3 * 3600) {
+async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600) {
   try {
     const already = await kv.get(dedupKey)
     if (already) return 0
     await kv.set(dedupKey, '1', { ex: ttl })
   } catch { return 0 }
-  return sendPushToMatch(payload, slug)
+  return sendPushToMatch(payload, slug, {}, log)
 }
 
 // ── Capture proactive du summary ESPN (compos + stats + événements) ────────────
@@ -501,7 +511,7 @@ export default async function handler(req, res) {
         if (freshKickoff) {
           log.push(`[espn:${slug}:${eventId}] KO catch-up (~${Math.round((Date.now() - matchStart) / 60_000)}min)`)
           const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug)
+            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
           if (sent > 0) notifsSent++
         }
       }
@@ -513,7 +523,32 @@ export default async function handler(req, res) {
     if (!LIVE_ESPN.has(prevStatus) && !FINAL_ESPN.has(prevStatus) && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] KO`)
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug)
+        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
+      if (sent > 0) notifsSent++
+    }
+
+    // ⚽ But — score différent du poll précédent, alors que le match était en
+    // direct au poll précédent. Volontairement PAS restreint au statut ACTUEL
+    // encore "en direct" (ancien bug) : un but marqué en toute fin de mi-temps
+    // ou de match additionnelle peut, sur le même poll (1/min), coïncider avec
+    // le passage déjà détecté à STATUS_HALFTIME/STATUS_FINAL côté ESPN — dans
+    // ce cas l'ancienne condition (LIVE_ESPN.has(status) && status !==
+    // 'STATUS_HALFTIME') supprimait purement et simplement la notif de but,
+    // alors que c'est justement le cas le plus fréquent (but à la 45e+/90e+).
+    // Seule exclusion légitime : un changement de score alors qu'on était DÉJÀ
+    // en mi-temps au poll précédent ET qu'on y est toujours (vraie pause,
+    // aucun but possible) — ça correspond à une correction tardive de données
+    // ESPN, pas un but réel.
+    const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
+    if (
+      LIVE_ESPN.has(prevStatus) &&
+      !steadyHalftime &&
+      prevScore !== null &&
+      prevScore !== score
+    ) {
+      log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
+      const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
+        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, slug, log)
       if (sent > 0) notifsSent++
     }
 
@@ -521,7 +556,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
     }
 
@@ -529,7 +564,7 @@ export default async function handler(req, res) {
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
     }
 
@@ -537,7 +572,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
       log.push(`[espn:${slug}:${eventId}] FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
       // Capture finale — le boxscore/évènements se stabilisent parfois
       // quelques secondes après le sifflet final (corrections tardives).
@@ -567,19 +602,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // ⚽ But — score change pendant un match en cours (pas pendant halftime)
-    if (
-      LIVE_ESPN.has(status) &&
-      status !== 'STATUS_HALFTIME' &&
-      prevScore !== null &&
-      prevScore !== score
-    ) {
-      log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
-      const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, slug)
-      if (sent > 0) notifsSent++
-    }
-
     // 📊 Ticker "score en direct" — uniquement pour les abonnés qui suivent
     // une des deux équipes (jamais envoyé aux abonnés sans filtre configuré,
     // pour ne pas transformer l'app en spam pour tout le monde). Même `tag`
@@ -599,6 +621,7 @@ export default async function handler(req, res) {
         },
         slug,
         { onlyFavorites: true },
+        log,
       )
     }
   }
