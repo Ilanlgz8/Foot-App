@@ -5,9 +5,12 @@
    ========================================================= */
 :root {
   --red:        #ef4444;
+  --red-rgb:    239, 68, 68;
   --red-light:  #f87171;
   --red-vivid:  #ff2d2d;
-  --red-dim:    rgba(239,68,68,0.12);
+  --red-deep:   #dc2626;
+  --red-deep-rgb: 220, 38, 38;
+  --red-dim:    rgba(var(--red-rgb), 0.12);
   --green:      #16a34a;
   --green-light:#4ade80;
   --green-dim:  rgba(22,163,74,0.10);
@@ -19,13 +22,29 @@
   --bg-mid:     #0d1320;
   --bg-card:    rgba(10,15,24,0.97);
   --border:     rgba(255,255,255,0.065);
-  --border-red: rgba(239,68,68,0.2);
-  --border-glow:rgba(239,68,68,0.35);
+  --border-red: rgba(var(--red-rgb), 0.2);
+  --border-glow:rgba(var(--red-rgb), 0.35);
   --text-main:  #f1f5f9;
   --text-mid:   #8b9ab0;
   --text-dim:   #3d4d60;
-  --shadow-red: 0 0 40px rgba(239,68,68,0.18);
+  --shadow-red: 0 0 40px rgba(var(--red-rgb), 0.18);
   --shadow-card:0 16px 48px rgba(0,0,0,0.4);
+  /* Triplets RGB pour composer des rgba() à alpha variable sans dupliquer
+     la valeur hex partout (voir accueil.css, match.css, etc. — c'était le
+     principal problème de cohérence couleur identifié dans l'app : 79
+     occurrences de #ef4444 et 19 de #dc2626 écrites en dur avant ce passage). */
+  --black-rgb:  0, 0, 0;
+  --white-rgb:  255, 255, 255;
+  --radius-pill: 999px;
+  /* Fonds "presque noirs" consolidés — avant ce passage, #0d0d0d et #0f0f1a
+     étaient utilisés côte à côte pour le même rôle (fond de card/panel) sans
+     être reconnus comme la même intention ; fusionnés sur #0d0d0d à la
+     demande de l'utilisateur pour qu'il n'y ait plus aucune diff de fond
+     entre les cards de l'app. */
+  --bg-panel:      #0d0d0d;
+  --bg-panel-grad: linear-gradient(160deg, #0f0f0f 0%, #0a0a0a 100%);
+  --bg-page-grad:  linear-gradient(180deg, #04070d 0%, #080d17 50%, #0c1020 100%);
+  --bg-detail:     #0a0a0f;
 }
 
 *, *::before, *::after { box-sizing: border-box; }

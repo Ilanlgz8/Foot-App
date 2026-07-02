@@ -33,13 +33,13 @@
   color: #fff;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.55), 0 0 18px rgba(239,68,68,0.35);
+  text-shadow: 0 2px 10px rgba(var(--black-rgb),0.55), 0 0 18px rgba(var(--red-rgb),0.35);
 }
 .lmp__heroMinute--ft {
   font-size: 1rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.55);
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  color: rgba(var(--white-rgb),0.55);
+  text-shadow: 0 2px 8px rgba(var(--black-rgb),0.5);
 }
 
 /* Point live pulsant devant la minute (remplace le fond/bordure rouge) */
@@ -47,8 +47,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239,68,68,0.9);
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(var(--red-rgb),0.9);
   animation: lmpDotPulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -71,7 +71,7 @@
   font-weight: 700;
   color: rgba(255,200,50,0.95);
   letter-spacing: 0.04em;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.5);
   animation: lmpPulse 1.8s ease-in-out infinite;
 }
 @keyframes lmpPulse {
@@ -83,7 +83,7 @@
 .lmp__heroXg {
   font-size: 0.62rem;
   font-weight: 600;
-  color: rgba(239,68,68,0.65);
+  color: rgba(var(--red-rgb),0.65);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-top: 0.15rem;
@@ -94,12 +94,12 @@
   display: inline-block;
   margin-top: 0.3rem;
   padding: 2px 8px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(var(--white-rgb),0.1);
+  border: 1px solid rgba(var(--white-rgb),0.18);
   border-radius: 4px;
   font-size: 0.62rem;
   font-weight: 800;
-  color: rgba(255,255,255,0.75);
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -111,7 +111,7 @@
   gap: 0 0.5rem;
   margin: 0.8rem 1rem 0;
   padding-top: 0.65rem;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid rgba(var(--white-rgb),0.1);
   position: relative;
   z-index: 2;
 }
@@ -131,13 +131,13 @@
 
 .lmp__heroScorersDiv {
   width: 1px;
-  background: rgba(255,255,255,0.12);
+  background: rgba(var(--white-rgb),0.12);
   align-self: stretch;
 }
 
 .lmp__heroScorerItem {
   font-size: 0.7rem;
-  color: rgba(255,255,255,0.72);
+  color: rgba(var(--white-rgb),0.72);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -146,14 +146,14 @@
 
 .lmp__heroScorerMin {
   font-size: 0.65rem;
-  color: #ef4444;
+  color: var(--red);
   font-weight: 700;
 }
 
 .lmp__page {
   min-height: 100vh;
   padding: 0 0 4rem;
-  background: var(--bg, #0a0a0f);
+  background: var(--bg-detail);
 }
 
 .lmp__backBtn {
@@ -162,17 +162,17 @@
   gap: 0.3rem;
   margin: 1rem 1rem 0;
   padding: 0.4rem 0.85rem;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(var(--white-rgb),0.05);
+  border: 1px solid rgba(var(--white-rgb),0.1);
   border-radius: 0.5rem;
-  color: rgba(255,255,255,0.55);
+  color: rgba(var(--white-rgb),0.55);
   font-size: 0.82rem;
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
 .lmp__backBtn:hover {
   color: #fff;
-  background: rgba(255,255,255,0.09);
+  background: rgba(var(--white-rgb),0.09);
 }
 
 /* ── Card header (reprend live__card mais non-cliquable) ── */
@@ -183,7 +183,7 @@
 .lmp__headerCard:hover {
   transform: none !important;
   box-shadow: none !important;
-  border-color: rgba(255,255,255,0.07) !important;
+  border-color: rgba(var(--white-rgb),0.07) !important;
 }
 
 /* ── Header match (legacy — plus utilisé, gardé pour fallback) ── */
@@ -193,9 +193,9 @@
   margin: 1rem;
   padding: 0.5rem 1rem 1.1rem;
   background: linear-gradient(160deg, rgba(25,10,10,0.95), rgba(10,10,18,0.98));
-  border: 1px solid rgba(220,38,38,0.18);
+  border: 1px solid rgba(var(--red-deep-rgb),0.18);
   border-radius: 1.1rem;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.45);
+  box-shadow: 0 4px 32px rgba(var(--black-rgb),0.45);
 }
 
 .lmp__comp {
@@ -205,7 +205,7 @@
   gap: 0.45rem;
   font-size: 0.74rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.45);
+  color: rgba(var(--white-rgb),0.45);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 0.7rem;
@@ -241,19 +241,19 @@
   width: 4rem;
   height: 4rem;
   object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 2px 8px rgba(var(--black-rgb),0.5));
 }
 .lmp__crestFallback {
   width: 4rem;
   height: 4rem;
   border-radius: 50%;
-  background: rgba(255,255,255,0.06);
+  background: rgba(var(--white-rgb),0.06);
 }
 
 .lmp__teamName {
   font-size: 0.82rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.85);
+  color: rgba(var(--white-rgb),0.85);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -264,7 +264,7 @@
 .lmp__teamXg {
   font-size: 0.58rem;
   font-weight: 600;
-  color: rgba(239,68,68,0.6);
+  color: rgba(var(--red-rgb),0.6);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   text-align: center;
@@ -290,14 +290,14 @@
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 1rem;
   font-weight: 700;
-  color: #ef4444;
+  color: var(--red);
   letter-spacing: 0.08em;
 }
 .lmp__minuteFt {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.4);
+  color: rgba(var(--white-rgb),0.4);
   letter-spacing: 0.08em;
 }
 .lmp__repriseLabel {
@@ -327,7 +327,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95));
-  border: 1px solid rgba(220,38,38,0.22);
+  border: 1px solid rgba(var(--red-deep-rgb),0.22);
   border-radius: 0.65rem;
 }
 .lmp__pill--scored {
@@ -336,7 +336,7 @@
 .lmp__pillBar {
   width: 2px;
   height: 2.4rem;
-  background: rgba(255,255,255,0.35);
+  background: rgba(var(--white-rgb),0.35);
   border-radius: 1px;
 }
 
@@ -352,12 +352,12 @@
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
-  color: rgba(239,68,68,0.9);
+  color: rgba(var(--red-rgb),0.9);
 }
 .lmp__xgLabel {
   font-size: 0.6rem;
   font-weight: 600;
-  color: rgba(239,68,68,0.5);
+  color: rgba(var(--red-rgb),0.5);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -369,7 +369,7 @@
   align-items: start;
   margin-top: 1rem;
   padding-top: 0.8rem;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(var(--white-rgb),0.06);
   gap: 0 0.5rem;
 }
 .lmp__scorersHome {
@@ -389,19 +389,19 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.73rem;
-  color: rgba(255,255,255,0.65);
+  color: rgba(var(--white-rgb),0.65);
 }
 .lmp__scorer--home { justify-content: flex-end; flex-direction: row-reverse; }
 .lmp__scorer--away { justify-content: flex-start; }
 .lmp__scorerMin {
   font-size: 0.68rem;
-  color: #ef4444;
+  color: var(--red);
   font-weight: 600;
 }
 .lmp__scorersGap {
   width: 1px;
   align-self: stretch;
-  background: rgba(255,255,255,0.08);
+  background: rgba(var(--white-rgb),0.08);
   flex-shrink: 0;
 }
 
@@ -411,7 +411,7 @@
   gap: 0.4rem;
   padding: 0 1rem;
   margin: 1.2rem 0 0;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(var(--white-rgb),0.07);
 }
 .lmp__tab {
   flex: 1;
@@ -419,7 +419,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: rgba(255,255,255,0.4);
+  color: rgba(var(--white-rgb),0.4);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -428,10 +428,10 @@
   white-space: nowrap;
   text-align: center;
 }
-.lmp__tab:hover { color: rgba(255,255,255,0.7); }
+.lmp__tab:hover { color: rgba(var(--white-rgb),0.7); }
 .lmp__tab--active {
-  color: #f87171;
-  border-bottom-color: #ef4444;
+  color: var(--red-light);
+  border-bottom-color: var(--red);
 }
 
 /* ── Contenu onglet ── */
@@ -459,9 +459,9 @@
 /* Animation BUT */
 @keyframes pillGoal {
   0%   { transform: scale(1);    background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95)); color: #f0d0d0; }
-  15%  { transform: scale(1.22); background: linear-gradient(135deg, rgba(239,68,68,0.9), rgba(185,28,28,0.95)); color: #fff; border-color: rgba(239,68,68,0.8); box-shadow: 0 0 24px rgba(239,68,68,0.6); }
-  45%  { transform: scale(1.1);  background: linear-gradient(135deg, rgba(220,38,38,0.7), rgba(153,27,27,0.8)); color: #fff; }
-  100% { transform: scale(1);    background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95)); color: #f0d0d0; border-color: rgba(220,38,38,0.22); }
+  15%  { transform: scale(1.22); background: linear-gradient(135deg, rgba(var(--red-rgb),0.9), rgba(185,28,28,0.95)); color: #fff; border-color: rgba(var(--red-rgb),0.8); box-shadow: 0 0 24px rgba(var(--red-rgb),0.6); }
+  45%  { transform: scale(1.1);  background: linear-gradient(135deg, rgba(var(--red-deep-rgb),0.7), rgba(153,27,27,0.8)); color: #fff; }
+  100% { transform: scale(1);    background: linear-gradient(135deg, rgba(80,15,15,0.85), rgba(35,6,6,0.95)); color: #f0d0d0; border-color: rgba(var(--red-deep-rgb),0.22); }
 }
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -476,6 +476,6 @@
   justify-content: center;
   gap: 1rem;
   min-height: 60vh;
-  color: rgba(255,255,255,0.4);
+  color: rgba(var(--white-rgb),0.4);
   font-size: 0.9rem;
 }

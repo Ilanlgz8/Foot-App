@@ -125,7 +125,12 @@ function Accueil() {
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
   // dayOffset — comme le panneau résultats juste au-dessus, pour ne pas
   // changer quand l'utilisateur navigue vers un autre jour dans "Matchs".
-  const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
+  // S'il n'y a qu'un seul match dans toute la journée, la carte ne sert à
+  // rien (c'est déjà le seul match visible partout ailleurs) → masquée.
+  const matchDuJour = useMemo(
+    () => todayMatchesForResults.length > 1 ? pickMatchDuJour(todayMatchesForResults) : null,
+    [todayMatchesForResults]
+  )
 
   const results = useMemo(() => {
     const seen = new Set()

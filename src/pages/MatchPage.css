@@ -4,7 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg, #0a0a0f);
+  background: var(--bg-detail);
 }
 
 /* ── Hero gradient plein-écran ───────────────────────────────────────────────── */
@@ -20,9 +20,9 @@
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0,0,0,.38) 0%,
-    rgba(0,0,0,.08) 45%,
-    rgba(0,0,0,.62) 100%
+    rgba(var(--black-rgb),.38) 0%,
+    rgba(var(--black-rgb),.08) 45%,
+    rgba(var(--black-rgb),.62) 100%
   );
   z-index: 0;
 }
@@ -38,17 +38,17 @@
 }
 
 .mp__hero__back {
-  background: rgba(0,0,0,.32);
-  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(var(--black-rgb),.32);
+  border: 1px solid rgba(var(--white-rgb),.14);
   border-radius: 20px;
-  color: rgba(255,255,255,.8);
+  color: rgba(var(--white-rgb),.8);
   font-size: 0.82rem;
   font-weight: 600;
   padding: 5px 14px;
   cursor: pointer;
   transition: background .15s;
 }
-.mp__hero__back:hover { background: rgba(0,0,0,.55); }
+.mp__hero__back:hover { background: rgba(var(--black-rgb),.55); }
 
 .mp__hero__comp {
   display: flex;
@@ -66,7 +66,7 @@
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.5);
+  color: rgba(var(--white-rgb),.5);
 }
 
 /* Centre : crests + score/heure */
@@ -95,7 +95,7 @@
   border-radius: 50%;
   overflow: hidden;
   border: 1.5px solid rgba(200,210,225,0.28);
-  box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 2px 10px rgba(0,0,0,.55);
+  box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 2px 10px rgba(var(--black-rgb),.55);
   background: rgba(10, 14, 24, 0.88);
   flex-shrink: 0;
 }
@@ -113,7 +113,7 @@
 .mp__hero__crestFb {
   width: 54px;
   height: 54px;
-  background: rgba(255,255,255,.08);
+  background: rgba(var(--white-rgb),.08);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -127,7 +127,7 @@
   font-weight: 800;
   color: #fff;
   text-align: center;
-  text-shadow: 0 1px 8px rgba(0,0,0,.85);
+  text-shadow: 0 1px 8px rgba(var(--black-rgb),.85);
   max-width: 76px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -146,7 +146,7 @@
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.38);
+  color: rgba(var(--white-rgb),.38);
   text-align: center;
 }
 .mp__hero__score {
@@ -156,7 +156,7 @@
   color: #fff;
   line-height: 1;
   letter-spacing: .04em;
-  text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  text-shadow: 0 2px 12px rgba(var(--black-rgb),.5);
 }
 .mp__hero__time {
   font-family: 'Chakra Petch', system-ui, sans-serif;
@@ -165,7 +165,7 @@
   color: #fff;
   line-height: 1;
   letter-spacing: .04em;
-  text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  text-shadow: 0 2px 12px rgba(var(--black-rgb),.5);
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────────────*/
@@ -186,7 +186,7 @@
 .mp__tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid rgba(255,255,255,.07);
+  border-bottom: 1px solid rgba(var(--white-rgb),.07);
   margin-top: 0;
 }
 
@@ -196,7 +196,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: rgba(255,255,255,.38);
+  color: rgba(var(--white-rgb),.38);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: .03em;
@@ -205,8 +205,8 @@
   white-space: nowrap;
   text-align: center;
 }
-.mp__tab:hover { color: rgba(255,255,255,.65); }
-.mp__tab--active { color: #f87171; border-bottom-color: #ef4444; }
+.mp__tab:hover { color: rgba(var(--white-rgb),.65); }
+.mp__tab--active { color: var(--red-light); border-bottom-color: var(--red); }
 
 /* ── Contenu ──────────────────────────────────────────────────────────────────*/
 .mp__tabContent {
@@ -237,7 +237,7 @@
   justify-content: center;
   gap: 1rem;
   min-height: 60vh;
-  color: rgba(255,255,255,.4);
+  color: rgba(var(--white-rgb),.4);
   font-size: .9rem;
 }
 .mp__tabLoading {
@@ -262,17 +262,17 @@
 .mp__statsTeam {
   font-size: 0.8rem;
   font-weight: 800;
-  color: rgba(255,255,255,.85);
+  color: rgba(var(--white-rgb),.85);
 }
 .mp__statsTeam--r { text-align: right; }
 
 .mp__recap {
   font-size: 0.8rem;
   line-height: 1.5;
-  color: rgba(255,255,255,.78);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(239,68,68,0.18);
-  border-left: 3px solid rgba(239,68,68,0.55);
+  color: rgba(var(--white-rgb),.78);
+  background: rgba(var(--white-rgb),0.04);
+  border: 1px solid rgba(var(--red-rgb),0.18);
+  border-left: 3px solid rgba(var(--red-rgb),0.55);
   border-radius: 0.6rem;
   padding: 10px 12px;
   margin: 0 0 14px;
@@ -283,7 +283,7 @@
   font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.45);
+  color: rgba(var(--white-rgb),.45);
 }
 
 .mp__statsList {
@@ -294,8 +294,8 @@
 
 /* Card par stat */
 .mp__statRow {
-  background: #0f0f1a;
-  border: 1px solid rgba(255,255,255,.05);
+  background: var(--bg-panel);
+  border: 1px solid rgba(var(--white-rgb),.05);
   border-radius: 9px;
   padding: 8px 10px;
 }
@@ -305,7 +305,7 @@
   font-weight: 700;
   letter-spacing: .13em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.9);
+  color: rgba(var(--white-rgb),.9);
   text-align: center;
   margin-bottom: 6px;
 }
@@ -326,13 +326,13 @@
      matchModal.css (classes modal__statBar et pm__stat, deja corrige) - donc
      corriger l'un ne touchait pas l'autre. Un match live passe par
      LiveMatchPage.jsx qui reutilise matchModal.css, d'ou la difference. */
-  color: rgba(255,255,255,.95);
+  color: rgba(var(--white-rgb),.95);
   min-width: 0;
   line-height: 1;
   white-space: nowrap;
 }
 .mp__statVal--r     { text-align: right; }
-.mp__statVal--lead  { color: #ef4444; }
+.mp__statVal--lead  { color: var(--red); }
 
 /* Barres symétriques depuis le centre */
 .mp__statBars {
@@ -347,18 +347,18 @@
   flex-shrink: 0;
 }
 .mp__bar--home {
-  background: #ef4444;
+  background: var(--red);
   border-radius: 3px 0 0 3px;
   margin-left: auto;   /* pousse la barre vers le centre depuis la gauche */
 }
 .mp__bar--away {
-  background: rgba(255,255,255,.18);
+  background: rgba(var(--white-rgb),.18);
   border-radius: 0 3px 3px 0;
 }
 .mp__barDiv {
   width: 1px;
   height: 14px;
-  background: rgba(255,255,255,.14);
+  background: rgba(var(--white-rgb),.14);
   flex-shrink: 0;
 }
 

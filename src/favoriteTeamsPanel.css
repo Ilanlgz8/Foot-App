@@ -12,9 +12,9 @@
   display: flex;
   flex-direction: column;
   background: #0f1218;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--white-rgb), 0.1);
   border-radius: 0.85rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px rgba(var(--black-rgb), 0.5);
   z-index: 200;
   overflow: hidden;
 }
@@ -26,27 +26,27 @@
   padding: 0.7rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(var(--white-rgb), 0.9);
+  border-bottom: 1px solid rgba(var(--white-rgb), 0.07);
 }
 
 .fav-panel__close {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(var(--white-rgb), 0.45);
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
   padding: 0.1rem 0.3rem;
 }
 
-.fav-panel__close:hover { color: rgba(255, 255, 255, 0.85); }
+.fav-panel__close:hover { color: rgba(var(--white-rgb), 0.85); }
 
 .fav-panel__hint {
   margin: 0;
   padding: 0.6rem 0.9rem;
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(var(--white-rgb), 0.45);
   line-height: 1.4;
 }
 
@@ -63,11 +63,11 @@
   padding: 0.4rem 0.6rem;
   border-radius: 0.5rem;
   font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(var(--white-rgb), 0.75);
   cursor: pointer;
 }
 
-.fav-panel__item:hover { background: rgba(255, 255, 255, 0.05); }
+.fav-panel__item:hover { background: rgba(var(--white-rgb), 0.05); }
 
 .fav-panel__emblem {
   width: 18px;
@@ -77,7 +77,7 @@
 }
 
 .fav-panel__item input {
-  accent-color: #ef4444;
+  accent-color: var(--red);
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
@@ -85,7 +85,7 @@
 
 .fav-panel__footer {
   padding: 0.7rem 0.9rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(var(--white-rgb), 0.07);
 }
 
 .fav-panel__sub, .fav-panel__unsub {
@@ -106,10 +106,10 @@
 .fav-panel__sub:hover:not(:disabled) { background: rgba(74, 222, 128, 0.25); }
 
 .fav-panel__unsub {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.55);
+  background: rgba(var(--white-rgb), 0.06);
+  color: rgba(var(--white-rgb), 0.55);
 }
 
-.fav-panel__unsub:hover:not(:disabled) { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.fav-panel__unsub:hover:not(:disabled) { background: rgba(var(--red-rgb), 0.15); color: var(--red-light); }
 
 .fav-panel__sub:disabled, .fav-panel__unsub:disabled { opacity: 0.6; cursor: default; }
