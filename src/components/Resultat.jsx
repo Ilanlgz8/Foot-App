@@ -18,11 +18,27 @@ import { mergeScore }    from '../utils/matchUtils'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
+// App.jsx remonte tout le contenu de la page à chaque changement de route
+// (`key={location.pathname}`) — y compris au retour arrière depuis
+// /match/:id vers /resultats. Ce composant est donc démonté puis recréé de
+// zéro à chaque fois, ce qui remettait la journée sélectionnée à l'index 0
+// (bug rapporté : sélectionner la 8e journée, ouvrir un match, faire retour
+// ramenait à la 6e). On sauvegarde donc la sélection dans sessionStorage
+// pour la restaurer au remontage, le temps de la session en cours.
+const RESULTATS_STATE_KEY = 'resultats_ui_state'
+function loadResultatsState() {
+  try {
+    const raw = sessionStorage.getItem(RESULTATS_STATE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
 function Resultats() {
   const navigate = useNavigate()
-  const [selectedComp, setSelectedComp] = useState('WC')
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [viewMode, setViewMode]         = useState('journee') // 'journee' | 'poule'
+  const savedState = loadResultatsState()
+  const [selectedComp, setSelectedComp] = useState(savedState?.selectedComp ?? 'WC')
+  const [currentIndex, setCurrentIndex] = useState(savedState?.currentIndex ?? 0)
+  const [viewMode, setViewMode]         = useState(savedState?.viewMode ?? 'journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
   const [search, setSearch]             = useState('')
@@ -39,6 +55,13 @@ function Resultats() {
       setCompAnchor(null)
     }
   }, [compOpen])
+  // Sauvegarde la sélection courante (compétition/journée/vue) pour la
+  // restaurer si ce composant est remonté (retour arrière depuis un match).
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(RESULTATS_STATE_KEY, JSON.stringify({ selectedComp, currentIndex, viewMode }))
+    } catch {}
+  }, [selectedComp, currentIndex, viewMode])
   useEffect(() => {
     if (!compOpen) return
     const onDown = (e) => {
@@ -122,10 +145,16 @@ function Resultats() {
     return teams
   }
 
+  const total = grouped.length
+  // currentIndex peut venir de sessionStorage (restauration après retour
+  // arrière) : si la liste de journées a changé depuis, on retombe sur la
+  // dernière valide plutôt que de rester bloqué sur un index vide.
+  useEffect(() => {
+    if (total > 0 && currentIndex >= total) setCurrentIndex(total - 1)
+  }, [total, currentIndex])
   const currentGroup    = grouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches  = currentGroup?.matches ?? []
-  const total           = grouped.length
 
   // Recherche — filtre côté client par nom d'équipe (traduit ou brut).
   function matchesTeamSearch(team) {

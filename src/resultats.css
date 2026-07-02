@@ -186,15 +186,15 @@
 }
 .resultats__searchClear {
   position: absolute;
-  right: 0.6rem;
+  right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: rgba(var(--white-rgb),0.4);
-  font-size: 0.7rem;
+  font-size: 1.15rem;
   cursor: pointer;
-  padding: 0.2rem;
+  padding: 0.3rem;
   line-height: 1;
 }
 .resultats__searchClear:hover { color: var(--red-light); }
