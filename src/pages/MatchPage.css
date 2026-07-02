@@ -89,6 +89,16 @@
   align-items: center;
 }
 
+/* Losanges de forme un peu plus grands ici que le reste de l'app (demande
+   explicite), scopé à cette page pour ne pas impacter Accueil/LiveMatchPage. */
+.mp__hero__team .formDiamonds {
+  gap: 4.5px;
+}
+.mp__hero__team .formDiamonds__item {
+  width: 8px;
+  height: 8px;
+}
+
 .mp__hero__crestWrap {
   width: 54px;
   height: 54px;

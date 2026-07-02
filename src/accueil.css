@@ -2945,13 +2945,18 @@
 .poster__team-col--home { align-items: flex-start; }
 .poster__team-col--away { align-items: flex-end; }
 
-/* Forme (losanges) — toujours centrée dans la colonne (comme le blason),
-   même quand le nom d'équipe est aligné vers le bord extérieur (design
-   "poster" home=gauche/away=droite) : un enfant peut s'auto-centrer via
-   align-self sans changer l'alignement du reste de la colonne. */
-.poster__team-col .formDiamonds {
-  align-self: center;
-  margin-top: 1px;
+/* Groupe nom + losanges : le nom est aligné vers le bord extérieur de la
+   colonne (design "poster" home=gauche/away=droite, cf. .poster__team-col--
+   home/--away), donc centrer les losanges sur TOUTE la colonne (comme avant)
+   les décale visuellement du nom. En regroupant les deux dans une mini-colonne
+   à largeur naturelle (shrink-to-fit) avec align-items:center, les losanges se
+   centrent par rapport au nom lui-même, tout en gardant le groupe entier plaqué
+   au bord extérieur via l'align-items hérité du parent .poster__team-col. */
+.poster__nameGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
 }
 
 .poster__crestWrap {

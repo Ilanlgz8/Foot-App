@@ -98,8 +98,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
                 onError={() => setHomeCrestError(true)} /></div>
             : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
           }
-          <span className="poster__name poster__name--home">{homeShort}</span>
-          <FormDiamonds form={hForm} />
+          <div className="poster__nameGroup">
+            <span className="poster__name poster__name--home">{homeShort}</span>
+            <FormDiamonds form={hForm} />
+          </div>
         </div>
 
         <div className="poster__center">
@@ -125,8 +127,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
                 onError={() => setAwayCrestError(true)} /></div>
             : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
           }
-          <span className="poster__name poster__name--away">{awayShort}</span>
-          <FormDiamonds form={aForm} />
+          <div className="poster__nameGroup">
+            <span className="poster__name poster__name--away">{awayShort}</span>
+            <FormDiamonds form={aForm} />
+          </div>
         </div>
 
       </div>

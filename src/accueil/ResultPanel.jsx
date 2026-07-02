@@ -33,7 +33,7 @@ function formatDayLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function ResultPanel({ results, loading, view = 'chrono', formMap = null }) {
+export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped  = groupByDay(results)
   const navigate = useNavigate()
   const [dayIndex, setDayIndex] = useState(0)
@@ -70,7 +70,7 @@ export function ResultPanel({ results, loading, view = 'chrono', formMap = null 
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
               <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-                <MatchCard match={match} noWinnerLoser noGradient formMap={formMap} />
+                <MatchCard match={match} noWinnerLoser noGradient />
               </div>
             ))}
           </div>
@@ -85,7 +85,7 @@ export function ResultPanel({ results, loading, view = 'chrono', formMap = null 
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
                     <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-                      <MatchCard match={match} noWinnerLoser noGradient formMap={formMap} />
+                      <MatchCard match={match} noWinnerLoser noGradient />
                     </div>
                   ))}
                 </div>
