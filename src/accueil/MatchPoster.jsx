@@ -94,7 +94,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest && !homeCrestError
-            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.homeTeam.crest} alt=""
+            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
                 onError={() => setHomeCrestError(true)} /></div>
             : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
           }
@@ -123,7 +123,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest && !awayCrestError
-            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.awayTeam.crest} alt=""
+            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
                 onError={() => setAwayCrestError(true)} /></div>
             : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
           }

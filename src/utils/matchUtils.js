@@ -34,10 +34,28 @@ function parseEspnClock(clock) {
   return (isNaN(base) || isNaN(extra)) ? null : { base, extra }
 }
 
+// ── Cap sur le temps additionnel en fin de période (90/105/120') ──────────
+// Entre le coup de sifflet de fin de période et le vrai début de la période
+// suivante (prolongations, 2e MT de prolongation, tirs au but), ESPN ne
+// renvoie pas toujours un statut dédié pour cette pause (contrairement à
+// STATUS_END_PERIOD, géré séparément dans calcMinute quand il est présent) —
+// le statut reste STATUS_IN_PROGRESS avec une horloge figée sur le dernier
+// arrêt de jeu connu, et l'interpolation (qui avance sans limite pour éviter
+// les minutes gelées après un retour d'arrière-plan) faisait grimper le
+// temps additionnel indéfiniment (91', 92', 93'... du "90+X") au lieu
+// d'afficher "Prolongation" (bug signalé). Aucun arrêt de jeu réel ne dépasse
+// ~15min → au-delà, on considère la pause déjà entamée.
+const STOPPAGE_CAP = 15
+function isEndOfPeriodBase(base) {
+  return base === 90 || base === 105 || base === 120
+}
+
 /**
  * Interpole la minute ESPN en temps réel depuis le dernier poll.
  * Évite le lag de ~30-50s entre deux polls ESPN + ticker Accueil.
  * Résultat : retard résiduel ~2-3s (délai intrinsèque d'ESPN).
+ * Retourne 'OVERRUN' (signal spécial, voir STOPPAGE_CAP) si le temps
+ * additionnel extrapolé dépasse le plafond en fin de période.
  */
 function interpolateEspnMinute(state) {
   const parsed = parseEspnClock(state.espnClock)
@@ -58,6 +76,7 @@ function interpolateEspnMinute(state) {
   if (parsed.extra > 0) {
     // Temps additionnel : la base (45 ou 90) est fixe, on avance l'extra
     const currentExtra = Math.floor(parsed.extra + elapsedMins)
+    if (isEndOfPeriodBase(parsed.base) && currentExtra > STOPPAGE_CAP) return 'OVERRUN'
     return `${parsed.base}+${currentExtra}'`
   }
 
@@ -152,10 +171,15 @@ export function calcMinute(match) {
       // (91'…105', pause, 106'…120', +arrêts éventuels) : même logique
       // d'interpolation que le temps réglementaire, pas de calcul spécial requis.
       const interpolated = interpolateEspnMinute(state)
+      if (interpolated === 'OVERRUN') return 'Prolongation'
       if (interpolated) return interpolated
       // Fallback si interpolation non disponible (capturedAt absent ou trop vieux)
       const parsed = parseEspnClock(state.espnClock)
       if (parsed) {
+        // Même plafond que l'interpolation (voir STOPPAGE_CAP) : le clock
+        // brut peut lui aussi être resté figé au-delà du raisonnable si le
+        // dernier poll remonte à un moment déjà tardif de la pause.
+        if (isEndOfPeriodBase(parsed.base) && parsed.extra > STOPPAGE_CAP) return 'Prolongation'
         return parsed.extra > 0
           ? `${parsed.base}+${parsed.extra}'`
           : `${Math.max(1, parsed.base)}'`

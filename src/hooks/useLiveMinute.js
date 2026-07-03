@@ -140,6 +140,19 @@ function confirmFt(match, now, queryClient) {
   queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
 
   const code = match.competition?.code
+  const isWC = code === 'WC' || match.competition?.id === 2000
+
+  // Tableau des phases finales (bracket WC) : football-data.org n'assigne
+  // l'équipe qualifiée au tour suivant qu'une fois le match officiellement
+  // clôturé côté FD.org — ce délai côté FD.org est hors de notre contrôle.
+  // Mais AVANT ce fix, notre propre cache (useWcKnockout, staleTime 10min)
+  // ajoutait un délai supplémentaire de NOTRE côté en plus de celui de
+  // FD.org : le bracket ne se rafraîchissait jamais suite à une fin de
+  // match, seulement au bout de 10min ou en rechargeant la page. Ici on
+  // force un refetch dès qu'on sait qu'un match WC est terminé (2 essais,
+  // comme pour todayMatches/matches FINISHED ci-dessous, au cas où FD.org
+  // lui-même n'aurait pas encore mis à jour au 1er essai).
+  if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
 
   // À 2s : mise à jour immédiate Accueil (recent results) + page Résultats
   setTimeout(() => {
@@ -149,6 +162,7 @@ function confirmFt(match, now, queryClient) {
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
     }
+    if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
     // Effacer les caches localStorage pour forcer un refetch propre
     try { localStorage.removeItem(`foot_matches_${todayStr}`) } catch {}
     if (code) {
@@ -157,6 +171,9 @@ function confirmFt(match, now, queryClient) {
   }, 2_000)
 
   // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
+  // Aussi un 2e essai pour le bracket : si FD.org n'avait pas encore assigné
+  // l'équipe qualifiée au 1er essai (2s), il y a de bonnes chances que ce
+  // soit fait 5min plus tard.
   setTimeout(() => {
     markEnded(id)
     delete espnScoresCache[id]
@@ -166,6 +183,7 @@ function confirmFt(match, now, queryClient) {
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
     }
+    if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
   }, 5 * 60_000)
 }
 

@@ -153,8 +153,11 @@ function Navbar() {
       )}
 
       {/* ── Barre de nav permanente mobile ── */}
+      {/* Live inséré entre Programme et Résultats (au lieu d'être ajouté à la
+          fin) → demande explicite de l'utilisateur pour qu'il tombe pile au
+          centre de la barre (2 onglets de chaque côté) et se remarque plus. */}
       <div className="navbar__quickNav">
-        {navigation.map(item => (
+        {navigation.slice(0, 2).map(item => (
           <NavLink
             key={item.href}
             to={item.href}
@@ -173,6 +176,19 @@ function Navbar() {
             <span className="navbar__qnLabel">Live</span>
           </button>
         )}
+        {navigation.slice(2).map(item => (
+          <NavLink
+            key={item.href}
+            to={item.href}
+            end={item.href === '/'}
+            className={({ isActive }) =>
+              isActive ? 'navbar__qnLink navbar__qnLink--active' : 'navbar__qnLink'
+            }
+          >
+            {QN_ICONS[item.href]}
+            <span className="navbar__qnLabel">{item.name}</span>
+          </NavLink>
+        ))}
       </div>
     </nav>
   )
