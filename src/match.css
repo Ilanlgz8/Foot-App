@@ -423,7 +423,10 @@
 
 .matchs__wcGroupCard__crest {
   width: 1.4rem; height: 1.4rem;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  transform: scale(1.18);
   flex-shrink: 0;
   filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.4));
 }
@@ -749,13 +752,19 @@
 
 .matchs__crest {
   width: 2.8rem; height: 2.8rem;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
+     (même pattern que live__crest/mp__hero__crest, pour un rendu circulaire cohérent). */
+  transform: scale(1.18);
   flex-shrink: 0;
   filter: drop-shadow(0 2px 8px rgba(var(--black-rgb),0.6));
   transition: transform 0.2s;
 }
 
-.matchs__match:hover .matchs__crest { transform: scale(1.1); }
+/* 1.18 (zoom crop) x 1.1 (effet hover) combinés en une seule valeur */
+.matchs__match:hover .matchs__crest { transform: scale(1.3); }
 
 .matchs__teamName {
   font-size: 0.9rem;

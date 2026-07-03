@@ -118,7 +118,7 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
                         : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
                       }
                       {team.team.crest && (
-                        <img src={team.team.crest} alt="" className="classement__teamCrest"
+                        <img src={team.team.crest} alt="" loading="lazy" className="classement__teamCrest"
                           onError={e => e.currentTarget.style.display = 'none'} />
                       )}
                       <span className="classement__teamName">

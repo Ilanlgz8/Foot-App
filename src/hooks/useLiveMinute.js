@@ -33,6 +33,11 @@ import { playGoalSound, playWhistleKO, playWhistleHT, playWhistleFT } from '../u
 let quotaRemaining = Infinity
 let espnFailStreak = 0
 
+// Stages FD.org à élimination directe (jamais de match nul possible) — même
+// liste que KNOCKOUT_ORDER dans useWcKnockout.js, dupliquée ici pour éviter un
+// import croisé entre hooks pour une simple liste de constantes.
+const KNOCKOUT_STAGES = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
+
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
@@ -614,6 +619,29 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         if (espnStatus === 'STATUS_POSTPONED' || espnStatus === 'STATUS_CANCELED') {
           setLiveState(mid, 'ended', { endedAt: now })
           setTimeout(() => { markEnded(mid); clearMatchState(mid) }, 5 * 60_000)
+          continue
+        }
+
+        // ── Garde : score à égalité en phase à élimination directe ──────────────
+        // Un match à élimination directe (8es de finale et plus) ne peut JAMAIS
+        // se terminer à égalité après les prolongations : la séance de tirs au
+        // but est obligatoire. Si ESPN envoie un simple STATUS_FINAL/FULL_TIME
+        // (pas STATUS_FINAL_AET ni STATUS_FINAL_PEN, qui restent des signaux de
+        // fin réelle) alors que le score fusionné est encore à égalité, ce n'est
+        // pas un vrai FT — ESPN n'a pas encore confirmé le passage aux tab (bug
+        // signalé : le match affichait "Terminé" 1-1 juste après le 120e, sans
+        // jamais montrer "T.A.B."). On force le passage en tab plutôt que de
+        // confirmer un FT qu'on sait impossible.
+        const isKnockout = KNOCKOUT_STAGES.includes(match.stage)
+        const scoresStillTied = ftSafeHome != null && ftSafeAway != null && ftSafeHome === ftSafeAway
+        if (
+          (espnStatus === 'STATUS_FINAL' || espnStatus === 'STATUS_FULL_TIME') &&
+          isKnockout && scoresStillTied
+        ) {
+          delete pendingFt[mid]
+          markLive(match)
+          clearFtFlags(mid)
+          setEspnData(mid, { espnClock: '120:00', espnStatus: 'STATUS_SHOOTOUT', espnPeriod: 5 })
           continue
         }
 

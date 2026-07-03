@@ -336,12 +336,18 @@
 
 .resultats__crest {
   width: 3.1rem; height: 3.1rem;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
+     (même pattern que live__crest/mp__hero__crest, pour un rendu circulaire cohérent). */
+  transform: scale(1.18);
   filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.5));
   transition: transform 0.18s;
 }
 
-.resultats__card:hover .resultats__crest { transform: scale(1.06); }
+/* 1.18 (zoom crop) x 1.06 (effet hover) combinés en une seule valeur */
+.resultats__card:hover .resultats__crest { transform: scale(1.25); }
 
 .resultats__crestFb {
   width: 3.1rem; height: 3.1rem;

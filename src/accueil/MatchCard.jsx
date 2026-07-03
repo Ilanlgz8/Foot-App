@@ -227,7 +227,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
       <div className="accueil__matchCardTeam">
         <div className="accueil__matchCardCrestWrap">
           {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className={homeCrestCls} data-team={match.homeTeam?.name}
+            ? <img src={match.homeTeam.crest} alt="" loading="lazy" className={homeCrestCls} data-team={match.homeTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>
@@ -259,7 +259,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
       <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
         <div className="accueil__matchCardCrestWrap">
           {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className={awayCrestCls} data-team={match.awayTeam?.name}
+            ? <img src={match.awayTeam.crest} alt="" loading="lazy" className={awayCrestCls} data-team={match.awayTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>

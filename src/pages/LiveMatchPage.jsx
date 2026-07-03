@@ -49,6 +49,24 @@ const TEAM_SHORT = {
   'Milan AC': 'Milan', 'Hellas Verona': 'Verona',
   'PSV Eindhoven': 'PSV', 'Club Brugge': 'Bruges', 'Slavia Prague': 'Slavia',
 }
+// 5 pastilles par équipe pendant la séance de tab : gris = pas encore marqué,
+// vert = but marqué. Basé sur le compteur ESPN `shootoutScore` (fiable, déjà
+// utilisé pour le score "(x-y tab)") : les N premières pastilles passent au
+// vert où N = nombre de buts marqués. Simplification assumée : un tir raté
+// n'est pas distingué d'un tir pas encore tenté (les deux ne comptent pas dans
+// le compteur) — distinguer précisément un raté demanderait de parser le détail
+// tir-par-tir d'ESPN, jamais vérifié sur un vrai match en tab, donc pas fait.
+function ShootoutDots({ scored }) {
+  const n = scored ?? 0
+  return (
+    <div className="lmp__soDots">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={`lmp__soDot${i < n ? ' lmp__soDot--scored' : ''}`} />
+      ))}
+    </div>
+  )
+}
+
 function shortenName(name) {
   if (!name) return name
   if (TEAM_SHORT[name]) return TEAM_SHORT[name]
@@ -110,6 +128,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
     : period === 'Prolongations' ? 'PROLONGATIONS'
     : period === 'T.A.B.'        ? 'T.A.B.'
     : null
+
+  // Score des tab en direct (mêmes champs que MatchModal.jsx)
+  const homeShootout = espn?.homeShootout ?? null
+  const awayShootout = espn?.awayShootout ?? null
+  const showLivePens = period === 'T.A.B.' && (homeShootout != null || awayShootout != null)
 
   // Score localStorage (partagé avec Live.jsx)
   const scoreKey = `foot_lv_score_${match.id}`
@@ -176,11 +199,18 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
           <span className="mp__hero__name">{homeName}</span>
           <FormDiamonds form={hForm} />
           {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
+          {showLivePens && <ShootoutDots scored={homeShootout} />}
         </div>
 
         <div className="mp__hero__center">
           <span className="mp__hero__score">{h} – {a}</span>
           {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
+          {/* Score des tab en direct — ESPN expose un champ shootoutScore dédié
+              par compétiteur (voir api/fifa-live.js), déjà tracké côté client
+              dans espnScoresCache (useLiveMinute.js) mais pas encore affiché ici. */}
+          {showLivePens && (
+            <span className="lmp__heroPens">({homeShootout ?? 0}-{awayShootout ?? 0} tab)</span>
+          )}
         </div>
 
         <div className="mp__hero__team mp__hero__team--away">
@@ -190,6 +220,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
           <span className="mp__hero__name">{awayName}</span>
           <FormDiamonds form={aForm} />
           {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}
+          {showLivePens && <ShootoutDots scored={awayShootout} />}
         </div>
       </div>
 

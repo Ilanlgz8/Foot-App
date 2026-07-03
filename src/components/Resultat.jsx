@@ -185,7 +185,7 @@ function Resultats() {
         <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
             {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display='none'} />
+              ? <img src={match.homeTeam.crest} alt="" loading="lazy" className="resultats__crest" onError={e => e.target.style.display='none'} />
               : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.homeTeam)}</span>
@@ -205,7 +205,7 @@ function Resultats() {
         <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
           <div className="resultats__crestWrap">
             {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" onError={e => e.target.style.display='none'} />
+              ? <img src={match.awayTeam.crest} alt="" loading="lazy" className="resultats__crest" onError={e => e.target.style.display='none'} />
               : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
           </div>
           <span className="resultats__teamName">{tName(match.awayTeam)}</span>
@@ -380,7 +380,7 @@ function Resultats() {
                       {teams.map(t => (
                         <li key={t.id} className="matchs__wcGroupCard__team">
                           {t.crest
-                            ? <img src={t.crest} alt="" className="matchs__wcGroupCard__crest" onError={e => e.currentTarget.style.display='none'} />
+                            ? <img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest" onError={e => e.currentTarget.style.display='none'} />
                             : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>}
                           <span className="matchs__wcGroupCard__teamName">{translateTeam(t.shortName || t.name)}</span>
                         </li>

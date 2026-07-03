@@ -157,14 +157,14 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
       <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`} title={_name(m.homeTeam)}>
         <span className="bracket__crestWrap">
           {m.homeTeam?.crest
-            ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+            ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
       </div>
       <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`} title={_name(m.awayTeam)}>
         <span className="bracket__crestWrap">
           {m.awayTeam?.crest
-            ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
+            ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="bracket__crest" onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
       </div>
@@ -708,7 +708,7 @@ function Matchs() {
         <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
         <div className="matchs__team matchs__team--home">
           {match.homeTeam.crest && (
-            <img src={match.homeTeam.crest} alt="" className="matchs__crest"
+            <img src={match.homeTeam.crest} alt="" loading="lazy" className="matchs__crest"
               onError={e => e.target.style.display = 'none'} />
           )}
           <span className="matchs__teamName">{teamName(match.homeTeam)}</span>
@@ -719,7 +719,7 @@ function Matchs() {
         </div>
         <div className="matchs__team matchs__team--away">
           {match.awayTeam.crest && (
-            <img src={match.awayTeam.crest} alt="" className="matchs__crest"
+            <img src={match.awayTeam.crest} alt="" loading="lazy" className="matchs__crest"
               onError={e => e.target.style.display = 'none'} />
           )}
           <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
@@ -900,7 +900,7 @@ function Matchs() {
                           {teams.map(t => (
                             <li key={t.id} className="matchs__wcGroupCard__team">
                               {t.crest
-                                ? <img src={t.crest} alt="" className="matchs__wcGroupCard__crest"
+                                ? <img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest"
                                     onError={e => e.currentTarget.style.display = 'none'} />
                                 : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>
                               }

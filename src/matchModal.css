@@ -168,12 +168,18 @@
 
 .modal__crest {
   width: 3.4rem; height: 3.4rem;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
+     (même pattern que live__crest/mp__hero__crest, pour un rendu circulaire cohérent). */
+  transform: scale(1.18);
   filter: drop-shadow(0 4px 12px rgba(var(--black-rgb),0.5));
   transition: transform 0.25s;
 }
 
-.modal__crest:hover { transform: scale(1.08) rotate(-2deg); }
+/* 1.18 (zoom crop) x 1.08 (effet hover) combinés en une seule valeur */
+.modal__crest:hover { transform: scale(1.27) rotate(-2deg); }
 
 .modal__teamName {
   font-size: 0.85rem;
