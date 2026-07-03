@@ -247,7 +247,11 @@ async function sendPushToMatch(payload, slug, options = {}, log = null) {
   if (stale.length) {
     try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
   }
-  if (failed) log?.push(`[push] sent=${sent} failed=${failed} stale=${stale.length} total=${subs.length}`)
+  // Log systématique (avant : seulement si échec) — permet de distinguer "le
+  // serveur a bien envoyé et le service de push a accepté" (sent=X, rien à
+  // corriger côté code, la suite dépend d'Apple/Google/l'OS du téléphone) de
+  // "le serveur n'a même pas réussi à envoyer" (failed>0, cause visible).
+  log?.push(`[push] sent=${sent} failed=${failed} stale=${stale.length} total=${subs.length}`)
   return sent
 }
 
@@ -589,8 +593,17 @@ export default async function handler(req, res) {
       prevScore !== score
     ) {
       log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
+      // tag explicite et UNIQUE par but (inclut le score) : sans ça, sw-push.js
+      // retombe sur un tag par défaut basé uniquement sur matchId, donc PARTAGÉ
+      // entre tous les buts d'un même match. Un 2e but réutiliserait alors le
+      // même tag que le 1er — sur certaines plateformes (iOS notamment), la
+      // notif ne prévient pas forcément l'utilisateur de la même façon la 2e
+      // fois (le natif traite ça comme un remplacement, pas un nouvel avertissement,
+      // selon comment le swipe/lecture du 1er a été géré). Un tag unique par but
+      // supprime totalement ce risque : chaque but est une notif indépendante,
+      // jamais un remplacement silencieux d'une précédente.
       const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId }, slug, log)
+        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${score}` }, slug, log)
       if (sent > 0) notifsSent++
     }
 
