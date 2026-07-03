@@ -10,6 +10,7 @@ import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { calcProno } from '../utils/calcProno'
 import { GroupModal } from './GroupModal'
+import { usePersistedState } from '../hooks/usePersistedState'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -518,9 +519,13 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
 function Matchs() {
   /* ── State ── */
   const navigate = useNavigate()
-  const [selectedComp,  setSelectedComp]  = useState('WC')
-  const [currentIndex,  setCurrentIndex]  = useState(0)
-  const [wcView,        setWcView]        = useState('poules') // 'poules' | 'bracket' | 'matchs'
+  // Persistés dans sessionStorage : App.jsx remonte cette page à chaque
+  // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
+  // d'un match rebasculait toujours sur la 1ère journée/tour (16e) au lieu
+  // de celui consulté (ex: 8e de finale).
+  const [selectedComp,  setSelectedComp]  = usePersistedState('matchs_selectedComp', 'WC')
+  const [currentIndex,  setCurrentIndex]  = usePersistedState('matchs_currentIndex', 0)
+  const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
   const [compOpen,      setCompOpen]      = useState(false)
   // Dropdown "Changer" — voir Classement.jsx pour l'explication (portail
@@ -660,10 +665,16 @@ function Matchs() {
   }, [grouped])
 
   /* Navigation journées */
+  const total = filteredGrouped.length
+  // currentIndex peut venir de sessionStorage (retour depuis /match/:id) : si
+  // la liste de journées/tours a changé depuis, on retombe sur la dernière
+  // valide plutôt que de rester bloqué sur un index vide.
+  useEffect(() => {
+    if (total > 0 && currentIndex >= total) setCurrentIndex(total - 1)
+  }, [total, currentIndex])
   const currentGroup      = filteredGrouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches    = currentGroup?.matches ?? []
-  const total             = filteredGrouped.length
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {

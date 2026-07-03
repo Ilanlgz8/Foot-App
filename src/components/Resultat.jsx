@@ -15,30 +15,19 @@ import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { mergeScore }    from '../utils/matchUtils'
+import { usePersistedState } from '../hooks/usePersistedState'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
-// App.jsx remonte tout le contenu de la page à chaque changement de route
-// (`key={location.pathname}`) — y compris au retour arrière depuis
-// /match/:id vers /resultats. Ce composant est donc démonté puis recréé de
-// zéro à chaque fois, ce qui remettait la journée sélectionnée à l'index 0
-// (bug rapporté : sélectionner la 8e journée, ouvrir un match, faire retour
-// ramenait à la 6e). On sauvegarde donc la sélection dans sessionStorage
-// pour la restaurer au remontage, le temps de la session en cours.
-const RESULTATS_STATE_KEY = 'resultats_ui_state'
-function loadResultatsState() {
-  try {
-    const raw = sessionStorage.getItem(RESULTATS_STATE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
-}
-
 function Resultats() {
   const navigate = useNavigate()
-  const savedState = loadResultatsState()
-  const [selectedComp, setSelectedComp] = useState(savedState?.selectedComp ?? 'WC')
-  const [currentIndex, setCurrentIndex] = useState(savedState?.currentIndex ?? 0)
-  const [viewMode, setViewMode]         = useState(savedState?.viewMode ?? 'journee') // 'journee' | 'poule'
+  // Persistés dans sessionStorage : App.jsx remonte cette page à chaque
+  // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
+  // d'un match rebasculait toujours sur la 1ère journée au lieu de celle
+  // consultée (ex: 8e journée → 6e).
+  const [selectedComp, setSelectedComp] = usePersistedState('resultats_selectedComp', 'WC')
+  const [currentIndex, setCurrentIndex] = usePersistedState('resultats_currentIndex', 0)
+  const [viewMode, setViewMode]         = usePersistedState('resultats_viewMode', 'journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
   const [search, setSearch]             = useState('')
@@ -55,13 +44,6 @@ function Resultats() {
       setCompAnchor(null)
     }
   }, [compOpen])
-  // Sauvegarde la sélection courante (compétition/journée/vue) pour la
-  // restaurer si ce composant est remonté (retour arrière depuis un match).
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(RESULTATS_STATE_KEY, JSON.stringify({ selectedComp, currentIndex, viewMode }))
-    } catch {}
-  }, [selectedComp, currentIndex, viewMode])
   useEffect(() => {
     if (!compOpen) return
     const onDown = (e) => {
