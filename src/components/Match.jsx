@@ -421,7 +421,15 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
           {[...svgPathsLeft, ...svgPathsRight, ...finalPaths].map((d, i) => (
             <path key={i} d={d} fill="none"
               stroke="rgba(239,68,68,0.55)" strokeWidth="1.75"
-              strokeLinecap="round" strokeLinejoin="round"
+              // strokeLinejoin="round" arrondissait le coin à chaque angle
+              // droit (horizontal → vertical) des connecteurs — d'où
+              // l'impression de lignes "légèrement courbées" alors que les
+              // tracés eux-mêmes (commandes H/V du path) sont mathématiquement
+              // parfaitement droits. "miter" donne un angle net à 90°, comme
+              // sur un vrai tableau de phases finales. strokeLinecap="round"
+              // conservé : il n'arrondit que les extrémités libres des
+              // segments, pas les angles — c'est l'effet "moderne" voulu.
+              strokeLinecap="round" strokeLinejoin="miter"
             />
           ))}
         </svg>

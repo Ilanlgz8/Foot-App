@@ -347,12 +347,12 @@ function Accueil() {
         {/* ── Live — pleine largeur, priorité absolue ── */}
         {widgetMatches.length > 0 && (
           <div className="accueil__liveSection">
+            {/* Bouton "Voir tout" retiré : faisait doublon avec le bouton
+                "Live" de la navbar (même destination /live) — signalé par
+                l'utilisateur. Ce dernier reste l'unique accès à la page /live. */}
             <div className="accueil__liveSectionHeader">
               <span className="accueil__liveDot" />
               <span className="accueil__liveSectionTitle">EN DIRECT</span>
-              <button className="accueil__liveDirectBtn" onClick={() => navigate('/live')}>
-                Voir tout <span className="accueil__livePageBtnArrow">›</span>
-              </button>
             </div>
             <LiveWidget
               liveMatches={widgetMatches}

@@ -534,7 +534,7 @@
     height: 0.38rem;
     border-radius: 50%;
     background: #fff;
-    animation: pulse 1.2s ease-in-out infinite;
+    animation: pulse 1.2s ease-in-out infinite, pulseRed 1.6s ease-out infinite;
     box-shadow: 0 0 4px rgba(var(--white-rgb),0.9);
     flex-shrink: 0;
   }
@@ -639,6 +639,10 @@
     white-space: nowrap;
   }
 
+  /* Seul accès à /live sur mobile (le bouton "Voir tout" de l'Accueil a été
+     retiré, doublon) → rendu plus visible qu'avant : fond teinté + anneau qui
+     pulse autour du point, au lieu d'un simple point discret dans un onglet
+     par ailleurs identique aux autres. */
   .navbar__qnLive {
     flex: 1;
     display: flex;
@@ -647,23 +651,25 @@
     justify-content: center;
     gap: 4px;
     padding: 8px 4px 10px;
+    margin: 2px 0;
     border: none;
-    background: none;
+    background: rgba(var(--red-rgb),0.14);
     cursor: pointer;
     color: var(--red);
     font-size: 0.62rem;
     font-weight: 900;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    border-radius: 6px;
-    transition: color 0.18s;
+    border-radius: 9px;
+    box-shadow: 0 0 0 1px rgba(var(--red-rgb),0.25) inset;
+    transition: color 0.18s, background 0.18s;
   }
   .navbar__qnLiveDot {
-    width: 0.42rem;
-    height: 0.42rem;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     background: var(--red);
-    animation: pulse 1.2s ease-in-out infinite;
+    animation: pulse 1.2s ease-in-out infinite, pulseRed 1.6s ease-out infinite;
     box-shadow: 0 0 6px rgba(var(--red-rgb),0.9);
     flex-shrink: 0;
   }
