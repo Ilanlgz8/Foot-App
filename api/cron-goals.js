@@ -220,7 +220,15 @@ async function sendPushToMatch(payload, slug, options = {}, log = null) {
     catch { stale.push(subRaw); return }
     if (!matcher(sub.comps, slug)) return
     try {
-      await webpush.sendNotification(sub, payloadStr, { TTL: options.ttl ?? 3600 })
+      // urgency: 'high' — sans ça, les services de push (notamment Apple sur
+      // iOS, largement majoritaire chez nos abonnés) peuvent différer la
+      // livraison en arrière-plan/économie d'énergie, ce qui correspond
+      // exactement au symptôme observé (notifs de but rares et imprévisibles,
+      // alors qu'il n'y en a que ~0-10 par match — pas un problème de volume).
+      await webpush.sendNotification(sub, payloadStr, {
+        TTL: options.ttl ?? 3600,
+        urgency: options.urgency ?? 'normal',
+      })
       sent++
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) {
@@ -249,7 +257,9 @@ async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600) 
     if (already) return 0
     await kv.set(dedupKey, '1', { ex: ttl })
   } catch { return 0 }
-  return sendPushToMatch(payload, slug, {}, log)
+  // urgency 'high' : ces notifs (KO/but/mi-temps/reprise/fin) sont rares et
+  // importantes — priorité max pour limiter les retards/pertes en arrière-plan.
+  return sendPushToMatch(payload, slug, { urgency: 'high' }, log)
 }
 
 // ── Capture proactive du summary ESPN (compos + stats + événements) ────────────
@@ -467,6 +477,15 @@ export default async function handler(req, res) {
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
     const eventId  = evt.id
 
+    // Diagnostic temporaire : vérifie si comp.status.displayClock (l'horloge)
+    // avance déjà pendant que status reste bloqué sur SCHEDULED après l'heure
+    // programmée — ça dira si la minute/clock ESPN est une donnée indépendante
+    // du statut (auquel cas la détecter serait utile) ou si elle vient du même
+    // flux et est donc bloquée en même temps (auquel cas ça n'aiderait pas).
+    if (slug === 'fifa.world' && status === 'STATUS_SCHEDULED' && evt.date && Date.now() >= new Date(evt.date).getTime()) {
+      log.push(`[espn:${slug}:${eventId}] SCHEDULED mais heure passée — displayClock="${comp.status?.displayClock ?? ''}"`)
+    }
+
     // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
     // Si ESPN dit encore SCHEDULED mais que l'API FIFA officielle confirme que le
     // match a commencé (Period != 0), on bascule immédiatement en IN_PROGRESS →
@@ -479,6 +498,17 @@ export default async function handler(req, res) {
         const awayNames = fifaTeamNamesAll(m.AwayTeam)
         return homeNames.some(n => fuzzyTeamFifa(rawHome, n)) && awayNames.some(n => fuzzyTeamFifa(rawAway, n))
       })
+      // Diagnostic temporaire : si le match ESPN est encore SCHEDULED après
+      // l'heure prévue mais qu'aucun match FIFA ne matche, on veut voir
+      // EXACTEMENT les noms comparés pour savoir si c'est un problème de
+      // matching de noms (ESPN "X" vs FIFA "Y" jamais reconnus comme pareils)
+      // plutôt que de deviner un correctif au hasard.
+      if (!fifaMatch && status === 'STATUS_SCHEDULED' && evt.date && Date.now() >= new Date(evt.date).getTime()) {
+        const fifaAllNames = fifaLiveMatches.map(m =>
+          `[${fifaTeamNamesAll(m.HomeTeam).join('/')} vs ${fifaTeamNamesAll(m.AwayTeam).join('/')}]`
+        ).join(' ')
+        log.push(`[fifa-match-fail:${eventId}] ESPN="${rawHome}" vs "${rawAway}" — FIFA dispo: ${fifaAllNames || '(aucun)'}`)
+      }
       if (fifaMatch) {
         const fifaStatus = fifaEffectiveStatus(fifaMatch)
         if (status === 'STATUS_SCHEDULED' && fifaStatus) {
@@ -508,6 +538,22 @@ export default async function handler(req, res) {
       await cacheEspnSummary(slug, eventId, log)
     }
 
+    // 🔴 Coup d'envoi — basé sur l'heure de coup d'envoi PROGRAMMÉE (evt.date),
+    // pas sur le statut "live" ESPN qui a un lag connu (~10min sur le slug WC,
+    // voir fifa-override plus haut). evt.date est une donnée fixe connue à
+    // l'avance, sans lag possible : dès qu'elle est dépassée, on notifie —
+    // beaucoup plus simple et fiable que de dépendre d'une 2e API externe
+    // (FIFA) pour accélérer la détection du statut live. sendDeduped()
+    // garantit qu'on n'envoie qu'une seule fois par match (clé Redis dédiée).
+    const kickoffAt     = evt.date ? new Date(evt.date).getTime() : null
+    const kickoffPassed = kickoffAt != null && Date.now() >= kickoffAt
+    const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
+    if (kickoffPassed && notPostponed && !FINAL_ESPN.has(status)) {
+      const sent = await sendDeduped(`push:espn:ko:${eventId}`,
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
+      if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (heure programmée)`) }
+    }
+
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
@@ -516,30 +562,11 @@ export default async function handler(req, res) {
     // Sauvegarder état courant (TTL 12h)
     try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
 
-    // Premier poll → baseline, pas de notif.
-    // Exception : si le match est déjà en cours ET a démarré il y a < 5min
-    // (2 matchs simultanés : le 2ème n'avait pas de baseline au 1er cron → KO manqué)
+    // Premier poll → baseline, pas de notif de changement d'état (le KO est
+    // déjà géré ci-dessus, indépendamment de prevState).
     if (prevState === null) {
-      if (LIVE_ESPN.has(status) && !FINAL_ESPN.has(status)) {
-        const matchStart = evt.date ? new Date(evt.date).getTime() : null
-        const freshKickoff = matchStart && (Date.now() - matchStart < 5 * 60_000)
-        if (freshKickoff) {
-          log.push(`[espn:${slug}:${eventId}] KO catch-up (~${Math.round((Date.now() - matchStart) / 60_000)}min)`)
-          const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-            { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
-          if (sent > 0) notifsSent++
-        }
-      }
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
       continue
-    }
-
-    // 🔴 Coup d'envoi
-    if (!LIVE_ESPN.has(prevStatus) && !FINAL_ESPN.has(prevStatus) && status === 'STATUS_IN_PROGRESS') {
-      log.push(`[espn:${slug}:${eventId}] KO`)
-      const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: '🔴 Coup d\'envoi !', body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
-      if (sent > 0) notifsSent++
     }
 
     // ⚽ But — score différent du poll précédent, alors que le match était en
