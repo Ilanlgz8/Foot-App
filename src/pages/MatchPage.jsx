@@ -22,6 +22,7 @@ import { useEspnMatchDetail } from '../hooks/useEspnMatchDetail'
 import { useAflMatchStats } from '../hooks/useApiFootball'
 import {
   PreMatchSection,
+  PmPronoSection,
   ComposTab,
   ClassementTab,
   MatchTimeline,
@@ -381,7 +382,7 @@ function calcTeamStats(teamId, compMatches) {
   }
 }
 
-function MpSeasonStats({ match, formMap, compMatches }) {
+function MpSeasonStats({ match, formMap, compMatches, hideForm = false }) {
   const homeId   = match.homeTeam?.id
   const awayId   = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -421,21 +422,25 @@ function MpSeasonStats({ match, formMap, compMatches }) {
       </div>
 
       {/* Forme récente — dernier match joué de chaque équipe (score, W/D/L,
-          date), même bloc que l'onglet "Avant-match" — manquait ici avant. */}
-      <div className="pm__section modal__seasonForm">
-        <h3 className="pm__sectionTitle">Forme récente</h3>
-        <div className="pm__formGrid">
-          <div className="pm__formCol">
-            <p className="pm__formTeamName">{homeName}</p>
-            <TeamFormTable teamId={homeId} compMatches={compMatches} />
-          </div>
-          <div className="pm__formDivider" />
-          <div className="pm__formCol">
-            <p className="pm__formTeamName">{awayName}</p>
-            <TeamFormTable teamId={awayId} compMatches={compMatches} />
+          date), même bloc que l'onglet "Avant-match". Masqué quand
+          PreMatchSection est rendu juste après (matchs à venir) : il a déjà
+          son propre bloc Forme récente, l'afficher ici aussi le dupliquait. */}
+      {!hideForm && (
+        <div className="pm__section modal__seasonForm">
+          <h3 className="pm__sectionTitle">Forme récente</h3>
+          <div className="pm__formGrid">
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{homeName}</p>
+              <TeamFormTable teamId={homeId} compMatches={compMatches} />
+            </div>
+            <div className="pm__formDivider" />
+            <div className="pm__formCol">
+              <p className="pm__formTeamName">{awayName}</p>
+              <TeamFormTable teamId={awayId} compMatches={compMatches} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -543,10 +548,13 @@ export default function MatchPage() {
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>
+                      {/* Probabilités estimées — tout en haut, avant Stats saison */}
+                      <div className="mp__pronoTop"><PmPronoSection prono={prono} /></div>
                       <MpSeasonStats
                         match={match}
                         formMap={formMap}
                         compMatches={compMatches}
+                        hideForm
                       />
                       <PreMatchSection
                         match={match}
@@ -554,6 +562,7 @@ export default function MatchPage() {
                         formMap={formMap}
                         compMatches={compMatches}
                         hideStats
+                        hideProno
                       />
                     </>
             )}

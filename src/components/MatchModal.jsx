@@ -1275,45 +1275,52 @@ export function MatchStatsSection({ match }) {
   )
 }
 
-export function PreMatchSection({ match, prono, formMap, compMatches, hideStats = false }) {
+// Bloc "Probabilités estimées" (design pm__* de MatchPage) — extrait de
+// PreMatchSection pour pouvoir être affiché seul, en haut de page, sans
+// dupliquer le JSX (voir usage dans MatchPage.jsx).
+export function PmPronoSection({ prono }) {
+  if (!prono) return null
+  const winner = prono.home >= prono.away && prono.home >= prono.draw ? 'home'
+    : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
+    : 'draw'
+  return (
+    <div className="pm__section">
+      <h3 className="pm__sectionTitle">Probabilités estimées</h3>
+      <div className="pm__pronoRow">
+        <div className="pm__pronoBar">
+          <div className={`pm__pronoSeg pm__pronoSeg--home${winner === 'home' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.home }}>
+            {prono.home}%
+          </div>
+          <div className={`pm__pronoSeg pm__pronoSeg--draw${winner === 'draw' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.draw }}>
+            {prono.draw}%
+          </div>
+          <div className={`pm__pronoSeg pm__pronoSeg--away${winner === 'away' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.away }}>
+            {prono.away}%
+          </div>
+        </div>
+      </div>
+      <div className="pm__pronoNums">
+        <span className={`pm__pronoNum${winner === 'home' ? ' pm__pronoNum--winner' : ''}`}>{prono.home}%<br /><small>Victoire</small></span>
+        <span className={`pm__pronoNum pm__pronoNum--draw${winner === 'draw' ? ' pm__pronoNum--winner' : ''}`}>{prono.draw}%<br /><small>Nul</small></span>
+        <span className={`pm__pronoNum${winner === 'away' ? ' pm__pronoNum--winner' : ''}`}>{prono.away}%<br /><small>Victoire</small></span>
+      </div>
+      <p className="pm__disclaimer">Basé sur la forme des 5 derniers matchs</p>
+    </div>
+  )
+}
+
+export function PreMatchSection({ match, prono, formMap, compMatches, hideStats = false, hideProno = false }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-  const winner = prono
-    ? (prono.home >= prono.away && prono.home >= prono.draw ? 'home'
-      : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
-      : 'draw')
-    : null
 
   return (
     <div className="pm__wrap">
 
-      {/* Prono */}
-      {prono && (
-        <div className="pm__section">
-          <h3 className="pm__sectionTitle">Probabilités estimées</h3>
-          <div className="pm__pronoRow">
-            <div className="pm__pronoBar">
-              <div className={`pm__pronoSeg pm__pronoSeg--home${winner === 'home' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.home }}>
-                {prono.home}%
-              </div>
-              <div className={`pm__pronoSeg pm__pronoSeg--draw${winner === 'draw' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.draw }}>
-                {prono.draw}%
-              </div>
-              <div className={`pm__pronoSeg pm__pronoSeg--away${winner === 'away' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.away }}>
-                {prono.away}%
-              </div>
-            </div>
-          </div>
-          <div className="pm__pronoNums">
-            <span className={`pm__pronoNum${winner === 'home' ? ' pm__pronoNum--winner' : ''}`}>{prono.home}%<br /><small>Victoire</small></span>
-            <span className={`pm__pronoNum pm__pronoNum--draw${winner === 'draw' ? ' pm__pronoNum--winner' : ''}`}>{prono.draw}%<br /><small>Nul</small></span>
-            <span className={`pm__pronoNum${winner === 'away' ? ' pm__pronoNum--winner' : ''}`}>{prono.away}%<br /><small>Victoire</small></span>
-          </div>
-          <p className="pm__disclaimer">Basé sur la forme des 5 derniers matchs</p>
-        </div>
-      )}
+      {/* Prono — masqué si déjà affiché ailleurs (ex: MatchPage l'affiche
+          en haut de page, au-dessus de "Stats saison") */}
+      {!hideProno && <PmPronoSection prono={prono} />}
 
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
       <H2HSection match={match} compMatches={compMatches} />

@@ -416,6 +416,15 @@ export default async function handler(req, res) {
   if (!setupVapid())
     return res.status(503).json({ error: 'VAPID non configuré' })
 
+  // Marqueur "dernière exécution" — lu par /api/debug-push pour vérifier que
+  // cron-job.org appelle bien cet endpoint chaque minute. Avant ce fix,
+  // aucune trace de la dernière exécution réelle n'existait nulle part :
+  // impossible de distinguer "le cron tourne mais rien à notifier" de
+  // "cron-job.org a arrêté d'appeler cet endpoint" (secret expiré, job
+  // désactivé côté cron-job.org...) — cause plausible de notifs manquantes
+  // non détectable depuis le code de l'app seul.
+  try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
+
   const now       = new Date()
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
@@ -625,6 +634,15 @@ export default async function handler(req, res) {
       )
     }
   }
+
+  // Résultat détaillé de CETTE exécution — utile pour /api/debug-push (voir
+  // marqueur lastRun plus haut) : distingue "0 notif car rien à notifier" de
+  // "le cron ne tourne plus du tout".
+  try {
+    await kv.set('cron:goals:lastResult', JSON.stringify({
+      at: Date.now(), events: allEvents.length, notifsSent,
+    }), { ex: 7 * 24 * 3600 })
+  } catch {}
 
   return res.status(200).json({
     ok: true,

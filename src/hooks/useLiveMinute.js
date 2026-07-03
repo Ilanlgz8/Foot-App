@@ -325,7 +325,7 @@ function _runFtSafeguards(matches, now, queryClient) {
 // ESPN — couche primaire (via /api/fifa-live)
 // ─────────────────────────────────────────────
 
-async function _doPollESPN(matches, queryClient) {
+async function _doPollESPN(matches, queryClient, forceFresh = false) {
   const now = Date.now()
 
   // ── Pending kickoff : afficher le widget dès l'heure prévue ──
@@ -368,10 +368,19 @@ async function _doPollESPN(matches, queryClient) {
     // premier plan) : ce fetch n'avait aucune limite de temps. Avec le timeout,
     // il échoue proprement en 10s max → le catch ci-dessous relâche le verrou via
     // le finally de pollESPN(), et le tick suivant peut repartir sur un fetch frais.
+    // forceFresh : utilisé au retour au premier plan (voir onVisible plus bas).
+    // Le cache Redis serveur (6-8s) peut sinon renvoyer un score pré-but si un
+    // but a été marqué juste avant/pendant que l'app était en arrière-plan et
+    // qu'un autre appel (n'importe quel utilisateur) a rafraîchi ce cache
+    // juste avant notre retour au premier plan — les 2 polls de rattrapage
+    // (immédiat + à 3s) tombaient alors sur le MÊME cache encore valide,
+    // laissant le score figé jusqu'au prochain cycle naturel du cache.
+    // forceFresh demande au serveur de contourner ce cache pour CET appel
+    // précis, sans changer le TTL normal utilisé par tous les autres polls.
     const res = await fetch('/api/fifa-live', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ matches: toTrack }),
+      body:    JSON.stringify({ matches: toTrack, forceFresh }),
       signal:  AbortSignal.timeout(10_000),
     })
 
@@ -701,22 +710,27 @@ async function _doPollESPN(matches, queryClient) {
 // Empêche deux appels simultanés à _doPollESPN (race condition visibilitychange + Worker).
 // Si un poll est déjà en cours, on mémorise qu'un nouveau poll est souhaité (_pollQueued)
 // et on le lancera dès que le poll courant se termine.
-async function pollESPN(matches, queryClient) {
+let _pollQueuedForceFresh = false
+
+async function pollESPN(matches, queryClient, forceFresh = false) {
   if (_pollInProgress) {
     _pollQueued = true
+    if (forceFresh) _pollQueuedForceFresh = true
     return
   }
   _pollInProgress = true
   _pollQueued     = false
   try {
-    await _doPollESPN(matches, queryClient)
+    await _doPollESPN(matches, queryClient, forceFresh)
   } finally {
     _pollInProgress = false
     // Si un poll était en attente pendant qu'on était occupé, on le lance maintenant
     if (_pollQueued) {
       _pollQueued = false
+      const queuedForceFresh = _pollQueuedForceFresh
+      _pollQueuedForceFresh  = false
       // Léger délai pour laisser React traiter le setQueryData précédent
-      setTimeout(() => pollESPN(matches, queryClient), 150)
+      setTimeout(() => pollESPN(matches, queryClient, queuedForceFresh), 150)
     }
   }
 }
@@ -966,26 +980,35 @@ export function useLiveMinute(matches) {
   // Dès que la page redevient visible, on force un poll ESPN immédiat
   // sans attendre le prochain tick (jusqu'à 15s de retard sinon).
   useEffect(() => {
+    // Anti-doublon : sur iOS, 'visibilitychange' et 'focus'/'pageshow' peuvent
+    // se déclencher quasi simultanément pour le même retour au premier plan
+    // (on écoute les 3 events — voir plus bas — car 'visibilitychange' seul
+    // n'est pas toujours fiable pour détecter la reprise après une longue
+    // mise en arrière-plan iOS/PWA, cause plausible du score qui restait figé
+    // indéfiniment plutôt que juste en retard de quelques secondes).
+    let lastRunAt = 0
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastRunAt < 1_000) return
+      lastRunAt = Date.now()
       // Marquer les données ESPN comme périmées : empêche l'interpolation stale
       window.__espnNeedsRefresh = Date.now()
 
       if (!navigator.onLine) {
-        window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient), { once: true })
+        window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient, true), { once: true })
         return
       }
 
       // Poll immédiat — le lock garantit qu'un tick Worker concurrent est mis en file
-      // d'attente plutôt que de créer une race condition avec des données Redis décalées
-      await pollESPN(matchesRef.current, queryClient)
+      // d'attente plutôt que de créer une race condition avec des données Redis décalées.
+      // forceFresh=true : contourne le cache Redis serveur pour ce poll précis (voir
+      // commentaire détaillé dans _doPollESPN).
+      await pollESPN(matchesRef.current, queryClient, true)
 
       // 2ème poll après 3s pour rattraper les buts marqués pendant l'arrière-plan iOS.
-      // Redis peut retourner un cache stale sur le 1er poll (lag ~12s) → 2ème poll
-      // force une réponse ESPN fraîche et met à jour le score manqué.
       setTimeout(() => {
         if (document.visibilityState === 'visible') {
-          pollESPN(matchesRef.current, queryClient)
+          pollESPN(matchesRef.current, queryClient, true)
         }
       }, 3_000)
       const now = Date.now()
@@ -1005,7 +1028,13 @@ export function useLiveMinute(matches) {
       })
     }
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    window.addEventListener('pageshow', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+      window.removeEventListener('pageshow', onVisible)
+    }
   }, [queryClient])
 
   // Recalibration manuelle

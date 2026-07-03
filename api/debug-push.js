@@ -50,13 +50,31 @@ export default async function handler(req, res) {
     info.subscriptions = { error: e.message }
   }
 
-  // 3. Dernier run du cron (on vérifie une clé ESPN récente)
+  // 3. Dernier run du cron — AVANT ce fix, cette section ne vérifiait RIEN
+  // de réel (juste "KV répond"), donc impossible de savoir si cron-job.org
+  // appelle bien /api/cron-goals chaque minute ou si le job est cassé côté
+  // cron-job.org (secret expiré, job désactivé/en pause, plan gratuit
+  // expiré...) — cause plausible de "je ne reçois plus aucune notif de but"
+  // qu'aucun log applicatif ne peut révéler puisque le cron externe
+  // n'atteint alors même pas ce serveur.
   try {
-    // Lister quelques clés cron:espn:* pour voir si le cron tourne
-    // Note : smembers sur un pattern n'existe pas, on juste confirme que KV répond
-    info.kv = { reachable: true }
+    const lastRun    = await kv.get('cron:goals:lastRun')
+    const lastResult = await kv.get('cron:goals:lastResult')
+    const parsedResult = lastResult
+      ? (typeof lastResult === 'string' ? JSON.parse(lastResult) : lastResult)
+      : null
+    const ageSec = lastRun ? Math.round((Date.now() - Number(lastRun)) / 1000) : null
+    info.cron = {
+      reachable:   true,
+      lastRunAgo:  ageSec != null ? `${ageSec}s` : 'jamais',
+      // Le cron est censé tourner toutes les 60s (cron-job.org) → si la
+      // dernière exécution connue date de plus de 3min, cron-job.org
+      // n'appelle probablement plus cet endpoint.
+      stale:       ageSec == null || ageSec > 180,
+      lastResult:  parsedResult,
+    }
   } catch (e) {
-    info.kv = { reachable: false, error: e.message }
+    info.cron = { reachable: false, error: e.message }
   }
 
   // 4. Test envoi VAPID (dry-run — sans vraie subscription)

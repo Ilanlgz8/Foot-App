@@ -269,6 +269,13 @@
   margin-top: 1.1rem;
 }
 
+/* Bloc Probabilités estimées affiché seul en haut de page (matchs à venir),
+   hors de .pm__wrap → pas de gap flex automatique, espacement manuel avant
+   Stats saison. */
+.mp__pronoTop {
+  margin-bottom: 1.1rem;
+}
+
 .mp__statsHeader {
   display: flex;
   justify-content: space-between;

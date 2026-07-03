@@ -51,12 +51,14 @@ function fuzzyTeam(a, b) {
 
 // ── FIFA fetch + cache ─────────────────────────────────────────────────────────
 
-async function fetchFifaLive() {
+async function fetchFifaLive(bypassCache = false) {
   const cKey = 'fifa:live'
-  try {
-    const cached = await kv.get(cKey)
-    if (cached) return { data: safeJson(cached), fromCache: true }
-  } catch {}
+  if (!bypassCache) {
+    try {
+      const cached = await kv.get(cKey)
+      if (cached) return { data: safeJson(cached), fromCache: true }
+    } catch {}
+  }
 
   try {
     const res = await fetch(FIFA_LIVE_URL, {
@@ -334,15 +336,17 @@ function extractBoxscoreStats(hArr, aArr) {
   }
 }
 
-async function fetchEspnEvents(slugSet, today, yesterday) {
+async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false) {
   const allEvents = []
   await Promise.allSettled([...slugSet].map(async slug => {
     const cKey = `espn:fb:${slug}`
     let events = null
-    try {
-      const cached = await kv.get(cKey)
-      if (cached) events = safeJson(cached)
-    } catch {}
+    if (!bypassCache) {
+      try {
+        const cached = await kv.get(cKey)
+        if (cached) events = safeJson(cached)
+      } catch {}
+    }
 
     if (!events) {
       try {
@@ -379,7 +383,11 @@ export default async function handler(req, res) {
     if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { matches } = req.body ?? {}
+  // forceFresh : envoyé par le client au retour au premier plan (voir onVisible
+  // dans useLiveMinute.js) — contourne le cache Redis (6-8s) pour CET appel
+  // précis, afin de ne pas rater un but marqué juste avant/pendant l'arrière-plan
+  // si ce cache a été rafraîchi par un autre appel juste avant notre retour.
+  const { matches, forceFresh } = req.body ?? {}
   if (!Array.isArray(matches) || !matches.length) return res.json({})
   if (matches.length > 20) return res.status(400).json({ error: 'Trop de matchs (max 20)' })
 
@@ -407,7 +415,7 @@ export default async function handler(req, res) {
   // FIFA est UNIQUEMENT utilisé pour les données de score/buteurs WC.
   // Les statuts (espnStatus/espnClock/espnPeriod) viennent d'ESPN — plus fiables.
   // ══════════════════════════════════════════════════════════════════════════
-  const { data: fifaLive, fromCache: fifaCached } = await fetchFifaLive()
+  const { data: fifaLive, fromCache: fifaCached } = await fetchFifaLive(!!forceFresh)
 
   // Index FIFA par fdMatchId : score + buteurs + IDs FIFA pour les compos/stats
   const fifaByFdId = {}
@@ -456,7 +464,7 @@ export default async function handler(req, res) {
   }
 
   const espnEvents = slugSet.size > 0
-    ? await fetchEspnEvents(slugSet, today, yesterday)
+    ? await fetchEspnEvents(slugSet, today, yesterday, !!forceFresh)
     : []
 
   // Matcher chaque match FD.org avec un event ESPN
