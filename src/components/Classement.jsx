@@ -226,7 +226,7 @@ function Classement() {
           <div className="accueil__matchCardTeam">
             <div className="accueil__matchCardCrestWrap">
               {m.homeTeam?.crest
-                ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" />
+                ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
             <span className="accueil__matchCardName">{hn}</span>
@@ -245,7 +245,7 @@ function Classement() {
           <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
             <div className="accueil__matchCardCrestWrap">
               {m.awayTeam?.crest
-                ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" />
+                ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
             <span className="accueil__matchCardName">{an}</span>
@@ -555,7 +555,7 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest"
+                            <img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
                               onError={e => e.currentTarget.style.display = 'none'} />
                           )}
                           <span className="classement__scorerTeam">

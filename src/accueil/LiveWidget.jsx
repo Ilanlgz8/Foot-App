@@ -29,11 +29,11 @@ function LiveChip({ match, espn, onMatchClick }) {
     >
       <div className="accueil__liveChipTeams">
         {match.homeTeam?.crest
-          ? <img src={match.homeTeam.crest} alt="" className="accueil__liveChipCrest" />
+          ? <img src={match.homeTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.homeTeam?.name} />
           : <div className="accueil__liveChipCrestFb" />}
         <span className="accueil__liveChipScore">{hs ?? '-'} – {as_ ?? '-'}</span>
         {match.awayTeam?.crest
-          ? <img src={match.awayTeam.crest} alt="" className="accueil__liveChipCrest" />
+          ? <img src={match.awayTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.awayTeam?.name} />
           : <div className="accueil__liveChipCrestFb" />}
       </div>
       <span className={`accueil__liveChipMinute${isTermine ? ' accueil__liveChipMinute--ft' : ''}`}>
