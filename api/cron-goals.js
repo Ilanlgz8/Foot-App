@@ -100,7 +100,7 @@ async function fetchFifaLiveMatches(log) {
       headers: { Accept: 'application/json' },
       signal:  AbortSignal.timeout(6_000),
     })
-    if (!res.ok) return []
+    if (!res.ok) { log.push(`[fifa:live] http=${res.status}`); return [] }
     const json = await res.json()
     const data = json.Results ?? []
     try { await kv.set('fifa:live', JSON.stringify(data), { ex: 6 }) } catch {}
@@ -445,6 +445,12 @@ export default async function handler(req, res) {
   // FIFA live — fetché une seule fois, utilisé pour accélérer la détection WC (voir plus bas)
   const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(log) : []
+  // Diagnostic temporaire (retard notif coup d'envoi signalé encore présent malgré
+  // le fix fifa-override ci-dessous) : si cette ligne montre matches=0 à chaque
+  // appel pendant qu'un match WC est en cours, ça veut dire que fetchFifaLiveMatches
+  // échoue silencieusement (voir son catch) et que le fix ne se déclenche jamais —
+  // exactement le même type de panne que l'API FotMob (voir useFotmobXG, retiré).
+  if (hasWc) log.push(`[fifa:live] matches=${fifaLiveMatches.length}`)
 
   for (const { slug, evt } of allEvents) {
     const comp = evt.competitions?.[0]

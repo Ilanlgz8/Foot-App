@@ -15,7 +15,6 @@ import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
 import { calcProno }        from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
-import { useFotmobXG }      from '../hooks/useFotmobXG'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
 import {
@@ -107,11 +106,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
 
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
-  // Le xG ne vient jamais de espn.stats (ESPN ne fournit pas ce champ, useLiveMinute
-  // ne l'a jamais peuplé) — il vient de FotMob via ce hook dédié.
-  const fotmobXg = useFotmobXG(match)
-  const xgHome   = fotmobXg?.home ?? null
-  const xgAway   = fotmobXg?.away ?? null
 
   const h = hs ?? '–', a = as_ ?? '–'
 
@@ -198,7 +192,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
           <FormDiamonds form={hForm} />
-          {xgHome != null && <span className="lmp__heroXg">{xgHome.toFixed(2)} xG</span>}
           {showLivePens && <ShootoutDots scored={homeShootout} />}
         </div>
 
@@ -219,7 +212,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
           <FormDiamonds form={aForm} />
-          {xgAway != null && <span className="lmp__heroXg">{xgAway.toFixed(2)} xG</span>}
           {showLivePens && <ShootoutDots scored={awayShootout} />}
         </div>
       </div>

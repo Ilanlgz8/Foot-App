@@ -79,16 +79,6 @@
   50%       { opacity: 0.45; }
 }
 
-/* xG shown below team name in hero */
-.lmp__heroXg {
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: rgba(var(--red-rgb),0.65);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-top: 0.15rem;
-}
-
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
 .lmp__heroPeriodBadge {
   display: inline-block;

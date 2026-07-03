@@ -667,7 +667,10 @@ export default function LineupPitch({ home, away }) {
               }}
             >
               {t?.crest && (
-                <img src={t.crest} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                <img src={t.crest} alt="" data-team={t?.name} style={{
+                  width: 24, height: 24, objectFit: 'cover', objectPosition: 'center',
+                  borderRadius: '50%', transform: 'scale(1.18)',
+                }} />
               )}
               <span style={{
                 fontSize:      10,
