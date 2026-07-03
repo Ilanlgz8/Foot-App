@@ -880,6 +880,22 @@ async function pollApiFootball(matches, queryClient) {
   }
 }
 
+// ── Invalidation des stats live "à la demande" (fifaStats/espnSummary/aflStats) ──
+// Ces 3 hooks (MatchModal.jsx / useApiFootball.js) sont des useQuery indépendants
+// avec leur propre refetchInterval (45-90s) — contrairement au score (espnScores),
+// ils ne font PAS partie du poll coordonné de useLiveMinute et n'étaient donc PAS
+// concernés par le fix cold-start/forceFresh ci-dessus : à l'ouverture de l'app en
+// plein match, le score se mettait à jour immédiatement mais les stats (possession,
+// tirs, corners) pouvaient rester vides jusqu'à leur prochain cycle (jusqu'à 90s).
+// On force ici un refetch immédiat, même logique que pour le score.
+function invalidateLiveStatsQueries(queryClient) {
+  queryClient.invalidateQueries({
+    predicate: q =>
+      Array.isArray(q.queryKey) &&
+      ['fifaStats', 'espnSummary', 'aflStats'].includes(q.queryKey[0]),
+  })
+}
+
 // ─────────────────────────────────────────────
 // Hook principal
 // ─────────────────────────────────────────────
@@ -961,6 +977,7 @@ export function useLiveMinute(matches) {
     // (même sans live en cours — pour détecter les pending kickoffs au bon moment)
     if (prevMatchesLen.current === 0 && matches.length > 0) {
       pollESPN(matches, queryClient)
+      invalidateLiveStatsQueries(queryClient)
     }
     prevMatchesLen.current = matches.length
   }, [matches, queryClient])
@@ -993,6 +1010,9 @@ export function useLiveMinute(matches) {
       lastRunAt = Date.now()
       // Marquer les données ESPN comme périmées : empêche l'interpolation stale
       window.__espnNeedsRefresh = Date.now()
+      // Stats live (possession/tirs/corners) — même fix que le score : ne pas
+      // attendre leur cycle de refetch propre (jusqu'à 90s) après un retour au premier plan.
+      invalidateLiveStatsQueries(queryClient)
 
       if (!navigator.onLine) {
         window.addEventListener('online', () => pollESPN(matchesRef.current, queryClient, true), { once: true })
