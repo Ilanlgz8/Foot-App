@@ -89,7 +89,7 @@ body::before {
    l'attribut data-team ajouté sur les <img> de crest concernées. À étendre
    avec la même méthode si un autre drapeau est signalé pareil. */
 img[data-team="Argentina"] {
-  transform: scale(1.55) !important;
+  transform: scale(1.75) !important;
 }
 
 /* ── Animations globales ── */

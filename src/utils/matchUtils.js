@@ -194,6 +194,19 @@ export function calcMinute(match) {
   if (match.status !== 'IN_PLAY' && match.status !== 'PAUSED' && !wasLive) return null
   if (match.status === 'FINISHED') return null
 
+  // ── Déjà connu en prolongations mais espnStatus indisponible sur ce poll ──
+  // Les heuristiques ci-dessous (pausedAt/half2Start/kickoffAt/utcDate) ne
+  // modélisent QUE les 2 mi-temps réglementaires (45'/90') — elles n'ont
+  // aucune notion des prolongations. Si un poll ESPN précédent a déjà établi
+  // qu'on est en prolongations (espnPeriod 3 ou 4, mémorisé par setEspnData)
+  // mais qu'espnStatus n'est pas exploitable sur CE poll (ex: transition
+  // entre la fin de la 1ère période de prolongation et sa mi-temps), ces
+  // heuristiques calculaient depuis half2Start/kickoffAt d'il y a bien plus
+  // d'1h30 de temps réel écoulé → un résultat absurde du style "90+27'" au
+  // lieu de "Pause"/"105'" (bug signalé). "Prolongation" reste l'affichage
+  // le plus honnête ici : pas assez d'info pour une minute précise.
+  if (state.espnPeriod === 3 || state.espnPeriod === 4) return 'Prolongation'
+
   // ── MI-TEMPS & 2ème MT ──
   if (state.pausedAt) {
     if (state.half2Start) {
