@@ -316,6 +316,21 @@ export function useMatchRecap(match) {
     queryKey:  ['matchRecap', match?.id],
     enabled:   !!match?.id && !!slug && !!date && match?.status === 'FINISHED',
     staleTime: 30 * 60_000,
+    // ⚠️ BUG CORRIGÉ : sans refetchInterval, un utilisateur ouvrant la page
+    // juste après le FT (avant que cron-goals.js ait fini de générer le
+    // résumé — comp.details peut arriver "quelques dizaines de secondes
+    // après le FT", voir son propre commentaire) tombait sur `recap: null`
+    // UNE SEULE FOIS et ne revoyait jamais le résumé, même une fois généré
+    // côté serveur quelques instants plus tard (aucun déclencheur de refetch
+    // ensuite). Même pattern "auto-limité" que useLineups (lineups2) : on
+    // retente toutes les 20s tant qu'on n'a rien, avec un plafond (~5min)
+    // pour ne pas boucler indéfiniment si le match n'a jamais assez de
+    // données pour générer un résumé fiable (cas prévu, voir generateRecap).
+    refetchInterval: q => {
+      if (q.state.data) return false
+      if ((q.state.dataUpdateCount ?? 0) >= 15) return false
+      return 20_000
+    },
     retry: 1,
     queryFn: async () => {
       // 1. Scoreboard → event ID (même logique que useEspnMatchStats)

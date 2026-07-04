@@ -522,6 +522,15 @@ export default async function handler(req, res) {
   if (hasWc) log.push(`[fifa:live] matches=${fifaLiveMatches.length}`)
 
   for (const { slug, evt } of allEvents) {
+   // ⚠️ Durcissement : avant, une erreur inattendue sur UN SEUL match (donnée
+   // ESPN malformée, champ manquant non prévu...) faisait planter TOUT le
+   // reste de la boucle — donc tous les autres matchs de cette passe, y
+   // compris ceux dont la notif était sur le point de partir. Avec la boucle
+   // interne (plusieurs passes par appel, voir plus bas), une passe entière
+   // perdue pèse un peu plus qu'avant sur le total. Un try/catch par match
+   // isole le problème : un match cassé est loggé et ignoré, les autres
+   // continuent d'être traités normalement dans la même passe.
+   try {
     const comp = evt.competitions?.[0]
     if (!comp) continue
 
@@ -799,6 +808,9 @@ export default async function handler(req, res) {
         log,
       )
     }
+   } catch (e) {
+     log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
+   }
   }
 
     return { notifsSent, events: allEvents.length, log }
@@ -836,11 +848,22 @@ export default async function handler(req, res) {
 
   while (true) {
     const passStart = Date.now()
-    const result = await runOnePass()
-    totalNotifs += result.notifsSent
-    totalEvents  = result.events
-    allLogs.push(`[pass ${passes + 1}] notifs=${result.notifsSent} events=${result.events}`, ...result.log)
-    passes++
+    // ⚠️ Durcissement : si runOnePass() lève une erreur inattendue AVANT même
+    // d'entrer dans la boucle par-match (ex: le fetch ESPN groupé plante), on
+    // ne veut pas perdre TOUTE la réponse HTTP (et donc que cron-job.org voie
+    // un échec/timeout au lieu d'un 200 avec le détail de l'erreur). On log
+    // et on arrête proprement la boucle plutôt que de laisser l'exception
+    // remonter jusqu'au handler (qui n'a pas de try/catch englobant).
+    try {
+      const result = await runOnePass()
+      totalNotifs += result.notifsSent
+      totalEvents  = result.events
+      allLogs.push(`[pass ${passes + 1}] notifs=${result.notifsSent} events=${result.events}`, ...result.log)
+      passes++
+    } catch (e) {
+      allLogs.push(`[pass ${passes + 1}] ERREUR passe entière : ${e.message}`)
+      break
+    }
 
     const elapsedTotal = Date.now() - loopStart
     const remaining    = BUDGET_MS - elapsedTotal

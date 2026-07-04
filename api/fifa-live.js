@@ -259,12 +259,15 @@ function extractEspnCards(comp, homeTeamId) {
 // ── ESPN summary → stats live (possession, tirs, corners) ─────────────────────
 // Le scoreboard ESPN n'inclut pas statistics[] pour le soccer.
 // Les stats réelles sont dans l'endpoint /summary?event={espnEventId}.
-// ⚠️ TTL abaissé de 30s à 8s (aligné sur ESPN_TTL du score) : avant ce fix, la
-// possession/tirs/corners pouvait traîner jusqu'à 30s de retard sur le score
-// lui-même (qui se met à jour en ~8s) — signalé par l'utilisateur comme une
-// asymétrie gênante en live. Cache toujours PARTAGÉ entre tous les
-// utilisateurs (une requête ESPN par fenêtre de 8s, pas par utilisateur).
-const SUMMARY_TTL = 8   // Cache Redis summary (s)
+// ⚠️ TTL abaissé de 30s à 10s (proche de ESPN_TTL=8s du score, marge de
+// sécurité volontaire) : avant ce fix, la possession/tirs/corners pouvait
+// traîner jusqu'à 30s de retard sur le score lui-même — signalé par
+// l'utilisateur comme une asymétrie gênante en live. 10s plutôt que 8s :
+// aucune limite de débit ESPN documentée publiquement, donc marge de
+// prudence délibérée (25% de requêtes en moins qu'à 8s) pour une perte de
+// fraîcheur perçue négligeable. Cache toujours PARTAGÉ entre tous les
+// utilisateurs (une requête ESPN par fenêtre de 10s, pas par utilisateur).
+const SUMMARY_TTL = 10   // Cache Redis summary (s)
 
 async function fetchEspnSummaryStats(slug, espnEventId) {
   if (!slug || !espnEventId) return null
