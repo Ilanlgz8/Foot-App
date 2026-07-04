@@ -88,7 +88,8 @@ body::before {
    spécifique dans chaque composant, un seul override global ici, ciblé via
    l'attribut data-team ajouté sur les <img> de crest concernées. À étendre
    avec la même méthode si un autre drapeau est signalé pareil. */
-img[data-team="Argentina"] {
+img[data-team="Argentina"],
+img[data-team="Uzbekistan"] {
   transform: scale(1.75) !important;
 }
 
