@@ -287,7 +287,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           </div>
         )}
         {isFinished && wentToAet && (
-          <span className="accueil__matchCardAet">Après prolongation</span>
+          <span className="accueil__matchCardAet">Après prlong.</span>
         )}
 
       </div>

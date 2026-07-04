@@ -178,6 +178,37 @@
   text-shadow: 0 2px 12px rgba(var(--black-rgb),.5);
 }
 
+/* Tirs au but / prolongation — même pattern que .resultats__pensBlock /
+   .resultats__aet (page Résultat), pour un affichage identique partout. */
+.mp__hero__pensBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  margin-top: 0.25rem;
+}
+.mp__hero__pensLabel {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(var(--white-rgb),0.5);
+  text-transform: uppercase;
+}
+.mp__hero__pensScore {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(var(--white-rgb),0.7);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.mp__hero__aet {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(var(--white-rgb),0.5);
+  margin-top: 0.25rem;
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────────*/
 .mp__wrap {
   flex: 1;

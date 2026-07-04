@@ -86,6 +86,14 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   const isFinished = match.status === 'FINISHED'
   const hs         = match.score?.fullTime?.home ?? match.score?.halfTime?.home
   const as_        = match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  // Tirs au but / prolongation — même logique que Resultat.jsx et
+  // accueil/MatchCard.jsx (mutuellement exclusifs : un match aux tab a
+  // duration='PENALTY_SHOOTOUT', pas 'EXTRA_TIME'). Manquait ici : cette page
+  // affichait juste "Terminé" sans jamais préciser tab/prolongation.
+  const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+  const wentToAet  = match.score?.duration === 'EXTRA_TIME'
+  const hPens      = match.score?.penalties?.home ?? null
+  const aPens      = match.score?.penalties?.away ?? null
   const emblem     = comp?.emblem ?? match.competition?.emblem
   const compName   = match.competition?.name ?? comp?.name ?? ''
   const gradient   = getMatchGradient(
@@ -141,6 +149,15 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
             <>
               <span className="mp__hero__label">Terminé</span>
               <span className="mp__hero__score">{hs} – {as_}</span>
+              {wentToPens && hPens != null && aPens != null && (
+                <div className="mp__hero__pensBlock">
+                  <span className="mp__hero__pensLabel">T.A.B</span>
+                  <span className="mp__hero__pensScore">({hPens}-{aPens})</span>
+                </div>
+              )}
+              {wentToAet && (
+                <span className="mp__hero__aet">Après prlong.</span>
+              )}
             </>
           ) : (
             <>
@@ -285,30 +302,17 @@ function MpMatchStats({ match }) {
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)
   const { data: recap } = useMatchRecap(match)
 
-  // ── Fil du match : buts + cartons (ESPN) + remplacements (FD.org) ──────────
-  // Même logique que FinishedDetails dans MatchModal.jsx : données ESPN déjà
-  // persistées en localStorage si le match a été suivi en live, sinon fetch à
-  // la demande. FD.org (useMatchDetail) fournit le fallback buteurs/cartons et
-  // l'unique source des remplacements (ESPN ne les expose pas).
-  const cachedEspn = getEspnData(match?.id)
-  const { espnData: fetchedEspn, loading: espnDetailLoading } = useEspnMatchDetail(
-    !cachedEspn ? match : null,
-    match?.competition?.id,
-    !cachedEspn
-  )
-  const espnData = cachedEspn ?? fetchedEspn
+  // ── Fil du match : remplacements uniquement ────────────────────────────────
+  // Buts ET cartons sont désormais affichés dans le hero (MatchPageHero, qui
+  // les fusionne triés par minute) — les remontrer ici faisait doublon
+  // (constat utilisateur : d'abord pour les buts, puis pour les cartons
+  // "vu qu'on les a déplacés dans le header"). FD.org (useMatchDetail) reste
+  // l'unique source des remplacements (ESPN n'en expose aucune).
   const { detail, loading: detailLoading } = useMatchDetail(match?.id)
 
-  // Les buts ne sont plus affichés ici : ils sont déjà dans le hero (voir
-  // MatchPageHero), qui fusionne buts + cartons triés par minute. Les
-  // afficher aussi dans le Fil du match faisait doublon (constat
-  // utilisateur : "ça affiche deux fois les buteurs"). Le Fil du match ne
-  // garde donc que cartons + remplacements.
-  const fdBookings  = detail?.bookings      ?? []
   const fdSubs      = detail?.substitutions ?? []
-  const espnCards   = espnData?.cards   ?? []
-  const hasEvents   = espnCards.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
-  const eventsLoading = (!cachedEspn && espnDetailLoading) || detailLoading
+  const hasEvents   = fdSubs.length > 0
+  const eventsLoading = detailLoading
 
   const fifaRows = fifaStatsToRows(fifaData)
   const espnRows = fifaStatsToRows(espnStatsData?.stats)
@@ -335,17 +339,13 @@ function MpMatchStats({ match }) {
           placeholder vide, cf. logique H2H) */}
       {recap && <p className="mp__recap">{recap}</p>}
 
-      {/* Fil du match — cartons + remplacements seulement (buts déjà dans le
-          hero, voir plus haut). Si rien à montrer ET aucun but marqué, on le
-          précise ; si des buts existent mais aucun carton/remplacement, on
-          n'affiche rien ici (pas d'erreur : les buts sont bien visibles,
-          juste ailleurs sur la page). */}
+      {/* Fil du match — remplacements seulement (buts + cartons déjà dans le
+          hero, voir plus haut). S'il n'y a aucun remplacement à montrer ET
+          aucun but marqué, on le précise ; s'il y a des buts/cartons mais pas
+          de remplacement, on n'affiche rien ici (pas d'erreur : tout est déjà
+          visible dans le hero). */}
       {hasEvents
-        ? <MatchTimeline
-            espnCards={espnCards}
-            fdBookings={fdBookings} fdSubs={fdSubs}
-            homeId={match.homeTeam?.id}
-          />
+        ? <MatchTimeline fdSubs={fdSubs} homeId={match.homeTeam?.id} />
         : (!eventsLoading && totalGoals === 0)
           ? <p className="pm__noData">Match sans but (0 – 0)</p>
           : null
