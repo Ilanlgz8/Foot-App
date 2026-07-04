@@ -117,10 +117,16 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   // donc ${minute}' ajoutait une 2e apostrophe en trop dans tous les cas.
   const minuteLabel = isTermine ? 'Terminé' : (minute ?? '–')
 
-  // Badge période (MI-TEMPS, PROLONGATIONS, T.A.B.…)
+  // Badge période (MI-TEMPS, PROLONGATIONS, T.A.B., 1ère/2ème MT…)
+  // ⚠️ Avant, '1ère MT'/'2ème MT' (retournés par getMatchPeriod pendant le
+  // temps réglementaire) ne matchaient aucune branche → pas de badge du tout
+  // pendant la 1ère/2ème mi-temps, seulement pour Mi-temps/Prolongations/T.A.B.
+  // (demande explicite : ajouter le même style de badge pour ces 2 cas).
   const periodBadge = period === 'Mi-temps'      ? 'MI-TEMPS'
     : period === 'Prolongations' ? 'PROLONGATIONS'
     : period === 'T.A.B.'        ? 'T.A.B.'
+    : period === '1ère MT'       ? '1ÈRE MI-TEMPS'
+    : period === '2ème MT'       ? '2ÈME MI-TEMPS'
     : null
 
   // Score des tab en direct (mêmes champs que MatchModal.jsx)
