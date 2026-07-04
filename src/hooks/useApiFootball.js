@@ -360,3 +360,65 @@ export function useAflMatchStats(match) {
   })
   return { ...query, isLoading: infoLoading || query.isLoading }
 }
+
+// ── Classement des meilleurs passeurs décisifs ──────────────────────────────
+// ⚠️ football-data.org (useScorers.js) n'a PAS d'endpoint "top assists" — son
+// /scorers est un classement de BUTEURS, qui n'inclut donc que des joueurs
+// ayant marqué au moins 1 but. Un joueur avec 0 but mais des passes décisives
+// (ex: Michael Olise) n'apparaît jamais dans cette liste, quel que soit le tri
+// appliqué dessus — c'était le bug de la 1ère version (Classement.jsx
+// re-triait juste useScorers). api-football expose un vrai endpoint dédié,
+// indépendant des buts marqués : /players/topassists?league=&season=
+// (confirmé existant et documenté, cf. api-football.com/documentation-v3).
+//
+// Champs de la réponse api-football (forme `results[].{player,statistics[0]}`,
+// mêmes conventions que /players/topscorers) — mappés ici vers le format déjà
+// utilisé par Classement.jsx pour éviter de dupliquer le rendu :
+//   { player: { name }, team: { name, shortName, crest }, goals, assists }
+// ⚠️ Les noms d'équipe api-football suivent une convention différente de
+// football-data.org (celle utilisée par translateTeam()) — la traduction FR
+// peut donc ne pas s'appliquer sur cette liste précise (dictionnaire
+// TEAM_NAMES_FR pas garanti de matcher les noms api-football exactement).
+function transformTopAssists(data) {
+  const rows = data?.response ?? []
+  return rows
+    .map(r => {
+      const stat = r.statistics?.[0] ?? {}
+      const p    = r.player ?? {}
+      const name = p.name ?? ([p.firstname, p.lastname].filter(Boolean).join(' ') || '?')
+      return {
+        player: { id: p.id, name },
+        team: {
+          id:        stat.team?.id,
+          name:      stat.team?.name ?? '',
+          shortName: stat.team?.name ?? '',
+          crest:     stat.team?.logo ?? null,
+        },
+        goals:   stat.goals?.total    ?? 0,
+        assists: stat.goals?.assists  ?? 0,
+      }
+    })
+    .filter(r => (r.assists ?? 0) > 0)
+    // Tri explicite par passes décisives — l'API renvoie déjà normalement dans
+    // cet ordre, mais on ne se repose pas dessus (le filtre ci-dessus pourrait
+    // en théorie désordonner si l'API changeait son tri interne un jour).
+    .sort((a, b) => (b.assists ?? 0) - (a.assists ?? 0) || (b.goals ?? 0) - (a.goals ?? 0))
+}
+
+// staleTime volontairement long (10min) : l'endpoint topassists lui-même
+// n'est mis à jour que "plusieurs fois par semaine" côté api-football (doc
+// officielle) — pas la peine de le repoller plus souvent, la donnée réelle
+// ne bouge de toute façon pas plus vite que ça.
+export function useAflTopAssists(compId) {
+  const leagueInfo = FD_TO_AFL[compId]
+  return useQuery({
+    queryKey: ['aflTopAssists', compId],
+    queryFn: async () => {
+      const data = await afetch('players/topassists', { league: leagueInfo.league, season: leagueInfo.season })
+      return transformTopAssists(data)
+    },
+    enabled:   !!leagueInfo,
+    staleTime: 10 * 60_000,
+    retry: 1,
+  })
+}

@@ -8,6 +8,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
+import { useAflTopAssists } from '../hooks/useApiFootball'
 import { useMatches } from '../hooks/useMatchs'
 import { StandingsTable } from './StandingsTable'
 
@@ -52,6 +53,18 @@ function Classement() {
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
+  // Passeurs décisifs — SOURCE SÉPARÉE de useScorers (voir commentaire détaillé
+  // dans useApiFootball.js) : football-data.org/scorers est un classement de
+  // BUTEURS, il exclut par construction les joueurs à 0 but (ex: Michael
+  // Olise avec des passes mais pas de but n'y apparaît jamais). api-football
+  // a un vrai endpoint dédié /players/topassists, indépendant des buts marqués.
+  const {
+    data: topAssistsData,
+    isLoading: assistsLoading,
+    error: assistsErrorObj,
+  } = useAflTopAssists(selectedComp)
+  const topAssists  = topAssistsData ?? []
+  const assistsError = assistsErrorObj?.message ?? null
 
   // Recherche — filtre côté client, ne nécessite aucune donnée supplémentaire.
   function matchesTeamSearch(team) {
@@ -67,15 +80,7 @@ function Classement() {
   }
   const filteredStandings = standings.filter(row => matchesTeamSearch(row.team))
 
-  // Classement passeurs — même donnée que useScorers (chaque buteur inclut déjà
-  // `assists`, voir Classement.jsx ligne ~574 et useScorers.js), juste triée
-  // différemment. Zéro appel réseau supplémentaire. On exclut les joueurs à 0/
-  // sans passe pour ne pas afficher des dizaines de lignes à "—".
-  const assistSorted = [...scorers]
-    .filter(s => (s.assists ?? 0) > 0)
-    .sort((a, b) => (b.assists ?? 0) - (a.assists ?? 0) || (b.goals ?? 0) - (a.goals ?? 0))
-
-  const scorerBase = view === 'passeurs' ? assistSorted : scorers
+  const scorerBase = view === 'passeurs' ? topAssists : scorers
 
   // _rank = position dans la liste (buteurs ou passeurs) NON filtrée, pour que
   // le badge affiché reste le vrai rang même quand la recherche réduit la liste
@@ -93,7 +98,8 @@ function Classement() {
   // différents testés sans succès). Cette liste plus large couvre déjà la
   // quasi-totalité des cas réels de recherche par équipe.
   const displayScorers = searchNorm ? filteredScorers : filteredScorers.slice(0, 25)
-  const scorersBusy = scorersLoading
+  const scorersBusy = view === 'passeurs' ? assistsLoading : scorersLoading
+  const scorersErrorMsg = view === 'passeurs' ? assistsError : scorersError
 
   // Pagination (20 par page) — UNIQUEMENT en recherche (liste potentiellement
   // longue, ex: tous les buteurs d'une équipe). Le top 25 par défaut s'affiche
@@ -538,15 +544,15 @@ function Classement() {
                 ))}
               </div>
             )}
-            {!scorersBusy && scorersError && (
+            {!scorersBusy && scorersErrorMsg && (
               <p className="classement__state">Données non disponibles.</p>
             )}
-            {!scorersBusy && !scorersError && scorerBase.length === 0 && (
+            {!scorersBusy && !scorersErrorMsg && scorerBase.length === 0 && (
               <p className="classement__state">
                 {view === 'passeurs' ? 'Aucun passeur décisif disponible.' : 'Aucun buteur disponible.'}
               </p>
             )}
-            {!scorersBusy && !scorersError && scorerBase.length > 0 && displayScorers.length === 0 && (
+            {!scorersBusy && !scorersErrorMsg && scorerBase.length > 0 && displayScorers.length === 0 && (
               <p className="classement__state">
                 {view === 'passeurs' ? `Aucun passeur ne correspond à « ${search} ».` : `Aucun buteur ne correspond à « ${search} ».`}
               </p>
