@@ -85,10 +85,15 @@ export default async function handler(req, res) {
   // confondues.
   try {
     const raw = (await kv.lrange('cron:goals:logHistory', 0, -1)) ?? []
-    const filter = String(req.query.match ?? '').trim()
+    // ⚠️ BUG CORRIGÉ : filtre sensible à la casse (l.includes(filter)) — les
+    // noms d'équipe dans les logs viennent d'ESPN, toujours avec majuscule
+    // ("France", "Paraguay"...), donc chercher "france" en minuscule ne
+    // matchait jamais RIEN (constat utilisateur : plusieurs essais à vide
+    // avec un mot-clé pourtant correct). Comparaison insensible à la casse.
+    const filter = String(req.query.match ?? '').trim().toLowerCase()
     info.logHistory = {
       totalLines: raw.length,
-      lines: filter ? raw.filter(l => l.includes(filter)) : raw.slice(-200),
+      lines: filter ? raw.filter(l => l.toLowerCase().includes(filter)) : raw.slice(-200),
     }
   } catch (e) {
     info.logHistory = { error: e.message }
