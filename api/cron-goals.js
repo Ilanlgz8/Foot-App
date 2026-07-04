@@ -509,17 +509,19 @@ export default async function handler(req, res) {
   )
 
   const allEvents = allResults.flatMap(r => r.status === 'fulfilled' ? r.value : [])
-  log.push(`[espn] total events=${allEvents.length}`)
+  // ⚠️ Ces 2 lignes de diagnostic (total events / matches FIFA live) étaient
+  // loggées à CHAQUE passe, identiques la plupart du temps — ça remplissait le
+  // buffer glissant `cron:goals:logHistory` (1000 lignes) de bruit sans intérêt
+  // en ~1h30-2h (constat : un but signalé par l'utilisateur n'était déjà plus
+  // dans l'historique au moment où il l'a vérifié). Le nombre d'events est de
+  // toute façon déjà visible dans la ligne "[pass N] notifs=X events=Y" ajoutée
+  // par la boucle multi-passes plus bas — pas la peine de le dupliquer ici.
+  // Retiré de la persistance pour laisser la place à des lignes réellement
+  // utiles (KO/but/mi-temps/fin) sur une fenêtre de temps plus longue.
 
   // FIFA live — fetché une seule fois, utilisé pour accélérer la détection WC (voir plus bas)
   const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(log) : []
-  // Diagnostic temporaire (retard notif coup d'envoi signalé encore présent malgré
-  // le fix fifa-override ci-dessous) : si cette ligne montre matches=0 à chaque
-  // appel pendant qu'un match WC est en cours, ça veut dire que fetchFifaLiveMatches
-  // échoue silencieusement (voir son catch) et que le fix ne se déclenche jamais —
-  // exactement le même type de panne que l'API FotMob (voir useFotmobXG, retiré).
-  if (hasWc) log.push(`[fifa:live] matches=${fifaLiveMatches.length}`)
 
   for (const { slug, evt } of allEvents) {
    // ⚠️ Durcissement : avant, une erreur inattendue sur UN SEUL match (donnée
@@ -919,7 +921,11 @@ export default async function handler(req, res) {
     if (allLogs.length) {
       const stamped = allLogs.map(l => `${new Date().toISOString()} ${l}`)
       await kv.rpush('cron:goals:logHistory', ...stamped)
-      await kv.ltrim('cron:goals:logHistory', -1000, -1)
+      // Cap relevé 1000 → 4000 : avec le bruit en moins (voir ci-dessus), une
+      // ligne "[pass N] notifs=X events=Y" par passe (~3-4/min) consomme
+      // beaucoup moins vite le buffer — vise plusieurs heures d'historique
+      // au lieu d'1h30-2h, pour pouvoir vérifier un incident signalé après coup.
+      await kv.ltrim('cron:goals:logHistory', -4000, -1)
       await kv.expire('cron:goals:logHistory', 24 * 3600)
     }
   } catch {}
