@@ -171,6 +171,24 @@ function confirmFt(match, now, queryClient) {
     queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
+      // ⚠️ BUG CORRIGÉ : le classement (useStandings, queryKey ['standings', code])
+      // n'était JAMAIS invalidé à la fin d'un match — seul hook de données
+      // affectées par un FT à ne recevoir aucune invalidation proactive (audit :
+      // aucune autre référence à 'standings' dans tout le code). Concrètement,
+      // un utilisateur resté sur la page Classement pendant qu'un match de la
+      // même compétition se termine ne voyait jamais le tableau bouger tant que
+      // le staleTime (2min) + un déclencheur (refocus/remount) n'arrivaient pas.
+      // Même schéma 2s + 5min que le bracket WC juste au-dessus : FD.org peut
+      // mettre quelques secondes à recalculer le classement après le FT.
+      queryClient.invalidateQueries({ queryKey: ['standings', code] })
+      // Même audit, même constat : "Forme récente" (teamForm2) et le
+      // classement buteurs/passeurs (scorers) n'étaient pas non plus
+      // invalidés. Clé partielle ['teamForm2', code] : matche les deux
+      // variantes de saison (2026 pour WC, 'cur' sinon) sans avoir à
+      // dupliquer l'invalidation — comportement par défaut de React Query
+      // (préfixe de clé, pas besoin de clé exacte).
+      queryClient.invalidateQueries({ queryKey: ['teamForm2', code] })
+      queryClient.invalidateQueries({ queryKey: ['scorers', code] })
     }
     if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
     // Effacer les caches localStorage pour forcer un refetch propre
@@ -181,9 +199,9 @@ function confirmFt(match, now, queryClient) {
   }, 2_000)
 
   // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
-  // Aussi un 2e essai pour le bracket : si FD.org n'avait pas encore assigné
-  // l'équipe qualifiée au 1er essai (2s), il y a de bonnes chances que ce
-  // soit fait 5min plus tard.
+  // Aussi un 2e essai pour le bracket, le classement, la forme et les
+  // buteurs/passeurs : si FD.org n'avait pas encore mis à jour au 1er essai
+  // (2s), il y a de bonnes chances que ce soit fait 5min plus tard.
   setTimeout(() => {
     markEnded(id)
     delete espnScoresCache[id]
@@ -192,6 +210,9 @@ function confirmFt(match, now, queryClient) {
     queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
+      queryClient.invalidateQueries({ queryKey: ['standings', code] })
+      queryClient.invalidateQueries({ queryKey: ['teamForm2', code] })
+      queryClient.invalidateQueries({ queryKey: ['scorers', code] })
     }
     if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
   }, 5 * 60_000)
@@ -901,7 +922,18 @@ async function pollApiFootball(matches, queryClient) {
         } catch {}
 
         queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-        setTimeout(() => queryClient.invalidateQueries({ queryKey: ['todayMatches'] }), 2_000)
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+          // Même fix que confirmFt() (couche ESPN primaire) : le classement
+          // n'était invalidé nulle part, y compris sur ce chemin de secours
+          // api-football (fenêtres critiques uniquement, rare mais possible
+          // si ESPN est down au moment du FT).
+          if (match.competition?.code) {
+            queryClient.invalidateQueries({ queryKey: ['standings', match.competition.code] })
+            queryClient.invalidateQueries({ queryKey: ['teamForm2', match.competition.code] })
+            queryClient.invalidateQueries({ queryKey: ['scorers', match.competition.code] })
+          }
+        }, 2_000)
         if (match.competition?.code) {
           try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
         }
@@ -914,6 +946,9 @@ async function pollApiFootball(matches, queryClient) {
           if (codeForEviction) {
             queryClient.invalidateQueries({ queryKey: ['matches', codeForEviction, 'FINISHED'] })
             queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+            queryClient.invalidateQueries({ queryKey: ['standings', codeForEviction] })
+            queryClient.invalidateQueries({ queryKey: ['teamForm2', codeForEviction] })
+            queryClient.invalidateQueries({ queryKey: ['scorers', codeForEviction] })
           }
         }, 5 * 60_000)
       }
