@@ -8,7 +8,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
-import { useAflTopAssists } from '../hooks/useApiFootball'
+import { useEspnAssists } from '../hooks/useEspnAssists'
 import { useMatches } from '../hooks/useMatchs'
 import { StandingsTable } from './StandingsTable'
 
@@ -53,21 +53,22 @@ function Classement() {
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
-  // Passeurs décisifs — SOURCE SÉPARÉE de useScorers (voir commentaire détaillé
-  // dans useApiFootball.js) : football-data.org/scorers est un classement de
-  // BUTEURS, il exclut par construction les joueurs à 0 but (ex: Michael
-  // Olise avec des passes mais pas de but n'y apparaît jamais). api-football
-  // a un vrai endpoint dédié /players/topassists, indépendant des buts marqués.
+  // Passeurs décisifs — SOURCE SÉPARÉE de useScorers : football-data.org/scorers
+  // est un classement de BUTEURS, il exclut par construction les joueurs à 0
+  // but (ex: Michael Olise avec des passes mais pas de but n'y apparaît
+  // jamais). Source : ESPN (voir useEspnAssists.js) — api-football avait un
+  // vrai endpoint dédié mais son plan gratuit ne couvre pas la saison en
+  // cours, rendant le classement vide en permanence.
   const {
     data: topAssistsData,
     isLoading: assistsLoading,
     error: assistsErrorObj,
-  } = useAflTopAssists(selectedComp)
+  } = useEspnAssists(selectedComp)
   const topAssists  = topAssistsData ?? []
   const assistsError = assistsErrorObj?.message ?? null
-  // Passeurs indisponible (ex: compte api-football suspendu) → masquer
-  // l'onglet plutôt que d'afficher une liste vide qui semble cassée. Si
-  // l'utilisateur était déjà sur cet onglet au moment où l'erreur arrive,
+  // Passeurs indisponible (ex: ESPN a changé la structure de sa page) →
+  // masquer l'onglet plutôt que d'afficher une liste vide qui semble cassée.
+  // Si l'utilisateur était déjà sur cet onglet au moment où l'erreur arrive,
   // on le ramène sur Buteurs pour ne pas rester bloqué sur un onglet caché.
   const assistsUnavailable = !assistsLoading && !!assistsError
   useEffect(() => {
