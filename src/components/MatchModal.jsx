@@ -1468,8 +1468,8 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
         <div className="modal__teams">
           <div className="modal__team">
             {match.homeTeam.crest && (
-              <img src={match.homeTeam.crest} alt="" className="modal__crest" data-team={match.homeTeam?.name}
-                onError={e => e.currentTarget.style.display = 'none'} />
+              <div className="modal__crestWrap"><img src={match.homeTeam.crest} alt="" className="modal__crest" data-team={match.homeTeam?.name}
+                onError={e => e.currentTarget.style.display = 'none'} /></div>
             )}
             <span className="modal__teamName">
               {translateTeam(match.homeTeam.shortName || match.homeTeam.name)}
@@ -1533,8 +1533,8 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
 
           <div className="modal__team modal__team--away">
             {match.awayTeam.crest && (
-              <img src={match.awayTeam.crest} alt="" className="modal__crest" data-team={match.awayTeam?.name}
-                onError={e => e.currentTarget.style.display = 'none'} />
+              <div className="modal__crestWrap"><img src={match.awayTeam.crest} alt="" className="modal__crest" data-team={match.awayTeam?.name}
+                onError={e => e.currentTarget.style.display = 'none'} /></div>
             )}
             <span className="modal__teamName">
               {translateTeam(match.awayTeam.shortName || match.awayTeam.name)}

@@ -380,7 +380,7 @@ function Resultats() {
                       {teams.map(t => (
                         <li key={t.id} className="matchs__wcGroupCard__team">
                           {t.crest
-                            ? <img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} />
+                            ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} /></div>
                             : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>}
                           <span className="matchs__wcGroupCard__teamName">{translateTeam(t.shortName || t.name)}</span>
                         </li>

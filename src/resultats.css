@@ -332,17 +332,26 @@
 .resultats__team--away { align-items: center; }
 .resultats__team--loser { opacity: 1; }
 
-.resultats__crestWrap { flex-shrink: 0; }
+/* Le clip circulaire doit être sur ce WRAPPER (taille fixe), pas sur l'image
+   elle-même : mettre border-radius + transform:scale sur le MÊME élément ne
+   fait qu'agrandir tout le cercle proportionnellement (forme + contenu
+   ensemble), ça ne resserre pas le cadrage sur le drapeau et ne mange donc
+   pas la marge interne — contrairement à ce pattern-ci, où seule l'image
+   zoome à l'intérieur d'un cercle de taille fixe, ce qui recadre vraiment
+   (même principe que mp__hero__crestWrap/live__crestWrap/poster__crestWrap). */
+.resultats__crestWrap {
+  width: 3.1rem; height: 3.1rem;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.5));
+}
 
 .resultats__crest {
-  width: 3.1rem; height: 3.1rem;
+  width: 100%; height: 100%;
   object-fit: cover;
   object-position: center;
-  border-radius: 50%;
-  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
-     (même pattern que live__crest/mp__hero__crest, pour un rendu circulaire cohérent). */
   transform: scale(1.18);
-  filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.5));
   transition: transform 0.18s;
 }
 
@@ -514,7 +523,7 @@
   }
 
   .resultats__teamName  { font-size: 0.75rem; }
-  .resultats__crest     { width: 1.8rem; height: 1.8rem; }
+  .resultats__crestWrap { width: 1.8rem; height: 1.8rem; }
   .resultats__scoreNum  { font-size: 1.2rem; }
 }
 

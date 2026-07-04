@@ -1238,31 +1238,34 @@
   flex-direction: column;
 }
 
+/* Le clip circulaire doit être sur ce WRAPPER (taille fixe), pas sur l'image
+   elle-même : mettre border-radius + transform:scale sur le MÊME élément ne
+   fait qu'agrandir tout le cercle proportionnellement (forme + contenu
+   ensemble), ça ne resserre pas le cadrage et ne mange donc pas la marge
+   interne du drapeau — contrairement à ce pattern-ci, où seule l'image zoome
+   à l'intérieur d'un cercle de taille fixe (même principe que
+   mp__hero__crestWrap/live__crestWrap/poster__crestWrap). */
 .accueil__matchCardCrestWrap {
-  width: 2.5rem;
-  height: 2.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  overflow: hidden;
   flex-shrink: 0;
+  filter: drop-shadow(0 1px 5px rgba(var(--black-rgb),0.8));
 }
 
 .accueil__matchCardCrest {
-  width: 2.3rem;
-  height: 2.3rem;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   object-position: center;
-  border-radius: 50%;
-  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
-     (même pattern que live__crest/mp__hero__crest, pour un rendu circulaire cohérent). */
   transform: scale(1.18);
-  filter: drop-shadow(0 1px 5px rgba(var(--black-rgb),0.8));
   transition: opacity 0.2s, filter 0.2s;
 }
 
 .accueil__matchCardCrest--loser {
   opacity: 0.28;
-  filter: drop-shadow(0 1px 5px rgba(var(--black-rgb),0.8)) grayscale(0.6);
+  filter: grayscale(0.6);
 }
 
 .accueil__matchCardCrestEmpty {
@@ -2511,7 +2514,7 @@
 
   /* Match cards */
   .accueil__matchCard { padding: 0.55rem 0.3rem; column-gap: 0.6rem; }
-  .accueil__matchCardCrest { width: 2rem; height: 2rem; }
+  .accueil__matchCardCrestWrap { width: 2rem; height: 2rem; }
   .accueil__matchCardName { font-size: 0.7rem; }
   .accueil__matchCardValue { font-size: 1rem; padding: 0.18rem 0.6rem; min-width: 4rem; }
 
@@ -3104,12 +3107,21 @@
   align-items: center;
   gap: 0.35rem;
 }
-.accueil__liveChipCrest {
+.accueil__liveChipCrestWrap {
   width: 18px;
   height: 18px;
-  object-fit: cover;
   border-radius: 50%;
+  overflow: hidden;
   flex-shrink: 0;
+}
+.accueil__liveChipCrest {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
+     (même pattern que live__crest/mp__hero__crest). */
+  transform: scale(1.18);
 }
 .accueil__liveChipCrestFb {
   width: 18px;
@@ -3209,12 +3221,22 @@
   gap: 8px;
   min-width: 0;
 }
-.accueil__mdjCrest {
+.accueil__mdjCrestWrap {
   width: 52px;
   height: 52px;
-  object-fit: cover;
   border-radius: 50%;
+  overflow: hidden;
   border: 2px solid rgba(var(--white-rgb),0.15);
+  flex-shrink: 0;
+}
+.accueil__mdjCrest {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
+     (même pattern que live__crest/mp__hero__crest). */
+  transform: scale(1.18);
 }
 .accueil__mdjCrestFb {
   width: 52px;

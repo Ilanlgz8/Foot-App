@@ -51,7 +51,7 @@ export function MatchDuJourCard({ match, onClick }) {
       <div className="accueil__mdjTeams">
         <div className="accueil__mdjTeam">
           {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} />
+            ? <div className="accueil__mdjCrestWrap"><img src={match.homeTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{homeName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{homeName}</span>
         </div>
@@ -63,7 +63,7 @@ export function MatchDuJourCard({ match, onClick }) {
 
         <div className="accueil__mdjTeam">
           {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} />
+            ? <div className="accueil__mdjCrestWrap"><img src={match.awayTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{awayName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{awayName}</span>
         </div>

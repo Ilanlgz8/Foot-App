@@ -555,8 +555,8 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
-                              onError={e => e.currentTarget.style.display = 'none'} />
+                            <div className="classement__scorerCrestWrap"><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
+                              onError={e => e.currentTarget.style.display = 'none'} /></div>
                           )}
                           <span className="classement__scorerTeam">
                             {translateTeam(s.team?.shortName || s.team?.name || '')}
