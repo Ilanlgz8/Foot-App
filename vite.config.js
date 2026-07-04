@@ -100,8 +100,11 @@ export default defineConfig(({ mode }) => {
             if (eventId) {
               return `/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`
             }
+            // &limit=100 : voir api/espn.js — sans ce paramètre, ESPN renvoie
+            // des noms d'équipe placeholder pour les matchs à élimination
+            // directe pas encore "résolus" (bug confirmé en prod).
             const base = `/apis/site/v2/sports/soccer/${slug}/scoreboard`
-            return dates ? `${base}?dates=${dates}` : base
+            return dates ? `${base}?dates=${dates}&limit=100` : `${base}?limit=100`
           },
         },
         // Proxy api-football.com : /apifootball?[_ep=endpoint&]...params... → v3.football.api-sports.io

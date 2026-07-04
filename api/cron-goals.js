@@ -200,7 +200,18 @@ function setupVapid() {
 
 async function fetchEspnEvents(slug, date, log) {
   try {
-    const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}`, {
+    // ⚠️ BUG MAJEUR TROUVÉ (preuve directe) : SANS &limit=100, ESPN renvoie pour
+    // les matchs à élimination directe pas encore "affichés" par défaut des noms
+    // d'équipe PLACEHOLDER de bracket ("Round of 32 5 Winner" au lieu de
+    // "France") ET un statut/score figés à SCHEDULED/0-0 — vérifié en comparant
+    // en direct la MÊME URL avec et sans ce paramètre pour le match France-
+    // Paraguay (8e de finale) : sans limit=100 → noms placeholder ; avec
+    // limit=100 → "France"/"Paraguay" corrects. C'est cette variante "placeholder"
+    // que ce fetch recevait depuis le début, ce qui empêchait TOUT matching par
+    // nom (fuzzyTeamFifa côté FIFA) de fonctionner pour ces matchs → aucune
+    // notif (coup d'envoi/but) ne pouvait jamais partir. Le paramètre ne change
+    // rien pour les matchs de poule (déjà correctement nommés) — ajout sans risque.
+    const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}&limit=100`, {
       headers: { 'Cache-Control': 'no-cache' },
       signal: AbortSignal.timeout(6_000),
     })

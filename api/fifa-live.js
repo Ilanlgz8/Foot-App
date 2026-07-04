@@ -358,9 +358,15 @@ async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false) {
 
     if (!events) {
       try {
+        // ⚠️ &limit=100 indispensable : sans lui, ESPN renvoie pour les matchs à
+        // élimination directe pas encore "résolus" par défaut des noms d'équipe
+        // placeholder de bracket ("Round of 32 5 Winner") et un statut/score
+        // figés à SCHEDULED/0-0, même après le vrai coup d'envoi — confirmé en
+        // comparant en direct la même URL avec/sans ce paramètre (voir même fix
+        // dans cron-goals.js, où le bug a été identifié en premier).
         const [rT, rY] = await Promise.all([
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}&limit=100`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
+          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}&limit=100`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
         ])
         const [jT, jY] = await Promise.all([
           rT.ok ? rT.json() : { events: [] },

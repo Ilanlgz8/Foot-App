@@ -114,8 +114,12 @@ export default async function handler(req, res) {
 
     // ── Mode scoreboard (pas de cache — données live, doivent rester fraîches) ──
     if (dates && !/^\d{8}$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD attendu)' })
+    // ⚠️ &limit=100 indispensable pour les matchs à élimination directe : sans
+    // lui, ESPN renvoie des noms d'équipe placeholder de bracket ("Round of 32
+    // 5 Winner") et un statut/score figés SCHEDULED/0-0 même après le vrai
+    // coup d'envoi (bug confirmé en direct sur France-Paraguay, 8e de finale).
     const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
-    const url  = dates ? `${base}?dates=${dates}` : base
+    const url  = dates ? `${base}?dates=${dates}&limit=100` : `${base}?limit=100`
 
     const response = await fetch(url, {
       headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
