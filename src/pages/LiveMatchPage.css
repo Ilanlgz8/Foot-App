@@ -168,6 +168,13 @@
   font-weight: 700;
 }
 
+/* Icône but/carton devant le nom — utilisée uniquement sur MatchPage
+   (page Résultat), qui fusionne désormais buts + cartons dans cette liste
+   (même icônes que le Fil du match : ⚽ 🟨 🟥). */
+.lmp__heroScorerIcon {
+  margin-right: 0.2rem;
+}
+
 .lmp__page {
   min-height: 100vh;
   padding: 0 0 4rem;

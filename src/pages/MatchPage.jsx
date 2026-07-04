@@ -30,6 +30,7 @@ import {
   getEspnData,
   TabDots,
   TeamFormTable,
+  buildMatchEvents,
 } from '../components/MatchModal'
 import './MatchPage.css'
 import '../matchModal.css'
@@ -92,9 +93,9 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
     match.awayTeam?.name || awayName
   )
 
-  // Buteurs — même source/logique que MpMatchStats (cache localStorage
-  // persistant si le match a été suivi en live, sinon fetch ESPN à la
-  // demande). queryKey partagée avec MpMatchStats → pas de double fetch,
+  // Buteurs + cartons — même source/logique que MpMatchStats (cache
+  // localStorage persistant si le match a été suivi en live, sinon fetch ESPN
+  // à la demande). queryKey partagée avec MpMatchStats → pas de double fetch,
   // React Query dédup les deux appels automatiquement.
   const cachedEspn = isFinished ? getEspnData(match?.id) : null
   const { espnData: fetchedEspn } = useEspnMatchDetail(
@@ -103,6 +104,14 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
     isFinished && !cachedEspn
   )
   const espnScorers = (cachedEspn ?? fetchedEspn)?.scorers ?? []
+  const espnCards   = (cachedEspn ?? fetchedEspn)?.cards   ?? []
+  // Buts + cartons fusionnés et triés par minute (même logique que le Fil du
+  // match dans l'onglet Statistiques, sans les remplacements — le hero reste
+  // compact). Uniquement ici (page Résultat) : demande explicite de
+  // l'utilisateur, LiveMatchPage garde son affichage buts-seuls actuel.
+  const { home: homeEvents, away: awayEvents } = buildMatchEvents({
+    espnScorers, espnCards, homeId: match.homeTeam?.id,
+  })
 
   return (
     <div className="mp__hero" style={{ background: gradient }}>
@@ -150,23 +159,30 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
         </div>
       </div>
 
-      {/* Buteurs — sous les noms d'équipe, même présentation qu'en direct */}
-      {espnScorers.length > 0 && (
+      {/* Buts + cartons — sous les noms d'équipe, triés par minute. Avant : ne
+          montrait que les buts ici, et l'onglet Statistiques répétait les
+          mêmes buts en y ajoutant les cartons dans le Fil du match → les buts
+          apparaissaient deux fois sur la page (signalé par l'utilisateur).
+          Le hero montre maintenant la même liste fusionnée (buts+cartons),
+          au bon endroit selon la minute. */}
+      {(homeEvents.length > 0 || awayEvents.length > 0) && (
         <div className="lmp__heroScorers">
           <div className="lmp__heroScorersHome">
-            {espnScorers.filter(s => s.team === 'home').map((s, i) => (
-              <span key={i} className="lmp__heroScorerItem">
-                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
-                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+            {homeEvents.map(e => (
+              <span key={e.key} className="lmp__heroScorerItem">
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                {e.name}
+                {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
               </span>
             ))}
           </div>
           <div className="lmp__heroScorersDiv" />
           <div className="lmp__heroScorersAway">
-            {espnScorers.filter(s => s.team === 'away').map((s, i) => (
-              <span key={i} className="lmp__heroScorerItem">
-                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
-                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
+            {awayEvents.map(e => (
+              <span key={e.key} className="lmp__heroScorerItem">
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                {e.name}
+                {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
               </span>
             ))}
           </div>
@@ -283,13 +299,15 @@ function MpMatchStats({ match }) {
   const espnData = cachedEspn ?? fetchedEspn
   const { detail, loading: detailLoading } = useMatchDetail(match?.id)
 
-  const fdGoals     = detail?.goals         ?? []
+  // Les buts ne sont plus affichés ici : ils sont déjà dans le hero (voir
+  // MatchPageHero), qui fusionne buts + cartons triés par minute. Les
+  // afficher aussi dans le Fil du match faisait doublon (constat
+  // utilisateur : "ça affiche deux fois les buteurs"). Le Fil du match ne
+  // garde donc que cartons + remplacements.
   const fdBookings  = detail?.bookings      ?? []
   const fdSubs      = detail?.substitutions ?? []
-  const espnScorers = espnData?.scorers ?? []
   const espnCards   = espnData?.cards   ?? []
-  const hasEvents   = espnScorers.length > 0 || espnCards.length > 0 ||
-    fdGoals.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
+  const hasEvents   = espnCards.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
   const eventsLoading = (!cachedEspn && espnDetailLoading) || detailLoading
 
   const fifaRows = fifaStatsToRows(fifaData)
@@ -317,17 +335,19 @@ function MpMatchStats({ match }) {
           placeholder vide, cf. logique H2H) */}
       {recap && <p className="mp__recap">{recap}</p>}
 
-      {/* Fil du match */}
+      {/* Fil du match — cartons + remplacements seulement (buts déjà dans le
+          hero, voir plus haut). Si rien à montrer ET aucun but marqué, on le
+          précise ; si des buts existent mais aucun carton/remplacement, on
+          n'affiche rien ici (pas d'erreur : les buts sont bien visibles,
+          juste ailleurs sur la page). */}
       {hasEvents
         ? <MatchTimeline
-            espnScorers={espnScorers} espnCards={espnCards}
-            fdGoals={fdGoals} fdBookings={fdBookings} fdSubs={fdSubs}
+            espnCards={espnCards}
+            fdBookings={fdBookings} fdSubs={fdSubs}
             homeId={match.homeTeam?.id}
           />
-        : !eventsLoading
-          ? <p className="pm__noData">
-              {totalGoals > 0 ? 'Événements non disponibles' : 'Match sans but (0 – 0)'}
-            </p>
+        : (!eventsLoading && totalGoals === 0)
+          ? <p className="pm__noData">Match sans but (0 – 0)</p>
           : null
       }
 

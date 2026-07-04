@@ -1371,12 +1371,38 @@
   box-shadow: 0 0 16px rgba(var(--red-deep-rgb),0.15), 0 0 4px rgba(var(--red-deep-rgb),0.08);
 }
 
-/* Score des tirs au but — même style que .resultats__pens (page Résultats) */
-.accueil__matchCardPens {
+/* Tirs au but : score 120' au-dessus (déjà affiché), puis "T.A.B" + score des
+   tab en dessous, sur 2 lignes — même pattern que .resultats__pensBlock
+   (page Résultats), pour un affichage identique. */
+.accueil__matchCardPensBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  margin-top: 0.15rem;
+}
+.accueil__matchCardPensLabel {
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(var(--white-rgb),0.4);
+  text-transform: uppercase;
+}
+.accueil__matchCardPensScore {
   font-size: 0.6rem;
   font-weight: 700;
-  color: rgba(var(--white-rgb),0.5);
+  color: rgba(var(--white-rgb),0.55);
   letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Match décidé en prolongation (sans tirs au but) — même style que .resultats__aet */
+.accueil__matchCardAet {
+  font-size: 0.46rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(var(--white-rgb),0.4);
+  margin-top: 0.15rem;
 }
 
 

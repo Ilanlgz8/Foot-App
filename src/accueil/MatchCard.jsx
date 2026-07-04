@@ -157,6 +157,9 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   const hPens = match.score?.penalties?.home ?? null
   const aPens = match.score?.penalties?.away ?? null
+  // Décidé en prolongation SANS tirs au but — mutuellement exclusif avec
+  // wentToPens (voir Resultat.jsx, même logique).
+  const wentToAet = match.score?.duration === 'EXTRA_TIME'
 
   // ── Détection de but ──
   // scoreKey : clé localStorage pour mémoriser le dernier score connu.
@@ -278,7 +281,13 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           {(isLive || isFinished) ? `${hs ?? 0} – ${as_ ?? 0}` : formatHour(match.utcDate)}
         </span>
         {isFinished && wentToPens && hPens != null && aPens != null && (
-          <span className="accueil__matchCardPens">({hPens}-{aPens} tab)</span>
+          <div className="accueil__matchCardPensBlock">
+            <span className="accueil__matchCardPensLabel">T.A.B</span>
+            <span className="accueil__matchCardPensScore">({hPens}-{aPens})</span>
+          </div>
+        )}
+        {isFinished && wentToAet && (
+          <span className="accueil__matchCardAet">Après prolongation</span>
         )}
 
       </div>

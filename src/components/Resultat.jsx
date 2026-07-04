@@ -47,6 +47,10 @@ function MatchCard({ match }) {
   const hs   = match.score?.fullTime?.home ?? 0
   const as_  = match.score?.fullTime?.away ?? 0
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+  // Décidé en prolongation SANS tirs au but (score.duration ne vaut
+  // 'EXTRA_TIME' que dans ce cas précis — si ça s'est joué aux tab, duration
+  // vaut déjà 'PENALTY_SHOOTOUT', donc les deux sont mutuellement exclusifs).
+  const wentToAet = match.score?.duration === 'EXTRA_TIME'
   const hp   = match.score?.penalties?.home ?? null
   const ap   = match.score?.penalties?.away ?? null
   const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
@@ -71,7 +75,13 @@ function MatchCard({ match }) {
           <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
         </div>
         {wentToPens && hp != null && ap != null && (
-          <span className="resultats__pens">({hp}-{ap} tab)</span>
+          <div className="resultats__pensBlock">
+            <span className="resultats__pensLabel">T.A.B</span>
+            <span className="resultats__pensScore">({hp}-{ap})</span>
+          </div>
+        )}
+        {wentToAet && (
+          <span className="resultats__aet">Après prolongation</span>
         )}
         <span className="resultats__ftBadge">Terminé</span>
       </div>

@@ -175,7 +175,10 @@ function espnMinuteLabel(raw) {
   return base ? `${base}'` : (raw || '')
 }
 
-function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], homeId }) {
+// Exportée : réutilisée par MatchPage.jsx pour fusionner buts + cartons dans
+// le hero (au lieu de n'y afficher que les buts), triés par minute — même
+// logique que le Fil du match, sans dupliquer le parsing des minutes.
+export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], homeId }) {
   const events = { home: [], away: [] }
   let k = 0
 

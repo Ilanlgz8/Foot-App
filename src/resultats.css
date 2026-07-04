@@ -429,11 +429,37 @@
   color: #334155;
 }
 
-.resultats__pens {
+/* Tirs au but : score 120' au-dessus (déjà affiché), puis "T.A.B" + score des
+   tab en dessous, sur 2 lignes (au lieu d'une seule ligne "(x-y tab)"). */
+.resultats__pensBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  margin-top: 0.15rem;
+}
+.resultats__pensLabel {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(var(--white-rgb),0.4);
+  text-transform: uppercase;
+}
+.resultats__pensScore {
   font-size: 0.68rem;
   font-weight: 700;
-  color: rgba(var(--white-rgb),0.5);
+  color: rgba(var(--white-rgb),0.55);
   letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Match décidé en prolongation (sans tirs au but) */
+.resultats__aet {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(var(--white-rgb),0.4);
+  margin-top: 0.15rem;
 }
 
 /* ── Responsive ── */
