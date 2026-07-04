@@ -304,9 +304,6 @@ async function fetchEspnSummaryStats(slug, espnEventId) {
 function extractBoxscoreStats(hArr, aArr) {
   if (!hArr?.length && !aArr?.length) return null
 
-  // Log temporaire — voir tous les noms de stats ESPN disponibles
-  if (hArr?.length) console.log('[espn:stats] home fields:', hArr.map(s => s.name).join(', '))
-
   function find(arr, ...names) {
     if (!arr) return null
     for (const name of names) {

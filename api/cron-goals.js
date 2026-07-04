@@ -558,15 +558,6 @@ export default async function handler(req, res) {
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
     const eventId  = evt.id
 
-    // Diagnostic temporaire : vérifie si comp.status.displayClock (l'horloge)
-    // avance déjà pendant que status reste bloqué sur SCHEDULED après l'heure
-    // programmée — ça dira si la minute/clock ESPN est une donnée indépendante
-    // du statut (auquel cas la détecter serait utile) ou si elle vient du même
-    // flux et est donc bloquée en même temps (auquel cas ça n'aiderait pas).
-    if (slug === 'fifa.world' && status === 'STATUS_SCHEDULED' && evt.date && Date.now() >= new Date(evt.date).getTime()) {
-      log.push(`[espn:${slug}:${eventId}] SCHEDULED mais heure passée — displayClock="${comp.status?.displayClock ?? ''}"`)
-    }
-
     // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
     // Si ESPN dit encore SCHEDULED mais que l'API FIFA officielle confirme que le
     // match a commencé (Period != 0), on bascule immédiatement en IN_PROGRESS →
@@ -579,17 +570,6 @@ export default async function handler(req, res) {
         const awayNames = fifaTeamNamesAll(m.AwayTeam)
         return homeNames.some(n => fuzzyTeamFifa(rawHome, n)) && awayNames.some(n => fuzzyTeamFifa(rawAway, n))
       })
-      // Diagnostic temporaire : si le match ESPN est encore SCHEDULED après
-      // l'heure prévue mais qu'aucun match FIFA ne matche, on veut voir
-      // EXACTEMENT les noms comparés pour savoir si c'est un problème de
-      // matching de noms (ESPN "X" vs FIFA "Y" jamais reconnus comme pareils)
-      // plutôt que de deviner un correctif au hasard.
-      if (!fifaMatch && status === 'STATUS_SCHEDULED' && evt.date && Date.now() >= new Date(evt.date).getTime()) {
-        const fifaAllNames = fifaLiveMatches.map(m =>
-          `[${fifaTeamNamesAll(m.HomeTeam).join('/')} vs ${fifaTeamNamesAll(m.AwayTeam).join('/')}]`
-        ).join(' ')
-        log.push(`[fifa-match-fail:${eventId}] ESPN="${rawHome}" vs "${rawAway}" — FIFA dispo: ${fifaAllNames || '(aucun)'}`)
-      }
       if (fifaMatch) {
         const fifaStatus = fifaEffectiveStatus(fifaMatch)
         if (status === 'STATUS_SCHEDULED' && fifaStatus) {
