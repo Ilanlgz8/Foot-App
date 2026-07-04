@@ -1371,6 +1371,14 @@
   box-shadow: 0 0 16px rgba(var(--red-deep-rgb),0.15), 0 0 4px rgba(var(--red-deep-rgb),0.08);
 }
 
+/* Score des tirs au but — même style que .resultats__pens (page Résultats) */
+.accueil__matchCardPens {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(var(--white-rgb),0.5);
+  letter-spacing: 0.02em;
+}
+
 
 /* ── Navigation par jour dans le panel résultats ── */
 .accueil__resultNav {

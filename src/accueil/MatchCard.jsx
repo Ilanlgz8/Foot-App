@@ -133,10 +133,30 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
     return () => clearInterval(id)
   }, [liveMinute, match.id])
 
-  // Score : fusion ESPN + football-data.org, on garde toujours le plus à jour des deux
-  // (évite d'afficher un score ESPN périmé alors que FD.org a déjà la bonne valeur, ou l'inverse)
-  const hs  = mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
-  const as_ = mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+  // Score : fusion ESPN + football-data.org PENDANT le direct seulement (ESPN
+  // est alors la source la plus à jour, <10s de délai vs 1-5min pour FD.org).
+  // Une fois le match TERMINÉ, on fait confiance au score final de football-
+  // data.org (match.score.fullTime) et on arrête de merger avec ESPN : un
+  // score ESPN live périmé/faux resté en localStorage (ex: gonflé par les
+  // tirs au but, avant notre fix sur la détection tab) pouvait sinon rester
+  // affiché indéfiniment via mergeScore (qui garde le max des deux) — c'est
+  // ce qui causait l'affichage "4-4" au lieu de "2-2 (4-2 tab)" sur un match
+  // aux tirs au but.
+  const hs  = isFinished
+    ? (match.score?.fullTime?.home ?? match.score?.halfTime?.home ?? 0)
+    : mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+  const as_ = isFinished
+    ? (match.score?.fullTime?.away ?? match.score?.halfTime?.away ?? 0)
+    : mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+
+  // Tirs au but : score.fullTime est TOUJOURS à égalité dans ce cas (football-
+  // data.org y met le score après prolongations, pas après les tab) — le vrai
+  // vainqueur et le score des tab viennent de score.penalties. Même logique
+  // que Resultat.jsx/Match.jsx/MatchModal.jsx, pour un affichage identique
+  // partout dans l'app.
+  const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+  const hPens = match.score?.penalties?.home ?? null
+  const aPens = match.score?.penalties?.away ?? null
 
   // ── Détection de but ──
   // scoreKey : clé localStorage pour mémoriser le dernier score connu.
@@ -196,8 +216,13 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
   // Qui a gagné ? (uniquement pour les matchs terminés, et si noWinnerLoser est false)
-  const homeWins = !noWinnerLoser && isFinished && hs != null && as_ != null && hs > as_
-  const awayWins = !noWinnerLoser && isFinished && hs != null && as_ != null && as_ > hs
+  // Aux tirs au but, fullTime est à égalité → le vainqueur se lit dans penalties.
+  const homeWins = !noWinnerLoser && isFinished && (wentToPens
+    ? (hPens != null && aPens != null && hPens > aPens)
+    : (hs != null && as_ != null && hs > as_))
+  const awayWins = !noWinnerLoser && isFinished && (wentToPens
+    ? (hPens != null && aPens != null && aPens > hPens)
+    : (hs != null && as_ != null && as_ > hs))
 
   // Texte affiché au centre :
   //   - Match à venir   → heure (ex: "20:45")
@@ -252,6 +277,9 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
           {/* Match en cours ou terminé → score | À venir → heure */}
           {(isLive || isFinished) ? `${hs ?? 0} – ${as_ ?? 0}` : formatHour(match.utcDate)}
         </span>
+        {isFinished && wentToPens && hPens != null && aPens != null && (
+          <span className="accueil__matchCardPens">({hPens}-{aPens} tab)</span>
+        )}
 
       </div>
 
