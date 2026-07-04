@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/cron-goals.js": { "maxDuration": 30 }
+  },
   "rewrites": [
     { "source": "/news",           "destination": "/api/news" },
     { "source": "/espn",           "destination": "/api/espn" },

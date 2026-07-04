@@ -486,11 +486,19 @@ export default async function handler(req, res) {
   // non détectable depuis le code de l'app seul.
   try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
 
-  const now       = new Date()
-  const today     = dateStr(now)
-  const yesterday = dateStr(new Date(now - 86_400_000))
-  let notifsSent  = 0
-  const log       = []
+  // ── Une "passe" = un cycle complet fetch ESPN + traitement de tous les
+  // événements, identique à ce que faisait cet endpoint avant (une seule
+  // fois par appel cron-job.org, donc au mieux toutes les 60s). Extrait en
+  // fonction pour pouvoir être rejouée PLUSIEURS fois au sein du même appel
+  // (voir boucle interne juste après la définition) — c'est ça qui réduit le
+  // délai réel sans dépendre d'un cron plus fréquent que 60s (cron-job.org
+  // ne descend jamais sous la minute, même sur un plan payant).
+  async function runOnePass() {
+    const log      = []
+    let notifsSent = 0
+    const now       = new Date()
+    const today     = dateStr(now)
+    const yesterday = dateStr(new Date(now - 86_400_000))
 
   // Fetch tous les slugs ESPN en parallèle (aujourd'hui + hier pour les matchs tardifs)
   const allResults = await Promise.allSettled(
@@ -620,70 +628,103 @@ export default async function handler(req, res) {
     try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
 
     // Premier poll → baseline, pas de notif de changement d'état (le KO est
-    // déjà géré ci-dessus, indépendamment de prevState).
+    // déjà géré ci-dessus, indépendamment de prevState). On initialise aussi
+    // le compteur "buts déjà notifiés" (goalTrack, voir bloc But ci-dessous)
+    // sur le score de départ, pour ne jamais déclencher un rattrapage
+    // rétroactif sur des buts antérieurs au premier poll de ce match.
     if (prevState === null) {
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
+      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away, pendingSince: null }), { ex: 12 * 3600 }) } catch {}
       continue
     }
 
-    // ⚽ But — score différent du poll précédent, alors que le match était en
-    // direct au poll précédent. Volontairement PAS restreint au statut ACTUEL
-    // encore "en direct" (ancien bug) : un but marqué en toute fin de mi-temps
-    // ou de match additionnelle peut, sur le même poll (1/min), coïncider avec
-    // le passage déjà détecté à STATUS_HALFTIME/STATUS_FINAL côté ESPN — dans
-    // ce cas l'ancienne condition (LIVE_ESPN.has(status) && status !==
-    // 'STATUS_HALFTIME') supprimait purement et simplement la notif de but,
-    // alors que c'est justement le cas le plus fréquent (but à la 45e+/90e+).
-    // Seule exclusion légitime : un changement de score alors qu'on était DÉJÀ
-    // en mi-temps au poll précédent ET qu'on y est toujours (vraie pause,
-    // aucun but possible) — ça correspond à une correction tardive de données
-    // ESPN, pas un but réel.
+    // ⚽ But — approche "toujours complète, quitte à attendre un peu" (choix
+    // explicite de l'utilisateur, en alternative à l'envoi immédiat parfois
+    // générique). Au lieu de notifier dès que le score diffère du poll
+    // précédent, on compare le score actuel à un compteur persistant "buts
+    // déjà notifiés par camp" (goalTrack:${eventId}) : si comp.details n'a pas
+    // encore le nom du buteur, on RETENTE aux polls suivants (jusqu'à 5 min)
+    // au lieu d'envoyer tout de suite un "⚽ But !" générique définitif —
+    // sendDeduped() garde son rôle habituel (une seule notif par but), le
+    // compteur sert uniquement à décider QUAND l'appeler. Ça gère aussi
+    // naturellement le cas où un 2e but est marqué avant que le 1er ait été
+    // résolu (chaque côté a son propre compteur, indépendant du score exact
+    // au moment de la détection).
+    //
+    // Exclusion conservée de l'ancienne logique : un changement de score alors
+    // qu'on était DÉJÀ en mi-temps au poll précédent ET qu'on y est toujours
+    // (vraie pause, aucun but possible) = correction tardive de données ESPN,
+    // pas un but réel → absorbé silencieusement dans le compteur, jamais notifié.
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
-    if (
-      LIVE_ESPN.has(prevStatus) &&
-      !steadyHalftime &&
-      prevScore !== null &&
-      prevScore !== score
-    ) {
-      log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
+    if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
+      const trackKey = `goalTrack:${eventId}`
+      let track = null
+      try { track = await kv.get(trackKey) } catch {}
+      track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away, pendingSince: null }
 
-      // ⚠️ BUG CORRIGÉ : la notif de but n'affichait jamais le buteur ("But !"
-      // générique) alors que comp.details (déjà fetché à chaque poll) contient
-      // les buts détaillés — extractEspnScorers() plus haut dans ce fichier
-      // s'en sert déjà pour générer le résumé de fin de match, jamais réutilisé
-      // ici. On identifie le camp qui vient de marquer (score qui a augmenté)
-      // et on prend son dernier but connu (le plus tardif) = celui qui vient
-      // d'arriver. Fallback silencieux sur le titre générique si ESPN n'a pas
-      // encore mis à jour comp.details (arrive parfois quelques secondes après
-      // le changement de score) — jamais bloquant pour l'envoi de la notif.
-      const [prevHome, prevAway] = (prevScore ?? '0-0').split('-').map(n => parseInt(n, 10) || 0)
-      const scoringSide  = home > prevHome ? 'home' : away > prevAway ? 'away' : null
-      const scoringTeam  = scoringSide === 'home' ? homeTeam : scoringSide === 'away' ? awayTeam : null
-      const goalScorers  = scoringSide ? extractEspnScorers(comp, homeC.team?.id).filter(g => g.team === scoringSide) : []
-      const lastScorer   = goalScorers.sort((a, b) => parseMin(a.minute) - parseMin(b.minute)).pop()
-      // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même convention
-      // (nom + ", pen"/", csc" entre parenthèses) que generateRecap() plus haut
-      // dans ce fichier, pour rester cohérent. Fallback générique si ESPN n'a
-      // pas encore mis à jour comp.details au moment exact du poll (quelques
-      // secondes de décalage possible) — jamais bloquant pour l'envoi.
-      const scorerSuffix = lastScorer ? (lastScorer.ownGoal ? ', csc' : lastScorer.penaltyKick ? ', pen' : '') : ''
-      const minuteText   = lastScorer ? minuteLabel(lastScorer.minute) : ''
-      const goalTitle    = (lastScorer && scoringTeam)
-        ? `⚽ But pour ${scoringTeam} (${lastScorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
-        : '⚽ But !'
+      const sides = []
+      if (home > track.home) sides.push('home')
+      if (away > track.away) sides.push('away')
 
-      // tag explicite et UNIQUE par but (inclut le score) : sans ça, sw-push.js
-      // retombe sur un tag par défaut basé uniquement sur matchId, donc PARTAGÉ
-      // entre tous les buts d'un même match. Un 2e but réutiliserait alors le
-      // même tag que le 1er — sur certaines plateformes (iOS notamment), la
-      // notif ne prévient pas forcément l'utilisateur de la même façon la 2e
-      // fois (le natif traite ça comme un remplacement, pas un nouvel avertissement,
-      // selon comment le swipe/lecture du 1er a été géré). Un tag unique par but
-      // supprime totalement ce risque : chaque but est une notif indépendante,
-      // jamais un remplacement silencieux d'une précédente.
-      const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${score}` }, slug, log)
-      if (sent > 0) notifsSent++
+      let trackChanged = false
+      // Une fois le match final, plus de nouveau poll utile à attendre pour ce
+      // match (il sort bientôt de la fenêtre today/yesterday) → on résout tout
+      // de suite avec ce qu'on a, plutôt que de laisser un but en attente
+      // indéfiniment sans jamais pouvoir le rattraper.
+      const forceNow = FINAL_ESPN.has(status)
+
+      for (const side of sides) {
+        if (steadyHalftime) {
+          track[side] = side === 'home' ? home : away
+          trackChanged = true
+          continue
+        }
+
+        const scoringTeam = side === 'home' ? homeTeam : awayTeam
+        const goalScorers = extractEspnScorers(comp, homeC.team?.id)
+          .filter(g => g.team === side)
+          .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
+        const lastScorer  = goalScorers[goalScorers.length - 1] ?? null
+
+        const pendingSince  = track.pendingSince ?? Date.now()
+        const waitedTooLong = forceNow || (Date.now() - pendingSince > 5 * 60_000)
+
+        if (!lastScorer && !waitedTooLong) {
+          if (!track.pendingSince) { track.pendingSince = pendingSince; trackChanged = true }
+          log.push(`[espn:${slug}:${eventId}] BUT ${side} en attente du buteur`)
+          continue
+        }
+
+        // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même
+        // convention (nom + ", pen"/", csc" entre parenthèses) que
+        // generateRecap() plus haut dans ce fichier, pour rester cohérent.
+        // Fallback générique uniquement si le délai de 5 min est dépassé sans
+        // qu'ESPN n'ait jamais rattaché de buteur (rare, mais mieux que de ne
+        // jamais notifier ce but).
+        const scorerSuffix = lastScorer ? (lastScorer.ownGoal ? ', csc' : lastScorer.penaltyKick ? ', pen' : '') : ''
+        const minuteText   = lastScorer ? minuteLabel(lastScorer.minute) : ''
+        const goalTitle    = lastScorer
+          ? `⚽ But pour ${scoringTeam} (${lastScorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
+          : '⚽ But !'
+
+        log.push(`[espn:${slug}:${eventId}] BUT ${side} ${score}${lastScorer ? '' : ' (générique, délai dépassé)'}`)
+
+        // tag/clé de dédup incluant le camp (`side`) — au cas rarissime où les
+        // deux équipes marquent au même poll : sans ça, la 2e notif serait
+        // silencieusement absorbée par la clé de dédup de la 1ère (même score
+        // exact au moment de l'envoi).
+        const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${score}`,
+          { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${score}` }, slug, log)
+        if (sent > 0) notifsSent++
+
+        track[side] = side === 'home' ? home : away
+        track.pendingSince = null
+        trackChanged = true
+      }
+
+      if (trackChanged) {
+        try { await kv.set(trackKey, JSON.stringify(track), { ex: 12 * 3600 }) } catch {}
+      }
     }
 
     // ⏸ Mi-temps
@@ -760,20 +801,69 @@ export default async function handler(req, res) {
     }
   }
 
+    return { notifsSent, events: allEvents.length, log }
+  }
+
+  // ── Boucle interne : plusieurs passes par appel cron-job.org ────────────
+  // ⚠️ cron-job.org ne descend jamais sous 1 appel/minute (vérifié — limite
+  // dure de leur service, même sur un plan payant) : impossible d'aller plus
+  // vite en augmentant la fréquence du cron externe. En revanche, RIEN
+  // n'empêche CET appel de faire plusieurs passes ESPN à l'intérieur de lui-
+  // même avant de répondre — c'est ce qu'on fait ici, gratuitement, sans
+  // nouvelle infra. Seule contrainte réelle : le plan gratuit de cron-job.org
+  // coupe la connexion après 30s d'exécution (leur FAQ), donc on reste
+  // volontairement sous cette limite (BUDGET_MS) par sécurité — sur un
+  // compte "Sustaining Member" payant chez eux (limite plus haute), BUDGET_MS
+  // peut être augmenté sans toucher au reste du code.
+  //
+  // ⚠️ IMPORTANT pour comprendre le vrai gain : le pire délai n'est PAS
+  // POLL_INTERVAL_MS (l'écart entre les passes internes), il est dominé par
+  // le "trou mort" entre la DERNIÈRE passe d'un appel et la 1ère passe de
+  // l'appel suivant (60s plus tard) = environ (60 - BUDGET_MS). Faire plus de
+  // passes internes rapprochées n'aide quasiment pas le pire cas si
+  // BUDGET_MS reste petit — le vrai levier, c'est de pousser BUDGET_MS aussi
+  // près que possible des 30s de cron-job.org. Avec BUDGET_MS=26s : passes
+  // à peu près à 0/8/16/24s, trou mort ≈ 60-24 = 36s → pire cas ≈ 35-36s
+  // (au lieu de 60s avant, et 48s avec une 1ère version moins bien réglée
+  // de cette boucle qui ne poussait pas assez BUDGET_MS).
+  const BUDGET_MS         = 26_000  // le plus proche possible des 30s de cron-job.org (marge de 4s)
+  const POLL_INTERVAL_MS  = 8_000   // passes rapprochées → réduit surtout le délai MOYEN, pas le pire cas
+  const loopStart = Date.now()
+  const allLogs   = []
+  let totalNotifs = 0
+  let totalEvents = 0
+  let passes      = 0
+
+  while (true) {
+    const passStart = Date.now()
+    const result = await runOnePass()
+    totalNotifs += result.notifsSent
+    totalEvents  = result.events
+    allLogs.push(`[pass ${passes + 1}] notifs=${result.notifsSent} events=${result.events}`, ...result.log)
+    passes++
+
+    const elapsedTotal = Date.now() - loopStart
+    const remaining    = BUDGET_MS - elapsedTotal
+    if (remaining <= POLL_INTERVAL_MS) break // pas assez de marge pour une passe de plus
+    const elapsedPass = Date.now() - passStart
+    await new Promise(r => setTimeout(r, Math.max(0, POLL_INTERVAL_MS - elapsedPass)))
+  }
+
   // Résultat détaillé de CETTE exécution — utile pour /api/debug-push (voir
   // marqueur lastRun plus haut) : distingue "0 notif car rien à notifier" de
   // "le cron ne tourne plus du tout".
   try {
     await kv.set('cron:goals:lastResult', JSON.stringify({
-      at: Date.now(), events: allEvents.length, notifsSent,
+      at: Date.now(), events: totalEvents, notifsSent: totalNotifs, passes,
     }), { ex: 7 * 24 * 3600 })
   } catch {}
 
   return res.status(200).json({
     ok: true,
     slugs: ESPN_SLUGS.length,
-    events: allEvents.length,
-    notifsSent,
-    log,
+    passes,
+    events: totalEvents,
+    notifsSent: totalNotifs,
+    log: allLogs,
   })
 }

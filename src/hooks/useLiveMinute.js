@@ -1,12 +1,17 @@
 // Suivi live en deux couches :
 //
 // ── PRIMAIRE : /api/fifa-live (Vercel function → ESPN + Redis cache) ──
-//   • Fetch server-side : scoreboard ESPN mis en cache Redis 12s
+//   • Fetch server-side : scoreboard ESPN mis en cache Redis 8s, FIFA live 6s
+//     (voir api/fifa-live.js — ESPN_TTL/FIFA_TTL — cache PARTAGÉ entre tous
+//     les utilisateurs, donc le coût upstream ne dépend pas du nombre de
+//     clients qui pollent, seulement de ce TTL)
 //   • eventId → fdMatchId stocké Redis 6h → survit aux rechargements iOS
-//   • Scorer preservation + stats summary côté serveur
-//   • Données parsées retournées proprement : { [fdMatchId]: { home, away, scorers, stats, ... } }
-//   • Si ESPN est down → Redis renvoie les dernières données connues
-//   • Poll toutes les 15s dès qu'un match approche ou est en cours
+//   • Scorer preservation + stats summary côté serveur (cache 30s, séparé —
+//     voir SUMMARY_TTL dans api/fifa-live.js : les stats live comme la
+//     possession sont donc un peu moins fraîches que le score lui-même)
+//   • Poll toutes les 5s dès qu'un match approche ou est en cours (Web
+//     Worker dédié, non throttlé même en arrière-plan — voir espnTimerWorker.js
+//     et le hook plus bas ; ⚠️ commentaire corrigé, ce n'était plus 15s)
 //
 // ── FALLBACK : api-football.com (/apifootball?live=all) ──
 //   • Poll toutes les 60s, UNIQUEMENT dans les 4 fenêtres critiques
