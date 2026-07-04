@@ -1,5 +1,6 @@
 // Proxy api-football.com — clé APIFOOTBALL_KEY côté serveur uniquement
 // Cache Redis par endpoint pour éviter de consommer le quota (100 req/jour)
+// (redeploy forcé pour vérifier la prise en compte d'une nouvelle valeur de clé)
 import { Redis } from '@upstash/redis'
 
 const kv = new Redis({
