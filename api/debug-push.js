@@ -77,6 +77,23 @@ export default async function handler(req, res) {
     info.cron = { reachable: false, error: e.message }
   }
 
+  // 3bis. Historique des logs (dernières lignes, toutes exécutions confondues
+  // sur les dernières 24h) — permet de diagnostiquer un match précis après
+  // coup (ex: "pourquoi tel but n'a pas été notifié ?") au lieu de deviner
+  // sans preuve. Filtrable côté client via ?match=<eventId ESPN ou mot-clé>
+  // pour ne pas avoir à lire des milliers de lignes toutes compétitions
+  // confondues.
+  try {
+    const raw = (await kv.lrange('cron:goals:logHistory', 0, -1)) ?? []
+    const filter = String(req.query.match ?? '').trim()
+    info.logHistory = {
+      totalLines: raw.length,
+      lines: filter ? raw.filter(l => l.includes(filter)) : raw.slice(-200),
+    }
+  } catch (e) {
+    info.logHistory = { error: e.message }
+  }
+
   // 4. Test envoi VAPID (dry-run — sans vraie subscription)
   try {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)

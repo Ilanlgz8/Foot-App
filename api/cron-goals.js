@@ -910,6 +910,22 @@ export default async function handler(req, res) {
     }), { ex: 7 * 24 * 3600 })
   } catch {}
 
+  // ⚠️ Historique persistant des logs (constat utilisateur : notifs de but/fin
+  // de match manquées sans qu'on puisse voir a posteriori ce qui s'est passé
+  // côté serveur — jusqu'ici, `log` n'existait que dans la réponse HTTP de
+  // CET appel précis, jamais consultable après coup). On empile chaque ligne
+  // (préfixée d'un horodatage) dans une liste Redis glissante, exposée par
+  // /api/debug-push, pour pouvoir diagnostiquer un incident après qu'il se
+  // soit produit plutôt que de deviner sans preuve.
+  try {
+    if (allLogs.length) {
+      const stamped = allLogs.map(l => `${new Date().toISOString()} ${l}`)
+      await kv.rpush('cron:goals:logHistory', ...stamped)
+      await kv.ltrim('cron:goals:logHistory', -1000, -1)
+      await kv.expire('cron:goals:logHistory', 24 * 3600)
+    }
+  } catch {}
+
   return res.status(200).json({
     ok: true,
     slugs: ESPN_SLUGS.length,

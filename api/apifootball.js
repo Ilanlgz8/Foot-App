@@ -15,6 +15,42 @@ function cacheTTL(endpoint) {
   return 6 * 3600                                              // 6h — fixtures et autres
 }
 
+// ── Budget interne — empêche de redéclencher le blocage anti-abus d'api-football ──
+// Confirmé (api-football.com/news/post/how-ratelimit-works, recherche faite
+// suite au constat utilisateur "le compte a déjà sauté 6 fois") : le plan
+// gratuit autorise 10 req/min ET 100 req/jour (reset 00:00 UTC) — dépasser le
+// débit PAR MINUTE (via un pic de trafic, même bref) peut déclencher un
+// blocage TEMPORAIRE OU PERMANENT de la clé/l'IP, sans préavis, en plus des
+// simples 429. Root cause très probable des suspensions répétées : ce proxy
+// ne limitait QUE les appels identiques (cache par endpoint+params), jamais
+// le DÉBIT global vers l'upstream — un pic de matchs live simultanés
+// (plusieurs championnats + Mondial, plusieurs utilisateurs, endpoints/params
+// différents = autant de cache miss) peut facilement dépasser 10/min sans
+// qu'aucun garde-fou ne l'empêche jusqu'ici.
+//
+// Fix : un budget interne, sous les vraies limites (marge de sécurité), qui
+// empêche TOUT appel upstream au-delà — mieux vaut renvoyer "pas de donnée
+// pour l'instant" (déjà géré gracieusement côté UI, voir le fix Classement.jsx
+// qui masque l'onglet Passeurs sur erreur) que de re-déclencher un blocage.
+const MINUTE_CAP = 7   // sur 10/min réels
+const DAILY_CAP   = 80  // sur 100/jour réels
+
+async function reserveQuota() {
+  const now       = new Date()
+  const minuteKey = `aflcache:quota:min:${now.toISOString().slice(0, 16)}`
+  const dayKey    = `aflcache:quota:day:${now.toISOString().slice(0, 10)}`
+  try {
+    const [minuteCount, dayCount] = await Promise.all([kv.incr(minuteKey), kv.incr(dayKey)])
+    if (minuteCount === 1) { try { await kv.expire(minuteKey, 70) } catch {} }
+    if (dayCount === 1)    { try { await kv.expire(dayKey, 26 * 3600) } catch {} }
+    return minuteCount <= MINUTE_CAP && dayCount <= DAILY_CAP
+  } catch {
+    // Redis down → impossible de compter, mais on ne veut pas non plus
+    // couper tout le fallback pour cette seule raison → on laisse passer.
+    return true
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' })
@@ -40,7 +76,19 @@ export default async function handler(req, res) {
     }
   } catch { /* Redis down → continue */ }
 
-  // ── 2. Fetch api-football ────────────────────────────────────────────────────
+  // ── 2. Budget interne — voir reserveQuota() ci-dessus ─────────────────────────
+  // Réponse dans la MÊME forme qu'une erreur api-football réelle (`errors`
+  // non-vide, HTTP 200) : le code client (afetch() dans useApiFootball.js)
+  // détecte déjà ce champ et bascule en état d'erreur proprement, donc aucune
+  // duplication de logique de gestion d'erreur nécessaire côté front.
+  const allowed = await reserveQuota()
+  if (!allowed) {
+    res.status(200).setHeader('Content-Type', 'application/json')
+    res.setHeader('x-cache', 'QUOTA')
+    return res.json({ errors: { quota: 'Budget interne api-football atteint, réessaie plus tard' }, response: [] })
+  }
+
+  // ── 3. Fetch api-football ────────────────────────────────────────────────────
   try {
     const url = `https://v3.football.api-sports.io/${endpoint}${queryStr ? `?${queryStr}` : ''}`
     const response = await fetch(url, {

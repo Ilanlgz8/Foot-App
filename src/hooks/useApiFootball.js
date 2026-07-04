@@ -88,12 +88,29 @@ function teamSimilarity(a, b) {
 }
 
 // ── Fetch via proxy /apifootball ───────────────────────────────────────────────
+// ⚠️ api-football encode certaines erreurs DANS le corps JSON avec un statut
+// HTTP 200 (ex: compte suspendu, plan trop limité pour la saison demandée) —
+// un simple check `!res.ok` ne les détecte donc pas : la réponse "réussit"
+// techniquement mais `response` est vide, ce qui semblait être un classement
+// vide plutôt qu'une vraie panne (constat concret : compte api-football
+// suspendu → topassists silencieusement vide au lieu de remonter une erreur).
+// On vérifie donc aussi le champ `errors` du corps (objet non-vide = erreur
+// upstream) et on le transforme en exception, pour que React Query passe
+// bien en état d'erreur et que l'UI puisse réagir (masquer l'onglet plutôt
+// que d'afficher une liste vide qui semble cassée).
 async function afetch(endpoint, params = {}) {
   const p = new URLSearchParams(params)
   if (endpoint !== 'fixtures') p.set('_ep', endpoint)
   const res = await fetch(`/apifootball?${p.toString()}`)
   if (!res.ok) throw new Error(`api-football ${res.status}: ${endpoint}`)
-  return res.json()
+  const data = await res.json()
+  const errs = data?.errors
+  const hasErrors = errs && (Array.isArray(errs) ? errs.length > 0 : Object.keys(errs).length > 0)
+  if (hasErrors) {
+    const msg = typeof errs === 'object' ? Object.values(errs).join(' / ') : String(errs)
+    throw new Error(`api-football: ${msg}`)
+  }
+  return data
 }
 
 // ── Résolution fixture ID à partir d'un match FD.org ─────────────────────────

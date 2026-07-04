@@ -65,6 +65,14 @@ function Classement() {
   } = useAflTopAssists(selectedComp)
   const topAssists  = topAssistsData ?? []
   const assistsError = assistsErrorObj?.message ?? null
+  // Passeurs indisponible (ex: compte api-football suspendu) → masquer
+  // l'onglet plutôt que d'afficher une liste vide qui semble cassée. Si
+  // l'utilisateur était déjà sur cet onglet au moment où l'erreur arrive,
+  // on le ramène sur Buteurs pour ne pas rester bloqué sur un onglet caché.
+  const assistsUnavailable = !assistsLoading && !!assistsError
+  useEffect(() => {
+    if (assistsUnavailable && view === 'passeurs') setView('buteurs')
+  }, [assistsUnavailable, view])
 
   // Recherche — filtre côté client, ne nécessite aucune donnée supplémentaire.
   function matchesTeamSearch(team) {
@@ -482,12 +490,14 @@ function Classement() {
             >
               Buteurs
             </button>
-            <button
-              className={`classement__viewBtn ${view === 'passeurs' ? 'classement__viewBtn--active' : ''}`}
-              onClick={() => setView('passeurs')}
-            >
-              Passeurs
-            </button>
+            {!assistsUnavailable && (
+              <button
+                className={`classement__viewBtn ${view === 'passeurs' ? 'classement__viewBtn--active' : ''}`}
+                onClick={() => setView('passeurs')}
+              >
+                Passeurs
+              </button>
+            )}
           </div>
         </div>
 
