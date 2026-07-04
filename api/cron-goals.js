@@ -50,7 +50,22 @@ const LIVE_ESPN  = new Set([
   'STATUS_OVERTIME',
   'STATUS_SHOOTOUT',
 ])
-const FINAL_ESPN = new Set(['STATUS_FINAL', 'STATUS_FULL_TIME'])
+// ⚠️ BUG CORRIGÉ : un match à élimination directe décidé en prolongation ou
+// aux tirs au but ne renvoie JAMAIS 'STATUS_FINAL' côté ESPN — il renvoie
+// 'STATUS_FINAL_AET' ou 'STATUS_FINAL_PEN' (statuts déjà identifiés et gérés
+// côté client, voir useLiveMinute.js). Comme ces deux valeurs manquaient ici,
+// FINAL_ESPN.has(status) restait FAUX indéfiniment pour ces matchs : la notif
+// "Fin de match" ne partait jamais, ET la notif "Coup d'envoi" (dont la
+// condition est justement "tant que le statut n'est pas final") continuait
+// de se redéclencher à chaque expiration de sa clé de dédup (3h) — d'où des
+// notifs de coup d'envoi reçues des heures après la fin réelle du match,
+// pour n'importe quel match de phase à élimination directe allant en
+// prolongation/tab (constat utilisateur, en pleine phase à élimination
+// directe du Mondial).
+const FINAL_ESPN = new Set([
+  'STATUS_FINAL', 'STATUS_FULL_TIME',
+  'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
+])
 
 // ── FIFA live — couche rapide WC (même cache Redis que api/fifa-live.js) ───────
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
@@ -553,8 +568,14 @@ export default async function handler(req, res) {
     const kickoffPassed = kickoffAt != null && Date.now() >= kickoffAt
     const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
     if (kickoffPassed && notPostponed && !FINAL_ESPN.has(status)) {
+      // TTL de dédup à 6h (au lieu du défaut 3h) : cette notif se redéclenche
+      // tant que le match n'est pas détecté "final" — avec le fix FINAL_ESPN
+      // ci-dessus ça ne devrait plus arriver, mais 6h laisse une marge de
+      // sécurité si un statut ESPN imprévu (autre variante FINAL_*) passait
+      // encore à travers, plutôt que de retomber sur 3h qui peut être trop
+      // court pour un match prolongation+tab (jusqu'à ~3h).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log)
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600)
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (heure programmée)`) }
     }
 
