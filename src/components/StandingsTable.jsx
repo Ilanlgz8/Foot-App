@@ -66,8 +66,10 @@ function Forme({ results }) {
  * @param {object}   formMap          — { [teamId]: ['W','D','L',...] } (optionnel)
  * @param {object[]} qualificationRules — règles de zones colorées (optionnel)
  *   Format : [{ start, end, dotClassName }]
+ * @param {boolean}  isCountry        — true si équipes NATIONALES (drapeaux,
+ *   cercle) plutôt que clubs (écussons, pas de cercle forcé) — voir index.css
  */
-export function StandingsTable({ rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null }) {
+export function StandingsTable({ rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false }) {
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
@@ -118,7 +120,7 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
                         : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
                       }
                       {team.team.crest && (
-                        <div className="classement__teamCrestWrap"><img src={team.team.crest} alt="" loading="lazy" className="classement__teamCrest" data-team={team.team.name}
+                        <div className="classement__teamCrestWrap" data-crest={isCountry ? 'country' : 'club'}><img src={team.team.crest} alt="" loading="lazy" className="classement__teamCrest" data-team={team.team.name}
                           onError={e => e.currentTarget.style.display = 'none'} /></div>
                       )}
                       <span className="classement__teamName">

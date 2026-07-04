@@ -40,6 +40,8 @@ const fmtDate = (d) => {
    poule à la fois), le coût du chargement eager est négligeable. */
 function MatchCard({ match }) {
   const navigate = useNavigate()
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
   // score.fullTime = score après prolongations le cas échéant (football-data.org
   // inclut les buts de prolong dedans, seuls les tirs au but sont à part dans
   // score.penalties). Un match décidé aux tab est TOUJOURS à égalité en fullTime
@@ -60,7 +62,7 @@ function MatchCard({ match }) {
   return (
     <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
       <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
-        <div className="resultats__crestWrap">
+        <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.homeTeam?.crest
             ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
             : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
@@ -86,7 +88,7 @@ function MatchCard({ match }) {
         <span className="resultats__ftBadge">Terminé</span>
       </div>
       <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
-        <div className="resultats__crestWrap">
+        <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.awayTeam?.crest
             ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
             : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
@@ -417,7 +419,7 @@ function Resultats() {
                       {teams.map(t => (
                         <li key={t.id} className="matchs__wcGroupCard__team">
                           {t.crest
-                            ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} /></div>
+                            ? <div className="matchs__wcGroupCard__crestWrap" data-crest="country"><img src={t.crest} alt="" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} /></div>
                             : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>}
                           <span className="matchs__wcGroupCard__teamName">{translateTeam(t.shortName || t.name)}</span>
                         </li>

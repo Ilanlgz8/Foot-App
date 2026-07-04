@@ -77,21 +77,35 @@ body::before {
 }
 
 
-/* ── Zoom correctif pour crests/drapeaux à marge interne excessive ──
-   Chaque composant qui affiche un crest (MatchCard, MatchPoster, Live,
-   MatchPage/LiveMatchPage hero...) applique déjà un léger zoom générique
-   (scale 1.18) pour compenser la marge interne souvent présente dans les
-   images crest/drapeau fournies par football-data.org, une fois recadrées
-   en cercle. Insuffisant pour le drapeau de l'Argentine (constaté par
-   l'utilisateur : vide visible aux pôles nord/sud) — sa marge interne est
-   plus grande que la moyenne. Plutôt que dupliquer une valeur de zoom
-   spécifique dans chaque composant, un seul override global ici, ciblé via
-   l'attribut data-team ajouté sur les <img> de crest concernées. À étendre
-   avec la même méthode si un autre drapeau est signalé pareil. */
-img[data-team="Argentina"],
-img[data-team="Uzbekistan"],
-img[data-team="Korea Republic"] {
-  transform: scale(1.75) !important;
+/* ── Blason club vs drapeau pays — traitement unique, partagé par TOUS les
+   composants qui affichent un crest (Classement, Résultat, Programme, cards
+   Accueil, pages Match/Live, modal...). Chaque wrapper pose un attribut
+   data-crest="club" ou "country" (voir chaque composant) plutôt que de
+   dupliquer une règle par fichier CSS.
+   ⚠️ HISTORIQUE : avant, tout était forcé en cercle avec object-fit:cover +
+   un zoom (scale 1.18, voire 1.75 pour Argentine/Ouzbékistan/Corée du Sud en
+   correctif ponctuel) pour compenser la marge interne des images. Deux
+   problèmes distincts remontés par l'utilisateur :
+   1) Les blasons de CLUB sont souvent des écussons/boucliers non circulaires
+      (contrairement aux drapeaux) — le cercle forcé les déforme/tronque sans
+      raison. → pas de cercle, rendu par défaut (contain, sans recadrage).
+   2) Même pour les drapeaux (où le cercle a du sens), "cover + zoom" RECADRE
+      les bords : ex. le drapeau du Canada (bandes rouges de part et d'autre
+      de la feuille) perdait ses bandes rouges, ne laissant que le centre
+      blanc/feuille visible. → object-fit:contain (pas de crop, le drapeau
+      entier reste visible, quitte à ne pas remplir tout le cercle) : les
+      correctifs de zoom par équipe deviennent inutiles et sont retirés. */
+[data-crest="club"] {
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+[data-crest="club"] > img {
+  object-fit: contain !important;
+  transform: none !important;
+}
+[data-crest="country"] > img {
+  object-fit: contain !important;
+  transform: none !important;
 }
 
 /* ── Animations globales ── */

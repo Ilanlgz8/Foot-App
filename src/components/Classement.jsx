@@ -233,7 +233,7 @@ function Classement() {
         <div className={`accueil__matchCard${live ? ' accueil__matchCard--live' : ''}`}>
           {/* Équipe domicile */}
           <div className="accueil__matchCardTeam">
-            <div className="accueil__matchCardCrestWrap">
+            <div className="accueil__matchCardCrestWrap" data-crest="country">
               {m.homeTeam?.crest
                 ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
@@ -252,7 +252,7 @@ function Classement() {
 
           {/* Équipe extérieur */}
           <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
-            <div className="accueil__matchCardCrestWrap">
+            <div className="accueil__matchCardCrestWrap" data-crest="country">
               {m.awayTeam?.crest
                 ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
@@ -297,6 +297,7 @@ function Classement() {
                 formMap={formMap}
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
+                isCountry={selectedComp === 'WC'}
               />
             )}
 
@@ -354,6 +355,7 @@ function Classement() {
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
+                isCountry={selectedComp === 'WC'}
               />
             </div>
           ))}
@@ -566,7 +568,7 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <div className="classement__scorerCrestWrap"><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
+                            <div className="classement__scorerCrestWrap" data-crest={selectedComp === 'WC' ? 'country' : 'club'}><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
                               onError={e => e.currentTarget.style.display = 'none'} /></div>
                           )}
                           <span className="classement__scorerTeam">
@@ -662,6 +664,7 @@ function Classement() {
                   qualificationRules={qualificationRules}
                   snapshotKey={`standings_prev_${selectedComp}`}
                   snapshotRows={standings}
+                  isCountry={selectedComp === 'WC'}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
         )}

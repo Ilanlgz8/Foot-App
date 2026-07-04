@@ -239,6 +239,8 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   const awayNameCls  = matchClass('accueil__matchCardName',  awayWins, homeWins)
   const homeCrestCls = matchClass('accueil__matchCardCrest', false,    awayWins)  // blason perdant → grisé
   const awayCrestCls = matchClass('accueil__matchCardCrest', false,    homeWins)
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
   const cardGradient = noGradient ? null : getMatchGradient(
     match.homeTeam?.name || match.homeTeam?.shortName || '',
     match.awayTeam?.name || match.awayTeam?.shortName || ''
@@ -253,7 +255,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 
       {/* Équipe domicile */}
       <div className="accueil__matchCardTeam">
-        <div className="accueil__matchCardCrestWrap">
+        <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.homeTeam?.crest
             ? <img src={match.homeTeam.crest} alt="" loading="lazy" className={homeCrestCls} data-team={match.homeTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
@@ -294,7 +296,7 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
 
       {/* Équipe extérieure */}
       <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
-        <div className="accueil__matchCardCrestWrap">
+        <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.awayTeam?.crest
             ? <img src={match.awayTeam.crest} alt="" loading="lazy" className={awayCrestCls} data-team={match.awayTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />

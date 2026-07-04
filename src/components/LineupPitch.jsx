@@ -619,7 +619,7 @@ function PlayerGrid({ starters, subs }) {
 }
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function LineupPitch({ home, away }) {
+export default function LineupPitch({ home, away, isCountry = false }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
   // Rouge app pour les deux équipes — cohérent avec le thème
@@ -667,10 +667,16 @@ export default function LineupPitch({ home, away }) {
               }}
             >
               {t?.crest && (
-                <div style={{ width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{
+                  width: 24, height: 24, flexShrink: 0,
+                  borderRadius: isCountry ? '50%' : 0,
+                  overflow: isCountry ? 'hidden' : 'visible',
+                }}>
+                  {/* Blason (club, pas de cercle forcé, pas de crop) vs drapeau
+                      (pays, cercle) — voir index.css pour l'équivalent en CSS
+                      partagé ; ici en inline faute de classe CSS dédiée. */}
                   <img src={t.crest} alt="" data-team={t?.name} style={{
-                    width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center',
-                    transform: 'scale(1.18)',
+                    width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center',
                   }} />
                 </div>
               )}

@@ -15,6 +15,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // Vrai formMap depuis football-data.org pour cette compétition
   const compCode = match.competition?.code ?? null
   const { formMap } = useTeamForm(compCode)
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || compCode === 'WC'
 
   // Fallback initiale si le crest ne charge pas (404, image cassée)
   const [homeCrestError, setHomeCrestError] = useState(false)
@@ -94,7 +96,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--home">
           {match.homeTeam?.crest && !homeCrestError
-            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
+            ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
                 onError={() => setHomeCrestError(true)} /></div>
             : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
           }
@@ -123,7 +125,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__team-col poster__team-col--away">
           {match.awayTeam?.crest && !awayCrestError
-            ? <div className="poster__crestWrap"><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
+            ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
                 onError={() => setAwayCrestError(true)} /></div>
             : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
           }

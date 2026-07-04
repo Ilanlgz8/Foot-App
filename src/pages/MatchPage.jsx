@@ -121,6 +121,9 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
     espnScorers, espnCards, homeId: match.homeTeam?.id,
   })
 
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+
   return (
     <div className="mp__hero" style={{ background: gradient }}>
       <div className="mp__hero__overlay" />
@@ -138,7 +141,7 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
       <div className="mp__hero__mid">
         <div className="mp__hero__team">
           {match.homeTeam?.crest
-            ? <div className="mp__hero__crestWrap"><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" data-team={match.homeTeam?.name} /></div>
+            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" data-team={match.homeTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
           <FormDiamonds form={hForm} />
@@ -169,7 +172,7 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
 
         <div className="mp__hero__team mp__hero__team--away">
           {match.awayTeam?.crest
-            ? <div className="mp__hero__crestWrap"><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" data-team={match.awayTeam?.name} /></div>
+            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" data-team={match.awayTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
           <FormDiamonds form={aForm} />

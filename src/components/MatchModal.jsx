@@ -658,6 +658,7 @@ export function ComposTab({ match, compMatches }) {
   const homeCrest = match?.homeTeam?.crest ?? null
   const awayCrest = match?.awayTeam?.crest ?? null
   const withCrest = (obj, crest) => obj ? { ...obj, crest } : obj
+  // isWC déjà calculé plus haut dans ce composant (voir usage useLineups ci-dessus)
 
   if (lineups) {
     return (
@@ -665,6 +666,7 @@ export function ComposTab({ match, compMatches }) {
         <LineupPitch
           home={withCrest(lineups.home, homeCrest)}
           away={withCrest(lineups.away, awayCrest)}
+          isCountry={isWC}
         />
       </div>
     )
@@ -692,6 +694,7 @@ export function ComposTab({ match, compMatches }) {
           <LineupPitch
             home={withCrest(probable.home, homeCrest)}
             away={withCrest(probable.away, awayCrest)}
+            isCountry={isWC}
           />
         </div>
       </div>
@@ -786,7 +789,7 @@ export function ClassementTab({ match, compId }) {
                 {g.name.replace('GROUP_', 'Groupe ')}
               </p>
             )}
-            <StandingsTable rows={g.table} compact={false} formMap={formMap} qualificationRules={rules} />
+            <StandingsTable rows={g.table} compact={false} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
           </div>
         ))}
       </div>
@@ -800,7 +803,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={standings} formMap={formMap} qualificationRules={rules} />
+      <StandingsTable rows={standings} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
     </div>
   )
 }
@@ -1470,6 +1473,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
     return new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   }
 
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+
   const modal = (
     <div className="modal__overlay" onClick={onClose}>
       <div className="modal__panel" onClick={e => e.stopPropagation()}>
@@ -1485,7 +1491,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
         <div className="modal__teams">
           <div className="modal__team">
             {match.homeTeam.crest && (
-              <div className="modal__crestWrap"><img src={match.homeTeam.crest} alt="" className="modal__crest" data-team={match.homeTeam?.name}
+              <div className="modal__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="modal__crest" data-team={match.homeTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} /></div>
             )}
             <span className="modal__teamName">
@@ -1550,7 +1556,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
 
           <div className="modal__team modal__team--away">
             {match.awayTeam.crest && (
-              <div className="modal__crestWrap"><img src={match.awayTeam.crest} alt="" className="modal__crest" data-team={match.awayTeam?.name}
+              <div className="modal__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="modal__crest" data-team={match.awayTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} /></div>
             )}
             <span className="modal__teamName">

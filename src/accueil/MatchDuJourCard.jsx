@@ -40,6 +40,8 @@ export function MatchDuJourCard({ match, onClick }) {
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
   const kickoff  = new Date(match.utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
 
   return (
     <button className="accueil__mdj" onClick={onClick}>
@@ -51,7 +53,7 @@ export function MatchDuJourCard({ match, onClick }) {
       <div className="accueil__mdjTeams">
         <div className="accueil__mdjTeam">
           {match.homeTeam?.crest
-            ? <div className="accueil__mdjCrestWrap"><img src={match.homeTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
+            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{homeName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{homeName}</span>
         </div>
@@ -63,7 +65,7 @@ export function MatchDuJourCard({ match, onClick }) {
 
         <div className="accueil__mdjTeam">
           {match.awayTeam?.crest
-            ? <div className="accueil__mdjCrestWrap"><img src={match.awayTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
+            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{awayName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{awayName}</span>
         </div>

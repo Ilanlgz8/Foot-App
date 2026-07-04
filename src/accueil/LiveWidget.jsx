@@ -17,6 +17,8 @@ function LiveChip({ match, espn, onMatchClick }) {
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
   const minute    = isTermine ? 'FIN' : (calcMinute(match) ?? '–')
+  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
+  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
 
   const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
   const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
@@ -29,11 +31,11 @@ function LiveChip({ match, espn, onMatchClick }) {
     >
       <div className="accueil__liveChipTeams">
         {match.homeTeam?.crest
-          ? <div className="accueil__liveChipCrestWrap"><img src={match.homeTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.homeTeam?.name} /></div>
+          ? <div className="accueil__liveChipCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.homeTeam?.name} /></div>
           : <div className="accueil__liveChipCrestFb" />}
         <span className="accueil__liveChipScore">{hs ?? '-'} – {as_ ?? '-'}</span>
         {match.awayTeam?.crest
-          ? <div className="accueil__liveChipCrestWrap"><img src={match.awayTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.awayTeam?.name} /></div>
+          ? <div className="accueil__liveChipCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="accueil__liveChipCrest" data-team={match.awayTeam?.name} /></div>
           : <div className="accueil__liveChipCrestFb" />}
       </div>
       <span className={`accueil__liveChipMinute${isTermine ? ' accueil__liveChipMinute--ft' : ''}`}>
