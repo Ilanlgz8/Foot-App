@@ -946,7 +946,13 @@ export function TeamFormTable({ teamId, compMatches }) {
             <span className="pm__formMatchup">
               <span className={`pm__formTeam${myHome ? ' pm__formTeam--me' : ''}`}>{hName}</span>
               <span className="pm__formScore">
-                {hs}:{as_}{wentToPens && hp != null && ap != null ? ` (${hp}-${ap} tab)` : ''}
+                <span className="pm__formScoreMain">{hs}:{as_}</span>
+                {wentToPens && hp != null && ap != null && (
+                  <span className="pm__formPens">
+                    <span className="pm__formPensLabel">T.A.B</span>
+                    <span className="pm__formPensScore">({hp}-{ap})</span>
+                  </span>
+                )}
               </span>
               <span className={`pm__formTeam${!myHome ? ' pm__formTeam--me' : ''}`}>{aName}</span>
             </span>
@@ -1136,13 +1142,19 @@ function H2HSection({ match, compMatches }) {
             }
             return (
               <div key={i} className="pm__h2hRow">
-                <span className="pm__h2hDate">{date}</span>
+                <ResultBadge result={result} />
                 <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
                 <span className="pm__h2hScore">
-                  {hs} – {as_}{wentToPens && hp != null && ap != null ? ` (${hp}-${ap} tab)` : ''}
+                  <span className="pm__h2hScoreMain">{hs} – {as_}</span>
+                  {wentToPens && hp != null && ap != null && (
+                    <span className="pm__formPens">
+                      <span className="pm__formPensLabel">T.A.B</span>
+                      <span className="pm__formPensScore">({hp}-{ap})</span>
+                    </span>
+                  )}
                 </span>
                 <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
-                <ResultBadge result={result} />
+                <span className="pm__h2hDate">{date}</span>
               </div>
             )
           })}
