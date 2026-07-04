@@ -597,6 +597,21 @@ export default async function handler(req, res) {
     const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
       ? scorers : (prevData?.scorers ?? [])
 
+    // ⚠️ Fix désync score/buteur (constat utilisateur : le nom du buteur et la
+    // minute s'affichent déjà mais le score reste bloqué à l'ancienne valeur,
+    // ~20s de retard) : pour un match WC, home/away et scorers viennent tous
+    // les deux de la même réponse FIFA (fifaD), mais rien ne garantit qu'ils
+    // sont mis à jour de façon parfaitement synchrone côté FIFA — observé :
+    // le tableau Goals[] peut apparaître avant que le champ Score s'incrémente
+    // réellement. Un buteur déjà connu pour un camp est en soi la preuve qu'un
+    // but a été marqué pour ce camp, même si le champ numérique du score n'a
+    // pas encore suivi → on plafonne home/away par en-bas avec le nombre de
+    // buteurs déjà connus pour chaque camp (ne peut jamais les faire baisser).
+    const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
+    const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
+    home = Math.max(home, homeGoalsFromScorers)
+    away = Math.max(away, awayGoalsFromScorers)
+
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus)
     const cards = extractEspnCards(comp, homeC?.team?.id)
     const bestCards = cards.length >= (prevData?.cards?.length ?? 0)
@@ -690,14 +705,24 @@ export default async function handler(req, res) {
     const bestScorers = fifaD.scorers.length >= (prevData?.scorers?.length ?? 0)
       ? fifaD.scorers : (prevData?.scorers ?? [])
 
+    // Même fix de désync score/buteur que la branche principale ci-dessus
+    // (voir commentaire détaillé) — ici encore plus important : ce chemin de
+    // repli dépend UNIQUEMENT de FIFA (ESPN pas matché), donc si FIFA a lui-
+    // même une incohérence interne entre Goals[] et Score, rien d'autre ne la
+    // corrige.
+    const fbHomeGoals = bestScorers.filter(s => s.team === 'home').length
+    const fbAwayGoals = bestScorers.filter(s => s.team === 'away').length
+    const fbHome = Math.max(fifaD.home ?? 0, fbHomeGoals)
+    const fbAway = Math.max(fifaD.away ?? 0, fbAwayGoals)
+
     result[fdMatch.id] = {
       espnEventId:  fifaD.fifaMatchId,
       espnSlug:     'fifa',
       espnStatus:   fifaToEspnStatus(fm),
       espnClock:    fifaToClock(fm),
       espnPeriod:   fifaToPeriod(fm),
-      home:         fifaD.home,
-      away:         fifaD.away,
+      home:         fbHome,
+      away:         fbAway,
       scorers:      bestScorers,
       // Pas de source fiable pour les cartons ici (fallback FIFA sans ESPN) →
       // on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.

@@ -643,7 +643,7 @@ export default async function handler(req, res) {
     // rétroactif sur des buts antérieurs au premier poll de ce match.
     if (prevState === null) {
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
-      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away, pendingSince: null }), { ex: 12 * 3600 }) } catch {}
+      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away, pendingSince: {} }), { ex: 12 * 3600 }) } catch {}
       continue
     }
 
@@ -655,10 +655,28 @@ export default async function handler(req, res) {
     // encore le nom du buteur, on RETENTE aux polls suivants (jusqu'à 5 min)
     // au lieu d'envoyer tout de suite un "⚽ But !" générique définitif —
     // sendDeduped() garde son rôle habituel (une seule notif par but), le
-    // compteur sert uniquement à décider QUAND l'appeler. Ça gère aussi
-    // naturellement le cas où un 2e but est marqué avant que le 1er ait été
-    // résolu (chaque côté a son propre compteur, indépendant du score exact
-    // au moment de la détection).
+    // compteur sert uniquement à décider QUAND l'appeler.
+    //
+    // ⚠️ BUG CORRIGÉ (constat utilisateur : Maroc-Canada, 2 buts marocains,
+    // aucune notif reçue) : quand le score d'un même camp montait de PLUS DE 1
+    // entre deux passes (ex: 0 → 2 directement, deux buts marqués dans le même
+    // intervalle de poll — plausible avec ~8-36s entre passes), l'ancien code
+    // ne traitait qu'UNE seule "side" par camp (peu importe l'écart), envoyait
+    // UNE SEULE notif (celle du dernier buteur connu), puis faisait sauter le
+    // compteur directement à la nouvelle valeur (`track[side] = home`) — ce qui
+    // marquait silencieusement les DEUX buts comme "déjà notifiés" alors qu'un
+    // seul push avait réellement été envoyé. Fix : on compare le compteur déjà
+    // notifié (track[side]) au nombre RÉEL de buts attendus (home/away), et on
+    // boucle un but à la fois (while) — un envoi par but manquant, chacun avec
+    // son propre scorer (goalScorers[n]) s'il est déjà connu côté ESPN, sinon
+    // on s'arrête à ce but précis et on retente au poll suivant (les buts
+    // suivants, eux, restent bloqués derrière tant que celui-ci n'est pas résolu
+    // — comportement voulu : préserve l'ordre chronologique d'envoi).
+    //
+    // Effet de bord corrigé au passage : pendingSince était un champ UNIQUE
+    // partagé pour tout le match, donc faux si les DEUX équipes attendaient
+    // un buteur en même temps (le délai de l'une écrasait celui de l'autre).
+    // Passé en objet { home, away } pour être vraiment indépendant par camp.
     //
     // Exclusion conservée de l'ancienne logique : un changement de score alors
     // qu'on était DÉJÀ en mi-temps au poll précédent ET qu'on y est toujours
@@ -669,7 +687,9 @@ export default async function handler(req, res) {
       const trackKey = `goalTrack:${eventId}`
       let track = null
       try { track = await kv.get(trackKey) } catch {}
-      track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away, pendingSince: null }
+      track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away, pendingSince: {} }
+      // Migration douce : anciennes entrées Redis avec pendingSince en number/null
+      if (!track.pendingSince || typeof track.pendingSince !== 'object') track.pendingSince = {}
 
       const sides = []
       if (home > track.home) sides.push('home')
@@ -683,8 +703,10 @@ export default async function handler(req, res) {
       const forceNow = FINAL_ESPN.has(status)
 
       for (const side of sides) {
+        const targetCount = side === 'home' ? home : away
+
         if (steadyHalftime) {
-          track[side] = side === 'home' ? home : away
+          track[side] = targetCount
           trackChanged = true
           continue
         }
@@ -693,42 +715,49 @@ export default async function handler(req, res) {
         const goalScorers = extractEspnScorers(comp, homeC.team?.id)
           .filter(g => g.team === side)
           .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
-        const lastScorer  = goalScorers[goalScorers.length - 1] ?? null
 
-        const pendingSince  = track.pendingSince ?? Date.now()
+        const pendingSince  = track.pendingSince[side] ?? Date.now()
         const waitedTooLong = forceNow || (Date.now() - pendingSince > 5 * 60_000)
 
-        if (!lastScorer && !waitedTooLong) {
-          if (!track.pendingSince) { track.pendingSince = pendingSince; trackChanged = true }
-          log.push(`[espn:${slug}:${eventId}] BUT ${side} en attente du buteur`)
-          continue
+        // Un but à la fois — tant que track[side] < targetCount, il reste au
+        // moins un but réel non notifié.
+        while (track[side] < targetCount) {
+          const goalIndex = track[side] // 0 = 1er but de ce camp, 1 = 2e, etc.
+          const scorer     = goalScorers[goalIndex] ?? null
+
+          if (!scorer && !waitedTooLong) {
+            if (!track.pendingSince[side]) { track.pendingSince[side] = pendingSince; trackChanged = true }
+            log.push(`[espn:${slug}:${eventId}] BUT ${side} en attente du buteur (${goalIndex + 1}/${targetCount})`)
+            break // ce but (et les suivants) retentera au prochain poll
+          }
+
+          // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même
+          // convention (nom + ", pen"/", csc" entre parenthèses) que
+          // generateRecap() plus haut dans ce fichier, pour rester cohérent.
+          // Fallback générique uniquement si le délai de 5 min est dépassé sans
+          // qu'ESPN n'ait jamais rattaché de buteur (rare, mais mieux que de ne
+          // jamais notifier ce but).
+          const scorerSuffix = scorer ? (scorer.ownGoal ? ', csc' : scorer.penaltyKick ? ', pen' : '') : ''
+          const minuteText   = scorer ? minuteLabel(scorer.minute) : ''
+          const goalTitle    = scorer
+            ? `⚽ But pour ${scoringTeam} (${scorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
+            : '⚽ But !'
+
+          log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, délai dépassé)'}`)
+
+          // Clé de dédup basée sur "le Nème but de ce camp dans ce match" —
+          // stable et unique même si 2 buts du même camp partagent le même
+          // score de départ/arrivée entre deux passes (contrairement à
+          // l'ancienne clé basée sur le score complet, qui ne pouvait pas
+          // distinguer 2 buts consécutifs du même camp).
+          const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
+            { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log)
+          if (sent > 0) notifsSent++
+
+          track[side]++
+          track.pendingSince[side] = null
+          trackChanged = true
         }
-
-        // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même
-        // convention (nom + ", pen"/", csc" entre parenthèses) que
-        // generateRecap() plus haut dans ce fichier, pour rester cohérent.
-        // Fallback générique uniquement si le délai de 5 min est dépassé sans
-        // qu'ESPN n'ait jamais rattaché de buteur (rare, mais mieux que de ne
-        // jamais notifier ce but).
-        const scorerSuffix = lastScorer ? (lastScorer.ownGoal ? ', csc' : lastScorer.penaltyKick ? ', pen' : '') : ''
-        const minuteText   = lastScorer ? minuteLabel(lastScorer.minute) : ''
-        const goalTitle    = lastScorer
-          ? `⚽ But pour ${scoringTeam} (${lastScorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
-          : '⚽ But !'
-
-        log.push(`[espn:${slug}:${eventId}] BUT ${side} ${score}${lastScorer ? '' : ' (générique, délai dépassé)'}`)
-
-        // tag/clé de dédup incluant le camp (`side`) — au cas rarissime où les
-        // deux équipes marquent au même poll : sans ça, la 2e notif serait
-        // silencieusement absorbée par la clé de dédup de la 1ère (même score
-        // exact au moment de l'envoi).
-        const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${score}`,
-          { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${score}` }, slug, log)
-        if (sent > 0) notifsSent++
-
-        track[side] = side === 'home' ? home : away
-        track.pendingSince = null
-        trackChanged = true
       }
 
       if (trackChanged) {
