@@ -128,53 +128,19 @@ async function fetchFifaLiveMatches(log) {
 }
 
 // ── Traduction noms ESPN → français ───────────────────────────────────────────
-// ⚠️ BUG CORRIGÉ : cette table ne couvrait que les CLUBS (Ligue 1, Premier
-// League...) — aucune entrée pour les équipes NATIONALES. Résultat concret :
-// pendant la Coupe du Monde, toutes les notifs push affichaient les noms de
-// pays en anglais ("Argentina 1-0 Cape Verde" au lieu de "Argentine 1-0
-// Cap-Vert"), alors que le reste de l'app traduit déjà systématiquement via
-// translateTeam()/TEAM_NAMES_FR (src/data/teamNames.js) — jamais réutilisé
-// ici jusqu'à présent. TEAM_NAMES_FR couvre justement les pays (section
-// "Euro / Nations" + "Coupe du monde", clés = nom anglais ESPN, ex:
-// "Argentina" → "Argentine") : on l'ajoute en repli, sans toucher à la table
-// clubs ci-dessous (clés ESPN différentes, gardées séparées).
-const TEAM_FR_CLUBS = {
-  // Ligue 1
-  'Paris Saint-Germain': 'Paris SG', 'PSG': 'Paris SG',
-  'Olympique de Marseille': 'Marseille', 'Olympique Lyonnais': 'Lyon',
-  'AS Monaco': 'Monaco', 'LOSC Lille': 'Lille', 'OGC Nice': 'Nice',
-  'Stade Rennais': 'Rennes', 'RC Lens': 'Lens', 'Toulouse FC': 'Toulouse',
-  'Stade Brestois': 'Brest', 'Nantes': 'Nantes', 'RC Strasbourg': 'Strasbourg',
-  'Angers SCO': 'Angers', 'Le Havre AC': 'Le Havre',
-  // Premier League
-  'Manchester City': 'Man. City', 'Manchester United': 'Man. United',
-  'Arsenal': 'Arsenal', 'Liverpool': 'Liverpool', 'Chelsea': 'Chelsea',
-  'Tottenham Hotspur': 'Tottenham', 'Newcastle United': 'Newcastle',
-  'Aston Villa': 'Aston Villa', 'Brighton & Hove Albion': 'Brighton',
-  'West Ham United': 'West Ham', 'Wolverhampton Wanderers': 'Wolves',
-  'Crystal Palace': 'C. Palace', 'Nottingham Forest': 'Nott. Forest',
-  'Fulham': 'Fulham', 'Brentford': 'Brentford', 'Everton': 'Everton',
-  // La Liga
-  'Real Madrid': 'Real Madrid', 'FC Barcelona': 'Barcelone', 'Barcelona': 'Barcelone',
-  'Atletico Madrid': 'Atl. Madrid', 'Athletic Bilbao': 'Ath. Bilbao',
-  'Real Sociedad': 'R. Sociedad', 'Villarreal': 'Villarreal',
-  'Sevilla': 'Séville', 'Real Betis': 'Betis', 'Valencia': 'Valence',
-  'Rayo Vallecano': 'Rayo', 'Girona': 'Girona',
-  // Bundesliga
-  'Bayern Munich': 'Bayern', 'Borussia Dortmund': 'Dortmund',
-  'RB Leipzig': 'Leipzig', 'Bayer Leverkusen': 'Leverkusen',
-  'Eintracht Frankfurt': 'Frankfurt', 'Borussia Mönchengladbach': "M'gladbach",
-  'Werder Bremen': 'Werder', 'Union Berlin': 'Union Berlin',
-  // Serie A
-  'Internazionale': 'Inter', 'Inter Milan': 'Inter',
-  'AC Milan': 'Milan', 'Juventus': 'Juventus', 'Napoli': 'Naples',
-  'AS Roma': 'Rome', 'Lazio': 'Lazio', 'Atalanta': 'Atalanta',
-  // Divers
-  'PSV Eindhoven': 'PSV', 'Club Brugge': 'Bruges', 'Ajax': 'Ajax',
-  'Porto': 'Porto', 'Benfica': 'Benfica',
-}
-
-function t(name) { return TEAM_FR_CLUBS[name] ?? TEAM_NAMES_FR[name] ?? name }
+// ⚠️ INCOHÉRENCE CORRIGÉE : une 2e table de clubs (TEAM_FR_CLUBS) faisait
+// doublon avec TEAM_NAMES_FR (src/data/teamNames.js, déjà utilisée partout
+// ailleurs dans l'app via translateTeam()). Vérifié : 28 des 63 clés de
+// TEAM_FR_CLUBS existaient déjà dans TEAM_NAMES_FR, dont 4 avec une traduction
+// DIFFÉRENTE (ex: "Crystal Palace" → "C. Palace" ici mais "Crystal Palace"
+// partout ailleurs dans l'app) — donc une notif push pouvait afficher une
+// abréviation différente de ce que montre le reste de l'app pour la même
+// équipe. TEAM_FR_CLUBS utilisait en plus des clés en nom LONG ("Manchester
+// City") alors que t() est appelé avec shortDisplayName en priorité ("Man
+// City") : la plupart de ses entrées ne matchaient donc jamais. Supprimée au
+// profit de TEAM_NAMES_FR seule, qui couvre déjà clubs + pays avec les bonnes
+// clés (shortDisplayName) et reste l'unique source de vérité utilisée partout.
+function t(name) { return TEAM_NAMES_FR[name] ?? name }
 
 // Même format que espnMinuteLabel() côté client (MatchModal.jsx) — dupliqué
 // volontairement (fonction pure de 2 lignes : pas la peine d'importer tout un
