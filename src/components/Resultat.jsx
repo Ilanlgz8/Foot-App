@@ -81,7 +81,7 @@ function MatchCard({ match }) {
           </div>
         )}
         {wentToAet && (
-          <span className="resultats__aet">Après prlong.</span>
+          <span className="resultats__aet">Après prolong.</span>
         )}
         <span className="resultats__ftBadge">Terminé</span>
       </div>

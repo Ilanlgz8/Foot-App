@@ -156,7 +156,7 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
                 </div>
               )}
               {wentToAet && (
-                <span className="mp__hero__aet">Après prlong.</span>
+                <span className="mp__hero__aet">Après prolong.</span>
               )}
             </>
           ) : (
