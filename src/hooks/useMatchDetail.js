@@ -545,6 +545,38 @@ const FD_POS = {
   'Striker':            'ST',
 }
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur : compo officielle mal placée alors que
+// la compo probable — même écran, même code de placement — était correcte).
+// FD_POS n'est qu'une liste d'égalités EXACTES : tout libellé de poste renvoyé
+// par football-data.org qui n'y figure pas EXACTEMENT (ex: variante de
+// casse/ponctuation, sélection nationale utilisant un intitulé différent d'un
+// club, poste rare jamais rencontré côté clubs européens) retombait sur ''
+// (FD_POS[p.position] ?? '') — et posCat('')/laneWeight('') dans
+// LineupPitch.jsx classent tout poste vide en MILIEU CENTRAL par défaut, quel
+// que soit le vrai poste du joueur (un défenseur ou attaquant avec un libellé
+// non reconnu s'affichait donc au milieu du terrain). La compo probable, elle,
+// vient toujours d'ESPN (parseEspnRoster, codes GK/DEF/MID/FWD génériques
+// beaucoup plus stables) — jamais de ce problème.
+// Fix : même principe de généralisation déjà appliqué à laneWeight/depthWeight
+// dans LineupPitch.jsx (mots-clés plutôt que liste figée) — si le libellé exact
+// n'est pas connu, on déduit la catégorie par mot-clé (back/defence → DEF,
+// midfield → MID, wing/forward/striker/attack → FWD) et le couloir par
+// "left"/"right" dans le texte, au lieu de perdre toute l'info.
+function mapFdPosition(raw) {
+  if (!raw) return ''
+  const exact = FD_POS[raw]
+  if (exact) return exact
+  const low     = raw.toLowerCase()
+  const isLeft  = /\bleft\b/.test(low)
+  const isRight = /\bright\b/.test(low)
+  if (/goalkeeper|keeper/.test(low)) return 'GK'
+  if (/wing.?back/.test(low))        return isLeft ? 'LWB' : isRight ? 'RWB' : 'DEF'
+  if (/back|defen[cs]e|defender|sweeper/.test(low)) return isLeft ? 'LB' : isRight ? 'RB' : 'DEF'
+  if (/midfield/.test(low))          return isLeft ? 'LM'  : isRight ? 'RM'  : 'MID'
+  if (/wing(er)?|forward|striker|attack/.test(low)) return isLeft ? 'LW' : isRight ? 'RW' : 'FWD'
+  return ''
+}
+
 export function useFdLineups(match) {
   const { detail, loading } = useMatchDetail(match?.id)
 
@@ -552,7 +584,7 @@ export function useFdLineups(match) {
     name:         p.name ?? '?',
     shortName:    p.name ?? '?',
     number:       p.shirtNumber ?? '',
-    position:     FD_POS[p.position] ?? '',
+    position:     mapFdPosition(p.position),
     positionName: p.position ?? '',
     order:        i,
   })

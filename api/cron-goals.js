@@ -606,26 +606,24 @@ export default async function handler(req, res) {
       await cacheEspnSummary(slug, eventId, log)
     }
 
-    // 🔴 Coup d'envoi — basé sur l'heure de coup d'envoi PROGRAMMÉE (evt.date),
-    // pas sur le statut "live" ESPN qui a un lag connu (~10min sur le slug WC,
-    // voir fifa-override plus haut). evt.date est une donnée fixe connue à
-    // l'avance, sans lag possible : dès qu'elle est dépassée, on notifie —
-    // beaucoup plus simple et fiable que de dépendre d'une 2e API externe
-    // (FIFA) pour accélérer la détection du statut live. sendDeduped()
-    // garantit qu'on n'envoie qu'une seule fois par match (clé Redis dédiée).
-    const kickoffAt     = evt.date ? new Date(evt.date).getTime() : null
-    const kickoffPassed = kickoffAt != null && Date.now() >= kickoffAt
-    const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
-    if (kickoffPassed && notPostponed && !FINAL_ESPN.has(status)) {
-      // TTL de dédup à 6h (au lieu du défaut 3h) : cette notif se redéclenche
-      // tant que le match n'est pas détecté "final" — avec le fix FINAL_ESPN
-      // ci-dessus ça ne devrait plus arriver, mais 6h laisse une marge de
-      // sécurité si un statut ESPN imprévu (autre variante FINAL_*) passait
-      // encore à travers, plutôt que de retomber sur 3h qui peut être trop
-      // court pour un match prolongation+tab (jusqu'à ~3h).
+    // 🔴 Coup d'envoi — basé sur la confirmation RÉELLE (statut LIVE_ESPN, déjà
+    // corrigé par le fifa-override ci-dessus pour compenser le lag ESPN connu
+    // sur le Mondial), plutôt que sur l'heure programmée (evt.date).
+    // ⚠️ Avant : notifiait dès l'heure prévue dépassée, même si le coup
+    // d'envoi réel avait du retard (VAR, retard d'équipe...) — décalage
+    // signalé par l'utilisateur, symétrique au bug corrigé côté affichage
+    // client (calcMinute affichait "1'" avant la vraie confirmation ESPN,
+    // voir useLiveMinute.js/matchUtils.js). Même correctif appliqué ici pour
+    // rester cohérent : la notif part exactement quand le match passe "Débute"
+    // → minute réelle côté client. sendDeduped() garantit un envoi unique par
+    // match, peu importe le nombre de polls où LIVE_ESPN.has(status) reste vrai.
+    const notPostponed = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
+    if (LIVE_ESPN.has(status) && notPostponed) {
+      // TTL de dédup à 6h : marge de sécurité pour un match prolongation+tab
+      // (peut dépasser 3h depuis le coup d'envoi).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
         { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600)
-      if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (heure programmée)`) }
+      if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (confirmé ESPN)`) }
     }
 
     const stateKey  = `cron:espn:${eventId}`
