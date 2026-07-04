@@ -296,7 +296,19 @@ const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — même durée que api/espn.js
 function hasUsefulSummaryData(json) {
   const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
   const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
-  return hasRosters || hasBoxscore
+  // ⚠️ BUG CORRIGÉ (même fix que api/espn.js) : pour la Coupe du Monde, ESPN
+  // met les compos dans header.competitions[0].competitors[].roster, PAS dans
+  // json.rosters (déjà géré côté client dans useLineups/useEspnMatchStats).
+  // Cette fonction ne le vérifiait pas → la capture proactive censée éviter
+  // "pas de compo si je n'ai pas suivi le match en direct" (voir commentaire
+  // au-dessus) ne se déclenchait en réalité JAMAIS pour un match de CM, alors
+  // que c'est justement la compétition concernée. Constat concret : Maroc-
+  // Canada affichait "Compos non disponibles" alors que l'app avait déjà
+  // récupéré les compos des deux équipes à un moment donné — jamais
+  // sauvegardées faute de ce check.
+  const competitors  = json?.header?.competitions?.[0]?.competitors ?? []
+  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
+  return hasRosters || hasBoxscore || hasHeaderRoster
 }
 
 async function cacheEspnSummary(slug, eventId, log) {

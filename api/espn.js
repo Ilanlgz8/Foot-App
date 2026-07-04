@@ -31,7 +31,18 @@ const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — largement de quoi couvrir la 
 function hasUsefulData(json) {
   const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
   const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
-  return hasRosters || hasBoxscore
+  // ⚠️ BUG CORRIGÉ : pour la Coupe du Monde, ESPN ne remplit quasiment jamais
+  // json.rosters — les compos sont dans header.competitions[0].competitors[].
+  // roster à la place (déjà géré côté client, voir useLineups/useEspnMatchStats
+  // dans useMatchDetail.js). Cette fonction ne le vérifiait pas : un summary WC
+  // avec compo dispo UNIQUEMENT à cet endroit était jugé "pas utile" et jamais
+  // mis en cache Redis. Résultat concret : dès qu'ESPN cesse de servir les
+  // rosters en direct (fenêtre limitée), plus aucune compo n'était récupérable
+  // pour ce match, même pour un utilisateur qui l'avait consulté pendant qu'ESPN
+  // avait encore la donnée — rien n'avait jamais été sauvegardé.
+  const competitors  = json?.header?.competitions?.[0]?.competitors ?? []
+  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
+  return hasRosters || hasBoxscore || hasHeaderRoster
 }
 
 export default async function handler(req, res) {
