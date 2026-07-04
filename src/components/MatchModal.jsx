@@ -69,22 +69,21 @@ export function ESPNScorers({ scorers = [] }) {
 }
 
 // ── Stats ESPN (possession, tirs, corners) ───────────────────────────────────
+// Design "table minimaliste" : une ligne par stat, valeur dom. à gauche,
+// libellé au centre, valeur ext. à droite — la valeur la plus haute est
+// mise en avant (couleur + gras). Remplace l'ancienne barre de progression
+// (jugée trop chargée par rapport à ce format plus lisible d'un coup d'œil).
 function StatBar({ homeVal, awayVal, label }) {
-  const hNum = parseFloat(homeVal) || 0
-  const aNum = parseFloat(awayVal) || 0
-  const total = hNum + aNum
-  const homePct = total === 0 ? 50 : Math.round((hNum / total) * 100)
+  const hNum = parseFloat(homeVal)
+  const aNum = parseFloat(awayVal)
+  const hasNums   = !Number.isNaN(hNum) && !Number.isNaN(aNum)
+  const homeLeads = hasNums && hNum > aNum
+  const awayLeads = hasNums && aNum > hNum
   return (
-    <div className="modal__statBar">
-      <span className="modal__statBarLabel">{label}</span>
-      <div className="modal__statBarRow">
-        <span className="modal__statBarVal">{homeVal ?? '–'}</span>
-        <div className="modal__statBarTrack">
-          <div className="modal__statBarFill modal__statBarFill--home" style={{ width: `${homePct}%` }} />
-          <div className="modal__statBarFill modal__statBarFill--away" style={{ width: `${100 - homePct}%` }} />
-        </div>
-        <span className="modal__statBarVal modal__statBarVal--away">{awayVal ?? '–'}</span>
-      </div>
+    <div className="modal__statTableRow">
+      <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`}>{homeVal ?? '–'}</span>
+      <span className="modal__statTableLabel">{label}</span>
+      <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`}>{awayVal ?? '–'}</span>
     </div>
   )
 }
@@ -881,17 +880,15 @@ export function PronoSection({ prono, homeShort, awayShort }) {
   return (
     <div className="modal__prono">
       <p className="modal__pronoTitle">Probabilités estimées</p>
-      <div className="modal__pronoRow">
-        <div className="modal__pronoBar">
-          <div className={`modal__pronoSeg modal__pronoSeg--home${winner === 'home' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-home': prono.home }} />
-          <div className={`modal__pronoSeg modal__pronoSeg--draw${winner === 'draw' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-draw': prono.draw }} />
-          <div className={`modal__pronoSeg modal__pronoSeg--away${winner === 'away' ? ' modal__pronoSeg--winner' : ''}`} style={{ '--prono-away': prono.away }} />
-        </div>
+      <div className="modal__pronoPercents">
+        <span className={`modal__pronoPct${winner === 'home' ? ' modal__pronoPct--winner' : ''}`}>{prono.home}%</span>
+        <span className={`modal__pronoPct modal__pronoPct--draw${winner === 'draw' ? ' modal__pronoPct--winner' : ''}`}>{prono.draw}%</span>
+        <span className={`modal__pronoPct${winner === 'away' ? ' modal__pronoPct--winner' : ''}`}>{prono.away}%</span>
       </div>
-      <div className="modal__pronoNums">
-        <span className={`modal__pronoNum modal__pronoNum--home${winner === 'home' ? ' modal__pronoNum--winner' : ''}`}>{prono.home}%</span>
-        <span className={`modal__pronoNum modal__pronoNum--draw${winner === 'draw' ? ' modal__pronoNum--winner' : ''}`}>{prono.draw}%</span>
-        <span className={`modal__pronoNum modal__pronoNum--away${winner === 'away' ? ' modal__pronoNum--winner' : ''}`}>{prono.away}%</span>
+      <div className="modal__pronoBar modal__pronoBar--thin">
+        <div className="modal__pronoSeg modal__pronoSeg--home" style={{ '--prono-home': prono.home }} />
+        <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ '--prono-draw': prono.draw }} />
+        <div className="modal__pronoSeg modal__pronoSeg--away" style={{ '--prono-away': prono.away }} />
       </div>
       <div className="modal__pronoKeys">
         <span>Victoire</span>
@@ -1297,23 +1294,20 @@ export function PmPronoSection({ prono }) {
   return (
     <div className="pm__section">
       <h3 className="pm__sectionTitle">Probabilités estimées</h3>
-      <div className="pm__pronoRow">
-        <div className="pm__pronoBar">
-          <div className={`pm__pronoSeg pm__pronoSeg--home${winner === 'home' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.home }}>
-            {prono.home}%
-          </div>
-          <div className={`pm__pronoSeg pm__pronoSeg--draw${winner === 'draw' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.draw }}>
-            {prono.draw}%
-          </div>
-          <div className={`pm__pronoSeg pm__pronoSeg--away${winner === 'away' ? ' pm__pronoSeg--winner' : ''}`} style={{ '--p': prono.away }}>
-            {prono.away}%
-          </div>
-        </div>
+      <div className="pm__pronoPercents">
+        <span className={`pm__pronoPct${winner === 'home' ? ' pm__pronoPct--winner' : ''}`}>{prono.home}%</span>
+        <span className={`pm__pronoPct pm__pronoPct--draw${winner === 'draw' ? ' pm__pronoPct--winner' : ''}`}>{prono.draw}%</span>
+        <span className={`pm__pronoPct${winner === 'away' ? ' pm__pronoPct--winner' : ''}`}>{prono.away}%</span>
       </div>
-      <div className="pm__pronoNums">
-        <span className={`pm__pronoNum${winner === 'home' ? ' pm__pronoNum--winner' : ''}`}>{prono.home}%<br /><small>Victoire</small></span>
-        <span className={`pm__pronoNum pm__pronoNum--draw${winner === 'draw' ? ' pm__pronoNum--winner' : ''}`}>{prono.draw}%<br /><small>Nul</small></span>
-        <span className={`pm__pronoNum${winner === 'away' ? ' pm__pronoNum--winner' : ''}`}>{prono.away}%<br /><small>Victoire</small></span>
+      <div className="pm__pronoBar pm__pronoBar--thin">
+        <div className="pm__pronoSeg pm__pronoSeg--home" style={{ '--p': prono.home }} />
+        <div className="pm__pronoSeg pm__pronoSeg--draw" style={{ '--p': prono.draw }} />
+        <div className="pm__pronoSeg pm__pronoSeg--away" style={{ '--p': prono.away }} />
+      </div>
+      <div className="pm__pronoTeams">
+        <span>Victoire</span>
+        <span>Nul</span>
+        <span>Victoire</span>
       </div>
       <p className="pm__disclaimer">Basé sur la forme des 5 derniers matchs</p>
     </div>

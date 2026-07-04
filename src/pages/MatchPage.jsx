@@ -209,40 +209,20 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   )
 }
 
-// ── Barre stat unique (mix A+C) ───────────────────────────────────────────────
+// ── Table minimaliste stats (variante D) ──────────────────────────────────────
+// Une ligne par stat : valeur dom. | libellé | valeur ext., la valeur la plus
+// haute (au sens "higher"/"lower is better" déjà calculé par l'appelant via
+// homeBetter/awayBetter) mise en avant. Remplace l'ancienne barre symétrique.
 function MpStatRow({ label, homeVal, awayVal, homeBetter, awayBetter }) {
-  const hNum = parseFloat(String(homeVal ?? '').replace('%', ''))
-  const aNum = parseFloat(String(awayVal ?? '').replace('%', ''))
-  const total = (hNum || 0) + (aNum || 0) || 1
-  // barres : chaque côté max 50% de la piste centrale
-  const hPct = Math.round((hNum / total) * 100)
-  const aPct = Math.round((aNum / total) * 100)
-  const barsValid = !isNaN(hNum) && !isNaN(aNum)
-
   return (
     <div className="mp__statRow">
+      <span className={`mp__statVal${homeBetter ? ' mp__statVal--home' : ''}`}>
+        {homeVal ?? '–'}
+      </span>
       <span className="mp__statLabel">{label}</span>
-      <div className="mp__statBarRow">
-        <span className={`mp__statVal${homeBetter ? ' mp__statVal--lead' : ''}`}>
-          {homeVal ?? '–'}
-        </span>
-
-        {barsValid ? (
-          <div className="mp__statBars">
-            <div className="mp__bar mp__bar--home"
-                 style={{ width: `${hPct}%` }} />
-            <div className="mp__barDiv" />
-            <div className="mp__bar mp__bar--away"
-                 style={{ width: `${aPct}%` }} />
-          </div>
-        ) : (
-          <div className="mp__statBars" />
-        )}
-
-        <span className={`mp__statVal mp__statVal--r${awayBetter ? ' mp__statVal--lead' : ''}`}>
-          {awayVal ?? '–'}
-        </span>
-      </div>
+      <span className={`mp__statVal mp__statVal--r${awayBetter ? ' mp__statVal--away' : ''}`}>
+        {awayVal ?? '–'}
+      </span>
     </div>
   )
 }
