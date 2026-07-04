@@ -21,6 +21,7 @@
 
 import { Redis } from '@upstash/redis'
 import webpush   from 'web-push'
+import { TEAM_NAMES_FR } from '../src/data/teamNames.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -127,7 +128,17 @@ async function fetchFifaLiveMatches(log) {
 }
 
 // ── Traduction noms ESPN → français ───────────────────────────────────────────
-const TEAM_FR = {
+// ⚠️ BUG CORRIGÉ : cette table ne couvrait que les CLUBS (Ligue 1, Premier
+// League...) — aucune entrée pour les équipes NATIONALES. Résultat concret :
+// pendant la Coupe du Monde, toutes les notifs push affichaient les noms de
+// pays en anglais ("Argentina 1-0 Cape Verde" au lieu de "Argentine 1-0
+// Cap-Vert"), alors que le reste de l'app traduit déjà systématiquement via
+// translateTeam()/TEAM_NAMES_FR (src/data/teamNames.js) — jamais réutilisé
+// ici jusqu'à présent. TEAM_NAMES_FR couvre justement les pays (section
+// "Euro / Nations" + "Coupe du monde", clés = nom anglais ESPN, ex:
+// "Argentina" → "Argentine") : on l'ajoute en repli, sans toucher à la table
+// clubs ci-dessous (clés ESPN différentes, gardées séparées).
+const TEAM_FR_CLUBS = {
   // Ligue 1
   'Paris Saint-Germain': 'Paris SG', 'PSG': 'Paris SG',
   'Olympique de Marseille': 'Marseille', 'Olympique Lyonnais': 'Lyon',
@@ -163,7 +174,16 @@ const TEAM_FR = {
   'Porto': 'Porto', 'Benfica': 'Benfica',
 }
 
-function t(name) { return TEAM_FR[name] ?? name }
+function t(name) { return TEAM_FR_CLUBS[name] ?? TEAM_NAMES_FR[name] ?? name }
+
+// Même format que espnMinuteLabel() côté client (MatchModal.jsx) — dupliqué
+// volontairement (fonction pure de 2 lignes : pas la peine d'importer tout un
+// composant React dans une fonction serverless pour ça). ESPN renvoie le
+// clock au format "MM:SS" (ex: "34:00"), jamais directement "34'".
+function minuteLabel(raw) {
+  const base = String(raw ?? '').split(':')[0]
+  return base ? `${base}'` : ''
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -626,6 +646,32 @@ export default async function handler(req, res) {
       prevScore !== score
     ) {
       log.push(`[espn:${slug}:${eventId}] BUT ${prevScore} → ${score}`)
+
+      // ⚠️ BUG CORRIGÉ : la notif de but n'affichait jamais le buteur ("But !"
+      // générique) alors que comp.details (déjà fetché à chaque poll) contient
+      // les buts détaillés — extractEspnScorers() plus haut dans ce fichier
+      // s'en sert déjà pour générer le résumé de fin de match, jamais réutilisé
+      // ici. On identifie le camp qui vient de marquer (score qui a augmenté)
+      // et on prend son dernier but connu (le plus tardif) = celui qui vient
+      // d'arriver. Fallback silencieux sur le titre générique si ESPN n'a pas
+      // encore mis à jour comp.details (arrive parfois quelques secondes après
+      // le changement de score) — jamais bloquant pour l'envoi de la notif.
+      const [prevHome, prevAway] = (prevScore ?? '0-0').split('-').map(n => parseInt(n, 10) || 0)
+      const scoringSide  = home > prevHome ? 'home' : away > prevAway ? 'away' : null
+      const scoringTeam  = scoringSide === 'home' ? homeTeam : scoringSide === 'away' ? awayTeam : null
+      const goalScorers  = scoringSide ? extractEspnScorers(comp, homeC.team?.id).filter(g => g.team === scoringSide) : []
+      const lastScorer   = goalScorers.sort((a, b) => parseMin(a.minute) - parseMin(b.minute)).pop()
+      // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même convention
+      // (nom + ", pen"/", csc" entre parenthèses) que generateRecap() plus haut
+      // dans ce fichier, pour rester cohérent. Fallback générique si ESPN n'a
+      // pas encore mis à jour comp.details au moment exact du poll (quelques
+      // secondes de décalage possible) — jamais bloquant pour l'envoi.
+      const scorerSuffix = lastScorer ? (lastScorer.ownGoal ? ', csc' : lastScorer.penaltyKick ? ', pen' : '') : ''
+      const minuteText   = lastScorer ? minuteLabel(lastScorer.minute) : ''
+      const goalTitle    = (lastScorer && scoringTeam)
+        ? `⚽ But pour ${scoringTeam} (${lastScorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
+        : '⚽ But !'
+
       // tag explicite et UNIQUE par but (inclut le score) : sans ça, sw-push.js
       // retombe sur un tag par défaut basé uniquement sur matchId, donc PARTAGÉ
       // entre tous les buts d'un même match. Un 2e but réutiliserait alors le
@@ -636,7 +682,7 @@ export default async function handler(req, res) {
       // supprime totalement ce risque : chaque but est une notif indépendante,
       // jamais un remplacement silencieux d'une précédente.
       const sent = await sendDeduped(`push:espn:goal:${eventId}:${score}`,
-        { title: '⚽ But !', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${score}` }, slug, log)
+        { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${score}` }, slug, log)
       if (sent > 0) notifsSent++
     }
 

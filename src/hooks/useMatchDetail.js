@@ -224,11 +224,15 @@ export function useEspnMatchStats(match) {
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 
-      // 3. Stats depuis boxscore.teams
-      const teams    = summary.boxscore?.teams ?? []
-      const homeTeam = teams.find(t => t.homeAway === 'home')
-      const awayTeam = teams.find(t => t.homeAway === 'away')
-
+      // 3. Stats — normalement depuis boxscore.teams, mais pour la CM ESPN
+      // laisse souvent boxscore.teams vide et place les stats dans
+      // header.competitions[0].competitors[].statistics à la place (même
+      // faille WC que pour les rosters ci-dessous — déjà gérée pour les buts/
+      // cartons/stats des matchs terminés dans useEspnMatchDetail.js, mais PAS
+      // ici : c'est CE hook qui alimente le fallback stats de MpMatchStats
+      // (page Résultat), donc ce trou privait concrètement l'utilisateur de la
+      // possession/tirs/etc. dès que ni FIFA ni boxscore ne répondaient —
+      // exactement le bug rapporté ("pas les stats si j'ai pas suivi en live").
       const getStat = (team, ...names) => {
         for (const n of names) {
           const s = (team?.statistics ?? []).find(st => st.name === n)
@@ -246,13 +250,40 @@ export function useEspnMatchStats(match) {
         yellowCards:   getStat(team, 'yellowCards'),
       })
 
-      const stats = { home: mapStats(homeTeam), away: mapStats(awayTeam) }
-      const hasData = Object.values(stats.home ?? {}).some(v => v != null)
+      const boxTeams = summary.boxscore?.teams ?? []
+      let homeTeam = boxTeams.find(t => t.homeAway === 'home')
+      let awayTeam = boxTeams.find(t => t.homeAway === 'away')
+
+      let stats    = { home: mapStats(homeTeam), away: mapStats(awayTeam) }
+      let hasData  = Object.values(stats.home ?? {}).some(v => v != null)
+
+      if (!hasData) {
+        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
+        const hc = competitors.find(c => c.homeAway === 'home')
+        const ac = competitors.find(c => c.homeAway === 'away')
+        if (hc || ac) {
+          stats   = { home: mapStats(hc), away: mapStats(ac) }
+          hasData = Object.values(stats.home ?? {}).some(v => v != null)
+        }
+      }
       if (!hasData) return null
 
       // 4. Lineups depuis rosters si disponibles (ESPN ne les retourne pas toujours pour WC)
       let lineups = null
-      const rosters = summary.rosters ?? []
+      let rosters = summary.rosters ?? []
+      // WC : rosters absents de summary.rosters, présents dans header.competitions
+      // (même fallback que useLineups/useProbableLineups plus haut — manquait
+      // ici, ce qui privait ComposTab d'une de ses 3 sources pour la CM).
+      if (rosters.length === 0) {
+        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
+        if (competitors.length >= 1) {
+          rosters = competitors.map(c => ({
+            team:      c.team,
+            athletes:  c.roster ?? c.athletes ?? [],
+            formation: c.formation ?? '',
+          }))
+        }
+      }
       if (rosters.length >= 1) {
         const name0 = rosters[0]?.team?.displayName ?? ''
         const homeIdx = fuzzyTeam(fdHome, name0) ? 0 : 1

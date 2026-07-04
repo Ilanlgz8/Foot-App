@@ -18,7 +18,7 @@ function Classement() {
   const initGroup   = location.state?.group   ?? null   // ex: "GROUP_A"
 
   const [selectedComp, setSelectedComp] = useState(initCompId)
-  const [view, setView] = useState('classement') // 'classement' | 'buteurs'
+  const [view, setView] = useState('classement') // 'classement' | 'buteurs' | 'passeurs'
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [search, setSearch] = useState('')
   const searchNorm = search.trim().toLowerCase()
@@ -66,11 +66,22 @@ function Classement() {
     return player.includes(searchNorm) || matchesTeamSearch(s.team)
   }
   const filteredStandings = standings.filter(row => matchesTeamSearch(row.team))
-  // _rank = position dans le classement buteurs NON filtré, pour que le badge
-  // affiché reste le vrai rang même quand la recherche réduit la liste
+
+  // Classement passeurs — même donnée que useScorers (chaque buteur inclut déjà
+  // `assists`, voir Classement.jsx ligne ~574 et useScorers.js), juste triée
+  // différemment. Zéro appel réseau supplémentaire. On exclut les joueurs à 0/
+  // sans passe pour ne pas afficher des dizaines de lignes à "—".
+  const assistSorted = [...scorers]
+    .filter(s => (s.assists ?? 0) > 0)
+    .sort((a, b) => (b.assists ?? 0) - (a.assists ?? 0) || (b.goals ?? 0) - (a.goals ?? 0))
+
+  const scorerBase = view === 'passeurs' ? assistSorted : scorers
+
+  // _rank = position dans la liste (buteurs ou passeurs) NON filtrée, pour que
+  // le badge affiché reste le vrai rang même quand la recherche réduit la liste
   // (sinon un joueur classé 15e chercherait à s'afficher "#1" une fois seul
   // dans la liste filtrée).
-  const filteredScorers = scorers
+  const filteredScorers = scorerBase
     .map((s, i) => ({ ...s, _rank: i }))
     .filter(matchesScorerSearch)
 
@@ -90,7 +101,7 @@ function Classement() {
   // Reset à la page 1 si la recherche ou la compétition change, sinon on peut
   // se retrouver sur une page vide/hors limites après un filtrage qui réduit
   // le nombre total de pages.
-  useEffect(() => { setScorerPage(0) }, [searchNorm, selectedComp])
+  useEffect(() => { setScorerPage(0) }, [searchNorm, selectedComp, view])
   const paginationEnabled = !!searchNorm
   const scorerPageCount = Math.max(1, Math.ceil(displayScorers.length / SCORERS_PER_PAGE))
   const pagedScorers = paginationEnabled
@@ -465,15 +476,25 @@ function Classement() {
             >
               Buteurs
             </button>
+            <button
+              className={`classement__viewBtn ${view === 'passeurs' ? 'classement__viewBtn--active' : ''}`}
+              onClick={() => setView('passeurs')}
+            >
+              Passeurs
+            </button>
           </div>
         </div>
 
-        {/* Recherche équipe/buteur — filtre côté client */}
+        {/* Recherche équipe/buteur/passeur — filtre côté client */}
         <div className="classement__searchWrap">
           <input
             type="text"
             className="classement__searchInput"
-            placeholder={view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'}
+            placeholder={
+              view === 'buteurs'  ? 'Rechercher un buteur ou une équipe…'
+              : view === 'passeurs' ? 'Rechercher un passeur ou une équipe…'
+              : 'Rechercher une équipe…'
+            }
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -494,8 +515,8 @@ function Classement() {
           </div>
         )}
 
-        {/* ── Vue Buteurs ── */}
-        {view === 'buteurs' && (
+        {/* ── Vue Buteurs / Passeurs ── */}
+        {(view === 'buteurs' || view === 'passeurs') && (
           <>
             {scorersBusy && (
               <div className="classement__scorersList">
@@ -520,11 +541,15 @@ function Classement() {
             {!scorersBusy && scorersError && (
               <p className="classement__state">Données non disponibles.</p>
             )}
-            {!scorersBusy && !scorersError && scorers.length === 0 && (
-              <p className="classement__state">Aucun buteur disponible.</p>
+            {!scorersBusy && !scorersError && scorerBase.length === 0 && (
+              <p className="classement__state">
+                {view === 'passeurs' ? 'Aucun passeur décisif disponible.' : 'Aucun buteur disponible.'}
+              </p>
             )}
-            {!scorersBusy && !scorersError && scorers.length > 0 && displayScorers.length === 0 && (
-              <p className="classement__state">Aucun buteur ne correspond à « {search} ».</p>
+            {!scorersBusy && !scorersError && scorerBase.length > 0 && displayScorers.length === 0 && (
+              <p className="classement__state">
+                {view === 'passeurs' ? `Aucun passeur ne correspond à « ${search} ».` : `Aucun buteur ne correspond à « ${search} ».`}
+              </p>
             )}
             {!scorersBusy && displayScorers.length > 0 && (
               <div className="classement__scorersList">
@@ -564,16 +589,32 @@ function Classement() {
                         </div>
                       </div>
 
-                      {/* Stats */}
+                      {/* Stats — en vue Passeurs, la passe décisive passe en premier
+                          (stat qui a servi au tri), le nombre de buts reste en second. */}
                       <div className="classement__scorerStats">
-                        <div className="classement__scorerStatItem classement__scorerStatItem--goals">
-                          <span className="classement__scorerGoals">{s.goals ?? 0}</span>
-                          <span className="classement__scorerStatLabel">G</span>
-                        </div>
-                        <div className="classement__scorerStatItem classement__scorerStatItem--assists">
-                          <span className="classement__scorerAssists">{s.assists ?? '—'}</span>
-                          <span className="classement__scorerStatLabel">A</span>
-                        </div>
+                        {view === 'passeurs' ? (
+                          <>
+                            <div className="classement__scorerStatItem classement__scorerStatItem--assists">
+                              <span className="classement__scorerAssists">{s.assists ?? 0}</span>
+                              <span className="classement__scorerStatLabel">A</span>
+                            </div>
+                            <div className="classement__scorerStatItem classement__scorerStatItem--goals">
+                              <span className="classement__scorerGoals">{s.goals ?? '—'}</span>
+                              <span className="classement__scorerStatLabel">G</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="classement__scorerStatItem classement__scorerStatItem--goals">
+                              <span className="classement__scorerGoals">{s.goals ?? 0}</span>
+                              <span className="classement__scorerStatLabel">G</span>
+                            </div>
+                            <div className="classement__scorerStatItem classement__scorerStatItem--assists">
+                              <span className="classement__scorerAssists">{s.assists ?? '—'}</span>
+                              <span className="classement__scorerStatLabel">A</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )

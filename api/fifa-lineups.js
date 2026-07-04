@@ -286,10 +286,22 @@ export default async function handler(req, res) {
   }
 
   // ── 2. Lineup : cache Redis (7j) sinon fetch FIFA ───────────────────────────
+  // ⚠️ BUG CORRIGÉ : avant, dès que le lineup était introuvable (FIFA match ID
+  // non résolu OU compo pas encore publiée), la route retournait un 404
+  // IMMÉDIAT — avant même d'essayer les stats (section 3 ci-dessous), qui sont
+  // pourtant indépendantes (elles n'ont besoin que de ids.fifaMatchId, déjà
+  // résolu dans le 2e cas). Conséquence concrète : "possession" et les autres
+  // stats FIFA n'apparaissaient JAMAIS pour un match sans compo dispo — ce qui
+  // inclut tout match pas suivi en direct (les compos ne sont mises en cache
+  // que si quelqu'un/le cron les a récupérées à temps), même si les stats,
+  // elles, étaient parfaitement accessibles. On continue maintenant vers les
+  // stats dans tous les cas, et on ne renvoie 404 qu'à la toute fin, si
+  // vraiment rien (ni compo ni stats) n'a pu être trouvé.
   const lineupKey = `fifa:lineup:${fdMatchId}`
   let lineupResult = null
   try { lineupResult = safeJson(await kv.get(lineupKey)) } catch {}
 
+  let lineupDiag = null
   if (!lineupResult?.home?.starters?.length) {
     if (!ids?.fifaMatchId) {
       // Diagnostic : tester directement l'accessibilité de l'API FIFA
@@ -302,27 +314,21 @@ export default async function handler(req, res) {
         fifaDiag = `status=${r.status}`
       } catch (e) { fifaDiag = `error=${e.message}` }
 
-      return res.status(404).json({
-        error: 'Match FIFA introuvable',
-        diag: { utcDate, fdHome, fdAway, fifaApi: fifaDiag },
-      })
+      lineupResult = null
+      lineupDiag = { error: 'Match FIFA introuvable', diag: { utcDate, fdHome, fdAway, fifaApi: fifaDiag } }
+    } else {
+      lineupResult = await fetchFifaLineup(ids)
+      if (lineupResult?.home?.starters?.length) {
+        // Cache 7 jours — lineup d'un match terminé est définitive
+        try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: 7 * 24 * 3600 }) } catch {}
+      } else {
+        lineupResult = null
+        lineupDiag = { error: 'Compositions FIFA introuvables (pas encore publiées)' }
+      }
     }
-
-    lineupResult = await fetchFifaLineup(ids)
-    if (!lineupResult?.home?.starters?.length) {
-      return res.status(404).json({ error: 'Compositions FIFA introuvables (pas encore publiées)' })
-    }
-
-    // Cache 7 jours — lineup d'un match terminé est définitive
-    try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: 7 * 24 * 3600 }) } catch {}
   }
 
-  // ── 3. Stats — TOUJOURS tentées, indépendamment du cache lineup ────────────
-  // ⚠️ FIX : avant, dès que le lineup était en cache (quasi toujours vrai : les
-  // compos sont publiées ~1h avant le KO et mises en cache 7j), la route
-  // retournait "stats: null" sans même essayer de les récupérer. Résultat :
-  // aucune statistique pour la quasi-totalité des matchs de Coupe du Monde
-  // dès qu'ils n'étaient plus "tout frais". Cache court (2min) pour rester léger.
+  // ── 3. Stats — TOUJOURS tentées, indépendamment du résultat du lineup ──────
   let stats = null
   if (ids?.fifaMatchId) {
     try {
@@ -343,5 +349,10 @@ export default async function handler(req, res) {
     } catch {}
   }
 
-  return res.json({ ...lineupResult, stats })
+  // Rien du tout (ni compo ni stats) → 404, avec le diagnostic le plus utile
+  if (!lineupResult?.home?.starters?.length && !stats) {
+    return res.status(404).json(lineupDiag ?? { error: 'Aucune donnée FIFA disponible' })
+  }
+
+  return res.json({ ...(lineupResult ?? {}), stats })
 }
