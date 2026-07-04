@@ -246,13 +246,15 @@ function _checkPendingKickoffs(matches, queryClient) {
 
     markPendingKickoff(match)
 
-    // Fix : seed kickoffAt dès l'heure prévue → le compteur de minutes démarre
-    // immédiatement sans attendre la confirmation ESPN (peut prendre jusqu'à 5min).
-    // Priorité : si ESPN confirme plus tard, setKickoffAt(mid, now - mins*60s) corrige finement.
-    const pendingState = getMatchState(match.id)
-    if (!pendingState.kickoffAt) {
-      setKickoffAt(match.id, utcMs)
-    }
+    // ⚠️ NE PAS seed kickoffAt ici sur l'heure prévue. Un essai précédent le
+    // faisait pour démarrer le compteur de minutes sans attendre ESPN — mais
+    // ça cassait justement le placeholder "Débute" (calcMinute exige
+    // `!state.kickoffAt` pour l'afficher, voir matchUtils.js) : le match
+    // affichait "1'" dès l'heure prévue même si le coup d'envoi réel avait du
+    // retard (poteau, contrôle VAR, retard équipe...). Comportement voulu :
+    // "Débute" tant qu'ESPN n'a pas confirmé, puis kickoffAt posé avec la
+    // vraie minute ESPN (voir "KO détecté" plus bas dans _doPollESPN) →
+    // transition directe vers la bonne minute, jamais "1'" avant le vrai KO.
 
     // Pré-seeder le cache à 0 si rien encore
     if (!espnScoresCache[match.id]) {
