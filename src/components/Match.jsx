@@ -117,6 +117,48 @@ const _fmtD = (d) => {
   if (date.getTime() === tomorrow.getTime()) return `Demain`
   return new Date(d).toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'short' })
 }
+
+const teamName = (team) =>
+  team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
+
+/* Ligne de match (poules + journée) — définie AU NIVEAU MODULE (comme
+   BracketSvgView plus haut) : sinon, recréée à chaque render de Matchs()
+   (ex: input recherche, ticker, refetch), React perd l'identité du composant
+   et démonte/remonte tous les <img> crest → flicker/rechargement visible des
+   drapeaux à chaque re-render (constat utilisateur : "ça fait comme un
+   refresh à chaque fois"). */
+function MatchRow({ match, index, inModal = false }) {
+  const navigate = useNavigate()
+  const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
+
+  return (
+    <div
+      className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${isUpcoming ? ' matchs__match--upcoming' : ''}`}
+      style={{ borderTop: index === 0 ? 'none' : undefined }}
+      onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
+    >
+      <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
+      <div className="matchs__team matchs__team--home">
+        {match.homeTeam.crest && (
+          <div className="matchs__crestWrap"><img src={match.homeTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.homeTeam?.name}
+            onError={e => e.target.style.display = 'none'} /></div>
+        )}
+        <span className="matchs__teamName">{teamName(match.homeTeam)}</span>
+      </div>
+      <div className="matchs__score">
+        <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
+        {isUpcoming && <span className="matchs__upcomingHint">›</span>}
+      </div>
+      <div className="matchs__team matchs__team--away">
+        {match.awayTeam.crest && (
+          <div className="matchs__crestWrap"><img src={match.awayTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.awayTeam?.name}
+            onError={e => e.target.style.display = 'none'} /></div>
+        )}
+        <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
+      </div>
+    </div>
+  )
+}
 const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
 
 // Card compacte pour le bracket : SEULEMENT le drapeau (plus de nom, plus de
@@ -691,42 +733,6 @@ function Matchs() {
   }
 
   const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
-
-  const teamName = (team) =>
-    team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
-
-  /* ── Ligne de match (poules + journée) ── */
-  function MatchRow({ match, index, inModal = false }) {
-    const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
-
-    return (
-      <div
-        className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${isUpcoming ? ' matchs__match--upcoming' : ''}`}
-        style={{ borderTop: index === 0 ? 'none' : undefined }}
-        onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
-      >
-        <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
-        <div className="matchs__team matchs__team--home">
-          {match.homeTeam.crest && (
-            <div className="matchs__crestWrap"><img src={match.homeTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.homeTeam?.name}
-              onError={e => e.target.style.display = 'none'} /></div>
-          )}
-          <span className="matchs__teamName">{teamName(match.homeTeam)}</span>
-        </div>
-        <div className="matchs__score">
-          <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
-          {isUpcoming && <span className="matchs__upcomingHint">›</span>}
-        </div>
-        <div className="matchs__team matchs__team--away">
-          {match.awayTeam.crest && (
-            <div className="matchs__crestWrap"><img src={match.awayTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.awayTeam?.name}
-              onError={e => e.target.style.display = 'none'} /></div>
-          )}
-          <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
-        </div>
-      </div>
-    )
-  }
 
   /* ── Rendu ── */
   return (

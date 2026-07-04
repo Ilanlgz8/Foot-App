@@ -18,6 +18,67 @@ import { mergeScore }    from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
+const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
+const fmtDate = (d) => {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const date  = new Date(d); date.setHours(0,0,0,0)
+  if (date.getTime() === today.getTime()) return `Aujourd'hui`
+  return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
+}
+
+/* Carte de match — définie AU NIVEAU MODULE : sinon, recréée à chaque render
+   de Resultats() (or celui-ci re-render toutes les ~15s via espnScores/
+   useLiveData), React perd l'identité du composant et démonte/remonte tous
+   les <img> crest → flicker/rechargement visible des drapeaux à intervalle
+   régulier (constat utilisateur : "ça fait comme un refresh à chaque fois"). */
+function MatchCard({ match }) {
+  const navigate = useNavigate()
+  // score.fullTime = score après prolongations le cas échéant (football-data.org
+  // inclut les buts de prolong dedans, seuls les tirs au but sont à part dans
+  // score.penalties). Un match décidé aux tab est TOUJOURS à égalité en fullTime
+  // → le vainqueur doit se déterminer via le score des tab, pas via fullTime.
+  const hs   = match.score?.fullTime?.home ?? 0
+  const as_  = match.score?.fullTime?.away ?? 0
+  const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
+  const hp   = match.score?.penalties?.home ?? null
+  const ap   = match.score?.penalties?.away ?? null
+  const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
+  const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
+  const draw = !wentToPens && hs === as_
+
+  return (
+    <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
+      <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
+        <div className="resultats__crestWrap">
+          {match.homeTeam?.crest
+            ? <img src={match.homeTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
+            : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
+        </div>
+        <span className="resultats__teamName">{tName(match.homeTeam)}</span>
+      </div>
+      <div className="resultats__scoreCenter">
+        <span className="resultats__cardDate">{fmtDate(match.utcDate)}</span>
+        <div className="resultats__scoreRow">
+          <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
+          <span className="resultats__scoreDash">–</span>
+          <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
+        </div>
+        {wentToPens && hp != null && ap != null && (
+          <span className="resultats__pens">({hp}-{ap} tab)</span>
+        )}
+        <span className="resultats__ftBadge">Terminé</span>
+      </div>
+      <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
+        <div className="resultats__crestWrap">
+          {match.awayTeam?.crest
+            ? <img src={match.awayTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
+            : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
+        </div>
+        <span className="resultats__teamName">{tName(match.awayTeam)}</span>
+      </div>
+    </div>
+  )
+}
 
 function Resultats() {
   const navigate = useNavigate()
@@ -156,63 +217,6 @@ function Resultats() {
     if (!searchNorm) return wcGroups
     return wcGroups.filter(g => groupTeams(matchesByGroup.get(g) ?? []).some(matchesTeamSearch))
   }, [wcGroups, searchNorm, matchesByGroup])
-
-  const fmtDate = (d) => {
-    const today = new Date(); today.setHours(0,0,0,0)
-    const date  = new Date(d); date.setHours(0,0,0,0)
-    if (date.getTime() === today.getTime()) return `Aujourd'hui`
-    return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
-  }
-  const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
-
-  // Carte de match réutilisable
-  function MatchCard({ match }) {
-    // score.fullTime = score après prolongations le cas échéant (football-data.org
-    // inclut les buts de prolong dedans, seuls les tirs au but sont à part dans
-    // score.penalties). Un match décidé aux tab est TOUJOURS à égalité en fullTime
-    // → le vainqueur doit se déterminer via le score des tab, pas via fullTime.
-    const hs   = match.score?.fullTime?.home ?? 0
-    const as_  = match.score?.fullTime?.away ?? 0
-    const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
-    const hp   = match.score?.penalties?.home ?? null
-    const ap   = match.score?.penalties?.away ?? null
-    const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
-    const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
-    const draw = !wentToPens && hs === as_
-
-    return (
-      <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-        <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
-          <div className="resultats__crestWrap">
-            {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
-              : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
-          </div>
-          <span className="resultats__teamName">{tName(match.homeTeam)}</span>
-        </div>
-        <div className="resultats__scoreCenter">
-          <span className="resultats__cardDate">{fmtDate(match.utcDate)}</span>
-          <div className="resultats__scoreRow">
-            <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
-            <span className="resultats__scoreDash">–</span>
-            <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
-          </div>
-          {wentToPens && hp != null && ap != null && (
-            <span className="resultats__pens">({hp}-{ap} tab)</span>
-          )}
-          <span className="resultats__ftBadge">Terminé</span>
-        </div>
-        <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
-          <div className="resultats__crestWrap">
-            {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
-              : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
-          </div>
-          <span className="resultats__teamName">{tName(match.awayTeam)}</span>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <section className="resultats">
