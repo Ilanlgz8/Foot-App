@@ -57,6 +57,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée' })
   }
 
+  // ── Diagnostic ponctuel — vérifie QUELLE clé est réellement chargée en
+  // production, sans jamais exposer la clé complète. Protégé par CRON_SECRET
+  // (même convention que debug-push.js). Utile pour confirmer/infirmer qu'une
+  // nouvelle valeur Vercel est bien celle utilisée par la fonction, sans coller
+  // la clé en clair dans une conversation.
+  if (req.query.debugkey !== undefined) {
+    const secret = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'Non autorisé' })
+    }
+    const key = process.env.APIFOOTBALL_KEY ?? ''
+    return res.status(200).json({
+      present: !!key,
+      length:  key.length,
+      preview: key ? `${key.slice(0, 4)}…${key.slice(-4)}` : null,
+    })
+  }
+
   const { _ep, ...rest } = req.query
   const endpoint = _ep ?? 'fixtures'
 
