@@ -126,7 +126,14 @@ const teamName = (team) =>
    (ex: input recherche, ticker, refetch), React perd l'identité du composant
    et démonte/remonte tous les <img> crest → flicker/rechargement visible des
    drapeaux à chaque re-render (constat utilisateur : "ça fait comme un
-   refresh à chaque fois"). */
+   refresh à chaque fois").
+   Pas de loading="lazy" sur les crests de cette page (ici et plus bas) : même
+   raison que sur Résultat — la page est démontée/remontée en entier à chaque
+   retour depuis /match/:id (comportement normal du routeur), donc les <img>
+   sont recréées à chaque fois. Avec "lazy", même une image déjà en cache
+   navigateur repasse par l'IntersectionObserver avant de s'afficher → flash
+   "vide → image" à chaque retour (constat utilisateur, même bug que sur
+   Résultat). Les listes ici restent courtes, le coût eager est négligeable. */
 function MatchRow({ match, index, inModal = false }) {
   const navigate = useNavigate()
   const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
@@ -140,7 +147,7 @@ function MatchRow({ match, index, inModal = false }) {
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
         {match.homeTeam.crest && (
-          <div className="matchs__crestWrap"><img src={match.homeTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.homeTeam?.name}
+          <div className="matchs__crestWrap"><img src={match.homeTeam.crest} alt="" className="matchs__crest" data-team={match.homeTeam?.name}
             onError={e => e.target.style.display = 'none'} /></div>
         )}
         <span className="matchs__teamName">{teamName(match.homeTeam)}</span>
@@ -151,7 +158,7 @@ function MatchRow({ match, index, inModal = false }) {
       </div>
       <div className="matchs__team matchs__team--away">
         {match.awayTeam.crest && (
-          <div className="matchs__crestWrap"><img src={match.awayTeam.crest} alt="" loading="lazy" className="matchs__crest" data-team={match.awayTeam?.name}
+          <div className="matchs__crestWrap"><img src={match.awayTeam.crest} alt="" className="matchs__crest" data-team={match.awayTeam?.name}
             onError={e => e.target.style.display = 'none'} /></div>
         )}
         <span className="matchs__teamName">{teamName(match.awayTeam)}</span>
@@ -199,14 +206,14 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
       <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`} title={_name(m.homeTeam)}>
         <span className="bracket__crestWrap">
           {m.homeTeam?.crest
-            ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="bracket__crest" data-team={m.homeTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
+            ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" data-team={m.homeTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
       </div>
       <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`} title={_name(m.awayTeam)}>
         <span className="bracket__crestWrap">
           {m.awayTeam?.crest
-            ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="bracket__crest" data-team={m.awayTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
+            ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" data-team={m.awayTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
       </div>
@@ -906,7 +913,7 @@ function Matchs() {
                           {teams.map(t => (
                             <li key={t.id} className="matchs__wcGroupCard__team">
                               {t.crest
-                                ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest" data-team={t.name}
+                                ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" className="matchs__wcGroupCard__crest" data-team={t.name}
                                     onError={e => e.currentTarget.style.display = 'none'} /></div>
                                 : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>
                               }

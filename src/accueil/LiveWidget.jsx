@@ -24,7 +24,7 @@ function LiveChip({ match, espn, onMatchClick }) {
   return (
     <button
       type="button"
-      className="accueil__liveChip"
+      className={`accueil__liveChip${isTermine ? ' accueil__liveChip--ft' : ''}`}
       onClick={() => onMatchClick?.(match)}
     >
       <div className="accueil__liveChipTeams">

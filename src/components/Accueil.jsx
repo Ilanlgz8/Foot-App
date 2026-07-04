@@ -293,6 +293,13 @@ function Accueil() {
     ? [...liveMatches, ...pendingMatches]
     : liveMatches
 
+  // Le widget garde un match "ft" affiché quelques minutes après la fin (voir
+  // LiveWidget) pour montrer le score final — mais il ne doit plus avoir l'air
+  // "en direct" à ce moment-là (point rouge pulsant + "EN DIRECT"). On
+  // n'affiche donc ce header que s'il reste au moins un match réellement en
+  // cours (pas terminé) dans le lot.
+  const hasLiveNow = widgetMatches.some(m => getMatchState(m.id).ft !== true)
+
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
     const now4h = Date.now() - 4 * 60 * 60_000
@@ -317,12 +324,25 @@ function Accueil() {
         const lsScore = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
         if (lsScore && lsScore.home != null) { lsHome = lsScore.home; lsAway = lsScore.away }
       } catch {}
+      const es = espnScores[m.id]
+      // Tirs au but : voir même fix dans Resultat.jsx — sans ça, score.duration/
+      // penalties étaient écrasés par le fullTime reconstruit ci-dessous, et le
+      // badge "(x-y tab)" de MatchCard restait vide pour un match qu'ESPN
+      // détecte fini avant que football-data.org ne le confirme.
+      const wentToPens = es?.homeShootout != null && es?.awayShootout != null
       return {
         ...m,
-        score: { fullTime: {
-          home: mergeScore(espnScores[m.id]?.home, lsHome ?? m.score?.fullTime?.home),
-          away: mergeScore(espnScores[m.id]?.away, lsAway ?? m.score?.fullTime?.away),
-        } },
+        score: {
+          ...m.score,
+          fullTime: {
+            home: mergeScore(es?.home, lsHome ?? m.score?.fullTime?.home),
+            away: mergeScore(es?.away, lsAway ?? m.score?.fullTime?.away),
+          },
+          ...(wentToPens ? {
+            duration: 'PENALTY_SHOOTOUT',
+            penalties: { home: es.homeShootout, away: es.awayShootout },
+          } : {}),
+        },
         status: 'FINISHED',
       }
     })
@@ -350,10 +370,12 @@ function Accueil() {
             {/* Bouton "Voir tout" retiré : faisait doublon avec le bouton
                 "Live" de la navbar (même destination /live) — signalé par
                 l'utilisateur. Ce dernier reste l'unique accès à la page /live. */}
-            <div className="accueil__liveSectionHeader">
-              <span className="accueil__liveDot" />
-              <span className="accueil__liveSectionTitle">EN DIRECT</span>
-            </div>
+            {hasLiveNow && (
+              <div className="accueil__liveSectionHeader">
+                <span className="accueil__liveDot" />
+                <span className="accueil__liveSectionTitle">EN DIRECT</span>
+              </div>
+            )}
             <LiveWidget
               liveMatches={widgetMatches}
               espnScores={espnScores}

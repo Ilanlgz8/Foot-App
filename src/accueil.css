@@ -3110,6 +3110,15 @@
   border-color: rgba(var(--red-rgb),0.35);
 }
 
+/* Match terminé : plus d'aspect "en direct" (bordure rouge) */
+.accueil__liveChip--ft {
+  border-color: rgba(var(--white-rgb),0.1);
+}
+.accueil__liveChip--ft:hover {
+  background: rgba(var(--white-rgb),0.06);
+  border-color: rgba(var(--white-rgb),0.16);
+}
+
 .accueil__liveChipTeams {
   display: flex;
   align-items: center;

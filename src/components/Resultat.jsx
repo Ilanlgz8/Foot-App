@@ -30,7 +30,14 @@ const fmtDate = (d) => {
    de Resultats() (or celui-ci re-render toutes les ~15s via espnScores/
    useLiveData), React perd l'identité du composant et démonte/remonte tous
    les <img> crest → flicker/rechargement visible des drapeaux à intervalle
-   régulier (constat utilisateur : "ça fait comme un refresh à chaque fois"). */
+   régulier (constat utilisateur : "ça fait comme un refresh à chaque fois").
+   Pas de loading="lazy" ici : cette page est de toute façon démontée/remontée
+   en entier à chaque navigation vers /match/:id puis retour (comportement
+   normal du routeur) — recrée les <img> à chaque fois. Avec "lazy", même une
+   image déjà en cache navigateur repasse par l'IntersectionObserver avant de
+   se charger, ce qui ajoute un flash "vide → image" perceptible à chaque
+   retour (constat utilisateur). Les listes ici sont courtes (une journée/
+   poule à la fois), le coût du chargement eager est négligeable. */
 function MatchCard({ match }) {
   const navigate = useNavigate()
   // score.fullTime = score après prolongations le cas échéant (football-data.org
@@ -51,7 +58,7 @@ function MatchCard({ match }) {
       <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
         <div className="resultats__crestWrap">
           {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
+            ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
             : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
         </div>
         <span className="resultats__teamName">{tName(match.homeTeam)}</span>
@@ -71,7 +78,7 @@ function MatchCard({ match }) {
       <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
         <div className="resultats__crestWrap">
           {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" loading="lazy" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
+            ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
             : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
         </div>
         <span className="resultats__teamName">{tName(match.awayTeam)}</span>
@@ -139,12 +146,28 @@ function Resultats() {
           const ls = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
           if (ls && ls.home != null) { lsHome = ls.home; lsAway = ls.away }
         } catch {}
+        const es = espnScores[m.id]
+        // Tirs au but : pour un match qu'ESPN détecte terminé AVANT que
+        // football-data.org ne le confirme officiellement, FD.org n'a pas
+        // encore rempli score.penalties (il ne le fait qu'à leur propre statut
+        // FINISHED). La seule source dispo est alors le suivi ESPN
+        // (homeShootout/awayShootout, alimenté par useLiveMinute). Sans ça, le
+        // score.fullTime reconstruit ci-dessous écrasait score.duration/
+        // penalties → le badge "(x-y tab)" restait vide pour ces matchs-là.
+        const wentToPens = es?.homeShootout != null && es?.awayShootout != null
         return {
           ...m,
-          score: { fullTime: {
-            home: mergeScore(espnScores[m.id]?.home, lsHome ?? m.score?.fullTime?.home),
-            away: mergeScore(espnScores[m.id]?.away, lsAway ?? m.score?.fullTime?.away),
-          } },
+          score: {
+            ...m.score,
+            fullTime: {
+              home: mergeScore(es?.home, lsHome ?? m.score?.fullTime?.home),
+              away: mergeScore(es?.away, lsAway ?? m.score?.fullTime?.away),
+            },
+            ...(wentToPens ? {
+              duration: 'PENALTY_SHOOTOUT',
+              penalties: { home: es.homeShootout, away: es.awayShootout },
+            } : {}),
+          },
           status: 'FINISHED',
         }
       })
@@ -384,7 +407,7 @@ function Resultats() {
                       {teams.map(t => (
                         <li key={t.id} className="matchs__wcGroupCard__team">
                           {t.crest
-                            ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" loading="lazy" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} /></div>
+                            ? <div className="matchs__wcGroupCard__crestWrap"><img src={t.crest} alt="" className="matchs__wcGroupCard__crest" data-team={t.name} onError={e => e.currentTarget.style.display='none'} /></div>
                             : <span className="matchs__wcGroupCard__crestFallback">{(t.shortName || t.name)?.[0]}</span>}
                           <span className="matchs__wcGroupCard__teamName">{translateTeam(t.shortName || t.name)}</span>
                         </li>
