@@ -378,6 +378,7 @@ export function useAflMatchStats(match) {
   return { ...query, isLoading: infoLoading || query.isLoading }
 }
 
-// Classement des passes décisives : voir useEspnAssists.js (src/hooks/) — le
-// plan gratuit api-football ne couvre pas la saison en cours, remplacé par un
-// scraping de la page stats publique ESPN.
+// Classement des passes décisives : retiré (api-football → plan gratuit ne
+// couvre pas la saison en cours ; scraping ESPN tenté ensuite, ne fonctionnait
+// pas non plus). Le nombre de passes décisives reste affiché en info
+// secondaire dans le classement des buteurs quand disponible.

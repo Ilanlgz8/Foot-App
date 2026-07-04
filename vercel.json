@@ -6,7 +6,6 @@
     { "source": "/news",           "destination": "/api/news" },
     { "source": "/espn",           "destination": "/api/espn" },
     { "source": "/apifootball",    "destination": "/api/apifootball" },
-    { "source": "/espn-assists",   "destination": "/api/espn-assists" },
     { "source": "/api/fifa-live",     "destination": "/api/fifa-live" },
     { "source": "/api/fifa-lineups", "destination": "/api/fifa-lineups" },
     { "source": "/cron-goals",        "destination": "/api/cron-goals" },
