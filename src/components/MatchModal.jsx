@@ -596,23 +596,31 @@ export function ComposTab({ match, compMatches }) {
     isWC ? match : (espnDone && !espnOrFdHasData ? match : null)
   )
 
-  // Source 3a (matchs à venir) : probables via ESPN (fonctionne WC avec header.competitions)
+  // Source 3a : probables via ESPN (dernier XI connu de chaque équipe).
+  // Avant : limité aux matchs pas encore terminés (isUpcoming) — un match déjà
+  // fini dont la vraie compo n'a jamais pu être récupérée (FIFA/ESPN/FD.org/
+  // api-football tous vides) affichait "Compos non disponibles" au lieu du
+  // dernier XI connu, alors que rien n'empêche de l'utiliser aussi après coup
+  // (demande explicite : "éviter de rien afficher"). Toujours activé — ne
+  // s'affiche de toute façon que si `lineups` (Source 1/2/3) est vide, voir
+  // plus bas.
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
-    isUpcoming ? match : null,
+    match,
     compMatches
   )
 
-  // Source 3b (matchs à venir) : probables via api-football (fallback si ESPN vide)
+  // Source 3b : probables via api-football (fallback si ESPN vide) — même
+  // changement que Source 3a.
   const { data: aflProbableData, isLoading: aflProbableLoading } = useAflProbableLineups(
-    isUpcoming ? match : null,
+    match,
     compMatches
   )
 
   const isLoading = espnLoading || espnMatchLoading
     || (!espnHasData && fdLoading)
     || (!espnHasData && !fdLineups?.home?.starters?.length && aflLoading)
-    || (isUpcoming && probableLoading)
-    || (isUpcoming && !probableData && aflProbableLoading)
+    || probableLoading
+    || (!probableData && aflProbableLoading)
 
   // api-football fournit un `grid` ("ligne:colonne") par titulaire — une
   // coordonnée exacte propre à CE match (jamais périmée), contrairement au

@@ -586,7 +586,11 @@ export default function MatchPage() {
                       />
                     </>
             )}
-            {activeTab === 'compos'     && <ComposTab match={match} compMatches={isFinished ? [] : compMatches} />}
+            {/* compMatches transmis même pour un match terminé : nécessaire au
+                fallback "compositions probables" de ComposTab (dernier XI
+                connu), maintenant aussi actif après-coup si la vraie compo
+                n'a jamais pu être récupérée. */}
+            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>
