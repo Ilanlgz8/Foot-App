@@ -231,6 +231,22 @@ function MpStatRow({ label, homeVal, awayVal, homeBetter, awayBetter }) {
   )
 }
 
+// Skeleton shimmer (mêmes classes que MpStatRow) — remplace le spinner
+// générique, même logique que les skeletons ajoutés dans MatchModal.jsx.
+function MpStatsSkeleton() {
+  return (
+    <div className="mp__statsList">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="mp__statRow">
+          <div className="sk" style={{ width: '1.6rem', height: '0.9rem', marginLeft: 'auto' }} />
+          <div className="sk" style={{ width: '4.4rem', height: '0.6rem' }} />
+          <div className="sk" style={{ width: '1.6rem', height: '0.9rem' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Helpers stats match terminé (mêmes que MatchModal, dupliqués) ─────────────
 const MATCH_STAT_KEYS = [
   { key: 'Ball possession',  label: 'Possession',     higher: true  },
@@ -330,7 +346,7 @@ function MpMatchStats({ match }) {
       }
 
       {isLoading ? (
-        <div className="mp__tabLoading"><div className="modal__spinner" /></div>
+        <MpStatsSkeleton />
       ) : rows.length > 0 ? (
         <div className="mp__statsList">
           {rows.map(r => (
@@ -563,7 +579,7 @@ export default function MatchPage() {
                     }
                   </>
                 : formLoading
-                  ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
+                  ? <MpStatsSkeleton />
                   : <>
                       {/* Pronostic des fans — tout en haut, avant Stats saison
                           (pas de tabs Stats Live/Stats Saison avant le

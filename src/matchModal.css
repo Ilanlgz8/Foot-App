@@ -966,6 +966,43 @@
   padding: 0 0.25rem;
 }
 
+/* ── Skeleton compos — approxime la forme du terrain (LineupPitch, en
+   inline styles, aucune classe CSS à réutiliser) : deux moitiés empilées
+   avec des rangées de pastilles shimmer imitant gardien/défense/milieu/
+   attaque, plutôt qu'un simple spinner générique. */
+.pitch__sk {
+  aspect-ratio: 3 / 4;
+  max-width: 22rem;
+  margin: 0.5rem auto 0;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(34,197,94,0.05), rgba(34,197,94,0.02));
+  border: 1px solid rgba(var(--white-rgb),0.06);
+  border-radius: 0.9rem;
+}
+.pitch__skHalf {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 0.4rem;
+}
+.pitch__skHalf--away {
+  flex-direction: column-reverse;
+}
+.pitch__skRow {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+}
+.pitch__skDot {
+  width: 10%;
+  aspect-ratio: 1;
+  border-radius: 50% !important;
+}
+
 /* =========================================================
    MATCH MODAL — RESPONSIVE
    ========================================================= */

@@ -115,6 +115,146 @@ function ESPNStats({ stats }) {
   )
 }
 
+// ── Skeletons de chargement — remplacent les anciens spinners "Chargement…"
+// par des placeholders qui reprennent la forme exacte du contenu final
+// (mêmes classes CSS que le contenu réel), avec le shimmer .sk déjà utilisé
+// dans Classement.jsx/Resultat.jsx. Perçu comme plus premium et évite le
+// petit "saut" de layout au moment où le vrai contenu apparaît. ──────────────
+function StatsSkeleton() {
+  return (
+    <div className="modal__espnStats">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="modal__statTableRow">
+          <div className="sk" style={{ width: '1.6rem', height: '0.9rem', marginLeft: 'auto' }} />
+          <div className="sk" style={{ width: '4.4rem', height: '0.6rem' }} />
+          <div className="sk" style={{ width: '1.6rem', height: '0.9rem' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CompsSkeleton() {
+  const rows = [1, 4, 3, 3]
+  return (
+    <div className="pitch__sk">
+      {['home', 'away'].map(side => (
+        <div key={side} className={`pitch__skHalf pitch__skHalf--${side}`}>
+          {rows.map((n, ri) => (
+            <div key={ri} className="pitch__skRow">
+              {Array.from({ length: n }).map((_, i) => (
+                <div key={i} className="sk pitch__skDot" />
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ClassementSkeleton({ rows = 6 }) {
+  return (
+    <div className="classement__tableWrap">
+      <table className="classement__table">
+        <thead>
+          <tr>
+            <th>Pos</th><th>Équipe</th><th>MJ</th><th>Pts</th>
+            <th>V</th><th>N</th><th>D</th><th>Diff</th><th>BM</th><th>Forme</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }).map((_, i) => (
+            <tr key={i} className="classement__row">
+              <td><div className="sk" style={{ width: '1.2rem', height: '0.8rem' }} /></td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="sk" style={{ width: '1.5rem', height: '1.5rem', borderRadius: '50%', flexShrink: 0 }} />
+                  <div className="sk" style={{ width: `${5 + (i % 3)}rem`, height: '0.8rem' }} />
+                </div>
+              </td>
+              {Array.from({ length: 7 }).map((_, j) => (
+                <td key={j}><div className="sk" style={{ width: '1.5rem', height: '0.8rem', margin: '0 auto' }} /></td>
+              ))}
+              <td>
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  {Array.from({ length: 5 }).map((_, k) => (
+                    <div key={k} className="sk" style={{ width: '1.35rem', height: '1.35rem', borderRadius: '0.3rem' }} />
+                  ))}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EventsSkeleton() {
+  return (
+    <div className="modal__stats">
+      <div className="modal__statsCol modal__statsCol--home">
+        {[60, 45].map((w, i) => (
+          <div key={i} className="modal__goalRow">
+            <div className="sk" style={{ width: `${w}%`, height: '0.7rem' }} />
+            <div className="sk" style={{ width: '1.4rem', height: '0.6rem' }} />
+          </div>
+        ))}
+      </div>
+      <div className="modal__statsDivider" />
+      <div className="modal__statsCol modal__statsCol--away">
+        {[50, 65].map((w, i) => (
+          <div key={i} className="modal__goalRow modal__goalRow--away">
+            <div className="sk" style={{ width: '1.4rem', height: '0.6rem' }} />
+            <div className="sk" style={{ width: `${w}%`, height: '0.7rem' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PmStatsSkeleton() {
+  const widths = [40, 65, 30, 50, 35]
+  return (
+    <div className="pm__statTable">
+      {widths.map((w, i) => (
+        <div key={i} className="pm__statRow">
+          <div className="sk" style={{ width: '1.6rem', height: '0.85rem', marginLeft: 'auto' }} />
+          <div className="sk" style={{ width: '4.2rem', height: '0.56rem' }} />
+          <div className="sk" style={{ width: '1.6rem', height: '0.85rem' }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function H2HSkeleton() {
+  return (
+    <div className="h2h__list">
+      {[0, 1, 2].map(i => (
+        <div key={i} className="h2h__row">
+          <div className="h2h__matchup">
+            <div className="h2h__side h2h__side--home">
+              <div className="sk" style={{ width: '4.5rem', height: '0.72rem' }} />
+              <div className="sk h2h__crestWrap" style={{ borderRadius: '22%' }} />
+            </div>
+            <div className="h2h__scoreBlock">
+              <div className="sk" style={{ width: '2.2rem', height: '0.5rem' }} />
+              <div className="sk" style={{ width: '2rem', height: '0.9rem' }} />
+            </div>
+            <div className="h2h__side h2h__side--away">
+              <div className="sk h2h__crestWrap" style={{ borderRadius: '22%' }} />
+              <div className="sk" style={{ width: '4.5rem', height: '0.72rem' }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Timeline des buts FD.org (fallback) ──────────────────────────────────────
 export function GoalTimeline({ goals = [], homeId }) {
   if (goals.length === 0) return null
@@ -445,7 +585,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   // ── Priorité 2 : Stats FIFA live (WC 2026) ──
   if (isFifaMatch) {
     if (fifaStatsLoading) {
-      return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+      return <StatsSkeleton />
     }
     return (
       <div>
@@ -474,7 +614,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
 
   // Loading ESPN summary
   if (summaryLoading && hasEspnId) {
-    return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+    return <StatsSkeleton />
   }
 
   // ── Priorité 4 : Fallback api-football ──
@@ -485,7 +625,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
     .filter(Boolean)
 
   if (aflLoading && rows.length === 0) {
-    return <div className="modal__state"><div className="modal__spinner" />Chargement des stats…</div>
+    return <StatsSkeleton />
   }
 
   return (
@@ -720,7 +860,7 @@ export function ComposTab({ match, compMatches }) {
     : null
 
   if (isLoading) {
-    return <div className="modal__state"><div className="modal__spinner" />Chargement des compos…</div>
+    return <CompsSkeleton />
   }
 
   // Enrichit les objets lineup avec les crests du match (non inclus dans l'API ESPN roster)
@@ -844,7 +984,7 @@ export function ClassementTab({ match, compId }) {
   const { formMap } = useTeamForm(compId)
 
   if (loading) {
-    return <div className="modal__state"><div className="modal__spinner" />Chargement du classement…</div>
+    return <div style={{ padding: '4px 0' }}><ClassementSkeleton /></div>
   }
 
   const rules = COMP_RULES[compId] ?? DEFAULT_RULES
@@ -902,15 +1042,10 @@ function FinishedDetails({ match, espnData, detail, loading }) {
   // On considère ESPN "utile" seulement s'il a des buteurs OU des stats.
   const espnHasData = espnScorers.length > 0 || !!espnData?.stats
 
-  // Spinner : on attend si aucune source n'a encore répondu
+  // Skeleton : on attend si aucune source n'a encore répondu
   const hasAnyData = espnHasData || fdGoals.length > 0 || !!detail
   if (loading && !hasAnyData) {
-    return (
-      <div className="modal__state">
-        <div className="modal__spinner" />
-        Chargement…
-      </div>
-    )
+    return <EventsSkeleton />
   }
 
   const hasEvents = espnScorers.length > 0 || espnCards.length > 0 ||
@@ -1177,7 +1312,7 @@ function H2HSection({ match, compMatches }) {
     <div className="pm__section">
       <h3 className="pm__sectionTitle">Derniers résultats entre les deux équipes</h3>
       {isLoading ? (
-        <p className="pm__noData">Chargement…</p>
+        <H2HSkeleton />
       ) : (
         <div className="h2h__list">
           {rows.map((m, i) => {
@@ -1349,9 +1484,7 @@ export function MatchStatsSection({ match }) {
 
       {/* Stats du match */}
       {isLoading ? (
-        <div style={{ display:'flex', justifyContent:'center', padding:'1.5rem 0' }}>
-          <div className="modal__spinner" />
-        </div>
+        <PmStatsSkeleton />
       ) : rows.length > 0 ? (
         <div className="pm__statTable">
           {rows.map(({ label, hv, av, hBetter, aBetter }) => (
