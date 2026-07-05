@@ -401,6 +401,7 @@ export default function LiveMatchPage() {
                 <StatsSubTabs view={statsView} onChange={setStatsView} />
                 {/* Pouls collectif — sous Stats Live/Stats Saison, au-dessus
                     du contenu des stats */}
+                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions result={matchOutcome(match)} kickoffAt={match.utcDate} />
                 {statsView === 'live' ? (
                   <LiveStatsTab
                     match={match}
