@@ -667,17 +667,11 @@ export default function LineupPitch({ home, away, isCountry = false }) {
               }}
             >
               {t?.crest && (
-                <div style={{
-                  width: 24, height: 24, flexShrink: 0,
-                  borderRadius: isCountry ? '50%' : 0,
-                  overflow: isCountry ? 'hidden' : 'visible',
-                }}>
-                  {/* Blason (club, pas de cercle forcé, pas de crop) vs drapeau
-                      (pays, cercle) — voir index.css pour l'équivalent en CSS
-                      partagé ; ici en inline faute de classe CSS dédiée. */}
-                  <img src={t.crest} alt="" data-team={t?.name} style={{
-                    width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center',
-                  }} />
+                // data-crest="club"/"country" branché sur le système partagé
+                // de index.css (forme + object-fit + correctifs par équipe),
+                // au lieu de dupliquer la logique en inline comme avant.
+                <div data-crest={isCountry ? 'country' : 'club'} style={{ width: 24, height: 24, flexShrink: 0 }}>
+                  <img src={t.crest} alt="" data-team={t?.name} style={{ width: '100%', height: '100%' }} />
                 </div>
               )}
               <span style={{

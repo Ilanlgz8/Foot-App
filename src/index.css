@@ -105,10 +105,14 @@ body::before {
    vide, garanti), mais SANS le zoom manuel (scale) qui aggravait le
    recadrage en plus du crop déjà nécessaire pour remplir un cercle avec un
    drapeau rectangulaire — c'est ce zoom EN TROP qui coupait les bandes
-   rouges du Canada, pas le cover de base. Compromis assumé : le drapeau est
-   toujours légèrement recadré sur les côtés (inhérent à mettre un
-   rectangle dans un cercle), mais moins qu'avant, et le rond reste toujours
-   parfaitement visible. */
+   rouges du Canada, pas le cover de base.
+   ⚠️ CHANGEMENT DE FORME (3e passage, choix utilisateur) : après avoir vu
+   plusieurs options (cercle, rectangle arrondi, squircle, hexagone, carré
+   arrondi, écusson), le CARRÉ ARRONDI a été retenu pour les drapeaux pays à
+   la place du cercle. object-fit:cover est conservé à l'identique (le taux
+   de recadrage dépend du ratio du cadre, pas de la forme du masque
+   border-radius) — seul le rayon change, de 50% (cercle parfait) à 22%
+   (carré aux coins nettement arrondis, cf. mockup validé). */
 [data-crest="club"] {
   border-radius: 0 !important;
   overflow: visible !important;
@@ -118,7 +122,7 @@ body::before {
   transform: none !important;
 }
 [data-crest="country"] {
-  border-radius: 50% !important;
+  border-radius: 22% !important;
   overflow: hidden !important;
 }
 [data-crest="country"] > img {
@@ -130,17 +134,19 @@ body::before {
 }
 
 /* ── Correctifs ponctuels par équipe ──────────────────────────────────────
-   Même avec object-fit:cover (garanti sans bande vide sur un cercle), un
+   Même avec object-fit:cover (garanti sans bande vide sur le cadre), un
    sous-ensemble de drapeaux ont une marge interne inhabituellement grande
    BAKED IN dans l'image elle-même (le graphisme du drapeau n'est pas
    collé aux bords du fichier) — cover recadre le CANEVAS extérieur de
    l'image mais ne peut pas retirer cette marge interne, donc elle reste
-   visible comme un vide/flou aux pôles du cercle pour CES drapeaux précis
+   visible comme un vide/flou sur les bords pour CES drapeaux précis
    (constat utilisateur, cas déjà identifiés : Argentine, Ouzbékistan, Corée
-   du Sud, + Jordanie). Un zoom supplémentaire ciblé UNIQUEMENT sur ces
-   drapeaux (via data-team, sélecteur plus spécifique que la règle générale
-   ci-dessus donc prioritaire même à !important égal) règle ça sans
-   affecter les autres drapeaux qui n'ont pas ce problème. */
+   du Sud, + Jordanie). Ce problème de marge interne est indépendant de la
+   forme du masque (cercle ou carré arrondi, cf. règle ci-dessus) : il reste
+   donc pertinent après le passage au carré arrondi. Un zoom supplémentaire
+   ciblé UNIQUEMENT sur ces drapeaux (via data-team, sélecteur plus
+   spécifique que la règle générale ci-dessus donc prioritaire même à
+   !important égal) règle ça sans affecter les autres drapeaux. */
 [data-crest="country"] img[data-team="Argentina"],
 [data-crest="country"] img[data-team="Jordan"],
 [data-crest="country"] img[data-team="Uzbekistan"],
