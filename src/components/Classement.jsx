@@ -619,7 +619,7 @@ function Classement() {
             <table className="classement__table">
               <thead>
                 <tr>
-                  <th>Pos</th><th>Équipe</th><th>Pts</th><th>MJ</th>
+                  <th>Pos</th><th>Équipe</th><th>MJ</th><th>Pts</th>
                   <th>V</th><th>N</th><th>D</th><th>Diff</th><th>BM</th><th>Forme</th>
                 </tr>
               </thead>
