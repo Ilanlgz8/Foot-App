@@ -82,8 +82,8 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
           <tr>
             <th>Pos</th>
             <th>Équipe</th>
-            <th>Pts</th>
             <th>MJ</th>
+            <th>Pts</th>
             <th>V</th>
             <th>N</th>
             <th>D</th>
@@ -129,8 +129,8 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
                     </div>
                   </div>
                 </td>
-                <td><strong>{team.points}</strong></td>
                 <td>{team.playedGames}</td>
+                <td><strong>{team.points}</strong></td>
                 <td>{team.won}</td>
                 <td>{team.draw}</td>
                 <td>{team.lost}</td>

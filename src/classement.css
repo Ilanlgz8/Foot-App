@@ -648,8 +648,8 @@
 /* Largeurs % : identiques dans tous les groupes → colonnes alignées */
 .classement__table--compact thead th:nth-child(1) { width: 5%; text-align: center; }   /* Pos  */
 .classement__table--compact thead th:nth-child(2) { width: auto; }                        /* Équipe — prend le reste */
-.classement__table--compact thead th:nth-child(3) { width: 8%; text-align: center; }   /* Pts  */
-.classement__table--compact thead th:nth-child(4) { width: 7%; text-align: center; }   /* MJ   */
+.classement__table--compact thead th:nth-child(3) { width: 7%; text-align: center; }   /* MJ   */
+.classement__table--compact thead th:nth-child(4) { width: 8%; text-align: center; }   /* Pts  */
 .classement__table--compact thead th:nth-child(5),
 .classement__table--compact thead th:nth-child(6),
 .classement__table--compact thead th:nth-child(7) { width: 7%; text-align: center; }   /* V N D */
@@ -1295,7 +1295,7 @@
   }
   .classement__modalBox .classement__table thead th { font-size: 0.58rem; }
 
-  /* Centrer les colonnes numériques (Pos, Pts, MJ, V, N, D, Diff, Forme) */
+  /* Centrer les colonnes numériques (Pos, MJ, Pts, V, N, D, Diff, Forme) */
   .classement__modalBox .classement__table thead th:nth-child(1),
   .classement__modalBox .classement__table thead th:nth-child(3),
   .classement__modalBox .classement__table thead th:nth-child(4),
