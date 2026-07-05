@@ -42,6 +42,31 @@ function bucketFor(minute) {
   return '90+'
 }
 
+// Exécute `fn` sur chaque item de `items`, avec au plus `limit` requêtes en
+// vol simultanément (au lieu d'un Promise.all global sur tout le tableau).
+//
+// ⚠️ Pourquoi c'est nécessaire ici : à ce stade du Mondial (poules + 32es
+// terminés), il y a déjà ~85 matchs FINISHED pour la Coupe du Monde, soit
+// ~25-30 dates ESPN distinctes à interroger (passe 1) PUIS jusqu'à ~85 appels
+// summary (passe 2). Un Promise.all sans limite envoie TOUTES ces requêtes en
+// une seule salve — ESPN (ou Vercel) se met alors à répondre en erreur/timeout
+// à une bonne partie d'entre elles, et comme chaque échec est avalé
+// silencieusement (try/catch, pour ne pas bloquer le reste), le résultat final
+// pouvait finir avec très peu — voire aucun — event résolu, sans qu'aucune
+// erreur ne soit visible nulle part. Limiter la concurrence évite ça.
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 export function useGoalsByMinute(selectedComp, finishedMatches) {
   const slug = COMPETITION_ESPN_SLUG[selectedComp] ?? null
   const matches = finishedMatches ?? []
@@ -53,7 +78,7 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
     // déjà ouvert Tendances AVANT le fix de la date ESPN (voir commit
     // précédent) resserviraient leur résultat vide en cache pendant jusqu'à
     // 15min (staleTime) sans jamais retenter le vrai fetch corrigé.
-    queryKey: ['goalsByMinute', 'v2', selectedComp, matchIds],
+    queryKey: ['goalsByMinute', 'v3', selectedComp, matchIds],
     enabled: !!slug && matches.length > 0,
     staleTime: 15 * 60_000,
     retry: 1,
@@ -83,14 +108,14 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
       }
 
       const allEvents = []
-      await Promise.all([...neededDates].map(async (day) => {
+      await mapWithConcurrency([...neededDates], 4, async (day) => {
         try {
           const res = await fetch(`/espn?slug=${slug}&dates=${day}`)
           if (!res.ok) return
           const board = await res.json()
           allEvents.push(...(board.events ?? []))
         } catch { /* jour ignoré si erreur réseau — pas bloquant pour le reste */ }
-      }))
+      })
 
       const eventIds = []
       const seenIds = new Set()
@@ -117,7 +142,7 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
       const buckets = Object.fromEntries(BUCKET_ORDER.map(k => [k, 0]))
       let totalGoals = 0
 
-      await Promise.all(eventIds.map(async (eventId) => {
+      await mapWithConcurrency(eventIds, 4, async (eventId) => {
         try {
           const res = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
           if (!res.ok) return
@@ -127,7 +152,7 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
             if (bucket) { buckets[bucket]++; totalGoals++ }
           }
         } catch { /* match ignoré si erreur réseau */ }
-      }))
+      })
 
       return {
         rounds: BUCKET_ORDER.map(key => ({ key, label: key, goals: buckets[key] })),
