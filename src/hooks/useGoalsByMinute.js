@@ -53,40 +53,60 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
     staleTime: 15 * 60_000,
     retry: 1,
     queryFn: async () => {
-      // 1. Grouper par date ESPN — un seul appel scoreboard par jour distinct,
-      // au lieu d'un appel par match, pour retrouver l'eventId de chacun.
-      const byDate = new Map()
+      // 1. Construire l'ensemble des dates ESPN à interroger.
+      //
+      // ⚠️ ESPN groupe son scoreboard par date CALENDAIRE LOCALE du stade, pas
+      // par date UTC. Beaucoup de matchs de ce Mondial (Amérique du Nord) se
+      // jouent en soirée locale, ce qui fait "rouler" leur utcDate au
+      // lendemain UTC. Exemple vérifié : Czechia-Corée du Sud, utcDate
+      // 2026-06-12T02:00Z (2h du matin), apparaît dans le scoreboard ESPN
+      // dates=20260611 — jamais dans dates=20260612. Avec un seul jour
+      // (l'ancien code prenait juste le jour UTC), ce match — et la plupart
+      // des matchs joués en soirée — n'étaient JAMAIS résolus en eventId,
+      // eventIds restait vide, et le graphique par minute n'affichait rien.
+      // Fix : pour chaque match on interroge la date UTC ET la veille, puis on
+      // fusionne tous les events récupérés dans un seul pool avant le matching
+      // fuzzy. Tous les fuseaux du tournoi sont en retard sur UTC (jamais en
+      // avance), donc "UTC ou UTC-1" couvre tous les cas sans avoir à
+      // maintenir une table de fuseaux par stade.
+      const neededDates = new Set()
       for (const m of matches) {
         if (!m?.utcDate) continue
-        const day = espnDateStr(m.utcDate)
-        if (!byDate.has(day)) byDate.set(day, [])
-        byDate.get(day).push(m)
+        const d = new Date(m.utcDate)
+        neededDates.add(espnDateStr(d))
+        neededDates.add(espnDateStr(new Date(d.getTime() - 86_400_000)))
       }
 
-      const eventIds = []
-      await Promise.all([...byDate.entries()].map(async ([day, dayMatches]) => {
+      const allEvents = []
+      await Promise.all([...neededDates].map(async (day) => {
         try {
           const res = await fetch(`/espn?slug=${slug}&dates=${day}`)
           if (!res.ok) return
           const board = await res.json()
-          for (const m of dayMatches) {
-            const fdHome = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
-            const fdAway = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
-            for (const evt of board.events ?? []) {
-              const comp  = evt.competitions?.[0]
-              const homeC = (comp?.competitors ?? []).find(c => c.homeAway === 'home')
-              const awayC = (comp?.competitors ?? []).find(c => c.homeAway === 'away')
-              if (!homeC || !awayC) continue
-              const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-              const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
-              if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-                eventIds.push(evt.id)
-                break
-              }
-            }
-          }
+          allEvents.push(...(board.events ?? []))
         } catch { /* jour ignoré si erreur réseau — pas bloquant pour le reste */ }
       }))
+
+      const eventIds = []
+      const seenIds = new Set()
+      for (const m of matches) {
+        const fdHome = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
+        const fdAway = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
+        for (const evt of allEvents) {
+          if (seenIds.has(evt.id)) continue
+          const comp  = evt.competitions?.[0]
+          const homeC = (comp?.competitors ?? []).find(c => c.homeAway === 'home')
+          const awayC = (comp?.competitors ?? []).find(c => c.homeAway === 'away')
+          if (!homeC || !awayC) continue
+          const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+          const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+          if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+            eventIds.push(evt.id)
+            seenIds.add(evt.id)
+            break
+          }
+        }
+      }
 
       // 2. Summary par match résolu → minutes de but réelles
       const buckets = Object.fromEntries(BUCKET_ORDER.map(k => [k, 0]))

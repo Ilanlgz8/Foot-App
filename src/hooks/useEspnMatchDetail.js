@@ -10,9 +10,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 
-function espnDate(match) {
+function espnDate(match, offsetDays = 0) {
   if (!match?.utcDate) return null
   const d = new Date(match.utcDate)
+  if (offsetDays) d.setUTCDate(d.getUTCDate() + offsetDays)
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
@@ -142,12 +143,31 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       if (!slug || !match) return null
 
       // ── Passe 1 : scoreboard → event ID ──
-      const dateParam = isMatchToday(match) ? '' : `&dates=${espnDate(match)}`
-      const res1 = await fetch(`/espn?slug=${slug}${dateParam}`)
-      if (!res1.ok) return null
-      const board = await res1.json()
+      //
+      // ⚠️ ESPN groupe son scoreboard par date CALENDAIRE LOCALE du stade, pas
+      // par date UTC — beaucoup de matchs de ce Mondial (Amérique du Nord) se
+      // jouent en soirée locale, ce qui fait "rouler" leur utcDate au
+      // lendemain UTC (vérifié : un match à 02h00 UTC apparaît dans le
+      // scoreboard ESPN de la veille). Pour un match non-today, on interroge
+      // donc la date UTC ET la veille, et on fusionne les events — tous les
+      // fuseaux du tournoi sont en retard sur UTC, jamais en avance.
+      let events
+      if (isMatchToday(match)) {
+        const res = await fetch(`/espn?slug=${slug}`)
+        events = res.ok ? ((await res.json()).events ?? []) : []
+      } else {
+        const [res1, res2] = await Promise.all([
+          fetch(`/espn?slug=${slug}&dates=${espnDate(match, 0)}`),
+          fetch(`/espn?slug=${slug}&dates=${espnDate(match, -1)}`),
+        ])
+        const [board1, board2] = await Promise.all([
+          res1.ok ? res1.json() : null,
+          res2.ok ? res2.json() : null,
+        ])
+        events = [...(board1?.events ?? []), ...(board2?.events ?? [])]
+      }
 
-      const found = findEspnEvent(board, match)
+      const found = findEspnEvent({ events }, match)
       if (!found) return null   // match non trouvé dans le scoreboard
 
       // ── Passe 2 : summary → buts + stats complets ──
