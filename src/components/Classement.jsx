@@ -10,6 +10,7 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { StandingsTable } from './StandingsTable'
+import { TendancesView } from './TendancesView'
 
 
 function Classement() {
@@ -110,6 +111,10 @@ function Classement() {
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
   const { matches: wcSched, loading: wcSchedLoading } = useMatches('WC', 'SCHEDULED')
   const { matches: wcFin,   loading: wcFinLoading   } = useMatches('WC', 'FINISHED')
+  // Onglet Tendances — matchs terminés de la compétition SÉLECTIONNÉE (pas
+  // forcément WC, contrairement à wcFin ci-dessus qui sert à l'auto-ouverture
+  // de groupe). Même hook/endpoint que Résultats, aucun appel réseau dédié.
+  const { matches: trendsMatches, loading: trendsLoading } = useMatches(selectedComp, 'FINISHED')
 
   const selectedCompetition = competitions.find((c) => c.id === selectedComp)
 
@@ -476,24 +481,32 @@ function Classement() {
             >
               Buteurs
             </button>
+            <button
+              className={`classement__viewBtn ${view === 'tendances' ? 'classement__viewBtn--active' : ''}`}
+              onClick={() => setView('tendances')}
+            >
+              Tendances
+            </button>
           </div>
         </div>
 
-        {/* Recherche équipe/buteur — filtre côté client */}
-        <div className="classement__searchWrap">
-          <input
-            type="text"
-            className="classement__searchInput"
-            placeholder={
-              view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'
-            }
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="classement__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
-          )}
-        </div>
+        {/* Recherche équipe/buteur — filtre côté client, pas de sens sur Tendances (vue agrégée) */}
+        {view !== 'tendances' && (
+          <div className="classement__searchWrap">
+            <input
+              type="text"
+              className="classement__searchInput"
+              placeholder={
+                view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'
+              }
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="classement__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
+            )}
+          </div>
+        )}
 
         {/* Légende zones */}
         {view === 'classement' && (
@@ -671,6 +684,16 @@ function Classement() {
 
         {view === 'classement' && !loading && !error && standings.length === 0 && (
           <p className="classement__state">Aucune donnée disponible.</p>
+        )}
+
+        {/* ── Vue Tendances ── */}
+        {view === 'tendances' && (
+          <TendancesView
+            standings={standings}
+            matches={trendsMatches}
+            loading={trendsLoading || loading}
+            isCountry={selectedComp === 'WC'}
+          />
         )}
 
       </div>
