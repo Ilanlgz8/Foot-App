@@ -11,15 +11,32 @@
 // GET  /api/pulse?matchId=X&resource=curve
 //   → { samples: [{ minute, home, draw, away }, ...] } triés par minute
 //
-// POST /api/pulse { matchId, deviceId, action: 'vote', choice: 'home'|'draw'|'away' }
+// POST /api/pulse { matchId, deviceId, action: 'vote', choice: 'home'|'draw'|'away', kickoffAt? }
 //   → change (ou pose) le vote de ce device pour ce match, idempotent si
-//     déjà le même choix.
+//     déjà le même choix. kickoffAt (ISO, match.utcDate) est optionnel mais
+//     recommandé : si fourni et déjà passé, le vote est rejeté (403) — verrou
+//     serveur en plus du verrou UI (`locked`), pour que le classement de
+//     précision ne puisse pas être faussé par un vote posté après coup d'envoi.
 // POST /api/pulse { matchId, deviceId, action: 'react', emoji }
 //   → incrémente le compteur de cet emoji. Cooldown 1.5s/device (SET NX PX).
 // POST /api/pulse { matchId, action: 'sample', minute, home, draw, away }
 //   → enregistre un point de la courbe de bascule (pas de deviceId : donnée
 //     algorithmique, pas une opinion utilisateur — dédupliquée par minute
 //     côté serveur, peu importe qui l'envoie).
+//
+// POST /api/pulse { matchId, deviceId, action: 'resolve', result: 'home'|'draw'|'away' }
+//   → clôture le pronostic de ce match pour ce device : compare son vote
+//     ('pulse:voter:*') au résultat réel envoyé par le client (matchOutcome()
+//     côté front), attribue des points si juste, idempotent (verrou
+//     'pulse:resolved:*'). Alimente un classement global cross-match
+//     ('pulse:leaderboard', sorted set) — toujours anonyme (deviceId), aucune
+//     donnée personnelle, même philosophie que le reste de Pouls collectif.
+//     Note honnêteté : le résultat est envoyé par le client, pas vérifié
+//     serveur-side contre une source officielle — acceptable ici car aucun
+//     enjeu réel (pas de compte, pas de prix), même niveau de confiance que
+//     les autres actions (vote/react/sample) déjà non vérifiées.
+// GET  /api/pulse?resource=leaderboard[&deviceId=X]
+//   → { top: [{deviceId, points}, ...] (10 max), me: {rank, points, correct, total} | null }
 
 import { Redis } from '@upstash/redis'
 
@@ -46,6 +63,11 @@ const EMOJIS     = new Set(['⚽', '🔥', '😱', '👏', '😡'])
 const PULSE_TTL  = 60 * 60 * 8        // 8h — couvre largement un match + prolongations + tab
 const CURVE_TTL  = 60 * 60 * 24 * 3   // 3j — le temps de consulter le récap après coup
 
+const LEADERBOARD_KEY  = 'pulse:leaderboard'
+const PROFILE_PREFIX   = 'pulse:profile:'
+const LEADERBOARD_TTL  = 60 * 60 * 24 * 120  // 120j — couvre tout le tournoi + marge large
+const CORRECT_POINTS   = 10
+
 function isValidMatchId(id) {
   return typeof id === 'string' && id.length > 0 && id.length <= 40 && /^[a-zA-Z0-9_-]+$/.test(id)
 }
@@ -54,6 +76,19 @@ function isValidDeviceId(id) {
 }
 function isValidPct(n) {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100
+}
+// Coup d'envoi (match.utcDate) envoyé par le client pour verrouiller le vote
+// côté serveur — l'UI (prop `locked`) empêche déjà le clic, mais un client
+// qui appellerait l'API directement (devtools) pourrait sinon voter après le
+// coup d'envoi, voire après avoir vu le résultat, ce qui fausserait le
+// classement de précision. Bornes larges (+/- 5 ans) pour rejeter une valeur
+// aberrante sans dépendre d'une horloge serveur/client parfaitement synchro.
+function isValidIsoTimestamp(s) {
+  if (typeof s !== 'string' || !s) return false
+  const ms = Date.parse(s)
+  if (Number.isNaN(ms)) return false
+  const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000
+  return Math.abs(ms - Date.now()) <= fiveYearsMs
 }
 
 async function readAggregate(matchId) {
@@ -83,6 +118,34 @@ async function readCurve(matchId) {
     .sort((a, b) => a.minute - b.minute)
 }
 
+// Top 10 + (optionnel) le rang/profil d'un device précis. zrange avec
+// {rev:true, withScores:true} renvoie un tableau plat [membre, score, ...]
+// (vérifié dans node_modules/@upstash/redis — pas de désérialisation
+// spéciale, contrairement à zscan).
+async function readLeaderboard(deviceId) {
+  const raw = await kv.zrange(LEADERBOARD_KEY, 0, 9, { rev: true, withScores: true })
+  const top = []
+  for (let i = 0; i < raw.length; i += 2) {
+    top.push({ deviceId: String(raw[i]), points: Number(raw[i + 1]) })
+  }
+
+  let me = null
+  if (deviceId) {
+    const [rank, score, profile] = await Promise.all([
+      kv.zrevrank(LEADERBOARD_KEY, deviceId),
+      kv.zscore(LEADERBOARD_KEY, deviceId),
+      kv.hgetall(`${PROFILE_PREFIX}${deviceId}`),
+    ])
+    me = {
+      rank:    rank != null ? rank + 1 : null,
+      points:  score != null ? Number(score) : 0,
+      correct: Number(profile?.correct ?? 0),
+      total:   Number(profile?.total ?? 0),
+    }
+  }
+  return { top, me }
+}
+
 export default async function handler(req, res) {
   const origin = req.headers.origin ?? ''
   if (!isAllowedOrigin(origin)) {
@@ -93,6 +156,17 @@ export default async function handler(req, res) {
 
   // ── GET : lecture publique (données déjà anonymes/agrégées) ─────────────
   if (req.method === 'GET') {
+    if (resource === 'leaderboard') {
+      const deviceId = String(req.query.deviceId ?? '')
+      try {
+        const data = await readLeaderboard(isValidDeviceId(deviceId) ? deviceId : null)
+        return res.status(200).json({ ok: true, ...data })
+      } catch (e) {
+        console.error('[pulse] leaderboard read error:', e.message)
+        return res.status(503).json({ error: 'Lecture temporairement indisponible' })
+      }
+    }
+
     const matchId = String(req.query.matchId ?? '')
     if (!isValidMatchId(matchId)) return res.status(400).json({ error: 'matchId invalide' })
     try {
@@ -147,8 +221,19 @@ export default async function handler(req, res) {
     // ── Vote pronostic (1/X/2) ──────────────────────────────────────────────
     if (action === 'vote') {
       if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'deviceId invalide' })
-      const { choice } = body
+      const { choice, kickoffAt } = body
       if (!CHOICES.has(choice)) return res.status(400).json({ error: 'choice invalide' })
+
+      // Verrou serveur : un pronostic ne peut être posé qu'avant le coup
+      // d'envoi. Si le client n'envoie pas kickoffAt (ancien build, ou usage
+      // hors match précis), on laisse passer plutôt que de bloquer à tort —
+      // le verrou UI (`locked`) reste la première ligne de défense dans ce cas.
+      if (kickoffAt !== undefined) {
+        if (!isValidIsoTimestamp(kickoffAt)) return res.status(400).json({ error: 'kickoffAt invalide' })
+        if (Date.now() >= Date.parse(kickoffAt)) {
+          return res.status(403).json({ error: 'Pronostic clos, le match a commencé' })
+        }
+      }
 
       const voterKey = `pulse:voter:${matchId}:${deviceId}`
       const previous  = await kv.get(voterKey)
@@ -184,6 +269,42 @@ export default async function handler(req, res) {
 
       const data = await readAggregate(matchId)
       return res.status(200).json({ ok: true, ...data })
+    }
+
+    // ── Clôture pronostic : points de précision + classement global ─────────
+    if (action === 'resolve') {
+      if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'deviceId invalide' })
+      const { result } = body
+      if (!CHOICES.has(result)) return res.status(400).json({ error: 'result invalide' })
+
+      const voterKey    = `pulse:voter:${matchId}:${deviceId}`
+      const resolvedKey = `pulse:resolved:${matchId}:${deviceId}`
+      const myChoice    = await kv.get(voterKey)
+
+      // Idempotent : un seul calcul de points par (match, device), même si le
+      // client rappelle resolve plusieurs fois (reload, re-render...).
+      const firstTime = await kv.set(resolvedKey, '1', { nx: true, ex: LEADERBOARD_TTL })
+
+      if (firstTime && myChoice && CHOICES.has(myChoice)) {
+        const correct    = myChoice === result
+        const points     = correct ? CORRECT_POINTS : 0
+        const profileKey = `${PROFILE_PREFIX}${deviceId}`
+        if (points > 0) await kv.zincrby(LEADERBOARD_KEY, points, deviceId)
+        await kv.hincrby(profileKey, 'total', 1)
+        if (correct) await kv.hincrby(profileKey, 'correct', 1)
+        await Promise.all([
+          kv.expire(LEADERBOARD_KEY, LEADERBOARD_TTL),
+          kv.expire(profileKey, LEADERBOARD_TTL),
+        ])
+      }
+
+      const data = await readLeaderboard(deviceId)
+      return res.status(200).json({
+        ok: true,
+        myVote: myChoice ?? null,
+        matchCorrect: myChoice ? myChoice === result : null,
+        ...data,
+      })
     }
 
     // ── Échantillon de la courbe de bascule ─────────────────────────────────

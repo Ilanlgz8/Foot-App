@@ -62,13 +62,16 @@ export function usePulse(matchId, enabled = true) {
     staleTime:       4_000,
   })
 
-  const vote = useCallback(async (choice) => {
+  // kickoffAt (ISO, match.utcDate) est transmis au serveur pour qu'il refuse
+  // le vote une fois le coup d'envoi passé — verrou en plus du `locked` de
+  // l'UI, qui à lui seul ne protège pas contre un appel direct à l'API.
+  const vote = useCallback(async (choice, kickoffAt) => {
     if (!id) return
     // Optimiste : on fixe le choix visuellement avant la réponse serveur.
     setMyVote(choice)
     try { localStorage.setItem(myVoteKey(id), choice) } catch {}
     try {
-      const result = await postPulse({ matchId: id, deviceId: getDeviceId(), action: 'vote', choice })
+      const result = await postPulse({ matchId: id, deviceId: getDeviceId(), action: 'vote', choice, kickoffAt })
       queryClient.setQueryData(['pulse', id], result)
     } catch {
       // Échec réseau : le choix local reste affiché (optimiste), le prochain
@@ -89,12 +92,58 @@ export function usePulse(matchId, enabled = true) {
     } catch {}
   }, [id, queryClient])
 
+  // Clôture pronostic une fois le match terminé : compare myVote au résultat
+  // réel (matchOutcome() côté appelant) et met à jour le classement global.
+  // Idempotent côté serveur (verrou 'pulse:resolved:*') donc sûr à rappeler
+  // à chaque render (StrictMode, remount...).
+  const resolveLock = useRef(false)
+  const [resolution, setResolution] = useState(null) // { matchCorrect, top, me }
+  const resolve = useCallback(async (result) => {
+    if (!id || !result || resolveLock.current) return
+    resolveLock.current = true
+    try {
+      const data = await postPulse({ matchId: id, deviceId: getDeviceId(), action: 'resolve', result })
+      setResolution(data)
+    } catch {
+      // Échec réseau : pas grave, ce n'est qu'un classement pour le fun —
+      // pas de retry agressif, le prochain accès à la page réessaiera.
+    }
+  }, [id])
+
   return {
     votes:      data?.votes     ?? { home: 0, draw: 0, away: 0, total: 0 },
     reactions:  data?.reactions ?? {},
     myVote,
     vote,
     react,
+    resolve,
+    resolution,
     isLoading,
+  }
+}
+
+/**
+ * Classement global "pronostics" (cross-match, anonyme par device).
+ * Rafraîchi automatiquement après un resolve() réussi via resolution ci-dessus
+ * (LivePulse le fusionne), ou manuellement via refetch().
+ */
+export function useLeaderboard(enabled = false) {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['pulse-leaderboard'],
+    queryFn:  async () => {
+      const res = await fetch(`/api/pulse?resource=leaderboard&deviceId=${encodeURIComponent(getDeviceId())}`)
+      if (!res.ok) throw new Error(`pulse-leaderboard ${res.status}`)
+      return res.json()
+    },
+    enabled,
+    staleTime: 30_000,
+    retry:     1,
+  })
+
+  return {
+    top:      data?.top ?? [],
+    me:       data?.me  ?? null,
+    isLoading,
+    refetch,
   }
 }

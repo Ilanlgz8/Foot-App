@@ -1339,6 +1339,54 @@
    coup d'œil, sans doublon visuel. La carte prend toute la largeur
    disponible (comme les autres sections du modal) — un max-width la
    rétrécissait et coupait/serrait les noms de pays sur les côtés. */
+/* ── H2H : évolution du rapport de force ── même technique que ProbaCurve.css
+   (polyline SVG à la main) — perspective fixe = l'équipe qui reçoit
+   aujourd'hui, du plus ancien (gauche) au plus récent (droite). */
+.h2h__trend {
+  margin-bottom: 0.7rem;
+  padding: 0.7rem 0.8rem 0.6rem;
+  background: rgba(var(--white-rgb), 0.03);
+  border: 1px solid rgba(var(--white-rgb), 0.07);
+  border-radius: 0.9rem;
+}
+.h2h__trendTitle {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(var(--white-rgb), 0.4);
+  margin: 0 0 0.45rem;
+}
+.h2h__trendSvg {
+  width: 100%;
+  height: 44px;
+  display: block;
+  overflow: visible;
+}
+.h2h__trendMid {
+  stroke: rgba(var(--white-rgb), 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.h2h__trendLine {
+  fill: none;
+  stroke: var(--match-home, #3b82f6);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.h2h__trendLegend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb), 0.5);
+}
+.h2h__trendLegendItem--home { color: var(--match-home, #3b82f6); }
+.h2h__trendLegendItem--away { color: var(--match-away, var(--red)); }
+
 .h2h__list {
   display: flex;
   flex-direction: column;

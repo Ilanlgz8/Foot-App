@@ -112,6 +112,86 @@
   color: rgba(var(--white-rgb), 0.25);
 }
 
+/* ── Score de précision (post-match) + classement global ── */
+.pulse__resultBanner {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.55rem;
+}
+.pulse__resultBanner--win {
+  color: var(--green-light);
+  background: var(--green-dim);
+}
+.pulse__resultBanner--lose {
+  color: rgba(var(--white-rgb), 0.55);
+  background: rgba(var(--white-rgb), 0.04);
+}
+
+.pulse__boardToggle {
+  align-self: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(var(--white-rgb), 0.5);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+.pulse__boardToggle:active { opacity: 0.6; }
+
+.pulse__board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+
+.pulse__boardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pulse__boardRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+}
+.pulse__boardRank {
+  width: 1.2rem;
+  font-weight: 800;
+  color: rgba(var(--white-rgb), 0.4);
+  font-variant-numeric: tabular-nums;
+}
+.pulse__boardName {
+  flex: 1;
+  color: rgba(var(--white-rgb), 0.7);
+  font-weight: 600;
+}
+.pulse__boardPts {
+  font-weight: 800;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse__boardMe {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb), 0.45);
+  text-align: center;
+}
+
 /* ── Réactions live (LiveMatchPage uniquement) ── */
 .pulse__reactions {
   display: flex;

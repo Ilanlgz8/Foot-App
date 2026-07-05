@@ -131,6 +131,33 @@ export function finalScore(score) {
   return { home: score.fullTime?.home ?? null, away: score.fullTime?.away ?? null }
 }
 
+/**
+ * Résultat 1/N/2 d'un match terminé, à partir de finalScore() (donc du score
+ * 120min, tirs au but exclus) + la même règle de départage aux tab que le
+ * reste du projet (H2HSection, useTeamForm.js) : le score 120min est par
+ * définition à égalité si le match est allé aux tirs au but, donc c'est
+ * score.penalties qui décide, jamais un match nul dans ce cas.
+ * Retourne null si le score n'est pas encore connu (match pas terminé).
+ */
+export function matchOutcome(match) {
+  if (!match) return null
+  const fs = finalScore(match.score)
+  if (fs.home == null || fs.away == null) return null
+
+  if (
+    match.score?.duration === 'PENALTY_SHOOTOUT' &&
+    match.score?.penalties?.home != null &&
+    match.score?.penalties?.away != null
+  ) {
+    const { home: hp, away: ap } = match.score.penalties
+    return hp > ap ? 'home' : 'away'
+  }
+
+  if (fs.home > fs.away) return 'home'
+  if (fs.away > fs.home) return 'away'
+  return 'draw'
+}
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
   const now   = Date.now()

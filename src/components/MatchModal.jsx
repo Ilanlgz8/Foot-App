@@ -11,7 +11,7 @@ import { useStandings }       from '../hooks/useStandings'
 import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
 import { calcLiveProno } from '../utils/calcProno'
 import { updateDangerMeter } from '../utils/dangerMeter'
 import { recordProbaSample } from '../utils/probaCurve'
@@ -1280,6 +1280,47 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
   )
 }
 
+// Évolution du rapport de force sur l'historique H2H disponible, dans l'ordre
+// chronologique (plus ancien à gauche → plus récent à droite). Basée sur
+// matchOutcome() (même règle de départage tab que le reste de l'app :
+// H2HSection, useTeamForm.js) pour ne pas dupliquer cette logique. Perspective
+// fixe = l'équipe qui reçoit aujourd'hui, peu importe qui recevait à l'époque.
+// Même technique (SVG polyline à la main) que ProbaCurve.jsx — pas de lib de
+// graphique pour un seul tracé.
+function H2HTrend({ rows, homeId, homeShort, awayShort }) {
+  const chrono = rows.slice().reverse() // rows = plus récent d'abord → on repasse en ordre chronologique
+  if (chrono.length < 3) return null // pas assez de points pour qu'une tendance ait un sens
+
+  const toValue = (m) => {
+    const outcome = matchOutcome(m)
+    if (outcome === 'draw') return 50
+    const wasHomeToday = m.homeTeam?.id === homeId
+    const homeWonThatMatch = outcome === 'home'
+    return wasHomeToday === homeWonThatMatch ? 100 : 0
+  }
+
+  const width  = 100
+  const height = 32
+  const n = chrono.length
+  const toX = (i) => n === 1 ? width / 2 : (i / (n - 1)) * width
+  const toY = (v) => height - (v / 100) * height
+  const points = chrono.map((m, i) => `${toX(i).toFixed(1)},${toY(toValue(m)).toFixed(1)}`).join(' ')
+
+  return (
+    <div className="h2h__trend">
+      <p className="h2h__trendTitle">Évolution du rapport de force</p>
+      <svg className="h2h__trendSvg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <line x1="0" y1={height / 2} x2={width} y2={height / 2} className="h2h__trendMid" vectorEffect="non-scaling-stroke" />
+        <polyline points={points} className="h2h__trendLine" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="h2h__trendLegend">
+        <span className="h2h__trendLegendItem h2h__trendLegendItem--home">{homeShort}</span>
+        <span className="h2h__trendLegendItem h2h__trendLegendItem--away">{awayShort}</span>
+      </div>
+    </div>
+  )
+}
+
 function H2HSection({ match, compMatches }) {
   const { data: h2hMatches, isLoading } = useH2H(match)
   const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
@@ -1287,10 +1328,13 @@ function H2HSection({ match, compMatches }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
 
-  // Données FD.org (du plus récent au plus vieux)
+  // Données FD.org (du plus récent au plus vieux). Pas de troncature
+  // arbitraire ici : on affiche tout ce que l'API renvoie réellement pour ce
+  // duo d'équipes plutôt que de promettre un nombre fixe — football-data.org
+  // ne documente pas de garantie sur la profondeur de son historique H2H
+  // (parfois 2 confrontations, parfois une dizaine selon les équipes).
   const fdRecent = (h2hMatches ?? [])
     .filter(m => m.status === 'FINISHED')
-    .slice(-8)
     .reverse()
 
   // Fallback : confrontations dans la compétition en cours (si FD.org vide)
@@ -1308,13 +1352,18 @@ function H2HSection({ match, compMatches }) {
   // toute la section plutôt que d'afficher un titre suivi d'un texte "vide".
   if (!isLoading && !rows.length) return null
 
+  const homeShort = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayShort = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+
   return (
     <div className="pm__section">
-      <h3 className="pm__sectionTitle">Derniers résultats entre les deux équipes</h3>
+      <h3 className="pm__sectionTitle">Historique des confrontations</h3>
       {isLoading ? (
         <H2HSkeleton />
       ) : (
-        <div className="h2h__list">
+        <>
+          <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
+          <div className="h2h__list">
           {rows.map((m, i) => {
             const isHomeTeam = m.homeTeam?.id === homeId
             const fsH2H = finalScore(m.score)
@@ -1368,7 +1417,8 @@ function H2HSection({ match, compMatches }) {
               </div>
             )
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   )
@@ -1513,7 +1563,7 @@ export function PreMatchSection({ match, formMap, compMatches, hideStats = false
 
       {/* Pronostic des fans — masqué si déjà affiché ailleurs (ex: MatchPage
           l'affiche en haut de page, au-dessus de "Stats saison") */}
-      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} />}
+      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} kickoffAt={match.utcDate} />}
 
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
       <H2HSection match={match} compMatches={compMatches} />
@@ -1773,6 +1823,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
               locked
               showReactions
+              kickoffAt={match.utcDate}
             />
 
             {/* Onglets match en cours */}

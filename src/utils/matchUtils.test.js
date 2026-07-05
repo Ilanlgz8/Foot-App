@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from './matchUtils'
 import { setEspnData, setKickoffAt } from './matchStateTracker'
 
 const MID = 1
@@ -80,6 +80,37 @@ describe('finalScore', () => {
   it('score absent ou vide : renvoie {home:null, away:null}', () => {
     expect(finalScore(null)).toEqual({ home: null, away: null })
     expect(finalScore({})).toEqual({ home: null, away: null })
+  })
+})
+
+describe('matchOutcome', () => {
+  it('victoire domicile en temps réglementaire', () => {
+    expect(matchOutcome({ score: { fullTime: { home: 2, away: 0 } } })).toBe('home')
+  })
+
+  it('victoire extérieur', () => {
+    expect(matchOutcome({ score: { fullTime: { home: 0, away: 1 } } })).toBe('away')
+  })
+
+  it('match nul (hors tirs au but)', () => {
+    expect(matchOutcome({ score: { fullTime: { home: 1, away: 1 } } })).toBe('draw')
+  })
+
+  it('tirs au but : jamais nul, decide par score.penalties (pas le score 120min à égalité)', () => {
+    expect(matchOutcome({
+      score: {
+        duration: 'PENALTY_SHOOTOUT',
+        fullTime: { home: 4, away: 5 },
+        regularTime: { home: 1, away: 1 },
+        extraTime: { home: 0, away: 0 },
+        penalties: { home: 3, away: 4 },
+      },
+    })).toBe('away')
+  })
+
+  it('match pas terminé (score manquant) : renvoie null', () => {
+    expect(matchOutcome({ score: { fullTime: { home: null, away: null } } })).toBeNull()
+    expect(matchOutcome(null)).toBeNull()
   })
 })
 

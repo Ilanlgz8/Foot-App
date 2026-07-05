@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState }    from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
@@ -401,7 +401,7 @@ export default function LiveMatchPage() {
                 <StatsSubTabs view={statsView} onChange={setStatsView} />
                 {/* Pouls collectif — sous Stats Live/Stats Saison, au-dessus
                     du contenu des stats */}
-                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
+                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions result={matchOutcome(match)} kickoffAt={match.utcDate} />
                 {statsView === 'live' ? (
                   <LiveStatsTab
                     match={match}
