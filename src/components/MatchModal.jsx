@@ -456,26 +456,26 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
 // utils/dangerMeter.js pour la logique de decay/momentum.
 
 
-// function DangerMeter({ matchId, stats, homeShort, awayShort }) {
-//   const result = updateDangerMeter(matchId, stats)
-//   if (!result) return null
-//   const { homePct, awayPct, hasSignal } = result
+function DangerMeter({ matchId, stats, homeShort, awayShort }) {
+  const result = updateDangerMeter(matchId, stats)
+  if (!result) return null
+  const { homePct, awayPct, hasSignal } = result
 
-//   return (
-//     <div className="danger">
-//       <p className="danger__title">Pression du moment</p>
-//       <div className="danger__bar">
-//         <div className="danger__seg danger__seg--home" style={{ '--danger-w': homePct }} />
-//         <div className="danger__seg danger__seg--away" style={{ '--danger-w': awayPct }} />
-//       </div>
-//       <div className="danger__labels">
-//         <span>{homeShort}{hasSignal && homePct >= 65 ? ' 🔥' : ''}</span>
-//         <span>{awayShort}{hasSignal && awayPct >= 65 ? ' 🔥' : ''}</span>
-//       </div>
-//       {!hasSignal && <p className="danger__hint">En attente d'occasions…</p>}
-//     </div>
-//   )
-// }
+  return (
+    <div className="danger">
+      <p className="danger__title">Pression du moment</p>
+      <div className="danger__bar">
+        <div className="danger__seg danger__seg--home" style={{ '--danger-w': homePct }} />
+        <div className="danger__seg danger__seg--away" style={{ '--danger-w': awayPct }} />
+      </div>
+      <div className="danger__labels">
+        <span>{homeShort}{hasSignal && homePct >= 65 ? ' 🔥' : ''}</span>
+        <span>{awayShort}{hasSignal && awayPct >= 65 ? ' 🔥' : ''}</span>
+      </div>
+      {!hasSignal && <p className="danger__hint">En attente d'occasions…</p>}
+    </div>
+  )
+}
 
 // Convertit les stats api-football (statisticsItems) vers le même format
 // normalisé {home:{shots,shotsOnTarget,corners}, away:{...}} que ESPN/FIFA,
