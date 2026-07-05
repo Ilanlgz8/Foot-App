@@ -14,7 +14,7 @@ import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { mergeScore }    from '../utils/matchUtils'
+import { mergeScore, finalScore } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
@@ -42,12 +42,15 @@ function MatchCard({ match }) {
   const navigate = useNavigate()
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
-  // score.fullTime = score après prolongations le cas échéant (football-data.org
-  // inclut les buts de prolong dedans, seuls les tirs au but sont à part dans
-  // score.penalties). Un match décidé aux tab est TOUJOURS à égalité en fullTime
-  // → le vainqueur doit se déterminer via le score des tab, pas via fullTime.
-  const hs   = match.score?.fullTime?.home ?? 0
-  const as_  = match.score?.fullTime?.away ?? 0
+  // finalScore() = score 120min (prolongations incluses, tirs au but exclus).
+  // ⚠️ NE PAS lire match.score.fullTime directement : pour un match décidé aux
+  // tab, FD.org y met regularTime+extraTime+penalties CUMULÉS (bug confirmé en
+  // prod), pas le score 120min — voir finalScore() dans matchUtils.js. Un match
+  // décidé aux tab est TOUJOURS à égalité en score 120min → le vainqueur doit
+  // se déterminer via le score des tab (score.penalties), pas via ce score.
+  const fsRes = finalScore(match.score)
+  const hs   = fsRes.home ?? 0
+  const as_  = fsRes.away ?? 0
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   // Décidé en prolongation SANS tirs au but (score.duration ne vaut
   // 'EXTRA_TIME' que dans ce cas précis — si ça s'est joué aux tab, duration

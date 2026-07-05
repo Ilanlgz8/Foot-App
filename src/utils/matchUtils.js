@@ -99,6 +99,38 @@ export function mergeScore(a, b) {
   return Math.max(a, b)
 }
 
+/**
+ * Score "vrai" du match (120 minutes, tirs au but EXCLUS) — à utiliser à la
+ * place de match.score.fullTime dès qu'on affiche/agrège le score final d'un
+ * match.
+ *
+ * ⚠️ Bug FD.org découvert en production (constat utilisateur, confirmé sur
+ * de vrais matchs de la CM 2026) : pour un match décidé aux tirs au but,
+ * score.fullTime n'est PAS le score après prolongations comme supposé partout
+ * dans le code — c'est en réalité regularTime + extraTime + penalties,
+ * CUMULÉS. Exemple réel vérifié (8e de finale) :
+ *   fullTime: {home:4, away:5}, regularTime: {home:1, away:1},
+ *   extraTime: {home:0, away:0}, penalties: {home:3, away:4}
+ *   → 1+0+3=4, 1+0+4=5 : fullTime inclut bien les tab, le vrai score 120min
+ *   est 1-1 (regularTime + extraTime), pas 4-5.
+ * FD.org ne fournit regularTime/extraTime QUE quand le match est allé
+ * au-delà du temps réglementaire (duration !== 'REGULAR') — sinon on retombe
+ * sur fullTime, qui est déjà correct dans ce cas (aucun changement de
+ * comportement pour l'immense majorité des matchs, y compris ceux décidés en
+ * prolongations SANS tirs au but : fullTime y est déjà correctement égal à
+ * regularTime + extraTime).
+ */
+export function finalScore(score) {
+  if (!score) return { home: null, away: null }
+  if (score.regularTime?.home != null && score.regularTime?.away != null) {
+    return {
+      home: score.regularTime.home + (score.extraTime?.home ?? 0),
+      away: score.regularTime.away + (score.extraTime?.away ?? 0),
+    }
+  }
+  return { home: score.fullTime?.home ?? null, away: score.fullTime?.away ?? null }
+}
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
   const now   = Date.now()

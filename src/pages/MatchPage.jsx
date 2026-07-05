@@ -10,6 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
+import { finalScore } from '../utils/matchUtils'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { LivePulse }               from '../components/LivePulse'
 import { ProbaCurve }              from '../components/ProbaCurve'
@@ -83,8 +84,9 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const isFinished = match.status === 'FINISHED'
-  const hs         = match.score?.fullTime?.home ?? match.score?.halfTime?.home
-  const as_        = match.score?.fullTime?.away ?? match.score?.halfTime?.away
+  const fs         = finalScore(match.score)
+  const hs         = fs.home ?? match.score?.halfTime?.home
+  const as_        = fs.away ?? match.score?.halfTime?.away
   // Tirs au but / prolongation — même logique que Resultat.jsx et
   // accueil/MatchCard.jsx (mutuellement exclusifs : un match aux tab a
   // duration='PENALTY_SHOOTOUT', pas 'EXTRA_TIME'). Manquait ici : cette page
@@ -302,8 +304,7 @@ function MpMatchStats({ match }) {
 
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-  const hs       = match.score?.fullTime?.home
-  const as_      = match.score?.fullTime?.away
+  const { home: hs, away: as_ } = finalScore(match.score)
   const totalGoals = (hs ?? 0) + (as_ ?? 0)
 
   const isLoading = !rows.length && ((isWC && fifaLoading) || espnLoading || aflLoading)
@@ -355,14 +356,22 @@ function calcTeamStats(teamId, compMatches) {
   let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
   matches.forEach(m => {
     const myHome = m.homeTeam?.id === teamId
-    const f = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
-    const a = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
+    const fs = finalScore(m.score)
+    const f = myHome ? fs.home : fs.away
+    const a = myHome ? fs.away : fs.home
     if (f == null || a == null) return
     gf += f; ga += a
     if (a === 0) cs++
     if (f > 0 && a > 0) btts++
     if (f + a >= 3) over25++
-    if (f > a) wins++
+    // Aux tirs au but, le score 120min (f/a) est TOUJOURS à égalité : le vrai
+    // résultat vient de score.penalties (même convention que FormDiamonds).
+    if (m.score?.duration === 'PENALTY_SHOOTOUT' &&
+        m.score?.penalties?.home != null && m.score?.penalties?.away != null) {
+      const myPens  = myHome ? m.score.penalties.home : m.score.penalties.away
+      const oppPens = myHome ? m.score.penalties.away : m.score.penalties.home
+      if (myPens > oppPens) wins++; else losses++
+    } else if (f > a) wins++
     else if (f === a) draws++
     else losses++
   })

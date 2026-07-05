@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, mergeScore } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -136,24 +136,28 @@ export function MatchCard({ match, noWinnerLoser = false, tracked = false, onTra
   // Score : fusion ESPN + football-data.org PENDANT le direct seulement (ESPN
   // est alors la source la plus à jour, <10s de délai vs 1-5min pour FD.org).
   // Une fois le match TERMINÉ, on fait confiance au score final de football-
-  // data.org (match.score.fullTime) et on arrête de merger avec ESPN : un
+  // data.org (finalScore(match.score)) et on arrête de merger avec ESPN : un
   // score ESPN live périmé/faux resté en localStorage (ex: gonflé par les
   // tirs au but, avant notre fix sur la détection tab) pouvait sinon rester
   // affiché indéfiniment via mergeScore (qui garde le max des deux) — c'est
   // ce qui causait l'affichage "4-4" au lieu de "2-2 (4-2 tab)" sur un match
   // aux tirs au but.
+  //
+  // ⚠️ NE PAS lire match.score.fullTime directement (bug FD.org confirmé en
+  // prod : pour un match aux tab, fullTime = regularTime+extraTime+penalties
+  // CUMULÉS, pas le score 120min) — voir finalScore() dans matchUtils.js.
+  const fsCard = finalScore(match.score)
   const hs  = isFinished
-    ? (match.score?.fullTime?.home ?? match.score?.halfTime?.home ?? 0)
-    : mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
+    ? (fsCard.home ?? match.score?.halfTime?.home ?? 0)
+    : mergeScore(espnScore?.home, fsCard.home ?? match.score?.halfTime?.home)
   const as_ = isFinished
-    ? (match.score?.fullTime?.away ?? match.score?.halfTime?.away ?? 0)
-    : mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+    ? (fsCard.away ?? match.score?.halfTime?.away ?? 0)
+    : mergeScore(espnScore?.away, fsCard.away ?? match.score?.halfTime?.away)
 
-  // Tirs au but : score.fullTime est TOUJOURS à égalité dans ce cas (football-
-  // data.org y met le score après prolongations, pas après les tab) — le vrai
-  // vainqueur et le score des tab viennent de score.penalties. Même logique
-  // que Resultat.jsx/Match.jsx/MatchModal.jsx, pour un affichage identique
-  // partout dans l'app.
+  // Tirs au but : le score 120min (finalScore) est TOUJOURS à égalité dans ce
+  // cas — le vrai vainqueur et le score des tab viennent de score.penalties.
+  // Même logique que Resultat.jsx/Match.jsx/MatchModal.jsx, pour un affichage
+  // identique partout dans l'app.
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   const hPens = match.score?.penalties?.home ?? null
   const aPens = match.score?.penalties?.away ?? null

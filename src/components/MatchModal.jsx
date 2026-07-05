@@ -11,7 +11,7 @@ import { useStandings }       from '../hooks/useStandings'
 import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
 import { calcLiveProno } from '../utils/calcProno'
 import { updateDangerMeter } from '../utils/dangerMeter'
 import { recordProbaSample } from '../utils/probaCurve'
@@ -523,14 +523,22 @@ function calcSeasonTeamStats(teamId, compMatches) {
   let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
   matches.forEach(m => {
     const myHome = m.homeTeam?.id === teamId
-    const f = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
-    const a = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
+    const fs = finalScore(m.score)
+    const f = myHome ? fs.home : fs.away
+    const a = myHome ? fs.away : fs.home
     if (f == null || a == null) return
     gf += f; ga += a
     if (a === 0) cs++
     if (f > 0 && a > 0) btts++
     if (f + a >= 3) over25++
-    if (f > a) wins++
+    // Aux tirs au but, le score 120min (f/a) est TOUJOURS à égalité : le vrai
+    // résultat vient de score.penalties (même convention que FormDiamonds).
+    if (m.score?.duration === 'PENALTY_SHOOTOUT' &&
+        m.score?.penalties?.home != null && m.score?.penalties?.away != null) {
+      const myPens  = myHome ? m.score.penalties.home : m.score.penalties.away
+      const oppPens = myHome ? m.score.penalties.away : m.score.penalties.home
+      if (myPens > oppPens) wins++; else losses++
+    } else if (f > a) wins++
     else if (f === a) draws++
     else losses++
   })
@@ -881,7 +889,8 @@ export function ClassementTab({ match, compId }) {
 // Priorité ESPN (persisté en localStorage au FT) → fallback FD.org
 function FinishedDetails({ match, espnData, detail, loading }) {
   const homeId     = match.homeTeam?.id
-  const totalGoals = (match.score?.fullTime?.home ?? 0) + (match.score?.fullTime?.away ?? 0)
+  const fsFinished = finalScore(match.score)
+  const totalGoals = (fsFinished.home ?? 0) + (fsFinished.away ?? 0)
 
   const fdGoals     = detail?.goals         ?? []
   const fdBookings  = detail?.bookings      ?? []
@@ -967,12 +976,13 @@ export function TeamFormTable({ teamId, compMatches }) {
     <div className="pm__formTable">
       {matches.map((m, i) => {
         const myHome  = m.homeTeam?.id === teamId
-        const hs      = m.score?.fullTime?.home ?? '-'
-        const as_     = m.score?.fullTime?.away ?? '-'
+        const fsRow   = finalScore(m.score)
+        const hs      = fsRow.home ?? '-'
+        const as_     = fsRow.away ?? '-'
         const myGoals  = myHome ? hs : as_
         const oppGoals = myHome ? as_ : hs
-        // fullTime inclut déjà les buts de prolongations — un match décidé aux
-        // tirs au but y est TOUJOURS à égalité, le vrai W/D/L vient de penalties.
+        // Score 120min (finalScore) : un match décidé aux tirs au but y est
+        // TOUJOURS à égalité, le vrai W/D/L vient de penalties.
         const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
         const hp = m.score?.penalties?.home ?? null
         const ap = m.score?.penalties?.away ?? null
@@ -1021,16 +1031,17 @@ function calcTeamStats(teamId, compMatches) {
   const results = []
   matches.forEach(m => {
     const myHome = m.homeTeam?.id === teamId
-    const f = myHome ? m.score?.fullTime?.home : m.score?.fullTime?.away
-    const a = myHome ? m.score?.fullTime?.away : m.score?.fullTime?.home
+    const fs = finalScore(m.score)
+    const f = myHome ? fs.home : fs.away
+    const a = myHome ? fs.away : fs.home
     if (f == null || a == null) return
     gf += f; ga += a
     if (a === 0) cs++
     if (f > 0 && a > 0) btts++
     if (f + a >= 3) over25++
-    // fullTime inclut déjà les buts de prolongations — un match décidé aux tirs
-    // au but y est TOUJOURS à égalité, le vrai W/D/L vient de score.penalties
-    // (sans ça, une victoire aux tab comptait comme un nul dans les stats/série).
+    // Score 120min (finalScore) : un match décidé aux tirs au but y est
+    // TOUJOURS à égalité, le vrai W/D/L vient de score.penalties (sans ça, une
+    // victoire aux tab comptait comme un nul dans les stats/série).
     let outcome
     if (m.score?.duration === 'PENALTY_SHOOTOUT') {
       const hp = m.score?.penalties?.home ?? null
@@ -1170,12 +1181,13 @@ function H2HSection({ match, compMatches }) {
         <div className="pm__h2hList">
           {rows.map((m, i) => {
             const isHomeTeam = m.homeTeam?.id === homeId
-            const hs = m.score?.fullTime?.home ?? '-'
-            const as_ = m.score?.fullTime?.away ?? '-'
+            const fsH2H = finalScore(m.score)
+            const hs = fsH2H.home ?? '-'
+            const as_ = fsH2H.away ?? '-'
             const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
             const myGoals  = isHomeTeam ? hs : as_
             const oppGoals = isHomeTeam ? as_ : hs
-            // fullTime est à égalité par définition si le match est allé aux tab.
+            // Score 120min (finalScore) : à égalité par définition si le match est allé aux tab.
             const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
             const hp = m.score?.penalties?.home ?? null
             const ap = m.score?.penalties?.away ?? null
@@ -1303,8 +1315,7 @@ export function MatchStatsSection({ match }) {
     (isWC && fifaLoading) || espnLoading || aflLoading
   )
 
-  const hs  = match.score?.fullTime?.home
-  const as_ = match.score?.fullTime?.away
+  const { home: hs, away: as_ } = finalScore(match.score)
 
   return (
     <div className="pm__section">
@@ -1467,21 +1478,21 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const hForm = formMap?.[match.homeTeam?.id]
   const aForm = formMap?.[match.awayTeam?.id]
   const liveMinute = isLive ? calcMinute(match) : null
+  const fsPanel = finalScore(match.score)
   const prono = isLive && (hForm || aForm)
     ? calcLiveProno(
         hForm, aForm,
-        mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
-        mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
+        mergeScore(espnScore?.home, fsPanel.home ?? match.score?.halfTime?.home),
+        mergeScore(espnScore?.away, fsPanel.away ?? match.score?.halfTime?.away),
         liveMinute
       )
     : null
 
   if (isLive && prono) recordProbaSample(match.id, liveMinute, prono)
 
-  const hs  = match.score?.fullTime?.home
-  const as_ = match.score?.fullTime?.away
-  // fullTime inclut déjà les buts de prolongations — un match décidé aux tirs
-  // au but y est TOUJOURS à égalité, le vrai vainqueur vient de score.penalties.
+  const { home: hs, away: as_ } = fsPanel
+  // Score 120min (finalScore) : un match décidé aux tirs au but y est
+  // TOUJOURS à égalité, le vrai vainqueur vient de score.penalties.
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   const hPens = match.score?.penalties?.home ?? null
   const aPens = match.score?.penalties?.away ?? null
@@ -1542,8 +1553,9 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               </>
             ) : isLive ? (() => {
               const matchSt = getMatchState(match.id)
-              const liveHs  = mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
-              const liveAs  = mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+              const fsLiveBadge = finalScore(match.score)
+              const liveHs  = mergeScore(espnScore?.home, fsLiveBadge.home ?? match.score?.halfTime?.home)
+              const liveAs  = mergeScore(espnScore?.away, fsLiveBadge.away ?? match.score?.halfTime?.away)
               const minute  = calcMinute(match)
               const period  = getMatchPeriod(match)
               // Score des tab en direct — ESPN uniquement (champ confirmé fiable,

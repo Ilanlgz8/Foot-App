@@ -9,8 +9,10 @@ import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
+import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
-import { TendancesView } from './TendancesView'
+// TendancesView mis de côté (voir commentaire plus bas) — import retiré,
+// fichier conservé pour être retravaillé plus tard.
 
 
 function Classement() {
@@ -111,10 +113,8 @@ function Classement() {
   // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
   const { matches: wcSched, loading: wcSchedLoading } = useMatches('WC', 'SCHEDULED')
   const { matches: wcFin,   loading: wcFinLoading   } = useMatches('WC', 'FINISHED')
-  // Onglet Tendances — matchs terminés de la compétition SÉLECTIONNÉE (pas
-  // forcément WC, contrairement à wcFin ci-dessus qui sert à l'auto-ouverture
-  // de groupe). Même hook/endpoint que Résultats, aucun appel réseau dédié.
-  const { matches: trendsMatches, loading: trendsLoading } = useMatches(selectedComp, 'FINISHED')
+  // Fetch dédié à l'onglet Tendances retiré avec l'onglet lui-même (mis de
+  // côté, voir TendancesView.jsx) — évite un appel réseau pour rien.
 
   const selectedCompetition = competitions.find((c) => c.id === selectedComp)
 
@@ -211,11 +211,12 @@ function Classement() {
     function MatchRow({ m, showScore }) {
       const hn  = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
       const an  = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
-      const sh  = m.score?.fullTime?.home ?? m.score?.halfTime?.home
-      const sa  = m.score?.fullTime?.away ?? m.score?.halfTime?.away
+      const fsGroupRow = finalScore(m.score)
+      const sh  = fsGroupRow.home ?? m.score?.halfTime?.home
+      const sa  = fsGroupRow.away ?? m.score?.halfTime?.away
       const live = ['IN_PLAY','PAUSED'].includes(m.status)
       const isFinished = m.status === 'FINISHED'
-      // fullTime est à égalité par définition si le match est allé aux tab.
+      // Score 120min (finalScore) : à égalité par définition si le match est allé aux tab.
       const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
       const pH = m.score?.penalties?.home ?? null
       const pA = m.score?.penalties?.away ?? null
@@ -481,32 +482,26 @@ function Classement() {
             >
               Buteurs
             </button>
-            <button
-              className={`classement__viewBtn ${view === 'tendances' ? 'classement__viewBtn--active' : ''}`}
-              onClick={() => setView('tendances')}
-            >
-              Tendances
-            </button>
+            {/* Onglet "Tendances" mis de côté pour être retravaillé plus tard —
+                voir TendancesView.jsx / tendances.css (conservés, pas supprimés). */}
           </div>
         </div>
 
-        {/* Recherche équipe/buteur — filtre côté client, pas de sens sur Tendances (vue agrégée) */}
-        {view !== 'tendances' && (
-          <div className="classement__searchWrap">
-            <input
-              type="text"
-              className="classement__searchInput"
-              placeholder={
-                view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'
-              }
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            {search && (
-              <button className="classement__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
-            )}
-          </div>
-        )}
+        {/* Recherche équipe/buteur — filtre côté client */}
+        <div className="classement__searchWrap">
+          <input
+            type="text"
+            className="classement__searchInput"
+            placeholder={
+              view === 'buteurs' ? 'Rechercher un buteur ou une équipe…' : 'Rechercher une équipe…'
+            }
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="classement__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
+          )}
+        </div>
 
         {/* Légende zones */}
         {view === 'classement' && (
@@ -686,14 +681,7 @@ function Classement() {
           <p className="classement__state">Aucune donnée disponible.</p>
         )}
 
-        {/* ── Vue Tendances ── */}
-        {view === 'tendances' && (
-          <TendancesView
-            matches={trendsMatches}
-            loading={trendsLoading}
-            isCountry={selectedComp === 'WC'}
-          />
-        )}
+        {/* Vue Tendances mise de côté — voir TendancesView.jsx (conservé, pas branché) */}
 
       </div>
         </main>

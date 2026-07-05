@@ -1,6 +1,6 @@
 import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, mergeScore }     from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -37,8 +37,9 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   )
   const isUpcoming = !isFinished && !isLive
 
-  const homeScore = mergeScore(espnScore?.home, match.score?.fullTime?.home)
-  const awayScore = mergeScore(espnScore?.away, match.score?.fullTime?.away)
+  const fsPoster  = finalScore(match.score)
+  const homeScore = mergeScore(espnScore?.home, fsPoster.home)
+  const awayScore = mergeScore(espnScore?.away, fsPoster.away)
   const minute    = isLive ? calcMinute(match) : null
 
   const homeName  = match.homeTeam?.name ?? ''

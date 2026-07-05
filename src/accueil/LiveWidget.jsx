@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
 import { MatchCard } from './MatchCard'
 
 // ── Widget live — version allégée ───────────────────────────────────────────
@@ -20,8 +20,9 @@ function LiveChip({ match, espn, onMatchClick }) {
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
 
-  const hs = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
-  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+  const fsChip = finalScore(match.score)
+  const hs = mergeScore(espn?.home, fsChip.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, fsChip.away ?? match.score?.halfTime?.away)
 
   return (
     <button

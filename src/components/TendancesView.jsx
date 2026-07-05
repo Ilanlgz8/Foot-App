@@ -27,12 +27,17 @@
 // résolution ESPN fragile) — pas fabriqué, donc pas affiché.
 import { useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
+import { finalScore } from '../utils/matchUtils'
 import '../tendances.css'
 
+// ⚠️ Partout ci-dessous : NE PAS lire match.score.fullTime directement — pour
+// un match décidé aux tirs au but, FD.org y met regularTime+extraTime+
+// penalties CUMULÉS (bug confirmé en prod), pas le score 120min. On passe
+// systématiquement par finalScore() (matchUtils.js), qui isole le vrai score
+// 120min (tab exclus).
 function sumGoals(matches) {
   return matches.reduce((acc, m) => {
-    const h = m.score?.fullTime?.home
-    const a = m.score?.fullTime?.away
+    const { home: h, away: a } = finalScore(m.score)
     if (h == null || a == null) return acc
     return acc + h + a
   }, 0)
@@ -44,8 +49,7 @@ function sumGoals(matches) {
 function aggregateTeamGoals(matches) {
   const map = new Map()
   for (const m of matches) {
-    const hs = m.score?.fullTime?.home
-    const as = m.score?.fullTime?.away
+    const { home: hs, away: as } = finalScore(m.score)
     const home = m.homeTeam
     const away = m.awayTeam
     if (hs == null || as == null || !home?.id || !away?.id) continue
@@ -63,17 +67,16 @@ function aggregateTeamGoals(matches) {
 }
 
 // Répartition 1ère mi-temps / 2e mi-temps (+ prolongations éventuelles) —
-// calculée à partir de score.halfTime et score.fullTime, deux champs déjà
-// fournis par football-data.org pour chaque match terminé (aucun appel en
-// plus, aucune dépendance ESPN). Pour un match allé en prolongations,
-// "fullTime" inclut les buts des prolongations : le libellé du 2e bloc le
-// précise pour rester honnête sur ce qui est compté.
+// calculée à partir de score.halfTime et finalScore(), déjà fournis par
+// football-data.org pour chaque match terminé (aucun appel en plus, aucune
+// dépendance ESPN). Pour un match allé en prolongations, le 2e bloc inclut
+// les buts des prolongations : le libellé le précise pour rester honnête.
 function halfSplit(matches) {
   let firstHalf = 0, secondHalfPlus = 0
   for (const m of matches) {
     const ht = m.score?.halfTime
-    const ft = m.score?.fullTime
-    if (ht?.home == null || ht?.away == null || ft?.home == null || ft?.away == null) continue
+    const ft = finalScore(m.score)
+    if (ht?.home == null || ht?.away == null || ft.home == null || ft.away == null) continue
     firstHalf += ht.home + ht.away
     secondHalfPlus += Math.max(0, (ft.home - ht.home) + (ft.away - ht.away))
   }
@@ -84,8 +87,8 @@ function halfSplit(matches) {
 function homeAwaySplit(matches) {
   let home = 0, away = 0
   for (const m of matches) {
-    const ft = m.score?.fullTime
-    if (ft?.home == null || ft?.away == null) continue
+    const ft = finalScore(m.score)
+    if (ft.home == null || ft.away == null) continue
     home += ft.home
     away += ft.away
   }
@@ -95,8 +98,9 @@ function homeAwaySplit(matches) {
 // Les matchs les plus prolifiques (le plus de buts marqués au total).
 function topScoringMatches(matches, n = 3) {
   return matches
-    .filter(m => m.score?.fullTime?.home != null && m.score?.fullTime?.away != null)
-    .map(m => ({ match: m, total: m.score.fullTime.home + m.score.fullTime.away }))
+    .map(m => ({ match: m, fs: finalScore(m.score) }))
+    .filter(({ fs }) => fs.home != null && fs.away != null)
+    .map(({ match, fs }) => ({ match, fs, total: fs.home + fs.away }))
     .sort((a, b) => b.total - a.total || new Date(b.match.utcDate) - new Date(a.match.utcDate))
     .slice(0, n)
 }
@@ -144,7 +148,10 @@ export function TendancesView({ matches, loading, isCountry }) {
 
   const totalGoals = useMemo(() => sumGoals(finished), [finished])
   const playedCount = useMemo(
-    () => finished.filter(m => m.score?.fullTime?.home != null && m.score?.fullTime?.away != null).length,
+    () => finished.filter(m => {
+      const fs = finalScore(m.score)
+      return fs.home != null && fs.away != null
+    }).length,
     [finished]
   )
   const avgGoals = playedCount > 0 ? totalGoals / playedCount : 0
@@ -215,11 +222,11 @@ export function TendancesView({ matches, loading, isCountry }) {
         <div className="trends__panel">
           <p className="trends__panelTitle">Matchs les plus prolifiques</p>
           <div className="trends__rankList">
-            {topMatches.map(({ match, total }, i) => (
+            {topMatches.map(({ match, fs, total }, i) => (
               <div key={match.id} className="trends__rankRow">
                 <span className="trends__rankPos">{i + 1}</span>
                 <span className="trends__rankName">
-                  {translateTeam(match.homeTeam?.shortName || match.homeTeam?.name)} {match.score.fullTime.home}-{match.score.fullTime.away} {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name)}
+                  {translateTeam(match.homeTeam?.shortName || match.homeTeam?.name)} {fs.home}-{fs.away} {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name)}
                 </span>
                 <span className="trends__rankValue">{total}</span>
               </div>

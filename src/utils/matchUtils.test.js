@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore } from './matchUtils'
 import { setEspnData, setKickoffAt } from './matchStateTracker'
 
 const MID = 1
@@ -39,6 +39,47 @@ describe('mergeScore', () => {
   })
   it('renvoie null si les deux sont inconnues', () => {
     expect(mergeScore(null, null)).toBeNull()
+  })
+})
+
+describe('finalScore', () => {
+  it('match REGULAR : renvoie fullTime tel quel', () => {
+    expect(finalScore({ fullTime: { home: 2, away: 0 } })).toEqual({ home: 2, away: 0 })
+  })
+
+  it('match EXTRA_TIME (prolongations, sans tab) : fullTime déjà correct', () => {
+    // Donnée réelle observée : fullTime = regularTime + extraTime, cohérent.
+    expect(finalScore({
+      fullTime: { home: 3, away: 2 },
+      regularTime: { home: 2, away: 2 },
+      extraTime: { home: 1, away: 0 },
+    })).toEqual({ home: 3, away: 2 })
+  })
+
+  it('match PENALTY_SHOOTOUT : ignore fullTime (qui inclut les tab) et renvoie le score 120min', () => {
+    // Donnée réelle observée en prod (CM 2026, 8e de finale) : fullTime={4,5}
+    // inclut à tort les tirs au but (penalties={3,4}) en plus du score réel
+    // 120min (regularTime+extraTime={1,1}). Le bug corrigé ici.
+    expect(finalScore({
+      fullTime: { home: 4, away: 5 },
+      regularTime: { home: 1, away: 1 },
+      extraTime: { home: 0, away: 0 },
+      penalties: { home: 3, away: 4 },
+    })).toEqual({ home: 1, away: 1 })
+  })
+
+  it('match PENALTY_SHOOTOUT après prolongations non-nulles', () => {
+    expect(finalScore({
+      fullTime: { home: 3, away: 4 },
+      regularTime: { home: 1, away: 1 },
+      extraTime: { home: 1, away: 1 },
+      penalties: { home: 1, away: 2 },
+    })).toEqual({ home: 2, away: 2 })
+  })
+
+  it('score absent ou vide : renvoie {home:null, away:null}', () => {
+    expect(finalScore(null)).toEqual({ home: null, away: null })
+    expect(finalScore({})).toEqual({ home: null, away: null })
   })
 })
 

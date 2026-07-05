@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState }    from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
@@ -103,8 +103,9 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
     ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
 
-  const hs  = mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home)
-  const as_ = mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away)
+  const fsLive = finalScore(match.score)
+  const hs  = mergeScore(espn?.home, fsLive.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, fsLive.away ?? match.score?.halfTime?.away)
 
   const homeName = shortenName(translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?'))
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
@@ -271,11 +272,12 @@ export default function LiveMatchPage() {
   // Cette page n'existe que pour des matchs en direct (liveMatches) → toujours
   // la version live du prono, réévaluée selon le score réel + le temps restant.
   const liveMinute = match ? calcMinute(match) : null
+  const fsProno = match ? finalScore(match.score) : { home: null, away: null }
   const prono = match && (hForm || aForm)
     ? calcLiveProno(
         hForm, aForm,
-        mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
-        mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
+        mergeScore(espn?.home, fsProno.home ?? match.score?.halfTime?.home),
+        mergeScore(espn?.away, fsProno.away ?? match.score?.halfTime?.away),
         liveMinute
       )
     : null
