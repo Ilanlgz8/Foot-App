@@ -1299,19 +1299,20 @@
    avec largeurs min/flex évite complètement la classe de bug "colonnes qui
    ne correspondent plus au nombre d'enfants". Pas de badge résultat : le
    liseré latéral coloré (vert/gris/rouge) suffit à lire le résultat d'un
-   coup d'œil, sans doublon visuel. La carte est centrée et plafonnée en
-   largeur pour rester lisible même sur grand écran. */
+   coup d'œil, sans doublon visuel. La carte prend toute la largeur
+   disponible (comme les autres sections du modal) — un max-width la
+   rétrécissait et coupait/serrait les noms de pays sur les côtés. */
 .h2h__list {
   display: flex;
   flex-direction: column;
-  max-width: 30rem;
-  margin: 0 auto;
+  width: 100%;
   background: linear-gradient(165deg, rgba(var(--white-rgb),0.035), rgba(var(--white-rgb),0.01));
   border: 1px solid rgba(var(--white-rgb),0.07);
   border-radius: 1.1rem;
   padding: 0.2rem 0.9rem;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 .h2h__list::before {
   content: '';
