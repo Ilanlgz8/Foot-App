@@ -14,6 +14,7 @@ import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
 import { calcLiveProno } from '../utils/calcProno'
+import { recordProbaSample } from '../utils/probaCurve'
 import { LivePulse }     from '../components/LivePulse'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
@@ -269,14 +270,18 @@ export default function LiveMatchPage() {
   const aForm = formMap?.[match?.awayTeam?.id]
   // Cette page n'existe que pour des matchs en direct (liveMatches) → toujours
   // la version live du prono, réévaluée selon le score réel + le temps restant.
+  const liveMinute = match ? calcMinute(match) : null
   const prono = match && (hForm || aForm)
     ? calcLiveProno(
         hForm, aForm,
         mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
         mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
-        calcMinute(match)
+        liveMinute
       )
     : null
+
+  // Échantillonnage pour la courbe de bascule post-match (voir <ProbaCurve>).
+  if (match && prono) recordProbaSample(match.id, liveMinute, prono)
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 

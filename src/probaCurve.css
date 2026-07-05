@@ -1,0 +1,65 @@
+/* ══════════════════════════════════════════════════════════════
+   ProbaCurve — courbe de bascule post-match
+   ══════════════════════════════════════════════════════════════ */
+.curve {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.curve__title {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(var(--white-rgb), 0.4);
+  margin: 0 0 0.6rem;
+}
+
+.curve__svg {
+  width: 100%;
+  height: 90px;
+  display: block;
+  overflow: visible;
+}
+
+.curve__midline {
+  stroke: rgba(var(--white-rgb), 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.curve__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.curve__line--home { stroke: #3b82f6; }
+.curve__line--away { stroke: var(--red); }
+
+.curve__legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  margin-top: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb), 0.55);
+}
+.curve__legendItem { position: relative; padding-left: 1rem; }
+.curve__legendItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.65rem;
+  height: 2px;
+  border-radius: 1px;
+}
+.curve__legendItem--home::before { background: #3b82f6; }
+.curve__legendItem--away::before { background: var(--red); }

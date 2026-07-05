@@ -13,6 +13,8 @@ import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { calcProno, calcLiveProno } from '../utils/calcProno'
+import { updateDangerMeter } from '../utils/dangerMeter'
+import { recordProbaSample } from '../utils/probaCurve'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -307,6 +309,47 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
   })
 }
 
+// ── Jauge de dangerosité en direct ("pression du moment") ──────────────────
+// Complémentaire à PronoSection (qui répond à "qui va gagner au final") :
+// celle-ci répond à "qui pousse LÀ maintenant", à partir des mêmes stats
+// déjà affichées (tirs/tirs cadrés/corners) — voir utils/dangerMeter.js
+// pour la logique de decay/momentum.
+function DangerMeter({ matchId, stats, homeShort, awayShort }) {
+  const result = updateDangerMeter(matchId, stats)
+  if (!result) return null
+  const { homePct, awayPct, hasSignal } = result
+
+  return (
+    <div className="danger">
+      <p className="danger__title">Pression du moment</p>
+      <div className="danger__bar">
+        <div className="danger__seg danger__seg--home" style={{ '--danger-w': homePct }} />
+        <div className="danger__seg danger__seg--away" style={{ '--danger-w': awayPct }} />
+      </div>
+      <div className="danger__labels">
+        <span>{homeShort}{hasSignal && homePct >= 65 ? ' 🔥' : ''}</span>
+        <span>{awayShort}{hasSignal && awayPct >= 65 ? ' 🔥' : ''}</span>
+      </div>
+      {!hasSignal && <p className="danger__hint">En attente d'occasions…</p>}
+    </div>
+  )
+}
+
+// Convertit les stats api-football (statisticsItems) vers le même format
+// normalisé {home:{shots,shotsOnTarget,corners}, away:{...}} que ESPN/FIFA,
+// pour que DangerMeter fonctionne aussi sur ce fallback.
+function extractAflDangerStats(statsData) {
+  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
+  const items = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
+  const find = (name) => items.find(i => i.name === name)
+  const shots = find('Total shots'), onTarget = find('Shots on target'), corners = find('Corner kicks')
+  if (!shots && !onTarget && !corners) return null
+  return {
+    home: { shots: shots?.home ?? null, shotsOnTarget: onTarget?.home ?? null, corners: corners?.home ?? null },
+    away: { shots: shots?.away ?? null, shotsOnTarget: onTarget?.away ?? null, corners: corners?.away ?? null },
+  }
+}
+
 // ── Onglet Stats Live ─────────────────────────────────────────────────────────
 // Priorité : ESPN (déjà fetché par LiveProvider, 0 quota) → api-football fallback
 const STAT_KEYS = [
@@ -359,10 +402,27 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
-  // Barre de prono affichée en haut du tab stats
+  // Stats normalisées {home:{shots,shotsOnTarget,corners}, away:{...}} —
+  // quelle que soit la source active (ESPN scoreboard/FIFA/ESPN summary/
+  // api-football) — pour alimenter DangerMeter avec les mêmes chiffres déjà
+  // affichés dans ESPNStats, sans dupliquer les appels de fetch.
+  const activeStats = hasEspn ? espnScore.stats
+    : (isFifaMatch && fifaStats) ? fifaStats
+    : summaryStats ? summaryStats
+    : extractAflDangerStats(statsData)
+
+  // Barre de prono + jauge de dangerosité, affichées en haut du tab stats
   const pronoBar = prono ? (
     <div style={{ marginBottom: '0.25rem' }}>
       <PronoSection prono={prono} homeShort={homeShort || homeName} awayShort={awayShort || awayName} />
+      {isLive && (
+        <DangerMeter
+          matchId={match.id}
+          stats={activeStats}
+          homeShort={homeShort || homeName}
+          awayShort={awayShort || awayName}
+        />
+      )}
     </div>
   ) : null
 
@@ -1457,16 +1517,22 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   // pronostic pré-match figé pendant tout le match.
   const hForm = formMap?.[match.homeTeam?.id]
   const aForm = formMap?.[match.awayTeam?.id]
+  const liveMinute = isLive ? calcMinute(match) : null
   const prono = !isFinished && (hForm || aForm)
     ? (isLive
         ? calcLiveProno(
             hForm, aForm,
             mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
             mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
-            calcMinute(match)
+            liveMinute
           )
         : calcProno(hForm, aForm))
     : null
+
+  // Échantillonnage pour la courbe de bascule post-match (voir <ProbaCurve>,
+  // affichée sur MatchPage une fois le match terminé) — un point par minute,
+  // dédupliqué en amont dans probaCurve.js.
+  if (isLive && prono) recordProbaSample(match.id, liveMinute, prono)
 
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away

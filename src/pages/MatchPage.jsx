@@ -13,6 +13,7 @@ import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient }        from '../data/teamPhotos'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { LivePulse }               from '../components/LivePulse'
+import { ProbaCurve }              from '../components/ProbaCurve'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -546,6 +547,7 @@ export default function MatchPage() {
               isFinished
                 ? <>
                     <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
+                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                     <StatsSubTabs view={statsView} onChange={setStatsView} />
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
