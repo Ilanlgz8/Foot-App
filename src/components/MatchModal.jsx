@@ -12,7 +12,7 @@ import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
-import { calcProno } from '../utils/calcProno'
+import { calcProno, calcLiveProno } from '../utils/calcProno'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -1452,10 +1452,21 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
 
   if (!match) return null
 
-  // Prono basé sur la forme FD.org
+  // Prono basé sur la forme FD.org — en direct, on le réévalue selon le
+  // score réel et le temps restant (calcLiveProno) plutôt que de garder le
+  // pronostic pré-match figé pendant tout le match.
   const hForm = formMap?.[match.homeTeam?.id]
   const aForm = formMap?.[match.awayTeam?.id]
-  const prono = !isFinished && (hForm || aForm) ? calcProno(hForm, aForm) : null
+  const prono = !isFinished && (hForm || aForm)
+    ? (isLive
+        ? calcLiveProno(
+            hForm, aForm,
+            mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
+            mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
+            calcMinute(match)
+          )
+        : calcProno(hForm, aForm))
+    : null
 
   const hs  = match.score?.fullTime?.home
   const as_ = match.score?.fullTime?.away

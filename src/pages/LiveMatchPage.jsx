@@ -13,7 +13,7 @@ import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
-import { calcProno }        from '../utils/calcProno'
+import { calcLiveProno } from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -266,7 +266,16 @@ export default function LiveMatchPage() {
   const { formMap, compMatches } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
-  const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
+  // Cette page n'existe que pour des matchs en direct (liveMatches) → toujours
+  // la version live du prono, réévaluée selon le score réel + le temps restant.
+  const prono = match && (hForm || aForm)
+    ? calcLiveProno(
+        hForm, aForm,
+        mergeScore(espn?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
+        mergeScore(espn?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
+        calcMinute(match)
+      )
+    : null
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
