@@ -11,6 +11,7 @@ import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
+import { PanelSkeleton } from '../accueil/MatchCard'
 // TendancesView mis de côté (voir commentaire plus bas) — import retiré,
 // fichier conservé pour être retravaillé plus tard.
 
@@ -270,8 +271,13 @@ function Classement() {
     }
 
     function MatchList({ list, showScore, empty }) {
-      if (loadingM) return <div className="gm__loading">Chargement…</div>
-      if (!list.length) return <div className="gm__empty">{empty}</div>
+      if (loadingM) return <PanelSkeleton />
+      if (!list.length) return (
+        <div className="gm__empty">
+          <span className="gm__emptyIcon" aria-hidden="true">⚽</span>
+          <p className="gm__emptyTitle">{empty}</p>
+        </div>
+      )
       return <div className="accueil__matchCards">{list.map(m => <MatchRow key={m.id} m={m} showScore={showScore} />)}</div>
     }
 
