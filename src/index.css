@@ -129,6 +129,25 @@ body::before {
   transform: none !important;
 }
 
+/* ── Correctifs ponctuels par équipe ──────────────────────────────────────
+   Même avec object-fit:cover (garanti sans bande vide sur un cercle), un
+   sous-ensemble de drapeaux ont une marge interne inhabituellement grande
+   BAKED IN dans l'image elle-même (le graphisme du drapeau n'est pas
+   collé aux bords du fichier) — cover recadre le CANEVAS extérieur de
+   l'image mais ne peut pas retirer cette marge interne, donc elle reste
+   visible comme un vide/flou aux pôles du cercle pour CES drapeaux précis
+   (constat utilisateur, cas déjà identifiés : Argentine, Ouzbékistan, Corée
+   du Sud, + Jordanie). Un zoom supplémentaire ciblé UNIQUEMENT sur ces
+   drapeaux (via data-team, sélecteur plus spécifique que la règle générale
+   ci-dessus donc prioritaire même à !important égal) règle ça sans
+   affecter les autres drapeaux qui n'ont pas ce problème. */
+[data-crest="country"] img[data-team="Argentina"],
+[data-crest="country"] img[data-team="Jordan"],
+[data-crest="country"] img[data-team="Uzbekistan"],
+[data-crest="country"] img[data-team="Korea Republic"] {
+  transform: scale(1.75) !important;
+}
+
 /* ── Animations globales ── */
 @keyframes spin     { to { transform: rotate(360deg); } }
 @keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
