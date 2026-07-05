@@ -952,8 +952,8 @@
   white-space: nowrap;
 }
 .modal__statTableVal--right { text-align: right; }
-.modal__statTableVal--home { color: #93c5fd; font-weight: 900; }
-.modal__statTableVal--away { color: var(--red-light); font-weight: 900; }
+.modal__statTableVal--home { color: var(--match-home, #93c5fd); font-weight: 900; }
+.modal__statTableVal--away { color: var(--match-away, var(--red-light)); font-weight: 900; }
 
 .modal__statTableLabel {
   text-align: center;
@@ -1278,10 +1278,9 @@
   font-variant-numeric: tabular-nums;
 }
 .pm__statVal--right { text-align: right; }
-.pm__statVal--better {
-  color: var(--red-light);
-  font-weight: 900;
-}
+.pm__statVal--better { font-weight: 900; }
+.pm__statVal--better--home { color: var(--match-home, var(--red-light)); }
+.pm__statVal--better--away { color: var(--match-away, var(--red-light)); }
 
 .pm__statName {
   font-size: 0.56rem;

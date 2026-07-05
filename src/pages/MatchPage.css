@@ -375,8 +375,8 @@
   white-space: nowrap;
 }
 .mp__statVal--r     { text-align: right; }
-.mp__statVal--home  { color: #93c5fd; font-weight: 900; }
-.mp__statVal--away  { color: var(--red-light); font-weight: 900; }
+.mp__statVal--home  { color: var(--match-home, #93c5fd); font-weight: 900; }
+.mp__statVal--away  { color: var(--match-away, var(--red-light)); font-weight: 900; }
 
 /* ── Desktop ──────────────────────────────────────────────────────────────────*/
 @media (min-width: 768px) {

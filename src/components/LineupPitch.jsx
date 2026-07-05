@@ -619,12 +619,8 @@ function PlayerGrid({ starters, subs }) {
 }
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function LineupPitch({ home, away, isCountry = false }) {
+export default function LineupPitch({ home, away, isCountry = false, hColor = '#ef4444', aColor = '#eadfdfe4' }) {
   const [activeTeam, setActiveTeam] = useState('home')
-
-  // Rouge app pour les deux équipes — cohérent avec le thème
-  const hColor = '#ef4444'
-  const aColor = '#eadfdfe4'
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 

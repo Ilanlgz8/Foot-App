@@ -16,7 +16,7 @@ import { calcLiveProno } from '../utils/calcProno'
 import { updateDangerMeter } from '../utils/dangerMeter'
 import { recordProbaSample } from '../utils/probaCurve'
 import { LivePulse } from './LivePulse'
-import { getMatchThemeVars } from '../data/teamPhotos'
+import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -721,6 +721,10 @@ export function ComposTab({ match, compMatches }) {
   const withCrest = (obj, crest) => obj ? { ...obj, crest } : obj
   // isWC déjà calculé plus haut dans ce composant (voir usage useLineups ci-dessus)
 
+  // Couleurs dynamiques des vraies équipes (même logique anti-collision que le
+  // hero/LivePulse/DangerMeter) — remplace le rouge fixe pour les deux équipes.
+  const { home: pitchHome, away: pitchAway } = getMatchTeamColors(match?.homeTeam?.name, match?.awayTeam?.name)
+
   if (lineups) {
     return (
       <div style={{ padding: '8px 0 0' }}>
@@ -728,6 +732,8 @@ export function ComposTab({ match, compMatches }) {
           home={withCrest(lineups.home, homeCrest)}
           away={withCrest(lineups.away, awayCrest)}
           isCountry={isWC}
+          hColor={pitchHome.main}
+          aColor={pitchAway.main}
         />
       </div>
     )
@@ -756,6 +762,8 @@ export function ComposTab({ match, compMatches }) {
             home={withCrest(probable.home, homeCrest)}
             away={withCrest(probable.away, awayCrest)}
             isCountry={isWC}
+            hColor={pitchHome.main}
+            aColor={pitchAway.main}
           />
         </div>
       </div>
@@ -1115,9 +1123,9 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
           const aBetter = !noCompare && (higher ? aNum > hNum : aNum < hNum)
           return (
             <div key={label} className="pm__statRow">
-              <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv ?? '–'}</span>
+              <span className={`pm__statVal${hBetter ? ' pm__statVal--better pm__statVal--better--home' : ''}`}>{hv ?? '–'}</span>
               <span className="pm__statName">{label}</span>
-              <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better' : ''}`}>{av ?? '–'}</span>
+              <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better pm__statVal--better--away' : ''}`}>{av ?? '–'}</span>
             </div>
           )
         })}
@@ -1321,9 +1329,9 @@ export function MatchStatsSection({ match }) {
         <div className="pm__statTable">
           {rows.map(({ label, hv, av, hBetter, aBetter }) => (
             <div key={label} className="pm__statRow">
-              <span className={`pm__statVal${hBetter ? ' pm__statVal--better' : ''}`}>{hv}</span>
+              <span className={`pm__statVal${hBetter ? ' pm__statVal--better pm__statVal--better--home' : ''}`}>{hv}</span>
               <span className="pm__statName">{label}</span>
-              <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better' : ''}`}>{av}</span>
+              <span className={`pm__statVal pm__statVal--right${aBetter ? ' pm__statVal--better pm__statVal--better--away' : ''}`}>{av}</span>
             </div>
           ))}
         </div>
