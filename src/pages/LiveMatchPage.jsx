@@ -336,12 +336,6 @@ export default function LiveMatchPage() {
           </div>
           <TabDots count={TABS.length} active={TABS.indexOf(activeTab)} />
 
-          {/* Pouls collectif — pronostic des fans (figé au coup d'envoi,
-              déjà commencé ici puisque cette page n'existe que pour des
-              matchs en direct) + réactions emoji live. Toujours visible,
-              indépendamment de l'onglet actif. */}
-          <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
-
           {/* Contenu */}
           <div
             key={activeTab}
@@ -368,6 +362,8 @@ export default function LiveMatchPage() {
                 ) : (
                   <SeasonStatsTab match={match} compMatches={compMatches} />
                 )}
+                {/* Pouls collectif — sous Stats Live/Stats Saison */}
+                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
               </>
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}

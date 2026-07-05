@@ -1342,10 +1342,6 @@ export function PreMatchSection({ match, formMap, compMatches, hideStats = false
   return (
     <div className="pm__wrap">
 
-      {/* Pronostic des fans — masqué si déjà affiché ailleurs (ex: MatchPage
-          l'affiche en haut de page, au-dessus de "Stats saison") */}
-      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} />}
-
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
       <H2HSection match={match} compMatches={compMatches} />
 
@@ -1357,6 +1353,10 @@ export function PreMatchSection({ match, formMap, compMatches, hideStats = false
           compMatches={compMatches}
         />
       )}
+
+      {/* Pronostic des fans — sous Stats saison, masqué si déjà affiché
+          ailleurs (ex: MatchPage l'affiche déjà lui-même) */}
+      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} />}
 
       {/* Forme récente */}
       {compMatches?.length > 0 && (
@@ -1591,17 +1591,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
           />
         ) : isLive ? (
           <div ref={swipeLive.ref}>
-            {/* Pronostic des fans — modal-wide, au-dessus des onglets (pas
-                dans un onglet dédié, remplace l'ancienne barre de proba
-                algorithmique déjà visible sur l'Accueil via MatchPoster). */}
-            <LivePulse
-              matchId={match.id}
-              homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-              awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-              locked
-              showReactions
-            />
-
             {/* Onglets match en cours */}
             <div className="modal__tabs">
               <button
@@ -1626,7 +1615,19 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 transition: swipeLive.isDragging ? 'none' : undefined,
               }}
             >
-              {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} compMatches={compMatches} />}
+              {tab === 'livestats' && (
+                <>
+                  <LiveStatsTab match={match} espnScore={espnScore} compMatches={compMatches} />
+                  {/* Pronostic des fans — sous Stats Live */}
+                  <LivePulse
+                    matchId={match.id}
+                    homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+                    awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+                    locked
+                    showReactions
+                  />
+                </>
+              )}
               {tab === 'compos'      && <ComposTab match={match} compMatches={compMatches} />}
               {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
             </div>

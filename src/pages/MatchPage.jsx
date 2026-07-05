@@ -543,27 +543,29 @@ export default function MatchPage() {
             {activeTab === 'statistiques' && (
               isFinished
                 ? <>
-                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
-                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                     <StatsSubTabs view={statsView} onChange={setStatsView} />
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
                       : <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
                     }
+                    {/* Pronostic des fans + courbe de bascule — sous les
+                        onglets Stats Live/Stats Saison (remplace l'ancienne
+                        barre de proba algorithmique, déjà visible sur
+                        l'Accueil via MatchPoster). */}
+                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
+                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                   </>
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>
-                      {/* Pronostic des fans — tout en haut, avant Stats saison
-                          (remplace l'ancienne barre de proba algorithmique,
-                          déjà visible sur l'Accueil via MatchPoster). */}
-                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                       <MpSeasonStats
                         match={match}
                         formMap={formMap}
                         compMatches={compMatches}
                         hideForm
                       />
+                      {/* Pronostic des fans — sous Stats saison */}
+                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                       <PreMatchSection
                         match={match}
                         formMap={formMap}
