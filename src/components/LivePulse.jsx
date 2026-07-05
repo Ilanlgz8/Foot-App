@@ -9,7 +9,6 @@ import { useState, useCallback, useEffect } from 'react'
 import { usePulse, useLeaderboard } from '../hooks/usePulse'
 import '../livePulse.css'
 
-const REACTION_EMOJIS = ['⚽', '🔥', '😱', '👏', '😡']
 const CORRECT_POINTS = 10 // doit rester synchro avec api/pulse.js (CORRECT_POINTS)
 
 function pct(n, total) {
@@ -131,25 +130,6 @@ export function LivePulse({ matchId, homeShort, awayShort, locked = false, showR
               )}
             </>
           )}
-        </div>
-      )}
-
-      {showReactions && (
-        <div className="pulse__reactions">
-          {REACTION_EMOJIS.map(emoji => (
-            <button
-              key={emoji}
-              type="button"
-              className="pulse__reactionBtn"
-              onClick={() => handleReact(emoji)}
-            >
-              {bursts.filter(b => b.emoji === emoji).map(b => (
-                <span key={b.id} className="pulse__burst" aria-hidden="true">{emoji}</span>
-              ))}
-              <span className="pulse__reactionEmoji">{emoji}</span>
-              <span className="pulse__reactionCount">{reactions[emoji] ?? 0}</span>
-            </button>
-          ))}
         </div>
       )}
     </div>
