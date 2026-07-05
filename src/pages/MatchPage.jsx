@@ -544,16 +544,17 @@ export default function MatchPage() {
               isFinished
                 ? <>
                     <StatsSubTabs view={statsView} onChange={setStatsView} />
+                    {/* Pronostic des fans + courbe de bascule — sous les
+                        onglets Stats Live/Stats Saison, au-dessus du
+                        contenu des stats (remplace l'ancienne barre de
+                        proba algorithmique, déjà visible sur l'Accueil
+                        via MatchPoster). */}
+                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
+                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
                       : <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
                     }
-                    {/* Pronostic des fans + courbe de bascule — sous les
-                        onglets Stats Live/Stats Saison (remplace l'ancienne
-                        barre de proba algorithmique, déjà visible sur
-                        l'Accueil via MatchPoster). */}
-                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
-                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                   </>
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>

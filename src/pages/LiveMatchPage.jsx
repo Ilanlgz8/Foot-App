@@ -351,6 +351,9 @@ export default function LiveMatchPage() {
             {activeTab === 'stats' && (
               <>
                 <StatsSubTabs view={statsView} onChange={setStatsView} />
+                {/* Pouls collectif — sous Stats Live/Stats Saison, au-dessus
+                    du contenu des stats */}
+                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
                 {statsView === 'live' ? (
                   <LiveStatsTab
                     match={match}
@@ -362,8 +365,6 @@ export default function LiveMatchPage() {
                 ) : (
                   <SeasonStatsTab match={match} compMatches={compMatches} />
                 )}
-                {/* Pouls collectif — sous Stats Live/Stats Saison */}
-                <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
               </>
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
