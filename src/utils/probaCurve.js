@@ -1,4 +1,6 @@
-// probaCurve — enregistre côté serveur (api/curve.js) un échantillon de la
+// probaCurve — enregistre côté serveur (api/pulse.js, action 'sample' —
+// fusionné avec le pouls collectif pour rester sous la limite de 12
+// Serverless Functions du plan Hobby Vercel) un échantillon de la
 // proba de victoire en direct (calcLiveProno) une fois par minute de match,
 // pour tracer la "courbe de bascule" une fois le match terminé (voir
 // <ProbaCurve>). Agrégé côté serveur (Redis, dédupliqué par minute) plutôt
@@ -28,10 +30,10 @@ export function recordProbaSample(matchId, minute, prono) {
   seen.add(min)
   sentMinutes.set(key, seen)
 
-  fetch('/api/curve', {
+  fetch('/api/pulse', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ matchId: key, minute: min, home: prono.home, draw: prono.draw, away: prono.away }),
+    body:    JSON.stringify({ matchId: key, action: 'sample', minute: min, home: prono.home, draw: prono.draw, away: prono.away }),
   }).catch(() => {
     // Échec silencieux : simple enregistrement d'arrière-plan, un autre
     // spectateur du même match complétera probablement l'échantillon
