@@ -247,6 +247,49 @@ function MpStatsSkeleton() {
   )
 }
 
+// Skeleton pleine page (hero + onglets + stats) — remplace le spinner
+// centré affiché avant que le match soit chargé (1er accès direct par URL,
+// pas de state router). Reprend les mêmes classes que MatchPageHero pour
+// un placement identique, donc pas de saut de layout à l'arrivée du match.
+function MpPageSkeleton() {
+  return (
+    <div className="mp__page">
+      <div className="mp__hero">
+        <div className="mp__hero__top">
+          <div className="sk" style={{ width: '3.2rem', height: '0.85rem' }} />
+          <div className="sk" style={{ width: '5rem', height: '0.7rem' }} />
+        </div>
+        <div className="mp__hero__mid">
+          <div className="mp__hero__team">
+            <div className="sk" style={{ width: '3.4rem', height: '3.4rem', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3.4rem', height: '0.75rem' }} />
+          </div>
+          <div className="mp__hero__center">
+            <div className="sk" style={{ width: '4rem', height: '0.6rem' }} />
+            <div className="sk" style={{ width: '5rem', height: '2rem', marginTop: '0.3rem' }} />
+          </div>
+          <div className="mp__hero__team mp__hero__team--away">
+            <div className="sk" style={{ width: '3.4rem', height: '3.4rem', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3.4rem', height: '0.75rem' }} />
+          </div>
+        </div>
+      </div>
+      <div className="mp__wrap">
+        <div className="mp__tabs">
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ flex: 1, padding: '0.75rem 0', display: 'flex', justifyContent: 'center' }}>
+              <div className="sk" style={{ width: '4rem', height: '0.8rem' }} />
+            </div>
+          ))}
+        </div>
+        <div className="mp__tabContent">
+          <MpStatsSkeleton />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Helpers stats match terminé (mêmes que MatchModal, dupliqués) ─────────────
 const MATCH_STAT_KEYS = [
   { key: 'Ball possession',  label: 'Possession',     higher: true  },
@@ -515,14 +558,7 @@ export default function MatchPage() {
   )
 
   if (isLoading || !match) {
-    return (
-      <div className="mp__page">
-        <div className="mp__loading">
-          <div className="modal__spinner" />
-          <p>Chargement du match…</p>
-        </div>
-      </div>
-    )
+    return <MpPageSkeleton />
   }
 
   return (

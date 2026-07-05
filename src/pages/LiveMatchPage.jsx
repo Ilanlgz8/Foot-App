@@ -77,6 +77,57 @@ function shortenName(name) {
   return `${words[0][0].toUpperCase()}. ${words.slice(1).join(' ')}`
 }
 
+// Skeleton pleine page — remplace le spinner générique affiché avant que le
+// match soit reçu du LiveProvider. Même logique que MpPageSkeleton dans
+// MatchPage.jsx (dupliqué ici, pas de composant partagé, cf. le pattern déjà
+// utilisé pour les helpers stats "mêmes que MatchModal, dupliqués").
+function LmpPageSkeleton() {
+  return (
+    <div className="mp__page">
+      <div className="mp__hero lmp__hero">
+        <div className="mp__hero__top">
+          <div className="sk" style={{ width: '3.2rem', height: '0.85rem' }} />
+          <div className="sk" style={{ width: '5rem', height: '0.7rem' }} />
+        </div>
+        <div className="mp__hero__mid">
+          <div className="mp__hero__team">
+            <div className="sk" style={{ width: '3.4rem', height: '3.4rem', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3.4rem', height: '0.75rem' }} />
+          </div>
+          <div className="mp__hero__center">
+            <div className="sk" style={{ width: '3rem', height: '0.6rem' }} />
+            <div className="sk" style={{ width: '4.5rem', height: '1.8rem', marginTop: '0.3rem' }} />
+          </div>
+          <div className="mp__hero__team mp__hero__team--away">
+            <div className="sk" style={{ width: '3.4rem', height: '3.4rem', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3.4rem', height: '0.75rem' }} />
+          </div>
+        </div>
+      </div>
+      <div className="mp__wrap">
+        <div className="mp__tabs">
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ flex: 1, padding: '0.75rem 0', display: 'flex', justifyContent: 'center' }}>
+              <div className="sk" style={{ width: '4rem', height: '0.8rem' }} />
+            </div>
+          ))}
+        </div>
+        <div className="mp__tabContent">
+          <div className="mp__statsList">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="mp__statRow">
+                <div className="sk" style={{ width: '1.6rem', height: '0.9rem', marginLeft: 'auto' }} />
+                <div className="sk" style={{ width: '4.4rem', height: '0.6rem' }} />
+                <div className="sk" style={{ width: '1.6rem', height: '0.9rem' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hero live (style MatchPage + éléments live) ───────────────────────────────
 function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const matchSt   = getMatchState(match.id)
@@ -302,14 +353,7 @@ export default function LiveMatchPage() {
   )
 
   if (!match) {
-    return (
-      <div className="mp__page">
-        <div className="mp__loading">
-          <div className="modal__spinner" />
-          <p>Chargement du match…</p>
-        </div>
-      </div>
-    )
+    return <LmpPageSkeleton />
   }
 
   return (
