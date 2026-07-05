@@ -650,6 +650,9 @@
   background: linear-gradient(90deg, rgba(var(--white-rgb),0.044), rgba(var(--white-rgb),0.018));
   border-color: rgba(var(--white-rgb),0.075);
 }
+.accueil__resultCard:active {
+  background: linear-gradient(90deg, rgba(var(--white-rgb),0.07), rgba(var(--white-rgb),0.03));
+}
 
 /* Skeleton résultats */
 .accueil__resultCardSk {
@@ -745,6 +748,10 @@
   border-color: #333;
   border-left-color: var(--red-deep);
   transform: translateY(-2px);
+}
+.accueil__card:active {
+  transform: scale(0.98);
+  transition-duration: 0.1s;
 }
 
 .accueil__cardImgWrap {
@@ -976,6 +983,11 @@
 }
 .accueil__matchCardClickable:hover {
   background: rgba(var(--red-rgb),0.06);
+}
+/* Le hover ci-dessus ne se déclenche jamais sur mobile (pas de souris) —
+   sans :active, un tap ne donnait aucun retour visuel avant la navigation. */
+.accueil__matchCardClickable:active {
+  background: rgba(var(--red-rgb),0.1);
 }
 .accueil__matchCardClickable:hover .accueil__matchCard {
   background: transparent;
@@ -1489,12 +1501,16 @@
   border: 1px solid rgba(var(--red-rgb),0.18);
   border-radius: 0.6rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
   font-family: inherit;
 }
 .accueil__liveChip:hover {
   background: rgba(var(--red-rgb),0.08);
   border-color: rgba(var(--red-rgb),0.35);
+}
+.accueil__liveChip:active {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
 }
 
 /* Match terminé : plus d'aspect "en direct" (bordure rouge) */
