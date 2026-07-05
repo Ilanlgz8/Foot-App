@@ -8,7 +8,6 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
 import { useOnline } from './hooks/useOnline'
 import { OfflineBanner } from './components/OfflineBanner'
-import { unlockAudio } from './utils/sounds'
 
 const MatchAVenir = lazy(() => import('./components/Match.jsx'))
 const Resultat = lazy(() => import('./components/Resultat.jsx'))
@@ -21,9 +20,6 @@ const MatchPage = lazy(() => import('./pages/MatchPage.jsx'))
 function App() {
   const location = useLocation()
   const online   = useOnline()
-
-  // Débloquer l'AudioContext au premier geste (requis par Chrome/Safari)
-  useEffect(() => { unlockAudio() }, [])
 
   // Remonter en haut de page à chaque changement de route.
   // Sans ça, le navigateur conserve la position de scroll précédente : si on clique

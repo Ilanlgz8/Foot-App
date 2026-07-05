@@ -13,7 +13,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 
 ### Live
 - `LiveProvider` (context) — polling ESPN global, survit aux changements de route
-- `useLiveMinute.js` — watchdog ESPN, met à jour le state, joue les sons
+- `useLiveMinute.js` — watchdog ESPN, met à jour le state (sons retirés)
 - `liveTracker.js` — source de vérité des matchs live (localStorage)
 - `matchStateTracker.js` — state machine par match (kickoffAt, pausedAt, ft…)
 - Route `/live` → `Live.jsx` (grille de cards) → clic → `/live/:matchId` → `LiveMatchPage.jsx`
@@ -46,7 +46,7 @@ src/
     LiveMatchPage.jsx  — page dédiée /live/:matchId
     LiveMatchPage.css
   hooks/
-    useLiveMinute.js   — watchdog ESPN + sons (pas de notify)
+    useLiveMinute.js   — watchdog ESPN (pas de notify, sons retirés)
     useSwipe.js        — swipe tactile
     usePushNotifications.js
     useStandings.js
@@ -61,7 +61,6 @@ src/
     matchStateTracker.js
     matchUtils.js
     calcProno.js
-    sounds.js
   data/
     teamNames.js       — TEAM_NAMES_FR + translateTeam()
     competitions.js

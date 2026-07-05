@@ -26,7 +26,6 @@ import {
   getLiveState, setLiveState,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
-import { playGoalSound, playWhistleKO, playWhistleHT, playWhistleFT } from '../utils/sounds'
 import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
@@ -493,21 +492,6 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         markLive(match)
 
         const prevCache = espnScoresCache[mid]
-        const prevTotal = (prevCache?.home ?? -1) + (prevCache?.away ?? -1)
-        const newTotal  = home + away
-
-        // Détection but : score total augmente
-        if (prevCache && newTotal > prevTotal) {
-          playGoalSound()
-        }
-
-        // Détection tir au but marqué : le total tab augmente (le score
-        // principal, lui, ne bouge plus une fois en tab — cf home/away ci-dessus).
-        const prevShootoutTotal = (prevCache?.homeShootout ?? -1) + (prevCache?.awayShootout ?? -1)
-        const newShootoutTotal  = (homeShootout ?? -1) + (awayShootout ?? -1)
-        if (prevCache && newShootoutTotal > prevShootoutTotal && newShootoutTotal >= 0) {
-          playGoalSound()
-        }
 
         // ── Regression guard ─────────────────────────────────────────────────
         // Pendant un match live, on ne descend jamais un score déjà connu.
@@ -563,16 +547,11 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       ) {
         const mins = parseClockMins(espnClock)
         if (mins != null && mins > 0) setKickoffAt(mid, now - mins * 60_000)
-        // Ne siffler que si on détecte le KO dans les 5 premières minutes
-        // (évite le sifflet intempestif si on détecte un match déjà en cours)
-        const minsFromKickoff = (now - new Date(match.utcDate)) / 60_000
-        if (minsFromKickoff <= 5) playWhistleKO()
       }
 
       // ── HT détecté ──
       if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
         trackMatchState({ ...match, status: 'PAUSED' })
-        playWhistleHT()
       }
 
       // ── 2H détecté ──
@@ -715,7 +694,6 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         // STATUS_FINAL + score inchangé + horloge >= 85 → FT confirmé
         delete pendingFt[mid]
         confirmFt(match, now, queryClient)
-        playWhistleFT()
       }
 
       // ── FALLBACK J-1 : STATUS_SCHEDULED mais FD.org sait que c'est live ──
