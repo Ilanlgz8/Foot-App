@@ -17,7 +17,6 @@ import {
   useEspnMatchStats,
   useFifaStats,
   useMatchDetail,
-  useMatchRecap,
 } from '../hooks/useMatchDetail'
 import { useEspnMatchDetail } from '../hooks/useEspnMatchDetail'
 import { useAflMatchStats } from '../hooks/useApiFootball'
@@ -283,7 +282,6 @@ function MpMatchStats({ match }) {
   const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? match : null, isWC, false)
   const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match)
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)
-  const { data: recap } = useMatchRecap(match)
 
   // ── Fil du match : remplacements uniquement ────────────────────────────────
   // Buts ET cartons sont désormais affichés dans le hero (MatchPageHero, qui
@@ -317,10 +315,6 @@ function MpMatchStats({ match }) {
         <span className="mp__statsCenter">Match</span>
         <span className="mp__statsTeam mp__statsTeam--r">{as_ != null ? `${as_} ` : ''}{awayName}</span>
       </div>
-
-      {/* Résumé auto — masqué tant qu'aucun texte n'est disponible (pas de
-          placeholder vide, cf. logique H2H) */}
-      {recap && <p className="mp__recap">{recap}</p>}
 
       {/* Fil du match — remplacements seulement (buts + cartons déjà dans le
           hero, voir plus haut). S'il n'y a aucun remplacement à montrer ET
