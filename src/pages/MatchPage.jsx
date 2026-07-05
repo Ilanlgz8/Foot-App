@@ -12,7 +12,6 @@ import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, matchOutcome } from '../utils/matchUtils'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
-import { LivePulse }               from '../components/LivePulse'
 import { ProbaCurve }              from '../components/ProbaCurve'
 import {
   useEspnMatchStats,
@@ -608,7 +607,6 @@ export default function MatchPage() {
                         contenu des stats (remplace l'ancienne barre de
                         proba algorithmique, déjà visible sur l'Accueil
                         via MatchPoster). */}
-                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked result={outcome} kickoffAt={match.utcDate} />
                     <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
@@ -621,8 +619,7 @@ export default function MatchPage() {
                       {/* Pronostic des fans — tout en haut, avant Stats saison
                           (pas de tabs Stats Live/Stats Saison avant le
                           coup d'envoi, donc pas de raison de le descendre). */}
-                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} kickoffAt={match.utcDate} />
-                      <MpSeasonStats
+                     <MpSeasonStats
                         match={match}
                         formMap={formMap}
                         compMatches={compMatches}

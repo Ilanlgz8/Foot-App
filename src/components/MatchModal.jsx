@@ -14,7 +14,6 @@ import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
 import { calcLiveProno } from '../utils/calcProno'
 import { recordProbaSample } from '../utils/probaCurve'
-import { LivePulse } from './LivePulse'
 import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -1564,8 +1563,6 @@ export function PreMatchSection({ match, formMap, compMatches, hideStats = false
 
       {/* Pronostic des fans — masqué si déjà affiché ailleurs (ex: MatchPage
           l'affiche en haut de page, au-dessus de "Stats saison") */}
-      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} kickoffAt={match.utcDate} />}
-
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
       <H2HSection match={match} compMatches={compMatches} />
 
@@ -1818,14 +1815,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
             {/* Pronostic des fans — modal-wide, au-dessus des onglets (la
                 modale n'a pas de sous-onglets Stats Live/Stats Saison,
                 contrairement à LiveMatchPage/MatchPage). */}
-            <LivePulse
-              matchId={match.id}
-              homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-              awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-              locked
-              showReactions
-              kickoffAt={match.utcDate}
-            />
 
             {/* Onglets match en cours */}
             <div className="modal__tabs">
