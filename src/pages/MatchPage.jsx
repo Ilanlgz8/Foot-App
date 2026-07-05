@@ -558,14 +558,16 @@ export default function MatchPage() {
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>
+                      {/* Pronostic des fans — tout en haut, avant Stats saison
+                          (pas de tabs Stats Live/Stats Saison avant le
+                          coup d'envoi, donc pas de raison de le descendre). */}
+                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                       <MpSeasonStats
                         match={match}
                         formMap={formMap}
                         compMatches={compMatches}
                         hideForm
                       />
-                      {/* Pronostic des fans — sous Stats saison */}
-                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                       <PreMatchSection
                         match={match}
                         formMap={formMap}
