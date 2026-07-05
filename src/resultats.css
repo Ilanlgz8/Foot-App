@@ -317,6 +317,10 @@
   background: rgba(20,28,44,0.95);
   border-color: rgba(var(--white-rgb),0.1);
 }
+/* Feedback tap — le hover ci-dessus ne se déclenche jamais sur mobile. */
+.resultats__card:active {
+  background: rgba(26,36,56,0.97);
+}
 
 /* ── Équipes ── */
 .resultats__team {

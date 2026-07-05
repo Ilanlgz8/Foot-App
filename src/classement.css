@@ -965,6 +965,12 @@
   border-color: rgba(var(--red-deep-rgb),0.45);
   transform: translateY(-2px);
 }
+/* Le hover ci-dessus ne se déclenche jamais sur mobile — sans :active,
+   un tap sur une card groupe n'avait aucun retour visuel. */
+.classement__groupBlock--clickable:active {
+  transform: scale(0.98);
+  transition-duration: 0.1s;
+}
 
 .classement__groupExpandHint {
   margin-left: auto;
