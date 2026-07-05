@@ -1147,6 +1147,7 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
 
 function H2HSection({ match, compMatches }) {
   const { data: h2hMatches, isLoading } = useH2H(match)
+  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
 
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
@@ -1178,7 +1179,7 @@ function H2HSection({ match, compMatches }) {
       {isLoading ? (
         <p className="pm__noData">Chargement…</p>
       ) : (
-        <div className="pm__h2hList">
+        <div className="h2h__list">
           {rows.map((m, i) => {
             const isHomeTeam = m.homeTeam?.id === homeId
             const fsH2H = finalScore(m.score)
@@ -1199,21 +1200,37 @@ function H2HSection({ match, compMatches }) {
             } else {
               result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
             }
+            const resultClass = result === 'W' ? 'h2h__row--w' : result === 'L' ? 'h2h__row--l' : 'h2h__row--d'
             return (
-              <div key={i} className="pm__h2hRow">
+              <div key={i} className={`h2h__row ${resultClass}`}>
+                <span className="h2h__date">{date}</span>
+                <div className="h2h__matchup">
+                  <div className="h2h__side h2h__side--home">
+                    <span className="h2h__team">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
+                    {m.homeTeam?.crest && (
+                      <span className="h2h__crestWrap" data-crest={isWC ? 'country' : 'club'}>
+                        <img src={m.homeTeam.crest} alt="" className="h2h__crest" data-team={m.homeTeam?.name}
+                          onError={e => { e.currentTarget.style.display = 'none' }} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="h2h__scoreBlock">
+                    <span className="h2h__score">{hs} – {as_}</span>
+                    {wentToPens && hp != null && ap != null && (
+                      <span className="h2h__pens">tab {hp}-{ap}</span>
+                    )}
+                  </div>
+                  <div className="h2h__side h2h__side--away">
+                    {m.awayTeam?.crest && (
+                      <span className="h2h__crestWrap" data-crest={isWC ? 'country' : 'club'}>
+                        <img src={m.awayTeam.crest} alt="" className="h2h__crest" data-team={m.awayTeam?.name}
+                          onError={e => { e.currentTarget.style.display = 'none' }} />
+                      </span>
+                    )}
+                    <span className="h2h__team">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
+                  </div>
+                </div>
                 <ResultBadge result={result} />
-                <span className="pm__h2hHome">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
-                <span className="pm__h2hScore">
-                  <span className="pm__h2hScoreMain">{hs} – {as_}</span>
-                  {wentToPens && hp != null && ap != null && (
-                    <span className="pm__formPens">
-                      <span className="pm__formPensLabel">T.A.B</span>
-                      <span className="pm__formPensScore">({hp}-{ap})</span>
-                    </span>
-                  )}
-                </span>
-                <span className="pm__h2hAway">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
-                <span className="pm__h2hDate">{date}</span>
               </div>
             )
           })}
