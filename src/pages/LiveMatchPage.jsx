@@ -14,6 +14,7 @@ import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { getMatchGradient } from '../data/teamPhotos'
 import { calcLiveProno } from '../utils/calcProno'
+import { LivePulse }     from '../components/LivePulse'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -276,6 +277,8 @@ export default function LiveMatchPage() {
         calcMinute(match)
       )
     : null
+  const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
+  const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -327,6 +330,12 @@ export default function LiveMatchPage() {
             ))}
           </div>
           <TabDots count={TABS.length} active={TABS.indexOf(activeTab)} />
+
+          {/* Pouls collectif — pronostic des fans (figé au coup d'envoi,
+              déjà commencé ici puisque cette page n'existe que pour des
+              matchs en direct) + réactions emoji live. Toujours visible,
+              indépendamment de l'onglet actif. */}
+          <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked showReactions />
 
           {/* Contenu */}
           <div

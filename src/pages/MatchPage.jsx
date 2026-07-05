@@ -12,6 +12,7 @@ import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient }        from '../data/teamPhotos'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
+import { LivePulse }               from '../components/LivePulse'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -470,6 +471,8 @@ export default function MatchPage() {
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
+  const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
+  const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 
   const [activeTab, setActiveTab] = useState('statistiques')
   const [tabDir, setTabDir]       = useState(null)
@@ -542,6 +545,7 @@ export default function MatchPage() {
             {activeTab === 'statistiques' && (
               isFinished
                 ? <>
+                    <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} locked />
                     <StatsSubTabs view={statsView} onChange={setStatsView} />
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
@@ -551,6 +555,7 @@ export default function MatchPage() {
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>
+                      <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
                       {/* Probabilités estimées — tout en haut, avant Stats saison */}
                       <div className="mp__pronoTop"><PmPronoSection prono={prono} /></div>
                       <MpSeasonStats
