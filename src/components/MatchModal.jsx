@@ -913,9 +913,13 @@ function ResultBadge({ result }) {
 }
 
 export function TeamFormTable({ teamId, compMatches }) {
+  // compMatches (FD.org) est trié du plus ancien au plus récent → slice(-5)
+  // garde les 5 derniers, puis reverse() pour afficher le dernier match joué
+  // tout en haut (même convention que H2HSection juste au-dessus).
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
     .slice(-5)
+    .reverse()
 
   if (!matches.length) return <p className="pm__noData">Pas de données</p>
 
