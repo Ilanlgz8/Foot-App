@@ -1203,7 +1203,6 @@ function H2HSection({ match, compMatches }) {
             const resultClass = result === 'W' ? 'h2h__row--w' : result === 'L' ? 'h2h__row--l' : 'h2h__row--d'
             return (
               <div key={i} className={`h2h__row ${resultClass}`}>
-                <span className="h2h__date">{date}</span>
                 <div className="h2h__matchup">
                   <div className="h2h__side h2h__side--home">
                     <span className="h2h__team">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
@@ -1215,6 +1214,7 @@ function H2HSection({ match, compMatches }) {
                     )}
                   </div>
                   <div className="h2h__scoreBlock">
+                    <span className="h2h__date">{date}</span>
                     <span className="h2h__score">{hs} – {as_}</span>
                     {wentToPens && hp != null && ap != null && (
                       <span className="h2h__pens">tab {hp}-{ap}</span>
@@ -1230,7 +1230,6 @@ function H2HSection({ match, compMatches }) {
                     <span className="h2h__team">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
                   </div>
                 </div>
-                <ResultBadge result={result} />
               </div>
             )
           })}

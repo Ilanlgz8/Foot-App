@@ -1297,13 +1297,15 @@
    l'override mobile ne redéfinissait que 4 tracks tout en masquant le badge
    résultat — cause du rendu cassé/serré signalé par l'utilisateur). Flexbox
    avec largeurs min/flex évite complètement la classe de bug "colonnes qui
-   ne correspondent plus au nombre d'enfants" : chaque row garde exactement
-   les mêmes éléments (date, écusson+nom domicile, score, nom+écusson
-   extérieur, badge) à toutes les tailles d'écran, seules les tailles de
-   police et espacements sont réduits sur mobile. */
+   ne correspondent plus au nombre d'enfants". Pas de badge résultat : le
+   liseré latéral coloré (vert/gris/rouge) suffit à lire le résultat d'un
+   coup d'œil, sans doublon visuel. La carte est centrée et plafonnée en
+   largeur pour rester lisible même sur grand écran. */
 .h2h__list {
   display: flex;
   flex-direction: column;
+  max-width: 30rem;
+  margin: 0 auto;
   background: linear-gradient(165deg, rgba(var(--white-rgb),0.035), rgba(var(--white-rgb),0.01));
   border: 1px solid rgba(var(--white-rgb),0.07);
   border-radius: 1.1rem;
@@ -1321,7 +1323,6 @@
 .h2h__row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   padding: 0.6rem 0.15rem;
   border-radius: 0.6rem;
   transition: background-color 0.15s ease;
@@ -1335,14 +1336,6 @@
 .h2h__row--d { box-shadow: inset 2px 0 0 rgba(148,163,184,0.4); }
 .h2h__row--l { box-shadow: inset 2px 0 0 rgba(239,68,68,0.55); }
 
-.h2h__date {
-  flex: 0 0 auto;
-  font-size: 0.6rem;
-  font-weight: 600;
-  color: rgba(var(--white-rgb),0.45);
-  white-space: nowrap;
-  min-width: 2.6rem;
-}
 .h2h__matchup {
   flex: 1 1 auto;
   display: flex;
@@ -1385,8 +1378,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1rem;
-  min-width: 2.6rem;
+  gap: 0.15rem;
+  min-width: 3rem;
+  padding: 0 0.4rem;
+}
+.h2h__date {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: rgba(var(--white-rgb),0.4);
+  white-space: nowrap;
 }
 .h2h__score {
   font-size: 0.82rem;
@@ -1449,17 +1450,16 @@
     border-bottom: 1px solid rgba(var(--white-rgb),0.08);
   }
 
-  /* H2H : le badge résultat reste TOUJOURS visible (c'est l'info la plus
-     lisible d'un coup d'œil) — on réduit seulement tailles/espacements et on
-     masque la date pour gagner de la place, jamais un élément structurel. */
+  /* H2H : on réduit tailles/espacements, aucun élément n'est masqué (plus de
+     badge à gérer — le liseré coloré porte le résultat à toutes les tailles). */
   .h2h__row {
-    gap: 0.3rem;
     padding: 0.5rem 0.1rem;
   }
-  .h2h__date { display: none; }
   .h2h__matchup { gap: 0.3rem; }
+  .h2h__scoreBlock { min-width: 2.4rem; padding: 0 0.2rem; }
   .h2h__crestWrap { width: 1rem; height: 1rem; }
   .h2h__team { font-size: 0.64rem; }
+  .h2h__date { font-size: 0.46rem; }
   .h2h__score { font-size: 0.72rem; }
   .h2h__pens { font-size: 0.48rem; }
 }
