@@ -22,6 +22,7 @@
 import { Redis } from '@upstash/redis'
 import webpush   from 'web-push'
 import { TEAM_NAMES_FR } from '../src/data/teamNames.js'
+import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -30,18 +31,14 @@ const kv = new Redis({
 
 // ── Config ESPN ────────────────────────────────────────────────────────────────
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-// WC 2026 via 'fifa.world' + toutes compétitions club couvertes par l'app
-const ESPN_SLUGS = [
-  'fifa.world',          // WC 2026 — ESPN couvre le WC, statuts fiables
-  'fra.1',
-  'eng.1',
-  'esp.1',
-  'ger.1',
-  'ita.1',
-  'uefa.champions',
-  'uefa.europa',
-  'uefa.europa.conf',
-]
+// WC 2026 + toutes compétitions club couvertes par l'app.
+// ⚠️ INCOHÉRENCE CORRIGÉE : cette liste était dupliquée ici ET dans
+// api/fifa-live.js (sous forme d'un mapping id FD.org → slug, plus complet
+// puisqu'il sert aussi au matching FD.org↔ESPN) — déplacée dans
+// src/data/espnSlugs.js comme source unique, ce fichier n'en dérive plus
+// qu'un tableau à plat (l'id FD.org ne sert à rien ici : le cron parcourt
+// tous les événements ESPN sans les rattacher à un match FD.org précis).
+const ESPN_SLUGS = Object.values(ESPN_SLUG_BY_COMP_ID)
 
 const LIVE_ESPN  = new Set([
   'STATUS_IN_PROGRESS',

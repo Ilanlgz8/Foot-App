@@ -7,6 +7,7 @@
 // Output: { [fdMatchId]: { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, espnEventId, espnSlug } }
 
 import { Redis } from '@upstash/redis'
+import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -196,17 +197,13 @@ function extractFifaScorers(m) {
 // ESPN est la source principale pour espnStatus / espnClock / espnPeriod.
 // WC 2026 : slug 'fifa.world' → ESPN couvre aussi la WC, statuts fiables.
 // FIFA sert UNIQUEMENT pour le score + buteurs WC (plus réactif sur les buts).
-const COMP_ESPN = {
-  2000: 'fifa.world',       // WC 2026
-  2015: 'fra.1',
-  2021: 'eng.1',
-  2014: 'esp.1',
-  2002: 'ger.1',
-  2019: 'ita.1',
-  2001: 'uefa.champions',
-  2146: 'uefa.europa',
-  2048: 'uefa.europa.conf',
-}
+// ⚠️ INCOHÉRENCE CORRIGÉE : ce mapping id FD.org → slug ESPN était dupliqué
+// ici ET dans cron-goals.js (sous forme d'un simple tableau de slugs sans les
+// id FD.org) — deux copies à tenir manuellement synchronisées, avec un vrai
+// risque d'oubli si une compétition est ajoutée un jour dans un fichier sans
+// penser à l'autre. Déplacé dans src/data/competitions.js (déjà la source
+// pour TEAM_NAMES_FR partagée avec cron-goals.js) — source unique désormais.
+const COMP_ESPN = ESPN_SLUG_BY_COMP_ID
 
 function parseEspnScore(raw) {
   if (raw == null) return 0

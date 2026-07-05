@@ -27,6 +27,7 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { playGoalSound, playWhistleKO, playWhistleHT, playWhistleFT } from '../utils/sounds'
+import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -71,19 +72,13 @@ try {
   }
 } catch {}
 
-// football-data.org competition ID → slug ESPN
-// Exporté pour useEspnMatchDetail
-export const COMP_ESPN = {
-  2015: 'fra.1',
-  2021: 'eng.1',
-  2014: 'esp.1',
-  2002: 'ger.1',
-  2019: 'ita.1',
-  2001: 'uefa.champions',
-  2146: 'uefa.europa',
-  2048: 'uefa.europa.conf',
-  2000: 'fifa.world',
-}
+// football-data.org competition ID → slug ESPN — voir src/data/espnSlugs.js.
+// ⚠️ INCOHÉRENCE CORRIGÉE : ce mapping existait en TRIPLE (ici, dans
+// api/fifa-live.js, et sous forme de simple tableau dans api/cron-goals.js) —
+// trois copies à tenir manuellement synchronisées. Importé ici depuis la
+// source unique et ré-exporté pour ne rien casser côté appelants
+// (useMatchDetail.js notamment, qui importe COMP_ESPN depuis ce fichier).
+export const COMP_ESPN = ESPN_SLUG_BY_COMP_ID
 
 // ─────────────────────────────────────────────
 // Helpers communs (conservés pour api-football fallback)
