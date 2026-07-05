@@ -247,7 +247,7 @@
   text-align: center;
 }
 .mp__tab:hover { color: rgba(var(--white-rgb),.65); }
-.mp__tab--active { color: var(--red-light); border-bottom-color: var(--red); }
+.mp__tab--active { color: var(--match-home, var(--red-light)); border-bottom-color: var(--match-home, var(--red)); }
 
 /* ── Contenu ──────────────────────────────────────────────────────────────────*/
 .mp__tabContent {

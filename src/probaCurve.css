@@ -38,8 +38,8 @@
   stroke-linejoin: round;
   stroke-linecap: round;
 }
-.curve__line--home { stroke: #3b82f6; }
-.curve__line--away { stroke: var(--red); }
+.curve__line--home { stroke: var(--match-home, #3b82f6); }
+.curve__line--away { stroke: var(--match-away, var(--red)); }
 
 .curve__legend {
   display: flex;
@@ -61,5 +61,5 @@
   height: 2px;
   border-radius: 1px;
 }
-.curve__legendItem--home::before { background: #3b82f6; }
-.curve__legendItem--away::before { background: var(--red); }
+.curve__legendItem--home::before { background: var(--match-home, #3b82f6); }
+.curve__legendItem--away::before { background: var(--match-away, var(--red)); }

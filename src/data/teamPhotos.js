@@ -917,3 +917,31 @@ export function getTeamPhoto(name) {
 export function getTeamColor(name) {
   return lookupColor(name)?.p ?? fallbackColor(name, 0).p
 }
+
+// Convertit un hex '#rrggbb' en triplet "r, g, b" utilisable dans rgba(var(--x), a)
+// — même convention que --red-rgb déjà utilisée partout dans les CSS de l'appli.
+export function hexToRgbTriplet(hex) {
+  try {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    if ([r, g, b].some(Number.isNaN)) throw new Error('invalid hex')
+    return `${r}, ${g}, ${b}`
+  } catch {
+    return '239, 68, 68' // repli = --red-rgb
+  }
+}
+
+// Variables CSS --match-home/--match-away (+ leurs variantes -rgb pour rgba())
+// à poser en style inline sur le conteneur de page/modale — thème dynamique
+// aux couleurs des 2 équipes, avec anti-collision déjà géré par
+// getMatchTeamColors (jamais la même couleur des deux côtés).
+export function getMatchThemeVars(homeName, awayName) {
+  const { home, away } = getMatchTeamColors(homeName, awayName)
+  return {
+    '--match-home':     home.main,
+    '--match-home-rgb': hexToRgbTriplet(home.main),
+    '--match-away':     away.main,
+    '--match-away-rgb': hexToRgbTriplet(away.main),
+  }
+}

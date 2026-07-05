@@ -16,6 +16,7 @@ import { calcLiveProno } from '../utils/calcProno'
 import { updateDangerMeter } from '../utils/dangerMeter'
 import { recordProbaSample } from '../utils/probaCurve'
 import { LivePulse } from './LivePulse'
+import { getMatchThemeVars } from '../data/teamPhotos'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -1492,9 +1493,12 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
 
+  // Thème dynamique — mêmes couleurs anti-collision que MatchPage/LiveMatchPage.
+  const themeVars = getMatchThemeVars(match.homeTeam?.name, match.awayTeam?.name)
+
   const modal = (
     <div className="modal__overlay" onClick={onClose}>
-      <div className="modal__panel" onClick={e => e.stopPropagation()}>
+      <div className="modal__panel" style={themeVars} onClick={e => e.stopPropagation()}>
 
         <button className="modal__close" onClick={onClose}>✕</button>
 

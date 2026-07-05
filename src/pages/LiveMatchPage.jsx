@@ -12,7 +12,7 @@ import { getMatchState }    from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
-import { getMatchGradient } from '../data/teamPhotos'
+import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { calcLiveProno } from '../utils/calcProno'
 import { recordProbaSample } from '../utils/probaCurve'
 import { LivePulse }     from '../components/LivePulse'
@@ -284,6 +284,8 @@ export default function LiveMatchPage() {
   if (match && prono) recordProbaSample(match.id, liveMinute, prono)
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
+  // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient).
+  const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -309,7 +311,7 @@ export default function LiveMatchPage() {
   }
 
   return (
-    <div className="mp__page">
+    <div className="mp__page" style={themeVars}>
 
       {/* Hero gradient avec score live */}
       <MatchHeader match={match} espn={espn} hForm={hForm} aForm={aForm} onBack={() => {

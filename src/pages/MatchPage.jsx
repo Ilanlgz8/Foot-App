@@ -9,7 +9,7 @@ import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
-import { getMatchGradient }        from '../data/teamPhotos'
+import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { LivePulse }               from '../components/LivePulse'
 import { ProbaCurve }              from '../components/ProbaCurve'
@@ -465,6 +465,9 @@ export default function MatchPage() {
   const aForm = formMap?.[match?.awayTeam?.id]
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
+  // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient),
+  // posées en CSS vars sur la page pour teinter onglets/LivePulse/DangerMeter/ProbaCurve.
+  const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
 
   const [activeTab, setActiveTab] = useState('statistiques')
   const [tabDir, setTabDir]       = useState(null)
@@ -498,7 +501,7 @@ export default function MatchPage() {
   }
 
   return (
-    <div className="mp__page">
+    <div className="mp__page" style={themeVars}>
 
       {/* Hero plein-écran avec gradient */}
       <MatchPageHero match={match} navigate={navigate} hForm={hForm} aForm={aForm} />
