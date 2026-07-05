@@ -1,7 +1,10 @@
 // LivePulse — "pouls collectif" : pronostic des fans (vote anonyme 1/X/2,
-// verrouillé au coup d'envoi) + réactions emoji en direct. Partagé entre
-// MatchPage.jsx (matchs à venir/terminés) et LiveMatchPage.jsx (matchs en
-// direct — réactions actives en plus du pronostic figé).
+// verrouillé au coup d'envoi) + réactions emoji en direct. Remplace
+// l'ancienne barre de probabilité algorithmique (PronoSection/PmPronoSection,
+// retirée) dans les vues détail de match — celle-ci reste visible sur
+// l'Accueil (carte "Match du jour", MatchPoster.jsx), pas besoin de la
+// répéter ici. Style "segmented control" (3 boutons distincts) plutôt qu'une
+// barre continue — chaque choix se tape individuellement.
 import { useState, useCallback } from 'react'
 import { usePulse } from '../hooks/usePulse'
 import '../livePulse.css'
@@ -17,7 +20,7 @@ function pct(n, total) {
  * @param {string|number} matchId
  * @param {string} homeShort / awayShort — noms courts déjà traduits (FR)
  * @param {boolean} locked         true = vote fermé (match déjà commencé), lecture seule
- * @param {boolean} showReactions  true = affiche la ligne de réactions emoji (LiveMatchPage uniquement)
+ * @param {boolean} showReactions  true = affiche la ligne de réactions emoji (matchs en direct uniquement)
  */
 export function LivePulse({ matchId, homeShort, awayShort, locked = false, showReactions = false }) {
   const { votes, reactions, myVote, vote, react } = usePulse(matchId, !!matchId)
@@ -34,10 +37,22 @@ export function LivePulse({ matchId, homeShort, awayShort, locked = false, showR
 
   const { home, draw, away, total } = votes
   const hasVotes = total > 0
-  const homePct = hasVotes ? pct(home, total) : 33
-  const drawPct = hasVotes ? pct(draw, total) : 34
-  const awayPct = hasVotes ? pct(away, total) : 33
+  const homePct = hasVotes ? pct(home, total) : null
+  const drawPct = hasVotes ? pct(draw, total) : null
+  const awayPct = hasVotes ? pct(away, total) : null
   const canVote = !locked
+
+  const choice = (key, label, value) => (
+    <button
+      type="button"
+      className={`pulse__choice pulse__choice--${key}${myVote === key ? ' pulse__choice--mine' : ''}`}
+      onClick={() => canVote && vote(key)}
+      disabled={!canVote}
+    >
+      <span className="pulse__choiceLabel">{label}</span>
+      {value != null && <span className="pulse__choicePct">{value}%</span>}
+    </button>
+  )
 
   return (
     <div className="pulse">
@@ -49,40 +64,10 @@ export function LivePulse({ matchId, homeShort, awayShort, locked = false, showR
         {hasVotes && <span className="pulse__count">{total.toLocaleString('fr-FR')} avis</span>}
       </div>
 
-      <div className="pulse__bar" role="group" aria-label="Voter pour un résultat">
-        <button
-          type="button"
-          className={`pulse__seg pulse__seg--home${myVote === 'home' ? ' pulse__seg--mine' : ''}`}
-          style={{ '--pulse-w': homePct }}
-          onClick={() => canVote && vote('home')}
-          disabled={!canVote}
-        >
-          {hasVotes && <span className="pulse__pct">{homePct}%</span>}
-        </button>
-        <button
-          type="button"
-          className={`pulse__seg pulse__seg--draw${myVote === 'draw' ? ' pulse__seg--mine' : ''}`}
-          style={{ '--pulse-w': drawPct }}
-          onClick={() => canVote && vote('draw')}
-          disabled={!canVote}
-        >
-          {hasVotes && <span className="pulse__pct pulse__pct--draw">{drawPct}%</span>}
-        </button>
-        <button
-          type="button"
-          className={`pulse__seg pulse__seg--away${myVote === 'away' ? ' pulse__seg--mine' : ''}`}
-          style={{ '--pulse-w': awayPct }}
-          onClick={() => canVote && vote('away')}
-          disabled={!canVote}
-        >
-          {hasVotes && <span className="pulse__pct">{awayPct}%</span>}
-        </button>
-      </div>
-
-      <div className="pulse__labels">
-        <span className={myVote === 'home' ? 'pulse__label--mine' : ''}>{homeShort}</span>
-        <span className={myVote === 'draw' ? 'pulse__label--mine' : ''}>Nul</span>
-        <span className={myVote === 'away' ? 'pulse__label--mine' : ''}>{awayShort}</span>
+      <div className="pulse__choices" role="group" aria-label="Voter pour un résultat">
+        {choice('home', homeShort, homePct)}
+        {choice('draw', 'Nul', drawPct)}
+        {choice('away', awayShort, awayPct)}
       </div>
 
       {!hasVotes && (

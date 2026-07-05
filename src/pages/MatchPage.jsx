@@ -7,7 +7,6 @@ import { useState }                from 'react'
 import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
-import { calcProno }               from '../utils/calcProno'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient }        from '../data/teamPhotos'
@@ -24,7 +23,6 @@ import { useEspnMatchDetail } from '../hooks/useEspnMatchDetail'
 import { useAflMatchStats } from '../hooks/useApiFootball'
 import {
   PreMatchSection,
-  PmPronoSection,
   ComposTab,
   ClassementTab,
   MatchTimeline,
@@ -471,7 +469,6 @@ export default function MatchPage() {
   const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
-  const prono = (hForm || aForm) ? calcProno(hForm, aForm) : null
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 
@@ -557,9 +554,10 @@ export default function MatchPage() {
                 : formLoading
                   ? <div className="mp__tabLoading"><div className="modal__spinner" /></div>
                   : <>
+                      {/* Pronostic des fans — tout en haut, avant Stats saison
+                          (remplace l'ancienne barre de proba algorithmique,
+                          déjà visible sur l'Accueil via MatchPoster). */}
                       <LivePulse matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
-                      {/* Probabilités estimées — tout en haut, avant Stats saison */}
-                      <div className="mp__pronoTop"><PmPronoSection prono={prono} /></div>
                       <MpSeasonStats
                         match={match}
                         formMap={formMap}
@@ -568,7 +566,6 @@ export default function MatchPage() {
                       />
                       <PreMatchSection
                         match={match}
-                        prono={prono}
                         formMap={formMap}
                         compMatches={compMatches}
                         hideStats

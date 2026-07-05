@@ -45,68 +45,61 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Barre à 3 segments tactiles — plus "épaisse" que la jauge de proba
-   algorithmique (modal__pronoBar--thin) pour signaler que celle-ci se
-   TAPE, elle ne se lit pas juste passivement. */
-.pulse__bar {
+/* Segmented control — 3 boutons distincts (au lieu d'une barre continue
+   proportionnelle) : chaque choix se tape individuellement, le choix de
+   l'utilisateur se détache visuellement (bordure + fond teinté) plutôt que
+   d'être lu dans la largeur relative d'un segment. */
+.pulse__choices {
   display: flex;
-  height: 2.6rem;
-  border-radius: 0.6rem;
-  overflow: hidden;
-  gap: 2px;
+  gap: 6px;
 }
 
-.pulse__seg {
-  flex: var(--pulse-w);
-  border: none;
+.pulse__choice {
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.55rem 0.4rem;
+  border-radius: 0.6rem;
+  border: 1.5px solid var(--border);
+  background: rgba(var(--white-rgb), 0.03);
   cursor: pointer;
-  transition: flex 0.5s ease, filter 0.15s ease, transform 0.1s ease;
-  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
-.pulse__seg:disabled { cursor: default; }
-.pulse__seg:not(:disabled):active { transform: scale(0.97); }
+.pulse__choice:disabled { cursor: default; }
+.pulse__choice:not(:disabled):active { transform: scale(0.96); }
 
-.pulse__seg--home {
-  background: linear-gradient(135deg, #1e3a5f, #3b82f6);
-  border-radius: 0.5rem 0 0 0.5rem;
+.pulse__choiceLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb), 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
-.pulse__seg--draw {
-  background: rgba(var(--white-rgb), 0.08);
-}
-.pulse__seg--away {
-  background: linear-gradient(135deg, #7f1d1d, var(--red));
-  border-radius: 0 0.5rem 0.5rem 0;
-}
-
-.pulse__seg--mine {
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
-}
-
-.pulse__pct {
-  font-size: 0.85rem;
+.pulse__choicePct {
+  font-size: 0.95rem;
   font-weight: 800;
   color: #f8fafc;
   font-variant-numeric: tabular-nums;
 }
-.pulse__pct--draw {
-  font-size: 0.72rem;
-  color: rgba(var(--white-rgb), 0.7);
-}
 
-.pulse__labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: rgba(var(--white-rgb), 0.5);
-  padding: 0 0.1rem;
+.pulse__choice--home.pulse__choice--mine {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
 }
-.pulse__label--mine {
+.pulse__choice--draw.pulse__choice--mine {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(var(--white-rgb), 0.08);
+}
+.pulse__choice--away.pulse__choice--mine {
+  border-color: var(--red);
+  background: rgba(var(--red-rgb), 0.12);
+}
+.pulse__choice--mine .pulse__choiceLabel {
   color: #f8fafc;
-  font-weight: 800;
 }
 
 .pulse__hint {
@@ -173,6 +166,6 @@
 
 @media (max-width: 400px) {
   .pulse { padding: 0.85rem 0.8rem 0.95rem; }
-  .pulse__bar { height: 2.3rem; }
+  .pulse__choice { padding: 0.45rem 0.3rem; }
   .pulse__reactionEmoji { font-size: 1rem; }
 }

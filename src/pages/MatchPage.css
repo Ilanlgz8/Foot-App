@@ -300,13 +300,6 @@
   margin-top: 1.1rem;
 }
 
-/* Bloc Probabilités estimées affiché seul en haut de page (matchs à venir),
-   hors de .pm__wrap → pas de gap flex automatique, espacement manuel avant
-   Stats saison. */
-.mp__pronoTop {
-  margin-bottom: 1.1rem;
-}
-
 .mp__statsHeader {
   display: flex;
   justify-content: space-between;
@@ -421,11 +414,6 @@
   .mp__tabContent .pm__wrap         { gap: 2.5rem; }
   .mp__tabContent .pm__section      { gap: 1rem; }
   .mp__tabContent .pm__sectionTitle { font-size: .75rem; letter-spacing: .18em; }
-  .mp__tabContent .pm__pronoPercents{ padding: 0 .5rem; }
-  .mp__tabContent .pm__pronoPct     { font-size: .95rem; }
-  .mp__tabContent .pm__pronoPct--winner { font-size: 1.05rem; }
-  .mp__tabContent .pm__pronoBar--thin { height: 7px; }
-  .mp__tabContent .pm__disclaimer   { font-size: .7rem; }
   .mp__tabContent .pm__formGrid     { gap: 0 2rem; }
   .mp__tabContent .pm__formRow      { gap: .6rem; font-size: .92rem; padding: .25rem 0; }
   .mp__tabContent .pm__badge        { font-size: .72rem; width: 1.7rem; height: 1.7rem; border-radius: .4rem; }

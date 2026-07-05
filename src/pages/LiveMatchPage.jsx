@@ -361,7 +361,6 @@ export default function LiveMatchPage() {
                   <LiveStatsTab
                     match={match}
                     espnScore={espn}
-                    prono={prono}
                     homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
                     awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
                     compMatches={compMatches}

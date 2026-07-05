@@ -12,9 +12,10 @@ import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore } from '../utils/matchUtils'
-import { calcProno, calcLiveProno } from '../utils/calcProno'
+import { calcLiveProno } from '../utils/calcProno'
 import { updateDangerMeter } from '../utils/dangerMeter'
 import { recordProbaSample } from '../utils/probaCurve'
+import { LivePulse } from './LivePulse'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -310,10 +311,10 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
 }
 
 // ── Jauge de dangerosité en direct ("pression du moment") ──────────────────
-// Complémentaire à PronoSection (qui répond à "qui va gagner au final") :
-// celle-ci répond à "qui pousse LÀ maintenant", à partir des mêmes stats
-// déjà affichées (tirs/tirs cadrés/corners) — voir utils/dangerMeter.js
-// pour la logique de decay/momentum.
+// Complémentaire à LivePulse (qui répond à "qui les fans pensent voir
+// gagner") : celle-ci répond à "qui pousse LÀ maintenant", à partir des
+// mêmes stats déjà affichées (tirs/tirs cadrés/corners) — voir
+// utils/dangerMeter.js pour la logique de decay/momentum.
 function DangerMeter({ matchId, stats, homeShort, awayShort }) {
   const result = updateDangerMeter(matchId, stats)
   if (!result) return null
@@ -367,7 +368,7 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, compMatches }) {
+export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatches }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -411,18 +412,17 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
     : summaryStats ? summaryStats
     : extractAflDangerStats(statsData)
 
-  // Barre de prono + jauge de dangerosité, affichées en haut du tab stats
-  const pronoBar = prono ? (
+  // Jauge de dangerosité, affichée en haut du tab stats — le pronostic des
+  // fans (LivePulse) est affiché plus haut, au niveau de la modale/page
+  // entière (pas dupliqué ici), voir MatchModal/LiveMatchPage.
+  const dangerBlock = isLive ? (
     <div style={{ marginBottom: '0.25rem' }}>
-      <PronoSection prono={prono} homeShort={homeShort || homeName} awayShort={awayShort || awayName} />
-      {isLive && (
-        <DangerMeter
-          matchId={match.id}
-          stats={activeStats}
-          homeShort={homeShort || homeName}
-          awayShort={awayShort || awayName}
-        />
-      )}
+      <DangerMeter
+        matchId={match.id}
+        stats={activeStats}
+        homeShort={homeShort || homeName}
+        awayShort={awayShort || awayName}
+      />
     </div>
   ) : null
 
@@ -433,7 +433,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
   if (hasEspn) {
     return (
       <div>
-        {pronoBar}
+        {dangerBlock}
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -448,7 +448,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
     }
     return (
       <div>
-        {pronoBar}
+        {dangerBlock}
         {fifaStats
           ? <ESPNStats stats={fifaStats} />
           : <p className="modal__noEvents">Stats non disponibles</p>
@@ -463,7 +463,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
   if (summaryStats) {
     return (
       <div>
-        {pronoBar}
+        {dangerBlock}
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -489,7 +489,7 @@ export function LiveStatsTab({ match, espnScore, prono, homeShort, awayShort, co
 
   return (
     <div>
-      {pronoBar}
+      {dangerBlock}
       {rows.length > 0 ? (
         <div className="modal__espnStats">
           {rows.map(item => (
@@ -934,35 +934,6 @@ export function TabDots({ count, active }) {
   )
 }
 
-// ── Modal principale ─────────────────────────────────────────────────────────
-export function PronoSection({ prono, homeShort, awayShort }) {
-  if (!prono) return null
-  const winner = prono.home >= prono.away && prono.home >= prono.draw ? 'home'
-    : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
-    : 'draw'
-  return (
-    <div className="modal__prono">
-      <p className="modal__pronoTitle">Probabilités estimées</p>
-      <div className="modal__pronoPercents">
-        <span className={`modal__pronoPct${winner === 'home' ? ' modal__pronoPct--winner' : ''}`}>{prono.home}%</span>
-        <span className={`modal__pronoPct modal__pronoPct--draw${winner === 'draw' ? ' modal__pronoPct--winner' : ''}`}>{prono.draw}%</span>
-        <span className={`modal__pronoPct${winner === 'away' ? ' modal__pronoPct--winner' : ''}`}>{prono.away}%</span>
-      </div>
-      <div className="modal__pronoBar modal__pronoBar--thin">
-        <div className="modal__pronoSeg modal__pronoSeg--home" style={{ '--prono-home': prono.home }} />
-        <div className="modal__pronoSeg modal__pronoSeg--draw" style={{ '--prono-draw': prono.draw }} />
-        <div className="modal__pronoSeg modal__pronoSeg--away" style={{ '--prono-away': prono.away }} />
-      </div>
-      <div className="modal__pronoKeys">
-        <span>Victoire</span>
-        <span>Nul</span>
-        <span>Victoire</span>
-      </div>
-      <p className="modal__pronoDisclaimer">Basé sur la forme des 5 derniers matchs</p>
-    </div>
-  )
-}
-
 // ── Section pré-match ────────────────────────────────────────────────────────
 // Affichée pour les matchs à venir : prono + forme 5 derniers + H2H
 
@@ -1362,38 +1333,7 @@ export function MatchStatsSection({ match }) {
   )
 }
 
-// Bloc "Probabilités estimées" (design pm__* de MatchPage) — extrait de
-// PreMatchSection pour pouvoir être affiché seul, en haut de page, sans
-// dupliquer le JSX (voir usage dans MatchPage.jsx).
-export function PmPronoSection({ prono }) {
-  if (!prono) return null
-  const winner = prono.home >= prono.away && prono.home >= prono.draw ? 'home'
-    : prono.away >= prono.home && prono.away >= prono.draw ? 'away'
-    : 'draw'
-  return (
-    <div className="pm__section">
-      <h3 className="pm__sectionTitle">Probabilités estimées</h3>
-      <div className="pm__pronoPercents">
-        <span className={`pm__pronoPct${winner === 'home' ? ' pm__pronoPct--winner' : ''}`}>{prono.home}%</span>
-        <span className={`pm__pronoPct pm__pronoPct--draw${winner === 'draw' ? ' pm__pronoPct--winner' : ''}`}>{prono.draw}%</span>
-        <span className={`pm__pronoPct${winner === 'away' ? ' pm__pronoPct--winner' : ''}`}>{prono.away}%</span>
-      </div>
-      <div className="pm__pronoBar pm__pronoBar--thin">
-        <div className="pm__pronoSeg pm__pronoSeg--home" style={{ '--p': prono.home }} />
-        <div className="pm__pronoSeg pm__pronoSeg--draw" style={{ '--p': prono.draw }} />
-        <div className="pm__pronoSeg pm__pronoSeg--away" style={{ '--p': prono.away }} />
-      </div>
-      <div className="pm__pronoTeams">
-        <span>Victoire</span>
-        <span>Nul</span>
-        <span>Victoire</span>
-      </div>
-      <p className="pm__disclaimer">Basé sur la forme des 5 derniers matchs</p>
-    </div>
-  )
-}
-
-export function PreMatchSection({ match, prono, formMap, compMatches, hideStats = false, hideProno = false }) {
+export function PreMatchSection({ match, formMap, compMatches, hideStats = false, hideProno = false }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -1402,9 +1342,9 @@ export function PreMatchSection({ match, prono, formMap, compMatches, hideStats 
   return (
     <div className="pm__wrap">
 
-      {/* Prono — masqué si déjà affiché ailleurs (ex: MatchPage l'affiche
-          en haut de page, au-dessus de "Stats saison") */}
-      {!hideProno && <PmPronoSection prono={prono} />}
+      {/* Pronostic des fans — masqué si déjà affiché ailleurs (ex: MatchPage
+          l'affiche en haut de page, au-dessus de "Stats saison") */}
+      {!hideProno && <LivePulse matchId={match.id} homeShort={homeName} awayShort={awayName} />}
 
       {/* Dernières confrontations — en premier pour voir l'historique direct */}
       <H2HSection match={match} compMatches={compMatches} />
@@ -1454,7 +1394,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   const pickPreTab = (t) => goPreTab(t, null)
 
   // ── Swipe entre onglets (mobile) ──────────────────────────────────────────
-  const LIVE_TABS = ['livestats','compos','prono','classement']
+  const LIVE_TABS = ['livestats','compos','classement']
   const PRE_TABS  = ['avant-match','compos','classement']
 
   const swipeLive = useSwipe(
@@ -1512,26 +1452,21 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
 
   if (!match) return null
 
-  // Prono basé sur la forme FD.org — en direct, on le réévalue selon le
-  // score réel et le temps restant (calcLiveProno) plutôt que de garder le
-  // pronostic pré-match figé pendant tout le match.
+  // calcLiveProno n'est plus affiché tel quel (remplacé par LivePulse, le
+  // pronostic des fans) — gardé uniquement pour alimenter l'échantillonnage
+  // de la courbe de bascule post-match (voir <ProbaCurve> sur MatchPage).
   const hForm = formMap?.[match.homeTeam?.id]
   const aForm = formMap?.[match.awayTeam?.id]
   const liveMinute = isLive ? calcMinute(match) : null
-  const prono = !isFinished && (hForm || aForm)
-    ? (isLive
-        ? calcLiveProno(
-            hForm, aForm,
-            mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
-            mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
-            liveMinute
-          )
-        : calcProno(hForm, aForm))
+  const prono = isLive && (hForm || aForm)
+    ? calcLiveProno(
+        hForm, aForm,
+        mergeScore(espnScore?.home, match.score?.fullTime?.home ?? match.score?.halfTime?.home),
+        mergeScore(espnScore?.away, match.score?.fullTime?.away ?? match.score?.halfTime?.away),
+        liveMinute
+      )
     : null
 
-  // Échantillonnage pour la courbe de bascule post-match (voir <ProbaCurve>,
-  // affichée sur MatchPage une fois le match terminé) — un point par minute,
-  // dédupliqué en amont dans probaCurve.js.
   if (isLive && prono) recordProbaSample(match.id, liveMinute, prono)
 
   const hs  = match.score?.fullTime?.home
@@ -1656,6 +1591,17 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
           />
         ) : isLive ? (
           <div ref={swipeLive.ref}>
+            {/* Pronostic des fans — modal-wide, au-dessus des onglets (pas
+                dans un onglet dédié, remplace l'ancienne barre de proba
+                algorithmique déjà visible sur l'Accueil via MatchPoster). */}
+            <LivePulse
+              matchId={match.id}
+              homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
+              awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
+              locked
+              showReactions
+            />
+
             {/* Onglets match en cours */}
             <div className="modal__tabs">
               <button
@@ -1666,21 +1612,12 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
                 className={`modal__tab${tab === 'compos' ? ' modal__tab--active' : ''}`}
                 onClick={() => pickTab('compos')}
               >Compos</button>
-              {prono && (
-                <button
-                  className={`modal__tab${tab === 'prono' ? ' modal__tab--active' : ''}`}
-                  onClick={() => pickTab('prono')}
-                >Prono</button>
-              )}
               <button
                 className={`modal__tab${tab === 'classement' ? ' modal__tab--active' : ''}`}
                 onClick={() => pickTab('classement')}
               >Classement</button>
             </div>
-            <TabDots
-              count={LIVE_TABS.filter(t => t !== 'prono' || prono).length}
-              active={LIVE_TABS.filter(t => t !== 'prono' || prono).indexOf(tab)}
-            />
+            <TabDots count={LIVE_TABS.length} active={LIVE_TABS.indexOf(tab)} />
             <div
               key={tab}
               className={`modal__tabContent${!swipeLive.isDragging && tabDir === 'left' ? ' modal__tabContent--fromRight' : !swipeLive.isDragging && tabDir === 'right' ? ' modal__tabContent--fromLeft' : ''}`}
@@ -1692,13 +1629,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               {tab === 'livestats' && <LiveStatsTab match={match} espnScore={espnScore} compMatches={compMatches} />}
               {tab === 'compos'      && <ComposTab match={match} compMatches={compMatches} />}
               {tab === 'classement'  && <ClassementTab match={match} compId={compId} />}
-              {tab === 'prono'       && (
-                <PronoSection
-                  prono={prono}
-                  homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-                  awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
-                />
-              )}
             </div>
           </div>
         ) : (
@@ -1730,7 +1660,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
               {preTab === 'avant-match' && (
                 <PreMatchSection
                   match={match}
-                  prono={prono}
                   formMap={formMap}
                   compMatches={compMatches}
                 />

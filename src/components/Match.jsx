@@ -8,7 +8,6 @@ import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
 import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { calcProno } from '../utils/calcProno'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
 
