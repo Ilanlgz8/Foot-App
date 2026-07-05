@@ -48,7 +48,12 @@ export function useGoalsByMinute(selectedComp, finishedMatches) {
   const matchIds = matches.map(m => m.id).join(',')
 
   return useQuery({
-    queryKey: ['goalsByMinute', selectedComp, matchIds],
+    // 'v2' : bump volontaire — l'app persiste les résultats React Query en
+    // localStorage 24h (voir main.jsx). Sans ce bump, les navigateurs ayant
+    // déjà ouvert Tendances AVANT le fix de la date ESPN (voir commit
+    // précédent) resserviraient leur résultat vide en cache pendant jusqu'à
+    // 15min (staleTime) sans jamais retenter le vrai fetch corrigé.
+    queryKey: ['goalsByMinute', 'v2', selectedComp, matchIds],
     enabled: !!slug && matches.length > 0,
     staleTime: 15 * 60_000,
     retry: 1,
