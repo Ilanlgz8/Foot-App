@@ -103,7 +103,24 @@ body::before {
   object-fit: contain !important;
   transform: none !important;
 }
+/* ⚠️ CORRIGÉ : le cercle n'était pas assez "forcé" pour les pays — je ne
+   forçais que object-fit sur l'<img>, en comptant sur le border-radius/
+   overflow déjà posé par la classe CSS de chaque composant (ex:
+   classement__teamCrestWrap). Ça ne suffit pas avec object-fit:contain : si
+   le drapeau ne remplit pas tout le cadre (lettrboxing), les coins de
+   l'image restent visibles/carrés à l'intérieur d'un cercle qui n'a plus
+   rien à découper → le rond ne se voit plus du tout. Fix : forcer le cercle
+   ET un fond neutre directement sur le wrapper (au lieu de compter sur
+   chaque composant), pour que le cadre circulaire reste visible même quand
+   le drapeau ne le remplit pas entièrement. */
+[data-crest="country"] {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
 [data-crest="country"] > img {
+  width: 100% !important;
+  height: 100% !important;
   object-fit: contain !important;
   transform: none !important;
 }
