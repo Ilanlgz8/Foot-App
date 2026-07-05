@@ -689,6 +689,7 @@ function Classement() {
         {/* ── Vue Tendances ── */}
         {view === 'tendances' && (
           <TendancesView
+            selectedComp={selectedComp}
             standings={standings}
             matches={trendsMatches}
             loading={trendsLoading || loading}
