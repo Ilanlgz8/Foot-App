@@ -144,7 +144,13 @@ body::before {
 [data-crest="country"] img[data-team="Argentina"],
 [data-crest="country"] img[data-team="Jordan"],
 [data-crest="country"] img[data-team="Uzbekistan"],
-[data-crest="country"] img[data-team="Korea Republic"] {
+[data-crest="country"] img[data-team="Korea Republic"],
+[data-crest="country"] img[data-team="South Korea"] {
+  /* ⚠️ Corée du Sud : le nom exact varie selon la source (football-data.org
+     vs ESPN) — "Korea Republic" ET "South Korea" existent tous les deux
+     ailleurs dans l'app pour cette même équipe (voir teamPhotos.js). Le 1er
+     essai ne ciblait que "Korea Republic" → ne matchait pas partout où
+     l'autre variante est utilisée. Les deux valeurs couvertes ici. */
   transform: scale(1.75) !important;
 }
 
