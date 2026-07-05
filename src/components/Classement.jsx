@@ -690,9 +690,8 @@ function Classement() {
         {view === 'tendances' && (
           <TendancesView
             selectedComp={selectedComp}
-            standings={standings}
             matches={trendsMatches}
-            loading={trendsLoading || loading}
+            loading={trendsLoading}
             isCountry={selectedComp === 'WC'}
           />
         )}

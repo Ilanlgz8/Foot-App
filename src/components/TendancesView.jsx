@@ -2,12 +2,20 @@
 // compétition (buts marqués, répartition des buts par minute de jeu,
 // meilleures attaques/défenses).
 //
-// Les KPI + meilleures attaques/défenses viennent de standings + liste des
-// matchs terminés, déjà fetchées ailleurs dans l'app (aucun appel réseau
-// dédié). La répartition par minute vient d'ESPN (useGoalsByMinute.js) —
-// seule source qui expose la minute exacte de chaque but ; voir le
-// commentaire de ce hook pour le détail du coût réseau et pourquoi ce n'est
-// pas possible via football-data.org.
+// ⚠️ Meilleures attaques/défenses : NE PAS utiliser standings[].goalsFor —
+// pour une compétition à élimination directe (WC, CL...), football-data.org
+// fige goalsFor/goalsAgainst à la fin de la phase de poules : les buts
+// marqués/encaissés en 8es/quarts/demies/finale n'y sont JAMAIS ajoutés. Une
+// équipe qui marque en poules puis enchaîne plusieurs matchs à élimination
+// directe se retrouvait donc sous-comptée (constat utilisateur : chiffres
+// faux dès que la phase de poules est terminée). On recalcule à la place
+// nous-mêmes en additionnant les scores de TOUS les matchs terminés
+// (poules + élimination directe), déjà présents dans `matches`.
+//
+// Les KPI viennent de la liste des matchs terminés, déjà fetchée ailleurs
+// dans l'app (aucun appel réseau dédié). La répartition par minute vient
+// d'ESPN (useGoalsByMinute.js) — seule source qui expose la minute exacte de
+// chaque but ; voir le commentaire de ce hook pour le détail du coût réseau.
 //
 // Volontairement absent : classement des cartons (ESPN les expose aussi via
 // comp.details, mais rien ne les agrège encore ici — pas fabriqué, donc pas
@@ -24,6 +32,30 @@ function sumGoals(matches) {
     if (h == null || a == null) return acc
     return acc + h + a
   }, 0)
+}
+
+// Additionne buts marqués/encaissés par équipe sur TOUS les matchs terminés
+// fournis (poules ET élimination directe) — contrairement à standings[], qui
+// s'arrête à la fin des poules pour ce genre de compétition.
+function aggregateTeamGoals(matches) {
+  const map = new Map()
+  for (const m of matches) {
+    const hs = m.score?.fullTime?.home
+    const as = m.score?.fullTime?.away
+    const home = m.homeTeam
+    const away = m.awayTeam
+    if (hs == null || as == null || !home?.id || !away?.id) continue
+
+    if (!map.has(home.id)) map.set(home.id, { team: home, goalsFor: 0, goalsAgainst: 0, played: 0 })
+    if (!map.has(away.id)) map.set(away.id, { team: away, goalsFor: 0, goalsAgainst: 0, played: 0 })
+
+    const h = map.get(home.id)
+    h.goalsFor += hs; h.goalsAgainst += as; h.played += 1
+
+    const a = map.get(away.id)
+    a.goalsFor += as; a.goalsAgainst += hs; a.played += 1
+  }
+  return [...map.values()]
 }
 
 function TeamRankRow({ rank, team, value, isCountry }) {
@@ -47,7 +79,7 @@ function TeamRankRow({ rank, team, value, isCountry }) {
   )
 }
 
-export function TendancesView({ selectedComp, standings, matches, loading, isCountry }) {
+export function TendancesView({ selectedComp, matches, loading, isCountry }) {
   const finished = useMemo(
     () => (matches ?? []).filter(m => m.status === 'FINISHED'),
     [matches]
@@ -65,15 +97,15 @@ export function TendancesView({ selectedComp, standings, matches, loading, isCou
   const maxGoals = Math.max(1, ...rounds.map(r => r.goals))
   const hasMinuteData = rounds.some(r => r.goals > 0)
 
-  const eligible = (standings ?? []).filter(t => t.playedGames > 0)
-  const bestAttacks  = [...eligible].sort((a, b) => (b.goalsFor ?? 0) - (a.goalsFor ?? 0)).slice(0, 5)
-  const bestDefenses = [...eligible].sort((a, b) => (a.goalsAgainst ?? 0) - (b.goalsAgainst ?? 0)).slice(0, 5)
+  const teamGoals = useMemo(() => aggregateTeamGoals(finished), [finished])
+  const bestAttacks  = [...teamGoals].sort((a, b) => (b.goalsFor ?? 0) - (a.goalsFor ?? 0)).slice(0, 5)
+  const bestDefenses = [...teamGoals].sort((a, b) => (a.goalsAgainst ?? 0) - (b.goalsAgainst ?? 0)).slice(0, 5)
 
   if (loading) {
     return <div className="trends"><p className="trends__hint">Calcul des tendances…</p></div>
   }
 
-  if (playedCount === 0 && eligible.length === 0) {
+  if (playedCount === 0 && teamGoals.length === 0) {
     return (
       <div className="trends">
         <p className="trends__hint">Pas encore assez de matchs joués pour dégager des tendances.</p>
