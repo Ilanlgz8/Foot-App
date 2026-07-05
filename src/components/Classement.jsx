@@ -689,7 +689,6 @@ function Classement() {
         {/* ── Vue Tendances ── */}
         {view === 'tendances' && (
           <TendancesView
-            selectedComp={selectedComp}
             matches={trendsMatches}
             loading={trendsLoading}
             isCountry={selectedComp === 'WC'}

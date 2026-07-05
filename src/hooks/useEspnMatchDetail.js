@@ -114,26 +114,6 @@ function extractFromSummary(json, homeTeamId) {
   }
 }
 
-// Extrait UNIQUEMENT les minutes de but (pas le côté home/away, pas le nom du
-// buteur) d'une réponse summary ESPN — utilisé par useGoalsByMinute.js pour
-// agréger la répartition des buts par minute sur toute une compétition, sans
-// dupliquer la logique déjà écrite dans extractFromSummary ci-dessus.
-export function extractGoalMinutes(json) {
-  const comp = json?.header?.competitions?.[0] ?? json?.competitions?.[0]
-  const minutes = []
-  for (const play of json?.plays ?? []) {
-    if (play.type?.id !== '57' && play.scoringPlay !== true) continue
-    if (play.clock?.displayValue) minutes.push(play.clock.displayValue)
-  }
-  if (minutes.length === 0) {
-    for (const d of (comp?.details ?? [])) {
-      if (d.type?.text !== 'Goal' && d.type?.id !== '57') continue
-      if (d.clock?.displayValue) minutes.push(d.clock.displayValue)
-    }
-  }
-  return minutes
-}
-
 export function useEspnMatchDetail(match, compId, enabled = true) {
   const slug = COMP_ESPN[compId] ?? COMP_ESPN[match?.competition?.id] ?? null
 
