@@ -337,7 +337,11 @@ export default function Live() {
 
         {/* Grille */}
         {live.length === 0 ? (
-          <div className="live__empty">Aucun match en direct pour le moment.</div>
+          <div className="live__empty">
+            <span className="live__emptyIcon" aria-hidden="true">⚽</span>
+            <p className="live__emptyTitle">Aucun match en direct</p>
+            <p className="live__emptyHint">Reviens à l'heure du coup d'envoi pour suivre les scores en temps réel.</p>
+          </div>
         ) : (
           <div className="live__grid">
             {live.map(match => (
