@@ -1672,20 +1672,7 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   // calcLiveProno n'est plus affiché tel quel (remplacé par LivePulse, le
   // pronostic des fans) — gardé uniquement pour alimenter l'échantillonnage
   // de la courbe de bascule post-match (voir <ProbaCurve> sur MatchPage).
-  const hForm = formMap?.[match.homeTeam?.id]
-  const aForm = formMap?.[match.awayTeam?.id]
-  const liveMinute = isLive ? calcMinute(match) : null
-  const fsPanel = finalScore(match.score)
-  const prono = isLive && (hForm || aForm)
-    ? calcLiveProno(
-        hForm, aForm,
-        mergeScore(espnScore?.home, fsPanel.home ?? match.score?.halfTime?.home),
-        mergeScore(espnScore?.away, fsPanel.away ?? match.score?.halfTime?.away),
-        liveMinute
-      )
-    : null
-
-  if (isLive && prono) recordProbaSample(match.id, liveMinute, prono)
+  
 
   const { home: hs, away: as_ } = fsPanel
   // Score 120min (finalScore) : un match décidé aux tirs au but y est
