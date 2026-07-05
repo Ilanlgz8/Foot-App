@@ -617,12 +617,26 @@
   text-align: center;
 }
 
-/* ── Empty state ── */
+/* ── Empty state — même traitement que .live__empty (icône + titre),
+   plutôt qu'une simple ligne de texte grise perdue dans le panneau. ── */
 .accueil__tickerEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
   padding: 3rem 1rem;
   text-align: center;
+  animation: fadeUp 0.3s ease both;
+}
+.accueil__tickerEmptyIcon {
+  font-size: 1.8rem;
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+.accueil__tickerEmptyTitle {
   color: #475569;
   font-size: 0.78rem;
+  font-weight: 600;
 }
 
 /* ══════════════════════════════════════════

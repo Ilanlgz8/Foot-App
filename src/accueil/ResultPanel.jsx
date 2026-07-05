@@ -62,14 +62,17 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
       <div className="accueil__dashPanelBody">
         {loading && <PanelSkeleton />}
         {!loading && results.length === 0 && (
-          <p className="accueil__tickerEmpty">Aucun résultat disponible.</p>
+          <div className="accueil__tickerEmpty">
+            <span className="accueil__tickerEmptyIcon" aria-hidden="true">⚽</span>
+            <p className="accueil__tickerEmptyTitle">Aucun résultat disponible</p>
+          </div>
         )}
 
         {/* Chronologique */}
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
-              <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
+              <div key={match.id ?? i} className="accueil__matchCardClickable" onClick={() => navigate(`/match/${match.id}`, { state: { match } })}>
                 <MatchCard match={match} noWinnerLoser noGradient />
               </div>
             ))}
@@ -84,7 +87,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
                 <p className="accueil__compGroupTitle">{name}</p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
-                    <div key={match.id ?? i} onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
+                    <div key={match.id ?? i} className="accueil__matchCardClickable" onClick={() => navigate(`/match/${match.id}`, { state: { match } })}>
                       <MatchCard match={match} noWinnerLoser noGradient />
                     </div>
                   ))}
