@@ -546,7 +546,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   if (hasEspn) {
     return (
       <div>
-        {dangerBlock}
+       
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -561,7 +561,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
     }
     return (
       <div>
-        {dangerBlock}
+        
         {fifaStats
           ? <ESPNStats stats={fifaStats} />
           : <p className="modal__noEvents">Stats non disponibles</p>
@@ -576,7 +576,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   if (summaryStats) {
     return (
       <div>
-        {dangerBlock}
+       
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -602,7 +602,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
 
   return (
     <div>
-      {dangerBlock}
+     
       {rows.length > 0 ? (
         <div className="modal__espnStats">
           {rows.map(item => (
