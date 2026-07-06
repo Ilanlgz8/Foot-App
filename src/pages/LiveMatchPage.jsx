@@ -332,7 +332,6 @@ export default function LiveMatchPage() {
     : null
 
   // Échantillonnage pour la courbe de bascule post-match (voir <ProbaCurve>).
-  if (match && prono) recordProbaSample(match.id, liveMinute, prono)
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
   // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient).
