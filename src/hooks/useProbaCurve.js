@@ -5,6 +5,7 @@
 // plus : staleTime infini, pas de polling.
 import { useQuery } from '@tanstack/react-query'
 
+
 export function useProbaCurve(matchId, enabled = true) {
   const id = matchId != null ? String(matchId) : null
 

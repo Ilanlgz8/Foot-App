@@ -10,6 +10,7 @@
 //
 // Dédup en mémoire (pas besoin de persister davantage) : évite un POST par
 // poll pour une minute déjà envoyée durant cette session.
+import { updateDangerMeter } from './dangerMeter'
 const sentMinutes = new Map() // matchId -> Set<number>
 
 function parseMinuteToNumber(minute) {
