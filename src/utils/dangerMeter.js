@@ -40,13 +40,13 @@ function statsEqual(a, b) {
  * @param {{home:{shots,shotsOnTarget,corners}, away:{shots,shotsOnTarget,corners}}|null} stats
  * @returns {{homePct:number, awayPct:number, hasSignal:boolean}|null}
  */
-export function updateDangerMeter(matchId, stats) {
-  if (!matchId || !stats?.home || !stats?.away) return null
-  const key = String(matchId)
-  const prior = state.get(key) ?? {
-    home: 0, away: 0, prevStats: null,
-    lastPct: { homePct: 50, awayPct: 50, hasSignal: false },
-  }
+// export function updateDangerMeter(matchId, stats) {
+//   if (!matchId || !stats?.home || !stats?.away) return null
+//   const key = String(matchId)
+//   const prior = state.get(key) ?? {
+//     home: 0, away: 0, prevStats: null,
+//     lastPct: { homePct: 50, awayPct: 50, hasSignal: false },
+//   }
 
   // Rien de nouveau depuis le dernier appel (même relevé de stats, ex.
   // re-render sans nouveau poll) → ne pas ré-appliquer la décroissance.
@@ -73,4 +73,4 @@ export function updateDangerMeter(matchId, stats) {
 
   state.set(key, { home, away, prevStats: stats, lastPct: pct })
   return pct
-}
+

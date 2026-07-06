@@ -42,7 +42,7 @@ import '../live.css'
 // l'app, ex: Resultat.jsx qui importe match.css).
 import './LiveMatchPage.css'
 
-const updateDangerMeter = () => {}
+
 
 // ── Fetch fallback si accès direct par URL ────────────────────────────────────
 function useMatchData(matchId, initialMatch) {
