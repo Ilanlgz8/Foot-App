@@ -12,7 +12,6 @@ import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, matchOutcome } from '../utils/matchUtils'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
-import { ProbaCurve }              from '../components/ProbaCurve'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -609,7 +608,7 @@ export default function MatchPage() {
                         contenu des stats (remplace l'ancienne barre de
                         proba algorithmique, déjà visible sur l'Accueil
                         via MatchPoster). */}
-                    <ProbaCurve matchId={match.id} homeShort={homeShort} awayShort={awayShort} />
+                    
                     {statsView === 'live'
                       ? <MpMatchStats match={match} />
                       : <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
