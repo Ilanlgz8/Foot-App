@@ -537,16 +537,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   // Jauge de dangerosité, affichée en haut du tab stats — le pronostic des
   // fans (LivePulse) est affiché plus haut, au niveau de la modale/page
   // entière (pas dupliqué ici), voir MatchModal/LiveMatchPage.
-  const dangerBlock = isLive ? (
-    <div style={{ marginBottom: '0.25rem' }}>
-      <DangerMeter
-        matchId={match.id}
-        stats={activeStats}
-        homeShort={homeShort || homeName}
-        awayShort={awayShort || awayName}
-      />
-    </div>
-  ) : null
+  
 
   // H2H affiché en bas pour matchs terminés (pas en live pour ne pas alourdir)
   const h2hBlock = !isLive ? <H2HSection match={match} compMatches={compMatches} /> : null
