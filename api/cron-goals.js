@@ -93,11 +93,29 @@ function fifaTeamNamesAll(team) {
 // ⚠️ Volontairement PAS de mapping vers STATUS_FINAL ici : FIFA peut retourner un
 // faux statut "terminé" lors de transitions normales (VAR, mi-temps) — même limite
 // documentée côté client (useLiveMinute.js) contre les faux FT. On ne l'utilise donc
-// que pour accélérer la détection du coup d'envoi et de la mi-temps, jamais la fin.
+// que pour accélérer la détection du coup d'envoi et de la mi-temps, jamais la fin —
+// SAUF le cas étroit de fifaConfirmsShootoutOver() ci-dessous (fin des tab), où ce
+// risque de faux positif ne s'applique pas (voir son commentaire).
 function fifaEffectiveStatus(m) {
   if (m.MatchStatus !== 1 || m.Period === 0) return null
   if (m.Period === 3 || m.Period === 5) return 'STATUS_HALFTIME'
   return 'STATUS_IN_PROGRESS'
+}
+
+// ⚠️ FIX retard fin de tirs au but (~7min, constat utilisateur + vérifié sur le
+// vrai match Suisse-Colombie CM 2026 : dernier tir au but réel à 22:50:28Z d'après
+// le wallclock ESPN lui-même, mais ESPN ne bascule son statut scoreboard en
+// STATUS_FINAL_PEN que vers 22:57:27Z — ESPN a donc ~7min de retard sur SES
+// PROPRES données détaillées pour confirmer la fin du match aux tab).
+// Le risque de faux positif qui interdit d'utiliser FIFA pour déclarer la fin
+// en temps normal (VAR pendant le jeu, cf fifaEffectiveStatus ci-dessus) ne
+// s'applique PAS ici : cette fonction n'est appelée QUE quand ESPN nous a déjà
+// confirmé nous-mêmes que le match est en tirs au but (STATUS_SHOOTOUT) — donc
+// après 120min+ confirmées par ESPN. Aucune transition de jeu normal (VAR,
+// mi-temps) ne peut ressembler à "MatchStatus=3 Period=8" dans cette fenêtre :
+// soit les tab sont réellement finis, soit ils continuent (Period reste 7).
+function fifaConfirmsShootoutOver(m) {
+  return m.MatchStatus === 3 && m.Period === 8
 }
 
 async function fetchFifaLiveMatches(log) {
@@ -544,6 +562,12 @@ export default async function handler(req, res) {
           // HALFTIME → IN_PROGRESS ni pour déclarer une fin de match.)
           status = 'STATUS_HALFTIME'
           log.push(`[fifa-override:${eventId}] ESPN=IN_PROGRESS → FIFA=HALFTIME (mi-temps anticipée)`)
+        } else if (status === 'STATUS_SHOOTOUT' && fifaConfirmsShootoutOver(fifaMatch)) {
+          // Voir commentaire de fifaConfirmsShootoutOver() : fenêtre étroite et sûre
+          // (ESPN nous a déjà confirmé nous-mêmes qu'on est en tab), donc pas le
+          // même risque de faux FT que pendant le jeu normal.
+          status = 'STATUS_FINAL_PEN'
+          log.push(`[fifa-override:${eventId}] ESPN=STATUS_SHOOTOUT → FIFA=FINAL (fin tab anticipée)`)
         }
         const fh = fifaMatch.HomeTeam?.Score
         const fa = fifaMatch.AwayTeam?.Score
@@ -599,6 +623,17 @@ export default async function handler(req, res) {
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
       try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away, pendingSince: {} }), { ex: 12 * 3600 }) } catch {}
       continue
+    }
+
+    // ⚠️ Diagnostic (constat : la notif "mi-temps" ne s'est jamais déclenchée sur
+    // plusieurs vrais matchs de CM 2026 récents alors qu'ils ont bien eu une vraie
+    // pause — aucune preuve directe trouvée dans le code, ESPN pourrait ne jamais
+    // renvoyer STATUS_HALFTIME pour ce statut précis, ou une autre valeur inconnue).
+    // Log de CHAQUE transition de statut brute (pas juste celles qu'on gère
+    // explicitement plus bas) pour avoir la preuve exacte au prochain match live,
+    // au lieu de deviner un correctif sans donnée réelle.
+    if (status !== prevStatus) {
+      log.push(`[espn:${slug}:${eventId}] transition ${prevStatus} → ${status} (period=${comp.status?.period ?? '?'}, clock=${comp.status?.displayClock ?? '?'})`)
     }
 
     // ⚽ But — approche "toujours complète, quitte à attendre un peu" (choix

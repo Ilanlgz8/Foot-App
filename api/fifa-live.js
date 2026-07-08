@@ -575,6 +575,19 @@ export default async function handler(req, res) {
       }
     }
 
+    // ⚠️ FIX retard fin de tirs au but (~7min, vérifié sur un vrai match CM 2026 :
+    // dernier tir réel confirmé par le wallclock ESPN lui-même à 22:50:28Z, mais
+    // ESPN ne bascule son statut scoreboard en STATUS_FINAL_PEN que vers 22:57:27Z —
+    // ESPN a du retard sur SES PROPRES données détaillées pour confirmer la fin aux
+    // tab). Contrairement à l'usage normal de fifaToEspnStatus() (jamais fiable pour
+    // déclarer une fin de match en cours de jeu — VAR pouvant faussement ressembler à
+    // Period=8), cette fenêtre est sûre : on ne l'utilise QUE quand ESPN nous a déjà
+    // confirmé nous-mêmes être en tirs au but (STATUS_SHOOTOUT) — donc après 120min+
+    // confirmées par ESPN, où aucune transition de jeu normal ne peut se produire.
+    if (isWC && espnStatus === 'STATUS_SHOOTOUT' && fifaD?.fifaRaw?.MatchStatus === 3 && fifaD.fifaRaw.Period === 8) {
+      finalEspnStatus = 'STATUS_FINAL_PEN'
+    }
+
     // Score : FIFA si WC (plus réactif sur les buts), ESPN sinon
     // Pour WC : max(FIFA, ESPN) → le premier à détecter le but gagne
     // Évite d'attendre FIFA si ESPN a déjà mis à jour (ou inversement)
