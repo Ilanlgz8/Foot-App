@@ -184,3 +184,84 @@ body::before {
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.35rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM v2 — refonte navigation/UX (tokens --sf-*)
+   Coexiste avec les anciens tokens le temps de la migration.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  /* Surfaces noir-marine */
+  --sf-bg:        #0a0c14;
+  --sf-surface:   #131829;
+  --sf-surface-2: #1a2138;
+  --sf-surface-3: #232c4a;
+
+  /* Identité rouge */
+  --sf-red:       #fb3b4e;
+  --sf-red-light: #ff7382;
+  --sf-red-deep:  #b81830;
+  --sf-red-rgb:   251, 59, 78;
+
+  /* LIVE — rouge vif (demande : direct en rouge, pas en vert) */
+  --sf-live:      #ff2e43;
+  --sf-live-rgb:  255, 46, 67;
+  /* Minutes des matchs en direct — rouge clair (mais pas trop) */
+  --sf-live-min:  #ff7b85;
+
+  /* Or champagne — vainqueurs, leaders, moments forts */
+  --sf-gold:      #f6c667;
+  --sf-gold-rgb:  246, 198, 103;
+
+  --sf-text:      #f5f7fd;
+  --sf-muted:     #9aa3bb;
+  --sf-faint:     #5d6580;
+
+  --sf-border:    rgba(148, 163, 210, 0.12);
+  --sf-radius:    16px;
+  --sf-radius-s:  10px;
+
+  --sf-font-display: 'Archivo', 'Chakra Petch', system-ui, sans-serif;
+  --sf-font-body:    'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Contour rouge animé pour les widgets LIVE ──────────────────
+   Usage : ajouter la classe .sf-liveBorder à n'importe quelle card
+   (elle doit avoir un border-radius). Le contour conic-gradient
+   tourne en continu — réservé aux éléments en direct uniquement. */
+@property --sf-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes sfLiveSpin {
+  to { --sf-angle: 360deg; }
+}
+.sf-liveBorder {
+  position: relative;
+}
+.sf-liveBorder::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sf-angle),
+    var(--sf-live) 0deg,
+    rgba(var(--sf-live-rgb), 0.45) 40deg,
+    rgba(var(--sf-live-rgb), 0.08) 110deg,
+    rgba(var(--sf-live-rgb), 0.08) 250deg,
+    rgba(var(--sf-live-rgb), 0.45) 320deg,
+    var(--sf-live) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: sfLiveSpin 3.2s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf-liveBorder::before { animation: none; }
+}

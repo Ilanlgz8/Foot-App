@@ -1,196 +1,185 @@
-import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+/**
+ * Navbar v2 — refonte navigation
+ *
+ * Mobile  (<640px) : header [date | StatFootix centré | cloche]
+ *                    + bottom tab bar fixe (zone du pouce) avec orb Live central
+ * Desktop (≥640px) : header [brand | liens | DIRECT + cloche]
+ *
+ * L'orb Live est TOUJOURS visible (fini le layout shift) :
+ * badge + pulsation uniquement quand des matchs sont en cours.
+ */
+import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
-import '../accueil.css'
 
-const navigation = [
+const NAV = [
   { name: 'Accueil',    href: '/' },
   { name: 'Programme',  href: '/matchs' },
   { name: 'Résultats',  href: '/resultats' },
   { name: 'Classement', href: '/classement' },
 ]
 
-// Icônes SVG pour la barre de nav mobile
-const QN_ICONS = {
+/* Icônes tab bar — variante outline (inactif) + variante pleine (actif).
+   Les deux sont rendues, le CSS affiche la bonne selon l'état. */
+const ICONS = {
   '/': (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12L12 2l10 10"/>
-      <path d="M4 10v10a1 1 0 001 1h5v-6h4v6h5a1 1 0 001-1V10"/>
-    </svg>
+    <>
+      <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 10.5L12 3l9 7.5" />
+        <path d="M5 9.5V20a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V9.5" />
+      </svg>
+      <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2.5l9.5 7.9a1 1 0 01-.64 1.77H20V20a2 2 0 01-2 2h-3.5v-6.5h-5V22H6a2 2 0 01-2-2v-7.83H3.14a1 1 0 01-.64-1.77L12 2.5z" />
+      </svg>
+    </>
   ),
   '/matchs': (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="17" rx="2.5"/>
-      <path d="M3 9h18"/>
-      <path d="M8 2v4M16 2v4"/>
-      <circle cx="8" cy="14" r="0.9" fill="currentColor"/>
-      <circle cx="12" cy="14" r="0.9" fill="currentColor"/>
-      <circle cx="16" cy="14" r="0.9" fill="currentColor"/>
-      <circle cx="8" cy="18" r="0.9" fill="currentColor"/>
-      <circle cx="12" cy="18" r="0.9" fill="currentColor"/>
-    </svg>
+    <>
+      <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="17" rx="3" />
+        <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+      </svg>
+      <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M7 2.5a1 1 0 012 0V4h6V2.5a1 1 0 012 0V4h1a3 3 0 013 3v1.5H3V7a3 3 0 013-3h1V2.5zM3 10.5h18V19a3 3 0 01-3 3H6a3 3 0 01-3-3v-8.5zm5 3.5a1.2 1.2 0 100 2.4A1.2 1.2 0 008 14zm4 0a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4zm4 0a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z" />
+      </svg>
+    </>
   ),
   '/resultats': (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-    </svg>
+    <>
+      <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8.5 12.2l2.4 2.4 4.8-5" />
+      </svg>
+      <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.5 7.3l-5.2 5.5a1 1 0 01-1.44.02L7.5 12.4a1 1 0 111.42-1.4l1.63 1.65 4.5-4.76a1 1 0 111.45 1.38z" />
+      </svg>
+    </>
   ),
   '/classement': (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="14" width="5" height="7" rx="1"/>
-      <rect x="9.5" y="9" width="5" height="12" rx="1"/>
-      <rect x="17" y="4" width="5" height="17" rx="1"/>
-    </svg>
+    <>
+      <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 01-10 0V4z" />
+        <path d="M7 6H4.5a1 1 0 00-1 1c0 2.2 1.6 4 3.7 4.4M17 6h2.5a1 1 0 011 1c0 2.2-1.6 4-3.7 4.4" />
+      </svg>
+      <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M7 3h10a1 1 0 011 1v1h2a1 1 0 011 1c0 2.9-2 5.4-4.8 6.1A6 6 0 0114.5 15v2.5H17a1 1 0 011 1V21H6v-2.5a1 1 0 011-1h2.5V15a6 6 0 01-2.7-2.9C4 11.4 2 8.9 2 6a1 1 0 011-1h3V4a1 1 0 011-1zm-1 4H4.1c.3 1.5 1.3 2.7 2.6 3.3A6 6 0 016 8V7zm14 0h-2v1c0 .8-.2 1.6-.6 2.3 1.4-.6 2.3-1.8 2.6-3.3z" />
+      </svg>
+    </>
   ),
 }
 
-function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const close = () => setMobileOpen(false)
+/* Ballon de foot — orb Live central */
+const BallIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7l3.4 2.5-1.3 4h-4.2l-1.3-4L12 7z" fill="currentColor" stroke="none" />
+    <path d="M12 7V3.2M15.4 9.5l3.6-1.3M14.1 13.5l2.3 3.2M9.9 13.5l-2.3 3.2M8.6 9.5L5 8.2" />
+  </svg>
+)
 
+/* Date du jour compacte, ex. "Mer. 8 juil." — calculée une fois par montage */
+function todayLabel() {
+  const s = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function Navbar() {
   const { liveMatches } = useLiveData()
-  const navigate        = useNavigate()
+  const liveCount = liveMatches.length
 
   return (
-    <nav className="navbar">
-      {/* Bordure animée conic-gradient */}
-      <div className="navbar__border" aria-hidden="true" />
-      <div className="navbar__overlay" />
-      <div className="navbar__glow" />
-      <div className="navbar__container">
-        <div className="navbar__inner">
+    <>
+      {/* ── Header ── */}
+      <header className="sfHeader">
+        <div className="sfHeader__inner">
+          <span className="sfHeader__date">{todayLabel()}</span>
 
-          {/* Hamburger — visible sur mobile uniquement, tout à gauche */}
-          <button
-            className="navbar__menuButton"
-            onClick={() => setMobileOpen(o => !o)}
-            aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? (
-              <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            ) : (
-              <svg className="navbar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
-            )}
-          </button>
-
-           {/* ── Mini header ── */}
-
-          {/* Brand — centré sur mobile, à gauche sur desktop */}
-          <NavLink to="/" className="navbar__brand" onClick={close}>
-            <div className="accueil__miniHeader">
-              <h1 className="accueil__miniTitle">
-                <span className="accueil__heroStat">Stat</span>Footix
-              </h1>
-            </div>
+          <NavLink to="/" className="sfHeader__brand">
+            <span>Stat</span>Footix
           </NavLink>
 
-          {/* Desktop nav — caché sur mobile via CSS */}
-          <div className="navbar__navWrap">
-            <div className="navbar__nav">
-              {navigation.map(item => (
-                <NavLink
-                  key={item.href}
-                  to={item.href}
-                  end={item.href === '/'}
-                  className={({ isActive }) =>
-                    isActive ? 'navbar__navLink navbar__navLink--active' : 'navbar__navLink'
-                  }
-                >
-                  {item.name}
-                </NavLink>
-              ))}
-            </div>
-          </div>
+          {/* Liens — desktop uniquement */}
+          <nav className="sfHeader__nav" aria-label="Navigation principale">
+            {NAV.map(item => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                end={item.href === '/'}
+                className={({ isActive }) =>
+                  isActive ? 'sfNavLink sfNavLink--active' : 'sfNavLink'
+                }
+              >
+                {item.name}
+              </NavLink>
+            ))}
+          </nav>
 
-          {/* Bouton DIRECT — desktop uniquement, visible si matchs en cours */}
-          {liveMatches.length > 0 && (
-            <button className="navbar__liveBtn" onClick={() => navigate('/live')}>
-              <span className="navbar__liveBtnDot" />
-              DIRECT
-              <span className="navbar__liveBtnArrow">›</span>
-            </button>
-          )}
-
-          {/* ── Groupe droit : cloche ── */}
-          <div className="navbar__mobileRight">
-            {/* Cloche notifications — desktop + mobile */}
+          <div className="sfHeader__right">
+            {/* DIRECT — desktop uniquement, visible si matchs en cours */}
+            {liveCount > 0 && (
+              <NavLink to="/live" className="sfLiveBtn">
+                <span className="sfLiveBtn__dot" />
+                DIRECT
+                <span className="sfLiveBtn__count">{liveCount}</span>
+              </NavLink>
+            )}
             <NotificationBell />
           </div>
-
         </div>
-      </div>
+      </header>
 
-      {/* Menu mobile déroulant */}
-      {mobileOpen && (
-        <div className="navbar__mobileMenu">
-          <ul className="navbar__mobileList">
-            {navigation.map(item => (
-              <li key={item.href}>
-                <NavLink
-                  to={item.href}
-                  end={item.href === '/'}
-                  className={({ isActive }) =>
-                    isActive
-                      ? 'navbar__mobileLink navbar__mobileLink--active'
-                      : 'navbar__mobileLink'
-                  }
-                  onClick={close}
-                >
-                  {item.name}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ── Barre de nav permanente mobile ── */}
-      {/* Live inséré entre Programme et Résultats (au lieu d'être ajouté à la
-          fin) → demande explicite de l'utilisateur pour qu'il tombe pile au
-          centre de la barre (2 onglets de chaque côté) et se remarque plus. */}
-      <div className="navbar__quickNav">
-        {navigation.slice(0, 2).map(item => (
+      {/* ── Bottom tab bar — mobile uniquement ── */}
+      <nav className="sfTabbar" aria-label="Navigation">
+        {NAV.slice(0, 2).map(item => (
           <NavLink
             key={item.href}
             to={item.href}
             end={item.href === '/'}
             className={({ isActive }) =>
-              isActive ? 'navbar__qnLink navbar__qnLink--active' : 'navbar__qnLink'
+              isActive ? 'sfTab sfTab--active' : 'sfTab'
             }
           >
-            {QN_ICONS[item.href]}
-            <span className="navbar__qnLabel">{item.name}</span>
+            {ICONS[item.href]}
+            <span className="sfTab__label">{item.name}</span>
           </NavLink>
         ))}
-        {liveMatches.length > 0 && (
-          <button className="navbar__qnLive" onClick={() => navigate('/live')}>
-            <span className="navbar__qnLiveDot" />
-            <span className="navbar__qnLabel">Live</span>
-          </button>
-        )}
-        {navigation.slice(2).map(item => (
+
+        {/* Orb Live central — toujours présent, pulse seulement si live */}
+        <NavLink
+          to="/live"
+          className={({ isActive }) =>
+            [
+              'sfTabLive',
+              liveCount > 0 ? 'sfTabLive--hasLive' : '',
+              isActive ? 'sfTabLive--active' : '',
+            ].filter(Boolean).join(' ')
+          }
+        >
+          <span className="sfTabLive__orb">
+            <BallIcon />
+            {liveCount > 0 && <span className="sfTabLive__count">{liveCount}</span>}
+          </span>
+          <span className="sfTab__label">Live</span>
+        </NavLink>
+
+        {NAV.slice(2).map(item => (
           <NavLink
             key={item.href}
             to={item.href}
             end={item.href === '/'}
             className={({ isActive }) =>
-              isActive ? 'navbar__qnLink navbar__qnLink--active' : 'navbar__qnLink'
+              isActive ? 'sfTab sfTab--active' : 'sfTab'
             }
           >
-            {QN_ICONS[item.href]}
-            <span className="navbar__qnLabel">{item.name}</span>
+            {ICONS[item.href]}
+            <span className="sfTab__label">{item.name}</span>
           </NavLink>
         ))}
-      </div>
-    </nav>
+      </nav>
+    </>
   )
 }
 
