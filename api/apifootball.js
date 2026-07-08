@@ -22,34 +22,58 @@ function cacheTTL(endpoint) {
 // gratuit autorise 10 req/min ET 100 req/jour (reset 00:00 UTC) — dépasser le
 // débit PAR MINUTE (via un pic de trafic, même bref) peut déclencher un
 // blocage TEMPORAIRE OU PERMANENT de la clé/l'IP, sans préavis, en plus des
-// simples 429. Root cause très probable des suspensions répétées : ce proxy
-// ne limitait QUE les appels identiques (cache par endpoint+params), jamais
-// le DÉBIT global vers l'upstream — un pic de matchs live simultanés
-// (plusieurs championnats + Mondial, plusieurs utilisateurs, endpoints/params
-// différents = autant de cache miss) peut facilement dépasser 10/min sans
-// qu'aucun garde-fou ne l'empêche jusqu'ici.
+// simples 429.
 //
-// Fix : un budget interne, sous les vraies limites (marge de sécurité), qui
-// empêche TOUT appel upstream au-delà — mieux vaut renvoyer "pas de donnée
-// pour l'instant" (déjà géré gracieusement côté UI, voir le fix Classement.jsx
-// qui masque l'onglet Passeurs sur erreur) que de re-déclencher un blocage.
-const MINUTE_CAP = 7   // sur 10/min réels
-const DAILY_CAP   = 80  // sur 100/jour réels
+// ⚠️ MISE À JOUR après un 8e blocage malgré ce budget (constat utilisateur) :
+// un compteur "≤7 par fenêtre de 60s" est une MOYENNE glissante — il n'empêche
+// PAS que ces 7 appels arrivent tous regroupés en 1-2 secondes (ex: plusieurs
+// utilisateurs différents ouvrent chacun un match différent au même moment,
+// juste avant un coup d'envoi — chaque ouverture peut déclencher jusqu'à 4
+// appels réels dans resolveFixtureInfo() côté client). Si l'anti-abus
+// d'api-football réagit à une RAFALE (beaucoup de requêtes dans la même
+// seconde) plutôt qu'à la seule moyenne/minute — ce qui n'est pas documenté
+// publiquement par api-football, donc hypothèse la plus probable au vu des
+// faits (blocages répétés malgré un compteur qui semblait correct), pas une
+// certitude — un budget par minute seul ne protège pas contre ça.
+// Ajout d'un verrou d'espacement minimum (SET NX PX) entre deux appels réels
+// upstream : jamais plus d'1 appel toutes les SPACING_MS, quel que soit le
+// nombre de requêtes qui arrivent en même temps. Lisse mécaniquement toute
+// rafale, en plus du budget par minute/jour (abaissé aussi par prudence).
+const MINUTE_CAP  = 4    // sur 10/min réels — abaissé (7 n'a pas suffi)
+const DAILY_CAP    = 60  // sur 100/jour réels — abaissé (80 n'a pas suffi)
+const SPACING_MS   = 600 // espacement minimum entre 2 appels upstream réels
 
 async function reserveQuota() {
   const now       = new Date()
   const minuteKey = `aflcache:quota:min:${now.toISOString().slice(0, 16)}`
   const dayKey    = `aflcache:quota:day:${now.toISOString().slice(0, 10)}`
+  const spaceKey  = 'aflcache:quota:spacing'
   try {
-    const [minuteCount, dayCount] = await Promise.all([kv.incr(minuteKey), kv.incr(dayKey)])
+    const [minuteCount, dayCount, spacingOk] = await Promise.all([
+      kv.incr(minuteKey),
+      kv.incr(dayKey),
+      kv.set(spaceKey, '1', { nx: true, px: SPACING_MS }),
+    ])
     if (minuteCount === 1) { try { await kv.expire(minuteKey, 70) } catch {} }
     if (dayCount === 1)    { try { await kv.expire(dayKey, 26 * 3600) } catch {} }
-    return minuteCount <= MINUTE_CAP && dayCount <= DAILY_CAP
+    return minuteCount <= MINUTE_CAP && dayCount <= DAILY_CAP && !!spacingOk
   } catch {
     // Redis down → impossible de compter, mais on ne veut pas non plus
     // couper tout le fallback pour cette seule raison → on laisse passer.
     return true
   }
+}
+
+// Persiste le quota RÉEL restant (renvoyé par api-football dans les headers
+// de chaque réponse) pour pouvoir diagnostiquer après coup sans deviner —
+// avant ce fix, cette info existait déjà dans la réponse HTTP mais n'était
+// jamais gardée nulle part, donc impossible de savoir a posteriori à quel
+// point on était proche d'un blocage.
+async function trackRealRemaining(remaining) {
+  if (remaining == null) return
+  try {
+    await kv.set('aflcache:last_remaining', JSON.stringify({ remaining: Number(remaining), at: Date.now() }), { ex: 24 * 3600 })
+  } catch {}
 }
 
 export default async function handler(req, res) {
@@ -68,10 +92,18 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Non autorisé' })
     }
     const key = process.env.APIFOOTBALL_KEY ?? ''
+    let lastRemaining = null
+    try {
+      const raw = await kv.get('aflcache:last_remaining')
+      lastRemaining = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    } catch {}
     return res.status(200).json({
       present: !!key,
       length:  key.length,
       preview: key ? `${key.slice(0, 4)}…${key.slice(-4)}` : null,
+      // Dernier quota RÉEL restant (header api-football), pour diagnostiquer
+      // après coup à quel point on était proche d'un blocage sans deviner.
+      lastRemaining,
     })
   }
 
@@ -116,6 +148,7 @@ export default async function handler(req, res) {
 
     const body      = await response.text()
     const remaining = response.headers.get('x-ratelimit-requests-remaining')
+    await trackRealRemaining(remaining)
 
     // ── 4. Stocker en cache si succès ─────────────────────────────────────────
     if (response.ok) {
