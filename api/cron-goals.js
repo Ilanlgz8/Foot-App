@@ -65,6 +65,11 @@ const FINAL_ESPN = new Set([
   'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
 ])
 
+// Délai d'attente du nom du buteur avant d'envoyer un "⚽ But !" générique —
+// voir le commentaire détaillé au niveau du bloc "⚽ But" plus bas (constat
+// utilisateur : 5min faisait percevoir l'absence totale de notif).
+const GOAL_SCORER_WAIT_MS = 45_000
+
 // ── FIFA live — couche rapide WC (même cache Redis que api/fifa-live.js) ───────
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 
@@ -282,11 +287,21 @@ async function sendPushToMatch(payload, slug, options = {}, log = null) {
   return sent
 }
 
+// ⚠️ DURCISSEMENT : l'ancien check "get puis set" n'était pas atomique — deux
+// exécutions qui se chevauchent (cron-job.org qui relance avant que la
+// précédente ait fini de répondre, retry réseau côté cron-job.org...)
+// pouvaient toutes les deux lire "pas encore envoyé" avant que l'une des deux
+// n'ait eu le temps de poser la clé, et déclencher un envoi en double — ou,
+// combiné au compteur goalTrack (lecture/modification/écriture non-atomique
+// lui aussi), corrompre le compteur d'un but au point qu'il ne soit plus
+// jamais renvoyé. SET...NX (déjà utilisé ailleurs dans l'app, voir
+// api/pulse.js) pose la clé de façon atomique : si elle existe déjà, l'appel
+// renvoie null immédiatement sans l'écraser — une seule des exécutions
+// concurrentes peut gagner la course, l'autre voit qu'elle a perdu.
 async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600) {
   try {
-    const already = await kv.get(dedupKey)
-    if (already) return 0
-    await kv.set(dedupKey, '1', { ex: ttl })
+    const acquired = await kv.set(dedupKey, '1', { ex: ttl, nx: true })
+    if (!acquired) return 0
   } catch { return 0 }
   // urgency 'high' : ces notifs (KO/but/mi-temps/reprise/fin) sont rares et
   // importantes — priorité max pour limiter les retards/pertes en arrière-plan.
@@ -636,15 +651,26 @@ export default async function handler(req, res) {
       log.push(`[espn:${slug}:${eventId}] transition ${prevStatus} → ${status} (period=${comp.status?.period ?? '?'}, clock=${comp.status?.displayClock ?? '?'})`)
     }
 
-    // ⚽ But — approche "toujours complète, quitte à attendre un peu" (choix
-    // explicite de l'utilisateur, en alternative à l'envoi immédiat parfois
-    // générique). Au lieu de notifier dès que le score diffère du poll
+    // ⚽ But — approche "complète si possible, mais jamais silencieuse trop
+    // longtemps". Au lieu de notifier dès que le score diffère du poll
     // précédent, on compare le score actuel à un compteur persistant "buts
     // déjà notifiés par camp" (goalTrack:${eventId}) : si comp.details n'a pas
-    // encore le nom du buteur, on RETENTE aux polls suivants (jusqu'à 5 min)
-    // au lieu d'envoyer tout de suite un "⚽ But !" générique définitif —
-    // sendDeduped() garde son rôle habituel (une seule notif par but), le
-    // compteur sert uniquement à décider QUAND l'appeler.
+    // encore le nom du buteur, on RETENTE aux polls suivants (jusqu'à
+    // GOAL_SCORER_WAIT_MS) au lieu d'envoyer tout de suite un "⚽ But !"
+    // générique définitif — sendDeduped() garde son rôle habituel (une seule
+    // notif par but), le compteur sert uniquement à décider QUAND l'appeler.
+    //
+    // ⚠️ RÉGLÉ (constat utilisateur : "depuis que ça attend le buteur, je ne
+    // reçois plus les notifs de but") : la fenêtre d'attente était à 5 minutes.
+    // Combinée au pire cas de détection du but lui-même (jusqu'à ~60s de
+    // "trou mort" entre deux appels cron-job.org, cron-job.org ne descendant
+    // jamais sous 1 appel/minute), le délai total avant la toute PREMIÈRE
+    // notif pouvait dépasser 6 minutes quand ESPN ne publiait jamais le
+    // buteur assez vite — perçu à raison comme "plus de notif du tout" par
+    // l'utilisateur. Ramenée à 45s : le nom du but est encore attendu le temps
+    // d'un aller-retour raisonnable, mais le pire cas total tombe à environ
+    // 60+45 = 105s au lieu de 360s, bien plus proche du ressenti "immédiat"
+    // d'avant l'introduction de cette attente.
     //
     // ⚠️ BUG CORRIGÉ (constat utilisateur : Maroc-Canada, 2 buts marocains,
     // aucune notif reçue) : quand le score d'un même camp montait de PLUS DE 1
@@ -706,7 +732,7 @@ export default async function handler(req, res) {
           .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
 
         const pendingSince  = track.pendingSince[side] ?? Date.now()
-        const waitedTooLong = forceNow || (Date.now() - pendingSince > 5 * 60_000)
+        const waitedTooLong = forceNow || (Date.now() - pendingSince > GOAL_SCORER_WAIT_MS)
 
         // Un but à la fois — tant que track[side] < targetCount, il reste au
         // moins un but réel non notifié.
@@ -910,12 +936,21 @@ export default async function handler(req, res) {
     if (allLogs.length) {
       const stamped = allLogs.map(l => `${new Date().toISOString()} ${l}`)
       await kv.rpush('cron:goals:logHistory', ...stamped)
-      // Cap relevé 1000 → 4000 : avec le bruit en moins (voir ci-dessus), une
-      // ligne "[pass N] notifs=X events=Y" par passe (~3-4/min) consomme
-      // beaucoup moins vite le buffer — vise plusieurs heures d'historique
-      // au lieu d'1h30-2h, pour pouvoir vérifier un incident signalé après coup.
-      await kv.ltrim('cron:goals:logHistory', -4000, -1)
-      await kv.expire('cron:goals:logHistory', 24 * 3600)
+      // ⚠️ RELEVÉ (constat direct via /api/debug-push, demandé par l'utilisateur
+      // pour diagnostiquer une notif de but manquante) : même sans aucun match
+      // live, la ligne "[pass N] notifs=0 events=Y" à elle seule tourne autour
+      // de 4 lignes/minute (une par passe) → ~5760 lignes/jour rien qu'en
+      // bruit de fond, ce qui dépassait le cap de 4000 en MOINS DE 24h — donc
+      // bien avant que la fenêtre glissante ait la moindre chance de couvrir
+      // un match joué la veille, contrairement à ce que suggérait le
+      // commentaire précédent ("vise plusieurs heures"). C'est très
+      // probablement pourquoi la soirée Argentine-Égypte n'était déjà plus
+      // dans l'historique le lendemain. Cap relevé 4000 → 30000 et fenêtre
+      // 24h → 96h (4 jours) : de quoi couvrir un jour de bruit de fond +
+      // plusieurs matchs live avec de la marge, pour pouvoir vérifier un
+      // incident signalé le lendemain (voire 2-3 jours après).
+      await kv.ltrim('cron:goals:logHistory', -30_000, -1)
+      await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     }
   } catch {}
 

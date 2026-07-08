@@ -52,6 +52,16 @@ const espnScoresCache = {}
 // condition (stale Redis cache vs fresh ESPN data → régression de score).
 let _pollInProgress = false
 let _pollQueued     = false   // au plus un poll en attente
+// Horodatage du dernier verrou posé — sert à détecter un verrou "fantôme" :
+// sur iOS, un fetch en cours au moment où l'app passe en arrière-plan peut
+// rester gelé (réseau suspendu) tant que l'app n'est pas revenue au premier
+// plan. Le retour au premier plan appelle pollESPN(forceFresh=true), qui se
+// contentait alors de mettre ce poll en FILE D'ATTENTE derrière le fetch gelé
+// — lequel ne se débloque et ne timeout (AbortSignal 10s) qu'une fois relancé
+// par l'event loop, retardant d'autant le rafraîchissement "immédiat" censé
+// suivre le retour sur l'app. Voir STALE_LOCK_MS plus bas.
+let _pollStartedAt = 0
+const STALE_LOCK_MS = 4_000
 
 // "FT potentiel" — STATUS_FINAL vu une 1ère fois, en attente de confirmation
 // { [matchId]: { since: number, score: string } }
@@ -550,8 +560,31 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       }
 
       // ── HT détecté ──
+      // Poser pausedAt=now serait faux si on détecte la mi-temps en retard
+      // (app fermée/arrière-plan pendant le vrai coup de sifflet) : ça ferait
+      // repartir "reprise dans 15min" de zéro alors que la pause est peut-être
+      // déjà bien avancée (bug signalé). Correctif — PAS une moyenne devinée :
+      // ESPN GÈLE son horloge (espnClock) sur la minute réelle atteinte au
+      // coup de sifflet ("45:00", ou "45:00+3:00" s'il y a eu 3min d'arrêts de
+      // jeu) et la maintient identique tant que dure la pause — qu'on
+      // l'observe à l'instant précis ou 10min plus tard, la valeur lue est la
+      // MÊME donnée réelle. On calcule donc pausedAt = kickoff + cette vraie
+      // durée jouée, pas une estimation à peu près.
+      // Seul residuel non garanti : le kickoff de référence lui-même.
+      //   1. prevState.kickoffAt (confirmé par ESPN) si l'app a vu le coup
+      //      d'envoi à un moment donné — fiable.
+      //   2. match.utcDate (heure programmée FD.org) sinon, TOUJOURS
+      //      disponible même si l'app n'a jamais tourné avant cet instant —
+      //      peut différer de quelques minutes du coup d'envoi réel (retard
+      //      terrain, cérémonie...), seule imprécision restante.
+      // Si l'horloge ESPN est vide/inexploitable (rare), repli sur 47min
+      // (durée moyenne 45min + arrêts de jeu) plutôt que de ne rien poser.
       if (espnStatus === 'STATUS_HALFTIME' && !prevState.pausedAt) {
-        trackMatchState({ ...match, status: 'PAUSED' })
+        const koReference   = prevState.kickoffAt ?? new Date(match.utcDate).getTime()
+        const realHalfMins  = parseClockMins(espnClock)
+        const halfMins      = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
+        const estimatedPausedAt = Math.min(now, koReference + halfMins * 60_000)
+        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
       }
 
       // ── 2H détecté ──
@@ -761,11 +794,24 @@ let _pollQueuedForceFresh = false
 
 async function pollESPN(matches, queryClient, forceFresh = false) {
   if (_pollInProgress) {
-    _pollQueued = true
-    if (forceFresh) _pollQueuedForceFresh = true
-    return
+    // Verrou fantôme : un forceFresh (retour au premier plan) qui tombe sur un
+    // verrou posé il y a plus de STALE_LOCK_MS n'est presque sûrement pas un
+    // poll légitime encore en cours (10s max normalement) mais un fetch gelé
+    // par la suspension réseau iOS pendant que l'app était en arrière-plan. On
+    // ne veut pas attendre qu'il se débloque tout seul (jusqu'à 10s de plus,
+    // potentiellement davantage si les timers étaient eux aussi suspendus) —
+    // on force le nouveau poll immédiatement plutôt que de le mettre en file.
+    if (forceFresh && Date.now() - _pollStartedAt > STALE_LOCK_MS) {
+      console.warn('[useLiveMinute] verrou fantôme détecté (>', STALE_LOCK_MS, 'ms) → poll forcé sans attendre')
+      _pollInProgress = false
+    } else {
+      _pollQueued = true
+      if (forceFresh) _pollQueuedForceFresh = true
+      return
+    }
   }
   _pollInProgress = true
+  _pollStartedAt  = Date.now()
   _pollQueued     = false
   try {
     await _doPollESPN(matches, queryClient, forceFresh)

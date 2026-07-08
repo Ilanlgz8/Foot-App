@@ -105,13 +105,19 @@ export function setLiveState(matchId, state, { since, endedAt } = {}) {
 
 /**
  * À appeler à chaque fois qu'on reçoit des données fraîches sur un match en live.
+ *
+ * @param {number} [pausedAtOverride] - timestamp à utiliser pour pausedAt au lieu de
+ *   Date.now(). Utile quand la mi-temps est détectée alors qu'elle a en réalité
+ *   commencé plus tôt (app fermée/arrière-plan pendant le coup de sifflet) : sans
+ *   ça, le countdown "reprise dans Xmin" repartirait de 15min à chaque réouverture
+ *   au lieu de refléter le temps de pause déjà écoulé (bug signalé).
  */
-export function trackMatchState(match) {
+export function trackMatchState(match, pausedAtOverride) {
   if (!match?.id) return
   const stored = JSON.parse(localStorage.getItem(key(match.id)) || '{}')
 
   if (match.status === 'PAUSED' && !stored.pausedAt) {
-    stored.pausedAt = Date.now()
+    stored.pausedAt = pausedAtOverride ?? Date.now()
     localStorage.setItem(key(match.id), JSON.stringify(stored))
   }
 }

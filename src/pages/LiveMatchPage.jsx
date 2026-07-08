@@ -248,12 +248,12 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
       {/* Centre : crests + score */}
       <div className="mp__hero__mid">
         <div className="mp__hero__team">
+          {showLivePens && <ShootoutDots scored={homeShootout} />}
           {match.homeTeam?.crest
             ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" data-team={match.homeTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
           <FormDiamonds form={hForm} />
-          {showLivePens && <ShootoutDots scored={homeShootout} />}
         </div>
 
         <div className="mp__hero__center">
@@ -268,12 +268,12 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
         </div>
 
         <div className="mp__hero__team mp__hero__team--away">
+          {showLivePens && <ShootoutDots scored={awayShootout} />}
           {match.awayTeam?.crest
             ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" data-team={match.awayTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
           <FormDiamonds form={aForm} />
-          {showLivePens && <ShootoutDots scored={awayShootout} />}
         </div>
       </div>
 
