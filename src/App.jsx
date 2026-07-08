@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react'
 import './App.css'
+import './theme-v2.css'
 import Navbar from './components/navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Accueil from './components/Accueil.jsx'

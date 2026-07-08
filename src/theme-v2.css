@@ -1,0 +1,157 @@
+/* ═══════════════════════════════════════════════════════════════
+   THÈME v2 — re-skin global (Phase 2)
+
+   Stratégie : toutes les pages consomment les tokens de index.css
+   (--bg-panel, --bg-card, --red, --border…). En les redéfinissant
+   ici (chargé APRÈS index.css), on re-skinne l'app entière sans
+   toucher aux 9000 lignes de CSS existantes → zéro risque layout.
+
+   Les overrides ciblés utilisent #root pour gagner en spécificité
+   face aux CSS des pages lazy-loadées (injectées après ce fichier).
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces : noir pur → noir-marine profond ── */
+  --bg-deep:      #070910;
+  --bg-dark:      #0a0c14;
+  --bg-mid:       #10141f;
+  --bg-card:      rgba(19, 24, 41, 0.97);
+  --bg-panel:     #131829;
+  --bg-panel-grad: linear-gradient(160deg, #161c30 0%, #11162a 100%);
+  --bg-page-grad:  linear-gradient(180deg, #070910 0%, #0a0e1a 50%, #0d1122 100%);
+  --bg-detail:    #0c0f1a;
+
+  /* ── Rouge : plus punchy (identité conservée) ── */
+  --red:        #fb3b4e;
+  --red-rgb:    251, 59, 78;
+  --red-light:  #ff7382;
+  --red-vivid:  #ff2e43;
+  --red-deep:   #c11a30;
+  --red-deep-rgb: 193, 26, 48;
+
+  /* ── Bordures bleutées (fini le gris terne) ── */
+  --border:     rgba(148, 163, 210, 0.12);
+  --border-red: rgba(var(--red-rgb), 0.22);
+
+  /* ── Texte ── */
+  --text-mid:   #9aa3bb;
+  --text-dim:   #5d6580;
+
+  /* ── Or champagne ── */
+  --gold-light: #f6c667;
+}
+
+/* ── Fond de page : navy + halo rouge ambiant très subtil en haut ── */
+html body {
+  background:
+    radial-gradient(90% 34% at 50% -4%, rgba(var(--sf-red-rgb), 0.055), transparent 70%),
+    var(--sf-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE — rouge vif + contours animés (demande utilisateur)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Chips live de l'Accueil — contour rouge qui tourne */
+#root .accueil__liveChip {
+  position: relative;
+  border-color: rgba(var(--sf-live-rgb), 0.22);
+  background: linear-gradient(180deg, rgba(var(--sf-live-rgb), 0.06), transparent 55%),
+              var(--sf-surface);
+}
+#root .accueil__liveChip:not(.accueil__liveChip--ft)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sf-angle),
+    var(--sf-live) 0deg,
+    rgba(var(--sf-live-rgb), 0.45) 40deg,
+    rgba(var(--sf-live-rgb), 0.07) 110deg,
+    rgba(var(--sf-live-rgb), 0.07) 250deg,
+    rgba(var(--sf-live-rgb), 0.45) 320deg,
+    var(--sf-live) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: sfLiveSpin 3.2s linear infinite;
+  pointer-events: none;
+}
+/* Match terminé affiché dans le widget → contour neutre, pas d'animation */
+#root .accueil__liveChip--ft {
+  border-color: var(--sf-border);
+}
+
+/* Cards de la page /live — même contour animé */
+#root .live__card {
+  position: relative;
+  border-color: rgba(var(--sf-live-rgb), 0.2);
+  background: linear-gradient(180deg, rgba(var(--sf-live-rgb), 0.05), transparent 50%),
+              linear-gradient(145deg, #141a2e, #0f1425);
+}
+#root .live__card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sf-angle),
+    var(--sf-live) 0deg,
+    rgba(var(--sf-live-rgb), 0.4) 45deg,
+    rgba(var(--sf-live-rgb), 0.06) 115deg,
+    rgba(var(--sf-live-rgb), 0.06) 245deg,
+    rgba(var(--sf-live-rgb), 0.4) 315deg,
+    var(--sf-live) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: sfLiveSpin 3.2s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Minutes en direct — rouge clair (mais pas trop) */
+#root .accueil__liveChipMinute { color: var(--sf-live-min); }
+#root .accueil__liveChipMinute--ft { color: var(--sf-faint); }
+#root .live__minute { color: var(--sf-live-min); }
+#root .modal__liveMinute { color: var(--sf-live-min); }
+
+/* Point + titre "EN DIRECT" — rouge vif */
+#root .accueil__liveDot { background: var(--sf-live); }
+#root .accueil__liveSectionTitle { color: var(--sf-live); }
+
+@media (prefers-reduced-motion: reduce) {
+  #root .accueil__liveChip::before,
+  #root .live__card::before { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POLISH GLOBAL
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Panels de l'Accueil — bordure hardcodée #1d1d1d → bleutée + reflet haut */
+#root .accueil__dashPanel {
+  border-color: var(--sf-border);
+  background: linear-gradient(180deg, rgba(148, 163, 210, 0.045), transparent 42%),
+              var(--bg-panel-grad);
+}
+
+/* Chips de filtre compétition — style pilule v2 */
+#root .accueil__compChip {
+  background: var(--sf-surface);
+  border-color: var(--sf-border);
+  color: var(--sf-muted);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+#root .accueil__compChip--active {
+  background: rgba(var(--sf-red-rgb), 0.14);
+  border-color: rgba(var(--sf-red-rgb), 0.45);
+  color: #fff;
+}
