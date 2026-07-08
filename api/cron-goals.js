@@ -699,6 +699,20 @@ export default async function handler(req, res) {
     // pas un but réel → absorbé silencieusement dans le compteur, jamais notifié.
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
     if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
+      // Verrou léger (5s, NX) anti-concurrence : le compteur `track` ci-dessous
+      // est lu puis réécrit en 2 étapes (pas atomique par nature, contrairement
+      // à sendDeduped() qui l'est déjà via SET NX). Si deux exécutions de ce
+      // cron traitent CE MÊME match au même instant (chevauchement cron-job.org,
+      // retry réseau, ou un futur 2e cron externe ajouté pour réduire le délai
+      // moyen), une lecture/écriture concurrente pourrait faire "reculer" le
+      // compteur et bloquer silencieusement un but suivant. Si le verrou est
+      // déjà pris, on saute cette passe pour ce match — sans risque : la passe
+      // suivante (quelques secondes plus tard) retraitera avec des données à jour.
+      const lockKey = `goalLock:${eventId}`
+      const lockAcquired = await kv.set(lockKey, '1', { px: 5_000, nx: true }).catch(() => null)
+      if (!lockAcquired) {
+        log.push(`[espn:${slug}:${eventId}] verrou but déjà pris (exécution concurrente) — passe suivante`)
+      } else {
       const trackKey = `goalTrack:${eventId}`
       let track = null
       try { track = await kv.get(trackKey) } catch {}
@@ -778,6 +792,7 @@ export default async function handler(req, res) {
       if (trackChanged) {
         try { await kv.set(trackKey, JSON.stringify(track), { ex: 12 * 3600 }) } catch {}
       }
+      } // fin du else (verrou acquis)
     }
 
     // ⏸ Mi-temps

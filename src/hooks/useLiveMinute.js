@@ -1164,6 +1164,36 @@ export function useLiveMinute(matches) {
     }
   }, [queryClient])
 
+  // ── Filet de sécurité indépendant des events DOM ──
+  // Bug WebKit documenté de longue date : sur iOS, visibilitychange (et
+  // parfois focus/pageshow) ne se déclenche pas toujours de façon fiable pour
+  // une PWA en mode standalone mise en arrière-plan brièvement via le
+  // multitâche (contrairement à un verrouillage d'écran, plus fiable) — ce
+  // qui correspond exactement au bug signalé : retour sur l'app après <5min
+  // en arrière-plan, score/stats live pas rafraîchis, sans qu'aucun des 3
+  // listeners ci-dessus ne se soit déclenché.
+  // Ce filet ne dépend d'AUCUN event : un setInterval qui mesure l'écart RÉEL
+  // entre deux tops (au lieu de faire confiance à l'intervalle programmé) se
+  // détecte lui-même suspendu — si le JS était gelé (app en arrière-plan), le
+  // prochain tick arrive bien après les 2s programmées dès que l'app redevient
+  // active, ce qui EST la preuve qu'on sort d'une suspension, peu importe
+  // qu'un event iOS se soit déclenché ou non.
+  useEffect(() => {
+    let lastAlive = Date.now()
+    const GAP_THRESHOLD_MS = 4_000  // > intervalle programmé (2s) : suspension probable
+    const id = setInterval(() => {
+      const now = Date.now()
+      const gap = now - lastAlive
+      lastAlive = now
+      if (gap > GAP_THRESHOLD_MS) {
+        window.__espnNeedsRefresh = now
+        invalidateLiveStatsQueries(queryClient)
+        pollESPN(matchesRef.current, queryClient, true)
+      }
+    }, 2_000)
+    return () => clearInterval(id)
+  }, [queryClient])
+
   // Recalibration manuelle
   // ─ Force un refetch FD.org pour récupérer les statuts IN_PLAY à jour,
   //   puis repoll ESPN → réaffiche les widgets live même après vidage de cache.

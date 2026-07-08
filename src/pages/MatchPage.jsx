@@ -10,7 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { finalScore, matchOutcome } from '../utils/matchUtils'
+import { finalScore, matchOutcome, mergeScore } from '../utils/matchUtils'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
   useEspnMatchStats,
@@ -93,8 +93,6 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   // affichait juste "Terminé" sans jamais préciser tab/prolongation.
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   const wentToAet  = match.score?.duration === 'EXTRA_TIME'
-  const hPens      = match.score?.penalties?.home ?? null
-  const aPens      = match.score?.penalties?.away ?? null
   const emblem     = comp?.emblem ?? match.competition?.emblem
   const compName   = match.competition?.name ?? comp?.name ?? ''
   const gradient   = getMatchGradient(
@@ -107,6 +105,20 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   // à la demande). queryKey partagée avec MpMatchStats → pas de double fetch,
   // React Query dédup les deux appels automatiquement.
   const cachedEspn = isFinished ? getEspnData(match?.id) : null
+
+  // Score tirs au but : fusion FD.org (match.score.penalties) + snapshot ESPN
+  // persisté au moment du FT (cachedEspn.home/awayShootout), même garde
+  // anti-régression (Math.max) que mergeScore() pour le score classique.
+  // ⚠️ Bug constaté : FD.org peut brièvement re-servir une valeur de
+  // score.penalties plus basse quelques minutes après la fin du match (même
+  // catégorie d'instabilité déjà documentée pour score.fullTime, voir
+  // finalScore() ci-dessus), le temps qu'ils recalculent/resynchronisent côté
+  // serveur. Sans fusion, l'écran suivait cette régression telle quelle
+  // (4-3 → 3-3 → 4-3). cachedEspn est écrit une seule fois par confirmFt()
+  // avec la valeur ESPN déjà anti-régressée (voir useLiveMinute.js) et ne
+  // change plus jamais après → sert de plancher fiable.
+  const hPens = mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null)
+  const aPens = mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null)
   const { espnData: fetchedEspn } = useEspnMatchDetail(
     isFinished && !cachedEspn ? match : null,
     match?.competition?.id,

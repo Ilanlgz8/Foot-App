@@ -1650,8 +1650,11 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   // Score 120min (finalScore) : un match décidé aux tirs au but y est
   // TOUJOURS à égalité, le vrai vainqueur vient de score.penalties.
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
-  const hPens = match.score?.penalties?.home ?? null
-  const aPens = match.score?.penalties?.away ?? null
+  // Fusion FD.org + snapshot ESPN persisté (même garde anti-régression que
+  // dans MatchPage.jsx) : évite qu'un score.penalties FD.org transitoirement
+  // incomplet fasse régresser l'affichage juste après la fin du match.
+  const hPens = mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null)
+  const aPens = mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null)
   const hWin = isFinished && (wentToPens ? (hPens != null && aPens != null && hPens > aPens) : hs > as_)
   const aWin = isFinished && (wentToPens ? (hPens != null && aPens != null && aPens > hPens) : as_ > hs)
 
