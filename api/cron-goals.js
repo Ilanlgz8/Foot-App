@@ -893,12 +893,25 @@ export default async function handler(req, res) {
   // l'appel suivant (60s plus tard) = environ (60 - BUDGET_MS). Faire plus de
   // passes internes rapprochées n'aide quasiment pas le pire cas si
   // BUDGET_MS reste petit — le vrai levier, c'est de pousser BUDGET_MS aussi
-  // près que possible des 30s de cron-job.org. Avec BUDGET_MS=26s : passes
-  // à peu près à 0/8/16/24s, trou mort ≈ 60-24 = 36s → pire cas ≈ 35-36s
-  // (au lieu de 60s avant, et 48s avec une 1ère version moins bien réglée
-  // de cette boucle qui ne poussait pas assez BUDGET_MS).
-  const BUDGET_MS         = 26_000  // le plus proche possible des 30s de cron-job.org (marge de 4s)
-  const POLL_INTERVAL_MS  = 8_000   // passes rapprochées → réduit surtout le délai MOYEN, pas le pire cas
+  // près que possible des 30s de cron-job.org.
+  //
+  // ⚠️ RÉDUIT (compte Vercel Hobby a atteint 100% du quota gratuit "Fluid
+  // Active CPU", mail reçu le 08/07) : cette boucle interne — 1 fetch ESPN +
+  // toute la logique de détection par match, à CHAQUE passe — tournait 4x/min,
+  // 1440 fois/jour (cron-job.org), soit jusqu'à ~5760 passes/jour. C'est de
+  // très loin le plus gros poste de calcul actif de tout le projet, largement
+  // responsable d'avoir atteint le plafond gratuit alors qu'il reste encore
+  // des jours de Mondial. Repassé à 1 seule passe par appel (BUDGET_MS=0) :
+  // on retombe sur la cadence native de cron-job.org (1 appel/min, pas de
+  // boucle interne), ce qui réduit le calcul actif d'environ 4x d'un coup.
+  // Contrepartie honnête : le pire délai remonte à environ 60s (au lieu de
+  // ~35s avec 4 passes) pour une notif de but. Si le tableau de bord Vercel
+  // (Usage → Fluid Active CPU) repasse sous le plafond avec de la marge, ces
+  // deux constantes peuvent être remontées prudemment (ex: 2 passes) — je n'ai
+  // pas accès à ce tableau de bord donc je ne peux pas calibrer plus finement
+  // à distance.
+  const BUDGET_MS         = 0       // 1 seule passe par appel — voir commentaire ci-dessus
+  const POLL_INTERVAL_MS  = 8_000
   const loopStart = Date.now()
   const allLogs   = []
   let totalNotifs = 0

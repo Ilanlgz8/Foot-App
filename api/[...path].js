@@ -1,15 +1,16 @@
 // Proxy football-data.org — catch-all Vercel pour /api/v4/**
 //
-// ⚠️ SÉCURITÉ (corrigé lors d'un audit) : ce endpoint transmettait n'importe
-// quel chemin/query vers football-data.org avec notre clé API_KEY, sans
-// AUCUNE protection — ni cache, ni origin check, ni limite de débit.
-// N'importe qui pouvait appeler /api/v4/<tout> directement (curl, bot) et
-// consommer librement le quota FD.org (10 req/min sur le plan gratuit),
-// provoquant des 429 pour les vrais utilisateurs (voir CLAUDE.md, problème
-// déjà documenté et jusqu'ici non expliqué). Ajout d'un budget global partagé
-// (même pattern que reserveQuota() dans api/apifootball.js, déjà éprouvé en
-// prod suite à une suspension de compte api-football) : quel que soit
-// l'appelant, jamais plus de FD_MINUTE_CAP requêtes upstream par minute.
+// ⚠️ Ce endpoint n'est PAS utilisé par le front actuel (tous les hooks passent
+// par fdUrl()/api/football.js, qui a son propre cache Redis) — vérifié par
+// audit du code. Il reste néanmoins une route publique appelable directement
+// (curl, bot) qui utiliserait notre clé API_KEY sans aucune protection.
+// Budget global léger en défense en profondeur, avec sa PROPRE clé Redis
+// (fdcatchall:quota:min:*, distincte de celle du cache de football.js) —
+// ⚠️ ne JAMAIS partager cette clé avec api/football.js : ce dernier gère un
+// volume légitime bien plus élevé (tout le trafic normal de l'app), et un
+// budget partagé finirait par bloquer de vraies requêtes utilisateur (bug
+// vécu : classements/stats saison indisponibles après un partage de clé mal
+// dimensionné).
 import { Redis } from '@upstash/redis'
 
 let kv = null
@@ -20,17 +21,12 @@ function getKv() {
   return kv
 }
 
-// ⚠️ Clé Redis PARTAGÉE avec api/football.js (même compteur `fd:quota:min:*`) :
-// les deux endpoints tapent le MÊME quota football-data.org (10 req/min total,
-// tous appelants confondus) — un budget compté séparément par fichier
-// laisserait passer jusqu'à 2x FD_MINUTE_CAP en combinant les deux, dépassant
-// la vraie limite. FD_MINUTE_CAP doit rester identique des deux côtés.
-const FD_MINUTE_CAP = 7 // sur 10/min réels — marge de sécurité, même logique qu'apifootball.js
+const FD_MINUTE_CAP = 5 // ce endpoint n'a normalement AUCUN trafic légitime
 
 async function reserveFdQuota() {
   const redis = getKv()
   if (!redis) return true // Redis indisponible → on ne bloque pas tout le service pour ça
-  const minuteKey = `fd:quota:min:${new Date().toISOString().slice(0, 16)}`
+  const minuteKey = `fdcatchall:quota:min:${new Date().toISOString().slice(0, 16)}`
   try {
     const count = await redis.incr(minuteKey)
     if (count === 1) await redis.expire(minuteKey, 70)

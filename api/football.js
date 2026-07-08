@@ -50,30 +50,6 @@ function getCacheControl(ttl) {
   return `public, s-maxage=${ttl}, stale-while-revalidate=${Math.round(ttl / 2)}`
 }
 
-// ── Budget global anti-rafale (défense en profondeur) ─────────────────────
-// Le cache Redis ci-dessus protège déjà la plupart des cas (requêtes
-// identiques partagées entre tous les utilisateurs), mais un appelant qui
-// varie le chemin/les query params à chaque requête (ou qui tape directement
-// cet endpoint depuis l'extérieur) forcerait un cache miss à chaque fois et
-// pourrait consommer le quota FD.org (10 req/min, plan gratuit) sans aucune
-// limite. Même pattern que reserveQuota() dans api/apifootball.js, déjà
-// éprouvé en prod (une suspension de compte évitée depuis). Clé Redis
-// PARTAGÉE avec api/[...path].js (même compteur `fd:quota:min:*`, même
-// FD_MINUTE_CAP) car les deux endpoints consomment le même quota upstream.
-const FD_MINUTE_CAP = 7 // sur 10/min réels
-
-async function reserveFdQuota(redis) {
-  if (!redis) return true
-  const minuteKey = `fd:quota:min:${new Date().toISOString().slice(0, 16)}`
-  try {
-    const count = await redis.incr(minuteKey)
-    if (count === 1) await redis.expire(minuteKey, 70)
-    return count <= FD_MINUTE_CAP
-  } catch {
-    return true
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' })
@@ -106,16 +82,6 @@ export default async function handler(req, res) {
             .send(typeof cached === 'string' ? cached : JSON.stringify(cached))
         }
       } catch { /* Redis indisponible → on continue vers FD.org */ }
-    }
-
-    // ── Budget global — seulement consulté après un cache miss (voir plus haut) ──
-    if (!(await reserveFdQuota(redis))) {
-      return res
-        .status(200)
-        .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'no-store')
-        .setHeader('X-Cache', 'QUOTA')
-        .json({ errors: { quota: 'Budget interne football-data.org atteint, réessaie plus tard' } })
     }
 
     // ── Fetch football-data.org ──────────────────────────────────────────────

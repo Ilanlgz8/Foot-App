@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260707&limit=100\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary?event=760508\" -o /tmp/summary760508.json)",
+      "Read(//tmp/**)",
+      "Bash(node --check api/cron-goals.js)",
+      "Bash(node --check api/fifa-live.js)",
+      "Bash(curl -s \"https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260706&limit=100\" \"https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260707&limit=100\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
