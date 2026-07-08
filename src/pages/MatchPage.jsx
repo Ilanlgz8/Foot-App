@@ -547,7 +547,7 @@ export default function MatchPage() {
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
   // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient),
-  // posées en CSS vars sur la page pour teinter onglets/LivePulse/DangerMeter/ProbaCurve.
+  // posées en CSS vars sur la page pour teinter les onglets.
   const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
 
   const [activeTab, setActiveTab] = useState('statistiques')

@@ -12,8 +12,6 @@ import { useSwipe }           from '../hooks/useSwipe'
 import { translateTeam }       from '../data/teamNames'
 import { getMatchState, getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
-import { calcLiveProno } from '../utils/calcProno'
-import { recordProbaSample } from '../utils/probaCurve'
 import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -449,30 +447,6 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
   })
 }
 
-// ── Jauge de dangerosité en direct ("pression du moment") ──────────────────
-// Complémentaire à LivePulse (qui répond à "qui les fans pensent voir
-// gagner") : celle-ci répond à "qui pousse LÀ maintenant", à partir des
-// mêmes stats déjà affichées (tirs/tirs cadrés/corners) — voir
-// utils/dangerMeter.js pour la logique de decay/momentum.
-
-
-
-
-// Convertit les stats api-football (statisticsItems) vers le même format
-// normalisé {home:{shots,shotsOnTarget,corners}, away:{...}} que ESPN/FIFA,
-// pour que DangerMeter fonctionne aussi sur ce fallback.
-function extractAflDangerStats(statsData) {
-  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
-  const items = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
-  const find = (name) => items.find(i => i.name === name)
-  const shots = find('Total shots'), onTarget = find('Shots on target'), corners = find('Corner kicks')
-  if (!shots && !onTarget && !corners) return null
-  return {
-    home: { shots: shots?.home ?? null, shotsOnTarget: onTarget?.home ?? null, corners: corners?.home ?? null },
-    away: { shots: shots?.away ?? null, shotsOnTarget: onTarget?.away ?? null, corners: corners?.away ?? null },
-  }
-}
-
 // ── Onglet Stats Live ─────────────────────────────────────────────────────────
 // Priorité : ESPN (déjà fetché par LiveProvider, 0 quota) → api-football fallback
 const STAT_KEYS = [
@@ -525,20 +499,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
-  // Stats normalisées {home:{shots,shotsOnTarget,corners}, away:{...}} —
-  // quelle que soit la source active (ESPN scoreboard/FIFA/ESPN summary/
-  // api-football) — pour alimenter DangerMeter avec les mêmes chiffres déjà
-  // affichés dans ESPNStats, sans dupliquer les appels de fetch.
-  const activeStats = hasEspn ? espnScore.stats
-    : (isFifaMatch && fifaStats) ? fifaStats
-    : summaryStats ? summaryStats
-    : extractAflDangerStats(statsData)
-
-  // Jauge de dangerosité, affichée en haut du tab stats — le pronostic des
-  // fans (LivePulse) est affiché plus haut, au niveau de la modale/page
-  // entière (pas dupliqué ici), voir MatchModal/LiveMatchPage.
-  
-
   // H2H affiché en bas pour matchs terminés (pas en live pour ne pas alourdir)
   const h2hBlock = !isLive ? <H2HSection match={match} compMatches={compMatches} /> : null
 
@@ -546,7 +506,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   if (hasEspn) {
     return (
       <div>
-       
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -561,7 +520,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
     }
     return (
       <div>
-        
         {fifaStats
           ? <ESPNStats stats={fifaStats} />
           : <p className="modal__noEvents">Stats non disponibles</p>
@@ -576,7 +534,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   if (summaryStats) {
     return (
       <div>
-       
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         {h2hBlock}
@@ -602,7 +559,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
 
   return (
     <div>
-     
       {rows.length > 0 ? (
         <div className="modal__espnStats">
           {rows.map(item => (
@@ -842,7 +798,7 @@ export function ComposTab({ match, compMatches }) {
   // isWC déjà calculé plus haut dans ce composant (voir usage useLineups ci-dessus)
 
   // Couleurs dynamiques des vraies équipes (même logique anti-collision que le
-  // hero/LivePulse/DangerMeter) — remplace le rouge fixe pour les deux équipes.
+  // hero) — remplace le rouge fixe pour les deux équipes.
   const { home: pitchHome, away: pitchAway } = getMatchTeamColors(match?.homeTeam?.name, match?.awayTeam?.name)
 
   if (lineups) {
@@ -1640,11 +1596,6 @@ function MatchModal({ match, compId: compIdProp, onClose, defaultTab = 'stats', 
   }, [])
 
   if (!match) return null
-
-  // calcLiveProno n'est plus affiché tel quel (remplacé par LivePulse, le
-  // pronostic des fans) — gardé uniquement pour alimenter l'échantillonnage
-  // de la courbe de bascule post-match (voir <ProbaCurve> sur MatchPage).
-  
 
   const { home: hs, away: as_ } = fsPanel
   // Score 120min (finalScore) : un match décidé aux tirs au but y est
