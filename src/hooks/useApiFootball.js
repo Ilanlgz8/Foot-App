@@ -299,7 +299,14 @@ export function useAflLiveStats(match, isLive = true) {
   return useQuery({
     queryKey:        ['aflStats', info?.fixtureId],
     queryFn:         async () => {
-      const data = await afetch('fixtures/statistics', { fixture: info.fixtureId })
+      // Même contournement du cache Redis serveur qu'useFifaStats, pour la
+      // même raison (retour d'arrière-plan récent, voir useLiveMinute.js).
+      const forceFresh = typeof window !== 'undefined'
+        && window.__liveStatsForceFreshUntil
+        && Date.now() < window.__liveStatsForceFreshUntil
+      const params = { fixture: info.fixtureId }
+      if (forceFresh) params.forceFresh = '1'
+      const data = await afetch('fixtures/statistics', params)
       return transformStats(data, info.homeTeamId)
     },
     enabled:         !!info?.fixtureId && isLive,

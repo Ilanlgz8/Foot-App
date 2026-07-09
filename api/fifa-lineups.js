@@ -254,8 +254,14 @@ function parseFifaStats(statsData) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
-  const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '' } = req.query
+  const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '', forceFresh = '' } = req.query
   if (!fdMatchId) return res.status(400).json({ error: 'fdMatchId requis' })
+  // forceFresh=1 : contourne le cache Redis stats (mais pas les IDs/lineup,
+  // qui n'ont pas besoin de fraîcheur) — voir même paramètre dans
+  // api/fifa-live.js. Utilisé au retour au premier plan (useLiveMinute.js) :
+  // sans ça, un retour d'arrière-plan pouvait retomber sur un snapshot déjà
+  // vieux de près de 2min (TTL du cache stats) au lieu de données fraîches.
+  const skipStatsCache = forceFresh === '1' || forceFresh === 'true'
 
   // ── 1. IDs FIFA : cache Redis (7j) → autodiscovery → fallback legacy ───────
   // ⚠️ Résolu AVANT le lineup (contrairement à avant) : les stats en ont besoin
@@ -332,7 +338,7 @@ export default async function handler(req, res) {
   let stats = null
   if (ids?.fifaMatchId) {
     try {
-      const cachedStats = safeJson(await kv.get(`fifa:stats:${fdMatchId}`))
+      const cachedStats = skipStatsCache ? null : safeJson(await kv.get(`fifa:stats:${fdMatchId}`))
       if (cachedStats) {
         stats = cachedStats
       } else {

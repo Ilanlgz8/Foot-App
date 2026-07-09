@@ -1119,6 +1119,15 @@ export function useLiveMinute(matches) {
       window.__espnNeedsRefresh = Date.now()
       // Stats live (possession/tirs/corners) — même fix que le score : ne pas
       // attendre leur cycle de refetch propre (jusqu'à 90s) après un retour au premier plan.
+      // ⚠️ L'invalidation seule ne suffit pas (constat utilisateur : stats figées
+      // après un passage en arrière-plan) : invalidateQueries relance bien un
+      // fetch côté client, mais /api/fifa-lineups et /api/apifootball ont leur
+      // propre cache Redis serveur (120s / 60s) — un refetch qui tombe dans
+      // cette fenêtre reçoit la MÊME donnée périmée. Cette fenêtre (8s, le temps
+      // du poll immédiat + du 2ème poll à 3s ci-dessous) dit aux queryFn stats
+      // de contourner ce cache serveur via forceFresh=1 (voir useFifaStats /
+      // useAflLiveStats et le paramètre forceFresh côté API).
+      window.__liveStatsForceFreshUntil = Date.now() + 8_000
       invalidateLiveStatsQueries(queryClient)
 
       if (!navigator.onLine) {
@@ -1187,6 +1196,9 @@ export function useLiveMinute(matches) {
       lastAlive = now
       if (gap > GAP_THRESHOLD_MS) {
         window.__espnNeedsRefresh = now
+        // Même contournement du cache Redis stats que dans onVisible ci-dessus
+        // (ce filet se déclenche justement quand visibilitychange n'a pas fired).
+        window.__liveStatsForceFreshUntil = now + 8_000
         invalidateLiveStatsQueries(queryClient)
         pollESPN(matchesRef.current, queryClient, true)
       }

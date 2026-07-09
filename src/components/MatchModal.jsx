@@ -398,7 +398,15 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
   return useQuery({
     queryKey: ['espnSummary', espnEventId],
     queryFn: async () => {
-      const res = await fetch(`/espn?slug=${espnSlug}&eventId=${espnEventId}`)
+      // Retour d'arrière-plan récent (voir useLiveMinute.js onVisible) : on
+      // contourne le cache Redis serveur du summary ESPN pour ne pas
+      // resservir les mêmes stats périmées qu'avant la mise en arrière-plan.
+      const forceFresh = typeof window !== 'undefined'
+        && window.__liveStatsForceFreshUntil
+        && Date.now() < window.__liveStatsForceFreshUntil
+      const url = `/espn?slug=${espnSlug}&eventId=${espnEventId}`
+        + (forceFresh ? '&forceFresh=1' : '')
+      const res = await fetch(url)
       if (!res.ok) return null
       const json = await res.json()
 

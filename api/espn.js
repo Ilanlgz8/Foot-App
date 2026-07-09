@@ -24,7 +24,24 @@ const ALLOWED_SLUGS = new Set([
   'fifa.world',
 ])
 
-const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — largement de quoi couvrir la consultation des résultats
+const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)
+const LIVE_SUMMARY_CACHE_TTL = 45              // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
+
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées") :
+// hasUsefulData() ne regardait QUE la présence de rosters/boxscore pour
+// décider de mettre en cache — or les rosters sont dispo dès l'AVANT-MATCH.
+// Résultat : le tout premier summary fetché (souvent avant/juste après le
+// coup d'envoi, quand le boxscore est encore vide ou quasi) se retrouvait
+// caché pour 7 JOURS ENTIERS, et absolument TOUS les utilisateurs recevaient
+// ensuite ce même instantané figé pendant tout le reste du match — bien plus
+// large que le simple cas "retour d'arrière-plan". Le TTL 7j reste justifié
+// pour un match TERMINÉ (permet de revoir les stats bien après qu'ESPN les
+// retire), mais un match encore EN COURS doit garder un TTL court.
+function isMatchFinished(json) {
+  const statusName = json?.header?.competitions?.[0]?.status?.type?.name
+  const completed  = json?.header?.competitions?.[0]?.status?.type?.completed
+  return completed === true || statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL'
+}
 
 // Un summary "utile" contient au moins des rosters ou un boxscore — évite de
 // mettre en cache une réponse vide/quasi-vide qui bloquerait un refetch utile.
@@ -46,7 +63,8 @@ function hasUsefulData(json) {
 }
 
 export default async function handler(req, res) {
-  const { slug, dates, eventId, recap } = req.query
+  const { slug, dates, eventId, recap, forceFresh } = req.query
+  const skipCache = forceFresh === '1' || forceFresh === 'true'
 
   if (!slug)                    return res.status(400).json({ error: 'Paramètre slug manquant' })
   if (!ALLOWED_SLUGS.has(slug)) return res.status(400).json({ error: 'Slug non autorisé' })
@@ -74,9 +92,14 @@ export default async function handler(req, res) {
 
     if (eventId) {
       // ── Mode summary : cache Redis partagé d'abord ──────────────────────────
+      // forceFresh=1 (retour d'arrière-plan récent côté client, voir
+      // window.__liveStatsForceFreshUntil dans useLiveMinute.js) contourne
+      // cette lecture pour ne pas resservir un instantané potentiellement
+      // périmé — le fetch frais ci-dessous réécrit quand même le cache après,
+      // au bénéfice des autres utilisateurs.
       const cacheKey = `espn:summary:${slug}:${eventId}`
       try {
-        const cached = await kv.get(cacheKey)
+        const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {
           clearTimeout(timeoutId)
           const body = typeof cached === 'string' ? cached : JSON.stringify(cached)
@@ -100,7 +123,8 @@ export default async function handler(req, res) {
       try {
         const parsed = JSON.parse(body)
         if (hasUsefulData(parsed)) {
-          await kv.set(cacheKey, body, { ex: SUMMARY_CACHE_TTL })
+          const ttl = isMatchFinished(parsed) ? SUMMARY_CACHE_TTL : LIVE_SUMMARY_CACHE_TTL
+          await kv.set(cacheKey, body, { ex: ttl })
         }
       } catch { /* JSON invalide ou KV en erreur → tant pis, pas bloquant pour la réponse */ }
 

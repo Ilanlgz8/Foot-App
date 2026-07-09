@@ -415,9 +415,16 @@ export function useFifaStats(match, enabled = true, live = true) {
     retry: 2,
     retryDelay: 3_000,
     queryFn: async () => {
+      // Retour d'arrière-plan récent (voir useLiveMinute.js onVisible) : on
+      // contourne le cache Redis serveur (120s) pour ne pas réafficher les
+      // mêmes stats périmées qu'avant la mise en arrière-plan.
+      const forceFresh = typeof window !== 'undefined'
+        && window.__liveStatsForceFreshUntil
+        && Date.now() < window.__liveStatsForceFreshUntil
       const url = `/api/fifa-lineups?fdMatchId=${match.id}`
         + `&home=${encodeURIComponent(fdHome)}`
         + `&away=${encodeURIComponent(fdAway)}`
+        + (forceFresh ? '&forceFresh=1' : '')
       const res = await fetch(url)
       if (!res.ok) return null
       const data = await res.json()

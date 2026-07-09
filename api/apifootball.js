@@ -9,9 +9,20 @@ const kv = new Redis({
 })
 
 // TTL cache Redis selon le type d'endpoint
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées,
+// surtout après un passage en arrière-plan") : 'statistics' était caché 2h.
+// Pour un match EN COURS, ce cache Redis est PARTAGÉ entre tous les
+// utilisateurs — dès qu'UN SEUL client déclenche le 1er fetch (souvent tôt
+// dans le match, quand ESPN/FIFA n'ont pas encore de données et que le
+// fallback api-football prend le relais), la possession/tirs/corners
+// restaient figés à cette valeur pour TOUT LE MONDE pendant les 2 HEURES
+// suivantes — largement plus long qu'un match complet. Ramené à 60s, cohérent
+// avec le cache stats FIFA (120s, voir api/fifa-lineups.js) : toujours un
+// vrai cache (protège le quota api-football, cf. les suspensions de compte
+// déjà rencontrées), mais qui laisse les stats réellement évoluer en direct.
 function cacheTTL(endpoint) {
   if (endpoint.includes('lineups'))    return 7  * 24 * 3600  // 7 jours — lineups ne changent pas
-  if (endpoint.includes('statistics')) return 2  * 3600        // 2h — stats live
+  if (endpoint.includes('statistics')) return 60               // 1min — stats live (était 2h, bug)
   if (endpoint.includes('status'))     return 60               // 1min — quota restant
   return 6 * 3600                                              // 6h — fixtures et autres
 }
@@ -107,7 +118,7 @@ export default async function handler(req, res) {
     })
   }
 
-  const { _ep, ...rest } = req.query
+  const { _ep, forceFresh, ...rest } = req.query
   const endpoint = _ep ?? 'fixtures'
 
   if (!/^[a-z0-9/_-]+$/i.test(endpoint)) {
@@ -117,9 +128,16 @@ export default async function handler(req, res) {
   const queryStr = new URLSearchParams(rest).toString()
 
   // ── 1. Cache Redis (avant le rate limit pour économiser quota) ────────────────
+  // forceFresh=1 (posé côté client juste après un retour d'arrière-plan, voir
+  // window.__liveStatsForceFreshUntil dans useLiveMinute.js) contourne cette
+  // lecture pour ne pas renvoyer les mêmes stats live périmées qu'avant la
+  // mise en arrière-plan (le TTL 60s seul ne suffit pas si le retour tombe
+  // dans la fenêtre). Le paramètre est exclu de rest → n'affecte ni la clé
+  // de cache ni les params envoyés à l'API upstream.
+  const skipCache = forceFresh === '1' || forceFresh === 'true'
   const cacheKey = `aflcache:${endpoint}:${queryStr}`
   try {
-    const cached = await kv.get(cacheKey)
+    const cached = skipCache ? null : await kv.get(cacheKey)
     if (cached) {
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('x-cache', 'HIT')
