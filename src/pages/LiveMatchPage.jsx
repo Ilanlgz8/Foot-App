@@ -24,6 +24,8 @@ import {
   ComposTab,
   ClassementTab,
   TabDots,
+  useH2HRows,
+  H2HTabContent,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
 import './MatchPage.css'
@@ -304,8 +306,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-const TABS = ['stats', 'compos', 'classement']
-
 export default function LiveMatchPage() {
   const { matchId }            = useParams()
   const navigate               = useNavigate()
@@ -336,6 +336,12 @@ export default function LiveMatchPage() {
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
   // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient).
   const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
+
+  // Historique des confrontations — onglet dédié, masqué tant qu'aucune
+  // confrontation connue n'est confirmée (même logique que MatchPage).
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches)
+  const showH2HTab = !h2hLoading && h2hRows.length > 0
+  const TABS = ['stats', 'compos', 'classement', ...(showH2HTab ? ['historique'] : [])]
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -375,7 +381,8 @@ export default function LiveMatchPage() {
               >
                 {t === 'stats'       ? 'Statistiques'
                : t === 'compos'     ? 'Compos'
-               :                      'Classement'}
+               : t === 'classement' ? 'Classement'
+               :                      'Historique'}
               </button>
             ))}
           </div>
@@ -413,6 +420,7 @@ export default function LiveMatchPage() {
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+            {activeTab === 'historique' && <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />}
           </div>
         </div>
       </div>

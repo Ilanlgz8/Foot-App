@@ -456,7 +456,10 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatches }) {
+// compMatches n'est plus utilisé ici depuis que l'historique des
+// confrontations a son propre onglet (H2HTabContent) — les appelants
+// (LiveMatchPage) continuent de le passer, il est simplement ignoré.
+export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -491,16 +494,12 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
-  // H2H affiché en bas pour matchs terminés (pas en live pour ne pas alourdir)
-  const h2hBlock = !isLive ? <H2HSection match={match} compMatches={compMatches} /> : null
-
   // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
     return (
       <div>
         <ESPNStats stats={espnScore.stats} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-        {h2hBlock}
       </div>
     )
   }
@@ -517,7 +516,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
           : <p className="modal__noEvents">Stats non disponibles</p>
         }
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-        {h2hBlock}
       </div>
     )
   }
@@ -528,7 +526,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
       <div>
         <ESPNStats stats={summaryStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-        {h2hBlock}
       </div>
     )
   }
@@ -565,7 +562,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort, compMatch
       ) : (
         <p className="modal__noEvents">Stats non disponibles</p>
       )}
-      {h2hBlock}
     </div>
   )
 }
@@ -1019,7 +1015,7 @@ function ResultBadge({ result }) {
 export function TeamFormTable({ teamId, compMatches }) {
   // compMatches (FD.org) est trié du plus ancien au plus récent → slice(-5)
   // garde les 5 derniers, puis reverse() pour afficher le dernier match joué
-  // tout en haut (même convention que H2HSection juste au-dessus).
+  // tout en haut (même convention que l'onglet Historique, voir H2HRowsList).
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
     .slice(-5)
@@ -1203,7 +1199,7 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
 // Évolution du rapport de force sur l'historique H2H disponible, dans l'ordre
 // chronologique (plus ancien à gauche → plus récent à droite). Basée sur
 // matchOutcome() (même règle de départage tab que le reste de l'app :
-// H2HSection, useTeamForm.js) pour ne pas dupliquer cette logique. Perspective
+// useH2HRows, useTeamForm.js) pour ne pas dupliquer cette logique. Perspective
 // fixe = l'équipe qui reçoit aujourd'hui, peu importe qui recevait à l'époque.
 // Même technique (SVG polyline à la main) que ProbaCurve.jsx — pas de lib de
 // graphique pour un seul tracé.
@@ -1306,12 +1302,15 @@ function H2HBilan({ rows, match, isWC }) {
   )
 }
 
-function H2HSection({ match, compMatches }) {
+// ── Hook partagé : calcule les confrontations passées (rows) + état de
+// chargement. Appelé au niveau de la page (MatchPage/LiveMatchPage) pour
+// piloter à la fois la visibilité du bouton d'onglet "Historique" et le
+// contenu affiché (H2HTabContent) sans dupliquer la logique FD.org +
+// fallback compMatches à deux endroits.
+export function useH2HRows(match, compMatches) {
   const { data: h2hMatches, isLoading } = useH2H(match)
-  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
-
-  const homeId = match.homeTeam?.id
-  const awayId = match.awayTeam?.id
+  const homeId = match?.homeTeam?.id
+  const awayId = match?.awayTeam?.id
 
   // Données FD.org (du plus récent au plus vieux). Pas de troncature
   // arbitraire ici : on affiche tout ce que l'API renvoie réellement pour ce
@@ -1331,79 +1330,91 @@ function H2HSection({ match, compMatches }) {
       ).slice().reverse()
     : []
 
-  const rows = fdRecent.length ? fdRecent : compH2H
+  return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }
+}
 
-  // Aucune confrontation connue (une fois le chargement terminé) → on masque
-  // toute la section plutôt que d'afficher un titre suivi d'un texte "vide".
-  if (!isLoading && !rows.length) return null
+// ── Liste des confrontations (championnat/date + équipes-score alignés) —
+// utilisée par H2HTabContent.
+function H2HRowsList({ rows, homeId }) {
+  return (
+    <div className="h2h__list">
+    {rows.map((m, i) => {
+      const isHomeTeam = m.homeTeam?.id === homeId
+      const fsH2H = finalScore(m.score)
+      const hs = fsH2H.home ?? '-'
+      const as_ = fsH2H.away ?? '-'
+      const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+      const myGoals  = isHomeTeam ? hs : as_
+      const oppGoals = isHomeTeam ? as_ : hs
+      // Score 120min (finalScore) : à égalité par définition si le match est allé aux tab.
+      const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
+      const hp = m.score?.penalties?.home ?? null
+      const ap = m.score?.penalties?.away ?? null
+      let result
+      if (wentToPens && hp != null && ap != null) {
+        const myPens  = isHomeTeam ? hp : ap
+        const oppPens = isHomeTeam ? ap : hp
+        result = myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D'
+      } else {
+        result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
+      }
+      // Vainqueur de CETTE ligne (surbrillance nom + buts en or)
+      const homeWon = result !== 'D' && ((result === 'W') === isHomeTeam)
+      const awayWon = result !== 'D' && !homeWon
+      const compLabel = m.competition?.name ?? ''
+      return (
+        <div key={i} className="h2h__row">
+          {/* Championnat + date — en haut à gauche de la card */}
+          <div className="h2h__meta">{compLabel ? `${compLabel} · ${date}` : date}</div>
+          {/* Équipes + score alignés sur une seule ligne, score centré */}
+          <div className="h2h__lineup">
+            <span className={`h2h__team${homeWon ? ' h2h__team--win' : ''}`}>
+              {translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}
+            </span>
+            <span className="h2h__scoreWrap">
+              <span className="h2h__score">
+                <span className={homeWon ? 'h2h__goal--w' : ''}>{hs}</span>
+                {' – '}
+                <span className={awayWon ? 'h2h__goal--w' : ''}>{as_}</span>
+              </span>
+              {wentToPens && hp != null && ap != null && (
+                <span className="h2h__pens">tab {hp}-{ap}</span>
+              )}
+            </span>
+            <span className={`h2h__team h2h__team--right${awayWon ? ' h2h__team--win' : ''}`}>
+              {translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}
+            </span>
+          </div>
+        </div>
+      )
+    })}
+    </div>
+  )
+}
 
+// ── Contenu de l'onglet "Historique" dédié (MatchPage/LiveMatchPage) — la
+// section H2H vivait auparavant dans "Statistiques"/"Avant-match", elle a
+// désormais son propre onglet (le libellé de l'onglet fait déjà office de
+// titre, pas besoin de le répéter). rows/isLoading viennent de
+// useH2HRows(), appelé une seule fois au niveau de la page pour piloter à la
+// fois ce contenu ET la visibilité du bouton d'onglet lui-même (masqué tant
+// qu'aucune confrontation connue — demande explicite : "si y'en a pas on le
+// hide, on affiche pas le bouton").
+export function H2HTabContent({ match, rows, isLoading }) {
+  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
+  const homeId = match.homeTeam?.id
   const homeShort = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayShort = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
+  if (isLoading) return <H2HSkeleton />
+  if (!rows.length) return <p className="modal__noEvents">Aucune confrontation connue entre ces deux équipes</p>
+
   return (
-    <div className="pm__section">
-      <h3 className="pm__sectionTitle">Historique des confrontations</h3>
-      {isLoading ? (
-        <H2HSkeleton />
-      ) : (
-        <>
-          <H2HBilan rows={rows} match={match} isWC={isWC} />
-          <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
-          <div className="h2h__list">
-          {rows.map((m, i) => {
-            const isHomeTeam = m.homeTeam?.id === homeId
-            const fsH2H = finalScore(m.score)
-            const hs = fsH2H.home ?? '-'
-            const as_ = fsH2H.away ?? '-'
-            const date = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-            const myGoals  = isHomeTeam ? hs : as_
-            const oppGoals = isHomeTeam ? as_ : hs
-            // Score 120min (finalScore) : à égalité par définition si le match est allé aux tab.
-            const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
-            const hp = m.score?.penalties?.home ?? null
-            const ap = m.score?.penalties?.away ?? null
-            let result
-            if (wentToPens && hp != null && ap != null) {
-              const myPens  = isHomeTeam ? hp : ap
-              const oppPens = isHomeTeam ? ap : hp
-              result = myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D'
-            } else {
-              result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
-            }
-            // Vainqueur de CETTE ligne (surbrillance nom + buts en or)
-            const homeWon = result !== 'D' && ((result === 'W') === isHomeTeam)
-            const awayWon = result !== 'D' && !homeWon
-            const compLabel = m.competition?.name ?? ''
-            return (
-              <div key={i} className="h2h__row">
-                {/* Championnat + date — en haut à gauche de la card */}
-                <div className="h2h__meta">{compLabel ? `${compLabel} · ${date}` : date}</div>
-                {/* Équipes + score alignés sur une seule ligne, score centré */}
-                <div className="h2h__lineup">
-                  <span className={`h2h__team${homeWon ? ' h2h__team--win' : ''}`}>
-                    {translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}
-                  </span>
-                  <span className="h2h__scoreWrap">
-                    <span className="h2h__score">
-                      <span className={homeWon ? 'h2h__goal--w' : ''}>{hs}</span>
-                      {' – '}
-                      <span className={awayWon ? 'h2h__goal--w' : ''}>{as_}</span>
-                    </span>
-                    {wentToPens && hp != null && ap != null && (
-                      <span className="h2h__pens">tab {hp}-{ap}</span>
-                    )}
-                  </span>
-                  <span className={`h2h__team h2h__team--right${awayWon ? ' h2h__team--win' : ''}`}>
-                    {translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-          </div>
-        </>
-      )}
-    </div>
+    <>
+      <H2HBilan rows={rows} match={match} isWC={isWC} />
+      <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
+      <H2HRowsList rows={rows} homeId={homeId} />
+    </>
   )
 }
 
@@ -1546,8 +1557,8 @@ export function PreMatchSection({ match, formMap, compMatches, hideStats = false
 
       {/* Pronostic des fans — masqué si déjà affiché ailleurs (ex: MatchPage
           l'affiche en haut de page, au-dessus de "Stats saison") */}
-      {/* Dernières confrontations — en premier pour voir l'historique direct */}
-      <H2HSection match={match} compMatches={compMatches} />
+      {/* Historique des confrontations : déplacé dans son propre onglet
+          "Historique" (MatchPage/LiveMatchPage) — voir H2HTabContent. */}
 
       {/* Stats saison */}
       {!hideStats && compMatches?.length > 0 && (
