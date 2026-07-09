@@ -174,15 +174,29 @@ export function calcMinute(match) {
   // ⚠️ 'STATUS_SCHEDULED' (string truthy) = FIFA/ESPN n'a pas encore confirmé le KO.
   // Sans le test sur STATUS_SCHEDULED, la condition !state.espnStatus serait fausse
   // même si le match n'est pas encore officiellement en cours → '–' affiché au lieu de 'Débute'.
+  //
+  // ⚠️ BUG CORRIGÉ (régression signalée : "Débute" a disparu, "1'" s'affiche dès
+  // l'heure prévue) : ce garde-fou ne testait QUE match.status === 'SCHEDULED'.
+  // Or football-data.org rapporte 'TIMED' pour les matchs à venir de la Coupe
+  // du monde (voir _checkPendingKickoffs dans useLiveMinute.js, qui teste bien
+  // les deux statuts, lui) — pour un match WC, ce bloc n'était donc JAMAIS
+  // atteint, et l'heuristique utcDate plus bas ("Math.max(1, elapsed)") prenait
+  // le relais dès l'heure de coup d'envoi prévue, sans attendre la confirmation
+  // ESPN. Idem si FD.org bascule sur 'IN_PLAY' de son côté avant qu'ESPN
+  // confirme réellement le KO (détections pas forcément synchrones) : on veut
+  // "Débute" tant qu'ESPN n'a rien confirmé, quel que soit le statut FD.org,
+  // sauf s'il indique déjà PAUSED/FINISHED (signe qu'on est allé plus loin).
   if (
-    match.status === 'SCHEDULED' &&
+    match.status !== 'FINISHED' && match.status !== 'PAUSED' &&
     (!state.espnStatus || state.espnStatus === 'STATUS_SCHEDULED') &&
-    !state.kickoffAt
+    !state.kickoffAt && !state.pausedAt
   ) {
-    const nowMs   = Date.now()
-    const utcMs   = new Date(match.utcDate).getTime()
-    if (nowMs >= utcMs && nowMs - utcMs < 30 * 60_000) return 'Débute'
-    return null
+    const utcMs = new Date(match.utcDate).getTime()
+    if (now < utcMs) return null
+    if (now - utcMs < 30 * 60_000) return 'Débute'
+    // Au-delà de 30min sans confirmation ESPN : on laisse tomber vers les
+    // heuristiques utcDate plus bas plutôt que de rester bloqué sans rien
+    // afficher (cas rare : ESPN indisponible ou très en retard).
   }
 
   // ── Tirs au but (period 5 / STATUS_SHOOTOUT) ──

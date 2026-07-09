@@ -125,6 +125,22 @@ describe('calcMinute', () => {
     expect(calcMinute(match)).toBe('Débute')
   })
 
+  it('affiche "Débute" (pas "1\'") pour un match TIMED (statut FD.org des matchs WC à venir)', () => {
+    // Régression constatée : le garde-fou "Débute" ne testait que status === 'SCHEDULED',
+    // hors football-data.org rapporte 'TIMED' pour les matchs à venir de la Coupe du
+    // monde → "Débute" ne s'affichait jamais pour un match WC, l'heuristique utcDate
+    // prenait le relais immédiatement et affichait "1'" avant même la confirmation ESPN.
+    const match = baseMatch({ status: 'TIMED', utcDate: '2026-07-03T18:59:00.000Z' })
+    expect(calcMinute(match)).toBe('Débute')
+  })
+
+  it('affiche "Débute" (pas "1\'") si FD.org bascule sur IN_PLAY avant qu\'ESPN confirme le KO', () => {
+    // Même régression, autre déclencheur : FD.org peut passer IN_PLAY de son côté
+    // avant qu'ESPN ait confirmé le coup d'envoi réel (détections pas synchrones).
+    const match = baseMatch({ status: 'IN_PLAY', utcDate: '2026-07-03T18:59:00.000Z' })
+    expect(calcMinute(match)).toBe('Débute')
+  })
+
   it('interpole la minute en temps réglementaire depuis le dernier poll ESPN', () => {
     setEspnData(MID, { espnClock: '42:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 2 })
     vi.advanceTimersByTime(90_000) // +1min30 depuis le poll
