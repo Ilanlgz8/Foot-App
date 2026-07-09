@@ -368,7 +368,18 @@ function extractEspnScorers(comp, homeTeamId) {
     .filter(d => {
       const txt = (d.type?.text ?? '').toLowerCase()
       const id  = String(d.type?.id ?? '')
-      return txt.includes('goal') || txt === 'penaltykick' || id === '57' || id === '58' || id === '72'
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "les buts marqués sur penalty,
+      // ça ne s'affiche pas le buteur") : `txt === 'penaltykick'` exigeait une
+      // égalité stricte SANS espace, alors qu'ESPN libelle ce type d'événement
+      // avec un espace/tiret (ex: "Penalty - Scored", cf. le même style que
+      // "Yellow Card"/"Red Card" ailleurs dans ce fichier) — cette égalité ne
+      // matchait donc quasiment jamais en pratique, et le but manquait
+      // silencieusement à l'appel : pas de buteur affiché, et côté notif push
+      // (plus bas dans ce fichier), retombée sur le message générique "⚽ But !"
+      // après le délai d'attente. `txt.includes('penalty')` élargit la
+      // détection sans dépendre du format exact — mais on exclut explicitement
+      // "miss" pour ne jamais compter un penalty RATÉ comme un but marqué.
+      return txt.includes('goal') || (txt.includes('penalty') && !txt.includes('miss')) || id === '57' || id === '58' || id === '72'
     })
     .map(d => {
       const ath = d.athletesInvolved?.[0]
