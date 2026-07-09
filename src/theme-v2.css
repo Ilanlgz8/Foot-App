@@ -11,15 +11,24 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Surfaces : noir pur → noir-marine profond ── */
-  --bg-deep:      #070910;
-  --bg-dark:      #0a0c14;
-  --bg-mid:       #10141f;
-  --bg-card:      rgba(19, 24, 41, 0.97);
-  --bg-panel:     #131829;
-  --bg-panel-grad: linear-gradient(160deg, #161c30 0%, #11162a 100%);
-  --bg-page-grad:  linear-gradient(180deg, #070910 0%, #0a0e1a 50%, #0d1122 100%);
-  --bg-detail:    #0c0f1a;
+  /* ── Surfaces : noir grisé neutre (sobre, laisse le rouge dominer) ── */
+  --bg-deep:      #08080a;
+  --bg-dark:      #0b0b0e;
+  --bg-mid:       #101014;
+  --bg-card:      rgba(18, 18, 23, 0.97);
+  --bg-panel:     #141419;
+  --bg-panel-grad: linear-gradient(160deg, #17171d 0%, #111116 100%);
+  --bg-page-grad:  linear-gradient(180deg, #08080a 0%, #0d0d11 50%, #101015 100%);
+  --bg-detail:    #0e0e12;
+
+  /* Ré-alignement des tokens --sf-* (navbar, live) sur le noir grisé */
+  --sf-bg:        #0b0b0e;
+  --sf-surface:   #141419;
+  --sf-surface-2: #1a1a21;
+  --sf-surface-3: #24242d;
+  --sf-border:    rgba(255, 255, 255, 0.09);
+  --sf-muted:     #9a9fad;
+  --sf-faint:     #5c6069;
 
   /* ── Rouge : plus punchy (identité conservée) ── */
   --red:        #fb3b4e;
@@ -30,12 +39,12 @@
   --red-deep-rgb: 193, 26, 48;
 
   /* ── Bordures bleutées (fini le gris terne) ── */
-  --border:     rgba(148, 163, 210, 0.12);
+  --border:     rgba(255, 255, 255, 0.085);
   --border-red: rgba(var(--red-rgb), 0.22);
 
   /* ── Texte ── */
-  --text-mid:   #9aa3bb;
-  --text-dim:   #5d6580;
+  --text-mid:   #9a9fad;
+  --text-dim:   #5c6069;
 
   /* ── Or champagne ── */
   --gold-light: #f6c667;
@@ -91,7 +100,7 @@ html body {
   position: relative;
   border-color: rgba(var(--sf-live-rgb), 0.2);
   background: linear-gradient(180deg, rgba(var(--sf-live-rgb), 0.05), transparent 50%),
-              linear-gradient(145deg, #141a2e, #0f1425);
+              linear-gradient(145deg, #17171e, #101015);
 }
 #root .live__card::before {
   content: '';
@@ -139,7 +148,7 @@ html body {
 /* Panels de l'Accueil — bordure hardcodée #1d1d1d → bleutée + reflet haut */
 #root .accueil__dashPanel {
   border-color: var(--sf-border);
-  background: linear-gradient(180deg, rgba(148, 163, 210, 0.045), transparent 42%),
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
               var(--bg-panel-grad);
 }
 
@@ -154,4 +163,43 @@ html body {
   background: rgba(var(--sf-red-rgb), 0.14);
   border-color: rgba(var(--sf-red-rgb), 0.45);
   color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PHASE 3 — hero aux couleurs des équipes + or champagne
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Match du jour : halos aux couleurs des DEUX équipes (injectées par
+   MatchDuJourCard via --mdj-home/--mdj-away), ADN rouge conservé au
+   centre, base noir grisé. Repli rouge si équipe inconnue. */
+#root .accueil__mdj {
+  border-color: var(--sf-border);
+  background:
+    radial-gradient(110% 95% at 0% 0%,
+      color-mix(in srgb, var(--mdj-home, #fb3b4e) 34%, transparent), transparent 55%),
+    radial-gradient(110% 95% at 100% 0%,
+      color-mix(in srgb, var(--mdj-away, #fb3b4e) 30%, transparent), transparent 55%),
+    radial-gradient(ellipse 100% 80% at 50% -10%, rgba(var(--sf-red-rgb), 0.14), transparent 65%),
+    linear-gradient(180deg, #17171d 0%, #0c0c10 100%);
+}
+
+/* ── Or champagne unifié : vainqueurs & leader ── */
+
+/* Score du vainqueur (page Résultats) : jaune criard → or champagne */
+#root .resultats__scoreNum--win { color: var(--sf-gold); }
+
+/* Nom du vainqueur (panneaux Accueil) : halo VERT résiduel → halo or */
+#root .accueil__matchCardName--winner {
+  text-shadow: 0 0 12px rgba(var(--sf-gold-rgb), 0.32);
+}
+
+/* Leader du classement : ligne dorée + position champagne */
+#root .classement__row--top1 {
+  background: linear-gradient(90deg, rgba(var(--sf-gold-rgb), 0.08), transparent 55%);
+}
+#root .classement__row--top1:hover {
+  background: linear-gradient(90deg, rgba(var(--sf-gold-rgb), 0.13), transparent 60%);
+}
+#root .classement__row--top1 td:first-child .classement__position {
+  color: var(--sf-gold);
 }

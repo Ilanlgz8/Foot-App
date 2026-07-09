@@ -7,6 +7,7 @@
 // se joue UNE FOIS au montage puis s'arrête (un tremblement permanent aurait
 // été fatigant à l'usage, voir discussion).
 import { translateTeam } from '../data/teamNames'
+import { getMatchTeamColors } from '../data/teamPhotos'
 
 const TEAM_SHORT = {
   'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
@@ -43,8 +44,20 @@ export function MatchDuJourCard({ match, onClick }) {
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
 
+  // Couleurs réelles des deux équipes (dico curé teamPhotos) → halos latéraux
+  // du hero. Le thème v2 (theme-v2.css) les consomme via var(--mdj-home/away),
+  // avec repli rouge de marque si l'équipe est inconnue.
+  const teamColors = getMatchTeamColors(match.homeTeam?.name, match.awayTeam?.name)
+
   return (
-    <button className="accueil__mdj" onClick={onClick}>
+    <button
+      className="accueil__mdj"
+      onClick={onClick}
+      style={{
+        '--mdj-home': teamColors.home.main,
+        '--mdj-away': teamColors.away.main,
+      }}
+    >
       <div className="accueil__mdjTitleWrap">
         <span className="accueil__mdjTitle">Match du jour</span>
         <div className="accueil__mdjUnderline" />
