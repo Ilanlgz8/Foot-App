@@ -438,7 +438,20 @@ export default async function handler(req, res) {
   // si ce cache a été rafraîchi par un autre appel juste avant notre retour.
   const { matches, forceFresh } = req.body ?? {}
   if (!Array.isArray(matches) || !matches.length) return res.json({})
-  if (matches.length > 20) return res.status(400).json({ error: 'Trop de matchs (max 20)' })
+  // ⚠️ BUG CORRIGÉ (question utilisateur : "l'app va supporter d'avoir genre
+  // 30 matchs par jour ?") : ce plafond était à 20 — un simple samedi après-
+  // midi avec plusieurs championnats club en simultané (PL + Bundesliga +
+  // Serie A + Ligue 1 + coupes européennes...) peut largement dépasser ce
+  // nombre de matchs "à suivre" au même moment (fenêtre 0-150min après KO,
+  // voir toTrack dans useLiveMinute.js). Conséquence AVANT ce fix : la
+  // requête entière échouait (400), donc PLUS AUCUN match ne recevait de
+  // score/stats ce jour-là, pas juste les matchs en trop. Relevé à 60 — large
+  // marge pour un jour très chargé, tout en gardant un plafond de sécurité
+  // contre un payload abusif. Le vrai coût serveur ne scale de toute façon
+  // pas linéairement avec le nombre de matchs (voir fetchEspnSummaryStats
+  // désormais parallélisé plus bas), donc ce plafond n'est qu'un garde-fou,
+  // pas une contrainte de performance réelle.
+  if (matches.length > 60) return res.status(400).json({ error: 'Trop de matchs (max 60)' })
 
   const now       = new Date()
   const today     = dateStr(now)
@@ -518,6 +531,18 @@ export default async function handler(req, res) {
 
   // Matcher chaque match FD.org avec un event ESPN
   const usedEspnIds = new Set()
+  // ⚠️ PERF (question utilisateur sur la tenue en charge avec beaucoup de
+  // matchs simultanés) : les fetchEspnSummaryStats() nécessaires plus bas
+  // dans cette boucle ne sont PLUS attendus (`await`) un par un — ça
+  // sérialisait un aller-retour réseau PAR MATCH (ex: 20 matchs en direct
+  // sans stats scoreboard × ~300-500ms chacun = jusqu'à 10s rien que pour
+  // cette étape, risquant de dépasser le timeout par défaut d'une fonction
+  // Vercel Hobby et de faire échouer TOUTE la réponse). Le fetch est lancé
+  // immédiatement (la requête réseau part tout de suite) mais collecté ici
+  // pour être résolu APRÈS la boucle, en parallèle pour tous les matchs qui
+  // en ont besoin — le temps total ne dépend plus du nombre de matchs mais
+  // du plus lent des appels ESPN.
+  const pendingStatsFetches = []
   for (const fdMatch of matches) {
     const slug = COMP_ESPN[fdMatch.competition?.id]
     if (!slug) continue
@@ -707,6 +732,7 @@ export default async function handler(req, res) {
     // Si scoreboard vide (WC et beaucoup de ligues club) ET match en cours
     // → appel summary endpoint ESPN (cached 30s Redis) qui contient boxscore complet
     let matchStats = extractBoxscoreStats(homeC?.statistics, awayC?.statistics)
+    let statsPromise = null
     if (
       !matchStats &&
       (finalEspnStatus === 'STATUS_IN_PROGRESS' ||
@@ -714,8 +740,12 @@ export default async function handler(req, res) {
        finalEspnStatus === 'STATUS_END_PERIOD')
     ) {
       // found.slug = 'fifa.world' pour WC, 'fra.1' etc pour club
-      matchStats = await fetchEspnSummaryStats(found.slug, found.evt.id)
+      // Pas de `await` ici — voir commentaire sur pendingStatsFetches plus haut.
+      statsPromise = fetchEspnSummaryStats(found.slug, found.evt.id)
     }
+    // Valeur temporaire tant que statsPromise n'est pas résolu (voir plus bas,
+    // après la boucle) — jamais renvoyée telle quelle au client si un fetch
+    // est en cours : écrasée par le vrai résultat une fois Promise.allSettled fini.
     matchStats = matchStats ?? prevData?.stats ?? null
 
     result[fdMatch.id] = {
@@ -755,6 +785,23 @@ export default async function handler(req, res) {
         fifaStageId:  prevData.fifaStageId,
       } : {}),
     }
+
+    if (statsPromise) {
+      pendingStatsFetches.push({ fdMatchId: fdMatch.id, promise: statsPromise, prevStats: prevData?.stats ?? null })
+    }
+  }
+
+  // Résout tous les fetchs de stats ESPN collectés ci-dessus EN PARALLÈLE
+  // (voir commentaire détaillé sur pendingStatsFetches plus haut) — remplace
+  // la valeur temporaire (prevData?.stats) posée dans la boucle par le
+  // résultat réel, une fois tous les appels réseau terminés.
+  if (pendingStatsFetches.length > 0) {
+    const settled = await Promise.allSettled(pendingStatsFetches.map(p => p.promise))
+    settled.forEach((r, i) => {
+      const { fdMatchId, prevStats } = pendingStatsFetches[i]
+      const fresh = r.status === 'fulfilled' ? r.value : null
+      if (result[fdMatchId]) result[fdMatchId].stats = fresh ?? prevStats
+    })
   }
 
   // ══════════════════════════════════════════════════════════════════════════
