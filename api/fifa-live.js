@@ -638,10 +638,23 @@ export default async function handler(req, res) {
       const espnAway = parseEspnScore(awayC?.score) ?? 0
       home    = Math.max(fifaD.home ?? 0, espnHome)
       away    = Math.max(fifaD.away ?? 0, espnAway)
-      // FIFA scorers en priorité, fallback ESPN si FIFA n'a pas trouvé les noms
-      scorers = fifaD.scorers.length > 0
-        ? fifaD.scorers
-        : extractEspnScorers(comp, homeC?.team?.id)
+      // ⚠️ AMÉLIORATION (question utilisateur : "pour avoir le score plus
+      // rapidement c'est FIFA ou ESPN ?") : le score numérique (ligne
+      // ci-dessus) prenait déjà le max des deux sources — le premier arrivé
+      // gagne. Mais le NOM du buteur ne suivait pas la même logique : FIFA
+      // était toujours préféré dès qu'il avait au moins 1 but connu, même si
+      // ESPN avait DÉJÀ le nom et que FIFA était encore vide/en retard sur ce
+      // but précis. Même principe "le plus complet des deux gagne" appliqué
+      // ici : on prend la liste la plus longue (donc la plus à jour) entre
+      // FIFA et ESPN, à égalité on garde FIFA (déjà jugé plus fiable pour les
+      // noms sur la CM). Ne change rien à la certitude du but lui-même :
+      // chaque source ne liste que des buts qu'ELLE a confirmés dans ses
+      // propres données structurées (Goals[] FIFA / details[] ESPN), et le
+      // garde anti-régression juste en dessous (bestScorers) empêche de toute
+      // façon de perdre un but déjà connu d'un poll à l'autre.
+      const fifaScorers = fifaD.scorers
+      const espnScorersNow = extractEspnScorers(comp, homeC?.team?.id)
+      scorers = fifaScorers.length >= espnScorersNow.length ? fifaScorers : espnScorersNow
     } else {
       home    = parseEspnScore(homeC?.score)
       away    = parseEspnScore(awayC?.score)
