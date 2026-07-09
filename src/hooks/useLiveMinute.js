@@ -1089,6 +1089,36 @@ export function useLiveMinute(matches) {
     prevMatchesLen.current = matches.length
   }, [matches, queryClient])
 
+  // ── Ancrage précoce de half2Start dès que FD.org confirme la reprise ──
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "à la reprise de la mi-temps j'ai
+  // genre 5min d'avance sur le temps", ex. 54' affiché alors que le vrai jeu
+  // venait tout juste de reprendre à 46') : tant qu'aucun signal PRÉCIS
+  // (ESPN period=2 ou api-football '2H' avec l'horloge exacte, voir plus haut
+  // dans ce fichier) n'a positionné half2Start, calcMinute() se rabat sur
+  // l'heuristique de matchUtils.js qui suppose une pause EXACTEMENT DE 15MIN
+  // (pausedAt + 15min = coup d'envoi de la 2e MT). Si la vraie pause dure plus
+  // longtemps (fréquent : mi-temps CM avec animation/VAR, souvent 16-20min),
+  // dès que FD.org bascule IN_PLAY (confirmant que le jeu a réellement repris)
+  // cette heuristique calcule le temps écoulé en 2e MT à partir d'une pause
+  // supposée plus courte qu'en réalité → elle "rattrape" l'écart d'un coup et
+  // affiche une minute en avance sur le vrai jeu, le temps qu'ESPN/api-football
+  // arrivent avec l'horloge précise.
+  // Fix : dès que FD.org (déjà réel, pas une supposition) confirme IN_PLAY
+  // après une pause connue, on ancre half2Start à CET INSTANT (minute 46,
+  // hypothèse la plus prudente : le jeu vient tout juste de reprendre) plutôt
+  // que de laisser matchUtils.js deviner depuis une durée de pause fixe. Cet
+  // ancrage précoce est ensuite écrasé par la détection ESPN/api-football plus
+  // précise dès qu'elle arrive (setHalf2Start n'a pas de garde anti-écrasement).
+  useEffect(() => {
+    for (const match of matches) {
+      if (match.status !== 'IN_PLAY') continue
+      const state = getMatchState(match.id)
+      if (state.pausedAt && !state.half2Start) {
+        setHalf2Start(match.id, Date.now())
+      }
+    }
+  }, [matches])
+
   // ── Cold start réseau pas prêt (iOS PWA) ──
   // Si le réseau est offline au montage du hook → attendre l'event 'online'
   // (iOS peut mettre 1-3s à établir la connexion après ouverture de la PWA)
