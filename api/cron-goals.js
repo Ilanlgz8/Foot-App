@@ -564,6 +564,21 @@ export default async function handler(req, res) {
   const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(log) : []
 
+  // ⚠️ PERF (même classe de bug que api/fifa-live.js, voir son commentaire
+  // détaillé — question utilisateur sur la tenue en charge avec ~30-50
+  // matchs/jour à la reprise des championnats) : cacheEspnSummary() était
+  // attendu (await) séquentiellement DANS la boucle, un match à la fois. Avec
+  // beaucoup de matchs live en même temps, ça pouvait cumuler plusieurs
+  // secondes avant même d'atteindre la détection de but/notif pour les
+  // derniers matchs de la liste — risque de dépasser le timeout de la
+  // fonction (10s par défaut sur Vercel Hobby) et de perdre TOUTE la passe
+  // (aucune notif envoyée), pas juste ralentir. cacheEspnSummary() ne
+  // retourne rien d'utile à la suite du traitement (effet de bord Redis
+  // uniquement, déjà protégé par son propre try/catch) → sans risque de
+  // paralléliser : chaque appel part immédiatement, résolu tous ensemble
+  // juste avant de retourner, pour ne pas être coupé par la fin de la fonction.
+  const pendingSummaryFetches = []
+
   for (const { slug, evt } of allEvents) {
    // ⚠️ Durcissement : avant, une erreur inattendue sur UN SEUL match (donnée
    // ESPN malformée, champ manquant non prévu...) faisait planter TOUT le
@@ -632,7 +647,7 @@ export default async function handler(req, res) {
     // direct — voir cacheEspnSummary() plus haut. Tourne pour CHAQUE match
     // live à CHAQUE poll (1/min), suivi ou non par un utilisateur.
     if (LIVE_ESPN.has(status)) {
-      await cacheEspnSummary(slug, eventId, log)
+      pendingSummaryFetches.push(cacheEspnSummary(slug, eventId, log))
     }
 
     // 🔴 Coup d'envoi — basé sur la confirmation RÉELLE (statut LIVE_ESPN, déjà
@@ -905,6 +920,14 @@ export default async function handler(req, res) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
    }
   }
+
+    // Attendre que tous les cacheEspnSummary() lancés en parallèle soient
+    // terminés avant de retourner — sinon la fonction pourrait rendre sa
+    // réponse (et donc être coupée par Vercel) alors que certains sont
+    // encore en vol.
+    if (pendingSummaryFetches.length > 0) {
+      await Promise.allSettled(pendingSummaryFetches)
+    }
 
     return { notifsSent, events: allEvents.length, log }
   }
