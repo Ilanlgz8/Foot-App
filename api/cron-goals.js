@@ -65,6 +65,29 @@ const FINAL_ESPN = new Set([
   'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
 ])
 
+// ── Normalisation statut ESPN ──────────────────────────────────────────────────
+// ⚠️ BUG CORRIGÉ (même fix que api/fifa-live.js, voir commentaire détaillé
+// là-bas — constat en DIRECT sur France-Maroc, quart CM 2026 : ESPN renvoyait
+// type.name = "STATUS_SECOND_HALF" pendant la 2e MT, absent de LIVE_ESPN
+// ci-dessus). Conséquence ici : le match n'était plus considéré "live" par
+// ce cron → plus aucune notif (but, mi-temps, fin) envoyée pendant toute la
+// 2e MT. `type.state` ('pre'/'in'/'post') sert de filet générique.
+const KNOWN_ESPN_STATUS = new Set([
+  'STATUS_SCHEDULED', 'STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD',
+  'STATUS_EXTRA_TIME', 'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
+  'STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
+  'STATUS_POSTPONED', 'STATUS_CANCELED',
+])
+function normalizeEspnStatus(st) {
+  const name = st?.type?.name ?? ''
+  if (KNOWN_ESPN_STATUS.has(name)) return name
+  if (name === 'STATUS_FIRST_HALF' || name === 'STATUS_SECOND_HALF') return 'STATUS_IN_PROGRESS'
+  if (st?.type?.completed === true) return 'STATUS_FINAL'
+  if (st?.type?.state === 'in')   return 'STATUS_IN_PROGRESS'
+  if (st?.type?.state === 'post') return 'STATUS_FINAL'
+  return name || 'STATUS_SCHEDULED'
+}
+
 // Délai d'attente du nom du buteur avant d'envoyer un "⚽ But !" générique —
 // voir le commentaire détaillé au niveau du bloc "⚽ But" plus bas (constat
 // utilisateur : 5min faisait percevoir l'absence totale de notif).
@@ -554,7 +577,7 @@ export default async function handler(req, res) {
     const comp = evt.competitions?.[0]
     if (!comp) continue
 
-    let   status   = comp.status?.type?.name ?? ''
+    let   status   = normalizeEspnStatus(comp.status)
     const homeC    = comp.competitors?.find(c => c.homeAway === 'home')
     const awayC    = comp.competitors?.find(c => c.homeAway === 'away')
     if (!homeC || !awayC) continue

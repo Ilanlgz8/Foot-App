@@ -205,6 +205,37 @@ function extractFifaScorers(m) {
 // pour TEAM_NAMES_FR partagée avec cron-goals.js) — source unique désormais.
 const COMP_ESPN = ESPN_SLUG_BY_COMP_ID
 
+// ── Normalisation statut ESPN ──────────────────────────────────────────────────
+// ⚠️ BUG CORRIGÉ (constat en DIRECT sur France-Maroc, quart CM 2026 : fetch
+// direct de site.api.espn.com pendant la 2e MT renvoyait
+// type.name = "STATUS_SECOND_HALF" — PAS le générique "STATUS_IN_PROGRESS"
+// que TOUT le pipeline attend (ce fichier, cron-goals.js, matchUtils.js côté
+// client). Conséquence concrète et vérifiée : score/buteurs/stats plus mis à
+// jour pendant toute la 2e MT (le bloc "CAS 1 : Match EN COURS" de
+// useLiveMinute.js exige explicitement safeStatus === 'STATUS_IN_PROGRESS'),
+// ET les notifs de but/mi-temps de cron-goals.js coupées (même check dans
+// son Set LIVE_ESPN) — le match était traité comme "non reconnu" alors qu'il
+// était bien en cours. `type.state` ('pre'/'in'/'post') est lui un champ
+// générique et fiable côté ESPN quel que soit le libellé exact du statut →
+// utilisé ici comme filet de sécurité pour tout statut "en cours" non mappé
+// explicitement, en plus du mapping direct des variantes déjà repérées.
+const KNOWN_ESPN_STATUS = new Set([
+  'STATUS_SCHEDULED', 'STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD',
+  'STATUS_EXTRA_TIME', 'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
+  'STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
+  'STATUS_POSTPONED', 'STATUS_CANCELED',
+])
+function normalizeEspnStatus(st) {
+  const name = st?.type?.name ?? ''
+  if (KNOWN_ESPN_STATUS.has(name)) return name
+  // Variantes par mi-temps déjà repérées en direct
+  if (name === 'STATUS_FIRST_HALF' || name === 'STATUS_SECOND_HALF') return 'STATUS_IN_PROGRESS'
+  if (st?.type?.completed === true) return 'STATUS_FINAL'
+  if (st?.type?.state === 'in')   return 'STATUS_IN_PROGRESS'
+  if (st?.type?.state === 'post') return 'STATUS_FINAL'
+  return name || 'STATUS_SCHEDULED'
+}
+
 function parseEspnScore(raw) {
   if (raw == null) return 0
   if (typeof raw === 'number') return Math.round(raw)
@@ -559,7 +590,7 @@ export default async function handler(req, res) {
     usedEspnIds.add(found.evt.id)
     const comp     = found.evt.competitions[0]
     const st       = comp.status
-    const espnStatus = st?.type?.name ?? 'STATUS_SCHEDULED'
+    const espnStatus = normalizeEspnStatus(st)
     const espnClock  = st?.displayClock ?? ''
     const espnPeriod = st?.period ?? null
 
