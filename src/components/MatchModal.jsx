@@ -1362,8 +1362,14 @@ function H2HRowsList({ rows, homeId }) {
       const homeWon = result !== 'D' && ((result === 'W') === isHomeTeam)
       const awayWon = result !== 'D' && !homeWon
       const compLabel = m.competition?.name ?? ''
+      // Liseré or à gauche : repère visuel immédiat pour un match allé aux
+      // tirs au but, sans avoir à lire le petit texte "tab X-Y" sous le score
+      // (demande utilisateur : affichage jugé "brouillon", historique dense
+      // à parcourir rapidement — ce repère aide à repérer d'un coup d'œil les
+      // confrontations les plus disputées).
+      const pensRow = wentToPens && hp != null && ap != null
       return (
-        <div key={i} className="h2h__row">
+        <div key={i} className={`h2h__row${pensRow ? ' h2h__row--pens' : ''}`}>
           {/* Championnat + date — en haut à gauche de la card */}
           <div className="h2h__meta">{compLabel ? `${compLabel} · ${date}` : date}</div>
           {/* Équipes + score alignés sur une seule ligne, score centré */}
