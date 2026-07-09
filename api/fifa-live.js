@@ -859,8 +859,26 @@ export default async function handler(req, res) {
   }
 
   // ── Persistance Redis ─────────────────────────────────────────────────────
+  // ⚠️ AMÉLIORATION (question utilisateur : "avec plus de matchs, ça va pas
+  // exploser le quota Redis ?") : ce coût-là scale VRAIMENT avec le nombre de
+  // matchs (contrairement au poll lui-même, dominé par le nombre de
+  // compétitions distinctes, pas de matchs) — un kv.set était écrit à CHAQUE
+  // poll pour CHAQUE match, même quand rien n'avait changé depuis le poll
+  // précédent (cas ultra majoritaire : la plupart des polls d'un match ne
+  // voient aucun but/carton/changement de statut). On réécrit maintenant
+  // uniquement si le contenu a réellement changé — `fromCache` est exclu de
+  // la comparaison (bascule true/false selon le cache FIFA interne sans
+  // rapport avec une vraie évolution du match, ce qui aurait fait réécrire
+  // à chaque poll quand même). Avec beaucoup de matchs simultanés, la
+  // majorité des writes sont désormais évités plutôt que multipliés.
+  const stableFields = (data) => {
+    const { fromCache, ...rest } = data
+    return JSON.stringify(rest)
+  }
   const writes = []
   for (const [midStr, data] of Object.entries(result)) {
+    const prev = storedData[midStr]
+    if (prev && stableFields(data) === stableFields(prev)) continue
     writes.push(kv.set(`fm:match:${midStr}`, JSON.stringify(data), { ex: MATCH_TTL }))
   }
   if (writes.length > 0) await Promise.allSettled(writes)
