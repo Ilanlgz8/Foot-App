@@ -231,19 +231,11 @@ function H2HSkeleton() {
     <div className="h2h__list">
       {[0, 1, 2].map(i => (
         <div key={i} className="h2h__row">
-          <div className="h2h__matchup">
-            <div className="h2h__side h2h__side--home">
-              <div className="sk" style={{ width: '4.5rem', height: '0.72rem' }} />
-              <div className="sk h2h__crestWrap" style={{ borderRadius: '22%' }} />
-            </div>
-            <div className="h2h__scoreBlock">
-              <div className="sk" style={{ width: '2.2rem', height: '0.5rem' }} />
-              <div className="sk" style={{ width: '2rem', height: '0.9rem' }} />
-            </div>
-            <div className="h2h__side h2h__side--away">
-              <div className="sk h2h__crestWrap" style={{ borderRadius: '22%' }} />
-              <div className="sk" style={{ width: '4.5rem', height: '0.72rem' }} />
-            </div>
+          <div className="sk" style={{ width: '7rem', height: '0.5rem', marginBottom: '0.5rem' }} />
+          <div className="h2h__lineup">
+            <div className="sk" style={{ width: '4.5rem', height: '0.72rem', justifySelf: 'end' }} />
+            <div className="sk" style={{ width: '2.4rem', height: '0.9rem' }} />
+            <div className="sk" style={{ width: '4.5rem', height: '0.72rem' }} />
           </div>
         </div>
       ))}
@@ -1249,6 +1241,71 @@ function H2HTrend({ rows, homeId, homeShort, awayShort }) {
   )
 }
 
+// ── Bilan des confrontations : victoires / nuls / victoires + barre de
+//    domination aux couleurs réelles des deux équipes (teamPhotos) ──────────
+function H2HBilan({ rows, match, isWC }) {
+  const homeId = match.homeTeam?.id
+  let homeWins = 0, awayWins = 0, draws = 0
+  for (const m of rows) {
+    const fs = finalScore(m.score)
+    if (fs.home == null || fs.away == null) continue
+    const pens = m.score?.duration === 'PENALTY_SHOOTOUT' ? m.score?.penalties : null
+    let winnerId
+    if (pens && pens.home != null && pens.away != null) {
+      winnerId = pens.home > pens.away ? m.homeTeam?.id
+               : pens.home < pens.away ? m.awayTeam?.id : null
+    } else {
+      winnerId = fs.home > fs.away ? m.homeTeam?.id
+               : fs.home < fs.away ? m.awayTeam?.id : null
+    }
+    if (winnerId == null) draws++
+    else if (winnerId === homeId) homeWins++
+    else awayWins++
+  }
+  if (homeWins + awayWins + draws === 0) return null
+
+  const colors = getMatchTeamColors(
+    match.homeTeam?.name || match.homeTeam?.shortName || '',
+    match.awayTeam?.name || match.awayTeam?.shortName || ''
+  )
+
+  const crest = (team) => team?.crest && (
+    <span className="h2h__bilanCrestWrap" data-crest={isWC ? 'country' : 'club'}>
+      <img src={team.crest} alt="" className="h2h__bilanCrest" data-team={team?.name}
+        onError={e => { e.currentTarget.style.display = 'none' }} />
+    </span>
+  )
+
+  return (
+    <div className="h2h__bilan">
+      <div className="h2h__bilanGrid">
+        <div className="h2h__bilanSide">
+          {crest(match.homeTeam)}
+          <div className="h2h__bilanWins">{homeWins}</div>
+          <div className="h2h__bilanLabel">Victoires</div>
+        </div>
+        {/* Nuls : label AU-DESSUS, chiffre en bas — le chiffre vient toucher
+            la barre de domination (demande utilisateur : "trop haut" quand le
+            label était dessous et repoussait le chiffre vers le haut) */}
+        <div className="h2h__bilanMid">
+          <div className="h2h__bilanLabel">Nuls</div>
+          <div className="h2h__bilanDraws">{draws}</div>
+        </div>
+        <div className="h2h__bilanSide">
+          {crest(match.awayTeam)}
+          <div className="h2h__bilanWins">{awayWins}</div>
+          <div className="h2h__bilanLabel">Victoires</div>
+        </div>
+      </div>
+      <div className="h2h__domBar">
+        {homeWins > 0 && <span style={{ flexGrow: homeWins, background: colors.home.main }} />}
+        {draws    > 0 && <span className="h2h__domBar--nul" style={{ flexGrow: draws }} />}
+        {awayWins > 0 && <span style={{ flexGrow: awayWins, background: colors.away.main }} />}
+      </div>
+    </div>
+  )
+}
+
 function H2HSection({ match, compMatches }) {
   const { data: h2hMatches, isLoading } = useH2H(match)
   const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
@@ -1290,6 +1347,7 @@ function H2HSection({ match, compMatches }) {
         <H2HSkeleton />
       ) : (
         <>
+          <H2HBilan rows={rows} match={match} isWC={isWC} />
           <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
           <div className="h2h__list">
           {rows.map((m, i) => {
@@ -1312,35 +1370,32 @@ function H2HSection({ match, compMatches }) {
             } else {
               result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
             }
-            const resultClass = result === 'W' ? 'h2h__row--w' : result === 'L' ? 'h2h__row--l' : 'h2h__row--d'
+            // Vainqueur de CETTE ligne (surbrillance nom + buts en or)
+            const homeWon = result !== 'D' && ((result === 'W') === isHomeTeam)
+            const awayWon = result !== 'D' && !homeWon
+            const compLabel = m.competition?.name ?? ''
             return (
-              <div key={i} className={`h2h__row ${resultClass}`}>
-                <div className="h2h__matchup">
-                  <div className="h2h__side h2h__side--home">
-                    <span className="h2h__team">{translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}</span>
-                    {m.homeTeam?.crest && (
-                      <span className="h2h__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-                        <img src={m.homeTeam.crest} alt="" className="h2h__crest" data-team={m.homeTeam?.name}
-                          onError={e => { e.currentTarget.style.display = 'none' }} />
-                      </span>
-                    )}
-                  </div>
-                  <div className="h2h__scoreBlock">
-                    <span className="h2h__date">{date}</span>
-                    <span className="h2h__score">{hs} – {as_}</span>
+              <div key={i} className="h2h__row">
+                {/* Championnat + date — en haut à gauche de la card */}
+                <div className="h2h__meta">{compLabel ? `${compLabel} · ${date}` : date}</div>
+                {/* Équipes + score alignés sur une seule ligne, score centré */}
+                <div className="h2h__lineup">
+                  <span className={`h2h__team${homeWon ? ' h2h__team--win' : ''}`}>
+                    {translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}
+                  </span>
+                  <span className="h2h__scoreWrap">
+                    <span className="h2h__score">
+                      <span className={homeWon ? 'h2h__goal--w' : ''}>{hs}</span>
+                      {' – '}
+                      <span className={awayWon ? 'h2h__goal--w' : ''}>{as_}</span>
+                    </span>
                     {wentToPens && hp != null && ap != null && (
                       <span className="h2h__pens">tab {hp}-{ap}</span>
                     )}
-                  </div>
-                  <div className="h2h__side h2h__side--away">
-                    {m.awayTeam?.crest && (
-                      <span className="h2h__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-                        <img src={m.awayTeam.crest} alt="" className="h2h__crest" data-team={m.awayTeam?.name}
-                          onError={e => { e.currentTarget.style.display = 'none' }} />
-                      </span>
-                    )}
-                    <span className="h2h__team">{translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}</span>
-                  </div>
+                  </span>
+                  <span className={`h2h__team h2h__team--right${awayWon ? ' h2h__team--win' : ''}`}>
+                    {translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}
+                  </span>
                 </div>
               </div>
             )

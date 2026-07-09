@@ -1337,107 +1337,131 @@
 .h2h__trendLegendItem--home { color: var(--match-home, #3b82f6); }
 .h2h__trendLegendItem--away { color: var(--match-away, var(--red)); }
 
+/* ── H2H v2 — bilan + lignes "championnat / équipes-score alignés" ────────
+   Structure validée sur mockup : championnat+date en haut à gauche de chaque
+   card, puis équipes et score sur UNE ligne (score centré, noms rapprochés
+   du score), vainqueur en blanc + buts en or. Badge V/N/D supprimé. */
+
+.h2h__bilan { margin-bottom: 0.9rem; }
+.h2h__bilanGrid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+.h2h__bilanSide { text-align: center; }
+.h2h__bilanCrestWrap {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 0.25rem;
+}
+.h2h__bilanCrestWrap[data-crest='country'] {
+  border-radius: 50%;
+  overflow: hidden;
+}
+.h2h__bilanCrest { max-width: 100%; max-height: 100%; object-fit: contain; }
+.h2h__bilanWins {
+  font-family: var(--sf-font-display);
+  font-weight: 900;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.h2h__bilanLabel {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sf-faint);
+  margin-top: 0.15rem;
+}
+/* Nuls calés en bas de la grille, près de la barre de domination */
+.h2h__bilanMid { text-align: center; align-self: end; padding-bottom: 1px; }
+.h2h__bilanDraws {
+  font-family: var(--sf-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--sf-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 3px;   /* label au-dessus, chiffre en bas contre la barre */
+}
+.h2h__domBar {
+  display: flex;
+  gap: 2px;
+  height: 7px;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 0.3rem;
+}
+.h2h__domBar span { border-radius: 99px; min-width: 6px; }
+.h2h__domBar--nul { background: var(--sf-surface-3); }
+
 .h2h__list {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  background: linear-gradient(165deg, rgba(var(--white-rgb),0.035), rgba(var(--white-rgb),0.01));
-  border: 1px solid rgba(var(--white-rgb),0.07);
-  border-radius: 1.1rem;
-  padding: 0.2rem 0.9rem;
-  position: relative;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.h2h__list::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(var(--red-rgb),0.55), transparent);
+  gap: 6px;
+  margin-top: 0.75rem;
 }
 .h2h__row {
-  display: flex;
-  align-items: center;
-  padding: 0.6rem 0.15rem;
-  border-radius: 0.6rem;
-  transition: background-color 0.15s ease;
+  background: var(--sf-surface-2);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem 0.68rem;
+  transition: border-color 0.2s;
 }
-.h2h__row + .h2h__row {
-  border-top: 1px solid rgba(var(--white-rgb),0.045);
-}
-/* Liseré latéral discret selon le résultat — lecture instantanée de
-   l'historique sans avoir à lire chaque score. */
-.h2h__row--w { box-shadow: inset 2px 0 0 rgba(34,197,94,0.55); }
-.h2h__row--d { box-shadow: inset 2px 0 0 rgba(148,163,184,0.4); }
-.h2h__row--l { box-shadow: inset 2px 0 0 rgba(239,68,68,0.55); }
-
-.h2h__matchup {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-.h2h__side {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-.h2h__side--home { justify-content: flex-end; }
-.h2h__side--away { justify-content: flex-start; }
-.h2h__crestWrap {
-  flex: 0 0 auto;
-  width: 1.2rem;
-  height: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.h2h__crestWrap > img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.h2h__team {
-  font-size: 0.72rem;
+.h2h__row:hover { border-color: var(--sf-border); }
+.h2h__meta {
+  font-size: 0.58rem;
   font-weight: 700;
-  color: rgba(var(--white-rgb),0.85);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sf-faint);
+  text-align: left;
+  margin-bottom: 0.45rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.h2h__scoreBlock {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  min-width: 3rem;
-  padding: 0 0.4rem;
+.h2h__lineup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.42rem;   /* noms rapprochés du score (demande utilisateur) */
+  align-items: center;   /* noms et score à la même hauteur */
 }
-.h2h__date {
-  font-size: 0.52rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: rgba(var(--white-rgb),0.4);
+.h2h__team {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sf-muted);
+  text-align: right;     /* rapproché du score */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+.h2h__team--right { text-align: left; }
+.h2h__team--win { color: var(--sf-text); font-weight: 700; }
+.h2h__scoreWrap { text-align: center; }
 .h2h__score {
-  font-size: 0.82rem;
+  font-family: var(--sf-font-display);
   font-weight: 900;
-  color: #f1f5f9;
+  font-size: 0.92rem;
+  line-height: 1;
+  color: var(--sf-text);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.h2h__goal--w { color: var(--sf-gold); }
 .h2h__pens {
-  font-size: 0.52rem;
+  display: block;
+  font-size: 0.55rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: rgba(var(--white-rgb),0.5);
+  color: var(--sf-gold);
   white-space: nowrap;
+  margin-top: 0.2rem;
 }
 
 /* Bloc "T.A.B (x-y)" partagé — Forme récente + H2H, même pattern que
@@ -1486,18 +1510,15 @@
     border-bottom: 1px solid rgba(var(--white-rgb),0.08);
   }
 
-  /* H2H : on réduit tailles/espacements, aucun élément n'est masqué (plus de
-     badge à gérer — le liseré coloré porte le résultat à toutes les tailles). */
-  .h2h__row {
-    padding: 0.5rem 0.1rem;
-  }
-  .h2h__matchup { gap: 0.3rem; }
-  .h2h__scoreBlock { min-width: 2.4rem; padding: 0 0.2rem; }
-  .h2h__crestWrap { width: 1rem; height: 1rem; }
-  .h2h__team { font-size: 0.64rem; }
-  .h2h__date { font-size: 0.46rem; }
-  .h2h__score { font-size: 0.72rem; }
+  /* H2H v2 mobile : on réduit tailles et espacements, rien n'est masqué. */
+  .h2h__row { padding: 0.5rem 0.55rem 0.58rem; }
+  .h2h__lineup { gap: 0.3rem; }
+  .h2h__team { font-size: 0.68rem; }
+  .h2h__meta { font-size: 0.52rem; }
+  .h2h__score { font-size: 0.8rem; }
   .h2h__pens { font-size: 0.48rem; }
+  .h2h__bilanWins { font-size: 1.2rem; }
+  .h2h__bilanCrestWrap { width: 32px; height: 32px; }
 }
 
 /* ── Indicateur de pages (dots) sous les onglets swipables ────────────────── */
