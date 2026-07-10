@@ -1757,7 +1757,7 @@
   overflow: hidden;
   border-radius: 14px;
   padding: 0.85rem 1rem 0.9rem;
-  background: #0d0d0d;
+  background: var(--bg-deep);
   border: 1px solid rgba(var(--white-rgb),0.06);
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, background 0.15s;
@@ -1765,10 +1765,10 @@
 
 /* Dégradé couleurs des 2 équipes, très discret — le fond doit rester lisible
    avant tout, l'idée est une "ambiance" pas un habillage visible en soi. Même
-   principe d'un overlay sombre au-dessus que .accueil__matchCard::before,
-   mais poussé plus loin ici (0.92 vs 0.74 d'opacité de noir) car ce dégradé
-   est affiché à pleine saturation juste en dessous (contrairement à
-   MatchCard, dont le --match-card-gradient est déjà pré-atténué à la source). */
+   principe d'un overlay sombre au-dessus que .accueil__matchCard::before.
+   ⚠️ Assombri (retour utilisateur : le panel devait être plus foncé) : fond de
+   base passé de #0d0d0d à --bg-deep (#05080d), teinte du dégradé réduite
+   0.16→0.10, overlay noir renforcé (0.92→0.96 / 0.7→0.82). */
 .resultHero::before {
   content: '';
   position: absolute;
@@ -1776,7 +1776,7 @@
   z-index: 0;
   pointer-events: none;
   background: var(--result-hero-gradient);
-  opacity: 0.16;
+  opacity: 0.10;
 }
 .resultHero::after {
   content: '';
@@ -1784,7 +1784,7 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(5,8,13,0.92) 0%, rgba(5,8,13,0.7) 100%);
+  background: linear-gradient(180deg, rgba(5,8,13,0.96) 0%, rgba(5,8,13,0.82) 100%);
 }
 .resultHero > * {
   position: relative;
