@@ -48,9 +48,19 @@ function LiveChip({ match, espn, onMatchClick }) {
 
 export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) {
   const now = Date.now()
+  // ⚠️ BUG CORRIGÉ (demande utilisateur) : un match "Terminé" restait affiché ici
+  // avec le dégradé de couleurs équipes (getMatchGradient dans MatchCard) pendant
+  // toute la grace period de 5min avant l'éviction réelle du tracker (voir
+  // useLiveMinute.js confirmFt/markEnded) — cette grace period existe pour
+  // laisser le temps à un 2e essai de rafraîchir bracket/classement/forme, PAS
+  // pour l'affichage. On exclut ft===true ici explicitement : dès que le flag
+  // "Terminé" est confirmé (protégé contre les faux retours par le fix anti-
+  // race de _doPollESPN), le widget disparaît au prochain re-render (poll live
+  // suivant, ~10-20s max — pas de mécanisme dédié pour un effet plus instantané,
+  // ft étant stocké en localStorage et non en state React).
   const live = liveMatches.filter(m => {
     const state = getMatchState(m.id)
-    if (state.ft === true) return true
+    if (state.ft === true) return false
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
     if (m.status === 'SCHEDULED' || m.status === 'TIMED') {
       const utcMs = new Date(m.utcDate).getTime()
