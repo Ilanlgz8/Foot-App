@@ -17,7 +17,7 @@ const kv = new Redis({
 })
 
 const FIFA_BASE  = 'https://api.fifa.com/api/v3'
-const WC_COMP_ID = '17'  // FIFA World Cup competition ID (stable)
+const WC_COMP_ID = '17'  // ID compétition Coupe du Monde (stable)
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
