@@ -3,6 +3,7 @@ import { translateTeam } from '../data/teamNames'
 import { finalScore } from '../utils/matchUtils'
 import { getMatchGradient, getMatchTeamColors } from '../data/teamPhotos'
 import { COMPETITIONS } from '../data/competitions'
+import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
 
 // ── Carte "résultat en héros" (redesign panneau Résultats récents, Accueil) ──
 // Composant DÉDIÉ, volontairement séparé de MatchCard.jsx (accueil/MatchCard.jsx) :
@@ -47,7 +48,14 @@ export function ResultHeroCard({ match }) {
   const accentColor = homeWins ? homeColor.main : awayWins ? awayColor.main : homeColor.main
 
   const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
-  const compName = comp?.shortName ?? match.competition?.name ?? ''
+  // Nom complet (pas l'abréviation shortName) + logo — retour utilisateur :
+  // "Mondial" remplacé par "Coupe du Monde", même logo que sur les autres
+  // pages (LiveMatchPage/MatchPage, voir mp__hero__comp). Round ajouté quand
+  // connu (quarts, demies...) — KNOCKOUT_LABELS est la même source que
+  // useWcKnockout.js/useMatchs.js, pas de duplication d'une 2e table.
+  const compName  = comp?.name ?? match.competition?.name ?? ''
+  const compLogo  = comp?.emblem ?? match.competition?.emblem
+  const roundLabel = KNOCKOUT_LABELS[match.stage] ?? null
 
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -63,7 +71,14 @@ export function ResultHeroCard({ match }) {
     >
       <div className="resultHero__accentBar" />
       <div className="resultHero__topRow">
-        {compName && <span className="resultHero__comp">{compName}</span>}
+        <div className="resultHero__compGroup">
+          {compLogo && <img src={compLogo} alt="" className="resultHero__compLogo" />}
+          {compName && (
+            <span className="resultHero__comp">
+              {compName}{roundLabel ? ` · ${roundLabel}` : ''}
+            </span>
+          )}
+        </div>
         <span className="resultHero__status">Terminé</span>
       </div>
 

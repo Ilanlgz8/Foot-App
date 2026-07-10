@@ -413,7 +413,7 @@ function Accueil() {
           </div>
 
           {/* Résultats récents */}
-          <div className="accueil__dashPanel">
+          <div className="accueil__dashPanel accueil__dashPanel--result">
             <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
               <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
               <div className="accueil__resultHeaderRight">

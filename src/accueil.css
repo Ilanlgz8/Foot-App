@@ -140,6 +140,13 @@
   position: relative;
 }
 
+/* Panel "Résultats récents" — fond plus foncé (retour utilisateur), modifier
+   dédié pour ne PAS affecter le panel "matchs à venir" qui partage la même
+   classe .accueil__dashPanel de base. */
+.accueil__dashPanel--result {
+  background: var(--bg-deep);
+}
+
 /* Accent ligne rouge en haut du panel */
 .accueil__dashPanel::before {
   content: '';
@@ -1819,12 +1826,27 @@
   margin-bottom: 0.7rem;
   padding-top: 0.15rem;
 }
+.resultHero__compGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.resultHero__compLogo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .resultHero__comp {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: rgba(var(--white-rgb),0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .resultHero__status {
   font-size: 0.6rem;
