@@ -8,6 +8,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
+- **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
 - **Cron externe** : cron-job.org → `POST /cron-goals` toutes les minutes avec header `x-cron-secret`
 
 ## Architecture clé
@@ -102,6 +103,10 @@ public/
 - ✅ Comptes api-football suspendus à répétition (8 fois) : désactivé définitivement
   (`PERMANENTLY_DISABLED` dans `api/apifootball.js`), ESPN + football-data.org couvrent déjà
   l'essentiel des compos/stats en fallback
+- ✅ Fluid Active CPU dépassé (4h/mois Hobby, mail Vercel 08/07) : poll client 10s→30s
+  (`espnTimerWorker.js`), `cron-goals.js` rebridé à 1 passe/min (`BUDGET_MS=0`), fast-path
+  cache partagé dans `api/fifa-live.js` (voir ci-dessus) pour anticiper la reprise des
+  championnats club (plus de compétitions + spectateurs simultanés)
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org

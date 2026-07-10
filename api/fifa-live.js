@@ -31,6 +31,16 @@ const ESPN_TTL      = 8           // Cache Redis ESPN (s)
 const MATCH_TTL     = 90 * 24 * 3600   // Données match persistées 90 jours (WC 2026)
 const ESPN_TIMEOUT  = 5_000
 const FIFA_TIMEOUT  = 7_000
+// ⚠️ AJOUT (question utilisateur : "quand y'aura plein de matchs en même temps
+// [reprise championnats club], ça va tenir le quota CPU ?") : marqueur séparé de
+// fm:match:{id} — celui-ci indique juste QUAND le dernier calcul RÉEL (fetch
+// ESPN/FIFA + matching + extraction) a eu lieu pour un match, peu importe si le
+// contenu a changé. Sert au fast-path plus bas : si un autre utilisateur a déjà
+// fait ce calcul il y a moins de FRESH_TTL secondes pour les mêmes matchs, on lui
+// repique directement le résultat au lieu de tout refaire. Plus il y a de
+// spectateurs simultanés sur les mêmes matchs, plus ce fast-path est efficace —
+// l'inverse du problème actuel où chaque utilisateur ajoute du coût.
+const FRESH_TTL     = 12
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -482,6 +492,26 @@ export default async function handler(req, res) {
 
   const result = {}
 
+  // ── Fast-path : réutiliser un calcul tout juste fait par un AUTRE utilisateur ──
+  // Voir commentaire de FRESH_TTL plus haut. Tout ou rien (pas de fast-path
+  // partiel match par match) : si ne serait-ce qu'UN match manque de fraîcheur,
+  // on retombe sur le pipeline complet ci-dessous, strictement inchangé — choix
+  // délibéré pour ne prendre aucun risque de régression sur le matching FIFA/ESPN
+  // déjà éprouvé (buts, cartons, désync score/buteur, tirs au but…).
+  // forceFresh (retour au premier plan) contourne toujours ce fast-path, comme il
+  // contourne déjà le cache ESPN/FIFA plus bas — même intention.
+  if (!forceFresh) {
+    try {
+      const freshFlags = await kv.mget(...matches.map(m => `fm:fresh:${m.id}`))
+      const allFresh = matches.every((m, i) => freshFlags[i] != null && storedData[m.id])
+      if (allFresh) {
+        const fast = {}
+        matches.forEach(m => { fast[m.id] = { ...storedData[m.id], fromCache: true } })
+        return res.json(fast)
+      }
+    } catch {}
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // PHASE 1 : FIFA live → score + buteurs + IDs (WC uniquement)
   // FIFA est UNIQUEMENT utilisé pour les données de score/buteurs WC.
@@ -900,8 +930,15 @@ export default async function handler(req, res) {
   // dupliquer toute la logique de traitement (regression guards, etc.) côté
   // serveur ET côté client sur 2 chemins différents.
   const ablyPublishes = []
+  // Marqueurs de fraîcheur (voir FRESH_TTL/fast-path plus haut) — pour TOUS les
+  // matchs réellement (re)calculés cette passe (phases 1-3), changés ou pas :
+  // seule une VRAIE tentative de calcul justifie de dire "c'est frais", pas
+  // juste la persistance Redis (qui elle reste conditionnelle, volontairement,
+  // pour ne pas faire remonter le nombre de commandes Redis).
+  const freshWrites = []
   for (const [midStr, data] of Object.entries(result)) {
     const prev = storedData[midStr]
+    freshWrites.push(kv.set(`fm:fresh:${midStr}`, '1', { ex: FRESH_TTL }))
     if (prev && stableFields(data) === stableFields(prev)) continue
     writes.push(kv.set(`fm:match:${midStr}`, JSON.stringify(data), { ex: MATCH_TTL }))
     if (ablyClient) {
@@ -911,6 +948,7 @@ export default async function handler(req, res) {
     }
   }
   if (writes.length > 0) await Promise.allSettled(writes)
+  if (freshWrites.length > 0) await Promise.allSettled(freshWrites)
   if (ablyPublishes.length > 0) await Promise.allSettled(ablyPublishes)
 
   // ── Redis last-known pour matchs non trouvés ──────────────────────────────
