@@ -466,6 +466,27 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       const prevState = getMatchState(mid)
       const matchAge  = (now - new Date(match.utcDate)) / 60_000
 
+      // ── Garde anti-régression "Terminé" ───────────────────────────────────────
+      // BUG CORRIGÉ (constat utilisateur : "Terminé" déjà affiché correctement,
+      // puis revient à "pas fini" quelques secondes après un retour d'arrière-plan
+      // de 5min+, avant de re-confirmer "Terminé"). Cause : au retour au premier
+      // plan, plusieurs polls partent en parallèle (immédiat + 3s + watchdog) —
+      // un poll démarré AVANT la mise en veille peut être resté en vol pendant
+      // toute la durée de la mise en veille (le réseau/JS est suspendu par l'OS,
+      // pas juste ralenti) et résoudre APRÈS qu'un poll plus récent ait déjà
+      // confirmé le FT. Sa réponse "en cours" est alors périmée (obsolète) et ne
+      // doit pas effacer un "Terminé" déjà confirmé.
+      // Fix : on compare l'heure de DÉMARRAGE de ce poll (`now`, capturé avant le
+      // fetch en haut de _doPollESPN) à `termineAt` (heure de confirmation FT).
+      // Si ce poll a démarré AVANT que le FT ait été confirmé → sa donnée est
+      // trop vieille → on n'efface PAS le flag ft.
+      // N'empêche PAS la correction d'un vrai faux FT (bug de la 21e minute
+      // déjà corrigé) : dans ce cas le poll correcteur démarre APRÈS termineAt
+      // (le faux FT étant déjà passé), donc ce garde le laisse passer normalement.
+      const isStaleFtReversal = prevState.ft === true
+        && prevState.termineAt != null
+        && now < prevState.termineAt
+
       // ── Correction statuts FIFA implausibles ─────────────────────────────────
       // FIFA retourne parfois STATUS_EXTRA_TIME/OVERTIME lors de transitions normales
       // (halftime, début 2e MT) — même bug que le faux STATUS_FINAL à la 21e min.
@@ -498,7 +519,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       ) {
         if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
         delete pendingFt[mid]
-        clearFtFlags(mid)
+        if (!isStaleFtReversal) clearFtFlags(mid)
         markLive(match)
 
         const prevCache = espnScoresCache[mid]
@@ -675,7 +696,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         ) {
           delete pendingFt[mid]
           markLive(match)
-          clearFtFlags(mid)
+          if (!isStaleFtReversal) clearFtFlags(mid)
           setEspnData(mid, { espnClock: '120:00', espnStatus: 'STATUS_SHOOTOUT', espnPeriod: 5 })
           continue
         }
@@ -695,7 +716,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         if (!timePlausible) {
           delete pendingFt[mid]
           markLive(match)
-          clearFtFlags(mid)
+          if (!isStaleFtReversal) clearFtFlags(mid)
           // Override espnStatus → STATUS_IN_PROGRESS pour que calcMinute ne retourne
           // pas null (STATUS_FINAL → null). Si espnClock est vide, on dérive depuis utcDate.
           const ftMins = espnClock ? parseClockMins(espnClock) : null
@@ -720,7 +741,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           // But tardif dans le même poll → rester live
           delete pendingFt[mid]
           markLive(match)
-          clearFtFlags(mid)
+          if (!isStaleFtReversal) clearFtFlags(mid)
           continue
         }
 
