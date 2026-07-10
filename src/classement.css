@@ -356,6 +356,37 @@
   box-shadow: 0 0 6px rgba(22,163,74,0.5);
 }
 
+/* ── Étoile favori + ligne mise en avant ── */
+.classement__favStar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(var(--white-rgb),0.28);
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+}
+.classement__favStar:hover        { color: rgba(var(--white-rgb),0.5); }
+.classement__favStar:active       { transform: scale(0.85); }
+.classement__favStar--active      { color: #f59e0b; }
+.classement__favStar--active:hover { color: #f59e0b; }
+.classement__favStar:disabled     { cursor: not-allowed; opacity: 0.35; }
+
+.classement__row--favorite {
+  background: rgba(239,68,68,0.06);
+}
+.classement__row--favorite:hover {
+  background: rgba(239,68,68,0.1);
+}
+.classement__row--favorite td:first-child .classement__position {
+  color: var(--red-light, #ef4444);
+}
+
 /* ── Variantes des zones ── */
 .classement__zoneCard--ucl    { border-color: rgba(34,197,94,0.12); }
 .classement__zoneCard--uel    { border-color: rgba(245,158,11,0.12); }

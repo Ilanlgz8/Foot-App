@@ -10,6 +10,8 @@ import { mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
+import { MyTeamBanner } from '../accueil/MyTeamBanner'
+import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { pickMatchDuJour } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
@@ -165,6 +167,32 @@ function Accueil() {
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   const { liveMatches, espnScores, recalibrate } = useLiveData()
   const navigate = useNavigate()
+
+  // ── Bandeau "Mon équipe" ──
+  // Cherche un match d'une équipe favorite UNIQUEMENT parmi les données déjà
+  // chargées par cette page (live en cours, matchs d'aujourd'hui, matchs du
+  // jour actuellement affiché dans le panneau "à venir") — pas de fetch dédié,
+  // pour rester cohérent avec le principe "aucun coût réseau supplémentaire".
+  // Priorité : live maintenant > encore à jouer aujourd'hui > prochain jour
+  // avec matchs déjà chargé. Si rien ne correspond, le bandeau ne s'affiche
+  // simplement pas (pas de recherche plus large délibérément).
+  const { favorites: favClubs } = useFavoriteClubs()
+  const favMatch = useMemo(() => {
+    if (favClubs.length === 0) return null
+    const favIds = new Set(favClubs.map(t => t.id))
+    const involvesFav = (m) => favIds.has(m.homeTeam?.id) || favIds.has(m.awayTeam?.id)
+
+    const live = liveMatches.find(involvesFav)
+    if (live) return { match: live, isLive: true }
+
+    const todayUpcoming = todayMatchesForResults.find(m => involvesFav(m) && m.status !== 'FINISHED')
+    if (todayUpcoming) return { match: todayUpcoming, isLive: false }
+
+    const nextLoaded = matches.find(m => involvesFav(m) && (m.status === 'TIMED' || m.status === 'SCHEDULED'))
+    if (nextLoaded) return { match: nextLoaded, isLive: false }
+
+    return null
+  }, [favClubs, liveMatches, todayMatchesForResults, matches])
 
   // ── Modal live (clic sur carte LiveWidget) ──
   // live → navigate('/live/:matchId'), pas de modal
@@ -331,6 +359,18 @@ function Accueil() {
       <div className="accueil__backdrop accueil__backdrop--two" />
 
       <div className="accueil__inner">
+
+        {/* ── Mon équipe — au-dessus de tout, mise en avant personnelle ── */}
+        {favMatch && (
+          <MyTeamBanner
+            match={favMatch.match}
+            isLive={favMatch.isLive}
+            espnScore={espnScores[favMatch.match.id]}
+            onClick={() => favMatch.isLive
+              ? navigate(`/live/${favMatch.match.id}`)
+              : navigate(`/match/${favMatch.match.id}`, { state: { match: favMatch.match } })}
+          />
+        )}
 
         {/* ── Match du jour — devant tout le reste, y compris le live ── */}
         {matchDuJour && (

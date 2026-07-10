@@ -11,6 +11,8 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { WatchBadge } from './WatchBadge'
+import { FavStarBadge } from './FavStarBadge'
+import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -136,6 +138,8 @@ const teamName = (team) =>
    Résultat). Les listes ici restent courtes, le coût eager est négligeable. */
 function MatchRow({ match, index, inModal = false }) {
   const navigate = useNavigate()
+  const { isFavorite } = useFavoriteClubs()
+  const isFav = isFavorite(match.homeTeam?.id) || isFavorite(match.awayTeam?.id)
   const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
@@ -146,6 +150,7 @@ function MatchRow({ match, index, inModal = false }) {
       style={{ borderTop: index === 0 ? 'none' : undefined }}
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
     >
+      {isFav && <FavStarBadge variant="row" />}
       <WatchBadge match={match} variant="row" />
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">

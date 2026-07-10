@@ -303,6 +303,7 @@
 
 /* ── Card style Sofascore ── */
 .resultats__card {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 8.5rem 1fr;
   align-items: center;

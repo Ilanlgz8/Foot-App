@@ -112,6 +112,108 @@
   margin: 0 auto;
 }
 
+/* ── Bandeau "Mon équipe" ── */
+.myTeamBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  background: var(--bg-panel-grad);
+  border: 1px solid #1d1d1d;
+  border-left: 3px solid var(--red);
+  border-radius: 0.85rem;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.myTeamBanner:hover { background: rgba(var(--white-rgb),0.03); }
+.myTeamBanner:active { transform: scale(0.99); }
+
+.myTeamBanner__kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red-light, #ef4444);
+}
+.myTeamBanner__liveDot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(var(--red-rgb),0.8);
+  animation: pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.myTeamBanner__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.myTeamBanner__team {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+.myTeamBanner__team--away { flex-direction: row-reverse; text-align: right; }
+
+.myTeamBanner__crestWrap {
+  width: 1.9rem; height: 1.9rem;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(var(--white-rgb),0.04);
+}
+.myTeamBanner__crest { width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.15); }
+.myTeamBanner__crestEmpty { width: 1.9rem; height: 1.9rem; border-radius: 50%; background: rgba(var(--white-rgb),0.06); flex-shrink: 0; }
+
+.myTeamBanner__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f5f5f5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.myTeamBanner__date {
+  font-size: 0.72rem;
+  color: rgba(var(--white-rgb),0.45);
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.myTeamBanner__score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.myTeamBanner__minute {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--red-light, #ef4444);
+}
+
+@media (max-width: 480px) {
+  .myTeamBanner__name { font-size: 0.7rem; }
+  .myTeamBanner__crestWrap, .myTeamBanner__crestEmpty { width: 1.6rem; height: 1.6rem; }
+}
+
 
 /* ── GRILLE PRINCIPALE — toujours 50/50 ── */
 .accueil__mainGrid {

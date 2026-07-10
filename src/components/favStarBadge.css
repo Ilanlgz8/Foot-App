@@ -1,0 +1,17 @@
+/* FavStarBadge — auto-porté comme watchBadge.css, réutilisable telle quelle
+   sur Match.jsx (Programme) et Resultat.jsx/accueil/MatchCard.jsx (Résultats). */
+.favStarBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+}
+
+/* Variante "row" : coin haut-GAUCHE (WatchBadge occupe déjà le coin
+   haut-droit sur les mêmes lignes de match — voir watchBadge.css). */
+.favStarBadge--row {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.6rem;
+  z-index: 2;
+}

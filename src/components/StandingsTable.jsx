@@ -46,6 +46,28 @@ function useStandingsSnapshot(snapshotKey, snapshotRows) {
   return prevSnapshot
 }
 
+// Étoile de favori — même principe visuel simple qu'ailleurs dans l'app
+// (icône outline, remplie quand active). stopPropagation() : la ligne entière
+// n'a pas de onClick actuellement, mais StandingsTable est aussi rendue dans
+// des contextes cliquables (GroupModal notamment) — mieux vaut être sûr que
+// le clic sur l'étoile ne se propage jamais à un parent.
+function FavStar({ active, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      className={`classement__favStar${active ? ' classement__favStar--active' : ''}`}
+      onClick={e => { e.stopPropagation(); onClick() }}
+      disabled={disabled && !active}
+      aria-label={active ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      aria-pressed={active}
+    >
+      <svg viewBox="0 0 24 24" width="15" height="15" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" />
+      </svg>
+    </button>
+  )
+}
+
 function Forme({ results }) {
   if (!results || results.length === 0)
     return <span style={{ color: '#3d4d60', fontSize: '0.75rem' }}>—</span>
@@ -68,8 +90,16 @@ function Forme({ results }) {
  *   Format : [{ start, end, dotClassName }]
  * @param {boolean}  isCountry        — true si équipes NATIONALES (drapeaux,
  *   cercle) plutôt que clubs (écussons, pas de cercle forcé) — voir index.css
+ * @param {boolean}  favoritable      — affiche une étoile de favori par ligne (optionnel)
+ * @param {function} isFavorite       — (teamId) => bool, requis si favoritable
+ * @param {function} onToggleFavorite — (team) => void, requis si favoritable
+ * @param {boolean}  favLimitReached  — désactive l'ajout (pas le retrait) si le plafond est atteint
+ * @param {string}   compCode         — code compétition transmis à onToggleFavorite (contexte du favori)
  */
-export function StandingsTable({ rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false }) {
+export function StandingsTable({
+  rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false,
+  favoritable = false, isFavorite = null, onToggleFavorite = null, favLimitReached = false, compCode = null,
+}) {
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
@@ -100,11 +130,16 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
             const formeSlice = compact && forme ? forme.slice(-3) : forme
             const prevPos = prevSnapshot[team.team.id]
             const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0
+            const isFav   = favoritable && isFavorite ? isFavorite(team.team.id) : false
 
             return (
               <tr
                 key={team.team.id}
-                className={topRank ? `classement__row classement__row--top${team.position}` : 'classement__row'}
+                className={[
+                  'classement__row',
+                  topRank ? `classement__row--top${team.position}` : '',
+                  isFav ? 'classement__row--favorite' : '',
+                ].filter(Boolean).join(' ')}
               >
                 <td>
                   <div className="classement__positionWrap">
@@ -115,6 +150,19 @@ export function StandingsTable({ rows, compact = false, formMap = {}, qualificat
                 <td>
                   <div className="classement__teamCell">
                     <div className="classement__teamTopLine">
+                      {favoritable && (
+                        <FavStar
+                          active={isFav}
+                          disabled={favLimitReached}
+                          onClick={() => onToggleFavorite?.({
+                            id:        team.team.id,
+                            name:      team.team.name,
+                            shortName: team.team.shortName,
+                            crest:     team.team.crest,
+                            compCode,
+                          })}
+                        />
+                      )}
                       {zone
                         ? <span className={zone.dotClassName} aria-hidden="true" />
                         : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />

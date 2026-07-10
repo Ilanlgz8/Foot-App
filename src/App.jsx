@@ -17,6 +17,7 @@ const MentionsLegales = lazy(() => import('./components/MentionsLegales.jsx'))
 const Live = lazy(() => import('./components/Live.jsx'))
 const LiveMatchPage = lazy(() => import('./pages/LiveMatchPage.jsx'))
 const MatchPage = lazy(() => import('./pages/MatchPage.jsx'))
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
 
 function App() {
   const location = useLocation()
@@ -55,6 +56,7 @@ function App() {
             <Route path="/live" element={<Live />} />
             <Route path="/live/:matchId" element={<LiveMatchPage />} />
             <Route path="/match/:matchId" element={<MatchPage />} />
+            <Route path="/favoris" element={<FavoritesPage />} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
           </Routes>
         </Suspense>

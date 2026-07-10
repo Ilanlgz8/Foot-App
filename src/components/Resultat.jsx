@@ -16,6 +16,8 @@ import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { mergeScore, finalScore } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { FavStarBadge } from './FavStarBadge'
+import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
@@ -40,6 +42,8 @@ const fmtDate = (d) => {
    poule à la fois), le coût du chargement eager est négligeable. */
 function MatchCard({ match }) {
   const navigate = useNavigate()
+  const { isFavorite } = useFavoriteClubs()
+  const isFav = isFavorite(match.homeTeam?.id) || isFavorite(match.awayTeam?.id)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
   // finalScore() = score 120min (prolongations incluses, tirs au but exclus).
@@ -64,6 +68,7 @@ function MatchCard({ match }) {
 
   return (
     <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
+      {isFav && <FavStarBadge variant="row" />}
       <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
         <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.homeTeam?.crest

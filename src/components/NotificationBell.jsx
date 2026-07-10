@@ -11,10 +11,8 @@
  *   • Caché          → non supporté / refusé / vérification initiale
  */
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import FavoriteTeamsPanel from './FavoriteTeamsPanel'
 import '../notificationBell.css'
 
 // Cloche sonnante (abonné) — avec lignes de vibration
@@ -48,35 +46,8 @@ function Spinner() {
 }
 
 export default function NotificationBell() {
-  const { status, subscribe, unsubscribe } = usePushNotifications()
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [anchor, setAnchor] = useState(null)
-  const wrapRef  = useRef(null)
-  const panelRef = useRef(null)
-
-  // ⚠️ La navbar a `overflow: hidden` (pour contenir ses effets de bordure
-  // animée) — un panneau positionné en `absolute` à l'intérieur serait donc
-  // coupé/invisible dès qu'il déborde de la navbar, quel que soit son
-  // z-index (overflow:hidden clippe peu importe le z-index). On rend le
-  // panneau via un portail dans <body>, positionné en `fixed` à partir des
-  // coordonnées réelles de la cloche — il échappe complètement au clipping.
-  useLayoutEffect(() => {
-    if (!panelOpen || !wrapRef.current) return
-    const r = wrapRef.current.getBoundingClientRect()
-    setAnchor({ top: r.bottom + 8, right: window.innerWidth - r.right })
-  }, [panelOpen])
-
-  // Fermeture au clic en dehors du bouton/panneau
-  useEffect(() => {
-    if (!panelOpen) return
-    const onClick = (e) => {
-      if (wrapRef.current?.contains(e.target)) return
-      if (panelRef.current?.contains(e.target)) return
-      setPanelOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [panelOpen])
+  const { status } = usePushNotifications()
+  const navigate = useNavigate()
 
   // Cacher seulement si navigateur incompatible ou vérification en cours
   if (status === 'unsupported' || status === 'checking') return null
@@ -85,25 +56,22 @@ export default function NotificationBell() {
   const isLoading    = status === 'loading'
   const isDenied     = status === 'denied'
 
+  // La cloche mène désormais à une page dédiée (/favoris) plutôt qu'un
+  // popover étroit — retour utilisateur : "un grand affichage" pour choisir
+  // les championnats suivis ET les équipes favorites (mise en avant dans
+  // l'app), au lieu d'un panneau coincé sous la cloche.
   const handleClick = () => {
     if (isLoading) return
-    if (isDenied) {
-      alert('Les notifications sont bloquées. Activez-les dans les réglages de votre navigateur.')
-      return
-    }
-    // La cloche ouvre désormais le panneau de réglages (équipes suivies +
-    // activer/désactiver) au lieu de basculer directement — un seul point
-    // d'entrée pour tout ce qui touche aux notifs.
-    setPanelOpen(o => !o)
+    navigate('/favoris')
   }
 
   const label = isLoading  ? 'Activation en cours…'
-    : isSubscribed         ? 'Réglages des notifications'
+    : isSubscribed         ? 'Favoris et réglages des notifications'
     : isDenied             ? 'Notifications bloquées — voir les réglages'
-    :                        'Activer les notifications'
+    :                        'Favoris et notifications'
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }}>
       <button
         className={`notif-bell${isSubscribed ? ' notif-bell--active' : ''}${isLoading ? ' notif-bell--loading' : ''}${isDenied ? ' notif-bell--denied' : ''}`}
         onClick={handleClick}
@@ -118,18 +86,6 @@ export default function NotificationBell() {
             ? <BellRinging />
             : <BellMuted faded={isDenied} />}
       </button>
-
-      {panelOpen && anchor && createPortal(
-        <FavoriteTeamsPanel
-          ref={panelRef}
-          anchor={anchor}
-          status={status}
-          subscribe={subscribe}
-          unsubscribe={unsubscribe}
-          onClose={() => setPanelOpen(false)}
-        />,
-        document.body
-      )}
     </div>
   )
 }
