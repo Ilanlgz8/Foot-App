@@ -48,7 +48,7 @@ function AProposModal({ onClose }) {
           <p>Prochainement : support multi-compétitions (Champions League, Ligue 1, Premier League), notifications de buts et statistiques joueurs.</p>
 
           <h3>Données & fraîcheur</h3>
-          <p>Les données sont fournies par <strong>football-data.org</strong>, <strong>ESPN</strong> et <strong>api-football</strong>, mises en cache localement. Les scores live sont mis à jour toutes les 30 secondes via plusieurs sources croisées pour une précision maximale.</p>
+          <p>Les données sont fournies par <strong>football-data.org</strong>, <strong>ESPN</strong> et <strong>FIFA</strong>, mises en cache localement. Les scores live sont mis à jour toutes les 30 secondes via plusieurs sources croisées pour une précision maximale.</p>
 
           <h3>Technologies</h3>
           <p>Développé avec <strong>React</strong> + <strong>TanStack Query</strong> pour la gestion du cache. Déployé sur <strong>Vercel</strong> avec des fonctions serverless pour sécuriser les appels API. Zéro dépendance inutile, code 100% open.</p>

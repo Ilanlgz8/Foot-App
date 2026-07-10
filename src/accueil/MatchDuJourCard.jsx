@@ -8,24 +8,8 @@
 // été fatigant à l'usage, voir discussion).
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
+import { TEAM_SHORT } from '../data/teamShortNames'
 
-const TEAM_SHORT = {
-  'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
-  'Paris Saint-Germain FC': 'Paris SG', 'Crystal Palace': 'C. Palace',
-  'Wolverhampton': 'Wolves', 'Wolverhampton Wanderers': 'Wolves',
-  'Nottingham Forest': 'Nott. Forest', 'Brighton & Hove Albion': 'Brighton',
-  'Brighton Hove Albion': 'Brighton', 'Newcastle United': 'Newcastle',
-  'Tottenham Hotspur': 'Tottenham', 'West Ham United': 'West Ham',
-  'Manchester City': 'Man. City', 'Manchester United': 'Man. United',
-  'Leeds United': 'Leeds', 'Atlético Madrid': 'Atl. Madrid',
-  'Athletic Bilbao': 'Ath. Bilbao', 'Real Sociedad': 'R. Sociedad',
-  'Deportivo Alavés': 'Alavés', 'Rayo Vallecano': 'Rayo',
-  'Bayern Munich': 'Bayern', 'Eintracht Frankfurt': 'Frankfurt',
-  'Werder Brême': 'Werder', 'Werder Bremen': 'Werder',
-  'Borussia Dortmund': 'Dortmund', 'Inter Milan': 'Inter',
-  'Milan AC': 'Milan', 'Hellas Verona': 'Verona',
-  'PSV Eindhoven': 'PSV', 'Club Brugge': 'Bruges', 'Slavia Prague': 'Slavia',
-}
 function shortenName(name) {
   if (!name) return name
   if (TEAM_SHORT[name]) return TEAM_SHORT[name]

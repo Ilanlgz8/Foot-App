@@ -22,7 +22,7 @@ import * as Ably from 'ably'
 import EspnTimerWorker from '../workers/espnTimerWorker.js?worker'
 import {
   getMatchState, trackMatchState, clearMatchState, clearFtFlags,
-  getTrackedMatches, setKickoffAt, setHalf2Start,
+  setKickoffAt, setHalf2Start,
   clearAllMatchStates, setEspnData, setEspnWorking,
   getLiveState, setLiveState,
 } from '../utils/matchStateTracker'
@@ -36,7 +36,6 @@ import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
 // Constantes
 // ─────────────────────────────────────────────
 
-let quotaRemaining = Infinity
 let espnFailStreak = 0
 
 // Stages FD.org à élimination directe (jamais de match nul possible) — même
@@ -889,164 +888,12 @@ async function pollESPN(matches, queryClient, forceFresh = false) {
   }
 }
 
-// ─────────────────────────────────────────────
-// api-football.com — couche de fallback
-// ─────────────────────────────────────────────
-
-function isInPollingWindow(match, trackedIds) {
-  if (quotaRemaining < 5) return false
-
-  const state   = getMatchState(match.id)
-  const elapsed = (Date.now() - new Date(match.utcDate)) / 60000
-
-  if (elapsed >= 0 && elapsed <= 90 && !state.kickoffAt) return true
-  if (!trackedIds.has(String(match.id))) return false
-
-  if (state.kickoffAt && !state.pausedAt) {
-    const realElapsed = (Date.now() - state.kickoffAt) / 60000
-    if (realElapsed >= 44 && realElapsed <= 55) return true
-  }
-
-  if (state.pausedAt && !state.half2Start) {
-    const pause = (Date.now() - state.pausedAt) / 60000
-    if (pause >= 13 && pause <= 30) return true
-  }
-
-  if (state.half2Start) {
-    const half2 = (Date.now() - state.half2Start) / 60000
-    if (half2 >= 44 && half2 <= 105) return true
-  }
-
-  return false
-}
-
-function findMatch(fixture, matches) {
-  const apiHome = normalize(fixture.teams?.home?.name ?? '')
-  const apiAway = normalize(fixture.teams?.away?.name ?? '')
-  if (!apiHome || !apiAway) return null
-
-  return matches.find(m => {
-    const h = normalize(m.homeTeam?.name ?? m.homeTeam?.shortName ?? '')
-    const a = normalize(m.awayTeam?.name ?? m.awayTeam?.shortName ?? '')
-    return fuzzyTeam(h, apiHome) && fuzzyTeam(a, apiAway)
-  }) ?? null
-}
-
-async function pollApiFootball(matches, queryClient) {
-  try {
-    const res = await fetch('/apifootball?live=all')
-    if (!res.ok) {
-      console.warn('[useLiveMinute] api-football réponse non-OK :', res.status)
-      return
-    }
-
-    const remaining = res.headers.get('x-quota-remaining')
-    if (remaining !== null) {
-      quotaRemaining = parseInt(remaining, 10)
-      if (quotaRemaining < 10) {
-        console.warn(`[useLiveMinute] Quota api-football bas : ${quotaRemaining} req restantes`)
-      }
-    }
-
-    const json     = await res.json()
-    const fixtures = json.response ?? []
-    let koDetected = false
-
-    for (const fixture of fixtures) {
-      const match = findMatch(fixture, matches)
-      if (!match) continue
-
-      const status     = fixture.fixture?.status?.short
-      const apiElapsed = fixture.fixture?.status?.elapsed
-      const state      = getMatchState(match.id)
-
-      // Fenêtre 0 : KO détecté
-      if (status === '1H') {
-        if (!state.kickoffAt && apiElapsed != null) {
-          setKickoffAt(match.id, Date.now() - apiElapsed * 60_000)
-          setLiveState(match.id, 'live')
-          markLive(match)
-          koDetected = true
-        }
-      }
-
-      // Fenêtre 1 : HT détecté
-      if (status === 'HT' && !state.pausedAt) {
-        trackMatchState({ ...match, status: 'PAUSED' })
-      }
-
-      // Fenêtre 2 : 2H détecté
-      if (status === '2H') {
-        if (apiElapsed != null && apiElapsed > 45 && apiElapsed < 90) {
-          const half2Start = Date.now() - (apiElapsed - 46) * 60_000
-          setHalf2Start(match.id, half2Start)
-        } else if (!state.half2Start) {
-          trackMatchState({ ...match, status: 'IN_PLAY' })
-        }
-      }
-
-      // Fenêtre 3 : FT détecté
-      if (status === 'FT' || status === 'AET' || status === 'PEN') {
-        const ls = getLiveState(match.id)
-        if (ls.state === 'ended') continue  // déjà géré
-        if (!isTrackedLive(match.id)) continue
-
-        const now = Date.now()
-        setLiveState(match.id, 'ended', { endedAt: now })
-
-        try {
-          const currentState = getMatchState(match.id)
-          localStorage.setItem(`foot_ms_${match.id}`, JSON.stringify({
-            ...currentState,
-            ft:        true,
-            termineAt: now,
-          }))
-        } catch {}
-
-        queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
-          // Même fix que confirmFt() (couche ESPN primaire) : le classement
-          // n'était invalidé nulle part, y compris sur ce chemin de secours
-          // api-football (fenêtres critiques uniquement, rare mais possible
-          // si ESPN est down au moment du FT).
-          if (match.competition?.code) {
-            queryClient.invalidateQueries({ queryKey: ['standings', match.competition.code] })
-            queryClient.invalidateQueries({ queryKey: ['teamForm2', match.competition.code] })
-            queryClient.invalidateQueries({ queryKey: ['scorers', match.competition.code] })
-          }
-        }, 2_000)
-        if (match.competition?.code) {
-          try { localStorage.removeItem(`matches_${match.competition.code}_FINISHED`) } catch {}
-        }
-
-        const codeForEviction = match.competition?.code
-        setTimeout(() => {
-          markEnded(match.id)
-          clearMatchState(match.id, { preserveEnded: true })
-          queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-          if (codeForEviction) {
-            queryClient.invalidateQueries({ queryKey: ['matches', codeForEviction, 'FINISHED'] })
-            queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
-            queryClient.invalidateQueries({ queryKey: ['standings', codeForEviction] })
-            queryClient.invalidateQueries({ queryKey: ['teamForm2', codeForEviction] })
-            queryClient.invalidateQueries({ queryKey: ['scorers', codeForEviction] })
-          }
-        }, 5 * 60_000)
-      }
-    }
-
-    if (koDetected) {
-      const liveState = queryClient.getQueryState(['liveMatches'])
-      const liveAge   = Date.now() - (liveState?.dataUpdatedAt ?? 0)
-      if (liveAge > 30_000) {
-        queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
-      }
-    }
-  } catch (err) {
-    console.warn('[useLiveMinute] Erreur polling api-football :', err.message)
-  }
-}
+// api-football.com (fetch client + intervalle 60s) retiré : l'endpoint est
+// PERMANENTLY_DISABLED (voir api/apifootball.js) et renvoie toujours une
+// réponse vide — ce bloc ne faisait plus qu'un aller-retour réseau inutile
+// toutes les 60s pour chaque utilisateur, en continu, sans jamais rien
+// détecter. Kickoff/mi-temps/fin de match sont déjà couverts par ESPN
+// (source primaire, voir pollESPN plus haut) et FIFA (api/fifa-live.js).
 
 // ── Invalidation des stats live "à la demande" (fifaStats/espnSummary/aflStats) ──
 // Ces 3 hooks (MatchModal.jsx / useApiFootball.js) sont des useQuery indépendants
@@ -1156,37 +1003,9 @@ export function useLiveMinute(matches) {
     }
   }, [matches, queryClient])
 
-  // ── api-football.com : intervalle 60s (fallback) ──
-  const apiFbRef = useRef(null)
-  useEffect(() => {
-    const tick = async () => {
-      const current    = matchesRef.current
-      const trackedIds = getTrackedMatches()
-      const needsPoll  = current.some(m => isInPollingWindow(m, trackedIds))
-      if (needsPoll) {
-        await pollApiFootball(current, queryClient)
-      }
-    }
-    apiFbRef.current = tick
-    tick()
-    const id = setInterval(tick, 60_000)
-    return () => clearInterval(id)
-  }, [queryClient])
-
-  // Poll api-football immédiat si un match passe IN_PLAY sans kickoffAt connu
-  const knownInPlayRef = useRef(new Set())
   // Re-poll ESPN dès que matches[] se peuple (cold start PWA : premier poll était sur tableau vide)
   const prevMatchesLen = useRef(0)
   useEffect(() => {
-    const newMatches = matches.filter(m =>
-      (m.status === 'IN_PLAY' || m.status === 'PAUSED') &&
-      !getMatchState(m.id).kickoffAt &&
-      !knownInPlayRef.current.has(m.id)
-    )
-    newMatches.forEach(m => knownInPlayRef.current.add(m.id))
-    if (newMatches.length > 0 && apiFbRef.current) {
-      apiFbRef.current()
-    }
     // Cold start : matches[] vient de se charger (0 → N) → re-poll ESPN immédiatement
     // (même sans live en cours — pour détecter les pending kickoffs au bon moment)
     if (prevMatchesLen.current === 0 && matches.length > 0) {
@@ -1353,11 +1172,8 @@ export function useLiveMinute(matches) {
     try { await queryClient.refetchQueries({ queryKey: ['todayMatches'] }) } catch {}
     // 2. Attendre un tick que matchesRef.current soit mis à jour par le re-render React
     await new Promise(r => setTimeout(r, 200))
-    // 3. Repoll ESPN + api-football avec les données fraîches
-    await Promise.all([
-      pollESPN(matchesRef.current, queryClient),
-      pollApiFootball(matchesRef.current, queryClient),
-    ])
+    // 3. Repoll ESPN avec les données fraîches
+    await pollESPN(matchesRef.current, queryClient)
   })
 
   return { recalibrate: recalibrate.current }

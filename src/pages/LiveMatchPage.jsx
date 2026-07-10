@@ -12,6 +12,7 @@ import { getMatchState }    from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
+import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { calcLiveProno } from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
@@ -34,23 +35,6 @@ import '../live.css'
 import '../matchModal.css'
 
 // ── Raccourcis noms ───────────────────────────────────────────────────────────
-const TEAM_SHORT = {
-  'Union Saint-Gilloise': 'Union SG', 'Paris Saint-Germain': 'Paris SG',
-  'Paris Saint-Germain FC': 'Paris SG', 'Crystal Palace': 'C. Palace',
-  'Wolverhampton': 'Wolves', 'Wolverhampton Wanderers': 'Wolves',
-  'Nottingham Forest': 'Nott. Forest', 'Brighton & Hove Albion': 'Brighton',
-  'Brighton Hove Albion': 'Brighton', 'Newcastle United': 'Newcastle',
-  'Tottenham Hotspur': 'Tottenham', 'West Ham United': 'West Ham',
-  'Manchester City': 'Man. City', 'Manchester United': 'Man. United',
-  'Leeds United': 'Leeds', 'Atlético Madrid': 'Atl. Madrid',
-  'Athletic Bilbao': 'Ath. Bilbao', 'Real Sociedad': 'R. Sociedad',
-  'Deportivo Alavés': 'Alavés', 'Rayo Vallecano': 'Rayo',
-  'Bayern Munich': 'Bayern', 'Eintracht Frankfurt': 'Frankfurt',
-  'Werder Brême': 'Werder', 'Werder Bremen': 'Werder',
-  'Borussia Dortmund': 'Dortmund', 'Inter Milan': 'Inter',
-  'Milan AC': 'Milan', 'Hellas Verona': 'Verona',
-  'PSV Eindhoven': 'PSV', 'Club Brugge': 'Bruges', 'Slavia Prague': 'Slavia',
-}
 // 5 pastilles par équipe pendant la séance de tab : gris = pas encore marqué,
 // vert = but marqué. Basé sur le compteur ESPN `shootoutScore` (fiable, déjà
 // utilisé pour le score "(x-y tab)") : les N premières pastilles passent au

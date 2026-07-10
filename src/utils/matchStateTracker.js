@@ -9,7 +9,6 @@ export const isEspnWorking  = ()  => _espnWorking
 // ─────────────────────────────────────────────────────────────────────────────
 
 const key = (id) => `foot_ms_${id}`
-const TRACKED_KEY = 'foot_tracked_matches'
 
 // Auto-nettoyage au chargement : supprimer les états 'ended' de plus de 3h
 // (ils bloquent la ré-injection si ESPN revient — inutile après 3h)
@@ -25,29 +24,6 @@ try {
     } catch {}
   }
 } catch {}
-
-/**
- * Retourne l'ensemble des IDs de matchs sélectionnés pour le suivi précis.
- */
-export function getTrackedMatches() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(TRACKED_KEY) || '[]'))
-  } catch {
-    return new Set()
-  }
-}
-
-/**
- * Active ou désactive le suivi précis d'un match.
- */
-export function toggleTrackedMatch(matchId) {
-  const ids = getTrackedMatches()
-  const sid = String(matchId)
-  if (ids.has(sid)) ids.delete(sid)
-  else ids.add(sid)
-  localStorage.setItem(TRACKED_KEY, JSON.stringify([...ids]))
-  return ids.has(sid)
-}
 
 /**
  * Retourne l'état live d'un match :
