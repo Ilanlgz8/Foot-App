@@ -717,24 +717,6 @@
 }
 
 
-/* ── Navigation par jour dans le panel résultats ── */
-.accueil__resultNav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.7rem 1.3rem;
-}
-
-.accueil__resultNavLabel {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #f5f5f5;
-  letter-spacing: -0.02em;
-  flex: 1;
-  text-align: center;
-}
-
 /* ── Empty state — même traitement que .live__empty (icône + titre),
    plutôt qu'une simple ligne de texte grise perdue dans le panneau. ── */
 .accueil__tickerEmpty {
@@ -1870,39 +1852,24 @@
    Composant dédié (src/accueil/ResultHeroCard.jsx), volontairement séparé de
    .accueil__matchCard : voir le commentaire en tête de ce fichier JSX.
    ========================================================= */
+/* Retour utilisateur : le fond teinté couleur équipe (::before ci-dessous,
+   désormais retiré) donnait une impression de bleu marine grisé sur beaucoup
+   de matchs (équipes aux couleurs bleutées très fréquentes en foot). Fond
+   plat noir légèrement grisé + bordure rouge animée à la place. */
 .resultHero {
   position: relative;
   overflow: hidden;
   border-radius: 14px;
   padding: 0.85rem 1rem 0.9rem;
-  background: #000000;
-  border: 1px solid rgba(var(--white-rgb),0.06);
+  background: #0a0a0a;
+  border: 1px solid rgba(var(--red-rgb),0.25);
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  transition: transform 0.15s, background 0.15s;
+  animation: resultHeroBorderPulse 2.6s ease-in-out infinite;
 }
-
-/* Dégradé couleurs des 2 équipes, très discret — le fond doit rester lisible
-   avant tout, l'idée est une "ambiance" pas un habillage visible en soi. Même
-   principe d'un overlay sombre au-dessus que .accueil__matchCard::before.
-   ⚠️ Assombri (retour utilisateur x3) : fond de base #0d0d0d → --bg-deep →
-   #000000, teinte du dégradé réduite 0.16→0.10→0.07, overlay noir renforcé
-   (0.92→0.96→0.98 / 0.7→0.82→0.9). */
-.resultHero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: var(--result-hero-gradient);
-  opacity: 0.07;
-}
-.resultHero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.9) 100%);
+@keyframes resultHeroBorderPulse {
+  0%, 100% { border-color: rgba(var(--red-rgb),0.18); box-shadow: 0 0 0 rgba(var(--red-rgb),0); }
+  50%      { border-color: rgba(var(--red-rgb),0.55); box-shadow: 0 0 10px rgba(var(--red-rgb),0.18); }
 }
 .resultHero > * {
   position: relative;
@@ -1910,12 +1877,14 @@
 }
 
 .resultHero:hover {
-  border-color: rgba(var(--white-rgb),0.12);
   transform: translateY(-1px);
 }
 .resultHero:active {
   transform: scale(0.98);
   transition-duration: 0.1s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .resultHero { animation: none; border-color: rgba(var(--red-rgb),0.3); }
 }
 
 /* Liseré du haut : couleur de l'équipe gagnante (voir --result-hero-accent,

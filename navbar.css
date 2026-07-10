@@ -48,7 +48,8 @@
   text-align: center;
   line-height: 1;
 }
-.sfHeader__brand span { color: var(--sf-red-light); }
+/* Retour utilisateur : rouge plus vif que --sf-red-light (trop pâle/rosé) */
+.sfHeader__brand span { color: var(--sf-red); }
 
 .sfHeader__nav { display: none; }   /* liens desktop uniquement */
 

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { translateTeam } from '../data/teamNames'
 import { finalScore } from '../utils/matchUtils'
-import { getMatchGradient, getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchTeamColors } from '../data/teamPhotos'
 import { COMPETITIONS } from '../data/competitions'
 import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
 
@@ -39,7 +39,6 @@ export function ResultHeroCard({ match }) {
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
   const homeRaw = match.homeTeam?.name || match.homeTeam?.shortName || ''
   const awayRaw = match.awayTeam?.name || match.awayTeam?.shortName || ''
-  const gradient = getMatchGradient(homeRaw, awayRaw)
   const { home: homeColor, away: awayColor } = getMatchTeamColors(homeRaw, awayRaw)
   // Couleur d'accent = celle du VAINQUEUR (celle du perdant si match nul, les
   // deux teintes restent alors visibles à parts égales) — utilisée pour le
@@ -63,7 +62,7 @@ export function ResultHeroCard({ match }) {
   return (
     <div
       className="resultHero"
-      style={{ '--result-hero-gradient': gradient, '--result-hero-accent': accentColor }}
+      style={{ '--result-hero-accent': accentColor }}
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
       role="button"
       tabIndex={0}
