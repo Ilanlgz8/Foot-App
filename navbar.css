@@ -245,20 +245,36 @@
     background: rgba(var(--sf-red-rgb), 0.14);
   }
 
+  /* Toujours visible (même sans match en cours) — pill neutre par défaut,
+     bascule en rouge/pulse uniquement quand liveCount > 0 (.sfLiveBtn--live).
+     Avant : lien absent du DOM si liveCount === 0, seul moyen d'accès à /live
+     en desktop disparaissait totalement. Même logique que l'orb mobile,
+     toujours présent + pulse conditionnel. */
   .sfLiveBtn {
     display: inline-flex;
     align-items: center;
     gap: 7px;
     padding: 8px 14px;
     border-radius: 99px;
-    background: linear-gradient(135deg, var(--sf-red), var(--sf-red-deep));
-    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--sf-muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.06em;
     text-decoration: none;
+    transition: color 0.2s, background 0.2s;
+  }
+  .sfLiveBtn:hover { color: var(--sf-text); background: rgba(255, 255, 255, 0.1); }
+  .sfLiveBtn--active:not(.sfLiveBtn--live) {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .sfLiveBtn--live {
+    background: linear-gradient(135deg, var(--sf-red), var(--sf-red-deep));
+    color: #fff;
     box-shadow: 0 4px 16px rgba(var(--sf-red-rgb), 0.32);
   }
+  .sfLiveBtn--live:hover { color: #fff; }
   .sfLiveBtn__dot {
     width: 7px;
     height: 7px;

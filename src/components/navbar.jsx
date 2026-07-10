@@ -5,8 +5,10 @@
  *                    + bottom tab bar fixe (zone du pouce) avec orb Live central
  * Desktop (≥640px) : header [brand | liens | DIRECT + cloche]
  *
- * L'orb Live est TOUJOURS visible (fini le layout shift) :
- * badge + pulsation uniquement quand des matchs sont en cours.
+ * Le lien Live (orb mobile + pill DIRECT desktop) est TOUJOURS visible
+ * (fini le layout shift ET la disparition totale du point d'accès /live
+ * en desktop quand rien n'est en cours) : badge + pulsation/rouge
+ * uniquement quand des matchs sont en cours.
  */
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
@@ -118,14 +120,23 @@ function Navbar() {
           </nav>
 
           <div className="sfHeader__right">
-            {/* DIRECT — desktop uniquement, visible si matchs en cours */}
-            {liveCount > 0 && (
-              <NavLink to="/live" className="sfLiveBtn">
-                <span className="sfLiveBtn__dot" />
-                DIRECT
-                <span className="sfLiveBtn__count">{liveCount}</span>
-              </NavLink>
-            )}
+            {/* DIRECT — desktop uniquement, toujours présent (comme l'orb
+                mobile) : pill neutre par défaut, rouge/pulse + badge
+                uniquement si des matchs sont en cours. */}
+            <NavLink
+              to="/live"
+              className={({ isActive }) =>
+                [
+                  'sfLiveBtn',
+                  liveCount > 0 ? 'sfLiveBtn--live' : '',
+                  isActive ? 'sfLiveBtn--active' : '',
+                ].filter(Boolean).join(' ')
+              }
+            >
+              {liveCount > 0 && <span className="sfLiveBtn__dot" />}
+              DIRECT
+              {liveCount > 0 && <span className="sfLiveBtn__count">{liveCount}</span>}
+            </NavLink>
             <NotificationBell />
           </div>
         </div>

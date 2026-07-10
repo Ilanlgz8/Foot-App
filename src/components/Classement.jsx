@@ -12,6 +12,7 @@ import { useMatches } from '../hooks/useMatchs'
 import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
 import { PanelSkeleton } from '../accueil/MatchCard'
+import { usePersistedState } from '../hooks/usePersistedState'
 // Étoile de favori RETIRÉE de cette page (retour utilisateur : pas concluant
 // ici) — ne reste que dans FavoritesPage.jsx (page /favoris, ouverte depuis
 // la cloche). StandingsTable garde le prop favoritable pour cet usage-là.
@@ -21,18 +22,36 @@ import { PanelSkeleton } from '../accueil/MatchCard'
 
 function Classement() {
   const location = useLocation()
-  const initCompId  = location.state?.compId  ?? 'WC'
-  const initGroup   = location.state?.group   ?? null   // ex: "GROUP_A"
+  // Navigation explicite (ex: depuis MatchModal "voir le classement du groupe")
+  // — prioritaire sur l'état persisté, appliquée une seule fois via l'effet
+  // ci-dessous. Sinon (arrivée directe sur /classement), on reprend la
+  // compétition/le groupe déjà consultés (usePersistedState, voir Match.jsx/
+  // Resultat.jsx pour le même pattern).
+  const navCompId = location.state?.compId ?? null
+  const initGroup = location.state?.group  ?? null   // ex: "GROUP_A"
 
-  const [selectedComp, setSelectedComp] = useState(initCompId)
-  const [view, setView] = useState('classement') // 'classement' | 'buteurs'
-  const [selectedGroup, setSelectedGroup] = useState(null)
-  const [search, setSearch] = useState('')
+  // Persistés dans sessionStorage : App.jsx remonte cette page à chaque
+  // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
+  // d'un match rebasculait toujours sur la compétition/l'onglet/la recherche
+  // par défaut au lieu de ceux consultés.
+  const [selectedComp, setSelectedComp] = usePersistedState('classement_selectedComp', navCompId ?? 'WC')
+  const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
+  const [search, setSearch] = usePersistedState('classement_search', '')
+  const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)
   const searchNorm = search.trim().toLowerCase()
   const SCORERS_PER_PAGE = 20
   const [scorerPage, setScorerPage] = useState(0)
   const [compOpen, setCompOpen] = useState(false)
   const didAutoOpen = useRef(false)
+  const didApplyNavComp = useRef(false)
+
+  // Navigation explicite depuis une autre page (compId dans location.state)
+  // écrase la compétition persistée — une seule fois par arrivée sur la page.
+  useEffect(() => {
+    if (didApplyNavComp.current || !navCompId) return
+    setSelectedComp(navCompId)
+    didApplyNavComp.current = true
+  }, [navCompId, setSelectedComp])
 
   // ── Dropdown "Changer" — même technique que le panneau de la cloche notifs :
   // rendu via portail dans <body> (échappe à l'overflow:hidden de .compHeader)
@@ -128,10 +147,14 @@ function Classement() {
     const normG = g => (g ?? '').toUpperCase().replace(/\s+/g, '_')
     const found = groups.find(g => normG(g.name) === initGroup)
     if (found) {
-      setSelectedGroup(found)
+      setSelectedGroupName(found.name)
       didAutoOpen.current = true
     }
-  }, [groups, initGroup])
+  }, [groups, initGroup, setSelectedGroupName])
+
+  // Groupe réellement affiché — dérivé du nom persisté + données groups
+  // fraîchement récupérées (évite d'afficher un tableau figé/périmé).
+  const selectedGroup = selectedGroupName ? groups.find(g => g.name === selectedGroupName) ?? null : null
 
   const competitionRules = {
     FL1: [
@@ -356,7 +379,7 @@ function Classement() {
             <div
               key={group.name}
               className="classement__groupBlock classement__groupBlock--clickable"
-              onClick={() => setSelectedGroup(groups.find(g => g.name === group.name) ?? group)}
+              onClick={() => setSelectedGroupName(group.name)}
               title="Voir le groupe en détail"
             >
               <div className="classement__groupHeader">
@@ -378,7 +401,7 @@ function Classement() {
         {selectedGroup && (
           <GroupModal
             group={selectedGroup}
-            onClose={() => setSelectedGroup(null)}
+            onClose={() => setSelectedGroupName(null)}
             schedMatches={wcSched}
             finMatches={wcFin}
             loadingM={wcSchedLoading || wcFinLoading}
