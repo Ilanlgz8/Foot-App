@@ -116,28 +116,34 @@
   gap: 0.5rem;
   margin-bottom: 1.1rem;
 }
+/* --chip-color/--chip-color-rgb posés en inline style (FavoritesPage.jsx),
+   couleur réelle curée de chaque équipe (getTeamColor) — chaque équipe
+   suivie a sa propre teinte au lieu d'un ambre plat uniforme. */
 .favPage__clubChip {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: rgba(245,158,11,0.1);
-  border: 1px solid rgba(245,158,11,0.35);
+  background: rgba(var(--chip-color-rgb, 245,158,11), 0.12);
+  border: 1px solid rgba(var(--chip-color-rgb, 245,158,11), 0.4);
   border-radius: var(--radius-pill);
   padding: 0.35rem 0.6rem 0.35rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #f59e0b;
+  color: var(--chip-color, #f59e0b);
   cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
 }
+.favPage__clubChip:active { transform: scale(0.96); }
 .favPage__clubChip img {
   width: 16px; height: 16px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px rgba(var(--chip-color-rgb, 245,158,11), 0.5);
 }
 .favPage__clubChipX {
-  color: rgba(245,158,11,0.6);
+  color: rgba(var(--chip-color-rgb, 245,158,11), 0.65);
   font-size: 0.85rem;
   margin-left: 0.1rem;
 }
-.favPage__clubChip:hover .favPage__clubChipX { color: #f59e0b; }
+.favPage__clubChip:hover .favPage__clubChipX { color: var(--chip-color, #f59e0b); }
 
 .favPage__state {
   font-size: 0.8rem;

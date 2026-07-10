@@ -13,6 +13,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { WatchBadge } from './WatchBadge'
 import { FavStarBadge } from './FavStarBadge'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
+import { getTeamColor } from '../data/teamPhotos'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -139,7 +140,13 @@ const teamName = (team) =>
 function MatchRow({ match, index, inModal = false }) {
   const navigate = useNavigate()
   const { isFavorite } = useFavoriteClubs()
-  const isFav = isFavorite(match.homeTeam?.id) || isFavorite(match.awayTeam?.id)
+  const homeIsFav = isFavorite(match.homeTeam?.id)
+  const awayIsFav = isFavorite(match.awayTeam?.id)
+  const isFav = homeIsFav || awayIsFav
+  // Si les 2 équipes sont favorites, priorité à domicile pour la couleur du badge.
+  const favColor = isFav
+    ? getTeamColor((homeIsFav ? match.homeTeam : match.awayTeam)?.shortName || (homeIsFav ? match.homeTeam : match.awayTeam)?.name)
+    : null
   const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
@@ -150,7 +157,7 @@ function MatchRow({ match, index, inModal = false }) {
       style={{ borderTop: index === 0 ? 'none' : undefined }}
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
     >
-      {isFav && <FavStarBadge variant="row" />}
+      {isFav && <FavStarBadge variant="row" color={favColor} />}
       <WatchBadge match={match} variant="row" />
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">

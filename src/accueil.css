@@ -113,14 +113,19 @@
 }
 
 /* ── Bandeau "Mon équipe" ── */
+/* --fav-team-color/--fav-team-rgb posés en inline style (MyTeamBanner.jsx)
+   avec la vraie couleur curée de l'équipe favorite concernée — le bandeau
+   n'est plus un rouge générique identique pour toutes les équipes suivies. */
 .myTeamBanner {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
-  background: var(--bg-panel-grad);
+  background:
+    linear-gradient(135deg, rgba(var(--fav-team-rgb, 239,68,68), 0.1), transparent 60%),
+    var(--bg-panel-grad);
   border: 1px solid #1d1d1d;
-  border-left: 3px solid var(--red);
+  border-left: 3px solid var(--fav-team-color, var(--red));
   border-radius: 0.85rem;
   padding: 0.7rem 1rem;
   margin-bottom: 0.9rem;
@@ -129,7 +134,11 @@
   font-family: inherit;
   transition: background 0.15s, border-color 0.15s;
 }
-.myTeamBanner:hover { background: rgba(var(--white-rgb),0.03); }
+.myTeamBanner:hover {
+  background:
+    linear-gradient(135deg, rgba(var(--fav-team-rgb, 239,68,68), 0.16), transparent 60%),
+    var(--bg-panel-grad);
+}
 .myTeamBanner:active { transform: scale(0.99); }
 
 .myTeamBanner__kicker {
@@ -140,13 +149,13 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--red-light, #ef4444);
+  color: var(--fav-team-color, var(--red-light, #ef4444));
 }
 .myTeamBanner__liveDot {
   width: 5px; height: 5px;
   border-radius: 50%;
-  background: var(--red);
-  box-shadow: 0 0 6px rgba(var(--red-rgb),0.8);
+  background: var(--fav-team-color, var(--red));
+  box-shadow: 0 0 6px rgba(var(--fav-team-rgb, 239,68,68), 0.8);
   animation: pulse 1.5s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -206,7 +215,7 @@
 .myTeamBanner__minute {
   font-size: 0.6rem;
   font-weight: 700;
-  color: var(--red-light, #ef4444);
+  color: var(--fav-team-color, var(--red-light, #ef4444));
 }
 
 @media (max-width: 480px) {

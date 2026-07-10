@@ -22,6 +22,7 @@ import { useStandings } from '../hooks/useStandings'
 import { COMPETITIONS, COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { StandingsTable } from '../components/StandingsTable'
 import { translateTeam } from '../data/teamNames'
+import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import '../favoritesPage.css'
 
 function formatGroupName(raw = '') {
@@ -107,13 +108,23 @@ export default function FavoritesPage() {
 
         {favClubs.length > 0 && (
           <div className="favPage__clubChips">
-            {favClubs.map(t => (
-              <button key={t.id} className="favPage__clubChip" onClick={() => toggleFavClub(t)} type="button">
-                {t.crest && <img src={t.crest} alt="" />}
-                <span>{translateTeam(t.shortName || t.name)}</span>
-                <span className="favPage__clubChipX" aria-hidden="true">×</span>
-              </button>
-            ))}
+            {favClubs.map(t => {
+              const color = getTeamColor(t.shortName || t.name)
+              const rgb = hexToRgbTriplet(color)
+              return (
+                <button
+                  key={t.id}
+                  className="favPage__clubChip"
+                  style={{ '--chip-color': color, '--chip-color-rgb': rgb }}
+                  onClick={() => toggleFavClub(t)}
+                  type="button"
+                >
+                  {t.crest && <img src={t.crest} alt="" />}
+                  <span>{translateTeam(t.shortName || t.name)}</span>
+                  <span className="favPage__clubChipX" aria-hidden="true">×</span>
+                </button>
+              )
+            })}
           </div>
         )}
 

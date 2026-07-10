@@ -373,18 +373,25 @@
 }
 .classement__favStar:hover        { color: rgba(var(--white-rgb),0.5); }
 .classement__favStar:active       { transform: scale(0.85); }
+/* Repli ambre si jamais aucune couleur d'équipe n'est fournie en inline style
+   (color prop null) — en pratique toujours écrasé par le style inline par équipe. */
 .classement__favStar--active      { color: #f59e0b; }
 .classement__favStar--active:hover { color: #f59e0b; }
 .classement__favStar:disabled     { cursor: not-allowed; opacity: 0.35; }
 
+/* Ligne favorite : couleur réelle de l'équipe (--fav-color-rgb posé en inline
+   style sur <tr> par StandingsTable), avec un liseré latéral pour bien la
+   distinguer sans alourdir la ligne — plus de rouge/ambre plat identique
+   pour toutes les équipes suivies. */
 .classement__row--favorite {
-  background: rgba(239,68,68,0.06);
+  background: rgba(var(--fav-color-rgb, 239,68,68), 0.07);
+  box-shadow: inset 3px 0 0 0 rgba(var(--fav-color-rgb, 239,68,68), 0.55);
 }
 .classement__row--favorite:hover {
-  background: rgba(239,68,68,0.1);
+  background: rgba(var(--fav-color-rgb, 239,68,68), 0.12);
 }
 .classement__row--favorite td:first-child .classement__position {
-  color: var(--red-light, #ef4444);
+  color: var(--fav-color, var(--red-light, #ef4444));
 }
 
 /* ── Variantes des zones ── */

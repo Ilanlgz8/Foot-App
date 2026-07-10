@@ -18,6 +18,7 @@ import { mergeScore, finalScore } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
+import { getTeamColor } from '../data/teamPhotos'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
@@ -43,7 +44,12 @@ const fmtDate = (d) => {
 function MatchCard({ match }) {
   const navigate = useNavigate()
   const { isFavorite } = useFavoriteClubs()
-  const isFav = isFavorite(match.homeTeam?.id) || isFavorite(match.awayTeam?.id)
+  const homeIsFav = isFavorite(match.homeTeam?.id)
+  const awayIsFav = isFavorite(match.awayTeam?.id)
+  const isFav = homeIsFav || awayIsFav
+  const favColor = isFav
+    ? getTeamColor((homeIsFav ? match.homeTeam : match.awayTeam)?.shortName || (homeIsFav ? match.homeTeam : match.awayTeam)?.name)
+    : null
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
   // finalScore() = score 120min (prolongations incluses, tirs au but exclus).
@@ -68,7 +74,7 @@ function MatchCard({ match }) {
 
   return (
     <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-      {isFav && <FavStarBadge variant="row" />}
+      {isFav && <FavStarBadge variant="row" color={favColor} />}
       <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
         <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.homeTeam?.crest

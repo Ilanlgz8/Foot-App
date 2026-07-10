@@ -1,6 +1,7 @@
 // Composant partagé — utilisé dans Classement.jsx et MatchModal.jsx (onglet Classement)
 import { useEffect, useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
+import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 // Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
 // pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
 // visitée au moins une fois (chunk lazy pas encore chargé), l'onglet Classement de
@@ -51,7 +52,10 @@ function useStandingsSnapshot(snapshotKey, snapshotRows) {
 // n'a pas de onClick actuellement, mais StandingsTable est aussi rendue dans
 // des contextes cliquables (GroupModal notamment) — mieux vaut être sûr que
 // le clic sur l'étoile ne se propage jamais à un parent.
-function FavStar({ active, onClick, disabled }) {
+// color : couleur curée de l'équipe (getTeamColor), appliquée seulement à
+// l'état actif — l'étoile inactive reste neutre pour ne pas laisser deviner
+// la couleur avant que l'équipe soit vraiment ajoutée aux favoris.
+function FavStar({ active, onClick, disabled, color }) {
   return (
     <button
       type="button"
@@ -60,6 +64,7 @@ function FavStar({ active, onClick, disabled }) {
       disabled={disabled && !active}
       aria-label={active ? 'Retirer des favoris' : 'Ajouter aux favoris'}
       aria-pressed={active}
+      style={active && color ? { color } : undefined}
     >
       <svg viewBox="0 0 24 24" width="15" height="15" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" />
@@ -131,6 +136,11 @@ export function StandingsTable({
             const prevPos = prevSnapshot[team.team.id]
             const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0
             const isFav   = favoritable && isFavorite ? isFavorite(team.team.id) : false
+            // Couleur réelle de l'équipe (drapeau/maillot curé) — donne à chaque
+            // ligne favorite sa propre teinte au lieu d'un rouge/ambre uniforme
+            // pour toutes les équipes suivies.
+            const favColor    = isFav ? getTeamColor(team.team.shortName || team.team.name) : null
+            const favColorRgb = favColor ? hexToRgbTriplet(favColor) : null
 
             return (
               <tr
@@ -140,6 +150,7 @@ export function StandingsTable({
                   topRank ? `classement__row--top${team.position}` : '',
                   isFav ? 'classement__row--favorite' : '',
                 ].filter(Boolean).join(' ')}
+                style={isFav ? { '--fav-color': favColor, '--fav-color-rgb': favColorRgb } : undefined}
               >
                 <td>
                   <div className="classement__positionWrap">
@@ -154,6 +165,7 @@ export function StandingsTable({
                         <FavStar
                           active={isFav}
                           disabled={favLimitReached}
+                          color={favColor}
                           onClick={() => onToggleFavorite?.({
                             id:        team.team.id,
                             name:      team.team.name,

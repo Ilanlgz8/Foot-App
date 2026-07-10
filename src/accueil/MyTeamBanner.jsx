@@ -3,6 +3,8 @@
 // données déjà chargées par la page (voir le calcul dans Accueil.jsx).
 import { translateTeam } from '../data/teamNames'
 import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
+import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
+import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 
 function formatDate(utcDate) {
   const d = new Date(utcDate)
@@ -25,8 +27,21 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
   const as_ = mergeScore(espnScore?.away, fs.away)
   const minute = isLive ? calcMinute(match) : null
 
+  // Couleur réelle de l'équipe favorite concernée (home ou away) — le bandeau
+  // reprend sa teinte au lieu d'un rouge générique fixe, cohérent avec le
+  // thème dynamique déjà utilisé sur les pages match (getMatchThemeVars).
+  const { isFavorite } = useFavoriteClubs()
+  const homeIsFav = isFavorite(match.homeTeam?.id)
+  const favColor = getTeamColor(homeIsFav ? (match.homeTeam?.shortName || match.homeTeam?.name) : (match.awayTeam?.shortName || match.awayTeam?.name))
+  const favColorRgb = hexToRgbTriplet(favColor)
+
   return (
-    <button className="myTeamBanner" onClick={onClick} type="button">
+    <button
+      className="myTeamBanner"
+      onClick={onClick}
+      type="button"
+      style={{ '--fav-team-color': favColor, '--fav-team-rgb': favColorRgb }}
+    >
       <span className="myTeamBanner__kicker">
         {isLive
           ? <><span className="myTeamBanner__liveDot" />Mon équipe · en direct</>
