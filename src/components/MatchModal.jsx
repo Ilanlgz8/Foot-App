@@ -94,8 +94,16 @@ function ESPNStats({ stats }) {
     { label: 'Tirs',          hv: h.shots         != null ? `${h.shots}`         : null, av: a.shots         != null ? `${a.shots}`         : null },
     { label: 'Tirs cadrés',   hv: h.shotsOnTarget != null ? `${h.shotsOnTarget}` : null, av: a.shotsOnTarget != null ? `${a.shotsOnTarget}` : null },
     { label: 'Corners',       hv: h.corners       != null ? `${h.corners}`       : null, av: a.corners       != null ? `${a.corners}`       : null },
+    { label: 'Passes',        hv: h.passes        != null ? `${h.passes}`        : null, av: a.passes        != null ? `${a.passes}`        : null },
+    { label: 'Précision passes', hv: h.passPct    != null ? `${h.passPct}%`      : null, av: a.passPct       != null ? `${a.passPct}%`       : null },
+    { label: 'Tacles',        hv: h.tackles       != null ? `${h.tackles}`       : null, av: a.tackles       != null ? `${a.tackles}`        : null },
+    { label: 'Interceptions', hv: h.interceptions != null ? `${h.interceptions}` : null, av: a.interceptions != null ? `${a.interceptions}`  : null },
+    { label: 'Centres',       hv: h.crosses       != null ? `${h.crosses}`       : null, av: a.crosses       != null ? `${a.crosses}`        : null },
+    { label: 'Longs ballons', hv: h.longBalls     != null ? `${h.longBalls}`     : null, av: a.longBalls     != null ? `${a.longBalls}`      : null },
+    { label: 'Arrêts',        hv: h.saves         != null ? `${h.saves}`         : null, av: a.saves         != null ? `${a.saves}`          : null },
     { label: 'Fautes',        hv: h.fouls         != null ? `${h.fouls}`         : null, av: a.fouls         != null ? `${a.fouls}`         : null },
-    { label: 'Hors-jeu',      hv: h.offside       != null ? `${h.offside}`       : null, av: a.offside       != null ? `${a.offside}`       : null },
+    { label: 'Hors-jeu',      hv: h.offsides      != null ? `${h.offsides}`      : null, av: a.offsides      != null ? `${a.offsides}`      : null },
+    { label: 'Cartons rouges',hv: h.redCards      != null ? `${h.redCards}`      : null, av: a.redCards      != null ? `${a.redCards}`       : null },
   ].filter(r => r.hv != null || r.av != null)
 
   if (rows.length === 0) return null
@@ -1464,8 +1472,16 @@ function fifaStatsToRows(data) {
     makeStatRow('Tirs',         h.shots,          a.shots,          true),
     makeStatRow('Tirs cadrés',  h.shotsOnTarget,  a.shotsOnTarget,  true),
     makeStatRow('Corners',      h.corners,        a.corners,        true),
+    makeStatRow('Passes',       h.passes,         a.passes,         true),
+    makeStatRow('Précision passes', h.passPct != null ? `${h.passPct}%` : null, a.passPct != null ? `${a.passPct}%` : null, true),
+    makeStatRow('Tacles',       h.tackles,        a.tackles,        true),
+    makeStatRow('Interceptions', h.interceptions, a.interceptions,  true),
+    makeStatRow('Centres',      h.crosses,        a.crosses,        true),
+    makeStatRow('Longs ballons', h.longBalls,     a.longBalls,      true),
+    makeStatRow('Arrêts',       h.saves,          a.saves,          true),
     makeStatRow('Fautes',       h.fouls,          a.fouls,          false),
-    makeStatRow('Hors-jeux',    h.offside,        a.offside,        false),
+    makeStatRow('Hors-jeux',    h.offsides,       a.offsides,       false),
+    makeStatRow('Cartons rouges', h.redCards,     a.redCards,       false),
   ].filter(Boolean)
 }
 

@@ -396,11 +396,39 @@ function extractBoxscoreStats(hArr, aArr) {
   // autre source xG réelle malgré ce que suggérait la doc ("FotMob (xG)") —
   // aucune intégration FotMob n'a jamais existé dans le code.
 
+  // Stats supplémentaires (retour utilisateur) — noms de champs vérifiés sur
+  // un vrai match ESPN terminé (même méthode que pour le fix corners) : tous
+  // présents dans le tableau `statistics` du boxscore, pas d'invention.
+  const hPasses      = find(hArr, 'totalPasses')
+  const aPasses      = find(aArr, 'totalPasses')
+  const hPassPct     = find(hArr, 'passPct')
+  const aPassPct     = find(aArr, 'passPct')
+  const hTackles     = find(hArr, 'totalTackles')
+  const aTackles     = find(aArr, 'totalTackles')
+  const hInterceptions = find(hArr, 'interceptions')
+  const aInterceptions = find(aArr, 'interceptions')
+  const hCrosses     = find(hArr, 'totalCrosses')
+  const aCrosses     = find(aArr, 'totalCrosses')
+  const hLongBalls   = find(hArr, 'totalLongBalls')
+  const aLongBalls   = find(aArr, 'totalLongBalls')
+  const hRedCards    = find(hArr, 'redCards')
+  const aRedCards    = find(aArr, 'redCards')
+  const hSaves       = find(hArr, 'saves')
+  const aSaves       = find(aArr, 'saves')
+
   if (hPoss == null && hShots == null && hCorners == null) return null
 
   return {
-    home: { poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside },
-    away: { poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside },
+    home: {
+      poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside,
+      passes: hPasses, passPct: hPassPct, tackles: hTackles, interceptions: hInterceptions,
+      crosses: hCrosses, longBalls: hLongBalls, redCards: hRedCards, saves: hSaves,
+    },
+    away: {
+      poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside,
+      passes: aPasses, passPct: aPassPct, tackles: aTackles, interceptions: aInterceptions,
+      crosses: aCrosses, longBalls: aLongBalls, redCards: aRedCards, saves: aSaves,
+    },
   }
 }
 
