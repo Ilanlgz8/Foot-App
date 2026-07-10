@@ -541,6 +541,29 @@ export default async function handler(req, res) {
     const today     = dateStr(now)
     const yesterday = dateStr(new Date(now - 86_400_000))
 
+  // ── Jour sans aucun match connu : sauter les 18 fetchs ESPN ─────────────────
+  // ⚠️ AJOUT (question utilisateur : "les jours où y'a pas de match, faudrait
+  // que le cron ne tourne pas") : cron-job.org appelle cet endpoint 1x/min
+  // 24/7, y compris les jours sans AUCUN match sur les 9 compétitions suivies
+  // (trêve internationale, jour creux...). Avant ce fix, chaque passe faisait
+  // quand même les 18 fetchs ESPN (9 slugs × today+yesterday) et tout le
+  // traitement associé pour ne rien trouver. Marqueur posé UNIQUEMENT quand un
+  // fetch RÉEL vient de confirmer 0 event (jamais deviné à l'avance) — voir
+  // plus bas où il est posé, avec garde contre une panne ESPN temporaire
+  // confondue avec "vraiment aucun match". Fenêtre courte (20min) : le
+  // scoreboard ESPN liste déjà les matchs SCHEDULED à venir dans la journée,
+  // pas seulement ceux en cours — donc "0 event" veut dire "rien du tout
+  // aujourd'hui", pas juste "rien en direct maintenant". Un nouveau match ne
+  // peut pas apparaître par surprise en moins de 20min dans ce contexte, mais
+  // on revérifie quand même régulièrement par sécurité plutôt que de rester
+  // silencieux toute la journée sur une fausse détection.
+  const emptyDayKey = 'cron:emptyDay'
+  let knownEmpty = false
+  try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
+  if (knownEmpty) {
+    return { notifsSent: 0, events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
+  }
+
   // Fetch tous les slugs ESPN en parallèle (aujourd'hui + hier pour les matchs tardifs)
   const allResults = await Promise.allSettled(
     ESPN_SLUGS.flatMap(slug => [
@@ -550,6 +573,15 @@ export default async function handler(req, res) {
   )
 
   const allEvents = allResults.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+
+  // Poser le marqueur "jour vide" seulement si le fetch a vraiment abouti pour
+  // toutes les compétitions (aucune erreur réseau dans ce passage) — sinon une
+  // panne ESPN temporaire serait à tort mémorisée comme "aucun match", et on
+  // resterait aveugle jusqu'à 20min sur de vrais matchs en cours.
+  const espnFetchFailed = log.some(l => /^\[espn:.*\] error=/.test(l))
+  if (allEvents.length === 0 && !espnFetchFailed) {
+    try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
+  }
   // ⚠️ Ces 2 lignes de diagnostic (total events / matches FIFA live) étaient
   // loggées à CHAQUE passe, identiques la plupart du temps — ça remplissait le
   // buffer glissant `cron:goals:logHistory` (1000 lignes) de bruit sans intérêt
