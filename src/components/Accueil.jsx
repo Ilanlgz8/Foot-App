@@ -5,7 +5,7 @@ import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
-import { getTrackedMatches, toggleTrackedMatch, getMatchState } from '../utils/matchStateTracker'
+import { getMatchState } from '../utils/matchStateTracker'
 import { mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { LiveWidget } from '../accueil/LiveWidget'
@@ -44,8 +44,6 @@ function CompFilter({ competitions, active, onChange }) {
     </div>
   )
 }
-
-const MAX_TRACKED = 5
 
 function getDayLabel(offset) {
   if (offset === 0) return "Aujourd'hui"
@@ -173,20 +171,6 @@ function Accueil() {
 
   // pré-match → navigation vers /match/:matchId (plus de modal)
 
-  // ── Suivi précis ──
-  const [trackedIds, setTrackedIds] = useState(() => getTrackedMatches())
-
-  useEffect(() => {
-    if (matches.length > 0 && matches.length <= MAX_TRACKED) {
-      let changed = false
-      const ids = getTrackedMatches()
-      matches.filter(m => m.status !== 'FINISHED').forEach(m => {
-        if (!ids.has(String(m.id))) { toggleTrackedMatch(m.id); changed = true }
-      })
-      if (changed) setTrackedIds(getTrackedMatches())
-    }
-  }, [matches.length])
-
   // Auto-avance au jour suivant si aujourd'hui n'a plus de match à venir
   // (tous terminés ou aucun match ce jour-là)
   useEffect(() => {
@@ -199,14 +183,6 @@ function Accueil() {
       return () => clearTimeout(id)
     }
   }, [matches, matchesLoading, dayOffset])
-
-  const handleToggleTrack = (matchId) => {
-    const ids = getTrackedMatches()
-    if (!ids.has(String(matchId)) && ids.size >= MAX_TRACKED) return
-    toggleTrackedMatch(matchId)
-    setTrackedIds(getTrackedMatches())
-  }
-  const trackHandler = matches.length > MAX_TRACKED ? handleToggleTrack : null
 
   // ── Préchargement des jours adjacents ──
   useEffect(() => {

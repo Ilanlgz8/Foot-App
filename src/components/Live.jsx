@@ -341,6 +341,9 @@ export default function Live() {
             <span className="live__emptyIcon" aria-hidden="true">⚽</span>
             <p className="live__emptyTitle">Aucun match en direct</p>
             <p className="live__emptyHint">Reviens à l'heure du coup d'envoi pour suivre les scores en temps réel.</p>
+            <button className="live__emptyCta" onClick={() => navigate('/matchs')}>
+              Voir le programme →
+            </button>
           </div>
         ) : (
           <div className="live__grid">

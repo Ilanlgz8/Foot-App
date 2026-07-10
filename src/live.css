@@ -423,6 +423,22 @@
   color: rgba(var(--white-rgb),0.35);
   max-width: 22rem;
 }
+.live__emptyCta {
+  margin-top: 0.9rem;
+  background: rgba(var(--red-rgb),0.12);
+  border: 1px solid rgba(var(--red-rgb),0.3);
+  color: var(--red-light);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.live__emptyCta:hover {
+  background: rgba(var(--red-rgb),0.2);
+  border-color: rgba(var(--red-rgb),0.5);
+}
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {

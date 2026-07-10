@@ -200,25 +200,69 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
   const hW   = fin && (wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_)
   const aW   = fin && (wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs)
 
+  // `title` (nom complet au survol) ne se déclenche jamais au tactile — sur
+  // mobile, seul le drapeau reste visible, sans aucun moyen de connaître le
+  // nom de l'équipe sans taper la card (qui navigue direct vers /match/:id).
+  // Appui long sur un drapeau = révèle le nom en surimpression sans naviguer
+  // (le tap simple continue de naviguer comme avant, comportement inchangé).
+  const longPressRef  = useRef(false)
+  const pressTimerRef = useRef(null)
+  const revealTimerRef = useRef(null)
+  const [revealedSide, setRevealedSide] = useState(null) // 'home' | 'away' | null
+
+  const startPress = (side) => {
+    pressTimerRef.current = setTimeout(() => {
+      longPressRef.current = true
+      setRevealedSide(side)
+      revealTimerRef.current = setTimeout(() => setRevealedSide(null), 1600)
+    }, 420)
+  }
+  const cancelPress = () => {
+    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null }
+  }
+  useEffect(() => () => {
+    cancelPress()
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current)
+  }, [])
+
+  const handleClick = () => {
+    if (longPressRef.current) { longPressRef.current = false; return }
+    if (!tbd) onSelect(m)
+  }
+
   return (
     <div
       className={`bracket__card bracket__card--compact ${big ? 'bracket__card--big' : ''} ${live ? 'bracket__card--live' : ''}`}
       style={{ ...style, ...(cardH != null ? { minHeight: cardH } : {}), display:'flex', flexDirection:'column' }}
-      onClick={() => !tbd && onSelect(m)}
+      onClick={handleClick}
     >
-      <div className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`} title={_name(m.homeTeam)}>
+      <div
+        className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}
+        title={_name(m.homeTeam)}
+        onTouchStart={() => startPress('home')}
+        onTouchEnd={cancelPress}
+        onTouchMove={cancelPress}
+      >
         <span className="bracket__crestWrap" data-crest="country">
           {m.homeTeam?.crest
             ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" data-team={m.homeTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
+        {revealedSide === 'home' && <span className="bracket__nameTip">{_name(m.homeTeam)}</span>}
       </div>
-      <div className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`} title={_name(m.awayTeam)}>
+      <div
+        className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`}
+        title={_name(m.awayTeam)}
+        onTouchStart={() => startPress('away')}
+        onTouchEnd={cancelPress}
+        onTouchMove={cancelPress}
+      >
         <span className="bracket__crestWrap" data-crest="country">
           {m.awayTeam?.crest
             ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" data-team={m.awayTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
+        {revealedSide === 'away' && <span className="bracket__nameTip">{_name(m.awayTeam)}</span>}
       </div>
     </div>
   )
@@ -588,6 +632,10 @@ function Matchs() {
   const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
   const [compOpen,      setCompOpen]      = useState(false)
+  // Recherche équipe (vue "Par journée" uniquement) — même pattern que
+  // Resultat.jsx, pour la parité avec les 2 autres pages liste de l'app.
+  const [search, setSearch] = useState('')
+  const searchNorm = search.trim().toLowerCase()
   // Dropdown "Changer" — voir Classement.jsx pour l'explication (portail
   // dans <body> + position fixed calculée depuis le bouton, comme la cloche).
   const compHeroRef = useRef(null)
@@ -735,6 +783,24 @@ function Matchs() {
   const currentGroup      = filteredGrouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches    = currentGroup?.matches ?? []
+
+  // Recherche — filtre côté client par nom d'équipe (traduit ou brut), même
+  // logique que Resultat.jsx. En recherche, on ignore le découpage par
+  // journée : on cherche sur TOUS les matchs à venir de la compétition
+  // (sinon une équipe absente de la journée affichée semblerait n'avoir
+  // aucun match programmé).
+  function matchesTeamSearch(team) {
+    if (!searchNorm) return true
+    const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
+    const raw         = (team?.name ?? '').toLowerCase()
+    return translated.includes(searchNorm) || raw.includes(searchNorm)
+  }
+  const filteredSearchMatches = useMemo(() => {
+    if (!searchNorm) return []
+    return matches
+      .filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED')
+      .filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam))
+  }, [matches, searchNorm])
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {
@@ -963,6 +1029,9 @@ function Matchs() {
                   <p className="bracket__emptyText">
                     Le tableau des phases finales sera disponible dès la fin de la phase de groupes.
                   </p>
+                  <button className="bracket__emptyCta" onClick={() => pickWcView('poules')}>
+                    Voir les poules →
+                  </button>
                 </div>
               )}
               {!bracketLoading && !bracketError && rounds.length > 0 && (
@@ -974,7 +1043,32 @@ function Matchs() {
           )}
 
           {/* ═══ Vue Par journée ═══ */}
-          {!loading && !error && (!isWC || wcView === 'matchs') && total > 0 && (
+          {!loading && !error && (!isWC || wcView === 'matchs') && (
+            <div className="matchs__searchWrap">
+              <input
+                type="text"
+                className="matchs__searchInput"
+                placeholder="Rechercher une équipe…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button className="matchs__searchClear" onClick={() => setSearch('')} aria-label="Effacer la recherche">✕</button>
+              )}
+            </div>
+          )}
+
+          {!loading && !error && (!isWC || wcView === 'matchs') && searchNorm && (
+            filteredSearchMatches.length === 0 ? (
+              <p className="matchs__state">Aucun match à venir ne correspond à « {search} ».</p>
+            ) : (
+              <div className="matchs__panel">
+                {filteredSearchMatches.map((m, i) => <MatchRow key={m.id} match={m} index={i} />)}
+              </div>
+            )
+          )}
+
+          {!loading && !error && (!isWC || wcView === 'matchs') && !searchNorm && total > 0 && (
             <>
               <div className="matchs__nav">
                 <button className="matchs__navBtn"

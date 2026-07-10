@@ -357,6 +357,20 @@ export default function LiveMatchPage() {
     () => { const i = TABS.indexOf(activeTab); if (i > 0) goTab(TABS[i - 1], 'right') }
   )
 
+  // Filet de sécurité : si le match n'est (plus) dans liveMatches — lien direct
+  // vers un match déjà terminé et évincé du tracker, ou match qui se termine
+  // pendant que l'utilisateur est sur la page — on redirige vers la page match
+  // classique (qui a son propre fetch de secours) au lieu de rester bloqué sur
+  // le skeleton indéfiniment. Petit délai pour ne pas rediriger sur un flash
+  // transitoire au tout premier rendu.
+  useEffect(() => {
+    if (match) return
+    const t = setTimeout(() => {
+      navigate(`/match/${matchId}`, { replace: true })
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [match, matchId, navigate])
+
   if (!match) {
     return <LmpPageSkeleton />
   }
@@ -405,8 +419,6 @@ export default function LiveMatchPage() {
             {activeTab === 'stats' && (
               <>
                 <StatsSubTabs view={statsView} onChange={setStatsView} />
-                {/* Pouls collectif — sous Stats Live/Stats Saison, au-dessus
-                    du contenu des stats */}
                 {statsView === 'live' ? (
                   <LiveStatsTab
                     match={match}
