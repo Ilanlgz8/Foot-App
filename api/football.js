@@ -33,6 +33,30 @@ function getKv() {
   return kv
 }
 
+// ── Budget global anti-429 (constat utilisateur : "on se prend un méchant
+// tunnel à attendre" — le vrai problème n'était PAS le cache Redis par clé
+// ci-dessus (qui protège bien les requêtes RÉPÉTÉES identiques), mais
+// l'absence de garde-fou GLOBAL, tous utilisateurs confondus, sur le nombre
+// de vrais appels upstream/minute — exactement le même trou que celui déjà
+// corrigé pour api-football (voir reserveQuota() dans api/apifootball.js,
+// même principe repris ici). Le "tunnel" lui-même venait du client
+// (fdFetch.js, waitForSlot() bloquant en synchrone jusqu'à 60s) — traité
+// séparément côté client, ce budget ici est le vrai garde-fou serveur.
+const MINUTE_CAP = 7   // sur 10/min réels — marge de sécurité, même logique qu'api-football
+const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
+const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
+
+async function reserveQuota(redis) {
+  if (!redis) return true  // Redis down → impossible de compter, on laisse passer plutôt que tout bloquer
+  try {
+    const now       = new Date()
+    const minuteKey = `fd:quota:${now.toISOString().slice(0, 16)}`
+    const count     = await redis.incr(minuteKey)
+    if (count === 1) { try { await redis.expire(minuteKey, 70) } catch {} }
+    return count <= MINUTE_CAP
+  } catch { return true }
+}
+
 function getTtl(fdPath, qs) {
   if (qs.includes('status=IN_PLAY') || qs.includes('status=PAUSED')) return 0
   if (/^\/v4\/matches\/\d+$/.test(fdPath) && !qs) return 3600         // détail FT — 1h
@@ -67,6 +91,8 @@ export default async function handler(req, res) {
 
     const ttl      = getTtl(fdPath, qs)
     const cacheKey = `fd:${fdPath}${qs ? '?' + qs : ''}`
+    const staleKey = `fd:stale:${fdPath}${qs ? '?' + qs : ''}`
+    const downKey  = 'fd:down'
     const redis    = getKv()
 
     // ── Tentative de lecture depuis Redis ────────────────────────────────────
@@ -84,6 +110,38 @@ export default async function handler(req, res) {
       } catch { /* Redis indisponible → on continue vers FD.org */ }
     }
 
+    // ── Garde-fous avant d'attaquer FD.org : budget/minute + circuit breaker ──
+    // Constat utilisateur : "on se prend un méchant tunnel à attendre parce
+    // qu'on a déjà fait trop de requêtes en 1min". Le cache Redis ci-dessus
+    // protège les requêtes RÉPÉTÉES (même clé), mais rien ne protégeait le
+    // total de VRAIS appels upstream/minute tous utilisateurs confondus — si
+    // beaucoup de clés différentes expirent en même temps, on pouvait quand
+    // même dépasser les 10/min réels de FD.org. Si le budget est épuisé OU
+    // qu'un vrai 429 a été vu récemment (circuit breaker), on sert la copie
+    // "stale" (dernière bonne réponse connue, jusqu'à 24h) plutôt que
+    // d'attendre/échouer — un score vieux de quelques minutes reste bien
+    // plus utile qu'une erreur ou une attente bloquante.
+    if (redis) {
+      let blocked = false
+      try { blocked = !!(await redis.get(downKey)) } catch {}
+      if (!blocked) blocked = !(await reserveQuota(redis))
+      if (blocked) {
+        try {
+          const stale = await redis.get(staleKey)
+          if (stale) {
+            return res
+              .status(200)
+              .setHeader('Content-Type', 'application/json')
+              .setHeader('Cache-Control', 'no-store')
+              .setHeader('X-Cache', 'STALE')
+              .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+          }
+        } catch {}
+        // Pas de copie de secours disponible (1re requête pour cette clé) →
+        // on tente quand même l'appel réel, faute de mieux.
+      }
+    }
+
     // ── Fetch football-data.org ──────────────────────────────────────────────
     const url = `https://api.football-data.org${fdPath}${qs ? '?' + qs : ''}`
     const response = await fetch(url, {
@@ -94,10 +152,27 @@ export default async function handler(req, res) {
     const body = await response.text()
 
     // ── Mise en cache Redis si réponse OK ────────────────────────────────────
-    if (ttl > 0 && redis && response.ok) {
+    if (redis && response.ok) {
       try {
-        await redis.set(cacheKey, body, { ex: ttl })
+        if (ttl > 0) await redis.set(cacheKey, body, { ex: ttl })
+        await redis.set(staleKey, body, { ex: STALE_TTL })
       } catch { /* silently ignore — pas critique */ }
+    } else if (response.status === 429 && redis) {
+      // Vrai 429 malgré notre propre budget (autre source de trafic partageant
+      // le quota, marge insuffisante...) → circuit breaker : on arrête
+      // d'insister pendant DOWN_TTL plutôt que d'aggraver un blocage en cours.
+      try { await redis.set(downKey, '1', { ex: DOWN_TTL }) } catch {}
+      try {
+        const stale = await redis.get(staleKey)
+        if (stale) {
+          return res
+            .status(200)
+            .setHeader('Content-Type', 'application/json')
+            .setHeader('Cache-Control', 'no-store')
+            .setHeader('X-Cache', 'STALE')
+            .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+        }
+      } catch {}
     }
 
     res

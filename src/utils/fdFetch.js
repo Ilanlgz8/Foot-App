@@ -1,63 +1,28 @@
 /**
- * fdFetch — wrapper rate-limité pour football-data.org (free tier : 10 req/min)
+ * fdFetch — wrapper pour football-data.org (proxy /api/football)
  *
- * Sliding window counter PERSISTÉ en localStorage :
- *   - Le log survit aux rechargements de page
- *   - Le serveur se souvient des requêtes des 60s précédentes même après reload
- *   - Sans persistence, le limiter se réinitialisait à 0 au reload → 429 garanti
+ * ⚠️ CHANGEMENT (constat utilisateur : "on se prend un méchant tunnel à
+ * attendre parce qu'on a déjà fait trop de requêtes en 1min") : ce fichier
+ * bloquait AVANT chaque appel via waitForSlot(), une attente synchrone
+ * pouvant aller jusqu'à 60s dès que 25 requêtes clientes avaient été émises
+ * dans la dernière minute — c'était littéralement le "tunnel" ressenti (l'app
+ * semble figée pendant que ce setTimeout tourne en boucle).
  *
- * MAX_RPM = 9 (1 de marge sur la limite officielle de 10 req/min)
+ * Cette protection cliente était de toute façon la mauvaise couche : elle ne
+ * protège qu'UN SEUL navigateur, sans savoir combien d'autres utilisateurs
+ * interrogent /api/football au même moment — donc ni suffisante pour
+ * vraiment garantir de rester sous les 10 req/min réels de FD.org (partagés
+ * par TOUS les utilisateurs), ni nécessaire pour ça (le cache Redis déjà en
+ * place protège les requêtes répétées).
+ *
+ * La vraie protection vit maintenant côté serveur (api/football.js) : budget
+ * global partagé (Redis, tous utilisateurs confondus) + copie "stale" servie
+ * en secours si le budget est épuisé ou qu'un vrai 429 survient — le client
+ * n'a donc plus besoin d'attendre quoi que ce soit avant d'appeler, il reçoit
+ * toujours une réponse rapide (fraîche ou légèrement périmée), jamais un gel.
  */
 
-// Avec le cache Vercel edge sur api/football.js, la plupart des requêtes sont
-// servies par le CDN et n'atteignent pas FD.org. On peut monter la limite client
-// à 25 sans risquer de 429 côté FD.org (quota réel protégé par le CDN).
-const MAX_RPM    = 25
-const WINDOW     = 60_000
-const STORAGE_KEY = 'fd_req_log'
-
-// Restaure le log depuis localStorage au chargement du module
-function loadLog() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    // Ne garder que les entrées encore dans la fenêtre
-    return Array.isArray(parsed) ? parsed.filter(t => t > Date.now() - WINDOW) : []
-  } catch { return [] }
-}
-
-function saveLog(log) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(log)) } catch {}
-}
-
-// Singleton partagé entre tous les hooks
-const log = loadLog()
-
-async function waitForSlot() {
-  for (;;) {
-    const now = Date.now()
-
-    // Purger les requêtes hors fenêtre
-    while (log.length > 0 && log[0] < now - WINDOW) {
-      log.shift()
-    }
-
-    if (log.length < MAX_RPM) {
-      log.push(now)
-      saveLog(log)
-      return
-    }
-
-    // Slot plein → attendre que le plus ancien expire
-    const waitMs = WINDOW - (now - log[0]) + 50
-    console.warn(`[fdFetch] Limite atteinte (${log.length}/${MAX_RPM} req/min) — attente ${waitMs}ms`)
-    await new Promise(r => setTimeout(r, waitMs))
-  }
-}
-
 export async function fdFetch(url, options) {
-  await waitForSlot()
   return fetch(url, options)
 }
 
