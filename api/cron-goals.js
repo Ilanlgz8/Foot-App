@@ -937,6 +937,15 @@ export default async function handler(req, res) {
     // pour ne pas transformer l'app en spam pour tout le monde). Même `tag`
     // à chaque minute → remplace la notif précédente au lieu d'empiler
     // (silent + renotify:false côté SW → pas de nouveau son/vibration).
+    // ⚠️ CORRIGÉ (demande utilisateur : "moins de délai sur le live") : ce
+    // ticker passait en urgency 'normal' par défaut (seul point de tout ce
+    // fichier oublié lors du fix urgency:'high' plus haut) — sur iOS, une
+    // notif 'normal' peut être différée par Apple pour économiser la
+    // batterie, ce qui allait justement à l'encontre de son rôle (suivre le
+    // direct). Passé en 'high' comme le reste des notifs importantes : le
+    // risque de limitation par excès de priorité reste faible ici (déjà
+    // restreint aux seuls abonnés qui suivent l'une des deux équipes, pas
+    // envoyé à tout le monde).
     if (LIVE_ESPN.has(status)) {
       const minuteLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
       await sendPushToMatch(
@@ -950,7 +959,7 @@ export default async function handler(req, res) {
           renotify: false,
         },
         slug,
-        { onlyFavorites: true },
+        { onlyFavorites: true, urgency: 'high' },
         log,
       )
     }

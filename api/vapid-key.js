@@ -12,7 +12,7 @@
 // client de quoi se connecter à un service tiers sans jamais exposer de
 // secret) donc regroupé ici plutôt que forcer un fichier séparé.
 //
-// Le client Realtime (src/hooks/useAblyLive.js) ne reçoit JAMAIS la clé API
+// Le client Realtime (src/hooks/useLiveMinute.js, voir getAblyClient()) ne reçoit JAMAIS la clé API
 // Ably brute (ABLY_API_KEY, secrète, reste côté serveur) : il obtient un
 // tokenRequest borné, généré ici via le SDK serveur, avec capability
 // restreinte à `subscribe` uniquement sur les canaux `live-*` — même un

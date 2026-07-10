@@ -4,9 +4,10 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 
 ## Stack
 - **Frontend** : React 18, Vite, React Router, React Query, vite-plugin-pwa (Workbox)
-- **APIs** : ESPN (primaire, live), football-data.org (matchs/classements), api-football (compos), FotMob (xG)
-- **Backend Vercel** : `/api/*` serverless functions
+- **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback), FotMob (xG)
+- **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
+- **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Cron externe** : cron-job.org → `POST /cron-goals` toutes les minutes avec header `x-cron-secret`
 
 ## Architecture clé
@@ -87,17 +88,23 @@ public/
 - `CRON_SECRET` — header `x-cron-secret` requis pour `/cron-goals` et `/debug-push`
 - `KV_REST_API_URL`, `KV_REST_API_TOKEN` — Upstash Redis
 - `FOOTBALL_DATA_API_KEY` — football-data.org
-- `API_FOOTBALL_KEY` — api-football
+- `API_FOOTBALL_KEY` — api-football (clé toujours présente mais inutilisée, voir `PERMANENTLY_DISABLED`)
+- `ABLY_API_KEY` — pub/sub temps quasi réel (token borné généré via `/api/vapid-key?ably=1`)
 
 ## Problèmes connus / résolus
 - ✅ Doublons notifs : suppression des appels client-side dans useLiveMinute
 - ✅ Noms équipes en anglais : translateTeam dans notify.js + map FR dans cron-goals.js
 - ✅ Doublons au rechargement : _notified persisté en localStorage (TTL 4h)
 - ✅ Re-sync subscription Redis : réduit de 4h → 5min
+- ✅ Erreur 429 sur /api/football : budget global Redis (7/min + verrou d'espacement 800ms, tous
+  utilisateurs confondus) + copie stale servie en secours dans `api/football.js` — le blocage
+  synchrone côté client (`fdFetch.js`) qui causait le "tunnel" ressenti a été supprimé
+- ✅ Comptes api-football suspendus à répétition (8 fois) : désactivé définitivement
+  (`PERMANENTLY_DISABLED` dans `api/apifootball.js`), ESPN + football-data.org couvrent déjà
+  l'essentiel des compos/stats en fallback
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
-- 🔍 Erreur 429 sur /api/football : rate limit football-data.org (plan gratuit = 10 req/min)
 
 ## Conventions
 - Noms français partout dans l'UI
