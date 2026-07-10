@@ -844,6 +844,44 @@ export default async function handler(req, res) {
       } // fin du else (verrou acquis)
     }
 
+    // 🟥 Carton rouge — même schéma de dédup par compteur que les buts, mais
+    // SANS délai d'attente : contrairement au buteur d'un but (parfois publié
+    // par ESPN quelques secondes après le changement de score), le joueur
+    // exclu est TOUJOURS déjà présent dans comp.details au moment où le
+    // carton y apparaît. Coût réseau/Redis : nul en plus — extractEspnCards()
+    // relit comp.details, déjà récupéré pour ce match dans cette même passe
+    // (déjà utilisé plus bas pour generateRecap) ; seul ajout réel : la
+    // commande de lecture/écriture du compteur cardTrack, négligeable (un
+    // carton rouge reste rare, 0-2 par match en moyenne).
+    if (LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
+      const reds = extractEspnCards(comp, homeC.team?.id).filter(c => c.red)
+        .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
+      const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
+
+      const cardTrackKey = `cardTrack:${eventId}`
+      let cardTrack = null
+      try { cardTrack = await kv.get(cardTrackKey) } catch {}
+      cardTrack = cardTrack ? (typeof cardTrack === 'string' ? JSON.parse(cardTrack) : cardTrack) : { home: 0, away: 0 }
+      let cardTrackChanged = false
+
+      for (const side of ['home', 'away']) {
+        const list = redsBySide[side]
+        while (cardTrack[side] < list.length) {
+          const card       = list[cardTrack[side]]
+          const teamName   = side === 'home' ? homeTeam : awayTeam
+          const minuteText = minuteLabel(card.minute)
+          const sent = await sendDeduped(`push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
+            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log)
+          if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] carton rouge ${side} ${card.name}`) }
+          cardTrack[side]++
+          cardTrackChanged = true
+        }
+      }
+      if (cardTrackChanged) {
+        try { await kv.set(cardTrackKey, JSON.stringify(cardTrack), { ex: 12 * 3600 }) } catch {}
+      }
+    }
+
     // ⏸ Mi-temps
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
