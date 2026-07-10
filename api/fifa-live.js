@@ -7,12 +7,22 @@
 // Output: { [fdMatchId]: { espnStatus, espnClock, espnPeriod, home, away, scorers, stats, espnEventId, espnSlug } }
 
 import { Redis } from '@upstash/redis'
+import Ably from 'ably'
 import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 })
+
+// ── Ably (temps quasi réel) ────────────────────────────────────────────────
+// Client REST (pas Realtime) : chaque invocation de cette fonction serverless
+// est un processus éphémère, une connexion persistante n'a aucun sens ici —
+// le client REST fait un simple appel HTTP par publish, sans rien à fermer.
+// ABLY_API_KEY absent (pas encore configuré) → ablyClient reste null, tout
+// le reste du fichier continue de fonctionner exactement comme avant (aucune
+// régression si Ably n'est pas configuré).
+const ablyClient = process.env.ABLY_API_KEY ? new Ably.Rest(process.env.ABLY_API_KEY) : null
 
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 const FIFA_TTL      = 6           // Cache Redis FIFA live (s)
@@ -876,12 +886,32 @@ export default async function handler(req, res) {
     return JSON.stringify(rest)
   }
   const writes = []
+  // ── Publication Ably (temps quasi réel) ───────────────────────────────────
+  // Même condition que le write-skip Redis ci-dessus (donnée réellement
+  // changée) : publiée UNIQUEMENT quand ce poll précis vient de détecter un
+  // vrai changement (score, statut, buteur...), jamais à chaque poll pour
+  // rien. Effet recherché : le premier client dont le poll tombe sur un cache
+  // Redis expiré (donc un vrai fetch upstream) prévient TOUS les autres
+  // utilisateurs abonnés au même match instantanément, sans qu'ils aient à
+  // attendre leur propre prochain cycle de poll (jusqu'à ~10-20s de moins
+  // dans le pire cas). Signal minimal (pas les données complètes) : le
+  // client réagit en relançant son poll normal, qui retombera de toute façon
+  // sur un cache Redis tout juste rafraîchi (rapide, pas cher) — évite de
+  // dupliquer toute la logique de traitement (regression guards, etc.) côté
+  // serveur ET côté client sur 2 chemins différents.
+  const ablyPublishes = []
   for (const [midStr, data] of Object.entries(result)) {
     const prev = storedData[midStr]
     if (prev && stableFields(data) === stableFields(prev)) continue
     writes.push(kv.set(`fm:match:${midStr}`, JSON.stringify(data), { ex: MATCH_TTL }))
+    if (ablyClient) {
+      ablyPublishes.push(
+        ablyClient.channels.get(`live-${midStr}`).publish('update', { t: Date.now() }).catch(() => {})
+      )
+    }
   }
   if (writes.length > 0) await Promise.allSettled(writes)
+  if (ablyPublishes.length > 0) await Promise.allSettled(ablyPublishes)
 
   // ── Redis last-known pour matchs non trouvés ──────────────────────────────
   for (const m of matches) {

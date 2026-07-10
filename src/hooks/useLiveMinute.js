@@ -18,6 +18,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import * as Ably from 'ably'
 import EspnTimerWorker from '../workers/espnTimerWorker.js?worker'
 import {
   getMatchState, trackMatchState, clearMatchState, clearFtFlags,
@@ -62,6 +63,45 @@ let _pollQueued     = false   // au plus un poll en attente
 // suivre le retour sur l'app. Voir STALE_LOCK_MS plus bas.
 let _pollStartedAt = 0
 const STALE_LOCK_MS = 4_000
+
+// ── Ably (temps quasi réel, complément du poll — ne le remplace pas) ──────────
+// Principe : le poll classique ci-dessus reste la SEULE source de données et
+// de vérité (aucune duplication de la logique de traitement/regression guards
+// ici). Ably sert uniquement de "signal de réveil" : quand le poll d'un AUTRE
+// utilisateur détecte un vrai changement pour un match qu'on suit, le serveur
+// (api/fifa-live.js) publie un événement minimal sur le canal `live-{id}` —
+// on réagit en relançant simplement notre propre pollESPN(), qui retombera de
+// toute façon sur un cache Redis tout juste rafraîchi (rapide, pas cher).
+// Gain concret : on n'attend plus son propre prochain tick (jusqu'à ~10-20s)
+// pour profiter d'un changement déjà détecté ailleurs.
+// Un seul client Realtime partagé par onglet (pas un par appel du hook) : la
+// connexion websocket Ably est coûteuse à ouvrir/fermer en boucle, et
+// useLiveMinute peut être ré-invoqué à chaque changement de route.
+let _ablyClient        = null
+let _ablyFailed         = false   // Ably non configuré/en erreur → abandon silencieux, aucun impact sur le poll normal
+const _ablySubscribed   = new Map() // matchId → channel
+let _lastAblyWake       = 0
+const ABLY_WAKE_DEBOUNCE_MS = 2_000 // évite une rafale de re-polls si plusieurs canaux réagissent au même instant
+
+function getAblyClient() {
+  if (_ablyClient || _ablyFailed) return _ablyClient
+  try {
+    _ablyClient = new Ably.Realtime({
+      // authCallback (pas authUrl) : permet de détecter proprement le 503
+      // "Ably non configuré côté serveur" et d'abandonner silencieusement au
+      // lieu de laisser le SDK Ably retenter en boucle indéfiniment — le poll
+      // classique continue de fonctionner seul, exactement comme avant.
+      authCallback: async (data, cb) => {
+        try {
+          const res = await fetch('/api/vapid-key?ably=1')
+          if (!res.ok) { _ablyFailed = true; cb('Ably non configuré', null); return }
+          cb(null, await res.json())
+        } catch (e) { _ablyFailed = true; cb(e, null) }
+      },
+    })
+  } catch { _ablyFailed = true; return null }
+  return _ablyClient
+}
 
 // "FT potentiel" — STATUS_FINAL vu une 1ère fois, en attente de confirmation
 // { [matchId]: { since: number, score: string } }
@@ -1074,6 +1114,47 @@ export function useLiveMinute(matches) {
       clearInterval(watchdogId)
     }
   }, [queryClient])
+
+  // ── Ably : réveil instantané dès qu'un AUTRE utilisateur détecte un changement ──
+  // Complément du poll ci-dessus, ne le remplace pas (voir commentaire sur
+  // getAblyClient() plus haut). S'abonne uniquement aux matchs actuellement
+  // suivis (live ou sur le point de l'être) — pas à tous les matchs du jour,
+  // pour ne pas gaspiller de canaux/messages Ably pour rien.
+  useEffect(() => {
+    const relevant = matches.filter(m =>
+      m.status === 'IN_PLAY' || m.status === 'PAUSED' || isTrackedLive(m.id)
+    )
+    const relevantIds = new Set(relevant.map(m => m.id))
+
+    // Désabonner les matchs qui ne sont plus pertinents (terminés, etc.)
+    for (const [id, channel] of _ablySubscribed) {
+      if (!relevantIds.has(id)) {
+        channel.unsubscribe()
+        _ablySubscribed.delete(id)
+      }
+    }
+
+    if (relevantIds.size === 0) return
+
+    const client = getAblyClient()
+    if (!client) return
+
+    const wake = () => {
+      const now = Date.now()
+      if (now - _lastAblyWake < ABLY_WAKE_DEBOUNCE_MS) return
+      _lastAblyWake = now
+      pollESPN(matchesRef.current, queryClient)
+    }
+
+    for (const id of relevantIds) {
+      if (_ablySubscribed.has(id)) continue
+      try {
+        const channel = client.channels.get(`live-${id}`)
+        channel.subscribe('update', wake)
+        _ablySubscribed.set(id, channel)
+      } catch { /* Ably indisponible → le poll classique suffit seul */ }
+    }
+  }, [matches, queryClient])
 
   // ── api-football.com : intervalle 60s (fallback) ──
   const apiFbRef = useRef(null)
