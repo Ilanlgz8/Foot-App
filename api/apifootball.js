@@ -54,6 +54,20 @@ const MINUTE_CAP  = 4    // sur 10/min réels — abaissé (7 n'a pas suffi)
 const DAILY_CAP    = 60  // sur 100/jour réels — abaissé (80 n'a pas suffi)
 const SPACING_MS   = 600 // espacement minimum entre 2 appels upstream réels
 
+// ── Circuit breaker anti-gaspillage (constat utilisateur : 8e blocage du
+// compte api-football malgré MINUTE_CAP/DAILY_CAP/SPACING_MS déjà très
+// prudents) : une fois le compte bloqué/suspendu, TOUS les appels suivants
+// échouent de toute façon jusqu'à ce qu'api-football le débloque — les
+// retenter quand même ne fait que gaspiller le budget interne (4 req/min)
+// ET du CPU Vercel pour un résultat connu d'avance (déjà au plafond gratuit
+// "Active CPU" une fois ce mois-ci, voir cron-goals.js). Dès qu'un appel
+// upstream échoue clairement (HTTP non-ok OU `errors` non-vide dans le
+// corps), on pose ce flag pour couper court aux appels suivants pendant
+// DOWN_TTL. Auto-guérison : le flag expire tout seul, un futur appel retente
+// alors normalement, sans intervention manuelle.
+const DOWN_TTL   = 20 * 60 // 20min — assez long pour épargner du budget, assez court pour retenter vite si débloqué
+const DOWN_KEY   = 'aflcache:down'
+
 async function reserveQuota() {
   const now       = new Date()
   const minuteKey = `aflcache:quota:min:${now.toISOString().slice(0, 16)}`
@@ -145,7 +159,19 @@ export default async function handler(req, res) {
     }
   } catch { /* Redis down → continue */ }
 
-  // ── 2. Budget interne — voir reserveQuota() ci-dessus ─────────────────────────
+  // ── 2. Circuit breaker — voir commentaire DOWN_TTL ci-dessus ──────────────────
+  // Vérifié AVANT reserveQuota() : pas la peine de consommer le budget interne
+  // pour un appel qu'on sait déjà condamné à échouer.
+  try {
+    const down = await kv.get(DOWN_KEY)
+    if (down) {
+      res.status(200).setHeader('Content-Type', 'application/json')
+      res.setHeader('x-cache', 'DOWN')
+      return res.json({ errors: { down: 'api-football indisponible (bloqué/suspendu), nouvelle tentative automatique plus tard' }, response: [] })
+    }
+  } catch { /* Redis down → on tente quand même l'appel réel */ }
+
+  // ── 3. Budget interne — voir reserveQuota() ci-dessus ─────────────────────────
   // Réponse dans la MÊME forme qu'une erreur api-football réelle (`errors`
   // non-vide, HTTP 200) : le code client (afetch() dans useApiFootball.js)
   // détecte déjà ce champ et bascule en état d'erreur proprement, donc aucune
@@ -157,7 +183,7 @@ export default async function handler(req, res) {
     return res.json({ errors: { quota: 'Budget interne api-football atteint, réessaie plus tard' }, response: [] })
   }
 
-  // ── 3. Fetch api-football ────────────────────────────────────────────────────
+  // ── 4. Fetch api-football ────────────────────────────────────────────────────
   try {
     const url = `https://v3.football.api-sports.io/${endpoint}${queryStr ? `?${queryStr}` : ''}`
     const response = await fetch(url, {
@@ -168,10 +194,23 @@ export default async function handler(req, res) {
     const remaining = response.headers.get('x-ratelimit-requests-remaining')
     await trackRealRemaining(remaining)
 
-    // ── 4. Stocker en cache si succès ─────────────────────────────────────────
-    if (response.ok) {
+    // Détecter un blocage/suspension même sous HTTP 200 (api-football encode
+    // certaines erreurs dans le corps, voir commentaire afetch() côté client)
+    // pour armer le circuit breaker ci-dessus dès ce constat, sans attendre
+    // un prochain appel qui échouerait à nouveau pour rien.
+    let bodyErrors = null
+    try {
+      const parsed = JSON.parse(body)
+      bodyErrors = parsed?.errors
+    } catch {}
+    const hasBodyErrors = bodyErrors && (Array.isArray(bodyErrors) ? bodyErrors.length > 0 : Object.keys(bodyErrors).length > 0)
+
+    // ── 5. Stocker en cache si succès ─────────────────────────────────────────
+    if (response.ok && !hasBodyErrors) {
       const ttl = cacheTTL(endpoint)
       try { await kv.set(cacheKey, body, { ex: ttl }) } catch {}
+    } else if (!response.ok || hasBodyErrors) {
+      try { await kv.set(DOWN_KEY, '1', { ex: DOWN_TTL }) } catch {}
     }
 
     res.status(response.status).setHeader('Content-Type', 'application/json')
@@ -179,6 +218,10 @@ export default async function handler(req, res) {
     if (remaining) res.setHeader('x-quota-remaining', remaining)
     res.send(body)
   } catch (err) {
+    // Erreur réseau (timeout, DNS...) : pas forcément un blocage compte, mais
+    // le comportement sûr par défaut reste d'armer le circuit breaker plutôt
+    // que de retenter en boucle sur une source instable.
+    try { await kv.set(DOWN_KEY, '1', { ex: DOWN_TTL }) } catch {}
     res.status(500).json({ error: err.message })
   }
 }
