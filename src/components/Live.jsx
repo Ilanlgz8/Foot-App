@@ -88,43 +88,6 @@ function ScorerColumns({ scorers = [] }) {
   )
 }
 
-function StatsBar({ stats }) {
-  if (!stats) return null
-  const { home, away } = stats
-  const fmtShots = (s, sot) => s == null ? null : sot != null ? `${s} (${sot})` : `${s}`
-  const rows = []
-  if (home.poss != null) {
-    const hp = Math.round(home.poss), ap = Math.round(away.poss ?? (100 - home.poss))
-    rows.push({ h: `${hp}%`, label: 'Possession', a: `${ap}%`, hNum: hp, aNum: ap })
-  }
-  const hs = fmtShots(home.shots, home.shotsOnTarget)
-  const as_ = fmtShots(away.shots, away.shotsOnTarget)
-  if (hs != null) rows.push({ h: hs, label: 'Tirs', a: as_, hNum: home.shots ?? 0, aNum: away.shots ?? 0 })
-  if (home.corners != null) rows.push({ h: `${home.corners}`, label: 'Corners', a: `${away.corners}`, hNum: home.corners, aNum: away.corners })
-  if (!rows.length) return null
-  return (
-    <div className="live__stats">
-      {rows.map((row, i) => {
-        const total = (row.hNum + row.aNum) || 1
-        const homePct = (row.hNum / total) * 100
-        return (
-          <div key={i} className="live__statRow">
-            <div className="live__statHeader">
-              <span className="live__statNum">{row.h}</span>
-              <span className="live__statLabel">{row.label}</span>
-              <span className="live__statNum live__statNum--right">{row.a}</span>
-            </div>
-            <div className="live__statTrack">
-              <div className="live__statFill" style={{ width: `${homePct}%` }} />
-              <div className="live__statFill live__statFill--away" style={{ width: `${100 - homePct}%` }} />
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Animation BUT ────────────────────────────────────────────────────────────
 function GoalCelebration({ teamName, scoreStr }) {
   return (
@@ -279,9 +242,6 @@ function LiveCard({ match, espn, onClick }) {
       {/* Buteurs */}
       {(espn?.scorers?.length > 0) && <div className="live__divider" />}
       <ScorerColumns scorers={espn?.scorers ?? []} />
-
-      {/* Stats */}
-      <StatsBar stats={espn?.stats ?? null} />
     </div>
   )
 }

@@ -319,56 +319,6 @@
   white-space: nowrap;
 }
 
-/* Stats */
-.live__stats {
-  padding: 0.4rem 1rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-.live__statRow { display: flex; flex-direction: column; gap: 0.25rem; }
-.live__statHeader {
-  display: grid;
-  grid-template-columns: minmax(2.75rem, 1fr) minmax(5.5rem, auto) minmax(2.75rem, 1fr);
-  gap: 0.5rem;
-  align-items: center;
-}
-.live__statNum {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: rgba(var(--white-rgb),0.92);
-  min-width: 2.5rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.live__statNum--right { text-align: right; }
-.live__statLabel {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: rgba(var(--white-rgb),0.75);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  white-space: nowrap;
-}
-.live__statTrack {
-  height: 5px;
-  background: rgba(var(--white-rgb),0.06);
-  border-radius: var(--radius-pill);
-  display: flex;
-  overflow: hidden;
-}
-.live__statFill {
-  height: 100%;
-  background: var(--red);
-  transition: width 0.6s ease;
-}
-.live__statFill--away {
-  background: linear-gradient(90deg, #c8d4e0, #e8eef5);
-}
-
 /* Empty state — remplace le texte brut par un mini bloc cohérent avec le
    reste de l'app (icône + titre + sous-texte), plutôt qu'une simple ligne
    grise perdue dans la page. */

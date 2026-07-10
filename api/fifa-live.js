@@ -409,25 +409,37 @@ function extractBoxscoreStats(hArr, aArr) {
   const aInterceptions = find(aArr, 'interceptions')
   const hCrosses     = find(hArr, 'totalCrosses')
   const aCrosses     = find(aArr, 'totalCrosses')
+  const hCrossPct    = find(hArr, 'crossPct')
+  const aCrossPct    = find(aArr, 'crossPct')
   const hLongBalls   = find(hArr, 'totalLongBalls')
   const aLongBalls   = find(aArr, 'totalLongBalls')
+  const hLongBallPct = find(hArr, 'longballPct')
+  const aLongBallPct = find(aArr, 'longballPct')
+  const hTacklePct   = find(hArr, 'tacklePct')
+  const aTacklePct   = find(aArr, 'tacklePct')
   const hRedCards    = find(hArr, 'redCards')
   const aRedCards    = find(aArr, 'redCards')
   const hSaves       = find(hArr, 'saves')
   const aSaves       = find(aArr, 'saves')
+  const hClearances  = find(hArr, 'effectiveClearance', 'totalClearance')
+  const aClearances  = find(aArr, 'effectiveClearance', 'totalClearance')
+  const hBlockedShots = find(hArr, 'blockedShots')
+  const aBlockedShots = find(aArr, 'blockedShots')
 
   if (hPoss == null && hShots == null && hCorners == null) return null
 
   return {
     home: {
       poss: hPoss, shots: hShots, shotsOnTarget: hSOT, corners: hCorners, fouls: hFouls, yellow: hYellow, offsides: hOffside,
-      passes: hPasses, passPct: hPassPct, tackles: hTackles, interceptions: hInterceptions,
-      crosses: hCrosses, longBalls: hLongBalls, redCards: hRedCards, saves: hSaves,
+      passes: hPasses, passPct: hPassPct, tackles: hTackles, tacklePct: hTacklePct, interceptions: hInterceptions,
+      crosses: hCrosses, crossPct: hCrossPct, longBalls: hLongBalls, longBallPct: hLongBallPct,
+      redCards: hRedCards, saves: hSaves, clearances: hClearances, blockedShots: hBlockedShots,
     },
     away: {
       poss: aPoss, shots: aShots, shotsOnTarget: aSOT, corners: aCorners, fouls: aFouls, yellow: aYellow, offsides: aOffside,
-      passes: aPasses, passPct: aPassPct, tackles: aTackles, interceptions: aInterceptions,
-      crosses: aCrosses, longBalls: aLongBalls, redCards: aRedCards, saves: aSaves,
+      passes: aPasses, passPct: aPassPct, tackles: aTackles, tacklePct: aTacklePct, interceptions: aInterceptions,
+      crosses: aCrosses, crossPct: aCrossPct, longBalls: aLongBalls, longBallPct: aLongBallPct,
+      redCards: aRedCards, saves: aSaves, clearances: aClearances, blockedShots: aBlockedShots,
     },
   }
 }
