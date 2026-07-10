@@ -17,6 +17,7 @@ import { calcLiveProno } from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
+import { WatchBadge }       from '../components/WatchBadge'
 import {
   LiveStatsTab,
   SeasonStatsTab,
@@ -228,6 +229,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
           {emblem && <img src={emblem} alt="" className="mp__hero__compLogo" />}
           <span className="mp__hero__compName">{compName}</span>
         </div>
+        <WatchBadge match={match} variant="hero" />
       </div>
 
       {/* Badge minute live + reprise (reprise SOUS "MT", pas au-dessus) */}

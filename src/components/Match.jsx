@@ -10,6 +10,7 @@ import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { WatchBadge } from './WatchBadge'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -145,6 +146,7 @@ function MatchRow({ match, index, inModal = false }) {
       style={{ borderTop: index === 0 ? 'none' : undefined }}
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
     >
+      <WatchBadge match={match} variant="row" />
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
         {match.homeTeam.crest && (
