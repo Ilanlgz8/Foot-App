@@ -4,7 +4,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 
 ## Stack
 - **Frontend** : React 18, Vite, React Router, React Query, vite-plugin-pwa (Workbox)
-- **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback), FotMob (xG)
+- **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback). xG retiré (`api/fifa-live.js`) : jamais présent en pratique dans le boxscore ESPN, aucune intégration FotMob n'a jamais existé malgré une ancienne mention ici
 - **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
@@ -53,7 +53,6 @@ src/
     usePushNotifications.js
     useStandings.js
     useTeamForm.js
-    useFotmobXG.js
     liveTracker.js
     useOnline.js
   context/

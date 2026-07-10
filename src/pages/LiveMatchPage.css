@@ -365,28 +365,6 @@
   border-radius: 1px;
 }
 
-/* xG */
-.lmp__xg {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  flex-shrink: 0;
-}
-.lmp__xgNum {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: rgba(var(--red-rgb),0.9);
-}
-.lmp__xgLabel {
-  font-size: 0.6rem;
-  font-weight: 600;
-  color: rgba(var(--red-rgb),0.5);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 /* Buteurs */
 .lmp__scorers {
   display: grid;

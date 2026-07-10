@@ -147,7 +147,7 @@
   padding: 0.15rem 0.45rem;
 }
 
-/* Ligne équipes + score — 3 colonnes: home | score | away (xG inline sous le nom) */
+/* Ligne équipes + score — 3 colonnes: home | score | away */
 .live__matchRow {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -209,32 +209,6 @@
   letter-spacing: 0.01em;
   text-align: center;
 }
-.live__teamXg {
-  font-size: 0.58rem;
-  font-weight: 600;
-  color: rgba(var(--red-rgb),0.65);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-}
-
-/* Anciens xgCol — gardés pour compat, cachés par défaut */
-.live__xgCol { display: none; }
-.live__xgNum {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: rgba(var(--red-rgb), 0.9);
-  letter-spacing: 0.01em;
-  line-height: 1;
-}
-.live__xgLabel {
-  font-size: 0.58rem;
-  font-weight: 600;
-  color: rgba(var(--red-rgb), 0.5);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 /* Score */
 .live__scoreWrap {
   display: flex;

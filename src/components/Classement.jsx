@@ -12,7 +12,9 @@ import { useMatches } from '../hooks/useMatchs'
 import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
 import { PanelSkeleton } from '../accueil/MatchCard'
-import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
+// Étoile de favori RETIRÉE de cette page (retour utilisateur : pas concluant
+// ici) — ne reste que dans FavoritesPage.jsx (page /favoris, ouverte depuis
+// la cloche). StandingsTable garde le prop favoritable pour cet usage-là.
 // TendancesView mis de côté (voir commentaire plus bas) — import retiré,
 // fichier conservé pour être retravaillé plus tard.
 
@@ -54,7 +56,6 @@ function Classement() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
 
-  const { favorites: favClubs, isFavorite: isFavClub, toggle: toggleFavClub, atLimit: favClubsAtLimit } = useFavoriteClubs()
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
@@ -312,11 +313,6 @@ function Classement() {
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 isCountry={selectedComp === 'WC'}
-                favoritable
-                isFavorite={isFavClub}
-                onToggleFavorite={toggleFavClub}
-                favLimitReached={favClubsAtLimit}
-                compCode={selectedComp}
               />
             )}
 
@@ -375,11 +371,6 @@ function Classement() {
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
                 isCountry={selectedComp === 'WC'}
-                favoritable
-                isFavorite={isFavClub}
-                onToggleFavorite={toggleFavClub}
-                favLimitReached={favClubsAtLimit}
-                compCode={selectedComp}
               />
             </div>
           ))}
@@ -691,11 +682,6 @@ function Classement() {
                   snapshotKey={`standings_prev_${selectedComp}`}
                   snapshotRows={standings}
                   isCountry={selectedComp === 'WC'}
-                  favoritable
-                  isFavorite={isFavClub}
-                  onToggleFavorite={toggleFavClub}
-                  favLimitReached={favClubsAtLimit}
-                  compCode={selectedComp}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
         )}

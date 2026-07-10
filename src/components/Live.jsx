@@ -258,9 +258,6 @@ function LiveCard({ match, espn, onClick }) {
             ? <div className="live__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="live__crest" data-team={match.homeTeam?.name} /></div>
             : <div className="live__crestFallback">{homeName?.[0] ?? ''}</div>}
           <span className="live__teamName">{homeName}</span>
-          {espn?.stats?.home?.xg != null && (
-            <span className="live__teamXg">{espn.stats.home.xg.toFixed(2)} xG</span>
-          )}
         </div>
 
         <ScoreDisplay
@@ -276,9 +273,6 @@ function LiveCard({ match, espn, onClick }) {
             ? <div className="live__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="live__crest" data-team={match.awayTeam?.name} /></div>
             : <div className="live__crestFallback">{awayName?.[0] ?? ''}</div>}
           <span className="live__teamName">{awayName}</span>
-          {espn?.stats?.away?.xg != null && (
-            <span className="live__teamXg">{espn.stats.away.xg.toFixed(2)} xG</span>
-          )}
         </div>
       </div>
 

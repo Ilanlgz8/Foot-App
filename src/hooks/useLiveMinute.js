@@ -505,6 +505,25 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       const prevState = getMatchState(mid)
       const matchAge  = (now - new Date(match.utcDate)) / 60_000
 
+      // ── Verrou anti-résurrection post-FT ──────────────────────────────────────
+      // BUG CORRIGÉ (constat utilisateur : le widget live disparaît correctement
+      // à la fin du match, puis réapparaît "en cours" avec un score pas à jour au
+      // relancement de l'app, avant de repartir pour de bon un peu plus tard).
+      // Cause : confirmFt() n'est appelé qu'après des gardes stricts (horloge
+      // ≥85min ET score stable entre 2 polls) — une fois le FT confirmé
+      // (liveState='ended'), un poll ULTÉRIEUR qui reçoit par erreur un statut
+      // "en cours" (mauvais matching FIFA/ESPN, cache Redis partagé pas encore
+      // rafraîchi côté serveur, glitch de flux) n'était PAS bloqué : CAS 1 et le
+      // fallback J-1 ci-dessous appelaient setLiveState('live')/markLive() sans
+      // vérifier qu'on avait déjà un FT confirmé, effaçant le flag `ft` et
+      // remettant le match dans liveTracker avec un score obsolète. Comme
+      // liveTracker persiste en localStorage, ce faux retour "live" survivait
+      // au rechargement de l'app tant qu'un poll suivant ne re-confirmait pas
+      // le vrai FT. Un match réellement terminé ne redevient jamais légitimement
+      // "en cours" dans la même journée → on verrouille : une fois 'ended', plus
+      // aucun signal ultérieur ne peut faire marche arrière.
+      const alreadyEnded = getLiveState(mid).state === 'ended'
+
       // ── Garde anti-régression "Terminé" ───────────────────────────────────────
       // BUG CORRIGÉ (constat utilisateur : "Terminé" déjà affiché correctement,
       // puis revient à "pas fini" quelques secondes après un retour d'arrière-plan
@@ -549,13 +568,14 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // CAS 1 : Match EN COURS — utilise safeStatus (statuts corrigés inclus)
       // ════════════════════════════════════════════════════════════════════
       if (
+        !alreadyEnded && (
         safeStatus === 'STATUS_IN_PROGRESS' ||
         safeStatus === 'STATUS_HALFTIME'    ||
         safeStatus === 'STATUS_END_PERIOD'  ||
         safeStatus === 'STATUS_EXTRA_TIME'  ||
         safeStatus === 'STATUS_OVERTIME'    ||
         safeStatus === 'STATUS_SHOOTOUT'
-      ) {
+      )) {
         if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
         delete pendingFt[mid]
         if (!isStaleFtReversal) clearFtFlags(mid)
@@ -790,7 +810,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       }
 
       // ── FALLBACK J-1 : STATUS_SCHEDULED mais FD.org sait que c'est live ──
+      // alreadyEnded exclu : FD.org peut mettre du temps à passer un match en
+      // FINISHED (délai connu, hors de notre contrôle) et le renvoyer encore
+      // IN_PLAY après qu'on ait déjà confirmé le FT côté ESPN — sans ce garde,
+      // ce fallback remettait le match en live avec le score FD.org (pas
+      // forcément le score final) juste après une confirmation FT correcte.
       if (
+        !alreadyEnded &&
         espnStatus === 'STATUS_SCHEDULED' &&
         (match.status === 'IN_PLAY' || match.status === 'PAUSED' || isTrackedLive(mid))
       ) {

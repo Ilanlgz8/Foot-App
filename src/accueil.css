@@ -2047,6 +2047,12 @@
   color: #ffffff;
   font-weight: 800;
 }
+/* Perdant : retour utilisateur — ne pas griser le nom de l'équipe perdante,
+   le garder pleinement lisible (blanc), seul le poids de police (700 vs 800
+   pour le vainqueur) marque encore la différence. */
+.resultHero__team--loser .resultHero__name {
+  color: #ffffff;
+}
 
 .resultHero__center {
   display: flex;
@@ -2075,8 +2081,11 @@
   color: #ffffff;
   text-shadow: 0 0 18px color-mix(in srgb, var(--result-hero-accent) 40%, transparent);
 }
+/* Retour utilisateur — ne pas griser le score du perdant, le garder lisible
+   (blanc plein) ; seule la lueur de couleur d'équipe (--scoreDigit--win)
+   distingue encore le vainqueur. */
 .resultHero__scoreDigit--lose {
-  color: rgba(var(--white-rgb),0.32);
+  color: #ffffff;
 }
 .resultHero__scoreSep {
   color: rgba(var(--white-rgb),0.25);
