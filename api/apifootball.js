@@ -101,7 +101,26 @@ async function trackRealRemaining(remaining) {
   } catch {}
 }
 
+// ── Coupure définitive (demande utilisateur : "mon compte sera suspendu à
+// jamais, oublie api-football") ────────────────────────────────────────────
+// Après 8 blocages malgré un throttling déjà très strict, plus la peine de
+// retenter automatiquement (voir DOWN_TTL plus haut, devenu inutile dans ce
+// cas) : chaque appel est coupé ICI, avant même Redis/le budget interne — coût
+// réel nul (juste un retour immédiat), et les autres sources déjà branchées
+// (ESPN, football-data.org, compos probables) prennent le relais partout où
+// api-football était utilisé, exactement comme si le compte n'avait jamais
+// existé. Pour réactiver un jour (nouvelle clé, nouveau compte) : repasser à
+// `false` suffit, tout le reste du fichier (cache, circuit breaker DOWN_TTL,
+// quota) redevient actif tel quel sans rien à réécrire.
+const PERMANENTLY_DISABLED = true
+
 export default async function handler(req, res) {
+  if (PERMANENTLY_DISABLED) {
+    res.status(200).setHeader('Content-Type', 'application/json')
+    res.setHeader('x-cache', 'DISABLED')
+    return res.json({ errors: { disabled: 'api-football désactivé définitivement côté app' }, response: [] })
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' })
   }
