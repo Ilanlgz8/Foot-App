@@ -254,6 +254,24 @@ function parseFifaStats(statsData) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
+  // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : aucune limite de
+  // débit ici, alors que ce endpoint a un vrai risque d'amplification — un
+  // fdMatchId inconnu (donc jamais en cache Redis) déclenche discoverFifaMatch()
+  // ET fetchFifaLineup() ET les stats, soit JUSQU'À ~10 fetchs sortants vers
+  // l'API FIFA pour UNE SEULE requête entrante. Un attaquant envoyant des
+  // fdMatchId bidons en boucle contournerait tout le cache et pourrait faire
+  // monter le coût (et le risque de blocage de notre IP par FIFA) très vite.
+  // Cap plus bas que les autres endpoints (30 vs 60/min) précisément à cause
+  // de cette amplification — un usage normal (1 utilisateur, 1 match) reste
+  // très largement en dessous.
+  const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+  const rlKey = `ratelimit:fifalineups:${ip}`
+  try {
+    const count = await kv.incr(rlKey)
+    if (count === 1) await kv.expire(rlKey, 60)
+    if (count > 30) return res.status(429).json({ error: 'Trop de requêtes' })
+  } catch {}
+
   const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '', forceFresh = '' } = req.query
   if (!fdMatchId) return res.status(400).json({ error: 'fdMatchId requis' })
   // forceFresh=1 : contourne le cache Redis stats (mais pas les IDs/lineup,

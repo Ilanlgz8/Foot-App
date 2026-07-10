@@ -72,13 +72,18 @@ src/
 
 api/
   cron-goals.js   — cron ESPN → VAPID push (source unique des notifs)
-  subscribe.js    — stocke subscriptions dans Redis (rate limit 20/h)
-  vapid-key.js    — expose la clé VAPID publique
-  push.js         — endpoint legacy (push manuel avec vérif ESPN)
+  subscribe.js    — stocke subscriptions dans Redis (rate limit 20/h, check Origin)
+  vapid-key.js    — expose la clé VAPID publique (+ token Ably via ?ably=1)
   debug-push.js   — diagnostic : nb subs Redis, VAPID ok (protégé par CRON_SECRET)
-  espn.js
-  football.js
-  apifootball.js
+  espn.js         — proxy ESPN (scoreboard/summary/recap), rate limit 60/min/IP
+  fifa-live.js    — live WC+club (FIFA+ESPN), fast-path cache partagé (voir Stack)
+  fifa-lineups.js — compos/stats FIFA (WC), rate limit 30/min/IP (amplification)
+  football.js     — proxy football-data.org, budget global 7/min + spacing
+  apifootball.js  — PERMANENTLY_DISABLED (voir Stack)
+  pulse.js        — (fusion pulse+curve) prono/courbe post-match
+  news.js         — agrégateur RSS, cache Redis 5min
+  [...path].js    — catch-all proxy FD.org non utilisé par le front, budget 5/min
+  (12/12 — plus de slot dispo, tout nouvel endpoint doit être fusionné dans un fichier existant)
 
 public/
   sw-push.js      — service worker push handler (vanilla JS, importé par Workbox)

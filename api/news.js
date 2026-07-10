@@ -1,4 +1,25 @@
 // Agrège plusieurs flux RSS football français
+//
+// ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : ce endpoint refetchait
+// les 4 flux RSS à CHAQUE appel, sans aucun cache ni limite de débit — un
+// endpoint public appelable en boucle (curl/bot) pouvait donc générer un
+// nombre illimité de fetchs sortants. Un cache Redis court (5min, l'actu
+// football n'a pas besoin d'être seconde par seconde) résout les deux
+// problèmes à la fois : coût réel réduit ET une éventuelle boucle d'appels
+// retombe sur le cache au lieu de re-taper les flux à chaque fois.
+import { Redis } from '@upstash/redis'
+
+let kv = null
+function getKv() {
+  if (!kv && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+  }
+  return kv
+}
+
+const NEWS_CACHE_KEY = 'news:articles'
+const NEWS_CACHE_TTL = 5 * 60 // 5min
+
 const RSS_FEEDS = [
   'https://www.lequipe.fr/rss/actu_rss_Football.xml',
   'https://rmcsport.bfmtv.com/rss/football/',
@@ -52,7 +73,18 @@ function fetchWithTimeout(url, options, ms = 6000) {
 }
 
 export default async function handler(_req, res) {
+  const redis = getKv()
   try {
+    if (redis) {
+      try {
+        const cached = await redis.get(NEWS_CACHE_KEY)
+        if (cached) {
+          const articles = typeof cached === 'string' ? JSON.parse(cached) : cached
+          return res.status(200).json({ articles })
+        }
+      } catch { /* KV indisponible → on retombe sur le fetch direct ci-dessous */ }
+    }
+
     const results = await Promise.allSettled(
       RSS_FEEDS.map(url => fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }))
     )
@@ -67,6 +99,10 @@ export default async function handler(_req, res) {
                        : RSS_FEEDS[i].includes('footmercato') ? 'Foot Mercato'
                        : 'Eurosport'
       articles.push(...parseRSS(xml, sourceName))
+    }
+
+    if (redis && articles.length > 0) {
+      try { await redis.set(NEWS_CACHE_KEY, JSON.stringify(articles), { ex: NEWS_CACHE_TTL }) } catch {}
     }
 
     res.status(200).json({ articles })

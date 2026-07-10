@@ -63,6 +63,21 @@ function hasUsefulData(json) {
 }
 
 export default async function handler(req, res) {
+  // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : ce proxy n'avait
+  // AUCUNE limite de débit — un endpoint public appelable directement
+  // (curl/bot), avec un mode "scoreboard" explicitement SANS cache (données
+  // live), pouvait être martelé sans aucune défense, générant un fetch ESPN
+  // réel à chaque appel. Même pattern déjà utilisé ailleurs dans l'app
+  // (api/fifa-live.js, api/pulse.js, api/subscribe.js) : compteur Redis par
+  // IP, fenêtre glissante de 60s.
+  const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+  const rlKey = `ratelimit:espn:${ip}`
+  try {
+    const count = await kv.incr(rlKey)
+    if (count === 1) await kv.expire(rlKey, 60)
+    if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
+  } catch {}
+
   const { slug, dates, eventId, recap, forceFresh } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
 
