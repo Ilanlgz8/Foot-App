@@ -379,8 +379,11 @@ function extractBoxscoreStats(hArr, aArr) {
   const aShots   = find(aArr, 'totalShots', 'shotsTotal', 'shots')
   const hSOT     = find(hArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
   const aSOT     = find(aArr, 'shotsOnTarget', 'shotsOnGoal', 'onGoalAttempts')
-  const hCorners = find(hArr, 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
-  const aCorners = find(aArr, 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
+  // 'wonCorners' = vrai nom de champ ESPN (vérifié sur un vrai match terminé) —
+  // les anciens noms devinés ('cornerKicks' etc.) ne matchaient jamais, corners
+  // toujours vide comme le xG. Gardés en repli au cas où ESPN varie par ligue.
+  const hCorners = find(hArr, 'wonCorners', 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
+  const aCorners = find(aArr, 'wonCorners', 'cornerKicks', 'cornerKick', 'cornersTotal', 'corners')
   const hFouls   = find(hArr, 'foulsCommitted', 'totalFouls', 'fouls', 'foulCommitted')
   const aFouls   = find(aArr, 'foulsCommitted', 'totalFouls', 'fouls', 'foulCommitted')
   const hYellow  = find(hArr, 'yellowCards', 'yellowCard')

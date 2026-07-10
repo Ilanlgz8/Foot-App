@@ -428,8 +428,8 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
       const awayPoss    = getStat(awayTeam, 'possessionPct')
       const homeShots   = getStat(homeTeam, 'totalShots', 'shotsTotal', 'shots')
       const awayShots   = getStat(awayTeam, 'totalShots', 'shotsTotal', 'shots')
-      const homeCorners = getStat(homeTeam, 'cornerKicks', 'corners')
-      const awayCorners = getStat(awayTeam, 'cornerKicks', 'corners')
+      const homeCorners = getStat(homeTeam, 'wonCorners', 'cornerKicks', 'corners')
+      const awayCorners = getStat(awayTeam, 'wonCorners', 'cornerKicks', 'corners')
 
       if (homePoss === null && homeShots === null) return null
 
