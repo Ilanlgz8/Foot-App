@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { MatchCard, PanelSkeleton } from './MatchCard'
+import { PanelSkeleton } from './MatchCard'
+import { ResultHeroCard } from './ResultHeroCard'
 
 function groupByDay(matches) {
   const groups = {}
@@ -35,7 +35,6 @@ function formatDayLabel(dateStr) {
 
 export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped  = groupByDay(results)
-  const navigate = useNavigate()
   const [dayIndex, setDayIndex] = useState(0)
 
   const currentDay     = grouped[dayIndex]
@@ -72,9 +71,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
-              <div key={match.id ?? i} className="accueil__matchCardClickable" onClick={() => navigate(`/match/${match.id}`, { state: { match } })}>
-                <MatchCard match={match} noWinnerLoser noGradient />
-              </div>
+              <ResultHeroCard key={match.id ?? i} match={match} />
             ))}
           </div>
         )}
@@ -87,9 +84,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
                 <p className="accueil__compGroupTitle">{name}</p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
-                    <div key={match.id ?? i} className="accueil__matchCardClickable" onClick={() => navigate(`/match/${match.id}`, { state: { match } })}>
-                      <MatchCard match={match} noWinnerLoser noGradient />
-                    </div>
+                    <ResultHeroCard key={match.id ?? i} match={match} />
                   ))}
                 </div>
               </div>
