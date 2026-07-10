@@ -73,13 +73,9 @@ export function ResultHeroCard({ match }) {
       <div className="resultHero__topRow">
         <div className="resultHero__compGroup">
           {compLogo && <img src={compLogo} alt="" className="resultHero__compLogo" />}
-          {compName && (
-            <span className="resultHero__comp">
-              {compName}{roundLabel ? ` · ${roundLabel}` : ''}
-            </span>
-          )}
+          {compName && <span className="resultHero__comp">{compName}</span>}
         </div>
-        <span className="resultHero__status">Terminé</span>
+        {roundLabel && <span className="resultHero__round">{roundLabel}</span>}
       </div>
 
       <div className="resultHero__body">
@@ -94,6 +90,7 @@ export function ResultHeroCard({ match }) {
         </div>
 
         <div className="resultHero__center">
+          <span className="resultHero__status">Terminé</span>
           <div className="resultHero__score">
             <span className={`resultHero__scoreDigit${homeWins ? ' resultHero__scoreDigit--win' : awayWins ? ' resultHero__scoreDigit--lose' : ''}`}>{hs}</span>
             <span className="resultHero__scoreSep">–</span>

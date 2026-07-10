@@ -1848,10 +1848,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.resultHero__status {
+/* Round (quarts/demies...) — aligné à droite de la ligne du haut, à la place
+   qu'occupait auparavant "Terminé" (déplacé au-dessus du score, voir
+   .resultHero__center ci-dessous). */
+.resultHero__round {
   font-size: 0.6rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  color: rgba(var(--white-rgb),0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+/* "Terminé" — au-dessus du score, centré (voir .resultHero__center). */
+.resultHero__status {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-dim);
 }
 
