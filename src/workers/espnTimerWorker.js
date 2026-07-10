@@ -2,14 +2,15 @@
 // Le navigateur limite setInterval à ~1min sur le main thread pour les onglets inactifs.
 // Un Worker tourne dans un thread séparé sans cette restriction.
 //
-// ⚠️ BUG CORRIGÉ (constat utilisateur : quota Redis Upstash à 960K/500K
-// commandes, largement dépassé) : le tick était à 5s alors que le cache
-// Redis serveur (/api/fifa-live.js) ne se rafraîchit lui-même que toutes les
-// 6-8s (FIFA_TTL/ESPN_TTL). Concrètement, la majorité des polls à 5s
-// retombaient sur EXACTEMENT le même cache que le poll précédent — payant le
-// coût Redis (lecture de cache à chaque appel, quel que soit le résultat)
-// sans gagner de fraîcheur réelle la plupart du temps. Passé à 10s : environ
-// moitié moins d'appels/commandes Redis pour une perte de réactivité
-// perçue minime (le score reste interpolé côté client entre deux polls, voir
-// interpolateEspnMinute() dans matchUtils.js).
-setInterval(() => postMessage('tick'), 10_000)
+// ⚠️ RÉDUIT (constat utilisateur : Fluid Active CPU Vercel Hobby déjà à
+// 4h13/4h, DÉPASSÉ — un dépassement peut mettre le projet entier EN PAUSE,
+// pas juste le ralentir). Chaque tick = une invocation de fonction Vercel
+// (/api/fifa-live) PAR CLIENT connecté, le plus gros poste de calcul actif
+// de toute l'app avec beaucoup d'utilisateurs en live simultané — largement
+// plus déterminant que le cron (1 invocation/min, tous utilisateurs
+// confondus, contre 1 invocation/tick PAR client ici). Passé de 10s à 20s :
+// moitié moins d'invocations. Compensé par Ably (voir useLiveMinute.js) qui
+// réveille immédiatement un client dès qu'un AUTRE utilisateur détecte un
+// changement — donc la fraîcheur perçue reste correcte sur les matchs
+// suivis par plusieurs personnes malgré ce tick plus lent.
+setInterval(() => postMessage('tick'), 20_000)

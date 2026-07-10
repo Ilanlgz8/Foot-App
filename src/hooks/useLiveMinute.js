@@ -1099,14 +1099,14 @@ export function useLiveMinute(matches) {
     }
 
     // Watchdog : si le Worker se bloque, continuer depuis le main thread
-    // ⚠️ Seuil relevé à 20s (le Worker tique maintenant lui-même toutes les
-    // 10s, voir espnTimerWorker.js) : un seuil égal à l'intervalle normal du
-    // Worker déclenchait ce watchdog sur du simple jitter (pas un vrai
-    // blocage), doublant inutilement les polls — donc les commandes Redis —
-    // exactement ce qu'on cherche à réduire (quota Upstash dépassé).
+    // ⚠️ Seuil relevé à 40s (le Worker tique maintenant lui-même toutes les
+    // 20s, voir espnTimerWorker.js — réduit pour le Fluid Active CPU Vercel,
+    // pas Redis cette fois) : même raisonnement qu'avant, garder le seuil à
+    // 2x l'intervalle normal du Worker pour ne pas déclencher ce watchdog sur
+    // du simple jitter et doubler les invocations pour rien.
     const watchdogId = setInterval(() => {
-      if (Date.now() - lastTickAt.t > 20_000) tick()
-    }, 20_000)
+      if (Date.now() - lastTickAt.t > 40_000) tick()
+    }, 40_000)
 
     return () => {
       worker?.terminate()

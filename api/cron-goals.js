@@ -670,6 +670,22 @@ export default async function handler(req, res) {
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (confirmé ESPN)`) }
     }
 
+    // ⚠️ CORRIGÉ (constat utilisateur : commandes Redis Upstash qui montent
+    // pendant la nuit "alors qu'il n'y a rien" — +16K en une nuit) : jusqu'ici,
+    // le get+set de stateKey ci-dessous s'exécutait pour CHAQUE événement
+    // renvoyé par ESPN (today+yesterday, toutes compétitions confondues), y
+    // compris les matchs encore STATUS_SCHEDULED (pas commencés) — un match
+    // programmé n'a AUCUNE transition à détecter avant son coup d'envoi (le
+    // KO lui-même est géré juste au-dessus, indépendamment de ce state). La
+    // nuit, avec plusieurs compétitions et des matchs à venir dans le
+    // calendrier ESPN mais aucun en direct, ce coût tournait quand même en
+    // fond 24/7 (le cron externe ne s'arrête jamais, cron-job.org appelle
+    // toutes les minutes même sans aucun match live). On saute maintenant
+    // entièrement ce match tant qu'il n'est pas devenu live/terminé au moins
+    // une fois — le baseline (voir plus bas) se posera alors naturellement
+    // au premier poll où il l'est vraiment, sans rien perdre.
+    if (status === 'STATUS_SCHEDULED' && notPostponed) continue
+
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
