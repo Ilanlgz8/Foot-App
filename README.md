@@ -1,16 +1,34 @@
-# React + Vite
+# StatFootix
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PWA football (React + Vite) : matchs en direct, résultats, classements, compositions, notifications push — Coupe du Monde 2026 et grands championnats européens.
 
-Currently, two official plugins are available:
+Déployé sur Vercel : `https://statfootix.vercel.app`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- **Frontend** : React 19, Vite, React Router, TanStack Query, vite-plugin-pwa (Workbox)
+- **Données** : ESPN (live), football-data.org (matchs/classements), FotMob (xG). `api-football` désactivé définitivement (compte suspendu à répétition — voir `api/apifootball.js`)
+- **Backend** : Vercel serverless functions (`api/*`)
+- **Push notifs** : Web Push VAPID (`web-push`), abonnements dans Upstash Redis
+- **Temps quasi réel** : Ably (pub/sub), en complément du polling
+- **Cron externe** : cron-job.org → `/api/cron-goals` chaque minute
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Détail complet de l'architecture (routes, hooks, conventions) : voir `CLAUDE.md`.
 
-## Expanding the ESLint configuration
+## Développement
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev       # serveur de dev
+npm run build     # build production
+npm run test      # tests unitaires (vitest)
+npm run lint      # eslint
+```
+
+## Structure
+
+```
+src/        composants, pages, hooks, contexte, utilitaires React
+api/        fonctions serverless Vercel (proxy ESPN/FD.org, notifs, live)
+public/     assets statiques + service worker push
+```
