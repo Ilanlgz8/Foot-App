@@ -45,15 +45,31 @@ function getKv() {
 const MINUTE_CAP = 7   // sur 10/min réels — marge de sécurité, même logique qu'api-football
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
+const SPACING_MS = 800 // espacement minimum entre 2 appels upstream réels, voir commentaire ci-dessous
 
+// ⚠️ CORRIGÉ (auto-relecture après coup — même faille qu'api-football avant
+// son propre correctif SPACING_MS) : un compteur par MINUTE CALENDAIRE fixe
+// ("2026-07-10T03:47") n'empêche pas une rafale à la frontière entre 2
+// fenêtres — ex: 7 appels à 03:47:59 (comptés dans la fenêtre :47) suivis de
+// 7 autres à 03:48:00 (comptés dans la fenêtre :48) = 14 appels réels en à
+// peine 1 seconde, largement au-dessus des 10/min réels de FD.org, alors que
+// chaque compteur pris séparément semblait pourtant "sous le budget". C'est
+// exactement le trou déjà découvert sur api-football (voir son commentaire
+// SPACING_MS) — je l'avais reproduit ici sans y penser au premier passage.
+// Le verrou d'espacement (SET NX PX) ci-dessous lisse mécaniquement ce cas,
+// peu importe le nombre de requêtes qui arrivent au même instant.
 async function reserveQuota(redis) {
   if (!redis) return true  // Redis down → impossible de compter, on laisse passer plutôt que tout bloquer
   try {
     const now       = new Date()
     const minuteKey = `fd:quota:${now.toISOString().slice(0, 16)}`
-    const count     = await redis.incr(minuteKey)
+    const spaceKey  = 'fd:quota:spacing'
+    const [count, spacingOk] = await Promise.all([
+      redis.incr(minuteKey),
+      redis.set(spaceKey, '1', { nx: true, px: SPACING_MS }),
+    ])
     if (count === 1) { try { await redis.expire(minuteKey, 70) } catch {} }
-    return count <= MINUTE_CAP
+    return count <= MINUTE_CAP && !!spacingOk
   } catch { return true }
 }
 
