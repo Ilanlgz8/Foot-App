@@ -70,6 +70,38 @@
   padding: 0.15rem 0.55rem;
 }
 
+/* Section par championnat — regroupe les cards, un seul badge compétition
+   par section (avant : répété sur chaque card, redondant). */
+.live__section + .live__section {
+  margin-top: 2rem;
+}
+.live__sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+.live__sectionLogo {
+  width: 1.4rem;
+  height: 1.4rem;
+  object-fit: contain;
+}
+.live__sectionName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+.live__sectionCount {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(var(--white-rgb),0.5);
+  background: rgba(var(--white-rgb),0.06);
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
 /* Grille — 3 colonnes desktop, 1 mobile */
 .live__grid {
   display: grid;
@@ -104,35 +136,13 @@
   transition-duration: 0.1s;
 }
 
-/* Header card : compétition + période */
-.live__cardHeader {
+/* Header card : période seulement — le badge compétition est maintenant
+   affiché une seule fois par section (voir .live__sectionHeader) */
+.live__cardHeader--periodOnly {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0.6rem 0.85rem 0.35rem;
-  border-bottom: 1px solid rgba(var(--white-rgb),0.04);
-}
-
-.live__compBadge {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-.live__compLogo {
-  width: 1.25rem;
-  height: 1.25rem;
-  object-fit: contain;
-}
-.live__compName {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: rgba(var(--white-rgb),0.45);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 9rem;
 }
 
 .live__period {
@@ -317,6 +327,29 @@
   color: rgba(var(--white-rgb),0.35);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* CTA pied de card — accès explicite à LiveMatchPage (avant : toute la card
+   était cliquable sans aucun indice visuel permanent, seulement au hover). */
+.live__cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.5rem;
+  border-top: 1px solid rgba(var(--white-rgb),0.06);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb),0.4);
+  transition: color 0.18s;
+}
+.live__card:hover .live__cardFooter {
+  color: rgba(var(--white-rgb),0.8);
+}
+.live__cardFooterChevron {
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
 /* Empty state — remplace le texte brut par un mini bloc cohérent avec le

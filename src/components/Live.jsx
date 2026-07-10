@@ -17,17 +17,28 @@ function shortenName(name) {
   return `${words[0][0]}. ${words.slice(1).join(' ')}`
 }
 
-function CompBadge({ match }) {
-  const comp   = COMPETITIONS.find(c => c.id === match.competition?.code)
-  const emblem = comp?.emblem ?? match.competition?.emblem
-  const name   = match.competition?.name ?? comp?.name ?? ''
-  if (!emblem && !name) return null
-  return (
-    <div className="live__compBadge">
-      {emblem && <img src={emblem} alt="" className="live__compLogo" />}
-      <span className="live__compName">{name}</span>
-    </div>
-  )
+// Regroupe les matchs live par championnat — un seul badge compétition par
+// section au lieu d'un par card (redondant).
+// Ordre (retour utilisateur) : Coupe du Monde toujours en tête (pas un
+// "championnat" club à proprement parler), puis Ligue 1 en premier parmi les
+// championnats club, puis le reste par ordre alphabétique.
+const SECTION_PRIORITY = { WC: 0, FL1: 1 }
+function groupByCompetition(matches) {
+  const map = new Map()
+  for (const m of matches) {
+    const code   = m.competition?.code ?? 'AUTRE'
+    const comp   = COMPETITIONS.find(c => c.id === code)
+    const name   = comp?.name ?? m.competition?.name ?? 'Autre compétition'
+    const emblem = comp?.emblem ?? m.competition?.emblem ?? null
+    if (!map.has(code)) map.set(code, { code, name, emblem, matches: [] })
+    map.get(code).matches.push(m)
+  }
+  return [...map.values()].sort((a, b) => {
+    const pa = SECTION_PRIORITY[a.code] ?? 2
+    const pb = SECTION_PRIORITY[b.code] ?? 2
+    if (pa !== pb) return pa - pb
+    return a.name.localeCompare(b.name, 'fr')
+  })
 }
 
 function PeriodBadge({ match }) {
@@ -208,9 +219,9 @@ function LiveCard({ match, espn, onClick }) {
     >
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 
-      {/* Header : compétition + période */}
-      <div className="live__cardHeader">
-        <CompBadge match={match} />
+      {/* Header : période seulement — le badge compétition est maintenant
+          affiché une seule fois par section (voir groupByCompetition) */}
+      <div className="live__cardHeader--periodOnly">
         <PeriodBadge match={match} />
       </div>
 
@@ -242,6 +253,13 @@ function LiveCard({ match, espn, onClick }) {
       {/* Buteurs */}
       {(espn?.scorers?.length > 0) && <div className="live__divider" />}
       <ScorerColumns scorers={espn?.scorers ?? []} />
+
+      {/* CTA explicite — avant, seule la card entière était cliquable sans
+          aucun indice visuel permanent (juste un hover, invisible au tactile).
+          Retour utilisateur : accès à LiveMatchPage pas assez clair. */}
+      <div className="live__cardFooter">
+        Voir le match <span className="live__cardFooterChevron">›</span>
+      </div>
     </div>
   )
 }
@@ -282,16 +300,25 @@ export default function Live() {
             </button>
           </div>
         ) : (
-          <div className="live__grid">
-            {live.map(match => (
-              <LiveCard
-                key={match.id}
-                match={match}
-                espn={espnScores[match.id] ?? null}
-                onClick={() => navigate(`/live/${match.id}`)}
-              />
-            ))}
-          </div>
+          groupByCompetition(live).map(group => (
+            <div key={group.code} className="live__section">
+              <div className="live__sectionHeader">
+                {group.emblem && <img src={group.emblem} alt="" className="live__sectionLogo" />}
+                <span className="live__sectionName">{group.name}</span>
+                <span className="live__sectionCount">{group.matches.length} en direct</span>
+              </div>
+              <div className="live__grid">
+                {group.matches.map(match => (
+                  <LiveCard
+                    key={match.id}
+                    match={match}
+                    espn={espnScores[match.id] ?? null}
+                    onClick={() => navigate(`/live/${match.id}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
     </section>
