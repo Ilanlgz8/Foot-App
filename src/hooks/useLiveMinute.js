@@ -1099,14 +1099,14 @@ export function useLiveMinute(matches) {
     }
 
     // Watchdog : si le Worker se bloque, continuer depuis le main thread
-    // ⚠️ Seuil relevé à 40s (le Worker tique maintenant lui-même toutes les
-    // 20s, voir espnTimerWorker.js — réduit pour le Fluid Active CPU Vercel,
-    // pas Redis cette fois) : même raisonnement qu'avant, garder le seuil à
-    // 2x l'intervalle normal du Worker pour ne pas déclencher ce watchdog sur
-    // du simple jitter et doubler les invocations pour rien.
+    // ⚠️ Seuil relevé à 60s (le Worker tique maintenant lui-même toutes les
+    // 30s, voir espnTimerWorker.js — réduit une 2e fois pour le Fluid Active
+    // CPU Vercel, déjà dépassé) : même raisonnement qu'avant, garder le seuil
+    // à 2x l'intervalle normal du Worker pour ne pas déclencher ce watchdog
+    // sur du simple jitter et doubler les invocations pour rien.
     const watchdogId = setInterval(() => {
-      if (Date.now() - lastTickAt.t > 40_000) tick()
-    }, 40_000)
+      if (Date.now() - lastTickAt.t > 60_000) tick()
+    }, 60_000)
 
     return () => {
       worker?.terminate()
