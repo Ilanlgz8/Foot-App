@@ -245,11 +245,14 @@
   100% { box-shadow: 0 0 0 14px rgba(var(--sf-live-rgb), 0); }
 }
 
-/* Badge nombre de matchs live — blanc/rouge vif (lisible sur l'orb rouge) */
+/* Badge nombre de matchs live — blanc/rouge vif (lisible sur l'orb rouge).
+   Écarté du cercle (top/right négatifs plus prononcés) : trop collé au bord,
+   le chiffre se retrouvait à cheval sur l'anneau néon rouge et devenait
+   difficile à lire (retour utilisateur). */
 .sfTabLive__count {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  top: -8px;
+  right: -8px;
   min-width: 20px;
   height: 20px;
   padding: 0 4px;
@@ -262,6 +265,8 @@
   place-items: center;
   border: 2.5px solid var(--sf-bg);
   font-variant-numeric: tabular-nums;
+  z-index: 4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Espace en bas des pages pour ne pas passer sous la tab bar ── */
