@@ -780,6 +780,21 @@
   padding-bottom: 0.2rem;
 }
 
+/* ── Badge coupe nationale (match de Coupe de France/Copa del Rey/FA Cup
+   fusionné dans l'onglet du championnat parent) — précise le nom réel de la
+   compétition sur la card, en haut à gauche (symétrique à la date). ── */
+.matchs__cupBadge {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  font-size: 0.56rem;
+  font-weight: 800;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 0.2rem;
+}
+
 /* ── Équipes ── */
 .matchs__team--home {
   grid-column: 1;

@@ -84,6 +84,7 @@ function MatchCard({ match }) {
         <span className="resultats__teamName">{tName(match.homeTeam)}</span>
       </div>
       <div className="resultats__scoreCenter">
+        {match.isCup && <span className="resultats__cupBadge">{match.competition?.name}</span>}
         <span className="resultats__cardDate">{fmtDate(match.utcDate)}</span>
         <div className="resultats__scoreRow">
           <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>

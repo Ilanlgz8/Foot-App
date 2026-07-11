@@ -27,6 +27,17 @@ export const COMPETITION_ESPN_SLUG = {
   COPA: 'conmebol.america',
 }
 
+// Coupes nationales — non couvertes par football-data.org en free tier (voir
+// CLAUDE.md), sourcées via ESPN et fusionnées DANS l'onglet du championnat
+// parent (pas d'entrée sidebar dédiée, contrairement à NL/CAN/COPA/EC) —
+// demande explicite : "dans ligue 1 on rajoute coupe de france mais à
+// l'intérieur de ligue 1, sur les cards on précise juste le nom de la coupe".
+export const DOMESTIC_CUPS = {
+  FL1: { slug: 'fra.coupe_de_france', name: 'Coupe de France' },
+  PD:  { slug: 'esp.copa_del_rey',    name: 'Copa del Rey' },
+  PL:  { slug: 'eng.fa',              name: 'FA Cup' },
+}
+
 // Compétitions sourcées via ESPN (pas football-data.org, voir espnAdapter.js)
 // : pas de classement/buteurs pour l'instant (ESPN n'expose pas proprement la
 // structure de groupe sur son scoreboard) — utilisé par Classement.jsx et

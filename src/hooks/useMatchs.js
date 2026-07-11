@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
-import { fetchEspnCompMatches } from '../utils/espnAdapter'
-import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
+import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
@@ -156,6 +156,19 @@ async function fetchMatchesForComp(selectedComp, status) {
     matches = await tryFetch(
       `/api/v4/competitions/${selectedComp}/matches?status=${status}`
     )
+  }
+
+  // Coupe nationale du championnat (Coupe de France/Copa del Rey/FA Cup) :
+  // fusionnée DANS ce même onglet plutôt que dans un onglet dédié (demande
+  // explicite) — voir DOMESTIC_CUPS (competitions.js) et fetchEspnCupMatches
+  // (espnAdapter.js), qui taggent ces matchs avec isCup:true + un nom de
+  // compétition différent pour le relabeling sur les cards.
+  if (DOMESTIC_CUPS[selectedComp]) {
+    const cupMatches = await fetchEspnCupMatches(selectedComp)
+    const cupFiltered = status === 'FINISHED'
+      ? cupMatches.filter(m => m.status === 'FINISHED')
+      : cupMatches.filter(m => m.status !== 'FINISHED')
+    if (cupFiltered.length > 0) matches = [...(matches ?? []), ...cupFiltered]
   }
 
   return matches

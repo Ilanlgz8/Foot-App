@@ -400,6 +400,17 @@
   white-space: nowrap;
 }
 
+/* ── Badge coupe nationale (match fusionné depuis Coupe de France/Copa del
+   Rey/FA Cup dans l'onglet du championnat parent) ── */
+.resultats__cupBadge {
+  font-size: 0.54rem;
+  font-weight: 800;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 .resultats__scoreRow {
   display: flex;
   align-items: center;

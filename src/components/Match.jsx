@@ -187,6 +187,7 @@ function MatchRow({ match, index, inModal = false }) {
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
     >
       {isFav && <FavStarBadge variant="row" color={favColor} />}
+      {match.isCup && <span className="matchs__cupBadge">{match.competition?.name}</span>}
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
         {match.homeTeam.crest && (

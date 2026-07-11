@@ -26,7 +26,7 @@
 //     en phase de groupes/qualifs, qui constituent l'essentiel du calendrier
 //     de ces compétitions).
 import { readCacheStale, writeCache } from '../hooks/localCache'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 
 // Id numérique synthétique par compétition ESPN — négatif pour ne jamais
 // entrer en collision avec un vrai id football-data.org (tous positifs, ex:
@@ -34,7 +34,7 @@ import { COMPETITIONS } from '../data/competitions'
 // d'autres endroits de l'app regroupent/comparent les matchs par
 // match.competition.id : un id null pour TOUTES ces compétitions les aurait
 // fait fusionner ensemble dans un seul groupe "Autre".
-const SYNTHETIC_COMP_ID = { NL: -1, CAN: -2, COPA: -3 }
+const SYNTHETIC_COMP_ID = { NL: -1, CAN: -2, COPA: -3, FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103 }
 
 // Statut ESPN → statut FD.org-like utilisé partout ailleurs dans l'app.
 const ESPN_STATUS_MAP = {
@@ -74,7 +74,12 @@ function windowRange() {
   return `${fmtDate(start)}-${fmtDate(end)}`
 }
 
-function normalizeEvent(event, compCode) {
+// `overrides` permet aux coupes nationales (voir fetchEspnCupMatches
+// ci-dessous) de garder le CODE du championnat parent (pour rester dans son
+// onglet/filtre existant, ex: 'FL1') tout en affichant un NOM différent sur
+// les cards ("Coupe de France" plutôt que "Ligue 1") — voir isCup, utilisé
+// par MatchRow/ResultRow pour afficher un petit badge distinctif.
+function normalizeEvent(event, compCode, overrides = {}) {
   const comp = event?.competitions?.[0]
   if (!comp) return null
 
@@ -88,16 +93,17 @@ function normalizeEvent(event, compCode) {
   const awayScore = played && away.score != null ? parseInt(away.score, 10) : null
 
   return {
-    id: `espn-${compCode}-${event.id}`,
+    id: `espn-${overrides.idPrefix ?? compCode}-${event.id}`,
     utcDate: event.date,
     status,
     matchday: null,
     stage: null,
     group: null,
+    isCup: overrides.isCup ?? false,
     competition: {
-      id: SYNTHETIC_COMP_ID[compCode] ?? null,
+      id: overrides.compId ?? SYNTHETIC_COMP_ID[compCode] ?? null,
       code: compCode,
-      name: COMPETITIONS.find(c => c.id === compCode)?.name ?? compCode,
+      name: overrides.compName ?? COMPETITIONS.find(c => c.id === compCode)?.name ?? compCode,
     },
     homeTeam: {
       id: home.team?.id ?? null,
@@ -135,6 +141,35 @@ export async function fetchEspnCompMatches(compCode, slug) {
     const json = await res.json()
     const matches = (json.events ?? [])
       .map(e => normalizeEvent(e, compCode))
+      .filter(Boolean)
+    if (matches.length > 0) writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
+    return matches.length > 0 ? matches : (readCacheStale(cacheKey) ?? [])
+  } catch {
+    return readCacheStale(cacheKey) ?? []
+  }
+}
+
+// Coupe nationale d'un championnat parent (Coupe de France pour FL1, Copa del
+// Rey pour PD, FA Cup pour PL — voir DOMESTIC_CUPS dans competitions.js).
+// Les matchs renvoyés gardent competition.code = parentCode (pour rester
+// filtrés dans l'onglet du championnat parent, voir useMatchs.js) mais
+// competition.name = nom de la coupe + isCup:true, pour le relabeling sur les
+// cards de match.
+export async function fetchEspnCupMatches(parentCode) {
+  const cup = DOMESTIC_CUPS[parentCode]
+  if (!cup) return []
+  const cacheKey = `matches_espn_cup_${parentCode}`
+  try {
+    const res = await fetch(`/espn?slug=${cup.slug}&dates=${windowRange()}`)
+    if (!res.ok) return readCacheStale(cacheKey) ?? []
+    const json = await res.json()
+    const matches = (json.events ?? [])
+      .map(e => normalizeEvent(e, parentCode, {
+        idPrefix: `${parentCode}-cup`,
+        isCup: true,
+        compId: SYNTHETIC_COMP_ID[`${parentCode}_CUP`] ?? null,
+        compName: cup.name,
+      }))
       .filter(Boolean)
     if (matches.length > 0) writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
     return matches.length > 0 ? matches : (readCacheStale(cacheKey) ?? [])

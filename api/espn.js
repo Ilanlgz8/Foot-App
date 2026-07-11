@@ -25,6 +25,9 @@ const ALLOWED_SLUGS = new Set([
   // Ligue des Nations / CAN / Copa America — tournois ponctuels, absents de
   // football-data.org en free tier (voir CLAUDE.md), couverts via ESPN.
   'uefa.nations', 'caf.nations', 'conmebol.america',
+  // Coupes nationales — absentes de football-data.org en free tier, fusionnées
+  // dans l'onglet du championnat parent (voir espnAdapter.js / useMatchs.js).
+  'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',
 ])
 
 const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)
