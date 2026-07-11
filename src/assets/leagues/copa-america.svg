@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="#0f172a" stroke="#0ea5e9" stroke-width="3.5"/>
+  <path d="M20 15 h24 l-3 9 h-18 Z" fill="#0ea5e9"/>
+  <path d="M23 24 h18 l3 8 h-24 Z" fill="#f8fafc" opacity="0.9"/>
+  <text x="32" y="49" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.3">COPA</text>
+</svg>

@@ -162,13 +162,18 @@
   margin-bottom: 0.55rem;
 }
 /* 3 colonnes : logo + nom compétition (gauche) | heure/minute (centrée au
-   milieu de la card) | vide (droite, symétrie). */
+   milieu de la card) | vide (droite, symétrie).
+   Remonté au plus près du bord haut de la card (retour utilisateur) :
+   margin-top négatif qui mange dans le padding du parent, compensé par un
+   margin-bottom plus grand pour que le reste du contenu (équipes/score) ne
+   bouge pas — la card garde exactement la même hauteur totale. */
 .pronos__matchMeta {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   font-size: 0.68rem;
-  margin-bottom: 0.5rem;
+  margin-top: -0.25rem;
+  margin-bottom: 0.75rem;
 }
 .pronos__metaTime {
   grid-column: 2;

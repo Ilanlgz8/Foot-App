@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="#0f172a" stroke="#1d4ed8" stroke-width="3.5"/>
+  <path d="M32 12 L34.5 18.5 L41.5 19 L36 23.3 L37.8 30 L32 26.2 L26.2 30 L28 23.3 L22.5 19 L29.5 18.5 Z" fill="#facc15"/>
+  <text x="32" y="49" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">EURO</text>
+</svg>

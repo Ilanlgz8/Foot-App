@@ -403,8 +403,17 @@ export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdS
   )
 }
 
-// ── Stats ESPN summary (possession, tirs, corners — endpoint summary) ─────────
+// ── Stats ESPN summary (endpoint summary → boxscore.teams[].statistics) ───────
 // Fetché à la demande quand espnEventId est connu mais le scoreboard n'a pas les stats.
+//
+// ⚠️ ÉLARGI (retour utilisateur : "on avait dit qu'on ajoutait d'autres
+// stats") — ne remontait avant que possession/tirs/corners alors qu'ESPN
+// fournit bien plus dans boxscore.teams[].statistics (vérifié en direct sur
+// un vrai match Premier League — noms de champs confirmés ci-dessous : fautes,
+// cartons, hors-jeu, tirs cadrés, passes, tacles, interceptions, centres,
+// longs ballons, dégagements, tirs contrés, arrêts). Le renderer ESPNStats
+// (juste au-dessus) sait déjà afficher toutes ces lignes, seule l'extraction
+// ici était incomplète.
 function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
   return useQuery({
     queryKey: ['espnSummary', espnEventId],
@@ -437,19 +446,56 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
         return null
       }
 
-      const homePoss    = getStat(homeTeam, 'possessionPct')
-      const awayPoss    = getStat(awayTeam, 'possessionPct')
-      const homeShots   = getStat(homeTeam, 'totalShots', 'shotsTotal', 'shots')
-      const awayShots   = getStat(awayTeam, 'totalShots', 'shotsTotal', 'shots')
-      const homeCorners = getStat(homeTeam, 'wonCorners', 'cornerKicks', 'corners')
-      const awayCorners = getStat(awayTeam, 'wonCorners', 'cornerKicks', 'corners')
+      // ⚠️ Les champs "*Pct" d'ESPN (passPct, tacklePct, crossPct,
+      // longballPct...) sont un RATIO 0-1 arrondi à 1 décimale dans
+      // displayValue (ex: "0.9" pour 86% de passes réussies, PAS 90%) —
+      // vérifié en direct. Affiché tel quel avec un "%" ça donnerait "0.9%"
+      // au lieu de "86%". On recalcule donc le vrai pourcentage nous-mêmes à
+      // partir des 2 compteurs bruts (réussi/total) plutôt que de faire
+      // confiance à ce champ arrondi.
+      const pct = (made, total) => (made != null && total != null && total > 0)
+        ? Math.round((made / total) * 100)
+        : null
 
-      if (homePoss === null && homeShots === null) return null
+      function buildSide(team) {
+        const totalPasses    = getStat(team, 'totalPasses')
+        const accuratePasses = getStat(team, 'accuratePasses')
+        const totalTackles   = getStat(team, 'totalTackles')
+        const okTackles      = getStat(team, 'effectiveTackles')
+        const totalCrosses   = getStat(team, 'totalCrosses')
+        const okCrosses      = getStat(team, 'accurateCrosses')
+        const totalLongBalls = getStat(team, 'totalLongBalls')
+        const okLongBalls    = getStat(team, 'accurateLongBalls')
 
-      return {
-        home: { poss: homePoss, shots: homeShots, corners: homeCorners },
-        away: { poss: awayPoss, shots: awayShots, corners: awayCorners },
+        return {
+          poss:          getStat(team, 'possessionPct'),
+          shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
+          shotsOnTarget: getStat(team, 'shotsOnTarget'),
+          corners:       getStat(team, 'wonCorners', 'cornerKicks', 'corners'),
+          passes:        totalPasses,
+          passPct:       pct(accuratePasses, totalPasses),
+          tackles:       totalTackles,
+          tacklePct:     pct(okTackles, totalTackles),
+          interceptions: getStat(team, 'interceptions'),
+          crosses:       totalCrosses,
+          crossPct:      pct(okCrosses, totalCrosses),
+          longBalls:     totalLongBalls,
+          longBallPct:   pct(okLongBalls, totalLongBalls),
+          clearances:    getStat(team, 'totalClearance', 'effectiveClearance'),
+          blockedShots:  getStat(team, 'blockedShots'),
+          saves:         getStat(team, 'saves'),
+          fouls:         getStat(team, 'foulsCommitted', 'fouls'),
+          offsides:      getStat(team, 'offsides'),
+          redCards:      getStat(team, 'redCards'),
+        }
       }
+
+      const home = buildSide(homeTeam)
+      const away = buildSide(awayTeam)
+
+      if (home.poss === null && home.shots === null) return null
+
+      return { home, away }
     },
     enabled:         enabled && !!espnEventId && !!espnSlug,
     staleTime:       30_000,

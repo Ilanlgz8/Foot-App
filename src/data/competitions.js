@@ -7,6 +7,14 @@ import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
 import europaLeagueLogo from '../assets/leagues/europa-league.png'
 import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
+// Pas de logo officiel disponible (pas de source récupérable depuis cet
+// environnement — accès web limité à quelques domaines autorisés) : badges
+// simples dessinés maison (couleurs distinctes par compétition), à remplacer
+// si un vrai logo est fourni un jour.
+import euroLogo from '../assets/leagues/euro.svg'
+import nationsLeagueLogo from '../assets/leagues/nations-league.svg'
+import canLogo from '../assets/leagues/can.svg'
+import copaAmericaLogo from '../assets/leagues/copa-america.svg'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
@@ -91,26 +99,24 @@ export const COMPETITIONS = [
     id: 'EC',
     name: 'Euro',
     shortName: 'Euro',
-    // Pas de logo dédié dispo dans les assets (à ajouter si fourni) — tous
-    // les composants gèrent déjà emblem=null proprement (pas d'<img> rendue).
-    emblem: null,
+    emblem: euroLogo,
   },
   {
     id: 'NL',
     name: 'Ligue des Nations',
     shortName: 'Nations L.',
-    emblem: null,
+    emblem: nationsLeagueLogo,
   },
   {
     id: 'CAN',
     name: 'Coupe d’Afrique des Nations',
     shortName: 'CAN',
-    emblem: null,
+    emblem: canLogo,
   },
   {
     id: 'COPA',
     name: 'Copa America',
     shortName: 'Copa America',
-    emblem: null,
+    emblem: copaAmericaLogo,
   },
 ]
