@@ -71,13 +71,10 @@ const ICONS = {
   ),
 }
 
-/* Ballon de foot — orb Live central */
+/* Ballon de foot — emoji système, net à toutes les tailles.
+   Le style/anim (fond sombre, néon, rotation) est porté par .sfTabLive__orb. */
 const BallIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7l3.4 2.5-1.3 4h-4.2l-1.3-4L12 7z" fill="currentColor" stroke="none" />
-    <path d="M12 7V3.2M15.4 9.5l3.6-1.3M14.1 13.5l2.3 3.2M9.9 13.5l-2.3 3.2M8.6 9.5L5 8.2" />
-  </svg>
+  <span className="sfTabLive__ball" aria-hidden="true">⚽</span>
 )
 
 /* Date du jour compacte, ex. "Mer. 8 juil." — calculée une fois par montage */

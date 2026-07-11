@@ -158,33 +158,70 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(145deg, var(--sf-red), var(--sf-red-deep));
-  box-shadow:
-    0 8px 24px rgba(var(--sf-red-rgb), 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
   position: relative;
+  /* Fond sombre rouge-nuit pour faire ressortir le ballon + le néon */
+  background: radial-gradient(circle at 50% 35%, #2a0e13, #120406);
   transition: transform 0.2s;
 }
 .sfTabLive:active .sfTabLive__orb { transform: scale(0.94); }
 
-/* Pulsation UNIQUEMENT quand des matchs sont en direct */
-.sfTabLive--hasLive .sfTabLive__orb {
-  animation: sfOrbPulse 2.4s ease-in-out infinite;
+/* Emoji ballon */
+.sfTabLive__ball {
+  font-size: 30px;
+  line-height: 1;
+  position: relative;
+  z-index: 3;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
-@keyframes sfOrbPulse {
+/* Le ballon roule doucement pendant le live */
+.sfTabLive--hasLive .sfTabLive__ball {
+  animation: sfBallRoll 4s linear infinite;
+}
+@keyframes sfBallRoll { to { transform: rotate(360deg); } }
+
+/* Anneau néon — gris discret au repos */
+.sfTabLive__orb::before {
+  content: '';
+  position: absolute;
+  inset: -2.5px;
+  border-radius: 50%;
+  z-index: 1;
+  border: 2.5px solid rgba(255, 255, 255, 0.14);
+}
+/* Onde de choc — couche séparée, invisible au repos */
+.sfTabLive__orb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+/* ── LIVE : anneau lumineux qui respire + onde de choc rouge (style B, 3s) ── */
+.sfTabLive--hasLive .sfTabLive__orb::before {
+  border-color: var(--sf-live);
+  animation: sfNeonBreath 3s ease-in-out infinite;
+}
+.sfTabLive--hasLive .sfTabLive__orb::after {
+  animation: sfNeonHalo 3s ease-out infinite;
+}
+@keyframes sfNeonBreath {
   0%, 100% {
     box-shadow:
-      0 8px 24px rgba(var(--sf-red-rgb), 0.42),
-      0 0 0 0 rgba(var(--sf-live-rgb), 0.38),
-      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      0 0 8px var(--sf-live),
+      0 0 16px rgba(var(--sf-live-rgb), 0.6),
+      inset 0 0 8px rgba(var(--sf-live-rgb), 0.5);
   }
   50% {
     box-shadow:
-      0 8px 24px rgba(var(--sf-red-rgb), 0.42),
-      0 0 0 12px rgba(var(--sf-live-rgb), 0),
-      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      0 0 20px var(--sf-live),
+      0 0 38px rgba(var(--sf-live-rgb), 0.9),
+      inset 0 0 16px rgba(var(--sf-live-rgb), 0.8);
   }
+}
+@keyframes sfNeonHalo {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--sf-live-rgb), 0.7); }
+  100% { box-shadow: 0 0 0 14px rgba(var(--sf-live-rgb), 0); }
 }
 
 /* Badge nombre de matchs live — blanc/rouge vif (lisible sur l'orb rouge) */
@@ -303,7 +340,14 @@
 /* ── Accessibilité : mouvement réduit ── */
 @media (prefers-reduced-motion: reduce) {
   .sfTabLive--hasLive .sfTabLive__orb,
+  .sfTabLive--hasLive .sfTabLive__orb::before,
+  .sfTabLive--hasLive .sfTabLive__orb::after,
+  .sfTabLive--hasLive .sfTabLive__ball,
   .sfLiveBtn__dot {
     animation: none;
+  }
+  /* Sans animation, on garde quand même un anneau rouge visible en live */
+  .sfTabLive--hasLive .sfTabLive__orb::before {
+    box-shadow: 0 0 12px var(--sf-live), inset 0 0 8px rgba(var(--sf-live-rgb), 0.6);
   }
 }
