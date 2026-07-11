@@ -184,6 +184,95 @@ export const TEAM_NAMES_FR = {
   'Panama': 'Panama',
   'Uzbekistan': 'Ouzbékistan',
   'Colombia': 'Colombie',
+
+  // ── Ligue des Nations / CAN / Copa America / Coupe de France, Copa del
+  // Rey, FA Cup (source ESPN, voir espnAdapter.js) ────────────────────────
+  // Ces compétitions couvrent des équipes absentes du Mondial/Euro (donc pas
+  // encore dans la liste ci-dessus) — traduction manquante = nom anglais
+  // brut affiché tel quel (translateTeam() retombe sur le nom d'origine s'il
+  // n'est pas dans ce dictionnaire). Complété ici plutôt que de laisser
+  // toutes ces sélections en anglais.
+  // CONMEBOL (Copa America) — les autres membres sont déjà couverts plus
+  // haut (Argentina, Brazil, Uruguay, Colombia, Ecuador, Paraguay).
+  'Chile': 'Chili',
+  'Peru': 'Pérou',
+  'Bolivia': 'Bolivie',
+  'Venezuela': 'Venezuela',
+  // CAF (CAN) — au-delà des qualifiés Mondial 2026 déjà listés plus haut
+  // (Afrique du Sud, Maroc, Côte d'Ivoire, Tunisie, Cap-Vert, Égypte,
+  // Sénégal, Algérie, Ghana, RD Congo).
+  'Nigeria': 'Nigeria',
+  'Cameroon': 'Cameroun',
+  'Mali': 'Mali',
+  'Burkina Faso': 'Burkina Faso',
+  'Guinea': 'Guinée',
+  'Zambia': 'Zambie',
+  'Uganda': 'Ouganda',
+  'Gabon': 'Gabon',
+  'Benin': 'Bénin',
+  'Mozambique': 'Mozambique',
+  'Sudan': 'Soudan',
+  'Zimbabwe': 'Zimbabwe',
+  'Comoros': 'Comores',
+  'Botswana': 'Botswana',
+  'Equatorial Guinea': 'Guinée équatoriale',
+  'Kenya': 'Kenya',
+  'Angola': 'Angola',
+  'Libya': 'Libye',
+  'Ethiopia': 'Éthiopie',
+  'Namibia': 'Namibie',
+  'Rwanda': 'Rwanda',
+  'Tanzania': 'Tanzanie',
+  'Guinea-Bissau': 'Guinée-Bissau',
+  'Central African Republic': 'République centrafricaine',
+  'Chad': 'Tchad',
+  'Niger': 'Niger',
+  'Mauritania': 'Mauritanie',
+  'Madagascar': 'Madagascar',
+  'Malawi': 'Malawi',
+  'Eswatini': 'Eswatini',
+  'Lesotho': 'Lesotho',
+  'Gambia': 'Gambie',
+  'Sierra Leone': 'Sierra Leone',
+  'Liberia': 'Liberia',
+  'Togo': 'Togo',
+  'Djibouti': 'Djibouti',
+  'Somalia': 'Somalie',
+  'Eritrea': 'Érythrée',
+  'South Sudan': 'Soudan du Sud',
+  'Burundi': 'Burundi',
+  // UEFA (Ligue des Nations) — au-delà des équipes Euro déjà listées plus
+  // haut. ⚠️ 'Bosnia and Herzegovina' (nom complet ESPN) s'ajoute à
+  // 'Bosnia-H.' (forme FD.org) déjà présente plus haut — deux clés
+  // différentes pour la même équipe, sources différentes.
+  'Wales': 'Pays de Galles',
+  'Northern Ireland': 'Irlande du Nord',
+  'Republic of Ireland': 'Irlande',
+  'Ireland': 'Irlande',
+  'Finland': 'Finlande',
+  'Iceland': 'Islande',
+  'Israel': 'Israël',
+  'Kazakhstan': 'Kazakhstan',
+  'Armenia': 'Arménie',
+  'Azerbaijan': 'Azerbaïdjan',
+  'Belarus': 'Biélorussie',
+  'Bulgaria': 'Bulgarie',
+  'Estonia': 'Estonie',
+  'Latvia': 'Lettonie',
+  'Lithuania': 'Lituanie',
+  'Moldova': 'Moldavie',
+  'Montenegro': 'Monténégro',
+  'North Macedonia': 'Macédoine du Nord',
+  'Bosnia and Herzegovina': 'Bosnie-Herzégovine',
+  'Cyprus': 'Chypre',
+  'Luxembourg': 'Luxembourg',
+  'Malta': 'Malte',
+  'Andorra': 'Andorre',
+  'San Marino': 'Saint-Marin',
+  'Gibraltar': 'Gibraltar',
+  'Kosovo': 'Kosovo',
+  'Faroe Islands': 'Îles Féroé',
+  'Liechtenstein': 'Liechtenstein',
 }
 
 export const translateTeam = (name) => TEAM_NAMES_FR[name] ?? name

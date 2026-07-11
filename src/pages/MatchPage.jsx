@@ -461,7 +461,22 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
     else if (outcome === 'D') { draws++; results.push('D') }
     else { losses++; results.push('L') }
   })
-  const played = wins + draws + losses
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "l'Angleterre a 4 matchs joués
+  // affichés alors qu'elle en a 5" pendant qu'elle jouait déjà son 6e) :
+  // "played" était calculé comme wins+draws+losses, qui EXCLUT tout match
+  // FINISHED dont le score n'est pas encore pleinement renseigné côté
+  // FD.org (juste après le coup de sifflet final, avant que l'API ait fini
+  // de repropager le score détaillé — décalage constaté en pratique, pas
+  // une erreur de comptage de notre côté). Un match FINISHED sans score
+  // exploitable disparaissait alors silencieusement du compteur "Matchs
+  // joués" au lieu d'être compté normalement une fois le score arrivé.
+  // "played" compte maintenant tous les matchs FINISHED (peu importe si le
+  // score est déjà exploitable) ; les stats qui ont besoin d'un score réel
+  // (moyennes, %) restent calculées sur scoredCount, le sous-ensemble avec
+  // score connu — sinon un match sans score connu tirerait ces moyennes
+  // vers le bas sans y avoir contribué.
+  const played     = matches.length
+  const scoredCount = wins + draws + losses
   if (!played) return null
 
   // Série en cours (même logique que SeasonStatsSection dans MatchModal.jsx)
@@ -474,11 +489,11 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
 
   return {
     played, wins, draws, losses,
-    avgFor:     (gf / played).toFixed(1),
-    avgAgainst: (ga / played).toFixed(1),
-    winPct:     Math.round((wins  / played) * 100),
-    bttsPct:    Math.round((btts  / played) * 100),
-    over25Pct:  Math.round((over25/ played) * 100),
+    avgFor:     scoredCount ? (gf / scoredCount).toFixed(1) : '0.0',
+    avgAgainst: scoredCount ? (ga / scoredCount).toFixed(1) : '0.0',
+    winPct:     scoredCount ? Math.round((wins  / scoredCount) * 100) : 0,
+    bttsPct:    scoredCount ? Math.round((btts  / scoredCount) * 100) : 0,
+    over25Pct:  scoredCount ? Math.round((over25/ scoredCount) * 100) : 0,
     cs,
     streak, streakType,
   }

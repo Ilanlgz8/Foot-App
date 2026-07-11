@@ -675,7 +675,14 @@ function calcSeasonTeamStats(teamId, compMatches, split = 'all') {
     else if (outcome === 'D') { draws++; results.push('D') }
     else { losses++; results.push('L') }
   })
-  const played = wins + draws + losses
+  // ⚠️ BUG CORRIGÉ (voir même correctif dans MatchPage.jsx/calcTeamStats,
+  // constat utilisateur : match "Matchs joués" en retard d'1 pour l'Angleterre) :
+  // "played" comptait wins+draws+losses, qui exclut un match FINISHED dont le
+  // score n'est pas encore pleinement renseigné par FD.org juste après le
+  // coup de sifflet. On compte maintenant tous les matchs FINISHED ; les
+  // moyennes/% restent calculées sur scoredCount (score connu uniquement).
+  const played      = matches.length
+  const scoredCount = wins + draws + losses
   if (!played) return null
 
   let streak = 0, streakType = null
@@ -687,11 +694,11 @@ function calcSeasonTeamStats(teamId, compMatches, split = 'all') {
 
   return {
     played,
-    avgFor:     (gf / played).toFixed(1),
-    avgAgainst: (ga / played).toFixed(1),
-    winPct:     Math.round((wins  / played) * 100),
-    bttsPct:    Math.round((btts  / played) * 100),
-    over25Pct:  Math.round((over25 / played) * 100),
+    avgFor:     scoredCount ? (gf / scoredCount).toFixed(1) : '0.0',
+    avgAgainst: scoredCount ? (ga / scoredCount).toFixed(1) : '0.0',
+    winPct:     scoredCount ? Math.round((wins  / scoredCount) * 100) : 0,
+    bttsPct:    scoredCount ? Math.round((btts  / scoredCount) * 100) : 0,
+    over25Pct:  scoredCount ? Math.round((over25 / scoredCount) * 100) : 0,
     cs,
     streak, streakType,
   }
@@ -1220,7 +1227,14 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
     else if (outcome === 'D') { draws++; results.push('D') }
     else { losses++; results.push('L') }
   })
-  const played = wins + draws + losses
+  // ⚠️ BUG CORRIGÉ (même correctif que calcTeamStats dans MatchPage.jsx et
+  // calcSeasonTeamStats plus haut dans ce fichier — constat utilisateur :
+  // "Matchs joués" en retard d'1 pour l'Angleterre) : "played" excluait tout
+  // match FINISHED sans score encore pleinement renseigné par FD.org. On
+  // compte maintenant tous les matchs FINISHED ; moyennes/% restent sur
+  // scoredCount (score connu uniquement) pour ne pas fausser ces stats.
+  const played      = matches.length
+  const scoredCount = wins + draws + losses
   if (!played) return null
 
   // Série en cours : compte les derniers résultats identiques consécutifs
@@ -1234,11 +1248,11 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
 
   return {
     played, wins, draws, losses, gf, ga, cs,
-    avgFor:     (gf / played).toFixed(1),
-    avgAgainst: (ga / played).toFixed(1),
-    winPct:     Math.round((wins / played) * 100),
-    bttsPct:    Math.round((btts / played) * 100),
-    over25Pct:  Math.round((over25 / played) * 100),
+    avgFor:     scoredCount ? (gf / scoredCount).toFixed(1) : '0.0',
+    avgAgainst: scoredCount ? (ga / scoredCount).toFixed(1) : '0.0',
+    winPct:     scoredCount ? Math.round((wins / scoredCount) * 100) : 0,
+    bttsPct:    scoredCount ? Math.round((btts / scoredCount) * 100) : 0,
+    over25Pct:  scoredCount ? Math.round((over25 / scoredCount) * 100) : 0,
     streak: streakLabel,
     streakType,
   }

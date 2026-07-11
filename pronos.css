@@ -166,27 +166,40 @@
    Remonté au plus près du bord haut de la card (retour utilisateur) :
    margin-top négatif qui mange dans le padding du parent, compensé par un
    margin-bottom plus grand pour que le reste du contenu (équipes/score) ne
-   bouge pas — la card garde exactement la même hauteur totale. */
+   bouge pas — la card garde exactement la même hauteur totale.
+   ⚠️ CORRIGÉ (retour utilisateur : nom de compét. et heure pas au même
+   niveau) : .pronos__metaComp (flex, logo 14px + texte) et .pronos__metaTime
+   (texte seul) n'avaient pas la même line-height → même avec align-items:
+   center sur la ligne de grille, leur texte ne tombait pas exactement au
+   même niveau visuel. line-height:14px commun aux deux (= hauteur du logo)
+   force l'alignement, peu importe la présence ou non d'une icône. Le
+   margin-top est aussi réduit (-0.25rem → -0.15rem, compensé côté
+   margin-bottom) : l'heure remonté trop haut avec l'ancienne valeur. */
 .pronos__matchMeta {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   font-size: 0.68rem;
-  margin-top: -0.25rem;
-  margin-bottom: 0.75rem;
+  line-height: 14px;
+  margin-top: -0.15rem;
+  margin-bottom: 0.65rem;
 }
 .pronos__metaTime {
   grid-column: 2;
   justify-self: center;
+  align-self: center;
   color: var(--text-main);
+  line-height: 14px;
 }
 .pronos__metaComp {
   grid-column: 1;
   justify-self: start;
+  align-self: center;
   display: flex;
   align-items: center;
   gap: 0.3rem;
   color: var(--text-main);
+  line-height: 14px;
 }
 .pronos__compLogo {
   width: 14px;
