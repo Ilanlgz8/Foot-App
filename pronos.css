@@ -182,7 +182,6 @@
   width: 1.5rem;
   height: 1.5rem;
   flex-shrink: 0;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
 }
 .pronos__crest {
   width: 100%;
