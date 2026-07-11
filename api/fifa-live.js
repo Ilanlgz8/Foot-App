@@ -264,28 +264,18 @@ function parseEspnScore(raw) {
   return 0
 }
 
-// ── Regression guard AVEC confirmation (but annulé VAR) ─────────────────────
-// Demande utilisateur : le score et le buteur doivent redescendre/disparaître
-// dans LiveMatchPage et tous les widgets quand un but est annulé par la VAR.
-// Un 1er correctif a été fait côté client (useLiveMinute.js) mais le score
-// affiché reste bloqué en pratique : pour un match Mondial (fifaD non-null,
-// isWC), CETTE fonction (source Redis PARTAGÉE entre tous les utilisateurs)
-// a SES PROPRES gardes anti-régression indépendantes — Math.max(FIFA, ESPN)
-// pour le score, liste de buteurs qui ne raccourcit jamais, et un plancher
-// score = max(score, nb de buteurs connus). Le client ne reçoit donc jamais
-// la valeur corrigée : elle est déjà écrasée ICI, en amont, avant même
-// d'atteindre le réseau. Même principe de correctif que côté client : une
-// valeur plus basse n'est acceptée que si elle est confirmée sur 2 passes de
-// calcul consécutives (comparée à la valeur BRUTE de la passe précédente,
-// stockée séparément de la valeur publiée) — un glitch isolé (FIFA ou ESPN
-// temporairement à jour partiellement) ne repasse jamais 2 fois de suite
-// avec la même valeur plus basse, contrairement à une vraie annulation VAR.
-function confirmedOrMax(fresh, cached, prevRaw) {
-  if (cached == null || fresh == null) return fresh ?? cached
-  if (fresh < cached && fresh === prevRaw) return fresh
-  return Math.max(fresh, cached)
-}
-// Même principe pour les listes (buteurs/cartons), comparaison par longueur.
+// ── But annulé VAR : le score suit la valeur ESPN/FIFA la plus récente
+// directement (pas d'historique anti-glitch sur le numérique — retour
+// utilisateur : un glitch isolé s'auto-corrige au poll suivant, alors que le
+// vrai bug à corriger ici (score qui reste bloqué des heures après une
+// annulation VAR) est bien plus grave). Seule la liste de buteurs
+// (buteurs/cartons) garde une confirmation sur 2 passes, via
+// confirmedListOrLonger ci-dessous — nécessaire car ESPN/FIFA publient
+// parfois un but sans nom de buteur avant de le compléter au poll suivant,
+// et on ne veut pas qu'un retrait isolé de buteur (glitch) fasse
+// disparaître un vrai but. Voir "BUT ANNULÉ VAR" dans handler() pour le
+// compteur permanent qui compense le champ numérique qui ne se corrige
+// jamais tout seul après une annulation.
 function confirmedListOrLonger(fresh, cached, prevRawLen) {
   const freshList  = fresh ?? []
   const cachedList = cached ?? []
@@ -796,13 +786,20 @@ export default async function handler(req, res) {
       scorers = extractEspnScorers(comp, homeC?.team?.id)
     }
 
-    // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations — la
-    // comparaison d'écart sur 2 passes consécutives, essayée juste avant,
-    // ne s'est PAS déclenchée en 40min+ en conditions réelles malgré une
-    // simulation qui la validait : le champ numérique brut ESPN/FIFA n'est
-    // visiblement pas parfaitement stable d'une passe à l'autre comme
-    // supposé, donc "le même écart 2 fois de suite" ne se produisait jamais
-    // exactement). Nouvelle approche, plus directe et moins fragile :
+    // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations — 2
+    // versions précédentes basées sur "protéger le numérique d'un pic isolé
+    // via un historique Math.max/confirmation" n'ont pas fonctionné en
+    // conditions réelles, probablement car ce champ n'est pas aussi stable
+    // d'une passe à l'autre que supposé). Simplifié sur retour utilisateur
+    // ("on poll bien le score non ? pourquoi pas prendre le plus récent") :
+    // on fait maintenant confiance DIRECTEMENT à la valeur la plus récente
+    // (rawHome/rawAway, sans historique de protection) — un glitch isolé
+    // d'un poll (rare) s'auto-corrige de toute façon au poll suivant,
+    // contrairement au vrai bug qu'on cherche à corriger ici (bloqué des
+    // heures). Le SEUL historique conservé : le compteur "buts annulés",
+    // nécessaire car LUI répond à un problème réel et confirmé (le champ
+    // numérique ESPN/FIFA ne se corrige typiquement jamais tout seul après
+    // une annulation VAR) :
     //
     // 1. bestScorers (voir confirmedListOrLonger, déjà fiable en soi — 2
     //    passes de confirmation intégrées) EST la source de vérité pour le
@@ -811,23 +808,18 @@ export default async function handler(req, res) {
     //    PERMANENCE (compteur qui ne fait qu'augmenter, jamais réinitialisé,
     //    même si un nouveau but fait remonter bestScorers ensuite).
     // 2. Migration : la 1ère fois que ce match est recalculé avec cette
-    //    version (homeCancelledGoals absent de prevData), s'il y a DÉJÀ un
-    //    écart entre le numérique et bestScorers, il est traité comme
-    //    confirmé immédiatement — sans ça, un match déjà bloqué AVANT ce
-    //    déploiement (transition déjà passée, donc invisible à la
-    //    comparaison pass-à-pass du point 1) resterait bloqué pour
-    //    toujours.
-    //
-    // Le champ numérique ESPN/FIFA ne se corrige TYPIQUEMENT JAMAIS tout
-    // seul après une annulation VAR (observé en direct) — le compteur reste
-    // donc actif indéfiniment tant que c'est le cas, sans avoir besoin qu'il
-    // se stabilise sur plusieurs passes.
+    //    version (homeCancelledGoals absent de prevData), un écart déjà
+    //    existant entre le numérique et bestScorers est traité comme
+    //    confirmé immédiatement — corrige un match déjà bloqué dès la
+    //    prochaine passe, sans attendre une nouvelle transition.
     const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
 
-    const homeNumeric = confirmedOrMax(rawHome, prevData?.home, prevData?.rawHome)
-    const awayNumeric = confirmedOrMax(rawAway, prevData?.away, prevData?.rawAway)
+    // Valeur la plus récente, sans protection anti-glitch historique (voir
+    // commentaire ci-dessus).
+    const homeNumeric = rawHome
+    const awayNumeric = rawAway
 
     const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
     const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
@@ -846,9 +838,8 @@ export default async function handler(req, res) {
     const homeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + homeNewlyCancelled
     const awayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + awayNewlyCancelled
 
-    // Score final : numérique confirmé (protège contre un pic isolé vers le
-    // haut sur un seul poll) MOINS les buts confirmés annulés, avec les
-    // buteurs confirmés comme plancher.
+    // Score final : valeur numérique la plus récente MOINS les buts
+    // confirmés annulés, avec les buteurs confirmés comme plancher.
     //
     // ⚠️ Fix désync score/buteur (constat utilisateur historique : le nom du
     // buteur et la minute s'affichent déjà mais le score reste bloqué à
@@ -935,9 +926,9 @@ export default async function handler(req, res) {
       away,
       scorers:      bestScorers,
       cards:        bestCards,
-      // Valeurs BRUTES de CETTE passe (pas home/away/bestScorers publiés
-      // ci-dessus) — servent uniquement à détecter une baisse confirmée à la
-      // PROCHAINE passe de calcul, voir confirmedOrMax/confirmedListOrLonger.
+      // rawScorersLen : longueur BRUTE (pas bestScorers) de CETTE passe —
+      // sert à confirmedListOrLonger à la PROCHAINE passe pour détecter une
+      // baisse confirmée. rawHome/rawAway conservés à titre informatif.
       rawHome,
       rawAway,
       rawScorersLen: scorers.length,
@@ -1001,8 +992,10 @@ export default async function handler(req, res) {
     const fbAwayGoals = bestScorers.filter(s => s.team === 'away').length
     const rawFbHome = fifaD.home ?? 0
     const rawFbAway = fifaD.away ?? 0
-    const fbHomeNumeric = confirmedOrMax(rawFbHome, prevData?.home, prevData?.rawHome)
-    const fbAwayNumeric = confirmedOrMax(rawFbAway, prevData?.away, prevData?.rawAway)
+    // Valeur la plus récente, sans protection anti-glitch historique (voir
+    // commentaire détaillé dans la branche principale ci-dessus).
+    const fbHomeNumeric = rawFbHome
+    const fbAwayNumeric = rawFbAway
     const prevFbHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
     const prevFbAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
     const fbHomeIsFirstPass = prevData?.homeCancelledGoals === undefined
