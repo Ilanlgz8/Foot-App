@@ -6,18 +6,19 @@
  *                    par date) avec une case de score par équipe. Un match
  *                    disparaît d'ici dès qu'il n'est plus SCHEDULED côté
  *                    football-data.org (dès le coup d'envoi).
- *   - "Résultat"   : matchs actuellement EN COURS — pour ne pas perdre le fil
- *                    entre le moment où un match quitte "Pronos" (coup
- *                    d'envoi) et le moment où il apparaît dans "Classement"
- *                    (une fois terminé). Branché directement sur
- *                    useLiveData() (LiveProvider) : ZÉRO requête réseau
- *                    supplémentaire, on réutilise le polling ESPN déjà actif
- *                    pour la page /live. Minute + score uniquement, pas de
- *                    stats (demande explicite de l'utilisateur).
- *   - "Classement" : points de chaque joueur du groupe, calculés CÔTÉ CLIENT
- *                    (3 pts score exact, 1 pt bon résultat, 0 sinon) à partir
- *                    des matchs FINISHED déjà exposés par football-data.org —
- *                    aucun calcul ni cron ajouté côté serveur.
+ *   - "Résultat"   : matchs actuellement EN COURS (branché sur useLiveData(),
+ *                    zéro requête réseau en plus, minute + score seulement,
+ *                    pas de stats) + matchs TERMINÉS depuis moins de 24h
+ *                    (score final, pas de minute). Sert de pont entre le
+ *                    moment où un match quitte "Pronos" (coup d'envoi) et le
+ *                    moment où il n'est plus affiché nulle part ailleurs que
+ *                    dans "Classement" (qui ne montre QUE le classement, pas
+ *                    les matchs).
+ *   - "Classement" : uniquement le classement des joueurs, calculés CÔTÉ
+ *                    CLIENT (3 pts score exact, 1 pt bon résultat, 0 sinon)
+ *                    à partir des matchs FINISHED déjà exposés par
+ *                    football-data.org — aucun calcul ni cron ajouté côté
+ *                    serveur.
  *
  * Identité : deviceId + pseudo persistés en localStorage (usePronosGroup),
  * aucune donnée sensible, groupe rejoint via un code à 6 caractères.
@@ -35,6 +36,13 @@ import '../../pronos.css'
 const TABS = ['pronos', 'resultat', 'classement']
 
 const COMP_IDS = COMPETITIONS.map(c => c.id)
+
+// Un match terminé reste visible dans "Résultat" 24h après (demande
+// utilisateur), + une marge couvrant la durée du match lui-même : on ne
+// connaît que l'heure de coup d'envoi (utcDate) côté football-data.org, pas
+// l'heure exacte de fin — 3h de marge couvre large (prolongations + tirs
+// au but compris).
+const FINISHED_DISPLAY_MS = 27 * 60 * 60 * 1000
 
 const _fmtH = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 const _fmtD = (d) => {
@@ -250,12 +258,35 @@ function LiveResultRow({ match, espn }) {
   )
 }
 
+// Ligne "match terminé récemment" (< 24h) — score final, pas de minute.
+function FinishedResultRow({ match }) {
+  const fs = finalScore(match.score)
+  return (
+    <div className="pronos__matchRow">
+      <div className="pronos__matchMeta">
+        <span>{match.competition?.name ?? ''}</span>
+        <span>Terminé</span>
+      </div>
+      <div className="pronos__matchTeams">
+        <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        <span className="pronos__liveScore">{fs.home ?? '-'}</span>
+        <span className="pronos__scoreSep">-</span>
+        <span className="pronos__liveScore">{fs.away ?? '-'}</span>
+        <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+      </div>
+    </div>
+  )
+}
+
 function Pronos() {
   const { deviceId, groupCode, pseudo, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   const [activeTab, setActiveTab] = useState('pronos')
 
   const { matches: upcoming, loading: loadingUpcoming } = useUpcomingMatchesAllComps(COMP_IDS)
-  const { matches: finished } = useFinishedMatchesAllComps(COMP_IDS, hasGroup && activeTab === 'classement')
+  // Requis par Résultat (matchs finis <24h à afficher) ET Classement (calcul des points)
+  const { matches: finished } = useFinishedMatchesAllComps(
+    COMP_IDS, hasGroup && (activeTab === 'resultat' || activeTab === 'classement')
+  )
   const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup)
   const { liveMatches, espnScores } = useLiveData()
 
@@ -263,6 +294,13 @@ function Pronos() {
     () => liveMatches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED'),
     [liveMatches]
   )
+
+  const recentFinished = useMemo(() => {
+    const now = Date.now()
+    return finished
+      .filter(m => now - new Date(m.utcDate).getTime() < FINISHED_DISPLAY_MS)
+      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+  }, [finished])
 
   const goTab = (t) => setActiveTab(t)
   const swipe = useSwipe(
@@ -375,17 +413,30 @@ function Pronos() {
         )}
 
         {activeTab === 'resultat' && (
-          inProgress.length === 0 ? (
+          inProgress.length === 0 && recentFinished.length === 0 ? (
             <div className="pronos__empty">
               <span className="pronos__emptyIcon">⚽</span>
-              <span className="pronos__emptyTitle">Aucun match en cours pour le moment</span>
+              <span className="pronos__emptyTitle">Aucun match en cours ou terminé récemment</span>
             </div>
           ) : (
-            <div className="pronos__day">
-              {inProgress.map(m => (
-                <LiveResultRow key={m.id} match={m} espn={espnScores[m.id] ?? null} />
-              ))}
-            </div>
+            <>
+              {inProgress.length > 0 && (
+                <div className="pronos__day">
+                  <div className="pronos__dayLabel">En cours</div>
+                  {inProgress.map(m => (
+                    <LiveResultRow key={m.id} match={m} espn={espnScores[m.id] ?? null} />
+                  ))}
+                </div>
+              )}
+              {recentFinished.length > 0 && (
+                <div className="pronos__day">
+                  <div className="pronos__dayLabel">Terminés (24h)</div>
+                  {recentFinished.map(m => (
+                    <FinishedResultRow key={m.id} match={m} />
+                  ))}
+                </div>
+              )}
+            </>
           )
         )}
 
