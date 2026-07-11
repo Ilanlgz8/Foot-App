@@ -156,8 +156,18 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   }
 }
 
-// Matchs SCHEDULED de TOUTES les compétitions suivies, fusionnés et triés
-// chronologiquement — pour Pronos.jsx ("afficher tout les matchs à venir").
+// Fenêtre d'affichage Pronos : les 7 prochains jours seulement (demande
+// utilisateur — pas tout le reste du tournoi d'un coup).
+const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+// Matchs à venir de TOUTES les compétitions suivies, fusionnés, triés
+// chronologiquement et limités aux 7 prochains jours — pour Pronos.jsx.
+// IMPORTANT : pour le WC/EC, fetchMatchesForComp('SCHEDULED') fait un 1er
+// essai SANS filtre de statut (récupère toute la saison, poules + bracket,
+// y compris les matchs déjà joués — voir commentaire plus haut, pensé pour
+// la page Programme qui filtre elle-même ensuite). Il faut donc filtrer ici
+// explicitement par statut (comme filteredGrouped dans Match.jsx) sous peine
+// d'afficher des matchs déjà terminés dans "à venir".
 // Cache combiné dédié (clé "ALL", TTL 1h comme le cache par-compétition
 // SCHEDULED) : au pire une rafale de N requêtes FD.org une fois par heure,
 // lissée par le budget global déjà en place dans api/football.js.
@@ -173,11 +183,19 @@ export function useUpcomingMatchesAllComps(compIds) {
       const results = await Promise.allSettled(
         compIds.map(id => fetchMatchesForComp(id, 'SCHEDULED'))
       )
+      const now = Date.now()
       const merged = results
         .filter(r => r.status === 'fulfilled' && Array.isArray(r.value))
         .flatMap(r => r.value)
+        .filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
+        .filter(m => {
+          const t = new Date(m.utcDate).getTime()
+          return t >= now && t - now <= UPCOMING_WINDOW_MS
+        })
         .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
 
+      // Rien à écrire en cache si la fenêtre 7j est vide (ex: creux entre 2
+      // journées) — évite d'effacer un cache valide avec un résultat vide.
       if (merged.length === 0) return readCacheStale(key) ?? []
       writeCache(key, merged, ttl)
       return merged

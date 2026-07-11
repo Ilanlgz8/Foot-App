@@ -170,8 +170,29 @@
   align-items: center;
   gap: 0.5rem;
 }
+.pronos__team {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pronos__team--away { flex-direction: row-reverse; }
+.pronos__crestWrap {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
+.pronos__crest {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
 .pronos__teamName {
   flex: 1;
+  min-width: 0;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-main);

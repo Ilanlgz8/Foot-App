@@ -54,6 +54,22 @@ const _fmtD = (d) => {
   return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 const teamName = (team) => team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
+const isWCMatch = (match) => match.competition?.id === 2000 || match.competition?.code === 'WC'
+
+// Drapeau (pays, WC) ou blason (club) — même traitement partagé que le reste
+// de l'app via l'attribut data-crest (voir index.css : [data-crest="country"]
+// / [data-crest="club"], appliqué globalement, pas de CSS dupliqué ici).
+function TeamCrest({ team, isWC }) {
+  if (!team?.crest) return null
+  return (
+    <div className="pronos__crestWrap" data-crest={isWC ? 'country' : 'club'}>
+      <img
+        src={team.crest} alt="" className="pronos__crest" data-team={team?.name}
+        onError={e => { e.currentTarget.style.display = 'none' }}
+      />
+    </div>
+  )
+}
 
 function groupByDay(matches) {
   const map = {}
@@ -201,7 +217,10 @@ function MatchPredictRow({ match, myPred, onSave }) {
         <span>{_fmtH(match.utcDate)}</span>
       </div>
       <div className="pronos__matchTeams">
-        <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        <div className="pronos__team">
+          <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        </div>
         <input
           type="number" inputMode="numeric" min="0" max="20"
           className="pronos__scoreInput"
@@ -217,7 +236,10 @@ function MatchPredictRow({ match, myPred, onSave }) {
           onChange={e => setAway(e.target.value)}
           onBlur={commit}
         />
-        <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__team pronos__team--away">
+          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+          <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+        </div>
       </div>
     </div>
   )
@@ -248,11 +270,17 @@ function LiveResultRow({ match, espn }) {
         <span className="pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
       </div>
       <div className="pronos__matchTeams">
-        <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        <div className="pronos__team">
+          <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        </div>
         <span className="pronos__liveScore">{hs ?? '-'}</span>
         <span className="pronos__scoreSep">-</span>
         <span className="pronos__liveScore">{as_ ?? '-'}</span>
-        <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__team pronos__team--away">
+          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+          <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+        </div>
       </div>
     </div>
   )
@@ -268,11 +296,17 @@ function FinishedResultRow({ match }) {
         <span>Terminé</span>
       </div>
       <div className="pronos__matchTeams">
-        <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        <div className="pronos__team">
+          <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        </div>
         <span className="pronos__liveScore">{fs.home ?? '-'}</span>
         <span className="pronos__scoreSep">-</span>
         <span className="pronos__liveScore">{fs.away ?? '-'}</span>
-        <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__team pronos__team--away">
+          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+          <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+        </div>
       </div>
     </div>
   )
