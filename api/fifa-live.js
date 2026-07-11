@@ -857,6 +857,21 @@ export default async function handler(req, res) {
     let home = Math.max(homeNumeric - homeCancelledGoals, homeGoalsFromScorers)
     let away = Math.max(awayNumeric - awayCancelledGoals, awayGoalsFromScorers)
 
+    // ⚠️ Log diagnostic TEMPORAIRE (retour utilisateur : score encore bloqué
+    // après plusieurs correctifs, 40min+ sans résolution malgré une logique
+    // validée par simulation) — dès qu'un écart existe entre le numérique et
+    // les buteurs confirmés, on trace les valeurs réelles (visible dans les
+    // logs Vercel, Functions → fifa-live) pour comprendre CE QUI, dans les
+    // données réelles ESPN/FIFA, diffère de ce qui a été simulé. À retirer
+    // une fois la cause confirmée.
+    if (rawHomeGap > 0 || rawAwayGap > 0 || (prevData?.homeCancelledGoals ?? 0) > 0 || (prevData?.awayCancelledGoals ?? 0) > 0) {
+      console.log(`[VAR-DEBUG] ${fdMatch.id} ${fdMatch.homeTeam?.name ?? homeC?.team?.name}-${fdMatch.awayTeam?.name ?? awayC?.team?.name} ` +
+        `fifaHome=${fifaD?.home} espnHome=${parseEspnScore(homeC?.score)} rawHome=${rawHome} homeNumeric=${homeNumeric} ` +
+        `scorersFifa=${fifaD?.scorers?.length} scorersEspn=${extractEspnScorers(comp, homeC?.team?.id)?.length} ` +
+        `bestScorersHome=${homeGoalsFromScorers} rawHomeGap=${rawHomeGap} homeGapConfirmed=${homeGapConfirmed} ` +
+        `homeCancelledGoals=${homeCancelledGoals} finalHome=${home}`)
+    }
+
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
     // scénario VAR réaliste pour un carton annulé → confirmation non requise,
     // même garde simple qu'avant.
