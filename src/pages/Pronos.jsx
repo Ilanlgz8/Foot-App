@@ -221,24 +221,26 @@ function MatchPredictRow({ match, myPred, onSave }) {
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
         </div>
-        <input
-          type="number" inputMode="numeric" min="0" max="20"
-          className="pronos__scoreInput"
-          value={home}
-          onChange={e => setHome(e.target.value)}
-          onBlur={commit}
-        />
-        <span className="pronos__scoreSep">-</span>
-        <input
-          type="number" inputMode="numeric" min="0" max="20"
-          className="pronos__scoreInput"
-          value={away}
-          onChange={e => setAway(e.target.value)}
-          onBlur={commit}
-        />
-        <div className="pronos__team pronos__team--away">
-          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__scoreGroup">
+          <input
+            type="number" inputMode="numeric" min="0" max="20"
+            className="pronos__scoreInput"
+            value={home}
+            onChange={e => setHome(e.target.value)}
+            onBlur={commit}
+          />
+          <span className="pronos__scoreSep">-</span>
+          <input
+            type="number" inputMode="numeric" min="0" max="20"
+            className="pronos__scoreInput"
+            value={away}
+            onChange={e => setAway(e.target.value)}
+            onBlur={commit}
+          />
+        </div>
+        <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
         </div>
       </div>
     </div>
@@ -274,12 +276,14 @@ function LiveResultRow({ match, espn }) {
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
         </div>
-        <span className="pronos__liveScore">{hs ?? '-'}</span>
-        <span className="pronos__scoreSep">-</span>
-        <span className="pronos__liveScore">{as_ ?? '-'}</span>
-        <div className="pronos__team pronos__team--away">
-          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__scoreGroup">
+          <span className="pronos__liveScore">{hs ?? '-'}</span>
+          <span className="pronos__scoreSep">-</span>
+          <span className="pronos__liveScore">{as_ ?? '-'}</span>
+        </div>
+        <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
         </div>
       </div>
     </div>
@@ -300,12 +304,14 @@ function FinishedResultRow({ match }) {
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
         </div>
-        <span className="pronos__liveScore">{fs.home ?? '-'}</span>
-        <span className="pronos__scoreSep">-</span>
-        <span className="pronos__liveScore">{fs.away ?? '-'}</span>
-        <div className="pronos__team pronos__team--away">
-          <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+        <div className="pronos__scoreGroup">
+          <span className="pronos__liveScore">{fs.home ?? '-'}</span>
+          <span className="pronos__scoreSep">-</span>
+          <span className="pronos__liveScore">{fs.away ?? '-'}</span>
+        </div>
+        <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
+          <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
         </div>
       </div>
     </div>
