@@ -559,6 +559,33 @@ export default async function handler(req, res) {
     return { notifsSent: 0, events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
   }
 
+  // ── Aucun match imminent (mais pas "jour vide") : lever le pied jusqu'au
+  // prochain coup d'envoi connu ──────────────────────────────────────────────
+  // ⚠️ AJOUT (question utilisateur : "pour ce genre de requêtes toutes les
+  // minutes, pourquoi pas ne pas fetcher tant qu'y'a pas de match ce jour-là ?")
+  // : le mécanisme "jour vide" ci-dessus ne couvre QUE les jours SANS AUCUN
+  // match. Un jour avec un seul match tardif (ex: 21h) fait quand même les 18
+  // fetchs ESPN toutes les minutes depuis minuit, alors que rien ne peut se
+  // passer avant le coup d'envoi. Même prudence que "jour vide" : jamais deviné
+  // à l'avance, uniquement posé après un fetch RÉEL qui confirme qu'aucun match
+  // n'est en direct, et TOUJOURS re-vérifié en vrai au plus tard 25min après
+  // (jamais un blocage figé jusqu'au coup d'envoi — si l'horaire bouge ou qu'un
+  // match commence plus tôt que prévu, on le rattrape au prochain re-check).
+  // Marge de sécurité 1h30 avant le coup d'envoi le plus proche connu : le
+  // polling normal reprend largement avant l'heure programmée, jamais pile
+  // dessus. Champ d'application volontairement étroit (uniquement "aucun match
+  // en direct ET prochain KO loin") pour ne jamais toucher au comportement
+  // pendant/juste avant un match — seul le temps mort matinal/après-midi avant
+  // un match du soir est concerné.
+  const NEXT_CHECK_BUFFER_MS = 90 * 60 * 1000  // 1h30 de marge avant le 1er coup d'envoi connu
+  const NEXT_CHECK_MAX_MS    = 25 * 60 * 1000  // jamais plus de 25min sans re-vérifier en vrai
+  const nextCheckKey = 'cron:nextCheck'
+  let skipUntil = null
+  try { skipUntil = await kv.get(nextCheckKey) } catch {}
+  if (skipUntil && Number(skipUntil) > now.getTime()) {
+    return { notifsSent: 0, events: 0, log: [`aucun match en direct/imminent (re-check ${new Date(Number(skipUntil)).toLocaleTimeString('fr-FR')}) — fetch ESPN sauté`] }
+  }
+
   // Fetch tous les slugs ESPN en parallèle (aujourd'hui + hier pour les matchs tardifs)
   const allResults = await Promise.allSettled(
     ESPN_SLUGS.flatMap(slug => [
@@ -576,6 +603,29 @@ export default async function handler(req, res) {
   const espnFetchFailed = log.some(l => /^\[espn:.*\] error=/.test(l))
   if (allEvents.length === 0 && !espnFetchFailed) {
     try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
+  }
+
+  // Poser le marqueur "rien d'imminent" (voir commentaire plus haut) —
+  // uniquement si le fetch a abouti, qu'AUCUN match trouvé n'est actuellement
+  // en direct, et qu'il reste une vraie marge avant le prochain coup d'envoi
+  // programmé (les matchs déjà terminés/reportés n'entrent pas en compte).
+  if (allEvents.length > 0 && !espnFetchFailed) {
+    const anyLive = allEvents.some(({ evt }) =>
+      LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
+    if (!anyLive) {
+      const upcomingKickoffs = allEvents
+        .filter(({ evt }) => normalizeEspnStatus(evt.competitions?.[0]?.status) === 'STATUS_SCHEDULED')
+        .map(({ evt }) => Date.parse(evt.date))
+        .filter(t => Number.isFinite(t) && t > now.getTime())
+      const nextKickoff = upcomingKickoffs.length ? Math.min(...upcomingKickoffs) : null
+      const farEnough = nextKickoff == null || (nextKickoff - now.getTime()) > NEXT_CHECK_BUFFER_MS
+      if (farEnough) {
+        const skipCandidate = nextKickoff != null
+          ? Math.min(nextKickoff - NEXT_CHECK_BUFFER_MS, now.getTime() + NEXT_CHECK_MAX_MS)
+          : now.getTime() + NEXT_CHECK_MAX_MS
+        try { await kv.set(nextCheckKey, skipCandidate, { ex: Math.ceil(NEXT_CHECK_MAX_MS / 1000) + 60 }) } catch {}
+      }
+    }
   }
   // ⚠️ Ces 2 lignes de diagnostic (total events / matches FIFA live) étaient
   // loggées à CHAQUE passe, identiques la plupart du temps — ça remplissait le
