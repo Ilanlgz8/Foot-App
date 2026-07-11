@@ -183,8 +183,20 @@ export function outcomeForTeam(match, teamId) {
   const isAway = match.awayTeam?.id === teamId
   if (!isHome && !isAway) return null
 
+  // ⚠️ 2e BUG CORRIGÉ (l'utilisateur a signalé que le problème persistait
+  // pour l'Angleterre après le 1er correctif ci-dessus) : l'ordre de check
+  // était faux pour un match à élimination directe décidé aux tirs au but.
+  // score.winner === 'DRAW' peut ne refléter QUE le score 120min (à égalité
+  // par définition en cas de tab) sans tenir compte des tirs au but — en le
+  // vérifiant EN PREMIER (comme avant), un match comme Mexique-Angleterre
+  // (1/8, Mondial 2026), s'il a été décidé aux tab, retombait sur 'D' au
+  // lieu du vrai résultat W/L, AVANT même d'avoir regardé score.penalties.
+  // matchOutcome() (au-dessus) avait le bon ordre depuis le début (tab
+  // vérifiés avant toute comparaison de score) — outcomeForTeam() ne le
+  // respectait pas. Les branches HOME_TEAM/AWAY_TEAM restent fiables en
+  // premier (non ambiguës, jamais un score à égalité), seul le cas DRAW est
+  // repoussé après le check tab.
   const winner = match.score?.winner
-  if (winner === 'DRAW')      return 'D'
   if (winner === 'HOME_TEAM') return isHome ? 'W' : 'L'
   if (winner === 'AWAY_TEAM') return isAway ? 'W' : 'L'
 
@@ -200,6 +212,8 @@ export function outcomeForTeam(match, teamId) {
     const homeWon = hp > ap
     return (isHome && homeWon) || (isAway && !homeWon) ? 'W' : 'L'
   }
+
+  if (winner === 'DRAW') return 'D'
 
   const fs = finalScore(match.score)
   if (fs.home == null || fs.away == null) return null
