@@ -88,11 +88,6 @@ function normalizeEspnStatus(st) {
   return name || 'STATUS_SCHEDULED'
 }
 
-// Délai d'attente du nom du buteur avant d'envoyer un "⚽ But !" générique —
-// voir le commentaire détaillé au niveau du bloc "⚽ But" plus bas (constat
-// utilisateur : 5min faisait percevoir l'absence totale de notif).
-const GOAL_SCORER_WAIT_MS = 45_000
-
 // ── FIFA live — couche rapide WC (même cache Redis que api/fifa-live.js) ───────
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 
@@ -733,7 +728,7 @@ export default async function handler(req, res) {
     // rétroactif sur des buts antérieurs au premier poll de ce match.
     if (prevState === null) {
       log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
-      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away, pendingSince: {} }), { ex: 12 * 3600 }) } catch {}
+      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away }), { ex: 12 * 3600 }) } catch {}
       continue
     }
 
@@ -748,52 +743,35 @@ export default async function handler(req, res) {
       log.push(`[espn:${slug}:${eventId}] transition ${prevStatus} → ${status} (period=${comp.status?.period ?? '?'}, clock=${comp.status?.displayClock ?? '?'})`)
     }
 
-    // ⚽ But — approche "complète si possible, mais jamais silencieuse trop
-    // longtemps". Au lieu de notifier dès que le score diffère du poll
-    // précédent, on compare le score actuel à un compteur persistant "buts
-    // déjà notifiés par camp" (goalTrack:${eventId}) : si comp.details n'a pas
-    // encore le nom du buteur, on RETENTE aux polls suivants (jusqu'à
-    // GOAL_SCORER_WAIT_MS) au lieu d'envoyer tout de suite un "⚽ But !"
-    // générique définitif — sendDeduped() garde son rôle habituel (une seule
-    // notif par but), le compteur sert uniquement à décider QUAND l'appeler.
+    // ⚽ But — envoi IMMÉDIAT dès que le score diffère du poll précédent (plus
+    // d'attente du nom du buteur avant d'envoyer quoi que ce soit).
     //
-    // ⚠️ RÉGLÉ (constat utilisateur : "depuis que ça attend le buteur, je ne
-    // reçois plus les notifs de but") : la fenêtre d'attente était à 5 minutes.
-    // Combinée au pire cas de détection du but lui-même (jusqu'à ~60s de
-    // "trou mort" entre deux appels cron-job.org, cron-job.org ne descendant
-    // jamais sous 1 appel/minute), le délai total avant la toute PREMIÈRE
-    // notif pouvait dépasser 6 minutes quand ESPN ne publiait jamais le
-    // buteur assez vite — perçu à raison comme "plus de notif du tout" par
-    // l'utilisateur. Ramenée à 45s : le nom du but est encore attendu le temps
-    // d'un aller-retour raisonnable, mais le pire cas total tombe à environ
-    // 60+45 = 105s au lieu de 360s, bien plus proche du ressenti "immédiat"
-    // d'avant l'introduction de cette attente.
+    // ⚠️ REVERT (constat utilisateur direct : "avant ça marchait, à partir du
+    // moment où on a dit d'attendre le buteur, ça a cassé") : ce fichier avait
+    // introduit une attente (GOAL_SCORER_WAIT_MS, d'abord 5min puis réduite à
+    // 45s) pour inclure le nom du buteur quand ESPN ne l'avait pas encore
+    // publié au moment exact du changement de score — dans l'idée d'éviter un
+    // "⚽ But !" générique. Mais d'après le retour direct de l'utilisateur,
+    // c'est précisément à partir de l'introduction de cette attente que les
+    // notifs de but ont cessé d'arriver de façon fiable, alors que coup
+    // d'envoi/mi-temps/fin (qui n'ont jamais eu ce mécanisme d'attente)
+    // continuaient d'arriver normalement — signal clair que le bug est dans
+    // cette logique d'attente spécifiquement, même si aucune preuve directe
+    // (log serveur) n'a pu être obtenue pour le confirmer avec certitude
+    // absolue. Plutôt que de continuer à retoucher un mécanisme déjà repris
+    // 3 fois (5min→45s, fix multi-buts, fix pendingSince par camp) sans
+    // pouvoir prouver le bug exact, la solution la plus sûre et la plus
+    // simple est de supprimer l'attente : le nom du buteur est utilisé s'il
+    // est DÉJÀ présent dans comp.details au moment du poll qui détecte le
+    // but, sinon message générique envoyé tout de suite (jamais de retry
+    // différé). Le compteur goalTrack (1 but à la fois, un envoi par but
+    // manquant) est conservé : c'est lui qui gère les buts multiples entre
+    // deux polls (ex: 0→2 d'un coup), pas la partie retirée ici.
     //
-    // ⚠️ BUG CORRIGÉ (constat utilisateur : Maroc-Canada, 2 buts marocains,
-    // aucune notif reçue) : quand le score d'un même camp montait de PLUS DE 1
-    // entre deux passes (ex: 0 → 2 directement, deux buts marqués dans le même
-    // intervalle de poll — plausible avec ~8-36s entre passes), l'ancien code
-    // ne traitait qu'UNE seule "side" par camp (peu importe l'écart), envoyait
-    // UNE SEULE notif (celle du dernier buteur connu), puis faisait sauter le
-    // compteur directement à la nouvelle valeur (`track[side] = home`) — ce qui
-    // marquait silencieusement les DEUX buts comme "déjà notifiés" alors qu'un
-    // seul push avait réellement été envoyé. Fix : on compare le compteur déjà
-    // notifié (track[side]) au nombre RÉEL de buts attendus (home/away), et on
-    // boucle un but à la fois (while) — un envoi par but manquant, chacun avec
-    // son propre scorer (goalScorers[n]) s'il est déjà connu côté ESPN, sinon
-    // on s'arrête à ce but précis et on retente au poll suivant (les buts
-    // suivants, eux, restent bloqués derrière tant que celui-ci n'est pas résolu
-    // — comportement voulu : préserve l'ordre chronologique d'envoi).
-    //
-    // Effet de bord corrigé au passage : pendingSince était un champ UNIQUE
-    // partagé pour tout le match, donc faux si les DEUX équipes attendaient
-    // un buteur en même temps (le délai de l'une écrasait celui de l'autre).
-    // Passé en objet { home, away } pour être vraiment indépendant par camp.
-    //
-    // Exclusion conservée de l'ancienne logique : un changement de score alors
-    // qu'on était DÉJÀ en mi-temps au poll précédent ET qu'on y est toujours
-    // (vraie pause, aucun but possible) = correction tardive de données ESPN,
-    // pas un but réel → absorbé silencieusement dans le compteur, jamais notifié.
+    // Exclusion conservée : un changement de score alors qu'on était DÉJÀ en
+    // mi-temps au poll précédent ET qu'on y est toujours (vraie pause, aucun
+    // but possible) = correction tardive de données ESPN, pas un but réel →
+    // absorbé silencieusement dans le compteur, jamais notifié.
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
     if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
       // Verrou léger (5s, NX) anti-concurrence : le compteur `track` ci-dessous
@@ -813,20 +791,13 @@ export default async function handler(req, res) {
       const trackKey = `goalTrack:${eventId}`
       let track = null
       try { track = await kv.get(trackKey) } catch {}
-      track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away, pendingSince: {} }
-      // Migration douce : anciennes entrées Redis avec pendingSince en number/null
-      if (!track.pendingSince || typeof track.pendingSince !== 'object') track.pendingSince = {}
+      track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away }
 
       const sides = []
       if (home > track.home) sides.push('home')
       if (away > track.away) sides.push('away')
 
       let trackChanged = false
-      // Une fois le match final, plus de nouveau poll utile à attendre pour ce
-      // match (il sort bientôt de la fenêtre today/yesterday) → on résout tout
-      // de suite avec ce qu'on a, plutôt que de laisser un but en attente
-      // indéfiniment sans jamais pouvoir le rattraper.
-      const forceNow = FINAL_ESPN.has(status)
 
       for (const side of sides) {
         const targetCount = side === 'home' ? home : away
@@ -842,34 +813,24 @@ export default async function handler(req, res) {
           .filter(g => g.team === side)
           .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
 
-        const pendingSince  = track.pendingSince[side] ?? Date.now()
-        const waitedTooLong = forceNow || (Date.now() - pendingSince > GOAL_SCORER_WAIT_MS)
-
         // Un but à la fois — tant que track[side] < targetCount, il reste au
-        // moins un but réel non notifié.
+        // moins un but réel non notifié. Envoi immédiat, avec le nom du
+        // buteur s'il est déjà connu côté ESPN à ce poll précis, sinon
+        // message générique tout de suite (voir commentaire plus haut).
         while (track[side] < targetCount) {
           const goalIndex = track[side] // 0 = 1er but de ce camp, 1 = 2e, etc.
           const scorer     = goalScorers[goalIndex] ?? null
 
-          if (!scorer && !waitedTooLong) {
-            if (!track.pendingSince[side]) { track.pendingSince[side] = pendingSince; trackChanged = true }
-            log.push(`[espn:${slug}:${eventId}] BUT ${side} en attente du buteur (${goalIndex + 1}/${targetCount})`)
-            break // ce but (et les suivants) retentera au prochain poll
-          }
-
           // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même
           // convention (nom + ", pen"/", csc" entre parenthèses) que
           // generateRecap() plus haut dans ce fichier, pour rester cohérent.
-          // Fallback générique uniquement si le délai de 5 min est dépassé sans
-          // qu'ESPN n'ait jamais rattaché de buteur (rare, mais mieux que de ne
-          // jamais notifier ce but).
           const scorerSuffix = scorer ? (scorer.ownGoal ? ', csc' : scorer.penaltyKick ? ', pen' : '') : ''
           const minuteText   = scorer ? minuteLabel(scorer.minute) : ''
           const goalTitle    = scorer
             ? `⚽ But pour ${scoringTeam} (${scorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
             : '⚽ But !'
 
-          log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, délai dépassé)'}`)
+          log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, buteur pas encore publié)'}`)
 
           // Clé de dédup basée sur "le Nème but de ce camp dans ce match" —
           // stable et unique même si 2 buts du même camp partagent le même
@@ -881,7 +842,6 @@ export default async function handler(req, res) {
           if (sent > 0) notifsSent++
 
           track[side]++
-          track.pendingSince[side] = null
           trackChanged = true
         }
       }
