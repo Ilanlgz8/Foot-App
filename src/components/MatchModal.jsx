@@ -9,7 +9,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome , isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -1127,8 +1127,22 @@ export function TeamFormTable({ teamId, compMatches }) {
   // compMatches (FD.org) est trié du plus ancien au plus récent → slice(-5)
   // garde les 5 derniers, puis reverse() pour afficher le dernier match joué
   // tout en haut (même convention que l'onglet Historique, voir H2HRowsList).
+  //
+  // ⚠️ BUG CORRIGÉ (constat utilisateur répété pour l'Angleterre, toujours
+  // présent après 2 correctifs faits ailleurs dans useTeamForm.js/
+  // matchUtils.js) : CE composant est celui RÉELLEMENT affiché à l'écran
+  // pour "Forme récente" — mais il avait sa PROPRE logique W/D/L
+  // indépendante, jamais branchée sur outcomeForTeam() (matchUtils.js),
+  // reconstruite ici directement depuis compMatches plutôt que d'utiliser le
+  // formMap déjà corrigé dans useTeamForm.js. Les correctifs précédents
+  // n'avaient donc jamais eu d'effet sur ce qui s'affiche réellement.
+  // Remplacé par outcomeForTeam() (même fonction, même priorité partout) —
+  // un match dont le résultat n'est pas encore déterminable (score pas
+  // encore renseigné par FD.org) est maintenant exclu de la liste plutôt que
+  // silencieusement affiché comme un match nul "-:-" trompeur.
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
+    .filter(m => outcomeForTeam(m, teamId) != null)
     .slice(-5)
     .reverse()
 
@@ -1141,21 +1155,10 @@ export function TeamFormTable({ teamId, compMatches }) {
         const fsRow   = finalScore(m.score)
         const hs      = fsRow.home ?? '-'
         const as_     = fsRow.away ?? '-'
-        const myGoals  = myHome ? hs : as_
-        const oppGoals = myHome ? as_ : hs
-        // Score 120min (finalScore) : un match décidé aux tirs au but y est
-        // TOUJOURS à égalité, le vrai W/D/L vient de penalties.
         const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
         const hp = m.score?.penalties?.home ?? null
         const ap = m.score?.penalties?.away ?? null
-        let result
-        if (wentToPens && hp != null && ap != null) {
-          const myPens  = myHome ? hp : ap
-          const oppPens = myHome ? ap : hp
-          result = myPens > oppPens ? 'W' : myPens < oppPens ? 'L' : 'D'
-        } else {
-          result = myGoals > oppGoals ? 'W' : myGoals < oppGoals ? 'L' : 'D'
-        }
+        const result  = outcomeForTeam(m, teamId)
         const hName   = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
         const aName   = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
         const date    = new Date(m.utcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
