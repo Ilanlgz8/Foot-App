@@ -825,8 +825,23 @@ export default async function handler(req, res) {
     // qu'un but annulé, donc ce plancher ne réintroduit plus le bug).
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
-    home = Math.max(home, homeGoalsFromScorers)
-    away = Math.max(away, awayGoalsFromScorers)
+
+    // ⚠️ BUT ANNULÉ VAR — SUITE (constat utilisateur : le nom du buteur a bien
+    // disparu mais le score restait bloqué à 2-1 au lieu de 1-1). Cause :
+    // ESPN/FIFA ne corrigent pas forcément le champ NUMÉRIQUE du score
+    // (competitor.score / fifaD.home) à la même vitesse que la liste
+    // d'événements détaillés (Goals[]/details[], d'où vient bestScorers) —
+    // ici bestScorers avait déjà confirmé la baisse (2 passes de suite) mais
+    // le plancher Math.max(home, homeGoalsFromScorers) ci-dessous empêchait
+    // quand même le score de suivre, puisqu'il ne fait QUE remonter. Si le
+    // nombre de buteurs CONFIRMÉS vient de baisser par rapport à la dernière
+    // passe stockée (signal indépendant, déjà passé par sa propre
+    // confirmation 2-passes via confirmedListOrLonger), on le suit
+    // directement plutôt que de le traiter comme un simple plancher.
+    const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
+    const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
+    home = homeGoalsFromScorers < prevHomeScorersLen ? homeGoalsFromScorers : Math.max(home, homeGoalsFromScorers)
+    away = awayGoalsFromScorers < prevAwayScorersLen ? awayGoalsFromScorers : Math.max(away, awayGoalsFromScorers)
 
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
     // scénario VAR réaliste pour un carton annulé → confirmation non requise,
