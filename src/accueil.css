@@ -729,12 +729,16 @@
 
 
 /* ── Navigation par jour dans le panel résultats ── */
+/* Padding haut réduit (0.7rem→0.35rem) : trop d'espace entre le header du
+   panel ("Résultats récents") et le libellé du jour ("Hier ‹ ›") juste en
+   dessous — retour utilisateur. Le bas garde plus d'air (0.6rem) avant le
+   divider suivant. */
 .accueil__resultNav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.7rem 1.3rem;
+  padding: 0.35rem 1.3rem 0.6rem;
 }
 
 .accueil__resultNavLabel {
@@ -1198,6 +1202,9 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.4rem;
+  /* padding-bottom réduit : trop d'air avant le libellé "Hier" juste en
+     dessous (voir accueil__resultNav) — retour utilisateur. */
+  padding-bottom: 0.7rem;
 }
 .accueil__dashPanelHeader--withFilter .accueil__compFilter {
   padding: 0.18rem;
