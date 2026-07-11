@@ -350,15 +350,7 @@ function Accueil() {
         status: 'FINISHED',
       }
     })
-    // Retour utilisateur : le panneau ne doit montrer QUE les résultats
-    // d'aujourd'hui, pas ceux d'hier — `filteredResults` mélange aujourd'hui
-    // + hier (voir resultsSourceMatches, nécessaire au filet anti-résurrection
-    // ft/endedAt géré juste au-dessus dans todayFt), donc on filtre ici sur la
-    // date réelle du match pour ne garder que le jour courant.
-    return [
-      ...todayFtMapped,
-      ...filteredResults.filter(r => !todayFtIds.has(r.id) && r.utcDate?.slice(0, 10) === absoluteToday),
-    ]
+    return [...todayFtMapped, ...filteredResults.filter(r => !todayFtIds.has(r.id))]
   })()
 
   return (

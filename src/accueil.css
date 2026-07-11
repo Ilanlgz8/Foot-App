@@ -253,9 +253,20 @@
 
 /* Panel "Résultats récents" — fond plus foncé (retour utilisateur x2, --bg-deep
    jugé encore trop clair), modifier dédié pour ne PAS affecter le panel
-   "matchs à venir" qui partage la même classe .accueil__dashPanel de base. */
+   "matchs à venir" qui partage la même classe .accueil__dashPanel de base.
+   Bordure rouge animée (retour utilisateur) — box-shadow en inset car le
+   panel a overflow:hidden (une ombre portée classique serait rognée). */
 .accueil__dashPanel--result {
-  background: #000000;
+  background: #0a0a0a;
+  border-color: rgba(var(--red-rgb),0.25);
+  animation: resultPanelBorderPulse 2.6s ease-in-out infinite;
+}
+@keyframes resultPanelBorderPulse {
+  0%, 100% { border-color: rgba(var(--red-rgb),0.18); box-shadow: inset 0 0 0 rgba(var(--red-rgb),0); }
+  50%      { border-color: rgba(var(--red-rgb),0.6); box-shadow: inset 0 0 16px rgba(var(--red-rgb),0.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .accueil__dashPanel--result { animation: none; border-color: rgba(var(--red-rgb),0.35); }
 }
 
 /* Accent ligne rouge en haut du panel */
@@ -716,6 +727,24 @@
   margin-top: 0.15rem;
 }
 
+
+/* ── Navigation par jour dans le panel résultats ── */
+.accueil__resultNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1.3rem;
+}
+
+.accueil__resultNavLabel {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #f5f5f5;
+  letter-spacing: -0.02em;
+  flex: 1;
+  text-align: center;
+}
 
 /* ── Empty state — même traitement que .live__empty (icône + titre),
    plutôt qu'une simple ligne de texte grise perdue dans le panneau. ── */
@@ -1852,24 +1881,21 @@
    Composant dédié (src/accueil/ResultHeroCard.jsx), volontairement séparé de
    .accueil__matchCard : voir le commentaire en tête de ce fichier JSX.
    ========================================================= */
-/* Retour utilisateur : le fond teinté couleur équipe (::before ci-dessous,
-   désormais retiré) donnait une impression de bleu marine grisé sur beaucoup
-   de matchs (équipes aux couleurs bleutées très fréquentes en foot). Fond
-   plat noir légèrement grisé + bordure rouge animée à la place. */
+/* Retour utilisateur : le fond teinté couleur équipe (::before, retiré ici)
+   donnait une impression de bleu marine grisé sur beaucoup de matchs
+   (équipes aux couleurs bleutées très fréquentes en foot) — fond plat gardé.
+   La bordure rouge animée demandée s'applique au PANEL (voir
+   .accueil__dashPanel--result plus bas), pas à chaque card individuellement
+   (trop de bordures qui pulsent en même temps sinon). */
 .resultHero {
   position: relative;
   overflow: hidden;
   border-radius: 14px;
   padding: 0.85rem 1rem 0.9rem;
   background: #0a0a0a;
-  border: 1px solid rgba(var(--red-rgb),0.25);
+  border: 1px solid rgba(var(--white-rgb),0.06);
   cursor: pointer;
-  transition: transform 0.15s, background 0.15s;
-  animation: resultHeroBorderPulse 2.6s ease-in-out infinite;
-}
-@keyframes resultHeroBorderPulse {
-  0%, 100% { border-color: rgba(var(--red-rgb),0.18); box-shadow: 0 0 0 rgba(var(--red-rgb),0); }
-  50%      { border-color: rgba(var(--red-rgb),0.55); box-shadow: 0 0 10px rgba(var(--red-rgb),0.18); }
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
 }
 .resultHero > * {
   position: relative;
@@ -1877,14 +1903,12 @@
 }
 
 .resultHero:hover {
+  border-color: rgba(var(--white-rgb),0.12);
   transform: translateY(-1px);
 }
 .resultHero:active {
   transform: scale(0.98);
   transition-duration: 0.1s;
-}
-@media (prefers-reduced-motion: reduce) {
-  .resultHero { animation: none; border-color: rgba(var(--red-rgb),0.3); }
 }
 
 /* Liseré du haut : couleur de l'équipe gagnante (voir --result-hero-accent,
