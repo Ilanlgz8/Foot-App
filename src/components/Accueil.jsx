@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
-import { useTodayMatches, prefetchMatchesForDate } from '../hooks/useTodayMatches'
+import { useTodayMatches, prefetchMatchesForDate, useRecentDaysMatches } from '../hooks/useTodayMatches'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
@@ -114,18 +114,19 @@ function Accueil() {
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
 
-  // Résultats récents : toujours basés sur aujourd'hui (absolu) + hier.
-  // Indépendant de dayOffset — le panneau résultats affiche toujours les matchs
-  // terminés du jour courant et de la veille, même quand on consulte un jour futur.
+  // Résultats récents : jusqu'à 7 jours en arrière (était limité à
+  // aujourd'hui + hier — retour utilisateur : impossible de consulter plus
+  // loin). Indépendant de dayOffset — le panneau résultats affiche toujours
+  // les matchs terminés des derniers jours, même quand on consulte un jour
+  // futur dans "Matchs". Coût réseau marginal grâce au cache (voir
+  // useRecentDaysMatches) : chaque jour PASSÉ est mis en cache 6h dès son
+  // premier fetch (un résultat FINISHED ne change plus), seul "aujourd'hui"
+  // est vraiment rafraîchi souvent.
+  const RESULTS_DAYS_BACK = 7
   const absoluteToday = todayDateStr
-  const absoluteYesterday = useMemo(() => {
-    const d = new Date(absoluteToday + 'T12:00:00')
-    d.setDate(d.getDate() - 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }, [absoluteToday])
   // React Query déduplique : si dayOffset=0, absoluteToday === targetDate → pas de double fetch
-  const { matches: todayMatchesForResults }     = useTodayMatches(absoluteToday)
-  const { matches: yesterdayMatchesForResults } = useTodayMatches(absoluteYesterday)
+  const { matches: todayMatchesForResults } = useTodayMatches(absoluteToday)
+  const { matches: resultsSourceMatches, loading: recentDaysLoading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
 
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
   // dayOffset — comme le panneau résultats juste au-dessus, pour ne pas
@@ -135,23 +136,11 @@ function Accueil() {
   // qui inclurait des matchs déjà terminés/live et fausserait le décompte).
   const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
 
-  // Base commune (aujourd'hui + hier, dédupliquée) pour tout ce qui doit
-  // rester indépendant de dayOffset dans le panneau résultats — `results`
-  // (FD.org FINISHED) ET `todayFt` plus bas (détection rapide via ESPN).
-  const resultsSourceMatches = useMemo(() => {
-    const seen = new Set()
-    return [...todayMatchesForResults, ...yesterdayMatchesForResults].filter(m => {
-      if (seen.has(m.id)) return false
-      seen.add(m.id)
-      return true
-    })
-  }, [todayMatchesForResults, yesterdayMatchesForResults])
-
   const results = useMemo(
     () => resultsSourceMatches.filter(m => m.status === 'FINISHED'),
     [resultsSourceMatches]
   )
-  const resultsLoading = matchesLoading
+  const resultsLoading = recentDaysLoading
 
   // Forme (5 derniers résultats) pour les losanges sous chaque nom d'équipe —
   // fusion de toutes les compétitions présentes dans les 2 panneaux (matchs

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 
@@ -114,4 +114,70 @@ export function useTodayMatches(targetDate) {
   })
 
   return { matches: data ?? [], loading: isLoading }
+}
+
+// ── useRecentDaysMatches ──────────────────────────────────────────────────
+// Panneau "Résultats récents" (Accueil) — étendu de 2 jours (aujourd'hui +
+// hier) à N jours en arrière, à la demande de l'utilisateur. Le coût réseau
+// supplémentaire reste très faible : chaque jour PASSÉ (isToday=false) est
+// mis en cache localStorage avec un TTL de 6h (voir useTodayMatches
+// ci-dessus, réutilisé tel quel ici) — un résultat FINISHED ne change plus
+// jamais, donc au-delà du tout premier chargement de chaque jour, tout part
+// du cache, pas du réseau. Seul "aujourd'hui" reste rafraîchi souvent (utile
+// s'il y a un match en cours). useQueries (même pattern que
+// useTeamFormMulti dans useTeamForm.js) : N requêtes indépendantes, mais
+// TanStack les dédup/partage déjà avec useTodayMatches si l'un des jours
+// (typiquement aujourd'hui) est aussi demandé ailleurs sur la page — même
+// queryKey ['todayMatches', date].
+export function useRecentDaysMatches(numDays) {
+  const today = getLocalDateStr()
+
+  const dates = []
+  for (let i = 0; i < numDays; i++) {
+    const d = new Date(today + 'T12:00:00')
+    d.setDate(d.getDate() - i)
+    dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  }
+
+  const results = useQueries({
+    queries: dates.map(date => {
+      const isToday  = date === today
+      const cacheKey = `matches_${date}`
+      return {
+        queryKey: ['todayMatches', date],
+        queryFn: async () => {
+          const result = await fetchTodayMatches(date)
+          if (result.length > 0) {
+            const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
+            let ttl
+            if (!isToday)    ttl = 6 * 60 * 60 * 1000
+            else if (hasLive) ttl = 2 * 60 * 1000
+            else              ttl = 60 * 60 * 1000
+            writeCache(cacheKey, result, ttl)
+            return result
+          }
+          const stale = readCacheStale(cacheKey)
+          if (stale?.length > 0) return stale
+          return []
+        },
+        initialData:          readCacheStale(cacheKey) ?? undefined,
+        initialDataUpdatedAt: getCacheSavedAt(cacheKey),
+        staleTime:            isToday ? 60 * 1000 : 30 * 60 * 1000,
+        refetchInterval:      isToday ? getRefetchInterval : false,
+        retry:                false,
+      }
+    }),
+  })
+
+  const seen = new Set()
+  const matches = []
+  for (const r of results) {
+    for (const m of r.data ?? []) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      matches.push(m)
+    }
+  }
+
+  return { matches, loading: results.some(r => r.isLoading) }
 }
