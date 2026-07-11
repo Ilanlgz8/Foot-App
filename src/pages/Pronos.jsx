@@ -55,11 +55,23 @@ const _fmtD = (d) => {
 }
 const teamName = (team) => team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
 const isWCMatch = (match) => match.competition?.id === 2000 || match.competition?.code === 'WC'
-// Nom FR de la compétition (ex: "FIFA World Cup" → "Coupe du Monde"), même
-// mapping que COMPETITIONS (data/competitions.js) utilisé partout ailleurs.
-const compName = (match) => {
+// Nom FR + logo de la compétition (ex: "FIFA World Cup" → "Coupe du Monde"
+// + emblème), même mapping que COMPETITIONS (data/competitions.js) utilisé
+// partout ailleurs (Live.jsx, etc.).
+const compInfo = (match) => {
   const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
-  return comp?.name ?? match.competition?.name ?? ''
+  return { name: comp?.name ?? match.competition?.name ?? '', emblem: comp?.emblem ?? null }
+}
+
+// Logo + nom de la compétition, aligné à droite de la card.
+function CompLabel({ match }) {
+  const { name, emblem } = compInfo(match)
+  return (
+    <span className="pronos__metaComp">
+      {emblem && <img src={emblem} alt="" className="pronos__compLogo" />}
+      {name}
+    </span>
+  )
 }
 
 // Drapeau (pays, WC) ou blason (club) — même traitement partagé que le reste
@@ -219,8 +231,8 @@ function MatchPredictRow({ match, myPred, onSave }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{compName(match)}</span>
-        <span>{_fmtH(match.utcDate)}</span>
+        <span className="pronos__metaTime">{_fmtH(match.utcDate)}</span>
+        <CompLabel match={match} />
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
@@ -274,8 +286,8 @@ function LiveResultRow({ match, espn }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{compName(match)}</span>
-        <span className="pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
+        <span className="pronos__metaTime pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
+        <CompLabel match={match} />
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
@@ -302,8 +314,8 @@ function FinishedResultRow({ match }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{compName(match)}</span>
-        <span>Terminé</span>
+        <span className="pronos__metaTime">Terminé</span>
+        <CompLabel match={match} />
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
