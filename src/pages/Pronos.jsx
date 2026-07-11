@@ -55,6 +55,12 @@ const _fmtD = (d) => {
 }
 const teamName = (team) => team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
 const isWCMatch = (match) => match.competition?.id === 2000 || match.competition?.code === 'WC'
+// Nom FR de la compétition (ex: "FIFA World Cup" → "Coupe du Monde"), même
+// mapping que COMPETITIONS (data/competitions.js) utilisé partout ailleurs.
+const compName = (match) => {
+  const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  return comp?.name ?? match.competition?.name ?? ''
+}
 
 // Drapeau (pays, WC) ou blason (club) — même traitement partagé que le reste
 // de l'app via l'attribut data-crest (voir index.css : [data-crest="country"]
@@ -213,7 +219,7 @@ function MatchPredictRow({ match, myPred, onSave }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{match.competition?.name ?? ''}</span>
+        <span>{compName(match)}</span>
         <span>{_fmtH(match.utcDate)}</span>
       </div>
       <div className="pronos__matchTeams">
@@ -268,7 +274,7 @@ function LiveResultRow({ match, espn }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{match.competition?.name ?? ''}</span>
+        <span>{compName(match)}</span>
         <span className="pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
       </div>
       <div className="pronos__matchTeams">
@@ -296,7 +302,7 @@ function FinishedResultRow({ match }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span>{match.competition?.name ?? ''}</span>
+        <span>{compName(match)}</span>
         <span>Terminé</span>
       </div>
       <div className="pronos__matchTeams">
@@ -399,7 +405,12 @@ function Pronos() {
         </div>
         <div className="pronos__headerRight">
           <span className="pronos__playerCount">{playerCount} joueur{playerCount > 1 ? 's' : ''}</span>
-          <button className="pronos__leaveBtn" onClick={leaveGroup}>Quitter</button>
+          <button
+            className="pronos__leaveBtn"
+            onClick={() => { if (window.confirm('Quitter ce groupe de pronos ?')) leaveGroup() }}
+          >
+            Quitter
+          </button>
         </div>
       </div>
 

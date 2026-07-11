@@ -92,15 +92,16 @@
   padding: 10px 8px calc(12px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(
     180deg,
-    rgba(10, 12, 20, 0) 0%,
-    rgba(10, 12, 20, 0.92) 32%,
-    #0a0c14 70%
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.92) 32%,
+    #000000 70%
   );
   pointer-events: none;               /* le fond dégradé ne capte pas les taps */
 }
 .sfTabbar > * { pointer-events: auto; }
 
-/* Pilule flottante en arrière-plan des onglets */
+/* Pilule flottante en arrière-plan des onglets — noir neutre (pas de teinte
+   bleu marine, retour utilisateur) */
 .sfTabbar::before {
   content: '';
   position: absolute;
@@ -108,22 +109,22 @@
   right: 12px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   height: 62px;
-  background: rgba(26, 33, 56, 0.82);
+  background: rgba(15, 15, 16, 0.85);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(148, 163, 210, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 22px;
   z-index: -1;
 }
 
-/* ── Onglet standard ── */
+/* ── Onglet standard — icônes blanches au repos, rouge vif quand actif ── */
 .sfTab {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   padding: 8px 0 12px;
-  color: var(--sf-faint);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 10px;
   font-weight: 600;
   text-decoration: none;
@@ -138,7 +139,7 @@
 .sfTab--active .sfTab__icLine { display: none; }
 .sfTab--active .sfTab__icFill {
   display: block;
-  color: var(--sf-red-light);
+  color: var(--sf-red);
   transform: translateY(-1px);
 }
 .sfTab--active::after {
@@ -148,7 +149,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--sf-red-light);
+  background: var(--sf-red);
 }
 
 .sfTab__label { line-height: 1; }
