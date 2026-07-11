@@ -253,9 +253,34 @@ function matchesFavoriteStrict(subComps, slug) {
   return subComps.includes(slug)
 }
 
-async function sendPushToMatch(payload, slug, options = {}, log = null) {
-  let subs = []
-  try { subs = (await kv.smembers('push:subscriptions')) ?? [] } catch { return 0 }
+// ⚠️ AJOUT (question utilisateur : optimiser encore le CPU du cron) : avant,
+// CHAQUE appel à sendPushToMatch() (donc chaque notif ET le ticker "score en
+// direct", appelé une fois PAR MATCH EN DIRECT à CHAQUE passe) refaisait un
+// kv.smembers('push:subscriptions') + un JSON.parse() de CHAQUE abonné —
+// alors que la liste ne change quasiment jamais dans la même passe. Avec
+// plusieurs matchs en direct simultanés (fréquent en phase de poule), ça
+// relisait/reparsait la même liste plusieurs fois par minute pour rien.
+// loadSubscriptions() la récupère et la parse UNE SEULE FOIS par passe
+// (appelé une fois dans runOnePass(), voir plus bas), puis le résultat est
+// réutilisé pour tous les matchs/types de notifs de cette même passe.
+async function loadSubscriptions(log) {
+  let raw = []
+  try { raw = (await kv.smembers('push:subscriptions')) ?? [] } catch { return [] }
+  const parsed = []
+  const stale  = []
+  for (const subRaw of raw) {
+    try { parsed.push({ raw: subRaw, sub: typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw }) }
+    catch { stale.push(subRaw) }
+  }
+  if (stale.length) {
+    try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
+    log?.push(`[push] ${stale.length} abonnement(s) illisible(s) retiré(s)`)
+  }
+  return parsed
+}
+
+async function sendPushToMatch(payload, slug, options = {}, log = null, subsCache = null) {
+  const subs = subsCache ?? await loadSubscriptions(log)
   if (!subs.length) return 0
 
   const matcher = options.onlyFavorites ? matchesFavoriteStrict : matchesFavorite
@@ -264,10 +289,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null) {
   let sent = 0
   let failed = 0
 
-  await Promise.allSettled(subs.map(async subRaw => {
-    let sub
-    try { sub = typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw }
-    catch { stale.push(subRaw); return }
+  await Promise.allSettled(subs.map(async ({ raw: subRaw, sub }) => {
     if (!matcher(sub.comps, slug)) return
     try {
       // urgency: 'high' — sans ça, les services de push (notamment Apple sur
@@ -316,14 +338,14 @@ async function sendPushToMatch(payload, slug, options = {}, log = null) {
 // api/pulse.js) pose la clé de façon atomique : si elle existe déjà, l'appel
 // renvoie null immédiatement sans l'écraser — une seule des exécutions
 // concurrentes peut gagner la course, l'autre voit qu'elle a perdu.
-async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600) {
+async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600, subsCache = null) {
   try {
     const acquired = await kv.set(dedupKey, '1', { ex: ttl, nx: true })
     if (!acquired) return 0
   } catch { return 0 }
   // urgency 'high' : ces notifs (KO/but/mi-temps/reprise/fin) sont rares et
   // importantes — priorité max pour limiter les retards/pertes en arrière-plan.
-  return sendPushToMatch(payload, slug, { urgency: 'high' }, log)
+  return sendPushToMatch(payload, slug, { urgency: 'high' }, log, subsCache)
 }
 
 // ── Capture proactive du summary ESPN (compos + stats + événements) ────────────
@@ -655,6 +677,10 @@ export default async function handler(req, res) {
   // paralléliser : chaque appel part immédiatement, résolu tous ensemble
   // juste avant de retourner, pour ne pas être coupé par la fin de la fonction.
   const pendingSummaryFetches = []
+  // Chargée UNE FOIS pour toute la passe (voir loadSubscriptions() plus haut)
+  // — réutilisée par tous les appels sendDeduped/sendPushToMatch ci-dessous,
+  // qu'il y ait 1 ou plusieurs matchs en direct dans cette même passe.
+  const subsCache = await loadSubscriptions(log)
 
   for (const { slug, evt } of allEvents) {
    // ⚠️ Durcissement : avant, une erreur inattendue sur UN SEUL match (donnée
@@ -743,7 +769,7 @@ export default async function handler(req, res) {
       // TTL de dédup à 6h : marge de sécurité pour un match prolongation+tab
       // (peut dépasser 3h depuis le coup d'envoi).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600)
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache)
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`) }
     }
 
@@ -888,7 +914,7 @@ export default async function handler(req, res) {
           // l'ancienne clé basée sur le score complet, qui ne pouvait pas
           // distinguer 2 buts consécutifs du même camp).
           const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
-            { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log)
+            { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log, undefined, subsCache)
           if (sent > 0) notifsSent++
 
           track[side]++
@@ -929,7 +955,7 @@ export default async function handler(req, res) {
           const teamName   = side === 'home' ? homeTeam : awayTeam
           const minuteText = minuteLabel(card.minute)
           const sent = await sendDeduped(`push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
-            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log)
+            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log, undefined, subsCache)
           if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} carton rouge ${side} ${card.name}`) }
           cardTrack[side]++
           cardTrackChanged = true
@@ -944,7 +970,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
       if (sent > 0) notifsSent++
     }
 
@@ -952,7 +978,7 @@ export default async function handler(req, res) {
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
       if (sent > 0) notifsSent++
     }
 
@@ -960,7 +986,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
       if (sent > 0) notifsSent++
       // Capture finale — le boxscore/évènements se stabilisent parfois
       // quelques secondes après le sifflet final (corrections tardives).
@@ -1019,6 +1045,7 @@ export default async function handler(req, res) {
         slug,
         { onlyFavorites: true, urgency: 'high' },
         log,
+        subsCache,
       )
     }
    } catch (e) {
