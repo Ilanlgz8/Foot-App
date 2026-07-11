@@ -897,14 +897,22 @@ export default async function handler(req, res) {
           const goalIndex = track[side] // 0 = 1er but de ce camp, 1 = 2e, etc.
           const scorer     = goalScorers[goalIndex] ?? null
 
-          // Format "But pour {équipe} (joueur[, pen/csc]) minute'" — même
-          // convention (nom + ", pen"/", csc" entre parenthèses) que
-          // generateRecap() plus haut dans ce fichier, pour rester cohérent.
+          // Format "But pour {équipe}" en titre + "joueur[, pen/csc] minute'"
+          // puis le score sur une 2e ligne dans le body — même convention
+          // (nom + ", pen"/", csc" entre parenthèses… ici sans parenthèses
+          // puisque isolé sur sa propre ligne) que generateRecap() plus haut
+          // dans ce fichier. Retour utilisateur : le titre et le body sont
+          // déjà rendus sur des lignes séparées par l'OS (titre en gras,
+          // body en dessous) — mettre l'équipe dans le titre et le
+          // buteur+minute dans le body donne donc naturellement le saut de
+          // ligne demandé entre "équipe qui a marqué" et "buteur + minute".
           const scorerSuffix = scorer ? (scorer.ownGoal ? ', csc' : scorer.penaltyKick ? ', pen' : '') : ''
           const minuteText   = scorer ? minuteLabel(scorer.minute) : ''
-          const goalTitle    = scorer
-            ? `⚽ But pour ${scoringTeam} (${scorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
-            : '⚽ But !'
+          const goalTitle    = `⚽ But pour ${scoringTeam} !`
+          const scorerLine   = scorer
+            ? `${scorer.name}${scorerSuffix}${minuteText ? ` ${minuteText}` : ''}`
+            : 'But marqué'
+          const goalBody     = `${scorerLine}\n${homeTeam} ${scoreStr} ${awayTeam}`
 
           log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, buteur pas encore publié)'}`)
 
@@ -914,7 +922,7 @@ export default async function handler(req, res) {
           // l'ancienne clé basée sur le score complet, qui ne pouvait pas
           // distinguer 2 buts consécutifs du même camp).
           const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
-            { title: goalTitle, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log, undefined, subsCache)
+            { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log, undefined, subsCache)
           if (sent > 0) notifsSent++
 
           track[side]++
