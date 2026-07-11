@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSwipe } from '../hooks/useSwipe'
 
 // Un seul article par page — les flèches de navigation sont dans l'en-tête
 // (à côté du titre), ce qui libère la carte pour qu'elle remplisse toute la
@@ -16,6 +17,17 @@ export function NewsCarousel({ news, loading, error }) {
     const id = setInterval(() => setPage(p => (p + 1) % pages), 20000)
     return () => clearInterval(id)
   }, [page, pages, loading])
+
+  // Swipe tactile mobile (question utilisateur) — même hook que MatchPage/
+  // LiveMatchPage (finger-follow, axis locking, spring-back), réutilisé ici
+  // pour rester cohérent avec le reste de l'app plutôt que d'inventer une 2e
+  // logique de swipe. Boucle sur les extrémités (comme l'auto-rotation
+  // ci-dessus) : swiper à gauche sur le dernier article revient au premier,
+  // et inversement — plus naturel qu'un blocage sec en bout de liste.
+  const swipe = useSwipe(
+    () => { if (pages > 1) setPage(p => (p + 1) % pages) },
+    () => { if (pages > 1) setPage(p => (p - 1 + pages) % pages) },
+  )
 
   return (
     <div className="accueil__section">
@@ -55,7 +67,16 @@ export function NewsCarousel({ news, loading, error }) {
       {error && <p className="accueil__state accueil__state--error">{error}</p>}
 
       {!loading && !error && (
-        <div className="accueil__grid accueil__grid--carousel" key={page}>
+        <div
+          ref={swipe.ref}
+          className="accueil__grid accueil__grid--carousel"
+          key={page}
+          style={{
+            transform: `translateX(${swipe.dragOffset}px)`,
+            transition: swipe.isDragging ? 'none' : 'transform 0.25s ease',
+            touchAction: 'pan-y',
+          }}
+        >
           {slice.length === 0 && <p className="accueil__empty">Aucun article disponible.</p>}
           {slice.map(article => (
             <a key={article.url} href={article.url}
