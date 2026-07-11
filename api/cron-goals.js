@@ -694,7 +694,7 @@ export default async function handler(req, res) {
       // (peut dépasser 3h depuis le coup d'envoi).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
         { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600)
-      if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] KO (confirmé ESPN)`) }
+      if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`) }
     }
 
     // ⚠️ CORRIGÉ (constat utilisateur : commandes Redis Upstash qui montent
@@ -727,7 +727,7 @@ export default async function handler(req, res) {
     // sur le score de départ, pour ne jamais déclencher un rattrapage
     // rétroactif sur des buts antérieurs au premier poll de ce match.
     if (prevState === null) {
-      log.push(`[espn:${slug}:${eventId}] baseline ${status}|${score}`)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} baseline ${status}|${score}`)
       try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away }), { ex: 12 * 3600 }) } catch {}
       continue
     }
@@ -740,7 +740,7 @@ export default async function handler(req, res) {
     // explicitement plus bas) pour avoir la preuve exacte au prochain match live,
     // au lieu de deviner un correctif sans donnée réelle.
     if (status !== prevStatus) {
-      log.push(`[espn:${slug}:${eventId}] transition ${prevStatus} → ${status} (period=${comp.status?.period ?? '?'}, clock=${comp.status?.displayClock ?? '?'})`)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} transition ${prevStatus} → ${status} (period=${comp.status?.period ?? '?'}, clock=${comp.status?.displayClock ?? '?'})`)
     }
 
     // ⚽ But — envoi IMMÉDIAT dès que le score diffère du poll précédent (plus
@@ -786,7 +786,7 @@ export default async function handler(req, res) {
       const lockKey = `goalLock:${eventId}`
       const lockAcquired = await kv.set(lockKey, '1', { px: 5_000, nx: true }).catch(() => null)
       if (!lockAcquired) {
-        log.push(`[espn:${slug}:${eventId}] verrou but déjà pris (exécution concurrente) — passe suivante`)
+        log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} verrou but déjà pris (exécution concurrente) — passe suivante`)
       } else {
       const trackKey = `goalTrack:${eventId}`
       let track = null
@@ -830,7 +830,7 @@ export default async function handler(req, res) {
             ? `⚽ But pour ${scoringTeam} (${scorer.name}${scorerSuffix})${minuteText ? ` ${minuteText}` : ''}`
             : '⚽ But !'
 
-          log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, buteur pas encore publié)'}`)
+          log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} BUT ${side} ${goalIndex + 1}/${targetCount}${scorer ? '' : ' (générique, buteur pas encore publié)'}`)
 
           // Clé de dédup basée sur "le Nème but de ce camp dans ce match" —
           // stable et unique même si 2 buts du même camp partagent le même
@@ -880,7 +880,7 @@ export default async function handler(req, res) {
           const minuteText = minuteLabel(card.minute)
           const sent = await sendDeduped(`push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
             { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log)
-          if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] carton rouge ${side} ${card.name}`) }
+          if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} carton rouge ${side} ${card.name}`) }
           cardTrack[side]++
           cardTrackChanged = true
         }
@@ -892,7 +892,7 @@ export default async function handler(req, res) {
 
     // ⏸ Mi-temps
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
-      log.push(`[espn:${slug}:${eventId}] mi-temps`)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
         { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
@@ -900,7 +900,7 @@ export default async function handler(req, res) {
 
     // ▶️ Reprise 2ème MT
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
-      log.push(`[espn:${slug}:${eventId}] reprise`)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
         { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
@@ -908,7 +908,7 @@ export default async function handler(req, res) {
 
     // 🏁 Fin de match — garde anti-faux FT : ESPN STATUS_FINAL est fiable, on le prend tel quel
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
-      log.push(`[espn:${slug}:${eventId}] FT`)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log)
       if (sent > 0) notifsSent++
