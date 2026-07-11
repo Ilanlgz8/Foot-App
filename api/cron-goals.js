@@ -875,6 +875,44 @@ export default async function handler(req, res) {
 
       let trackChanged = false
 
+      // ⚽❌ But annulé (VAR / correction ESPN) — demande utilisateur : "si le
+      // but est refusé avec la VAR au bout de quelques minutes faut que
+      // l'app puisse annuler le but". Le score ESPN (home/away, relu à
+      // CHAQUE poll) reflète déjà automatiquement l'annulation dès qu'ESPN
+      // la publie — mais SANS ce bloc, track[side] restait bloqué au-dessus
+      // du score réel corrigé : le prochain VRAI but à cet index ne
+      // déclenchait plus jamais rien (track[side] < targetCount devenait
+      // durablement faux), et personne n'était prévenu que le but affiché
+      // avait disparu du score.
+      const cancelledSides = []
+      if (home < track.home) cancelledSides.push('home')
+      if (away < track.away) cancelledSides.push('away')
+
+      for (const side of cancelledSides) {
+        const scoringTeam  = side === 'home' ? homeTeam : awayTeam
+        const newCount     = side === 'home' ? home : away
+        const prevCount    = track[side]
+
+        log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} BUT ANNULÉ ${side} ${prevCount}→${newCount}`)
+
+        const sent = await sendDeduped(`push:espn:goalcancel:${eventId}:${side}:${newCount}`,
+          { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, log, undefined, subsCache)
+        if (sent > 0) notifsSent++
+
+        // Libère les clés de dédup des buts retirés : si un VRAI but est
+        // marqué plus tard à ce même index (ex: le but annulé était le 2e
+        // du camp, un nouveau 2e but légitime est marqué 10min après),
+        // sendDeduped() doit pouvoir renvoyer une notif à cet index — sans
+        // ce nettoyage, la clé laissée par l'envoi original bloquerait
+        // silencieusement ce futur but pendant tout le TTL restant (3h).
+        for (let i = newCount; i < prevCount; i++) {
+          try { await kv.del(`push:espn:goal:${eventId}:${side}:${i + 1}`) } catch {}
+        }
+
+        track[side] = newCount
+        trackChanged = true
+      }
+
       for (const side of sides) {
         const targetCount = side === 'home' ? home : away
 
