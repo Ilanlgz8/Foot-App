@@ -16,15 +16,22 @@
 //
 // Portée volontairement réduite pour cette 1ère version (à faire évoluer si
 // besoin) :
-//   - Pas de matchday/stage/group : ESPN n'expose pas proprement la structure
-//     de groupe dans son scoreboard pour ces compétitions → pas d'onglet
-//     "Poules" ni de tableau à élimination directe pour NL/CAN/COPA pour
-//     l'instant (Programme + Résultats seulement).
+//   - Pas de matchday/group : ESPN n'expose pas proprement la structure de
+//     groupe dans son scoreboard pour ces compétitions → pas d'onglet
+//     "Poules" pour NL/CAN/COPA pour l'instant (Programme + Résultats
+//     seulement). `stage` EST par contre détecté (voir mapEspnStage) via
+//     event.season.slug — ça permet le tableau à élimination directe pour
+//     les coupes nationales (voir fetchEspnCupMatches + useCupKnockout) et,
+//     accessoirement, un regroupement "Demi-finales"/"Finale" plus propre
+//     que le fallback par jour pour NL/CAN/COPA si leurs phases finales
+//     utilisent la même convention de nommage (pas vérifié, sans impact si
+//     faux : retombe simplement sur le regroupement par jour existant).
 //   - Pas de score.penalties : ESPN ne distingue pas clairement le score
 //     120min du score final en cas de tirs au but sur ces flux (contrairement
-//     à FD.org, voir finalScore() dans matchUtils.js) — impact limité (rare
-//     en phase de groupes/qualifs, qui constituent l'essentiel du calendrier
-//     de ces compétitions).
+//     à FD.org, voir finalScore() dans matchUtils.js) — un match de coupe
+//     décidé aux tab peut donc afficher un score à égalité dans le tableau
+//     (le gagnant reste correct via winner/advance ESPN, mais pas exposé ici
+//     pour l'instant).
 import { readCacheStale, writeCache } from '../hooks/localCache'
 import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 
@@ -55,6 +62,35 @@ const ESPN_STATUS_MAP = {
 
 function mapStatus(espnStatusName) {
   return ESPN_STATUS_MAP[espnStatusName] ?? 'SCHEDULED'
+}
+
+// event.season.slug → stage FD.org-like (même enum que useWcKnockout.js :
+// LAST_32/LAST_16/QUARTER_FINALS/SEMI_FINALS/THIRD_PLACE/FINAL), pour pouvoir
+// réutiliser TEL QUEL le moteur de tableau à élimination directe existant
+// (voir useCupKnockout dans useWcKnockout.js). Valeurs vérifiées en direct
+// sur de vrais matchs ESPN : "third-round" (FA Cup), "semifinals" (Coupe de
+// France, Copa del Rey), "final" (Copa del Rey), "round-of-32" (Copa del
+// Rey). Les tours antérieurs (round-1, round-2... qualifs amateurs) ne
+// matchent volontairement rien ici → stage reste null → pas dans le tableau
+// à élimination directe, mais toujours visibles dans Programme/Résultats
+// (regroupés par jour, voir groupRounds() dans useMatchs.js). C'est ce qui
+// fait naturellement démarrer le tableau au moment où les clubs pros entrent
+// en lice, sans logique de coupure spécifique à coder par compétition.
+const CUP_STAGE_MAP = {
+  roundof32:      'LAST_32',
+  roundof16:      'LAST_16',
+  quarterfinal:   'QUARTER_FINALS',
+  quarterfinals:  'QUARTER_FINALS',
+  semifinal:      'SEMI_FINALS',
+  semifinals:     'SEMI_FINALS',
+  final:          'FINAL',
+  thirdplace:     'THIRD_PLACE',
+  thirdplacematch: 'THIRD_PLACE',
+}
+function mapEspnStage(seasonSlug) {
+  if (!seasonSlug) return null
+  const norm = seasonSlug.toLowerCase().replace(/[-\s]/g, '')
+  return CUP_STAGE_MAP[norm] ?? null
 }
 
 function pad2(n) { return String(n).padStart(2, '0') }
@@ -92,13 +128,22 @@ function normalizeEvent(event, compCode, overrides = {}) {
   const homeScore = played && home.score != null ? parseInt(home.score, 10) : null
   const awayScore = played && away.score != null ? parseInt(away.score, 10) : null
 
+  // ESPN indique directement qui a été éliminé/qualifié via winner/advance
+  // (fiable même quand le score affiché est à égalité après tirs au but,
+  // contrairement à une simple comparaison home>away — voir getWinnerTeamId
+  // dans useWcKnockout.js, qui préfère ce champ dès qu'il est présent).
+  let winnerTeamId = null
+  if (home.winner === true) winnerTeamId = home.team?.id ?? null
+  else if (away.winner === true) winnerTeamId = away.team?.id ?? null
+
   return {
     id: `espn-${overrides.idPrefix ?? compCode}-${event.id}`,
     utcDate: event.date,
     status,
     matchday: null,
-    stage: null,
+    stage: mapEspnStage(event.season?.slug),
     group: null,
+    winnerTeamId,
     isCup: overrides.isCup ?? false,
     competition: {
       id: overrides.compId ?? SYNTHETIC_COMP_ID[compCode] ?? null,

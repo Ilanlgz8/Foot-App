@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { fetchEspnCupMatches } from '../utils/espnAdapter'
+import { DOMESTIC_CUPS } from '../data/competitions'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
@@ -43,6 +45,12 @@ const EMPTY_ROUNDS = []
 // chaque match du tour N+1, on cherche quels 2 matchs du tour N ont produit
 // ses 2 équipes (home/away), et on les replace côte à côte dans cet ordre.
 function getWinnerTeamId(m) {
+  // Matchs sourcés ESPN (coupes nationales, voir espnAdapter.js) : le
+  // vainqueur est déjà connu directement (winner/advance), y compris pour un
+  // match décidé aux tirs au but où le score affiché reste à égalité — pas
+  // besoin (et pas fiable) de comparer home/away dans ce cas.
+  if (m.winnerTeamId) return m.winnerTeamId
+
   const hs  = m.score?.fullTime?.home
   const as_ = m.score?.fullTime?.away
   if (hs == null || as_ == null) return null
@@ -141,6 +149,48 @@ export function useWcKnockout(compCode = 'WC') {
       }
       all = all ?? []
 
+      const knockout = all.filter(m => KNOCKOUT_ORDER.includes(m.stage))
+
+      const rounds = []
+      for (const stage of KNOCKOUT_ORDER) {
+        const stageMatches = knockout.filter(m => m.stage === stage)
+        if (stageMatches.length > 0) {
+          rounds.push({ stage, label: KNOCKOUT_LABELS[stage], matches: stageMatches })
+        }
+      }
+
+      reorderRoundsByTopology(rounds)
+
+      writeCache(cacheKey, rounds, STALE_MS)
+      return rounds
+    },
+    initialData:          readCacheStale(cacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(cacheKey),
+    staleTime:            STALE_MS,
+    retry: false,
+  })
+
+  return {
+    rounds:  data ?? EMPTY_ROUNDS,
+    loading: isLoading,
+    error:   error?.message ?? null,
+  }
+}
+
+// ── useCupKnockout — même moteur de tableau, source ESPN ──────────────────
+// Coupes nationales (Coupe de France/Copa del Rey/FA Cup, voir DOMESTIC_CUPS
+// dans competitions.js) : pas de FD.org, matchs sourcés via
+// fetchEspnCupMatches (espnAdapter.js), stage déjà résolu depuis
+// event.season.slug (mapEspnStage) → même KNOCKOUT_ORDER/LABELS et même
+// reorderRoundsByTopology que WC/EC, juste une source de matchs différente.
+export function useCupKnockout(parentCode) {
+  const cacheKey = `cup_knockout_${parentCode}`
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['cup-knockout', parentCode],
+    enabled: !!DOMESTIC_CUPS[parentCode],
+    queryFn: async () => {
+      const all = await fetchEspnCupMatches(parentCode)
       const knockout = all.filter(m => KNOCKOUT_ORDER.includes(m.stage))
 
       const rounds = []

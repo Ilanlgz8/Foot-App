@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import './../match.css'
 import './../compHeader.css'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
-import { useWcKnockout } from '../hooks/useWcKnockout'
+import { useWcKnockout, useCupKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -227,7 +227,7 @@ const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
 // cardH: hauteur mini imposée (px). `null` = mode sonde → contenu naturel.
 // big: true pour la card de la finale/petite finale — mise en avant,
 // drapeaux plus grands (voir bracket__card--big dans match.css).
-function BkCard({ m, style, onSelect, cardH, big = false, desktop = false }) {
+function BkCard({ m, style, onSelect, cardH, big = false, desktop = false, isCountry = true }) {
   const fin  = m.status === 'FINISHED'
   const live = m.status === 'IN_PLAY' || m.status === 'PAUSED'
   const tbd  = !m.homeTeam?.name && !m.awayTeam?.name
@@ -288,7 +288,7 @@ function BkCard({ m, style, onSelect, cardH, big = false, desktop = false }) {
         onTouchEnd={cancelPress}
         onTouchMove={cancelPress}
       >
-        <span className="bracket__crestWrap" data-crest="country">
+        <span className="bracket__crestWrap" data-crest={isCountry ? 'country' : 'club'}>
           {m.homeTeam?.crest
             ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" data-team={m.homeTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
@@ -304,7 +304,7 @@ function BkCard({ m, style, onSelect, cardH, big = false, desktop = false }) {
         onTouchEnd={cancelPress}
         onTouchMove={cancelPress}
       >
-        <span className="bracket__crestWrap" data-crest="country">
+        <span className="bracket__crestWrap" data-crest={isCountry ? 'country' : 'club'}>
           {m.awayTeam?.crest
             ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" data-team={m.awayTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
@@ -331,7 +331,7 @@ function splitHalf(matches) {
   return [matches.slice(0, half), matches.slice(half)]
 }
 
-function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
+function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isCountry = true }) {
   // Constantes de layout résolues selon le mode (voir BK_*_DESKTOP plus
   // haut) — shadowe volontairement les BK_* module-level pour tout le reste
   // de cette fonction, aucun autre call site à toucher.
@@ -620,7 +620,7 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
             const sH      = GRID_H / n
             const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
-              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop}
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop} isCountry={isCountry}
                 style={{ position:'absolute', left:rXLeft(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
@@ -633,7 +633,7 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
             const sH      = GRID_H / n
             const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
-              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop}
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop} isCountry={isCountry}
                 style={{ position:'absolute', left:rXRight(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
@@ -653,7 +653,7 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
           </div>
         )}
         {finalRound?.matches[0] && (
-          <BkCard key={finalRound.matches[0].id} m={finalRound.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop}
+          <BkCard key={finalRound.matches[0].id} m={finalRound.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop} isCountry={isCountry}
             style={{ position:'absolute', left:centerX, top:finalTop, width:CENTER_W, zIndex:2 }}
           />
         )}
@@ -669,7 +669,7 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
             <div style={{ display:'flex', justifyContent:'center', marginBottom:'0.5rem' }}>
               <div className="bracket__thirdLabel">🥉 {_shortLabel(third)}</div>
             </div>
-            <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop}
+            <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop} isCountry={isCountry}
               style={{ position:'static', width:CENTER_W }}
             />
           </div>
@@ -744,13 +744,32 @@ function Matchs() {
   // football-data.org). Le nom "isWC" reste historique (beaucoup de call
   // sites), mais couvre bien les 2 depuis l'ajout de l'Euro.
   const isWC        = selectedComp === 'WC' || selectedComp === 'EC'
+  // Coupe nationale fusionnée dans cet onglet (Coupe de France/Copa del
+  // Rey/FA Cup) : pas de vue "Poules" (pas de phase de groupes), mais un
+  // tableau à élimination directe SI — voir useCupKnockout (source ESPN,
+  // useWcKnockout.js) et DOMESTIC_CUPS (competitions.js).
+  const hasCup       = !!DOMESTIC_CUPS[selectedComp]
+  const {
+    rounds:  cupRounds,
+    loading: cupBracketLoading,
+    error:   cupBracketError,
+  } = useCupKnockout(selectedComp)
+  const bracketRounds  = hasCup ? cupRounds        : rounds
+  const bracketLoad    = hasCup ? cupBracketLoading : bracketLoading
+  const bracketErr     = hasCup ? cupBracketError   : bracketError
+  // Vrai pour toute compétition ayant un toggle Poules/Journée/Phase finale
+  // (WC, EC, ou une coupe nationale fusionnée) — remplace les anciens tests
+  // "!isWC"/"isWC" isolés dans les vues ci-dessous, qui ignoraient le cas
+  // coupe nationale et auraient affiché "Par journée" ET le bracket en même
+  // temps pour ces onglets.
+  const hasToggle    = isWC || hasCup
   // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
   // à rien (le bracket est propre à la CdM, changer de championnat en sort de
   // toute façon) — on la masque et on laisse le tableau utiliser toute la
   // largeur dispo au lieu de rester capé à 1200px (voir .matchs__layout,
   // .matchs__layout--bracketFull dans match.css). Demande explicite : "encore
   // de la place, tu peux agrandir".
-  const bracketFullWidth = isWC && wcView === 'bracket' && isBracketDesktop
+  const bracketFullWidth = hasToggle && wcView === 'bracket' && isBracketDesktop
 
   // Note : plus de ticker de minute ici — les cards du bracket sont
   // maintenant compactes (drapeau + nom uniquement, plus de texte "minute
@@ -811,15 +830,19 @@ function Matchs() {
      (handleSelectComp) et marqué dès qu'un clic manuel a lieu (pickWcView). */
   const autoSwitchDone = useRef(false)
 
-  /* Auto-switch : si des matchs existent mais aucun groupe détecté → vue par journée */
+  /* Auto-switch : si des matchs existent mais aucun groupe détecté → vue par
+     journée. Couvre aussi les coupes nationales (hasCup) : elles n'ont
+     jamais de groupes (wcGroups reste [] tant que !isWC), donc basculent
+     immédiatement hors de "poules" — qui ne leur est de toute façon jamais
+     proposé comme bouton (voir le toggle plus bas). */
   useEffect(() => {
     if (autoSwitchDone.current) return
-    if (isWC && wcView === 'poules' && !loading && matches.length > 0 && wcGroups.length === 0) {
+    if ((isWC || hasCup) && wcView === 'poules' && !loading && matches.length > 0 && wcGroups.length === 0) {
       setWcView('matchs')
       setCurrentIndex(0)
       autoSwitchDone.current = true
     }
-  }, [isWC, wcView, loading, matches.length, wcGroups.length])
+  }, [isWC, hasCup, wcView, loading, matches.length, wcGroups.length])
 
   /* Auto-switch (2e garde-fou, plus fiable) : si un match à élimination directe
      est déjà TERMINÉ, on est forcément après la phase de poules — inutile
@@ -973,10 +996,11 @@ function Matchs() {
           <div className="matchs__header">
             <h1 className="matchs__kicker">Matchs à venir</h1>
             <div className="matchs__headerRow">
-              {/* Toggle vues CdM */}
-              {isWC && (
+              {/* Toggle vues CdM / coupe nationale */}
+              {(isWC || hasCup) && (
                 <div className="matchs__wcToggle">
-                  {/* ── Poules : terrain de foot vu du dessus ── */}
+                  {/* ── Poules : terrain de foot vu du dessus (WC/EC seulement — pas de phase de groupes pour une coupe nationale) ── */}
+                  {isWC && (
                   <button
                     className={`matchs__wcToggleBtn ${wcView === 'poules' ? 'matchs__wcToggleBtn--active' : ''}`}
                     onClick={() => pickWcView('poules')}
@@ -997,6 +1021,7 @@ function Matchs() {
                     </svg>
                     Poules
                   </button>
+                  )}
 
                   {/* ── Par journée : liste de matchs ── */}
                   <button
@@ -1039,7 +1064,7 @@ function Matchs() {
                       {/* Finale */}
                       <rect x="17" y="10.75" width="6" height="2.5" rx="0.8" fill="currentColor" opacity=".6"/>
                     </svg>
-                    Phase finale
+                    {hasCup ? DOMESTIC_CUPS[selectedComp]?.name : 'Phase finale'}
                   </button>
                 </div>
               )}
@@ -1094,42 +1119,44 @@ function Matchs() {
           )}
 
           {/* États chargement pour les autres vues */}
-          {loading && (!isWC || wcView !== 'poules') && (
+          {loading && (!hasToggle || wcView !== 'poules') && (
             <div className="matchs__state"><div className="matchs__spinner" /><p>Chargement des matchs...</p></div>
           )}
           {error && <p className="matchs__state matchs__state--error">{error}</p>}
 
           {/* ═══ Vue Phase finale (bracket) ═══ */}
-          {isWC && wcView === 'bracket' && (
+          {hasToggle && wcView === 'bracket' && (
             <>
-              {bracketLoading && (
+              {bracketLoad && (
                 <div className="matchs__state"><div className="matchs__spinner" /><p>Chargement du tableau...</p></div>
               )}
-              {bracketError && (
-                <p className="matchs__state matchs__state--error">{bracketError}</p>
+              {bracketErr && (
+                <p className="matchs__state matchs__state--error">{bracketErr}</p>
               )}
-              {!bracketLoading && !bracketError && rounds.length === 0 && (
+              {!bracketLoad && !bracketErr && bracketRounds.length === 0 && (
                 <div className="bracket__empty">
                   <span className="bracket__emptyIcon">🏆</span>
-                  <p className="bracket__emptyTitle">Phase finale à venir</p>
+                  <p className="bracket__emptyTitle">{hasCup ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Phase finale à venir'}</p>
                   <p className="bracket__emptyText">
-                    Le tableau des phases finales sera disponible dès la fin de la phase de groupes.
+                    {hasCup
+                      ? "Le tableau apparaît dès que des matchs à partir des 32es de finale sont programmés ou joués."
+                      : 'Le tableau des phases finales sera disponible dès la fin de la phase de groupes.'}
                   </p>
-                  <button className="bracket__emptyCta" onClick={() => pickWcView('poules')}>
-                    Voir les poules →
+                  <button className="bracket__emptyCta" onClick={() => pickWcView(isWC ? 'poules' : 'matchs')}>
+                    {isWC ? 'Voir les poules →' : 'Voir le programme →'}
                   </button>
                 </div>
               )}
-              {!bracketLoading && !bracketError && rounds.length > 0 && (
+              {!bracketLoad && !bracketErr && bracketRounds.length > 0 && (
                 <div className="bracket__container" ref={bracketWrapRef}>
-                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} containerRef={bracketWrapRef} isDesktop={isBracketDesktop} />
+                  <BracketSvgView rounds={bracketRounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} containerRef={bracketWrapRef} isDesktop={isBracketDesktop} isCountry={isWC} />
                 </div>
               )}
             </>
           )}
 
           {/* ═══ Vue Par journée ═══ */}
-          {!loading && !error && (!isWC || wcView === 'matchs') && (
+          {!loading && !error && (!hasToggle || wcView === 'matchs') && (
             <div className="matchs__searchWrap">
               <input
                 type="text"
@@ -1144,7 +1171,7 @@ function Matchs() {
             </div>
           )}
 
-          {!loading && !error && (!isWC || wcView === 'matchs') && searchNorm && (
+          {!loading && !error && (!hasToggle || wcView === 'matchs') && searchNorm && (
             filteredSearchMatches.length === 0 ? (
               <p className="matchs__state">Aucun match à venir ne correspond à « {search} ».</p>
             ) : (
@@ -1154,7 +1181,7 @@ function Matchs() {
             )
           )}
 
-          {!loading && !error && (!isWC || wcView === 'matchs') && !searchNorm && total > 0 && (
+          {!loading && !error && (!hasToggle || wcView === 'matchs') && !searchNorm && total > 0 && (
             <>
               <div className="matchs__nav">
                 <button className="matchs__navBtn"
@@ -1171,7 +1198,7 @@ function Matchs() {
             </>
           )}
 
-          {!loading && !error && !isWC && matches.length === 0 && (
+          {!loading && !error && (!hasToggle || wcView === 'matchs') && matches.length === 0 && (
             <p className="matchs__state">Aucun match à venir pour le moment.</p>
           )}
 
