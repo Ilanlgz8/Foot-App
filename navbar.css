@@ -29,13 +29,29 @@
   padding-top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
-.sfHeader__date {
+/* Bouton Pronos — mobile uniquement, à la place de l'ancienne date */
+.sfHeader__pronosBtn {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
   font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--sf-faint);
+  color: var(--sf-red);
+  background: rgba(var(--sf-red-rgb), 0.14);
+  border: 1px solid rgba(var(--sf-red-rgb), 0.28);
+  border-radius: 99px;
+  padding: 5px 10px;
+  text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.sfHeader__pronosBtn:hover { background: rgba(var(--sf-red-rgb), 0.2); }
+.sfHeader__pronosBtn--active {
+  color: #fff;
+  background: rgba(var(--sf-red-rgb), 0.55);
+  border-color: transparent;
 }
 
 .sfHeader__brand {
@@ -259,7 +275,7 @@
     padding: 14px 24px;
   }
 
-  .sfHeader__date { display: none; }
+  .sfHeader__pronosBtn { display: none; }
   .sfHeader__brand { text-align: left; font-size: 22px; }
 
   .sfHeader__nav {

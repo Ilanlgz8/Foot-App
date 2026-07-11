@@ -67,6 +67,66 @@ export function getClubSeason() {
   return month <= 7 ? year - 1 : year
 }
 
+// Logique de fetch partagée (extraite pour être réutilisable hors du hook,
+// ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
+// voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
+async function fetchMatchesForComp(selectedComp, status) {
+  const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
+
+  async function tryFetch(url) {
+    const res = await fdFetch(fdUrl(url))
+    if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+    if (!res.ok) return null
+    const json = await res.json()
+    return json.matches ?? []
+  }
+
+  let matches = null
+
+  if (!isClub) {
+    const wcSeason = new Date().getFullYear()
+    if (status === 'SCHEDULED') {
+      matches = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
+      )
+      if (!matches || matches.length === 0) {
+        matches = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
+        )
+      }
+      if (!matches || matches.length === 0) {
+        matches = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches`
+        )
+      }
+    } else {
+      matches = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
+      )
+      if (!matches || matches.length === 0) {
+        matches = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
+        )
+      }
+    }
+  } else if (status === 'FINISHED') {
+    matches = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
+    )
+    if (!matches || matches.length === 0) {
+      matches = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+      )
+    }
+  } else {
+    matches = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+    )
+  }
+
+  return matches
+}
+
 export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   const key         = cacheKey(selectedComp, status)
   const cachedData  = readCacheStale(key)
@@ -76,66 +136,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', selectedComp, status],
     queryFn: async () => {
-      const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
-
-      // Helper : fetch une URL et retourne les matches (null si 429/403/erreur)
-      async function tryFetch(url) {
-        const res = await fdFetch(fdUrl(url))
-        if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-        if (!res.ok) return null
-        const json = await res.json()
-        return json.matches ?? []
-      }
-
-      let matches = null
-
-      if (!isClub) {
-        const wcSeason = new Date().getFullYear()
-        if (status === 'SCHEDULED') {
-          // Essai 1 : tous les matchs de la saison (poules + bracket complets)
-          matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
-          )
-          // Essai 2 : seulement TIMED si retourne vide (FD.org utilise TIMED pour heure confirmée)
-          if (!matches || matches.length === 0) {
-            matches = await tryFetch(
-              `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
-            )
-          }
-          // Essai 3 : sans filtre de saison (saison courante par défaut sur FD.org)
-          if (!matches || matches.length === 0) {
-            matches = await tryFetch(
-              `/api/v4/competitions/${selectedComp}/matches`
-            )
-          }
-        } else {
-          // Résultats WC : seulement FINISHED
-          matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
-          )
-          if (!matches || matches.length === 0) {
-            matches = await tryFetch(
-              `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
-            )
-          }
-        }
-      } else if (status === 'FINISHED') {
-        // Clubs : saison qui vient de se terminer (juin 2026 → 2025)
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
-        )
-        if (!matches || matches.length === 0) {
-          matches = await tryFetch(
-            `/api/v4/competitions/${selectedComp}/matches?status=${status}`
-          )
-        }
-      } else {
-        // Clubs SCHEDULED
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=${status}`
-        )
-      }
-
+      const matches = await fetchMatchesForComp(selectedComp, status)
       if (!matches) return readCacheStale(key) ?? []
       if (matches.length > 0) writeCache(key, matches, ttl)
       return matches.length > 0 ? matches : (readCacheStale(key) ?? [])
@@ -152,5 +153,84 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
     loading: isLoading,
     error: error?.message === '429' ? null : (error?.message ?? null), // 429 silencieux
     grouped: groupRounds(data ?? [], order),
+  }
+}
+
+// Matchs SCHEDULED de TOUTES les compétitions suivies, fusionnés et triés
+// chronologiquement — pour Pronos.jsx ("afficher tout les matchs à venir").
+// Cache combiné dédié (clé "ALL", TTL 1h comme le cache par-compétition
+// SCHEDULED) : au pire une rafale de N requêtes FD.org une fois par heure,
+// lissée par le budget global déjà en place dans api/football.js.
+export function useUpcomingMatchesAllComps(compIds) {
+  const key        = cacheKey('ALL', 'SCHEDULED')
+  const cachedData = readCacheStale(key)
+  const cachedAt   = getCacheSavedAt(key)
+  const ttl        = TTL.SCHEDULED
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['matches', 'ALL', 'SCHEDULED', compIds.join(',')],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        compIds.map(id => fetchMatchesForComp(id, 'SCHEDULED'))
+      )
+      const merged = results
+        .filter(r => r.status === 'fulfilled' && Array.isArray(r.value))
+        .flatMap(r => r.value)
+        .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+
+      if (merged.length === 0) return readCacheStale(key) ?? []
+      writeCache(key, merged, ttl)
+      return merged
+    },
+    initialData:          cachedData ?? undefined,
+    initialDataUpdatedAt: cachedAt,
+    staleTime: ttl,
+    retry: false,
+  })
+
+  return {
+    matches: data ?? [],
+    loading: isLoading,
+    error: error?.message === '429' ? null : (error?.message ?? null),
+  }
+}
+
+// Matchs FINISHED de toutes les compétitions — utilisé UNIQUEMENT par l'onglet
+// Classement de Pronos.jsx pour comparer les pronostics au score réel. TTL
+// volontairement long (10min, cache dédié "ALL_FINISHED_PRONOS", distinct du
+// cache FINISHED 2min utilisé par Résultats) et enabled=false tant que
+// l'onglet Classement n'est pas ouvert : évite une rafale répétée de N
+// requêtes FD.org, un classement pronos n'a pas besoin d'être seconde près.
+export function useFinishedMatchesAllComps(compIds, enabled = true) {
+  const key        = 'matches_ALL_FINISHED_PRONOS'
+  const cachedData = readCacheStale(key)
+  const cachedAt   = getCacheSavedAt(key)
+  const ttl        = 10 * 60 * 1000
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['matches', 'ALL', 'FINISHED_PRONOS', compIds.join(',')],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        compIds.map(id => fetchMatchesForComp(id, 'FINISHED'))
+      )
+      const merged = results
+        .filter(r => r.status === 'fulfilled' && Array.isArray(r.value))
+        .flatMap(r => r.value)
+
+      if (merged.length === 0) return readCacheStale(key) ?? []
+      writeCache(key, merged, ttl)
+      return merged
+    },
+    initialData:          cachedData ?? undefined,
+    initialDataUpdatedAt: cachedAt,
+    staleTime: ttl,
+    retry: false,
+    enabled,
+  })
+
+  return {
+    matches: data ?? [],
+    loading: isLoading,
+    error: error?.message === '429' ? null : (error?.message ?? null),
   }
 }

@@ -1,0 +1,245 @@
+/* ═══════════════════════════════════════════════════════════════
+   PRONOS — pronostics entre amis (groupe par code)
+   ═══════════════════════════════════════════════════════════════ */
+
+.pronos__page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+}
+
+/* ── Écran d'intro (créer/rejoindre) ── */
+.pronos__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem 1rem;
+}
+.pronos__introIcon { font-size: 2.2rem; margin-bottom: 0.4rem; }
+.pronos__introTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+.pronos__introText {
+  font-size: 0.88rem;
+  color: var(--text-mid);
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 0 0 0.8rem;
+}
+.pronos__introBtn {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pronos__introBtn:hover { border-color: rgba(var(--red-rgb), 0.4); }
+.pronos__introBtn--primary {
+  background: linear-gradient(135deg, var(--red), var(--red-deep));
+  border-color: transparent;
+  color: #fff;
+}
+.pronos__input {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.95rem;
+  text-align: center;
+}
+.pronos__input:focus { outline: none; border-color: rgba(var(--red-rgb), 0.5); }
+.pronos__input--code {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.pronos__error {
+  color: var(--red-light);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* ── Header groupe ── */
+.pronos__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+.pronos__headerLabel {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.pronos__headerCode {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-main);
+}
+.pronos__headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.pronos__playerCount { font-size: 0.78rem; color: var(--text-mid); }
+.pronos__leaveBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+.pronos__leaveBtn:hover { color: var(--red-light); border-color: rgba(var(--red-rgb), 0.35); }
+
+/* ── Onglets (même recette visuelle que .mp__tab) ── */
+.pronos__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.pronos__tab {
+  flex: 1;
+  padding: 0.7rem 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-mid);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pronos__tab:hover { color: var(--text-main); }
+.pronos__tab--active { color: var(--red-light); border-bottom-color: var(--red); }
+
+.pronos__tabContent { min-height: 200px; }
+
+/* ── Liste matchs à venir ── */
+.pronos__day { margin-bottom: 1.1rem; }
+.pronos__dayLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0.2rem 0.5rem;
+}
+.pronos__matchRow {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.55rem;
+}
+.pronos__matchMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+.pronos__matchTeams {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pronos__teamName {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pronos__teamName--away { text-align: right; }
+.pronos__scoreInput {
+  width: 2.2rem;
+  height: 2.2rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-weight: 700;
+  -moz-appearance: textfield;
+}
+.pronos__scoreInput::-webkit-outer-spin-button,
+.pronos__scoreInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pronos__scoreInput:focus { outline: none; border-color: rgba(var(--red-rgb), 0.5); }
+.pronos__scoreSep { color: var(--text-dim); font-size: 0.8rem; }
+
+/* ── Classement ── */
+.pronos__leaderboard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.pronos__lbRow {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.pronos__lbRow:last-child { border-bottom: none; }
+.pronos__lbRow--me { background: rgba(var(--red-rgb), 0.08); }
+.pronos__lbRank {
+  width: 1.4rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+.pronos__lbRow:first-child .pronos__lbRank { color: var(--red-light); }
+.pronos__lbName {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.pronos__lbPoints {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--red-light);
+}
+
+/* ── Empty state ── */
+.pronos__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+.pronos__emptyIcon { font-size: 1.8rem; opacity: 0.4; }
+.pronos__emptyTitle { font-size: 0.85rem; color: var(--text-mid); font-weight: 600; }

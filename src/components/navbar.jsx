@@ -77,14 +77,6 @@ const BallIcon = () => (
   <span className="sfTabLive__ball" aria-hidden="true">⚽</span>
 )
 
-/* Date du jour compacte, ex. "Mer. 8 juil." — calculée une fois par montage */
-function todayLabel() {
-  const s = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'short', day: 'numeric', month: 'short',
-  })
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
 function Navbar() {
   const { liveMatches } = useLiveData()
   const liveCount = liveMatches.length
@@ -94,7 +86,15 @@ function Navbar() {
       {/* ── Header ── */}
       <header className="sfHeader">
         <div className="sfHeader__inner">
-          <span className="sfHeader__date">{todayLabel()}</span>
+          {/* Pronos — mobile uniquement, à la place de la date (voir sfHeader__pronosBtn) */}
+          <NavLink
+            to="/pronos"
+            className={({ isActive }) =>
+              isActive ? 'sfHeader__pronosBtn sfHeader__pronosBtn--active' : 'sfHeader__pronosBtn'
+            }
+          >
+            Pronos
+          </NavLink>
 
           <NavLink to="/" className="sfHeader__brand">
             <span>Stat</span>Footix
