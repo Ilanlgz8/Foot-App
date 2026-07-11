@@ -3,7 +3,13 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as competitions } from '../data/competitions'
+import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/competitions'
+
+// NL/CAN/COPA sont sourcées via ESPN (voir espnAdapter.js) : pas de
+// classement/buteurs pour l'instant (ESPN n'expose pas proprement les
+// groupes sur son scoreboard) — donc pas sélectionnables ici tant que ce
+// n'est pas construit.
+const competitions = allCompetitions.filter(c => !NO_STANDINGS_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamForm } from '../hooks/useTeamForm'

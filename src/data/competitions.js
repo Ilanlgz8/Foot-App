@@ -22,7 +22,16 @@ export const COMPETITION_ESPN_SLUG = {
   CL:  'uefa.champions',
   WC:  'fifa.world',
   EC:  'uefa.euro',
+  NL:  'uefa.nations',
+  CAN: 'caf.nations',
+  COPA: 'conmebol.america',
 }
+
+// Compétitions sourcées via ESPN (pas football-data.org, voir espnAdapter.js)
+// : pas de classement/buteurs pour l'instant (ESPN n'expose pas proprement la
+// structure de groupe sur son scoreboard) — utilisé par Classement.jsx et
+// FavoritesPage.jsx pour ne pas proposer un classement qui n'existe pas.
+export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA'])
 
 export const COMPETITIONS = [
   {
@@ -73,6 +82,24 @@ export const COMPETITIONS = [
     shortName: 'Euro',
     // Pas de logo dédié dispo dans les assets (à ajouter si fourni) — tous
     // les composants gèrent déjà emblem=null proprement (pas d'<img> rendue).
+    emblem: null,
+  },
+  {
+    id: 'NL',
+    name: 'Ligue des Nations',
+    shortName: 'Nations L.',
+    emblem: null,
+  },
+  {
+    id: 'CAN',
+    name: 'Coupe d’Afrique des Nations',
+    shortName: 'CAN',
+    emblem: null,
+  },
+  {
+    id: 'COPA',
+    name: 'Copa America',
+    shortName: 'Copa America',
     emblem: null,
   },
 ]

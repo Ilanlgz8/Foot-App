@@ -22,6 +22,9 @@ const ALLOWED_SLUGS = new Set([
   'fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1',
   'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
   'fifa.world', 'uefa.euro',
+  // Ligue des Nations / CAN / Copa America — tournois ponctuels, absents de
+  // football-data.org en free tier (voir CLAUDE.md), couverts via ESPN.
+  'uefa.nations', 'caf.nations', 'conmebol.america',
 ])
 
 const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)
@@ -152,7 +155,10 @@ export default async function handler(req, res) {
     }
 
     // ── Mode scoreboard (pas de cache — données live, doivent rester fraîches) ──
-    if (dates && !/^\d{8}$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD attendu)' })
+    // Format simple (YYYYMMDD) OU plage (YYYYMMDD-YYYYMMDD) — la plage est
+    // nécessaire pour les tournois ponctuels (NL/CAN/Copa America) où l'on
+    // interroge une fenêtre large plutôt qu'un jour précis.
+    if (dates && !/^\d{8}(-\d{8})?$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD ou YYYYMMDD-YYYYMMDD attendu)' })
     // ⚠️ &limit=100 indispensable pour les matchs à élimination directe : sans
     // lui, ESPN renvoie des noms d'équipe placeholder de bracket ("Round of 32
     // 5 Winner") et un statut/score figés SCHEDULED/0-0 même après le vrai

@@ -2,6 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
+import { fetchEspnCompMatches } from '../utils/espnAdapter'
+import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+
+// Compétitions sans couverture football-data.org (free tier) — servies via
+// ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
+// pas de Poules/tableau pour l'instant, Programme+Résultats seulement).
+const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA'])
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)
@@ -28,6 +35,11 @@ function cacheKey(comp, status) {
 export function groupRounds(matches, order = 'asc') {
   const groupStage = matches.filter(m => m.matchday != null)
   const knockout    = matches.filter(m => m.matchday == null && m.stage)
+  // NL/CAN/COPA (source ESPN, voir espnAdapter.js) n'ont ni matchday ni stage
+  // exploitable → sans ce 3e groupe, ces matchs ne rentraient dans AUCUNE des
+  // 2 listes ci-dessus et disparaissaient silencieusement de Programme/
+  // Résultats. On les regroupe par jour calendaire à la place.
+  const ungrouped   = matches.filter(m => m.matchday == null && !m.stage)
 
   const mdMap = {}
   groupStage.forEach(m => { (mdMap[m.matchday] ??= []).push(m) })
@@ -48,7 +60,19 @@ export function groupRounds(matches, order = 'asc') {
       matches: [...ms].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
     }))
 
-  const chrono   = [...mdEntries, ...koEntries]
+  const dayMap = {}
+  ungrouped.forEach(m => {
+    const d = new Date(m.utcDate)
+    const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    ;(dayMap[dayKey] ??= []).push(m)
+  })
+  const dayEntries = Object.keys(dayMap).sort().map(dayKey => ({
+    key: `day-${dayKey}`,
+    label: new Date(`${dayKey}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }),
+    matches: [...dayMap[dayKey]].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
+  }))
+
+  const chrono   = [...mdEntries, ...koEntries, ...dayEntries]
   const ordered  = order === 'desc' ? [...chrono].reverse() : chrono
   return ordered.map(g => ({
     ...g,
@@ -71,6 +95,16 @@ export function getClubSeason() {
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
 // voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
 async function fetchMatchesForComp(selectedComp, status) {
+  if (ESPN_SOURCED_COMPS.has(selectedComp)) {
+    const slug = COMPETITION_ESPN_SLUG[selectedComp]
+    const all  = await fetchEspnCompMatches(selectedComp, slug)
+    if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
+    // 'SCHEDULED' ici couvre aussi TIMED/IN_PLAY/PAUSED — même logique que
+    // Programme pour WC/EC qui affiche "à venir" au sens large (voir filtre
+    // par date/statut fait ensuite côté composant, ex: filterUpcomingWindow).
+    return all.filter(m => m.status !== 'FINISHED')
+  }
+
   const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
 
   async function tryFetch(url) {

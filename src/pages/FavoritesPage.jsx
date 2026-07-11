@@ -19,7 +19,7 @@ import { usePushNotifications, resyncFavoriteTeams } from '../hooks/usePushNotif
 import { useFavoriteTeams } from '../hooks/useFavoriteTeams'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { useStandings } from '../hooks/useStandings'
-import { COMPETITIONS, COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { COMPETITIONS, COMPETITION_ESPN_SLUG, NO_STANDINGS_COMPS } from '../data/competitions'
 import { StandingsTable } from '../components/StandingsTable'
 import { translateTeam } from '../data/teamNames'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
@@ -81,7 +81,11 @@ export default function FavoritesPage() {
         <div className="favPage__chipGrid">
           {COMPETITIONS.map(comp => {
             const slug = COMPETITION_ESPN_SLUG[comp.id]
-            if (!slug) return null
+            // NL/CAN/COPA : pas encore pollées par cron-goals.js (voir
+            // espnSlugs.js) → pas de notifs réelles possibles pour l'instant,
+            // on ne propose donc pas le toggle (éviterait une case à cocher
+            // qui ne fait rien).
+            if (!slug || NO_STANDINGS_COMPS.has(comp.id)) return null
             const active = favComps.includes(slug)
             return (
               <button
@@ -129,7 +133,7 @@ export default function FavoritesPage() {
         )}
 
         <div className="favPage__chipGrid favPage__chipGrid--tabs">
-          {COMPETITIONS.map(comp => (
+          {COMPETITIONS.filter(comp => !NO_STANDINGS_COMPS.has(comp.id)).map(comp => (
             <button
               key={comp.id}
               className={`favPage__chip${selectedComp === comp.id ? ' favPage__chip--active' : ''}`}
