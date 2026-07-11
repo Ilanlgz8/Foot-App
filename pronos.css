@@ -180,6 +180,20 @@
   white-space: nowrap;
 }
 .pronos__teamName--away { text-align: right; }
+
+/* ── Résultat (match en cours) ── */
+.pronos__liveMinute {
+  color: var(--sf-live-min);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.pronos__liveScore {
+  min-width: 1.6rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
 .pronos__scoreInput {
   width: 2.2rem;
   height: 2.2rem;

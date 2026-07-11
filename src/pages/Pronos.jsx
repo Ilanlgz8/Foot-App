@@ -1,9 +1,19 @@
 /**
  * Pronos.jsx — Pronos entre amis (groupe par code, pas de compte).
  *
- * Deux onglets séparés (demandé par l'utilisateur) :
+ * Trois onglets séparés (demandé par l'utilisateur) :
  *   - "Pronos"     : matchs à venir (toutes compétitions confondues, triés
- *                    par date) avec une case de score par équipe.
+ *                    par date) avec une case de score par équipe. Un match
+ *                    disparaît d'ici dès qu'il n'est plus SCHEDULED côté
+ *                    football-data.org (dès le coup d'envoi).
+ *   - "Résultat"   : matchs actuellement EN COURS — pour ne pas perdre le fil
+ *                    entre le moment où un match quitte "Pronos" (coup
+ *                    d'envoi) et le moment où il apparaît dans "Classement"
+ *                    (une fois terminé). Branché directement sur
+ *                    useLiveData() (LiveProvider) : ZÉRO requête réseau
+ *                    supplémentaire, on réutilise le polling ESPN déjà actif
+ *                    pour la page /live. Minute + score uniquement, pas de
+ *                    stats (demande explicite de l'utilisateur).
  *   - "Classement" : points de chaque joueur du groupe, calculés CÔTÉ CLIENT
  *                    (3 pts score exact, 1 pt bon résultat, 0 sinon) à partir
  *                    des matchs FINISHED déjà exposés par football-data.org —
@@ -15,10 +25,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
+import { useLiveData } from '../context/LiveProvider'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
 import '../../pronos.css'
+
+const TABS = ['pronos', 'resultat', 'classement']
 
 const COMP_IDS = COMPETITIONS.map(c => c.id)
 
@@ -201,6 +215,41 @@ function MatchPredictRow({ match, myPred, onSave }) {
   )
 }
 
+// Ligne "match en cours" — minute + score seulement (pas de stats, pas de
+// buteurs) : juste de quoi suivre un match qu'on a pronostiqué le temps qu'il
+// se joue, entre l'onglet Pronos (avant coup d'envoi) et Classement (une fois
+// terminé). Ticker 5s pour faire avancer calcMinute() entre deux polls ESPN,
+// même logique que LiveCard (Live.jsx).
+function LiveResultRow({ match, espn }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 5_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const period = getMatchPeriod(match)
+  const minute = calcMinute(match)
+  const fs = finalScore(match.score)
+  const hs = mergeScore(espn?.home, fs.home ?? match.score?.halfTime?.home)
+  const as_ = mergeScore(espn?.away, fs.away ?? match.score?.halfTime?.away)
+
+  return (
+    <div className="pronos__matchRow">
+      <div className="pronos__matchMeta">
+        <span>{match.competition?.name ?? ''}</span>
+        <span className="pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
+      </div>
+      <div className="pronos__matchTeams">
+        <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+        <span className="pronos__liveScore">{hs ?? '-'}</span>
+        <span className="pronos__scoreSep">-</span>
+        <span className="pronos__liveScore">{as_ ?? '-'}</span>
+        <span className="pronos__teamName pronos__teamName--away">{teamName(match.awayTeam)}</span>
+      </div>
+    </div>
+  )
+}
+
 function Pronos() {
   const { deviceId, groupCode, pseudo, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   const [activeTab, setActiveTab] = useState('pronos')
@@ -208,11 +257,17 @@ function Pronos() {
   const { matches: upcoming, loading: loadingUpcoming } = useUpcomingMatchesAllComps(COMP_IDS)
   const { matches: finished } = useFinishedMatchesAllComps(COMP_IDS, hasGroup && activeTab === 'classement')
   const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup)
+  const { liveMatches, espnScores } = useLiveData()
+
+  const inProgress = useMemo(
+    () => liveMatches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED'),
+    [liveMatches]
+  )
 
   const goTab = (t) => setActiveTab(t)
   const swipe = useSwipe(
-    () => goTab(activeTab === 'pronos' ? 'classement' : activeTab),
-    () => goTab(activeTab === 'classement' ? 'pronos' : activeTab)
+    () => { const i = TABS.indexOf(activeTab); if (i < TABS.length - 1) goTab(TABS[i + 1]) },
+    () => { const i = TABS.indexOf(activeTab); if (i > 0) goTab(TABS[i - 1]) }
   )
 
   const grouped = useMemo(() => groupByDay(upcoming), [upcoming])
@@ -278,6 +333,12 @@ function Pronos() {
           Pronos
         </button>
         <button
+          className={`pronos__tab${activeTab === 'resultat' ? ' pronos__tab--active' : ''}`}
+          onClick={() => goTab('resultat')}
+        >
+          Résultat{inProgress.length > 0 ? ` (${inProgress.length})` : ''}
+        </button>
+        <button
           className={`pronos__tab${activeTab === 'classement' ? ' pronos__tab--active' : ''}`}
           onClick={() => goTab('classement')}
         >
@@ -310,6 +371,21 @@ function Pronos() {
                 ))}
               </div>
             ))
+          )
+        )}
+
+        {activeTab === 'resultat' && (
+          inProgress.length === 0 ? (
+            <div className="pronos__empty">
+              <span className="pronos__emptyIcon">⚽</span>
+              <span className="pronos__emptyTitle">Aucun match en cours pour le moment</span>
+            </div>
+          ) : (
+            <div className="pronos__day">
+              {inProgress.map(m => (
+                <LiveResultRow key={m.id} match={m} espn={espnScores[m.id] ?? null} />
+              ))}
+            </div>
           )
         )}
 
