@@ -734,6 +734,13 @@ function Matchs() {
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   const isWC        = selectedComp === 'WC'
+  // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
+  // à rien (le bracket est propre à la CdM, changer de championnat en sort de
+  // toute façon) — on la masque et on laisse le tableau utiliser toute la
+  // largeur dispo au lieu de rester capé à 1200px (voir .matchs__layout,
+  // .matchs__layout--bracketFull dans match.css). Demande explicite : "encore
+  // de la place, tu peux agrandir".
+  const bracketFullWidth = isWC && wcView === 'bracket' && isBracketDesktop
 
   // Note : plus de ticker de minute ici — les cards du bracket sont
   // maintenant compactes (drapeau + nom uniquement, plus de texte "minute
@@ -884,7 +891,7 @@ function Matchs() {
       <div className="matchs__backdrop matchs__backdrop--one" />
       <div className="matchs__backdrop matchs__backdrop--two" />
 
-      <div className="matchs__layout">
+      <div className={`matchs__layout${bracketFullWidth ? ' matchs__layout--bracketFull' : ''}`}>
 
         {/* ── Mobile : header compétition vedette (Option B) ── */}
         <div className={`compHeader${compOpen ? ' compHeader--open' : ''}`}>
@@ -928,8 +935,9 @@ function Matchs() {
           )}
         </div>
 
-        {/* ── Desktop : sidebar liste ── */}
-        <aside className="matchs__sidebar">
+        {/* ── Desktop : sidebar liste — masquée sur l'onglet Phase finale
+            (voir bracketFullWidth), le bracket est propre à la CdM. ── */}
+        <aside className={`matchs__sidebar${bracketFullWidth ? ' matchs__sidebar--hidden' : ''}`}>
           <p className="matchs__sidebarLabel">Championnats</p>
           <nav className="matchs__sidebarNav">
             {COMPETITIONS.map(comp => (

@@ -57,6 +57,16 @@
   max-width: 1200px;
   margin: 0 auto;
   align-items: flex-start;
+  transition: max-width 0.2s ease;
+}
+
+/* Onglet "Phase finale" en desktop : la sidebar Championnats est masquée
+   (voir .matchs__sidebar--hidden) et le plafond de 1200px n'a plus lieu
+   d'être — le tableau (déjà zoomé dynamiquement pour remplir l'espace, voir
+   BracketSvgView) profite alors de bien plus de largeur réelle. */
+.matchs__layout--bracketFull {
+  max-width: 2200px;
+  padding: 0 1rem;
 }
 
 /* ── Sidebar ── */
@@ -70,6 +80,10 @@
   padding: 1rem;
   box-shadow: 0 20px 60px rgba(var(--black-rgb),0.4);
   overflow: hidden;
+}
+
+.matchs__sidebar--hidden {
+  display: none;
 }
 
 /* Bordure verte côté terrain sur la sidebar */
