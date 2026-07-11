@@ -158,6 +158,56 @@ export function matchOutcome(match) {
   return 'draw'
 }
 
+/**
+ * Résultat W/D/L pour UNE équipe donnée d'un match terminé.
+ *
+ * ⚠️ BUG CORRIGÉ (constat utilisateur : "Forme récente" de l'Angleterre
+ * n'affichait pas son dernier match joué au Mondial 2026, disparu du
+ * compteur "Matchs joués" aussi) : juste après le coup de sifflet final,
+ * football-data.org marque parfois le match FINISHED avant d'avoir fini de
+ * renseigner le score détaillé (regularTime/extraTime/penalties) —
+ * finalScore() renvoie alors {home:null, away:null} et matchOutcome()/tout
+ * calcul basé dessus renvoie null, faisant disparaître silencieusement ce
+ * match des stats/formes tant que FD.org n'a pas fini de le compléter.
+ * score.winner ('HOME_TEAM'/'AWAY_TEAM'/'DRAW', déjà documenté dans le
+ * schéma football-data.org v4) est un champ catégorique plus simple,
+ * disponible plus tôt dans la plupart des cas — utilisé ici en PREMIER,
+ * avant de retomber sur la comparaison numérique si absent. Les matchs
+ * sourcés ESPN (Ligue des Nations/CAN/Copa America/coupes nationales, voir
+ * espnAdapter.js) exposent aussi ce champ (dérivé de winner/advance ESPN),
+ * donc cette priorité s'applique uniformément à toutes les sources.
+ */
+export function outcomeForTeam(match, teamId) {
+  if (!match || teamId == null) return null
+  const isHome = match.homeTeam?.id === teamId
+  const isAway = match.awayTeam?.id === teamId
+  if (!isHome && !isAway) return null
+
+  const winner = match.score?.winner
+  if (winner === 'DRAW')      return 'D'
+  if (winner === 'HOME_TEAM') return isHome ? 'W' : 'L'
+  if (winner === 'AWAY_TEAM') return isAway ? 'W' : 'L'
+
+  // Tirs au but : le score 120min (finalScore) est TOUJOURS à égalité par
+  // définition — le vrai résultat vient de score.penalties.
+  if (
+    match.score?.duration === 'PENALTY_SHOOTOUT' &&
+    match.score?.penalties?.home != null &&
+    match.score?.penalties?.away != null
+  ) {
+    const { home: hp, away: ap } = match.score.penalties
+    if (hp === ap) return null
+    const homeWon = hp > ap
+    return (isHome && homeWon) || (isAway && !homeWon) ? 'W' : 'L'
+  }
+
+  const fs = finalScore(match.score)
+  if (fs.home == null || fs.away == null) return null
+  if (fs.home === fs.away) return 'D'
+  const homeWon = fs.home > fs.away
+  return (isHome && homeWon) || (isAway && !homeWon) ? 'W' : 'L'
+}
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
   const now   = Date.now()

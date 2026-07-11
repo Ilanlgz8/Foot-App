@@ -1,14 +1,7 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCache, getCacheSavedAt, writeCache } from './localCache'
-import { finalScore } from '../utils/matchUtils'
-
-// Retourne 'W', 'L' ou 'D' selon les buts marqués et encaissés
-function getResult(myGoals, theirGoals) {
-  if (myGoals > theirGoals) return 'W'
-  if (myGoals < theirGoals) return 'L'
-  return 'D'
-}
+import { outcomeForTeam } from '../utils/matchUtils'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
@@ -41,31 +34,21 @@ async function fetchTeamForm(selectedComp) {
 
   const formMap = {}
 
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "Forme récente" de l'Angleterre
+  // n'affichait pas son dernier match joué au Mondial 2026) : on lisait
+  // avant directement le score numérique (finalScore) pour déterminer W/D/L,
+  // qui peut être temporairement absent juste après le coup de sifflet final
+  // (FD.org marque parfois FINISHED avant d'avoir fini de renseigner le
+  // score détaillé) — le match disparaissait alors silencieusement de la
+  // liste au lieu d'apparaître. outcomeForTeam() (matchUtils.js) résout ça
+  // en préférant score.winner (champ catégorique, disponible plus tôt) et
+  // ne retombe sur le score numérique qu'en dernier recours.
   matches.forEach(match => {
     const homeId = match.homeTeam.id
     const awayId = match.awayTeam.id
-    // ⚠️ NE PAS lire match.score.fullTime directement : pour un match décidé
-    // aux tirs au but, FD.org y met regularTime+extraTime+penalties CUMULÉS
-    // (bug confirmé en prod), pas le score 120min — voir finalScore() dans
-    // matchUtils.js pour le détail. Sans ce fix, un match gagné aux tab
-    // pouvait ressortir 'L' (défaite) dans "Forme récente" au lieu de 'W'.
-    const { home: homeGoals, away: awayGoals } = finalScore(match.score)
-
-    if (homeGoals === null || awayGoals === null) return
-
-    // Aux tirs au but, le score 120min est TOUJOURS à égalité : le vrai
-    // vainqueur se lit dans score.penalties (même convention que partout
-    // ailleurs dans l'app, voir MatchModal.jsx FormDiamonds).
-    let homeResult, awayResult
-    if (match.score?.duration === 'PENALTY_SHOOTOUT' &&
-        match.score?.penalties?.home != null && match.score?.penalties?.away != null) {
-      const { home: hp, away: ap } = match.score.penalties
-      homeResult = hp > ap ? 'W' : 'L'
-      awayResult = ap > hp ? 'W' : 'L'
-    } else {
-      homeResult = getResult(homeGoals, awayGoals)
-      awayResult = getResult(awayGoals, homeGoals)
-    }
+    const homeResult = outcomeForTeam(match, homeId)
+    const awayResult = outcomeForTeam(match, awayId)
+    if (!homeResult || !awayResult) return
 
     if (!formMap[homeId]) formMap[homeId] = []
     if (!formMap[awayId]) formMap[awayId] = []

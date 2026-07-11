@@ -160,6 +160,23 @@ body::before {
   transform: scale(1.75) !important;
 }
 
+/* ── Drapeaux ESPN (Ligue des Nations/CAN/Copa America/coupes nationales,
+   voir espnAdapter.js) — retour utilisateur : "pas la même forme que la
+   Coupe du Monde". Cause : les images football-data.org (WC/Euro) sont déjà
+   bord-à-bord (le graphisme du drapeau remplit tout le fichier), alors que
+   les images ESPN (a.espncdn.com/i/teamlogos/countries/…) ont une marge
+   interne cohérente sur TOUTE la série (canevas carré avec le drapeau
+   inséré au centre, pas de recadrage possible via object-fit:cover puisque
+   le canevas lui-même est déjà carré) — donnant un petit drapeau flottant
+   dans un cadre vide au lieu de remplir le carré arrondi comme les autres.
+   Zoom générique sur TOUTE image de ce CDN plutôt qu'un correctif équipe
+   par équipe comme ci-dessus (~90 nouvelles nations entre les 3
+   compétitions, impossible à vérifier une par une visuellement depuis cet
+   environnement) — valeur alignée sur les correctifs déjà validés. */
+[data-crest="country"] img[src*="teamlogos/countries"] {
+  transform: scale(1.6) !important;
+}
+
 /* ── Animations globales ── */
 @keyframes spin     { to { transform: rotate(360deg); } }
 @keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }

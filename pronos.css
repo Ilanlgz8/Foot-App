@@ -161,45 +161,32 @@
   padding: 0.7rem 0.85rem;
   margin-bottom: 0.55rem;
 }
-/* 3 colonnes : logo + nom compétition (gauche) | heure/minute (centrée au
-   milieu de la card) | vide (droite, symétrie).
-   Remonté au plus près du bord haut de la card (retour utilisateur) :
-   margin-top négatif qui mange dans le padding du parent, compensé par un
-   margin-bottom plus grand pour que le reste du contenu (équipes/score) ne
-   bouge pas — la card garde exactement la même hauteur totale.
-   ⚠️ CORRIGÉ (retour utilisateur : nom de compét. et heure pas au même
-   niveau) : .pronos__metaComp (flex, logo 14px + texte) et .pronos__metaTime
-   (texte seul) n'avaient pas la même line-height → même avec align-items:
-   center sur la ligne de grille, leur texte ne tombait pas exactement au
-   même niveau visuel. line-height:14px commun aux deux (= hauteur du logo)
-   force l'alignement, peu importe la présence ou non d'une icône. Le
-   margin-top est aussi réduit (-0.25rem → -0.15rem, compensé côté
-   margin-bottom) : l'heure remonté trop haut avec l'ancienne valeur. */
+/* ⚠️ REFAIT EN 2 LIGNES EMPILÉES (retour utilisateur avec capture d'écran à
+   l'appui : le nom de compétition ("🏆 Coupe du Monde") ressortait EN
+   DESSOUS de l'heure du match, trop bas — l'ancien layout 3-colonnes
+   côte-à-côte ne rendait pas comme prévu). Ordre désormais explicite et
+   sans ambiguïté : compétition D'ABORD (ligne du haut, alignée à gauche),
+   heure ENSUITE (ligne du dessous, centrée) — l'ordre DOM dans Pronos.jsx a
+   aussi été inversé (CompLabel avant le <span> heure) pour que ce soit
+   cohérent peu importe la façon dont c'est empilé. */
 .pronos__matchMeta {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 0.3rem;
   font-size: 0.68rem;
-  line-height: 14px;
-  margin-top: -0.15rem;
-  margin-bottom: 0.65rem;
-}
-.pronos__metaTime {
-  grid-column: 2;
-  justify-self: center;
-  align-self: center;
-  color: var(--text-main);
-  line-height: 14px;
+  margin-bottom: 0.55rem;
 }
 .pronos__metaComp {
-  grid-column: 1;
-  justify-self: start;
-  align-self: center;
+  align-self: flex-start;
   display: flex;
   align-items: center;
   gap: 0.3rem;
   color: var(--text-main);
-  line-height: 14px;
+}
+.pronos__metaTime {
+  align-self: center;
+  color: var(--text-main);
 }
 .pronos__compLogo {
   width: 14px;

@@ -275,8 +275,8 @@ function MatchPredictRow({ match, myPred, onSave, formMap }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span className="pronos__metaTime">{_fmtH(match.utcDate)}</span>
         <CompLabel match={match} />
+        <span className="pronos__metaTime">{_fmtH(match.utcDate)}</span>
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
@@ -338,8 +338,8 @@ function LiveResultRow({ match, espn }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span className="pronos__metaTime pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
         <CompLabel match={match} />
+        <span className="pronos__metaTime pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
@@ -366,8 +366,8 @@ function FinishedResultRow({ match }) {
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
-        <span className="pronos__metaTime">Terminé</span>
         <CompLabel match={match} />
+        <span className="pronos__metaTime">Terminé</span>
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">

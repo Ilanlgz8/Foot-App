@@ -136,6 +136,15 @@ function normalizeEvent(event, compCode, overrides = {}) {
   if (home.winner === true) winnerTeamId = home.team?.id ?? null
   else if (away.winner === true) winnerTeamId = away.team?.id ?? null
 
+  // Même info, mais dans la convention football-data.org (score.winner :
+  // 'HOME_TEAM'/'AWAY_TEAM'/'DRAW') — voir outcomeForTeam() dans
+  // matchUtils.js, qui s'en sert en priorité (plus fiable qu'une comparaison
+  // de score numérique, notamment pour les tirs au but).
+  let scoreWinner = null
+  if (status === 'FINISHED') {
+    scoreWinner = home.winner === true ? 'HOME_TEAM' : away.winner === true ? 'AWAY_TEAM' : 'DRAW'
+  }
+
   return {
     id: `espn-${overrides.idPrefix ?? compCode}-${event.id}`,
     utcDate: event.date,
@@ -163,6 +172,7 @@ function normalizeEvent(event, compCode, overrides = {}) {
       crest: away.team?.logo ?? null,
     },
     score: {
+      winner: scoreWinner,
       fullTime: { home: homeScore, away: awayScore },
       halfTime: { home: null, away: null },
       duration: 'REGULAR',
