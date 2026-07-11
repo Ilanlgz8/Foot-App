@@ -71,17 +71,17 @@ export function ESPNScorers({ scorers = [] }) {
 // libellé au centre, valeur ext. à droite — la valeur la plus haute est
 // mise en avant (couleur + gras). Remplace l'ancienne barre de progression
 // (jugée trop chargée par rapport à ce format plus lisible d'un coup d'œil).
-function StatBar({ homeVal, awayVal, label }) {
+function StatBar({ homeVal, awayVal, label, noCompare = false, homeColor = null, awayColor = null }) {
   const hNum = parseFloat(homeVal)
   const aNum = parseFloat(awayVal)
-  const hasNums   = !Number.isNaN(hNum) && !Number.isNaN(aNum)
+  const hasNums   = !noCompare && !Number.isNaN(hNum) && !Number.isNaN(aNum)
   const homeLeads = hasNums && hNum > aNum
   const awayLeads = hasNums && aNum > hNum
   return (
     <div className="modal__statTableRow">
-      <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`}>{homeVal ?? '–'}</span>
+      <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>{homeVal ?? '–'}</span>
       <span className="modal__statTableLabel">{label}</span>
-      <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`}>{awayVal ?? '–'}</span>
+      <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>{awayVal ?? '–'}</span>
     </div>
   )
 }
@@ -590,12 +590,20 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
 // un match terminé (même sous-onglet). Logique identique à MpSeasonStats
 // (MatchPage.jsx, utilisé pour les matchs à venir) mais exportée ici pour
 // être réutilisable sans dupliquer le calcul dans LiveMatchPage.
-function calcSeasonTeamStats(teamId, compMatches) {
-  const matches = (compMatches ?? []).filter(
-    m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId)
-  )
+// split: 'all' | 'home' | 'away' (retour utilisateur : comparatif dom/ext)
+function calcSeasonTeamStats(teamId, compMatches, split = 'all') {
+  const matches = (compMatches ?? []).filter(m => {
+    if (m.status !== 'FINISHED') return false
+    const isHome = m.homeTeam?.id === teamId
+    const isAway = m.awayTeam?.id === teamId
+    if (!isHome && !isAway) return false
+    if (split === 'home') return isHome
+    if (split === 'away') return isAway
+    return true
+  })
   if (!matches.length) return null
   let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
+  const results = []
   matches.forEach(m => {
     const myHome = m.homeTeam?.id === teamId
     const fs = finalScore(m.score)
@@ -608,17 +616,29 @@ function calcSeasonTeamStats(teamId, compMatches) {
     if (f + a >= 3) over25++
     // Aux tirs au but, le score 120min (f/a) est TOUJOURS à égalité : le vrai
     // résultat vient de score.penalties (même convention que FormDiamonds).
+    let outcome
     if (m.score?.duration === 'PENALTY_SHOOTOUT' &&
         m.score?.penalties?.home != null && m.score?.penalties?.away != null) {
       const myPens  = myHome ? m.score.penalties.home : m.score.penalties.away
       const oppPens = myHome ? m.score.penalties.away : m.score.penalties.home
-      if (myPens > oppPens) wins++; else losses++
-    } else if (f > a) wins++
-    else if (f === a) draws++
-    else losses++
+      outcome = myPens > oppPens ? 'W' : 'L'
+    } else {
+      outcome = f > a ? 'W' : f === a ? 'D' : 'L'
+    }
+    if (outcome === 'W') { wins++; results.push('W') }
+    else if (outcome === 'D') { draws++; results.push('D') }
+    else { losses++; results.push('L') }
   })
   const played = wins + draws + losses
   if (!played) return null
+
+  let streak = 0, streakType = null
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (streakType === null) { streakType = results[i]; streak = 1 }
+    else if (results[i] === streakType) streak++
+    else break
+  }
+
   return {
     played,
     avgFor:     (gf / played).toFixed(1),
@@ -627,26 +647,38 @@ function calcSeasonTeamStats(teamId, compMatches) {
     bttsPct:    Math.round((btts  / played) * 100),
     over25Pct:  Math.round((over25 / played) * 100),
     cs,
+    streak, streakType,
   }
 }
 
 export function SeasonStatsTab({ match, compMatches }) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
-  const h = calcSeasonTeamStats(homeId, compMatches)
-  const a = calcSeasonTeamStats(awayId, compMatches)
 
-  if (!h && !a) {
+  // Toggle Global/Domicile/Extérieur (retour utilisateur)
+  const [split, setSplit] = useState('all')
+  const h = calcSeasonTeamStats(homeId, compMatches, split)
+  const a = calcSeasonTeamStats(awayId, compMatches, split)
+  const hAll = calcSeasonTeamStats(homeId, compMatches, 'all')
+  const aAll = calcSeasonTeamStats(awayId, compMatches, 'all')
+
+  if (!hAll && !aAll) {
     return <p className="modal__noEvents">Stats saison non disponibles</p>
   }
 
+  const streakColor = type => type === 'W' ? '#4ade80' : type === 'D' ? '#facc15' : '#f87171'
+  const streakLabel = s => !s?.streak ? '–' : `${s.streak}${s.streakType === 'W' ? 'V' : s.streakType === 'D' ? 'N' : 'D'}`
+
   const rows = [
+    { label: 'Matchs joués',            hv: h?.played,                 av: a?.played,                 noCompare: true },
     { label: 'Buts marqués / match',    hv: h?.avgFor,                 av: a?.avgFor },
     { label: 'Buts encaissés / match',  hv: h?.avgAgainst,             av: a?.avgAgainst },
     { label: '% Victoires',             hv: h ? `${h.winPct}%` : null, av: a ? `${a.winPct}%` : null },
     { label: 'Clean sheets',            hv: h?.cs,                     av: a?.cs },
     { label: 'Les 2 équipes marquent %',hv: h ? `${h.bttsPct}%` : null,av: a ? `${a.bttsPct}%` : null },
     { label: '+2.5 buts %',             hv: h ? `${h.over25Pct}%` : null, av: a ? `${a.over25Pct}%` : null },
+    { label: 'Série en cours',          hv: streakLabel(h), av: streakLabel(a), noCompare: true,
+      homeColor: h ? streakColor(h.streakType) : null, awayColor: a ? streakColor(a.streakType) : null },
   ].filter(r => r.hv != null || r.av != null)
 
   const homeName = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
@@ -654,8 +686,15 @@ export function SeasonStatsTab({ match, compMatches }) {
 
   return (
     <div className="modal__espnStats">
+      <div className="homeAwayToggle">
+        <button className={`homeAwayToggle__btn${split === 'all' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('all')}>Global</button>
+        <button className={`homeAwayToggle__btn${split === 'home' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('home')}>Domicile</button>
+        <button className={`homeAwayToggle__btn${split === 'away' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('away')}>Extérieur</button>
+      </div>
+
       {rows.map(r => (
-        <StatBar key={r.label} label={r.label} homeVal={r.hv ?? '–'} awayVal={r.av ?? '–'} />
+        <StatBar key={r.label} label={r.label} homeVal={r.hv ?? '–'} awayVal={r.av ?? '–'}
+          noCompare={r.noCompare} homeColor={r.homeColor} awayColor={r.awayColor} />
       ))}
 
       {/* Forme récente — même bloc que l'onglet "Avant-match" (TeamFormTable),
@@ -1092,10 +1131,17 @@ export function TeamFormTable({ teamId, compMatches }) {
 }
 
 // ── Stats saison calculées depuis compMatches ─────────────────────────────
-function calcTeamStats(teamId, compMatches) {
-  const matches = (compMatches ?? []).filter(
-    m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId)
-  )
+// split: 'all' | 'home' | 'away' (retour utilisateur : comparatif dom/ext)
+function calcTeamStats(teamId, compMatches, split = 'all') {
+  const matches = (compMatches ?? []).filter(m => {
+    if (m.status !== 'FINISHED') return false
+    const isHome = m.homeTeam?.id === teamId
+    const isAway = m.awayTeam?.id === teamId
+    if (!isHome && !isAway) return false
+    if (split === 'home') return isHome
+    if (split === 'away') return isAway
+    return true
+  })
   if (!matches.length) return null
   let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cs = 0, btts = 0, over25 = 0
   const results = []
@@ -1153,9 +1199,13 @@ function calcTeamStats(teamId, compMatches) {
 }
 
 function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches }) {
-  const h = calcTeamStats(homeId, compMatches)
-  const a = calcTeamStats(awayId, compMatches)
-  if (!h && !a) return null
+  // Toggle Global/Domicile/Extérieur (retour utilisateur)
+  const [split, setSplit] = useState('all')
+  const h = calcTeamStats(homeId, compMatches, split)
+  const a = calcTeamStats(awayId, compMatches, split)
+  const hAll = calcTeamStats(homeId, compMatches, 'all')
+  const aAll = calcTeamStats(awayId, compMatches, 'all')
+  if (!hAll && !aAll) return null
 
   // Série en cours : losanges colorés (◆ vert=V, jaune=N, rouge=D)
   const streakColor = type => type === 'W' ? '#4ade80' : type === 'D' ? '#facc15' : '#f87171'
@@ -1195,6 +1245,11 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
         <span className="pm__statTeam">{homeName}</span>
         <span />
         <span className="pm__statTeam pm__statTeam--away">{awayName}</span>
+      </div>
+      <div className="homeAwayToggle">
+        <button className={`homeAwayToggle__btn${split === 'all' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('all')}>Global</button>
+        <button className={`homeAwayToggle__btn${split === 'home' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('home')}>Domicile</button>
+        <button className={`homeAwayToggle__btn${split === 'away' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('away')}>Extérieur</button>
       </div>
       <div className="pm__statTable">
         {rows.map(({ label, hv, av, hRaw, aRaw, higher, noCompare }) => {
