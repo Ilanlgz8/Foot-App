@@ -63,7 +63,7 @@ const BK_CARD_W_DESKTOP   = 216
 const BK_FINAL_W_DESKTOP  = 270
 const BK_CONN_W_DESKTOP   = 40
 const BK_CARD_GAP_DESKTOP = 26
-const BK_HDR_H_DESKTOP    = 28
+const BK_HDR_H_DESKTOP    = 40
 // Le zoom fit-to-screen était plafonné à 1 (jamais agrandi au-delà de la
 // taille naturelle des cards) — pertinent en mobile (la taille naturelle
 // est déjà celle voulue), mais pas en desktop : sur un grand écran, la
@@ -338,6 +338,10 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
   const BK_CARD_GAP = isDesktop ? BK_CARD_GAP_DESKTOP : 16
   const BK_CONN_W   = isDesktop ? BK_CONN_W_DESKTOP   : 8
   const BK_HDR_H    = isDesktop ? BK_HDR_H_DESKTOP    : 18
+  // Espace pour le label "🏆 FINALE" au-dessus de sa card — agrandi en
+  // desktop car le chip lui-même est plus grand (voir bracket__finalLabel
+  // desktop dans match.css), sinon il chevaucherait les connecteurs SVG.
+  const BK_FINAL_LABEL_H = isDesktop ? 34 : 16
 
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu

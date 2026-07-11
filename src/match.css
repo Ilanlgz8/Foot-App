@@ -1245,8 +1245,19 @@
 /* Round title plus lisible quand il y a la place (colonnes bien plus larges
    que les 36px mobile). */
 .bracket__svgWrap--desktop .bracket__roundTitle {
-  font-size: 0.72rem;
-  padding: 0.24rem 0.55rem;
+  font-size: 1rem;
+  padding: 0.34rem 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+/* Labels "🏆 FINALE" / "🥉 3E PLACE" — même agrandissement en desktop. */
+.bracket__svgWrap--desktop .bracket__finalLabel {
+  font-size: 0.85rem;
+  padding: 0.28rem 0.9rem;
+}
+.bracket__svgWrap--desktop .bracket__thirdLabel {
+  font-size: 0.7rem;
+  padding: 0.24rem 0.75rem;
 }
 
 /* Card de la finale/petite finale en desktop : encore plus grande que les
