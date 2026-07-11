@@ -28,6 +28,7 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
+import { isNationalTeamComp } from '../utils/matchUtils'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -193,18 +194,20 @@ function confirmFt(match, now, queryClient) {
   queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
 
   const code = match.competition?.code
-  const isWC = code === 'WC' || match.competition?.id === 2000
+  const isWC = isNationalTeamComp(match)
 
-  // Tableau des phases finales (bracket WC) : football-data.org n'assigne
-  // l'équipe qualifiée au tour suivant qu'une fois le match officiellement
-  // clôturé côté FD.org — ce délai côté FD.org est hors de notre contrôle.
-  // Mais AVANT ce fix, notre propre cache (useWcKnockout, staleTime 10min)
-  // ajoutait un délai supplémentaire de NOTRE côté en plus de celui de
-  // FD.org : le bracket ne se rafraîchissait jamais suite à une fin de
-  // match, seulement au bout de 10min ou en rechargeant la page. Ici on
-  // force un refetch dès qu'on sait qu'un match WC est terminé (2 essais,
-  // comme pour todayMatches/matches FINISHED ci-dessous, au cas où FD.org
-  // lui-même n'aurait pas encore mis à jour au 1er essai).
+  // Tableau des phases finales (bracket WC/Euro) : football-data.org
+  // n'assigne l'équipe qualifiée au tour suivant qu'une fois le match
+  // officiellement clôturé côté FD.org — ce délai côté FD.org est hors de
+  // notre contrôle. Mais AVANT ce fix, notre propre cache (useWcKnockout,
+  // staleTime 10min) ajoutait un délai supplémentaire de NOTRE côté en plus
+  // de celui de FD.org : le bracket ne se rafraîchissait jamais suite à une
+  // fin de match, seulement au bout de 10min ou en rechargeant la page. Ici
+  // on force un refetch dès qu'on sait qu'un match WC/Euro est terminé (2
+  // essais, comme pour todayMatches/matches FINISHED ci-dessous, au cas où
+  // FD.org lui-même n'aurait pas encore mis à jour au 1er essai). Sans
+  // 2e argument, invalidateQueries matche par PRÉFIXE — ['wc-knockout']
+  // invalide donc bien ['wc-knockout','WC'] ET ['wc-knockout','EC'] à la fois.
   if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
 
   // À 2s : mise à jour immédiate Accueil (recent results) + page Résultats

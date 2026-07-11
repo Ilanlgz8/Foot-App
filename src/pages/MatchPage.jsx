@@ -10,7 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { finalScore, matchOutcome, mergeScore } from '../utils/matchUtils'
+import { finalScore, matchOutcome, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
   useEspnMatchStats,
@@ -137,7 +137,7 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   })
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   return (
     <div className="mp__hero" style={{ background: gradient }}>
@@ -353,7 +353,7 @@ function aflStatsToRows(statsData) {
 
 // ── Stats match terminé ───────────────────────────────────────────────────────
 function MpMatchStats({ match }) {
-  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
+  const isWC = isNationalTeamComp(match)
   const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? match : null, isWC, false)
   const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match)
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)

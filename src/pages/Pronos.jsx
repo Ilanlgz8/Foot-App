@@ -28,7 +28,7 @@ import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { calcProno } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -56,7 +56,7 @@ const _fmtD = (d) => {
   return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 const teamName = (team) => team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
-const isWCMatch = (match) => match.competition?.id === 2000 || match.competition?.code === 'WC'
+const isWCMatch = (match) => isNationalTeamComp(match)
 // Nom FR + logo de la compétition (ex: "FIFA World Cup" → "Coupe du Monde"
 // + emblème), même mapping que COMPETITIONS (data/competitions.js) utilisé
 // partout ailleurs (Live.jsx, etc.).

@@ -9,6 +9,7 @@
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { TEAM_SHORT } from '../data/teamShortNames'
+import { isNationalTeamComp } from '../utils/matchUtils'
 
 function shortenName(name) {
   if (!name) return name
@@ -26,7 +27,7 @@ export function MatchDuJourCard({ match, onClick }) {
   const awayName = shortenName(translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?'))
   const kickoff  = new Date(match.utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   // Couleurs réelles des deux équipes (dico curé teamPhotos) → halos latéraux
   // du hero. Le thème v2 (theme-v2.css) les consomme via var(--mdj-home/away),

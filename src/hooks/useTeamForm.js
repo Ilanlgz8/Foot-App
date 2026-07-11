@@ -19,9 +19,15 @@ const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 // useTeamFormMulti (plusieurs compétitions mélangées, voir plus bas).
 async function fetchTeamForm(selectedComp) {
   // WC 2026 : forcer season=2026 sinon FD.org renvoie WC 2022
+  // Euro : même problème (compétition non-annuelle, FD.org peut résoudre une
+  // vieille édition sans ?season= explicite — voir useWcKnockout.js) — année
+  // courante plutôt qu'une valeur figée, pas d'édition Euro connue à l'avance
+  // ici contrairement à WC 2026.
   // On NE filtre PAS status=FINISHED côté serveur (non supporté par le free tier FD.org
   // sur certains endpoints) → on filtre côté client
-  const seasonParam = selectedComp === 'WC' ? '?season=2026' : ''
+  const seasonParam = selectedComp === 'WC' ? '?season=2026'
+    : selectedComp === 'EC' ? `?season=${new Date().getFullYear()}`
+    : ''
   const res = await fdFetch(
     fdUrl(`/api/v4/competitions/${selectedComp}/matches${seasonParam}`)
   )

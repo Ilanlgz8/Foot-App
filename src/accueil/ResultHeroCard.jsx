@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { translateTeam } from '../data/teamNames'
-import { finalScore } from '../utils/matchUtils'
+import { finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { COMPETITIONS } from '../data/competitions'
 import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
@@ -36,7 +36,7 @@ export function ResultHeroCard({ match }) {
     ? (hPens != null && aPens != null && aPens > hPens)
     : as_ > hs
 
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
   const homeRaw = match.homeTeam?.name || match.homeTeam?.shortName || ''
   const awayRaw = match.awayTeam?.name || match.awayTeam?.shortName || ''
   const { home: homeColor, away: awayColor } = getMatchTeamColors(homeRaw, awayRaw)

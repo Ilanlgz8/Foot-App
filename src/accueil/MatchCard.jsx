@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -242,7 +242,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   const homeCrestCls = matchClass('accueil__matchCardCrest', false,    awayWins)  // blason perdant → grisé
   const awayCrestCls = matchClass('accueil__matchCardCrest', false,    homeWins)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
   const cardGradient = noGradient ? null : getMatchGradient(
     match.homeTeam?.name || match.homeTeam?.shortName || '',
     match.awayTeam?.name || match.awayTeam?.shortName || ''

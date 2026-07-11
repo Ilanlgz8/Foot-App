@@ -31,7 +31,6 @@ export const KNOCKOUT_LABELS = {
 }
 
 const EMPTY_ROUNDS = []
-const CACHE_KEY = 'wc_knockout'
 
 // football-data.org ne fournit aucun "index de position dans le bracket" —
 // l'ordre du tableau pour un tour donné suit l'ordre de création/planification
@@ -102,17 +101,33 @@ function reorderRoundsByTopology(rounds) {
   return rounds
 }
 
-export function useWcKnockout() {
+// compCode : 'WC' (défaut, historique) ou 'EC' (Euro) — même format de
+// bracket à élimination directe côté football-data.org (stage LAST_32/
+// LAST_16/QUARTER_FINALS/SEMI_FINALS/THIRD_PLACE/FINAL), donc même logique
+// de reconstruction/affichage, juste paramétrée par compétition. Cache et
+// queryKey inclus compCode pour ne jamais mélanger les 2 tableaux.
+// Seules WC/EC ont un bracket — enabled=false pour toute autre compétition
+// (Ligue 1, LaLiga...) : évite de taper FD.org pour rien à chaque fois que
+// Matchs() est monté (le hook est appelé inconditionnellement, la garde
+// react-query est le seul endroit possible pour ne pas violer les Rules of
+// Hooks avec un retour anticipé conditionnel).
+const BRACKET_COMPS = new Set(['WC', 'EC'])
+
+export function useWcKnockout(compCode = 'WC') {
+  const cacheKey = `wc_knockout_${compCode}`
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['wc-knockout'],
+    queryKey: ['wc-knockout', compCode],
+    enabled: BRACKET_COMPS.has(compCode),
     queryFn: async () => {
       // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :
       // football-data.org résout la "saison courante" comme "celle qui a la
       // date de début la plus récente", une règle ambiguë pour une compétition
-      // non-annuelle comme la CM. Sans ?season= explicite, l'endpoint peut
-      // silencieusement retourner un jeu de données obsolète/incomplet — vu en
-      // pratique : seuls 3 matchs de phase finale au lieu de tous ceux déjà joués.
-      const wcSeason = new Date().getFullYear()
+      // non-annuelle comme la CM/l'Euro. Sans ?season= explicite, l'endpoint
+      // peut silencieusement retourner un jeu de données obsolète/incomplet —
+      // vu en pratique : seuls 3 matchs de phase finale au lieu de tous ceux
+      // déjà joués.
+      const season = new Date().getFullYear()
       async function tryFetch(url) {
         const r = await fdFetch(fdUrl(url))
         if (r.status === 403 || r.status === 429) throw new Error(String(r.status))
@@ -120,9 +135,9 @@ export function useWcKnockout() {
         const j = await r.json()
         return j.matches ?? null
       }
-      let all = await tryFetch(`/api/v4/competitions/WC/matches?season=${wcSeason}`)
+      let all = await tryFetch(`/api/v4/competitions/${compCode}/matches?season=${season}`)
       if (!all || all.length === 0) {
-        all = await tryFetch(`/api/v4/competitions/WC/matches`)
+        all = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
       }
       all = all ?? []
 
@@ -138,11 +153,11 @@ export function useWcKnockout() {
 
       reorderRoundsByTopology(rounds)
 
-      writeCache(CACHE_KEY, rounds, STALE_MS)
+      writeCache(cacheKey, rounds, STALE_MS)
       return rounds
     },
-    initialData:          readCacheStale(CACHE_KEY) ?? undefined,
-    initialDataUpdatedAt: getCacheSavedAt(CACHE_KEY),
+    initialData:          readCacheStale(cacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(cacheKey),
     staleTime:            STALE_MS,
     retry: false,
   })

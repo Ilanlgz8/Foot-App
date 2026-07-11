@@ -21,7 +21,7 @@ const kv = new Redis({
 const ALLOWED_SLUGS = new Set([
   'fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1',
   'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
-  'fifa.world',
+  'fifa.world', 'uefa.euro',
 ])
 
 const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)

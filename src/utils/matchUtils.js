@@ -350,3 +350,20 @@ export function getMatchPeriod(match) {
   if (match.status === 'EXTRA_TIME')  return 'Prolongations'
   return null
 }
+
+// ── Compétitions "équipe nationale" (drapeau pays, PAS blason club) ──
+// Détermine si un match doit afficher un drapeau (cercle, [data-crest=
+// "country"]) plutôt qu'un blason club ([data-crest="club"]). AVANT :
+// chaque composant (~20 fichiers — MatchCard, Live.jsx, MatchPage.jsx,
+// Pronos.jsx, etc.) redéfinissait sa propre variable locale
+// `match.competition?.id === 2000 || match.competition?.code === 'WC'` —
+// un seul oubli lors de l'ajout d'une compétition nationale (Euro, Ligue des
+// Nations, CAN, Copa America) = drapeau affiché en blason carré quelque part
+// sans que ce soit repéré. Centralisé ici, un seul endroit à mettre à jour.
+const NATIONAL_TEAM_COMP_IDS   = new Set([2000, 2018]) // WC, Euro (id numérique football-data.org)
+const NATIONAL_TEAM_COMP_CODES = new Set(['WC', 'EC', 'NL', 'CAN', 'COPA'])
+export function isNationalTeamComp(match) {
+  const id   = match?.competition?.id
+  const code = match?.competition?.code
+  return NATIONAL_TEAM_COMP_IDS.has(id) || NATIONAL_TEAM_COMP_CODES.has(code)
+}

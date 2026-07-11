@@ -30,4 +30,13 @@ export const ESPN_SLUG_BY_COMP_ID = {
   2001: 'uefa.champions',
   2146: 'uefa.europa',
   2048: 'uefa.europa.conf',
+  // Euro — ajouté pour couvrir la même compétition que COMPETITIONS/EC dans
+  // competitions.js. ⚠️ id 2018 = meilleur souvenir de la valeur numérique
+  // football-data.org pour "European Championship", PAS vérifié en direct
+  // contre un vrai payload FD.org (pas de clé API dispo pour tester depuis
+  // cet environnement) — à confirmer au premier vrai match Euro live si le
+  // matching FD.org↔ESPN semble décalé (impact limité : juste l'enrichissement
+  // live via fifa-live.js, pas le Programme/Résultats/Classement de base qui
+  // utilisent le code string 'EC', pas cet id numérique).
+  2018: 'uefa.euro',
 }

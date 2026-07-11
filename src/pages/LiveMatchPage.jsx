@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState }    from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome , isNationalTeamComp } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -201,7 +201,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   )
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   return (
     <div className="mp__hero lmp__hero" style={{ background: gradient }}>

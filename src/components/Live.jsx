@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { TEAM_SHORT } from '../data/teamShortNames'
@@ -158,7 +158,7 @@ function LiveCard({ match, espn, onClick }) {
 
   const isLive = !isTermine && (match.status === 'IN_PLAY' || match.status === 'PAUSED' || minute !== null)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   useEffect(() => {
     if (!isLive) { prevHs.current = null; prevAs.current = null; return }

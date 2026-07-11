@@ -13,6 +13,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { getTeamColor } from '../data/teamPhotos'
+import { isNationalTeamComp } from '../utils/matchUtils'
 
 /* ═══════════════════════════════════════════════════════════════
    BRACKET SVG VIEW — layout mathématique pur, zéro DOM query
@@ -177,7 +178,7 @@ function MatchRow({ match, index, inModal = false }) {
     : null
   const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   return (
     <div
@@ -734,10 +735,14 @@ function Matchs() {
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
   const { formMap } = useTeamForm(selectedComp)
-  const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout()
+  const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout(selectedComp)
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
-  const isWC        = selectedComp === 'WC'
+  // WC ET Euro : mêmes vues Poules/Phase finale (les 2 seules compétitions du
+  // catalogue avec une phase de groupes + bracket à élimination directe côté
+  // football-data.org). Le nom "isWC" reste historique (beaucoup de call
+  // sites), mais couvre bien les 2 depuis l'ajout de l'Euro.
+  const isWC        = selectedComp === 'WC' || selectedComp === 'EC'
   // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
   // à rien (le bracket est propre à la CdM, changer de championnat en sort de
   // toute façon) — on la masque et on laisse le tableau utiliser toute la

@@ -1,6 +1,6 @@
 import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -16,7 +16,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const compCode = match.competition?.code ?? null
   const { formMap } = useTeamForm(compCode)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || compCode === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   // Fallback initiale si le crest ne charge pas (404, image cassée)
   const [homeCrestError, setHomeCrestError] = useState(false)

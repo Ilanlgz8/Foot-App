@@ -21,6 +21,7 @@ export const COMPETITION_ESPN_SLUG = {
   SA:  'ita.1',
   CL:  'uefa.champions',
   WC:  'fifa.world',
+  EC:  'uefa.euro',
 }
 
 export const COMPETITIONS = [
@@ -65,5 +66,13 @@ export const COMPETITIONS = [
     name: 'Coupe du Monde',
     shortName: 'Mondial',
     emblem: worldCupLogo,
+  },
+  {
+    id: 'EC',
+    name: 'Euro',
+    shortName: 'Euro',
+    // Pas de logo dédié dispo dans les assets (à ajouter si fourni) — tous
+    // les composants gèrent déjà emblem=null proprement (pas d'<img> rendue).
+    emblem: null,
   },
 ]

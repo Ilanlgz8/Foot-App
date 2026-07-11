@@ -2,7 +2,7 @@
 // équipe favorite (useFavoriteClubs) a un match live ou à venir parmi les
 // données déjà chargées par la page (voir le calcul dans Accueil.jsx).
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 
@@ -18,7 +18,7 @@ function formatDate(utcDate) {
 }
 
 export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 

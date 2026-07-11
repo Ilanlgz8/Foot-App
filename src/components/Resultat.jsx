@@ -14,7 +14,7 @@ import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { mergeScore, finalScore } from '../utils/matchUtils'
+import { mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
@@ -51,7 +51,7 @@ function MatchCard({ match }) {
     ? getTeamColor((homeIsFav ? match.homeTeam : match.awayTeam)?.shortName || (homeIsFav ? match.homeTeam : match.awayTeam)?.name)
     : null
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = match.competition?.id === 2000 || match.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
   // finalScore() = score 120min (prolongations incluses, tirs au but exclus).
   // ⚠️ NE PAS lire match.score.fullTime directement : pour un match décidé aux
   // tab, FD.org y met regularTime+extraTime+penalties CUMULÉS (bug confirmé en
@@ -203,7 +203,8 @@ function Resultats() {
   const grouped = useMemo(() => groupRounds(matches, 'desc'), [matches])
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
-  const isWC        = selectedComp === 'WC'
+  // WC ET Euro : même vue "poules" par groupes (voir même commentaire dans Match.jsx)
+  const isWC        = selectedComp === 'WC' || selectedComp === 'EC'
 
   // Groupes WC détectés
   const wcGroups = useMemo(() => {

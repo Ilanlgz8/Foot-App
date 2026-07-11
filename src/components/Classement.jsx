@@ -133,9 +133,11 @@ function Classement() {
     : displayScorers
 
   // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
-  // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope)
-  const { matches: wcSched, loading: wcSchedLoading } = useMatches('WC', 'SCHEDULED')
-  const { matches: wcFin,   loading: wcFinLoading   } = useMatches('WC', 'FINISHED')
+  // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope).
+  // Paramétré par selectedComp (avant : hardcodé 'WC') — sinon le modal groupe
+  // affichait toujours les matchs du Mondial même en consultant un groupe Euro.
+  const { matches: wcSched, loading: wcSchedLoading } = useMatches(selectedComp, 'SCHEDULED')
+  const { matches: wcFin,   loading: wcFinLoading   } = useMatches(selectedComp, 'FINISHED')
   // Fetch dédié à l'onglet Tendances retiré avec l'onglet lui-même (mis de
   // côté, voir TendancesView.jsx) — évite un appel réseau pour rien.
 
@@ -335,7 +337,7 @@ function Classement() {
                 formMap={formMap}
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
-                isCountry={selectedComp === 'WC'}
+                isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
               />
             )}
 
@@ -393,7 +395,7 @@ function Classement() {
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
-                isCountry={selectedComp === 'WC'}
+                isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
               />
             </div>
           ))}
@@ -608,7 +610,7 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <div className="classement__scorerCrestWrap" data-crest={selectedComp === 'WC' ? 'country' : 'club'}><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
+                            <div className="classement__scorerCrestWrap" data-crest={(selectedComp === 'WC' || selectedComp === 'EC') ? 'country' : 'club'}><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
                               onError={e => e.currentTarget.style.display = 'none'} /></div>
                           )}
                           <span className="classement__scorerTeam">
@@ -704,7 +706,7 @@ function Classement() {
                   qualificationRules={qualificationRules}
                   snapshotKey={`standings_prev_${selectedComp}`}
                   snapshotRows={standings}
-                  isCountry={selectedComp === 'WC'}
+                  isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
         )}

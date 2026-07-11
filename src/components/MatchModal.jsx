@@ -9,7 +9,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome , isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -750,7 +750,7 @@ export function ComposTab({ match, compMatches }) {
   // WC 2026 : useLineups gère FIFA API en interne (redis fm:match:) puis ESPN fallback.
   // Pour WC on lance api-football EN PARALLÈLE d'ESPN (ESPN/FIFA souvent vides si hors cron).
   // Pour non-WC, api-football attend qu'ESPN échoue (économie de quota 100 req/jour).
-  const isWC = match?.competition?.id === 2000 || match?.competition?.code === 'WC'
+  const isWC = isNationalTeamComp(match)
 
   // Source 1 : ESPN/FIFA (useLineups essaie FIFA Redis puis ESPN — gère WC en interne)
   const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
@@ -1481,7 +1481,7 @@ function H2HRowsList({ rows, homeId }) {
 // qu'aucune confrontation connue — demande explicite : "si y'en a pas on le
 // hide, on affiche pas le bouton").
 export function H2HTabContent({ match, rows, isLoading }) {
-  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
+  const isWC = isNationalTeamComp(match)
   const homeId = match.homeTeam?.id
   const homeShort = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayShort = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -1563,7 +1563,7 @@ function aflStatsToRows(statsData) {
 }
 
 export function MatchStatsSection({ match }) {
-  const isWC = match?.competition?.code === 'WC' || match?.competition?.id === 2000
+  const isWC = isNationalTeamComp(match)
 
   // Source 1 — FIFA (Redis, WC uniquement, one-shot)
   const { data: fifaData, isLoading: fifaLoading } = useFifaStats(
