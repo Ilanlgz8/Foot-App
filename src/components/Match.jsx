@@ -54,11 +54,24 @@ const BK_FINAL_W = 62
 // FINAL_W etc. calculés en tête de la fonction) ; la logique de zoom
 // fit-to-screen existante n'a pas besoin de changer, elle s'adapte déjà
 // dynamiquement à TOTAL_W/TOTAL_H quels qu'ils soient.
-const BK_CARD_W_DESKTOP   = 176
-const BK_FINAL_W_DESKTOP  = 230
-const BK_CONN_W_DESKTOP   = 34
-const BK_CARD_GAP_DESKTOP = 22
-const BK_HDR_H_DESKTOP    = 24
+// Agrandi une 1ère fois (176→216 etc.) : retour utilisateur après premier
+// déploiement — "encore de la place, on voit pas trop bien". Combiné au
+// zoom fit-to-screen qui peut désormais dépasser 1 en desktop (voir
+// BK_ZOOM_CAP_DESKTOP plus bas), le tableau remplit vraiment l'espace dispo
+// au lieu de rester à sa taille naturelle quand l'écran est très large.
+const BK_CARD_W_DESKTOP   = 216
+const BK_FINAL_W_DESKTOP  = 270
+const BK_CONN_W_DESKTOP   = 40
+const BK_CARD_GAP_DESKTOP = 26
+const BK_HDR_H_DESKTOP    = 28
+// Le zoom fit-to-screen était plafonné à 1 (jamais agrandi au-delà de la
+// taille naturelle des cards) — pertinent en mobile (la taille naturelle
+// est déjà celle voulue), mais pas en desktop : sur un grand écran, la
+// taille naturelle des cards laisse une large marge vide inutilisée. En
+// autorisant le zoom desktop à monter jusqu'à 1.6, le tableau grandit pour
+// occuper l'espace vraiment dispo, tout en restant borné par
+// availW/TOTAL_W et availH/TOTAL_H (donc jamais de débordement).
+const BK_ZOOM_CAP_DESKTOP = 1.6
 // Hauteur de card : mesurée via sonde (fiable, gère les variations de
 // métriques de fonte/rendu d'image selon l'appareil) plutôt que devinée à la
 // main — même principe que précédemment. Fallback plus généreux qu'avant
@@ -455,7 +468,8 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
       const maxVH  = lvhProbe.getBoundingClientRect().height || window.innerHeight
       const availH = Math.max(0, maxVH - rect.top - BOTTOM_SAFETY)
       if (!availW || !availH) return
-      const z = Math.min(1, availW / TOTAL_W, availH / TOTAL_H)
+      const zoomCap = isDesktop ? BK_ZOOM_CAP_DESKTOP : 1
+      const z = Math.min(zoomCap, availW / TOTAL_W, availH / TOTAL_H)
       setFitZoom(z > 0 ? z : 1)
     }
     compute()
@@ -470,7 +484,7 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
       window.removeEventListener('resize', compute)
       lvhProbe.remove()
     }
-  }, [containerRef, TOTAL_W, TOTAL_H])
+  }, [containerRef, TOTAL_W, TOTAL_H, isDesktop])
 
   // X gauche d'un tour, branche GAUCHE (croissant vers la droite)
   const rXLeft  = (ri) => BK_PAD_X + ri * (BK_CARD_W + BK_CONN_W)

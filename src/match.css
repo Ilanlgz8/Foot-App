@@ -1187,19 +1187,27 @@
    anneau vert vainqueur…) reste identique, juste réutilisé à plus grande
    échelle. */
 .bracket__card--desktop {
-  border-radius: 0.7rem;
+  border-radius: 0.8rem;
 }
 
 .bracket__team--desktop {
   justify-content: flex-start;
-  gap: 0.55rem;
-  padding: 0.32rem 0.6rem;
+  gap: 0.7rem;
+  padding: 0.45rem 0.8rem;
+}
+
+/* Drapeau plus grand qu'en mobile — la card desktop a la largeur pour ça
+   (voir BK_CARD_W_DESKTOP dans Match.jsx). */
+.bracket__team--desktop .bracket__crestWrap,
+.bracket__team--desktop .bracket__crestTbd {
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 .bracket__teamNameDesktop {
   flex: 1;
   min-width: 0;
-  font-size: 0.82rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-main, #f1f5f9);
   white-space: nowrap;
@@ -1213,10 +1221,10 @@
 
 .bracket__scoreDesktop {
   flex-shrink: 0;
-  font-size: 0.9rem;
+  font-size: 1.15rem;
   font-weight: 900;
   color: #fff;
-  min-width: 1.2rem;
+  min-width: 1.4rem;
   text-align: right;
 }
 
@@ -1227,18 +1235,19 @@
   padding: 0.24rem 0.55rem;
 }
 
-/* Card de la finale/petite finale en desktop : drapeau un peu plus contenu
-   qu'en mobile (le nom + score prennent maintenant le relais visuel). */
+/* Card de la finale/petite finale en desktop : encore plus grande que les
+   cards de tour normal (point de convergence du tableau, doit se voir
+   davantage — même logique qu'en mobile avec bracket__card--big). */
 .bracket__card--big.bracket__card--desktop .bracket__crestWrap,
 .bracket__card--big.bracket__card--desktop .bracket__crestTbd {
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 3.2rem;
+  height: 3.2rem;
 }
 .bracket__card--big.bracket__card--desktop .bracket__teamNameDesktop {
-  font-size: 0.95rem;
+  font-size: 1.2rem;
 }
 .bracket__card--big.bracket__card--desktop .bracket__scoreDesktop {
-  font-size: 1.1rem;
+  font-size: 1.35rem;
 }
 
 /* ── Écran vide (phase finale pas encore dispo) ── */
