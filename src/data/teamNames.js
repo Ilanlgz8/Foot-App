@@ -273,6 +273,24 @@ export const TEAM_NAMES_FR = {
   'Kosovo': 'Kosovo',
   'Faroe Islands': 'Îles Féroé',
   'Liechtenstein': 'Liechtenstein',
+  // ── Traductions manquantes trouvées en comparant avec les vrais noms
+  // ESPN (endpoint /teams de chaque compétition, vérifié en direct) ────────
+  // ESPN utilise "Türkiye" (pas "Turkey") pour la Ligue des Nations — clé
+  // séparée de 'Turkey' (FD.org/Euro) déjà présente plus haut, même pays.
+  'Türkiye': 'Turquie',
+  // Grèce : absente de la liste Euro (n'était pas qualifiée) donc jamais
+  // ajoutée — présente en Ligue des Nations.
+  'Greece': 'Grèce',
+  // Ligue des Nations ESPN renvoie "Bosnia-Herzegovina" (tiret, sans "and"),
+  // 3e variante après 'Bosnia-H.' (FD.org) et 'Bosnia and Herzegovina' (nom
+  // complet, vu ailleurs sur ESPN) déjà présentes plus haut.
+  'Bosnia-Herzegovina': 'Bosnie-Herzégovine',
+  // Copa America : invités CONCACAF absents du Mondial/Copa America côté
+  // qualifiés déjà listés, + ESPN renvoie "United States" (pas "USA") pour
+  // cette compétition spécifiquement.
+  'Costa Rica': 'Costa Rica',
+  'Jamaica': 'Jamaïque',
+  'United States': 'États-Unis',
 }
 
 export const translateTeam = (name) => TEAM_NAMES_FR[name] ?? name

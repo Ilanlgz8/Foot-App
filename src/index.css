@@ -160,19 +160,17 @@ body::before {
   transform: scale(1.75) !important;
 }
 
-/* ── Drapeaux ESPN (Ligue des Nations/CAN/Copa America/coupes nationales,
-   voir espnAdapter.js) — retour utilisateur : "pas la même forme que la
-   Coupe du Monde". Cause : les images football-data.org (WC/Euro) sont déjà
-   bord-à-bord (le graphisme du drapeau remplit tout le fichier), alors que
-   les images ESPN (a.espncdn.com/i/teamlogos/countries/…) ont une marge
-   interne cohérente sur TOUTE la série (canevas carré avec le drapeau
-   inséré au centre, pas de recadrage possible via object-fit:cover puisque
-   le canevas lui-même est déjà carré) — donnant un petit drapeau flottant
-   dans un cadre vide au lieu de remplir le carré arrondi comme les autres.
-   Zoom générique sur TOUTE image de ce CDN plutôt qu'un correctif équipe
-   par équipe comme ci-dessus (~90 nouvelles nations entre les 3
-   compétitions, impossible à vérifier une par une visuellement depuis cet
-   environnement) — valeur alignée sur les correctifs déjà validés. */
+/* ── Filet de sécurité drapeaux ESPN (Ligue des Nations/CAN/Copa America) ──
+   Retour utilisateur : certains drapeaux (ex. Pologne) ne remplissaient pas
+   le cadre arrondi, contrairement au Mondial/Euro (images football-data.org,
+   déjà bord-à-bord). Cause réelle identifiée : la marge interne des images
+   ESPN (a.espncdn.com/i/teamlogos/countries/…) VARIE selon le pays — un seul
+   scale() ne peut pas convenir à tous en même temps. Corrigé À LA SOURCE :
+   espnAdapter.js remplace maintenant ces images par des drapeaux
+   flagcdn.com bord-à-bord (voir data/countryFlags.js) pour tous les pays
+   couverts par la table de correspondance. Cette règle ne reste utile que
+   pour un pays qui manquerait encore à cette table (retombe sur l'image
+   ESPN d'origine) — filet de sécurité, plus le correctif principal. */
 [data-crest="country"] img[src*="teamlogos/countries"] {
   transform: scale(1.6) !important;
 }

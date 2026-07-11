@@ -34,6 +34,14 @@
 //     pour l'instant).
 import { readCacheStale, writeCache } from '../hooks/localCache'
 import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
+import { countryFlagUrl } from '../data/countryFlags'
+
+// Compétitions sélections nationales sourcées ESPN — voir countryFlags.js :
+// on remplace le blason ESPN (marge interne variable selon le pays, ne peut
+// pas être compensée par un simple zoom CSS uniforme) par un drapeau
+// flagcdn.com bord-à-bord quand on a le code du pays. Les coupes nationales
+// (FL1/PD/PL) sont des clubs, jamais concernées.
+const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'COPA'])
 
 // Id numérique synthétique par compétition ESPN — négatif pour ne jamais
 // entrer en collision avec un vrai id football-data.org (tous positifs, ex:
@@ -145,6 +153,12 @@ function normalizeEvent(event, compCode, overrides = {}) {
     scoreWinner = home.winner === true ? 'HOME_TEAM' : away.winner === true ? 'AWAY_TEAM' : 'DRAW'
   }
 
+  const isNationalTeamEspnComp = NATIONAL_TEAM_ESPN_COMPS.has(compCode)
+  const homeName = home.team?.displayName ?? home.team?.name ?? '?'
+  const awayName = away.team?.displayName ?? away.team?.name ?? '?'
+  const homeCrest = (isNationalTeamEspnComp && countryFlagUrl(homeName)) || home.team?.logo || null
+  const awayCrest = (isNationalTeamEspnComp && countryFlagUrl(awayName)) || away.team?.logo || null
+
   return {
     id: `espn-${overrides.idPrefix ?? compCode}-${event.id}`,
     utcDate: event.date,
@@ -161,15 +175,15 @@ function normalizeEvent(event, compCode, overrides = {}) {
     },
     homeTeam: {
       id: home.team?.id ?? null,
-      name: home.team?.displayName ?? home.team?.name ?? '?',
+      name: homeName,
       shortName: home.team?.shortDisplayName ?? home.team?.name ?? '?',
-      crest: home.team?.logo ?? null,
+      crest: homeCrest,
     },
     awayTeam: {
       id: away.team?.id ?? null,
-      name: away.team?.displayName ?? away.team?.name ?? '?',
+      name: awayName,
       shortName: away.team?.shortDisplayName ?? away.team?.name ?? '?',
-      crest: away.team?.logo ?? null,
+      crest: awayCrest,
     },
     score: {
       winner: scoreWinner,
