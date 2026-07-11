@@ -226,12 +226,46 @@
   white-space: nowrap;
   text-align: center;
 }
+/* Colonne centrale : cases de score + indicateur de points juste en dessous
+   (voir pronos__pointsHint) — un seul wrapper flex-column pour que les deux
+   restent centrés ensemble, quelle que soit la largeur du texte du hint. */
+.pronos__scoreCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  justify-self: center;
+}
 .pronos__scoreGroup {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  justify-self: center;
   padding-top: 0.15rem;
+}
+
+/* Points potentiels si le résultat pronostiqué est le bon — barème variable
+   selon le % de victoire/nul calculé par l'app (calcProno, même source que
+   la barre de pronostic de l'Accueil) : un outsider rapporte plus qu'un
+   favori évident. Le bonus score exact est affiché en dessous, plus discret
+   (il s'ajoute, il ne remplace pas). */
+.pronos__pointsHint {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.35;
+}
+.pronos__pointsHintValue {
+  color: var(--sf-gold, #f6c667);
+  font-weight: 800;
+  font-size: 0.7rem;
+}
+.pronos__pointsHintBonus {
+  display: block;
+  font-size: 0.56rem;
+  color: var(--text-dim);
+  opacity: 0.75;
 }
 
 /* ── Résultat (match en cours) ── */

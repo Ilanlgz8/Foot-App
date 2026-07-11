@@ -26,8 +26,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
+import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore } from '../utils/matchUtils'
+import { calcProno } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
@@ -102,13 +104,45 @@ function groupByDay(matches) {
   }))
 }
 
-// Points : 3 = score exact, 1 = bon résultat (victoire/nul/défaite), 0 sinon.
-function computePoints(pred, actualHome, actualAway) {
+// ── Points variables selon le pourcentage de victoire/nul de l'app ──
+// Même calcul que la barre de pronostic affichée sur l'Accueil/MatchPoster
+// (calcProno, basé sur la forme récente des 2 équipes) : plus le résultat
+// pronostiqué est PROBABLE (gros %), moins il rapporte de points ; plus il
+// est risqué (petit %, l'outsider), plus il en rapporte — jusqu'à 5 pts.
+// +2 pts de bonus fixe, EN PLUS, si le score est exactement le bon (pas
+// juste le bon résultat).
+// Limite assumée (choix simple plutôt que sur-ingénierie) : le % utilisé
+// pour scorer est celui calculé au moment où le match est terminé (forme la
+// plus à jour), pas figé au moment précis où le prono a été saisi — dans les
+// faits la forme ne bouge quasi jamais entre la saisie (généralement la
+// semaine du match) et le coup d'envoi, donc l'écart est négligeable, mais
+// ce n'est pas un vrai "gel des cotes" à la seconde près.
+const EXACT_SCORE_BONUS = 2
+function pronoPointsForProb(prob) {
+  if (!prob || prob <= 0) return 5
+  return Math.min(5, Math.max(1, Math.round(100 / prob)))
+}
+function outcomeOf(h, a) {
+  if (h > a) return 'home'
+  if (h < a) return 'away'
+  return 'draw'
+}
+// % 1/N/2 pour un match donné, à partir de la forme récente des 2 équipes
+// (formMap, voir useTeamFormMulti) — même source que MatchPoster.
+function matchProno(match, formMap) {
+  const hForm = formMap?.[match?.homeTeam?.id] ?? []
+  const aForm = formMap?.[match?.awayTeam?.id] ?? []
+  return calcProno(hForm, aForm)
+}
+
+function computePoints(pred, actualHome, actualAway, prono) {
   if (!pred || actualHome == null || actualAway == null) return 0
-  if (pred.home === actualHome && pred.away === actualAway) return 3
-  const predDiff   = Math.sign(pred.home - pred.away)
-  const actualDiff = Math.sign(actualHome - actualAway)
-  return predDiff === actualDiff ? 1 : 0
+  const predOutcome   = outcomeOf(pred.home, pred.away)
+  const actualOutcome = outcomeOf(actualHome, actualAway)
+  if (predOutcome !== actualOutcome) return 0
+  const base  = pronoPointsForProb(prono?.[predOutcome])
+  const exact = pred.home === actualHome && pred.away === actualAway
+  return exact ? base + EXACT_SCORE_BONUS : base
 }
 
 function JoinCreateScreen({ onCreate, onJoin }) {
@@ -211,7 +245,7 @@ function JoinCreateScreen({ onCreate, onJoin }) {
   )
 }
 
-function MatchPredictRow({ match, myPred, onSave }) {
+function MatchPredictRow({ match, myPred, onSave, formMap }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -228,6 +262,16 @@ function MatchPredictRow({ match, myPred, onSave }) {
     }
   }
 
+  // Points potentiels en direct, selon le score en cours de saisie — recalculé
+  // à chaque frappe : change de camp/valeur dès que le résultat pronostiqué
+  // (victoire dom./nul/victoire ext.) change. Basé sur le même % que la barre
+  // de pronostic de l'Accueil (calcProno) — voir computePoints plus haut.
+  const h = parseInt(home, 10)
+  const a = parseInt(away, 10)
+  const hasValidPred = Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20
+  const prono = useMemo(() => matchProno(match, formMap), [match, formMap])
+  const potentialPoints = hasValidPred ? pronoPointsForProb(prono[outcomeOf(h, a)]) : null
+
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
@@ -239,22 +283,30 @@ function MatchPredictRow({ match, myPred, onSave }) {
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
         </div>
-        <div className="pronos__scoreGroup">
-          <input
-            type="number" inputMode="numeric" min="0" max="20"
-            className="pronos__scoreInput"
-            value={home}
-            onChange={e => setHome(e.target.value)}
-            onBlur={commit}
-          />
-          <span className="pronos__scoreSep">-</span>
-          <input
-            type="number" inputMode="numeric" min="0" max="20"
-            className="pronos__scoreInput"
-            value={away}
-            onChange={e => setAway(e.target.value)}
-            onBlur={commit}
-          />
+        <div className="pronos__scoreCol">
+          <div className="pronos__scoreGroup">
+            <input
+              type="number" inputMode="numeric" min="0" max="20"
+              className="pronos__scoreInput"
+              value={home}
+              onChange={e => setHome(e.target.value)}
+              onBlur={commit}
+            />
+            <span className="pronos__scoreSep">-</span>
+            <input
+              type="number" inputMode="numeric" min="0" max="20"
+              className="pronos__scoreInput"
+              value={away}
+              onChange={e => setAway(e.target.value)}
+              onBlur={commit}
+            />
+          </div>
+          {potentialPoints != null && (
+            <div className="pronos__pointsHint">
+              <span className="pronos__pointsHintValue">+{potentialPoints}</span> pt{potentialPoints > 1 ? 's' : ''} si bon résultat
+              <span className="pronos__pointsHintBonus">+{EXACT_SCORE_BONUS} bonus si exact</span>
+            </div>
+          )}
         </div>
         <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
@@ -348,6 +400,18 @@ function Pronos() {
   const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup)
   const { liveMatches, espnScores } = useLiveData()
 
+  // Forme récente (pour calcProno → système de points variable, voir plus
+  // haut) — uniquement pour les compétitions réellement présentes dans les
+  // matchs à venir/terminés affichés ici (même pattern que Accueil.jsx),
+  // pas tout COMP_IDS à l'aveugle.
+  const formCompCodes = useMemo(() => {
+    const codes = new Set()
+    for (const m of upcoming) if (m.competition?.code) codes.add(m.competition.code)
+    for (const m of finished) if (m.competition?.code) codes.add(m.competition.code)
+    return [...codes]
+  }, [upcoming, finished])
+  const { formMap } = useTeamFormMulti(formCompCodes)
+
   const inProgress = useMemo(
     () => liveMatches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED'),
     [liveMatches]
@@ -374,6 +438,14 @@ function Pronos() {
     return map
   }, [finished])
 
+  // % 1/N/2 (calcProno) par match terminé, pour scorer avec le même barème
+  // que celui affiché avant le match (voir computePoints).
+  const pronoByMatchId = useMemo(() => {
+    const map = {}
+    finished.forEach(m => { map[String(m.id)] = matchProno(m, formMap) })
+    return map
+  }, [finished, formMap])
+
   const leaderboard = useMemo(() => {
     return Object.entries(players)
       .map(([id, pname]) => {
@@ -381,12 +453,12 @@ function Pronos() {
         Object.entries(predictions).forEach(([matchId, preds]) => {
           const myPred = preds[id]
           const actual = finishedById[matchId]
-          if (myPred && actual) points += computePoints(myPred, actual.home, actual.away)
+          if (myPred && actual) points += computePoints(myPred, actual.home, actual.away, pronoByMatchId[matchId])
         })
         return { id, name: pname, points }
       })
       .sort((a, b) => b.points - a.points)
-  }, [players, predictions, finishedById])
+  }, [players, predictions, finishedById, pronoByMatchId])
 
   const handlePredict = async (matchId, home, away) => {
     try {
@@ -468,6 +540,7 @@ function Pronos() {
                     match={m}
                     myPred={predictions[String(m.id)]?.[deviceId]}
                     onSave={handlePredict}
+                    formMap={formMap}
                   />
                 ))}
               </div>
