@@ -796,52 +796,56 @@ export default async function handler(req, res) {
       scorers = extractEspnScorers(comp, homeC?.team?.id)
     }
 
-    // ⚠️ BUT ANNULÉ VAR (constat utilisateur : score resté bloqué à 2-1 au
-    // lieu de 1-1 plus de 2min après l'annulation) : cette fonction alimente
-    // un cache Redis PARTAGÉ entre tous les utilisateurs — le 1er correctif
-    // (useLiveMinute.js, côté client) ne pouvait rien faire puisque la valeur
-    // corrigée n'atteignait même pas le client, déjà écrasée ICI par les
-    // anciennes gardes "jamais baisser" (scorers.length >= prevData.length,
-    // puis home = Math.max(home, nb de buteurs)). Remplacé par
-    // confirmedOrMax()/confirmedListOrLonger() (voir plus haut) : une valeur
-    // plus basse n'est acceptée qu'après 2 passes de calcul consécutives qui
-    // la confirment — un glitch isolé ne passe jamais, une vraie annulation
-    // VAR si.
-    let home = confirmedOrMax(rawHome, prevData?.home, prevData?.rawHome)
-    let away = confirmedOrMax(rawAway, prevData?.away, prevData?.rawAway)
+    // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations) : cette
+    // fonction alimente un cache Redis PARTAGÉ entre tous les utilisateurs.
+    // Deux correctifs précédents (confirmedOrMax/confirmedListOrLonger, puis
+    // un plancher scorers assoupli) n'ont tenu qu'UNE seule passe : dès la
+    // passe suivante, comme le champ NUMÉRIQUE ESPN/FIFA (competitor.score /
+    // fifaD.home) ne se corrige TYPIQUEMENT JAMAIS tout seul après une
+    // annulation VAR (observé en direct : reste bloqué indéfiniment sur
+    // l'ancienne valeur même quand le buteur a bien disparu de bestScorers),
+    // Math.max(rawHome_toujours_bloqué_à_2, ...) remontait le score à
+    // chaque nouvelle passe, quoi qu'on fasse APRÈS coup sur cette même
+    // passe. Un correctif ponctuel (comparer seulement à la passe
+    // précédente) ne suffit donc pas : il faut un correctif qui reste actif
+    // à CHAQUE passe suivante tant que le numérique reste bloqué.
+    //
+    // Solution : un compteur "buts annulés confirmés" par camp, mémorisé
+    // dans Redis et qui ne fait qu'AUGMENTER (jamais réinitialisé), soustrait
+    // du score numérique brut à chaque passe. Détecté quand bestScorers
+    // (déjà lui-même confirmé sur 2 passes via confirmedListOrLonger)
+    // contient MOINS de buteurs pour ce camp que la passe précédente
+    // stockée — signal indépendant du champ numérique, qui continue de
+    // s'appliquer tant que ce dernier ne s'est pas corrigé de lui-même
+    // (auquel cas la soustraction devient simplement inutile, sans casser
+    // quoi que ce soit).
     const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
-
-    // ⚠️ Fix désync score/buteur (constat utilisateur : le nom du buteur et la
-    // minute s'affichent déjà mais le score reste bloqué à l'ancienne valeur,
-    // ~20s de retard) : pour un match WC, home/away et scorers viennent tous
-    // les deux de la même réponse FIFA (fifaD), mais rien ne garantit qu'ils
-    // sont mis à jour de façon parfaitement synchrone côté FIFA — observé :
-    // le tableau Goals[] peut apparaître avant que le champ Score s'incrémente
-    // réellement. Un buteur déjà connu (et confirmé, voir bestScorers
-    // ci-dessus) pour un camp est en soi la preuve qu'un but a été marqué
-    // pour ce camp, même si le champ numérique du score n'a pas encore suivi
-    // → on plafonne home/away par en-bas avec le nombre de buteurs CONFIRMÉS
-    // pour chaque camp (bestScorers a déjà passé le même filtre anti-glitch
-    // qu'un but annulé, donc ce plancher ne réintroduit plus le bug).
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
-
-    // ⚠️ BUT ANNULÉ VAR — SUITE (constat utilisateur : le nom du buteur a bien
-    // disparu mais le score restait bloqué à 2-1 au lieu de 1-1). Cause :
-    // ESPN/FIFA ne corrigent pas forcément le champ NUMÉRIQUE du score
-    // (competitor.score / fifaD.home) à la même vitesse que la liste
-    // d'événements détaillés (Goals[]/details[], d'où vient bestScorers) —
-    // ici bestScorers avait déjà confirmé la baisse (2 passes de suite) mais
-    // le plancher Math.max(home, homeGoalsFromScorers) ci-dessous empêchait
-    // quand même le score de suivre, puisqu'il ne fait QUE remonter. Si le
-    // nombre de buteurs CONFIRMÉS vient de baisser par rapport à la dernière
-    // passe stockée (signal indépendant, déjà passé par sa propre
-    // confirmation 2-passes via confirmedListOrLonger), on le suit
-    // directement plutôt que de le traiter comme un simple plancher.
     const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
     const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
-    home = homeGoalsFromScorers < prevHomeScorersLen ? homeGoalsFromScorers : Math.max(home, homeGoalsFromScorers)
-    away = awayGoalsFromScorers < prevAwayScorersLen ? awayGoalsFromScorers : Math.max(away, awayGoalsFromScorers)
+    const homeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + Math.max(0, prevHomeScorersLen - homeGoalsFromScorers)
+    const awayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + Math.max(0, prevAwayScorersLen - awayGoalsFromScorers)
+
+    const homeNumeric = confirmedOrMax(rawHome, prevData?.home, prevData?.rawHome)
+    const awayNumeric = confirmedOrMax(rawAway, prevData?.away, prevData?.rawAway)
+    // Score final : numérique confirmé (protège contre un pic isolé vers le
+    // haut sur un seul poll) MOINS les buts confirmés annulés, avec les
+    // buteurs confirmés comme plancher (protège le cas inverse : but déjà
+    // marqué mais buteur pas encore publié, voir commentaire historique
+    // ci-dessous — jamais concerné par une soustraction puisque
+    // homeCancelledGoals ne peut pas dépasser homeGoalsFromScorers par
+    // construction).
+    //
+    // ⚠️ Fix désync score/buteur (constat utilisateur historique : le nom du
+    // buteur et la minute s'affichent déjà mais le score reste bloqué à
+    // l'ancienne valeur, ~20s de retard) : le tableau Goals[] peut
+    // apparaître avant que le champ Score FIFA/ESPN s'incrémente réellement
+    // → un buteur déjà connu (et confirmé) pour un camp est en soi la preuve
+    // qu'un but a été marqué, même si le champ numérique n'a pas encore
+    // suivi.
+    let home = Math.max(homeNumeric - homeCancelledGoals, homeGoalsFromScorers)
+    let away = Math.max(awayNumeric - awayCancelledGoals, awayGoalsFromScorers)
 
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
     // scénario VAR réaliste pour un carton annulé → confirmation non requise,
@@ -916,6 +920,10 @@ export default async function handler(req, res) {
       rawHome,
       rawAway,
       rawScorersLen: scorers.length,
+      // Compteur permanent de buts annulés confirmés (voir commentaire "BUT
+      // ANNULÉ VAR" plus haut) — ne fait qu'augmenter, jamais réinitialisé.
+      homeCancelledGoals,
+      awayCancelledGoals,
       // Tirs au but (ESPN uniquement — voir commentaire ci-dessus)
       homeShootout,
       awayShootout,
@@ -963,23 +971,21 @@ export default async function handler(req, res) {
 
     const fm       = fifaD.fifaRaw
     const prevData = storedData[fdMatch.id]
-    // Même correctif "but annulé VAR" que la branche principale ci-dessus
-    // (confirmedOrMax/confirmedListOrLonger) — ce chemin de repli dépend
-    // UNIQUEMENT de FIFA (ESPN pas matché), même exposé au même risque de
-    // score/buteur bloqué en cas d'annulation.
+    // Même correctif "but annulé VAR" (compteur permanent de buts annulés,
+    // voir commentaire détaillé dans la branche principale ci-dessus) — ce
+    // chemin de repli dépend UNIQUEMENT de FIFA (ESPN pas matché), même
+    // exposé au même risque de score/buteur bloqué en cas d'annulation.
     const bestScorers = confirmedListOrLonger(fifaD.scorers, prevData?.scorers, prevData?.rawScorersLen)
-
-    // Même fix de désync score/buteur que la branche principale ci-dessus
-    // (voir commentaire détaillé) — ici encore plus important : ce chemin de
-    // repli dépend UNIQUEMENT de FIFA (ESPN pas matché), donc si FIFA a lui-
-    // même une incohérence interne entre Goals[] et Score, rien d'autre ne la
-    // corrige.
     const fbHomeGoals = bestScorers.filter(s => s.team === 'home').length
     const fbAwayGoals = bestScorers.filter(s => s.team === 'away').length
+    const prevFbHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
+    const prevFbAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
+    const fbHomeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + Math.max(0, prevFbHomeScorersLen - fbHomeGoals)
+    const fbAwayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + Math.max(0, prevFbAwayScorersLen - fbAwayGoals)
     const rawFbHome = fifaD.home ?? 0
     const rawFbAway = fifaD.away ?? 0
-    const fbHome = Math.max(confirmedOrMax(rawFbHome, prevData?.home, prevData?.rawHome), fbHomeGoals)
-    const fbAway = Math.max(confirmedOrMax(rawFbAway, prevData?.away, prevData?.rawAway), fbAwayGoals)
+    const fbHome = Math.max(confirmedOrMax(rawFbHome, prevData?.home, prevData?.rawHome) - fbHomeCancelledGoals, fbHomeGoals)
+    const fbAway = Math.max(confirmedOrMax(rawFbAway, prevData?.away, prevData?.rawAway) - fbAwayCancelledGoals, fbAwayGoals)
 
     result[fdMatch.id] = {
       espnEventId:  fifaD.fifaMatchId,
@@ -993,6 +999,8 @@ export default async function handler(req, res) {
       rawHome:      rawFbHome,
       rawAway:      rawFbAway,
       rawScorersLen: fifaD.scorers.length,
+      homeCancelledGoals: fbHomeCancelledGoals,
+      awayCancelledGoals: fbAwayCancelledGoals,
       // Pas de source fiable pour les cartons ici (fallback FIFA sans ESPN) →
       // on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.
       cards:        prevData?.cards ?? [],
