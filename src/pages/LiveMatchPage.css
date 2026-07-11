@@ -1,5 +1,173 @@
 /* ── LiveMatchPage — page dédiée match en direct ── */
 
+/* ── Layout desktop : contenu + sidebar "En direct" ──────────────────────────
+   Mobile : sidebar masquée (pas de place, /live existe déjà pour parcourir
+   les autres matchs) — .lmp__layout reste en display block, .lmp__main garde
+   sa largeur pleine page inchangée. Desktop (≥1100px) : grille 2 colonnes,
+   sidebar collante (sticky) sur toute la hauteur de la fenêtre. */
+.lmp__layout {
+  display: block;
+}
+.lmp__main {
+  width: 100%;
+}
+.lmpSide {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .lmp__layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    align-items: start;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  .lmpSide {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 1.1rem 0.9rem;
+    background: var(--bg-detail);
+    border-left: 1px solid var(--sf-border);
+  }
+}
+
+.lmpSide__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.3rem 0.9rem;
+  border-bottom: 1px solid var(--sf-border);
+  margin-bottom: 0.8rem;
+}
+.lmpSide__headerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(var(--red-rgb), 0.7);
+  animation: sfLivePulse 1.6s ease-in-out infinite;
+}
+@keyframes sfLivePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.lmpSide__headerTitle {
+  font-family: var(--sf-font-display);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+.lmpSide__headerCount {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--sf-muted);
+  background: rgba(var(--white-rgb), 0.06);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.lmpSide__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lmpSide__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--sf-border);
+  background: var(--bg-panel);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.lmpSide__row:hover {
+  border-color: rgba(var(--red-rgb), 0.35);
+}
+.lmpSide__row--active {
+  border-color: var(--red);
+  background: rgba(var(--red-rgb), 0.08);
+}
+
+.lmpSide__badge {
+  align-self: flex-start;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--red-light);
+  background: rgba(var(--red-rgb), 0.14);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.lmpSide__badge--ft {
+  color: var(--sf-muted);
+  background: rgba(var(--white-rgb), 0.06);
+}
+
+.lmpSide__team {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lmpSide__crestWrap {
+  width: 1.3rem;
+  height: 1.3rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lmpSide__crest {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.lmpSide__crestFb {
+  width: 1.3rem;
+  height: 1.3rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(var(--white-rgb), 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--sf-muted);
+}
+
+.lmpSide__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lmpSide__score {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-main);
+  min-width: 1.1rem;
+  text-align: right;
+}
+
 /* ── Hero classes (style MatchPage + live overlay) ── */
 
 /* Extra classes on top of mp__hero */

@@ -1179,6 +1179,68 @@
   50%      { box-shadow: 0 0 16px rgba(251,191,36,0.4); }
 }
 
+/* ── Variante DESKTOP du tableau (≥900px, isDesktop dans Match.jsx) ──
+   Cards nettement plus larges (voir BK_CARD_W_DESKTOP) : la place gagnée
+   sert à afficher le nom complet de l'équipe à côté du drapeau, plus le
+   score une fois le match commencé/terminé — au lieu du drapeau seul de la
+   version mobile compacte. Le reste (glow rouge live, dégradé doré finale,
+   anneau vert vainqueur…) reste identique, juste réutilisé à plus grande
+   échelle. */
+.bracket__card--desktop {
+  border-radius: 0.7rem;
+}
+
+.bracket__team--desktop {
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0.32rem 0.6rem;
+}
+
+.bracket__teamNameDesktop {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main, #f1f5f9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bracket__team--loser .bracket__teamNameDesktop {
+  opacity: 0.7;
+}
+
+.bracket__scoreDesktop {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #fff;
+  min-width: 1.2rem;
+  text-align: right;
+}
+
+/* Round title plus lisible quand il y a la place (colonnes bien plus larges
+   que les 36px mobile). */
+.bracket__svgWrap--desktop .bracket__roundTitle {
+  font-size: 0.72rem;
+  padding: 0.24rem 0.55rem;
+}
+
+/* Card de la finale/petite finale en desktop : drapeau un peu plus contenu
+   qu'en mobile (le nom + score prennent maintenant le relais visuel). */
+.bracket__card--big.bracket__card--desktop .bracket__crestWrap,
+.bracket__card--big.bracket__card--desktop .bracket__crestTbd {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.bracket__card--big.bracket__card--desktop .bracket__teamNameDesktop {
+  font-size: 0.95rem;
+}
+.bracket__card--big.bracket__card--desktop .bracket__scoreDesktop {
+  font-size: 1.1rem;
+}
+
 /* ── Écran vide (phase finale pas encore dispo) ── */
 .bracket__empty {
   display: flex;

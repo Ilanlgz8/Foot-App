@@ -10,7 +10,6 @@ import { useWcKnockout } from '../hooks/useWcKnockout'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
-import { WatchBadge } from './WatchBadge'
 import { FavStarBadge } from './FavStarBadge'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { getTeamColor } from '../data/teamPhotos'
@@ -44,6 +43,22 @@ const BK_CARD_W = 36
 // les cards de tour normal — c'est le point de convergence du tableau, elle
 // doit se voir davantage (demande explicite : la finale "en plus gros").
 const BK_FINAL_W = 62
+
+// ── Variante DESKTOP (≥900px, voir isDesktop dans Matchs()) ──
+// Sur mobile le tableau est volontairement compact (drapeau seul, zoom
+// fit-to-screen) faute de place. Sur desktop il y a largement la place
+// d'afficher le nom complet de chaque équipe à côté du drapeau, avec des
+// cards nettement plus larges — demande explicite : "un tableau différent
+// et bien mieux vu qu'on a plus de place". Ces constantes remplacent les
+// BK_* ci-dessus dans BracketSvgView quand isDesktop=true (voir CARD_W,
+// FINAL_W etc. calculés en tête de la fonction) ; la logique de zoom
+// fit-to-screen existante n'a pas besoin de changer, elle s'adapte déjà
+// dynamiquement à TOTAL_W/TOTAL_H quels qu'ils soient.
+const BK_CARD_W_DESKTOP   = 176
+const BK_FINAL_W_DESKTOP  = 230
+const BK_CONN_W_DESKTOP   = 34
+const BK_CARD_GAP_DESKTOP = 22
+const BK_HDR_H_DESKTOP    = 24
 // Hauteur de card : mesurée via sonde (fiable, gère les variations de
 // métriques de fonte/rendu d'image selon l'appareil) plutôt que devinée à la
 // main — même principe que précédemment. Fallback plus généreux qu'avant
@@ -158,7 +173,6 @@ function MatchRow({ match, index, inModal = false }) {
       onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
     >
       {isFav && <FavStarBadge variant="row" color={favColor} />}
-      <WatchBadge match={match} variant="row" />
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
         {match.homeTeam.crest && (
@@ -198,7 +212,7 @@ const _name = (t) => t?.name ? translateTeam(t.shortName || t.name) : 'À venir'
 // cardH: hauteur mini imposée (px). `null` = mode sonde → contenu naturel.
 // big: true pour la card de la finale/petite finale — mise en avant,
 // drapeaux plus grands (voir bracket__card--big dans match.css).
-function BkCard({ m, style, onSelect, cardH, big = false }) {
+function BkCard({ m, style, onSelect, cardH, big = false, desktop = false }) {
   const fin  = m.status === 'FINISHED'
   const live = m.status === 'IN_PLAY' || m.status === 'PAUSED'
   const tbd  = !m.homeTeam?.name && !m.awayTeam?.name
@@ -242,15 +256,19 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
     if (!tbd) onSelect(m)
   }
 
+  // Desktop : assez de place pour le nom complet à côté du drapeau (+ le
+  // score si le match a commencé/est terminé) — voir BK_*_DESKTOP.
+  const showScore = desktop && (fin || live) && !tbd
+
   return (
     <div
-      className={`bracket__card bracket__card--compact ${big ? 'bracket__card--big' : ''} ${live ? 'bracket__card--live' : ''}`}
+      className={`bracket__card bracket__card--compact ${big ? 'bracket__card--big' : ''} ${live ? 'bracket__card--live' : ''} ${desktop ? 'bracket__card--desktop' : ''}`}
       style={{ ...style, ...(cardH != null ? { minHeight: cardH } : {}), display:'flex', flexDirection:'column' }}
       onClick={handleClick}
     >
       <div
-        className={`bracket__team ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}
-        title={_name(m.homeTeam)}
+        className={`bracket__team ${desktop ? 'bracket__team--desktop' : ''} ${hW?'bracket__team--winner':''} ${aW?'bracket__team--loser':''}`}
+        title={desktop ? undefined : _name(m.homeTeam)}
         onTouchStart={() => startPress('home')}
         onTouchEnd={cancelPress}
         onTouchMove={cancelPress}
@@ -260,11 +278,13 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
             ? <img src={m.homeTeam.crest} alt="" className="bracket__crest" data-team={m.homeTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
-        {revealedSide === 'home' && <span className="bracket__nameTip">{_name(m.homeTeam)}</span>}
+        {desktop && <span className="bracket__teamNameDesktop">{_name(m.homeTeam)}</span>}
+        {showScore && <span className="bracket__scoreDesktop">{hs ?? (wentToPens ? hp : '–')}</span>}
+        {revealedSide === 'home' && !desktop && <span className="bracket__nameTip">{_name(m.homeTeam)}</span>}
       </div>
       <div
-        className={`bracket__team ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`}
-        title={_name(m.awayTeam)}
+        className={`bracket__team ${desktop ? 'bracket__team--desktop' : ''} ${aW?'bracket__team--winner':''} ${hW?'bracket__team--loser':''}`}
+        title={desktop ? undefined : _name(m.awayTeam)}
         onTouchStart={() => startPress('away')}
         onTouchEnd={cancelPress}
         onTouchMove={cancelPress}
@@ -274,7 +294,9 @@ function BkCard({ m, style, onSelect, cardH, big = false }) {
             ? <img src={m.awayTeam.crest} alt="" className="bracket__crest" data-team={m.awayTeam?.name} onError={e=>{e.currentTarget.style.display='none'}}/>
             : <span className="bracket__crestTbd">?</span>}
         </span>
-        {revealedSide === 'away' && <span className="bracket__nameTip">{_name(m.awayTeam)}</span>}
+        {desktop && <span className="bracket__teamNameDesktop">{_name(m.awayTeam)}</span>}
+        {showScore && <span className="bracket__scoreDesktop">{as_ ?? (wentToPens ? ap : '–')}</span>}
+        {revealedSide === 'away' && !desktop && <span className="bracket__nameTip">{_name(m.awayTeam)}</span>}
       </div>
     </div>
   )
@@ -294,7 +316,16 @@ function splitHalf(matches) {
   return [matches.slice(0, half), matches.slice(half)]
 }
 
-function BracketSvgView({ rounds, onSelect, containerRef }) {
+function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false }) {
+  // Constantes de layout résolues selon le mode (voir BK_*_DESKTOP plus
+  // haut) — shadowe volontairement les BK_* module-level pour tout le reste
+  // de cette fonction, aucun autre call site à toucher.
+  const BK_CARD_W   = isDesktop ? BK_CARD_W_DESKTOP   : 36
+  const BK_FINAL_W  = isDesktop ? BK_FINAL_W_DESKTOP  : 62
+  const BK_CARD_GAP = isDesktop ? BK_CARD_GAP_DESKTOP : 16
+  const BK_CONN_W   = isDesktop ? BK_CONN_W_DESKTOP   : 8
+  const BK_HDR_H    = isDesktop ? BK_HDR_H_DESKTOP    : 18
+
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
   // (BK_PROBE_MATCH, un match à venir → séparateur date+heure 2 lignes),
@@ -339,12 +370,12 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
       <div ref={probeRef} aria-hidden="true"
         style={{ position:'fixed', top:-9999, left:-9999, width:BK_CARD_W,
                  visibility:'hidden', pointerEvents:'none' }}>
-        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} />
+        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} desktop={isDesktop} />
       </div>
       <div ref={probeBigRef} aria-hidden="true"
         style={{ position:'fixed', top:-9999, left:-9999, width:BK_FINAL_W,
                  visibility:'hidden', pointerEvents:'none' }}>
-        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} big />
+        <BkCard m={BK_PROBE_MATCH} onSelect={() => {}} style={{ position:'static' }} cardH={null} big desktop={isDesktop} />
       </div>
     </>,
     document.body
@@ -513,7 +544,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
           toujours "layout-able" (donc mesurable) mais jamais visible. */}
       {probe}
 
-    <div className="bracket__svgWrap" style={{ zoom: fitZoom }}>
+    <div className={`bracket__svgWrap${isDesktop ? ' bracket__svgWrap--desktop' : ''}`} style={{ zoom: fitZoom }}>
       {/* ── Tableau symétrique : 2 branches convergent vers la finale au
           centre, comme une affiche classique de Coupe du Monde. ── */}
       <div style={{ position:'relative', width:TOTAL_W, height:TOTAL_H, minWidth:TOTAL_W }}>
@@ -569,7 +600,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             const sH      = GRID_H / n
             const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
-              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH}
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop}
                 style={{ position:'absolute', left:rXLeft(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
@@ -582,7 +613,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             const sH      = GRID_H / n
             const cardTop = BK_HDR_H + sH * mi + (sH - cardH) / 2
             return (
-              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH}
+              <BkCard key={m.id} m={m} onSelect={onSelect} cardH={cardH} desktop={isDesktop}
                 style={{ position:'absolute', left:rXRight(ri), top:cardTop, width:BK_CARD_W, zIndex:1 }}
               />
             )
@@ -602,7 +633,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
           </div>
         )}
         {finalRound?.matches[0] && (
-          <BkCard key={finalRound.matches[0].id} m={finalRound.matches[0]} onSelect={onSelect} cardH={cardHBig} big
+          <BkCard key={finalRound.matches[0].id} m={finalRound.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop}
             style={{ position:'absolute', left:centerX, top:finalTop, width:CENTER_W, zIndex:2 }}
           />
         )}
@@ -618,7 +649,7 @@ function BracketSvgView({ rounds, onSelect, containerRef }) {
             <div style={{ display:'flex', justifyContent:'center', marginBottom:'0.5rem' }}>
               <div className="bracket__thirdLabel">🥉 {_shortLabel(third)}</div>
             </div>
-            <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardHBig} big
+            <BkCard key={third.matches[0].id} m={third.matches[0]} onSelect={onSelect} cardH={cardHBig} big desktop={isDesktop}
               style={{ position:'static', width:CENTER_W }}
             />
           </div>
@@ -670,6 +701,17 @@ function Matchs() {
   // Conteneur du bracket — mesuré par BracketSvgView pour calculer le zoom
   // "fit-to-screen" (voir commentaire dans BracketSvgView).
   const bracketWrapRef = useRef(null)
+  // Tableau desktop (≥900px) : cards larges avec nom complet + score au lieu
+  // du drapeau seul compact — voir BK_*_DESKTOP dans BracketSvgView.
+  const [isBracketDesktop, setIsBracketDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 900px)')
+    const onChange = () => setIsBracketDesktop(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
@@ -1048,7 +1090,7 @@ function Matchs() {
               )}
               {!bracketLoading && !bracketError && rounds.length > 0 && (
                 <div className="bracket__container" ref={bracketWrapRef}>
-                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} containerRef={bracketWrapRef} />
+                  <BracketSvgView rounds={rounds} onSelect={m => navigate(`/match/${m.id}`, { state: { match: m } })} containerRef={bracketWrapRef} isDesktop={isBracketDesktop} />
                 </div>
               )}
             </>

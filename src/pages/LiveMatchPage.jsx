@@ -19,6 +19,7 @@ import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
 import { WatchBadge }       from '../components/WatchBadge'
+import { LiveSidebar }      from '../components/LiveSidebar'
 import {
   LiveStatsTab,
   SeasonStatsTab,
@@ -360,7 +361,8 @@ export default function LiveMatchPage() {
   }
 
   return (
-    <div className="mp__page" style={themeVars}>
+    <div className="lmp__layout">
+    <div className="mp__page lmp__main" style={themeVars}>
 
       {/* Hero gradient avec score live */}
       <MatchHeader match={match} espn={espn} hForm={hForm} aForm={aForm} onBack={() => {
@@ -422,6 +424,11 @@ export default function LiveMatchPage() {
           </div>
         </div>
       </div>
+    </div>
+
+    {/* Sidebar desktop — tous les matchs en direct, cliquables (voir
+        .lmp__sidebar dans LiveMatchPage.css, masquée en mobile) */}
+    <LiveSidebar activeMatchId={match.id} />
     </div>
   )
 }
