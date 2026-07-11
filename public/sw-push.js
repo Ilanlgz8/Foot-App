@@ -26,7 +26,12 @@ self.addEventListener('push', event => {
   }
 
   const {
-    title    = 'But ! ${matchId}',
+    // ⚠️ BUG CORRIGÉ : chaîne simple au lieu d'un template literal — affichait
+    // littéralement "${matchId}" (avec les caractères $, {, }) au lieu
+    // d'interpoler l'id. Sans gravité en pratique (le serveur fournit toujours
+    // un vrai titre pour une notif de but), mais faux si jamais ce fallback
+    // est atteint.
+    title    = `But ! ${matchId}`,
     body     = '',
     matchId  = null,
     url      = '/',
