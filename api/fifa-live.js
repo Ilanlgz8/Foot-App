@@ -796,32 +796,32 @@ export default async function handler(req, res) {
       scorers = extractEspnScorers(comp, homeC?.team?.id)
     }
 
-    // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations) : cette
-    // fonction alimente un cache Redis PARTAGÉ entre tous les utilisateurs.
-    // Un 1er correctif basé sur "le nombre de buteurs vient de baisser PAR
-    // RAPPORT À LA PASSE PRÉCÉDENTE" ne suffisait pas : dès que la
-    // transition (2 buteurs → 1) était déjà passée (donc déjà stockée dans
-    // prevData AVANT ce correctif), plus aucune baisse n'était détectée —
-    // le compteur restait à 0 et le score restait bloqué, y compris pour un
-    // match DÉJÀ touché par une annulation au moment du déploiement.
+    // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations — la
+    // comparaison d'écart sur 2 passes consécutives, essayée juste avant,
+    // ne s'est PAS déclenchée en 40min+ en conditions réelles malgré une
+    // simulation qui la validait : le champ numérique brut ESPN/FIFA n'est
+    // visiblement pas parfaitement stable d'une passe à l'autre comme
+    // supposé, donc "le même écart 2 fois de suite" ne se produisait jamais
+    // exactement). Nouvelle approche, plus directe et moins fragile :
     //
-    // Solution robuste : comparer directement l'ÉCART (numérique confirmé −
-    // buteurs confirmés) d'une passe à l'autre, plutôt que la transition.
-    // Si ce même écart positif est observé sur 2 passes de calcul
-    // consécutives (peu importe qu'il ait commencé avant ou après ce
-    // déploiement), il est traité comme des buts annulés confirmés,
-    // mémorisé en PERMANENCE (le compteur ne fait qu'augmenter) et soustrait
-    // du score numérique à chaque passe suivante — le champ numérique
-    // ESPN/FIFA ne se corrigeant TYPIQUEMENT JAMAIS tout seul après une
-    // annulation VAR (observé en direct : reste bloqué indéfiniment sur
-    // l'ancienne valeur même quand le buteur a bien disparu de bestScorers).
-    // Contrepartie assumée : si un but est marqué et que le nom du buteur
-    // met EXCEPTIONNELLEMENT plus d'une passe à être publié (cas déjà connu,
-    // ~20s habituellement), le score peut être temporairement sous-estimé
-    // pendant cette fenêtre avant de se corriger automatiquement dès que le
-    // buteur est confirmé (le plancher buteurs reprend alors la main) — un
-    // compromis nécessaire pour pouvoir aussi corriger un match déjà bloqué
-    // au moment du déploiement, pas seulement les nouvelles annulations.
+    // 1. bestScorers (voir confirmedListOrLonger, déjà fiable en soi — 2
+    //    passes de confirmation intégrées) EST la source de vérité pour le
+    //    nombre de buts d'un camp. Dès qu'il baisse par rapport à la passe
+    //    précédente STOCKÉE, c'est un but confirmé annulé — mémorisé en
+    //    PERMANENCE (compteur qui ne fait qu'augmenter, jamais réinitialisé,
+    //    même si un nouveau but fait remonter bestScorers ensuite).
+    // 2. Migration : la 1ère fois que ce match est recalculé avec cette
+    //    version (homeCancelledGoals absent de prevData), s'il y a DÉJÀ un
+    //    écart entre le numérique et bestScorers, il est traité comme
+    //    confirmé immédiatement — sans ça, un match déjà bloqué AVANT ce
+    //    déploiement (transition déjà passée, donc invisible à la
+    //    comparaison pass-à-pass du point 1) resterait bloqué pour
+    //    toujours.
+    //
+    // Le champ numérique ESPN/FIFA ne se corrige TYPIQUEMENT JAMAIS tout
+    // seul après une annulation VAR (observé en direct) — le compteur reste
+    // donc actif indéfiniment tant que c'est le cas, sans avoir besoin qu'il
+    // se stabilise sur plusieurs passes.
     const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
@@ -829,23 +829,26 @@ export default async function handler(req, res) {
     const homeNumeric = confirmedOrMax(rawHome, prevData?.home, prevData?.rawHome)
     const awayNumeric = confirmedOrMax(rawAway, prevData?.away, prevData?.rawAway)
 
-    const rawHomeGap = Math.max(0, homeNumeric - homeGoalsFromScorers)
-    const rawAwayGap = Math.max(0, awayNumeric - awayGoalsFromScorers)
-    const homeGapConfirmed = rawHomeGap > 0 && rawHomeGap === (prevData?.rawGoalGapHome ?? null)
-    const awayGapConfirmed = rawAwayGap > 0 && rawAwayGap === (prevData?.rawGoalGapAway ?? null)
-    const homeCancelledGoals = homeGapConfirmed
-      ? Math.max(prevData?.homeCancelledGoals ?? 0, rawHomeGap)
-      : (prevData?.homeCancelledGoals ?? 0)
-    const awayCancelledGoals = awayGapConfirmed
-      ? Math.max(prevData?.awayCancelledGoals ?? 0, rawAwayGap)
-      : (prevData?.awayCancelledGoals ?? 0)
+    const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
+    const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
+    const homeIsFirstPass = prevData?.homeCancelledGoals === undefined
+    const awayIsFirstPass = prevData?.awayCancelledGoals === undefined
+    const homeNewlyCancelled = Math.max(
+      prevHomeScorersLen - homeGoalsFromScorers,
+      homeIsFirstPass ? homeNumeric - homeGoalsFromScorers : 0,
+      0
+    )
+    const awayNewlyCancelled = Math.max(
+      prevAwayScorersLen - awayGoalsFromScorers,
+      awayIsFirstPass ? awayNumeric - awayGoalsFromScorers : 0,
+      0
+    )
+    const homeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + homeNewlyCancelled
+    const awayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + awayNewlyCancelled
+
     // Score final : numérique confirmé (protège contre un pic isolé vers le
     // haut sur un seul poll) MOINS les buts confirmés annulés, avec les
-    // buteurs confirmés comme plancher (protège le cas inverse : but déjà
-    // marqué mais buteur pas encore publié, voir commentaire historique
-    // ci-dessous — jamais concerné par une soustraction puisque
-    // homeCancelledGoals ne peut pas dépasser homeGoalsFromScorers par
-    // construction).
+    // buteurs confirmés comme plancher.
     //
     // ⚠️ Fix désync score/buteur (constat utilisateur historique : le nom du
     // buteur et la minute s'affichent déjà mais le score reste bloqué à
@@ -857,19 +860,12 @@ export default async function handler(req, res) {
     let home = Math.max(homeNumeric - homeCancelledGoals, homeGoalsFromScorers)
     let away = Math.max(awayNumeric - awayCancelledGoals, awayGoalsFromScorers)
 
-    // ⚠️ Log diagnostic TEMPORAIRE (retour utilisateur : score encore bloqué
-    // après plusieurs correctifs, 40min+ sans résolution malgré une logique
-    // validée par simulation) — dès qu'un écart existe entre le numérique et
-    // les buteurs confirmés, on trace les valeurs réelles (visible dans les
-    // logs Vercel, Functions → fifa-live) pour comprendre CE QUI, dans les
-    // données réelles ESPN/FIFA, diffère de ce qui a été simulé. À retirer
-    // une fois la cause confirmée.
-    if (rawHomeGap > 0 || rawAwayGap > 0 || (prevData?.homeCancelledGoals ?? 0) > 0 || (prevData?.awayCancelledGoals ?? 0) > 0) {
+    // ⚠️ Log diagnostic TEMPORAIRE — à retirer une fois confirmé que le
+    // score suit bien une vraie annulation en conditions réelles.
+    if (homeCancelledGoals > 0 || awayCancelledGoals > 0 || homeNewlyCancelled > 0 || awayNewlyCancelled > 0) {
       console.log(`[VAR-DEBUG] ${fdMatch.id} ${fdMatch.homeTeam?.name ?? homeC?.team?.name}-${fdMatch.awayTeam?.name ?? awayC?.team?.name} ` +
-        `fifaHome=${fifaD?.home} espnHome=${parseEspnScore(homeC?.score)} rawHome=${rawHome} homeNumeric=${homeNumeric} ` +
-        `scorersFifa=${fifaD?.scorers?.length} scorersEspn=${extractEspnScorers(comp, homeC?.team?.id)?.length} ` +
-        `bestScorersHome=${homeGoalsFromScorers} rawHomeGap=${rawHomeGap} homeGapConfirmed=${homeGapConfirmed} ` +
-        `homeCancelledGoals=${homeCancelledGoals} finalHome=${home}`)
+        `rawHome=${rawHome} homeNumeric=${homeNumeric} prevScorersLen=${prevHomeScorersLen} bestScorersHome=${homeGoalsFromScorers} ` +
+        `homeIsFirstPass=${homeIsFirstPass} homeNewlyCancelled=${homeNewlyCancelled} homeCancelledGoals=${homeCancelledGoals} finalHome=${home}`)
     }
 
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
@@ -945,11 +941,6 @@ export default async function handler(req, res) {
       rawHome,
       rawAway,
       rawScorersLen: scorers.length,
-      // Écart brut (numérique confirmé − buteurs confirmés) de CETTE passe —
-      // sert à détecter 2 passes consécutives avec le MÊME écart, voir
-      // commentaire "BUT ANNULÉ VAR" plus haut.
-      rawGoalGapHome: rawHomeGap,
-      rawGoalGapAway: rawAwayGap,
       // Compteur permanent de buts annulés confirmés (voir commentaire "BUT
       // ANNULÉ VAR" plus haut) — ne fait qu'augmenter, jamais réinitialisé.
       homeCancelledGoals,
@@ -1001,10 +992,10 @@ export default async function handler(req, res) {
 
     const fm       = fifaD.fifaRaw
     const prevData = storedData[fdMatch.id]
-    // Même correctif "but annulé VAR" (écart numérique/buteurs confirmé sur
-    // 2 passes, voir commentaire détaillé dans la branche principale
-    // ci-dessus) — ce chemin de repli dépend UNIQUEMENT de FIFA (ESPN pas
-    // matché), même exposé au même risque de score/buteur bloqué.
+    // Même correctif "but annulé VAR" (transition + migration, voir
+    // commentaire détaillé dans la branche principale ci-dessus) — ce
+    // chemin de repli dépend UNIQUEMENT de FIFA (ESPN pas matché), même
+    // exposé au même risque de score/buteur bloqué.
     const bestScorers = confirmedListOrLonger(fifaD.scorers, prevData?.scorers, prevData?.rawScorersLen)
     const fbHomeGoals = bestScorers.filter(s => s.team === 'home').length
     const fbAwayGoals = bestScorers.filter(s => s.team === 'away').length
@@ -1012,16 +1003,22 @@ export default async function handler(req, res) {
     const rawFbAway = fifaD.away ?? 0
     const fbHomeNumeric = confirmedOrMax(rawFbHome, prevData?.home, prevData?.rawHome)
     const fbAwayNumeric = confirmedOrMax(rawFbAway, prevData?.away, prevData?.rawAway)
-    const rawFbHomeGap = Math.max(0, fbHomeNumeric - fbHomeGoals)
-    const rawFbAwayGap = Math.max(0, fbAwayNumeric - fbAwayGoals)
-    const fbHomeGapConfirmed = rawFbHomeGap > 0 && rawFbHomeGap === (prevData?.rawGoalGapHome ?? null)
-    const fbAwayGapConfirmed = rawFbAwayGap > 0 && rawFbAwayGap === (prevData?.rawGoalGapAway ?? null)
-    const fbHomeCancelledGoals = fbHomeGapConfirmed
-      ? Math.max(prevData?.homeCancelledGoals ?? 0, rawFbHomeGap)
-      : (prevData?.homeCancelledGoals ?? 0)
-    const fbAwayCancelledGoals = fbAwayGapConfirmed
-      ? Math.max(prevData?.awayCancelledGoals ?? 0, rawFbAwayGap)
-      : (prevData?.awayCancelledGoals ?? 0)
+    const prevFbHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
+    const prevFbAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
+    const fbHomeIsFirstPass = prevData?.homeCancelledGoals === undefined
+    const fbAwayIsFirstPass = prevData?.awayCancelledGoals === undefined
+    const fbHomeNewlyCancelled = Math.max(
+      prevFbHomeScorersLen - fbHomeGoals,
+      fbHomeIsFirstPass ? fbHomeNumeric - fbHomeGoals : 0,
+      0
+    )
+    const fbAwayNewlyCancelled = Math.max(
+      prevFbAwayScorersLen - fbAwayGoals,
+      fbAwayIsFirstPass ? fbAwayNumeric - fbAwayGoals : 0,
+      0
+    )
+    const fbHomeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + fbHomeNewlyCancelled
+    const fbAwayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + fbAwayNewlyCancelled
     const fbHome = Math.max(fbHomeNumeric - fbHomeCancelledGoals, fbHomeGoals)
     const fbAway = Math.max(fbAwayNumeric - fbAwayCancelledGoals, fbAwayGoals)
 
@@ -1037,8 +1034,6 @@ export default async function handler(req, res) {
       rawHome:      rawFbHome,
       rawAway:      rawFbAway,
       rawScorersLen: fifaD.scorers.length,
-      rawGoalGapHome: rawFbHomeGap,
-      rawGoalGapAway: rawFbAwayGap,
       homeCancelledGoals: fbHomeCancelledGoals,
       awayCancelledGoals: fbAwayCancelledGoals,
       // Pas de source fiable pour les cartons ici (fallback FIFA sans ESPN) →
