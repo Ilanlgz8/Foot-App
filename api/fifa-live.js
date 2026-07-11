@@ -264,6 +264,35 @@ function parseEspnScore(raw) {
   return 0
 }
 
+// ── Regression guard AVEC confirmation (but annulé VAR) ─────────────────────
+// Demande utilisateur : le score et le buteur doivent redescendre/disparaître
+// dans LiveMatchPage et tous les widgets quand un but est annulé par la VAR.
+// Un 1er correctif a été fait côté client (useLiveMinute.js) mais le score
+// affiché reste bloqué en pratique : pour un match Mondial (fifaD non-null,
+// isWC), CETTE fonction (source Redis PARTAGÉE entre tous les utilisateurs)
+// a SES PROPRES gardes anti-régression indépendantes — Math.max(FIFA, ESPN)
+// pour le score, liste de buteurs qui ne raccourcit jamais, et un plancher
+// score = max(score, nb de buteurs connus). Le client ne reçoit donc jamais
+// la valeur corrigée : elle est déjà écrasée ICI, en amont, avant même
+// d'atteindre le réseau. Même principe de correctif que côté client : une
+// valeur plus basse n'est acceptée que si elle est confirmée sur 2 passes de
+// calcul consécutives (comparée à la valeur BRUTE de la passe précédente,
+// stockée séparément de la valeur publiée) — un glitch isolé (FIFA ou ESPN
+// temporairement à jour partiellement) ne repasse jamais 2 fois de suite
+// avec la même valeur plus basse, contrairement à une vraie annulation VAR.
+function confirmedOrMax(fresh, cached, prevRaw) {
+  if (cached == null || fresh == null) return fresh ?? cached
+  if (fresh < cached && fresh === prevRaw) return fresh
+  return Math.max(fresh, cached)
+}
+// Même principe pour les listes (buteurs/cartons), comparaison par longueur.
+function confirmedListOrLonger(fresh, cached, prevRawLen) {
+  const freshList  = fresh ?? []
+  const cachedList = cached ?? []
+  if (freshList.length < cachedList.length && freshList.length === prevRawLen) return freshList
+  return freshList.length >= cachedList.length ? freshList : cachedList
+}
+
 function extractEspnScorers(comp, homeTeamId) {
   return (comp.details ?? [])
     .filter(d => {
@@ -742,12 +771,12 @@ export default async function handler(req, res) {
     // Score : FIFA si WC (plus réactif sur les buts), ESPN sinon
     // Pour WC : max(FIFA, ESPN) → le premier à détecter le but gagne
     // Évite d'attendre FIFA si ESPN a déjà mis à jour (ou inversement)
-    let home, away, scorers
+    let rawHome, rawAway, scorers
     if (fifaD) {
       const espnHome = parseEspnScore(homeC?.score) ?? 0
       const espnAway = parseEspnScore(awayC?.score) ?? 0
-      home    = Math.max(fifaD.home ?? 0, espnHome)
-      away    = Math.max(fifaD.away ?? 0, espnAway)
+      rawHome = Math.max(fifaD.home ?? 0, espnHome)
+      rawAway = Math.max(fifaD.away ?? 0, espnAway)
       // ⚠️ AMÉLIORATION (question utilisateur : "pour avoir le score plus
       // rapidement c'est FIFA ou ESPN ?") : le score numérique (ligne
       // ci-dessus) prenait déjà le max des deux sources — le premier arrivé
@@ -757,22 +786,30 @@ export default async function handler(req, res) {
       // but précis. Même principe "le plus complet des deux gagne" appliqué
       // ici : on prend la liste la plus longue (donc la plus à jour) entre
       // FIFA et ESPN, à égalité on garde FIFA (déjà jugé plus fiable pour les
-      // noms sur la CM). Ne change rien à la certitude du but lui-même :
-      // chaque source ne liste que des buts qu'ELLE a confirmés dans ses
-      // propres données structurées (Goals[] FIFA / details[] ESPN), et le
-      // garde anti-régression juste en dessous (bestScorers) empêche de toute
-      // façon de perdre un but déjà connu d'un poll à l'autre.
+      // noms sur la CM).
       const fifaScorers = fifaD.scorers
       const espnScorersNow = extractEspnScorers(comp, homeC?.team?.id)
       scorers = fifaScorers.length >= espnScorersNow.length ? fifaScorers : espnScorersNow
     } else {
-      home    = parseEspnScore(homeC?.score)
-      away    = parseEspnScore(awayC?.score)
+      rawHome = parseEspnScore(homeC?.score)
+      rawAway = parseEspnScore(awayC?.score)
       scorers = extractEspnScorers(comp, homeC?.team?.id)
     }
 
-    const bestScorers = scorers.length >= (prevData?.scorers?.length ?? 0)
-      ? scorers : (prevData?.scorers ?? [])
+    // ⚠️ BUT ANNULÉ VAR (constat utilisateur : score resté bloqué à 2-1 au
+    // lieu de 1-1 plus de 2min après l'annulation) : cette fonction alimente
+    // un cache Redis PARTAGÉ entre tous les utilisateurs — le 1er correctif
+    // (useLiveMinute.js, côté client) ne pouvait rien faire puisque la valeur
+    // corrigée n'atteignait même pas le client, déjà écrasée ICI par les
+    // anciennes gardes "jamais baisser" (scorers.length >= prevData.length,
+    // puis home = Math.max(home, nb de buteurs)). Remplacé par
+    // confirmedOrMax()/confirmedListOrLonger() (voir plus haut) : une valeur
+    // plus basse n'est acceptée qu'après 2 passes de calcul consécutives qui
+    // la confirment — un glitch isolé ne passe jamais, une vraie annulation
+    // VAR si.
+    let home = confirmedOrMax(rawHome, prevData?.home, prevData?.rawHome)
+    let away = confirmedOrMax(rawAway, prevData?.away, prevData?.rawAway)
+    const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
 
     // ⚠️ Fix désync score/buteur (constat utilisateur : le nom du buteur et la
     // minute s'affichent déjà mais le score reste bloqué à l'ancienne valeur,
@@ -780,16 +817,20 @@ export default async function handler(req, res) {
     // les deux de la même réponse FIFA (fifaD), mais rien ne garantit qu'ils
     // sont mis à jour de façon parfaitement synchrone côté FIFA — observé :
     // le tableau Goals[] peut apparaître avant que le champ Score s'incrémente
-    // réellement. Un buteur déjà connu pour un camp est en soi la preuve qu'un
-    // but a été marqué pour ce camp, même si le champ numérique du score n'a
-    // pas encore suivi → on plafonne home/away par en-bas avec le nombre de
-    // buteurs déjà connus pour chaque camp (ne peut jamais les faire baisser).
+    // réellement. Un buteur déjà connu (et confirmé, voir bestScorers
+    // ci-dessus) pour un camp est en soi la preuve qu'un but a été marqué
+    // pour ce camp, même si le champ numérique du score n'a pas encore suivi
+    // → on plafonne home/away par en-bas avec le nombre de buteurs CONFIRMÉS
+    // pour chaque camp (bestScorers a déjà passé le même filtre anti-glitch
+    // qu'un but annulé, donc ce plancher ne réintroduit plus le bug).
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
     home = Math.max(home, homeGoalsFromScorers)
     away = Math.max(away, awayGoalsFromScorers)
 
-    // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus)
+    // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
+    // scénario VAR réaliste pour un carton annulé → confirmation non requise,
+    // même garde simple qu'avant.
     const cards = extractEspnCards(comp, homeC?.team?.id)
     const bestCards = cards.length >= (prevData?.cards?.length ?? 0)
       ? cards : (prevData?.cards ?? [])
@@ -854,6 +895,12 @@ export default async function handler(req, res) {
       away,
       scorers:      bestScorers,
       cards:        bestCards,
+      // Valeurs BRUTES de CETTE passe (pas home/away/bestScorers publiés
+      // ci-dessus) — servent uniquement à détecter une baisse confirmée à la
+      // PROCHAINE passe de calcul, voir confirmedOrMax/confirmedListOrLonger.
+      rawHome,
+      rawAway,
+      rawScorersLen: scorers.length,
       // Tirs au but (ESPN uniquement — voir commentaire ci-dessus)
       homeShootout,
       awayShootout,
@@ -901,8 +948,11 @@ export default async function handler(req, res) {
 
     const fm       = fifaD.fifaRaw
     const prevData = storedData[fdMatch.id]
-    const bestScorers = fifaD.scorers.length >= (prevData?.scorers?.length ?? 0)
-      ? fifaD.scorers : (prevData?.scorers ?? [])
+    // Même correctif "but annulé VAR" que la branche principale ci-dessus
+    // (confirmedOrMax/confirmedListOrLonger) — ce chemin de repli dépend
+    // UNIQUEMENT de FIFA (ESPN pas matché), même exposé au même risque de
+    // score/buteur bloqué en cas d'annulation.
+    const bestScorers = confirmedListOrLonger(fifaD.scorers, prevData?.scorers, prevData?.rawScorersLen)
 
     // Même fix de désync score/buteur que la branche principale ci-dessus
     // (voir commentaire détaillé) — ici encore plus important : ce chemin de
@@ -911,8 +961,10 @@ export default async function handler(req, res) {
     // corrige.
     const fbHomeGoals = bestScorers.filter(s => s.team === 'home').length
     const fbAwayGoals = bestScorers.filter(s => s.team === 'away').length
-    const fbHome = Math.max(fifaD.home ?? 0, fbHomeGoals)
-    const fbAway = Math.max(fifaD.away ?? 0, fbAwayGoals)
+    const rawFbHome = fifaD.home ?? 0
+    const rawFbAway = fifaD.away ?? 0
+    const fbHome = Math.max(confirmedOrMax(rawFbHome, prevData?.home, prevData?.rawHome), fbHomeGoals)
+    const fbAway = Math.max(confirmedOrMax(rawFbAway, prevData?.away, prevData?.rawAway), fbAwayGoals)
 
     result[fdMatch.id] = {
       espnEventId:  fifaD.fifaMatchId,
@@ -923,6 +975,9 @@ export default async function handler(req, res) {
       home:         fbHome,
       away:         fbAway,
       scorers:      bestScorers,
+      rawHome:      rawFbHome,
+      rawAway:      rawFbAway,
+      rawScorersLen: fifaD.scorers.length,
       // Pas de source fiable pour les cartons ici (fallback FIFA sans ESPN) →
       // on préserve juste la dernière valeur ESPN connue plutôt que de la perdre.
       cards:        prevData?.cards ?? [],
