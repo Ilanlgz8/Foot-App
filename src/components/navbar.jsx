@@ -93,7 +93,12 @@ function Navbar() {
               isActive ? 'sfHeader__pronosBtn sfHeader__pronosBtn--active' : 'sfHeader__pronosBtn'
             }
           >
-            Pronos
+            <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <circle cx="12" cy="12" r="4.5" />
+              <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+            </svg>
+            <span>Pronos</span>
           </NavLink>
 
           <NavLink to="/" className="sfHeader__brand">
