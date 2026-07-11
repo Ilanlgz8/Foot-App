@@ -58,7 +58,10 @@
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-main);
-  font-size: 0.95rem;
+  /* 16px minimum : en dessous, Safari iOS zoome automatiquement la page au
+     focus d'un champ texte (comportement natif du navigateur, pas un bug
+     app) — voir même correctif sur .pronos__scoreInput plus bas. */
+  font-size: 16px;
   text-align: center;
 }
 .pronos__input:focus { outline: none; border-color: rgba(var(--red-rgb), 0.5); }
@@ -224,14 +227,15 @@
   color: var(--text-main);
 }
 .pronos__scoreInput {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.4rem;
+  height: 2.4rem;
   text-align: center;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-main);
-  font-size: 0.92rem;
+  /* 16px minimum : sinon Safari iOS zoome toute la page au focus du champ */
+  font-size: 16px;
   font-weight: 700;
   -moz-appearance: textfield;
 }
