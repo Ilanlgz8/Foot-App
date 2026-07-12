@@ -119,7 +119,9 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
   const wentToAet  = match.score?.duration === 'EXTRA_TIME'
   const emblem     = comp?.emblem ?? match.competition?.emblem
-  const compName   = match.competition?.name ?? comp?.name ?? ''
+  // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) — même correction
+  // que LiveMatchPage.jsx, voir le commentaire là-bas.
+  const compName   = comp?.name ?? match.competition?.name ?? ''
   const gradient   = getMatchGradient(
     match.homeTeam?.name || homeName,
     match.awayTeam?.name || awayName

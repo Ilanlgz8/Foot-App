@@ -131,7 +131,12 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const period  = getMatchPeriod(match)
   const comp    = COMPETITIONS.find(c => c.id === match.competition?.code)
   const emblem  = comp?.emblem ?? match.competition?.emblem
-  const compName = match.competition?.name ?? comp?.name ?? ''
+  // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) : match.competition?.name
+  // vient de football-data.org (toujours en anglais) — comp?.name (COMPETITIONS,
+  // data/competitions.js) contient déjà la traduction française et doit être
+  // prioritaire, comme partout ailleurs dans l'app (convention "Noms français
+  // partout dans l'UI", voir CLAUDE.md ; même ordre que ResultHeroCard.jsx/Pronos.jsx).
+  const compName = comp?.name ?? match.competition?.name ?? ''
 
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
   const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)

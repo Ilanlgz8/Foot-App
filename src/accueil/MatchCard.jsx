@@ -259,9 +259,18 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   // lmp__heroPeriodBadge) — demande explicite : une card en mode live doit
   // reprendre ce même habillage. Uniquement affiché en mode live (isLive) :
   // une card à venir/terminée n'a pas besoin de ce bandeau.
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : nom de compétition pas en français)
+  // : match.competition?.name vient de football-data.org (toujours en
+  // anglais — "FIFA World Cup", "UEFA Nations League"…). COMPETITIONS
+  // (data/competitions.js) contient déjà les noms français ("Coupe du
+  // Monde", "Ligue des Nations"…), donc DOIT être prioritaire ici — comme
+  // partout ailleurs dans l'app (convention "Noms français partout dans
+  // l'UI", voir CLAUDE.md ; même ordre que compInfo() dans Pronos.jsx).
+  // match.competition?.name ne sert plus que de repli si la compétition
+  // n'est pas (encore) dans COMPETITIONS.
   const liveComp = COMPETITIONS.find(c => c.id === match.competition?.code)
   const liveCompEmblem = liveComp?.emblem ?? match.competition?.emblem
-  const liveCompName   = match.competition?.name ?? liveComp?.name ?? ''
+  const liveCompName   = liveComp?.name ?? match.competition?.name ?? ''
   const rawPeriod = getMatchPeriod(match)
   const livePeriodLabel = rawPeriod === '1ère MT'       ? '1ère mi-temps'
     : rawPeriod === '2ème MT'       ? '2ème mi-temps'
