@@ -1048,7 +1048,7 @@
   position: absolute;
   top: 0; bottom: 0; left: calc(50% + 2px);
   border-radius: 0 4px 4px 0;
-  background: linear-gradient(90deg, #ec4899, #fca5a5);
+  background: #ec4899;
   box-shadow: 0 0 6px rgba(236,72,153,0.5);
   transition: width 0.25s ease;
 }
