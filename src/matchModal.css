@@ -1007,6 +1007,46 @@
   padding: 0 0.25rem;
 }
 
+/* ── Barre couleurs d'équipe (demande explicite, aperçu validé avant
+   implémentation) : chaque ligne de stat a maintenant, sous les valeurs,
+   une piste partant du centre et s'étendant vers le camp de l'équipe
+   concernée — proportionnelle à sa part de la stat — dans la VRAIE couleur
+   de chaque équipe (déjà calculée ailleurs via getMatchTeamColors, même
+   logique que le hero/le terrain des compos) plutôt qu'un rouge générique.
+   Un seul jeu de classes partagé par StatBar (stats live, MatchModal.jsx)
+   ET MpStatRow (stats match terminé/saison, MatchPage.jsx) — les deux
+   fichiers importent déjà ce CSS. */
+.statBar__wrap { padding: 0.55rem 0.1rem; }
+.statBar__wrap + .statBar__wrap { border-top: 1px solid rgba(var(--white-rgb),0.045); }
+.statBar__wrap .modal__statTableRow { padding: 0; }
+.statBar__wrap .modal__statTableRow + .modal__statTableRow { border-top: none; }
+.statBar__track {
+  position: relative;
+  height: 5px;
+  margin-top: 0.35rem;
+  background: rgba(var(--white-rgb),0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.statBar__home {
+  position: absolute;
+  top: 0; bottom: 0; right: 50%;
+  border-radius: 3px 0 0 3px;
+  transition: width 0.25s ease;
+}
+.statBar__away {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  border-radius: 0 3px 3px 0;
+  transition: width 0.25s ease;
+}
+.statBar__mid {
+  position: absolute;
+  top: -2px; bottom: -2px; left: 50%;
+  width: 1px;
+  background: rgba(var(--white-rgb),0.18);
+}
+
 /* ── Skeleton compos — approxime la forme du terrain (LineupPitch, en
    inline styles, aucune classe CSS à réutiliser) : deux moitiés empilées
    avec des rangées de pastilles shimmer imitant gardien/défense/milieu/

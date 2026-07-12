@@ -378,6 +378,14 @@
 .mp__statVal--home  { color: var(--match-home, #93c5fd); font-weight: 900; }
 .mp__statVal--away  { color: var(--match-away, var(--red-light)); font-weight: 900; }
 
+/* ── Barre couleurs d'équipe (demande explicite, aperçu validé) : même
+   classes .statBar__* que MatchModal.jsx (StatTrack, importé ici) — un seul
+   calcul de proportions/rendu de piste pour toute l'app. .mp__statRow perd
+   son padding/bordure propres quand il est imbriqué dans .statBar__wrap
+   (qui les porte à sa place) pour ne pas doubler l'espacement. */
+.statBar__wrap .mp__statRow { padding: 0; }
+.statBar__wrap .mp__statRow + .mp__statRow { border-top: none; }
+
 /* ── Desktop ──────────────────────────────────────────────────────────────────*/
 @media (min-width: 768px) {
   .mp__hero { padding: 20px 24px 30px; }

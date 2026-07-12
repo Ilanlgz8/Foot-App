@@ -71,6 +71,41 @@ export function ESPNScorers({ scorers = [] }) {
 // libellé au centre, valeur ext. à droite — la valeur la plus haute est
 // mise en avant (couleur + gras). Remplace l'ancienne barre de progression
 // (jugée trop chargée par rapport à ce format plus lisible d'un coup d'œil).
+// parseStatNum : lit une valeur affichée ("58%", "14", "–") en nombre pour
+// calculer les proportions de la barre — null si non exploitable (valeur
+// manquante ou "–"), auquel cas aucune barre n'est dessinée pour cette ligne
+// (comme avant, seuls les chiffres restent affichés).
+function parseStatNum(v) {
+  if (v == null) return null
+  const n = parseFloat(String(v).replace('%', ''))
+  return Number.isNaN(n) ? null : n
+}
+
+// ── Piste colorée sous chaque ligne de stat (demande explicite, aperçu
+// validé avant implémentation) : part du centre, s'étend vers le camp de
+// chaque équipe proportionnellement à sa part de la stat, dans la VRAIE
+// couleur de l'équipe (getMatchTeamColors, même logique que le hero/le
+// terrain des compos) plutôt qu'un rouge générique. Exportée : réutilisée
+// telle quelle par MpStatRow (MatchPage.jsx, stats match terminé/saison) —
+// une seule implémentation du calcul de proportions pour toute l'app.
+export function StatTrack({ homeVal, awayVal, homeColor, awayColor, noCompare = false }) {
+  if (noCompare) return null
+  const hNum = parseStatNum(homeVal)
+  const aNum = parseStatNum(awayVal)
+  if (hNum == null || aNum == null) return null
+  const total = hNum + aNum
+  if (total <= 0) return null
+  const hPct = (hNum / total) * 100
+  const aPct = (aNum / total) * 100
+  return (
+    <div className="statBar__track">
+      <span className="statBar__home" style={{ width: `${hPct / 2}%`, background: homeColor || 'var(--red)' }} />
+      <span className="statBar__away" style={{ width: `${aPct / 2}%`, background: awayColor || 'rgba(var(--white-rgb),0.4)' }} />
+      <span className="statBar__mid" />
+    </div>
+  )
+}
+
 function StatBar({ homeVal, awayVal, label, noCompare = false, homeColor = null, awayColor = null }) {
   const hNum = parseFloat(homeVal)
   const aNum = parseFloat(awayVal)
@@ -78,15 +113,18 @@ function StatBar({ homeVal, awayVal, label, noCompare = false, homeColor = null,
   const homeLeads = hasNums && hNum > aNum
   const awayLeads = hasNums && aNum > hNum
   return (
-    <div className="modal__statTableRow">
-      <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>{homeVal ?? '–'}</span>
-      <span className="modal__statTableLabel">{label}</span>
-      <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>{awayVal ?? '–'}</span>
+    <div className="statBar__wrap">
+      <div className="modal__statTableRow">
+        <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>{homeVal ?? '–'}</span>
+        <span className="modal__statTableLabel">{label}</span>
+        <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>{awayVal ?? '–'}</span>
+      </div>
+      <StatTrack homeVal={homeVal} awayVal={awayVal} homeColor={homeColor} awayColor={awayColor} noCompare={noCompare} />
     </div>
   )
 }
 
-function ESPNStats({ stats }) {
+function ESPNStats({ stats, homeColor, awayColor }) {
   if (!stats) return null
   const { home: h, away: a } = stats
   const rows = [
@@ -116,7 +154,7 @@ function ESPNStats({ stats }) {
   return (
     <div className="modal__espnStats">
       {rows.map(({ label, hv, av }) => (
-        <StatBar key={label} label={label} homeVal={hv} awayVal={av} />
+        <StatBar key={label} label={label} homeVal={hv} awayVal={av} homeColor={homeColor} awayColor={awayColor} />
       ))}
     </div>
   )
@@ -566,11 +604,17 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
+  // Couleurs réelles des équipes pour les barres de stats (demande explicite,
+  // aperçu validé) — même logique que le hero/le terrain des compos.
+  const { home: liveColH, away: liveColA } = getMatchTeamColors(
+    match.homeTeam?.name || homeName, match.awayTeam?.name || awayName
+  )
+
   // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
   if (hasEspn) {
     return (
       <div>
-        <ESPNStats stats={espnScore.stats} />
+        <ESPNStats stats={espnScore.stats} homeColor={liveColH.main} awayColor={liveColA.main} />
         {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
       </div>
     )
@@ -584,7 +628,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
     return (
       <div>
         {fifaStats
-          ? <ESPNStats stats={fifaStats} />
+          ? <ESPNStats stats={fifaStats} homeColor={liveColH.main} awayColor={liveColA.main} />
           : <p className="modal__noEvents">Stats non disponibles</p>
         }
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
@@ -596,7 +640,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
   if (summaryStats) {
     return (
       <div>
-        <ESPNStats stats={summaryStats} />
+        <ESPNStats stats={summaryStats} homeColor={liveColH.main} awayColor={liveColA.main} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
       </div>
     )
@@ -628,6 +672,8 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
               label={STAT_FR[item.name] ?? item.name}
               homeVal={item.home ?? '0'}
               awayVal={item.away ?? '0'}
+              homeColor={liveColH.main}
+              awayColor={liveColA.main}
             />
           ))}
         </div>
@@ -744,6 +790,13 @@ export function SeasonStatsTab({ match, compMatches }) {
   const homeName = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayName = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 
+  // Couleurs réelles des équipes pour les barres (demande explicite, aperçu
+  // validé) — sauf "Série en cours", qui garde sa couleur V/N/D dédiée
+  // (déjà posée par ligne ci-dessus, prioritaire via r.homeColor/r.awayColor).
+  const { home: seasColH, away: seasColA } = getMatchTeamColors(
+    match?.homeTeam?.name || homeName, match?.awayTeam?.name || awayName
+  )
+
   return (
     <div className="modal__espnStats">
       <div className="homeAwayToggle">
@@ -754,7 +807,9 @@ export function SeasonStatsTab({ match, compMatches }) {
 
       {rows.map(r => (
         <StatBar key={r.label} label={r.label} homeVal={r.hv ?? '–'} awayVal={r.av ?? '–'}
-          noCompare={r.noCompare} homeColor={r.homeColor} awayColor={r.awayColor} />
+          noCompare={r.noCompare}
+          homeColor={r.homeColor ?? seasColH.main}
+          awayColor={r.awayColor ?? seasColA.main} />
       ))}
 
       {/* Forme récente — même bloc que l'onglet "Avant-match" (TeamFormTable),
