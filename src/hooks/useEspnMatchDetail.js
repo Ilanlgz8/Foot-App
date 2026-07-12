@@ -177,13 +177,20 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
     },
     enabled:   enabled && !!slug && !!match?.id,
     // staleTime dynamique : un résultat VIDE (event trouvé mais ESPN n'a pas
-    // encore publié les plays/details, cf. commentaire plus haut) ne reste
-    // "frais" que 2 min → un simple retour sur la page relance le fetch et
-    // se corrige tout seul dès qu'ESPN a publié. Un résultat COMPLET reste
-    // frais 1h (match terminé, données stables, pas de refetch inutile).
+    // encore publié les plays/details) OU NUL (event pas trouvé dans le
+    // scoreboard à cet instant — même cause possible : ESPN pas encore à
+    // jour) ne reste "frais" que 2 min → un simple retour sur la page relance
+    // le fetch et se corrige tout seul dès qu'ESPN a publié. Un résultat
+    // COMPLET reste frais 1h (match terminé, données stables, pas de refetch
+    // inutile).
+    // ⚠️ BUG CORRIGÉ dans ce correctif même (constat utilisateur : toujours
+    // vide après fermeture/réouverture) : `d && d.scorers...` traitait `d ===
+    // null` comme "falsy" → retombait sur la branche 1h par erreur au lieu de
+    // 2 min. `d == null` (avec ==, pas ===) couvre explicitement null ET
+    // undefined comme "pas de résultat exploitable, retry vite".
     staleTime: (query) => {
       const d = query.state.data
-      const empty = d && d.scorers.length === 0 && d.cards.length === 0 && d.stats === null
+      const empty = d == null || (d.scorers.length === 0 && d.cards.length === 0 && d.stats === null)
       return empty ? 2 * 60_000 : 60 * 60_000
     },
     retry:     1,
@@ -192,4 +199,3 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
 
   return { espnData: data ?? null, loading: isLoading }
 }
-
