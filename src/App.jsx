@@ -18,6 +18,7 @@ const Live = lazy(() => import('./components/Live.jsx'))
 const LiveMatchPage = lazy(() => import('./pages/LiveMatchPage.jsx'))
 const MatchPage = lazy(() => import('./pages/MatchPage.jsx'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
+const DebugEspn = lazy(() => import('./pages/DebugEspn.jsx'))
 const Pronos = lazy(() => import('./pages/Pronos.jsx'))
 
 // ⚠️ AJOUT (constat utilisateur : "cliquer sur un bouton pour changer de page
@@ -92,6 +93,8 @@ function App() {
             <Route path="/favoris" element={<FavoritesPage />} />
             <Route path="/pronos" element={<Pronos />} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
+            <Route path="/debug-espn" element={<DebugEspn />} />
+
           </Routes>
         </Suspense>
       </div>

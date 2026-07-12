@@ -44,49 +44,94 @@ function extractFromSummary(json, homeTeamId) {
   const awayC = (comp?.competitors ?? []).find(c => c.homeAway === 'away') ??
                 (comp?.competitors ?? []).find(c => c.team?.id !== homeTeamId)
 
-  // ── Buts depuis les plays ESPN ──
+  // ── Buts + cartons ──────────────────────────────────────────────────────
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide pour des matchs
+  // jamais suivis en direct — confirmé via une page de diagnostic dédiée,
+  // dump JSON réel à l'appui sur un match CM 2026) : la structure réelle des
+  // entrées de comp.details N'A JAMAIS de champ `type` — ni `type.id`, ni
+  // `type.text`. Chaque entrée porte directement des flags booléens :
+  //   scoringPlay: true/false   → c'est un but ou non
+  //   redCard:     true/false   → carton rouge (si false ET pas un but, on
+  //                                en déduit un carton jaune — comp.details
+  //                                ne contient QUE des buts et des cartons,
+  //                                vérifié sur le dump : 5 entrées pour un
+  //                                match à 4 buts + 1 carton, aucun 6e type
+  //                                d'événement mêlé)
+  //   ownGoal, penaltyKick      → qualificatifs du but
+  // L'ancien code cherchait `d.type?.id === '57'` (but) / `'93'|'94'`
+  // (carton) — des champs qui n'ont jamais existé dans cette réponse, d'où
+  // 0 résultat à chaque fois pour tout match retombant sur ce chemin (summary
+  // post-match, PAS le snapshot live confirmFt() — ce qui explique pourquoi
+  // seuls les matchs jamais suivis en direct étaient touchés).
   const scorers = []
-  for (const play of json.plays ?? []) {
-    if (play.type?.id !== '57' && play.scoringPlay !== true) continue
-    const ath = play.participants?.[0]?.athlete ?? play.athletes?.[0]
-    scorers.push({
-      name:        ath?.shortName ?? ath?.displayName ?? '?',
-      minute:      play.clock?.displayValue ?? '',
-      team:        play.team?.id === homeC?.team?.id ? 'home' : 'away',
-      ownGoal:     play.ownGoal     ?? false,
-      penaltyKick: play.penaltyKick ?? false,
-    })
-  }
-
-  // ── Buts depuis gameInfo (fallback) ──
-  if (scorers.length === 0) {
-    const details = comp?.details ?? []
-    for (const d of details) {
-      if (d.type?.text !== 'Goal' && d.type?.id !== '57') continue
-      const ath = d.athletesInvolved?.[0]
-      scorers.push({
-        name:        ath?.shortName ?? ath?.displayName ?? '?',
-        minute:      d.clock?.displayValue ?? '',
-        team:        d.team?.id === homeC?.team?.id ? 'home' : 'away',
-        ownGoal:     d.ownGoal     ?? false,
-        penaltyKick: d.penaltyKick ?? false,
-      })
+  const cards = []
+  for (const d of (comp?.details ?? [])) {
+    const teamSide = d.team?.id === homeC?.team?.id ? 'home' : 'away'
+    const ath = d.participants?.[0]?.athlete
+    const name = ath?.shortName ?? ath?.displayName ?? '?'
+    const minute = d.clock?.displayValue ?? ''
+    if (d.scoringPlay === true) {
+      scorers.push({ name, minute, team: teamSide, ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false })
+    } else {
+      cards.push({ name, minute, team: teamSide, red: d.redCard === true })
     }
   }
 
-  // ── Cartons (jaune/rouge) — mêmes ids ESPN vérifiés (93=Red Card, 94=Yellow Card).
-  // Pas d'équivalent dans json.plays pour le soccer, uniquement dans comp.details.
-  const cards = []
-  for (const d of (comp?.details ?? [])) {
-    const id = String(d.type?.id ?? '')
-    if (id !== '93' && id !== '94') continue
-    const ath = d.athletesInvolved?.[0]
+  // ── Cartons JAUNES ───────────────────────────────────────────────────────
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : buts + cartons rouges OK, jaunes
+  // absents — vérifié via DebugEspn.jsx sur un vrai match CM 2026) :
+  // comp.details ne contient QUE les buts et les cartons ROUGES — ESPN ne
+  // met jamais les jaunes à cet endroit. Ils sont ailleurs : dans
+  // json.commentary[i].play, avec un vrai champ `type.id === '94'`
+  // ("Yellow Card") cette fois (contrairement à comp.details qui n'a jamais
+  // eu de champ `type`, voir plus haut). Preuve concrète obtenue en dump
+  // direct : Breel Embolo (Suisse), carton jaune, 44e minute.
+  // On ne prend QUE les jaunes ici — les rouges restent sourcés depuis
+  // comp.details ci-dessus (déjà fiable) pour ne pas les compter en double.
+  for (const c of (json.commentary ?? [])) {
+    const play = c.play
+    if (play?.type?.id !== '94') continue
+    const ath = play.participants?.[0]?.athlete
     cards.push({
       name:   ath?.shortName ?? ath?.displayName ?? '?',
-      minute: d.clock?.displayValue ?? '',
-      team:   d.team?.id === homeC?.team?.id ? 'home' : 'away',
-      red:    d.redCard === true || id === '93',
+      minute: play.clock?.displayValue ?? c.time?.displayValue ?? '',
+      team:   fuzzyTeam(homeC?.team?.displayName ?? '', play.team?.displayName ?? '') ? 'home' : 'away',
+      red:    false,
     })
+  }
+
+  // Filet de sécurité : si jamais une compétition renvoie encore l'ancien
+  // format à base de `type` (jamais observé en pratique, mais coût nul à
+  // garder en fallback), on complète avec cette détection historique.
+  if (scorers.length === 0 && cards.length === 0) {
+    for (const play of json.plays ?? []) {
+      if (play.type?.id !== '57' && play.scoringPlay !== true) continue
+      const ath = play.participants?.[0]?.athlete ?? play.athletes?.[0]
+      scorers.push({
+        name:        ath?.shortName ?? ath?.displayName ?? '?',
+        minute:      play.clock?.displayValue ?? '',
+        team:        play.team?.id === homeC?.team?.id ? 'home' : 'away',
+        ownGoal:     play.ownGoal     ?? false,
+        penaltyKick: play.penaltyKick ?? false,
+      })
+    }
+    for (const d of (comp?.details ?? [])) {
+      const id = String(d.type?.id ?? '')
+      if (d.type?.text === 'Goal' || id === '57') {
+        const ath = d.athletesInvolved?.[0]
+        scorers.push({
+          name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
+          team: d.team?.id === homeC?.team?.id ? 'home' : 'away',
+          ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false,
+        })
+      } else if (id === '93' || id === '94') {
+        const ath = d.athletesInvolved?.[0]
+        cards.push({
+          name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
+          team: d.team?.id === homeC?.team?.id ? 'home' : 'away', red: d.redCard === true || id === '93',
+        })
+      }
+    }
   }
 
   // ── Stats ──
@@ -157,18 +202,46 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
 
       const result = extractFromSummary(summary, found.homeTeamId)
 
-      // Persister pour prochaines ouvertures
-      try {
-        localStorage.setItem(`foot_espn_${match.id}`, JSON.stringify(result))
-      } catch {}
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide sur les 2 derniers
+      // matchs consultés juste après leur fin, alors que les buts existaient
+      // bien côté ESPN quelques minutes plus tard) : ESPN peut mettre
+      // quelques minutes à publier les plays/details complets après le coup
+      // de sifflet final — l'event est trouvé, le fetch réussit, mais
+      // scorers/cards sont encore vides à cet instant précis. Persister ce
+      // résultat vide dans le localStorage écrasait potentiellement un
+      // meilleur snapshot confirmFt(), ET restait comme fallback permanent
+      // même après qu'ESPN ait fini de publier. Même garde-fou que
+      // hasUsefulData() côté serveur (api/espn.js) : on ne persiste que si le
+      // résultat contient vraiment quelque chose.
+      const isUseful = result.scorers.length > 0 || result.cards.length > 0 || result.stats !== null
+      if (isUseful) {
+        try { localStorage.setItem(`foot_espn_${match.id}`, JSON.stringify(result)) } catch { /* quota localStorage plein, tant pis */ }
+      }
 
       return result
     },
     enabled:   enabled && !!slug && !!match?.id,
-    staleTime: 60 * 60_000,   // 1h — match terminé, données stables
+    // staleTime dynamique : un résultat VIDE (event trouvé mais ESPN n'a pas
+    // encore publié les plays/details) OU NUL (event pas trouvé dans le
+    // scoreboard à cet instant — même cause possible : ESPN pas encore à
+    // jour) ne reste "frais" que 2 min → un simple retour sur la page relance
+    // le fetch et se corrige tout seul dès qu'ESPN a publié. Un résultat
+    // COMPLET reste frais 1h (match terminé, données stables, pas de refetch
+    // inutile).
+    // ⚠️ BUG CORRIGÉ dans ce correctif même (constat utilisateur : toujours
+    // vide après fermeture/réouverture) : `d && d.scorers...` traitait `d ===
+    // null` comme "falsy" → retombait sur la branche 1h par erreur au lieu de
+    // 2 min. `d == null` (avec ==, pas ===) couvre explicitement null ET
+    // undefined comme "pas de résultat exploitable, retry vite".
+    staleTime: (query) => {
+      const d = query.state.data
+      const empty = d == null || (d.scorers.length === 0 && d.cards.length === 0 && d.stats === null)
+      return empty ? 2 * 60_000 : 60 * 60_000
+    },
     retry:     1,
     retryDelay: 2_000,
   })
 
   return { espnData: data ?? null, loading: isLoading }
 }
+
