@@ -782,21 +782,41 @@ export function SeasonStatsTab({ match, compMatches }) {
 
 // ── Sous-onglets "Stats live" / "Stats saison" — utilisé dans LiveMatchPage
 // et MatchPage (match terminé) au sein de l'onglet principal "Statistiques".
-export function StatsSubTabs({ view, onChange }) {
+// ⚠️ ÉVOLUTION (demande explicite : "met l'onglet historique... dans
+// l'onglet statistique... à côté de stat saison") : Historique (confrontations
+// passées) était un 4e onglet TOP-LEVEL séparé (Statistiques/Compos/Classement
+// /Historique) dans MatchPage.jsx + LiveMatchPage.jsx. Replié ici comme 3e
+// sous-onglet, à côté de Stats live/Stats saison — un seul endroit à
+// maintenir pour les 3 pages qui l'utilisent (MatchPage avant + après match,
+// LiveMatchPage). `showLive`/`showHistorique` permettent à chaque appelant de
+// n'afficher que les sous-onglets pertinents (ex: pas de "Stats live" avant
+// le coup d'envoi dans MatchPage.jsx, pas de "Historique" tant qu'aucune
+// confrontation connue n'est confirmée).
+export function StatsSubTabs({ view, onChange, showLive = true, showHistorique = false }) {
   return (
     <div className="statsSubTabs">
-      <button
-        className={`statsSubTabs__btn${view === 'live' ? ' statsSubTabs__btn--active' : ''}`}
-        onClick={() => onChange('live')}
-      >
-        Stats live
-      </button>
+      {showLive && (
+        <button
+          className={`statsSubTabs__btn${view === 'live' ? ' statsSubTabs__btn--active' : ''}`}
+          onClick={() => onChange('live')}
+        >
+          Stats live
+        </button>
+      )}
       <button
         className={`statsSubTabs__btn${view === 'saison' ? ' statsSubTabs__btn--active' : ''}`}
         onClick={() => onChange('saison')}
       >
         Stats saison
       </button>
+      {showHistorique && (
+        <button
+          className={`statsSubTabs__btn${view === 'historique' ? ' statsSubTabs__btn--active' : ''}`}
+          onClick={() => onChange('historique')}
+        >
+          Historique
+        </button>
+      )}
     </div>
   )
 }

@@ -645,19 +645,22 @@ export default function MatchPage() {
   // posées en CSS vars sur la page pour teinter les onglets.
   const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
 
-  // Historique des confrontations — onglet dédié, masqué tant qu'aucune
-  // confrontation connue n'est confirmée (demande explicite : pas de bouton
-  // si y'en a pas). Calculé une seule fois ici, réutilisé pour piloter à la
-  // fois la liste des onglets ET le contenu affiché.
+  // Historique des confrontations — masqué tant qu'aucune confrontation
+  // connue n'est confirmée (demande explicite : pas de bouton si y'en a pas).
+  // ⚠️ ÉVOLUTION (demande explicite) : n'est plus un onglet top-level séparé,
+  // replié comme 3e sous-onglet dans StatsSubTabs (voir MatchModal.jsx) —
+  // showH2HTab pilote maintenant seulement l'affichage du bouton "Historique"
+  // à l'intérieur de "Statistiques".
   const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
-  const TABS = ['statistiques', 'compos', 'classement', ...(showH2HTab ? ['historique'] : [])]
+  const TABS = ['statistiques', 'compos', 'classement']
 
   const [activeTab, setActiveTab] = useState('statistiques')
   const [tabDir, setTabDir]       = useState(null)
-  // Sous-onglet dans "Statistiques" pour un match terminé : Stats live (le
-  // récap du match, par défaut) / Stats saison (nouveau).
-  const [statsView, setStatsView] = useState('live')
+  // Sous-onglet dans "Statistiques" : Stats live (récap du match, uniquement
+  // si terminé) / Stats saison / Historique (si dispo). Avant le coup
+  // d'envoi, pas de "Stats live" → on démarre sur "saison".
+  const [statsView, setStatsView] = useState(isFinished ? 'live' : 'saison')
 
   const goTab = (t, dir) => { setTabDir(dir); setActiveTab(t) }
 
@@ -696,8 +699,7 @@ export default function MatchPage() {
               >
                 {t === 'statistiques' ? 'Statistiques'
                : t === 'compos'      ? 'Compos'
-               : t === 'classement'  ? 'Classement'
-               :                       'Historique'}
+               :                       'Classement'}
               </button>
             ))}
           </div>
@@ -718,37 +720,47 @@ export default function MatchPage() {
             {activeTab === 'statistiques' && (
               isFinished
                 ? <>
-                    <StatsSubTabs view={statsView} onChange={setStatsView} />
+                    <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
                     {/* Pronostic des fans + courbe de bascule — sous les
                         onglets Stats Live/Stats Saison, au-dessus du
                         contenu des stats (remplace l'ancienne barre de
                         proba algorithmique, déjà visible sur l'Accueil
                         via MatchPoster). */}
-                    
-                    {statsView === 'live'
-                      ? <MpMatchStats match={match} />
-                      : <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
+                    {statsView === 'live'       ? <MpMatchStats match={match} />
+                   : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                   :                              <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
                     }
                   </>
                 : formLoading
                   ? <MpStatsSkeleton />
                   : <>
-                      {/* Pronostic des fans — tout en haut, avant Stats saison
-                          (pas de tabs Stats Live/Stats Saison avant le
-                          coup d'envoi, donc pas de raison de le descendre). */}
-                     <MpSeasonStats
-                        match={match}
-                        formMap={formMap}
-                        compMatches={compMatches}
-                        hideForm
-                      />
-                      <PreMatchSection
-                        match={match}
-                        formMap={formMap}
-                        compMatches={compMatches}
-                        hideStats
-                        hideProno
-                      />
+                      {/* Sous-onglets seulement si Historique dispo — pas de
+                          "Stats live" avant le coup d'envoi (rien à
+                          récapituler), donc juste Stats saison / Historique. */}
+                      {showH2HTab && (
+                        <StatsSubTabs view={statsView} onChange={setStatsView} showLive={false} showHistorique />
+                      )}
+                      {statsView === 'historique' && showH2HTab
+                        ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                        : <>
+                            {/* Pronostic des fans — tout en haut, avant Stats saison
+                                (pas de tabs Stats Live/Stats Saison avant le
+                                coup d'envoi, donc pas de raison de le descendre). */}
+                            <MpSeasonStats
+                              match={match}
+                              formMap={formMap}
+                              compMatches={compMatches}
+                              hideForm
+                            />
+                            <PreMatchSection
+                              match={match}
+                              formMap={formMap}
+                              compMatches={compMatches}
+                              hideStats
+                              hideProno
+                            />
+                          </>
+                      }
                     </>
             )}
             {/* compMatches transmis même pour un match terminé : nécessaire au
@@ -757,7 +769,6 @@ export default function MatchPage() {
                 n'a jamais pu être récupérée. */}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
-            {activeTab === 'historique' && <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />}
           </div>
         </div>
       </div>

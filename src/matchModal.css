@@ -399,26 +399,36 @@
 .modal__espnStatVal:first-child { text-align: right; }
 .modal__espnStatVal:last-child  { text-align: left; }
 
-/* ── Sous-onglets "Stats live" / "Stats saison" ── */
+/* ── Sous-onglets "Stats live" / "Stats saison" / "Historique" ──
+   ⚠️ RESTYLE (demande explicite : "fais plus en forme de rectangle et
+   arrondi sur les angles" + "essaye de les mettre un peu plus sur un côté")
+   : avant, `flex:1` sur chaque bouton étirait le groupe sur toute la largeur
+   (forme pilule, look "toggle switch" 2 options). Avec 3 sous-onglets
+   possibles désormais (Historique en plus), cet étirement pleine largeur
+   ferait des boutons disproportionnés. Le groupe est maintenant de largeur
+   naturelle (fit-content), collé à gauche, avec un radius modéré (rectangle
+   arrondi) au lieu de --radius-pill (ovale complet). */
 .statsSubTabs {
   display: flex;
+  justify-content: flex-start;
+  width: fit-content;
   gap: 0.3rem;
   margin: 0 0 0.85rem;
   padding: 3px;
   background: rgba(var(--white-rgb),0.035);
   border: 1px solid rgba(var(--white-rgb),0.06);
-  border-radius: var(--radius-pill);
+  border-radius: 10px;
 }
 .statsSubTabs__btn {
-  flex: 1;
-  padding: 0.45rem 0.5rem;
+  padding: 0.45rem 0.85rem;
   background: transparent;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 7px;
   color: rgba(var(--white-rgb),0.45);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.2s, background 0.2s;
 }

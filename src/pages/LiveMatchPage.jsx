@@ -329,11 +329,13 @@ export default function LiveMatchPage() {
   // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient).
   const themeVars = getMatchThemeVars(match?.homeTeam?.name || homeShort, match?.awayTeam?.name || awayShort)
 
-  // Historique des confrontations — onglet dédié, masqué tant qu'aucune
-  // confrontation connue n'est confirmée (même logique que MatchPage).
+  // Historique des confrontations — masqué tant qu'aucune confrontation
+  // connue n'est confirmée (même logique que MatchPage). Replié comme 3e
+  // sous-onglet dans StatsSubTabs au lieu d'un onglet top-level séparé (voir
+  // MatchModal.jsx + MatchPage.jsx pour le même changement).
   const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
-  const TABS = ['stats', 'compos', 'classement', ...(showH2HTab ? ['historique'] : [])]
+  const TABS = ['stats', 'compos', 'classement']
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
@@ -415,8 +417,7 @@ export default function LiveMatchPage() {
               >
                 {t === 'stats'       ? 'Statistiques'
                : t === 'compos'     ? 'Compos'
-               : t === 'classement' ? 'Classement'
-               :                      'Historique'}
+               :                      'Classement'}
               </button>
             ))}
           </div>
@@ -436,7 +437,7 @@ export default function LiveMatchPage() {
           >
             {activeTab === 'stats' && (
               <>
-                <StatsSubTabs view={statsView} onChange={setStatsView} />
+                <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
                 {statsView === 'live' ? (
                   <LiveStatsTab
                     match={match}
@@ -445,6 +446,8 @@ export default function LiveMatchPage() {
                     awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
                     compMatches={compMatches}
                   />
+                ) : statsView === 'historique' ? (
+                  <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
                 ) : (
                   <SeasonStatsTab match={match} compMatches={compMatches} />
                 )}
@@ -452,7 +455,6 @@ export default function LiveMatchPage() {
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
-            {activeTab === 'historique' && <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />}
           </div>
         </div>
       </div>
