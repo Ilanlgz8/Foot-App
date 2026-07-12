@@ -136,7 +136,37 @@ export default function DebugEspn() {
         if (summary.boxscore) {
           push(`  Clés de summary.boxscore : [${Object.keys(summary.boxscore).join(', ')}]`)
         }
-      } else {
+
+        // ── Recherche spécifique des cartons JAUNES (constat utilisateur :
+        // buts + rouge OK, jaune absent) — comp.details semble ne garder que
+        // les événements "majeurs". On regarde keyEvents et commentary. ──
+        push(`\n\n══════ RECHERCHE CARTONS JAUNES ══════`)
+        if (Array.isArray(summary.keyEvents)) {
+          push(`\n📋 summary.keyEvents : ${summary.keyEvents.length} entrées`)
+          if (summary.keyEvents.length > 0) {
+            push(`  ${JSON.stringify(summary.keyEvents[0], null, 2)}`)
+          }
+        } else {
+          push(`\n📋 summary.keyEvents : absent ou pas un tableau (valeur : ${JSON.stringify(summary.keyEvents)})`)
+        }
+
+        if (Array.isArray(summary.commentary)) {
+          push(`\n📋 summary.commentary : ${summary.commentary.length} entrées`)
+          const yellowMentions = summary.commentary.filter(c => {
+            const txt = (c.text ?? c.commentary ?? JSON.stringify(c)).toLowerCase()
+            return txt.includes('yellow') || txt.includes('booked') || txt.includes('caution')
+          })
+          push(`  Entrées mentionnant "yellow/booked/caution" : ${yellowMentions.length}`)
+          if (yellowMentions.length > 0) {
+            push(`  Exemple : ${JSON.stringify(yellowMentions[0], null, 2)}`)
+          } else if (summary.commentary.length > 0) {
+            push(`  Exemple d'une entrée commentary (pour voir sa forme) :`)
+            push(`  ${JSON.stringify(summary.commentary[0], null, 2)}`)
+          }
+        } else {
+          push(`\n📋 summary.commentary : absent ou pas un tableau`)
+        }
+
         push(`\n✅ Les données existent bien chez ESPN pour ce match.`)
       }
     } catch (err) {
@@ -172,4 +202,3 @@ export default function DebugEspn() {
     </div>
   )
 }
-
