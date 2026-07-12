@@ -139,6 +139,28 @@ export function getMatchState(matchId) {
   return JSON.parse(localStorage.getItem(key(matchId)) || '{}')
 }
 
+// ── Fenêtre de grâce "Terminé" ──────────────────────────────────────────────
+// Avant : un match ft===true restait affiché "en direct" (Live.jsx,
+// LiveSidebar, LiveMatchPage) jusqu'à l'éviction complète du tracker
+// (5min — délai gardé pour laisser le temps à FD.org/classement/forme de se
+// mettre à jour, voir confirmFt dans useLiveMinute.js). Résultat : le badge
+// passait bien à "Terminé" immédiatement, mais restait visible dans ces
+// widgets jusqu'à 5min après la fin réelle → confusion signalée par
+// l'utilisateur ("ça a l'air encore en direct"). Cette fenêtre courte permet
+// aux widgets live d'afficher "Terminé" quelques secondes puis de disparaître,
+// indépendamment du délai (toujours 5min) avant l'éviction réelle du tracker.
+export const TERMINE_GRACE_MS = 8_000
+
+/**
+ * True si le match vient de passer "Terminé" il y a moins de `graceMs`.
+ */
+export function isRecentlyFinished(matchId, graceMs = TERMINE_GRACE_MS) {
+  const st = getMatchState(matchId)
+  if (st.ft !== true) return false
+  const termineAt = st.termineAt ?? 0
+  return Date.now() - termineAt < graceMs
+}
+
 /**
  * Efface uniquement les flags ft/termineAt sans toucher le reste du state.
  * Utilisé quand ESPN revient en IN_PLAY après un faux STATUS_FINAL :

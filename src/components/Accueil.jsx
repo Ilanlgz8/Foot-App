@@ -5,10 +5,9 @@ import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate, useRecentDaysMatches } from '../hooks/useTodayMatches'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
-import { getMatchState } from '../utils/matchStateTracker'
+import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
 import { mergeScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
-import { LiveWidget } from '../accueil/LiveWidget'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
@@ -183,10 +182,9 @@ function Accueil() {
     return null
   }, [favClubs, liveMatches, todayMatchesForResults, matches])
 
-  // ── Modal live (clic sur carte LiveWidget) ──
-  // live → navigate('/live/:matchId'), pas de modal
-
-  // pré-match → navigation vers /match/:matchId (plus de modal)
+  // ── Navigation cartes ──
+  // live (card en mode live, voir MatchPanel/onLiveClick) → /live/:matchId
+  // pré-match → /match/:matchId (pas de modal)
 
   // Auto-avance au jour suivant si aujourd'hui n'a plus de match à venir
   // (tous terminés ou aucun match ce jour-là)
@@ -223,6 +221,20 @@ function Accueil() {
     const id = setInterval(() => setTick(t => t + 1), 10_000)
     return () => clearInterval(id)
   }, [])
+
+  // ── Ticker rapide (1s) tant qu'une card vient de passer "Terminé" ──
+  // Sans lui, la card resterait affichée en mode live jusqu'au prochain
+  // tick du ticker 10s ci-dessus (ou plus) une fois la fenêtre de grâce
+  // passée — voir isRecentlyFinished (matchStateTracker.js) et le même
+  // pattern dans Live.jsx/LiveSidebar.jsx. S'arrête tout seul.
+  useEffect(() => {
+    if (!matches.some(m => isRecentlyFinished(m.id))) return
+    const id = setInterval(() => {
+      setTick(t => t + 1)
+      if (!matches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [matches])
 
   // ── Compétitions disponibles dans les données actuelles ──
   const matchCompetitions = useMemo(() => {
@@ -266,32 +278,6 @@ function Accueil() {
 
   const wcComp   = COMPETITIONS.find(c => c.id === 'WC')
   const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-
-  // ── Pending kickoffs : matchs dont l'heure est atteinte mais ESPN pas encore confirmé ──
-  // Détection directe depuis todayMatches (ne dépend pas du liveTracker).
-  // Le widget s'affiche dès l'heure H avec "Débute" — max 10s de délai (ticker).
-  const nowMs = Date.now()
-  const pendingMatches = dayOffset === 0
-    ? matches.filter(m => {
-        // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'
-        if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
-        if (liveMatches.some(l => l.id === m.id)) return false
-        const utcMs = new Date(m.utcDate).getTime()
-        return nowMs >= utcMs && nowMs - utcMs < 30 * 60_000
-      })
-    : []
-
-  // widgetMatches = live confirmés + pending kickoffs
-  const widgetMatches = pendingMatches.length > 0
-    ? [...liveMatches, ...pendingMatches]
-    : liveMatches
-
-  // Le widget garde un match "ft" affiché quelques minutes après la fin (voir
-  // LiveWidget) pour montrer le score final — mais il ne doit plus avoir l'air
-  // "en direct" à ce moment-là (point rouge pulsant + "EN DIRECT"). On
-  // n'affiche donc ce header que s'il reste au moins un match réellement en
-  // cours (pas terminé) dans le lot.
-  const hasLiveNow = widgetMatches.some(m => getMatchState(m.id).ft !== true)
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
@@ -369,30 +355,17 @@ function Accueil() {
           />
         )}
 
-        {/* ── Live — pleine largeur, priorité absolue ── */}
-        {widgetMatches.length > 0 && (
-          <div className="accueil__liveSection">
-            {/* Bouton "Voir tout" retiré : faisait doublon avec le bouton
-                "Live" de la navbar (même destination /live) — signalé par
-                l'utilisateur. Ce dernier reste l'unique accès à la page /live. */}
-            {hasLiveNow && (
-              <div className="accueil__liveSectionHeader">
-                <span className="accueil__liveDot" />
-                <span className="accueil__liveSectionTitle">EN DIRECT</span>
-              </div>
-            )}
-            <LiveWidget
-              liveMatches={widgetMatches}
-              espnScores={espnScores}
-              onMatchClick={(m) => navigate(`/live/${m.id}`)}
-            />
-          </div>
-        )}
-
         {/* ── Grille matchs / résultats — toujours 2 colonnes sur desktop ── */}
         <div className="accueil__mainGrid">
 
-          {/* Matchs à venir */}
+          {/* Matchs à venir — une card qui démarre reste à sa place et passe
+              en mode live (score/minute/statut) au lieu de disparaître au
+              profit d'un widget séparé ailleurs (demande utilisateur) : plus
+              de section "EN DIRECT" dédiée sur l'Accueil, voir isCardLive
+              dans accueil/MatchCard.jsx. Un match reste visible ici quelques
+              secondes après son "Terminé" (isRecentlyFinished) le temps que
+              la transition soit visible, avant de passer définitivement dans
+              "Résultats récents". */}
           <div className="accueil__dashPanel accueil__dashPanel--matchPanel">
             <div className="accueil__dashPanelHeader">
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
@@ -404,15 +377,15 @@ function Accueil() {
             <MatchPanel
               matches={dayOffset === 0
                 ? filteredMatches.filter(m => {
-                    if (widgetMatches.some(l => l.id === m.id)) return false
-                    if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return false
-                    if (m.status === 'FINISHED' || getMatchState(m.id).ft) return false
+                    if (m.status === 'FINISHED') return false
+                    if (getMatchState(m.id).ft) return isRecentlyFinished(m.id)
                     return true
                   })
                 : filteredMatches}
               loading={matchesLoading}
               espnScores={espnScores}
               onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
+              onLiveClick={m => navigate(`/live/${m.id}`)}
               formMap={formMap}
             />
           </div>

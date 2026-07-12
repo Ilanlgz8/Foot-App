@@ -11,7 +11,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useLiveData } from '../context/LiveProvider'
-import { getMatchState } from '../utils/matchStateTracker'
+import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
 import { TEAM_SHORT } from '../data/teamShortNames'
@@ -78,8 +78,19 @@ export function LiveSidebar({ activeMatchId }) {
   const navigate = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
 
+  // Même ticker dédié que Live.jsx — voir commentaire là-bas.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!liveMatches.some(m => isRecentlyFinished(m.id))) return
+    const id = setInterval(() => {
+      forceTick(n => n + 1)
+      if (!liveMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [liveMatches])
+
   const matches = liveMatches
-    .filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED' || getMatchState(m.id).ft === true)
+    .filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED' || isRecentlyFinished(m.id))
     .map(m => ({ ...m, _espn: espnScores[m.id] ?? null }))
 
   if (matches.length === 0) return null

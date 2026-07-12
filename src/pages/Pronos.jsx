@@ -28,6 +28,7 @@ import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
+import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { calcProno } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
@@ -408,21 +409,78 @@ function Pronos() {
     const codes = new Set()
     for (const m of upcoming) if (m.competition?.code) codes.add(m.competition.code)
     for (const m of finished) if (m.competition?.code) codes.add(m.competition.code)
+    for (const m of liveMatches) if (m.competition?.code) codes.add(m.competition.code)
     return [...codes]
-  }, [upcoming, finished])
+  }, [upcoming, finished, liveMatches])
   const { formMap } = useTeamFormMulti(formCompCodes)
 
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : un match venait de se terminer —
+  // bon prono, score exact — mais restait affiché "En direct" dans l'onglet
+  // Résultat au lieu de "Terminé", et n'apparaissait ensuite nulle part une
+  // fois disparu de "En cours") : `inProgress` ne testait que match.status
+  // (IN_PLAY/PAUSED, figé à IN_PLAY par liveTracker.markLive — jamais mis à
+  // jour), sans jamais regarder le flag `ft` (confirmé par ESPN, voir
+  // matchStateTracker). Résultat : LiveResultRow continuait de s'afficher
+  // après la fin réelle du match, avec calcMinute()/getMatchPeriod() qui
+  // renvoient null une fois ft===true → repli sur le texte littéral "En
+  // direct" (bug visuel). Ensuite, une fois le match évincé du tracker,
+  // aucune trace nulle part tant que football-data.org n'a pas confirmé
+  // FINISHED de son côté (1-5min de retard connu, voir CLAUDE.md) : le match
+  // devenait invisible dans "Résultat" pendant tout ce délai.
   const inProgress = useMemo(
-    () => liveMatches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED'),
+    () => liveMatches.filter(m => getMatchState(m.id).ft !== true && (m.status === 'IN_PLAY' || m.status === 'PAUSED')),
     [liveMatches]
   )
 
+  // Pont ft→FINISHED (même principe que resultPanel dans Accueil.jsx) : dès
+  // qu'ESPN confirme la fin d'un match encore suivi par le tracker live, on
+  // le fait apparaître immédiatement en "Terminé" avec son score final, sans
+  // attendre la confirmation football-data.org (qui peut prendre plusieurs
+  // minutes). Score : ESPN en mémoire (espnScores) ou, à défaut, la dernière
+  // valeur persistée par confirmFt (foot_espn_${id}) — mêmes deux sources
+  // que resultPanel.
+  const justFinished = useMemo(() => {
+    return liveMatches
+      .filter(m => getMatchState(m.id).ft === true)
+      .map(m => {
+        const es = espnScores[m.id]
+        let lsHome = null, lsAway = null
+        try {
+          const lsScore = JSON.parse(localStorage.getItem(`foot_espn_${m.id}`) ?? 'null')
+          if (lsScore && lsScore.home != null) { lsHome = lsScore.home; lsAway = lsScore.away }
+        } catch {}
+        const wentToPens = es?.homeShootout != null && es?.awayShootout != null
+        return {
+          ...m,
+          score: {
+            ...m.score,
+            fullTime: {
+              home: mergeScore(es?.home, lsHome ?? m.score?.fullTime?.home),
+              away: mergeScore(es?.away, lsAway ?? m.score?.fullTime?.away),
+            },
+            ...(wentToPens ? {
+              duration: 'PENALTY_SHOOTOUT',
+              penalties: { home: es.homeShootout, away: es.awayShootout },
+            } : {}),
+          },
+          status: 'FINISHED',
+        }
+      })
+  }, [liveMatches, espnScores])
+
+  // Fusion : matchs "pontés" en priorité (score le plus frais), puis le
+  // reste de `finished` (football-data.org) sans doublon.
+  const finishedAll = useMemo(() => {
+    const jfIds = new Set(justFinished.map(m => String(m.id)))
+    return [...justFinished, ...finished.filter(m => !jfIds.has(String(m.id)))]
+  }, [finished, justFinished])
+
   const recentFinished = useMemo(() => {
     const now = Date.now()
-    return finished
+    return finishedAll
       .filter(m => now - new Date(m.utcDate).getTime() < FINISHED_DISPLAY_MS)
       .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
-  }, [finished])
+  }, [finishedAll])
 
   const goTab = (t) => setActiveTab(t)
   const swipe = useSwipe(
@@ -434,17 +492,17 @@ function Pronos() {
 
   const finishedById = useMemo(() => {
     const map = {}
-    finished.forEach(m => { map[String(m.id)] = m.score?.fullTime ?? null })
+    finishedAll.forEach(m => { map[String(m.id)] = m.score?.fullTime ?? null })
     return map
-  }, [finished])
+  }, [finishedAll])
 
   // % 1/N/2 (calcProno) par match terminé, pour scorer avec le même barème
   // que celui affiché avant le match (voir computePoints).
   const pronoByMatchId = useMemo(() => {
     const map = {}
-    finished.forEach(m => { map[String(m.id)] = matchProno(m, formMap) })
+    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap) })
     return map
-  }, [finished, formMap])
+  }, [finishedAll, formMap])
 
   const leaderboard = useMemo(() => {
     return Object.entries(players)

@@ -313,10 +313,26 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   )
 }
 
+// Un match est considéré "live" pour le routage du clic dès que sa card
+// passe en mode live (même logique que isLive dans MatchCard/MatchPoster) :
+// IN_PLAY/PAUSED confirmé, ou coup d'envoi imminent/en cours détecté par
+// calcMinute() (ex: "Débute"), et pas encore terminé.
+function isCardLive(match) {
+  const ms = getMatchState(match.id)
+  const isFinished = ms.ft === true || match.status === 'FINISHED'
+  if (isFinished) return false
+  return match.status === 'IN_PLAY' || match.status === 'PAUSED' || calcMinute(match) !== null
+}
+
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
 // Sur mobile : posters Betclic-style. Sur desktop : cards classiques.
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, formMap = null }) {
+// onMatchClick → matchs pas encore commencés (page pré-match /match/:id)
+// onLiveClick  → matchs passés en live (page dédiée /live/:id) — la card
+// elle-même reste affichée à la même place et change juste d'affichage (voir
+// MatchCard : plus de noLive ici), au lieu de disparaître au profit d'un
+// widget séparé ailleurs sur l'Accueil (demande utilisateur).
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -333,31 +349,37 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
         <>
           {/* Mobile : affiches poster */}
           <div className="accueil__posterList">
-            {displayed.map(match => (
-              <MatchPoster
-                key={match.id}
-                match={match}
-                espnScore={espnScores[match.id] ?? null}
-                onClick={onMatchClick ? () => onMatchClick(match) : undefined}
-              />
-            ))}
+            {displayed.map(match => {
+              const clickHandler = isCardLive(match)
+                ? (onLiveClick ? () => onLiveClick(match) : undefined)
+                : (onMatchClick ? () => onMatchClick(match) : undefined)
+              return (
+                <MatchPoster
+                  key={match.id}
+                  match={match}
+                  espnScore={espnScores[match.id] ?? null}
+                  onClick={clickHandler}
+                />
+              )
+            })}
           </div>
 
           {/* Desktop : cards classiques */}
           <div className="accueil__matchCards">
             {displayed.map(match => {
-              const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
+              const clickHandler = isCardLive(match)
+                ? (onLiveClick ? () => onLiveClick(match) : undefined)
+                : (onMatchClick ? () => onMatchClick(match) : undefined)
               return (
                 <div
                   key={match.id}
-                  className={isUpcoming && onMatchClick ? 'accueil__matchCardClickable' : undefined}
-                  onClick={isUpcoming && onMatchClick ? () => onMatchClick(match) : undefined}
+                  className={clickHandler ? 'accueil__matchCardClickable' : undefined}
+                  onClick={clickHandler}
                 >
                   <MatchCard
                     match={match}
                     espnScore={espnScores[match.id] ?? null}
                     noAnimation
-                    noLive
                     formMap={formMap}
                   />
                 </div>

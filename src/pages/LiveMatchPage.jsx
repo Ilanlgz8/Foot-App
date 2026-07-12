@@ -8,7 +8,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
-import { getMatchState }    from '../utils/matchStateTracker'
+import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome , isNationalTeamComp } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
@@ -355,6 +355,33 @@ export default function LiveMatchPage() {
     }, 1200)
     return () => clearTimeout(t)
   }, [match, matchId, navigate])
+
+  // ── Sortie automatique quelques secondes après "Terminé" ──────────────────
+  // Avant : la page restait affichée en mode live (score/minute/onglets live)
+  // jusqu'à l'éviction complète du match du tracker (5min, voir confirmFt
+  // dans useLiveMinute.js) — le badge passait bien à "Terminé" immédiatement,
+  // mais la page elle-même donnait l'impression de rester "en direct" bien
+  // après la fin réelle (confusion signalée). Ticker dédié (3s) tant que le
+  // match n'est pas terminé, pour détecter le passage à ft===true sans
+  // attendre le prochain remount/poll global, puis redirection vers la page
+  // match classique une fois la fenêtre de grâce (TERMINE_GRACE_MS) écoulée.
+  const isTermine = match ? getMatchState(match.id).ft === true : false
+  const [, setLmpTick] = useState(0)
+  useEffect(() => {
+    if (isTermine) return
+    const id = setInterval(() => setLmpTick(t => t + 1), 3_000)
+    return () => clearInterval(id)
+  }, [isTermine])
+
+  useEffect(() => {
+    if (!match || !isTermine) return
+    const termineAt = getMatchState(match.id).termineAt ?? Date.now()
+    const remaining = TERMINE_GRACE_MS - (Date.now() - termineAt)
+    const t = setTimeout(() => {
+      navigate(`/match/${matchId}`, { replace: true })
+    }, Math.max(0, remaining))
+    return () => clearTimeout(t)
+  }, [isTermine, match, matchId, navigate])
 
   if (!match) {
     return <LmpPageSkeleton />

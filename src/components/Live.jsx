@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
-import { getMatchState } from '../utils/matchStateTracker'
+import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -269,8 +269,23 @@ export default function Live() {
   const navigate = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
 
+  // Ticker dédié : force un re-render toutes les secondes tant qu'un match
+  // vient de passer "Terminé" (fenêtre de grâce, voir isRecentlyFinished) —
+  // sans ça, rien ne déclenche le retrait de la card une fois la fenêtre
+  // passée (le ticker interne de LiveCard s'arrête lui-même dès isTermine).
+  // S'arrête tout seul dès qu'il n'y a plus aucun match dans la fenêtre.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!liveMatches.some(m => isRecentlyFinished(m.id))) return
+    const id = setInterval(() => {
+      forceTick(n => n + 1)
+      if (!liveMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [liveMatches])
+
   const live = liveMatches.filter(m =>
-    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || getMatchState(m.id).ft === true
+    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
   )
 
   return (
