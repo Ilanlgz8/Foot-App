@@ -7,13 +7,27 @@ import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
 import europaLeagueLogo from '../assets/leagues/europa-league.png'
 import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
-// Pas de logo officiel disponible (pas de source récupérable depuis cet
-// environnement — accès web limité à quelques domaines autorisés) : badges
-// simples dessinés maison (couleurs distinctes par compétition), à remplacer
-// si un vrai logo est fourni un jour.
+// Vrais logos ajoutés par l'utilisateur (12/07) : CAF (logo officiel de la
+// confédération, utilisé génériquement pour la CAN comme il n'existe pas de
+// logo CAN intemporel — pratique standard, ex. beIN/RMC Sport) + Nations
+// League (logo UEFA générique, pas lié à une édition précise). Fond
+// blanc/damier d'origine retiré (détourage transparent) — voir le fichier
+// caf-can.png nettoyé, le webp Nations League avait déjà une vraie
+// transparence.
+import nationsLeagueLogo from '../assets/leagues/nations-league-real.webp'
+import canLogo from '../assets/leagues/caf-can.png'
+// Pas de logo officiel utilisable pour l'instant (voir explication donnée à
+// l'utilisateur) : badges simples dessinés maison (couleurs distinctes par
+// compétition), à remplacer si un vrai logo propre (fond réellement
+// transparent, pas d'édition/année précise) est fourni un jour.
+// - Euro : le fichier fourni (Logo_UEFA_Euro_2024.svg) est celui de l'UEFA
+//   EURO 2024 ALLEMAGNE — spécifique à cette édition (déjà terminée), pas un
+//   logo générique "Euro".
+// - Copa America : le fichier fourni (jpg) a un fond "damier transparent" en
+//   réalité cuit dans les pixels (site source), impossible à détourer
+//   proprement car le trophée blanc se confond avec ce fond — tentative de
+//   nettoyage automatique a mangé une partie du trophée.
 import euroLogo from '../assets/leagues/euro.svg'
-import nationsLeagueLogo from '../assets/leagues/nations-league.svg'
-import canLogo from '../assets/leagues/can.svg'
 import copaAmericaLogo from '../assets/leagues/copa-america.svg'
 
 

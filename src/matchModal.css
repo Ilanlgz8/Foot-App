@@ -410,10 +410,10 @@
    arrondi) au lieu de --radius-pill (ovale complet). */
 .statsSubTabs {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   width: fit-content;
   gap: 0.3rem;
-  margin: 0 0 0.85rem;
+  margin: 0 auto 0.85rem;
   padding: 3px;
   background: rgba(var(--white-rgb),0.035);
   border: 1px solid rgba(var(--white-rgb),0.06);

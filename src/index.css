@@ -133,6 +133,17 @@ body::before {
   border-radius: 0 !important;
   overflow: visible !important;
   background: none !important;
+  /* ⚠️ AJOUT (constat utilisateur : "encore une bordure carré transparente
+     en fond" après le fix background ci-dessus) : plusieurs wrappers
+     (.mp__hero__crestWrap notamment) posent aussi un `border` + `box-shadow`
+     en dur pour habiller les DRAPEAUX (anneau lumineux autour du cercle) —
+     une fois le fond retiré et le radius repassé à 0 pour les clubs, ce
+     border+box-shadow restait visible tel quel et dessinait un cadre carré
+     autour du blason à la place du fond gris. Même raisonnement que
+     background ci-dessus : neutralisé ici pour TOUS les wrappers de logos de
+     club d'un coup, gardé intact pour data-crest="country" juste en dessous. */
+  border: none !important;
+  box-shadow: none !important;
 }
 [data-crest="club"] > img {
   object-fit: contain !important;
