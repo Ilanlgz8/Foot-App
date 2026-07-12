@@ -34,8 +34,25 @@ const persister = createSyncStoragePersister({
   storage: window.localStorage
 })
 
+// ⚠️ BUG TROUVÉ (constat utilisateur : "j'ai fermé/rouvert l'app, toujours pas
+// les buteurs" — alors que la donnée ESPN est bien là, vérifié en direct sur
+// l'API) : le cache React Query est persisté dans le localStorage (gcTime
+// 24h) SANS AUCUNE clé de version. Concrètement, si une requête a échoué
+// (renvoyé null) AVANT un correctif — ex: useEspnMatchDetail qui ne
+// trouvait pas l'event ESPN à cause du bug de date corrigé juste avant —
+// ce `null` reste persisté et continue d'être servi tel quel après le
+// déploiement du correctif, PENDANT JUSQU'À 24H, même après avoir fermé et
+// rouvert l'app (fermer/rouvrir ne vide pas le localStorage). `buster` est
+// le mécanisme officiel TanStack Query pour ce cas précis : dès qu'il
+// change, TOUT le cache persisté existant est jeté au démarrage, sans
+// affecter les vraies données utilisateur (pronos, favoris, etc. — stockées
+// ailleurs, pas dans ce cache). À incrémenter à chaque fois qu'un correctif
+// touche la logique/forme d'une requête déjà potentiellement mise en cache
+// avec une mauvaise valeur.
+const CACHE_BUSTER = 'v2-2026-07-12-espn-dual-date-fix'
+
 createRoot(document.getElementById('root')).render(
-  <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
+  <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>
     <BrowserRouter>
       <App />
     </BrowserRouter>
