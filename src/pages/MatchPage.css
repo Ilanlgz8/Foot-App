@@ -368,17 +368,18 @@
 
 .mp__statVal {
   font-size: 0.92rem;
-  font-weight: 700;
-  color: rgba(var(--white-rgb),0.7);
+  font-weight: 600;
+  color: rgba(var(--white-rgb),0.92);
   font-variant-numeric: tabular-nums;
   min-width: 0;
   white-space: nowrap;
 }
 .mp__statVal--r     { text-align: right; }
-/* Chiffres en blanc (retour utilisateur : pas la couleur de l'équipe) —
-   même logique que .modal__statTableVal--home/--away (matchModal.css). */
+/* Retour utilisateur : même blanc clair pour tous les chiffres (pas de
+   grisé) — le meneur se distingue uniquement par le poids (gras), la barre
+   colorée en dessous suffit déjà à montrer qui domine. */
 .mp__statVal--home,
-.mp__statVal--away { color: #fff; font-weight: 900; }
+.mp__statVal--away { color: rgba(var(--white-rgb),0.92); font-weight: 900; }
 
 /* ── Barre à couleurs fixes bleu clair/rose-violet clair (retour utilisateur :
    pas la couleur de l'équipe) : même classes .statBar__* que MatchModal.jsx

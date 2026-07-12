@@ -987,17 +987,17 @@
 
 .modal__statTableVal {
   font-size: 0.92rem;
-  font-weight: 700;
-  color: rgba(var(--white-rgb),0.7);
+  font-weight: 600;
+  color: rgba(var(--white-rgb),0.92);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .modal__statTableVal--right { text-align: right; }
-/* Chiffres en blanc (retour utilisateur : pas la couleur de l'équipe) — la
-   valeur la plus haute reste distinguée par un blanc plein + gras, l'autre
-   restant en blanc atténué (.modal__statTableVal de base, 0.7 d'opacité). */
+/* Retour utilisateur : même blanc clair pour tous les chiffres (pas de
+   grisé) — le meneur se distingue uniquement par le poids (gras), la barre
+   colorée en dessous suffit déjà à montrer qui domine. */
 .modal__statTableVal--home,
-.modal__statTableVal--away { color: #fff; font-weight: 900; }
+.modal__statTableVal--away { color: rgba(var(--white-rgb),0.92); font-weight: 900; }
 
 .modal__statTableLabel {
   text-align: center;
