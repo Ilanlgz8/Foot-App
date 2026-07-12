@@ -46,7 +46,7 @@
 }
 .pronos__introBtn:hover { border-color: rgba(var(--red-rgb), 0.4); }
 .pronos__introBtn--primary {
-  background: linear-gradient(135deg, var(--red), var(--red-deep));
+  background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
   border-color: transparent;
   color: #fff;
 }
@@ -71,7 +71,7 @@
   font-weight: 800;
 }
 .pronos__error {
-  color: var(--red-light);
+  color: var(--red-vivid);
   font-size: 0.82rem;
   margin: 0;
 }
@@ -108,7 +108,7 @@
 .pronos__playerCount { font-size: 0.78rem; color: var(--text-mid); }
 .pronos__leaveBtn {
   background: none;
-  border: 1px solid var(--red);
+  border: 1px solid var(--red-vivid);
   border-radius: 8px;
   color: #fff;
   font-size: 0.72rem;
@@ -139,7 +139,7 @@
   transition: color 0.15s, border-color 0.15s;
 }
 .pronos__tab:hover { color: var(--text-main); }
-.pronos__tab--active { color: var(--red-light); border-bottom-color: var(--red); }
+.pronos__tab--active { color: var(--red-vivid); border-bottom-color: var(--red-vivid); }
 
 .pronos__tabContent { min-height: 200px; }
 
@@ -326,7 +326,7 @@
 .pronos__toggleBtn {
   background: none;
   border: none;
-  color: var(--red-light);
+  color: var(--red-vivid);
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
@@ -400,7 +400,7 @@
   font-weight: 800;
   color: var(--text-dim);
 }
-.pronos__lbRow:first-child .pronos__lbRank { color: var(--red-light); }
+.pronos__lbRow:first-child .pronos__lbRank { color: var(--red-vivid); }
 .pronos__lbName {
   flex: 1;
   font-size: 0.88rem;
@@ -410,7 +410,7 @@
 .pronos__lbPoints {
   font-size: 0.88rem;
   font-weight: 800;
-  color: var(--red-light);
+  color: var(--red-vivid);
 }
 
 /* ── Empty state ── */
