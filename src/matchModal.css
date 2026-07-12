@@ -1038,7 +1038,7 @@
 }
 .statBar__home {
   position: absolute;
-  top: 0; bottom: 0; right: calc(50% + 2px);
+  top: 0; bottom: 0; right: calc(50% + 3.5px);
   border-radius: 4px 0 0 4px;
   background: linear-gradient(90deg, #0ea5e9, #38bdf8);
   box-shadow: 0 0 6px rgba(14,165,233,0.55);
@@ -1046,20 +1046,13 @@
 }
 .statBar__away {
   position: absolute;
-  top: 0; bottom: 0; left: calc(50% + 2px);
+  top: 0; bottom: 0; left: calc(50% + 3.5px);
   border-radius: 0 4px 4px 0;
   background: #ec4899;
   box-shadow: 0 0 6px rgba(236,72,153,0.5);
   transition: width 0.25s ease;
 }
-.statBar__mid {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 3px; height: 3px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: rgba(var(--white-rgb),0.3);
-}
+.statBar__mid { display: none; }
 
 /* ── Skeleton compos — approxime la forme du terrain (LineupPitch, en
    inline styles, aucune classe CSS à réutiliser) : deux moitiés empilées
