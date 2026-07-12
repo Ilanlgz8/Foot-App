@@ -9,7 +9,7 @@ import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
-import { getMatchGradient, getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, matchOutcome, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
@@ -284,7 +284,7 @@ function MpStatRow({ label, homeVal, awayVal, homeBetter, awayBetter, homeColor,
           {awayVal ?? '–'}
         </span>
       </div>
-      <StatTrack homeVal={homeVal} awayVal={awayVal} homeColor={homeColor} awayColor={awayColor} noCompare={noCompare} />
+      <StatTrack homeVal={homeVal} awayVal={awayVal} noCompare={noCompare} />
     </div>
   )
 }
@@ -390,12 +390,6 @@ function MpMatchStats({ match }) {
   const { home: hs, away: as_ } = finalScore(match.score)
   const totalGoals = (hs ?? 0) + (as_ ?? 0)
 
-  // Couleurs réelles des équipes pour les barres de stats (demande
-  // explicite, aperçu validé) — même logique que le hero/le terrain compos.
-  const { home: statColH, away: statColA } = getMatchTeamColors(
-    match.homeTeam?.name || homeName, match.awayTeam?.name || awayName
-  )
-
   const isLoading = !rows.length && ((isWC && fifaLoading) || espnLoading || aflLoading)
 
   return (
@@ -426,7 +420,6 @@ function MpMatchStats({ match }) {
             <MpStatRow key={r.label} label={r.label}
               homeVal={r.hv} awayVal={r.av}
               homeBetter={r.hBetter} awayBetter={r.aBetter}
-              homeColor={statColH.main} awayColor={statColA.main}
             />
           ))}
         </div>
@@ -548,13 +541,6 @@ function MpSeasonStats({ match, formMap, compMatches, hideForm = false }) {
     { label: 'Série en cours',          hv: streakLabel(h), av: streakLabel(a), noCompare: true, hColor: h ? streakColor(h.streakType) : null, aColor: a ? streakColor(a.streakType) : null },
   ]
 
-  // Couleurs réelles des équipes pour les barres (demande explicite, aperçu
-  // validé) — sauf "Série en cours", qui garde sa couleur V/N/D dédiée
-  // (hColor/aColor déjà posées ligne par ligne ci-dessus, prioritaires).
-  const { home: seasStColH, away: seasStColA } = getMatchTeamColors(
-    match?.homeTeam?.name || homeName, match?.awayTeam?.name || awayName
-  )
-
   return (
     <div className="mp__statsWrap">
       <div className="mp__statsHeader">
@@ -578,8 +564,8 @@ function MpSeasonStats({ match, formMap, compMatches, hideForm = false }) {
               homeVal={hv ?? '–'} awayVal={av ?? '–'}
               homeBetter={hBetter} awayBetter={aBetter}
               noCompare={noCompare}
-              homeColor={hColor ?? (noCompare ? null : seasStColH.main)}
-              awayColor={aColor ?? (noCompare ? null : seasStColA.main)}
+              homeColor={hColor}
+              awayColor={aColor}
             />
           )
         })}

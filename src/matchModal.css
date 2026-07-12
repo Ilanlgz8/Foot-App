@@ -993,8 +993,11 @@
   white-space: nowrap;
 }
 .modal__statTableVal--right { text-align: right; }
-.modal__statTableVal--home { color: var(--match-home, #93c5fd); font-weight: 900; }
-.modal__statTableVal--away { color: var(--match-away, var(--red-light)); font-weight: 900; }
+/* Chiffres en blanc (retour utilisateur : pas la couleur de l'équipe) — la
+   valeur la plus haute reste distinguée par un blanc plein + gras, l'autre
+   restant en blanc atténué (.modal__statTableVal de base, 0.7 d'opacité). */
+.modal__statTableVal--home,
+.modal__statTableVal--away { color: #fff; font-weight: 900; }
 
 .modal__statTableLabel {
   text-align: center;
@@ -1020,31 +1023,42 @@
 .statBar__wrap + .statBar__wrap { border-top: 1px solid rgba(var(--white-rgb),0.045); }
 .statBar__wrap .modal__statTableRow { padding: 0; }
 .statBar__wrap .modal__statTableRow + .modal__statTableRow { border-top: none; }
+/* Piste : paire de couleurs FIXES (pas la couleur/drapeau de l'équipe,
+   retour utilisateur explicite) — bleu clair domicile / rose-violet clair
+   extérieur, avec un léger glow pour un rendu plus moderne. Un vrai espace
+   de 4px (2px de chaque côté) sépare les deux barres au centre, plus lisible
+   qu'une simple ligne de séparation collée. */
 .statBar__track {
   position: relative;
-  height: 5px;
-  margin-top: 0.35rem;
-  background: rgba(var(--white-rgb),0.06);
-  border-radius: 3px;
+  height: 6px;
+  margin-top: 0.4rem;
+  background: rgba(var(--white-rgb),0.05);
+  border-radius: 4px;
   overflow: hidden;
 }
 .statBar__home {
   position: absolute;
-  top: 0; bottom: 0; right: 50%;
-  border-radius: 3px 0 0 3px;
+  top: 0; bottom: 0; right: calc(50% + 2px);
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(90deg, #38bdf8, #7dd3fc);
+  box-shadow: 0 0 6px rgba(56,189,248,0.5);
   transition: width 0.25s ease;
 }
 .statBar__away {
   position: absolute;
-  top: 0; bottom: 0; left: 50%;
-  border-radius: 0 3px 3px 0;
+  top: 0; bottom: 0; left: calc(50% + 2px);
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(90deg, #d8b4fe, #f0abfc);
+  box-shadow: 0 0 6px rgba(232,121,249,0.45);
   transition: width 0.25s ease;
 }
 .statBar__mid {
   position: absolute;
-  top: -2px; bottom: -2px; left: 50%;
-  width: 1px;
-  background: rgba(var(--white-rgb),0.18);
+  top: 50%; left: 50%;
+  width: 3px; height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(var(--white-rgb),0.3);
 }
 
 /* ── Skeleton compos — approxime la forme du terrain (LineupPitch, en
