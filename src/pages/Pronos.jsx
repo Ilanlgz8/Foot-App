@@ -318,13 +318,51 @@ function MatchPredictRow({ match, myPred, onSave, formMap }) {
   )
 }
 
+// Liste des pronos du groupe pour un match donné (déplié au clic sur "Voir
+// les pronos") — la donnée (predictions[matchId] = { deviceId: {home,away} })
+// est DÉJÀ chargée pour tous les joueurs du groupe via usePronosGroupData,
+// pas besoin d'appel réseau supplémentaire ni de nouvel endpoint. `actual` +
+// `prono` non nuls → affiche aussi les points gagnés par chacun (même calcul
+// que le classement, computePoints). Visible uniquement à partir du moment où
+// le match a débuté (onglet Résultat) : les pronos ne sont plus modifiables
+// dès le coup d'envoi (un match disparaît de l'onglet Pronos dès qu'il n'est
+// plus SCHEDULED), donc les révéler ici ne permet à personne de copier qui
+// que ce soit.
+function PredictionsPanel({ matchId, players, predictions, deviceId, actual, prono }) {
+  const preds = predictions[String(matchId)] ?? {}
+  const entries = Object.entries(preds)
+  if (entries.length === 0) {
+    return <p className="pronos__predictEmpty">Personne n'a pronostiqué ce match.</p>
+  }
+  return (
+    <div className="pronos__predictList">
+      {entries.map(([pid, pred]) => {
+        const pts = actual ? computePoints(pred, actual.home, actual.away, prono) : null
+        const exact = !!actual && pred.home === actual.home && pred.away === actual.away
+        return (
+          <div key={pid} className={`pronos__predictRow${pid === deviceId ? ' pronos__predictRow--me' : ''}`}>
+            <span className="pronos__predictName">{players[pid] ?? '?'}{pid === deviceId ? ' (toi)' : ''}</span>
+            <span className="pronos__predictScore">{pred.home}-{pred.away}</span>
+            {pts != null && (
+              <span className={`pronos__predictPts${exact ? ' pronos__predictPts--exact' : pts > 0 ? ' pronos__predictPts--ok' : ''}`}>
+                {pts > 0 ? `+${pts}` : '0'} pt{pts > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // Ligne "match en cours" — minute + score seulement (pas de stats, pas de
 // buteurs) : juste de quoi suivre un match qu'on a pronostiqué le temps qu'il
 // se joue, entre l'onglet Pronos (avant coup d'envoi) et Classement (une fois
 // terminé). Ticker 5s pour faire avancer calcMinute() entre deux polls ESPN,
 // même logique que LiveCard (Live.jsx).
-function LiveResultRow({ match, espn }) {
+function LiveResultRow({ match, espn, players, predictions, deviceId }) {
   const [, setTick] = useState(0)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 5_000)
     return () => clearInterval(id)
@@ -335,6 +373,7 @@ function LiveResultRow({ match, espn }) {
   const fs = finalScore(match.score)
   const hs = mergeScore(espn?.home, fs.home ?? match.score?.halfTime?.home)
   const as_ = mergeScore(espn?.away, fs.away ?? match.score?.halfTime?.away)
+  const predCount = Object.keys(predictions[String(match.id)] ?? {}).length
 
   return (
     <div className="pronos__matchRow">
@@ -357,13 +396,34 @@ function LiveResultRow({ match, espn }) {
           <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
         </div>
       </div>
+      {predCount > 0 && (
+        <div className="pronos__resultFooter pronos__resultFooter--end">
+          <button className="pronos__toggleBtn" onClick={() => setOpen(o => !o)}>
+            {open ? 'Masquer' : `Voir les pronos (${predCount})`}
+          </button>
+        </div>
+      )}
+      {open && (
+        <PredictionsPanel matchId={match.id} players={players} predictions={predictions} deviceId={deviceId} actual={null} prono={null} />
+      )}
     </div>
   )
 }
 
 // Ligne "match terminé récemment" (< 24h) — score final, pas de minute.
-function FinishedResultRow({ match }) {
+// Sous le score : le prono qu'on avait mis + les points gagnés pour CE match
+// (même formule variable que computePoints, cf. classement), et un bouton
+// pour déplier les pronos de tout le groupe (voir PredictionsPanel).
+function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
+  const [open, setOpen] = useState(false)
   const fs = finalScore(match.score)
+  const actual = (fs.home != null && fs.away != null) ? { home: fs.home, away: fs.away } : null
+  const myPred = predictions[String(match.id)]?.[deviceId] ?? null
+  const myPoints = (myPred && actual) ? computePoints(myPred, actual.home, actual.away, prono) : null
+  const exactMatch = !!myPred && !!actual && myPred.home === actual.home && myPred.away === actual.away
+  const predCount = Object.keys(predictions[String(match.id)] ?? {}).length
+  const predClass = myPoints == null ? '' : exactMatch ? ' pronos__myPredict--exact' : myPoints > 0 ? ' pronos__myPredict--ok' : ''
+
   return (
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
@@ -385,6 +445,24 @@ function FinishedResultRow({ match }) {
           <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
         </div>
       </div>
+      {(myPred || predCount > 0) && (
+        <div className="pronos__resultFooter">
+          {myPred ? (
+            <span className={`pronos__myPredict${predClass}`}>
+              Ton prono : {myPred.home}-{myPred.away}
+              {myPoints != null && <strong> · {myPoints > 0 ? `+${myPoints}` : '0'} pt{myPoints > 1 ? 's' : ''}</strong>}
+            </span>
+          ) : <span />}
+          {predCount > 0 && (
+            <button className="pronos__toggleBtn" onClick={() => setOpen(o => !o)}>
+              {open ? 'Masquer' : `Voir les pronos (${predCount})`}
+            </button>
+          )}
+        </div>
+      )}
+      {open && (
+        <PredictionsPanel matchId={match.id} players={players} predictions={predictions} deviceId={deviceId} actual={actual} prono={prono} />
+      )}
     </div>
   )
 }
@@ -618,7 +696,10 @@ function Pronos() {
                 <div className="pronos__day">
                   <div className="pronos__dayLabel">En cours</div>
                   {inProgress.map(m => (
-                    <LiveResultRow key={m.id} match={m} espn={espnScores[m.id] ?? null} />
+                    <LiveResultRow
+                      key={m.id} match={m} espn={espnScores[m.id] ?? null}
+                      players={players} predictions={predictions} deviceId={deviceId}
+                    />
                   ))}
                 </div>
               )}
@@ -626,7 +707,11 @@ function Pronos() {
                 <div className="pronos__day">
                   <div className="pronos__dayLabel">Terminés (24h)</div>
                   {recentFinished.map(m => (
-                    <FinishedResultRow key={m.id} match={m} />
+                    <FinishedResultRow
+                      key={m.id} match={m}
+                      players={players} predictions={predictions} deviceId={deviceId}
+                      prono={pronoByMatchId[String(m.id)]}
+                    />
                   ))}
                 </div>
               )}

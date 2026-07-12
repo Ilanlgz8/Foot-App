@@ -304,6 +304,80 @@
 .pronos__scoreInput:focus { outline: none; border-color: rgba(var(--red-rgb), 0.5); }
 .pronos__scoreSep { color: var(--text-dim); font-size: 0.8rem; }
 
+/* ── Ton prono + pronos du groupe (onglet Résultat) ── */
+.pronos__resultFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border);
+}
+.pronos__resultFooter--end { justify-content: flex-end; }
+.pronos__myPredict {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+.pronos__myPredict strong { color: var(--text-dim); font-weight: 800; }
+.pronos__myPredict--ok strong { color: var(--sf-gold, #f6c667); }
+.pronos__myPredict--exact strong { color: #4ade80; }
+.pronos__toggleBtn {
+  background: none;
+  border: none;
+  color: var(--red-light);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  white-space: nowrap;
+}
+.pronos__toggleBtn:hover { text-decoration: underline; }
+
+.pronos__predictList {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.pronos__predictRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.pronos__predictRow--me { background: rgba(var(--red-rgb), 0.08); }
+.pronos__predictName {
+  color: var(--text-main);
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pronos__predictScore { color: var(--text-main); font-weight: 800; }
+.pronos__predictPts {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 3rem;
+  text-align: right;
+}
+.pronos__predictPts--ok    { color: var(--sf-gold, #f6c667); }
+.pronos__predictPts--exact { color: #4ade80; }
+.pronos__predictEmpty {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin: 0.5rem 0 0;
+}
+
 /* ── Classement ── */
 .pronos__leaderboard {
   background: var(--bg-card);
