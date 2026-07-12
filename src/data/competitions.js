@@ -15,11 +15,16 @@ import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 // - Nations League : fond blanc/damier (artefact du site source) retiré,
 //   texte "UEFA NATIONS LEAGUE" recoloré en blanc (gris-bleu terne
 //   à l'origine, peu lisible sur fond sombre).
-// - Euro : logo officiel UEFA EURO 2024 ALLEMAGNE — ⚠️ spécifique à cette
-//   édition (déjà terminée), pas un logo "Euro" intemporel, mais c'est le
-//   fichier fourni et aucune alternative générique n'a pu être récupérée
-//   (pas d'accès réseau pour en télécharger un autre depuis cet
-//   environnement) — à remplacer si une version plus neutre est fournie.
+// - Euro : euro-generic.png, recadré depuis le logo ESPN "UEFA European
+//   Championship" (leaguelogos/soccer/500-dark/74.png, fourni par
+//   l'utilisateur) sur l'écusson trophée + arc-en-ciel de drapeaux
+//   uniquement — bandeau texte "UEFA / EURO2024 / GERMANY" retiré (coupe
+//   nette sur les lignes 100% transparentes qui séparaient déjà icône et
+//   texte). ⚠️ Reste visuellement daté de l'édition 2024 (aucune vraie
+//   alternative générique trouvée, même limite réseau que les autres), mais
+//   bien plus lisible en petit — l'ancien fichier (euro-real.png, tout bleu
+//   avec le texte complet) donnait un simple blob bleu illisible en petit
+//   (retour utilisateur).
 // - Copa America : fond "damier transparent" (en réalité cuit dans les
 //   pixels JPEG du site source) aplati en blanc uni plutôt que rendu
 //   transparent — le trophée blanc se confondait avec ce damier, une vraie
@@ -28,7 +33,7 @@ import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 //   du canvas d'origine découpés en cercle.
 import nationsLeagueLogo from '../assets/leagues/nations-league-real.png'
 import canLogo from '../assets/leagues/caf-can.png'
-import euroLogo from '../assets/leagues/euro-real.png'
+import euroLogo from '../assets/leagues/euro-generic.png'
 import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
 
 
