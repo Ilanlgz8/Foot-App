@@ -204,42 +204,47 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
 }
 
 // Fenêtre d'affichage Pronos : les 7 prochains jours seulement (demande
-// utilisateur — pas tout le reste du tournoi d'un coup).
+// utilisateur — pas tout le reste du tournoi d'un coup). Paramétrable
+// (windowDays) : Accueil.jsx s'en sert aussi avec une fenêtre plus large pour
+// trouver le prochain jour avec un match (voir useUpcomingMatchesAllComps).
 const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
-function filterUpcomingWindow(matches, now) {
+function filterUpcomingWindow(matches, now, windowMs = UPCOMING_WINDOW_MS) {
   return (matches ?? [])
     .filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
     .filter(m => {
       const t = new Date(m.utcDate).getTime()
-      return t >= now && t - now <= UPCOMING_WINDOW_MS
+      return t >= now && t - now <= windowMs
     })
     .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
 }
 
 // Matchs à venir de TOUTES les compétitions suivies, fusionnés, triés
-// chronologiquement et limités aux 7 prochains jours — pour Pronos.jsx.
-// IMPORTANT : pour le WC/EC, fetchMatchesForComp('SCHEDULED') fait un 1er
-// essai SANS filtre de statut (récupère toute la saison, poules + bracket,
-// y compris les matchs déjà joués — voir commentaire plus haut, pensé pour
-// la page Programme qui filtre elle-même ensuite). Il faut donc filtrer ici
-// explicitement par statut ET par date (comme filteredGrouped dans Match.jsx)
-// sous peine d'afficher des matchs déjà joués dans "à venir".
+// chronologiquement et limités à `windowDays` jours (7 par défaut, pour
+// Pronos.jsx). IMPORTANT : pour le WC/EC, fetchMatchesForComp('SCHEDULED')
+// fait un 1er essai SANS filtre de statut (récupère toute la saison, poules +
+// bracket, y compris les matchs déjà joués — voir commentaire plus haut,
+// pensé pour la page Programme qui filtre elle-même ensuite). Il faut donc
+// filtrer ici explicitement par statut ET par date (comme filteredGrouped
+// dans Match.jsx) sous peine d'afficher des matchs déjà joués dans "à venir".
 // Clé de cache "ALL_V2" (pas "ALL") : les navigateurs ayant déjà visité
 // Pronos AVANT ce filtre ont un ancien cache localStorage non filtré, encore
 // valide selon staleTime (1h) — sans changer de clé, ce vieux cache continue
 // d'être servi tel quel pendant jusqu'à 1h après le déploiement du fix.
+// windowDays fait partie de la clé de cache : une fenêtre 7j et une fenêtre
+// 30j (Accueil, voir plus bas) ne doivent jamais se marcher dessus.
 // Cache combiné dédié (TTL 1h comme le cache par-compétition SCHEDULED) : au
 // pire une rafale de N requêtes FD.org une fois par heure, lissée par le
 // budget global déjà en place dans api/football.js.
-export function useUpcomingMatchesAllComps(compIds) {
-  const key        = cacheKey('ALL_V2', 'SCHEDULED')
+export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
+  const windowMs   = windowDays * 24 * 60 * 60 * 1000
+  const key        = cacheKey(`ALL_V2_${windowDays}`, 'SCHEDULED')
   const cachedData = readCacheStale(key)
   const cachedAt   = getCacheSavedAt(key)
   const ttl        = TTL.SCHEDULED
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['matches', 'ALL_V2', 'SCHEDULED', compIds.join(',')],
+    queryKey: ['matches', 'ALL_V2', 'SCHEDULED', compIds.join(','), windowDays],
     queryFn: async () => {
       const results = await Promise.allSettled(
         compIds.map(id => fetchMatchesForComp(id, 'SCHEDULED'))
@@ -247,18 +252,18 @@ export function useUpcomingMatchesAllComps(compIds) {
       const now = Date.now()
       const merged = filterUpcomingWindow(
         results.filter(r => r.status === 'fulfilled' && Array.isArray(r.value)).flatMap(r => r.value),
-        now
+        now, windowMs
       )
 
-      // Rien à écrire en cache si la fenêtre 7j est vide (ex: creux entre 2
+      // Rien à écrire en cache si la fenêtre est vide (ex: creux entre 2
       // journées) — évite d'effacer un cache valide avec un résultat vide.
       // Le fallback est lui aussi re-filtré (même fenêtre) : jamais de vieux
       // match déjà joué réintroduit via le cache stale.
-      if (merged.length === 0) return filterUpcomingWindow(readCacheStale(key), now)
+      if (merged.length === 0) return filterUpcomingWindow(readCacheStale(key), now, windowMs)
       writeCache(key, merged, ttl)
       return merged
     },
-    initialData:          filterUpcomingWindow(cachedData, Date.now()),
+    initialData:          filterUpcomingWindow(cachedData, Date.now(), windowMs),
     initialDataUpdatedAt: cachedAt,
     staleTime: ttl,
     retry: false,

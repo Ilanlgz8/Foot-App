@@ -121,7 +121,22 @@ function Resultats() {
   // d'un match rebasculait toujours sur la 1ère journée au lieu de celle
   // consultée (ex: 8e journée → 6e).
   const [selectedComp, setSelectedComp] = usePersistedState('resultats_selectedComp', 'WC')
-  const [currentIndex, setCurrentIndex] = usePersistedState('resultats_currentIndex', 0)
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué sur une journée
+  // passée puis cliqué sur un match puis "retour", on retombait sur la
+  // journée la plus récente au lieu de celle consultée) : l'ancien
+  // `resultats_currentIndex` persistait un simple INDEX numérique dans le
+  // tableau `grouped` (ordre desc, le plus récent d'abord). Problème :
+  // `groupRounds` reconstruit ce tableau à chaque fois que `matches` change,
+  // et un nouveau round/journée qui vient de se terminer s'insère TOUJOURS en
+  // position 0 (le plus récent) — donc tous les index qui suivent se
+  // décalent de 1. Un index numérique brut persisté ne "suit" pas ce
+  // décalage : il se retrouve à pointer sur une journée différente (souvent
+  // plus récente) de celle réellement consultée avant de partir. On persiste
+  // désormais la CLÉ STABLE de la journée (ex: 'QUARTER_FINALS', 'md-3') au
+  // lieu de sa position, et on recalcule l'index à chaque render en la
+  // recherchant dans `grouped` — la position peut changer, la journée
+  // affichée reste la bonne.
+  const [currentRoundKey, setCurrentRoundKey] = usePersistedState('resultats_currentRoundKey', null)
   const [viewMode, setViewMode]         = usePersistedState('resultats_viewMode', 'journee') // 'journee' | 'poule'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
@@ -266,15 +281,22 @@ function Resultats() {
   }
 
   const total = grouped.length
-  // currentIndex peut venir de sessionStorage (restauration après retour
-  // arrière) : si la liste de journées a changé depuis, on retombe sur la
-  // dernière valide plutôt que de rester bloqué sur un index vide.
-  useEffect(() => {
-    if (total > 0 && currentIndex >= total) setCurrentIndex(total - 1)
-  }, [total, currentIndex])
+  // currentIndex dérivé de la clé persistée (voir commentaire plus haut) :
+  // recherché à chaque render dans `grouped`, jamais stocké tel quel — donc
+  // toujours correct même si de nouveaux rounds ont été ajoutés en tête de
+  // liste entre-temps. Pas de clé (1re visite) ou clé introuvable (round
+  // disparu, changement de compétition) → 0, la journée la plus récente.
+  const foundIndex = currentRoundKey != null ? grouped.findIndex(g => g.key === currentRoundKey) : -1
+  const currentIndex = foundIndex >= 0 ? foundIndex : 0
   const currentGroup    = grouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches  = currentGroup?.matches ?? []
+  // Navigue vers un index donné en persistant la CLÉ du round visé (pas
+  // l'index lui-même — voir commentaire plus haut).
+  const goToRoundIndex = (i) => {
+    const g = grouped[i]
+    if (g) setCurrentRoundKey(g.key)
+  }
 
   // Recherche — filtre côté client par nom d'équipe (traduit ou brut).
   function matchesTeamSearch(team) {
@@ -331,7 +353,7 @@ function Resultats() {
                   <button
                     key={comp.id}
                     className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
-                    onClick={() => { setSelectedComp(comp.id); setCurrentIndex(0); setViewMode('journee'); setOpenedGroup(null); setCompOpen(false) }}
+                    onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null); setCompOpen(false) }}
                   >
                     <img src={comp.emblem} alt="" className="compHeader__itemLogo"
                       onError={e => e.currentTarget.style.display = 'none'} />
@@ -350,7 +372,7 @@ function Resultats() {
           <nav className="resultats__sidebarNav">
             {COMPETITIONS.map(comp => (
               <button key={comp.id}
-                onClick={() => { setSelectedComp(comp.id); setCurrentIndex(0); setViewMode('journee'); setOpenedGroup(null) }}
+                onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null) }}
                 className={`resultats__sidebarItem ${selectedComp === comp.id ? 'resultats__sidebarItem--active' : ''}`}
               >
                 <img src={comp.emblem} alt=""
@@ -430,9 +452,9 @@ function Resultats() {
             ) : (
               <>
                 <div className="resultats__nav">
-                  <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i + 1)} disabled={currentIndex >= total - 1}>←</button>
+                  <button className="resultats__navBtn" onClick={() => goToRoundIndex(currentIndex + 1)} disabled={currentIndex >= total - 1}>←</button>
                   <span className="resultats__navLabel">{currentRoundLabel}</span>
-                  <button className="resultats__navBtn" onClick={() => setCurrentIndex(i => i - 1)} disabled={currentIndex <= 0}>→</button>
+                  <button className="resultats__navBtn" onClick={() => goToRoundIndex(currentIndex - 1)} disabled={currentIndex <= 0}>→</button>
                 </div>
                 <div className="resultats__list">
                   {currentMatches.map(match => <MatchCard key={match.id} match={match} />)}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate, useRecentDaysMatches } from '../hooks/useTodayMatches'
+import { useUpcomingMatchesAllComps } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
@@ -60,6 +61,10 @@ function getTargetDate(offset) {
   // Utiliser la date locale (pas UTC) pour éviter le décalage après minuit
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+// Toutes les compétitions suivies — pour la recherche du prochain jour avec
+// un match (voir useUpcomingMatchesAllComps plus bas).
+const ACCUEIL_COMP_IDS = COMPETITIONS.map(c => c.id)
 
 // Persisté au niveau module pour survivre aux navigations (remounts)
 // On sauvegarde aussi la date du jour pour détecter le passage de minuit
@@ -186,18 +191,38 @@ function Accueil() {
   // live (card en mode live, voir MatchPanel/onLiveClick) → /live/:matchId
   // pré-match → /match/:matchId (pas de modal)
 
-  // Auto-avance au jour suivant si aujourd'hui n'a plus de match à venir
-  // (tous terminés ou aucun match ce jour-là)
+  // Matchs à venir toutes compétitions, fenêtre large (30j) — sert UNIQUEMENT
+  // à savoir où sauter quand le jour affiché est vide (voir effet ci-dessous).
+  // Fenêtre distincte de celle de Pronos (7j, volontairement plus courte) :
+  // paramètre windowDays dédié dans useUpcomingMatchesAllComps, cache séparé,
+  // aucun impact sur Pronos.
+  const { matches: upcomingAllComps } = useUpcomingMatchesAllComps(ACCUEIL_COMP_IDS, 30)
+
+  // ⚠️ AMÉLIORÉ (constat utilisateur : si aujourd'hui ET demain n'ont aucun
+  // match, l'app restait bloquée sur "Demain" vide — l'ancien mécanisme ne
+  // gérait qu'UN SEUL jour vide, et uniquement en partant d'aujourd'hui). Va
+  // maintenant chercher, dans les matchs à venir des 30 prochains jours (tous
+  // compétitions confondues), le PROCHAIN jour qui a réellement un match, et y
+  // saute directement — peu importe qu'il soit demain, dans 3 jours ou dans 10.
+  // S'applique à n'importe quel jour vide affiché (pas seulement "aujourd'hui").
   useEffect(() => {
     if (matchesLoading) return
-    if (dayOffset !== 0) return  // seulement si on est sur "aujourd'hui"
     const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
-    if (!hasUpcoming) {
-      // Petit délai pour éviter un flash si les données arrivent en deux temps
-      const id = setTimeout(() => { setDayOffset(1); setMinDayOffset(1) }, 800)
-      return () => clearTimeout(id)
-    }
-  }, [matches, matchesLoading, dayOffset])
+    if (hasUpcoming) return
+
+    const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
+    const next = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfTargetDay)
+    if (!next) return  // rien de connu dans les 30j — on reste où on est
+
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0)
+    const next0  = new Date(next.utcDate); next0.setHours(0, 0, 0, 0)
+    const diffDays = Math.round((next0 - today0) / 86_400_000)
+    if (diffDays <= dayOffset) return  // ne recule jamais
+
+    // Petit délai pour éviter un flash si les données arrivent en deux temps
+    const id = setTimeout(() => { setDayOffset(diffDays); setMinDayOffset(diffDays) }, 800)
+    return () => clearTimeout(id)
+  }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps])
 
   // ── Préchargement des jours adjacents ──
   useEffect(() => {
