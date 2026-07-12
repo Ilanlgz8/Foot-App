@@ -635,10 +635,27 @@ export default async function handler(req, res) {
     const anyLive = allEvents.some(({ evt }) =>
       LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
     if (!anyLive) {
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : notif de coup d'envoi reçue
+      // ~25min après le vrai coup d'envoi, pour 2 matchs de suite) : ce
+      // filtre excluait un match SCHEDULED dont l'heure prévue (evt.date)
+      // vient tout juste d'être dépassée — exactement le cas d'un match qui
+      // DÉMARRE VRAIMENT à l'instant mais dont le statut ESPN n'a pas encore
+      // basculé sur IN_PROGRESS (lag connu et déjà documenté ailleurs dans ce
+      // fichier — jusqu'à ~10min sur le slug WC, voir plus haut). Résultat :
+      // `nextKickoff` retombait à `null` (plus aucun événement "futur"), donc
+      // `farEnough` passait à `true` sans aucune vraie certitude qu'aucun
+      // match n'était imminent — le cron partait alors se rendormir 25min
+      // (NEXT_CHECK_MAX_MS) PILE au moment où le match commençait, ratant le
+      // coup d'envoi jusqu'au réveil suivant. On garde maintenant aussi les
+      // matchs SCHEDULED dont l'heure est déjà passée (evt.date <= now) : un
+      // `nextKickoff` dans le passé proche donne un delta négatif, largement
+      // sous le seuil de 90min (NEXT_CHECK_BUFFER_MS) → `farEnough` reste
+      // `false`, le cron continue de poller normalement (1x/min) au lieu de
+      // sauter 25min, et rattrape le KO au prochain passage normal.
       const upcomingKickoffs = allEvents
         .filter(({ evt }) => normalizeEspnStatus(evt.competitions?.[0]?.status) === 'STATUS_SCHEDULED')
         .map(({ evt }) => Date.parse(evt.date))
-        .filter(t => Number.isFinite(t) && t > now.getTime())
+        .filter(t => Number.isFinite(t))
       const nextKickoff = upcomingKickoffs.length ? Math.min(...upcomingKickoffs) : null
       const farEnough = nextKickoff == null || (nextKickoff - now.getTime()) > NEXT_CHECK_BUFFER_MS
       if (farEnough) {
