@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { PanelSkeleton } from './MatchCard'
 import { ResultHeroCard } from './ResultHeroCard'
+import { usePersistedState } from '../hooks/usePersistedState'
 
 // Rétabli (retour utilisateur : la navigation par jour — aujourd'hui ⇄ hier —
 // avait été retirée par erreur suite à un malentendu ; l'utilisateur veut
@@ -38,7 +38,22 @@ function formatDayLabel(dateStr) {
 
 export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped  = groupByDay(results)
-  const [dayIndex, setDayIndex] = useState(0)
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué jusqu'à un
+  // jour précédent (ex: 8 juillet), cliqué sur un match, puis "retour",
+  // ce panneau repartait à "Aujourd'hui" au lieu de rester sur le 8 juillet)
+  // : `dayIndex` était un simple useState, jamais persisté. Accueil.jsx (le
+  // parent) est entièrement démonté à chaque changement de route
+  // (key={location.pathname} dans App.jsx), donc CE composant repart
+  // toujours de zéro au retour, même avec le fix scroll (App.jsx) — deux
+  // bugs différents, l'un sur la position de scroll, l'autre sur l'état
+  // "quel jour est affiché ici". On persiste la DATE elle-même (pas
+  // l'index : `grouped` peut changer de taille si un nouveau jour de
+  // résultats apparaît, ce qui décalerait tous les index suivants — même
+  // raison que le fix équivalent dans Resultat.jsx) et on retrouve l'index
+  // correspondant à chaque render.
+  const [currentDayStr, setCurrentDayStr] = usePersistedState('accueil_resultDay', null)
+  const foundIdx = currentDayStr != null ? grouped.findIndex(([day]) => day === currentDayStr) : -1
+  const dayIndex = foundIdx >= 0 ? foundIdx : 0
 
   const currentDay     = grouped[dayIndex]
   const dayLabel       = currentDay ? formatDayLabel(currentDay[0]) : null
@@ -46,16 +61,21 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
   const canGoBack      = dayIndex < grouped.length - 1
   const canGoForward   = dayIndex > 0
 
+  const goToDayIndex = (i) => {
+    const g = grouped[i]
+    if (g) setCurrentDayStr(g[0])
+  }
+
   const compGroups = groupByComp(currentMatches)
 
   return (
     <>
       <div className="accueil__resultNav">
-        <button className="accueil__dayArrow" onClick={() => setDayIndex(i => i + 1)} disabled={!canGoBack} aria-label="Jour précédent">
+        <button className="accueil__dayArrow" onClick={() => goToDayIndex(dayIndex + 1)} disabled={!canGoBack} aria-label="Jour précédent">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <span className="accueil__resultNavLabel">{dayLabel ?? '—'}</span>
-        <button className="accueil__dayArrow" onClick={() => setDayIndex(i => i - 1)} disabled={!canGoForward} aria-label="Jour suivant">
+        <button className="accueil__dayArrow" onClick={() => goToDayIndex(dayIndex - 1)} disabled={!canGoForward} aria-label="Jour suivant">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
