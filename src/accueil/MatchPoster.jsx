@@ -2,7 +2,7 @@ import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
-import { calcProno }                  from '../utils/calcProno'
+import { calcPronoAdvanced }          from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { FormDiamonds }               from './FormDiamonds'
@@ -15,7 +15,7 @@ function formatHour(dateStr) {
 export function MatchPoster({ match, espnScore = null, onClick }) {
   // Vrai formMap depuis football-data.org pour cette compétition
   const compCode = match.competition?.code ?? null
-  const { formMap } = useTeamForm(compCode)
+  const { formMap, compMatches } = useTeamForm(compCode)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
@@ -47,7 +47,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const awayName  = match.awayTeam?.name ?? ''
   const hForm     = formMap?.[match.homeTeam?.id] ?? []
   const aForm     = formMap?.[match.awayTeam?.id] ?? []
-  const prono     = calcProno(hForm, aForm)
+  const prono     = calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm)
 
   // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
   // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine

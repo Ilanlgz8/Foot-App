@@ -319,7 +319,8 @@ export default function LiveMatchPage() {
         hForm, aForm,
         mergeScore(espn?.home, fsProno.home ?? match.score?.halfTime?.home),
         mergeScore(espn?.away, fsProno.away ?? match.score?.halfTime?.away),
-        liveMinute
+        liveMinute,
+        { homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches }
       )
     : null
 

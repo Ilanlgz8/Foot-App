@@ -123,5 +123,13 @@ export function useTeamFormMulti(compCodes) {
   const formMap = {}
   for (const r of results) Object.assign(formMap, r.data?.formMap ?? {})
 
-  return { formMap, isLoading: results.some(r => r.isLoading) }
+  // matchesByComp : nécessaire à calcPronoAdvanced (calcProno.js) pour le
+  // modèle buts marqués/encaissés — contrairement à formMap (fusionné, une
+  // seule table id équipe → forme), les matchs saison doivent rester séparés
+  // PAR compétition (la moyenne du championnat n'a de sens que dans une
+  // seule compétition à la fois).
+  const matchesByComp = {}
+  codes.forEach((code, i) => { matchesByComp[code] = results[i]?.data?.matches ?? [] })
+
+  return { formMap, matchesByComp, isLoading: results.some(r => r.isLoading) }
 }

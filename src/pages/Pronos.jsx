@@ -30,7 +30,7 @@ import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
-import { calcProno } from '../utils/calcProno'
+import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
@@ -128,12 +128,15 @@ function outcomeOf(h, a) {
   if (h < a) return 'away'
   return 'draw'
 }
-// % 1/N/2 pour un match donné, à partir de la forme récente des 2 équipes
-// (formMap, voir useTeamFormMulti) — même source que MatchPoster.
-function matchProno(match, formMap) {
+// % 1/N/2 pour un match donné — buts marqués/encaissés saison (Poisson) +
+// confrontations directes si assez de données, sinon repli sur la forme
+// récente (formMap/matchesByComp, voir useTeamFormMulti) — même source et
+// même modèle que MatchPoster (Accueil).
+function matchProno(match, formMap, matchesByComp) {
   const hForm = formMap?.[match?.homeTeam?.id] ?? []
   const aForm = formMap?.[match?.awayTeam?.id] ?? []
-  return calcProno(hForm, aForm)
+  const compMatches = matchesByComp?.[match?.competition?.code] ?? []
+  return calcPronoAdvanced(match?.homeTeam?.id, match?.awayTeam?.id, compMatches, hForm, aForm)
 }
 
 function computePoints(pred, actualHome, actualAway, prono) {
@@ -246,7 +249,7 @@ function JoinCreateScreen({ onCreate, onJoin }) {
   )
 }
 
-function MatchPredictRow({ match, myPred, onSave, formMap }) {
+function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -270,7 +273,7 @@ function MatchPredictRow({ match, myPred, onSave, formMap }) {
   const h = parseInt(home, 10)
   const a = parseInt(away, 10)
   const hasValidPred = Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20
-  const prono = useMemo(() => matchProno(match, formMap), [match, formMap])
+  const prono = useMemo(() => matchProno(match, formMap, matchesByComp), [match, formMap, matchesByComp])
   const potentialPoints = hasValidPred ? pronoPointsForProb(prono[outcomeOf(h, a)]) : null
 
   return (
@@ -495,7 +498,7 @@ function Pronos() {
     for (const m of liveMatches) if (m.competition?.code) codes.add(m.competition.code)
     return [...codes]
   }, [upcoming, finished, liveMatches])
-  const { formMap } = useTeamFormMulti(formCompCodes)
+  const { formMap, matchesByComp } = useTeamFormMulti(formCompCodes)
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur : un match venait de se terminer —
   // bon prono, score exact — mais restait affiché "En direct" dans l'onglet
@@ -583,9 +586,9 @@ function Pronos() {
   // que celui affiché avant le match (voir computePoints).
   const pronoByMatchId = useMemo(() => {
     const map = {}
-    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap) })
+    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap, matchesByComp) })
     return map
-  }, [finishedAll, formMap])
+  }, [finishedAll, formMap, matchesByComp])
 
   const leaderboard = useMemo(() => {
     return Object.entries(players)
@@ -682,6 +685,7 @@ function Pronos() {
                     myPred={predictions[String(m.id)]?.[deviceId]}
                     onSave={handlePredict}
                     formMap={formMap}
+                    matchesByComp={matchesByComp}
                   />
                 ))}
               </div>
