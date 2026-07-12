@@ -311,11 +311,18 @@ function minuteSort(raw) {
   if (!m) return 9999
   return parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) / 100 : 0)
 }
-
 function espnMinuteLabel(raw) {
   const base = String(raw ?? '').split(':')[0]
-  return base ? `${base}'` : (raw || '')
+  if (!base) return raw || ''
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, capture à l'appui : "36''",
+  // "45'+2''") : ESPN renvoie déjà la minute pré-formatée avec son
+  // apostrophe (clock.displayValue = "36'", "45'+2'", "93'"...) — on en
+  // rajoutait systématiquement une 2e sans vérifier, d'où le doublon visible
+  // en fin de chaîne. On n'ajoute l'apostrophe que si elle n'y est pas déjà.
+  return base.endsWith(`'`) ? base : `${base}'`
 }
+
+
 
 // Exportée : réutilisée par MatchPage.jsx pour fusionner buts + cartons dans
 // le hero (au lieu de n'y afficher que les buts), triés par minute — même
