@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
 import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
+import { COMPETITIONS } from '../data/competitions'
 
 function GoalCelebration({ teamName, scoreStr }) {
   return (
@@ -253,12 +254,42 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
     match.awayTeam?.name || match.awayTeam?.shortName || ''
   )
 
+  // ── Bandeau live : compétition (haut gauche) + statut période (haut droite) ──
+  // Même contenu/logique que le hero de LiveMatchPage (mp__hero__comp +
+  // lmp__heroPeriodBadge) — demande explicite : une card en mode live doit
+  // reprendre ce même habillage. Uniquement affiché en mode live (isLive) :
+  // une card à venir/terminée n'a pas besoin de ce bandeau.
+  const liveComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const liveCompEmblem = liveComp?.emblem ?? match.competition?.emblem
+  const liveCompName   = match.competition?.name ?? liveComp?.name ?? ''
+  const rawPeriod = getMatchPeriod(match)
+  const livePeriodLabel = rawPeriod === '1ère MT'       ? '1ère mi-temps'
+    : rawPeriod === '2ème MT'       ? '2ème mi-temps'
+    : rawPeriod === 'Mi-temps'      ? 'Mi-temps'
+    : rawPeriod === 'Prolongations' ? 'Prolongations'
+    : rawPeriod === 'T.A.B.'        ? 'T.A.B.'
+    : null
+
   return (
     <div
       className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}${goal ? ' accueil__matchCard--goal' : ''}`}
       style={cardGradient ? { '--match-card-gradient': cardGradient } : undefined}
     >
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
+
+      {/* Bandeau live : compétition à gauche, statut de période à droite —
+          même habillage que le hero de LiveMatchPage. */}
+      {isLive && (
+        <div className="accueil__matchCardLiveBar">
+          <span className="accueil__matchCardLiveComp">
+            {liveCompEmblem && <img src={liveCompEmblem} alt="" className="accueil__matchCardLiveCompLogo" />}
+            <span className="accueil__matchCardLiveCompName">{liveCompName}</span>
+          </span>
+          {livePeriodLabel && (
+            <span className="accueil__matchCardLivePeriod">{livePeriodLabel}</span>
+          )}
+        </div>
+      )}
 
       {/* Équipe domicile */}
       <div className="accueil__matchCardTeam">
