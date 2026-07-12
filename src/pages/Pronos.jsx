@@ -472,10 +472,15 @@ function Pronos() {
   const [activeTab, setActiveTab] = useState('pronos')
 
   const { matches: upcoming, loading: loadingUpcoming } = useUpcomingMatchesAllComps(COMP_IDS)
-  // Requis par Résultat (matchs finis <24h à afficher) ET Classement (calcul des points)
-  const { matches: finished } = useFinishedMatchesAllComps(
-    COMP_IDS, hasGroup && (activeTab === 'resultat' || activeTab === 'classement')
-  )
+  // Requis par Résultat (matchs finis <24h à afficher) ET Classement (calcul des points).
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : en arrivant sur l'onglet Résultat, le
+  // dernier match terminé n'apparaissait qu'1-2s après, "comme un appel réseau"
+  // — parce que s'en était un : cette requête était gardée derrière
+  // activeTab==='resultat'/'classement', donc jamais lancée tant qu'on n'avait
+  // pas cliqué sur l'onglet, contrairement à `upcoming` ci-dessus (toujours
+  // active dès l'arrivée sur la page). Désormais lancée dès qu'on a un groupe,
+  // comme upcoming — la donnée est déjà chaude quand on clique sur l'onglet.
+  const { matches: finished } = useFinishedMatchesAllComps(COMP_IDS, hasGroup)
   const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup)
   const { liveMatches, espnScores } = useLiveData()
 

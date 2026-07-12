@@ -16,7 +16,7 @@
  *   Pas de stickyLive, pas de machine d'états complexe, pas de pendingEviction.
  */
 
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTodayMatches } from '../hooks/useTodayMatches'
 import { useLiveMatches } from '../hooks/useLiveMatches'
@@ -77,8 +77,24 @@ export function LiveProvider({ children }) {
     }
   }, [liveMatches.length])
 
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : navigation/clics "pas fluides",
+  // comme si l'app buggait un peu) : la value du Provider était un littéral
+  // objet recréé À CHAQUE render de LiveProvider — et LiveProvider re-render
+  // très souvent (poll ESPN toutes les 10-30s, mises à jour liveTracker, etc.).
+  // Comme LiveProvider englobe TOUTE l'app (au-dessus des Routes), une
+  // nouvelle référence d'objet ici fait re-render TOUS les composants qui
+  // appellent useLiveData() n'importe où dans l'arbre, même ceux dont les
+  // données affichées n'ont pas changé — un poll qui tombe pile pendant un
+  // clic/une navigation peut donc provoquer un à-coup visible. useMemo :
+  // seule une vraie nouvelle valeur de liveMatches/espnScores/recalibrate
+  // déclenche un re-render des consommateurs.
+  const ctxValue = useMemo(
+    () => ({ liveMatches, espnScores, recalibrate }),
+    [liveMatches, espnScores, recalibrate]
+  )
+
   return (
-    <LiveCtx.Provider value={{ liveMatches, espnScores, recalibrate }}>
+    <LiveCtx.Provider value={ctxValue}>
       {children}
     </LiveCtx.Provider>
   )
