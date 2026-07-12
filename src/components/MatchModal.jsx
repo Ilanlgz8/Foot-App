@@ -1476,14 +1476,22 @@ export function useH2HRows(match, compMatches) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
 
-  // Données FD.org (du plus récent au plus vieux). Pas de troncature
-  // arbitraire ici : on affiche tout ce que l'API renvoie réellement pour ce
-  // duo d'équipes plutôt que de promettre un nombre fixe — football-data.org
-  // ne documente pas de garantie sur la profondeur de son historique H2H
-  // (parfois 2 confrontations, parfois une dizaine selon les équipes).
+  // Données FD.org, du plus récent au plus vieux. ⚠️ CORRIGÉ (constat
+  // utilisateur : "met en premier les plus récent" — ce n'était pas le cas)
+  // : avant, un simple .reverse() supposait que l'API renvoyait déjà les
+  // confrontations du plus vieux au plus récent, ce qui n'est pas garanti
+  // (non documenté côté football-data.org, et dans les faits pas vérifié
+  // dans ce sens). Tri explicite par date décroissante — correct quel que
+  // soit l'ordre renvoyé par l'API, plus robuste qu'un .reverse() à l'aveugle.
+  // Pas de troncature arbitraire ici : on affiche tout ce que l'API renvoie
+  // réellement pour ce duo d'équipes plutôt que de promettre un nombre fixe
+  // — football-data.org ne documente pas de garantie sur la profondeur de
+  // son historique H2H (parfois 2 confrontations, parfois une dizaine selon
+  // les équipes).
   const fdRecent = (h2hMatches ?? [])
     .filter(m => m.status === 'FINISHED')
-    .reverse()
+    .slice()
+    .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
 
   // Fallback : confrontations dans la compétition en cours (si FD.org vide)
   const compH2H = !fdRecent.length && compMatches?.length
@@ -1491,7 +1499,7 @@ export function useH2HRows(match, compMatches) {
         m.status === 'FINISHED' &&
         ((m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
          (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId))
-      ).slice().reverse()
+      ).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
     : []
 
   return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }

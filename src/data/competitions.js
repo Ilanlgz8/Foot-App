@@ -7,28 +7,29 @@ import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
 import europaLeagueLogo from '../assets/leagues/europa-league.png'
 import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
-// Vrais logos ajoutés par l'utilisateur (12/07) : CAF (logo officiel de la
-// confédération, utilisé génériquement pour la CAN comme il n'existe pas de
-// logo CAN intemporel — pratique standard, ex. beIN/RMC Sport) + Nations
-// League (logo UEFA générique, pas lié à une édition précise). Fond
-// blanc/damier d'origine retiré (détourage transparent) — voir le fichier
-// caf-can.png nettoyé, le webp Nations League avait déjà une vraie
-// transparence.
+// Vrais logos ajoutés par l'utilisateur (12/07) — tous nettoyés/détourés :
+// - CAF : logo officiel de la confédération, utilisé génériquement pour la
+//   CAN comme il n'existe pas de logo CAN intemporel (pratique standard, ex.
+//   beIN/RMC Sport). Recadré : le fichier d'origine avait beaucoup de marge
+//   vide autour (rendait le logo visuellement plus petit que les autres).
+// - Nations League : fond blanc/damier (artefact du site source) retiré,
+//   texte "UEFA NATIONS LEAGUE" recoloré en blanc (gris-bleu terne
+//   à l'origine, peu lisible sur fond sombre).
+// - Euro : logo officiel UEFA EURO 2024 ALLEMAGNE — ⚠️ spécifique à cette
+//   édition (déjà terminée), pas un logo "Euro" intemporel, mais c'est le
+//   fichier fourni et aucune alternative générique n'a pu être récupérée
+//   (pas d'accès réseau pour en télécharger un autre depuis cet
+//   environnement) — à remplacer si une version plus neutre est fournie.
+// - Copa America : fond "damier transparent" (en réalité cuit dans les
+//   pixels JPEG du site source) aplati en blanc uni plutôt que rendu
+//   transparent — le trophée blanc se confondait avec ce damier, une vraie
+//   transparence aurait mangé une partie du trophée (testé). Résultat :
+//   disque blanc plein (comme la plupart des logos de compétition), coins
+//   du canvas d'origine découpés en cercle.
 import nationsLeagueLogo from '../assets/leagues/nations-league-real.png'
 import canLogo from '../assets/leagues/caf-can.png'
-// Pas de logo officiel utilisable pour l'instant (voir explication donnée à
-// l'utilisateur) : badges simples dessinés maison (couleurs distinctes par
-// compétition), à remplacer si un vrai logo propre (fond réellement
-// transparent, pas d'édition/année précise) est fourni un jour.
-// - Euro : le fichier fourni (Logo_UEFA_Euro_2024.svg) est celui de l'UEFA
-//   EURO 2024 ALLEMAGNE — spécifique à cette édition (déjà terminée), pas un
-//   logo générique "Euro".
-// - Copa America : le fichier fourni (jpg) a un fond "damier transparent" en
-//   réalité cuit dans les pixels (site source), impossible à détourer
-//   proprement car le trophée blanc se confond avec ce fond — tentative de
-//   nettoyage automatique a mangé une partie du trophée.
-import euroLogo from '../assets/leagues/euro.svg'
-import copaAmericaLogo from '../assets/leagues/copa-america.svg'
+import euroLogo from '../assets/leagues/euro-real.png'
+import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
