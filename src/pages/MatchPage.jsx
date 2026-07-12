@@ -140,13 +140,26 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   // change plus jamais après → sert de plancher fiable.
   const hPens = mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null)
   const aPens = mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null)
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : le déroulement buts/cartons restait
+  // vide sous le score, même après le fix du fallback ESPN à froid) : la
+  // condition ci-dessous ne regardait QUE "cachedEspn existe-t-il ?", pas
+  // "cachedEspn contient-il vraiment des buteurs/cartons ?". Or confirmFt()
+  // (useLiveMinute.js) persiste `foot_espn_{id}` dès qu'il connaît un SCORE au
+  // moment du FT — y compris quand `scorers`/`cards` sont encore vides à cet
+  // instant précis (poll juste avant que le serveur ait fini de les calculer,
+  // fréquent en prolongation/tab, ou app suivie seulement une partie du
+  // match). Un cachedEspn "vide mais présent" bloquait alors DÉFINITIVEMENT
+  // le fallback vers le résumé ESPN complet — le seul endroit qui a vraiment
+  // les buts/cartons dans ce cas. Le fallback se déclenche maintenant dès que
+  // scorers ET cards sont vides, peu importe si un score est déjà en cache.
+  const hasEspnEvents = (cachedEspn?.scorers?.length ?? 0) > 0 || (cachedEspn?.cards?.length ?? 0) > 0
   const { espnData: fetchedEspn } = useEspnMatchDetail(
-    isFinished && !cachedEspn ? match : null,
+    isFinished && !hasEspnEvents ? match : null,
     match?.competition?.id,
-    isFinished && !cachedEspn
+    isFinished && !hasEspnEvents
   )
-  const espnScorers = (cachedEspn ?? fetchedEspn)?.scorers ?? []
-  const espnCards   = (cachedEspn ?? fetchedEspn)?.cards   ?? []
+  const espnScorers = (cachedEspn?.scorers?.length ? cachedEspn.scorers : fetchedEspn?.scorers) ?? []
+  const espnCards   = (cachedEspn?.cards?.length   ? cachedEspn.cards   : fetchedEspn?.cards)   ?? []
   // Buts + cartons fusionnés et triés par minute (même logique que le Fil du
   // match dans l'onglet Statistiques, sans les remplacements — le hero reste
   // compact). Uniquement ici (page Résultat) : demande explicite de
