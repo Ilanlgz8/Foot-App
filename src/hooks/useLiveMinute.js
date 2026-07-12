@@ -152,40 +152,24 @@ export function fuzzyTeam(a, b) {
   )
 }
 
-// ── Regression guard AVEC confirmation (but annulé VAR) ─────────────────────
-// Demande utilisateur : quand un but est annulé par la VAR, le score ET le
-// nom du buteur doivent redescendre/disparaître dans LiveMatchPage et tous
-// les widgets — pas juste dans les notifs (déjà corrigé côté serveur,
-// api/cron-goals.js). Le garde-fou anti-régression ci-dessous (Math.max)
-// existe depuis longtemps pour une raison valable : ESPN peut renvoyer une
-// donnée bancale sur un SEUL poll isolé (cache Redis stale vs frais, retry
-// réseau) — sans lui, ce genre de glitch ferait clignoter le score vers le
-// bas puis remonter, et surtout reset le compteur qui fait rater le but
-// suivant (voir commentaire original plus bas). On ne peut donc pas
-// simplement supprimer Math.max().
-// Solution : n'accepter une valeur plus basse que si ESPN la confirme sur 2
-// polls consécutifs (comparaison à la valeur BRUTE vue au poll précédent,
-// stockée séparément de la valeur affichée/acceptée) — un glitch isolé ne
-// passe jamais 2 fois de suite avec la MÊME valeur plus basse, alors qu'une
-// vraie annulation VAR reste basse sur tous les polls suivants une fois
-// qu'ESPN a corrigé sa donnée. Délai résultant : au pire 2 cycles de poll
-// (~20-60s selon l'intervalle actif) — négligeable face aux 2-5min que
-// prend une revue VAR réelle.
-function confirmedOrMax(fresh, cached, prevRaw) {
-  if (cached == null || fresh == null) return fresh ?? cached
-  if (fresh < cached && fresh === prevRaw) return fresh // baisse confirmée 2 polls de suite
-  return Math.max(fresh, cached)
-}
-// Même principe pour les listes (buteurs/cartons) : on ne retire un élément
-// (buteur annulé) que si la liste plus courte est vue 2 polls de suite —
-// comparaison par longueur (suffisant : un glitch isolé ne reproduit pas la
-// même longueur réduite deux fois d'affilée par hasard).
-function confirmedListOrLonger(fresh, cached, prevRawLen) {
-  const freshList  = fresh ?? []
-  const cachedList = cached ?? []
-  if (freshList.length < cachedList.length && freshList.length === prevRawLen) return freshList
-  return freshList.length >= cachedList.length ? freshList : cachedList
-}
+// ── Score/buteurs : on fait confiance directement au serveur ────────────────
+// ⚠️ BUG CORRIGÉ (constat utilisateur : un but à 1-0 s'est brièvement
+// affiché 2-0) : ce fichier gardait sa PROPRE protection anti-régression
+// (confirmedOrMax/confirmedListOrLonger, exigeant 2 polls consécutifs avant
+// d'accepter une baisse) alors qu'api/fifa-live.js a été simplifié dans une
+// session précédente pour faire exactement l'inverse — faire confiance
+// directement à la valeur la plus fraîche, avec un compteur PERMANENT de
+// buts annulés côté serveur pour gérer les vraies annulations VAR (voir
+// homeCancelledGoals dans fifa-live.js). Le serveur est donc déjà la source
+// fiable et déjà "protégée" à sa manière ; garder EN PLUS un filtre anti-
+// régression ici, côté client, ne protégeait plus rien de réel — ça
+// ajoutait juste un délai supplémentaire d'1 poll (~15-30s) avant qu'une
+// correction déjà faite par le serveur (ex: glitch ESPN/FIFA isolé
+// auto-corrigé au poll suivant) ne redescende à l'écran, ce qui EST le bug
+// observé : le serveur avait déjà corrigé, mais ce garde-fou côté client la
+// bloquait encore un cycle de plus. On applique donc directement les
+// valeurs reçues du serveur (home/away/scorers/cards), sans double
+// protection.
 
 /**
  * Convertit un displayClock ESPN ("42:00", "45:00+2:00") en minutes entières.
@@ -621,19 +605,10 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
 
         const prevCache = espnScoresCache[mid]
 
-        // ── Regression guard AVEC confirmation (voir confirmedOrMax/
-        // confirmedListOrLonger plus haut) — laisse un vrai but annulé VAR
-        // redescendre le score et retirer le buteur après 2 polls
-        // consécutifs confirmant la baisse, tout en gardant la protection
-        // contre un poll isolé avec une donnée bancale.
-        const safeHome = confirmedOrMax(home, prevCache?.home, prevCache?.rawHome)
-        const safeAway = confirmedOrMax(away, prevCache?.away, prevCache?.rawAway)
-        const safeScorers = confirmedListOrLonger(scorers, prevCache?.scorers, prevCache?.rawScorersLen)
-        const safeCards   = confirmedListOrLonger(cards,   prevCache?.cards,   prevCache?.rawCardsLen)
-
-        // Tirs au but : pas de garde avec confirmation ici — un compteur de
-        // tab qui redescend n'est pas un scénario VAR réaliste (contrairement
-        // au score), on garde l'ancienne protection simple.
+        // Score/buteurs/cartons : valeurs serveur directement (voir
+        // commentaire "Score/buteurs : on fait confiance directement au
+        // serveur" en tête de fichier) — api/fifa-live.js gère déjà les
+        // annulations VAR et la stabilité des listes de son côté.
         const safeHomeShootout = (prevCache?.homeShootout != null && homeShootout != null)
           ? Math.max(homeShootout, prevCache.homeShootout)
           : (homeShootout ?? prevCache?.homeShootout ?? null)
@@ -642,20 +617,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           : (awayShootout ?? prevCache?.awayShootout ?? null)
 
         espnScoresCache[mid] = {
-          home:         safeHome,
-          away:         safeAway,
-          scorers:      safeScorers,
-          cards:        safeCards,
+          home:         home,
+          away:         away,
+          scorers:      scorers,
+          cards:        cards,
           stats:        stats   ?? prevCache?.stats   ?? null,
           homeShootout: safeHomeShootout,
           awayShootout: safeAwayShootout,
-          // Valeurs BRUTES de ce poll (pas les valeurs acceptées/affichées) —
-          // servent uniquement à détecter une baisse confirmée au poll
-          // suivant, voir confirmedOrMax/confirmedListOrLonger.
-          rawHome:        home ?? null,
-          rawAway:        away ?? null,
-          rawScorersLen: (scorers ?? []).length,
-          rawCardsLen:   (cards   ?? []).length,
           espnEventId:  data.espnEventId,
           espnSlug:     data.espnSlug,
         }
@@ -737,17 +705,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         const prevStats = prevCache?.stats ?? null
 
         // Toujours mettre à jour le score (le but est peut-être dans ce poll)
-        // Regression guard AVEC confirmation — même logique que le bloc live
-        // ci-dessus (voir confirmedOrMax/confirmedListOrLonger) : un but
-        // annulé VAR confirmé juste avant/à la fin du match doit aussi
-        // pouvoir redescendre le score final affiché, pas seulement en cours
-        // de match.
-        const ftSafeHome = confirmedOrMax(home, prevCache?.home, prevCache?.rawHome)
-        const ftSafeAway = confirmedOrMax(away, prevCache?.away, prevCache?.rawAway)
-        const ftScorers  = confirmedListOrLonger(scorers, prevCache?.scorers, prevCache?.rawScorersLen)
-        const ftCards    = confirmedListOrLonger(cards,   prevCache?.cards,   prevCache?.rawCardsLen)
+        // — valeurs serveur directement, voir commentaire en tête de fichier
+        // ("Score/buteurs : on fait confiance directement au serveur").
         // Même garde anti-régression pour le score des tab (dernier tir décisif
-        // pouvant arriver dans le même poll que la confirmation STATUS_FINAL_PEN).
+        // pouvant arriver dans le même poll que la confirmation STATUS_FINAL_PEN) :
+        // un compteur de tab qui redescend n'est pas un scénario réaliste,
+        // contrairement au score classique (annulation VAR déjà gérée côté
+        // serveur), donc gardé tel quel ici.
         const ftSafeHomeShootout = (prevCache?.homeShootout != null && homeShootout != null)
           ? Math.max(homeShootout, prevCache.homeShootout)
           : (homeShootout ?? prevCache?.homeShootout ?? null)
@@ -756,17 +720,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           : (awayShootout ?? prevCache?.awayShootout ?? null)
         espnScoresCache[mid] = {
           ...(prevCache ?? {}),
-          home:         ftSafeHome,
-          away:         ftSafeAway,
-          scorers:      ftScorers,
-          cards:        ftCards,
+          home:         home,
+          away:         away,
+          scorers:      scorers,
+          cards:        cards,
           stats:        stats   ?? prevStats,
           homeShootout: ftSafeHomeShootout,
           awayShootout: ftSafeAwayShootout,
-          rawHome:        home ?? null,
-          rawAway:        away ?? null,
-          rawScorersLen: (scorers ?? []).length,
-          rawCardsLen:   (cards   ?? []).length,
           espnEventId:  data.espnEventId,
           espnSlug:     data.espnSlug,
         }
