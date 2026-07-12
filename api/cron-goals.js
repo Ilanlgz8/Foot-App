@@ -866,7 +866,16 @@ export default async function handler(req, res) {
     // but possible) = correction tardive de données ESPN, pas un but réel →
     // absorbé silencieusement dans le compteur, jamais notifié.
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
-    if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
+    // Retour utilisateur : notif de carton rouge reçue des heures après un match
+    // fini (3h du mat', notif reçue en pleine journée). Cause : ce bloc restait
+    // vrai à CHAQUE poll tant que le match était FINAL (`|| FINAL_ESPN.has(status)`,
+    // sans lien avec prevStatus), pas seulement au moment réel de la transition
+    // live→FT — dans la fenêtre de rattrapage recap (12h, cron:espn:${eventId}),
+    // une correction tardive d'ESPN sur comp.details (but/carton ajouté après
+    // coup) déclenchait donc une notif alors que le match est terminé depuis
+    // longtemps. `LIVE_ESPN.has(prevStatus)` seul suffit à couvrir la transition
+    // live→FT (événement du sifflet final) sans rouvrir la fenêtre indéfiniment.
+    if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status)) {
       // Verrou léger (5s, NX) anti-concurrence : le compteur `track` ci-dessous
       // est lu puis réécrit en 2 étapes (pas atomique par nature, contrairement
       // à sendDeduped() qui l'est déjà via SET NX). Si deux exécutions de ce
@@ -1000,7 +1009,11 @@ export default async function handler(req, res) {
     // (déjà utilisé plus bas pour generateRecap) ; seul ajout réel : la
     // commande de lecture/écriture du compteur cardTrack, négligeable (un
     // carton rouge reste rare, 0-2 par match en moyenne).
-    if (LIVE_ESPN.has(status) || FINAL_ESPN.has(status)) {
+    // Même correctif que le bloc but ci-dessus : ne pas rouvrir la fenêtre de
+    // notif indéfiniment tant que le match reste FINAL (voir commentaire ligne
+    // ~869) — sinon un carton ajouté tardivement par ESPN à comp.details après
+    // la fin du match déclenche une notif "hors match" des heures plus tard.
+    if (LIVE_ESPN.has(status) || LIVE_ESPN.has(prevStatus)) {
       const reds = extractEspnCards(comp, homeC.team?.id).filter(c => c.red)
         .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
       const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
