@@ -14,7 +14,7 @@ import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 // blanc/damier d'origine retiré (détourage transparent) — voir le fichier
 // caf-can.png nettoyé, le webp Nations League avait déjà une vraie
 // transparence.
-import nationsLeagueLogo from '../assets/leagues/nations-league-real.webp'
+import nationsLeagueLogo from '../assets/leagues/nations-league-real.png'
 import canLogo from '../assets/leagues/caf-can.png'
 // Pas de logo officiel utilisable pour l'instant (voir explication donnée à
 // l'utilisateur) : badges simples dessinés maison (couleurs distinctes par
