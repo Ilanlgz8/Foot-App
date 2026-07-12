@@ -10,6 +10,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 
+// ⚠️ AJOUT (constat utilisateur : "pour les cartons jaune seulement ça met
+// le prénom en entier au lieu de la première lettre du prénom avec un point
+// comme les buts et cartons rouges") : les buts + cartons rouges viennent de
+// comp.details, où l'objet athlete a fiablement un `shortName` déjà abrégé
+// ("B. Embolo") fourni par ESPN. Les cartons jaunes viennent d'un endroit
+// différent (json.commentary[].play, voir plus bas) où l'objet athlete n'a
+// pas toujours ce même champ rempli — le code retombait alors sur
+// `displayName` (nom complet, "Breel Embolo") sans jamais l'abréger,
+// d'où l'incohérence visuelle. Ce helper abrège nous-mêmes le prénom
+// ("Breel Embolo" → "B. Embolo") quand shortName manque, pour un rendu
+// identique aux buts/rouges quelle que soit la donnée réellement fournie par
+// ESPN à cet endroit précis.
+function initialName(full) {
+  if (!full) return null
+  const parts = full.trim().split(/\s+/)
+  if (parts.length < 2) return full
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`
+}
+
 function espnDate(match, offsetDays = 0) {
   if (!match?.utcDate) return null
   const d = new Date(match.utcDate)
@@ -93,7 +112,7 @@ function extractFromSummary(json, homeTeamId) {
     if (play?.type?.id !== '94') continue
     const ath = play.participants?.[0]?.athlete
     cards.push({
-      name:   ath?.shortName ?? ath?.displayName ?? '?',
+      name:   ath?.shortName ?? initialName(ath?.displayName) ?? '?',
       minute: play.clock?.displayValue ?? c.time?.displayValue ?? '',
       team:   fuzzyTeam(homeC?.team?.displayName ?? '', play.team?.displayName ?? '') ? 'home' : 'away',
       red:    false,
