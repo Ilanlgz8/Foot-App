@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
@@ -8,6 +8,18 @@ import App from './App.jsx'
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload()
+  })
+
+  // Le check natif du navigateur ne se déclenche que sur une vraie navigation.
+  // Ouvrir la PWA depuis l'icône (retour au premier plan depuis le fond) n'en
+  // est pas toujours une → sans ceci, une PWA restée "en veille" peut ne
+  // jamais découvrir qu'une nouvelle version est dispo. On force la vérif
+  // à chaque passage au premier plan (via le header Cache-Control: no-cache
+  // posé sur /sw.js côté vercel.json, sw.js est toujours revalidé ici).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      navigator.serviceWorker.getRegistration().then(reg => reg?.update())
+    }
   })
 }
 import { BrowserRouter } from 'react-router-dom'
