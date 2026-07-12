@@ -34,6 +34,13 @@ function alpha(hex, a) {
   return `rgba(${r},${g},${b},${a})`
 }
 
+// normName : même normalisation que dans MatchModal.jsx (buildGoalCounts) —
+// dupliqué ici plutôt qu'importé pour éviter un import circulaire
+// (MatchModal.jsx importe déjà LineupPitch).
+function normName(n) {
+  return (n ?? '').trim().toLowerCase()
+}
+
 function formatName(name, sname) {
   const n = (name || sname || '?').trim()
   const parts = n.split(/\s+/)
@@ -355,7 +362,10 @@ function getPositions(starters, formation) {
 }
 
 // ── Dot joueur ────────────────────────────────────────────────────────────────
-function PlayerDot({ leftPct, topPct, player, teamColor }) {
+// goalCount : nombre de buts marqués par CE joueur dans ce match (0 = rien
+// affiché) — demande explicite : petit badge ballon façon appli/site foot,
+// avec "x2"/"x3" si doublé/triplé plutôt que d'empiler plusieurs ballons.
+function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0 }) {
   if (!player) return null
   const isGK  = ['GK','G','GB'].includes(stripSide(player.position))
   const color = isGK ? '#f59e0b' : teamColor
@@ -375,9 +385,10 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
       gap:           'clamp(3px, 1vw, 5px)',
       zIndex:        2,
     }}>
+      <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0 }}>
       <div style={{
-        width:          'clamp(32px, 9.5vw, 42px)',
-        height:         'clamp(32px, 9.5vw, 42px)',
+        width:          '100%',
+        height:         '100%',
         borderRadius:   '50%',
         display:        'flex',
         alignItems:     'center',
@@ -390,9 +401,35 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
         border:         `1.5px solid ${color}`,
         boxShadow:      `0 0 12px ${alpha(color, 0.4)}, inset 0 0 6px ${alpha(color, 0.1)}`,
         lineHeight:     1,
-        flexShrink:     0,
       }}>
         {num}
+      </div>
+      {goalCount > 0 && (
+        <div style={{
+          position:       'absolute',
+          top:            '-6px',
+          right:           goalCount > 1 ? '-14px' : '-6px',
+          height:         '17px',
+          minWidth:       '17px',
+          padding:        goalCount > 1 ? '0 5px 0 3px' : '0',
+          borderRadius:   '9px',
+          background:     '#0a0c14',
+          border:         '1.5px solid rgba(255,255,255,0.25)',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          gap:            '2px',
+          fontSize:       '10px',
+          lineHeight:     1,
+        }} aria-label={`${goalCount} but${goalCount > 1 ? 's' : ''}`}>
+          <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
+          {goalCount > 1 && (
+            <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', fontFamily: "'Chakra Petch', monospace" }}>
+              x{goalCount}
+            </span>
+          )}
+        </div>
+      )}
       </div>
       <span style={{
         fontSize:      'clamp(8.5px, 2.6vw, 11px)',
@@ -413,7 +450,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor }) {
 }
 
 // ── Terrain HTML/CSS ──────────────────────────────────────────────────────────
-function Pitch({ formation, positions, teamColor }) {
+function Pitch({ formation, positions, teamColor, goals }) {
   return (
     <div style={{
       position:    'relative',
@@ -522,7 +559,14 @@ function Pitch({ formation, positions, teamColor }) {
       {/* Joueurs */}
       {positions.map(({ leftPct, topPct, player }, i) =>
         player
-          ? <PlayerDot key={i} leftPct={leftPct} topPct={topPct} player={player} teamColor={teamColor} />
+          ? <PlayerDot
+              key={i}
+              leftPct={leftPct}
+              topPct={topPct}
+              player={player}
+              teamColor={teamColor}
+              goalCount={goals?.[normName(player.shortName || player.name)] ?? 0}
+            />
           : null
       )}
     </div>
@@ -619,7 +663,7 @@ function PlayerGrid({ starters, subs }) {
 }
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function LineupPitch({ home, away, isCountry = false, hColor = '#ef4444', aColor = '#eadfdfe4' }) {
+export default function LineupPitch({ home, away, isCountry = false, hColor = '#ef4444', aColor = '#eadfdfe4', goals = {} }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
   if (!home?.starters?.length && !away?.starters?.length) return null
@@ -699,7 +743,7 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
       </div>
 
       {/* Terrain */}
-      <Pitch formation={team.formation} positions={positions} teamColor={teamColor} />
+      <Pitch formation={team.formation} positions={positions} teamColor={teamColor} goals={goals} />
 
       {/* Liste joueurs */}
       <PlayerGrid starters={team.starters ?? []} subs={team.subs ?? []} />

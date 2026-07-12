@@ -453,7 +453,7 @@ export default function LiveMatchPage() {
                 )}
               </>
             )}
-            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
+            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} scorers={espn?.scorers ?? []} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>

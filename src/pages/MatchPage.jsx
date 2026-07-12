@@ -32,6 +32,8 @@ import {
   buildMatchEvents,
   useH2HRows,
   H2HTabContent,
+  fifaStatsToRows,
+  aflStatsToRows,
 } from '../components/MatchModal'
 import './MatchPage.css'
 import '../matchModal.css'
@@ -339,52 +341,18 @@ function MpPageSkeleton() {
   )
 }
 
-// ── Helpers stats match terminé (mêmes que MatchModal, dupliqués) ─────────────
-const MATCH_STAT_KEYS = [
-  { key: 'Ball possession',  label: 'Possession',     higher: true  },
-  { key: 'Total shots',      label: 'Tirs',           higher: true  },
-  { key: 'Shots on target',  label: 'Tirs cadrés',    higher: true  },
-  { key: 'Corner kicks',     label: 'Corners',        higher: true  },
-  { key: 'Fouls',            label: 'Fautes',         higher: false },
-  { key: 'Offsides',         label: 'Hors-jeux',      higher: false },
-  { key: 'Yellow Cards',     label: 'Cartons jaunes', higher: false },
-]
-
-function makeStatRow(label, hv, av, higher) {
-  if (hv == null && av == null) return null
-  const hvStr = hv != null ? String(hv) : '–'
-  const avStr = av != null ? String(av) : '–'
-  const hNum  = parseFloat(hvStr.replace('%', ''))
-  const aNum  = parseFloat(avStr.replace('%', ''))
-  const hBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? hNum > aNum : hNum < aNum)
-  const aBetter = !isNaN(hNum) && !isNaN(aNum) && (higher ? aNum > hNum : aNum < hNum)
-  return { label, hv: hvStr, av: avStr, hBetter, aBetter }
-}
-
-function fifaStatsToRows(data) {
-  if (!data?.home && !data?.away) return []
-  const h = data.home ?? {}
-  const a = data.away ?? {}
-  return [
-    makeStatRow('Possession',   h.poss  != null ? `${h.poss}%` : null,  a.poss  != null ? `${a.poss}%` : null,  true),
-    makeStatRow('Tirs',         h.shots,         a.shots,         true),
-    makeStatRow('Tirs cadrés',  h.shotsOnTarget, a.shotsOnTarget, true),
-    makeStatRow('Corners',      h.corners,       a.corners,       true),
-    makeStatRow('Fautes',       h.fouls,         a.fouls,         false),
-    makeStatRow('Hors-jeux',    h.offside,       a.offside,       false),
-  ].filter(Boolean)
-}
-
-function aflStatsToRows(statsData) {
-  if (!statsData) return []
-  const allPeriod = statsData.statistics?.find(s => s.period === 'ALL')
-  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
-  return MATCH_STAT_KEYS.map(({ key, label, higher }) => {
-    const item = items.find(i => i.name === key)
-    if (!item) return null
-    return makeStatRow(label, item.home ?? null, item.away ?? null, higher)
-  }).filter(Boolean)
-}
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "dans résultat y'a pas toutes les
+// stats live qu'il y a sur livematchpage") : les 2 fonctions ci-dessous
+// étaient dupliquées depuis MatchModal.jsx ("mêmes que MatchModal") mais
+// figées à une version courte (6 lignes : Possession/Tirs/Tirs cadrés/
+// Corners/Fautes/Hors-jeux) pendant que la version de MatchModal.jsx était
+// enrichie à 19 lignes (Passes, Tacles, Interceptions, Centres, Longs
+// ballons, Dégagements, Tirs contrés, Arrêts, Cartons rouges...) — le même
+// jeu de stats déjà utilisé en LIVE (LiveStatsTab/ESPNStats sur
+// LiveMatchPage). La donnée FIFA les avait déjà, seul l'affichage ici les
+// coupait. Importées depuis MatchModal.jsx désormais (voir plus bas) au lieu
+// d'une copie locale — une seule source de vérité, plus de risque de
+// re-divergence entre les deux pages.
 
 // ── Stats match terminé ───────────────────────────────────────────────────────
 function MpMatchStats({ match }) {
@@ -639,6 +607,17 @@ export default function MatchPage() {
   const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
+
+  // ⚠️ AJOUT (badge ballon à côté du buteur dans la compo, demande explicite)
+  // : même appel que dans MatchPageHero (React Query dédup par queryKey donc
+  // aucun fetch réseau supplémentaire) — nécessaire ICI pour transmettre les
+  // buteurs à ComposTab, qui ne fait pas ce fetch lui-même.
+  const { espnData: composEspnData } = useEspnMatchDetail(
+    isFinished ? match : null,
+    match?.competition?.id,
+    isFinished
+  )
+  const composScorers = composEspnData?.scorers ?? []
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
   const awayShort = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
   // Thème dynamique — mêmes couleurs anti-collision que le hero (getMatchGradient),
@@ -767,7 +746,7 @@ export default function MatchPage() {
                 fallback "compositions probables" de ComposTab (dernier XI
                 connu), maintenant aussi actif après-coup si la vraie compo
                 n'a jamais pu être récupérée. */}
-            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} />}
+            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} scorers={composScorers} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>

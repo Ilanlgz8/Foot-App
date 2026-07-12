@@ -823,7 +823,30 @@ export function StatsSubTabs({ view, onChange, showLive = true, showHistorique =
 
 // ── Onglet Compos — api-football (primaire) → ESPN/FIFA (fallback) ────────────
 
-export function ComposTab({ match, compMatches }) {
+// normName : normalise un nom de joueur pour faire correspondre le buteur
+// (liste ESPN scorers) au joueur affiché dans la compo (liste ESPN roster) —
+// mêmes deux champs `shortName` d'ESPN, censés être identiques, mais trim +
+// lowercase par prudence (espace en trop déjà observé sur au moins un nom
+// ESPN réel, ex: "Pedri " avec espace final).
+function normName(n) {
+  return (n ?? '').trim().toLowerCase()
+}
+
+// buildGoalCounts : { "nom normalisé" -> nombre de buts } à partir de la
+// liste de buteurs (même provenance ESPN que la compo — voir normName —
+// donc correspondance fiable, contrairement à un croisement entre deux
+// sources différentes comme pour les remplacements).
+function buildGoalCounts(scorers = []) {
+  const counts = {}
+  for (const s of scorers) {
+    const key = normName(s?.name)
+    if (!key) continue
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return counts
+}
+
+export function ComposTab({ match, compMatches, scorers = [] }) {
   const isFinished = match?.status === 'FINISHED'
   const isUpcoming = !isFinished
 
@@ -928,6 +951,10 @@ export function ComposTab({ match, compMatches }) {
   const { home: pitchHome, away: pitchAway } = getMatchTeamColors(match?.homeTeam?.name, match?.awayTeam?.name)
 
   if (lineups) {
+    // Buts par joueur — uniquement sur une VRAIE compo confirmée (pas sur les
+    // "probables" ci-dessous, où on ne sait pas si ce joueur a réellement
+    // joué ce match précis).
+    const goalCounts = buildGoalCounts(scorers)
     return (
       <div style={{ padding: '8px 0 0' }}>
         <LineupPitch
@@ -936,6 +963,7 @@ export function ComposTab({ match, compMatches }) {
           isCountry={isWC}
           hColor={pitchHome.main}
           aColor={pitchAway.main}
+          goals={goalCounts}
         />
       </div>
     )
@@ -1620,8 +1648,21 @@ function makeStatRow(label, hv, av, higher) {
   return { label, hv: hvStr, av: avStr, hBetter, aBetter }
 }
 
+// ⚠️ EXPORTÉ (constat utilisateur : "dans résultat y'a pas toutes les stats
+// live qu'il y a sur livematchpage") : MatchPage.jsx avait sa PROPRE copie de
+// cette fonction (commentaire "mêmes que MatchModal, dupliqués"), mais figée
+// à seulement 6 lignes (Possession/Tirs/Tirs cadrés/Corners/Fautes/Hors-jeux)
+// pendant que celle-ci était enrichie à 19 lignes (Passes, Tacles,
+// Interceptions, Centres, Longs ballons, Dégagements, Tirs contrés, Arrêts,
+// Cartons rouges...) — exactement le même jeu de stats que ESPNStats/
+// STAT_KEYS ci-dessus, utilisé en LIVE (LiveMatchPage). Résultat : une fois
+// le match terminé, ces 13 stats supplémentaires disparaissaient purement à
+// l'affichage (la donnée FIFA les avait bien) — pas un vrai manque de
+// donnée, juste deux fonctions dupliquées qui avaient divergé dans le temps.
+// Exportée ici et IMPORTÉE par MatchPage.jsx (sa copie locale supprimée) :
+// une seule source de vérité désormais, plus de risque de re-divergence.
 // Convertit les stats FIFA (useFifaStats) en lignes d'affichage
-function fifaStatsToRows(data) {
+export function fifaStatsToRows(data) {
   if (!data?.home && !data?.away) return []
   const h = data.home ?? {}
   const a = data.away ?? {}
@@ -1649,7 +1690,7 @@ function fifaStatsToRows(data) {
 }
 
 // Convertit les stats api-football (useAflMatchStats) en lignes d'affichage
-function aflStatsToRows(statsData) {
+export function aflStatsToRows(statsData) {
   if (!statsData) return []
   const allPeriod = statsData.statistics?.find(s => s.period === 'ALL')
   const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
