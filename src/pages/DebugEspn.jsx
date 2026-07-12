@@ -117,8 +117,15 @@ export default function DebugEspn() {
           push(`  Clés de comp : [${Object.keys(comp).join(', ')}]`)
           push(`  comp.details existe ? ${Array.isArray(comp.details) ? `oui, ${comp.details.length} entrées` : 'NON (absent ou pas un tableau)'}`)
           if (Array.isArray(comp.details) && comp.details.length > 0) {
-            push(`  Exemple de la 1ère entrée de comp.details :`)
-            push(`  ${JSON.stringify(comp.details[0], null, 2).slice(0, 800)}`)
+            // Dump COMPLET, sans troncature, et pour TOUTES les entrées (pas
+            // que la 1ère) — pour voir la forme des cartons en plus des buts.
+            // Le JSON de chaque event peut être long (participants imbriqués
+            // avec liens), donc on retire ces liens pour rester lisible.
+            const clean = (obj) => JSON.parse(JSON.stringify(obj, (key, val) => key === 'links' ? undefined : val))
+            comp.details.forEach((entry, i) => {
+              push(`\n  ── Entrée #${i + 1}/${comp.details.length} ──`)
+              push(`  ${JSON.stringify(clean(entry), null, 2)}`)
+            })
           }
         }
 
@@ -165,3 +172,4 @@ export default function DebugEspn() {
     </div>
   )
 }
+
