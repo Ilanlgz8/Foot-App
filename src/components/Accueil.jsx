@@ -200,23 +200,22 @@ function Accueil() {
   // saute directement — peu importe qu'il soit demain, dans 3 jours ou dans 10.
   // S'applique à n'importe quel jour vide affiché (pas seulement "aujourd'hui").
   //
-  // ⚠️ 2 BUGS CORRIGÉS (retour utilisateur : navigation manuelle vers un jour
-  // de demi-finale avec des cards "équipe à déterminer" (pas encore de
-  // vainqueur de quart) rendait le bouton "jour précédent" bloqué pour de bon) :
-  // 1. `hasUpcoming` testait `status !== 'FINISHED'`, donc se déclenchait aussi
-  //    pour un jour dont TOUS les matchs étaient déjà terminés (pas seulement
-  //    un jour réellement vide) — un jour de demi-finale avec des matchs
-  //    encore SCHEDULED (même sans équipes connues) ne devrait PAS être
-  //    considéré vide. Corrigé : on ne saute que si le jour n'a AUCUN match du
-  //    tout (`matches.length === 0`).
-  // 2. `setMinDayOffset(diffDays)` verrouillait le bouton "jour précédent" en
-  //    permanence dès qu'un saut avait eu lieu, même vers un jour éloigné —
-  //    impossible de revenir à un jour antérieur pourtant valide (aujourd'hui,
-  //    quarts de finale...). minDayOffset supprimé : le saut auto avance
-  //    seulement `dayOffset`, plus aucune restriction sur le retour manuel.
+  // ⚠️ BUG CORRIGÉ (retour utilisateur : navigation manuelle vers un jour de
+  // demi-finale avec des cards "équipe à déterminer" (pas encore de vainqueur
+  // de quart) rendait le bouton "jour précédent" bloqué pour de bon) :
+  // `setMinDayOffset(diffDays)` verrouillait le bouton "jour précédent" en
+  // permanence dès qu'un saut avait eu lieu, même vers un jour éloigné —
+  // impossible de revenir à un jour antérieur pourtant valide (aujourd'hui,
+  // quarts de finale...). minDayOffset supprimé : le saut auto avance
+  // seulement `dayOffset`, plus aucune restriction sur le retour manuel —
+  // la logique de déclenchement elle-même (hasUpcoming, ci-dessous) est
+  // INCHANGÉE : elle doit continuer à sauter dès que le jour affiché n'a plus
+  // AUCUN match à venir (jour vide OU tous les matchs déjà terminés), y
+  // compris au lancement de l'app à chaque fois.
   useEffect(() => {
     if (matchesLoading) return
-    if (matches.length > 0) return  // le jour a des matchs (même sans équipe connue/déjà terminés) → rien à faire
+    const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
+    if (hasUpcoming) return
 
     const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
     const next = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfTargetDay)
