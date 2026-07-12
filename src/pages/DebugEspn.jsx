@@ -98,6 +98,37 @@ export default function DebugEspn() {
 
       if (goalPlays.length === 0 && goalDetails.length === 0) {
         push(`\n⚠️ ESPN a bien l'event, mais AUCUN but n'est présent dans les données — soit le résumé n'est pas encore publié côté ESPN, soit sa structure a changé.`)
+
+        // ── Dump brut pour comprendre CE QUI existe réellement, sans supposer
+        // la structure attendue par le code actuel (extractFromSummary). ──
+        push(`\n\n══════ DUMP BRUT (pour diagnostic) ══════`)
+        push(`\n📋 Clés de premier niveau du JSON summary :`)
+        push(`  [${Object.keys(summary).join(', ')}]`)
+
+        push(`\n📋 json.plays existe ? ${Array.isArray(summary.plays) ? `oui, ${summary.plays.length} entrées` : 'NON (absent ou pas un tableau)'}`)
+        if (Array.isArray(summary.plays) && summary.plays.length > 0) {
+          push(`  Exemple de la 1ère entrée de plays :`)
+          push(`  ${JSON.stringify(summary.plays[0], null, 2).slice(0, 800)}`)
+        }
+
+        push(`\n📋 json.header existe ? ${summary.header ? 'oui' : 'NON'}`)
+        push(`📋 json.header.competitions[0] existe ? ${comp ? 'oui' : 'NON'}`)
+        if (comp) {
+          push(`  Clés de comp : [${Object.keys(comp).join(', ')}]`)
+          push(`  comp.details existe ? ${Array.isArray(comp.details) ? `oui, ${comp.details.length} entrées` : 'NON (absent ou pas un tableau)'}`)
+          if (Array.isArray(comp.details) && comp.details.length > 0) {
+            push(`  Exemple de la 1ère entrée de comp.details :`)
+            push(`  ${JSON.stringify(comp.details[0], null, 2).slice(0, 800)}`)
+          }
+        }
+
+        // Autres emplacements possibles où ESPN met parfois les événements
+        // (varie selon les sports/compétitions) — juste pour vérifier leur présence.
+        const altKeys = ['commentary', 'keyEvents', 'gamepackageJSON', 'boxscore', 'scoringSummary']
+        push(`\n📋 Autres clés possibles présentes dans le JSON : ${altKeys.filter(k => k in summary).join(', ') || '(aucune)'}`)
+        if (summary.boxscore) {
+          push(`  Clés de summary.boxscore : [${Object.keys(summary.boxscore).join(', ')}]`)
+        }
       } else {
         push(`\n✅ Les données existent bien chez ESPN pour ce match.`)
       }
