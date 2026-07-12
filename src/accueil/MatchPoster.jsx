@@ -1,11 +1,12 @@
 import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
 import { calcProno }                  from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { FormDiamonds }               from './FormDiamonds'
+import { COMPETITIONS }               from '../data/competitions'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -67,6 +68,24 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
   const cls = 'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
 
+  // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
+  // Même contenu/logique que le hero de LiveMatchPage et que la version
+  // desktop (accueil/MatchCard.jsx) — demande explicite : cette version
+  // mobile (posters) doit avoir le même traitement. comp?.name (COMPETITIONS,
+  // déjà traduit en français) est prioritaire sur match.competition?.name
+  // (football-data.org, toujours en anglais) — voir le fix équivalent dans
+  // MatchCard.jsx/LiveMatchPage.jsx/MatchPage.jsx.
+  const posterComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const posterCompEmblem = posterComp?.emblem ?? match.competition?.emblem
+  const posterCompName   = posterComp?.name ?? match.competition?.name ?? ''
+  const rawPosterPeriod = getMatchPeriod(match)
+  const posterPeriodLabel = rawPosterPeriod === '1ère MT'       ? '1ère mi-temps'
+    : rawPosterPeriod === '2ème MT'       ? '2ème mi-temps'
+    : rawPosterPeriod === 'Mi-temps'      ? 'Mi-temps'
+    : rawPosterPeriod === 'Prolongations' ? 'Prolongations'
+    : rawPosterPeriod === 'T.A.B.'        ? 'T.A.B.'
+    : null
+
   return (
     <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
@@ -82,14 +101,16 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       <div className="poster__bg poster__bg--gradientAlt" style={{ background: gradientAlt }} />
       <div className="poster__overlay" />
 
-      {/* ── Badge compét / live ── */}
+      {/* ── Badge compét (gauche, logo + nom FR) + statut période en live (droite) ── */}
       <div className="poster__topbar">
-        {isLive
-          ? <div className="poster__live-pill">
-              <span className="poster__live-dot" />En direct
-            </div>
-          : <span className="poster__comp-name">{match.competition?.name ?? ''}</span>
-        }
+        <span className="poster__topbarComp">
+          {isLive && <span className="poster__live-dot" />}
+          {posterCompEmblem && <img src={posterCompEmblem} alt="" className="poster__topbarCompLogo" />}
+          <span className="poster__comp-name">{posterCompName}</span>
+        </span>
+        {isLive && posterPeriodLabel && (
+          <span className="poster__topbarPeriod">{posterPeriodLabel}</span>
+        )}
       </div>
 
       {/* ── Bloc central : [crest+nom] | [label+temps] | [crest+nom] ── */}

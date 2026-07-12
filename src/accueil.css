@@ -1447,11 +1447,27 @@
   z-index: 2;
 }
 
-/* ── Barre du haut : badge compét / live ── */
+/* ── Barre du haut : compétition (gauche) + statut période en live (droite) ──
+   Même contenu/logique que le hero de LiveMatchPage — voir accueil/MatchPoster.jsx. */
 .poster__topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 14px 0;
+}
+.poster__topbarComp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.poster__topbarCompLogo {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  opacity: 0.85;
+  flex-shrink: 0;
 }
 .poster__comp-name {
   font-size: 0.58rem;
@@ -1459,20 +1475,22 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(var(--white-rgb),0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.poster__live-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(var(--red-rgb),0.18);
-  border: 1px solid rgba(var(--red-rgb),0.5);
-  border-radius: 20px;
-  padding: 3px 9px;
-  font-size: 0.62rem;
+.poster__topbarPeriod {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: rgba(var(--white-rgb),0.1);
+  border: 1px solid rgba(var(--white-rgb),0.18);
+  border-radius: 4px;
+  font-size: 0.56rem;
   font-weight: 800;
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--red-light);
 }
 .poster__live-dot {
   width: 6px;
@@ -1518,11 +1536,14 @@
   line-height: 1;
 }
 .poster__min-label {
+  /* Blanc avec halo rouge — même traitement que .lmp__heroMinute
+     (LiveMatchPage), au lieu du rose plein utilisé avant (retour
+     utilisateur : "c'est pas le même CSS que LiveMatchPage"). */
   font-size: 1rem;
   font-weight: 900;
-  color: var(--red-light);
+  color: #ffffff;
   letter-spacing: 0.06em;
-  text-shadow: 0 0 14px rgba(var(--red-rgb),0.55);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 14px rgba(var(--red-rgb),0.4);
   line-height: 1;
 }
 
@@ -1548,8 +1569,10 @@
   text-shadow: 0 2px 16px rgba(var(--black-rgb),0.5);
 }
 .poster--live .poster__score {
-  color: var(--red-light);
-  text-shadow: 0 0 22px rgba(var(--red-rgb),0.45);
+  /* Blanc — même traitement que .mp__hero__score (LiveMatchPage), au lieu
+     du rose plein utilisé avant (retour utilisateur). */
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(var(--black-rgb),0.5), 0 0 18px rgba(var(--red-rgb),0.3);
 }
 
 /* ── Colonnes équipe (gauche & droite) ── */
