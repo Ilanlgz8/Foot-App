@@ -49,7 +49,7 @@ const persister = createSyncStoragePersister({
 // ailleurs, pas dans ce cache). À incrémenter à chaque fois qu'un correctif
 // touche la logique/forme d'une requête déjà potentiellement mise en cache
 // avec une mauvaise valeur.
-const CACHE_BUSTER = 'v2-2026-07-12-espn-dual-date-fix'
+const CACHE_BUSTER = 'v3-2026-07-12-espn-summary-always-wins'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>

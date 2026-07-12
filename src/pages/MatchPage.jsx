@@ -140,26 +140,29 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   // change plus jamais après → sert de plancher fiable.
   const hPens = mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null)
   const aPens = mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null)
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : le déroulement buts/cartons restait
-  // vide sous le score, même après le fix du fallback ESPN à froid) : la
-  // condition ci-dessous ne regardait QUE "cachedEspn existe-t-il ?", pas
-  // "cachedEspn contient-il vraiment des buteurs/cartons ?". Or confirmFt()
-  // (useLiveMinute.js) persiste `foot_espn_{id}` dès qu'il connaît un SCORE au
-  // moment du FT — y compris quand `scorers`/`cards` sont encore vides à cet
-  // instant précis (poll juste avant que le serveur ait fini de les calculer,
-  // fréquent en prolongation/tab, ou app suivie seulement une partie du
-  // match). Un cachedEspn "vide mais présent" bloquait alors DÉFINITIVEMENT
-  // le fallback vers le résumé ESPN complet — le seul endroit qui a vraiment
-  // les buts/cartons dans ce cas. Le fallback se déclenche maintenant dès que
-  // scorers ET cards sont vides, peu importe si un score est déjà en cache.
-  const hasEspnEvents = (cachedEspn?.scorers?.length ?? 0) > 0 || (cachedEspn?.cards?.length ?? 0) > 0
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : le déroulement buts/cartons
+  // n'affichait QUE les buts marqués pendant qu'il regardait le match — les
+  // buts marqués après qu'il s'est endormi/a fermé l'app manquaient) : un
+  // 1er correctif avait juste changé "cachedEspn existe" en "cachedEspn a AU
+  // MOINS un but/carton", mais un snapshot PARTIEL (capturé en direct par
+  // confirmFt à l'instant précis de la fin du match) a justement TOUJOURS au
+  // moins quelques buts dedans dès qu'il y a eu but avant que l'utilisateur
+  // arrête de suivre — donc cette condition ne détectait jamais le cas
+  // "incomplet mais non vide". confirmFt() capture un INSTANTANÉ du direct, à
+  // un instant arbitraire — ce n'est structurellement JAMAIS une source
+  // fiable pour le récap final une fois le match terminé. Seul le résumé
+  // ESPN (POST-match, définitif) l'est. Nouvelle logique : une fois le match
+  // terminé, on va TOUJOURS chercher le résumé ESPN complet et on l'utilise
+  // en priorité — cachedEspn ne sert plus que de repli si ce fetch échoue
+  // (offline, ESPN indispo). React Query dédup/cache déjà cet appel
+  // (staleTime 1h), donc aucun coût réseau superflu à chaque ouverture.
   const { espnData: fetchedEspn } = useEspnMatchDetail(
-    isFinished && !hasEspnEvents ? match : null,
+    isFinished ? match : null,
     match?.competition?.id,
-    isFinished && !hasEspnEvents
+    isFinished
   )
-  const espnScorers = (cachedEspn?.scorers?.length ? cachedEspn.scorers : fetchedEspn?.scorers) ?? []
-  const espnCards   = (cachedEspn?.cards?.length   ? cachedEspn.cards   : fetchedEspn?.cards)   ?? []
+  const espnScorers = (fetchedEspn?.scorers?.length ? fetchedEspn.scorers : cachedEspn?.scorers) ?? []
+  const espnCards   = (fetchedEspn?.cards?.length   ? fetchedEspn.cards   : cachedEspn?.cards)   ?? []
   // Buts + cartons fusionnés et triés par minute (même logique que le Fil du
   // match dans l'onglet Statistiques, sans les remplacements — le hero reste
   // compact). Uniquement ici (page Résultat) : demande explicite de
