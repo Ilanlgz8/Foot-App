@@ -1048,8 +1048,8 @@
   position: absolute;
   top: 0; bottom: 0; left: calc(50% + 2px);
   border-radius: 0 4px 4px 0;
-  background: linear-gradient(90deg, #d8b4fe, #f0abfc);
-  box-shadow: 0 0 6px rgba(232,121,249,0.45);
+  background: linear-gradient(90deg, #f472b6, #fbcfe8);
+  box-shadow: 0 0 6px rgba(244,114,182,0.5);
   transition: width 0.25s ease;
 }
 .statBar__mid {
