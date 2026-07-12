@@ -5,7 +5,7 @@ import Navbar from './components/navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Accueil from './components/Accueil.jsx'
 import { LiveProvider } from './context/LiveProvider.jsx'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
 import { useOnline } from './hooks/useOnline'
 import { OfflineBanner } from './components/OfflineBanner'
@@ -43,8 +43,13 @@ function preloadRoutes() {
   import('./components/MentionsLegales.jsx')
 }
 
+// Positions de scroll par entrée d'historique (location.key) — niveau module
+// pour survivre aux remounts (voir useNavigationType ci-dessous).
+const scrollPositions = new Map()
+
 function App() {
   const location = useLocation()
+  const navType  = useNavigationType() // 'PUSH' | 'POP' | 'REPLACE'
   const online   = useOnline()
 
   useEffect(() => {
@@ -57,13 +62,41 @@ function App() {
     return () => clearTimeout(t)
   }, [])
 
-  // Remonter en haut de page à chaque changement de route.
-  // Sans ça, le navigateur conserve la position de scroll précédente : si on clique
-  // sur une card (MatchPage/LiveMatchPage/Résultats) après avoir scrollé plus bas,
-  // on atterrit au milieu/bas de la nouvelle page au lieu du haut.
+  // Mémorise la position de scroll en continu, par entrée d'historique
+  // (location.key — unique même pour 2 visites de la même URL), pour pouvoir
+  // la restaurer si on revient dessus via "retour arrière". Écoute en continu
+  // (pas juste au démontage) : plus fiable, aucune dépendance à l'ordre exact
+  // des effets React au moment du changement de route.
   useEffect(() => {
+    const onScroll = () => scrollPositions.set(location.key, window.scrollY)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [location.key])
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : scroller dans "Résultats récents"
+  // jusqu'à un résultat vieux de 2 jours, cliquer dessus, puis "retour"
+  // ramenait tout en haut de l'Accueil au lieu de laisser le scroll où il
+  // était) : ce useEffect forçait TOUJOURS window.scrollTo(0,0) à chaque
+  // changement de route, y compris au retour arrière. Utile pour une
+  // navigation "en avant" (nouvelle page = démarrer en haut, la raison
+  // d'être initiale de cet effet), mais faux pour un retour (l'ancienne page
+  // doit reprendre exactement où on l'avait laissée). useNavigationType()
+  // distingue les deux : 'POP' = bouton retour (ou navigate(-1)) → restaure
+  // la position sauvegardée pour cette page si on en a une ; sinon
+  // (PUSH/REPLACE, nouvelle page) → comportement inchangé, on repart en haut.
+  useEffect(() => {
+    if (navType === 'POP') {
+      const saved = scrollPositions.get(location.key)
+      if (saved != null) {
+        // Double rAF : laisse le temps au contenu (souvent déjà en cache,
+        // mais pas garanti) de se poser avant de scroller, sinon la page
+        // n'est parfois pas encore assez haute pour atteindre `saved`.
+        requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, saved)))
+        return
+      }
+    }
     window.scrollTo(0, 0)
-  }, [location.pathname])
+  }, [location.pathname, location.key, navType])
 
   // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
   useEffect(() => {
