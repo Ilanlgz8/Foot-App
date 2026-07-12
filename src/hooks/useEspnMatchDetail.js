@@ -157,18 +157,39 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
 
       const result = extractFromSummary(summary, found.homeTeamId)
 
-      // Persister pour prochaines ouvertures
-      try {
-        localStorage.setItem(`foot_espn_${match.id}`, JSON.stringify(result))
-      } catch {}
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide sur les 2 derniers
+      // matchs consultés juste après leur fin, alors que les buts existaient
+      // bien côté ESPN quelques minutes plus tard) : ESPN peut mettre
+      // quelques minutes à publier les plays/details complets après le coup
+      // de sifflet final — l'event est trouvé, le fetch réussit, mais
+      // scorers/cards sont encore vides à cet instant précis. Persister ce
+      // résultat vide dans le localStorage écrasait potentiellement un
+      // meilleur snapshot confirmFt(), ET restait comme fallback permanent
+      // même après qu'ESPN ait fini de publier. Même garde-fou que
+      // hasUsefulData() côté serveur (api/espn.js) : on ne persiste que si le
+      // résultat contient vraiment quelque chose.
+      const isUseful = result.scorers.length > 0 || result.cards.length > 0 || result.stats !== null
+      if (isUseful) {
+        try { localStorage.setItem(`foot_espn_${match.id}`, JSON.stringify(result)) } catch { /* quota localStorage plein, tant pis */ }
+      }
 
       return result
     },
     enabled:   enabled && !!slug && !!match?.id,
-    staleTime: 60 * 60_000,   // 1h — match terminé, données stables
+    // staleTime dynamique : un résultat VIDE (event trouvé mais ESPN n'a pas
+    // encore publié les plays/details, cf. commentaire plus haut) ne reste
+    // "frais" que 2 min → un simple retour sur la page relance le fetch et
+    // se corrige tout seul dès qu'ESPN a publié. Un résultat COMPLET reste
+    // frais 1h (match terminé, données stables, pas de refetch inutile).
+    staleTime: (query) => {
+      const d = query.state.data
+      const empty = d && d.scorers.length === 0 && d.cards.length === 0 && d.stats === null
+      return empty ? 2 * 60_000 : 60 * 60_000
+    },
     retry:     1,
     retryDelay: 2_000,
   })
 
   return { espnData: data ?? null, loading: isLoading }
 }
+
