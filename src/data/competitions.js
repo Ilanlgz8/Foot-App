@@ -107,7 +107,7 @@ export const COMPETITIONS = [
   {
     id: 'WC',
     name: 'Coupe du Monde',
-    shortName: 'Mondial',
+    shortName: 'Coupe du monde',
     emblem: worldCupLogo,
   },
   {
@@ -119,7 +119,7 @@ export const COMPETITIONS = [
   {
     id: 'NL',
     name: 'Ligue des Nations',
-    shortName: 'Nations L.',
+    shortName: 'Ligue des nations',
     emblem: nationsLeagueLogo,
   },
   {
