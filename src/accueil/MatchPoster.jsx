@@ -172,7 +172,12 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       <div className="poster__footer">
         <div className="poster__prono-labels">
           <span className="poster__lbl poster__lbl--h">{homeCode} {prono.home}%</span>
-          <span className="poster__lbl poster__lbl--d">Nul {prono.draw}%</span>
+          {/* Retour utilisateur : "Nul" restait figé au milieu du poster,
+              alors que le segment nul de la barre en dessous n'est PAS
+              forcément centré (sa position dépend de prono.home) — repositionné
+              pile au-dessus du centre réel du segment nul, pour qu'on associe
+              directement le libellé à l'endroit où il est sur la barre. */}
+          <span className="poster__lbl poster__lbl--d" style={{ left: `${prono.home + prono.draw / 2}%` }}>Nul {prono.draw}%</span>
           <span className="poster__lbl poster__lbl--a">{awayCode} {prono.away}%</span>
         </div>
         <div className="poster__prono-bar">

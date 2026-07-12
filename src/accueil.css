@@ -1656,9 +1656,14 @@
 
 /* Labels : largeur au contenu (pas calée sur le % du segment, voir plus bas)
    — un petit %, ex. 5%, ne laisse que ~15px de large sur le poster, jamais
-   assez pour "Équipe 5%" même en initiales. space-between les répartit dans
-   l'ordre dom./nul/ext. sans jamais les tronquer. */
+   assez pour "Équipe 5%" même en initiales. space-between répartit dom./ext.
+   aux 2 bords sans jamais les tronquer. "Nul" est sorti du flux flex et
+   repositionné en absolu (voir .poster__lbl--d) : sa position dépend de
+   prono.home (le segment nul de la barre n'est pas forcément centré), donc
+   un simple justify-content ne suffit pas à l'aligner avec le bon endroit
+   de la barre en dessous. */
 .poster__prono-labels {
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1674,8 +1679,13 @@
   flex: 0 0 auto;
 }
 .poster__lbl--h { text-align: left; }
-.poster__lbl--d { text-align: center; }
 .poster__lbl--a { text-align: right; }
+.poster__lbl--d {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  text-align: center;
+}
 
 /* Barre — légèrement plus haute */
 .poster__prono-bar {
