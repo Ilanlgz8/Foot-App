@@ -113,9 +113,26 @@ body::before {
    de recadrage dépend du ratio du cadre, pas de la forme du masque
    border-radius) — seul le rayon change, de 50% (cercle parfait) à 22%
    (carré aux coins nettement arrondis, cf. mockup validé). */
-[data-crest="club"] {
+/* ⚠️ AJOUT (constat utilisateur : "le fond carré grisé à l'arrière, ça
+   c'est que pour les drapeaux des pays, pas pour les logos des clubs") :
+   plusieurs wrappers de crest à travers l'app (mp__hero__crestWrap,
+   live__crestWrap, etc.) posent un `background` sombre en dur pour habiller
+   les DRAPEAUX (PNG souvent pas bord-à-bord, un fond évite un vide visible
+   autour) — mais cette règle par-composant s'appliquait aussi aux LOGOS DE
+   CLUB, qui n'en ont pas besoin (déjà bord-à-bord ou sur fond transparent).
+   Plutôt que traquer et corriger chaque background individuellement dans
+   chaque fichier CSS, on le neutralise ici, au même endroit déjà partagé par
+   TOUS les composants pour la distinction club/pays — un seul point de
+   vérité. Sélecteur doublé ([data-crest="club"] répété) : pur hack de
+   spécificité CSS, sans effet fonctionnel — juste pour garantir la priorité
+   sur .xxxCrestWrap { background: ... } même quand ce fichier CSS est
+   injecté APRÈS index.css (cas des pages en lazy(), chargées à la demande) :
+   à specificité égale (une classe = un attribut), c'est l'ordre d'injection
+   qui déciderait sinon, pas garanti dans notre cas. */
+[data-crest="club"][data-crest="club"] {
   border-radius: 0 !important;
   overflow: visible !important;
+  background: none !important;
 }
 [data-crest="club"] > img {
   object-fit: contain !important;

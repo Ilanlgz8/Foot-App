@@ -45,6 +45,27 @@ export default defineConfig(({ mode }) => {
               handler: 'CacheFirst',
               options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
             },
+            // ⚠️ AJOUT (constat utilisateur : "les crest se rechargent à chaque
+            // fois qu'on change de page, ça met parfois plusieurs secondes à
+            // réapparaître") : blasons de clubs (crests.football-data.org),
+            // drapeaux de pays (flagcdn.com) et logos ESPN de repli
+            // (a.espncdn.com, NL/CAN/COPA) n'avaient AUCUNE règle de cache
+            // côté service worker — chaque affichage repartait donc du cache
+            // HTTP par défaut du navigateur (pas garanti, peut être vidé sous
+            // pression mémoire, notamment iOS) au lieu d'être servi
+            // instantanément par le SW. CacheFirst + longue durée : ces
+            // images ne changent jamais une fois publiées (un blason ne
+            // change pas en cours de tournoi), donc aucun risque de servir du
+            // périmé — uniquement un gain de vitesse/fiabilité.
+            {
+              urlPattern: /^https:\/\/(crests\.football-data\.org|flagcdn\.com|a\.espncdn\.com)\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'team-crests',
+                expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 180 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             // ESPN — NetworkOnly : scores toujours en temps réel
             {
               urlPattern: /^https:\/\/site\.api\.espn\.com\/.*/i,
