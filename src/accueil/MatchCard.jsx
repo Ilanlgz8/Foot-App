@@ -106,7 +106,12 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   )
   const isFinished = _ms.ft === true || (match.status === 'FINISHED' && !_espnLive)
   const liveMinute = isFinished ? null : calcMinute(match)
-  // noLive = true → jamais de mode live (MatchPanel). isLive uniquement dans LiveWidget.
+  // noLive : gardé pour compat (plus jamais passé à true depuis MatchPanel —
+  // une card "Matchs à venir" passe maintenant elle-même en mode live dès le
+  // coup d'envoi, voir accueil/MatchCard.jsx/MatchPanel). calcMinute() renvoie
+  // déjà 'Débute' dès l'heure prévue (tant qu'ESPN n'a pas confirmé le KO,
+  // jusqu'à 30min après) → liveMinute !== null suffit à couvrir ce cas ici,
+  // sans code spécifique en plus.
   const isLive     = !noLive && !isFinished && (
     match.status === 'IN_PLAY' ||
     match.status === 'PAUSED'  ||

@@ -161,6 +161,32 @@ function Resultats() {
   // considère déjà terminés ("ft"), même si liveTracker les garde encore
   // quelques minutes dans liveMatches et que FD.org n'a pas encore basculé.
   const { liveMatches, espnScores } = useLiveData()
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : un match apparaît tout de suite
+  // dans le panneau résultats de l'Accueil, mais met "longtemps" à apparaître
+  // ici) : cette page n'avait aucun ticker interne, contrairement à
+  // Accueil.jsx. Le pont ft→FINISHED ci-dessous dépend de `liveMatches`/
+  // `espnScores`, mais une fois qu'ESPN a confirmé la fin du match, ce match
+  // n'est plus activement re-pollé (économie de budget API) → plus aucun
+  // re-render n'était déclenché ici pour faire réapparaître le flag `ft`
+  // fraîchement posé, tant qu'aucun AUTRE match live ne faisait bouger
+  // `espnScores`/`liveMatches` entre-temps. Ticker dédié (5s), tant qu'un
+  // match de la compétition affichée vient de passer `ft` mais n'est pas
+  // encore repris par football-data.org (donc pas encore dans fdMatches).
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    const pending = () => liveMatches.some(m =>
+      m.competition?.code === selectedComp &&
+      getMatchState(m.id).ft === true
+    )
+    if (!pending()) return
+    const id = setInterval(() => {
+      forceTick(n => n + 1)
+      if (!pending()) clearInterval(id)
+    }, 5_000)
+    return () => clearInterval(id)
+  }, [liveMatches, selectedComp])
+
   const matches = useMemo(() => {
     const known = new Set(fdMatches.map(m => m.id))
     const extra = liveMatches

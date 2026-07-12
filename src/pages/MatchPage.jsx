@@ -11,6 +11,7 @@ import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, matchOutcome, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
+import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
   useEspnMatchStats,
@@ -85,10 +86,32 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-  const isFinished = match.status === 'FINISHED'
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : après la redirection accélérée
+  // LiveMatchPage→MatchPage — voir TERMINE_GRACE_MS dans matchStateTracker.js
+  // — les buteurs n'apparaissaient plus et le match n'affichait pas
+  // "Terminé") : isFinished ne testait que match.status === 'FINISHED', un
+  // champ football-data.org qui a 1-5min de retard connu sur la vraie fin du
+  // match (voir CLAUDE.md). Or cette redirection amène ici SANS state passé
+  // par navigate() → `match` vient d'un fetch direct FD.org tout frais, donc
+  // presque toujours encore 'IN_PLAY' à ce moment-là. Ailleurs dans l'app
+  // (MatchCard, Resultat.jsx, Pronos.jsx…), le flag `ft` (confirmé par ESPN,
+  // voir matchStateTracker.js) a toujours priorité sur match.status pour
+  // cette raison — ce composant était le seul oublié.
+  const isFinished = match.status === 'FINISHED' || getMatchState(match.id).ft === true
+
+  // Buteurs + cartons — même source/logique que MpMatchStats (cache
+  // localStorage persistant si le match a été suivi en live, sinon fetch ESPN
+  // à la demande). queryKey partagée avec MpMatchStats → pas de double fetch,
+  // React Query dédup les deux appels automatiquement.
+  const cachedEspn = isFinished ? getEspnData(match?.id) : null
+
+  // Score : si FD.org n'a pas encore confirmé FINISHED (cas ci-dessus), son
+  // score peut encore être celui d'avant la fin du match — on fusionne avec
+  // le score ESPN persisté par confirmFt() (cachedEspn.home/away, déjà le bon
+  // score final) pour ne jamais afficher un score obsolète ici.
   const fs         = finalScore(match.score)
-  const hs         = fs.home ?? match.score?.halfTime?.home
-  const as_        = fs.away ?? match.score?.halfTime?.away
+  const hs         = mergeScore(cachedEspn?.home, fs.home ?? match.score?.halfTime?.home)
+  const as_        = mergeScore(cachedEspn?.away, fs.away ?? match.score?.halfTime?.away)
   // Tirs au but / prolongation — même logique que Resultat.jsx et
   // accueil/MatchCard.jsx (mutuellement exclusifs : un match aux tab a
   // duration='PENALTY_SHOOTOUT', pas 'EXTRA_TIME'). Manquait ici : cette page
@@ -101,12 +124,6 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
     match.homeTeam?.name || homeName,
     match.awayTeam?.name || awayName
   )
-
-  // Buteurs + cartons — même source/logique que MpMatchStats (cache
-  // localStorage persistant si le match a été suivi en live, sinon fetch ESPN
-  // à la demande). queryKey partagée avec MpMatchStats → pas de double fetch,
-  // React Query dédup les deux appels automatiquement.
-  const cachedEspn = isFinished ? getEspnData(match?.id) : null
 
   // Score tirs au but : fusion FD.org (match.score.penalties) + snapshot ESPN
   // persisté au moment du FT (cachedEspn.home/awayShootout), même garde
@@ -593,7 +610,8 @@ export default function MatchPage() {
   const { data: fetchedMatch, isLoading } = useMatchData(matchId, stateMatch)
   const match = stateMatch ?? fetchedMatch
 
-  const isFinished = match?.status === 'FINISHED'
+  // Même correction que dans MatchPageHero — voir le commentaire là-bas.
+  const isFinished = match?.status === 'FINISHED' || (match?.id != null && getMatchState(match.id).ft === true)
   const outcome = isFinished ? matchOutcome(match) : null
   const compId = match?.competition?.code ?? null
 
