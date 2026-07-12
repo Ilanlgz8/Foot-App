@@ -66,6 +66,15 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
 
+  // Retour utilisateur : quand une équipe a peu de chances (petit %), le
+  // libellé complet ("Paris Saint-Germain 5%") était coupé par "…" et le
+  // pourcentage disparaissait — le libellé était contraint à la même largeur
+  // que le segment de barre (parfois 5% du poster, ~15px). Initiales à 3
+  // lettres (tla FD.org si dispo, sinon 3 premières lettres du nom court) :
+  // toujours court, garanti de tenir quel que soit le %.
+  const homeCode = (match.homeTeam?.tla || homeShort || '').slice(0, 3).toUpperCase()
+  const awayCode = (match.awayTeam?.tla || awayShort || '').slice(0, 3).toUpperCase()
+
   const cls = 'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
 
   // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
@@ -162,15 +171,9 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       {/* ── Barre prono ── */}
       <div className="poster__footer">
         <div className="poster__prono-labels">
-          <span className="poster__lbl poster__lbl--h" style={{ width: `${prono.home}%` }}>
-            {homeShort} {prono.home}%
-          </span>
-          <span className="poster__lbl poster__lbl--d" style={{ width: `${prono.draw}%`, flexShrink: 0 }}>
-            Nul {prono.draw}%
-          </span>
-          <span className="poster__lbl poster__lbl--a" style={{ width: `${prono.away}%` }}>
-            {awayShort} {prono.away}%
-          </span>
+          <span className="poster__lbl poster__lbl--h">{homeCode} {prono.home}%</span>
+          <span className="poster__lbl poster__lbl--d">Nul {prono.draw}%</span>
+          <span className="poster__lbl poster__lbl--a">{awayCode} {prono.away}%</span>
         </div>
         <div className="poster__prono-bar">
           <div className="poster__seg poster__seg--h" style={{ width: `${prono.home}%`, background: hColor }} />

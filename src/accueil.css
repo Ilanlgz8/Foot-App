@@ -1654,22 +1654,24 @@
   gap: 3px;
 }
 
-/* Labels alignés sur les segments */
+/* Labels : largeur au contenu (pas calée sur le % du segment, voir plus bas)
+   — un petit %, ex. 5%, ne laisse que ~15px de large sur le poster, jamais
+   assez pour "Équipe 5%" même en initiales. space-between les répartit dans
+   l'ordre dom./nul/ext. sans jamais les tronquer. */
 .poster__prono-labels {
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
   width: 100%;
-  overflow: hidden;
+  gap: 0.35rem;
 }
 .poster__lbl {
   font-size: 0.66rem;
   font-weight: 700;
   color: rgba(var(--white-rgb),0.78);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.3;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 .poster__lbl--h { text-align: left; }
 .poster__lbl--d { text-align: center; }

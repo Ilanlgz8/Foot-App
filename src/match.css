@@ -396,6 +396,16 @@
   box-shadow: 0 0 10px rgba(var(--red-rgb),0.12);
 }
 
+/* Onglet "Phase finale" d'une coupe nationale tant que le tableau n'a pas
+   encore le moindre match (retour utilisateur : bug rencontré en ouvrant un
+   tableau pas encore rempli) — désactivé visuellement, se réactive tout seul
+   dès qu'un match apparaît côté ESPN (voir Match.jsx, cupBracketDisabled). */
+.matchs__wcToggleBtn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ═══════════════════════════════════════════
    TABLEAU DES POULES — FIFA style
    ═══════════════════════════════════════════ */

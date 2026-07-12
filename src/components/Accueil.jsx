@@ -69,7 +69,6 @@ const ACCUEIL_COMP_IDS = COMPETITIONS.map(c => c.id)
 // Persisté au niveau module pour survivre aux navigations (remounts)
 // On sauvegarde aussi la date du jour pour détecter le passage de minuit
 let _savedDayOffset = 0
-let _savedMinDayOffset = 0
 let _savedDate = getTargetDate(0)  // date locale au moment de la dernière sauvegarde
 
 function Accueil() {
@@ -78,12 +77,10 @@ function Accueil() {
   const todayDateStr = getTargetDate(0)
   if (_savedDate !== todayDateStr) {
     _savedDayOffset = 0
-    _savedMinDayOffset = 0
     _savedDate = todayDateStr
   }
 
   const [dayOffset, setDayOffset] = useState(_savedDayOffset)
-  const [minDayOffset, setMinDayOffset] = useState(_savedMinDayOffset)
   const targetDate   = getTargetDate(dayOffset)
 
   // ── Filtres compétition ──
@@ -94,7 +91,6 @@ function Accueil() {
 
   // Sync les valeurs dans les variables module à chaque changement
   useEffect(() => { _savedDayOffset = dayOffset; _savedDate = getTargetDate(0) }, [dayOffset])
-  useEffect(() => { _savedMinDayOffset = minDayOffset }, [minDayOffset])
 
   // Détecter le passage de minuit → réinitialiser dayOffset au nouveau "aujourd'hui"
   // (le module-level check ne suffit pas car useState ignore les changements de sa valeur initiale)
@@ -105,10 +101,8 @@ function Accueil() {
       if (newDate !== lastDate) {
         lastDate = newDate
         _savedDayOffset    = 0
-        _savedMinDayOffset = 0
         _savedDate         = newDate
         setDayOffset(0)
-        setMinDayOffset(0)
       }
     }, 30_000) // vérifie toutes les 30s — suffisant pour ne pas rater minuit
     return () => clearInterval(id)
@@ -205,10 +199,24 @@ function Accueil() {
   // compétitions confondues), le PROCHAIN jour qui a réellement un match, et y
   // saute directement — peu importe qu'il soit demain, dans 3 jours ou dans 10.
   // S'applique à n'importe quel jour vide affiché (pas seulement "aujourd'hui").
+  //
+  // ⚠️ 2 BUGS CORRIGÉS (retour utilisateur : navigation manuelle vers un jour
+  // de demi-finale avec des cards "équipe à déterminer" (pas encore de
+  // vainqueur de quart) rendait le bouton "jour précédent" bloqué pour de bon) :
+  // 1. `hasUpcoming` testait `status !== 'FINISHED'`, donc se déclenchait aussi
+  //    pour un jour dont TOUS les matchs étaient déjà terminés (pas seulement
+  //    un jour réellement vide) — un jour de demi-finale avec des matchs
+  //    encore SCHEDULED (même sans équipes connues) ne devrait PAS être
+  //    considéré vide. Corrigé : on ne saute que si le jour n'a AUCUN match du
+  //    tout (`matches.length === 0`).
+  // 2. `setMinDayOffset(diffDays)` verrouillait le bouton "jour précédent" en
+  //    permanence dès qu'un saut avait eu lieu, même vers un jour éloigné —
+  //    impossible de revenir à un jour antérieur pourtant valide (aujourd'hui,
+  //    quarts de finale...). minDayOffset supprimé : le saut auto avance
+  //    seulement `dayOffset`, plus aucune restriction sur le retour manuel.
   useEffect(() => {
     if (matchesLoading) return
-    const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
-    if (hasUpcoming) return
+    if (matches.length > 0) return  // le jour a des matchs (même sans équipe connue/déjà terminés) → rien à faire
 
     const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
     const next = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfTargetDay)
@@ -220,7 +228,7 @@ function Accueil() {
     if (diffDays <= dayOffset) return  // ne recule jamais
 
     // Petit délai pour éviter un flash si les données arrivent en deux temps
-    const id = setTimeout(() => { setDayOffset(diffDays); setMinDayOffset(diffDays) }, 800)
+    const id = setTimeout(() => { setDayOffset(diffDays) }, 800)
     return () => clearTimeout(id)
   }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps])
 
@@ -393,7 +401,7 @@ function Accueil() {
               "Résultats récents". */}
           <div className="accueil__dashPanel accueil__dashPanel--matchPanel">
             <div className="accueil__dashPanelHeader">
-              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => Math.max(minDayOffset, o - 1))} disabled={dayOffset <= minDayOffset} aria-label="Jour précédent">‹</button>
+              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o - 1)} aria-label="Jour précédent">‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
               <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
             </div>

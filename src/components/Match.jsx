@@ -757,6 +757,14 @@ function Matchs() {
   const bracketRounds  = hasCup ? cupRounds        : rounds
   const bracketLoad    = hasCup ? cupBracketLoading : bracketLoading
   const bracketErr     = hasCup ? cupBracketError   : bracketError
+  // Retour utilisateur : bug rencontré en ouvrant le tableau d'une coupe
+  // nationale (ex. Coupe de France) pas encore rempli côté ESPN — désactive
+  // l'onglet "Phase finale" pour ces compétitions tant qu'aucun match n'y
+  // figure. Se réactive automatiquement dès que cupRounds a au moins un
+  // match (le tableau "commence tout juste à se remplir"). Ne concerne QUE
+  // les coupes nationales — WC/EC ont déjà leur propre garde (état "à venir"
+  // géré normalement, jamais buggé).
+  const cupBracketDisabled = hasCup && cupRounds.length === 0
   // Vrai pour toute compétition ayant un toggle Poules/Journée/Phase finale
   // (WC, EC, ou une coupe nationale fusionnée) — remplace les anciens tests
   // "!isWC"/"isWC" isolés dans les vues ci-dessous, qui ignoraient le cas
@@ -859,6 +867,18 @@ function Matchs() {
       autoSwitchDone.current = true
     }
   }, [isWC, wcView, bracketLoading, hasPlayedKnockout])
+
+  /* Si l'onglet "Phase finale" d'une coupe nationale est désactivé (aucun
+     match dans le tableau, voir cupBracketDisabled) mais que wcView pointe
+     encore dessus — ex. retour depuis une navigation précédente où le
+     tableau contenait des matchs entre-temps disparus — on retombe sur "Par
+     journée" plutôt que d'afficher l'onglet actif mais désactivé. */
+  useEffect(() => {
+    if (cupBracketDisabled && wcView === 'bracket') {
+      setWcView('matchs')
+      setCurrentIndex(0)
+    }
+  }, [cupBracketDisabled, wcView])
 
   /* Changement manuel de vue (clics utilisateur) → on considère l'auto-switch
      "consommé" pour cette compétition, il ne doit plus jamais forcer la vue. */
@@ -1044,8 +1064,10 @@ function Matchs() {
 
                   {/* ── Phase finale : arbre de tournoi ── */}
                   <button
-                    className={`matchs__wcToggleBtn ${wcView === 'bracket' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => pickWcView('bracket')}
+                    className={`matchs__wcToggleBtn ${wcView === 'bracket' ? 'matchs__wcToggleBtn--active' : ''} ${cupBracketDisabled ? 'matchs__wcToggleBtn--disabled' : ''}`}
+                    onClick={() => { if (!cupBracketDisabled) pickWcView('bracket') }}
+                    disabled={cupBracketDisabled}
+                    title={cupBracketDisabled ? 'Le tableau apparaît dès les premiers matchs programmés' : undefined}
                   >
                     <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       {/* Matchs 1er tour */}
