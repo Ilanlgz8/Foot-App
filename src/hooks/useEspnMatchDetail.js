@@ -17,12 +17,6 @@ function espnDate(match, offsetDays = 0) {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-function isMatchToday(match) {
-  if (!match?.utcDate) return false
-  const d = new Date(match.utcDate), t = new Date()
-  return d.getUTCFullYear() === t.getUTCFullYear() && d.getUTCMonth() === t.getUTCMonth() && d.getUTCDate() === t.getUTCDate()
-}
-
 /** Passe 1 : trouve l'event ESPN dans le scoreboard et retourne { eventId, homeTeamId }. */
 function findEspnEvent(json, match) {
   for (const evt of json.events ?? []) {
@@ -128,24 +122,30 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       // par date UTC — beaucoup de matchs de ce Mondial (Amérique du Nord) se
       // jouent en soirée locale, ce qui fait "rouler" leur utcDate au
       // lendemain UTC (vérifié : un match à 02h00 UTC apparaît dans le
-      // scoreboard ESPN de la veille). Pour un match non-today, on interroge
-      // donc la date UTC ET la veille, et on fusionne les events — tous les
-      // fuseaux du tournoi sont en retard sur UTC, jamais en avance.
-      let events
-      if (isMatchToday(match)) {
-        const res = await fetch(`/espn?slug=${slug}`)
-        events = res.ok ? ((await res.json()).events ?? []) : []
-      } else {
-        const [res1, res2] = await Promise.all([
-          fetch(`/espn?slug=${slug}&dates=${espnDate(match, 0)}`),
-          fetch(`/espn?slug=${slug}&dates=${espnDate(match, -1)}`),
-        ])
-        const [board1, board2] = await Promise.all([
-          res1.ok ? res1.json() : null,
-          res2.ok ? res2.json() : null,
-        ])
-        events = [...(board1?.events ?? []), ...(board2?.events ?? [])]
-      }
+      // scoreboard ESPN de la veille). On interroge donc TOUJOURS la date UTC
+      // ET la veille, et on fusionne les events — tous les fuseaux du tournoi
+      // sont en retard sur UTC, jamais en avance.
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "pas de buteurs/stats si j'ai
+      // pas suivi le match jusqu'au bout") : le raccourci "isMatchToday" ci-
+      // dessous faisait un seul appel SANS date explicite pour un match du
+      // jour, en s'en remettant au "aujourd'hui" par défaut d'ESPN — qui peut
+      // différer du "aujourd'hui" UTC de l'app pour la même raison de fuseau
+      // ci-dessus, et qui n'avait alors AUCUN filet de sécurité (pas de
+      // 2e appel -1 jour) contrairement à la branche "non-today". Ce chemin à
+      // froid n'est emprunté QUE quand cachedEspn est vide, c'est-à-dire
+      // précisément quand l'utilisateur n'a pas suivi le match en direct —
+      // reproduit exactement le bug rapporté. Toujours utiliser le double
+      // appel daté, plus fiable, coût négligeable (1 requête HTTP de plus,
+      // uniquement pour un match déjà terminé).
+      const [sbRes1, sbRes2] = await Promise.all([
+        fetch(`/espn?slug=${slug}&dates=${espnDate(match, 0)}`),
+        fetch(`/espn?slug=${slug}&dates=${espnDate(match, -1)}`),
+      ])
+      const [board1, board2] = await Promise.all([
+        sbRes1.ok ? sbRes1.json() : null,
+        sbRes2.ok ? sbRes2.json() : null,
+      ])
+      const events = [...(board1?.events ?? []), ...(board2?.events ?? [])]
 
       const found = findEspnEvent({ events }, match)
       if (!found) return null   // match non trouvé dans le scoreboard

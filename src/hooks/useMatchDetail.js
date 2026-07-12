@@ -41,10 +41,33 @@ export function useMatchDetail(matchId) {
 //          FIFA API (/api/fifa-lineups) pour WC 2026 (espnSlug='fifa', compId=2000).
 // Disponible pour les compétitions dans COMP_ESPN uniquement.
 
-function matchDateStr(match) {
+function matchDateStr(match, offsetDays = 0) {
   if (!match?.utcDate) return null
   const d = new Date(match.utcDate)
+  if (offsetDays) d.setUTCDate(d.getUTCDate() + offsetDays)
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+// ⚠️ ESPN groupe son scoreboard par date CALENDAIRE LOCALE du stade, pas par
+// date UTC (voir même commentaire dans useEspnMatchDetail.js) — un match tard
+// le soir (fréquent, notamment CM en Amérique) peut apparaître dans le
+// scoreboard ESPN de la VEILLE alors que son utcDate FD.org est déjà le jour
+// suivant. Sans ce double appel, useEspnMatchStats/useLineups/
+// useProbableLineups ne trouvaient parfois jamais l'event ESPN pour un match
+// pas suivi en direct (le seul cas où on tombe sur ce chemin à froid) → stats/
+// compos manquantes uniquement pour les utilisateurs n'ayant pas regardé le
+// match jusqu'au bout (constat utilisateur). Interroge toujours date + date-1
+// et fusionne, au lieu de deviner laquelle est la bonne.
+async function fetchEspnEventsDual(slug, match) {
+  const [res1, res2] = await Promise.all([
+    fetch(`/espn?slug=${slug}&dates=${matchDateStr(match, 0)}`),
+    fetch(`/espn?slug=${slug}&dates=${matchDateStr(match, -1)}`),
+  ])
+  const [board1, board2] = await Promise.all([
+    res1.ok ? res1.json() : null,
+    res2.ok ? res2.json() : null,
+  ])
+  return [...(board1?.events ?? []), ...(board2?.events ?? [])]
 }
 
 function parseEspnRoster(roster) {
@@ -124,13 +147,12 @@ export function useLineups(match) {
 
       // ── ESPN (toutes compétitions, WC en fallback après FIFA) ─────────────────
 
-      // Étape 1 : trouver l'event ID via le scoreboard
-      const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
-      if (!sbRes.ok) return null
-      const sb = await sbRes.json()
+      // Étape 1 : trouver l'event ID via le scoreboard (double date, voir
+      // fetchEspnEventsDual)
+      const events = await fetchEspnEventsDual(slug, match)
 
       let eventId = null
-      for (const evt of sb.events ?? []) {
+      for (const evt of events) {
         const comp  = evt.competitions?.[0]
         const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
         const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
@@ -199,13 +221,11 @@ export function useEspnMatchStats(match) {
     staleTime: 30 * 60_000,
     retry: 1,
     queryFn: async () => {
-      // 1. Scoreboard → event ID
-      const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
-      if (!sbRes.ok) return null
-      const sb = await sbRes.json()
+      // 1. Scoreboard → event ID (double date, voir fetchEspnEventsDual)
+      const events = await fetchEspnEventsDual(slug, match)
 
       let eventId = null
-      for (const evt of sb.events ?? []) {
+      for (const evt of events) {
         const comp  = evt.competitions?.[0]
         const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
         const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
@@ -328,18 +348,16 @@ export function useProbableLineups(match, compMatches) {
       // Fetch rosters ESPN pour un match précédent
       const fetchEspnLineup = async (prevMatch, teamId) => {
         if (!prevMatch) return null
-        const date = matchDateStr(prevMatch)
         const fdH  = prevMatch.homeTeam?.name ?? prevMatch.homeTeam?.shortName ?? ''
         const fdA  = prevMatch.awayTeam?.name ?? prevMatch.awayTeam?.shortName ?? ''
 
         try {
           // 1. Scoreboard ESPN → trouver l'event ID du match précédent
-          const sbRes = await fetch(`/espn?slug=${slug}&dates=${date}`)
-          if (!sbRes.ok) return null
-          const sb = await sbRes.json()
+          // (double date, voir fetchEspnEventsDual)
+          const events = await fetchEspnEventsDual(slug, prevMatch)
 
           let eventId = null
-          for (const evt of sb.events ?? []) {
+          for (const evt of events) {
             const comp  = evt.competitions?.[0]
             const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
             const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
