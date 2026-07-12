@@ -77,6 +77,29 @@ function extractFromSummary(json, homeTeamId) {
     }
   }
 
+  // ── Cartons JAUNES ───────────────────────────────────────────────────────
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : buts + cartons rouges OK, jaunes
+  // absents — vérifié via DebugEspn.jsx sur un vrai match CM 2026) :
+  // comp.details ne contient QUE les buts et les cartons ROUGES — ESPN ne
+  // met jamais les jaunes à cet endroit. Ils sont ailleurs : dans
+  // json.commentary[i].play, avec un vrai champ `type.id === '94'`
+  // ("Yellow Card") cette fois (contrairement à comp.details qui n'a jamais
+  // eu de champ `type`, voir plus haut). Preuve concrète obtenue en dump
+  // direct : Breel Embolo (Suisse), carton jaune, 44e minute.
+  // On ne prend QUE les jaunes ici — les rouges restent sourcés depuis
+  // comp.details ci-dessus (déjà fiable) pour ne pas les compter en double.
+  for (const c of (json.commentary ?? [])) {
+    const play = c.play
+    if (play?.type?.id !== '94') continue
+    const ath = play.participants?.[0]?.athlete
+    cards.push({
+      name:   ath?.shortName ?? ath?.displayName ?? '?',
+      minute: play.clock?.displayValue ?? c.time?.displayValue ?? '',
+      team:   fuzzyTeam(homeC?.team?.displayName ?? '', play.team?.displayName ?? '') ? 'home' : 'away',
+      red:    false,
+    })
+  }
+
   // Filet de sécurité : si jamais une compétition renvoie encore l'ancien
   // format à base de `type` (jamais observé en pratique, mais coût nul à
   // garder en fallback), on complète avec cette détection historique.
@@ -221,3 +244,4 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
 
   return { espnData: data ?? null, loading: isLoading }
 }
+
