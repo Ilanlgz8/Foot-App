@@ -65,7 +65,7 @@ export function useNews() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['news'],
     queryFn: async () => {
-      const res = await fetch('/news')
+      const res = await fetch('/news', { signal: AbortSignal.timeout(15000) })
       if (!res.ok) throw new Error(`Erreur RSS : ${res.status}`)
       const json = await res.json()
       const articles = json.articles ?? []

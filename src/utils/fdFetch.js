@@ -22,8 +22,22 @@
  * toujours une réponse rapide (fraîche ou légèrement périmée), jamais un gel.
  */
 
-export async function fdFetch(url, options) {
-  return fetch(url, options)
+/**
+ * ⚠️ AJOUT (constat utilisateur : "skeleton bloqué au lancement sur mobile") :
+ * fetch() n'avait AUCUN timeout ici. Sur un réseau mobile qui répond mal
+ * (4G faible, bascule wifi/4G, requête qui part mais ne revient jamais), la
+ * promesse ne se résout NI en succès NI en erreur → React Query reste
+ * bloqué en isLoading:true pour toujours, et le skeleton ne disparaît
+ * jamais, même en rouvrant l'app (le cache localStorage de la requête
+ * précédente peut lui-même être vide/perimé selon le cas). Avant, rien ne
+ * pouvait débloquer ça côté client. Maintenant : timeout dur de 15s, la
+ * requête échoue proprement (React Query passe isLoading:false), l'appelant
+ * peut afficher une erreur / retomber sur du cache au lieu de rester figé.
+ */
+export async function fdFetch(url, options = {}) {
+  // Aucun appelant ne passe son propre signal aujourd'hui (vérifié) → pas besoin
+  // d'AbortSignal.any (support iOS plus récent) pour l'instant, juste le timeout.
+  return fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
 }
 
 /**
