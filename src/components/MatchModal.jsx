@@ -594,11 +594,23 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
     match, isFifaMatch && isLive
   )
 
-  // ESPN summary — fetché si on a l'event ID mais pas encore les stats du scoreboard
+  // BUG CORRIGÉ (constat utilisateur : "même sur LiveMatchPage j'avais que
+  // possession/tirs/tirs cadrés/fautes/corners") : cette requête n'était
+  // activée QUE si `!hasEspn` — dès que le scoreboard ESPN avait ne serait-ce
+  // que la possession/les tirs (l'ancienne "Priorité 1" plus bas, réputée
+  // "rare" dans un vieux commentaire mais en fait fréquente en pratique), la
+  // version enrichie (passes/tacles/interceptions/centres/longs ballons/
+  // dégagements/tirs contrés/arrêts — 19 champs contre 6) n'était JAMAIS
+  // interrogée : le scoreboard basique gagnait toujours la course et
+  // affichait ses seuls 6 champs, pour toute la durée du match. Elle se
+  // déclenche maintenant dès qu'on a un event ID, qu'il y ait déjà ou non
+  // des stats basiques du scoreboard — c'est un sur-ensemble strict des
+  // stats scoreboard, donc toujours préférable quand disponible (voir ordre
+  // de priorité ci-dessous, également corrigé).
   const { data: summaryStats, isLoading: summaryLoading } = useEspnSummaryStats(
     espnScore?.espnEventId,
     espnScore?.espnSlug,
-    isLive && !hasEspn && hasEspnId
+    isLive && hasEspnId
   )
 
   // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary) et pas FIFA
@@ -612,17 +624,9 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
   const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
   const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
-  // ── Priorité 1 : ESPN scoreboard stats (rarement dispo, mais gardé) ──
-  if (hasEspn) {
-    return (
-      <div>
-        <ESPNStats stats={espnScore.stats} />
-        {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-      </div>
-    )
-  }
-
-  // ── Priorité 2 : Stats FIFA live (WC 2026) ──
+  // ── Priorité 1 : Stats FIFA live (WC 2026) — vérifié AVANT le scoreboard
+  // basique ci-dessous (l'ancien ordre laissait un match CM avec juste
+  // possession/tirs au scoreboard ESPN doubler les stats FIFA, plus riches). ──
   if (isFifaMatch) {
     if (fifaStatsLoading) {
       return <StatsSkeleton />
@@ -638,7 +642,7 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
     )
   }
 
-  // ── Priorité 3 : ESPN summary stats (via /espn?eventId=) ──
+  // ── Priorité 2 : ESPN summary stats (19 champs) — préféré dès que dispo ──
   if (summaryStats) {
     return (
       <div>
@@ -648,9 +652,22 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
     )
   }
 
-  // Loading ESPN summary
+  // Chargement du summary en cours : on patiente plutôt que d'afficher tout
+  // de suite les stats basiques (ci-dessous) pour les remplacer un instant
+  // après une fois le summary arrivé — évite un saut visuel de contenu.
   if (summaryLoading && hasEspnId) {
     return <StatsSkeleton />
+  }
+
+  // ── Priorité 3 : ESPN scoreboard stats (6 champs seulement — repli si le
+  // summary n'a rien donné de plus, ou n'est pas interrogeable) ──
+  if (hasEspn) {
+    return (
+      <div>
+        <ESPNStats stats={espnScore.stats} />
+        {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+      </div>
+    )
   }
 
   // ── Priorité 4 : Fallback api-football ──
