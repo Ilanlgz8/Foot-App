@@ -1675,10 +1675,10 @@
   justify-content: center;
   gap: 8px;
 }
-/* Largeur fixe (pas flex:1). "Longueur" = largeur horizontale (retour
-   utilisateur) : élargie à 56px, hauteur revenue à 54px. */
+/* Largeur fixe (pas flex:1). Nettement élargie sur la card Accueil (retour
+   utilisateur : "agrandi beaucoup plus, au moins 15px") : 56px → 72px. */
 .poster__prono-pill {
-  width: 56px;
+  width: 72px;
   height: 54px;
   display: flex;
   flex-direction: column;
@@ -1690,7 +1690,7 @@
   background: #ffffff;
 }
 .poster__prono-pill--draw {
-  width: 48px;
+  width: 64px;
 }
 .poster__prono-pillLabel {
   font-size: 0.5rem;
