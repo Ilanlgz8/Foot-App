@@ -760,6 +760,14 @@ function calcSeasonTeamStats(teamId, compMatches, split = 'all') {
 export function SeasonStatsTab({ match, compMatches }) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
+  // ⚠️ BUG CORRIGÉ (écran noir en ouvrant "Stats saison" sur LiveMatchPage) :
+  // ces 2 variables avaient été supprimées par erreur en retirant le calcul
+  // de couleurs d'équipe (getMatchTeamColors, plus utilisé pour les barres,
+  // voir StatTrack) — mais elles servent aussi à afficher le nom des équipes
+  // dans le bloc "Forme récente" plus bas, qui plantait avec un
+  // ReferenceError (variable non définie) au lieu de simplement s'afficher.
+  const homeName = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
+  const awayName = translateTeam(match?.awayTeam?.shortName || match?.awayTeam?.name || '?')
 
   // Toggle Global/Domicile/Extérieur (retour utilisateur)
   const [split, setSplit] = useState('all')

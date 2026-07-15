@@ -394,7 +394,9 @@
 .resultats__cardDate {
   font-size: 0.58rem;
   font-weight: 600;
-  color: #334155;
+  /* Retour utilisateur : #334155 (gris ardoise foncé) trop peu lisible sur
+     le fond sombre de la card. */
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.06em;
   text-transform: capitalize;
   white-space: nowrap;
@@ -442,7 +444,9 @@
   font-weight: 800;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: #334155;
+  /* Retour utilisateur : #334155 (gris ardoise foncé) trop peu lisible sur
+     le fond sombre de la card. */
+  color: rgba(var(--white-rgb),0.75);
 }
 
 /* Tirs au but : score 120' au-dessus (déjà affiché), puis "T.A.B" + score des

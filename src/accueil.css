@@ -696,7 +696,9 @@
 .accueil__matchCardLabel {
   font-size: 0.52rem;
   font-weight: 700;
-  color: #4a4a4a;
+  /* Retour utilisateur : #4a4a4a trop peu lisible ("Terminé" sur une card de
+     match terminé, ou l'heure sur une card à venir). */
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.06em;
   line-height: 1;
 }

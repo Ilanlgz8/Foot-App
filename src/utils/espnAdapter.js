@@ -240,8 +240,22 @@ export async function fetchEspnCupMatches(parentCode) {
         compName: cup.name,
       }))
       .filter(Boolean)
-    if (matches.length > 0) writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
-    return matches.length > 0 ? matches : (readCacheStale(cacheKey) ?? [])
+    // ⚠️ BUG CORRIGÉ (retour utilisateur : l'onglet "Phase finale" d'une coupe
+    // nationale — ex. Coupe de France — restait actif/cliquable alors qu'aucun
+    // match de la NOUVELLE saison n'était encore programmé). L'ancien code
+    // retombait sur le cache périmé dès que `matches` était vide — y compris
+    // quand ESPN répond correctement (200 OK) avec `events: []` parce que la
+    // saison en cours vient de se terminer et que la suivante n'a pas encore
+    // démarré. Ce cache périmé contenait alors les matchs de la saison
+    // PRÉCÉDENTE (déjà terminée, tableau complet), ce qui faisait croire à
+    // useCupKnockout() qu'un vrai tableau existait déjà pour la saison
+    // actuelle — l'onglet ne se désactivait jamais. Le repli sur le cache
+    // périmé ne doit servir qu'en cas d'ÉCHEC réel de la requête (catch /
+    // !res.ok, voir plus haut/bas) — un fetch réussi qui renvoie 0 match est
+    // une vraie information (rien de programmé pour l'instant), pas une
+    // panne : on la fait remonter telle quelle.
+    writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
+    return matches
   } catch {
     return readCacheStale(cacheKey) ?? []
   }
