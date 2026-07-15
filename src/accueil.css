@@ -1666,19 +1666,20 @@
 }
 
 /* Pilules "côtes bookmaker" — même design que .modal__liveProno-* dans
-   matchModal.css (LiveMatchPage/LiveStatsTab) : fond clair pour trancher
-   sur le poster (dégradé couleurs d'équipe), cote décimale (pronoToOdds),
-   liseré rouge d'intensité proportionnelle à la probabilité
-   (pronoIntensity, src/utils/calcProno.js). Agrandies (retour utilisateur :
-   "plus vertical, chiffres et code équipe plus grands") — plus proches de
-   la taille du modal désormais, plutôt que nettement plus compactes. */
+   matchModal.css (LiveMatchPage/LiveStatsTab) : fond rouge plein, texte
+   blanc contouré de noir, cote décimale (pronoToOdds), liseré rouge vif
+   d'intensité proportionnelle à la probabilité (pronoIntensity,
+   src/utils/calcProno.js). Agrandies (retour utilisateur : "plus vertical,
+   chiffres et code équipe plus grands") — plus proches de la taille du
+   modal désormais, plutôt que nettement plus compactes. */
 .poster__prono-row {
   display: flex;
   gap: 4px;
 }
-/* Fond blanc pur + bordure plus épaisse et glow qui pulse — même retour
-   utilisateur que sur le modal (matchModal.css) : "bordure trop faible,
-   faut un beau blanc". */
+/* Fond rouge plein + texte blanc contouré de noir — même retour
+   utilisateur que sur le modal (matchModal.css), fond blanc jugé pas assez
+   percutant. Bordure épaisse en rouge vif (255,45,45), glow rapide et
+   marqué. */
 .poster__prono-pill {
   flex: 1;
   height: 44px;
@@ -1688,13 +1689,13 @@
   justify-content: center;
   gap: 2px;
   border-radius: 9px;
-  border: 1.8px solid transparent;
-  background: #ffffff;
-  animation: posterProno-pillGlow 1.8s ease-in-out infinite;
+  border: 2.5px solid transparent;
+  background: #c8102e;
+  animation: posterProno-pillGlow 1.3s ease-in-out infinite;
 }
 @keyframes posterProno-pillGlow {
-  0%, 100% { box-shadow: 0 0 0 rgba(239,68,68,0); }
-  50%      { box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+  0%, 100% { box-shadow: 0 0 0 rgba(255,45,45,0); }
+  50%      { box-shadow: 0 0 12px rgba(255,45,45,0.9); }
 }
 .poster__prono-pill--draw {
   flex: 0.8;
@@ -1704,12 +1705,16 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #111111;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5px #000000;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
 .poster__prono-pillVal {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #7a1e2e;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6px #000000;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
 
 /* ── Variante live ── */

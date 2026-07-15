@@ -341,12 +341,12 @@
   display: flex;
   gap: 6px;
 }
-/* Fond blanc pur (pas teinté) + bordure plus épaisse et glow qui pulse en
-   plus de la couleur fixe (retour utilisateur : "la bordure est trop
-   faible, faut un beau blanc") — le glow anime la pilule en plus de
-   l'intensité déjà proportionnelle au % (pronoIntensity), les deux se
-   cumulent : le favori a déjà la bordure la plus opaque ET le glow le plus
-   visible en valeur absolue. */
+/* Fond rouge plein + texte blanc contouré de noir (retour utilisateur,
+   après le fond blanc jugé pas assez percutant) — bordure plus épaisse
+   (2px→3px) en rouge plus vif (255,45,45 au lieu de 239,68,68) que le
+   fond, glow plus fort et plus rapide (1.8s→1.3s, blur/opacité montés) :
+   l'intensité proportionnelle au % (pronoIntensity) reste le signal du
+   favori, juste beaucoup plus voyante qu'avant. */
 .modal__liveProno__pill {
   flex: 1;
   height: 46px;
@@ -356,13 +356,13 @@
   justify-content: center;
   gap: 2px;
   border-radius: 10px;
-  border: 2px solid transparent;
-  background: #ffffff;
-  animation: modalLiveProno-pillGlow 1.8s ease-in-out infinite;
+  border: 3px solid transparent;
+  background: #c8102e;
+  animation: modalLiveProno-pillGlow 1.3s ease-in-out infinite;
 }
 @keyframes modalLiveProno-pillGlow {
-  0%, 100% { box-shadow: 0 0 0 rgba(239,68,68,0); }
-  50%      { box-shadow: 0 0 9px rgba(239,68,68,0.55); }
+  0%, 100% { box-shadow: 0 0 0 rgba(255,45,45,0); }
+  50%      { box-shadow: 0 0 14px rgba(255,45,45,0.95); }
 }
 .modal__liveProno__pill--draw {
   flex: 0.85;
@@ -372,12 +372,16 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #111111;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5px #000000;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
 .modal__liveProno__pillVal {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #7a1e2e;
+  color: #ffffff;
+  -webkit-text-stroke: 0.6px #000000;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
 
 .modal__stats {
