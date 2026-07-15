@@ -160,6 +160,15 @@ describe('calcLiveProno', () => {
     expect(sumsTo100(live)).toBe(true)
     expect(live.away).toBeGreaterThanOrEqual(5)
   })
+
+  it('plus de corners penche légèrement en faveur de l\'équipe qui domine, avec un poids plus faible que les tirs cadrés', () => {
+    const neutral       = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
+    const moreCorners   = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { homeCorners: 9, awayCorners: 1 })
+    const moreShotsOnTgt = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { homeShotsOnTarget: 9, awayShotsOnTarget: 1 })
+    expect(sumsTo100(moreCorners)).toBe(true)
+    expect(moreCorners.home).toBeGreaterThan(neutral.home)
+    expect(moreCorners.home).toBeLessThan(moreShotsOnTgt.home)
+  })
 })
 
 describe('pronoToOdds', () => {

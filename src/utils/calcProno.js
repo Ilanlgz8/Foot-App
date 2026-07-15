@@ -297,6 +297,7 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     homeRedCards = 0, awayRedCards = 0,
     homePoss = null, awayPoss = null,
     homeShotsOnTarget = null, awayShotsOnTarget = null,
+    homeCorners = null, awayCorners = null,
   } = opts
   const pre = (homeId != null && awayId != null && compMatches?.length)
     ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm)
@@ -339,6 +340,14 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   }
   if (homeShotsOnTarget != null && awayShotsOnTarget != null) {
     swing += Math.max(-10, Math.min(10, (homeShotsOnTarget - awayShotsOnTarget) * 1.5))
+  }
+  // Corners : indicateur de pression territoriale plus faible/bruyant que
+  // les tirs cadrés (beaucoup de corners ne débouchent sur rien) — poids et
+  // plafond volontairement plus bas. Donnée déjà récupérée sans coût
+  // supplémentaire (extractBoxscoreStats, api/fifa-live.js), juste jamais
+  // exploitée jusqu'ici.
+  if (homeCorners != null && awayCorners != null) {
+    swing += Math.max(-6, Math.min(6, (homeCorners - awayCorners) * 0.8))
   }
   if (swing !== 0) {
     now = {

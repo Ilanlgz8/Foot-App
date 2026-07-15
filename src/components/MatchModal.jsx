@@ -622,6 +622,8 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
       awayPoss:          pronoStats?.away?.poss,
       homeShotsOnTarget: pronoStats?.home?.shotsOnTarget,
       awayShotsOnTarget: pronoStats?.away?.shotsOnTarget,
+      homeCorners:       pronoStats?.home?.corners,
+      awayCorners:       pronoStats?.away?.corners,
     }
   ) : null
 

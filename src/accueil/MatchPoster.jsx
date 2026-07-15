@@ -78,6 +78,8 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         awayPoss:          espnScore?.stats?.away?.poss,
         homeShotsOnTarget: espnScore?.stats?.home?.shotsOnTarget,
         awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
+        homeCorners:       espnScore?.stats?.home?.corners,
+        awayCorners:       espnScore?.stats?.away?.corners,
       })
     : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm)
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
