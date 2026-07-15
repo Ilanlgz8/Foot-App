@@ -231,6 +231,23 @@ function Accueil() {
     return () => clearTimeout(id)
   }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps])
 
+  // ── Flèche "jour suivant" : saut DIRECT au prochain jour qui a un match ──
+  // (retour utilisateur : cliquer avançait d'un seul jour à la fois, et sur
+  // un jour vide ne se corrigeait qu'après coup via l'effet passif ci-dessus
+  // — délai visible + "ça revient au jour d'aujourd'hui" ressenti comme un
+  // bug. Même logique de recherche que l'effet passif (prochain match dans
+  // les 30j, toutes compétitions), mais déclenchée immédiatement au clic au
+  // lieu d'attendre un re-render + 800ms.) Vaut `null` si aucun match à venir
+  // n'est connu dans la fenêtre → sert aussi à désactiver la flèche.
+  const nextMatchDayOffset = useMemo(() => {
+    const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
+    const next = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfTargetDay)
+    if (!next) return null
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0)
+    const next0  = new Date(next.utcDate); next0.setHours(0, 0, 0, 0)
+    return Math.round((next0 - today0) / 86_400_000)
+  }, [targetDate, upcomingAllComps])
+
   // ── Préchargement des jours adjacents ──
   useEffect(() => {
     if (matchesLoading) return
@@ -400,9 +417,32 @@ function Accueil() {
               "Résultats récents". */}
           <div className="accueil__dashPanel accueil__dashPanel--matchPanel">
             <div className="accueil__dashPanelHeader">
-              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o - 1)} aria-label="Jour précédent">‹</button>
+              {/* BUG CORRIGÉ (retour utilisateur : "on peut retourner en
+                  arrière... alors que les matchs sont finis") : plancher à
+                  dayOffset 0 ("aujourd'hui") — ce panneau affiche les matchs
+                  À VENIR, revenir avant aujourd'hui n'a pas de sens ici (ces
+                  jours-là sont déjà couverts par le panneau "Résultats
+                  récents" juste en dessous). Contrairement à l'ancien
+                  minDayOffset (supprimé plus haut car il se verrouillait
+                  dynamiquement sur un saut auto lointain), ce plancher est
+                  FIXE à 0 : jamais de blocage sur un jour autre que le vrai
+                  "aujourd'hui". */}
+              <button
+                className="accueil__dayArrow"
+                onClick={() => setDayOffset(o => Math.max(0, o - 1))}
+                disabled={dayOffset <= 0}
+                aria-label="Jour précédent"
+              >‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
-              <button className="accueil__dayArrow" onClick={() => setDayOffset(o => o + 1)} aria-label="Jour suivant">›</button>
+              {/* Saut direct au prochain jour avec un match (voir
+                  nextMatchDayOffset ci-dessus) — désactivée si aucun match à
+                  venir n'est connu dans les 30 prochains jours. */}
+              <button
+                className="accueil__dayArrow"
+                onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}
+                disabled={nextMatchDayOffset == null}
+                aria-label="Jour suivant"
+              >›</button>
             </div>
             <CompFilter competitions={matchCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
             <div className="accueil__dashPanelDivider" />
