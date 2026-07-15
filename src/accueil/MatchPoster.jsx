@@ -2,7 +2,7 @@ import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
-import { calcPronoAdvanced }          from '../utils/calcProno'
+import { calcPronoAdvanced, calcLiveProno } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { FormDiamonds }               from './FormDiamonds'
@@ -47,7 +47,27 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const awayName  = match.awayTeam?.name ?? ''
   const hForm     = formMap?.[match.homeTeam?.id] ?? []
   const aForm     = formMap?.[match.awayTeam?.id] ?? []
-  const prono     = calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm)
+  // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
+  // card en live en fonction du score") : cette barre utilisait TOUJOURS
+  // calcPronoAdvanced (le prior pré-match figé), même une fois le match en
+  // direct — jamais calcLiveProno, qui est pourtant le modèle prévu pour ça
+  // (voir LiveMatchPage/LiveStatsTab). Résultat : les % restaient identiques
+  // du coup d'envoi à la fin du match quel que soit le score réel. En live,
+  // on utilise maintenant calcLiveProno (score + minute + cartons rouges/
+  // possession/tirs cadrés, déjà dans espnScore?.stats — aucun fetch de
+  // plus) ; pré-match et FT gardent calcPronoAdvanced (rien à faire glisser
+  // avant le coup d'envoi, résultat déjà figé une fois le match terminé).
+  const prono = isLive
+    ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
+        homeId: match.homeTeam?.id, awayId: match.awayTeam?.id, compMatches,
+        homeRedCards:      espnScore?.stats?.home?.redCards,
+        awayRedCards:      espnScore?.stats?.away?.redCards,
+        homePoss:          espnScore?.stats?.home?.poss,
+        awayPoss:          espnScore?.stats?.away?.poss,
+        homeShotsOnTarget: espnScore?.stats?.home?.shotsOnTarget,
+        awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
+      })
+    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm)
 
   // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
   // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine

@@ -302,6 +302,84 @@
 }
 
 /* ── Stats buts ── */
+/* ── Pronostic live (LiveStatsTab) — barre 1/N/2 façon côtes bookmaker,
+   même langage visuel que .poster__prono-* (accueil.css) mais adapté au
+   fond du modal/de la page match. ── */
+.modal__liveProno {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(var(--red-rgb),0.18);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(var(--red-rgb),0.08) 0%, rgba(255,255,255,0.02) 100%);
+}
+.modal__liveProno__title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--white-rgb),0.55);
+}
+.modal__liveProno__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(var(--red-rgb),0.8);
+  animation: modalLiveProno-pulse 1.6s ease-in-out infinite;
+}
+@keyframes modalLiveProno-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.modal__liveProno__labels {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.35rem;
+}
+.modal__liveProno__lbl {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(var(--white-rgb),0.85);
+  white-space: nowrap;
+  line-height: 1.3;
+  flex: 0 0 auto;
+}
+.modal__liveProno__lbl--h { text-align: left; }
+.modal__liveProno__lbl--a { text-align: right; }
+.modal__liveProno__lbl--d {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  color: rgba(var(--white-rgb),0.55);
+  font-weight: 600;
+}
+.modal__liveProno__bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  border-radius: 5px;
+  overflow: hidden;
+  gap: 2px;
+}
+.modal__liveProno__seg {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.modal__liveProno__seg--d {
+  background: rgba(var(--white-rgb),0.18);
+}
+
 .modal__stats {
   display: grid;
   grid-template-columns: 1fr 1px 1fr;

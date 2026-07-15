@@ -131,4 +131,33 @@ describe('calcLiveProno', () => {
     expect(pre.home).toBeGreaterThan(pre.away)
     expect(live.home).toBeGreaterThan(live.away)
   })
+
+  it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {
+    const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
+    const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 1 })
+    expect(sumsTo100(withRed)).toBe(true)
+    expect(withRed.home).toBeGreaterThan(neutral.home)
+  })
+
+  it('un carton rouge à domicile favorise l\'extérieur, à score égal', () => {
+    const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
+    const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { homeRedCards: 1 })
+    expect(sumsTo100(withRed)).toBe(true)
+    expect(withRed.away).toBeGreaterThan(neutral.away)
+  })
+
+  it('une possession/tirs cadrés nettement supérieurs penchent légèrement en faveur de l\'équipe qui domine', () => {
+    const neutral   = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
+    const dominant  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", {
+      homePoss: 70, awayPoss: 30, homeShotsOnTarget: 8, awayShotsOnTarget: 1,
+    })
+    expect(sumsTo100(dominant)).toBe(true)
+    expect(dominant.home).toBeGreaterThan(neutral.home)
+  })
+
+  it('un carton rouge ne peut jamais, à lui seul, écraser complètement une issue (plancher 5%)', () => {
+    const live = calcLiveProno(homeForm, awayForm, 0, 0, "89'", { awayRedCards: 2 })
+    expect(sumsTo100(live)).toBe(true)
+    expect(live.away).toBeGreaterThanOrEqual(5)
+  })
 })

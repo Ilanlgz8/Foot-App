@@ -233,7 +233,12 @@ function parseMinuteValue(minute) {
  *   de la simple forme récente.
  */
 export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, opts = {}) {
-  const { homeId, awayId, compMatches } = opts
+  const {
+    homeId, awayId, compMatches,
+    homeRedCards = 0, awayRedCards = 0,
+    homePoss = null, awayPoss = null,
+    homeShotsOnTarget = null, awayShotsOnTarget = null,
+  } = opts
   const pre = (homeId != null && awayId != null && compMatches?.length)
     ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm)
     : calcProno(homeForm, awayForm)
@@ -255,6 +260,33 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     now = favorHome
       ? { home: 27, draw: 55, away: 18 }
       : { home: 18, draw: 55, away: 27 }
+  }
+
+  // ── Ajustements "pression" (retour utilisateur : prendre en compte les
+  // cartons rouges/la possession/les tirs cadrés, pas juste le score brut)
+  // ── un carton rouge est un facteur de jeu majeur (supériorité numérique),
+  // pondéré nettement plus fort que possession/tirs cadrés (simples
+  // indicateurs de "qui domine" à l'instant T, pas de finalité). Toujours
+  // borné pour ne jamais, à eux seuls, écraser complètement une issue —
+  // distribute() (plus bas) garde de toute façon un plancher de 5% par
+  // issue. Appliqué sur `now` (le "si ça se terminait maintenant"), avant le
+  // blend avec `pre` — remaining fait déjà décroître son poids en fin de
+  // match comme le reste de `now`.
+  let swing = 0
+  const redDiff = (awayRedCards ?? 0) - (homeRedCards ?? 0)   // >0 = domicile en supériorité numérique
+  swing += Math.max(-2, Math.min(2, redDiff)) * 14            // jusqu'à ±28 pts pour 2 cartons d'écart
+  if (homePoss != null && awayPoss != null) {
+    swing += Math.max(-8, Math.min(8, (homePoss - awayPoss) * 0.15))
+  }
+  if (homeShotsOnTarget != null && awayShotsOnTarget != null) {
+    swing += Math.max(-10, Math.min(10, (homeShotsOnTarget - awayShotsOnTarget) * 1.5))
+  }
+  if (swing !== 0) {
+    now = {
+      home: Math.max(1, now.home + swing),
+      draw: now.draw,
+      away: Math.max(1, now.away - swing),
+    }
   }
 
   // Blend : à la mi-temps (remaining ~0.5) les deux comptent autant, en fin

@@ -14,7 +14,6 @@ import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { calcLiveProno } from '../utils/calcProno'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -310,19 +309,12 @@ export default function LiveMatchPage() {
   const { formMap, compMatches } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
-  // Cette page n'existe que pour des matchs en direct (liveMatches) → toujours
-  // la version live du prono, réévaluée selon le score réel + le temps restant.
-  const liveMinute = match ? calcMinute(match) : null
-  const fsProno = match ? finalScore(match.score) : { home: null, away: null }
-  const prono = match && (hForm || aForm)
-    ? calcLiveProno(
-        hForm, aForm,
-        mergeScore(espn?.home, fsProno.home ?? match.score?.halfTime?.home),
-        mergeScore(espn?.away, fsProno.away ?? match.score?.halfTime?.away),
-        liveMinute,
-        { homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches }
-      )
-    : null
+  // Le pronostic live (calcLiveProno, score + minute + cartons rouges +
+  // possession) est désormais calculé DANS LiveStatsTab (MatchModal.jsx) —
+  // c'est là qu'on a déjà les stats live sous la main pour l'enrichir, et ça
+  // permet de l'afficher au-dessus des stats sans dupliquer le calcul ici.
+  // hForm/aForm/compMatches (déjà chargés ici pour d'autres besoins de la
+  // page) lui sont simplement transmis en props, voir plus bas.
 
   // Échantillonnage pour la courbe de bascule post-match (voir <ProbaCurve>).
   const homeShort = translateTeam(match?.homeTeam?.shortName || match?.homeTeam?.name || '?')
@@ -444,6 +436,8 @@ export default function LiveMatchPage() {
                     match={match}
                     espnScore={espn}
                     compMatches={compMatches}
+                    hForm={hForm}
+                    aForm={aForm}
                   />
                 ) : statsView === 'historique' ? (
                   <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />

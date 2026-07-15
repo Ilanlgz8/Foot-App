@@ -8,7 +8,8 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
+import { calcLiveProno } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -542,10 +543,13 @@ const STAT_FR = {
   'Fouls':           'Fautes',
 }
 
-// compMatches n'est plus utilisé ici depuis que l'historique des
-// confrontations a son propre onglet (H2HTabContent) — les appelants
-// (LiveMatchPage) continuent de le passer, il est simplement ignoré.
-export function LiveStatsTab({ match, espnScore }) {
+// compMatches, hForm, aForm : ré-utilisés depuis le 15/07 (retour utilisateur)
+// pour le pronostic live (voir LiveProno plus bas) — compMatches sert de prior
+// pré-match (calcPronoAdvanced) à faire glisser vers le score réel, hForm/aForm
+// sont le repli si compMatches est insuffisant (calcProno, forme récente).
+// L'historique des confrontations affiché à l'écran reste dans son propre
+// onglet (H2HTabContent) : compMatches n'est plus utilisé pour ÇA ici.
+export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -589,24 +593,51 @@ export function LiveStatsTab({ match, espnScore }) {
     match, isLive && !isFifaMatch && !hasEspn && (!hasEspnId || espnSummaryFailed)
   )
 
+  // ── Pronostic live façon "côtes bookmaker" (retour utilisateur : afficher
+  // le calcul au-dessus des stats, recalculé selon le score actuel, les
+  // cartons rouges, la possession/pression adverse — pas juste figé au
+  // pré-match). Calculé ICI (pas dans le parent LiveMatchPage) car c'est ici
+  // qu'on a déjà les stats live (redCards/poss) sous la main, quelle que
+  // soit la source qui a fini de charger — et affiché AVANT même que les
+  // stats détaillées soient prêtes : le score/la minute arrivent toujours
+  // en premier (voir espnScore, déjà dispo dès le montage), pas besoin
+  // d'attendre fifaStats/summaryStats pour montrer un premier résultat.
+  // espnScore?.stats (scoreboard ESPN, déjà dans le cache live global —
+  // aucun fetch supplémentaire) suffit pour redCards/poss/shotsOnTarget :
+  // mêmes noms de champs que fifaStats/mergedStats (voir extractBoxscoreStats,
+  // api/fifa-live.js), donc valable quelle que soit la source finale des
+  // stats détaillées affichées plus bas.
+  const liveMinute = calcMinute(match)
+  const fsLive      = finalScore(match.score)
+  const homeGoals   = mergeScore(espnScore?.home, fsLive.home ?? match.score?.halfTime?.home)
+  const awayGoals   = mergeScore(espnScore?.away, fsLive.away ?? match.score?.halfTime?.away)
+  const pronoStats  = espnScore?.stats
+  const liveProno   = (hForm != null || aForm != null) ? calcLiveProno(
+    hForm, aForm, homeGoals, awayGoals, liveMinute,
+    {
+      homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
+      homeRedCards:      pronoStats?.home?.redCards,
+      awayRedCards:      pronoStats?.away?.redCards,
+      homePoss:          pronoStats?.home?.poss,
+      awayPoss:          pronoStats?.away?.poss,
+      homeShotsOnTarget: pronoStats?.home?.shotsOnTarget,
+      awayShotsOnTarget: pronoStats?.away?.shotsOnTarget,
+    }
+  ) : null
+
   // ── Priorité 1 : Stats FIFA live (WC 2026) — vérifié AVANT le scoreboard
   // basique ci-dessous (l'ancien ordre laissait un match CM avec juste
   // possession/tirs au scoreboard ESPN doubler les stats FIFA, plus riches). ──
-  if (isFifaMatch) {
-    if (fifaStatsLoading) {
-      return <StatsSkeleton />
+  const mergeSide = (...sides) => {
+    const out = {}
+    for (const side of sides) {
+      if (!side) continue
+      for (const k of Object.keys(side)) {
+        if (out[k] == null && side[k] != null) out[k] = side[k]
+      }
     }
-    return (
-      <div>
-        {fifaStats
-          ? <ESPNStats stats={fifaStats} />
-          : <p className="modal__noEvents">Stats non disponibles</p>
-        }
-        {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-      </div>
-    )
+    return out
   }
-
   // ── Priorité 2 : ESPN summary (19 champs) FUSIONNÉ avec le scoreboard
   // (6 champs) — question utilisateur : plutôt que "le premier qui a des
   // données gagne et on jette le reste", on combine champ par champ (le
@@ -621,64 +652,107 @@ export function LiveStatsTab({ match, espnScore }) {
   // sources peuvent techniquement dater de quelques secondes d'écart l'un de
   // l'autre en live — invisible en pratique (déjà le cas de base pour
   // n'importe quelle stat live qui a plusieurs secondes de retard). ──
-  const mergeSide = (...sides) => {
-    const out = {}
-    for (const side of sides) {
-      if (!side) continue
-      for (const k of Object.keys(side)) {
-        if (out[k] == null && side[k] != null) out[k] = side[k]
-      }
-    }
-    return out
-  }
   const mergedStats = (summaryStats || hasEspn) ? {
     home: mergeSide(summaryStats?.home, espnScore?.stats?.home),
     away: mergeSide(summaryStats?.away, espnScore?.stats?.away),
   } : null
 
-  if (mergedStats) {
+  // Corps de l'onglet (stats détaillées) — 4 priorités, une seule return à
+  // la fin de LiveStatsTab désormais (voir plus bas) pour pouvoir afficher
+  // le pronostic live au-dessus quel que soit le chemin emprunté ici.
+  const statsBody = (() => {
+    if (isFifaMatch) {
+      if (fifaStatsLoading) return <StatsSkeleton />
+      return (
+        <div>
+          {fifaStats
+            ? <ESPNStats stats={fifaStats} />
+            : <p className="modal__noEvents">Stats non disponibles</p>
+          }
+          {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        </div>
+      )
+    }
+
+    if (mergedStats) {
+      return (
+        <div>
+          <ESPNStats stats={mergedStats} />
+          {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        </div>
+      )
+    }
+
+    // Chargement du summary en cours (et aucune stat scoreboard à afficher
+    // tout de suite en attendant) : on patiente plutôt que d'afficher un état
+    // vide qui se remplirait un instant après — évite un saut visuel.
+    if (summaryLoading && hasEspnId) return <StatsSkeleton />
+
+    // ── Priorité 4 : Fallback api-football ──
+    const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
+    const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
+    const rows      = STAT_KEYS
+      .map(k => items.find(item => item.name === k))
+      .filter(Boolean)
+
+    if (aflLoading && rows.length === 0) return <StatsSkeleton />
+
     return (
       <div>
-        <ESPNStats stats={mergedStats} />
-        {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+        {rows.length > 0 ? (
+          <div className="modal__espnStats">
+            {rows.map(item => (
+              <StatBar
+                key={item.name}
+                label={STAT_FR[item.name] ?? item.name}
+                homeVal={item.home ?? '0'}
+                awayVal={item.away ?? '0'}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="modal__noEvents">Stats non disponibles</p>
+        )}
       </div>
     )
-  }
-
-  // Chargement du summary en cours (et aucune stat scoreboard à afficher
-  // tout de suite en attendant) : on patiente plutôt que d'afficher un état
-  // vide qui se remplirait un instant après — évite un saut visuel.
-  if (summaryLoading && hasEspnId) {
-    return <StatsSkeleton />
-  }
-
-  // ── Priorité 4 : Fallback api-football ──
-  const allPeriod = statsData?.statistics?.find(s => s.period === 'ALL')
-  const items     = allPeriod?.groups?.flatMap(g => g.statisticsItems ?? []) ?? []
-  const rows      = STAT_KEYS
-    .map(k => items.find(item => item.name === k))
-    .filter(Boolean)
-
-  if (aflLoading && rows.length === 0) {
-    return <StatsSkeleton />
-  }
+  })()
 
   return (
     <div>
-      {rows.length > 0 ? (
-        <div className="modal__espnStats">
-          {rows.map(item => (
-            <StatBar
-              key={item.name}
-              label={STAT_FR[item.name] ?? item.name}
-              homeVal={item.home ?? '0'}
-              awayVal={item.away ?? '0'}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="modal__noEvents">Stats non disponibles</p>
-      )}
+      {liveProno && <LiveProno prono={liveProno} match={match} />}
+      {statsBody}
+    </div>
+  )
+}
+
+// ── Pronostic live façon "côtes bookmaker" ────────────────────────────────
+// Barre 1/N/2 recalculée en direct (score, minute, cartons rouges,
+// possession, tirs cadrés — voir calcLiveProno) affichée au-dessus des
+// stats live pour un aperçu immédiat de "qui est favori maintenant", sans
+// attendre le chargement des stats détaillées.
+function LiveProno({ prono, match }) {
+  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+  const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
+  const awayCode = (match.awayTeam?.tla || awayName).slice(0, 3).toUpperCase()
+  const { home: homeColors, away: awayColors } = getMatchTeamColors(homeName, awayName)
+
+  return (
+    <div className="modal__liveProno">
+      <div className="modal__liveProno__title">
+        <span className="modal__liveProno__dot" />
+        Pronostic en direct
+      </div>
+      <div className="modal__liveProno__labels">
+        <span className="modal__liveProno__lbl modal__liveProno__lbl--h">{homeCode} {prono.home}%</span>
+        <span className="modal__liveProno__lbl modal__liveProno__lbl--d" style={{ left: `${prono.home + prono.draw / 2}%` }}>Nul {prono.draw}%</span>
+        <span className="modal__liveProno__lbl modal__liveProno__lbl--a">{awayCode} {prono.away}%</span>
+      </div>
+      <div className="modal__liveProno__bar">
+        <div className="modal__liveProno__seg modal__liveProno__seg--h" style={{ width: `${prono.home}%`, background: homeColors.main }} />
+        <div className="modal__liveProno__seg modal__liveProno__seg--d" style={{ width: `${prono.draw}%` }} />
+        <div className="modal__liveProno__seg modal__liveProno__seg--a" style={{ width: `${prono.away}%`, background: awayColors.main, opacity: 0.8 }} />
+      </div>
     </div>
   )
 }
