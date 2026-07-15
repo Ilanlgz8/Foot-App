@@ -337,24 +337,25 @@
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
-/* space-between (au lieu de center) : les 3 pilules s'écartent pour occuper
-   toute la largeur de .mp__tabContent, dont les marges gauche/droite sont
-   alignées sur celles du hero (.mp__hero, .mp__wrap — mêmes valeurs de
-   padding) — la pilule domicile tombe donc sous la colonne équipe domicile
-   du hero, l'extérieure sous la colonne extérieure, comme demandé. */
+/* space-between : les 3 pilules s'écartent pour occuper toute la largeur de
+   .mp__tabContent (marges alignées sur le hero) — la pilule domicile tombe
+   sous la colonne équipe domicile, l'extérieure sous l'extérieure. Gap
+   resserré à 6px (retour utilisateur : "espace moins les rectangles") pour
+   laisser la place à des pilules plus larges. */
 .modal__liveProno__row {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
-/* Largeur fixe (pas flex:1), centré via justify-content sur la row.
-   "Longueur" = largeur horizontale (retour utilisateur) : élargie à 66px,
-   hauteur revenue à 62px. Glow PERMANENT bordeaux (pas d'animation qui
-   clignote) réservé à la pilule FAVORITE — voir LivePronoPill, style inline
-   conditionnel sur isFavorite ; les 2 autres gardent une bordure
-   transparente ici. */
+/* Largeur fixe (pas flex:1), toutes les 3 identiques (même pattern que
+   .poster__prono-pill dans accueil.css). 112px = largeur des pilules
+   Accueil (102px) + 10px (retour utilisateur : "rajoute 10px de plus que
+   sur les rectangles [...] dans les cards des matchs à venir de accueil").
+   Glow PERMANENT bordeaux réservé à la pilule FAVORITE — voir
+   LivePronoPill, style inline conditionnel sur isFavorite ; les 2 autres
+   gardent une bordure transparente ici. */
 .modal__liveProno__pill {
-  width: 66px;
+  width: 112px;
   height: 62px;
   display: flex;
   flex-direction: column;
@@ -364,9 +365,6 @@
   border-radius: 10px;
   border: 3px solid transparent;
   background: #ffffff;
-}
-.modal__liveProno__pill--draw {
-  width: 56px;
 }
 .modal__liveProno__pillLabel {
   font-size: 0.5rem;

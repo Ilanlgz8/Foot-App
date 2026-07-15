@@ -754,22 +754,19 @@ function LiveProno({ prono, match }) {
       </div>
       <div className="modal__liveProno__row">
         <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} pct={prono.home} isFavorite={favorite === 'home'} />
-        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} draw isFavorite={favorite === 'draw'} />
+        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} isFavorite={favorite === 'draw'} />
         <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} pct={prono.away} isFavorite={favorite === 'away'} />
       </div>
     </div>
   )
 }
 
-function LivePronoPill({ label, value, pct, draw = false, isFavorite = false }) {
+function LivePronoPill({ label, value, pct, isFavorite = false }) {
   const style = isFavorite
     ? { borderColor: `rgba(159,30,52,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct) }
     : { borderColor: 'transparent' }
   return (
-    <div
-      className={`modal__liveProno__pill${draw ? ' modal__liveProno__pill--draw' : ''}`}
-      style={style}
-    >
+    <div className="modal__liveProno__pill" style={style}>
       <span className="modal__liveProno__pillLabel">{label}</span>
       <span className="modal__liveProno__pillVal">{value.toFixed(2)}</span>
     </div>
