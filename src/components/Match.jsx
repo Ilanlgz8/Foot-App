@@ -722,7 +722,11 @@ function Matchs() {
   // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
   // d'un match rebasculait toujours sur la 1ère journée/tour (16e) au lieu
   // de celui consulté (ex: 8e de finale).
-  const [selectedComp,  setSelectedComp]  = usePersistedState('matchs_selectedComp', 'WC')
+  // Clé 'shared_selectedComp' PARTAGÉE avec Classement.jsx et Resultat.jsx
+  // — changer de championnat ici met aussi à jour les deux autres pages (et
+  // inversement). Sûr car une seule des 3 pages est montée à la fois (voir
+  // usePersistedState.js).
+  const [selectedComp,  setSelectedComp]  = usePersistedState('shared_selectedComp', 'WC')
   const [currentIndex,  setCurrentIndex]  = usePersistedState('matchs_currentIndex', 0)
   const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)

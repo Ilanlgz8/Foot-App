@@ -40,7 +40,12 @@ function Classement() {
   // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
   // d'un match rebasculait toujours sur la compétition/l'onglet/la recherche
   // par défaut au lieu de ceux consultés.
-  const [selectedComp, setSelectedComp] = usePersistedState('classement_selectedComp', navCompId ?? 'WC')
+  // Clé 'shared_selectedComp' PARTAGÉE avec Match.jsx (Programme) et
+  // Resultat.jsx (Résultats) — changer de championnat ici met aussi à jour
+  // Programme/Résultats (et inversement). Sûr car une seule de ces 3 pages
+  // est montée à la fois (App.jsx remonte tout le contenu par route, voir
+  // usePersistedState.js).
+  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'WC')
   const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
   const [search, setSearch] = usePersistedState('classement_search', '')
   const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)

@@ -119,7 +119,11 @@ function Resultats() {
   // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
   // d'un match rebasculait toujours sur la 1ère journée au lieu de celle
   // consultée (ex: 8e journée → 6e).
-  const [selectedComp, setSelectedComp] = usePersistedState('resultats_selectedComp', 'WC')
+  // Clé 'shared_selectedComp' PARTAGÉE avec Classement.jsx et Match.jsx
+  // (Programme) — changer de championnat ici met aussi à jour les deux
+  // autres pages (et inversement). Sûr car une seule des 3 pages est montée
+  // à la fois (voir usePersistedState.js).
+  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', 'WC')
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué sur une journée
   // passée puis cliqué sur un match puis "retour", on retombait sur la
   // journée la plus récente au lieu de celle consultée) : l'ancien
