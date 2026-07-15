@@ -40,73 +40,23 @@
 import { Redis } from '@upstash/redis'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
 import { ESPN_SLUG_BY_COMP_ID } from '../../src/data/espnSlugs.js'
+// ⚠️ Toutes ces fonctions étaient dupliquées ici ET dans api/cron-goals.js —
+// risque de divergence si un futur bug est corrigé d'un seul côté. Extraites
+// dans src/utils/liveDetection.js (fonctions pures, sans dépendance
+// Node/Workers), importées ici ET par Vercel. Voir ce fichier pour le détail
+// et liveDetection.test.js pour les tests.
+import {
+  LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
+  normalizeFifa, fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
+  extractEspnScorers, extractEspnCards, generateRecap,
+  minuteLabel, dateStr, parseMin,
+} from '../../src/utils/liveDetection.js'
 
 const ESPN_SLUGS = Object.values(ESPN_SLUG_BY_COMP_ID)
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 
-const LIVE_ESPN  = new Set([
-  'STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD',
-  'STATUS_EXTRA_TIME', 'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
-])
-const FINAL_ESPN = new Set([
-  'STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
-])
-const KNOWN_ESPN_STATUS = new Set([
-  'STATUS_SCHEDULED', 'STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD',
-  'STATUS_EXTRA_TIME', 'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
-  'STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN',
-  'STATUS_POSTPONED', 'STATUS_CANCELED',
-])
-
-function normalizeEspnStatus(st) {
-  const name = st?.type?.name ?? ''
-  if (KNOWN_ESPN_STATUS.has(name)) return name
-  if (name === 'STATUS_FIRST_HALF' || name === 'STATUS_SECOND_HALF') return 'STATUS_IN_PROGRESS'
-  if (st?.type?.completed === true) return 'STATUS_FINAL'
-  if (st?.type?.state === 'in')   return 'STATUS_IN_PROGRESS'
-  if (st?.type?.state === 'post') return 'STATUS_FINAL'
-  return name || 'STATUS_SCHEDULED'
-}
-
-function normalizeFifa(name = '') {
-  return name.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]/g, '')
-}
-function fuzzyTeamFifa(a, b) {
-  const na = normalizeFifa(a), nb = normalizeFifa(b)
-  if (!na || !nb) return false
-  if (na === nb) return true
-  if (na.startsWith(nb.slice(0, 5)) || nb.startsWith(na.slice(0, 5))) return true
-  const wa = na.match(/[a-z]{4,}/g) ?? []
-  const wb = nb.match(/[a-z]{4,}/g) ?? []
-  return wa.some(x => wb.some(y => x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4))))
-}
-function fifaTeamNamesAll(team) {
-  return (team?.TeamName ?? []).map(t => t.Description).filter(Boolean)
-}
-function fifaEffectiveStatus(m) {
-  if (m.MatchStatus !== 1 || m.Period === 0) return null
-  if (m.Period === 3 || m.Period === 5) return 'STATUS_HALFTIME'
-  return 'STATUS_IN_PROGRESS'
-}
-function fifaConfirmsShootoutOver(m) {
-  return m.MatchStatus === 3 && m.Period === 8
-}
-
 function t(name) { return TEAM_NAMES_FR[name] ?? name }
-
-function minuteLabel(raw) {
-  const base = String(raw ?? '').split(':')[0]
-  return base ? `${base}'` : ''
-}
-
-function dateStr(d) {
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-}
-
-function parseMin(m) { return parseInt(String(m ?? '').replace(/[^\d]/g, ''), 10) || 0 }
 
 async function fetchEspnEvents(slug, date, log) {
   try {
@@ -177,95 +127,10 @@ async function cacheEspnSummary(kv, slug, eventId, log) {
   }
 }
 
-// ── Résumé auto de match (recap) — identique à generateRecap() dans
-// api/cron-goals.js, aucune dépendance crypto, copié tel quel. ──────────────
-function extractEspnScorers(comp, homeTeamId) {
-  return (comp.details ?? [])
-    .filter(d => {
-      const txt = (d.type?.text ?? '').toLowerCase()
-      const id  = String(d.type?.id ?? '')
-      return txt.includes('goal') || (txt.includes('penalty') && !txt.includes('miss')) || id === '57' || id === '58' || id === '72'
-    })
-    .map(d => {
-      const ath = d.athletesInvolved?.[0]
-      const txt = (d.type?.text ?? '').toLowerCase()
-      return {
-        name:        ath?.shortName ?? ath?.displayName ?? '?',
-        minute:      d.clock?.displayValue ?? '',
-        team:        d.team?.id === homeTeamId ? 'home' : 'away',
-        ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
-        penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
-      }
-    })
-}
-
-function extractEspnCards(comp, homeTeamId) {
-  return (comp.details ?? [])
-    .filter(d => {
-      const id = String(d.type?.id ?? '')
-      return id === '93' || id === '94'
-    })
-    .map(d => {
-      const ath = d.athletesInvolved?.[0]
-      return {
-        name:   ath?.shortName ?? ath?.displayName ?? '?',
-        minute: d.clock?.displayValue ?? '',
-        team:   d.team?.id === homeTeamId ? 'home' : 'away',
-        red:    d.redCard === true || String(d.type?.id) === '93',
-      }
-    })
-}
-
+// extractEspnScorers/extractEspnCards/generateRecap : importés de
+// src/utils/liveDetection.js (voir en tête de fichier) — anciennement
+// dupliqués ici et dans api/cron-goals.js, désormais une seule source, testée.
 const RECAP_TTL = 60 * 24 * 3600
-
-function generateRecap({ homeTeam, awayTeam, home, away, scorers, cards }) {
-  if (home == null || away == null) return null
-  const diff    = Math.abs(home - away)
-  const total   = home + away
-  const winner  = home > away ? 'home' : away > home ? 'away' : null
-  const winnerName = winner === 'home' ? homeTeam : winner === 'away' ? awayTeam : null
-  const loserName  = winner === 'home' ? awayTeam : winner === 'away' ? homeTeam : null
-
-  let intro
-  if (winner === null) {
-    intro = total === 0
-      ? `${homeTeam} et ${awayTeam} n'ont pas réussi à se départager (0-0).`
-      : `${homeTeam} et ${awayTeam} se quittent sur un match nul (${home}-${away}).`
-  } else if (diff >= 3) {
-    intro = `${winnerName} s'impose largement face à ${loserName} (${home}-${away}).`
-  } else if (diff === 2) {
-    intro = `${winnerName} prend le dessus sur ${loserName} (${home}-${away}).`
-  } else {
-    intro = `${winnerName} s'impose de justesse face à ${loserName} (${home}-${away}).`
-  }
-
-  const sortedGoals = [...(scorers ?? [])].sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
-  const lastGoal = sortedGoals[sortedGoals.length - 1]
-  if (winner && diff === 1 && lastGoal && parseMin(lastGoal.minute) >= 80 && lastGoal.team === winner) {
-    intro += ` Le but décisif est tombé tardivement, à la ${lastGoal.minute}.`
-  }
-  if (winner && sortedGoals.length >= 2 && sortedGoals[0].team !== winner) {
-    intro += ` ${winnerName} a renversé la situation après avoir été mené.`
-  }
-  if (total >= 5) intro += ' Un match spectaculaire, riche en buts.'
-
-  let scorersLine = ''
-  if (sortedGoals.length) {
-    const label = g => `${g.name} (${g.minute}${g.ownGoal ? ', csc' : g.penaltyKick ? ', pen' : ''})`
-    scorersLine = `Buteurs : ${sortedGoals.map(label).join(', ')}.`
-  }
-
-  const reds = (cards ?? []).filter(c => c.red)
-  let cardsLine = ''
-  if (reds.length === 1) {
-    const teamName = reds[0].team === 'home' ? homeTeam : awayTeam
-    cardsLine = `${teamName} a terminé la rencontre à 10 après le carton rouge de ${reds[0].name} (${reds[0].minute}).`
-  } else if (reds.length > 1) {
-    cardsLine = `La rencontre a été marquée par ${reds.length} exclusions.`
-  }
-
-  return [intro, scorersLine, cardsLine].filter(Boolean).join(' ')
-}
 
 // ── Envoi (relais Vercel) ─────────────────────────────────────────────────
 // Remplace sendDeduped()+sendPushToMatch() de api/cron-goals.js : le dédup

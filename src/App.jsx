@@ -9,6 +9,7 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
 import { useOnline } from './hooks/useOnline'
 import { OfflineBanner } from './components/OfflineBanner'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 const MatchAVenir = lazy(() => import('./components/Match.jsx'))
 const Resultat = lazy(() => import('./components/Resultat.jsx'))
@@ -110,29 +111,41 @@ function App() {
   return (
     // LiveProvider monté ici → hooks live survivent aux changements de route
     // + Web Worker ESPN continue de tourner même si l'utilisateur est sur Classement etc.
-    <LiveProvider>
-      <Navbar />
-      {!online && <OfflineBanner />}
-      <div key={location.pathname} className="page-transition">
-        <Suspense fallback={<div className="routeFallback" />}>
-          <Routes location={location}>
-            <Route path="/" element={<Accueil />} />
-            <Route path="/matchs" element={<MatchAVenir />} />
-            <Route path="/resultats" element={<Resultat />} />
-            <Route path="/classement" element={<Classement />} />
-            <Route path="/live" element={<Live />} />
-            <Route path="/live/:matchId" element={<LiveMatchPage />} />
-            <Route path="/match/:matchId" element={<MatchPage />} />
-            <Route path="/favoris" element={<FavoritesPage />} />
-            <Route path="/pronos" element={<Pronos />} />
-            <Route path="/mentions-legales" element={<MentionsLegales />} />
-            <Route path="/debug-espn" element={<DebugEspn />} />
+    //
+    // 2 niveaux d'ErrorBoundary (voir ErrorBoundary.jsx pour le contexte
+    // complet) : l'extérieur protège tout le shell (Navbar/Footer compris —
+    // filet de dernier recours si l'un d'eux plante) ; celui autour des
+    // Routes, KEYÉ par location.pathname, isole une page cassée SANS faire
+    // disparaître la navbar — et se réinitialise tout seul dès qu'on change
+    // de page (nouvelle clé = nouvelle instance = l'erreur précédente est
+    // oubliée), donc pas besoin d'un rechargement complet pour s'en sortir.
+    <ErrorBoundary>
+      <LiveProvider>
+        <Navbar />
+        {!online && <OfflineBanner />}
+        <div key={location.pathname} className="page-transition">
+          <ErrorBoundary key={location.pathname}>
+            <Suspense fallback={<div className="routeFallback" />}>
+              <Routes location={location}>
+                <Route path="/" element={<Accueil />} />
+                <Route path="/matchs" element={<MatchAVenir />} />
+                <Route path="/resultats" element={<Resultat />} />
+                <Route path="/classement" element={<Classement />} />
+                <Route path="/live" element={<Live />} />
+                <Route path="/live/:matchId" element={<LiveMatchPage />} />
+                <Route path="/match/:matchId" element={<MatchPage />} />
+                <Route path="/favoris" element={<FavoritesPage />} />
+                <Route path="/pronos" element={<Pronos />} />
+                <Route path="/mentions-legales" element={<MentionsLegales />} />
+                <Route path="/debug-espn" element={<DebugEspn />} />
 
-          </Routes>
-        </Suspense>
-      </div>
-      <Footer />
-    </LiveProvider>
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+        <Footer />
+      </LiveProvider>
+    </ErrorBoundary>
   )
 }
 

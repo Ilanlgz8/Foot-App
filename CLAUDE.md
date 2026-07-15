@@ -10,6 +10,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
 - **Cron (polling ESPN + notifs)** : Worker Cloudflare (`cf-worker/`, gratuit, Cron Trigger `* * * * *`) — fait le fetch ESPN + la détection (but/carton/KO/mi-temps/fin) chaque minute, coût CPU quasi nul (le réseau ne compte pas dans le budget CPU Cloudflare). N'appelle `/api/cron-goals` (mode `notify`, voir plus bas) QUE quand un vrai événement est détecté — Vercel ne fait plus que l'envoi push (VAPID + chiffrement par abonné), quelques dizaines de fois/jour de match au lieu de 1440x/jour inconditionnellement. Ancien schéma (cron-job.org → tout sur Vercel 1x/min 24/7) conservé intact en fallback manuel dans le même fichier — voir `cf-worker/README.md` pour le contexte complet et la procédure de déploiement/rollback.
+- **Robustesse** : `ErrorBoundary` (`src/components/ErrorBoundary.jsx`) autour de chaque route dans `App.jsx` (keyée par pathname) + une autour de tout le shell — un bug de rendu imprévu dans une page ne fait plus planter toute l'app (navbar comprise), contient les dégâts à la page concernée. Tests unitaires (`vitest`) sur la logique la plus fragile : `src/utils/liveDetection.test.js` (détection ESPN/FIFA, buteurs/cartons, recap — logique partagée entre `api/cron-goals.js` et `cf-worker/`) et `src/utils/calcProno.test.js` (modèle de pronostic).
 
 ## Architecture clé
 
@@ -44,6 +45,7 @@ src/
     NotificationBell.jsx
     Classement.jsx
     navbar.jsx
+    ErrorBoundary.jsx — filet de sécurité anti-écran-noir, utilisé dans App.jsx
   pages/
     LiveMatchPage.jsx  — page dédiée /live/:matchId
     LiveMatchPage.css
@@ -61,7 +63,10 @@ src/
     notify.js          — fonctions notif avec translateTeam + persistance localStorage
     matchStateTracker.js
     matchUtils.js
-    calcProno.js
+    calcProno.js        — modèle de pronostic (voir calcProno.test.js)
+    liveDetection.js    — détection ESPN/FIFA PARTAGÉE entre api/cron-goals.js et
+                           cf-worker/ (voir liveDetection.test.js) — source unique,
+                           ne JAMAIS redupliquer dans l'un des deux sans l'autre
   data/
     teamNames.js       — TEAM_NAMES_FR + translateTeam()
     competitions.js
