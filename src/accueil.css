@@ -1675,12 +1675,10 @@
   justify-content: center;
   gap: 8px;
 }
-/* Largeur fixe (pas flex:1), +20px (retour utilisateur), et les 3 pilules
-   ont maintenant TOUTES la même taille (plus de pilule "Nul" plus étroite,
-   retour utilisateur : "faut que les rectangles soient tous de la même
-   taille") : 72px → 92px pour les 3. */
+/* Largeur fixe (pas flex:1), +10px de plus (retour utilisateur), toutes les
+   3 pilules identiques : 92px → 102px. */
 .poster__prono-pill {
-  width: 92px;
+  width: 102px;
   height: 54px;
   display: flex;
   flex-direction: column;
@@ -1698,13 +1696,15 @@
   text-transform: uppercase;
   color: #111111;
 }
-/* Graisse relevée à 900 (retour utilisateur : "les chiffres + épais"). */
+/* Graisse 900 + rouge bordeaux éclairci et plus vif (retour utilisateur :
+   "clair et bien prononcé, un beau truc") — #c41e3a au lieu du bordeaux très
+   sombre #7a1e2e d'origine, plus lisible tout en restant "bordeaux". */
 .poster__prono-pillVal {
   font-family: 'Chakra Petch', sans-serif;
   font-size: 0.92rem;
   font-weight: 900;
   letter-spacing: 0.01em;
-  color: #7a1e2e;
+  color: #c41e3a;
 }
 
 /* ── Variante live ── */

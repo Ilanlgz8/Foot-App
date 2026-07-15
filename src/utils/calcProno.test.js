@@ -199,7 +199,7 @@ describe('pronoIntensity', () => {
 describe('pronoGlowShadow', () => {
   it('renvoie une valeur box-shadow CSS valide (3 halos rgba, ton bordeaux)', () => {
     const shadow = pronoGlowShadow(52)
-    expect(shadow).toContain('rgba(122,30,46,')
+    expect(shadow).toContain('rgba(196,30,58,')
     expect(shadow.split(',').filter(s => s.includes('rgba')).length).toBe(3)
   })
 

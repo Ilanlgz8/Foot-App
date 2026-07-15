@@ -373,14 +373,14 @@
 /* Police "sport" — Chakra Petch, déjà chargée par l'app (index.html) et
    déjà utilisée pour les numéros de maillot (LineupPitch.jsx) : look
    digital/scoreboard cohérent avec le reste de l'app plutôt qu'une police
-   de plus à charger. Graisse relevée à 800 (retour utilisateur : "les
-   chiffres en gras aussi"). */
+   de plus à charger. Graisse 800 + rouge bordeaux éclairci/vif (voir
+   accueil.css .poster__prono-pillVal — même teinte #c41e3a partout). */
 .modal__liveProno__pillVal {
   font-family: 'Chakra Petch', sans-serif;
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  color: #7a1e2e;
+  color: #c41e3a;
 }
 
 .modal__stats {
