@@ -7,7 +7,7 @@
 // plusieurs facteurs (Poisson + H2H), une valeur exacte serait fragile au
 // moindre ajustement de pondération sans rien prouver de plus utile.
 import { describe, it, expect } from 'vitest'
-import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow } from './calcProno'
+import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from './calcProno'
 
 function sumsTo100(p) {
   return p.home + p.draw + p.away === 100
@@ -197,9 +197,9 @@ describe('pronoIntensity', () => {
 })
 
 describe('pronoGlowShadow', () => {
-  it('renvoie une valeur box-shadow CSS valide (3 halos rgba)', () => {
+  it('renvoie une valeur box-shadow CSS valide (3 halos rgba, ton bordeaux)', () => {
     const shadow = pronoGlowShadow(52)
-    expect(shadow).toContain('rgba(255,7,45,')
+    expect(shadow).toContain('rgba(122,30,46,')
     expect(shadow.split(',').filter(s => s.includes('rgba')).length).toBe(3)
   })
 
@@ -207,5 +207,19 @@ describe('pronoGlowShadow', () => {
     const strong = pronoGlowShadow(70)
     const weak   = pronoGlowShadow(10)
     expect(strong).not.toBe(weak)
+  })
+})
+
+describe('pronoFavoriteKey', () => {
+  it('identifie le domicile comme favori quand son % est le plus haut', () => {
+    expect(pronoFavoriteKey({ home: 52, draw: 26, away: 22 })).toBe('home')
+  })
+
+  it('identifie l\'extérieur comme favori quand son % est le plus haut', () => {
+    expect(pronoFavoriteKey({ home: 20, draw: 25, away: 55 })).toBe('away')
+  })
+
+  it('identifie le nul comme favori quand son % est le plus haut', () => {
+    expect(pronoFavoriteKey({ home: 30, draw: 40, away: 30 })).toBe('draw')
   })
 })

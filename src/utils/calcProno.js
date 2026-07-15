@@ -32,16 +32,27 @@ export function pronoIntensity(pct) {
   return Math.max(0.35, Math.min(1, (pct - 5) / 45))
 }
 
-// Glow néon PERMANENT (pas d'animation clignotante, retour utilisateur :
-// "faut que ça trace le contour de la forme, pas que ça clignote") — 3
-// halos superposés (serré/saturé → large/diffus) dont l'opacité suit
-// pronoIntensity, pour que le favori garde le glow le plus marqué EN
-// PERMANENCE plutôt qu'un pic temporaire partagé par les 3 issues.
+// Glow PERMANENT (pas d'animation clignotante, retour utilisateur : "faut
+// que ça trace le contour de la forme, pas que ça clignote") — 3 halos
+// superposés (serré/saturé → large/diffus) dont l'opacité suit
+// pronoIntensity. Ton "rouge bordeaux" (122,30,46 = #7a1e2e), identique à la
+// couleur des chiffres de cote plutôt qu'un rouge néon vif — retour
+// utilisateur : "un beau rouge bordeaux", même teinte que les chiffres.
 export function pronoGlowShadow(pct) {
   const i = pronoIntensity(pct)
-  return `0 0 3px rgba(255,7,45,${(i * 0.7).toFixed(2)}), `
-    + `0 0 ${Math.round(6 + i * 12)}px rgba(255,7,45,${(i * 0.65).toFixed(2)}), `
-    + `0 0 ${Math.round(14 + i * 20)}px rgba(255,7,45,${(i * 0.35).toFixed(2)})`
+  return `0 0 3px rgba(122,30,46,${(i * 0.7).toFixed(2)}), `
+    + `0 0 ${Math.round(6 + i * 12)}px rgba(122,30,46,${(i * 0.65).toFixed(2)}), `
+    + `0 0 ${Math.round(14 + i * 20)}px rgba(122,30,46,${(i * 0.35).toFixed(2)})`
+}
+
+// Détermine l'issue favorite (% le plus haut = cote la plus basse) parmi
+// les 3 — utilisé pour n'appliquer le liseré/glow qu'à CETTE pilule
+// (retour utilisateur : "la bordure rouge mais que sur la côte la plus
+// basse"), les 2 autres pilules restent neutres (pas de liseré coloré).
+export function pronoFavoriteKey(prono) {
+  if (prono.home >= prono.draw && prono.home >= prono.away) return 'home'
+  if (prono.away >= prono.draw) return 'away'
+  return 'draw'
 }
 
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui

@@ -1666,23 +1666,20 @@
 }
 
 /* Pilules "côtes bookmaker" — même design que .modal__liveProno-* dans
-   matchModal.css (LiveMatchPage/LiveStatsTab) : fond rouge plein, texte
-   blanc contouré de noir, cote décimale (pronoToOdds), liseré rouge vif
-   d'intensité proportionnelle à la probabilité (pronoIntensity,
-   src/utils/calcProno.js). Agrandies (retour utilisateur : "plus vertical,
-   chiffres et code équipe plus grands") — plus proches de la taille du
-   modal désormais, plutôt que nettement plus compactes. */
+   matchModal.css (LiveMatchPage/LiveStatsTab) : fond blanc, chiffre
+   bordeaux en Chakra Petch, cote décimale (pronoToOdds). Liseré/glow
+   bordeaux PERMANENT réservé à la pilule FAVORITE (pronoFavorite, style
+   inline dans MatchPoster.jsx) — les 2 autres ont une bordure transparente. */
 .poster__prono-row {
   display: flex;
   justify-content: center;
   gap: 8px;
 }
-/* Plus vertical/étroit (largeur fixe, pas flex:1) + glow néon PERMANENT
-   (box-shadow calculé par pilule via pronoGlowShadow, plus d'animation qui
-   clignote) — même retour utilisateur que sur le modal (matchModal.css). */
+/* Vertical/étroit, largeur fixe (pas flex:1). Hauteur relevée à 62px
+   (retour utilisateur : "un peu trop court en longueur"). */
 .poster__prono-pill {
   width: 50px;
-  height: 54px;
+  height: 62px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1702,10 +1699,11 @@
   text-transform: uppercase;
   color: #111111;
 }
+/* Graisse relevée à 800 (retour utilisateur : "les chiffres en gras aussi"). */
 .poster__prono-pillVal {
   font-family: 'Chakra Petch', sans-serif;
   font-size: 0.92rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.01em;
   color: #7a1e2e;
 }

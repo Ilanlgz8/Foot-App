@@ -342,16 +342,15 @@
   justify-content: center;
   gap: 10px;
 }
-/* Plus vertical/étroit (retour utilisateur : "plus large en vertical,
-   moins long en longueur") — largeur fixe au lieu de flex:1 sur toute la
-   largeur, centré via justify-content sur la row. Glow néon PERMANENT
-   (plus d'animation qui clignote, retour utilisateur : "faut que ça trace
-   le contour de la forme, pas que ça clignote") — box-shadow calculé par
-   pilule via pronoGlowShadow (voir LivePronoPill), toujours allumé,
-   intensité proportionnelle au % de cette issue précise. */
+/* Vertical/étroit, largeur fixe (pas flex:1), centré via justify-content
+   sur la row. Hauteur relevée à 72px (retour utilisateur : "un peu trop
+   court en longueur"). Glow PERMANENT bordeaux (pas d'animation qui
+   clignote) réservé à la pilule FAVORITE — voir LivePronoPill, style inline
+   conditionnel sur isFavorite ; les 2 autres gardent une bordure
+   transparente ici. */
 .modal__liveProno__pill {
   width: 58px;
-  height: 62px;
+  height: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -374,11 +373,12 @@
 /* Police "sport" — Chakra Petch, déjà chargée par l'app (index.html) et
    déjà utilisée pour les numéros de maillot (LineupPitch.jsx) : look
    digital/scoreboard cohérent avec le reste de l'app plutôt qu'une police
-   de plus à charger. */
+   de plus à charger. Graisse relevée à 800 (retour utilisateur : "les
+   chiffres en gras aussi"). */
 .modal__liveProno__pillVal {
   font-family: 'Chakra Petch', sans-serif;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.01em;
   color: #7a1e2e;
 }
