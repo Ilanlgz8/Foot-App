@@ -1612,6 +1612,17 @@
   box-shadow: 0 0 0 3px rgba(200,210,225,0.07), 0 3px 10px rgba(var(--black-rgb),0.6);
   background: rgba(10, 14, 24, 0.88);
   flex-shrink: 0;
+  /* BUG CORRIGÉ (constat utilisateur, capture à l'appui) : .poster__team-col
+     force align-items:flex-start (home) / flex-end (away) pour plaquer le
+     GROUPE nom+losanges (.poster__nameGroup) vers le bord extérieur du poster
+     (voir commentaire sur .poster__nameGroup). Mais ce crest (44px, largeur
+     FIXE) héritait du même flex-start/flex-end — donc pour un nom plus large
+     que 44px (ex. "Angleterre", quasi la largeur max de 68px), le crest se
+     retrouvait collé au même bord gauche que le nom mais nettement plus
+     étroit → son centre visuel tombait ~12px plus à gauche que le centre du
+     nom/losanges en dessous. Le crest doit rester centré sur toute la
+     largeur de la colonne (68px), indépendamment de l'alignement du nom. */
+  align-self: center;
 }
 .poster__crest {
   width: 100%;
