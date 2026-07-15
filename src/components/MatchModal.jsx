@@ -642,32 +642,49 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
     )
   }
 
-  // ── Priorité 2 : ESPN summary stats (19 champs) — préféré dès que dispo ──
-  if (summaryStats) {
+  // ── Priorité 2 : ESPN summary (19 champs) FUSIONNÉ avec le scoreboard
+  // (6 champs) — question utilisateur : plutôt que "le premier qui a des
+  // données gagne et on jette le reste", on combine champ par champ (le
+  // summary est préféré à champ égal, le scoreboard ne comble que les trous).
+  // Aucun risque de casse : les deux sources retournent déjà le même format
+  // normalisé { home:{poss,shots,...}, away:{...} } avec des valeurs
+  // `null`-safe (voir useEspnSummaryStats/useEspnMatchDetail), ESPNStats
+  // filtre déjà les champs null à l'affichage — la fusion ne fait qu'élargir
+  // l'ensemble de champs non-null disponibles, jamais planter dessus. Seule
+  // nuance honnête : summary et scoreboard sont interrogés à des instants
+  // différents (staleTime différents), donc 2 champs fusionnés depuis 2
+  // sources peuvent techniquement dater de quelques secondes d'écart l'un de
+  // l'autre en live — invisible en pratique (déjà le cas de base pour
+  // n'importe quelle stat live qui a plusieurs secondes de retard). ──
+  const mergeSide = (...sides) => {
+    const out = {}
+    for (const side of sides) {
+      if (!side) continue
+      for (const k of Object.keys(side)) {
+        if (out[k] == null && side[k] != null) out[k] = side[k]
+      }
+    }
+    return out
+  }
+  const mergedStats = (summaryStats || hasEspn) ? {
+    home: mergeSide(summaryStats?.home, espnScore?.stats?.home),
+    away: mergeSide(summaryStats?.away, espnScore?.stats?.away),
+  } : null
+
+  if (mergedStats) {
     return (
       <div>
-        <ESPNStats stats={summaryStats} />
+        <ESPNStats stats={mergedStats} />
         {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
       </div>
     )
   }
 
-  // Chargement du summary en cours : on patiente plutôt que d'afficher tout
-  // de suite les stats basiques (ci-dessous) pour les remplacer un instant
-  // après une fois le summary arrivé — évite un saut visuel de contenu.
+  // Chargement du summary en cours (et aucune stat scoreboard à afficher
+  // tout de suite en attendant) : on patiente plutôt que d'afficher un état
+  // vide qui se remplirait un instant après — évite un saut visuel.
   if (summaryLoading && hasEspnId) {
     return <StatsSkeleton />
-  }
-
-  // ── Priorité 3 : ESPN scoreboard stats (6 champs seulement — repli si le
-  // summary n'a rien donné de plus, ou n'est pas interrogeable) ──
-  if (hasEspn) {
-    return (
-      <div>
-        <ESPNStats stats={espnScore.stats} />
-        {espnScore.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
-      </div>
-    )
   }
 
   // ── Priorité 4 : Fallback api-football ──
