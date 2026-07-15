@@ -218,15 +218,15 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           (pronoFavorite) — les 2 autres restent neutres. ── */}
       <div className="poster__footer">
         <div className="poster__prono-row">
-          <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(196,30,58,${pronoIntensity(prono.home)})`, boxShadow: pronoGlowShadow(prono.home) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.home)})`, boxShadow: pronoGlowShadow(prono.home) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">{homeCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(196,30,58,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">Nul</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(196,30,58,${pronoIntensity(prono.away)})`, boxShadow: pronoGlowShadow(prono.away) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.away)})`, boxShadow: pronoGlowShadow(prono.away) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">{awayCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.away).toFixed(2)}</span>
           </div>

@@ -35,15 +35,15 @@ export function pronoIntensity(pct) {
 // Glow PERMANENT (pas d'animation clignotante, retour utilisateur : "faut
 // que ça trace le contour de la forme, pas que ça clignote") — 3 halos
 // superposés (serré/saturé → large/diffus) dont l'opacité suit
-// pronoIntensity. Ton "rouge bordeaux" (196,30,58 = #c41e3a), identique à la
-// couleur des chiffres de cote plutôt qu'un rouge néon vif — éclairci et
-// rendu plus vif (retour utilisateur : "clair et bien prononcé, un beau
-// truc") par rapport au bordeaux très sombre d'origine (#7a1e2e).
+// pronoIntensity. Ton "rouge bordeaux" (159,30,52 = #9f1e34), identique à la
+// couleur des chiffres de cote — entre le bordeaux trop sombre d'origine
+// (#7a1e2e) et le rouge trop clair du tour précédent (#c41e3a), retour
+// utilisateur : "un peu trop clair, faut redescendre un peu".
 export function pronoGlowShadow(pct) {
   const i = pronoIntensity(pct)
-  return `0 0 3px rgba(196,30,58,${(i * 0.7).toFixed(2)}), `
-    + `0 0 ${Math.round(6 + i * 12)}px rgba(196,30,58,${(i * 0.65).toFixed(2)}), `
-    + `0 0 ${Math.round(14 + i * 20)}px rgba(196,30,58,${(i * 0.35).toFixed(2)})`
+  return `0 0 3px rgba(159,30,52,${(i * 0.7).toFixed(2)}), `
+    + `0 0 ${Math.round(6 + i * 12)}px rgba(159,30,52,${(i * 0.65).toFixed(2)}), `
+    + `0 0 ${Math.round(14 + i * 20)}px rgba(159,30,52,${(i * 0.35).toFixed(2)})`
 }
 
 // Détermine l'issue favorite (% le plus haut = cote la plus basse) parmi

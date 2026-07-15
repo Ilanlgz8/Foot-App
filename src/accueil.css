@@ -1696,15 +1696,17 @@
   text-transform: uppercase;
   color: #111111;
 }
-/* Graisse 900 + rouge bordeaux éclairci et plus vif (retour utilisateur :
-   "clair et bien prononcé, un beau truc") — #c41e3a au lieu du bordeaux très
-   sombre #7a1e2e d'origine, plus lisible tout en restant "bordeaux". */
+/* Graisse 900, chiffres agrandis pour bien remplir la pilule (retour
+   utilisateur : "grossis les chiffres, que ça prenne de la place"). Rouge
+   bordeaux #9f1e34 — entre le très sombre d'origine (#7a1e2e) et le trop
+   clair du tour précédent (#c41e3a), retour utilisateur : "un peu trop
+   clair, redescendre un peu". */
 .poster__prono-pillVal {
   font-family: 'Chakra Petch', sans-serif;
-  font-size: 0.92rem;
+  font-size: 1.25rem;
   font-weight: 900;
   letter-spacing: 0.01em;
-  color: #c41e3a;
+  color: #9f1e34;
 }
 
 /* ── Variante live ── */

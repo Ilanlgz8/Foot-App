@@ -763,7 +763,7 @@ function LiveProno({ prono, match }) {
 
 function LivePronoPill({ label, value, pct, draw = false, isFavorite = false }) {
   const style = isFavorite
-    ? { borderColor: `rgba(196,30,58,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct) }
+    ? { borderColor: `rgba(159,30,52,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct) }
     : { borderColor: 'transparent' }
   return (
     <div
