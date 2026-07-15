@@ -1967,7 +1967,14 @@
   border-radius: 1.5px;
   transform: rotate(45deg);
   flex-shrink: 0;
-  box-shadow: 0 0 0 1px rgba(var(--black-rgb),0.35), 0 1px 2px rgba(var(--black-rgb),0.4);
+  /* BUG CORRIGÉ (retour utilisateur : "les losanges qui sont pas alignés
+     verticalement centré") : l'ombre portée avait un décalage vers le bas
+     (0 1px 2px) — à 6px de taille, ce décalage représente ~17% de la
+     hauteur du losange, assez pour donner l'illusion optique qu'il "flotte"
+     au-dessus de son propre centre au lieu d'être vraiment centré dans sa
+     ligne. Remplacée par un halo symétrique (0 décalage, juste du flou) :
+     garde la même profondeur visuelle sans biaiser le centre perçu. */
+  box-shadow: 0 0 0 1px rgba(var(--black-rgb),0.35), 0 0 2px rgba(var(--black-rgb),0.4);
 }
 .formDiamonds__item--w { background: #4ade80; }
 .formDiamonds__item--d { background: #facc15; }
