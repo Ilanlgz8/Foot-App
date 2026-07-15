@@ -30,18 +30,30 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     _ms.espnStatus === 'STATUS_END_PERIOD'
   )
   const isFinished = _ms.ft === true || (match.status === 'FINISHED' && !_espnLive)
+  // BUG CORRIGÉ (constat utilisateur : "ça affiche pas 'Débute' sur la card,
+  // ça affiche que quand le match commence") : isLive ne regardait QUE
+  // match.status/_espnLive, jamais calcMinute() — or c'est calcMinute() qui
+  // renvoie 'Débute' pendant la fenêtre entre l'heure de coup d'envoi
+  // prévue et la confirmation ESPN (~30-60s, voir matchUtils.js). Comme
+  // minute n'était calculé QUE si isLive était déjà vrai, ce label ne
+  // pouvait jamais s'afficher — la card restait en "Coup d'envoi" (upcoming)
+  // jusqu'à ce qu'ESPN confirme, puis sautait direct à "1'"/"2'". Même
+  // pattern déjà utilisé et documenté dans MatchCard.jsx (liveMinute calculé
+  // d'abord, puis inclus dans la condition isLive).
+  const liveMinute  = isFinished ? null : calcMinute(match)
   const isLive     = !isFinished && (
     match.status === 'IN_PLAY' ||
     match.status === 'PAUSED'  ||
     match.status === 'HALFTIME'||
-    _espnLive
+    _espnLive ||
+    liveMinute !== null
   )
   const isUpcoming = !isFinished && !isLive
 
   const fsPoster  = finalScore(match.score)
   const homeScore = mergeScore(espnScore?.home, fsPoster.home)
   const awayScore = mergeScore(espnScore?.away, fsPoster.away)
-  const minute    = isLive ? calcMinute(match) : null
+  const minute    = isLive ? liveMinute : null
 
   const homeName  = match.homeTeam?.name ?? ''
   const awayName  = match.awayTeam?.name ?? ''
