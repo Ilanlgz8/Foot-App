@@ -260,15 +260,56 @@ export function useEspnMatchStats(match) {
         }
         return null
       }
-      const mapStats = (team) => ({
-        poss:          getStat(team, 'possessionPct'),
-        shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
-        shotsOnTarget: getStat(team, 'shotsOnTarget', 'shotsOnGoal', 'onGoal'),
-        corners:       getStat(team, 'cornerKicks', 'corners'),
-        fouls:         getStat(team, 'fouls', 'foulsCommitted'),
-        offside:       getStat(team, 'offsides', 'offside'),
-        yellowCards:   getStat(team, 'yellowCards'),
-      })
+      // BUG CORRIGÉ (constat utilisateur : "en résultat/live j'ai pas grand
+      // chose en stats qui s'affiche") : ce hook alimente MpMatchStats (page
+      // Résultat, matchs terminés) via fifaStatsToRows — cette dernière sait
+      // déjà afficher 19 lignes (Passes, Tacles, Interceptions, Centres,
+      // Longs ballons, Dégagements, Tirs contrés, Arrêts, Cartons rouges…,
+      // voir MatchModal.jsx), MAIS mapStats() ici n'en extrayait que 7
+      // (Possession/Tirs/Tirs cadrés/Corners/Fautes/Hors-jeux/Jaunes) — les
+      // 12 autres étaient donc TOUJOURS vides pour un match terminé, alors
+      // qu'ESPN les fournit (même endpoint /summary, mêmes noms de champs
+      // que useEspnSummaryStats dans MatchModal.jsx, déjà utilisé en LIVE).
+      // Même extraction ici désormais (passPct/tacklePct/etc recalculés à la
+      // main depuis les 2 compteurs bruts — les champs "*Pct" d'ESPN sont un
+      // ratio 0-1 arrondi, pas un vrai pourcentage, voir MatchModal.jsx) :
+      // une seule logique d'extraction, plus de divergence entre live et
+      // terminé.
+      const pct = (made, total) => (made != null && total != null && total > 0)
+        ? Math.round((made / total) * 100)
+        : null
+      const mapStats = (team) => {
+        const totalPasses    = getStat(team, 'totalPasses')
+        const accuratePasses = getStat(team, 'accuratePasses')
+        const totalTackles   = getStat(team, 'totalTackles')
+        const okTackles      = getStat(team, 'effectiveTackles')
+        const totalCrosses   = getStat(team, 'totalCrosses')
+        const okCrosses      = getStat(team, 'accurateCrosses')
+        const totalLongBalls = getStat(team, 'totalLongBalls')
+        const okLongBalls    = getStat(team, 'accurateLongBalls')
+        return {
+          poss:          getStat(team, 'possessionPct'),
+          shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
+          shotsOnTarget: getStat(team, 'shotsOnTarget', 'shotsOnGoal', 'onGoal'),
+          corners:       getStat(team, 'wonCorners', 'cornerKicks', 'corners'),
+          passes:        totalPasses,
+          passPct:       pct(accuratePasses, totalPasses),
+          tackles:       totalTackles,
+          tacklePct:     pct(okTackles, totalTackles),
+          interceptions: getStat(team, 'interceptions'),
+          crosses:       totalCrosses,
+          crossPct:      pct(okCrosses, totalCrosses),
+          longBalls:     totalLongBalls,
+          longBallPct:   pct(okLongBalls, totalLongBalls),
+          clearances:    getStat(team, 'totalClearance', 'effectiveClearance'),
+          blockedShots:  getStat(team, 'blockedShots'),
+          saves:         getStat(team, 'saves'),
+          fouls:         getStat(team, 'fouls', 'foulsCommitted'),
+          offsides:      getStat(team, 'offsides', 'offside'),
+          yellowCards:   getStat(team, 'yellowCards'),
+          redCards:      getStat(team, 'redCards'),
+        }
+      }
 
       const boxTeams = summary.boxscore?.teams ?? []
       let homeTeam = boxTeams.find(t => t.homeAway === 'home')
