@@ -224,7 +224,8 @@ export function useEspnMatchStats(match) {
       // 1. Scoreboard → event ID (double date, voir fetchEspnEventsDual)
       const events = await fetchEspnEventsDual(slug, match)
 
-      let eventId = null
+      let eventId   = null
+      let boardComp = null   // comp du SCOREBOARD (Passe 1) — voir pourquoi plus bas
       for (const evt of events) {
         const comp  = evt.competitions?.[0]
         const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
@@ -233,7 +234,8 @@ export function useEspnMatchStats(match) {
         const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
         const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
         if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-          eventId = evt.id
+          eventId   = evt.id
+          boardComp = comp
           break
         }
       }
@@ -320,6 +322,22 @@ export function useEspnMatchStats(match) {
 
       if (!hasData) {
         const competitors = summary.header?.competitions?.[0]?.competitors ?? []
+        const hc = competitors.find(c => c.homeAway === 'home')
+        const ac = competitors.find(c => c.homeAway === 'away')
+        if (hc || ac) {
+          stats   = { home: mapStats(hc), away: mapStats(ac) }
+          hasData = Object.values(stats.home ?? {}).some(v => v != null)
+        }
+      }
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "stats fausses/manquantes" sur un
+      // match CM 2026 précis — vérifié en comparant scoreboard et summary sur
+      // ce match : boxscore.teams ET header.competitions étaient TOUS LES DEUX
+      // vides côté summary, alors que le SCOREBOARD (Passe 1, `boardComp`,
+      // déjà en main) avait les stats complètes — possession/tirs/corners —
+      // pour les deux équipes). Même filet de sécurité que useEspnMatchDetail.js
+      // : on retombe sur boardComp avant d'abandonner, sans fetch en plus.
+      if (!hasData && boardComp) {
+        const competitors = boardComp.competitors ?? []
         const hc = competitors.find(c => c.homeAway === 'home')
         const ac = competitors.find(c => c.homeAway === 'away')
         if (hc || ac) {

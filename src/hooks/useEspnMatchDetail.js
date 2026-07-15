@@ -36,7 +36,7 @@ function espnDate(match, offsetDays = 0) {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-/** Passe 1 : trouve l'event ESPN dans le scoreboard et retourne { eventId, homeTeamId }. */
+/** Passe 1 : trouve l'event ESPN dans le scoreboard et retourne { eventId, homeTeamId, comp }. */
 function findEspnEvent(json, match) {
   for (const evt of json.events ?? []) {
     const comp  = evt.competitions?.[0]
@@ -49,15 +49,20 @@ function findEspnEvent(json, match) {
     const fdHome   = match.homeTeam?.name ?? match.homeTeam?.shortName ?? ''
     const fdAway   = match.awayTeam?.name ?? match.awayTeam?.shortName ?? ''
     if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-      return { eventId: evt.id, homeTeamId: homeC.team?.id }
+      // `comp` (l'objet competition du SCOREBOARD, pas du summary) remonté
+      // avec — voir pourquoi juste en dessous (extractDetails).
+      return { eventId: evt.id, homeTeamId: homeC.team?.id, comp }
     }
   }
   return null
 }
 
-/** Passe 2 : extrait buts + stats depuis la réponse summary ESPN. */
-function extractFromSummary(json, homeTeamId) {
-  const comp  = json.header?.competitions?.[0] ?? json.competitions?.[0]
+/** Extrait buts + cartons + stats à partir d'un objet "competition" ESPN (même
+ *  forme dans le scoreboard ET le summary : { competitors, details }). Séparé
+ *  de extractFromSummary() ci-dessous pour pouvoir l'appliquer aussi bien au
+ *  `comp` du scoreboard (Passe 1, déjà en main) qu'à celui du summary
+ *  (Passe 2) — voir queryFn plus bas pour pourquoi c'est nécessaire. */
+function extractDetails(comp, homeTeamId, commentary) {
   const homeC = (comp?.competitors ?? []).find(c => c.homeAway === 'home') ??
                 (comp?.competitors ?? []).find(c => c.team?.id === homeTeamId)
   const awayC = (comp?.competitors ?? []).find(c => c.homeAway === 'away') ??
@@ -107,7 +112,9 @@ function extractFromSummary(json, homeTeamId) {
   // direct : Breel Embolo (Suisse), carton jaune, 44e minute.
   // On ne prend QUE les jaunes ici — les rouges restent sourcés depuis
   // comp.details ci-dessus (déjà fiable) pour ne pas les compter en double.
-  for (const c of (json.commentary ?? [])) {
+  // `commentary` n'existe que sur la réponse summary (pas sur le scoreboard) —
+  // undefined dans ce 2e cas, la boucle ne fait simplement rien.
+  for (const c of (commentary ?? [])) {
     const play = c.play
     if (play?.type?.id !== '94') continue
     const ath = play.participants?.[0]?.athlete
@@ -123,17 +130,6 @@ function extractFromSummary(json, homeTeamId) {
   // format à base de `type` (jamais observé en pratique, mais coût nul à
   // garder en fallback), on complète avec cette détection historique.
   if (scorers.length === 0 && cards.length === 0) {
-    for (const play of json.plays ?? []) {
-      if (play.type?.id !== '57' && play.scoringPlay !== true) continue
-      const ath = play.participants?.[0]?.athlete ?? play.athletes?.[0]
-      scorers.push({
-        name:        ath?.shortName ?? ath?.displayName ?? '?',
-        minute:      play.clock?.displayValue ?? '',
-        team:        play.team?.id === homeC?.team?.id ? 'home' : 'away',
-        ownGoal:     play.ownGoal     ?? false,
-        penaltyKick: play.penaltyKick ?? false,
-      })
-    }
     for (const d of (comp?.details ?? [])) {
       const id = String(d.type?.id ?? '')
       if (d.type?.text === 'Goal' || id === '57') {
@@ -154,9 +150,15 @@ function extractFromSummary(json, homeTeamId) {
   }
 
   // ── Stats ──
-  const getStat = (c, name) => {
+  // ⚠️ Le scoreboard (Passe 1) et le summary (Passe 2) n'utilisent pas
+  // exactement les mêmes noms de champ pour la même stat (constaté en
+  // vérifiant les deux réponses côte à côte sur un vrai match CM 2026) :
+  // le scoreboard nomme les corners "wonCorners", le summary "corners" —
+  // on accepte les deux noms pour que extractDetails() fonctionne pareil
+  // quel que soit le `comp` (scoreboard ou summary) qu'on lui passe.
+  const getStat = (c, ...names) => {
     if (!c) return null
-    const found = (c.statistics ?? []).find(s => s.name === name)
+    const found = (c.statistics ?? []).find(s => names.includes(s.name))
     return found != null ? (parseFloat(found.displayValue) || 0) : null
   }
   const homePoss = getStat(homeC, 'possessionPct')
@@ -166,10 +168,16 @@ function extractFromSummary(json, homeTeamId) {
     scorers,
     cards,
     stats: (homePoss !== null || awayPoss !== null) ? {
-      home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners'), fouls: getStat(homeC, 'fouls'), offside: getStat(homeC, 'offsides') },
-      away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners'), fouls: getStat(awayC, 'fouls'), offside: getStat(awayC, 'offsides') },
+      home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners', 'wonCorners'), fouls: getStat(homeC, 'fouls', 'foulsCommitted'), offside: getStat(homeC, 'offsides') },
+      away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners', 'wonCorners'), fouls: getStat(awayC, 'fouls', 'foulsCommitted'), offside: getStat(awayC, 'offsides') },
     } : null,
   }
+}
+
+/** Passe 2 : extrait buts + stats depuis la réponse summary ESPN. */
+function extractFromSummary(json, homeTeamId) {
+  const comp = json.header?.competitions?.[0] ?? json.competitions?.[0]
+  return extractDetails(comp, homeTeamId, json.commentary)
 }
 
 export function useEspnMatchDetail(match, compId, enabled = true) {
@@ -216,10 +224,25 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
 
       // ── Passe 2 : summary → buts + stats complets ──
       const res2 = await fetch(`/espn?slug=${slug}&eventId=${found.eventId}`)
-      if (!res2.ok) return null
-      const summary = await res2.json()
+      const summaryResult = res2.ok ? extractFromSummary(await res2.json(), found.homeTeamId) : null
 
-      const result = extractFromSummary(summary, found.homeTeamId)
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "pas de buteurs, stats fausses"
+      // sur un match CM 2026 — vérifié en comparant les 2 réponses ESPN sur ce
+      // match précis) : pour certains matchs (constaté sur une demi-finale),
+      // le summary ESPN ne contient PAS le `header.competitions[0].details`
+      // attendu (buts/cartons) alors que le SCOREBOARD (Passe 1, déjà en
+      // main via `found.comp`) l'a bien, complet et correct — même équipes,
+      // mêmes stats de match (possession/tirs/corners), même buteurs. Plutôt
+      // que de dépendre uniquement du summary (parfois incomplet pour ces
+      // matchs-là), on retombe sur `found.comp` quand le summary n'a rien
+      // donné — sans coût réseau supplémentaire, cette donnée est déjà en
+      // mémoire depuis la Passe 1.
+      const boardResult = (!summaryResult || (summaryResult.scorers.length === 0 && summaryResult.cards.length === 0 && summaryResult.stats === null))
+        ? extractDetails(found.comp, found.homeTeamId)
+        : null
+      const result = (summaryResult && (summaryResult.scorers.length > 0 || summaryResult.cards.length > 0 || summaryResult.stats !== null))
+        ? summaryResult
+        : (boardResult ?? { scorers: [], cards: [], stats: null })
 
       // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide sur les 2 derniers
       // matchs consultés juste après leur fin, alors que les buts existaient
