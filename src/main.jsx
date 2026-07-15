@@ -46,22 +46,17 @@ const persister = createSyncStoragePersister({
   storage: window.localStorage
 })
 
-// ⚠️ BUG TROUVÉ (constat utilisateur : "j'ai fermé/rouvert l'app, toujours pas
-// les buteurs" — alors que la donnée ESPN est bien là, vérifié en direct sur
-// l'API) : le cache React Query est persisté dans le localStorage (gcTime
-// 24h) SANS AUCUNE clé de version. Concrètement, si une requête a échoué
-// (renvoyé null) AVANT un correctif — ex: useEspnMatchDetail qui ne
-// trouvait pas l'event ESPN à cause du bug de date corrigé juste avant —
-// ce `null` reste persisté et continue d'être servi tel quel après le
-// déploiement du correctif, PENDANT JUSQU'À 24H, même après avoir fermé et
-// rouvert l'app (fermer/rouvrir ne vide pas le localStorage). `buster` est
-// le mécanisme officiel TanStack Query pour ce cas précis : dès qu'il
-// change, TOUT le cache persisté existant est jeté au démarrage, sans
-// affecter les vraies données utilisateur (pronos, favoris, etc. — stockées
-// ailleurs, pas dans ce cache). À incrémenter à chaque fois qu'un correctif
-// touche la logique/forme d'une requête déjà potentiellement mise en cache
-// avec une mauvaise valeur.
-const CACHE_BUSTER = 'v3-2026-07-12-espn-summary-always-wins'
+// ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur, même symptôme que le
+// correctif ci-dessus mais un autre jour : "toujours pas les buteurs" alors
+// que la donnée ESPN est vérifiée bonne en direct sur l'API — fermer/rouvrir
+// l'app ne suffit pas, voir l'explication complète juste au-dessus) : le
+// correctif du 2026-07-15 (fallback scoreboard→summary dans
+// useEspnMatchDetail.js ET useEspnMatchStats) change la donnée renvoyée par
+// ces deux requêtes déjà potentiellement en cache avec un résultat vide
+// persisté AVANT ce correctif — sans bump du buster, ce vide serait resservi
+// jusqu'à 24h malgré le fix déployé. Toujours incrémenter ce buster à chaque
+// correctif qui touche la logique/forme d'une requête déjà en cache.
+const CACHE_BUSTER = 'v4-2026-07-15-espn-scoreboard-fallback'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>
