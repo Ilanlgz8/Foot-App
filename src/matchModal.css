@@ -337,9 +337,14 @@
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
+/* space-between (au lieu de center) : les 3 pilules s'écartent pour occuper
+   toute la largeur de .mp__tabContent, dont les marges gauche/droite sont
+   alignées sur celles du hero (.mp__hero, .mp__wrap — mêmes valeurs de
+   padding) — la pilule domicile tombe donc sous la colonne équipe domicile
+   du hero, l'extérieure sous la colonne extérieure, comme demandé. */
 .modal__liveProno__row {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   gap: 10px;
 }
 /* Largeur fixe (pas flex:1), centré via justify-content sur la row.

@@ -11,13 +11,23 @@ function strength(form) {
 // footer/MatchPoster.jsx) — partagé pour ne pas dupliquer la conversion
 // dans les deux composants qui l'affichent. ──────────────────────────────
 
-// % → cote décimale. Cote "juste" sans marge bookmaker (pas de vig) :
-// 100/%, arrondie à 2 décimales, jamais sous 1.01 (cote minimale plausible,
-// évite une division par une probabilité proche de 0 qui donnerait une
-// cote absurde genre 500.00).
+// Marge bookmaker (overround) — retour utilisateur : la somme des 3 cotes
+// "justes" (sans marge) semblait toujours tomber près de 10, ce qui ne
+// ressemble à aucun vrai bookmaker (ils prennent tous une marge : la somme
+// des probabilités implicites 1/cote dépasse 100%, jamais l'inverse). 1.06 =
+// overround modéré (marché bas : Pinnacle ~102-104% ; grand public plutôt
+// 106-110%) — volontairement discret plutôt que punitif. Appliqué en
+// multipliant chaque % par ce facteur avant de convertir en cote : ça
+// resserre les 3 cotes uniformément vers le bas, comme un vrai bookmaker.
+const BOOKMAKER_MARGIN = 1.06
+
+// % → cote décimale, avec la marge bookmaker ci-dessus. Arrondie à 2
+// décimales, jamais sous 1.01 (cote minimale plausible, évite une division
+// par une probabilité proche de 0 qui donnerait une cote absurde genre
+// 500.00).
 export function pronoToOdds(pct) {
   if (!pct || pct <= 0) return 99
-  return Math.max(1.01, Math.round((100 / pct) * 100) / 100)
+  return Math.max(1.01, Math.round((100 / (pct * BOOKMAKER_MARGIN)) * 100) / 100)
 }
 
 // Intensité visuelle (0-1) pour le liseré coloré de chaque issue — le

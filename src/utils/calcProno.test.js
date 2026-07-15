@@ -163,10 +163,9 @@ describe('calcLiveProno', () => {
 })
 
 describe('pronoToOdds', () => {
-  it('convertit un % en cote décimale cohérente (100/%)', () => {
-    expect(pronoToOdds(50)).toBe(2)
-    expect(pronoToOdds(25)).toBe(4)
-    expect(pronoToOdds(100)).toBe(1.01)
+  it('applique une marge bookmaker (~106% overround) plutôt que des cotes "justes"', () => {
+    expect(pronoToOdds(50)).toBeCloseTo(1.89, 2)
+    expect(pronoToOdds(25)).toBeCloseTo(3.77, 2)
   })
 
   it('ne descend jamais sous 1.01, même pour un % très élevé', () => {
@@ -181,6 +180,12 @@ describe('pronoToOdds', () => {
   it('une issue plus probable a toujours une cote plus basse', () => {
     expect(pronoToOdds(52)).toBeLessThan(pronoToOdds(26))
     expect(pronoToOdds(26)).toBeLessThan(pronoToOdds(22))
+  })
+
+  it('la somme des probabilités implicites (1/cote) dépasse 100%, comme un vrai bookmaker', () => {
+    const home = pronoToOdds(52), draw = pronoToOdds(26), away = pronoToOdds(22)
+    const impliedSum = 1 / home + 1 / draw + 1 / away
+    expect(impliedSum).toBeGreaterThan(1)
   })
 })
 

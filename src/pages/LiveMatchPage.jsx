@@ -430,8 +430,18 @@ export default function LiveMatchPage() {
           >
             {activeTab === 'stats' && (
               <>
-                <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
-                {statsView === 'live' ? (
+                {/* "Stats saison" retirée d'ici (retour utilisateur : remonter
+                    les côtes en direct, pas de sous-onglets à scroller avant
+                    de les voir) — déplacée en bas de l'onglet Classement,
+                    voir plus bas. Plus de sous-onglets du tout tant qu'il n'y
+                    a pas d'Historique disponible : un seul choix ("Stats
+                    live") n'a pas besoin d'un sélecteur. */}
+                {showH2HTab && (
+                  <StatsSubTabs view={statsView} onChange={setStatsView} showSaison={false} showHistorique />
+                )}
+                {statsView === 'historique' ? (
+                  <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                ) : (
                   <LiveStatsTab
                     match={match}
                     espnScore={espn}
@@ -439,15 +449,21 @@ export default function LiveMatchPage() {
                     hForm={hForm}
                     aForm={aForm}
                   />
-                ) : statsView === 'historique' ? (
-                  <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                ) : (
-                  <SeasonStatsTab match={match} compMatches={compMatches} />
                 )}
               </>
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} scorers={espn?.scorers ?? []} />}
-            {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
+            {activeTab === 'classement' && (
+              <>
+                <ClassementTab match={match} compId={compId} />
+                {/* Stats saison déplacée ici depuis l'onglet Statistiques
+                    (retour utilisateur) — regroupée avec le classement plutôt
+                    que perdue, mais sort du chemin direct vers les côtes en
+                    direct/stats live. */}
+                <h3 className="pm__sectionTitle" style={{ marginTop: '1.5rem' }}>Stats saison</h3>
+                <SeasonStatsTab match={match} compMatches={compMatches} />
+              </>
+            )}
           </div>
         </div>
       </div>

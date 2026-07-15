@@ -937,7 +937,7 @@ export function SeasonStatsTab({ match, compMatches }) {
 // n'afficher que les sous-onglets pertinents (ex: pas de "Stats live" avant
 // le coup d'envoi dans MatchPage.jsx, pas de "Historique" tant qu'aucune
 // confrontation connue n'est confirmée).
-export function StatsSubTabs({ view, onChange, showLive = true, showHistorique = false }) {
+export function StatsSubTabs({ view, onChange, showLive = true, showSaison = true, showHistorique = false }) {
   return (
     <div className="statsSubTabs">
       {showLive && (
@@ -948,12 +948,14 @@ export function StatsSubTabs({ view, onChange, showLive = true, showHistorique =
           Stats live
         </button>
       )}
-      <button
-        className={`statsSubTabs__btn${view === 'saison' ? ' statsSubTabs__btn--active' : ''}`}
-        onClick={() => onChange('saison')}
-      >
-        Stats saison
-      </button>
+      {showSaison && (
+        <button
+          className={`statsSubTabs__btn${view === 'saison' ? ' statsSubTabs__btn--active' : ''}`}
+          onClick={() => onChange('saison')}
+        >
+          Stats saison
+        </button>
+      )}
       {showHistorique && (
         <button
           className={`statsSubTabs__btn${view === 'historique' ? ' statsSubTabs__btn--active' : ''}`}
