@@ -226,8 +226,8 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: rgba(var(--white-rgb),0.4);
-  font-size: 1.15rem;
+  color: #fff;
+  font-size: 1.3rem;
   cursor: pointer;
   padding: 0.3rem;
   line-height: 1;
@@ -1084,21 +1084,19 @@
 .classement__modalClose {
   width: 1.8rem;
   height: 1.8rem;
-  border-radius: 50%;
-  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  border: none;
   background: transparent;
-  color: #555;
-  font-size: 0.75rem;
+  color: #fff;
+  font-size: 1.3rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 
 .classement__modalClose:hover {
-  background: rgba(var(--red-deep-rgb),0.12);
-  border-color: rgba(var(--red-deep-rgb),0.35);
   color: var(--red);
 }
 

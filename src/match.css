@@ -227,8 +227,8 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: rgba(var(--white-rgb),0.4);
-  font-size: 1.15rem;
+  color: #fff;
+  font-size: 1.3rem;
   cursor: pointer;
   padding: 0.3rem;
   line-height: 1;
@@ -622,22 +622,20 @@
 
 .wcModal__close {
   width: 2.1rem; height: 2.1rem;
-  border-radius: 50%;
-  border: 1px solid rgba(var(--white-rgb),0.08);
-  background: rgba(var(--white-rgb),0.04);
-  color: #64748b;
-  font-size: 0.85rem;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 1.4rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.18s;
+  transition: color 0.18s, transform 0.18s;
   flex-shrink: 0;
 }
 
 .wcModal__close:hover {
-  background: rgba(var(--red-rgb),0.18);
-  border-color: rgba(var(--red-rgb),0.35);
   color: var(--red-light);
   transform: rotate(90deg);
 }
