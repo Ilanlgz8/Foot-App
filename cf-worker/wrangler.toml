@@ -1,0 +1,19 @@
+name = "statfootix-cron"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# Cron Trigger : toutes les minutes — équivalent de ce que faisait
+# cron-job.org sur Vercel, sauf que le calcul tourne maintenant ici
+# (gratuit, pas de budget CPU Vercel consommé). Cloudflare Cron Triggers ont
+# la même granularité minimale (1 minute) que cron-job.org, donc aucune boucle
+# multi-passes interne n'est nécessaire (contrairement à l'ancien
+# api/cron-goals.js qui essayait de compenser la limite de cron-job.org).
+[triggers]
+crons = ["* * * * *"]
+
+# Secrets à configurer via `wrangler secret put <NOM>` (JAMAIS dans ce fichier,
+# voir cf-worker/README.md pour la procédure complète) :
+#   KV_REST_API_URL     — même Redis Upstash que Vercel (partagé)
+#   KV_REST_API_TOKEN   — idem
+#   CRON_SECRET         — même valeur que la variable Vercel CRON_SECRET
+#   VERCEL_NOTIFY_URL    — ex: https://statfootix.vercel.app/api/cron-goals

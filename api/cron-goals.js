@@ -535,6 +535,39 @@ export default async function handler(req, res) {
   if (!setupVapid())
     return res.status(503).json({ error: 'VAPID non configuré' })
 
+  // ── Mode "notify" (appelé par le Worker Cloudflare, voir cf-worker/) ──────
+  // ⚠️ AJOUT (sortir le polling ESPN/minute du plafond CPU Vercel — voir
+  // cf-worker/src/index.js pour le contexte complet) : avant, TOUT (fetch
+  // ESPN 1x/min 24/7 + envoi push) tournait ici sur Vercel, ce qui a fait
+  // dépasser le plafond gratuit "Fluid Active CPU" dès la Coupe du Monde
+  // 2026. Le polling + la détection (but/carton/KO/mi-temps/fin) tournent
+  // maintenant sur un Worker Cloudflare (gratuit, coût CPU quasi nul car le
+  // fetch réseau n'y compte pas dans le budget CPU, contrairement à Vercel).
+  // Ce Worker n'appelle CET endpoint que pour la partie réellement coûteuse
+  // en CPU (signature VAPID + chiffrement par abonné), et UNIQUEMENT quand il
+  // a détecté un vrai événement à notifier — donc quelques dizaines de fois
+  // par jour de match, au lieu de 1440 fois/jour inconditionnellement.
+  // Le mode complet ci-dessous (polling ESPN + multi-passes) reste intact et
+  // inchangé : fallback manuel/debug si besoin (ex: le Worker Cloudflare est
+  // en panne), sans avoir à ajouter une nouvelle fonction serverless
+  // (12/12 déjà atteint sur le plan Hobby — tout reste dans ce même fichier).
+  let body = null
+  if (req.method === 'POST') {
+    try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body } catch { body = null }
+  }
+  if (body?.mode === 'notify') {
+    const { payload, slug, options } = body
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ error: 'payload manquant' })
+    }
+    // Dédup déjà géré côté Worker (SET NX Redis avant l'appel) — ici on ne
+    // fait plus que le travail réellement coûteux : charger les abonnés,
+    // filtrer, chiffrer et envoyer. sendPushToMatch() est la même fonction
+    // inchangée que dans le mode complet ci-dessous (voir plus bas).
+    const sentCount = await sendPushToMatch(payload, slug ?? null, options ?? {})
+    return res.status(200).json({ ok: true, mode: 'notify', sent: sentCount })
+  }
+
   // Marqueur "dernière exécution" — lu par /api/debug-push pour vérifier que
   // cron-job.org appelle bien cet endpoint chaque minute. Avant ce fix,
   // aucune trace de la dernière exécution réelle n'existait nulle part :

@@ -9,7 +9,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
-- **Cron externe** : cron-job.org → `POST /cron-goals` toutes les minutes avec header `x-cron-secret`
+- **Cron (polling ESPN + notifs)** : Worker Cloudflare (`cf-worker/`, gratuit, Cron Trigger `* * * * *`) — fait le fetch ESPN + la détection (but/carton/KO/mi-temps/fin) chaque minute, coût CPU quasi nul (le réseau ne compte pas dans le budget CPU Cloudflare). N'appelle `/api/cron-goals` (mode `notify`, voir plus bas) QUE quand un vrai événement est détecté — Vercel ne fait plus que l'envoi push (VAPID + chiffrement par abonné), quelques dizaines de fois/jour de match au lieu de 1440x/jour inconditionnellement. Ancien schéma (cron-job.org → tout sur Vercel 1x/min 24/7) conservé intact en fallback manuel dans le même fichier — voir `cf-worker/README.md` pour le contexte complet et la procédure de déploiement/rollback.
 
 ## Architecture clé
 
@@ -70,7 +70,8 @@ src/
   matchModal.css
 
 api/
-  cron-goals.js   — cron ESPN → VAPID push (source unique des notifs)
+  cron-goals.js   — mode `notify` (appelé par cf-worker/, envoi push uniquement) + mode complet
+                    historique (polling ESPN, fallback manuel si le Worker Cloudflare est en panne)
   subscribe.js    — stocke subscriptions dans Redis (rate limit 20/h, check Origin)
   vapid-key.js    — expose la clé VAPID publique (+ token Ably via ?ably=1)
   debug-push.js   — diagnostic : nb subs Redis, VAPID ok (protégé par CRON_SECRET)
@@ -86,6 +87,12 @@ api/
 
 public/
   sw-push.js      — service worker push handler (vanilla JS, importé par Workbox)
+
+cf-worker/
+  src/index.js    — Worker Cloudflare : polling ESPN + détection, appelle /api/cron-goals
+                    (mode notify) uniquement quand il y a vraiment un événement à notifier
+  wrangler.toml   — Cron Trigger toutes les minutes
+  README.md       — procédure de déploiement/vérification/rollback
 ```
 
 ## Env vars Vercel (toutes configurées)
@@ -108,9 +115,11 @@ public/
   (`PERMANENTLY_DISABLED` dans `api/apifootball.js`), ESPN + football-data.org couvrent déjà
   l'essentiel des compos/stats en fallback
 - ✅ Fluid Active CPU dépassé (4h/mois Hobby, mail Vercel 08/07) : poll client 10s→30s
-  (`espnTimerWorker.js`), `cron-goals.js` rebridé à 1 passe/min (`BUDGET_MS=0`), fast-path
-  cache partagé dans `api/fifa-live.js` (voir ci-dessus) pour anticiper la reprise des
-  championnats club (plus de compétitions + spectateurs simultanés)
+  (`espnTimerWorker.js`), fast-path cache partagé dans `api/fifa-live.js` (voir ci-dessus) —
+  et surtout, root fix : le polling ESPN 1x/min 24/7 est sorti de Vercel vers un Worker
+  Cloudflare gratuit (`cf-worker/`, voir Stack) qui n'appelle Vercel que pour l'envoi push,
+  quand il y a vraiment quelque chose à notifier — règle le problème structurellement avant
+  la reprise de tous les championnats fin août, pas juste un pansement temporaire
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
