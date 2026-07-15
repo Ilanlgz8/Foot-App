@@ -1670,8 +1670,13 @@
    bordeaux en Chakra Petch, cote décimale (pronoToOdds). Liseré/glow
    bordeaux PERMANENT réservé à la pilule FAVORITE (pronoFavorite, style
    inline dans MatchPoster.jsx) — les 2 autres ont une bordure transparente. */
+/* BUG CORRIGÉ (constat utilisateur : "pas bien centré, plus d'espace à
+   droite qu'à gauche") : sans justify-content, l'espace restant une fois
+   les 3 pilules flex:1 à leur max-width partait tout à droite (flex-start
+   par défaut) au lieu d'être réparti des deux côtés. */
 .poster__prono-row {
   display: flex;
+  justify-content: center;
   gap: 8px;
 }
 /* flex:1 + max-width plafonné (PAS une largeur fixe) : +10px de plus (retour
