@@ -1074,6 +1074,26 @@ export function useLiveMinute(matches) {
     }
   }, [matches, queryClient])
 
+  // ⚠️ AJOUT (audit robustesse) : l'effet Ably ci-dessus ne désabonne QUE les
+  // canaux devenus non pertinents à chaque ré-exécution (matches/queryClient
+  // changent) — il ne retournait aucune fonction de nettoyage pour le
+  // démontage du composant lui-même, donc si LiveProvider (qui utilise ce
+  // hook) venait un jour à se démonter (actuellement il ne se démonte jamais
+  // en usage normal — monté une seule fois au-dessus du router — mais rien
+  // ne le garantit indéfiniment, ex. un futur refactor ou le Fast Refresh en
+  // dev), tous les canaux Ably encore abonnés restaient ouverts pour de bon.
+  // Effet séparé, dépendances vides exprès : ne s'exécute qu'au montage, son
+  // nettoyage qu'au démontage réel — désabonne tout ce qui reste dans la Map
+  // partagée à ce moment-là, sans toucher à la logique de l'effet ci-dessus.
+  useEffect(() => {
+    return () => {
+      for (const [, channel] of _ablySubscribed) {
+        try { channel.unsubscribe() } catch {}
+      }
+      _ablySubscribed.clear()
+    }
+  }, [])
+
   // Re-poll ESPN dès que matches[] se peuple (cold start PWA : premier poll était sur tableau vide)
   const prevMatchesLen = useRef(0)
   useEffect(() => {

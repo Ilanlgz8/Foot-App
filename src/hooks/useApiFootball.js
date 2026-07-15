@@ -98,7 +98,19 @@ function teamSimilarity(a, b) {
 // upstream) et on le transforme en exception, pour que React Query passe
 // bien en état d'erreur et que l'UI puisse réagir (masquer l'onglet plutôt
 // que d'afficher une liste vide qui semble cassée).
+// ⚠️ AJOUT (audit robustesse) : api-football est désactivé DÉFINITIVEMENT
+// côté serveur (PERMANENTLY_DISABLED dans api/apifootball.js, comptes
+// suspendus à répétition — voir CLAUDE.md). Le serveur répondait déjà avec
+// une erreur propre (`errors.disabled`), donc rien ne cassait — mais chaque
+// composant qui ouvre l'onglet Compos/Stats faisait quand même un vrai
+// aller-retour réseau pour l'apprendre à chaque fois. Miroir client de ce
+// flag : on court-circuite AVANT le fetch, mêmes conséquences pour tous les
+// appelants (déjà tous préparés à un afetch qui rejette — try/catch ou état
+// d'erreur React Query), juste sans le round-trip inutile.
+const AFL_DISABLED = true
+
 async function afetch(endpoint, params = {}) {
+  if (AFL_DISABLED) throw new Error('api-football désactivé définitivement côté app')
   const p = new URLSearchParams(params)
   if (endpoint !== 'fixtures') p.set('_ep', endpoint)
   const res = await fetch(`/apifootball?${p.toString()}`)
