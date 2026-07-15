@@ -341,12 +341,11 @@
   display: flex;
   gap: 6px;
 }
-/* Fond rouge plein + texte blanc contouré de noir (retour utilisateur,
-   après le fond blanc jugé pas assez percutant) — bordure plus épaisse
-   (2px→3px) en rouge plus vif (255,45,45 au lieu de 239,68,68) que le
-   fond, glow plus fort et plus rapide (1.8s→1.3s, blur/opacité montés) :
-   l'intensité proportionnelle au % (pronoIntensity) reste le signal du
-   favori, juste beaucoup plus voyante qu'avant. */
+/* Fond jaune "bumblebee" + texte noir SANS contour (retour utilisateur :
+   contour noir retiré). Texte passé en noir plutôt que blanc — sur un fond
+   aussi clair que le jaune, du blanc sans contour serait illisible (contraste
+   quasi nul) ; le noir, lui, n'a besoin d'aucun contour pour rester net.
+   Bordure toujours rouge vif (255,45,45), glow inchangé. */
 .modal__liveProno__pill {
   flex: 1;
   height: 46px;
@@ -357,7 +356,7 @@
   gap: 2px;
   border-radius: 10px;
   border: 3px solid transparent;
-  background: #c8102e;
+  background: #ffc72c;
   animation: modalLiveProno-pillGlow 1.3s ease-in-out infinite;
 }
 @keyframes modalLiveProno-pillGlow {
@@ -372,16 +371,12 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #ffffff;
-  -webkit-text-stroke: 0.5px #000000;
-  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
+  color: #000000;
 }
 .modal__liveProno__pillVal {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #ffffff;
-  -webkit-text-stroke: 0.6px #000000;
-  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
+  color: #000000;
 }
 
 .modal__stats {

@@ -1676,10 +1676,9 @@
   display: flex;
   gap: 4px;
 }
-/* Fond rouge plein + texte blanc contouré de noir — même retour
-   utilisateur que sur le modal (matchModal.css), fond blanc jugé pas assez
-   percutant. Bordure épaisse en rouge vif (255,45,45), glow rapide et
-   marqué. */
+/* Fond jaune "bumblebee" + texte noir SANS contour — même retour
+   utilisateur que sur le modal (matchModal.css). Bordure épaisse en rouge
+   vif (255,45,45), glow rapide et marqué. */
 .poster__prono-pill {
   flex: 1;
   height: 44px;
@@ -1690,7 +1689,7 @@
   gap: 2px;
   border-radius: 9px;
   border: 2.5px solid transparent;
-  background: #c8102e;
+  background: #ffc72c;
   animation: posterProno-pillGlow 1.3s ease-in-out infinite;
 }
 @keyframes posterProno-pillGlow {
@@ -1705,16 +1704,12 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #ffffff;
-  -webkit-text-stroke: 0.5px #000000;
-  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
+  color: #000000;
 }
 .poster__prono-pillVal {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #ffffff;
-  -webkit-text-stroke: 0.6px #000000;
-  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
+  color: #000000;
 }
 
 /* ── Variante live ── */
