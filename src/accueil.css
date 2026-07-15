@@ -1669,21 +1669,22 @@
    matchModal.css (LiveMatchPage/LiveStatsTab) : fond clair pour trancher
    sur le poster (dégradé couleurs d'équipe), cote décimale (pronoToOdds),
    liseré rouge d'intensité proportionnelle à la probabilité
-   (pronoIntensity, src/utils/calcProno.js). Tailles réduites vs le modal
-   (poster nettement plus compact, mobile). */
+   (pronoIntensity, src/utils/calcProno.js). Agrandies (retour utilisateur :
+   "plus vertical, chiffres et code équipe plus grands") — plus proches de
+   la taille du modal désormais, plutôt que nettement plus compactes. */
 .poster__prono-row {
   display: flex;
   gap: 4px;
 }
 .poster__prono-pill {
   flex: 1;
-  height: 34px;
+  height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  border-radius: 8px;
+  gap: 2px;
+  border-radius: 9px;
   border: 1.2px solid transparent;
   background: #fdf6f6;
 }
@@ -1691,14 +1692,14 @@
   flex: 0.8;
 }
 .poster__prono-pillLabel {
-  font-size: 0.42rem;
+  font-size: 0.52rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #a3888c;
 }
 .poster__prono-pillVal {
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #7a1e2e;
 }

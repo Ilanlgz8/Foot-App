@@ -90,10 +90,15 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // libellé complet ("Paris Saint-Germain 5%") était coupé par "…" et le
   // pourcentage disparaissait — le libellé était contraint à la même largeur
   // que le segment de barre (parfois 5% du poster, ~15px). Initiales à 3
-  // lettres (tla FD.org si dispo, sinon 3 premières lettres du nom court) :
-  // toujours court, garanti de tenir quel que soit le %.
-  const homeCode = (match.homeTeam?.tla || homeShort || '').slice(0, 3).toUpperCase()
-  const awayCode = (match.awayTeam?.tla || awayShort || '').slice(0, 3).toUpperCase()
+  // lettres — BUG CORRIGÉ (retour utilisateur : "les noms d'équipe à 3
+  // lettres en français") : priorité inversée. `homeShort`/`awayShort` sont
+  // déjà passés par translateTeam() (voir plus haut) donc en français ;
+  // l'ancien code priorisait `tla` (code FD.org brut, souvent la version
+  // anglaise/internationale du nom, ex. "ENG" au lieu de "ANG" pour
+  // l'Angleterre) — jamais traduit. `tla` ne sert plus qu'en dernier
+  // recours si `homeShort`/`awayShort` sont vides.
+  const homeCode = (homeShort || match.homeTeam?.tla || '').slice(0, 3).toUpperCase()
+  const awayCode = (awayShort || match.awayTeam?.tla || '').slice(0, 3).toUpperCase()
 
   const cls = 'poster' + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
 
