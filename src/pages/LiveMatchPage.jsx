@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome , isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -443,8 +443,6 @@ export default function LiveMatchPage() {
                   <LiveStatsTab
                     match={match}
                     espnScore={espn}
-                    homeShort={match.homeTeam?.shortName || match.homeTeam?.name}
-                    awayShort={match.awayTeam?.shortName || match.awayTeam?.name}
                     compMatches={compMatches}
                   />
                 ) : statsView === 'historique' ? (

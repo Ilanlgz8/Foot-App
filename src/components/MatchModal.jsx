@@ -1,16 +1,15 @@
-import { useEffect, useState }      from 'react'
+import { useState }      from 'react'
 import { useQuery }                from '@tanstack/react-query'
-import { useMatchDetail, useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups } from '../hooks/useMatchDetail'
+import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { useEspnMatchDetail }  from '../hooks/useEspnMatchDetail'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
-import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
+import { finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
+import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -21,12 +20,6 @@ export function getEspnData(matchId) {
     const raw = localStorage.getItem(`foot_espn_${matchId}`)
     return raw ? JSON.parse(raw) : null
   } catch { return null }
-}
-
-// ── Forme récente (matchs à venir) ──────────────────────────────────────────
-function FormBadge({ result }) {
-  const label = result === 'W' ? 'V' : result === 'D' ? 'N' : 'D'
-  return <span className={`modal__formeBadge modal__formeBadge--${result}`}>{label}</span>
 }
 
 // ── Buteurs ESPN (format espnScoresCache.scorers) ────────────────────────────
@@ -242,29 +235,6 @@ function ClassementSkeleton({ rows = 6 }) {
   )
 }
 
-function EventsSkeleton() {
-  return (
-    <div className="modal__stats">
-      <div className="modal__statsCol modal__statsCol--home">
-        {[60, 45].map((w, i) => (
-          <div key={i} className="modal__goalRow">
-            <div className="sk" style={{ width: `${w}%`, height: '0.7rem' }} />
-            <div className="sk" style={{ width: '1.4rem', height: '0.6rem' }} />
-          </div>
-        ))}
-      </div>
-      <div className="modal__statsDivider" />
-      <div className="modal__statsCol modal__statsCol--away">
-        {[50, 65].map((w, i) => (
-          <div key={i} className="modal__goalRow modal__goalRow--away">
-            <div className="sk" style={{ width: '1.4rem', height: '0.6rem' }} />
-            <div className="sk" style={{ width: `${w}%`, height: '0.7rem' }} />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function PmStatsSkeleton() {
   const widths = [40, 65, 30, 50, 35]
@@ -575,7 +545,7 @@ const STAT_FR = {
 // compMatches n'est plus utilisé ici depuis que l'historique des
 // confrontations a son propre onglet (H2HTabContent) — les appelants
 // (LiveMatchPage) continuent de le passer, il est simplement ignoré.
-export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
+export function LiveStatsTab({ match, espnScore }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -618,11 +588,6 @@ export function LiveStatsTab({ match, espnScore, homeShort, awayShort }) {
   const { data: statsData, isLoading: aflLoading } = useAflLiveStats(
     match, isLive && !isFifaMatch && !hasEspn && (!hasEspnId || espnSummaryFailed)
   )
-
-  // Couleurs fixes (pas la couleur de l'équipe) : voir StatTrack/CSS —
-  // homeName/awayName gardés seulement pour le fallback affiché ailleurs.
-  const homeName = match.homeTeam?.shortName ?? match.homeTeam?.name ?? 'Dom.'
-  const awayName = match.awayTeam?.shortName ?? match.awayTeam?.name ?? 'Ext.'
 
   // ── Priorité 1 : Stats FIFA live (WC 2026) — vérifié AVANT le scoreboard
   // basique ci-dessous (l'ancien ordre laissait un match CM avec juste
@@ -1098,41 +1063,6 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   )
 }
 
-// ── Cartons FD.org ────────────────────────────────────────────────────────────
-function Bookings({ bookings = [], homeId }) {
-  if (bookings.length === 0) return null
-  const icon = (card) =>
-    card === 'YELLOW_CARD'     ? '🟨' :
-    card === 'RED_CARD'        ? '🟥' :
-    card === 'YELLOW_RED_CARD' ? '🟨🟥' : '📋'
-  const homeCards = bookings.filter(b => b.team?.id === homeId)
-  const awayCards = bookings.filter(b => b.team?.id !== homeId)
-  if (homeCards.length === 0 && awayCards.length === 0) return null
-  return (
-    <div className="modal__stats" style={{ marginTop: '0.1rem' }}>
-      <div className="modal__statsCol modal__statsCol--home">
-        {homeCards.map((b, i) => (
-          <div key={i} className="modal__goalRow">
-            <span className="modal__goalName">{b.player?.shortName ?? b.player?.name ?? '?'}</span>
-            <span className="modal__goalMeta">{b.minute ? `${b.minute}'` : ''}</span>
-            <span className="modal__goalIcon">{icon(b.card)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="modal__statsDivider" />
-      <div className="modal__statsCol modal__statsCol--away">
-        {awayCards.map((b, i) => (
-          <div key={i} className="modal__goalRow modal__goalRow--away">
-            <span className="modal__goalIcon">{icon(b.card)}</span>
-            <span className="modal__goalMeta">{b.minute ? `${b.minute}'` : ''}</span>
-            <span className="modal__goalName">{b.player?.shortName ?? b.player?.name ?? '?'}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Onglet Classement — classement du championnat en cours ────────────────────
 // WC : affiche uniquement le(s) groupe(s) contenant les deux équipes
 // Autres : affiche le classement complet
@@ -1194,54 +1124,12 @@ export function ClassementTab({ match, compId }) {
   )
 }
 
-// ── Section détails match terminé ────────────────────────────────────────────
-// Priorité ESPN (persisté en localStorage au FT) → fallback FD.org
-function FinishedDetails({ match, espnData, detail, loading }) {
-  const homeId     = match.homeTeam?.id
-  const fsFinished = finalScore(match.score)
-  const totalGoals = (fsFinished.home ?? 0) + (fsFinished.away ?? 0)
-
-  const fdGoals     = detail?.goals         ?? []
-  const fdBookings  = detail?.bookings      ?? []
-  const fdSubs      = detail?.substitutions ?? []
-  const espnScorers = espnData?.scorers ?? []
-  const espnCards   = espnData?.cards   ?? []
-
-  // ESPN scoreboard ne retourne pas toujours les détails de buts pour les matchs passés.
-  // On considère ESPN "utile" seulement s'il a des buteurs OU des stats.
-  const espnHasData = espnScorers.length > 0 || !!espnData?.stats
-
-  // Skeleton : on attend si aucune source n'a encore répondu
-  const hasAnyData = espnHasData || fdGoals.length > 0 || !!detail
-  if (loading && !hasAnyData) {
-    return <EventsSkeleton />
-  }
-
-  const hasEvents = espnScorers.length > 0 || espnCards.length > 0 ||
-    fdGoals.length > 0 || fdBookings.length > 0 || fdSubs.length > 0
-
-  return (
-    <>
-      {/* ── Fil du match : buts + cartons + remplacements ── */}
-      {hasEvents
-        ? <MatchTimeline
-            espnScorers={espnScorers} espnCards={espnCards}
-            fdGoals={fdGoals} fdBookings={fdBookings} fdSubs={fdSubs}
-            homeId={homeId}
-          />
-        : !loading
-          ? <p className="modal__noEvents">
-              {totalGoals > 0 ? 'Événements non disponibles' : 'Match sans but (0 – 0)'}
-            </p>
-          : null   // FD.org charge encore, on n'affiche pas le message trop tôt
-      }
-
-      {/* ── Stats ESPN si disponibles ── */}
-      {espnData?.stats && <ESPNStats stats={espnData.stats} />}
-    </>
-  )
-}
-
+// (FinishedDetails — ex-section "détails match terminé" combinant buts +
+// cartons + remplacements + stats ESPN pour un match FT — et son helper
+// EventsSkeleton ont été retirés (10/07 cleanup) : plus aucun call site,
+// buts et cartons sont désormais affichés dans le hero (MatchPageHero, voir
+// MatchPage.jsx), et les remplacements + stats ont leur propre affichage
+// dédié ailleurs (MpMatchStats dans MatchPage.jsx).)
 
 // ── Indicateur de pages (dots) sous les onglets swipables ────────────────────
 // Signale visuellement que l'onglet actif fait partie d'un groupe swipable.
@@ -1865,7 +1753,7 @@ export function MatchStatsSection({ match }) {
   )
 }
 
-export function PreMatchSection({ match, formMap, compMatches, hideStats = false, hideProno = false }) {
+export function PreMatchSection({ match, compMatches, hideStats = false }) {
   const homeId = match.homeTeam?.id
   const awayId = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')

@@ -47,7 +47,7 @@ import { ESPN_SLUG_BY_COMP_ID } from '../../src/data/espnSlugs.js'
 // et liveDetection.test.js pour les tests.
 import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
-  normalizeFifa, fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
+  fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../../src/utils/liveDetection.js'
@@ -291,7 +291,7 @@ async function runOnePass(env) {
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
-    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+    const [prevStatus = null] = prevState ? prevState.split('|') : []
 
     try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
 

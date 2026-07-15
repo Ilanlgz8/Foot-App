@@ -115,7 +115,6 @@ function MatchCard({ match }) {
 }
 
 function Resultats() {
-  const navigate = useNavigate()
   // Persistés dans sessionStorage : App.jsx remonte cette page à chaque
   // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
   // d'un match rebasculait toujours sur la 1ère journée au lieu de celle

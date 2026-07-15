@@ -152,7 +152,7 @@ function Accueil() {
   const { formMap } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
-  const { liveMatches, espnScores, recalibrate } = useLiveData()
+  const { liveMatches, espnScores } = useLiveData()
   const navigate = useNavigate()
 
   // ── Bandeau "Mon équipe" ──
@@ -345,9 +345,6 @@ function Accueil() {
   // Matchs + résultats filtrés
   const filteredMatches = compFilterMatch  ? matches.filter(m => m.competition?.id === compFilterMatch)  : matches
   const filteredResults = compFilterResult ? results.filter(r => r.competition?.id === compFilterResult) : results
-
-  const wcComp   = COMPETITIONS.find(c => c.id === 'WC')
-  const todayStr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {

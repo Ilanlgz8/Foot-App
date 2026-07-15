@@ -92,7 +92,7 @@ export function PosterSkeleton() {
 //   noWinnerLoser → si true, pas de style gagnant/perdant (ex: dans le widget live)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
 //   noGradient    → si true, pas de dégradé couleurs équipes en fond (ex: panel Résultats)
-export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, isTermine = false, noLive = false, noGradient = false, formMap = null }) {
+export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, noLive = false, noGradient = false, formMap = null }) {
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.

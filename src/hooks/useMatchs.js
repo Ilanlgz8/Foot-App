@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'

@@ -1063,6 +1063,8 @@ export default async function handler(req, res) {
   // à chaque poll quand même). Avec beaucoup de matchs simultanés, la
   // majorité des writes sont désormais évités plutôt que multipliés.
   const stableFields = (data) => {
+    // fromCache exclu volontairement (voir commentaire ci-dessus), pas une variable oubliée.
+    // eslint-disable-next-line no-unused-vars
     const { fromCache, ...rest } = data
     return JSON.stringify(rest)
   }

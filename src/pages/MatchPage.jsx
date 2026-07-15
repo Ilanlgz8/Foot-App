@@ -10,7 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { finalScore, matchOutcome, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
+import { finalScore, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
@@ -509,7 +509,7 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
   }
 }
 
-function MpSeasonStats({ match, formMap, compMatches, hideForm = false }) {
+function MpSeasonStats({ match, compMatches, hideForm = false }) {
   const homeId   = match.homeTeam?.id
   const awayId   = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -607,7 +607,6 @@ export default function MatchPage() {
 
   // Même correction que dans MatchPageHero — voir le commentaire là-bas.
   const isFinished = match?.status === 'FINISHED' || (match?.id != null && getMatchState(match.id).ft === true)
-  const outcome = isFinished ? matchOutcome(match) : null
   const compId = match?.competition?.code ?? null
 
   // compMatches est nécessaire même pour un match terminé désormais : le
@@ -716,7 +715,7 @@ export default function MatchPage() {
                         via MatchPoster). */}
                     {statsView === 'live'       ? <MpMatchStats match={match} />
                    : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                   :                              <MpSeasonStats match={match} formMap={formMap} compMatches={compMatches} />
+                   :                              <MpSeasonStats match={match} compMatches={compMatches} />
                     }
                   </>
                 : formLoading
@@ -736,16 +735,13 @@ export default function MatchPage() {
                                 coup d'envoi, donc pas de raison de le descendre). */}
                             <MpSeasonStats
                               match={match}
-                              formMap={formMap}
                               compMatches={compMatches}
                               hideForm
                             />
                             <PreMatchSection
                               match={match}
-                              formMap={formMap}
                               compMatches={compMatches}
                               hideStats
-                              hideProno
                             />
                           </>
                       }

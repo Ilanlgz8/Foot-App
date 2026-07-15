@@ -5,8 +5,9 @@ import premierLeagueLogo from '../assets/leagues/premier-league.svg'
 import serieALogo from '../assets/leagues/serie-a-enilive.svg'
 import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
-import europaLeagueLogo from '../assets/leagues/europa-league.png'
-import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
+// (europa-league.png / conference-league.png : assets présents mais ces deux
+// compétitions ne sont pas suivies par l'app, voir COMPETITIONS plus bas —
+// imports morts retirés)
 // Vrais logos ajoutés par l'utilisateur (12/07) — tous nettoyés/détourés :
 // - CAF : logo officiel de la confédération, utilisé génériquement pour la
 //   CAN comme il n'existe pas de logo CAN intemporel (pratique standard, ex.

@@ -11,7 +11,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { trackMatchState, clearMatchState, isEspnWorking } from '../utils/matchStateTracker'
+import { trackMatchState, isEspnWorking } from '../utils/matchStateTracker'
 import { markLive } from './liveTracker'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 

@@ -279,7 +279,7 @@ function Classement() {
                 ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
-            <span className="accueil__matchCardName">{hn}</span>
+            <span className={`accueil__matchCardName${homeWin ? ' accueil__matchCardName--winner' : ''}`}>{hn}</span>
           </div>
 
           {/* Centre */}
@@ -298,7 +298,7 @@ function Classement() {
                 ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
-            <span className="accueil__matchCardName">{an}</span>
+            <span className={`accueil__matchCardName${awayWin ? ' accueil__matchCardName--winner' : ''}`}>{an}</span>
           </div>
         </div>
       )

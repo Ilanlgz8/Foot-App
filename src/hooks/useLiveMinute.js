@@ -209,7 +209,6 @@ function parseClockMins(clock) {
 
 function confirmFt(match, now, queryClient) {
   const id    = match.id
-  const cache = espnScoresCache[id]
   setLiveState(id, 'ended', { endedAt: now })
 
   // Persister le score ESPN pour MatchModal post-match

@@ -471,7 +471,7 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
 }
 
 function Pronos() {
-  const { deviceId, groupCode, pseudo, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
+  const { deviceId, groupCode, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   const [activeTab, setActiveTab] = useState('pronos')
 
   const { matches: upcoming, loading: loadingUpcoming } = useUpcomingMatchesAllComps(COMP_IDS)

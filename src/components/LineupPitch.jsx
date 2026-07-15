@@ -17,11 +17,10 @@ const LINE_Y = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function safeColor(raw) {
-  if (!raw) return null
-  return raw.startsWith('#') ? raw : `#${raw}`
-}
-
+// (safeColor, qui préfixait un `#` à une couleur brute venant de l'API, a été
+// retiré : les couleurs viennent désormais toujours de getMatchTeamColors()
+// (src/data/teamPhotos.js), une palette curée déjà au format `#rrggbb` — plus
+// aucune couleur brute d'API n'atteint ce composant.)
 function alpha(hex, a) {
   if (!hex || !hex.startsWith('#')) return `rgba(239,68,68,${a})`
   const full = hex.length === 4

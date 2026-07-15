@@ -6,7 +6,7 @@
 //   useLineups(match) — compositions via ESPN summary
 //   useH2H(match)     — confrontations directes via FD.org
 import { useQuery } from '@tanstack/react-query'
-import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 

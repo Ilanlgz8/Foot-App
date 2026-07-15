@@ -7,7 +7,6 @@ import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
 import { useWcKnockout, useCupKnockout } from '../hooks/useWcKnockout'
-import { useTeamForm } from '../hooks/useTeamForm'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
@@ -39,11 +38,11 @@ import { isNationalTeamComp } from '../utils/matchUtils'
 // peu plus larges), le zoom redevient bloquant en LARGEUR → le tableau
 // utilise vraiment toute la largeur dispo à l'écran, ET les drapeaux (qui
 // scalent avec BK_CARD_W) en profitent aussi.
-const BK_CARD_W = 36
+const BK_CARD_W_MOBILE = 36
 // Card de la FINALE (et de la petite finale) : volontairement plus large que
 // les cards de tour normal — c'est le point de convergence du tableau, elle
 // doit se voir davantage (demande explicite : la finale "en plus gros").
-const BK_FINAL_W = 62
+const BK_FINAL_W_MOBILE = 62
 
 // ── Variante DESKTOP (≥900px, voir isDesktop dans Matchs()) ──
 // Sur mobile le tableau est volontairement compact (drapeau seul, zoom
@@ -83,25 +82,25 @@ const BK_CARD_H_SAFETY = 4
 // réduite (30→16) pour rester bloquant en LARGEUR plutôt qu'en hauteur (voir
 // commentaire BK_CARD_W). Reste plus généreuse que la toute 1ère version
 // compacte (8) : un compromis, pas un simple retour en arrière.
-const BK_CARD_GAP = 16
+const BK_CARD_GAP_MOBILE = 16
 // Largeur de la zone connecteur entre rounds. Réduite (12→8) : les libellés
 // de tour sont maintenant très courts (16e/8e/4e/2e, voir BK_SHORT_LABELS)
 // donc beaucoup moins de risque de chevauchement entre chips voisines — cet
 // espace récupéré réduit TOTAL_W, ce qui fait mécaniquement grandir le zoom
 // fit-to-screen (donc les cards/drapeaux) puisque le zoom est bloquant en
-// LARGEUR (voir commentaire BK_CARD_W).
-const BK_CONN_W = 8
+// LARGEUR (voir commentaire BK_CARD_W_MOBILE).
+const BK_CONN_W_MOBILE = 8
 // Hauteur de l'en-tête de round (titre) — libellés courts (voir
 // BK_SHORT_LABELS), tiennent sur 1 ligne. Le titre de la finale n'est PLUS
-// dans cette rangée (voir BK_FINAL_LABEL_H) : demande explicite de le
+// dans cette rangée (voir BK_FINAL_LABEL_H_MOBILE) : demande explicite de le
 // mettre au niveau de la card de la finale plutôt que tout en haut.
 // 16→18 : suit l'agrandissement du texte des chips (bracket__roundTitle
 // 0.38rem→0.58rem dans match.css), pour ne pas les couper verticalement.
-const BK_HDR_H  = 18
+const BK_HDR_H_MOBILE  = 18
 // Espace réservé au-dessus de la card de la finale pour son propre label
 // "🏆 FINALE" — resserré pour que le label reste visuellement "accroché" à
 // sa card plutôt que de flotter avec un grand vide entre les deux.
-const BK_FINAL_LABEL_H = 16
+const BK_FINAL_LABEL_H_MOBILE = 16
 // Marge horizontale de sécu de part et d'autre du tableau (débordement du
 // titre de tour centré — voir bracket__roundTitle).
 const BK_PAD_X = 3
@@ -332,18 +331,18 @@ function splitHalf(matches) {
 }
 
 function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isCountry = true }) {
-  // Constantes de layout résolues selon le mode (voir BK_*_DESKTOP plus
-  // haut) — shadowe volontairement les BK_* module-level pour tout le reste
-  // de cette fonction, aucun autre call site à toucher.
-  const BK_CARD_W   = isDesktop ? BK_CARD_W_DESKTOP   : 36
-  const BK_FINAL_W  = isDesktop ? BK_FINAL_W_DESKTOP  : 62
-  const BK_CARD_GAP = isDesktop ? BK_CARD_GAP_DESKTOP : 16
-  const BK_CONN_W   = isDesktop ? BK_CONN_W_DESKTOP   : 8
-  const BK_HDR_H    = isDesktop ? BK_HDR_H_DESKTOP    : 18
+  // Constantes de layout résolues selon le mode (BK_*_DESKTOP vs BK_*_MOBILE,
+  // définies au niveau module plus haut) — nommées pareil (BK_CARD_W etc.)
+  // pour tout le reste de cette fonction, aucun autre call site à toucher.
+  const BK_CARD_W   = isDesktop ? BK_CARD_W_DESKTOP   : BK_CARD_W_MOBILE
+  const BK_FINAL_W  = isDesktop ? BK_FINAL_W_DESKTOP  : BK_FINAL_W_MOBILE
+  const BK_CARD_GAP = isDesktop ? BK_CARD_GAP_DESKTOP : BK_CARD_GAP_MOBILE
+  const BK_CONN_W   = isDesktop ? BK_CONN_W_DESKTOP   : BK_CONN_W_MOBILE
+  const BK_HDR_H    = isDesktop ? BK_HDR_H_DESKTOP    : BK_HDR_H_MOBILE
   // Espace pour le label "🏆 FINALE" au-dessus de sa card — agrandi en
   // desktop car le chip lui-même est plus grand (voir bracket__finalLabel
   // desktop dans match.css), sinon il chevaucherait les connecteurs SVG.
-  const BK_FINAL_LABEL_H = isDesktop ? 34 : 16
+  const BK_FINAL_LABEL_H = isDesktop ? 34 : BK_FINAL_LABEL_H_MOBILE
 
   // ── Mesure de la hauteur réelle de card via une sonde invisible ──
   // La sonde utilise le VRAI composant BkCard avec le pire cas de contenu
@@ -768,7 +767,10 @@ function Matchs() {
 
   /* ── Data ── */
   const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
-  const { formMap } = useTeamForm(selectedComp)
+  // useTeamForm(selectedComp) retiré (10/07 cleanup) : formMap n'était jamais
+  // consommé nulle part dans cette page (Programme n'affiche pas de losanges
+  // de forme) — fetch réseau pur perte, contraire à l'effort de réduction du
+  // budget CPU Vercel (voir CLAUDE.md, Fluid Active CPU).
   const { rounds, loading: bracketLoading, error: bracketError } = useWcKnockout(selectedComp)
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)

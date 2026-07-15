@@ -32,7 +32,7 @@ import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 // fonction et les tests associés (liveDetection.test.js).
 import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
-  normalizeFifa, fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
+  fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../src/utils/liveDetection.js'
@@ -614,7 +614,7 @@ export default async function handler(req, res) {
     const stateKey  = `cron:espn:${eventId}`
     let   prevState = null
     try { prevState = await kv.get(stateKey) } catch {}
-    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+    const [prevStatus = null] = prevState ? prevState.split('|') : []
 
     // Sauvegarder état courant (TTL 12h)
     try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
