@@ -380,15 +380,38 @@ function MpMatchStats({ match }) {
   const hasEvents   = fdSubs.length > 0
   const eventsLoading = detailLoading
 
-  const fifaRows = fifaStatsToRows(fifaData)
+  const { home: hs, away: as_ } = finalScore(match.score)
+  const totalGoals = (hs ?? 0) + (as_ ?? 0)
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "tir cadré 0 alors qu'il y a eu 3
+  // buts" — confirmé structurellement impossible, marquer nécessite au moins
+  // 1 tir cadré) : FIFA est toujours prioritaire dès qu'il renvoie QUOI QUE CE
+  // SOIT (fifaRows.length > 0), même des stats à 0 alors qu'un vrai match
+  // avec des buts a forcément eu des tirs cadrés — jamais vérifié avant. On
+  // rejette FIFA dans ce cas précis (mais UNIQUEMENT ce cas, sans casser les
+  // vrais 0-0) et on laisse la place à ESPN.
+  const fifaSotSum  = (fifaData?.home?.shotsOnTarget ?? 0) + (fifaData?.away?.shotsOnTarget ?? 0)
+  const fifaLooksOff = totalGoals > 0 && fifaSotSum === 0
+  const fifaRows = fifaLooksOff ? [] : fifaStatsToRows(fifaData)
   const espnRows = fifaStatsToRows(espnStatsData?.stats)
   const aflRows  = aflStatsToRows(aflStats)
-  const rows     = fifaRows.length ? fifaRows : espnRows.length ? espnRows : aflRows
+  // Dernier filet de sécurité (demande explicite utilisateur) : l'instantané
+  // ESPN capturé en direct (confirmFt(), voir matchStateTracker.js) si CE
+  // téléphone a suivi le match en live — même source que les buteurs du hero
+  // (getEspnData, déjà importé plus bas). Volontairement en dernier (avant
+  // aflRows, désactivé de toute façon) : un instantané pris en direct est
+  // moins fiable qu'une vraie source post-match, mais toujours mieux que rien.
+  // MpMatchStats n'est rendu que pour un match déjà terminé (voir l'appelant
+  // plus bas), pas besoin de re-vérifier isFinished ici.
+  const cachedLive = getEspnData(match?.id)
+  const cachedRows = fifaStatsToRows(cachedLive?.stats)
+  const rows = fifaRows.length ? fifaRows
+    : espnRows.length ? espnRows
+    : cachedRows.length ? cachedRows
+    : aflRows
 
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-  const { home: hs, away: as_ } = finalScore(match.score)
-  const totalGoals = (hs ?? 0) + (as_ ?? 0)
 
   const isLoading = !rows.length && ((isWC && fifaLoading) || espnLoading || aflLoading)
 
