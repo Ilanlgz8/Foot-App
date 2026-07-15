@@ -2,7 +2,7 @@ import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
-import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity } from '../utils/calcProno'
+import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { FormDiamonds }               from './FormDiamonds'
@@ -209,20 +209,20 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       </div>
 
       {/* ── Pronostic — pilules "côtes bookmaker", même design que
-          LiveProno (MatchModal.jsx/LiveMatchPage) : fond clair pour
-          trancher sur le poster, cote décimale (pronoToOdds), liseré rouge
-          d'intensité proportionnelle à la probabilité (pronoIntensity). ── */}
+          LiveProno (MatchModal.jsx/LiveMatchPage) : fond blanc, cote
+          décimale (pronoToOdds), liseré + glow néon PERMANENT d'intensité
+          proportionnelle à la probabilité (pronoIntensity/pronoGlowShadow). ── */}
       <div className="poster__footer">
         <div className="poster__prono-row">
-          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.home)})` }}>
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.home)})`, boxShadow: pronoGlowShadow(prono.home) }}>
             <span className="poster__prono-pillLabel">{homeCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill poster__prono-pill--draw" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.draw)})` }}>
+          <div className="poster__prono-pill poster__prono-pill--draw" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) }}>
             <span className="poster__prono-pillLabel">Nul</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.away)})` }}>
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.away)})`, boxShadow: pronoGlowShadow(prono.away) }}>
             <span className="poster__prono-pillLabel">{awayCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.away).toFixed(2)}</span>
           </div>

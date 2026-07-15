@@ -9,7 +9,7 @@ import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
-import { calcLiveProno, pronoToOdds, pronoIntensity } from '../utils/calcProno'
+import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -753,19 +753,19 @@ function LiveProno({ prono, match }) {
         Pronostic en direct
       </div>
       <div className="modal__liveProno__row">
-        <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} intensity={pronoIntensity(prono.home)} />
-        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} intensity={pronoIntensity(prono.draw)} draw />
-        <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} intensity={pronoIntensity(prono.away)} />
+        <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} pct={prono.home} />
+        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} draw />
+        <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} pct={prono.away} />
       </div>
     </div>
   )
 }
 
-function LivePronoPill({ label, value, intensity, draw = false }) {
+function LivePronoPill({ label, value, pct, draw = false }) {
   return (
     <div
       className={`modal__liveProno__pill${draw ? ' modal__liveProno__pill--draw' : ''}`}
-      style={{ borderColor: `rgba(255,7,45,${intensity})` }}
+      style={{ borderColor: `rgba(255,7,45,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct) }}
     >
       <span className="modal__liveProno__pillLabel">{label}</span>
       <span className="modal__liveProno__pillVal">{value.toFixed(2)}</span>

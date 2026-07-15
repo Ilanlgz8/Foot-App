@@ -1674,14 +1674,15 @@
    modal désormais, plutôt que nettement plus compactes. */
 .poster__prono-row {
   display: flex;
-  gap: 4px;
+  justify-content: center;
+  gap: 8px;
 }
-/* Retour au fond blanc + bordure "vrai néon" — même retour utilisateur que
-   sur le modal (matchModal.css) : 2 halos superposés (serré + diffus),
-   rouge pur (255,7,45), cycle rapide (1.1s), swing d'opacité marqué. */
+/* Plus vertical/étroit (largeur fixe, pas flex:1) + glow néon PERMANENT
+   (box-shadow calculé par pilule via pronoGlowShadow, plus d'animation qui
+   clignote) — même retour utilisateur que sur le modal (matchModal.css). */
 .poster__prono-pill {
-  flex: 1;
-  height: 44px;
+  width: 50px;
+  height: 54px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1690,25 +1691,22 @@
   border-radius: 9px;
   border: 2.5px solid transparent;
   background: #ffffff;
-  animation: posterProno-pillGlow 1.1s ease-in-out infinite;
-}
-@keyframes posterProno-pillGlow {
-  0%, 100% { box-shadow: 0 0 3px rgba(255,7,45,0.3), 0 0 7px rgba(255,7,45,0.18); }
-  50%      { box-shadow: 0 0 9px rgba(255,7,45,0.95), 0 0 22px rgba(255,7,45,0.7), 0 0 38px rgba(255,7,45,0.35); }
 }
 .poster__prono-pill--draw {
-  flex: 0.8;
+  width: 44px;
 }
 .poster__prono-pillLabel {
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #111111;
 }
 .poster__prono-pillVal {
-  font-size: 0.8rem;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 0.92rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
   color: #7a1e2e;
 }
 

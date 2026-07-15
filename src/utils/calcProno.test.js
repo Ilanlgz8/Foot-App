@@ -7,7 +7,7 @@
 // plusieurs facteurs (Poisson + H2H), une valeur exacte serait fragile au
 // moindre ajustement de pondération sans rien prouver de plus utile.
 import { describe, it, expect } from 'vitest'
-import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity } from './calcProno'
+import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow } from './calcProno'
 
 function sumsTo100(p) {
   return p.home + p.draw + p.away === 100
@@ -193,5 +193,19 @@ describe('pronoIntensity', () => {
   it('croît avec le %', () => {
     expect(pronoIntensity(52)).toBeGreaterThan(pronoIntensity(26))
     expect(pronoIntensity(26)).toBeGreaterThan(pronoIntensity(22))
+  })
+})
+
+describe('pronoGlowShadow', () => {
+  it('renvoie une valeur box-shadow CSS valide (3 halos rgba)', () => {
+    const shadow = pronoGlowShadow(52)
+    expect(shadow).toContain('rgba(255,7,45,')
+    expect(shadow.split(',').filter(s => s.includes('rgba')).length).toBe(3)
+  })
+
+  it('un favori net a un glow plus marqué qu\'un outsider', () => {
+    const strong = pronoGlowShadow(70)
+    const weak   = pronoGlowShadow(10)
+    expect(strong).not.toBe(weak)
   })
 })

@@ -32,6 +32,18 @@ export function pronoIntensity(pct) {
   return Math.max(0.35, Math.min(1, (pct - 5) / 45))
 }
 
+// Glow néon PERMANENT (pas d'animation clignotante, retour utilisateur :
+// "faut que ça trace le contour de la forme, pas que ça clignote") — 3
+// halos superposés (serré/saturé → large/diffus) dont l'opacité suit
+// pronoIntensity, pour que le favori garde le glow le plus marqué EN
+// PERMANENCE plutôt qu'un pic temporaire partagé par les 3 issues.
+export function pronoGlowShadow(pct) {
+  const i = pronoIntensity(pct)
+  return `0 0 3px rgba(255,7,45,${(i * 0.7).toFixed(2)}), `
+    + `0 0 ${Math.round(6 + i * 12)}px rgba(255,7,45,${(i * 0.65).toFixed(2)}), `
+    + `0 0 ${Math.round(14 + i * 20)}px rgba(255,7,45,${(i * 0.35).toFixed(2)})`
+}
+
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
 // somment à 100, avec un plancher de 5% par issue (jamais 0% affiché).
 function distribute(h, a, draw) {
