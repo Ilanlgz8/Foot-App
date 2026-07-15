@@ -7,28 +7,7 @@
   /* Sur tablette / mobile on remplace la sidebar par le header compétition */
   .compHeader {
     display: block;
-    /* BUG CORRIGÉ : le bouton "Changer" (dans ce header) disparaissait dès
-       qu'on ouvrait "Phase finale" — le tableau (BracketSvgView) fait un
-       scrollIntoView pour se caler en haut du viewport et se dimensionner
-       au maximum (voir Match.jsx), ce qui pousse ce header, situé au-dessus,
-       hors de l'écran. Revenir sur "Par journée"/"Poules" ne remontait pas
-       la page toute seule : le bouton restait donc introuvable tant qu'on
-       ne remontait pas manuellement. Plutôt que de rejouer un scroll après
-       coup (fragile, dépend du timing), on épingle simplement ce header en
-       haut du viewport (position: sticky) : il reste TOUJOURS visible, quel
-       que soit l'onglet actif ou la hauteur du contenu en dessous.
-       BUG CORRIGÉ (2) : avec `top: 0`, ce header essaie de se coller à la
-       MÊME position que .sfHeader (navbar globale, elle-même sticky top:0,
-       z-index:50 — voir navbar.css) → les deux se superposent, celui-ci
-       passe derrière la navbar (z-index plus faible) et se retrouve
-       partiellement masqué/coupé (le kicker "Matchs à venir" du dessous
-       apparaît alors comme "coupé" au-dessus de la barre). Fix : se coller
-       juste EN DESSOUS de la navbar via --sf-header-h (hauteur réelle
-       mesurée dans navbar.jsx, pas une valeur devinée — elle dépend de
-       l'encoche/l'île dynamique selon l'appareil). */
-    position: sticky;
-    top: var(--sf-header-h, 0px);
-    z-index: 30;
+    position: relative;
     background: linear-gradient(180deg, #050505 0%, #000 100%);
     border-bottom: 1px solid rgba(var(--red-rgb),0.18);
     overflow: hidden;

@@ -472,7 +472,21 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
     // du haut du viewport (scrollIntoView) : rect.top devient ~0, availH
     // redevient maximal, tout en restant UNE SEULE FOIS avant la mesure
     // (donc toujours indépendant d'où l'utilisateur était scrollé avant).
-    el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+    // BUG CORRIGÉ (mobile, constat utilisateur) : ce scrollIntoView poussait
+    // aussi hors écran tout ce qui est AU-DESSUS du bracket — sur mobile, ça
+    // inclut le header compétition (bouton "Changer"), le titre "Matchs à
+    // venir" et les onglets Poules/Par journée/Phase finale. Le bouton
+    // devenait introuvable tant qu'on ne quittait pas la page (clic sur un
+    // match + retour) pour forcer un remount avec scroll remis à zéro.
+    // Sur desktop, ce chrome au-dessus est minime (pas de header mobile) et
+    // le zoom max reste utile pour un grand tableau — on garde le scroll
+    // uniquement dans ce cas. Sur mobile, `zoomCap` est de toute façon
+    // plafonné à 1 (pas de zoom au-delà de la taille naturelle, voir plus
+    // bas) : le seul rôle du scroll était de maximiser `availH`, ce qui n'a
+    // plus lieu d'être si ça fait disparaître la navigation. On accepte donc
+    // simplement un zoom un peu plus petit sur mobile plutôt que de scroller
+    // la page à l'ouverture de l'onglet.
+    if (isDesktop) el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
 
     const compute = () => {
       const rect   = el.getBoundingClientRect()
@@ -921,22 +935,6 @@ function Matchs() {
     autoSwitchDone.current = true
     setWcView(v)
   }
-
-  /* BUG CORRIGÉ (mobile) : ouvrir "Phase finale" fait un scrollIntoView sur
-     le conteneur du bracket (voir plus haut, fitZoom) qui aligne son bord
-     haut sur le viewport — donc scrolle la page VERS LE BAS, en particulier
-     sous le header compétition mobile (.compHeader, avec le bouton
-     "Changer"). Revenir ensuite sur "Par journée"/"Poules" ne remontait pas
-     la page : elle restait scrollée là où le bracket l'avait laissée, donc
-     le bouton "Changer" (tout en haut) semblait avoir disparu. On remonte
-     donc explicitement en haut de page dès qu'on QUITTE la vue bracket. */
-  const prevWcView = useRef(wcView)
-  useEffect(() => {
-    if (prevWcView.current === 'bracket' && wcView !== 'bracket') {
-      window.scrollTo({ top: 0, behavior: 'instant' })
-    }
-    prevWcView.current = wcView
-  }, [wcView])
 
   /* Vue "Par journée" (toutes compétitions) : seulement les matchs pas encore
      joués (TIMED/SCHEDULED). Un match en direct (IN_PLAY/PAUSED) n'a plus sa
