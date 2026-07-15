@@ -417,7 +417,13 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
 
   const slotH    = cardH + BK_CARD_GAP
   const firstN   = Math.max(leftRounds[0]?.matches.length ?? 0, rightRounds[0]?.matches.length ?? 0)
-  const GRID_H   = firstN * slotH
+  // Cas réel du jour (voir mCY) : aucune branche (main vide), seule la
+  // finale existe → firstN vaut 0, donc une grille de hauteur 0 aurait
+  // rogné la card de la finale (finalTop négatif, card qui dépasse en haut
+  // du wrapper). On impose une hauteur mini suffisante pour loger la card
+  // "big" dans ce cas précis, sans changer le calcul normal (branches
+  // présentes) qui reste piloté par firstN comme avant.
+  const GRID_H   = main.length === 0 ? cardHBig : firstN * slotH
   const nSides   = main.length   // nb de tours par branche (hors finale)
   const sideW    = nSides * BK_CARD_W + Math.max(0, nSides - 1) * BK_CONN_W
   const CENTER_W = BK_FINAL_W
@@ -499,9 +505,22 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
   const rXRight = (ri) => TOTAL_W - BK_PAD_X - BK_CARD_W - ri * (BK_CARD_W + BK_CONN_W)
   const centerX = (TOTAL_W - CENTER_W) / 2
 
-  // Centre Y d'un match dans sa grille, pour une branche donnée
+  // Centre Y d'un match dans sa grille, pour une branche donnée.
+  // BUG CORRIGÉ (écran noir en cliquant "Phase finale" Coupe de France) :
+  // sideRounds[ri] n'était jamais gardé contre un index hors bornes. Ça
+  // arrive en vrai dès que `main` (tours hors FINALE/3e place) est vide mais
+  // qu'une FINALE existe seule dans la fenêtre de données — cas réel vérifié
+  // en direct sur l'API ESPN (aujourd'hui, seule la finale 2025-26 Nice-Lens
+  // est encore dans la fenêtre glissante de 60j, les tours précédents étant
+  // sortis de la fenêtre) : leftRounds/rightRounds sont alors des tableaux
+  // VIDES, donc lastLi/lastRi valent -1, et sideRounds[-1] est `undefined` →
+  // `.matches` plantait avec un TypeError non rattrapé (pas d'Error Boundary
+  // dans App.jsx) → démontage de tout l'arbre React → écran noir. On
+  // sécurise ici (retombe sur le centre de la grille) : plus jamais de throw,
+  // quelle que soit la forme des données.
   const mCY = (sideRounds, ri, mi) => {
-    const n = sideRounds[ri].matches.length
+    const n = sideRounds[ri]?.matches?.length
+    if (!n) return BK_HDR_H + GRID_H / 2
     return BK_HDR_H + GRID_H / n * (mi + 0.5)
   }
 
@@ -542,17 +561,23 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
   const leftFeedY  = mCY(leftRounds, lastLi, 0)
   const rightFeedX = rXRight(lastRi)
   const rightFeedY = mCY(rightRounds, lastRi, 0)
-  const finalPaths = finalRound ? [
+  // Pas de connecteur à tracer s'il n'y a aucune branche gauche/droite (voir
+  // commentaire mCY ci-dessus, même cas réel) : une ligne partant de nulle
+  // part vers la finale n'aurait aucun sens visuellement — la finale
+  // s'affiche alors seule, centrée, sans trait.
+  const finalPaths = (finalRound && main.length > 0) ? [
     `M ${leftFeedX} ${leftFeedY} H ${(leftFeedX + centerX) / 2} V ${finalCY} H ${centerX}`,
     `M ${rightFeedX} ${rightFeedY} H ${(rightFeedX + centerX + CENTER_W) / 2} V ${finalCY} H ${centerX + CENTER_W}`,
   ] : []
 
   const thirdTop = finalTop + cardHBig + 56
 
-  // Garde défensive : le call site (Matchs()) ne monte déjà ce composant que
-  // si rounds.length > 0, mais on la garde ici aussi (défense en profondeur,
-  // ex. futur appelant) — après tous les hooks, donc sans violer leur règle.
-  if (main.length === 0) return probe
+  // Garde défensive : rien à afficher que si NI branches, NI finale, NI 3e
+  // place. AVANT : `if (main.length === 0) return probe` sortait aussi
+  // quand seule la finale existait (cas réel du jour, voir mCY) — le match
+  // était alors invisible (juste la sonde), alors qu'il y a bien quelque
+  // chose à montrer. Élargi pour ne bloquer QUE le cas vraiment vide.
+  if (main.length === 0 && !finalRound && !third) return probe
 
   return (
     <>
