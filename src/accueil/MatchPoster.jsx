@@ -1,7 +1,7 @@
 import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
-import { getMatchState }              from '../utils/matchStateTracker'
+import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
@@ -152,7 +152,21 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
     const compute = () => {
-      const state = getMatchState(match.id)
+      let state = getMatchState(match.id)
+      // Filet de sécurité (constat utilisateur : "c'était déjà la mi-temps
+      // quand t'as fait les modifs, y'a pas 'reprise dans 15min'") : si
+      // aucun autre hook (useLiveMatches.js/useLiveMinute.js) n'a encore posé
+      // pausedAt pour ce match — fenêtre entre un déploiement et le prochain
+      // poll live, ou app ouverte directement en pleine mi-temps sans avoir
+      // witnessed la transition IN_PLAY→PAUSED — on le pose nous-mêmes ici
+      // plutôt que de rester bloqué indéfiniment sur le texte statique.
+      // Moins précis qu'une vraie estimation (useLiveMinute.js en a une,
+      // basée sur le clock ESPN), mais très largement préférable à un
+      // blocage permanent.
+      if (!state.pausedAt && !state.half2Start) {
+        trackMatchState({ ...match, status: 'PAUSED' })
+        state = getMatchState(match.id)
+      }
       // Arrêter le décompte si la 2ème MT a démarré
       if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
       const elapsed = Date.now() - state.pausedAt
@@ -224,14 +238,17 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__center">
           {isLive && minute && (
-            <div className="poster__min-label">
+            <div className={`poster__min-label${minute === 'MT' ? ' poster__min-label--reprise' : ''}`}>
               {/* calcMinute() renvoie déjà des libellés complets pour les états
                   spéciaux (MT/Pause/TAB/Débute) et inclut déjà l'apostrophe pour
                   les minutes chiffrées ("91'") — ne jamais en rajouter une.
                   À la mi-temps : countdown "Reprise dans X min" / "Reprise
                   imminente" (htLabel) au lieu du texte statique "Mi-temps" —
                   htLabel repasse à null tout seul dès que la 2ème MT démarre
-                  (half2Start), minute reprend alors le relais normalement. */}
+                  (half2Start), minute reprend alors le relais normalement.
+                  Police plus petite (--reprise) car ce texte est bien plus
+                  long que "MT"/"45'" et doit rester lisible dans l'espace
+                  disponible sans déborder. */}
               {minute === 'MT' ? (htLabel ?? 'Mi-temps') : minute}
             </div>
           )}
