@@ -1672,13 +1672,17 @@
    inline dans MatchPoster.jsx) — les 2 autres ont une bordure transparente. */
 .poster__prono-row {
   display: flex;
-  justify-content: center;
   gap: 8px;
 }
-/* Largeur fixe (pas flex:1), +10px de plus (retour utilisateur), toutes les
-   3 pilules identiques : 92px → 102px. */
+/* flex:1 + max-width plafonné (PAS une largeur fixe) : +10px de plus (retour
+   utilisateur), toutes les 3 pilules identiques, plafonnées à 102px. En
+   fixe pur, 3×102px + gaps dépasse la largeur dispo sur les écrans <400px
+   (.accueil passe à 0.6rem de padding latéral à ce breakpoint — vérifié
+   après coup) : flex:1 laisse les 3 pilules rétrécir ensemble pour tenir,
+   au lieu de déborder de la card. */
 .poster__prono-pill {
-  width: 102px;
+  flex: 1;
+  max-width: 102px;
   height: 54px;
   display: flex;
   flex-direction: column;

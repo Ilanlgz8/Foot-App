@@ -337,25 +337,25 @@
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
-/* space-between : les 3 pilules s'écartent pour occuper toute la largeur de
-   .mp__tabContent (marges alignées sur le hero) — la pilule domicile tombe
-   sous la colonne équipe domicile, l'extérieure sous l'extérieure. Gap
-   resserré à 6px (retour utilisateur : "espace moins les rectangles") pour
-   laisser la place à des pilules plus larges. */
+/* Les 3 pilules occupent toute la largeur de .mp__tabContent (marges
+   alignées sur le hero) — la pilule domicile tombe sous la colonne équipe
+   domicile, l'extérieure sous l'extérieure. Gap resserré à 6px (retour
+   utilisateur : "espace moins les rectangles"). Pas de justify-content ici :
+   flex:1 sur les pilules (voir plus bas) suffit à les répartir. */
 .modal__liveProno__row {
   display: flex;
-  justify-content: space-between;
   gap: 6px;
 }
-/* Largeur fixe (pas flex:1), toutes les 3 identiques (même pattern que
-   .poster__prono-pill dans accueil.css). 112px = largeur des pilules
-   Accueil (102px) + 10px (retour utilisateur : "rajoute 10px de plus que
-   sur les rectangles [...] dans les cards des matchs à venir de accueil").
-   Glow PERMANENT bordeaux réservé à la pilule FAVORITE — voir
-   LivePronoPill, style inline conditionnel sur isFavorite ; les 2 autres
-   gardent une bordure transparente ici. */
+/* flex:1 + max-width plafonné (PAS une largeur fixe) : 112px = largeur des
+   pilules Accueil (102px) + 10px (retour utilisateur), mais en fixe pur, 3
+   pilules à 112px + les gaps DÉPASSENT la largeur dispo sur les écrans
+   ~360-375px (iPhone SE/mini, Android d'entrée de gamme) — repéré en
+   vérifiant après coup, corrigé ici : flex:1 permet aux 3 pilules de
+   rétrécir ensemble pour tenir sur un petit écran, tout en plafonnant à
+   112px sur les écrans plus larges où il y a la place. */
 .modal__liveProno__pill {
-  width: 112px;
+  flex: 1;
+  max-width: 112px;
   height: 62px;
   display: flex;
   flex-direction: column;
