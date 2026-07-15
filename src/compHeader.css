@@ -7,7 +7,19 @@
   /* Sur tablette / mobile on remplace la sidebar par le header compétition */
   .compHeader {
     display: block;
-    position: relative;
+    /* BUG CORRIGÉ : le bouton "Changer" (dans ce header) disparaissait dès
+       qu'on ouvrait "Phase finale" — le tableau (BracketSvgView) fait un
+       scrollIntoView pour se caler en haut du viewport et se dimensionner
+       au maximum (voir Match.jsx), ce qui pousse ce header, situé au-dessus,
+       hors de l'écran. Revenir sur "Par journée"/"Poules" ne remontait pas
+       la page toute seule : le bouton restait donc introuvable tant qu'on
+       ne remontait pas manuellement. Plutôt que de rejouer un scroll après
+       coup (fragile, dépend du timing), on épingle simplement ce header en
+       haut du viewport (position: sticky) : il reste TOUJOURS visible, quel
+       que soit l'onglet actif ou la hauteur du contenu en dessous. */
+    position: sticky;
+    top: 0;
+    z-index: 30;
     background: linear-gradient(180deg, #050505 0%, #000 100%);
     border-bottom: 1px solid rgba(var(--red-rgb),0.18);
     overflow: hidden;
