@@ -370,15 +370,15 @@
   text-transform: uppercase;
   color: #111111;
 }
-/* Police "sport" — Chakra Petch, déjà chargée par l'app (index.html) et
-   déjà utilisée pour les numéros de maillot (LineupPitch.jsx). Graisse 900 +
-   chiffres agrandis (voir accueil.css .poster__prono-pillVal — même teinte
-   bordeaux #9f1e34 partout). */
+/* Police "sport" — Russo One (chargée via index.html), choisie parmi
+   plusieurs essais (retour utilisateur). Un seul poids (déjà très épais par
+   nature, pas besoin de font-weight 900). Taille resserrée par rapport à
+   Chakra Petch : glyphes plus larges/pleins à taille égale. */
 .modal__liveProno__pillVal {
-  font-family: 'Chakra Petch', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
+  font-family: 'Russo One', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 0;
   color: #9f1e34;
 }
 

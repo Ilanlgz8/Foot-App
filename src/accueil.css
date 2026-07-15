@@ -1696,16 +1696,14 @@
   text-transform: uppercase;
   color: #111111;
 }
-/* Graisse 900, chiffres agrandis pour bien remplir la pilule (retour
-   utilisateur : "grossis les chiffres, que ça prenne de la place"). Rouge
-   bordeaux #9f1e34 — entre le très sombre d'origine (#7a1e2e) et le trop
-   clair du tour précédent (#c41e3a), retour utilisateur : "un peu trop
-   clair, redescendre un peu". */
+/* Police Russo One (chargée via index.html, retour utilisateur après essai
+   de plusieurs polices). Un seul poids, déjà très épais par nature. Rouge
+   bordeaux #9f1e34. */
 .poster__prono-pillVal {
-  font-family: 'Chakra Petch', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 900;
-  letter-spacing: 0.01em;
+  font-family: 'Russo One', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
   color: #9f1e34;
 }
 
