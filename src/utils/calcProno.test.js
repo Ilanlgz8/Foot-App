@@ -35,6 +35,22 @@ describe('calcProno (forme récente)', () => {
     const p = calcProno(['W', 'W', 'W', 'W', 'W'], ['L', 'L', 'L', 'L', 'L'])
     expect(p.away).toBeGreaterThanOrEqual(5)
   })
+
+  it('le nul ne s\'écrase pas quand les deux équipes sont en grande forme (constat utilisateur : cote extérieur plus basse que le nul alors que cette équipe perdait)', () => {
+    // Avec une constante fixe pour le nul, deux équipes en pleine forme
+    // faisaient chuter sa part relative (elle ne suit pas leur niveau), ce
+    // qui pouvait laisser le nul en dessous de la victoire extérieure même
+    // pré-match — le nul doit rester comparable au cas neutre.
+    const neutral = calcProno([], [])
+    const bothStrong = calcProno(['W', 'W', 'W', 'W', 'W'], ['W', 'W', 'W', 'W', 'W'])
+    expect(bothStrong.draw).toBeGreaterThanOrEqual(neutral.draw - 3)
+  })
+
+  it('le nul est plus probable entre deux équipes de niveau proche qu\'entre deux équipes très inégales', () => {
+    const close      = calcProno(['W', 'D', 'L', 'W', 'D'], ['W', 'D', 'L', 'D', 'W'])
+    const mismatched = calcProno(['W', 'W', 'W', 'W', 'W'], ['L', 'L', 'L', 'L', 'L'])
+    expect(close.draw).toBeGreaterThan(mismatched.draw)
+  })
 })
 
 describe('calcPronoAdvanced — repli sur calcProno si données insuffisantes', () => {

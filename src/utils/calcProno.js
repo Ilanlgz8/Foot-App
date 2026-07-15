@@ -94,7 +94,28 @@ function distribute(h, a, draw) {
 export function calcProno(homeForm, awayForm) {
   const h = strength(homeForm) + 0.4   // avantage domicile ~+0.4 pt
   const a = strength(awayForm)
-  return distribute(h, a, 1.5)         // poids match nul constant
+
+  // Poids du nul — retour utilisateur (match en direct 1-0, l'équipe qui perd
+  // avait une cote de victoire PLUS BASSE que le nul, jugé pas logique) :
+  // avec une constante fixe (1.5), le nul s'écrasait mécaniquement dès que les
+  // DEUX équipes étaient en bonne forme (h et a élevés), alors que rien dans
+  // la réalité du foot ne justifie ça — deux équipes fortes et globalement
+  // proches en niveau (cas Argentine/Angleterre, toutes deux en grande forme)
+  // font AU MOINS aussi souvent match nul que deux équipes moyennes, sinon
+  // plus (stat foot connue : plus deux équipes sont proches, plus le nul est
+  // probable, indépendamment de leur niveau absolu). Le nul doit donc suivre
+  // le niveau moyen des deux équipes (avg), pas rester figé, et rester
+  // pénalisé seulement quand l'écart entre elles (gap) se creuse.
+  // Calibré pour retomber quasiment sur l'ancienne constante (1.5) dans le cas
+  // neutre (h=1.9, a=1.5, aucune forme connue) — seul le comportement aux
+  // extrêmes (deux équipes fortes et proches) change réellement.
+  // ⚠️ Coefficients choisis par raisonnement, PAS backtestés empiriquement —
+  // voir scripts/backtest-prono.mjs pour vérifier/affiner sur de vrais résultats.
+  const avg = (h + a) / 2
+  const gap = Math.abs(h - a)
+  const drawWeight = Math.max(0.6, 1.5 * (avg / 1.7) - gap * 0.4)
+
+  return distribute(h, a, drawWeight)
 }
 
 // ── Modèle avancé : buts marqués/encaissés (Poisson) + confrontations
