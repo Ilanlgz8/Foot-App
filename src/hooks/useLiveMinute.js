@@ -765,7 +765,17 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         // jamais montrer "T.A.B."). On force le passage en tab plutôt que de
         // confirmer un FT qu'on sait impossible.
         const isKnockout = KNOCKOUT_STAGES.includes(match.stage)
-        const scoresStillTied = ftSafeHome != null && ftSafeAway != null && ftSafeHome === ftSafeAway
+        // BUG CORRIGÉ (audit robustesse) : référençait ftSafeHome/ftSafeAway,
+        // jamais déclarées nulle part dans ce fichier (seules
+        // ftSafeHomeShootout/ftSafeAwayShootout, un concept différent —
+        // score des tirs au but — existent). ReferenceError garanti à CHAQUE
+        // match atteignant STATUS_FINAL/FULL_TIME/AET/PEN, avalé par le
+        // try/catch englobant (plus bas) mais qui interrompait alors le
+        // traitement de TOUS les autres matchs restants dans la même boucle
+        // Object.entries(liveData) de ce poll — pas juste celui en erreur.
+        // Le score déjà fusionné à comparer est `home`/`away`
+        // (déstructurés de `data` en haut de la boucle, voir plus haut).
+        const scoresStillTied = home != null && away != null && home === away
         if (
           (espnStatus === 'STATUS_FINAL' || espnStatus === 'STATUS_FULL_TIME') &&
           isKnockout && scoresStillTied
