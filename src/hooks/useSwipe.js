@@ -26,7 +26,19 @@ export function useSwipe(onSwipeLeft, onSwipeRight, threshold = 50) {
   const startY      = useRef(null)
   const scrollEl    = useRef(null)
   const lockedAxis  = useRef(null)   // 'h' | 'v' | null — verrouillé dès qu'on sait
-  const containerRef = useRef(null)
+
+  // BUG CORRIGÉ : certains consommateurs (ex. NewsCarousel) mettent un
+  // `key={page}` sur le conteneur swipable pour forcer un remount à chaque
+  // changement de page/onglet. Avec un simple useRef, l'élément DOM change
+  // sous nos pieds à chaque remount mais l'effet qui attache les listeners
+  // ne se redéclenche jamais (ses deps — les callbacks memoïsés — ne
+  // changent pas) : les listeners restent accrochés à l'ANCIEN nœud, déjà
+  // retiré du DOM. Résultat : le tout premier swipe (ou la 1ère rotation
+  // auto) fonctionne, puis plus aucun swipe ne répond — jusqu'à recharger
+  // l'app. On passe donc par un état (callback ref) : à chaque nouveau
+  // nœud DOM, `node` change, ce qui refait tourner l'effet d'attachement.
+  const [node, setNode] = useState(null)
+  const containerRef = useCallback(el => setNode(el), [])
 
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
@@ -101,8 +113,10 @@ export function useSwipe(onSwipeLeft, onSwipeRight, threshold = 50) {
   }, [dragOffset, threshold])
 
   // Attacher les listeners sur le conteneur avec passive:false sur touchmove
+  // — dépend de `node` (pas d'un ref muet) pour se ré-attacher à chaque
+  // remount du conteneur (voir commentaire plus haut).
   useEffect(() => {
-    const el = containerRef.current
+    const el = node
     if (!el) return
     el.addEventListener('touchstart', handleTouchStart, { passive: true })
     el.addEventListener('touchmove',  handleTouchMove,  { passive: false })
@@ -112,7 +126,7 @@ export function useSwipe(onSwipeLeft, onSwipeRight, threshold = 50) {
       el.removeEventListener('touchmove',  handleTouchMove)
       el.removeEventListener('touchend',   handleTouchEnd)
     }
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd])
+  }, [node, handleTouchStart, handleTouchMove, handleTouchEnd])
 
   return { ref: containerRef, dragOffset, isDragging }
 }

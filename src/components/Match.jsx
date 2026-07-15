@@ -922,6 +922,22 @@ function Matchs() {
     setWcView(v)
   }
 
+  /* BUG CORRIGÉ (mobile) : ouvrir "Phase finale" fait un scrollIntoView sur
+     le conteneur du bracket (voir plus haut, fitZoom) qui aligne son bord
+     haut sur le viewport — donc scrolle la page VERS LE BAS, en particulier
+     sous le header compétition mobile (.compHeader, avec le bouton
+     "Changer"). Revenir ensuite sur "Par journée"/"Poules" ne remontait pas
+     la page : elle restait scrollée là où le bracket l'avait laissée, donc
+     le bouton "Changer" (tout en haut) semblait avoir disparu. On remonte
+     donc explicitement en haut de page dès qu'on QUITTE la vue bracket. */
+  const prevWcView = useRef(wcView)
+  useEffect(() => {
+    if (prevWcView.current === 'bracket' && wcView !== 'bracket') {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+    prevWcView.current = wcView
+  }, [wcView])
+
   /* Vue "Par journée" (toutes compétitions) : seulement les matchs pas encore
      joués (TIMED/SCHEDULED). Un match en direct (IN_PLAY/PAUSED) n'a plus sa
      place ici — il est déjà visible dans le widget "EN DIRECT" de l'Accueil
