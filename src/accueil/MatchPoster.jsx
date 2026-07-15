@@ -2,7 +2,7 @@ import { useState }                   from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
-import { calcPronoAdvanced, calcLiveProno } from '../utils/calcProno'
+import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { FormDiamonds }               from './FormDiamonds'
@@ -203,22 +203,24 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
       </div>
 
-      {/* ── Barre prono ── */}
+      {/* ── Pronostic — pilules "côtes bookmaker", même design que
+          LiveProno (MatchModal.jsx/LiveMatchPage) : fond clair pour
+          trancher sur le poster, cote décimale (pronoToOdds), liseré rouge
+          d'intensité proportionnelle à la probabilité (pronoIntensity). ── */}
       <div className="poster__footer">
-        <div className="poster__prono-labels">
-          <span className="poster__lbl poster__lbl--h">{homeCode} {prono.home}%</span>
-          {/* Retour utilisateur : "Nul" restait figé au milieu du poster,
-              alors que le segment nul de la barre en dessous n'est PAS
-              forcément centré (sa position dépend de prono.home) — repositionné
-              pile au-dessus du centre réel du segment nul, pour qu'on associe
-              directement le libellé à l'endroit où il est sur la barre. */}
-          <span className="poster__lbl poster__lbl--d" style={{ left: `${prono.home + prono.draw / 2}%` }}>Nul {prono.draw}%</span>
-          <span className="poster__lbl poster__lbl--a">{awayCode} {prono.away}%</span>
-        </div>
-        <div className="poster__prono-bar">
-          <div className="poster__seg poster__seg--h" style={{ width: `${prono.home}%`, background: hColor }} />
-          <div className="poster__seg poster__seg--d"  style={{ width: `${prono.draw}%` }} />
-          <div className="poster__seg poster__seg--a" style={{ width: `${prono.away}%`, background: aColor, opacity: 0.75 }} />
+        <div className="poster__prono-row">
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(239,68,68,${pronoIntensity(prono.home)})` }}>
+            <span className="poster__prono-pillLabel">{homeCode}</span>
+            <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
+          </div>
+          <div className="poster__prono-pill poster__prono-pill--draw" style={{ borderColor: `rgba(239,68,68,${pronoIntensity(prono.draw)})` }}>
+            <span className="poster__prono-pillLabel">Nul</span>
+            <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
+          </div>
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(239,68,68,${pronoIntensity(prono.away)})` }}>
+            <span className="poster__prono-pillLabel">{awayCode}</span>
+            <span className="poster__prono-pillVal">{pronoToOdds(prono.away).toFixed(2)}</span>
+          </div>
         </div>
       </div>
     </div>

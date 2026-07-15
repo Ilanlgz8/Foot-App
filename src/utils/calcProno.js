@@ -7,6 +7,29 @@ function strength(form) {
   return pts / form.length
 }
 
+// ── Affichage façon "côtes bookmaker" (LiveProno/MatchModal.jsx, poster
+// footer/MatchPoster.jsx) — partagé pour ne pas dupliquer la conversion
+// dans les deux composants qui l'affichent. ──────────────────────────────
+
+// % → cote décimale. Cote "juste" sans marge bookmaker (pas de vig) :
+// 100/%, arrondie à 2 décimales, jamais sous 1.01 (cote minimale plausible,
+// évite une division par une probabilité proche de 0 qui donnerait une
+// cote absurde genre 500.00).
+export function pronoToOdds(pct) {
+  if (!pct || pct <= 0) return 99
+  return Math.max(1.01, Math.round((100 / pct) * 100) / 100)
+}
+
+// Intensité visuelle (0-1) pour le liseré coloré de chaque issue — le
+// favori ressort nettement sans qu'aucune issue ne soit totalement
+// "éteinte" (plancher 0.15). Volontairement plus qu'une simple
+// proportionnalité (pct-10)/50, pas juste pct/100 : sépare mieux le favori
+// net du reste sur les distributions courantes (ex. 52/26/22 → 0.84/0.32/0.24
+// plutôt que 0.52/0.26/0.22, à peine différenciable).
+export function pronoIntensity(pct) {
+  return Math.max(0.15, Math.min(0.95, (pct - 10) / 50))
+}
+
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
 // somment à 100, avec un plancher de 5% par issue (jamais 0% affiché).
 function distribute(h, a, draw) {

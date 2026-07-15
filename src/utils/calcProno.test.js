@@ -7,7 +7,7 @@
 // plusieurs facteurs (Poisson + H2H), une valeur exacte serait fragile au
 // moindre ajustement de pondération sans rien prouver de plus utile.
 import { describe, it, expect } from 'vitest'
-import { calcProno, calcPronoAdvanced, calcLiveProno } from './calcProno'
+import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity } from './calcProno'
 
 function sumsTo100(p) {
   return p.home + p.draw + p.away === 100
@@ -159,5 +159,39 @@ describe('calcLiveProno', () => {
     const live = calcLiveProno(homeForm, awayForm, 0, 0, "89'", { awayRedCards: 2 })
     expect(sumsTo100(live)).toBe(true)
     expect(live.away).toBeGreaterThanOrEqual(5)
+  })
+})
+
+describe('pronoToOdds', () => {
+  it('convertit un % en cote décimale cohérente (100/%)', () => {
+    expect(pronoToOdds(50)).toBe(2)
+    expect(pronoToOdds(25)).toBe(4)
+    expect(pronoToOdds(100)).toBe(1.01)
+  })
+
+  it('ne descend jamais sous 1.01, même pour un % très élevé', () => {
+    expect(pronoToOdds(100)).toBeGreaterThanOrEqual(1.01)
+  })
+
+  it('reste une valeur finie et raisonnable pour un % nul ou manquant', () => {
+    expect(Number.isFinite(pronoToOdds(0))).toBe(true)
+    expect(Number.isFinite(pronoToOdds(null))).toBe(true)
+  })
+
+  it('une issue plus probable a toujours une cote plus basse', () => {
+    expect(pronoToOdds(52)).toBeLessThan(pronoToOdds(26))
+    expect(pronoToOdds(26)).toBeLessThan(pronoToOdds(22))
+  })
+})
+
+describe('pronoIntensity', () => {
+  it('reste toujours entre 0.15 et 0.95', () => {
+    expect(pronoIntensity(0)).toBeGreaterThanOrEqual(0.15)
+    expect(pronoIntensity(100)).toBeLessThanOrEqual(0.95)
+  })
+
+  it('croît avec le %', () => {
+    expect(pronoIntensity(52)).toBeGreaterThan(pronoIntensity(26))
+    expect(pronoIntensity(26)).toBeGreaterThan(pronoIntensity(22))
   })
 })

@@ -302,18 +302,18 @@
 }
 
 /* ── Stats buts ── */
-/* ── Pronostic live (LiveStatsTab) — barre 1/N/2 façon côtes bookmaker,
-   même langage visuel que .poster__prono-* (accueil.css) mais adapté au
-   fond du modal/de la page match. ── */
+/* ── Pronostic live (LiveStatsTab) — pilules "côtes bookmaker" (fond
+   clair, liseré rouge, chiffre bordeaux), même langage visuel que
+   .poster__prono-* (accueil.css). Fond clair choisi pour trancher sur le
+   thème sombre de l'app — effet "carte de côtes" repéré, plutôt qu'une
+   couleur de plus qui se noie dans le reste. Voir LiveProno/LivePronoPill
+   dans MatchModal.jsx pour le calcul (pronoToOdds/pronoIntensity,
+   src/utils/calcProno.js). ── */
 .modal__liveProno {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
   margin-bottom: 1rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid rgba(var(--red-rgb),0.18);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(var(--red-rgb),0.08) 0%, rgba(255,255,255,0.02) 100%);
 }
 .modal__liveProno__title {
   display: flex;
@@ -323,61 +323,50 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.55);
+  color: rgba(var(--white-rgb),0.4);
 }
 .modal__liveProno__dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--red);
-  box-shadow: 0 0 6px rgba(var(--red-rgb),0.8);
+  box-shadow: 0 0 5px rgba(var(--red-rgb),0.7);
   animation: modalLiveProno-pulse 1.6s ease-in-out infinite;
 }
 @keyframes modalLiveProno-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
-.modal__liveProno__labels {
-  position: relative;
+.modal__liveProno__row {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  width: 100%;
-  gap: 0.35rem;
+  gap: 6px;
 }
-.modal__liveProno__lbl {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: rgba(var(--white-rgb),0.85);
-  white-space: nowrap;
-  line-height: 1.3;
-  flex: 0 0 auto;
-}
-.modal__liveProno__lbl--h { text-align: left; }
-.modal__liveProno__lbl--a { text-align: right; }
-.modal__liveProno__lbl--d {
-  position: absolute;
-  bottom: 0;
-  transform: translateX(-50%);
-  text-align: center;
-  color: rgba(var(--white-rgb),0.55);
-  font-weight: 600;
-}
-.modal__liveProno__bar {
+.modal__liveProno__pill {
+  flex: 1;
+  height: 46px;
   display: flex;
-  width: 100%;
-  height: 8px;
-  border-radius: 5px;
-  overflow: hidden;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  background: #fdf6f6;
 }
-.modal__liveProno__seg {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease;
+.modal__liveProno__pill--draw {
+  flex: 0.85;
 }
-.modal__liveProno__seg--d {
-  background: rgba(var(--white-rgb),0.18);
+.modal__liveProno__pillLabel {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #a3888c;
+}
+.modal__liveProno__pillVal {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #7a1e2e;
 }
 
 .modal__stats {

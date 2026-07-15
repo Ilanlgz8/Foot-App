@@ -9,7 +9,7 @@ import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
-import { calcLiveProno } from '../utils/calcProno'
+import { calcLiveProno, pronoToOdds, pronoIntensity } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -730,12 +730,21 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
 // possession, tirs cadrés — voir calcLiveProno) affichée au-dessus des
 // stats live pour un aperçu immédiat de "qui est favori maintenant", sans
 // attendre le chargement des stats détaillées.
+// Pilules "côtes bookmaker" (fond clair, liseré rouge, chiffre bordeaux) —
+// retour utilisateur après plusieurs itérations de design : fond blanc pour
+// trancher sur le thème sombre de l'app (effet "carte de côtes" qui attire
+// l'œil), cote décimale plutôt que % (plus proche d'un vrai bookmaker),
+// intensité du liseré rouge proportionnelle à la probabilité de chaque
+// issue (pronoIntensity) plutôt qu'une couleur uniforme — le favori ressort
+// nettement sans qu'aucune issue ne soit totalement "éteinte". Pas
+// d'animation sur les pilules elles-mêmes : le point qui pulse (kicker
+// ci-dessus) suffit déjà à signaler "en direct", une 2e animation aurait
+// fait doublon et fatigué l'œil sur 90 minutes d'affichage continu.
 function LiveProno({ prono, match }) {
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
   const awayCode = (match.awayTeam?.tla || awayName).slice(0, 3).toUpperCase()
-  const { home: homeColors, away: awayColors } = getMatchTeamColors(homeName, awayName)
 
   return (
     <div className="modal__liveProno">
@@ -743,16 +752,23 @@ function LiveProno({ prono, match }) {
         <span className="modal__liveProno__dot" />
         Pronostic en direct
       </div>
-      <div className="modal__liveProno__labels">
-        <span className="modal__liveProno__lbl modal__liveProno__lbl--h">{homeCode} {prono.home}%</span>
-        <span className="modal__liveProno__lbl modal__liveProno__lbl--d" style={{ left: `${prono.home + prono.draw / 2}%` }}>Nul {prono.draw}%</span>
-        <span className="modal__liveProno__lbl modal__liveProno__lbl--a">{awayCode} {prono.away}%</span>
+      <div className="modal__liveProno__row">
+        <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} intensity={pronoIntensity(prono.home)} />
+        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} intensity={pronoIntensity(prono.draw)} draw />
+        <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} intensity={pronoIntensity(prono.away)} />
       </div>
-      <div className="modal__liveProno__bar">
-        <div className="modal__liveProno__seg modal__liveProno__seg--h" style={{ width: `${prono.home}%`, background: homeColors.main }} />
-        <div className="modal__liveProno__seg modal__liveProno__seg--d" style={{ width: `${prono.draw}%` }} />
-        <div className="modal__liveProno__seg modal__liveProno__seg--a" style={{ width: `${prono.away}%`, background: awayColors.main, opacity: 0.8 }} />
-      </div>
+    </div>
+  )
+}
+
+function LivePronoPill({ label, value, intensity, draw = false }) {
+  return (
+    <div
+      className={`modal__liveProno__pill${draw ? ' modal__liveProno__pill--draw' : ''}`}
+      style={{ borderColor: `rgba(239,68,68,${intensity})` }}
+    >
+      <span className="modal__liveProno__pillLabel">{label}</span>
+      <span className="modal__liveProno__pillVal">{value.toFixed(2)}</span>
     </div>
   )
 }
