@@ -368,9 +368,21 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // (un but égalisateur/renversant reste possible même en fin de match).
   // Cas d'égalité : biaisé selon qui était favori au pré-match plutôt qu'un
   // 50/50 arbitraire.
+  //
+  // Écart de buts : jusqu'ici un 1-0 et un 5-0 recevaient EXACTEMENT la même
+  // confiance (seul le signe de `diff` comptait, jamais sa valeur) — repéré
+  // en creusant la question "est-ce qu'on gère bien la minute du match ?" :
+  // le temps restant n'a de sens que combiné à l'écart de buts (un but
+  // d'écart reste fragile même en fin de match, un large écart est quasi
+  // verrouillé bien avant la fin). Ajout d'un bonus de "verrouillage" au-delà
+  // du 1er but d'écart, pris sur le nul (rendements décroissants : le 2e but
+  // d'écart compte beaucoup, le 5e ne change plus grand-chose en pratique —
+  // capé pour ne jamais donner une fausse certitude à 100%).
+  const absDiff = Math.abs(diff)
+  const lockIn  = Math.min(9, (absDiff - 1) * 3)
   let now
-  if (diff > 0)      now = { home: 90, draw: 8,  away: 2  }
-  else if (diff < 0) now = { home: 2,  draw: 8,  away: 90 }
+  if (diff > 0)      now = { home: Math.min(97, 90 + lockIn), draw: Math.max(2, 8 - lockIn), away: 2 }
+  else if (diff < 0) now = { home: 2, draw: Math.max(2, 8 - lockIn), away: Math.min(97, 90 + lockIn) }
   else {
     const favorHome = pre.home >= pre.away
     now = favorHome

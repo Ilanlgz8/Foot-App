@@ -153,6 +153,14 @@ describe('calcLiveProno', () => {
     expect(live.home).toBeGreaterThan(live.away)
   })
 
+  it('un écart de buts plus large verrouille davantage la tête (à minute égale) qu\'un écart d\'1 seul but', () => {
+    const oneGoal   = calcLiveProno(homeForm, awayForm, 1, 0, "60'")
+    const fourGoals = calcLiveProno(homeForm, awayForm, 4, 0, "60'")
+    expect(sumsTo100(oneGoal)).toBe(true)
+    expect(sumsTo100(fourGoals)).toBe(true)
+    expect(fourGoals.home).toBeGreaterThan(oneGoal.home)
+  })
+
   it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {
     const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
     const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 1 })
