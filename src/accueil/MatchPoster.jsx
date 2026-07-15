@@ -126,12 +126,27 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       <div className="poster__middle">
 
         <div className="poster__team-col poster__team-col--home">
-          {match.homeTeam?.crest && !homeCrestError
-            ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
-                onError={() => setHomeCrestError(true)} /></div>
-            : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
-          }
+          {/* BUG CORRIGÉ : crest+nom étaient 2 enfants SÉPARÉS de team-col
+              (align-items:flex-start/flex-end pour plaquer le nom au bord
+              extérieur). Le crest (largeur fixe 44px) suivait donc le MÊME
+              bord que le nom, mais un nom plus large que 44px décale son
+              propre centre visuel vers la droite (home) — un correctif
+              précédent centrait le crest sur toute la colonne (68px), ce qui
+              ne matche que pour un nom qui occupe presque toute cette
+              largeur (ex. "Angleterre") : pour un nom court ("Maroc",
+              "France"…) le nom reste collé au bord tandis que le crest se
+              retrouve centré plus loin — toujours pas aligné. Fix définitif :
+              crest+nom+losanges sont maintenant TOUS les 3 enfants de
+              .poster__nameGroup (largeur "shrink-to-fit", align-items:center
+              — voir CSS), donc centrés les uns par rapport aux autres quelle
+              que soit la longueur du nom, tandis que le groupe entier reste
+              plaqué au bord extérieur via l'align-items hérité de team-col. */}
           <div className="poster__nameGroup">
+            {match.homeTeam?.crest && !homeCrestError
+              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
+                  onError={() => setHomeCrestError(true)} /></div>
+              : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
+            }
             <span className="poster__name poster__name--home">{homeShort}</span>
             <FormDiamonds form={hForm} />
           </div>
@@ -155,12 +170,12 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         </div>
 
         <div className="poster__team-col poster__team-col--away">
-          {match.awayTeam?.crest && !awayCrestError
-            ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
-                onError={() => setAwayCrestError(true)} /></div>
-            : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
-          }
           <div className="poster__nameGroup">
+            {match.awayTeam?.crest && !awayCrestError
+              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
+                  onError={() => setAwayCrestError(true)} /></div>
+              : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
+            }
             <span className="poster__name poster__name--away">{awayShort}</span>
             <FormDiamonds form={aForm} />
           </div>
