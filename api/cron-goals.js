@@ -34,7 +34,7 @@ import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
   normalizeFifa, fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
-  minuteLabel, dateStr, parseMin,
+  minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../src/utils/liveDetection.js'
 
 const kv = new Redis({
@@ -262,23 +262,8 @@ async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600, 
 // même s'il n'a jamais ouvert le match en direct.
 const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — même durée que api/espn.js
 
-function hasUsefulSummaryData(json) {
-  const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
-  const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
-  // ⚠️ BUG CORRIGÉ (même fix que api/espn.js) : pour la Coupe du Monde, ESPN
-  // met les compos dans header.competitions[0].competitors[].roster, PAS dans
-  // json.rosters (déjà géré côté client dans useLineups/useEspnMatchStats).
-  // Cette fonction ne le vérifiait pas → la capture proactive censée éviter
-  // "pas de compo si je n'ai pas suivi le match en direct" (voir commentaire
-  // au-dessus) ne se déclenchait en réalité JAMAIS pour un match de CM, alors
-  // que c'est justement la compétition concernée. Constat concret : Maroc-
-  // Canada affichait "Compos non disponibles" alors que l'app avait déjà
-  // récupéré les compos des deux équipes à un moment donné — jamais
-  // sauvegardées faute de ce check.
-  const competitors  = json?.header?.competitions?.[0]?.competitors ?? []
-  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
-  return hasRosters || hasBoxscore || hasHeaderRoster
-}
+// hasUsefulSummaryData : importée de src/utils/liveDetection.js (voir en
+// tête de fichier) — anciennement dupliquée ici et dans cf-worker/src/index.js.
 
 async function cacheEspnSummary(slug, eventId, log) {
   try {

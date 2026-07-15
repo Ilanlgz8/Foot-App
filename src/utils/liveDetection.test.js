@@ -9,7 +9,7 @@ import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
   fuzzyTeamFifa, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
-  minuteLabel, dateStr, parseMin,
+  minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from './liveDetection'
 
 describe('normalizeEspnStatus', () => {
@@ -205,5 +205,38 @@ describe('formatage', () => {
     // production actuel, ce test fige juste ce qui existe déjà.
     expect(parseMin("90'+3'")).toBe(903)
     expect(parseMin(null)).toBe(0)
+  })
+})
+
+describe('hasUsefulSummaryData', () => {
+  it('renvoie false pour un summary vide (rien à mettre en cache)', () => {
+    expect(hasUsefulSummaryData({})).toBe(false)
+    expect(hasUsefulSummaryData(null)).toBe(false)
+    expect(hasUsefulSummaryData({ rosters: [], boxscore: { teams: [] } })).toBe(false)
+  })
+
+  it('renvoie true si json.rosters est rempli (cas club standard)', () => {
+    expect(hasUsefulSummaryData({ rosters: [{ athletes: [{}] }] })).toBe(true)
+  })
+
+  it('renvoie true si boxscore.teams est rempli (stats dispo)', () => {
+    expect(hasUsefulSummaryData({ boxscore: { teams: [{ statistics: [] }] } })).toBe(true)
+  })
+
+  // Bug réel constaté en direct (Maroc-Canada, CM 2026) : ESPN met les compos
+  // de Coupe du Monde dans header.competitions[0].competitors[].roster, PAS
+  // dans json.rosters. Sans ce 3e check, un summary de CM avec compos déjà
+  // connues était jugé "pas utile" et jamais mis en cache — l'utilisateur
+  // voyait "Compos non disponibles" alors que l'app les avait déjà eues.
+  it('renvoie true si les compos sont dans header.competitions (cas Coupe du Monde)', () => {
+    const wcSummary = {
+      rosters: [],
+      boxscore: { teams: [] },
+      header: { competitions: [{ competitors: [
+        { roster: [{ athlete: { displayName: 'Joueur 1' } }] },
+        { roster: [] },
+      ] }] },
+    }
+    expect(hasUsefulSummaryData(wcSummary)).toBe(true)
   })
 })

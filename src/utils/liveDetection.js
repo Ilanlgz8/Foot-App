@@ -207,3 +207,25 @@ export function generateRecap({ homeTeam, awayTeam, home, away, scorers, cards }
 
   return [intro, scorersLine, cardsLine].filter(Boolean).join(' ')
 }
+
+// ⚠️ AJOUT (audit robustesse) : encore une fonction pure identique dupliquée
+// entre api/cron-goals.js et cf-worker/src/index.js (constaté en auditant le
+// fichier après un premier lot de bugs trouvés) — même risque de divergence
+// silencieuse que celui qui avait justifié la création de ce module. `json`
+// est un summary ESPN brut ; sert à décider si ça vaut le coup de le mettre
+// en cache Redis (évite de sauvegarder un summary "vide" qui écraserait un
+// summary utile déjà en cache).
+// ⚠️ Pour la Coupe du Monde, ESPN met les compositions dans
+// header.competitions[0].competitors[].roster, PAS dans json.rosters (déjà
+// géré côté client dans useLineups/useEspnMatchStats) — sans le 3e check
+// (hasHeaderRoster), un summary de Coupe du Monde avec compos déjà connues
+// était jugé "pas utile" et jamais caché (constat concret : Maroc-Canada
+// affichait "Compos non disponibles" alors que l'app avait déjà les 2
+// compositions à un moment donné, jamais sauvegardées faute de ce check).
+export function hasUsefulSummaryData(json) {
+  const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
+  const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
+  const competitors = json?.header?.competitions?.[0]?.competitors ?? []
+  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
+  return hasRosters || hasBoxscore || hasHeaderRoster
+}

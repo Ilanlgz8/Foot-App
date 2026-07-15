@@ -49,7 +49,7 @@ import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
   normalizeFifa, fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
-  minuteLabel, dateStr, parseMin,
+  minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../../src/utils/liveDetection.js'
 
 const ESPN_SLUGS = Object.values(ESPN_SLUG_BY_COMP_ID)
@@ -99,16 +99,10 @@ async function fetchFifaLiveMatches(kv, log) {
 
 // ── Capture proactive du summary ESPN (compos + stats + événements) ──────────
 // Identique à cacheEspnSummary() dans api/cron-goals.js — pur fetch + Redis,
-// aucune dépendance crypto, portable telle quelle.
+// aucune dépendance crypto, portable telle quelle. hasUsefulSummaryData :
+// importée de src/utils/liveDetection.js (voir en tête de fichier) —
+// anciennement dupliquée ici et dans api/cron-goals.js.
 const SUMMARY_CACHE_TTL = 7 * 24 * 3600
-
-function hasUsefulSummaryData(json) {
-  const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
-  const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
-  const competitors  = json?.header?.competitions?.[0]?.competitors ?? []
-  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
-  return hasRosters || hasBoxscore || hasHeaderRoster
-}
 
 async function cacheEspnSummary(kv, slug, eventId, log) {
   try {
