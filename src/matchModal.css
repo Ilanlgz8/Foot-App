@@ -342,15 +342,15 @@
   justify-content: center;
   gap: 10px;
 }
-/* Vertical/étroit, largeur fixe (pas flex:1), centré via justify-content
-   sur la row. Hauteur relevée à 72px (retour utilisateur : "un peu trop
-   court en longueur"). Glow PERMANENT bordeaux (pas d'animation qui
+/* Largeur fixe (pas flex:1), centré via justify-content sur la row.
+   "Longueur" = largeur horizontale (retour utilisateur) : élargie à 66px,
+   hauteur revenue à 62px. Glow PERMANENT bordeaux (pas d'animation qui
    clignote) réservé à la pilule FAVORITE — voir LivePronoPill, style inline
    conditionnel sur isFavorite ; les 2 autres gardent une bordure
    transparente ici. */
 .modal__liveProno__pill {
-  width: 58px;
-  height: 72px;
+  width: 66px;
+  height: 62px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -361,7 +361,7 @@
   background: #ffffff;
 }
 .modal__liveProno__pill--draw {
-  width: 50px;
+  width: 56px;
 }
 .modal__liveProno__pillLabel {
   font-size: 0.5rem;
