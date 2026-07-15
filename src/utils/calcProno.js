@@ -81,6 +81,41 @@ function distribute(h, a, draw) {
   return { home, draw: nul, away }
 }
 
+// ── Correction de surconfiance (backtest utilisateur, PL saison 2024-25,
+// 380 matchs) ────────────────────────────────────────────────────────────
+// Table de calibration observée (% prédit vs % réel de victoire domicile,
+// modèle calcPronoAdvanced) : bien calibré dans la zone médiane (20-50%,
+// écarts de 1 à 5 points sur des échantillons de 50-65 matchs — du bruit
+// normal), mais biais SYSTÉMATIQUE et cohérent sur plusieurs tranches à
+// effectif correct aux extrêmes :
+//   10-20% prédit (n=37) → 24.3% réel  (sous-estimé de 10 points)
+//   60-70% prédit (n=37) → 51.4% réel  (surestimé de 13 points)
+//   70-80% prédit (n=34) → 67.6% réel  (surestimé de 6 points)
+// → le modèle pousse ses pronostics trop loin vers les extrêmes (pas assez
+// d'incertitude gardée). Correctif standard pour ce type de biais :
+// "shrinkage" — ramener chaque pronostic PRÉ-MATCH un peu vers une
+// répartition neutre représentative du foot en général, sans supprimer le
+// signal, juste moins extrémiste. Appliqué à calcProno/calcPronoAdvanced
+// (le prior pré-match) mais PAS à calcLiveProno (son ajustement en direct
+// reflète de vraies infos du match en cours — score, cartons... — qui
+// justifient légitimement plus de confiance en fin de match, contrairement
+// à un pronostic pré-match).
+// BASE_RATE = répartition moyenne approximative dom/nul/ext toutes ligues
+// confondues, avantage domicile inclus (ordre de grandeur connu, pas une
+// valeur mesurée sur CE backtest précis).
+// ⚠️ SHRINK choisi par raisonnement à partir de l'ampleur des écarts
+// observés ci-dessus, PAS re-testé empiriquement après coup — à vérifier en
+// relançant scripts/backtest-prono.mjs après ce changement.
+const BASE_RATE = { home: 45, draw: 27, away: 28 }
+const SHRINK = 0.18
+
+function shrinkTowardBase(p) {
+  const home = p.home * (1 - SHRINK) + BASE_RATE.home * SHRINK
+  const draw = p.draw * (1 - SHRINK) + BASE_RATE.draw * SHRINK
+  const away = p.away * (1 - SHRINK) + BASE_RATE.away * SHRINK
+  return distribute(home, away, draw)
+}
+
 /**
  * calcProno — modèle DE BASE (forme récente V/N/D uniquement), gardé tel
  * quel comme filet de sécurité : utilisé quand on n'a pas assez de données
@@ -115,7 +150,7 @@ export function calcProno(homeForm, awayForm) {
   const gap = Math.abs(h - a)
   const drawWeight = Math.max(0.6, 1.5 * (avg / 1.7) - gap * 0.4)
 
-  return distribute(h, a, drawWeight)
+  return shrinkTowardBase(distribute(h, a, drawWeight))
 }
 
 // ── Modèle avancé : buts marqués/encaissés (Poisson) + confrontations
@@ -277,7 +312,7 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
     away = away * (1 - w) + h2hAway * w
   }
 
-  return distribute(home * 100, away * 100, draw * 100)
+  return shrinkTowardBase(distribute(home * 100, away * 100, draw * 100))
 }
 
 // calcMinute() (matchUtils.js) ne renvoie jamais un nombre brut — toujours

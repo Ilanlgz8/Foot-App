@@ -91,6 +91,11 @@ describe('calcPronoAdvanced — modèle buts/Poisson', () => {
     expect(p.home).toBeGreaterThan(60)
   })
 
+  it('reste raisonnable (< 95%) même pour un écart de force extrême — correction de surconfiance (backtest utilisateur : les pronostics >80% se réalisaient beaucoup moins souvent que prédit)', () => {
+    const p = calcPronoAdvanced('strong', 'weak', compMatches, [], [])
+    expect(p.home).toBeLessThan(95)
+  })
+
   it('reste équilibré entre deux équipes de force comparable', () => {
     const p = calcPronoAdvanced('t1', 't2', compMatches, [], [])
     expect(sumsTo100(p)).toBe(true)
