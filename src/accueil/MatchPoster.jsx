@@ -1,6 +1,6 @@
 import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, parseEspnClock } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -160,11 +160,21 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
       // poll live, ou app ouverte directement en pleine mi-temps sans avoir
       // witnessed la transition IN_PLAY→PAUSED — on le pose nous-mêmes ici
       // plutôt que de rester bloqué indéfiniment sur le texte statique.
-      // Moins précis qu'une vraie estimation (useLiveMinute.js en a une,
-      // basée sur le clock ESPN), mais très largement préférable à un
-      // blocage permanent.
+      // ⚠️ Ne PAS utiliser Date.now() comme instant de pause : si la mi-temps
+      // a déjà commencé depuis 10min quand l'app s'ouvre, ça ferait repartir
+      // le countdown à 15min au lieu d'afficher les 5min restantes (constat
+      // utilisateur). Même estimation que useLiveMinute.js : ESPN GÈLE son
+      // horloge (espnClock) sur la minute réelle atteinte au coup de sifflet
+      // et la garde identique tant que dure la pause — déjà en localStorage
+      // ici, posée par le watchdog global (LiveProvider) qui tourne sur
+      // toutes les pages, donc dispo même si on n'a jamais vu la transition
+      // nous-mêmes. pausedAt = kickoff + cette vraie durée jouée.
       if (!state.pausedAt && !state.half2Start) {
-        trackMatchState({ ...match, status: 'PAUSED' })
+        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
+        const realHalfMins = parseEspnClock(state.espnClock)?.base
+        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
+        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
+        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
         state = getMatchState(match.id)
       }
       // Arrêter le décompte si la 2ème MT a démarré

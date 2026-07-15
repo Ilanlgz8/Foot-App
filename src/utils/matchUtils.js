@@ -22,7 +22,7 @@ const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
  * "45:00+2:00"  → { base: 45, extra: 2 }
  * Retourne null si non parseable.
  */
-function parseEspnClock(clock) {
+export function parseEspnClock(clock) {
   if (!clock) return null
   const plusIdx = clock.indexOf('+')
   if (plusIdx === -1) {
