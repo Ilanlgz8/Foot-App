@@ -38,6 +38,22 @@ import { isNationalTeamComp } from '../utils/matchUtils'
 // ─────────────────────────────────────────────
 
 let espnFailStreak = 0
+// Retour utilisateur : "quand on capte mal la connexion pendant un match en
+// cours, ça met du temps avant que ça se remette à jour correctement même
+// si on recapte mieux après". Cause identifiée : la reprise automatique
+// après coupure repose ailleurs (React Query, main.jsx) sur l'event
+// navigateur 'online'/refetchOnReconnect — or 'online'/'offline' ne se
+// déclenchent QUE pour une vraie coupure totale (avion, wifi coupé), PAS
+// pour une mauvaise réception (le radio reste "connecté" mais les requêtes
+// échouent/traînent) — le cas exact décrit ici. Sans event fiable, rien ne
+// force un vrai résync une fois le réseau redevenu correct : il fallait
+// attendre le prochain cycle normal de chaque donnée (jusqu'à plusieurs
+// minutes pour standings/forme/buteurs). `espnFailStreak` (déjà utilisé
+// pour basculer isEspnWorking) est un signal fiable et indépendant de ces
+// events : c'est le résultat RÉEL d'un vrai aller-retour réseau. On l'utilise
+// donc aussi pour détecter la transition "on galérait → ça remarche" et
+// déclencher un résync large à ce moment précis, sans dépendre du navigateur.
+let _wasEspnStruggling = false
 
 // Stages FD.org à élimination directe (jamais de match nul possible) — même
 // liste que KNOCKOUT_ORDER dans useWcKnockout.js, dupliquée ici pour éviter un
@@ -502,13 +518,14 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
 
     if (!res.ok) {
       espnFailStreak++
-      if (espnFailStreak >= 3) setEspnWorking(false)
+      if (espnFailStreak >= 3) { setEspnWorking(false); _wasEspnStruggling = true }
       _runFtSafeguards(allMatches, now, queryClient)
       return
     }
 
     espnFailStreak = 0
     setEspnWorking(true)
+    if (_wasEspnStruggling) { _wasEspnStruggling = false; forceFullResync(queryClient) }
     try { localStorage.setItem('foot_espn_last_poll', String(Date.now())) } catch {}
 
     // liveData = { [fdMatchId]: { espnEventId, espnSlug, espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache? } }
@@ -861,7 +878,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
   } catch (err) {
     console.warn('[useLiveMinute] /api/fifa-live erreur :', err.message)
     espnFailStreak++
-    if (espnFailStreak >= 3) setEspnWorking(false)
+    if (espnFailStreak >= 3) { setEspnWorking(false); _wasEspnStruggling = true }
   }
 
   // Safeguards après traitement ESPN
@@ -935,6 +952,24 @@ function invalidateLiveStatsQueries(queryClient) {
       Array.isArray(q.queryKey) &&
       ['fifaStats', 'espnSummary', 'aflStats'].includes(q.queryKey[0]),
   })
+}
+
+// ── Résync large après une vraie coupure/mauvaise réception ─────────────────
+// Appelée quand espnFailStreak repasse de "en galère" (≥3 polls ratés) à un
+// poll réussi — voir _wasEspnStruggling plus haut. Même invalidation que le
+// retour au premier plan (onVisible, plus bas) : todayMatches, matches
+// FINISHED, standings, forme récente, buteurs — tout ce qui a pu rater son
+// cycle normal de rafraîchissement pendant la période de mauvaise connexion,
+// sans dépendre d'un event navigateur qui ne se déclenche pas dans ce cas.
+function forceFullResync(queryClient) {
+  queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+  queryClient.invalidateQueries({
+    predicate: q =>
+      Array.isArray(q.queryKey) &&
+      ['matches', 'standings', 'teamForm2', 'scorers', 'wc-knockout', 'cup-knockout'].includes(q.queryKey[0]),
+  })
+  window.__liveStatsForceFreshUntil = Date.now() + 8_000
+  invalidateLiveStatsQueries(queryClient)
 }
 
 // ─────────────────────────────────────────────
