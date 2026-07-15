@@ -114,7 +114,6 @@ function TeamRankRow({ rank, team, value, isCountry }) {
           <img
             src={team.crest}
             alt=""
-            loading="lazy"
             data-team={team.name}
             onError={e => { e.currentTarget.style.display = 'none' }}
           />

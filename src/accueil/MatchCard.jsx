@@ -87,6 +87,16 @@ export function PosterSkeleton() {
 
 // ── Carte d'un match ──
 // Affiche : logo + nom équipe dom | score/heure/minute | logo + nom équipe ext
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "les crests se rechargent à chaque
+// changement de page/onglet/retour") : pas de loading="lazy" sur les crests
+// ici — même raison que dans Resultat.jsx (voir son commentaire dédié) :
+// une image déjà en cache navigateur repasse quand même par
+// l'IntersectionObserver avec loading="lazy", ce qui ajoute un flash
+// "vide → image" perceptible à chaque montage de cette card (retour sur une
+// page, changement d'onglet Accueil/Live/Résultats...). Cette card est
+// utilisée dans plusieurs listes courtes, jamais des centaines d'images
+// d'un coup — le coût du chargement eager reste négligeable.
+//
 // Props :
 //   match         → données du match (football-data.org)
 //   noWinnerLoser → si true, pas de style gagnant/perdant (ex: dans le widget live)
@@ -304,7 +314,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
       <div className="accueil__matchCardTeam">
         <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" loading="lazy" className={homeCrestCls} data-team={match.homeTeam?.name}
+            ? <img src={match.homeTeam.crest} alt="" className={homeCrestCls} data-team={match.homeTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>
@@ -345,7 +355,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
       <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
         <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
           {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" loading="lazy" className={awayCrestCls} data-team={match.awayTeam?.name}
+            ? <img src={match.awayTeam.crest} alt="" className={awayCrestCls} data-team={match.awayTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>

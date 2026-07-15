@@ -276,7 +276,7 @@ function Classement() {
           <div className="accueil__matchCardTeam">
             <div className="accueil__matchCardCrestWrap" data-crest="country">
               {m.homeTeam?.crest
-                ? <img src={m.homeTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
+                ? <img src={m.homeTeam.crest} alt="" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
             <span className={`accueil__matchCardName${homeWin ? ' accueil__matchCardName--winner' : ''}`}>{hn}</span>
@@ -295,7 +295,7 @@ function Classement() {
           <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
             <div className="accueil__matchCardCrestWrap" data-crest="country">
               {m.awayTeam?.crest
-                ? <img src={m.awayTeam.crest} alt="" loading="lazy" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
+                ? <img src={m.awayTeam.crest} alt="" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
                 : <div className="accueil__matchCardCrestEmpty" />}
             </div>
             <span className={`accueil__matchCardName${awayWin ? ' accueil__matchCardName--winner' : ''}`}>{an}</span>
@@ -616,7 +616,7 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <div className="classement__scorerCrestWrap" data-crest={(selectedComp === 'WC' || selectedComp === 'EC') ? 'country' : 'club'}><img src={s.team.crest} alt="" loading="lazy" className="classement__scorerCrest" data-team={s.team?.name}
+                            <div className="classement__scorerCrestWrap" data-crest={(selectedComp === 'WC' || selectedComp === 'EC') ? 'country' : 'club'}><img src={s.team.crest} alt="" className="classement__scorerCrest" data-team={s.team?.name}
                               onError={e => e.currentTarget.style.display = 'none'} /></div>
                           )}
                           <span className="classement__scorerTeam">

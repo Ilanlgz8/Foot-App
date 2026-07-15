@@ -81,7 +81,7 @@ export function ResultHeroCard({ match }) {
         <div className={`resultHero__team${homeWins ? ' resultHero__team--winner' : ''}${awayWins ? ' resultHero__team--loser' : ''}`}>
           <div className="resultHero__crestWrap" data-crest={isWC ? 'country' : 'club'}>
             {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" loading="lazy" className="resultHero__crest" data-team={match.homeTeam?.name}
+              ? <img src={match.homeTeam.crest} alt="" className="resultHero__crest" data-team={match.homeTeam?.name}
                   onError={e => e.currentTarget.style.display = 'none'} />
               : <div className="resultHero__crestEmpty" />}
           </div>
@@ -106,7 +106,7 @@ export function ResultHeroCard({ match }) {
         <div className={`resultHero__team resultHero__team--away${awayWins ? ' resultHero__team--winner' : ''}${homeWins ? ' resultHero__team--loser' : ''}`}>
           <div className="resultHero__crestWrap" data-crest={isWC ? 'country' : 'club'}>
             {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" loading="lazy" className="resultHero__crest" data-team={match.awayTeam?.name}
+              ? <img src={match.awayTeam.crest} alt="" className="resultHero__crest" data-team={match.awayTeam?.name}
                   onError={e => e.currentTarget.style.display = 'none'} />
               : <div className="resultHero__crestEmpty" />}
           </div>

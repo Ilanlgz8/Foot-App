@@ -180,7 +180,7 @@ export function StandingsTable({
                         : <span className="classement__zoneDot classement__zoneDot--spacer" aria-hidden="true" />
                       }
                       {team.team.crest && (
-                        <div className="classement__teamCrestWrap" data-crest={isCountry ? 'country' : 'club'}><img src={team.team.crest} alt="" loading="lazy" className="classement__teamCrest" data-team={team.team.name}
+                        <div className="classement__teamCrestWrap" data-crest={isCountry ? 'country' : 'club'}><img src={team.team.crest} alt="" className="classement__teamCrest" data-team={team.team.name}
                           onError={e => e.currentTarget.style.display = 'none'} /></div>
                       )}
                       <span className="classement__teamName">
