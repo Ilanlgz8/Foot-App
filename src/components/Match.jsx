@@ -463,36 +463,30 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
     lvhProbe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:100lvh; visibility:hidden; pointer-events:none;'
     document.body.appendChild(lvhProbe)
 
-    // ERREUR CORRIGÉE : window.scrollTo(0,0) remontait à l'ABSOLU tout en
-    // haut de la page — donc au-dessus du header/sidebar/onglets Poules-
-    // Matchs-Phase finale, qui prennent eux-mêmes de la place. rect.top du
-    // conteneur restait alors grand (tout ce chrome au-dessus), et comme
-    // availH = hauteur écran − rect.top, le zoom calculé s'effondrait →
-    // tableau minuscule. On aligne donc plutôt le conteneur lui-même au ras
-    // du haut du viewport (scrollIntoView) : rect.top devient ~0, availH
-    // redevient maximal, tout en restant UNE SEULE FOIS avant la mesure
-    // (donc toujours indépendant d'où l'utilisateur était scrollé avant).
-    // BUG CORRIGÉ (mobile, constat utilisateur) : ce scrollIntoView poussait
-    // aussi hors écran tout ce qui est AU-DESSUS du bracket — sur mobile, ça
-    // inclut le header compétition (bouton "Changer"), le titre "Matchs à
-    // venir" et les onglets Poules/Par journée/Phase finale. Le bouton
-    // devenait introuvable tant qu'on ne quittait pas la page (clic sur un
-    // match + retour) pour forcer un remount avec scroll remis à zéro.
-    // Sur desktop, ce chrome au-dessus est minime (pas de header mobile) et
-    // le zoom max reste utile pour un grand tableau — on garde le scroll
-    // uniquement dans ce cas. Sur mobile, `zoomCap` est de toute façon
-    // plafonné à 1 (pas de zoom au-delà de la taille naturelle, voir plus
-    // bas) : le seul rôle du scroll était de maximiser `availH`, ce qui n'a
-    // plus lieu d'être si ça fait disparaître la navigation. On accepte donc
-    // simplement un zoom un peu plus petit sur mobile plutôt que de scroller
-    // la page à l'ouverture de l'onglet.
-    if (isDesktop) el.scrollIntoView?.({ block: 'start', behavior: 'instant' })
-
+    // ERREUR CORRIGÉE (v1) : window.scrollTo(0,0) remontait à l'ABSOLU tout
+    // en haut de la page — rect.top du conteneur restait grand (chrome
+    // au-dessus), et comme availH = hauteur écran − rect.top, le zoom
+    // calculé s'effondrait → tableau minuscule.
+    // ERREUR CORRIGÉE (v2) : la "solution" suivante (scrollIntoView pour
+    // amener rect.top à ~0) réglait le zoom mais scrollait la page toute
+    // seule à l'ouverture de l'onglet — sur mobile ça poussait le header
+    // compétition (bouton "Changer"), le titre et les onglets hors écran,
+    // introuvables sans quitter la page. Désactiver le scroll sur mobile
+    // (v3) réglait ça mais réintroduisait le bug v1 (tableau rétréci, plus
+    // petit qu'avant) puisque rect.top redevenait grand.
+    // FIX DÉFINITIF : on n'a pas besoin de scroller la page ni de connaître
+    // sa position actuelle pour calculer le zoom max. `availH` doit juste
+    // répondre à "quelle est la plus grande hauteur que le tableau pourrait
+    // occuper s'il était seul à l'écran ?" = la hauteur du viewport, point.
+    // On calcule donc le zoom MAXIMAL sur cette base fixe, sans jamais lire
+    // rect.top ni toucher au scroll — la page ne bouge plus toute seule, et
+    // le tableau garde sa taille maximale ; l'utilisateur scrolle normalement
+    // pour le voir en entier, comme n'importe quel contenu plus grand que
+    // l'écran.
     const compute = () => {
-      const rect   = el.getBoundingClientRect()
       const availW = el.clientWidth
       const maxVH  = lvhProbe.getBoundingClientRect().height || window.innerHeight
-      const availH = Math.max(0, maxVH - rect.top - BOTTOM_SAFETY)
+      const availH = Math.max(0, maxVH - BOTTOM_SAFETY)
       if (!availW || !availH) return
       const zoomCap = isDesktop ? BK_ZOOM_CAP_DESKTOP : 1
       const z = Math.min(zoomCap, availW / TOTAL_W, availH / TOTAL_H)
