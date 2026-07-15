@@ -185,9 +185,9 @@ describe('pronoToOdds', () => {
 })
 
 describe('pronoIntensity', () => {
-  it('reste toujours entre 0.15 et 0.95', () => {
-    expect(pronoIntensity(0)).toBeGreaterThanOrEqual(0.15)
-    expect(pronoIntensity(100)).toBeLessThanOrEqual(0.95)
+  it('reste toujours entre 0.35 et 1', () => {
+    expect(pronoIntensity(0)).toBeGreaterThanOrEqual(0.35)
+    expect(pronoIntensity(100)).toBeLessThanOrEqual(1)
   })
 
   it('croît avec le %', () => {

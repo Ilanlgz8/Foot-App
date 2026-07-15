@@ -22,12 +22,14 @@ export function pronoToOdds(pct) {
 
 // Intensité visuelle (0-1) pour le liseré coloré de chaque issue — le
 // favori ressort nettement sans qu'aucune issue ne soit totalement
-// "éteinte" (plancher 0.15). Volontairement plus qu'une simple
-// proportionnalité (pct-10)/50, pas juste pct/100 : sépare mieux le favori
-// net du reste sur les distributions courantes (ex. 52/26/22 → 0.84/0.32/0.24
-// plutôt que 0.52/0.26/0.22, à peine différenciable).
+// "éteinte". Plancher relevé à 0.35 (retour utilisateur : "la bordure est
+// trop faible") — même l'outsider garde un liseré bien visible, pas un
+// filet à peine perceptible. Volontairement plus qu'une simple
+// proportionnalité pct/100 : sépare mieux le favori net du reste sur les
+// distributions courantes (ex. 52/26/22 → 1/0.47/0.38 plutôt que
+// 0.52/0.26/0.22, à peine différenciable).
 export function pronoIntensity(pct) {
-  return Math.max(0.15, Math.min(0.95, (pct - 10) / 50))
+  return Math.max(0.35, Math.min(1, (pct - 5) / 45))
 }
 
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
