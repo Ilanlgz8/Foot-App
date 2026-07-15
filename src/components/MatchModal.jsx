@@ -663,12 +663,34 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
   const statsBody = (() => {
     if (isFifaMatch) {
       if (fifaStatsLoading) return <StatsSkeleton />
+      if (fifaStats) {
+        return (
+          <div>
+            <ESPNStats stats={fifaStats} />
+            {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+          </div>
+        )
+      }
+      // BUG CORRIGÉ (constat utilisateur : match CM, aucune stat affichée
+      // 25min après le coup d'envoi alors que score/minute étaient bons) :
+      // quand l'API FIFA officielle échoue à résoudre le match (matching par
+      // nom raté côté api/fifa-lineups.js — diagnostic confirmé "Match FIFA
+      // introuvable" sur un vrai match live), il n'y avait AUCUN repli vers
+      // ESPN pour les matchs CM — "Stats non disponibles" s'affichait direct
+      // alors qu'ESPN peut très bien avoir ses propres stats pour le même
+      // match (couverture indépendante de FIFA). On tente maintenant
+      // mergedStats (scoreboard/summary ESPN) avant d'abandonner.
+      if (mergedStats) {
+        return (
+          <div>
+            <ESPNStats stats={mergedStats} />
+            {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
+          </div>
+        )
+      }
       return (
         <div>
-          {fifaStats
-            ? <ESPNStats stats={fifaStats} />
-            : <p className="modal__noEvents">Stats non disponibles</p>
-          }
+          <p className="modal__noEvents">Stats non disponibles</p>
           {espnScore?.scorers?.length > 0 && <ESPNScorers scorers={espnScore.scorers} />}
         </div>
       )
