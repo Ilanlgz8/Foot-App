@@ -789,7 +789,17 @@ function Matchs() {
   // match (le tableau "commence tout juste à se remplir"). Ne concerne QUE
   // les coupes nationales — WC/EC ont déjà leur propre garde (état "à venir"
   // géré normalement, jamais buggé).
-  const cupBracketDisabled = hasCup && cupRounds.length === 0
+  // AFFINÉ (retour utilisateur : la finale de la saison précédente restait
+  // seule seule dans la fenêtre glissante de 60j de fetchEspnCupMatches une
+  // fois les tours antérieurs sortis de la fenêtre — voir mCY dans
+  // BracketSvgView) : `cupRounds.length === 0` ne suffit pas, ce cas précis a
+  // longueur 1 (juste FINAL). Il ne faut PAS afficher cette finale résiduelle
+  // comme si un vrai tableau de la nouvelle saison existait — l'onglet doit
+  // rester désactivé tant qu'AU MOINS un tour hors finale/3e place (donc un
+  // vrai début de tableau à élimination directe de la saison EN COURS) n'est
+  // pas apparu.
+  const cupBracketDisabled = hasCup &&
+    cupRounds.filter(r => r.stage !== 'THIRD_PLACE' && r.stage !== 'FINAL').length === 0
   // Vrai pour toute compétition ayant un toggle Poules/Journée/Phase finale
   // (WC, EC, ou une coupe nationale fusionnée) — remplace les anciens tests
   // "!isWC"/"isWC" isolés dans les vues ci-dessous, qui ignoraient le cas

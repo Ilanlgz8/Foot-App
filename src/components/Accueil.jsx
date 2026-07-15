@@ -248,6 +248,27 @@ function Accueil() {
     return Math.round((next0 - today0) / 86_400_000)
   }, [targetDate, upcomingAllComps])
 
+  // ── Flèche "jour précédent" : même saut direct, mais vers le jour AVEC
+  // match le plus proche en revenant vers aujourd'hui (retour utilisateur :
+  // "quand je retourne en arrière... ça ne saute pas le jour où y'a pas de
+  // match" — ne décrémentait qu'un jour à la fois). On ne considère que les
+  // matchs strictement avant le jour affiché : upcomingAllComps ne contient
+  // de toute façon que des matchs à venir (>= maintenant), donc tout candidat
+  // trouvé est automatiquement >= aujourd'hui — le plancher à 0 reste
+  // garanti sans logique supplémentaire. S'il n'y a AUCUN match connu entre
+  // aujourd'hui et le jour affiché, on retombe directement sur aujourd'hui
+  // (0) plutôt que de décrémenter un par un.
+  const prevMatchDayOffset = useMemo(() => {
+    if (dayOffset <= 0) return null
+    const startOfTargetDay = new Date(`${targetDate}T00:00:00`).getTime()
+    const before = upcomingAllComps.filter(m => new Date(m.utcDate).getTime() < startOfTargetDay)
+    if (before.length === 0) return 0  // rien entre aujourd'hui et ici → aujourd'hui directement
+    const prev = before[before.length - 1]  // trié croissant → le plus proche du jour affiché
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0)
+    const prev0  = new Date(prev.utcDate); prev0.setHours(0, 0, 0, 0)
+    return Math.max(0, Math.round((prev0 - today0) / 86_400_000))
+  }, [targetDate, upcomingAllComps, dayOffset])
+
   // ── Préchargement des jours adjacents ──
   useEffect(() => {
     if (matchesLoading) return
@@ -429,8 +450,8 @@ function Accueil() {
                   "aujourd'hui". */}
               <button
                 className="accueil__dayArrow"
-                onClick={() => setDayOffset(o => Math.max(0, o - 1))}
-                disabled={dayOffset <= 0}
+                onClick={() => { if (prevMatchDayOffset != null) setDayOffset(prevMatchDayOffset) }}
+                disabled={prevMatchDayOffset == null}
                 aria-label="Jour précédent"
               >‹</button>
               <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
