@@ -1675,10 +1675,12 @@
   justify-content: center;
   gap: 8px;
 }
-/* Largeur fixe (pas flex:1). Nettement élargie sur la card Accueil (retour
-   utilisateur : "agrandi beaucoup plus, au moins 15px") : 56px → 72px. */
+/* Largeur fixe (pas flex:1), +20px (retour utilisateur), et les 3 pilules
+   ont maintenant TOUTES la même taille (plus de pilule "Nul" plus étroite,
+   retour utilisateur : "faut que les rectangles soient tous de la même
+   taille") : 72px → 92px pour les 3. */
 .poster__prono-pill {
-  width: 72px;
+  width: 92px;
   height: 54px;
   display: flex;
   flex-direction: column;
@@ -1689,9 +1691,6 @@
   border: 2.5px solid transparent;
   background: #ffffff;
 }
-.poster__prono-pill--draw {
-  width: 64px;
-}
 .poster__prono-pillLabel {
   font-size: 0.5rem;
   font-weight: 700;
@@ -1699,11 +1698,11 @@
   text-transform: uppercase;
   color: #111111;
 }
-/* Graisse relevée à 800 (retour utilisateur : "les chiffres en gras aussi"). */
+/* Graisse relevée à 900 (retour utilisateur : "les chiffres + épais"). */
 .poster__prono-pillVal {
   font-family: 'Chakra Petch', sans-serif;
   font-size: 0.92rem;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.01em;
   color: #7a1e2e;
 }

@@ -222,7 +222,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
             <span className="poster__prono-pillLabel">{homeCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill poster__prono-pill--draw" style={pronoFavorite === 'draw' ? { borderColor: `rgba(122,30,46,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(122,30,46,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">Nul</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
           </div>
