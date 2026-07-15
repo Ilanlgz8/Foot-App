@@ -1,4 +1,4 @@
-import { useState }                   from 'react'
+import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { getMatchState }              from '../utils/matchStateTracker'
@@ -130,12 +130,40 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const posterCompEmblem = posterComp?.emblem ?? match.competition?.emblem
   const posterCompName   = posterComp?.name ?? match.competition?.name ?? ''
   const rawPosterPeriod = getMatchPeriod(match)
+  // "Mi-temps" → "MT" ici uniquement (retour utilisateur, spécifique à ce
+  // badge en haut à droite de la card Accueil — getMatchPeriod() lui-même
+  // n'est pas touché, MatchCard.jsx/LiveMatchPage.jsx gardent leur libellé
+  // complet).
   const posterPeriodLabel = rawPosterPeriod === '1ère MT'       ? '1ère mi-temps'
     : rawPosterPeriod === '2ème MT'       ? '2ème mi-temps'
-    : rawPosterPeriod === 'Mi-temps'      ? 'Mi-temps'
+    : rawPosterPeriod === 'Mi-temps'      ? 'MT'
     : rawPosterPeriod === 'Prolongations' ? 'Prolongations'
     : rawPosterPeriod === 'T.A.B.'        ? 'T.A.B.'
     : null
+
+  // Countdown mi-temps : "Reprise dans 15 min" → ... → "Reprise imminente"
+  // — remis en place (retour utilisateur), même logique déjà éprouvée que
+  // MatchCard.jsx (indépendante du calcul de la minute elle-même : basée
+  // sur matchStateTracker/pausedAt-half2Start, jamais sur liveMinute en
+  // écriture — ne perturbe donc jamais l'affichage de la minute réelle du
+  // match une fois la 2ème mi-temps commencée, calcMinute() reprend le
+  // relais tout seul).
+  const [htLabel, setHtLabel] = useState(null)
+  useEffect(() => {
+    if (liveMinute !== 'MT') { setHtLabel(null); return }
+    const compute = () => {
+      const state = getMatchState(match.id)
+      // Arrêter le décompte si la 2ème MT a démarré
+      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
+      const elapsed = Date.now() - state.pausedAt
+      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
+      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
+    }
+    compute()
+    // Mise à jour chaque minute (le décompte est en minutes)
+    const id = setInterval(compute, 60_000)
+    return () => clearInterval(id)
+  }, [liveMinute, match.id])
 
   return (
     <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
@@ -199,8 +227,12 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
             <div className="poster__min-label">
               {/* calcMinute() renvoie déjà des libellés complets pour les états
                   spéciaux (MT/Pause/TAB/Débute) et inclut déjà l'apostrophe pour
-                  les minutes chiffrées ("91'") — ne jamais en rajouter une. */}
-              {minute === 'MT' ? 'Mi-temps' : minute}
+                  les minutes chiffrées ("91'") — ne jamais en rajouter une.
+                  À la mi-temps : countdown "Reprise dans X min" / "Reprise
+                  imminente" (htLabel) au lieu du texte statique "Mi-temps" —
+                  htLabel repasse à null tout seul dès que la 2ème MT démarre
+                  (half2Start), minute reprend alors le relais normalement. */}
+              {minute === 'MT' ? (htLabel ?? 'Mi-temps') : minute}
             </div>
           )}
           {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
