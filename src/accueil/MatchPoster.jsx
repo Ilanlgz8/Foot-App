@@ -214,15 +214,15 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           d'intensité proportionnelle à la probabilité (pronoIntensity). ── */}
       <div className="poster__footer">
         <div className="poster__prono-row">
-          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,45,45,${pronoIntensity(prono.home)})` }}>
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.home)})` }}>
             <span className="poster__prono-pillLabel">{homeCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill poster__prono-pill--draw" style={{ borderColor: `rgba(255,45,45,${pronoIntensity(prono.draw)})` }}>
+          <div className="poster__prono-pill poster__prono-pill--draw" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.draw)})` }}>
             <span className="poster__prono-pillLabel">Nul</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,45,45,${pronoIntensity(prono.away)})` }}>
+          <div className="poster__prono-pill" style={{ borderColor: `rgba(255,7,45,${pronoIntensity(prono.away)})` }}>
             <span className="poster__prono-pillLabel">{awayCode}</span>
             <span className="poster__prono-pillVal">{pronoToOdds(prono.away).toFixed(2)}</span>
           </div>

@@ -765,7 +765,7 @@ function LivePronoPill({ label, value, intensity, draw = false }) {
   return (
     <div
       className={`modal__liveProno__pill${draw ? ' modal__liveProno__pill--draw' : ''}`}
-      style={{ borderColor: `rgba(255,45,45,${intensity})` }}
+      style={{ borderColor: `rgba(255,7,45,${intensity})` }}
     >
       <span className="modal__liveProno__pillLabel">{label}</span>
       <span className="modal__liveProno__pillVal">{value.toFixed(2)}</span>
