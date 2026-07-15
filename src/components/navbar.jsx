@@ -10,6 +10,7 @@
  * en desktop quand rien n'est en cours) : badge + pulsation/rouge
  * uniquement quand des matchs sont en cours.
  */
+import { useRef, useLayoutEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
 import NotificationBell from './NotificationBell'
@@ -81,10 +82,35 @@ function Navbar() {
   const { liveMatches } = useLiveData()
   const liveCount = liveMatches.length
 
+  // BUG CORRIGÉ : .sfHeader (ce header) est en position:sticky; top:0 —
+  // n'importe quel AUTRE élément sticky ailleurs dans l'app qui utiliserait
+  // aussi top:0 (ex. .compHeader sur Match.jsx mobile) se retrouve à vouloir
+  // se coller exactement à la même position que ce header, donc caché
+  // derrière lui (z-index plus faible) au lieu de s'empiler proprement en
+  // dessous. La hauteur de ce header n'est PAS une constante fiable : elle
+  // dépend de env(safe-area-inset-top) (encoche/île dynamique, variable par
+  // appareil) — donc pas question de la deviner en dur (même erreur que le
+  // "13rem" deviné pour le bracket, déjà corrigée ailleurs, voir Match.jsx).
+  // On la MESURE réellement et on la publie en variable CSS globale, pour
+  // que n'importe quel header sticky de page puisse faire
+  // `top: var(--sf-header-h)` et s'empiler proprement sous celui-ci.
+  const headerRef = useRef(null)
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const publish = () => {
+      document.documentElement.style.setProperty('--sf-header-h', `${el.offsetHeight}px`)
+    }
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <>
       {/* ── Header ── */}
-      <header className="sfHeader">
+      <header className="sfHeader" ref={headerRef}>
         <div className="sfHeader__inner">
           {/* Pronos — mobile uniquement, à la place de la date (voir sfHeader__pronosBtn) */}
           <NavLink
