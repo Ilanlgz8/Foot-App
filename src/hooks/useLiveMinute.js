@@ -249,6 +249,18 @@ function confirmFt(match, now, queryClient) {
     const todayStr = new Date().toISOString().slice(0, 10)
     // Invalider React Query
     queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+    // ⚠️ BUG CORRIGÉ (constat utilisateur : "les cards des matchs à venir dans
+    // Accueil ne se mettent pas à jour vite" — vrai surtout en phase finale,
+    // où la fin d'un quart de finale détermine l'adversaire réel de la demie
+    // suivante) : useUpcomingMatchesAllComps (Accueil, matchs à venir toutes
+    // compétitions confondues) utilise sa PROPRE clé de cache dédiée
+    // ['matches','ALL_V2',...], jamais couverte par l'invalidation
+    // ['matches', code, 'FINISHED'] juste en dessous (clés différentes,
+    // aucun préfixe commun) — ce hook restait donc bloqué sur son staleTime
+    // normal (jusqu'à 1h) même après ce bloc entier d'invalidations FT.
+    // Préfixe ['matches','ALL_V2'] : matche toutes les fenêtres/windowDays en
+    // une fois (pas besoin de connaître compIds/windowDays ici).
+    queryClient.invalidateQueries({ queryKey: ['matches', 'ALL_V2'] })
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
       // ⚠️ BUG CORRIGÉ : le classement (useStandings, queryKey ['standings', code])
@@ -288,6 +300,7 @@ function confirmFt(match, now, queryClient) {
     clearMatchState(id, { preserveEnded: true })
     queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
     queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
+    queryClient.invalidateQueries({ queryKey: ['matches', 'ALL_V2'] })
     if (code) {
       queryClient.invalidateQueries({ queryKey: ['matches', code, 'FINISHED'] })
       queryClient.invalidateQueries({ queryKey: ['standings', code] })
