@@ -8,18 +8,31 @@
 //   • VAPID configuré ?
 //   • Dernière exécution du cron (clé KV)
 
-import { Redis } from '@upstash/redis'
-import webpush  from 'web-push'
+import { Redis }  from '@upstash/redis'
+import webpush    from 'web-push'
+import crypto     from 'crypto'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 })
 
+// Comparaison à temps constant (audit sécurité) : `===` sur deux strings sort
+// dès le premier caractère différent, ce qui fuit en théorie un signal de
+// timing exploitable pour deviner le secret octet par octet. Risque réel
+// faible en HTTP (jitter réseau largement dominant), mais protection triviale
+// à ajouter — même principe que sur n'importe quel endpoint protégé par secret.
+function safeCompare(a, b) {
+  const bufA = Buffer.from(String(a))
+  const bufB = Buffer.from(String(b))
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 export default async function handler(req, res) {
   // Auth
   const secret = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeCompare(secret, process.env.CRON_SECRET)) {
     return res.status(401).json({ error: 'Non autorisé' })
   }
 

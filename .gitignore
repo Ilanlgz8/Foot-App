@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets (défense en profondeur — aucun .env n'a jamais été commit, mais
+# évite qu'un futur fichier local parte par erreur, audit sécurité)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

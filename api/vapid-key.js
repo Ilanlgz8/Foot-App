@@ -19,12 +19,36 @@
 // client malveillant qui l'intercepterait ne pourrait ni publier ni lire
 // autre chose que les scores en direct.
 import Ably from 'ably'
+import { Redis } from '@upstash/redis'
+
+let kv = null
+function getKv() {
+  if (!kv && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+  }
+  return kv
+}
 
 export default async function handler(req, res) {
   if (req.query.ably !== undefined) {
     const apiKey = process.env.ABLY_API_KEY
     if (!apiKey) {
       return res.status(503).json({ error: 'Ably non configuré sur ce serveur' })
+    }
+    // ── Rate limit (audit sécurité) : seul mode de cet endpoint qui déclenche
+    // un vrai appel sortant (création de token Ably) — sans garde-fou, un
+    // appel en boucle (curl/bot) pouvait générer un nombre illimité de
+    // créations de token. Même pattern (compteur Redis/IP, fenêtre 60s) que
+    // les autres proxies de l'app (espn.js, fifa-live.js, pulse.js...).
+    const redis = getKv()
+    if (redis) {
+      try {
+        const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+        const rlKey = `ratelimit:ablytoken:${ip}`
+        const count = await redis.incr(rlKey)
+        if (count === 1) await redis.expire(rlKey, 60)
+        if (count > 30) return res.status(429).json({ error: 'Trop de requêtes' })
+      } catch { /* Redis indisponible → on ne bloque pas le service pour ça */ }
     }
     try {
       const client = new Ably.Rest(apiKey)

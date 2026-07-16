@@ -21,6 +21,7 @@
 
 import { Redis } from '@upstash/redis'
 import webpush   from 'web-push'
+import crypto    from 'crypto'
 import { TEAM_NAMES_FR } from '../src/data/teamNames.js'
 import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 // ⚠️ Ces fonctions vivaient ici en dur, puis ont été DUPLIQUÉES telles
@@ -291,15 +292,25 @@ const RECAP_TTL = 60 * 24 * 3600  // 60j — largement de quoi couvrir une comp�
 
 // ── Handler ────────────────────────────────────────────────────────────────────
 
+// Comparaison à temps constant (audit sécurité) : évite qu'une différence de
+// timing sur le `===` classique fuite un signal exploitable pour deviner
+// CRON_SECRET octet par octet. Même helper que api/debug-push.js.
+function safeCompare(a, b) {
+  const bufA = Buffer.from(String(a))
+  const bufB = Buffer.from(String(b))
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 export default async function handler(req, res) {
   const secret     = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
   const bearerAuth = req.headers['authorization'] ?? ''
-  // Accepte : header x-cron-secret (cron-job.org), ?secret= (debug),
+  // Accepte : header x-cron-secret (cron-job.org / cf-worker), ?secret= (debug),
   //           ou Authorization: Bearer <CRON_SECRET> (Vercel Cron natif)
   const authorized =
-    process.env.CRON_SECRET && (
-      secret        === process.env.CRON_SECRET ||
-      bearerAuth    === `Bearer ${process.env.CRON_SECRET}`
+    !!process.env.CRON_SECRET && (
+      safeCompare(secret,     process.env.CRON_SECRET) ||
+      safeCompare(bearerAuth, `Bearer ${process.env.CRON_SECRET}`)
     )
   if (!authorized)
     return res.status(401).json({ error: 'Non autorisé' })

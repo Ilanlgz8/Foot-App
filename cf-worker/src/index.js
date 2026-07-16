@@ -138,9 +138,12 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
     if (!acquired) return
   } catch { return }
   try {
-    const res = await fetch(`${env.VERCEL_NOTIFY_URL}?secret=${encodeURIComponent(env.CRON_SECRET)}`, {
+    // Secret passé en HEADER (pas en query string) : une URL avec ?secret=
+    // finit dans les logs d'accès Vercel/Cloudflare en clair — le header ne
+    // l'est pas. api/cron-goals.js accepte déjà x-cron-secret en priorité.
+    const res = await fetch(env.VERCEL_NOTIFY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
       body: JSON.stringify({ mode: 'notify', payload, slug, options }),
       signal: AbortSignal.timeout(8_000),
     })
@@ -155,9 +158,9 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
 // directement sans passer par notifyVercel() (qui exige une clé de dédup).
 async function pushLiveTicker(env, payload, slug, log) {
   try {
-    const res = await fetch(`${env.VERCEL_NOTIFY_URL}?secret=${encodeURIComponent(env.CRON_SECRET)}`, {
+    const res = await fetch(env.VERCEL_NOTIFY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
       body: JSON.stringify({ mode: 'notify', payload, slug, options: { onlyFavorites: true, urgency: 'high' } }),
       signal: AbortSignal.timeout(8_000),
     })
