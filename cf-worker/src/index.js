@@ -179,19 +179,30 @@ async function runOnePass(env) {
   const yesterday = dateStr(new Date(now - 86_400_000))
 
   const emptyDayKey = 'cron:emptyDay'
-  let knownEmpty = false
-  try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
-  if (knownEmpty) {
-    return { events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
-  }
-
+  const nextCheckKey = 'cron:nextCheck'
   const NEXT_CHECK_BUFFER_MS = 90 * 60 * 1000
   const NEXT_CHECK_MAX_MS    = 25 * 60 * 1000
-  const nextCheckKey = 'cron:nextCheck'
-  let skipUntil = null
-  try { skipUntil = await kv.get(nextCheckKey) } catch {}
-  if (skipUntil && Number(skipUntil) > now.getTime()) {
-    return { events: 0, log: [`aucun match en direct/imminent — fetch ESPN sauté`] }
+
+  // Garde-fou (audit bug notifs groupées) : si on suit encore un match vu
+  // live sans confirmation de fin (cron:liveIds non vide), on ignore les 2
+  // clés de skip ci-dessous même si l'une d'elles était déjà armée — un
+  // match en cours qu'on connaît prime toujours sur une optimisation "aucun
+  // match" potentiellement erronée.
+  let trackingLiveAtStart = 0
+  try { trackingLiveAtStart = await kv.scard('cron:liveIds') } catch {}
+
+  if (trackingLiveAtStart === 0) {
+    let knownEmpty = false
+    try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
+    if (knownEmpty) {
+      return { events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
+    }
+
+    let skipUntil = null
+    try { skipUntil = await kv.get(nextCheckKey) } catch {}
+    if (skipUntil && Number(skipUntil) > now.getTime()) {
+      return { events: 0, log: [`aucun match en direct/imminent — fetch ESPN sauté`] }
+    }
   }
 
   const allResults = await Promise.allSettled(
@@ -203,28 +214,11 @@ async function runOnePass(env) {
   const allEvents = allResults.flatMap(r => r.status === 'fulfilled' ? r.value : [])
 
   const espnFetchFailed = log.some(l => /^\[espn:.*\] error=/.test(l))
-  if (allEvents.length === 0 && !espnFetchFailed) {
-    try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
-  }
-
-  if (allEvents.length > 0 && !espnFetchFailed) {
-    const anyLive = allEvents.some(({ evt }) =>
-      LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
-    if (!anyLive) {
-      const upcomingKickoffs = allEvents
-        .filter(({ evt }) => normalizeEspnStatus(evt.competitions?.[0]?.status) === 'STATUS_SCHEDULED')
-        .map(({ evt }) => Date.parse(evt.date))
-        .filter(t => Number.isFinite(t))
-      const nextKickoff = upcomingKickoffs.length ? Math.min(...upcomingKickoffs) : null
-      const farEnough = nextKickoff == null || (nextKickoff - now.getTime()) > NEXT_CHECK_BUFFER_MS
-      if (farEnough) {
-        const skipCandidate = nextKickoff != null
-          ? Math.min(nextKickoff - NEXT_CHECK_BUFFER_MS, now.getTime() + NEXT_CHECK_MAX_MS)
-          : now.getTime() + NEXT_CHECK_MAX_MS
-        try { await kv.set(nextCheckKey, skipCandidate, { ex: Math.ceil(NEXT_CHECK_MAX_MS / 1000) + 60 }) } catch {}
-      }
-    }
-  }
+  // ⚠️ Armement des 2 optimisations "on peut sauter le prochain fetch"
+  // (emptyDayKey / nextCheckKey) déplacé APRÈS la boucle de traitement des
+  // matchs ci-dessous — voir le commentaire à cet endroit pour le bug réel
+  // que ça corrige (notifs but/mi-temps/fin reçues d'un coup avec ~1h43 de
+  // retard sur Angleterre-Argentine).
 
   const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(kv, log) : []
@@ -279,6 +273,12 @@ async function runOnePass(env) {
 
     if (LIVE_ESPN.has(status)) {
       pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
+      // Marque ce match comme "toujours en cours" côté Redis, indépendamment
+      // du résultat de CETTE passe précise — voir cron:liveIds plus bas
+      // (garde-fou contre le bug de blackout notifs).
+      try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
+    } else if (FINAL_ESPN.has(status) || status === 'STATUS_POSTPONED' || status === 'STATUS_CANCELED') {
+      try { await kv.srem('cron:liveIds', String(eventId)) } catch {}
     }
 
     // 🔴 Coup d'envoi
@@ -470,6 +470,52 @@ async function runOnePass(env) {
 
   if (pendingSummaryFetches.length > 0) {
     await Promise.allSettled(pendingSummaryFetches)
+  }
+
+  // ── Armement des optimisations "on peut sauter le prochain fetch" ──────────
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : notifs but/mi-temps/fin reçues
+  // toutes d'un coup ~10min après la fin du match, alors que le coup d'envoi
+  // était arrivé à l'heure — reproduit sur les logs réels du direct
+  // Angleterre-Argentine : trou total de 19h47 à 21h30, un seul but/mi-temps/
+  // reprise jamais loggés individuellement). AVANT : ces 2 clés (emptyDayKey/
+  // nextCheckKey, jusqu'à 20-25min de fetch ESPN sauté chacune) s'armaient sur
+  // la seule base du fetch de CETTE passe — si ESPN renvoyait par accident (glitch
+  // ponctuel, statut mal classé le temps d'une passe...) une réponse qui ne
+  // montrait plus le match comme "live", le Worker croyait le match terminé/
+  // absent et coupait le prochain fetch pendant 20-25min, potentiellement
+  // reconduit passe après passe si le même aléa persistait — exactement le
+  // scénario reproduit ici. MAINTENANT : cron:liveIds (Set Redis) retient tout
+  // match qu'on a VU live à un moment (ajouté dès LIVE_ESPN, retiré seulement
+  // une fois FINAL/POSTPONED/CANCELED confirmé) — tant qu'il contient au moins
+  // un match, on n'arme JAMAIS ces 2 optimisations, même si LE FETCH DE CETTE
+  // PASSE PRÉCISE ne montre rien de live. Le coût : dans le pire cas, quelques
+  // minutes de fetch ESPN "pour rien" de plus après la vraie fin d'un match
+  // (le temps que FINAL_ESPN soit confirmé) — largement acceptable face au
+  // risque de rater des buts en direct.
+  let stillTrackingLive = 0
+  try { stillTrackingLive = await kv.scard('cron:liveIds') } catch {}
+
+  if (stillTrackingLive === 0) {
+    if (allEvents.length === 0 && !espnFetchFailed) {
+      try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
+    } else if (allEvents.length > 0 && !espnFetchFailed) {
+      const anyLive = allEvents.some(({ evt }) =>
+        LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
+      if (!anyLive) {
+        const upcomingKickoffs = allEvents
+          .filter(({ evt }) => normalizeEspnStatus(evt.competitions?.[0]?.status) === 'STATUS_SCHEDULED')
+          .map(({ evt }) => Date.parse(evt.date))
+          .filter(t => Number.isFinite(t))
+        const nextKickoff = upcomingKickoffs.length ? Math.min(...upcomingKickoffs) : null
+        const farEnough = nextKickoff == null || (nextKickoff - now.getTime()) > NEXT_CHECK_BUFFER_MS
+        if (farEnough) {
+          const skipCandidate = nextKickoff != null
+            ? Math.min(nextKickoff - NEXT_CHECK_BUFFER_MS, now.getTime() + NEXT_CHECK_MAX_MS)
+            : now.getTime() + NEXT_CHECK_MAX_MS
+          try { await kv.set(nextCheckKey, skipCandidate, { ex: Math.ceil(NEXT_CHECK_MAX_MS / 1000) + 60 }) } catch {}
+        }
+      }
+    }
   }
 
   return { events: allEvents.length, log }

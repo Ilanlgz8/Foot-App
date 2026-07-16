@@ -391,8 +391,25 @@ export default async function handler(req, res) {
   // on revérifie quand même régulièrement par sécurité plutôt que de rester
   // silencieux toute la journée sur une fausse détection.
   const emptyDayKey = 'cron:emptyDay'
+  // ⚠️ BUG CORRIGÉ (audit sécurité + constat utilisateur : notifs but/mi-temps/
+  // fin reçues d'un coup ~1h43 après avoir été détectées côté ESPN, sur le
+  // direct Angleterre-Argentine, via cf-worker qui partage cette même logique
+  // et ce même Redis) : les 2 marqueurs "on peut sauter le prochain fetch"
+  // ci-dessous (emptyDayKey/nextCheckKey) s'armaient sur la seule base du
+  // fetch de LA PASSE EN COURS — un aléa ESPN ponctuel (match absent du
+  // scoreboard ou statut mal classé le temps d'une passe) suffisait à couper
+  // jusqu'à 20-25min de détection, potentiellement reconduit passe après passe.
+  // cron:liveIds (Set Redis, partagé avec cf-worker) retient tout match VU
+  // live à un moment (ajouté/retiré au fil de la boucle plus bas) — tant qu'il
+  // n'est pas vide, on n'arme JAMAIS ces 2 marqueurs, même si l'un d'eux était
+  // déjà posé par une passe précédente.
+  let stillTrackingLive = 0
+  try { stillTrackingLive = await kv.scard('cron:liveIds') } catch {}
+
   let knownEmpty = false
-  try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
+  if (stillTrackingLive === 0) {
+    try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
+  }
   if (knownEmpty) {
     return { notifsSent: 0, events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
   }
@@ -419,7 +436,9 @@ export default async function handler(req, res) {
   const NEXT_CHECK_MAX_MS    = 25 * 60 * 1000  // jamais plus de 25min sans re-vérifier en vrai
   const nextCheckKey = 'cron:nextCheck'
   let skipUntil = null
-  try { skipUntil = await kv.get(nextCheckKey) } catch {}
+  if (stillTrackingLive === 0) {
+    try { skipUntil = await kv.get(nextCheckKey) } catch {}
+  }
   if (skipUntil && Number(skipUntil) > now.getTime()) {
     return { notifsSent: 0, events: 0, log: [`aucun match en direct/imminent (re-check ${new Date(Number(skipUntil)).toLocaleTimeString('fr-FR')}) — fetch ESPN sauté`] }
   }
@@ -439,15 +458,16 @@ export default async function handler(req, res) {
   // panne ESPN temporaire serait à tort mémorisée comme "aucun match", et on
   // resterait aveugle jusqu'à 20min sur de vrais matchs en cours.
   const espnFetchFailed = log.some(l => /^\[espn:.*\] error=/.test(l))
-  if (allEvents.length === 0 && !espnFetchFailed) {
+  if (stillTrackingLive === 0 && allEvents.length === 0 && !espnFetchFailed) {
     try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
   }
 
   // Poser le marqueur "rien d'imminent" (voir commentaire plus haut) —
   // uniquement si le fetch a abouti, qu'AUCUN match trouvé n'est actuellement
-  // en direct, et qu'il reste une vraie marge avant le prochain coup d'envoi
-  // programmé (les matchs déjà terminés/reportés n'entrent pas en compte).
-  if (allEvents.length > 0 && !espnFetchFailed) {
+  // en direct, qu'il reste une vraie marge avant le prochain coup d'envoi
+  // programmé (les matchs déjà terminés/reportés n'entrent pas en compte), ET
+  // qu'on ne suit déjà aucun match live connu (cron:liveIds — voir plus haut).
+  if (stillTrackingLive === 0 && allEvents.length > 0 && !espnFetchFailed) {
     const anyLive = allEvents.some(({ evt }) =>
       LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
     if (!anyLive) {
@@ -584,6 +604,11 @@ export default async function handler(req, res) {
     // live à CHAQUE poll (1/min), suivi ou non par un utilisateur.
     if (LIVE_ESPN.has(status)) {
       pendingSummaryFetches.push(cacheEspnSummary(slug, eventId, log))
+      // cron:liveIds partagé avec cf-worker/src/index.js (même Redis) — voir
+      // le garde-fou plus haut dans cette fonction (bug notifs groupées).
+      try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
+    } else if (FINAL_ESPN.has(status) || status === 'STATUS_POSTPONED' || status === 'STATUS_CANCELED') {
+      try { await kv.srem('cron:liveIds', String(eventId)) } catch {}
     }
 
     // 🔴 Coup d'envoi — basé sur la confirmation RÉELLE (statut LIVE_ESPN, déjà
