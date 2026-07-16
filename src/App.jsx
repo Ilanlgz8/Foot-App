@@ -19,8 +19,12 @@ const Live = lazy(() => import('./components/Live.jsx'))
 const LiveMatchPage = lazy(() => import('./pages/LiveMatchPage.jsx'))
 const MatchPage = lazy(() => import('./pages/MatchPage.jsx'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
-const DebugEspn = lazy(() => import('./pages/DebugEspn.jsx'))
 const Pronos = lazy(() => import('./pages/Pronos.jsx'))
+// DebugEspn : route désactivée (audit sécurité — page de diagnostic accessible
+// publiquement sans auth). Fichier gardé tel quel dans src/pages/DebugEspn.jsx
+// pour la remonter facilement si un bug ESPN similaire réapparaît : il suffit
+// de redécommenter cette ligne + le <Route> correspondant ci-dessous.
+// const DebugEspn = lazy(() => import('./pages/DebugEspn.jsx'))
 
 // ⚠️ AJOUT (constat utilisateur : "cliquer sur un bouton pour changer de page
 // c'est pas fluide") : chaque page est en lazy() — au tout premier clic vers
@@ -137,8 +141,7 @@ function App() {
                 <Route path="/favoris" element={<FavoritesPage />} />
                 <Route path="/pronos" element={<Pronos />} />
                 <Route path="/mentions-legales" element={<MentionsLegales />} />
-                <Route path="/debug-espn" element={<DebugEspn />} />
-
+                {/* <Route path="/debug-espn" element={<DebugEspn />} /> — voir commentaire import ci-dessus */}
               </Routes>
             </Suspense>
           </ErrorBoundary>
