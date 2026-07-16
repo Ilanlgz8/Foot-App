@@ -132,11 +132,19 @@ const RECAP_TTL = 60 * 24 * 3600
 // Worker vient d'acquérir la clé de dédup pour de vrai, jamais pour un
 // événement déjà notifié. Vercel ne fait plus que le travail réellement
 // coûteux (charger les abonnés, chiffrer, envoyer).
-async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = null, ttl = 3 * 3600) {
+// Tentative d'acquisition d'une clé de dédup (SET NX) — extrait de notifyVercel
+// ci-dessous pour pouvoir être appelé À L'AVANCE, groupé dans le pipeline
+// Redis de la boucle principale (voir plus bas, audit perf limite Cloudflare
+// 50 subrequests/exécution). Comportement identique à l'ancien bloc interne
+// de notifyVercel, juste extrait tel quel.
+async function acquireDedup(kv, dedupKey, ttl) {
   try {
-    const acquired = await env._kv.set(dedupKey, '1', { ex: ttl, nx: true })
-    if (!acquired) return
-  } catch { return }
+    return await kv.set(dedupKey, '1', { ex: ttl, nx: true })
+  } catch { return null }
+}
+
+// Envoi réel vers Vercel — extrait de notifyVercel ci-dessous, inchangé.
+async function sendToVercel(env, payload, slug, options = {}, log = null) {
   try {
     // Secret passé en HEADER (pas en query string) : une URL avec ?secret=
     // finit dans les logs d'accès Vercel/Cloudflare en clair — le header ne
@@ -151,6 +159,15 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
   } catch (e) {
     log?.push(`[notify→vercel] error=${e.message}`)
   }
+}
+
+// Inchangé pour TOUS les appelants existants (goal/goalcancel/red/ht/reprise/
+// ft) : acquiert le dédup puis envoie, exactement comme avant — seule la
+// mécanique interne a été découpée en 2 fonctions réutilisables séparément.
+async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = null, ttl = 3 * 3600) {
+  const acquired = await acquireDedup(env._kv, dedupKey, ttl)
+  if (!acquired) return
+  await sendToVercel(env, payload, slug, options, log)
 }
 
 // Ticker live (score en direct) : PAS de dédup (même tag remplace côté SW à
@@ -270,37 +287,102 @@ async function runOnePass(env) {
 
     const score    = `${home}-${away}`
     const scoreStr = `${home} – ${away}`
+    const isLive        = LIVE_ESPN.has(status)
+    const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
+    const isFinalNow    = FINAL_ESPN.has(status)
 
-    if (LIVE_ESPN.has(status)) {
+    if (isLive) {
       pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
-      // Marque ce match comme "toujours en cours" côté Redis, indépendamment
-      // du résultat de CETTE passe précise — voir cron:liveIds plus bas
-      // (garde-fou contre le bug de blackout notifs).
-      try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
-    } else if (FINAL_ESPN.has(status) || status === 'STATUS_POSTPONED' || status === 'STATUS_CANCELED') {
-      try { await kv.srem('cron:liveIds', String(eventId)) } catch {}
-    }
-
-    // 🔴 Coup d'envoi
-    const notPostponed = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
-    if (LIVE_ESPN.has(status) && notPostponed) {
-      await notifyVercel(env, `push:espn:ko:${eventId}`,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, {}, log, 6 * 3600)
-      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
     }
 
     if (status === 'STATUS_SCHEDULED' && notPostponed) continue
 
-    const stateKey  = `cron:espn:${eventId}`
-    let   prevState = null
-    try { prevState = await kv.get(stateKey) } catch {}
+    // ── Regroupement Redis en 1 seul aller-retour (audit perf : limite
+    // Cloudflare Workers gratuit = 50 requêtes sortantes/exécution, CHAQUE
+    // commande Redis Upstash en compte une — constat : un match live "sans
+    // rien de particulier cette minute" (le cas de très loin le plus
+    // fréquent) coûtait à lui seul ~7-8 requêtes séparées : sadd/srem
+    // liveIds, dédup KO, get+set état, get compteur buts, get compteur
+    // cartons, verrou but — de quoi épuiser le budget dès 2-3 matchs
+    // simultanés (samedi normal multi-championnats, ou simple soirée Ligue
+    // des Champions). Ces commandes sont toutes INDÉPENDANTES les unes des
+    // autres (aucune n'a besoin du RÉSULTAT d'une autre pour être ENVOYÉE —
+    // seul le code plus bas, une fois les résultats revenus, décide quoi en
+    // faire), donc regroupables sans rien changer au comportement : un
+    // pipeline Upstash exécute chaque commande dans l'ordre et de façon
+    // atomique côté serveur, exactement comme si elles étaient envoyées une
+    // par une — seul le TRANSPORT réseau est mutualisé en une seule requête
+    // HTTP (voir doc Upstash : "each command in the pipeline will be
+    // executed in order").
+    //
+    // ⚠️ goalTrack/cardTrack/verrou but sont ici toujours inclus dans le
+    // pipeline dès qu'un match n'est pas SCHEDULED (donc aussi un match
+    // reporté/annulé/déjà terminé), même si la condition qui les UTILISE
+    // plus bas reste IDENTIQUE à avant (LIVE_ESPN sur le statut précédent OU
+    // actuel — nécessaire pour ne pas rater un but marqué à la toute
+    // dernière seconde, pile au coup de sifflet final). Coût : quelques
+    // lectures/un verrou tenté sans être utilisés sur les matchs
+    // reportés/déjà terminés (rares, sans effet de bord observable — le
+    // verrou expire tout seul en 5s, jamais lu ailleurs), en échange d'un
+    // seul aller-retour réseau au lieu de plusieurs branches séparées.
+    const stateKey     = `cron:espn:${eventId}`
+    const trackKey      = `goalTrack:${eventId}`
+    const cardTrackKey  = `cardTrack:${eventId}`
+    const lockKey       = `goalLock:${eventId}`
+    const koKey         = `push:espn:ko:${eventId}`
+    const recapKey      = `recap:${eventId}`
+
+    let pipe = kv.pipeline()
+      .get(stateKey)                                          // [0] prevState
+      .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [1] (résultat inutilisé)
+      .get(trackKey)                                           // [2] rawTrack
+      .get(cardTrackKey)                                       // [3] rawCardTrack
+      .set(lockKey, '1', { px: 5_000, nx: true })              // [4] lockAcquired
+    // Marque ce match comme "toujours en cours" côté Redis, indépendamment du
+    // résultat de CETTE passe précise — voir cron:liveIds (garde-fou contre
+    // le bug de blackout notifs, déjà en place).
+    pipe = isLive
+      ? pipe.sadd('cron:liveIds', String(eventId))              // [5] (résultat inutilisé)
+      : pipe.srem('cron:liveIds', String(eventId))              // [5] (résultat inutilisé)
+    // [6] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
+    // terminé) — isLive et isFinalNow sont mutuellement exclusifs (aucun
+    // statut n'appartient aux 2 ensembles à la fois), jamais les deux en
+    // même temps dans le même pipeline.
+    if (isLive) pipe = pipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
+    else if (isFinalNow) pipe = pipe.get(recapKey)
+
+    let pipeResults = []
+    try {
+      pipeResults = await pipe.exec({ keepErrors: true })
+    } catch (e) {
+      log.push(`[espn:${slug}:${eventId}] pipeline error=${e.message}`)
+    }
+    // keepErrors:true → chaque entrée est { result, error? } — une commande
+    // en erreur individuelle (ou un échec réseau total, pipeResults=[])
+    // retombe sur null, exactement comme l'ancien "un .catch() par appel"
+    // séparé pour chaque commande.
+    const pick = (i) => (pipeResults[i] && !pipeResults[i].error) ? pipeResults[i].result : null
+
+    const prevState    = pick(0)
+    const rawTrack      = pick(2)
+    const rawCardTrack  = pick(3)
+    const lockAcquired  = pick(4)
+    const koAcquired    = isLive ? pick(6) : false
+    const recapAlready  = (!isLive && isFinalNow) ? pick(6) : null
+
     const [prevStatus = null] = prevState ? prevState.split('|') : []
 
-    try { await kv.set(stateKey, `${status}|${score}`, { ex: 12 * 3600 }) } catch {}
+    // 🔴 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
+    // que si on vient vraiment de l'acquérir, comportement identique à avant.
+    if (isLive && notPostponed && koAcquired) {
+      await sendToVercel(env,
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, {}, log)
+      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
+    }
 
     if (prevState === null) {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} baseline ${status}|${score}`)
-      try { await kv.set(`goalTrack:${eventId}`, JSON.stringify({ home, away }), { ex: 12 * 3600 }) } catch {}
+      try { await kv.set(trackKey, JSON.stringify({ home, away }), { ex: 12 * 3600 }) } catch {}
       continue
     }
 
@@ -311,15 +393,11 @@ async function runOnePass(env) {
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
 
     // ⚽ But (+ ❌ but annulé) — même state machine que api/cron-goals.js
-    if (LIVE_ESPN.has(prevStatus) || LIVE_ESPN.has(status)) {
-      const lockKey = `goalLock:${eventId}`
-      const lockAcquired = await kv.set(lockKey, '1', { px: 5_000, nx: true }).catch(() => null)
+    if (LIVE_ESPN.has(prevStatus) || isLive) {
       if (!lockAcquired) {
         log.push(`[espn:${slug}:${eventId}] verrou but déjà pris — passe suivante`)
       } else {
-        const trackKey = `goalTrack:${eventId}`
-        let track = null
-        try { track = await kv.get(trackKey) } catch {}
+        let track = rawTrack
         track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away }
 
         const sides = []
@@ -381,14 +459,12 @@ async function runOnePass(env) {
     }
 
     // 🟥 Carton rouge
-    if (LIVE_ESPN.has(status) || LIVE_ESPN.has(prevStatus)) {
+    if (isLive || LIVE_ESPN.has(prevStatus)) {
       const reds = extractEspnCards(comp, homeC.team?.id).filter(c => c.red)
         .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
       const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
 
-      const cardTrackKey = `cardTrack:${eventId}`
-      let cardTrack = null
-      try { cardTrack = await kv.get(cardTrackKey) } catch {}
+      let cardTrack = rawCardTrack
       cardTrack = cardTrack ? (typeof cardTrack === 'string' ? JSON.parse(cardTrack) : cardTrack) : { home: 0, away: 0 }
       let cardTrackChanged = false
 
@@ -425,23 +501,25 @@ async function runOnePass(env) {
     }
 
     // 🏁 Fin de match
-    if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
+    if (LIVE_ESPN.has(prevStatus) && isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT`)
       await notifyVercel(env, `push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
       await cacheEspnSummary(kv, slug, eventId, log)
     }
 
-    // 📝 Résumé auto — écrit directement en Redis, aucun appel Vercel
-    if (FINAL_ESPN.has(status)) {
+    // 📝 Résumé auto — écrit directement en Redis, aucun appel Vercel. Le
+    // "déjà généré ?" vient du pipeline ci-dessus (recapAlready) — seule
+    // l'écriture reste un appel séparé, rare (une fois par match, jamais
+    // ensuite puisque recapAlready sera non-null derrière).
+    if (isFinalNow) {
       try {
-        const already = await kv.get(`recap:${eventId}`)
-        if (!already) {
+        if (!recapAlready) {
           const scorers = extractEspnScorers(comp, homeC.team?.id)
           const cards   = extractEspnCards(comp, homeC.team?.id)
           const recap   = generateRecap({ homeTeam, awayTeam, home, away, scorers, cards })
           if (recap) {
-            await kv.set(`recap:${eventId}`, recap, { ex: RECAP_TTL })
+            await kv.set(recapKey, recap, { ex: RECAP_TTL })
             log.push(`[recap:${eventId}] généré`)
           }
         }
@@ -451,7 +529,7 @@ async function runOnePass(env) {
     }
 
     // 📊 Ticker "score en direct" — pas de dédup (même tag, remplace côté SW)
-    if (LIVE_ESPN.has(status)) {
+    if (isLive) {
       const mLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
       await pushLiveTicker(env, {
         title: `${homeTeam} ${scoreStr} ${awayTeam}`,
