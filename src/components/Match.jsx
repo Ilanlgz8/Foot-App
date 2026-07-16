@@ -6,7 +6,7 @@ import './../compHeader.css'
 import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
-import { useWcKnockout, useCupKnockout } from '../hooks/useWcKnockout'
+import { useWcKnockout, useCupKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
@@ -796,6 +796,15 @@ function Matchs() {
   const bracketRounds  = hasCup ? cupRounds        : rounds
   const bracketLoad    = hasCup ? cupBracketLoading : bracketLoading
   const bracketErr     = hasCup ? cupBracketError   : bracketError
+  // Correctif fraîcheur "à déterminer" (voir commentaire détaillé dans
+  // useWcKnockout.js) : le bracket ci-dessus est déjà chargé et plus frais
+  // (10min) que la vue "Par journée" (matches/grouped, 1h) — on réutilise ses
+  // rounds pour corriger l'affichage des mêmes matchs plus bas, sans requête
+  // réseau en plus.
+  const knockoutOverrides = useMemo(
+    () => getKnockoutTeamOverrides(bracketRounds),
+    [bracketRounds]
+  )
   // Retour utilisateur : bug rencontré en ouvrant le tableau d'une coupe
   // nationale (ex. Coupe de France) pas encore rempli côté ESPN — désactive
   // l'onglet "Phase finale" pour ces compétitions tant qu'aucun match n'y
@@ -944,10 +953,13 @@ function Matchs() {
     return grouped
       .map(g => ({
         ...g,
-        matches: g.matches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED'),
+        matches: applyKnockoutTeamOverrides(
+          g.matches.filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED'),
+          knockoutOverrides
+        ),
       }))
       .filter(g => g.matches.length > 0)
-  }, [grouped])
+  }, [grouped, knockoutOverrides])
 
   /* Navigation journées */
   const total = filteredGrouped.length
@@ -974,10 +986,13 @@ function Matchs() {
   }
   const filteredSearchMatches = useMemo(() => {
     if (!searchNorm) return []
-    return matches
+    // Override AVANT le filtre de recherche : sinon un match dont le vrai
+    // qualifié (bracket) correspond à la recherche, mais dont le nom encore
+    // caché en cache ("à déterminer") ne correspond pas, serait exclu à tort.
+    return applyKnockoutTeamOverrides(matches, knockoutOverrides)
       .filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED')
       .filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam))
-  }, [matches, searchNorm])
+  }, [matches, knockoutOverrides, searchNorm])
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {

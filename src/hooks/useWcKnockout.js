@@ -177,6 +177,42 @@ export function useWcKnockout(compCode = 'WC') {
   }
 }
 
+// ── Correctif fraîcheur "à déterminer" (Programme/Accueil vs bracket) ─────
+// Constat utilisateur : le tableau à élimination directe (useWcKnockout/
+// useCupKnockout ci-dessus, cache 10min) se met à jour avec les bons
+// qualifiés (ex: petite finale/finale) plus vite que la vue "Par journée" de
+// Programme (useMatches, cache 1h — voir TTL.SCHEDULED dans useMatchs.js) ou
+// les cards "à venir" de l'Accueil (useTodayMatches, cache 30min-6h côté
+// jours futurs) — ces caches plus longs sont volontaires (ménager le quota
+// football-data.org free tier + le budget CPU Vercel, voir CLAUDE.md), donc
+// on ne les raccourcit PAS. À la place, on réutilise ici les rounds DÉJÀ
+// chargés par le bracket (aucune requête réseau supplémentaire) pour
+// corriger l'affichage des mêmes matchs ailleurs dans l'app — ainsi tout se
+// met à jour en même temps, sans coût réseau additionnel ni risque de
+// re-déclencher le dépassement CPU déjà rencontré pendant la CdM.
+export function getKnockoutTeamOverrides(rounds) {
+  const map = new Map()
+  for (const round of rounds ?? []) {
+    for (const m of round.matches ?? []) {
+      if (m?.id != null) map.set(m.id, { homeTeam: m.homeTeam, awayTeam: m.awayTeam })
+    }
+  }
+  return map
+}
+
+export function applyKnockoutTeamOverrides(matches, overrides) {
+  if (!overrides || overrides.size === 0) return matches
+  return matches.map(m => {
+    const o = overrides.get(m.id)
+    if (!o) return m
+    // Garde-fou : ne remplace que si le bracket a mieux (au moins un nom
+    // d'équipe) — évite de régresser vers "à déterminer" dans le cas rare où
+    // le bracket lui-même n'a pas encore l'info alors que l'autre source si.
+    if (!o.homeTeam?.name && !o.awayTeam?.name) return m
+    return { ...m, homeTeam: o.homeTeam ?? m.homeTeam, awayTeam: o.awayTeam ?? m.awayTeam }
+  })
+}
+
 // ── useCupKnockout — même moteur de tableau, source ESPN ──────────────────
 // Coupes nationales (Coupe de France/Copa del Rey/FA Cup, voir DOMESTIC_CUPS
 // dans competitions.js) : pas de FD.org, matchs sourcés via

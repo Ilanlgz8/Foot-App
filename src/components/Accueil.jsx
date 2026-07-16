@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
 import { useTodayMatches, prefetchMatchesForDate, useRecentDaysMatches } from '../hooks/useTodayMatches'
 import { useUpcomingMatchesAllComps } from '../hooks/useMatchs'
+import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
@@ -110,7 +111,24 @@ function Accueil() {
 
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()
-  const { matches, loading: matchesLoading }             = useTodayMatches(targetDate)
+  const { matches: rawMatches, loading: matchesLoading } = useTodayMatches(targetDate)
+
+  // Correctif fraîcheur "à déterminer" (même logique que Match.jsx — voir
+  // commentaire détaillé dans useWcKnockout.js) : le tableau à élimination
+  // directe CdM (10min de cache) confirme les qualifiés (ex: petite finale/
+  // finale) plus vite que les cards "à venir" ci-dessous, qui s'appuient sur
+  // useTodayMatches (cache 30min-6h côté jours futurs, volontairement long —
+  // voir CLAUDE.md, budget CPU Vercel). Plutôt que de raccourcir ce cache
+  // (risque de re-déclencher le dépassement CPU pendant la CdM, la période de
+  // + forte charge), on réutilise ici les rounds du bracket — 1 seule requête
+  // légère en plus (10min de cache, souvent déjà en cache si Programme a été
+  // visité dans la session) — pour corriger l'affichage des mêmes matchs.
+  const { rounds: wcRounds } = useWcKnockout('WC')
+  const knockoutOverrides = useMemo(() => getKnockoutTeamOverrides(wcRounds), [wcRounds])
+  const matches = useMemo(
+    () => applyKnockoutTeamOverrides(rawMatches, knockoutOverrides),
+    [rawMatches, knockoutOverrides]
+  )
 
   // Résultats récents : jusqu'à 7 jours en arrière (était limité à
   // aujourd'hui + hier — retour utilisateur : impossible de consulter plus
@@ -123,7 +141,15 @@ function Accueil() {
   const RESULTS_DAYS_BACK = 7
   const absoluteToday = todayDateStr
   // React Query déduplique : si dayOffset=0, absoluteToday === targetDate → pas de double fetch
-  const { matches: todayMatchesForResults } = useTodayMatches(absoluteToday)
+  const { matches: rawTodayMatchesForResults } = useTodayMatches(absoluteToday)
+  // Pas besoin d'override ici pour resultsSourceMatches/results (FINISHED
+  // uniquement, un match déjà joué a forcément ses vraies équipes) — seul
+  // todayMatchesForResults sert aussi à afficher un match PAS ENCORE joué
+  // (matchDuJour, favMatch), donc lui en a besoin comme `matches` ci-dessus.
+  const todayMatchesForResults = useMemo(
+    () => applyKnockoutTeamOverrides(rawTodayMatchesForResults, knockoutOverrides),
+    [rawTodayMatchesForResults, knockoutOverrides]
+  )
   const { matches: resultsSourceMatches, loading: recentDaysLoading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
 
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
