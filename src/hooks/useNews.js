@@ -102,7 +102,17 @@ export function useNews() {
           source: a.source?.name
         }))
         .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-        .slice(0, 12)
+        // Retour utilisateur : trop peu d'articles affichés, notamment le
+        // mercato/transferts (déjà couverts par les mots-clés FOOTBALL_KEYWORDS
+        // ci-dessus + Foot Mercato, source dédiée transferts parmi les 4 flux)
+        // se retrouvait noyé/coupé par la limite de 12. Les 4 flux RSS
+        // combinés produisent largement plus de 12 articles foot pertinents
+        // par cycle de 5min (cache api/news.js) — remonter la limite à 24 ne
+        // coûte rien de plus en réseau (même fetch, juste moins tronqué) et
+        // laisse plus de place au mercato et aux articles moins "match du
+        // jour". Le carousel (NewsCarousel.jsx) gère déjà n'importe quel
+        // nombre d'articles dynamiquement, aucun autre changement nécessaire.
+        .slice(0, 24)
     },
     staleTime: 1000 * 60 * 30, // 30min (RSS gratuit, pas de quota)
     retry: false,
