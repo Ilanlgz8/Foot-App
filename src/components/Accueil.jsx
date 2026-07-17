@@ -113,6 +113,13 @@ function Accueil() {
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches: rawMatches, loading: matchesLoading } = useTodayMatches(targetDate)
 
+  // Matchs à venir toutes compétitions, fenêtre large (30j) — sert à savoir où
+  // sauter quand le jour affiché est vide (voir effet plus bas) ET, depuis le
+  // correctif ci-dessous, de filet de sécurité pour les cards elles-mêmes.
+  // Remonté plus haut dans le fichier (était plus bas) pour être disponible
+  // au moment de calculer `matches`.
+  const { matches: upcomingAllComps } = useUpcomingMatchesAllComps(ACCUEIL_COMP_IDS, 30)
+
   // Correctif fraîcheur "à déterminer" (même logique que Match.jsx — voir
   // commentaire détaillé dans useWcKnockout.js) : le tableau à élimination
   // directe CdM (10min de cache) confirme les qualifiés (ex: petite finale/
@@ -125,10 +132,35 @@ function Accueil() {
   // visité dans la session) — pour corriger l'affichage des mêmes matchs.
   const { rounds: wcRounds } = useWcKnockout('WC')
   const knockoutOverrides = useMemo(() => getKnockoutTeamOverrides(wcRounds), [wcRounds])
-  const matches = useMemo(
-    () => applyKnockoutTeamOverrides(rawMatches, knockoutOverrides),
-    [rawMatches, knockoutOverrides]
-  )
+
+  // ⚠️ AJOUT (constat utilisateur : la flèche "jour suivant" sautait au 16
+  // août — un vrai match LaLiga ce jour-là — mais aucune card ne s'affichait
+  // une fois arrivé dessus). Cause probable : useTodayMatches interroge FD.org
+  // via l'endpoint MULTI-compétitions `/v4/matches?dateFrom&dateTo&competitions=`
+  // (aucun ?season= précisé), alors que la recherche du jour à sauter
+  // (upcomingAllComps ci-dessus, useUpcomingMatchesAllComps → fetchMatchesForComp
+  // → endpoint PAR compétition `/v4/competitions/{id}/matches?status=SCHEDULED`)
+  // trouve bien ce même match — les 2 endpoints FD.org semblent résoudre
+  // différemment la "saison en cours" pour une date qui vient de basculer sur
+  // la saison suivante (même classe de bug déjà rencontrée et documentée pour
+  // WC/EC, voir getClubSeason()/season= dans useMatchs.js). Plutôt que de
+  // deviner le bon paramètre season à ajouter à l'endpoint multi-compétitions
+  // (risqué sans pouvoir le vérifier), on complète simplement `matches` avec
+  // les matchs du jour affiché déjà présents dans upcomingAllComps (donnée
+  // déjà chargée pour la recherche de saut, aucun coût réseau en plus,
+  // garantit par construction que tout jour trouvé par la flèche affiche bien
+  // ses cards).
+  const matches = useMemo(() => {
+    const seen = new Set(rawMatches.map(m => m.id))
+    const extra = upcomingAllComps.filter(m => {
+      if (seen.has(m.id)) return false
+      if (!m.utcDate) return false
+      const d = new Date(m.utcDate)
+      const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return localStr === targetDate
+    })
+    return applyKnockoutTeamOverrides([...rawMatches, ...extra], knockoutOverrides)
+  }, [rawMatches, upcomingAllComps, targetDate, knockoutOverrides])
 
   // Résultats récents : jusqu'à 7 jours en arrière (était limité à
   // aujourd'hui + hier — retour utilisateur : impossible de consulter plus
@@ -146,10 +178,19 @@ function Accueil() {
   // uniquement, un match déjà joué a forcément ses vraies équipes) — seul
   // todayMatchesForResults sert aussi à afficher un match PAS ENCORE joué
   // (matchDuJour, favMatch), donc lui en a besoin comme `matches` ci-dessus.
-  const todayMatchesForResults = useMemo(
-    () => applyKnockoutTeamOverrides(rawTodayMatchesForResults, knockoutOverrides),
-    [rawTodayMatchesForResults, knockoutOverrides]
-  )
+  // Même filet de sécurité upcomingAllComps que `matches`, pour le jour
+  // "aujourd'hui absolu" spécifiquement (peut différer de targetDate).
+  const todayMatchesForResults = useMemo(() => {
+    const seen = new Set(rawTodayMatchesForResults.map(m => m.id))
+    const extra = upcomingAllComps.filter(m => {
+      if (seen.has(m.id)) return false
+      if (!m.utcDate) return false
+      const d = new Date(m.utcDate)
+      const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return localStr === absoluteToday
+    })
+    return applyKnockoutTeamOverrides([...rawTodayMatchesForResults, ...extra], knockoutOverrides)
+  }, [rawTodayMatchesForResults, upcomingAllComps, absoluteToday, knockoutOverrides])
   const { matches: resultsSourceMatches, loading: recentDaysLoading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
 
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
@@ -211,12 +252,12 @@ function Accueil() {
   // live (card en mode live, voir MatchPanel/onLiveClick) → /live/:matchId
   // pré-match → /match/:matchId (pas de modal)
 
-  // Matchs à venir toutes compétitions, fenêtre large (30j) — sert UNIQUEMENT
-  // à savoir où sauter quand le jour affiché est vide (voir effet ci-dessous).
+  // upcomingAllComps : voir déclaration plus haut (remontée pour servir aussi
+  // de filet de sécurité à `matches`/`todayMatchesForResults`). Sert ici à
+  // savoir où sauter quand le jour affiché est vide (voir effet ci-dessous).
   // Fenêtre distincte de celle de Pronos (7j, volontairement plus courte) :
   // paramètre windowDays dédié dans useUpcomingMatchesAllComps, cache séparé,
   // aucun impact sur Pronos.
-  const { matches: upcomingAllComps } = useUpcomingMatchesAllComps(ACCUEIL_COMP_IDS, 30)
 
   // ⚠️ AMÉLIORÉ (constat utilisateur : si aujourd'hui ET demain n'ont aucun
   // match, l'app restait bloquée sur "Demain" vide — l'ancien mécanisme ne
