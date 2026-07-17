@@ -1,9 +1,27 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
+import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
+import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA' // EL/ECL non couverts par FD.org free tier
+
+// ⚠️ AJOUT (constat utilisateur : la flèche "jour suivant" de l'Accueil
+// sautait jusqu'au 16 août — un vrai match ce jour-là — mais le panneau
+// affichait "aucun match"). Cause : cette fonction (fetchTodayMatches,
+// utilisée pour les CARDS affichées) ne couvrait que EURO_COMPS + WC, alors
+// que la recherche du "prochain jour avec un match" (useUpcomingMatchesAllComps,
+// dans useMatchs.js) couvre TOUTES les compétitions suivies (voir
+// ACCUEIL_COMP_IDS dans Accueil.jsx) — Euro, Ligue des Nations, CAN, Copa
+// America (ESPN) et les coupes nationales fusionnées (Coupe de
+// France/Copa del Rey/FA Cup, ESPN elles aussi). La flèche pouvait donc
+// sauter vers un jour dont le SEUL match provenait d'une de ces
+// compétitions manquantes ici → jour trouvé, mais rien à afficher une fois
+// arrivé dessus. Complété pour couvrir exactement les mêmes compétitions
+// que la recherche de saut, afin que les deux soient toujours cohérentes.
+const ESPN_SOURCED_COMPS = ['NL', 'CAN', 'COPA'] // même liste que useMatchs.js
+const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 
 
 async function safeFetch(url) {
@@ -23,16 +41,25 @@ async function fetchTodayMatches(date) {
   prevD.setDate(prevD.getDate() - 1)
   const prevDate = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
 
-  // Les 2 requêtes partent en parallèle — MAX_RPM=25 + cache Vercel edge = aucun risque de 429
-  const [euroMatches, wcMatches] = await Promise.all([
+  // Toutes les requêtes partent en parallèle (FD.org : MAX_RPM=25 + cache
+  // Vercel edge = aucun risque de 429 ; ESPN : rate limit 60/min/IP côté
+  // api/espn.js, très large marge — voir CLAUDE.md). fetchEspnCompMatches/
+  // fetchEspnCupMatches renvoient TOUS les statuts sur une fenêtre glissante
+  // (voir espnAdapter.js) → filtrées par VALID_STATUS ici comme les autres,
+  // puis par date locale plus bas comme le reste.
+  const [euroMatches, wcMatches, ecMatches, ...espnResults] = await Promise.all([
     safeFetch(`/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`),
     safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
+    safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
+    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id])),
+    ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
   ])
+  const espnMatches = espnResults.flat().filter(m => VALID_STATUS.includes(m.status))
 
   // Dédupliquer par id et filtrer par date LOCALE
   // → un match à 00:00 local (= 22:00 UTC J-1) apparaît bien dans J local seulement
   const seen = new Set()
-  const all = [...euroMatches, ...wcMatches].filter(m => {
+  const all = [...euroMatches, ...wcMatches, ...ecMatches, ...espnMatches].filter(m => {
     if (seen.has(m.id)) return false
     seen.add(m.id)
     if (m.utcDate) {

@@ -39,16 +39,13 @@ function AProposModal({ onClose }) {
           <p>L'idée est née d'un constat simple : les applications foot existantes sont soit trop chargées, soit trop lentes, soit derrière un paywall. StatFootix se veut léger, rapide et entièrement gratuit, sans pub ni inscription.</p>
 
           <h3>Compétitions couvertes</h3>
-          <p>StatFootix couvre actuellement la <strong>Coupe du Monde FIFA</strong> avec les phases de groupes, le tableau à élimination directe, les classements et les résultats en temps réel. D'autres compétitions (Champions League, Ligue 1, Premier League…) arrivent prochainement.</p>
+          <p>StatFootix couvre la <strong>Coupe du Monde FIFA</strong>, l'<strong>Euro</strong>, la <strong>Ligue des Nations</strong>, la <strong>Coupe d'Afrique des Nations</strong>, la <strong>Copa America</strong>, la <strong>Ligue des Champions</strong> et les 5 grands championnats européens (<strong>Ligue 1</strong>, <strong>Premier League</strong>, <strong>LaLiga</strong>, <strong>Bundesliga</strong>, <strong>Serie A</strong>) — avec, pour chacun d'eux, sa coupe nationale associée (Coupe de France, Copa del Rey, FA Cup).</p>
 
           <h3>Fonctionnalités</h3>
-          <p>Scores en direct avec minutes calculées en temps réel, matchs à venir avec navigation jour par jour, résultats récents, classements de groupes interactifs, widget live dans l'accueil, actualités football, compos d'équipes, statistiques live, historique des confrontations et probabilités de victoire.</p>
-
-          <h3>Roadmap</h3>
-          <p>Prochainement : support multi-compétitions (Champions League, Ligue 1, Premier League), notifications de buts et statistiques joueurs.</p>
+          <p>Scores en direct avec minutes calculées en temps réel, matchs à venir avec navigation jour par jour, résultats récents, classements et buteurs, tableaux à élimination directe pour les compétitions à phase finale, notifications push (but, mi-temps, fin de match) sur les compétitions de ton choix, favoris par club, pronostics avec probabilités calculées, compos d'équipes, statistiques live, historique des confrontations et actualités football.</p>
 
           <h3>Données & fraîcheur</h3>
-          <p>Les données sont fournies par <strong>football-data.org</strong>, <strong>ESPN</strong> et <strong>FIFA</strong>, mises en cache localement. Les scores live sont mis à jour toutes les 30 secondes via plusieurs sources croisées pour une précision maximale.</p>
+          <p>Les données sont fournies par <strong>football-data.org</strong>, <strong>ESPN</strong> et <strong>FIFA</strong>, mises en cache localement. Les scores live sont rafraîchis en continu (toutes les 30 secondes côté application, avec un suivi serveur dédié en tâche de fond) via plusieurs sources croisées pour une précision maximale.</p>
 
           <h3>Technologies</h3>
           <p>Développé avec <strong>React</strong> + <strong>TanStack Query</strong> pour la gestion du cache. Déployé sur <strong>Vercel</strong> avec des fonctions serverless pour sécuriser les appels API. Zéro dépendance inutile, code 100% open.</p>
