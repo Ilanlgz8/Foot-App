@@ -20,10 +20,10 @@ function MentionsLegales() {
         <section className="mentions__section">
           <h2>Hébergement</h2>
           <p>
-            <strong>Netlify, Inc.</strong><br />
-            512 2nd Street, Suite 200<br />
-            San Francisco, CA 94107, États-Unis<br />
-            <a href="https://www.netlify.com" target="_blank" rel="noreferrer">www.netlify.com</a>
+            <strong>Vercel Inc.</strong><br />
+            340 S Lemon Ave #4133<br />
+            Walnut, CA 91789, États-Unis<br />
+            <a href="https://vercel.com" target="_blank" rel="noreferrer">vercel.com</a>
           </p>
         </section>
 
@@ -38,9 +38,13 @@ function MentionsLegales() {
         </section>
 
         <section className="mentions__section">
-          <h2>Données personnelles & RGPD</h2>
-          <p>StatFootix ne collecte aucune donnée personnelle des utilisateurs. Aucun compte, inscription ou formulaire n'est requis pour utiliser le site. Aucune donnée n'est transmise à des tiers à des fins commerciales.</p>
-          <p>Conformément au Règlement Général sur la Protection des Données (RGPD - UE 2016/679), vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à l'adresse indiquée ci-dessus.</p>
+          <h2>Données personnelles & Politique de confidentialité</h2>
+          <p>StatFootix ne demande ni compte, ni inscription, ni formulaire pour être utilisé. Les seules données traitées sont celles décrites ci-dessous, dans le cadre strict du fonctionnement du site.</p>
+          <p><strong>Notifications push (si vous les activez).</strong> Votre navigateur génère alors un abonnement technique (une adresse de point de terminaison et des clés de chiffrement, aucune information d'identité) que nous stockons afin de pouvoir vous envoyer des alertes (but, mi-temps, fin de match) sur les compétitions que vous suivez. Cet abonnement est conservé jusqu'à ce qu'il expire ou devienne invalide, ou jusqu'à ce que vous désactiviez les notifications depuis l'application — l'entrée correspondante est alors supprimée automatiquement.</p>
+          <p><strong>Adresse IP.</strong> Comme sur la plupart des sites web, votre adresse IP est traitée ponctuellement pour limiter les abus (protection anti-surcharge) sur certains services du site. Elle est conservée quelques minutes à quelques heures selon le service concerné, puis supprimée automatiquement, et n'est utilisée à aucune autre fin.</p>
+          <p>Aucune donnée n'est vendue, ni partagée à des fins publicitaires, ni croisée avec d'autres sources pour vous identifier personnellement.</p>
+          <p><strong>Sous-traitants techniques :</strong> Vercel (hébergement), Upstash (base de données), Ably (diffusion en temps réel des scores en direct), football-data.org et ESPN (données sportives). Ces prestataires peuvent traiter des données en dehors de l'Union Européenne dans le cadre de leur propre infrastructure.</p>
+          <p>Conformément au Règlement Général sur la Protection des Données (RGPD - UE 2016/679), vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Le moyen le plus simple de supprimer votre abonnement aux notifications est de les désactiver depuis l'application (cloche dans la barre de navigation) ; pour toute autre demande, contactez-nous à l'adresse indiquée ci-dessus.</p>
         </section>
 
         <section className="mentions__section">
