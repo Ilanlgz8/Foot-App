@@ -16,11 +16,25 @@ if ('serviceWorker' in navigator) {
   // jamais découvrir qu'une nouvelle version est dispo. On force la vérif
   // à chaque passage au premier plan (via le header Cache-Control: no-cache
   // posé sur /sw.js côté vercel.json, sw.js est toujours revalidé ici).
+  const checkForUpdate = () => navigator.serviceWorker.getRegistration().then(reg => reg?.update())
+
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      navigator.serviceWorker.getRegistration().then(reg => reg?.update())
-    }
+    if (document.visibilityState === 'visible') checkForUpdate()
   })
+
+  // ⚠️ AJOUT (constat utilisateur : app iOS installée sur l'écran d'accueil,
+  // laissée ouverte plusieurs heures sans être vraiment fermée/rouverte —
+  // "j'ai pas les nouveaux articles, ça fait 6h") : sur iOS en mode standalone,
+  // visibilitychange ne suffit pas toujours (l'app peut rester "visible" en
+  // arrière-plan léger sans déclencher l'événement, ou l'event est raté selon
+  // la version iOS) — sans second filet, une session ouverte longtemps peut ne
+  // jamais revérifier une nouvelle version tant qu'elle n'est pas vraiment
+  // tuée puis relancée. Vérif périodique tant que l'app est au premier plan :
+  // coût nul (un simple fetch conditionnel de sw.js, déjà no-cache), et
+  // rattrape ce cas sans dépendre d'un événement qui peut ne pas se déclencher.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') checkForUpdate()
+  }, 10 * 60 * 1000) // 10min
 }
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient } from '@tanstack/react-query'
