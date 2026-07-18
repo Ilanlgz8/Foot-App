@@ -398,7 +398,14 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
-  const displayed = active.length > 0 ? active : allMatches
+  const shortlist = active.length > 0 ? active : allMatches
+
+  // Priorité aux matchs live (retour utilisateur : "mettre en priorité les
+  // match live en premier et les match a venir en dessous"). Tri stable
+  // (garanti par le spec JS depuis ES2019) : à l'intérieur de chaque groupe
+  // (live / à venir), l'ordre chronologique déjà fourni par l'API est
+  // préservé — seul le regroupement live-d'abord est ajouté.
+  const displayed = [...shortlist].sort((a, b) => Number(isCardLive(b)) - Number(isCardLive(a)))
 
   return (
     <div className="accueil__dashPanelBody">
