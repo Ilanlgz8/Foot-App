@@ -448,6 +448,7 @@ export default function LiveMatchPage() {
                     compMatches={compMatches}
                     hForm={hForm}
                     aForm={aForm}
+                    h2hRows={h2hRows}
                   />
                 )}
               </>

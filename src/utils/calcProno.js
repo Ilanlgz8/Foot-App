@@ -116,17 +116,14 @@ function shrinkTowardBase(p) {
   return distribute(home, away, draw)
 }
 
-/**
- * calcProno — modèle DE BASE (forme récente V/N/D uniquement), gardé tel
- * quel comme filet de sécurité : utilisé quand on n'a pas assez de données
- * saison pour le modèle avancé (calcPronoAdvanced, plus bas) — ex. tout
- * début de phase de groupes d'un Mondial, championnat qui débute.
- *
- * @param {string[]} homeForm  ex: ['W','D','L','W','W']
- * @param {string[]} awayForm  ex: ['L','W','W','D','L']
- * @returns {{ home: number, draw: number, away: number }}  entiers %, somme = 100
- */
-export function calcProno(homeForm, awayForm) {
+// Version NON shrunk (avant rapprochement vers BASE_RATE) du modèle "forme
+// récente" — extraite de calcProno() pour être réutilisable telle quelle
+// dans le repli H2H complet ci-dessous (calcPronoAdvanced), qui a besoin de
+// mélanger ce prior AVANT le shrink final (le shrink ne doit s'appliquer
+// qu'UNE FOIS, sur le résultat déjà mélangé — sinon la base rate serait
+// appliquée deux fois et le pronostic s'aplatirait trop vers le neutre).
+// Comportement de calcProno() lui-même strictement inchangé.
+function rawFormProno(homeForm, awayForm) {
   const h = strength(homeForm) + 0.4   // avantage domicile ~+0.4 pt
   const a = strength(awayForm)
 
@@ -150,7 +147,21 @@ export function calcProno(homeForm, awayForm) {
   const gap = Math.abs(h - a)
   const drawWeight = Math.max(0.6, 1.5 * (avg / 1.7) - gap * 0.4)
 
-  return shrinkTowardBase(distribute(h, a, drawWeight))
+  return distribute(h, a, drawWeight)
+}
+
+/**
+ * calcProno — modèle DE BASE (forme récente V/N/D uniquement), gardé tel
+ * quel comme filet de sécurité : utilisé quand on n'a pas assez de données
+ * saison pour le modèle avancé (calcPronoAdvanced, plus bas) — ex. tout
+ * début de phase de groupes d'un Mondial, championnat qui débute.
+ *
+ * @param {string[]} homeForm  ex: ['W','D','L','W','W']
+ * @param {string[]} awayForm  ex: ['L','W','W','D','L']
+ * @returns {{ home: number, draw: number, away: number }}  entiers %, somme = 100
+ */
+export function calcProno(homeForm, awayForm) {
+  return shrinkTowardBase(rawFormProno(homeForm, awayForm))
 }
 
 // ── Modèle avancé : buts marqués/encaissés (Poisson) + confrontations
@@ -287,9 +298,43 @@ function directMeetings(compMatches, homeId, awayId) {
  * @param {object[]} compMatches   matchs de la compétition (useTeamForm)
  * @param {string[]} homeForm      fallback si pas assez de données saison
  * @param {string[]} awayForm      fallback si pas assez de données saison
+ * @param {{ fullH2H?: object[] }} [opts]
+ *   fullH2H : confrontations directes TOUTES compétitions/saisons confondues
+ *   (voir useH2H/useH2HRows, déjà chargées sur la fiche d'un match précis
+ *   pour l'onglet Historique — aucun appel réseau en plus ici). Plus riche
+ *   que le H2H "gratuit" tiré de compMatches (limité à la saison en cours de
+ *   CETTE compétition) : utilisée à la place quand fournie et non vide, y
+ *   compris comme repli en tout début de saison quand compMatches n'a pas
+ *   encore assez de matchs pour le modèle buts marqués/encaissés (voir plus
+ *   bas). Volontairement PAS utilisée dans les listes de plusieurs matchs à
+ *   la fois (Pronos.jsx, cards Accueil) : useH2H appelle un endpoint FD.org
+ *   PAR match — un appel par carte affichée dépasserait vite le budget
+ *   partagé (7 req/min, voir api/football.js).
  */
-export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm) {
-  const fallback = () => calcProno(homeForm, awayForm)
+export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
+  const { fullH2H } = opts
+
+  // Repli enrichi : pas (encore) assez de données saison pour le modèle buts
+  // marqués/encaissés (ex. tout début de saison, compMatches quasi vide) —
+  // si un historique de confrontations complet est fourni, mieux vaut s'en
+  // servir qu'un neutre plat identique pour tous les matchs. Même barème de
+  // poids que le correctif H2H du modèle avancé plus bas (H2H_WEIGHT_*),
+  // mélangé au prior "forme récente" (rawFormProno, PAS encore shrunk — le
+  // shrink final s'applique une seule fois, sur le résultat déjà mélangé).
+  const fallback = () => {
+    if (homeId != null && awayId != null && fullH2H?.length) {
+      const h2h = directMeetings(fullH2H, homeId, awayId)
+      if (h2h.count > 0) {
+        const raw = rawFormProno(homeForm, awayForm)
+        const w = Math.min(H2H_WEIGHT_MAX, h2h.count * H2H_WEIGHT_PER_MATCH)
+        const home = raw.home * (1 - w) + (h2h.hWins / h2h.count) * 100 * w
+        const draw = raw.draw * (1 - w) + (h2h.draws / h2h.count) * 100 * w
+        const away = raw.away * (1 - w) + (h2h.aWins / h2h.count) * 100 * w
+        return shrinkTowardBase(distribute(home, away, draw))
+      }
+    }
+    return calcProno(homeForm, awayForm)
+  }
   if (homeId == null || awayId == null) return fallback()
 
   const goalModel = buildGoalModel(compMatches)
@@ -299,7 +344,10 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
   if (!lambdas) return fallback()
 
   const poisson = poissonOutcomes(lambdas.lambdaHome, lambdas.lambdaAway)
-  const h2h = directMeetings(compMatches, homeId, awayId)
+  // H2H complet (fullH2H) préféré s'il est fourni et non vide — sinon repli
+  // sur compMatches (comportement identique à avant pour tout appelant qui
+  // ne passe pas fullH2H, ex. Pronos.jsx/Accueil).
+  const h2h = directMeetings(fullH2H?.length ? fullH2H : compMatches, homeId, awayId)
 
   let home = poisson.home, draw = poisson.draw, away = poisson.away
   if (h2h.count > 0) {
@@ -343,20 +391,28 @@ function parseMinuteValue(minute) {
  * @param {number|null} homeGoals  score domicile en direct
  * @param {number|null} awayGoals  score extérieur en direct
  * @param {string|number|null} minute  retour brut de calcMinute(match)
- * @param {{homeId?: string|number, awayId?: string|number, compMatches?: object[]}} [opts]
- *   si fournis, utilise calcPronoAdvanced() pour le prior pré-match au lieu
- *   de la simple forme récente.
+ * @param {{homeId?: string|number, awayId?: string|number, compMatches?: object[], fullH2H?: object[]}} [opts]
+ *   si homeId/awayId fournis, utilise calcPronoAdvanced() pour le prior
+ *   pré-match au lieu de la simple forme récente — fullH2H (optionnel,
+ *   confrontations toutes compétitions, voir calcPronoAdvanced) transite
+ *   telle quelle, y compris quand compMatches est vide/insuffisant.
  */
 export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, opts = {}) {
   const {
-    homeId, awayId, compMatches,
+    homeId, awayId, compMatches, fullH2H,
     homeRedCards = 0, awayRedCards = 0,
     homePoss = null, awayPoss = null,
     homeShotsOnTarget = null, awayShotsOnTarget = null,
     homeCorners = null, awayCorners = null,
   } = opts
-  const pre = (homeId != null && awayId != null && compMatches?.length)
-    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm)
+  // Condition élargie (avant : exigeait compMatches?.length) — calcPronoAdvanced
+  // gère déjà tout seul le cas compMatches vide (repli sur fullH2H puis sur
+  // calcProno), donc plus besoin de filtrer ici : ça permet à fullH2H de
+  // servir de repli même quand compMatches est vide (tout début de saison).
+  // Comportement strictement inchangé pour tout appelant qui ne passe pas
+  // fullH2H (retombe exactement sur calcProno comme avant).
+  const pre = (homeId != null && awayId != null)
+    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H })
     : calcProno(homeForm, awayForm)
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 

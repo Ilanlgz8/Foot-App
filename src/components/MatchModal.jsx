@@ -548,8 +548,12 @@ const STAT_FR = {
 // pré-match (calcPronoAdvanced) à faire glisser vers le score réel, hForm/aForm
 // sont le repli si compMatches est insuffisant (calcProno, forme récente).
 // L'historique des confrontations affiché à l'écran reste dans son propre
-// onglet (H2HTabContent) : compMatches n'est plus utilisé pour ÇA ici.
-export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
+// onglet (H2HTabContent), mais h2hRows (mêmes données, déjà chargées par
+// useH2HRows côté appelant) sert maintenant AUSSI de fullH2H pour le prono
+// (voir calcProno.js) — corrige les probabilités identiques en début de
+// saison (compMatches vide) en s'appuyant sur l'historique réel toutes
+// compétitions confondues plutôt que la seule forme récente neutre.
+export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -616,6 +620,7 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm }) {
     hForm, aForm, homeGoals, awayGoals, liveMinute,
     {
       homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
+      fullH2H:           h2hRows,
       homeRedCards:      pronoStats?.home?.redCards,
       awayRedCards:      pronoStats?.away?.redCards,
       homePoss:          pronoStats?.home?.poss,

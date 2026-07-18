@@ -130,6 +130,57 @@ describe('calcPronoAdvanced — confrontations directes (H2H)', () => {
   })
 })
 
+describe('calcPronoAdvanced — repli fullH2H (historique complet, ex. début de saison)', () => {
+  it('sans fullH2H, ignore toujours le H2H quand compMatches est insuffisant (comportement inchangé)', () => {
+    const advanced = calcPronoAdvanced('h', 'a', [], ['W'], ['L'])
+    const base     = calcProno(['W'], ['L'])
+    expect(advanced).toEqual(base)
+  })
+
+  it('avec fullH2H mais compMatches vide (tout début de saison), penche vers l\'équipe qui a dominé leurs confrontations passées plutôt que de rester neutre', () => {
+    const fullH2H = [
+      finished('h', 'a', 2, 0),
+      finished('a', 'h', 0, 2),
+      finished('h', 'a', 3, 1),
+    ]
+    const withH2H  = calcPronoAdvanced('h', 'a', [], [], [], { fullH2H })
+    const withoutH2H = calcPronoAdvanced('h', 'a', [], [], [])
+    expect(sumsTo100(withH2H)).toBe(true)
+    expect(withH2H.home).toBeGreaterThan(withoutH2H.home)
+  })
+
+  it('fullH2H sans aucune confrontation entre CES deux équipes retombe sur calcProno (pas de faux signal)', () => {
+    const fullH2H = [finished('x', 'y', 3, 0)] // aucune des 2 équipes concernées
+    const advanced = calcPronoAdvanced('h', 'a', [], ['W'], ['L'], { fullH2H })
+    const base      = calcProno(['W'], ['L'])
+    expect(advanced).toEqual(base)
+  })
+
+  it('fullH2H est préféré au H2H limité à compMatches (saison en cours) quand les deux sont fournis et divergent', () => {
+    // Reprend la fixture buts/Poisson ci-dessus (t1/t2 statistiquement égaux)
+    // : aucune confrontation directe dans compMatches, mais un historique
+    // complet où t1 a toujours dominé t2 — le résultat doit refléter
+    // fullH2H, pas juste le Poisson neutre de compMatches seul.
+    const compMatches = [
+      finished('t1', 't2', 1, 1), finished('t2', 't1', 1, 1),
+      finished('t3', 't4', 1, 1), finished('t4', 't3', 1, 1),
+      finished('t1', 't3', 1, 1), finished('t3', 't1', 1, 1),
+      finished('strong', 't1', 3, 0), finished('strong', 't2', 3, 0),
+      finished('t3', 'strong', 0, 3), finished('t4', 'strong', 0, 3),
+      finished('weak', 't1', 0, 3), finished('weak', 't2', 0, 3),
+      finished('t3', 'weak', 3, 0), finished('t4', 'weak', 3, 0),
+    ]
+    const fullH2H = [
+      finished('t1', 't2', 3, 0),
+      finished('t2', 't1', 0, 3),
+      finished('t1', 't2', 2, 0),
+    ]
+    const withFullH2H = calcPronoAdvanced('t1', 't2', compMatches, [], [], { fullH2H })
+    const withCompOnly = calcPronoAdvanced('t1', 't2', compMatches, [], [])
+    expect(withFullH2H.home).toBeGreaterThan(withCompOnly.home)
+  })
+})
+
 describe('calcLiveProno', () => {
   const homeForm = ['W', 'W', 'D', 'L', 'W']
   const awayForm = ['L', 'D', 'L', 'W', 'L']
@@ -138,6 +189,17 @@ describe('calcLiveProno', () => {
     const pre  = calcProno(homeForm, awayForm)
     const live = calcLiveProno(homeForm, awayForm, 0, 0, 'Débute')
     expect(live).toEqual(pre)
+  })
+
+  it('transmet bien fullH2H au prior pré-match (repli début de saison, compMatches vide)', () => {
+    const fullH2H = [
+      finished('h', 'a', 2, 0),
+      finished('a', 'h', 0, 2),
+      finished('h', 'a', 3, 1),
+    ]
+    const preWithH2H = calcPronoAdvanced('h', 'a', [], homeForm, awayForm, { fullH2H })
+    const live = calcLiveProno(homeForm, awayForm, 0, 0, 'Débute', { homeId: 'h', awayId: 'a', compMatches: [], fullH2H })
+    expect(live).toEqual(preWithH2H)
   })
 
   it('en toute fin de match, l\'équipe qui mène est massivement favorisée', () => {

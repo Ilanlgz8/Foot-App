@@ -5,6 +5,7 @@ import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
+import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
 import { COMPETITIONS }               from '../data/competitions'
 
@@ -16,6 +17,14 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   // Vrai formMap depuis football-data.org pour cette compétition
   const compCode = match.competition?.code ?? null
   const { formMap, compMatches } = useTeamForm(compCode)
+  // Historique complet toutes compétitions confondues (déjà chargé pour la
+  // fiche d'un match précis via le même hook, voir MatchModal.jsx) — corrige
+  // les pronos identiques en début de saison, quand compMatches (saison en
+  // cours) est encore vide. Un seul poster affiché à la fois sur l'Accueil
+  // ("Match du jour") donc un seul appel FD.org supplémentaire, budget-safe
+  // contrairement aux listes de plusieurs matchs (Pronos.jsx) qui restent
+  // sur le repli saison précédente (voir calcProno.js, opts.fullH2H).
+  const { rows: fullH2H } = useH2HRows(match, compMatches)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
@@ -72,6 +81,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
         homeId: match.homeTeam?.id, awayId: match.awayTeam?.id, compMatches,
+        fullH2H,
         homeRedCards:      espnScore?.stats?.home?.redCards,
         awayRedCards:      espnScore?.stats?.away?.redCards,
         homePoss:          espnScore?.stats?.home?.poss,
@@ -81,7 +91,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
       })
-    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm)
+    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm, { fullH2H })
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
   // bordeaux, voir footer plus bas (pronoFavoriteKey, calcProno.js).
   const pronoFavorite = pronoFavoriteKey(prono)
