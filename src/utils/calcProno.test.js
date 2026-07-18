@@ -51,6 +51,14 @@ describe('calcProno (forme récente)', () => {
     const mismatched = calcProno(['W', 'W', 'W', 'W', 'W'], ['L', 'L', 'L', 'L', 'L'])
     expect(close.draw).toBeGreaterThan(mismatched.draw)
   })
+
+  it('opts.neutralVenue désactive l\'avantage domicile (constat utilisateur : Coupe du Monde/Euro/CAN/Copa America se jouent sur terrain neutre pour les 2 équipes, sauf pays hôte)', () => {
+    const sameForm = ['W', 'D', 'L', 'W', 'D']
+    const normal  = calcProno(sameForm, sameForm)
+    const neutral = calcProno(sameForm, sameForm, { neutralVenue: true })
+    expect(normal.home).toBeGreaterThan(normal.away)    // comportement normal inchangé
+    expect(neutral.home).toBe(neutral.away)              // terrain neutre : aucune des 2 équipes favorisée
+  })
 })
 
 describe('calcPronoAdvanced — repli sur calcProno si données insuffisantes', () => {
@@ -101,6 +109,21 @@ describe('calcPronoAdvanced — modèle buts/Poisson', () => {
     expect(sumsTo100(p)).toBe(true)
     // Pas d'écart extrême attendu entre 2 équipes aux stats quasi identiques.
     expect(Math.abs(p.home - p.away)).toBeLessThan(40)
+  })
+
+  it('opts.neutralVenue supprime le résidu d\'avantage domicile même dans le modèle buts/Poisson (constat utilisateur : WC/EC/CAN/COPA se jouent sur terrain neutre)', () => {
+    const normal  = calcPronoAdvanced('t1', 't2', compMatches, [], [])
+    const neutral = calcPronoAdvanced('t1', 't2', compMatches, [], [], { neutralVenue: true })
+    // t1/t2 ont des stats quasi identiques : l'écart home/away restant en
+    // mode normal vient presque entièrement de l'avantage domicile — il doit
+    // se réduire (ou disparaître) une fois neutralVenue activé.
+    expect(Math.abs(neutral.home - neutral.away)).toBeLessThanOrEqual(Math.abs(normal.home - normal.away))
+  })
+
+  it('neutralVenue continue de favoriser la vraie équipe la plus forte (n\'écrase pas le signal, juste le biais domicile)', () => {
+    const p = calcPronoAdvanced('strong', 'weak', compMatches, [], [], { neutralVenue: true })
+    expect(p.home).toBeGreaterThan(p.away)
+    expect(p.home).toBeGreaterThan(55)
   })
 })
 

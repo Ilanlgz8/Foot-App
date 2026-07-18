@@ -109,10 +109,27 @@ function distribute(h, a, draw) {
 const BASE_RATE = { home: 45, draw: 27, away: 28 }
 const SHRINK = 0.18
 
-function shrinkTowardBase(p) {
-  const home = p.home * (1 - SHRINK) + BASE_RATE.home * SHRINK
-  const draw = p.draw * (1 - SHRINK) + BASE_RATE.draw * SHRINK
-  const away = p.away * (1 - SHRINK) + BASE_RATE.away * SHRINK
+// ⚠️ BUG CORRIGÉ (repéré en corrigeant le bonus avantage domicile ci-dessous
+// dans rawFormProno — un premier test avec neutralVenue montrait encore
+// home > away malgré la désactivation du bonus d'entrée) : BASE_RATE
+// lui-même encode un avantage domicile général (45% dom. vs 28% ext., moyenne
+// tous championnats confondus) — le shrink final tirait donc TOUJOURS vers un
+// résultat favorable au domicile, même à input parfaitement symétrique, pour
+// TOUTE compétition (y compris WC/EC/CAN/COPA à terrain neutre). NEUTRAL_
+// BASE_RATE retire cet avantage en répartissant également la masse domicile/
+// extérieur (45+28)/2, en gardant le nul identique — utilisé à la place pour
+// les compétitions à terrain neutre (voir isNeutralVenueComp, matchUtils.js).
+const NEUTRAL_BASE_RATE = {
+  home: (BASE_RATE.home + BASE_RATE.away) / 2,
+  draw: BASE_RATE.draw,
+  away: (BASE_RATE.home + BASE_RATE.away) / 2,
+}
+
+function shrinkTowardBase(p, neutralVenue = false) {
+  const base = neutralVenue ? NEUTRAL_BASE_RATE : BASE_RATE
+  const home = p.home * (1 - SHRINK) + base.home * SHRINK
+  const draw = p.draw * (1 - SHRINK) + base.draw * SHRINK
+  const away = p.away * (1 - SHRINK) + base.away * SHRINK
   return distribute(home, away, draw)
 }
 
@@ -122,9 +139,23 @@ function shrinkTowardBase(p) {
 // mélanger ce prior AVANT le shrink final (le shrink ne doit s'appliquer
 // qu'UNE FOIS, sur le résultat déjà mélangé — sinon la base rate serait
 // appliquée deux fois et le pronostic s'aplatirait trop vers le neutre).
-// Comportement de calcProno() lui-même strictement inchangé.
-function rawFormProno(homeForm, awayForm) {
-  const h = strength(homeForm) + 0.4   // avantage domicile ~+0.4 pt
+// Comportement de calcProno() lui-même strictement inchangé pour tout
+// appelant qui ne passe pas neutralVenue.
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "es-tu sûr que c'est la bonne logique
+// pour vraiment TOUS les matchs ?") : le bonus "avantage domicile" (+0.4)
+// s'appliquait aveuglément, y compris pour Coupe du Monde/Euro/CAN/Copa
+// America — des compétitions à hôte UNIQUE où l'immense majorité des matchs
+// se jouent sur terrain neutre pour LES DEUX équipes (aucun vrai avantage
+// domicile entre, par ex., l'Argentine et la France à un quart de finale au
+// Mexique — seul le·s pays hôte·s bénéficie·nt d'un vrai avantage sur SES
+// propres matchs, cas non géré ici faute de donnée fiable de lieu de match
+// dans l'app). La Ligue des Nations (NL) n'est PAS concernée : sa phase de
+// groupes se joue en vrai domicile/extérieur classique, seule la finale à 4
+// est à hôte neutre — voir isNeutralVenueComp() dans matchUtils.js.
+function rawFormProno(homeForm, awayForm, opts = {}) {
+  const { neutralVenue = false } = opts
+  const h = strength(homeForm) + (neutralVenue ? 0 : 0.4)   // avantage domicile ~+0.4 pt, nul sur terrain neutre
   const a = strength(awayForm)
 
   // Poids du nul — retour utilisateur (match en direct 1-0, l'équipe qui perd
@@ -158,10 +189,14 @@ function rawFormProno(homeForm, awayForm) {
  *
  * @param {string[]} homeForm  ex: ['W','D','L','W','W']
  * @param {string[]} awayForm  ex: ['L','W','W','D','L']
+ * @param {{ neutralVenue?: boolean }} [opts]
+ *   neutralVenue : désactive le bonus avantage domicile (+0.4, ET le biais
+ *   domicile de BASE_RATE au shrink final) — à passer pour WC/EC/CAN/COPA
+ *   (voir isNeutralVenueComp, matchUtils.js).
  * @returns {{ home: number, draw: number, away: number }}  entiers %, somme = 100
  */
-export function calcProno(homeForm, awayForm) {
-  return shrinkTowardBase(rawFormProno(homeForm, awayForm))
+export function calcProno(homeForm, awayForm, opts = {}) {
+  return shrinkTowardBase(rawFormProno(homeForm, awayForm, opts), opts.neutralVenue)
 }
 
 // ── Modèle avancé : buts marqués/encaissés (Poisson) + confrontations
@@ -356,9 +391,20 @@ function directMeetings(compMatches, homeId, awayId) {
  *   appelant de l'app ne passe ce flag → comportement de production
  *   strictement inchangé (la clé _debug est juste ignorée par les
  *   appelants qui ne la lisent pas).
+ *   neutralVenue : désactive le bonus avantage domicile dans le REPLI forme
+ *   récente (voir rawFormProno) — pour WC/EC/CAN/COPA (isNeutralVenueComp,
+ *   matchUtils.js). Le modèle buts marqués/encaissés (Poisson, ci-dessous)
+ *   n'a volontairement PAS besoin du même traitement : il calcule déjà
+ *   leagueAvgHome/leagueAvgAway à partir des VRAIS matchs de CETTE
+ *   compétition (compMatches) — sur un tournoi à hôte neutre, ces deux
+ *   moyennes se rejoignent naturellement d'elles-mêmes (aucun avantage
+ *   domicile réel dans les données), rien à corriger artificiellement là.
+ *   Seul le repli (utilisé tôt dans un tournoi, avant assez de matchs pour
+ *   le modèle buts) applique un bonus FIXE non dérivé des données — c'est
+ *   uniquement CE bonus-là qu'il faut neutraliser.
  */
 export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
-  const { fullH2H, debug } = opts
+  const { fullH2H, debug, neutralVenue } = opts
 
   // Repli enrichi : pas (encore) assez de données saison pour le modèle buts
   // marqués/encaissés (ex. tout début de saison, compMatches quasi vide) —
@@ -371,17 +417,17 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
     if (homeId != null && awayId != null && fullH2H?.length) {
       const h2h = directMeetings(fullH2H, homeId, awayId)
       if (h2h.count > 0) {
-        const raw = rawFormProno(homeForm, awayForm)
+        const raw = rawFormProno(homeForm, awayForm, { neutralVenue })
         const w = Math.min(H2H_WEIGHT_MAX, h2h.count * H2H_WEIGHT_PER_MATCH)
         const home = raw.home * (1 - w) + (h2h.hWins / h2h.count) * 100 * w
         const draw = raw.draw * (1 - w) + (h2h.draws / h2h.count) * 100 * w
         const away = raw.away * (1 - w) + (h2h.aWins / h2h.count) * 100 * w
-        const result = shrinkTowardBase(distribute(home, away, draw))
+        const result = shrinkTowardBase(distribute(home, away, draw), neutralVenue)
         if (debug) result._debug = { path: 'fallback-h2h', h2hCount: h2h.count }
         return result
       }
     }
-    const result = calcProno(homeForm, awayForm)
+    const result = calcProno(homeForm, awayForm, { neutralVenue })
     if (debug) result._debug = { path: 'fallback-base' }
     return result
   }
@@ -410,7 +456,7 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
     away = away * (1 - w) + h2hAway * w
   }
 
-  const result = shrinkTowardBase(distribute(home * 100, away * 100, draw * 100))
+  const result = shrinkTowardBase(distribute(home * 100, away * 100, draw * 100), neutralVenue)
   if (debug) {
     result._debug = {
       path: 'poisson',
@@ -451,15 +497,16 @@ function parseMinuteValue(minute) {
  * @param {number|null} homeGoals  score domicile en direct
  * @param {number|null} awayGoals  score extérieur en direct
  * @param {string|number|null} minute  retour brut de calcMinute(match)
- * @param {{homeId?: string|number, awayId?: string|number, compMatches?: object[], fullH2H?: object[]}} [opts]
+ * @param {{homeId?: string|number, awayId?: string|number, compMatches?: object[], fullH2H?: object[], neutralVenue?: boolean}} [opts]
  *   si homeId/awayId fournis, utilise calcPronoAdvanced() pour le prior
  *   pré-match au lieu de la simple forme récente — fullH2H (optionnel,
  *   confrontations toutes compétitions, voir calcPronoAdvanced) transite
  *   telle quelle, y compris quand compMatches est vide/insuffisant.
+ *   neutralVenue transite aussi telle quelle (voir calcPronoAdvanced).
  */
 export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, opts = {}) {
   const {
-    homeId, awayId, compMatches, fullH2H,
+    homeId, awayId, compMatches, fullH2H, neutralVenue,
     homeRedCards = 0, awayRedCards = 0,
     homePoss = null, awayPoss = null,
     homeShotsOnTarget = null, awayShotsOnTarget = null,
@@ -472,8 +519,8 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // Comportement strictement inchangé pour tout appelant qui ne passe pas
   // fullH2H (retombe exactement sur calcProno comme avant).
   const pre = (homeId != null && awayId != null)
-    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H })
-    : calcProno(homeForm, awayForm)
+    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue })
+    : calcProno(homeForm, awayForm, { neutralVenue })
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 
   const min           = parseMinuteValue(minute)

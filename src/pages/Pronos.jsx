@@ -29,7 +29,7 @@ import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
 import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -136,7 +136,9 @@ function matchProno(match, formMap, matchesByComp) {
   const hForm = formMap?.[match?.homeTeam?.id] ?? []
   const aForm = formMap?.[match?.awayTeam?.id] ?? []
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
-  return calcPronoAdvanced(match?.homeTeam?.id, match?.awayTeam?.id, compMatches, hForm, aForm)
+  return calcPronoAdvanced(match?.homeTeam?.id, match?.awayTeam?.id, compMatches, hForm, aForm, {
+    neutralVenue: isNeutralVenueComp(match),
+  })
 }
 
 function computePoints(pred, actualHome, actualAway, prono) {

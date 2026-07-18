@@ -8,7 +8,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
@@ -621,6 +621,7 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
     {
       homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
       fullH2H:           h2hRows,
+      neutralVenue:      isNeutralVenueComp(match),
       homeRedCards:      pronoStats?.home?.redCards,
       awayRedCards:      pronoStats?.away?.redCards,
       homePoss:          pronoStats?.home?.poss,

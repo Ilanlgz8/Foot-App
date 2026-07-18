@@ -1,6 +1,6 @@
 import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, parseEspnClock } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -82,6 +82,7 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
         homeId: match.homeTeam?.id, awayId: match.awayTeam?.id, compMatches,
         fullH2H,
+        neutralVenue:      isNeutralVenueComp(match),
         homeRedCards:      espnScore?.stats?.home?.redCards,
         awayRedCards:      espnScore?.stats?.away?.redCards,
         homePoss:          espnScore?.stats?.home?.poss,
@@ -91,7 +92,10 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
       })
-    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm, { fullH2H })
+    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm, {
+        fullH2H,
+        neutralVenue: isNeutralVenueComp(match),
+      })
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
   // bordeaux, voir footer plus bas (pronoFavoriteKey, calcProno.js).
   const pronoFavorite = pronoFavoriteKey(prono)

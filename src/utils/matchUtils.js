@@ -431,3 +431,23 @@ export function isNationalTeamComp(match) {
   const code = match?.competition?.code
   return NATIONAL_TEAM_COMP_IDS.has(id) || NATIONAL_TEAM_COMP_CODES.has(code)
 }
+
+// ── Compétitions à hôte unique, terrain "neutre" pour les 2 équipes ──
+// Sous-ensemble de isNationalTeamComp ci-dessus : Coupe du Monde, Euro, CAN
+// et Copa America se jouent (quasi) intégralement dans un seul pays hôte —
+// aucun avantage domicile réel entre les 2 équipes qui s'affrontent, sauf
+// pour le·s pays hôte·s sur SES propres matchs (cas non détecté ici, faute
+// de donnée fiable de lieu de match dans l'app). La Ligue des Nations (NL)
+// est volontairement EXCLUE : sa phase de groupes se joue en vrai domicile/
+// extérieur classique (chaque équipe reçoit chez elle), seule la finale à 4
+// est à hôte neutre — traiter TOUTE la compétition comme neutre serait donc
+// faux dans l'autre sens. Utilisé par calcProno.js (rawFormProno) pour ne
+// pas appliquer le bonus avantage domicile sur ces 4 compétitions — constat
+// utilisateur : le modèle traitait un quart de finale Argentine/France comme
+// si l'une des deux jouait "chez elle".
+const NEUTRAL_VENUE_COMP_CODES = new Set(['WC', 'EC', 'CAN', 'COPA'])
+export function isNeutralVenueComp(match) {
+  const id   = match?.competition?.id
+  const code = match?.competition?.code
+  return NATIONAL_TEAM_COMP_IDS.has(id) || NEUTRAL_VENUE_COMP_CODES.has(code)
+}
