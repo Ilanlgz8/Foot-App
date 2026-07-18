@@ -340,6 +340,22 @@ describe('calcLiveProno', () => {
     }
   })
 
+  it('un but qui ramène un écart énorme (4+ buts) à 3 buts ou moins fait bien baisser visiblement la cote du favori (bug réel signalé : 4-0 puis 4-1 affichaient exactement la même cote, le plancher à 5% écrasait toute variation entre deux scores déjà quasi certains)', () => {
+    // À 4 buts d'écart ou plus, le plancher d'affichage descend à 2% (au lieu
+    // de 5%) pour laisser le favori monter au-delà de son plafond habituel
+    // (~91%) — dès que l'écart repasse sous 4 buts, le plancher standard à 5%
+    // reprend la main et fait mécaniquement REdescendre le favori. Résultat :
+    // un but de l'équipe menée doit être visible à l'écran, même très tard
+    // dans un match très déséquilibré.
+    for (const minute of ["60'", "75'", "88'"]) {
+      const quatreZero = calcLiveProno(homeForm, awayForm, 4, 0, minute)
+      const quatreUn    = calcLiveProno(homeForm, awayForm, 4, 1, minute)
+      expect(sumsTo100(quatreZero)).toBe(true)
+      expect(sumsTo100(quatreUn)).toBe(true)
+      expect(quatreUn.home).toBeLessThan(quatreZero.home)
+    }
+  })
+
   it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {
     const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
     const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 1 })

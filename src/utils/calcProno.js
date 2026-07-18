@@ -67,7 +67,9 @@ export function pronoFavoriteKey(prono) {
 }
 
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
-// somment à 100, avec un plancher de 5% par issue (jamais 0% affiché).
+// somment à 100, avec un plancher (5% par défaut) par issue (jamais 0%
+// affiché). `floor` réglable — voir BLOWOUT_GOAL_MARGIN plus bas
+// (calcLiveProno) pour la raison d'être de ce paramètre.
 //
 // ⚠️ BUG CORRIGÉ (repéré en implémentant la projection Poisson en direct,
 // calcLiveProno : celle-ci peut légitimement produire DEUX issues quasi
@@ -85,10 +87,10 @@ export function pronoFavoriteKey(prono) {
 // avec 3 issues seulement, au plus 2 peuvent être sous le plancher en même
 // temps (sinon leur somme+la 3e ne pourrait pas faire 100), donc une seule
 // passe de redistribution suffit toujours mathématiquement.
-function distribute(h, a, draw) {
+function distribute(h, a, draw, floor = 5) {
   const total = h + a + draw || 1
   const vals = { home: (h / total) * 100, away: (a / total) * 100, nul: (draw / total) * 100 }
-  const FLOOR = 5
+  const FLOOR = floor
   const keys  = Object.keys(vals)
   const below = keys.filter(k => vals[k] < FLOOR)
   if (below.length > 0) {
@@ -710,7 +712,25 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     away = draw
   }
 
-  const result = distribute(home, away, draw)
+  // Plancher réduit sur les très gros écarts de buts (retour utilisateur :
+  // "à 4-0 la France marque, ça devient 4-1, et les cotes bougent pas...
+  // au moins bouger un peu... augmente le chiffre des côtes si le score est
+  // au dessus de +3-0") — seuil repris tel quel de sa proposition. Cause :
+  // le plancher standard à 5% (draw/away ne descendent jamais sous 5%) capait
+  // mécaniquement le favori à ~90-91% dès que l'écart réel dépassait ce
+  // plafond — un but de plus pour l'équipe menée fait bien bouger la vraie
+  // proba interne (Poisson, ex. 99.97%→99.66%), mais cette variation restait
+  // toujours en dessous du seuil visible une fois arrondie ET plafonnée : les
+  // deux scores affichaient exactement la même cote. À partir de 4 buts
+  // d'écart, le plancher descend à 2% : ça laisse de la place au favori pour
+  // monter jusqu'à ~96% quand l'écart est énorme (4+ buts), puis RE-descendre
+  // visiblement dès que l'équipe menée revient à 3 buts d'écart ou moins (le
+  // plancher standard à 5% reprend alors la main, replafonnant à ~90%).
+  // Toujours calculé sur les vraies probabilités Poisson, jamais une valeur
+  // inventée — seul le plancher d'AFFICHAGE change selon l'écart.
+  const BLOWOUT_GOAL_MARGIN = 4
+  const liveFloor = Math.abs(diff) >= BLOWOUT_GOAL_MARGIN ? 2 : 5
+  const result = distribute(home, away, draw, liveFloor)
 
   // Retour utilisateur (à raison) : "tu peux pas mettre la même cote pour
   // match nul et victoire de l'équipe qui perd, ça a aucun sens" — le
