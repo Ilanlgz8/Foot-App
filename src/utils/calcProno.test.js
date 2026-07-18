@@ -277,9 +277,23 @@ describe('calcLiveProno', () => {
 
   it('à égalité en fin de match, penche vers le favori pré-match plutôt qu\'un 50/50', () => {
     const pre = calcProno(homeForm, awayForm) // domicile favori (forme meilleure + bonus domicile)
-    const live = calcLiveProno(homeForm, awayForm, 1, 1, "89'")
+    // 75e plutôt que 89e (avant le passage à la projection Poisson en
+    // direct) : à 1 minute de la fin, une vraie projection Poisson écrase
+    // à juste titre home ET away à des valeurs infimes et quasi identiques
+    // (le nul domine alors très largement, statistiquement correct — si peu
+    // de temps ne laisse quasiment aucune chance de marquer) — le plancher
+    // d'affichage à 5% les rend alors indiscernables. Le favori pré-match
+    // reste bien visible à une minute plus raisonnable.
+    const live = calcLiveProno(homeForm, awayForm, 1, 1, "75'")
     expect(pre.home).toBeGreaterThan(pre.away)
     expect(live.home).toBeGreaterThan(live.away)
+  })
+
+  it('même à 1 minute de la fin, à égalité, le nul écrase largement home et away (projection Poisson : quasi plus de temps pour marquer)', () => {
+    const live = calcLiveProno(homeForm, awayForm, 1, 1, "89'")
+    expect(sumsTo100(live)).toBe(true)
+    expect(live.draw).toBeGreaterThan(live.home)
+    expect(live.draw).toBeGreaterThan(live.away)
   })
 
   it('un écart de buts plus large verrouille davantage la tête (à minute égale) qu\'un écart d\'1 seul but', () => {
@@ -297,6 +311,14 @@ describe('calcLiveProno', () => {
     // contrainte, le prior pré-match pouvait faire remonter home au-dessus
     // de draw malgré les 3 buts de retard à combler EN PLUS pour gagner.
     expect(live.home).toBeLessThanOrEqual(live.draw)
+  })
+
+  it('une équipe menée de 3 buts à mi-match ne produit jamais de pourcentage négatif (bug réel de distribute() : deux issues quasi nulles en même temps pouvaient faire ressortir home négatif)', () => {
+    const live = calcLiveProno(homeForm, awayForm, 0, 3, "60'")
+    expect(sumsTo100(live)).toBe(true)
+    expect(live.home).toBeGreaterThanOrEqual(0)
+    expect(live.draw).toBeGreaterThanOrEqual(0)
+    expect(live.away).toBeGreaterThanOrEqual(0)
   })
 
   it('symétrique : l\'équipe qui mène de plusieurs buts garde bien une victoire au moins aussi probable qu\'un nul', () => {

@@ -68,15 +68,42 @@ export function pronoFavoriteKey(prono) {
 
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
 // somment à 100, avec un plancher de 5% par issue (jamais 0% affiché).
+//
+// ⚠️ BUG CORRIGÉ (repéré en implémentant la projection Poisson en direct,
+// calcLiveProno : celle-ci peut légitimement produire DEUX issues quasi
+// nulles en même temps — ex. équipe menée de 3 buts à 15min de la fin, home
+// ET draw proches de 0%, away proche de 100%) : l'ancien "cascade" séquentiel
+// (chaque `if` relève l'issue sous le plancher SANS jamais redescendre celle
+// qui était déjà au-dessus) ne gérait qu'UNE seule issue sous le plancher à
+// la fois. Avec deux issues sous 5% simultanément, le dernier `if` (nul<5)
+// forçait nul à 5 et recalculait home = 100 - 5 - away SANS que `away` (resté
+// à ~99, jamais réajusté) n'ait cédé de terrain aux deux autres → home
+// ressortait NÉGATIF (constaté : -4). Remplacé par une redistribution
+// proportionnelle : les issues sous le plancher sont remontées à 5%, le
+// déficit total est repris PROPORTIONNELLEMENT sur celle(s) au-dessus (au
+// lieu d'une seule variable arbitrairement désignée par l'ordre des `if`) —
+// avec 3 issues seulement, au plus 2 peuvent être sous le plancher en même
+// temps (sinon leur somme+la 3e ne pourrait pas faire 100), donc une seule
+// passe de redistribution suffit toujours mathématiquement.
 function distribute(h, a, draw) {
-  const total = h + a + draw
-  let home = Math.round((h    / total) * 100)
-  let away = Math.round((a    / total) * 100)
-  let nul  = 100 - home - away   // absorbe l'arrondi
+  const total = h + a + draw || 1
+  const vals = { home: (h / total) * 100, away: (a / total) * 100, nul: (draw / total) * 100 }
+  const FLOOR = 5
+  const keys  = Object.keys(vals)
+  const below = keys.filter(k => vals[k] < FLOOR)
+  if (below.length > 0) {
+    const above   = keys.filter(k => !below.includes(k))
+    const deficit = below.reduce((s, k) => s + (FLOOR - vals[k]), 0)
+    below.forEach(k => { vals[k] = FLOOR })
+    const aboveSum = above.reduce((s, k) => s + vals[k], 0)
+    above.forEach(k => {
+      vals[k] = aboveSum > 0 ? vals[k] - deficit * (vals[k] / aboveSum) : vals[k] - deficit / above.length
+    })
+  }
 
-  if (home < 5) { home = 5;  nul  = 100 - home - away }
-  if (away < 5) { away = 5;  nul  = 100 - home - away }
-  if (nul  < 5) { nul  = 5;  home = 100 - nul  - away }
+  let home = Math.round(vals.home)
+  let away = Math.round(vals.away)
+  let nul  = 100 - home - away   // absorbe l'arrondi, comme avant
 
   return { home, draw: nul, away }
 }
@@ -484,6 +511,94 @@ function parseMinuteValue(minute) {
   return m ? parseInt(m[1], 10) : 45     // fallback neutre si format inconnu
 }
 
+// ── Projection Poisson en direct ────────────────────────────────────────
+// Retour utilisateur (bug réel : France favorite pré-match, menée 0-3 par
+// l'Angleterre — cote nul 6,74 MAIS cote victoire France 3,37, la victoire
+// ressortait plus probable que le nul, ce qui est structurellement
+// impossible) : l'ancien "now" de calcLiveProno (formule de verrouillage
+// ad-hoc, +3pts par but d'écart au-delà du 1er) mélangée linéairement avec
+// le pronostic pré-match ne respectait aucune contrainte réelle. Remplacé
+// par une vraie projection Poisson : mêmes buts espérés (λ) que le modèle
+// pré-match, mis à l'échelle du temps restant, combinés au score actuel —
+// un calcul de probabilité, pas une formule inventée. Une projection Poisson
+// ne peut par nature pas produire une victoire plus probable qu'un nul pour
+// l'équipe menée sur des λ réalistes (gagner demande de combler l'écart ET
+// de le dépasser d'un but, toujours au moins aussi rare) — le bug signalé
+// disparaît par construction, pas par un correctif appliqué après coup.
+
+// P(victoire dom./nul/victoire ext.) à partir d'un écart de buts déjà
+// acquis (diff = buts dom. - buts ext. au moment T) et des buts encore
+// espérés de chaque équipe jusqu'à la fin (lambdaHome/lambdaAway, DÉJÀ mis à
+// l'échelle du temps restant par l'appelant) — même grille Poisson que
+// poissonOutcomes(), décalée de `diff` plutôt que comparée à 0.
+function poissonOutcomesFromDiff(lambdaHome, lambdaAway, diff) {
+  let home = 0, draw = 0, away = 0
+  for (let i = 0; i <= MAX_GOALS_GRID; i++) {
+    const pi = poissonPmf(lambdaHome, i)
+    for (let j = 0; j <= MAX_GOALS_GRID; j++) {
+      const p = pi * poissonPmf(lambdaAway, j)
+      const finalDiff = diff + i - j
+      if (finalDiff > 0) home += p
+      else if (finalDiff < 0) away += p
+      else draw += p
+    }
+  }
+  const total = home + draw + away || 1
+  return { home: home / total, draw: draw / total, away: away / total }
+}
+
+// Buts totaux/match plausibles (plage large, pas une valeur unique
+// "correcte") — bornes de recherche pour fitLambdasToPreMatch ci-dessous,
+// pas une moyenne appliquée aveuglément à tous les matchs.
+const FIT_TOTAL_GOALS_MIN = 1.2
+const FIT_TOTAL_GOALS_MAX = 4.5
+
+// Retrouve une paire (λh, λa) de Poisson qui reproduit fidèlement un
+// pronostic pré-match déjà calculé (`pre`, home/draw/away en %) — PAS une
+// nouvelle prédiction : la même, juste reformulée en taux de buts espérés
+// pour pouvoir être projetée dans le temps restant (poissonOutcomesFromDiff
+// ci-dessus a besoin de λ, pas de %). Utilisée uniquement quand on n'a pas
+// de VRAIES stats buts marqués/encaissés saison (goalModel indisponible,
+// voir calcLiveProno) — sinon on utilise directement les λ mesurés.
+// Recherche à 2 paramètres par bissections imbriquées :
+//  - le total de buts (λh+λa) pilote surtout la proba de nul (plus de buts
+//    espérés = plus de variance = statistiquement moins de nuls) ;
+//  - pour un total donné, la répartition λh/λa pilote le rapport dom/ext.
+// ~350 évaluations de poissonOutcomes (grille 9×9) au total — largement
+// négligeable en coût (pas d'appel réseau, calcul pur), même appelé à
+// chaque re-render live.
+function fitLambdasToPreMatch(pre) {
+  const targetHome = pre.home / 100
+  const targetDraw = pre.draw / 100
+
+  function splitForTotal(total) {
+    let lo = 0.05, hi = total - 0.05
+    for (let i = 0; i < 22; i++) {
+      const mid = (lo + hi) / 2
+      const out = poissonOutcomes(mid, total - mid)
+      // Plus de λ domicile (à total fixé, donc moins de λ extérieur) → plus
+      // de victoires domicile — relation monotone, la bissection converge.
+      if (out.home < targetHome) lo = mid
+      else hi = mid
+    }
+    const lambdaHome = (lo + hi) / 2
+    return { lambdaHome, lambdaAway: total - lambdaHome }
+  }
+
+  let loT = FIT_TOTAL_GOALS_MIN, hiT = FIT_TOTAL_GOALS_MAX
+  let best = splitForTotal((loT + hiT) / 2)
+  for (let i = 0; i < 16; i++) {
+    const midT = (loT + hiT) / 2
+    best = splitForTotal(midT)
+    const out = poissonOutcomes(best.lambdaHome, best.lambdaAway)
+    // Nul obtenu trop élevé → il faut PLUS de buts totaux (plus de variance,
+    // moins de nuls), et inversement.
+    if (out.draw > targetDraw) loT = midT
+    else hiT = midT
+  }
+  return best
+}
+
 /**
  * calcLiveProno — même proba 1/X/2 que calcProno/calcPronoAdvanced, mais
  * réévaluée en direct selon le score réel et le temps restant. Ce n'est PAS
@@ -527,42 +642,37 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   const totalDuration = min > 90 ? 120 : 90
   const remaining     = Math.min(1, Math.max(0, (totalDuration - min) / totalDuration))
 
-  // Distribution "si l'arbitre sifflait la fin maintenant" — jamais 100%
-  // (un but égalisateur/renversant reste possible même en fin de match).
-  // Cas d'égalité : biaisé selon qui était favori au pré-match plutôt qu'un
-  // 50/50 arbitraire.
-  //
-  // Écart de buts : jusqu'ici un 1-0 et un 5-0 recevaient EXACTEMENT la même
-  // confiance (seul le signe de `diff` comptait, jamais sa valeur) — repéré
-  // en creusant la question "est-ce qu'on gère bien la minute du match ?" :
-  // le temps restant n'a de sens que combiné à l'écart de buts (un but
-  // d'écart reste fragile même en fin de match, un large écart est quasi
-  // verrouillé bien avant la fin). Ajout d'un bonus de "verrouillage" au-delà
-  // du 1er but d'écart, pris sur le nul (rendements décroissants : le 2e but
-  // d'écart compte beaucoup, le 5e ne change plus grand-chose en pratique —
-  // capé pour ne jamais donner une fausse certitude à 100%).
-  const absDiff = Math.abs(diff)
-  const lockIn  = Math.min(9, (absDiff - 1) * 3)
-  let now
-  if (diff > 0)      now = { home: Math.min(97, 90 + lockIn), draw: Math.max(2, 8 - lockIn), away: 2 }
-  else if (diff < 0) now = { home: 2, draw: Math.max(2, 8 - lockIn), away: Math.min(97, 90 + lockIn) }
-  else {
-    const favorHome = pre.home >= pre.away
-    now = favorHome
-      ? { home: 27, draw: 55, away: 18 }
-      : { home: 18, draw: 55, away: 27 }
-  }
+  // Coup d'envoi exact (0-0, minute 0) : rien à projeter, le direct EST le
+  // pré-match — évite aussi toute imprécision numérique de la projection
+  // Poisson ci-dessous (bissections, voir fitLambdasToPreMatch) à cet
+  // instant précis.
+  if (diff === 0 && remaining === 1) return pre
+
+  // ── Projection Poisson : buts espérés (λ) mis à l'échelle du temps
+  // restant, combinés au score actuel — voir le commentaire détaillé au-
+  // dessus de poissonOutcomesFromDiff/fitLambdasToPreMatch. λ RÉELS (mesurés
+  // sur la saison) quand dispo, sinon la MÊME info que `pre` juste
+  // reformulée en taux de buts.
+  const goalModel = (homeId != null && awayId != null) ? buildGoalModel(compMatches) : null
+  const measuredLambdas = goalModel ? computeLambdas(goalModel, homeId, awayId) : null
+  const { lambdaHome, lambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+
+  const proj = poissonOutcomesFromDiff(lambdaHome * remaining, lambdaAway * remaining, diff)
+  let home = proj.home * 100
+  let draw = proj.draw * 100
+  let away = proj.away * 100
 
   // ── Ajustements "pression" (retour utilisateur : prendre en compte les
   // cartons rouges/la possession/les tirs cadrés, pas juste le score brut)
-  // ── un carton rouge est un facteur de jeu majeur (supériorité numérique),
+  // — un carton rouge est un facteur de jeu majeur (supériorité numérique),
   // pondéré nettement plus fort que possession/tirs cadrés (simples
   // indicateurs de "qui domine" à l'instant T, pas de finalité). Toujours
   // borné pour ne jamais, à eux seuls, écraser complètement une issue —
   // distribute() (plus bas) garde de toute façon un plancher de 5% par
-  // issue. Appliqué sur `now` (le "si ça se terminait maintenant"), avant le
-  // blend avec `pre` — remaining fait déjà décroître son poids en fin de
-  // match comme le reste de `now`.
+  // issue. Ces signaux (cartons/possession/tirs/corners) n'ont pas
+  // d'équivalent dans le modèle Poisson buts marqués/encaissés pré-match —
+  // appliqués ici en ajustement direct sur le résultat de la projection,
+  // logique de pondération inchangée (déjà éprouvée, testée ci-dessous).
   let swing = 0
   const redDiff = (awayRedCards ?? 0) - (homeRedCards ?? 0)   // >0 = domicile en supériorité numérique
   swing += Math.max(-2, Math.min(2, redDiff)) * 14            // jusqu'à ±28 pts pour 2 cartons d'écart
@@ -581,34 +691,17 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     swing += Math.max(-6, Math.min(6, (homeCorners - awayCorners) * 0.8))
   }
   if (swing !== 0) {
-    now = {
-      home: Math.max(1, now.home + swing),
-      draw: now.draw,
-      away: Math.max(1, now.away - swing),
-    }
+    home = Math.max(1, home + swing)
+    away = Math.max(1, away - swing)
   }
 
-  // Blend : à la mi-temps (remaining ~0.5) les deux comptent autant, en fin
-  // de match "now" écrase le prior, au coup d'envoi (remaining=1) diff vaut
-  // toujours 0 donc pre === now de toute façon.
-  let home = pre.home * remaining + now.home * (1 - remaining)
-  let draw = pre.draw * remaining + now.draw * (1 - remaining)
-  let away = pre.away * remaining + now.away * (1 - remaining)
-
-  // Contrainte structurelle (bug réel signalé par l'utilisateur — France
-  // favorite pré-match, menée 0-3 par l'Angleterre : cote nul 6,74 mais cote
-  // victoire France 3,37, la victoire ressortait donc PLUS probable que le
-  // nul) : revenir au score demande de combler l'écart de buts, gagner
-  // demande de le combler ET de le dépasser d'au moins un but — donc
-  // toujours au moins aussi difficile que le nul, jamais plus facile. Le
-  // blend linéaire ci-dessus peut casser cette contrainte quand le prior
-  // pré-match était très favorable à l'équipe désormais menée (son avantage
-  // "victoire" d'avant-match ne s'efface pas aussi vite que son avantage
-  // "nul", qui était déjà proche de son plancher pré-match). On ne
-  // retouche pas le blend lui-même (garderait le même défaut structurel dans
-  // d'autres cas) : on plafonne juste la proba de victoire de l'équipe menée
-  // à celle du nul, l'excédent revenant à l'équipe qui mène (c'est cette
-  // probabilité-là que le blend sous-évaluait).
+  // Garde-fou mathématique (belt and suspenders) : une projection Poisson
+  // sur des λ réalistes ne peut normalement pas produire une victoire plus
+  // probable qu'un nul pour l'équipe menée (voir commentaire au-dessus de
+  // poissonOutcomesFromDiff) — gardé quand même en dernier recours après les
+  // ajustements "pression" ci-dessus (eux ne sont PAS contraints par la
+  // même logique Poisson, un gros swing pourrait en théorie repousser home
+  // au-dessus de draw même en étant mené).
   if (diff < 0 && home > draw) {
     away += home - draw
     home = draw
