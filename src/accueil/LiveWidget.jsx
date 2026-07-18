@@ -47,6 +47,10 @@ function LiveChip({ match, espn, onMatchClick }) {
 }
 
 export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) {
+  // Une seule valeur, utilisée de façon cohérente pour tout ce render (pas de
+  // risque d'incohérence interne) — recalculée naturellement à chaque poll
+  // live suivant, pas besoin de plus fréquent ici.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now()
   // ⚠️ BUG CORRIGÉ (demande utilisateur) : un match "Terminé" restait affiché ici
   // avec le dégradé de couleurs équipes (getMatchGradient dans MatchCard) pendant

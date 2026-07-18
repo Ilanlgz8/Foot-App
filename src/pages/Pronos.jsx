@@ -564,6 +564,12 @@ function Pronos() {
   }, [finished, justFinished])
 
   const recentFinished = useMemo(() => {
+    // Fenêtre d'affichage très large (27h) : la "fraîcheur" de `now` n'a
+    // d'importance qu'à la marge (borne re-testée à chaque refetch React
+    // Query de `finished`/`justFinished`, qui fait varier `finishedAll` de
+    // toute façon) — pas de ticker dédié nécessaire ici, contrairement au
+    // countdown mi-temps (Live.jsx) qui a besoin de la seconde/minute près.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
     return finishedAll
       .filter(m => now - new Date(m.utcDate).getTime() < FINISHED_DISPLAY_MS)

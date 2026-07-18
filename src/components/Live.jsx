@@ -128,7 +128,10 @@ function LiveCard({ match, espn, onClick }) {
   const minute = isTermine ? null : calcMinute(match)
   // Reprise : match en pause selon FD.org OU ESPN → déclenche le compte à rebours
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
+  // Une seule valeur, utilisée de façon cohérente pour tout ce render — le
+  // ticker 5s ci-dessus force le prochain recalcul, pas besoin de plus.
   const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
+    // eslint-disable-next-line react-hooks/purity
     ? Date.now() - matchSt.pausedAt : null
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000

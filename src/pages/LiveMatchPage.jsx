@@ -138,7 +138,10 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const compName = comp?.name ?? match.competition?.name ?? ''
 
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
+  // Une seule valeur, utilisée de façon cohérente pour tout ce render (même
+  // pattern que Live.jsx/MatchCard.jsx) — recalculée au prochain re-render live.
   const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
+    // eslint-disable-next-line react-hooks/purity
     ? Date.now() - matchSt.pausedAt : null
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000

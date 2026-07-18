@@ -265,7 +265,12 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       writeCache(key, merged, ttl)
       return merged
     },
-    initialData:          filterUpcomingWindow(cachedData, Date.now(), windowMs),
+    // Forme fonction (déjà utilisée dans useEspnScores.js) plutôt qu'une valeur
+    // calculée directement dans le corps du hook : Date.now() n'est alors appelé
+    // que quand React Query en a réellement besoin (1ère fois pour cette
+    // queryKey), pas à chaque render — résout l'appel impur pendant le render
+    // sans changer le résultat.
+    initialData:          () => filterUpcomingWindow(cachedData, Date.now(), windowMs),
     initialDataUpdatedAt: cachedAt,
     staleTime: ttl,
     retry: false,

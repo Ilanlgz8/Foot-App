@@ -425,6 +425,10 @@ function Accueil() {
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
+    // IIFE appelée directement dans le corps du render (pas mémoïsée) : cette
+    // valeur est donc fraîche à chaque render, contrairement au cas Pronos.jsx
+    // (mémoïsé avec des deps étroites) — aucun risque de péremption ici.
+    // eslint-disable-next-line react-hooks/purity
     const now4h = Date.now() - 4 * 60 * 60_000
     // resultsSourceMatches (aujourd'hui absolu + hier) — PAS `matches`, qui dépend
     // de dayOffset : sinon ce panneau se vide/réapparaît selon le jour affiché
