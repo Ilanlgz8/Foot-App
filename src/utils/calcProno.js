@@ -697,7 +697,38 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // reformulée en taux de buts.
   const goalModel = (homeId != null && awayId != null) ? buildGoalModel(compMatches) : null
   const measuredLambdas = goalModel ? computeLambdas(goalModel, homeId, awayId) : null
-  const { lambdaHome: baseLambdaHome, lambdaAway: baseLambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+  const { lambdaHome: rawLambdaHome, lambdaAway: rawLambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+
+  // ── Correctif surconfiance EN DIRECT (retour utilisateur : "pour l'équipe
+  // favorite à la base... je trouve qu'on est un peu trop sévère sur les
+  // côtes quand elle perd, même si le match se rapproche de la fin") ──
+  // Le backtest PL 2024-25 (voir BASE_RATE/SHRINK plus haut) a mesuré que le
+  // moteur buts marqués/encaissés (calcPronoAdvanced, celui qui calcule
+  // lambdaHome/lambdaAway ci-dessus) surestime sa confiance aux extrêmes
+  // (un pronostic annoncé 60-70% ne se vérifiait en réalité qu'à 51,4%).
+  // Cette correction (shrinkTowardBase/SHRINK) n'est appliquée QU'au
+  // pré-match — jamais ici en direct, sous prétexte que le score réel
+  // justifie plus de confiance. C'est vrai POUR LE SCORE lui-même (une
+  // vraie donnée, pas une prédiction), mais le moteur qui projette le TEMPS
+  // RESTANT reste exactement le même moteur dont le biais a été mesuré — le
+  // direct hérite donc probablement du même biais, sans jamais le corriger.
+  // Fix ciblé : on resserre l'ÉCART entre lambdaHome et lambdaAway (pas leur
+  // somme — le total de buts attendus, qui pilote la vraisemblance d'un nul
+  // en fin de match avec peu de temps restant, reste intact et légitime,
+  // voir poissonOutcomesFromDiff) vers leur moyenne. Ne touche donc QUE la
+  // partie du calcul liée à l'écart de force entre équipes (exactement ce
+  // que le backtest a trouvé trop confiant), sans affaiblir la certitude
+  // légitime d'un nul quand il ne reste presque plus de temps.
+  // ⚠️ LIVE_LAMBDA_SHRINK choisi par raisonnement (un peu plus léger que le
+  // SHRINK=0.18 du pré-match : une partie du signal a déjà été atténuée en
+  // amont — RATIO_SHRINK_K pour les λ mesurés sur la saison, le shrink du
+  // pré-match lui-même pour les λ reconstruits via fitLambdasToPreMatch),
+  // PAS re-testé sur un vrai backtest en direct (aucun n'existe à ce jour
+  // pour calcLiveProno) — à vérifier si un backtest live devient possible.
+  const LIVE_LAMBDA_SHRINK = 0.15
+  const lambdaAvg = (rawLambdaHome + rawLambdaAway) / 2
+  const baseLambdaHome = rawLambdaHome * (1 - LIVE_LAMBDA_SHRINK) + lambdaAvg * LIVE_LAMBDA_SHRINK
+  const baseLambdaAway = rawLambdaAway * (1 - LIVE_LAMBDA_SHRINK) + lambdaAvg * LIVE_LAMBDA_SHRINK
 
   // Rythme RÉEL de CE match (retour utilisateur : "4-3 à la 70e, la cote de
   // l'équipe menée d'1 seul but est à 18, pas cohérent, l'équipe est
