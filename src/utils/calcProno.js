@@ -710,5 +710,31 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     away = draw
   }
 
-  return distribute(home, away, draw)
+  const result = distribute(home, away, draw)
+
+  // Retour utilisateur (à raison) : "tu peux pas mettre la même cote pour
+  // match nul et victoire de l'équipe qui perd, ça a aucun sens" — le
+  // garde-fou ci-dessus égalise déjà home/draw (ou away/draw) sur les
+  // valeurs BRUTES (float), mais le plancher d'affichage à 5% de
+  // distribute() peut ensuite arrondir DEUX valeurs distinctes (ex. 0.6%
+  // et 1.8%) au MÊME entier (5%), effaçant leur différence — victoire et
+  // nul ressortent identiques à l'écran alors que gagner reste
+  // structurellement plus dur que faire nul. Corrigé après coup, sur le
+  // résultat déjà arrondi : si l'égalité survit, un point est repris sur la
+  // victoire (jamais sous 1%) et rendu à l'équipe qui mène — la cote de
+  // victoire de l'équipe menée reste ainsi TOUJOURS strictement plus haute
+  // (moins probable) que celle du nul, jamais identique.
+  if (diff < 0 && result.home >= result.draw) {
+    const target = Math.max(1, result.draw - 1)
+    const shift  = result.home - target
+    result.home = target
+    result.away += shift
+  } else if (diff > 0 && result.away >= result.draw) {
+    const target = Math.max(1, result.draw - 1)
+    const shift  = result.away - target
+    result.away = target
+    result.home += shift
+  }
+
+  return result
 }

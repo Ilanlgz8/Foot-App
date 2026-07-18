@@ -327,6 +327,19 @@ describe('calcLiveProno', () => {
     expect(live.home).toBeGreaterThanOrEqual(live.draw)
   })
 
+  it('menée au score, la cote de victoire de l\'équipe qui perd n\'est jamais affichée identique à la cote du nul (bug réel signalé : arrondi du plancher à 5% pouvait faire ressortir home:5/draw:5 malgré une réalité statistique différente)', () => {
+    // Sur toute la 2ème mi-temps, le floor à 5% de distribute() ne doit
+    // jamais faire remonter l'équipe menée au niveau du nul — l'inégalité
+    // stricte (perdre est structurellement moins probable qu'un nul quand
+    // on est mené) doit survivre à l'arrondi affiché, pas seulement au
+    // calcul flottant interne.
+    for (const minute of ["45'", "60'", "75'", "89'"]) {
+      const live = calcLiveProno(homeForm, awayForm, 0, 3, minute)
+      expect(sumsTo100(live)).toBe(true)
+      expect(live.home).toBeLessThan(live.draw)
+    }
+  })
+
   it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {
     const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
     const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 1 })
