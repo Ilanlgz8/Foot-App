@@ -10,6 +10,21 @@ export const isEspnWorking  = ()  => _espnWorking
 
 const key = (id) => `foot_ms_${id}`
 
+// Lecture protégée de l'état stocké — un localStorage corrompu (écriture
+// interrompue, quota dépassé, format d'une ancienne version de l'app...)
+// ferait planter JSON.parse() sans catch ; comme getMatchState() est appelé
+// dans le chemin chaud de quasiment tous les composants live (MatchCard,
+// Live.jsx, LiveMatchPage.jsx, MatchPage.jsx, useLiveMinute.js...), une seule
+// entrée corrompue pour un match aurait fait planter son affichage partout.
+// Repli sûr : état vide, comme si le match n'avait encore jamais été suivi.
+function readState(id) {
+  try {
+    return JSON.parse(localStorage.getItem(key(id)) || '{}')
+  } catch {
+    return {}
+  }
+}
+
 // Auto-nettoyage au chargement : supprimer les états 'ended' de plus de 3h
 // (ils bloquent la ré-injection si ESPN revient — inutile après 3h)
 try {
@@ -38,7 +53,7 @@ try {
  */
 export function getLiveState(matchId) {
   try {
-    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    const stored = readState(matchId)
     return {
       state:   stored.liveState    ?? 'unknown',
       since:   stored.pendingEndSince ?? null,
@@ -60,7 +75,7 @@ export function getLiveState(matchId) {
 export function setLiveState(matchId, state, { since, endedAt } = {}) {
   if (!matchId) return
   try {
-    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    const stored = readState(matchId)
     stored.liveState = state
 
     if (state === 'pendingEnd') {
@@ -90,7 +105,7 @@ export function setLiveState(matchId, state, { since, endedAt } = {}) {
  */
 export function trackMatchState(match, pausedAtOverride) {
   if (!match?.id) return
-  const stored = JSON.parse(localStorage.getItem(key(match.id)) || '{}')
+  const stored = readState(match.id)
 
   if (match.status === 'PAUSED' && !stored.pausedAt) {
     stored.pausedAt = pausedAtOverride ?? Date.now()
@@ -103,7 +118,7 @@ export function trackMatchState(match, pausedAtOverride) {
  */
 export function setHalf2Start(matchId, half2Start) {
   if (!matchId) return
-  const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+  const stored = readState(matchId)
   stored.half2Start = half2Start
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
@@ -113,7 +128,7 @@ export function setHalf2Start(matchId, half2Start) {
  */
 export function setKickoffAt(matchId, kickoffAt) {
   if (!matchId) return
-  const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+  const stored = readState(matchId)
   if (stored.kickoffAt) return
   stored.kickoffAt = kickoffAt
   localStorage.setItem(key(matchId), JSON.stringify(stored))
@@ -124,7 +139,7 @@ export function setKickoffAt(matchId, kickoffAt) {
  */
 export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
   if (!matchId) return
-  const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+  const stored = readState(matchId)
   stored.espnClock      = espnClock
   stored.espnStatus     = espnStatus
   stored.espnCapturedAt = Date.now()
@@ -136,7 +151,7 @@ export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
  * Retourne toutes les données mémorisées pour un match.
  */
 export function getMatchState(matchId) {
-  return JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+  return readState(matchId)
 }
 
 // ── Fenêtre de grâce "Terminé" ──────────────────────────────────────────────
@@ -170,7 +185,7 @@ export function isRecentlyFinished(matchId, graceMs = TERMINE_GRACE_MS) {
 export function clearFtFlags(matchId) {
   if (!matchId) return
   try {
-    const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+    const stored = readState(matchId)
     if (!stored.ft && !stored.termineAt) return  // rien à faire
     delete stored.ft
     delete stored.termineAt
@@ -189,7 +204,7 @@ export function clearFtFlags(matchId) {
 export function clearMatchState(matchId, { preserveEnded = false } = {}) {
   if (preserveEnded) {
     try {
-      const stored = JSON.parse(localStorage.getItem(key(matchId)) || '{}')
+      const stored = readState(matchId)
       if (stored.liveState === 'ended') {
         // Garder uniquement l'info de fin — efface kickoffAt, pausedAt, espnClock, ft, etc.
         localStorage.setItem(key(matchId), JSON.stringify({

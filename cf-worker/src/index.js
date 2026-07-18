@@ -58,6 +58,21 @@ const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 
 function t(name) { return TEAM_NAMES_FR[name] ?? name }
 
+// Lecture protégée d'une valeur Redis censée être du JSON (goalTrack/cardTrack) :
+// une entrée corrompue (aléa réseau/Upstash, ancien format, tampering externe)
+// ferait planter JSON.parse() — rattrapé plus haut par le try/catch par-match
+// (ligne ~246, "ERREUR match ignoré"), mais ça bloquerait alors TOUTES les
+// notifs de but/carton pour ce match jusqu'à expiration du TTL (12h). Avec ce
+// repli, une valeur corrompue redémarre juste le compteur à 0 pour cette passe
+// au lieu de black-lister le match pendant des heures.
+function safeJsonParse(raw, fallback) {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return fallback
+  }
+}
+
 async function fetchEspnEvents(slug, date, log) {
   try {
     const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}&limit=100`, {
@@ -398,7 +413,7 @@ async function runOnePass(env) {
         log.push(`[espn:${slug}:${eventId}] verrou but déjà pris — passe suivante`)
       } else {
         let track = rawTrack
-        track = track ? (typeof track === 'string' ? JSON.parse(track) : track) : { home, away }
+        track = track ? (typeof track === 'string' ? safeJsonParse(track, { home, away }) : track) : { home, away }
 
         const sides = []
         if (home > track.home) sides.push('home')
@@ -465,7 +480,7 @@ async function runOnePass(env) {
       const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
 
       let cardTrack = rawCardTrack
-      cardTrack = cardTrack ? (typeof cardTrack === 'string' ? JSON.parse(cardTrack) : cardTrack) : { home: 0, away: 0 }
+      cardTrack = cardTrack ? (typeof cardTrack === 'string' ? safeJsonParse(cardTrack, { home: 0, away: 0 }) : cardTrack) : { home: 0, away: 0 }
       let cardTrackChanged = false
 
       for (const side of ['home', 'away']) {
