@@ -197,7 +197,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
     if (hs != null && as_ != null) {
       try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
     }
-  }, [hs, as_])
+  }, [hs, as_, scoreKey])
 
   const gradient = getMatchGradient(
     match.homeTeam?.name || match.homeTeam?.shortName || '',

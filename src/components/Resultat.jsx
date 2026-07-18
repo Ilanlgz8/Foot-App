@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
@@ -302,23 +302,26 @@ function Resultats() {
   }
 
   // Recherche — filtre côté client par nom d'équipe (traduit ou brut).
-  function matchesTeamSearch(team) {
+  // useCallback avec [searchNorm] : référence stable tant que la recherche ne
+  // change pas (la fonction ne dépend réellement que de ça), utilisable sans
+  // risque dans les deux useMemo ci-dessous (pas d'invalidation à chaque render).
+  const matchesTeamSearch = useCallback((team) => {
     if (!searchNorm) return true
     const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
     const raw         = (team?.name ?? '').toLowerCase()
     return translated.includes(searchNorm) || raw.includes(searchNorm)
-  }
+  }, [searchNorm])
   // En recherche, on ignore le découpage par journée : on cherche sur
   // TOUS les résultats de la compétition (sinon une équipe absente de la
   // journée affichée semblerait n'avoir aucun résultat).
   const filteredMatches = useMemo(
     () => matches.filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam)),
-    [matches, searchNorm]
+    [matches, matchesTeamSearch]
   )
   const filteredWcGroups = useMemo(() => {
     if (!searchNorm) return wcGroups
     return wcGroups.filter(g => groupTeams(matchesByGroup.get(g) ?? []).some(matchesTeamSearch))
-  }, [wcGroups, searchNorm, matchesByGroup])
+  }, [wcGroups, searchNorm, matchesByGroup, matchesTeamSearch])
 
   return (
     <section className="resultats">

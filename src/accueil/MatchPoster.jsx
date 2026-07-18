@@ -201,6 +201,12 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
     // Mise à jour chaque minute (le décompte est en minutes)
     const id = setInterval(compute, 60_000)
     return () => clearInterval(id)
+    // match.id (stable, jamais réassigné) sert de proxy volontaire pour tout le
+    // reste de `match` utilisé dans compute() (match.utcDate = coup d'envoi prévu,
+    // fixe pour un match donné). Dépendre de `match` en entier redéclencherait cet
+    // effet — et recréerait le setInterval — à chaque poll live (nouvel objet à
+    // chaque update de score), sans que le countdown mi-temps n'en ait besoin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMinute, match.id])
 
   return (

@@ -207,6 +207,12 @@ function LiveCard({ match, espn, onClick }) {
     if (hs != null && as_ != null) {
       try { localStorage.setItem(scoreKey, JSON.stringify({ home: hs, away: as_ })) } catch {}
     }
+    // Deps volontairement restreintes (même raison que MatchCard.jsx) : détection
+    // "le score vient d'augmenter" via comparaison à prevHs/prevAs.current, ne doit
+    // se déclencher QUE sur un vrai changement de score/statut live — ajouter les
+    // noms d'équipe redéclencherait l'effet sans nouveau but, sans les rendre plus
+    // à jour (déjà lus via closure au bon moment).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hs, as_, isLive])
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
