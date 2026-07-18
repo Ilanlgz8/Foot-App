@@ -458,6 +458,20 @@ function Accueil() {
     // de dayOffset : sinon ce panneau se vide/réapparaît selon le jour affiché
     // dans "Matchs" (bug signalé : le match disparaît quand on va sur "Demain").
     const todayFt = resultsSourceMatches.filter(m => {
+      // ⚠️ Bug réel signalé : score figé (3-5 au lieu de 4-6, buts marqués après
+      // le FT ESPN mal détecté) alors que la page Résultat (Resultat.jsx) affichait
+      // le bon score. Root cause : une fois FD.org a lui-même confirmé le match
+      // FINISHED (score officiel, forcément à jour), ce panneau continuait quand
+      // même à écraser le score avec le snapshot localStorage foot_espn_ figé au
+      // moment précis de la confirmation FT locale (lsHome/lsAway ci-dessous,
+      // jamais rafraîchi ensuite) — cet override prioritaire (`lsHome ?? m.score...`)
+      // ignorait purement et simplement toute mise à jour FD.org ultérieure, même
+      // plus fraîche/exacte. Resultat.jsx n'a pas ce bug car il exclut de son
+      // override tout match déjà connu de fdMatches (voir `known` là-bas) — même
+      // logique reproduite ici : si FD.org a déjà le match en FINISHED, on fait
+      // confiance à SA version (déjà dans results/filteredResults plus bas), on
+      // n'applique plus jamais le patch local dessus.
+      if (m.status === 'FINISHED') return false
       const st = getMatchState(m.id)
       // ft (confirmé par ESPN) prime toujours, même si liveTracker garde encore
       // le match dans liveMatches (grâce period de 5min avant éviction) — sinon

@@ -528,8 +528,17 @@ function Pronos() {
   // valeur persistée par confirmFt (foot_espn_${id}) — mêmes deux sources
   // que resultPanel.
   const justFinished = useMemo(() => {
+    // ⚠️ Même bug réel que resultPanel dans Accueil.jsx (score figé 3-5 au lieu
+    // de 4-6, buts marqués après un FT ESPN mal détecté) : tant qu'un match
+    // reste dans liveMatches (grâce period 5min post-confirmFt), il passait ici
+    // en priorité sur `finished` (FD.org) même une fois FD.org lui-même à jour
+    // avec un score plus frais/exact — le snapshot localStorage foot_espn_ figé
+    // au moment du FT local ne se rafraîchit jamais. On exclut donc tout match
+    // déjà connu de `finished` : dans ce cas la version FD.org (fraîche, voir
+    // finishedAll plus bas) prend le relais automatiquement.
+    const finishedIds = new Set(finished.map(m => String(m.id)))
     return liveMatches
-      .filter(m => getMatchState(m.id).ft === true)
+      .filter(m => getMatchState(m.id).ft === true && !finishedIds.has(String(m.id)))
       .map(m => {
         const es = espnScores[m.id]
         let lsHome = null, lsAway = null
@@ -554,7 +563,7 @@ function Pronos() {
           status: 'FINISHED',
         }
       })
-  }, [liveMatches, espnScores])
+  }, [liveMatches, espnScores, finished])
 
   // Fusion : matchs "pontés" en priorité (score le plus frais), puis le
   // reste de `finished` (football-data.org) sans doublon.
