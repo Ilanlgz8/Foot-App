@@ -108,11 +108,24 @@ async function run() {
   let nScored  = 0
   let correctFavorite = 0
   // Calibration : 10 tranches de probabilité (0-10%, 10-20%, ... 90-100%)
-  // pour l'issue "domicile gagne" — dans chaque tranche, la fréquence
-  // réelle de victoires domicile devrait être proche du milieu de la
-  // tranche si le modèle est bien calibré.
-  const buckets = Array.from({ length: 10 }, () => ({ predictedSum: 0, actualWins: 0, n: 0 }))
+  // — une par issue (domicile/nul/extérieur). Jusqu'ici on ne vérifiait QUE
+  // "domicile gagne" (constat utilisateur : le nul et l'extérieur semblent
+  // trop proches l'un de l'autre dans les cotes affichées — BASE_RATE a
+  // draw=27/away=28, quasi identiques, donc le shrinkage rapproche
+  // mécaniquement le nul et l'extérieur l'un de l'autre quel que soit
+  // l'écart calculé par le modèle brut ; jamais vérifié empiriquement si
+  // c'est fondé ou si ça sur-aplati une vraie différence). Dans chaque
+  // tranche, la fréquence réelle de l'issue devrait être proche du milieu
+  // de la tranche si le modèle est bien calibré.
+  const bucketsHome = Array.from({ length: 10 }, () => ({ predictedSum: 0, actualWins: 0, n: 0 }))
+  const bucketsDraw = Array.from({ length: 10 }, () => ({ predictedSum: 0, actualWins: 0, n: 0 }))
+  const bucketsAway = Array.from({ length: 10 }, () => ({ predictedSum: 0, actualWins: 0, n: 0 }))
   let fellBackToBase = 0
+  // Diagnostic ciblé : matchs où le modèle Poisson (couche buts marqués/
+  // encaissés, PAS la forme récente ni le H2H) prédit déjà 50%+ de victoire
+  // extérieure — pour voir si le biais de surconfiance observé sur cette
+  // tranche vient du Poisson brut ou du mélange H2H qui suit.
+  const awayHighDebug = []
 
   for (const match of finished) {
     const homeId = match.homeTeam?.id
@@ -133,9 +146,27 @@ async function run() {
     const aForm = recentForm(awayId, finished, matchDate)
 
     const before = calcProno(hForm, aForm)
-    const pred   = calcPronoAdvanced(homeId, awayId, priorMatches, hForm, aForm)
+    // debug:true — voir doc calcPronoAdvanced (calcProno.js) : ajoute _debug
+    // (poisson brut / après H2H / échantillon dispo) sans rien changer au
+    // calcul lui-même. Utilisé ci-dessous pour diagnostiquer PRÉCISÉMENT quelle
+    // couche cause le biais de surconfiance "extérieur" à 50%+ (constat
+    // utilisateur : la forme/l'historique jouent-ils un rôle, ou est-ce le
+    // modèle buts marqués/encaissés seul ?) plutôt que de deviner un correctif.
+    const pred = calcPronoAdvanced(homeId, awayId, priorMatches, hForm, aForm, { debug: true })
     if (pred.home === before.home && pred.draw === before.draw && pred.away === before.away) {
       fellBackToBase++
+    }
+
+    if (pred.away >= 50 && pred._debug?.path === 'poisson') {
+      awayHighDebug.push({
+        finalAway:   pred.away,
+        poissonAway: pred._debug.poisson.away,
+        afterH2HAway: pred._debug.afterH2H.away,
+        h2hCount:    pred._debug.h2hCount,
+        hCount:      pred._debug.homeAwaySplits.hCount,
+        aCount:      pred._debug.homeAwaySplits.aCount,
+        actual,
+      })
     }
 
     // Brier score multi-classe : somme des (prédit - réel)^2 sur les 3 issues.
@@ -148,10 +179,20 @@ async function run() {
       : pred.away >= pred.draw ? 'away' : 'draw'
     if (favorite === actual) correctFavorite++
 
-    const bucketIdx = Math.min(9, Math.floor(pred.home / 10))
-    buckets[bucketIdx].predictedSum += pred.home
-    buckets[bucketIdx].actualWins   += actual === 'home' ? 1 : 0
-    buckets[bucketIdx].n++
+    const homeIdx = Math.min(9, Math.floor(pred.home / 10))
+    bucketsHome[homeIdx].predictedSum += pred.home
+    bucketsHome[homeIdx].actualWins   += actual === 'home' ? 1 : 0
+    bucketsHome[homeIdx].n++
+
+    const drawIdx = Math.min(9, Math.floor(pred.draw / 10))
+    bucketsDraw[drawIdx].predictedSum += pred.draw
+    bucketsDraw[drawIdx].actualWins   += actual === 'draw' ? 1 : 0
+    bucketsDraw[drawIdx].n++
+
+    const awayIdx = Math.min(9, Math.floor(pred.away / 10))
+    bucketsAway[awayIdx].predictedSum += pred.away
+    bucketsAway[awayIdx].actualWins   += actual === 'away' ? 1 : 0
+    bucketsAway[awayIdx].n++
   }
 
   if (nScored === 0) {
@@ -164,21 +205,44 @@ async function run() {
   console.log(`  Repères : 0 = parfait, 0.667 = un modèle "33/33/33 toujours" (aucune info), plus bas = mieux.\n`)
   console.log(`Favori du modèle a gagné : ${((correctFavorite / nScored) * 100).toFixed(1)}% des matchs\n`)
 
-  console.log('Calibration (issue "domicile gagne") — % prédit moyen vs % réel observé par tranche :')
-  console.log('tranche     n   % prédit moyen   % réel observé   écart')
-  buckets.forEach((b, i) => {
-    if (b.n === 0) return
-    const predAvg = b.predictedSum / b.n
-    const realPct = (b.actualWins / b.n) * 100
-    const gap = realPct - predAvg
-    console.log(
-      `${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)}%  ${String(b.n).padStart(3)}   `
-      + `${predAvg.toFixed(1).padStart(6)}%          ${realPct.toFixed(1).padStart(6)}%        `
-      + `${gap >= 0 ? '+' : ''}${gap.toFixed(1)}`
-    )
-  })
+  function printCalibration(label, buckets) {
+    console.log(`\nCalibration (issue "${label}") — % prédit moyen vs % réel observé par tranche :`)
+    console.log('tranche     n   % prédit moyen   % réel observé   écart')
+    buckets.forEach((b, i) => {
+      if (b.n === 0) return
+      const predAvg = b.predictedSum / b.n
+      const realPct = (b.actualWins / b.n) * 100
+      const gap = realPct - predAvg
+      console.log(
+        `${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)}%  ${String(b.n).padStart(3)}   `
+        + `${predAvg.toFixed(1).padStart(6)}%          ${realPct.toFixed(1).padStart(6)}%        `
+        + `${gap >= 0 ? '+' : ''}${gap.toFixed(1)}`
+      )
+    })
+  }
+
+  printCalibration('domicile gagne', bucketsHome)
+  printCalibration('nul',            bucketsDraw)
+  printCalibration('extérieur gagne', bucketsAway)
+
   console.log('\nSi "% réel observé" colle bien à "% prédit moyen" tranche par tranche, le modèle est bien calibré.')
   console.log('Un écart systématique dans un sens (toujours + ou toujours -) indiquerait un biais à corriger.')
+
+  // ── Diagnostic ciblé : d'où vient la surconfiance "extérieur" 50%+ ? ─────
+  if (awayHighDebug.length > 0) {
+    const n = awayHighDebug.length
+    const avg = key => awayHighDebug.reduce((s, d) => s + d[key], 0) / n
+    const actualAwayPct = (awayHighDebug.filter(d => d.actual === 'away').length / n) * 100
+    console.log(`\n── Diagnostic : matchs où le Poisson brut (buts marqués/encaissés, AVANT H2H et AVANT shrink) prédit déjà 50%+ extérieur (n=${n}) ──`)
+    console.log(`Poisson brut (extérieur)      : ${avg('poissonAway').toFixed(1)}%`)
+    console.log(`Après mélange H2H             : ${avg('afterH2HAway').toFixed(1)}%`)
+    console.log(`Final (après shrink affiché)  : ${avg('finalAway').toFixed(1)}%`)
+    console.log(`Réel observé                  : ${actualAwayPct.toFixed(1)}%`)
+    console.log(`Échantillon moyen équipe domicile (matchs domicile dispo) : ${avg('hCount').toFixed(1)}`)
+    console.log(`Échantillon moyen équipe extérieur (matchs extérieur dispo) : ${avg('aCount').toFixed(1)}`)
+    console.log('\nSi "Poisson brut" est déjà proche de "Final", le biais vient du modèle buts marqués/encaissés lui-même (pas du H2H).')
+    console.log('Si les échantillons domicile/extérieur sont petits (proches de MIN_TEAM_SPLITS=2), ça pointe vers des estimations bruitées par manque de matchs.')
+  }
 }
 
 run().catch(e => { console.error('Erreur :', e.message); process.exit(1) })

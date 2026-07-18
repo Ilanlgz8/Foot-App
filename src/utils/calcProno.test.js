@@ -104,6 +104,50 @@ describe('calcPronoAdvanced — modèle buts/Poisson', () => {
   })
 })
 
+describe('calcPronoAdvanced — shrinkage des ratios attaque/défense (petit échantillon)', () => {
+  // Diagnostic backtest (PL/PD/FL1 saison 2025/26, scripts/backtest-prono.mjs
+  // mode debug) : cote "extérieur gagne" 50%+ trop confiante, biais déjà présent
+  // dans le Poisson brut à un échantillon ~9 matchs/équipe — PAS un problème de
+  // H2H (qui ne bouge quasi rien) ni d'échantillon anormalement petit (9 est
+  // bien au-dessus de MIN_TEAM_SPLITS=2). Cause : les ratios attaque/défense
+  // (buts observés / moyenne ligue) sont multipliés entre eux sans être
+  // eux-mêmes ramenés vers la moyenne selon la taille de l'échantillon — le
+  // bruit de chaque ratio se compose au lieu de se lisser. Ces tests vérifient
+  // que le correctif (shrinkRatio, calcProno.js) fait bien ce qui est attendu :
+  // moins confiant à échantillon minimal, de plus en plus confiant à mesure que
+  // l'échantillon grandit, sans jamais inverser le sens du favori.
+  function buildFixture(splitsPerTeam) {
+    const compMatches = []
+    for (let i = 0; i < splitsPerTeam; i++) {
+      compMatches.push(finished('t1', 't2', 1, 1), finished('t2', 't1', 1, 1))
+      compMatches.push(finished('t3', 't4', 1, 1), finished('t4', 't3', 1, 1))
+      compMatches.push(finished('strong', 't1', 3, 0))
+      compMatches.push(finished('t3', 'strong', 0, 3))
+      compMatches.push(finished('weak', 't1', 0, 3))
+      compMatches.push(finished('t3', 'weak', 3, 0))
+    }
+    return compMatches
+  }
+
+  it('reste favorable à l\'équipe forte mais de façon plus mesurée à échantillon minimal (2 matchs, plancher MIN_TEAM_SPLITS)', () => {
+    const p = calcPronoAdvanced('strong', 'weak', buildFixture(2), [], [])
+    expect(sumsTo100(p)).toBe(true)
+    expect(p.home).toBeGreaterThan(p.away)
+    // Toujours favori, mais nettement moins tranché qu'avec un échantillon
+    // confortable (voir test suivant) — la confiance doit rester mesurée.
+    expect(p.home).toBeGreaterThan(50)
+    expect(p.home).toBeLessThan(75)
+  })
+
+  it('devient de plus en plus confiant à mesure que l\'échantillon grandit, à écart de force identique', () => {
+    const small = calcPronoAdvanced('strong', 'weak', buildFixture(2), [], [])
+    const medium = calcPronoAdvanced('strong', 'weak', buildFixture(4), [], [])
+    const large = calcPronoAdvanced('strong', 'weak', buildFixture(8), [], [])
+    expect(small.home).toBeLessThan(medium.home)
+    expect(medium.home).toBeLessThan(large.home)
+  })
+})
+
 describe('calcPronoAdvanced — confrontations directes (H2H)', () => {
   it('penche vers l\'équipe qui domine historiquement leurs confrontations directes', () => {
     // Mêmes stats offensives/défensives globales pour t1/t2 (via les matchs

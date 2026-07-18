@@ -251,6 +251,43 @@ function clampLambda(l) {
   return Math.min(5, Math.max(0.15, l))  // évite les extrêmes irréalistes sur petit échantillon
 }
 
+// ⚠️ Shrinkage des ratios attaque/défense vers 1.0 (équipe moyenne du
+// championnat), proportionnel à l'échantillon dispo — DIAGNOSTIQUÉ via
+// scripts/backtest-prono.mjs (mode debug) sur PL/PD/FL1 saison 2025/26
+// (constat utilisateur : cote "extérieur gagne" 50%+ trop confiante) :
+//   - le biais est DÉJÀ présent dans le Poisson brut, avant tout mélange H2H
+//     (H2H ne bouge quasi rien : 67.7%→68.5% sur PL) → pas la cause.
+//   - l'échantillon moyen (~9 matchs dom./ext. par équipe à ce stade de
+//     saison) n'est PAS anormalement petit (bien au-dessus du plancher
+//     MIN_TEAM_SPLITS=2) → un simple relèvement de ce plancher n'aurait rien
+//     corrigé, vérifié avant d'y toucher plutôt que deviné.
+// Cause réelle : attackHome/defenseHome/attackAway/defenseAway sont des
+// ratios "buts observés / moyenne ligue" pris tels quels, puis MULTIPLIÉS
+// entre eux dans lambda — sur un échantillon de quelques matchs, le bruit
+// d'échantillonnage sur chaque ratio (les buts sont des événements Poisson
+// rares, la variance reste élevée même à 9 matchs) se compose au lieu de se
+// moyenner, ce qui produit un lambda final bien plus extrême que ce que les
+// vraies forces des équipes justifient. Le shrink de sortie existant
+// (SHRINK=0.18, voir shrinkTowardBase) intervient trop tard dans le pipeline
+// pour corriger ça : il aplatit UNIFORMÉMENT la distribution finale, sans
+// rapport avec la fiabilité de CHAQUE ratio individuel qui a produit lambda.
+// Correctif : ramener chaque ratio vers 1.0 (équipe moyenne) à hauteur de
+// n/(n+RATIO_SHRINK_K) — avec n matchs réels, seul n/(n+K) du signal brut est
+// gardé, le reste retombe sur le neutre. K=8 : ~53% de confiance à 9 matchs
+// (notre échantillon moyen observé), ~65% à 15, quasi 100% à 40+ (fin de
+// saison, l'estimation redevient fiable). Appliqué symétriquement aux 4
+// ratios (pas seulement "extérieur") : le biais n'a aucune raison structurelle
+// de se limiter à l'issue extérieure, juste plus visible sur cette tranche
+// dans notre échantillon de diagnostic.
+// ⚠️ K=8 choisi par raisonnement (même ordre de grandeur que
+// MIN_LEAGUE_GAMES=10), PAS encore re-testé empiriquement après ce
+// changement — à vérifier en relançant scripts/backtest-prono.mjs.
+const RATIO_SHRINK_K = 8
+function shrinkRatio(ratio, n) {
+  const w = n / (n + RATIO_SHRINK_K)
+  return 1 + (ratio - 1) * w
+}
+
 // Buts attendus (λ) pour chaque équipe à partir de sa force d'attaque/
 // défense relative à la moyenne du championnat (modèle attaque×défense
 // classique, ex. Dixon-Coles simplifié).
@@ -260,10 +297,10 @@ function computeLambdas(goalModel, homeId, awayId) {
   if (!home || !away || home.hCount < MIN_TEAM_SPLITS || away.aCount < MIN_TEAM_SPLITS) return null
 
   const { leagueAvgHome, leagueAvgAway } = goalModel
-  const attackHome  = (home.hFor     / home.hCount) / leagueAvgHome
-  const defenseHome = (home.hAgainst / home.hCount) / leagueAvgAway
-  const attackAway  = (away.aFor     / away.aCount) / leagueAvgAway
-  const defenseAway = (away.aAgainst / away.aCount) / leagueAvgHome
+  const attackHome  = shrinkRatio((home.hFor     / home.hCount) / leagueAvgHome, home.hCount)
+  const defenseHome = shrinkRatio((home.hAgainst / home.hCount) / leagueAvgAway, home.hCount)
+  const attackAway  = shrinkRatio((away.aFor     / away.aCount) / leagueAvgAway, away.aCount)
+  const defenseAway = shrinkRatio((away.aAgainst / away.aCount) / leagueAvgHome, away.aCount)
 
   return {
     lambdaHome: clampLambda(attackHome * defenseAway * leagueAvgHome),
@@ -300,7 +337,7 @@ function directMeetings(compMatches, homeId, awayId) {
  * @param {object[]} compMatches   matchs de la compétition (useTeamForm)
  * @param {string[]} homeForm      fallback si pas assez de données saison
  * @param {string[]} awayForm      fallback si pas assez de données saison
- * @param {{ fullH2H?: object[] }} [opts]
+ * @param {{ fullH2H?: object[], debug?: boolean }} [opts]
  *   fullH2H : confrontations directes TOUTES compétitions/saisons confondues
  *   (voir useH2H/useH2HRows, déjà chargées sur la fiche d'un match précis
  *   pour l'onglet Historique — aucun appel réseau en plus ici). Plus riche
@@ -312,9 +349,16 @@ function directMeetings(compMatches, homeId, awayId) {
  *   la fois (Pronos.jsx, cards Accueil) : useH2H appelle un endpoint FD.org
  *   PAR match — un appel par carte affichée dépasserait vite le budget
  *   partagé (7 req/min, voir api/football.js).
+ *   debug : si true, ajoute une clé _debug au résultat avec le détail
+ *   couche par couche (Poisson brut → après H2H → après shrink) — UNIQUEMENT
+ *   pour scripts/backtest-prono.mjs (diagnostiquer LAQUELLE des 3 couches
+ *   cause un biais de calibration observé, plutôt que deviner). Aucun
+ *   appelant de l'app ne passe ce flag → comportement de production
+ *   strictement inchangé (la clé _debug est juste ignorée par les
+ *   appelants qui ne la lisent pas).
  */
 export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
-  const { fullH2H } = opts
+  const { fullH2H, debug } = opts
 
   // Repli enrichi : pas (encore) assez de données saison pour le modèle buts
   // marqués/encaissés (ex. tout début de saison, compMatches quasi vide) —
@@ -332,10 +376,14 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
         const home = raw.home * (1 - w) + (h2h.hWins / h2h.count) * 100 * w
         const draw = raw.draw * (1 - w) + (h2h.draws / h2h.count) * 100 * w
         const away = raw.away * (1 - w) + (h2h.aWins / h2h.count) * 100 * w
-        return shrinkTowardBase(distribute(home, away, draw))
+        const result = shrinkTowardBase(distribute(home, away, draw))
+        if (debug) result._debug = { path: 'fallback-h2h', h2hCount: h2h.count }
+        return result
       }
     }
-    return calcProno(homeForm, awayForm)
+    const result = calcProno(homeForm, awayForm)
+    if (debug) result._debug = { path: 'fallback-base' }
+    return result
   }
   if (homeId == null || awayId == null) return fallback()
 
@@ -362,7 +410,17 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
     away = away * (1 - w) + h2hAway * w
   }
 
-  return shrinkTowardBase(distribute(home * 100, away * 100, draw * 100))
+  const result = shrinkTowardBase(distribute(home * 100, away * 100, draw * 100))
+  if (debug) {
+    result._debug = {
+      path: 'poisson',
+      poisson: { home: poisson.home * 100, draw: poisson.draw * 100, away: poisson.away * 100 },
+      afterH2H: { home: home * 100, draw: draw * 100, away: away * 100 },
+      h2hCount: h2h.count,
+      homeAwaySplits: { hCount: goalModel.per[homeId]?.hCount, aCount: goalModel.per[awayId]?.aCount },
+    }
+  }
+  return result
 }
 
 // calcMinute() (matchUtils.js) ne renvoie jamais un nombre brut — toujours
