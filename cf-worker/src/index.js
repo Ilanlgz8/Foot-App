@@ -119,6 +119,89 @@ async function fetchFifaLiveMatches(kv, log) {
 // anciennement dupliquée ici et dans api/cron-goals.js.
 const SUMMARY_CACHE_TTL = 7 * 24 * 3600
 
+// ── Confirmation FT accélérée (retour utilisateur : le tick Cron normal met
+// jusqu'à 60s à confirmer un FT, trop lent pour la notif "Fin de match") ──
+//
+// Au lieu d'attendre passivement le prochain Cron Trigger pour la 2e
+// vérification (isFinalConfirmed, voir plus bas), on la déclenche
+// activement ~18s après la 1ère détection FINAL, dans une tâche de fond
+// AWAIT-ée séparément à la fin de runOnePass (pendingFinalRechecks) — donc
+// PAS bloquant pour le traitement des autres matchs de la même passe
+// (aucun autre match n'attend ces 18s). Cloudflare ne compte pas le temps
+// d'attente réseau/I/O dans le budget CPU 10ms du plan gratuit, et le Cron
+// Trigger autorise jusqu'à 15min de temps d'exécution horloge murale — 18s
+// est très largement dans ce budget.
+//
+// Réutilise EXACTEMENT la même source de données que le tick normal
+// (fetchEspnEvents → scoreboard, PAS le endpoint /summary qui a un
+// problème connu de header.competitions parfois absent, voir
+// cacheEspnSummary/hasUsefulSummaryData) — comportement identique à un
+// "tick anticipé", aucune nouvelle logique de détection introduite.
+//
+// Sûr par construction même en cas de double confirmation (ce recheck ET
+// le tick normal suivant confirment tous les deux, ex. si ce recheck rate
+// son fetch) : notifyVercel() est dédupliqué côté Redis (SET NX sur
+// push:espn:ft:{eventId}) et le recap vérifie recapAlready avant d'écrire
+// — au pire un no-op silencieux, jamais un doublon visible pour l'utilisateur.
+const FINAL_RECHECK_DELAY_MS = 18_000
+
+async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, scoreStr, log) {
+  await new Promise(resolve => setTimeout(resolve, FINAL_RECHECK_DELAY_MS))
+  try {
+    const today     = dateStr(new Date())
+    const yesterday = dateStr(new Date(Date.now() - 86_400_000))
+    const [evtsToday, evtsYesterday] = await Promise.all([
+      fetchEspnEvents(slug, today, log),
+      fetchEspnEvents(slug, yesterday, log),
+    ])
+    const evt = [...evtsToday, ...evtsYesterday].find(e => e.id === eventId)
+    if (!evt) {
+      log.push(`[final-recheck:${slug}:${eventId}] event introuvable au recheck — le tick normal reprendra le suivi`)
+      return
+    }
+    const comp = evt.competitions?.[0]
+    if (!comp) return
+    const status = normalizeEspnStatus(comp.status)
+    const homeC  = comp.competitors?.find(c => c.homeAway === 'home')
+    const awayC  = comp.competitors?.find(c => c.homeAway === 'away')
+    if (!homeC || !awayC) return
+    const home = parseInt(homeC.score ?? '0', 10) || 0
+    const away = parseInt(awayC.score ?? '0', 10) || 0
+    const freshScore = `${home}-${away}`
+
+    if (!FINAL_ESPN.has(status) || freshScore !== expectedScore) {
+      log.push(`[final-recheck:${slug}:${eventId}] pas confirmé (statut=${status}, score=${freshScore} vs attendu ${expectedScore}) — probable glitch ESPN évité, le tick normal reprendra le suivi normalement`)
+      return
+    }
+
+    log.push(`[final-recheck:${slug}:${eventId}] FT confirmé en avance (~${FINAL_RECHECK_DELAY_MS / 1000}s au lieu de jusqu'à 60s)`)
+    try { await kv.set(`cron:espn:${eventId}`, `${status}|${freshScore}`, { ex: 12 * 3600 }) } catch {}
+    await notifyVercel(env, `push:espn:ft:${eventId}`,
+      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
+    await cacheEspnSummary(kv, slug, eventId, log)
+    try {
+      const recapKey     = `recap:${eventId}`
+      const recapAlready = await kv.get(recapKey)
+      if (!recapAlready) {
+        const scorers = extractEspnScorers(comp, homeC.team?.id)
+        const cards   = extractEspnCards(comp, homeC.team?.id)
+        const recap   = generateRecap({ homeTeam, awayTeam, home, away, scorers, cards })
+        if (recap) {
+          await kv.set(recapKey, recap, { ex: RECAP_TTL })
+          log.push(`[recap:${eventId}] généré (via recheck accéléré)`)
+        }
+      }
+    } catch (e) {
+      log.push(`[recap:${eventId}] error (recheck)=${e.message}`)
+    }
+    try { await kv.srem('cron:liveIds', String(eventId)) } catch (e) {
+      log.push(`[cron:liveIds:${eventId}] error (recheck)=${e.message}`)
+    }
+  } catch (e) {
+    log.push(`[final-recheck:${slug}:${eventId}] error=${e.message}`)
+  }
+}
+
 async function cacheEspnSummary(kv, slug, eventId, log) {
   try {
     const url = `${ESPN_BASE}/${slug}/summary?event=${eventId}`
@@ -256,6 +339,11 @@ async function runOnePass(env) {
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(kv, log) : []
 
   const pendingSummaryFetches = []
+  // Tâches de fond "recheck FT accéléré" (voir recheckFinalMatch) — collectées
+  // ici et attendues tout à la fin de runOnePass, APRÈS le reste de la passe
+  // (armement cron:emptyDay/cron:nextCheck inclus) pour ne rien changer à
+  // l'ordre/timing de la logique existante, seulement prolonger la passe.
+  const pendingFinalRechecks = []
 
   for (const { slug, evt } of allEvents) {
    try {
@@ -569,6 +657,15 @@ async function runOnePass(env) {
       await cacheEspnSummary(kv, slug, eventId, log)
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
+      // 1ère détection cette passe (finalConfirmKey tout juste acquis) → programmer
+      // le recheck accéléré (~18s) au lieu d'attendre le tick normal (jusqu'à 60s).
+      // finalFirstSeen garantit que ceci ne se déclenche qu'UNE SEULE fois par
+      // séquence FT (la clé Redis a un TTL de 5min, largement au-delà de ces 18s).
+      if (finalFirstSeen) {
+        pendingFinalRechecks.push(
+          recheckFinalMatch(env, kv, slug, eventId, score, homeTeam, awayTeam, scoreStr, log)
+        )
+      }
     }
 
     // 📝 Résumé auto — écrit directement en Redis, aucun appel Vercel. Le
@@ -660,6 +757,17 @@ async function runOnePass(env) {
         }
       }
     }
+  }
+
+  // Attendu en tout dernier, après TOUT le reste de la passe (armement des
+  // optimisations inclus juste au-dessus) — voir recheckFinalMatch/
+  // pendingFinalRechecks plus haut : n'affecte l'ordre/timing d'AUCUNE
+  // logique existante, prolonge seulement la durée totale de CETTE passe de
+  // ~18s quand un match vient de flasher FINAL pour la 1ère fois (rare — une
+  // fois par match). Le Cron Trigger suivant se déclenche de toute façon sur
+  // son propre horaire, indépendamment de la fin de cette passe.
+  if (pendingFinalRechecks.length > 0) {
+    await Promise.allSettled(pendingFinalRechecks)
   }
 
   return { events: allEvents.length, log }
