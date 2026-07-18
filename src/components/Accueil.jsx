@@ -73,15 +73,25 @@ let _savedDayOffset = 0
 let _savedDate = getTargetDate(0)  // date locale au moment de la dernière sauvegarde
 
 function Accueil() {
-  // Si la date a changé depuis la dernière sauvegarde (passage de minuit),
-  // on repart de 0 pour que l'offset corresponde à la nouvelle "aujourd'hui"
   const todayDateStr = getTargetDate(0)
-  if (_savedDate !== todayDateStr) {
-    _savedDayOffset = 0
-    _savedDate = todayDateStr
-  }
 
-  const [dayOffset, setDayOffset] = useState(_savedDayOffset)
+  // Si la date a changé depuis la dernière sauvegarde (passage de minuit),
+  // on repart de 0 pour que l'offset corresponde à la nouvelle "aujourd'hui".
+  // Dans l'initialiseur paresseux de useState (pas dans le corps du composant) :
+  // ne s'exécute qu'une fois, au montage — exactement le seul moment où ça
+  // compte, puisque c'est la seule fois où _savedDayOffset nourrit l'état
+  // initial. Évite de muter des variables module-level pendant le render
+  // (ce que React ne garantit pas rejouer/committer de façon fiable en
+  // rendu concurrent), sans changer le comportement : la détection en
+  // continu (composant déjà monté) reste gérée par l'effet à intervalle
+  // plus bas.
+  const [dayOffset, setDayOffset] = useState(() => {
+    if (_savedDate !== todayDateStr) {
+      _savedDayOffset = 0
+      _savedDate = todayDateStr
+    }
+    return _savedDayOffset
+  })
   const targetDate   = getTargetDate(dayOffset)
 
   // ── Filtres compétition ──

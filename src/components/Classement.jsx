@@ -709,7 +709,13 @@ function Classement() {
         {/* Tableau(x) */}
         {view === 'classement' && !loading && !error && standings.length > 0 && (
           isMultiGroup
-            ? <MultiGroupView />
+            // Appelée comme fonction JS normale, pas comme composant JSX (<MultiGroupView />) :
+            // sinon React voit une "nouvelle" identité de composant à chaque render de
+            // Classement (fonction redéclarée à chaque fois) et démonte/remonte tout le
+            // sous-arbre (tableaux de chaque groupe) au lieu de le mettre à jour. En
+            // l'appelant directement, le JSX retourné devient part du render de Classement
+            // lui-même — même sortie visuelle, sans le remount inutile.
+            ? MultiGroupView()
             : filteredStandings.length > 0
               ? <StandingsTable
                   rows={filteredStandings}
