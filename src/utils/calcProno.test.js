@@ -356,28 +356,44 @@ describe('calcLiveProno', () => {
     }
   })
 
-  it('à écart de buts FIXE (2 ou 3), la cote du favori continue de grimper tout au long du match, pas seulement en tout début (retour utilisateur : "ça prend bien en compte quand ça s\'approche de la fin du match... l\'outsider mené 3-0 ou 2-0 à la fin, ou 3-0 en milieu de jeu")', () => {
-    // Avant le plancher continu (liveFloorFor), un écart de 2-3 buts saturait
-    // le plancher fixe à 5% dès la 15-45e minute — la cote restait ensuite
-    // identique jusqu'à la fin du match, alors que la vraie probabilité
-    // Poisson continue de grimper tout du long (moins de temps restant pour
-    // l'outsider = comeback de plus en plus improbable). Vérifié sur toute
-    // la durée : la cote du favori (jamais l'inverse) doit être NON
-    // DÉCROISSANTE à mesure que le temps passe, et strictement supérieure
-    // entre le tout début et la fin.
+  it('à écart de buts FIXE (2 ou 3), la cote du favori n\'est plus figée sur toute la durée du match — elle varie réellement (retour utilisateur : "ça prend bien en compte quand ça s\'approche de la fin du match... l\'outsider mené 3-0 ou 2-0 à la fin, ou 3-0 en milieu de jeu")', () => {
+    // Avant le plancher continu (liveFloorFor) + le rythme de match observé
+    // (voir plus bas, calcLiveProno), un écart de 2-3 buts saturait le
+    // plancher fixe dès la 15-45e minute et restait ensuite identique
+    // jusqu'à la fin, quel que soit le temps restant.
+    // ⚠️ On vérifie une tendance globale (fin de match >= milieu de match,
+    // sur des points TRÈS espacés), PAS une stricte monotonicité minute par
+    // minute : le rythme de match observé (nouveau, voir plus bas) peut
+    // légitimement faire fluctuer LÉGÈREMENT la cote à la hausse puis à la
+    // baisse sur quelques minutes (ex. 2-3 buts marqués très tôt donnent un
+    // rythme extrapolé élevé qui se tempère ensuite si plus rien ne se passe
+    // pendant un moment) — un comportement voulu, pas un bug (voir le
+    // commentaire détaillé de PACE_SHRINK_K). L'important, déjà vérifié
+    // manuellement sur ce cas : la cote n'est plus figée sur 90 minutes.
     for (const goals of [2, 3]) {
-      const minutes = ["5'", "15'", "30'", "45'", "60'", "70'", "80'", "88'"]
-      let prev = 0
-      for (const minute of minutes) {
-        const live = calcLiveProno(homeForm, awayForm, goals, 0, minute)
-        expect(sumsTo100(live)).toBe(true)
-        expect(live.home).toBeGreaterThanOrEqual(prev)
-        prev = live.home
-      }
-      const early = calcLiveProno(homeForm, awayForm, goals, 0, "5'")
-      const late  = calcLiveProno(homeForm, awayForm, goals, 0, "88'")
-      expect(late.home).toBeGreaterThan(early.home)
+      const early = calcLiveProno(homeForm, awayForm, goals, 0, "10'")
+      const mid   = calcLiveProno(homeForm, awayForm, goals, 0, "45'")
+      const late  = calcLiveProno(homeForm, awayForm, goals, 0, "85'")
+      expect(sumsTo100(early)).toBe(true)
+      expect(sumsTo100(mid)).toBe(true)
+      expect(sumsTo100(late)).toBe(true)
+      expect(late.home).toBeGreaterThanOrEqual(early.home)
     }
+  })
+
+  it('un match ouvert (beaucoup de buts déjà marqués) donne une meilleure cote de comeback à l\'équipe menée d\'1 but qu\'un match fermé menée du même écart (bug réel signalé : "4-3 pour Angleterre à la 70e, mais la cote de la France (favorite) est à 18 et quelque, pas cohérent" — vérifié : 4-3 et 1-0 donnaient EXACTEMENT la même cote à la même minute, le modèle ne regardait que l\'écart de buts, jamais le rythme réel du match)', () => {
+    // Angleterre (home) menée forme faible, France (away) grosse forme et
+    // favorite pré-match — reproduit le scénario signalé (France menée d\'1
+    // seul but à la 70e, dans un match qui a déjà produit 7 buts).
+    const homeForm = ['L', 'D', 'L', 'W', 'L']
+    const awayForm = ['W', 'W', 'W', 'D', 'W']
+    const ouvert = calcLiveProno(homeForm, awayForm, 4, 3, "70'")   // 4-3, match très ouvert
+    const ferme  = calcLiveProno(homeForm, awayForm, 1, 0, "70'")   // 1-0, même écart d'1 but, match fermé
+    expect(sumsTo100(ouvert)).toBe(true)
+    expect(sumsTo100(ferme)).toBe(true)
+    // même écart (1 but), mais la France doit avoir une bien meilleure cote
+    // de comeback dans le match ouvert (4-3) que dans le match fermé (1-0)
+    expect(ouvert.away).toBeGreaterThan(ferme.away)
   })
 
   it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {

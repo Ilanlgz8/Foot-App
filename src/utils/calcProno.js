@@ -697,7 +697,51 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // reformulée en taux de buts.
   const goalModel = (homeId != null && awayId != null) ? buildGoalModel(compMatches) : null
   const measuredLambdas = goalModel ? computeLambdas(goalModel, homeId, awayId) : null
-  const { lambdaHome, lambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+  const { lambdaHome: baseLambdaHome, lambdaAway: baseLambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+
+  // Rythme RÉEL de CE match (retour utilisateur : "4-3 à la 70e, la cote de
+  // l'équipe menée d'1 seul but est à 18, pas cohérent, l'équipe est
+  // favorite" — vérifié : le modèle donnait EXACTEMENT la même cote pour
+  // 4-3 que pour 1-0 à la même minute, parce que seul l'écart de buts (1
+  // dans les 2 cas) comptait, jamais le nombre total de buts déjà marqués.
+  // Un 4-3 est pourtant la preuve que CE match précis est très ouvert
+  // (défenses qui craquent) — bien plus propice à encore marquer dans les
+  // 20 dernières minutes qu'un match resté 1-0, alors que les λ pré-match/
+  // saison (mêmes dans les 2 cas) ne peuvent PAS le savoir à l'avance.
+  // Corrigé : le rythme de buts déjà observé DANS ce match (buts marqués /
+  // minutes jouées, projeté sur un match complet) est mélangé au rythme
+  // attendu pré-match — avec un poids qui grandit avec le nombre de minutes
+  // déjà jouées (plus de buts observés = plus fiable, même logique de
+  // shrinkage que shrinkRatio/RATIO_SHRINK_K plus haut, échantillon encore
+  // trop petit à la 5e pour en tirer grand-chose). Le ratio obtenu (rythme
+  // réel / rythme attendu) remet à l'échelle λh ET λa ENSEMBLE (préserve
+  // leur répartition dom/ext, seul le total de buts espérés change).
+  // ⚠️ Échantillon minimum avant d'en tirer une conclusion (même logique que
+  // MIN_LEAGUE_GAMES/MIN_TEAM_SPLITS plus haut) : sur les 20 premières
+  // minutes, l'extrapolation "buts marqués / minutes jouées" est bien trop
+  // bruitée pour être exploitable (1-2 buts précoces → un rythme extrapolé
+  // délirant, ex. 2 buts en 5min → "36 buts sur le match" avant même la
+  // moindre pondération) — testé : même fortement amorti par le shrinkage,
+  // ce bruit initial faisait parfois ressortir des inversions absurdes
+  // (4-1 affiché plus favori que 4-0 à la 5e minute). Ce n'est de toute
+  // façon pas le cas d'usage visé (le retour utilisateur portait sur la
+  // 70e minute) — en dessous de 20min, comportement inchangé (paceFactor=1).
+  // Au-delà, le poids donné au rythme observé grandit en continu (même
+  // logique de shrinkage que shrinkRatio/RATIO_SHRINK_K plus haut).
+  const MIN_PACE_MINUTES = 20
+  const PACE_SHRINK_K = 45  // minutes pour arriver à 50% de confiance dans le rythme observé
+  const MAX_PACE_FACTOR = 2.5  // borné : un coup de chaud dans le match ne doit pas non plus devenir délirant
+  const totalGoalsSoFar   = (homeGoals ?? 0) + (awayGoals ?? 0)
+  const baselinePace      = baseLambdaHome + baseLambdaAway
+  let paceFactor = 1
+  if (min >= MIN_PACE_MINUTES && totalGoalsSoFar > 0 && baselinePace > 0) {
+    const observedFullMatchPace = (totalGoalsSoFar / min) * totalDuration
+    const w = min / (min + PACE_SHRINK_K)
+    const blendedPace = baselinePace * (1 - w) + observedFullMatchPace * w
+    paceFactor = Math.max(1 / MAX_PACE_FACTOR, Math.min(MAX_PACE_FACTOR, blendedPace / baselinePace))
+  }
+  const lambdaHome = baseLambdaHome * paceFactor
+  const lambdaAway = baseLambdaAway * paceFactor
 
   const proj = poissonOutcomesFromDiff(lambdaHome * remaining, lambdaAway * remaining, diff)
   let home = proj.home * 100
