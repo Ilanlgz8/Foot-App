@@ -340,19 +340,43 @@ describe('calcLiveProno', () => {
     }
   })
 
-  it('un but qui ramène un écart énorme (4+ buts) à 3 buts ou moins fait bien baisser visiblement la cote du favori (bug réel signalé : 4-0 puis 4-1 affichaient exactement la même cote, le plancher à 5% écrasait toute variation entre deux scores déjà quasi certains)', () => {
-    // À 4 buts d'écart ou plus, le plancher d'affichage descend à 2% (au lieu
-    // de 5%) pour laisser le favori monter au-delà de son plafond habituel
-    // (~91%) — dès que l'écart repasse sous 4 buts, le plancher standard à 5%
-    // reprend la main et fait mécaniquement REdescendre le favori. Résultat :
-    // un but de l'équipe menée doit être visible à l'écran, même très tard
-    // dans un match très déséquilibré.
-    for (const minute of ["60'", "75'", "88'"]) {
+  it('un but qui ramène un écart de 4 buts à 3 buts fait bien baisser visiblement la cote du favori en début/milieu de match (bug réel signalé : 4-0 puis 4-1 affichaient exactement la même cote)', () => {
+    // Plancher d'affichage désormais CONTINU (voir liveFloorFor) plutôt qu'un
+    // simple seuil ON/OFF — le favori peut légitimement RE-converger avec un
+    // scénario voisin en toute fin de match si les deux sont déjà >99.9%
+    // quasi certains (différence réelle mais invisible à l'échelle du %
+    // entier affiché, ce qui est honnête, pas un bug) : on teste donc tôt/
+    // milieu de match, où l'écart doit rester visible.
+    for (const minute of ["5'", "15'"]) {
       const quatreZero = calcLiveProno(homeForm, awayForm, 4, 0, minute)
       const quatreUn    = calcLiveProno(homeForm, awayForm, 4, 1, minute)
       expect(sumsTo100(quatreZero)).toBe(true)
       expect(sumsTo100(quatreUn)).toBe(true)
       expect(quatreUn.home).toBeLessThan(quatreZero.home)
+    }
+  })
+
+  it('à écart de buts FIXE (2 ou 3), la cote du favori continue de grimper tout au long du match, pas seulement en tout début (retour utilisateur : "ça prend bien en compte quand ça s\'approche de la fin du match... l\'outsider mené 3-0 ou 2-0 à la fin, ou 3-0 en milieu de jeu")', () => {
+    // Avant le plancher continu (liveFloorFor), un écart de 2-3 buts saturait
+    // le plancher fixe à 5% dès la 15-45e minute — la cote restait ensuite
+    // identique jusqu'à la fin du match, alors que la vraie probabilité
+    // Poisson continue de grimper tout du long (moins de temps restant pour
+    // l'outsider = comeback de plus en plus improbable). Vérifié sur toute
+    // la durée : la cote du favori (jamais l'inverse) doit être NON
+    // DÉCROISSANTE à mesure que le temps passe, et strictement supérieure
+    // entre le tout début et la fin.
+    for (const goals of [2, 3]) {
+      const minutes = ["5'", "15'", "30'", "45'", "60'", "70'", "80'", "88'"]
+      let prev = 0
+      for (const minute of minutes) {
+        const live = calcLiveProno(homeForm, awayForm, goals, 0, minute)
+        expect(sumsTo100(live)).toBe(true)
+        expect(live.home).toBeGreaterThanOrEqual(prev)
+        prev = live.home
+      }
+      const early = calcLiveProno(homeForm, awayForm, goals, 0, "5'")
+      const late  = calcLiveProno(homeForm, awayForm, goals, 0, "88'")
+      expect(late.home).toBeGreaterThan(early.home)
     }
   })
 
@@ -380,7 +404,14 @@ describe('calcLiveProno', () => {
   })
 
   it('un carton rouge ne peut jamais, à lui seul, écraser complètement une issue (plancher 5%)', () => {
-    const live = calcLiveProno(homeForm, awayForm, 0, 0, "89'", { awayRedCards: 2 })
+    // 60' plutôt que 89' (choix d'origine) : le plancher continu (liveFloorFor,
+    // voir plus haut) réagit désormais à la vraie certitude Poisson, pas
+    // seulement à la cause — à 89' sur un score encore vierge, le nul devient
+    // légitimement quasi certain (très peu de temps pour marquer) INDÉPENDAMMENT
+    // des cartons, ce qui réduit le plancher pour cette toute autre raison. Le
+    // test isole donc l'effet "cartons seuls" à un moment où cette 2e cause ne
+    // s'ajoute pas encore (voir aussi le test 89'-nul-domine plus haut).
+    const live = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 2 })
     expect(sumsTo100(live)).toBe(true)
     expect(live.away).toBeGreaterThanOrEqual(5)
   })

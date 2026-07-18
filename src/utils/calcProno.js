@@ -601,6 +601,46 @@ function fitLambdasToPreMatch(pre) {
   return best
 }
 
+// ── Plancher d'affichage CONTINU pour le direct ─────────────────────────
+// Retour utilisateur en 2 temps :
+//  1. "à 4-0 la France marque, ça devient 4-1, et les cotes bougent pas" —
+//     un 1er correctif (plancher fixe 5%→2% déclenché à partir de 4 buts
+//     d'écart) réglait ce cas précis.
+//  2. "ça prend bien en compte aussi quand ça s'approche de la fin du
+//     match... l'outsider mené 3-0 ou 2-0 à la fin, ou 3-0 en milieu de
+//     jeu" — en vérifiant NUMÉRIQUEMENT (voir historique de session), un
+//     déficit de seulement 3 buts fait DÉJÀ chuter la vraie proba Poisson de
+//     l'outsider sous 5% dès la 15-30e minute, et un déficit de 2 buts
+//     plafonne dès la 45e — alors que la proba RÉELLE continue de baisser
+//     tout du long jusqu'à la fin du match (vérifié : déficit de 2 buts,
+//     proba du favori passant de 89.0% à la 5e à 99.98% à la 88e, en hausse
+//     continue — seul l'AFFICHAGE plafonnait trop tôt). Le seuil fixe "4
+//     buts d'écart" du 1er correctif, testé à nouveau sur ce cas, ne faisait
+//     que déplacer le plafond un cran plus loin (nouveau plateau plat dès
+//     que la proba brute dépassait 90%) : ENCORE un plancher fixe, donc
+//     ENCORE un plafond artificiel quelque part.
+// Un plancher fixe, quel qu'il soit, plafonne TOUJOURS le favori à
+// (100 - 2×plancher) : le seul moyen d'éviter un plateau plat est de faire
+// DÉCROÎTRE le plancher lui-même à mesure que la proba brute grimpe, au lieu
+// d'un simple interrupteur à 2 valeurs. Décroissance linéaire de 5% à 2%
+// entre 80% et 100% de proba brute du favori. En dessous de 80%,
+// comportement strictement inchangé (plancher standard à 5%, celui calibré
+// par le backtest pour le pré-match).
+// ⚠️ Plancher dur à 2%, PAS 1% (bug réel repéré en testant ce changement) :
+// l'enforcement anti-égalité nul/victoire de l'équipe menée (plus bas dans
+// calcLiveProno, "target = Math.max(1, result.draw - 1)") a lui-même besoin
+// qu'il reste au moins 1 point EN DESSOUS du nul pour repousser la victoire
+// — si le nul lui-même tombe déjà à 1% (plancher à 1%), il n'y a plus de
+// place pour descendre la victoire en dessous sans afficher 0% (interdit) :
+// les deux se retrouvaient identiques à 1%, ré-introduisant exactement le
+// bug d'égalité déjà corrigé. Avec un plancher dur à 2%, le nul ne descend
+// jamais sous 2%, laissant toujours au moins 1% de marge pour l'enforcement.
+function liveFloorFor(rawFavoritePct) {
+  if (rawFavoritePct <= 80) return 5
+  const t = Math.min(1, (rawFavoritePct - 80) / 20)  // 0 à 80%, 1 à 100%
+  return Math.max(2, 5 - t * 3)
+}
+
 /**
  * calcLiveProno — même proba 1/X/2 que calcProno/calcPronoAdvanced, mais
  * réévaluée en direct selon le score réel et le temps restant. Ce n'est PAS
@@ -712,25 +752,17 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     away = draw
   }
 
-  // Plancher réduit sur les très gros écarts de buts (retour utilisateur :
-  // "à 4-0 la France marque, ça devient 4-1, et les cotes bougent pas...
-  // au moins bouger un peu... augmente le chiffre des côtes si le score est
-  // au dessus de +3-0") — seuil repris tel quel de sa proposition. Cause :
-  // le plancher standard à 5% (draw/away ne descendent jamais sous 5%) capait
-  // mécaniquement le favori à ~90-91% dès que l'écart réel dépassait ce
-  // plafond — un but de plus pour l'équipe menée fait bien bouger la vraie
-  // proba interne (Poisson, ex. 99.97%→99.66%), mais cette variation restait
-  // toujours en dessous du seuil visible une fois arrondie ET plafonnée : les
-  // deux scores affichaient exactement la même cote. À partir de 4 buts
-  // d'écart, le plancher descend à 2% : ça laisse de la place au favori pour
-  // monter jusqu'à ~96% quand l'écart est énorme (4+ buts), puis RE-descendre
-  // visiblement dès que l'équipe menée revient à 3 buts d'écart ou moins (le
-  // plancher standard à 5% reprend alors la main, replafonnant à ~90%).
-  // Toujours calculé sur les vraies probabilités Poisson, jamais une valeur
-  // inventée — seul le plancher d'AFFICHAGE change selon l'écart.
-  const BLOWOUT_GOAL_MARGIN = 4
-  const liveFloor = Math.abs(diff) >= BLOWOUT_GOAL_MARGIN ? 2 : 5
-  const result = distribute(home, away, draw, liveFloor)
+  // ⚠️ Le plancher continu se base sur la proba de la SEULE projection
+  // Poisson (`proj`, avant les ajustements "pression" ci-dessus), PAS sur
+  // `home/draw/away` après swing — les cartons/possession/tirs/corners sont
+  // des signaux bien plus faibles/circonstanciels qu'un écart de buts déjà
+  // acquis (voir commentaire au-dessus de `swing`, "jamais, à eux seuls,
+  // écraser complètement une issue") : un carton rouge à score vierge ne
+  // doit PAS pouvoir, à lui seul, faire descendre le plancher sous 5% —
+  // seule une vraie certitude Poisson (issue d'un écart de buts réel projeté
+  // dans le temps restant) le justifie.
+  const projFavoritePct = Math.max(proj.home, proj.draw, proj.away) * 100
+  const result = distribute(home, away, draw, liveFloorFor(projFavoritePct))
 
   // Retour utilisateur (à raison) : "tu peux pas mettre la même cote pour
   // match nul et victoire de l'équipe qui perd, ça a aucun sens" — le
