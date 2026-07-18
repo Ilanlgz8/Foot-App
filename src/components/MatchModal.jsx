@@ -1549,11 +1549,6 @@ function H2HBilan({ rows, match, isWC }) {
   }
   if (homeWins + awayWins + draws === 0) return null
 
-  const colors = getMatchTeamColors(
-    match.homeTeam?.name || match.homeTeam?.shortName || '',
-    match.awayTeam?.name || match.awayTeam?.shortName || ''
-  )
-
   const crest = (team) => team?.crest && (
     <span className="h2h__bilanCrestWrap" data-crest={isWC ? 'country' : 'club'}>
       <img src={team.crest} alt="" className="h2h__bilanCrest" data-team={team?.name}
@@ -1582,10 +1577,14 @@ function H2HBilan({ rows, match, isWC }) {
           <div className="h2h__bilanLabel">Victoires</div>
         </div>
       </div>
+      {/* Paire de couleurs FIXES (pas la couleur d'équipe) — même logique que
+          .statBar__home/.statBar__away (stats live/saison, voir plus bas dans
+          ce fichier CSS) : cohérence visuelle entre tous les "qui domine"
+          affichés dans l'app, demande utilisateur explicite. */}
       <div className="h2h__domBar">
-        {homeWins > 0 && <span style={{ flexGrow: homeWins, background: colors.home.main }} />}
+        {homeWins > 0 && <span className="h2h__domBar--home" style={{ flexGrow: homeWins }} />}
         {draws    > 0 && <span className="h2h__domBar--nul" style={{ flexGrow: draws }} />}
-        {awayWins > 0 && <span style={{ flexGrow: awayWins, background: colors.away.main }} />}
+        {awayWins > 0 && <span className="h2h__domBar--away" style={{ flexGrow: awayWins }} />}
       </div>
     </div>
   )
@@ -1630,12 +1629,29 @@ export function useH2HRows(match, compMatches) {
   return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }
 }
 
+// Nombre de confrontations affichées avant repli derrière "Voir plus" —
+// au-delà, une liste (PSG-OM, Real-Barça...) peut compter des dizaines de
+// lignes et devenir interminable à parcourir (demande utilisateur).
+const H2H_ROWS_VISIBLE = 5
+
 // ── Liste des confrontations (championnat/date + équipes-score alignés) —
 // utilisée par H2HTabContent.
-function H2HRowsList({ rows, homeId }) {
+function H2HRowsList({ rows, homeId, isWC }) {
+  const [expanded, setExpanded] = useState(false)
+  const visibleRows = expanded ? rows : rows.slice(0, H2H_ROWS_VISIBLE)
+  const hiddenCount  = rows.length - H2H_ROWS_VISIBLE
+
+  const crest = (team) => team?.crest && (
+    <span className="h2h__rowCrestWrap" data-crest={isWC ? 'country' : 'club'}>
+      <img src={team.crest} alt="" className="h2h__rowCrest" data-team={team?.name}
+        onError={e => { e.currentTarget.style.display = 'none' }} />
+    </span>
+  )
+
   return (
+    <>
     <div className="h2h__list">
-    {rows.map((m, i) => {
+    {visibleRows.map((m, i) => {
       const isHomeTeam = m.homeTeam?.id === homeId
       const fsH2H = finalScore(m.score)
       const hs = fsH2H.home ?? '-'
@@ -1671,8 +1687,11 @@ function H2HRowsList({ rows, homeId }) {
           <div className="h2h__meta">{compLabel ? `${compLabel} · ${date}` : date}</div>
           {/* Équipes + score alignés sur une seule ligne, score centré */}
           <div className="h2h__lineup">
-            <span className={`h2h__team${homeWon ? ' h2h__team--win' : ''}`}>
-              {translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}
+            <span className="h2h__teamSide">
+              <span className={`h2h__team${homeWon ? ' h2h__team--win' : ''}`}>
+                {translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')}
+              </span>
+              {crest(m.homeTeam)}
             </span>
             <span className="h2h__scoreWrap">
               <span className="h2h__score">
@@ -1684,14 +1703,29 @@ function H2HRowsList({ rows, homeId }) {
                 <span className="h2h__pens">tab {hp}-{ap}</span>
               )}
             </span>
-            <span className={`h2h__team h2h__team--right${awayWon ? ' h2h__team--win' : ''}`}>
-              {translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}
+            <span className="h2h__teamSide h2h__teamSide--right">
+              {crest(m.awayTeam)}
+              <span className={`h2h__team h2h__team--right${awayWon ? ' h2h__team--win' : ''}`}>
+                {translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')}
+              </span>
             </span>
           </div>
         </div>
       )
     })}
     </div>
+    {hiddenCount > 0 && (
+      <button
+        type="button"
+        className="h2h__showMore"
+        onClick={() => setExpanded(e => !e)}
+        aria-expanded={expanded}
+      >
+        <span>{expanded ? 'Réduire' : `Voir les ${hiddenCount} confrontations précédentes`}</span>
+        <span className={`h2h__showMoreIcon${expanded ? ' h2h__showMoreIcon--open' : ''}`}>▾</span>
+      </button>
+    )}
+    </>
   )
 }
 
@@ -1716,7 +1750,7 @@ export function H2HTabContent({ match, rows, isLoading }) {
     <>
       <H2HBilan rows={rows} match={match} isWC={isWC} />
       <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
-      <H2HRowsList rows={rows} homeId={homeId} />
+      <H2HRowsList rows={rows} homeId={homeId} isWC={isWC} />
     </>
   )
 }

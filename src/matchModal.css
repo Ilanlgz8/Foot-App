@@ -1555,7 +1555,9 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--sf-faint);
+  /* Plus clair que --sf-faint (trop sombre, peu lisible) sans passer au blanc
+     plein — demande utilisateur : "un peu plus blanc mais pas complètement". */
+  color: rgba(var(--white-rgb), 0.7);
   margin-top: 0.15rem;
 }
 /* Nuls calés en bas de la grille, près de la barre de domination */
@@ -1565,7 +1567,10 @@
   font-weight: 700;
   font-size: 0.95rem;
   line-height: 1;
-  color: var(--sf-muted);
+  /* Gris argenté (assorti au segment "nuls" de la barre juste en dessous) —
+     pas doré : essayé, jugé trop proche visuellement de la couleur "vainqueur"
+     utilisée plus bas dans la liste, source de confusion (retour utilisateur). */
+  color: #c7c9d1;
   font-variant-numeric: tabular-nums;
   margin-top: 3px;   /* label au-dessus, chiffre en bas contre la barre */
 }
@@ -1578,7 +1583,19 @@
   margin-top: 0.3rem;
 }
 .h2h__domBar span { border-radius: 99px; min-width: 6px; }
-.h2h__domBar--nul { background: var(--sf-surface-3); }
+/* Paire de couleurs FIXES, pas la couleur de l'équipe — mêmes valeurs que
+   .statBar__home/.statBar__away plus bas dans ce fichier (stats live/saison),
+   pour que "qui domine" se lise avec le même code couleur partout dans l'app
+   (demande utilisateur explicite). */
+.h2h__domBar--home {
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+  box-shadow: 0 0 6px rgba(14,165,233,0.5);
+}
+.h2h__domBar--away {
+  background: #ec4899;
+  box-shadow: 0 0 6px rgba(236,72,153,0.45);
+}
+.h2h__domBar--nul { background: #c7c9d1; }
 
 .h2h__list {
   display: flex;
@@ -1586,13 +1603,15 @@
   gap: 8px;
 }
 .h2h__row {
-  background: var(--sf-surface-2);
-  border: 1px solid var(--sf-border);
+  /* Fond quasi noir + contour rouge (demande utilisateur), plutôt que le gris
+     neutre --sf-surface-2 utilisé ailleurs — accent visuel dédié à cette liste. */
+  background: #050506;
+  border: 1px solid rgba(var(--sf-red-rgb), 0.35);
   border-radius: 10px;
   padding: 0.68rem 0.8rem 0.75rem;
   transition: border-color 0.2s;
 }
-.h2h__row:hover { border-color: rgba(var(--sf-red-rgb), 0.22); }
+.h2h__row:hover { border-color: rgba(var(--sf-red-rgb), 0.55); }
 /* Repère visuel immédiat pour les confrontations allées aux tirs au but —
    voir commentaire JSX (H2HRowsList). Box-shadow inset plutôt que
    border-left : garde le border-radius intact sur les 4 coins. */
@@ -1615,10 +1634,30 @@
   gap: 0.42rem;   /* noms rapprochés du score (demande utilisateur) */
   align-items: center;   /* noms et score à la même hauteur */
 }
+.h2h__teamSide {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.h2h__teamSide--right { justify-content: flex-start; }
+.h2h__rowCrestWrap {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.h2h__rowCrestWrap[data-crest='country'] { border-radius: 50%; overflow: hidden; }
+.h2h__rowCrest { max-width: 100%; max-height: 100%; object-fit: contain; }
 .h2h__team {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--sf-muted);
+  /* Équipe perdante/match nul : blanc comme le score, pas grisé (demande
+     utilisateur — le gris donnait l'impression que ces lignes étaient
+     "désactivées"). Seule .h2h__team--win se démarque, en or. */
+  color: var(--sf-text);
   text-align: right;     /* rapproché du score */
   min-width: 0;
   overflow: hidden;
@@ -1626,7 +1665,7 @@
   white-space: nowrap;
 }
 .h2h__team--right { text-align: left; }
-.h2h__team--win { color: var(--sf-text); font-weight: 700; }
+.h2h__team--win { color: var(--sf-gold); font-weight: 700; }
 .h2h__scoreWrap { text-align: center; }
 .h2h__score {
   font-family: var(--sf-font-display);
@@ -1647,6 +1686,31 @@
   white-space: nowrap;
   margin-top: 0.2rem;
 }
+
+/* "Voir les X confrontations précédentes" — repli des lignes au-delà de
+   H2H_ROWS_VISIBLE (MatchModal.jsx), pour les historiques longs (grosses
+   rivalités) qui rendaient la liste interminable à scroller. */
+.h2h__showMore {
+  width: 100%;
+  margin-top: 8px;
+  padding: 0.55rem;
+  background: transparent;
+  border: 1px solid rgba(var(--sf-red-rgb), 0.35);
+  border-radius: 10px;
+  color: var(--sf-muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.h2h__showMore:hover { border-color: rgba(var(--sf-red-rgb), 0.55); color: var(--sf-text); }
+.h2h__showMoreIcon { display: inline-block; transition: transform 0.2s; }
+.h2h__showMoreIcon--open { transform: rotate(180deg); }
 
 /* Bloc "T.A.B (x-y)" partagé — Forme récente + H2H, même pattern que
    .accueil__matchCardPensBlock (cartes de match) pour un affichage
@@ -1698,11 +1762,14 @@
   .h2h__row { padding: 0.56rem 0.6rem 0.64rem; }
   .h2h__lineup { gap: 0.3rem; }
   .h2h__team { font-size: 0.68rem; }
+  .h2h__teamSide { gap: 0.25rem; }
+  .h2h__rowCrestWrap { width: 17px; height: 17px; }
   .h2h__meta { font-size: 0.52rem; }
   .h2h__score { font-size: 0.86rem; }
   .h2h__pens { font-size: 0.48rem; }
   .h2h__bilanWins { font-size: 1.3rem; }
   .h2h__bilanCrestWrap { width: 35px; height: 35px; }
+  .h2h__showMore { font-size: 0.66rem; padding: 0.5rem; }
 }
 
 /* ── Indicateur de pages (dots) sous les onglets swipables ────────────────── */
