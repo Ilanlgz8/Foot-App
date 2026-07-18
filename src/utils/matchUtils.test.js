@@ -5,7 +5,7 @@
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from './matchUtils'
-import { setEspnData, setKickoffAt } from './matchStateTracker'
+import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState } from './matchStateTracker'
 
 const MID = 1
 const baseMatch = (over = {}) => ({
@@ -199,6 +199,30 @@ describe('calcMinute', () => {
   it('affiche "TAB" pendant la séance de tirs au but', () => {
     setEspnData(MID, { espnClock: '120:00', espnStatus: 'STATUS_SHOOTOUT', espnPeriod: 5 })
     expect(calcMinute(baseMatch())).toBe('TAB')
+  })
+
+  it('n\'affiche PLUS null si ESPN indique FINAL mais que le FT n\'est pas encore confirmé (bug réel signalé : "j\'ai eu comme quoi le match est fini alors qu\'il est pas fini, on est encore dans le temps additionnel")', () => {
+    // Simule un match en tout début de temps additionnel de la 2ème MT (46min
+    // après la reprise, donc minute réelle 90+2) sur lequel ESPN vient
+    // d'envoyer un STATUS_FINAL — potentiel glitch ponctuel de l'API ESPN, PAS
+    // encore confirmé (voir pendingFt dans useLiveMinute.js : la confirmation
+    // n'a lieu qu'au 2e poll consécutif voyant FINAL, donc `ft` n'est pas
+    // encore posé à ce stade). AVANT ce fix, calcMinute() renvoyait null dès
+    // qu'il voyait espnStatus FINAL-ish, MÊME sans confirmation — la minute
+    // (et donc l'affichage "en direct") disparaissait à tort dès le 1er poll
+    // suspect.
+    trackMatchState({ id: MID, status: 'PAUSED' }, new Date('2026-07-03T18:00:00.000Z').getTime())
+    setHalf2Start(MID, new Date('2026-07-03T18:14:00.000Z').getTime())
+    setEspnData(MID, { espnClock: '90:00+1:00', espnStatus: 'STATUS_FINAL', espnPeriod: 2 })
+    const minute = calcMinute(baseMatch({ status: 'IN_PLAY' }))
+    expect(minute).not.toBeNull()
+    expect(minute).toBe("90+2'")
+  })
+
+  it('bascule bien sur null une fois le FT réellement confirmé (ft posé), y compris avec STATUS_FINAL', () => {
+    setEspnData(MID, { espnClock: '90:00+1:00', espnStatus: 'STATUS_FINAL', espnPeriod: 2 })
+    setFt(MID)
+    expect(calcMinute(baseMatch({ status: 'FINISHED' }))).toBeNull()
   })
 })
 

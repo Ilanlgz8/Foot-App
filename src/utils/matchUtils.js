@@ -3,7 +3,10 @@
 //   1. ESPN (primary)  → espnStatus / espnClock + interpolation temps réel entre polls
 //      • STATUS_HALFTIME            → 'MT'
 //      • STATUS_IN_PROGRESS / clock → minute interpolée depuis espnCapturedAt (~2s de retard)
-//      • STATUS_FINAL               → null
+//      • STATUS_FINAL               → null, mais SEULEMENT une fois confirmé (state.ft ===
+//        true, voir plus bas) — un STATUS_FINAL pas encore confirmé (1er poll, potentiel
+//        faux FT ESPN pendant le temps additionnel — retour utilisateur) continue d'afficher
+//        la minute normalement, comme si de rien n'était, en attendant la confirmation.
 //   2. pausedAt   → dès qu'on a vu PAUSED, on gère MT + 2ème MT en local
 //      a. half2Start (api-football.com ou ESPN) → minute précise 2ème MT
 //      b. pausedAt + 15min              → estimation si sources non dispo
@@ -280,12 +283,21 @@ export function calcMinute(match) {
         (() => { const p = parseEspnClock(state.espnClock); return p ? p.base >= 90 : false })()
       return pastRegulation ? 'Pause' : 'MT'
     }
-    if (
-      state.espnStatus === 'STATUS_FINAL'     ||
-      state.espnStatus === 'STATUS_FULL_TIME' ||
-      state.espnStatus === 'STATUS_FINAL_AET' ||
-      state.espnStatus === 'STATUS_FINAL_PEN'
-    ) return null
+    // ⚠️ SUPPRIMÉ (retour utilisateur : "j'ai eu comme quoi le match est fini
+    // alors qu'il est pas fini, on est encore dans le temps additionnel, c'est
+    // pas normal") : ce bloc renvoyait null dès qu'ESPN indiquait un statut
+    // FINAL-ish, MÊME si ce n'était que le 1er poll à le voir (potentiel
+    // glitch ESPN pendant le temps additionnel — voir le fix côté
+    // useLiveMinute.js/pendingFt, qui retarde maintenant la confirmation
+    // réelle du FT à un 2e poll). Résultat : la minute affichée disparaissait
+    // (ou le match semblait "terminé") dès le 1er poll suspect, AVANT même
+    // que la confirmation à 2 polls n'ait eu lieu. `state.ft` (tout en haut
+    // de cette fonction) est désormais le SEUL signal qui fait vraiment
+    // passer calcMinute() à null — il n'est écrit qu'une fois le FT
+    // confirmé (voir confirmFt). Tant que non confirmé, on laisse tomber
+    // vers les heuristiques normales plus bas (kickoffAt/half2Start), qui
+    // continuent d'afficher une minute crédible (ex. "90+3'") pendant
+    // l'attente de confirmation.
     if (state.espnStatus === 'STATUS_END_PERIOD') {
       // STATUS_END_PERIOD = coup de sifflet de fin des 90min+arrêts, AVANT que
       // la 1ère période de prolongation ne démarre vraiment (period passe à 3).

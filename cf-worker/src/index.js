@@ -340,12 +340,33 @@ async function runOnePass(env) {
     // reportés/déjà terminés (rares, sans effet de bord observable — le
     // verrou expire tout seul en 5s, jamais lu ailleurs), en échange d'un
     // seul aller-retour réseau au lieu de plusieurs branches séparées.
-    const stateKey     = `cron:espn:${eventId}`
-    const trackKey      = `goalTrack:${eventId}`
-    const cardTrackKey  = `cardTrack:${eventId}`
-    const lockKey       = `goalLock:${eventId}`
-    const koKey         = `push:espn:ko:${eventId}`
-    const recapKey      = `recap:${eventId}`
+    const stateKey        = `cron:espn:${eventId}`
+    const trackKey        = `goalTrack:${eventId}`
+    const cardTrackKey    = `cardTrack:${eventId}`
+    const lockKey         = `goalLock:${eventId}`
+    const koKey           = `push:espn:ko:${eventId}`
+    const recapKey        = `recap:${eventId}`
+    // ⚠️ AJOUT (retour utilisateur : "j'ai eu comme quoi le match est fini
+    // alors qu'il est pas fini, on est encore dans le temps additionnel, c'est
+    // pas normal") : ESPN peut renvoyer un statut FINAL de façon transitoire
+    // pendant une seule passe (glitch ponctuel côté API — déjà rencontré une
+    // fois pour un tout autre symptôme, voir le commentaire sur les notifs
+    // groupées reçues avec ~10min de retard plus bas). Avant ce fix, la
+    // notif "🏁 Fin de match" ET le passage "Terminé" côté client (voir
+    // confirmFt, useLiveMinute.js) faisaient confiance à UNE SEULE passe
+    // FINAL — un unique glitch (le temps additionnel confondu avec la fin
+    // par erreur côté ESPN) suffisait à déclarer le match terminé pour de
+    // bon. finalConfirmKey (SET NX, TTL 5min) sert de compteur "vu au moins
+    // une fois" : la 1ère passe FINAL l'acquiert et n'est PAS encore
+    // considérée confirmée (le match reste traité comme en cours) ; ce n'est
+    // qu'à la 2e passe FINAL consécutive (~1min plus tard, Cron Trigger
+    // toutes les minutes) — ET score inchangé entretemps (voir
+    // isFinalConfirmed plus bas) — que la fin est vraiment confirmée. Coût :
+    // ~1min de délai supplémentaire sur les notifs/passage "Terminé" pour
+    // TOUS les matchs (même ceux qui se terminent normalement), largement
+    // acceptable face au risque d'une fausse alerte "match terminé" envoyée
+    // en push à tous les abonnés en plein temps additionnel.
+    const finalConfirmKey = `finalConfirm:${eventId}`
 
     let pipe = kv.pipeline()
       .get(stateKey)                                          // [0] prevState
@@ -353,18 +374,15 @@ async function runOnePass(env) {
       .get(trackKey)                                           // [2] rawTrack
       .get(cardTrackKey)                                       // [3] rawCardTrack
       .set(lockKey, '1', { px: 5_000, nx: true })              // [4] lockAcquired
-    // Marque ce match comme "toujours en cours" côté Redis, indépendamment du
-    // résultat de CETTE passe précise — voir cron:liveIds (garde-fou contre
-    // le bug de blackout notifs, déjà en place).
-    pipe = isLive
-      ? pipe.sadd('cron:liveIds', String(eventId))              // [5] (résultat inutilisé)
-      : pipe.srem('cron:liveIds', String(eventId))              // [5] (résultat inutilisé)
-    // [6] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
+    // [5] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
     // terminé) — isLive et isFinalNow sont mutuellement exclusifs (aucun
     // statut n'appartient aux 2 ensembles à la fois), jamais les deux en
     // même temps dans le même pipeline.
     if (isLive) pipe = pipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
     else if (isFinalNow) pipe = pipe.get(recapKey)
+    // [6] optionnel : 1ère acquisition de finalConfirmKey (voir commentaire
+    // ci-dessus) — uniquement pertinent quand isFinalNow.
+    if (isFinalNow) pipe = pipe.set(finalConfirmKey, '1', { ex: 300, nx: true })
 
     let pipeResults = []
     try {
@@ -382,10 +400,34 @@ async function runOnePass(env) {
     const rawTrack      = pick(2)
     const rawCardTrack  = pick(3)
     const lockAcquired  = pick(4)
-    const koAcquired    = isLive ? pick(6) : false
-    const recapAlready  = (!isLive && isFinalNow) ? pick(6) : null
+    const koAcquired    = isLive ? pick(5) : false
+    const recapAlready  = (!isLive && isFinalNow) ? pick(5) : null
+    // true = c'est la 1ère fois qu'on voit ce match FINAL (clé tout juste
+    // créée) → PAS encore confirmé. false/null = la clé existait déjà → au
+    // moins une passe FINAL précédente → confirmation possible (sous réserve
+    // du score inchangé, voir isFinalConfirmed plus bas).
+    const finalFirstSeen = isFinalNow ? pick(6) : null
 
-    const [prevStatus = null] = prevState ? prevState.split('|') : []
+    const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
+    // Confirmé seulement à la 2e passe FINAL consécutive (ou plus), avec un
+    // score identique à la passe précédente — voir commentaire finalConfirmKey.
+    const isFinalConfirmed = isFinalNow && !finalFirstSeen && FINAL_ESPN.has(prevStatus) && prevScore === score
+
+    // Marque ce match comme "toujours en cours" côté Redis, indépendamment du
+    // résultat de CETTE passe précise — voir cron:liveIds (garde-fou contre
+    // le bug de blackout notifs, déjà en place). Un match FINAL mais PAS
+    // ENCORE confirmé (1ère passe, potentiel glitch) reste traité comme
+    // "encore en direct" ici — sinon cron:liveIds pourrait se vider et
+    // armer l'optimisation "sauter le prochain fetch ESPN pendant 20-25min"
+    // en pleine confusion, empêchant toute correction rapide si c'était
+    // effectivement un faux FINAL.
+    const stayTrackedAsLive = isLive || (isFinalNow && !isFinalConfirmed)
+    try {
+      if (stayTrackedAsLive) await kv.sadd('cron:liveIds', String(eventId))
+      else await kv.srem('cron:liveIds', String(eventId))
+    } catch (e) {
+      log.push(`[cron:liveIds:${eventId}] error=${e.message}`)
+    }
 
     // 🔴 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
     // que si on vient vraiment de l'acquérir, comportement identique à avant.
@@ -515,19 +557,28 @@ async function runOnePass(env) {
         { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
     }
 
-    // 🏁 Fin de match
-    if (LIVE_ESPN.has(prevStatus) && isFinalNow) {
-      log.push(`[espn:${slug}:${eventId}] FT`)
+    // 🏁 Fin de match — seulement une fois CONFIRMÉ (2e passe FINAL
+    // consécutive, score inchangé — voir finalConfirmKey/isFinalConfirmed
+    // plus haut). Sur la 1ère passe FINAL (potentiel glitch ESPN, ex. temps
+    // additionnel confondu avec la fin), on ne notifie PAS encore — juste
+    // au cas où la passe suivante infirme ce statut.
+    if (isFinalConfirmed) {
+      log.push(`[espn:${slug}:${eventId}] FT (confirmé)`)
       await notifyVercel(env, `push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
       await cacheEspnSummary(kv, slug, eventId, log)
+    } else if (isFinalNow) {
+      log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
     }
 
     // 📝 Résumé auto — écrit directement en Redis, aucun appel Vercel. Le
     // "déjà généré ?" vient du pipeline ci-dessus (recapAlready) — seule
     // l'écriture reste un appel séparé, rare (une fois par match, jamais
-    // ensuite puisque recapAlready sera non-null derrière).
-    if (isFinalNow) {
+    // ensuite puisque recapAlready sera non-null derrière). Gêné derrière le
+    // même garde-fou isFinalConfirmed — un résumé généré sur un faux FT
+    // (temps additionnel toujours en cours) risquerait d'omettre un
+    // but/carton arrivé juste après.
+    if (isFinalConfirmed) {
       try {
         if (!recapAlready) {
           const scorers = extractEspnScorers(comp, homeC.team?.id)

@@ -843,9 +843,30 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           continue
         }
 
-        // STATUS_FINAL + score inchangé + horloge >= 85 → FT confirmé
-        delete pendingFt[mid]
-        confirmFt(match, now, queryClient)
+        // STATUS_FINAL + score inchangé + horloge >= 85 → FT POTENTIEL.
+        // ⚠️ AJOUT (retour utilisateur : "j'ai eu comme quoi le match est
+        // fini alors qu'il est pas fini, on est encore dans le temps
+        // additionnel, c'est pas normal") : ESPN peut renvoyer STATUS_FINAL
+        // de façon transitoire pendant un seul poll (glitch ponctuel côté
+        // API, déjà rencontré pour d'autres symptômes — voir Safeguard 3
+        // plus bas, "FD.org réplique parfois les faux STATUS_FINAL"). Avant
+        // ce fix, confirmFt() était appelé dès CE poll — un unique glitch
+        // suffisait à passer le match "Terminé" pour de bon. `pendingFt`
+        // existe déjà dans ce fichier depuis un moment (structure + Safeguard
+        // 1, le timeout 45s plus haut) mais n'était jamais RENSEIGNÉ ici :
+        // le mécanisme de confirmation à 2 polls était construit mais jamais
+        // câblé. Corrigé : 1er poll STATUS_FINAL → mémorisé comme "pending"
+        // (pas encore confirmé) ; confirmé seulement si un poll SUIVANT
+        // revoit STATUS_FINAL avec le même score (ou après 45s sans
+        // infirmation, via Safeguard 1 — filet de sécurité si aucun poll
+        // suivant n'arrive, ex. app en arrière-plan).
+        const pft = pendingFt[mid]
+        if (pft && pft.score === currentScore) {
+          delete pendingFt[mid]
+          confirmFt(match, now, queryClient)
+        } else {
+          pendingFt[mid] = { since: now, score: currentScore }
+        }
       }
 
       // ── FALLBACK J-1 : STATUS_SCHEDULED mais FD.org sait que c'est live ──
