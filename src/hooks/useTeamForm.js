@@ -4,11 +4,32 @@ import { readCache, getCacheSavedAt, writeCache } from './localCache'
 import { outcomeForTeam } from '../utils/matchUtils'
 import { getClubSeason } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
+import { fetchEspnCompMatches } from '../utils/espnAdapter'
+import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
 // pourtant déjà plus fraîche côté serveur.
 const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
+
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "es-tu sûr que c'est la bonne logique
+// pour VRAIMENT tous les matchs ?") : Ligue des Nations/CAN/Copa America ne
+// sont PAS couvertes par football-data.org en free tier (voir competitions.js,
+// espnAdapter.js) — mais fetchTeamForm() interrogeait quand même FD.org sans
+// distinction pour CES 3 compétitions, qui répondait donc systématiquement
+// vide. Résultat : formMap/compMatches toujours vides pour NL/CAN/COPA → prono
+// neutre pour CHAQUE match de ces compétitions, en permanence (pas juste en
+// début de saison comme le vrai repli saison précédente plus bas). Corrigé en
+// sourçant forme/buts via ESPN pour ces 3 comps (fetchEspnCompMatches, même
+// fonction déjà utilisée pour Programme/Résultats — normalise vers exactement
+// la même forme d'objet que FD.org, voir espnAdapter.js, donc calcProno.js
+// n'a besoin d'aucune modification). Pas de repli "saison précédente" ESPN ici
+// : ces compétitions ne suivent pas un cycle annuel comparable aux
+// championnats club (getClubSeason() ne s'applique pas), et la fenêtre
+// glissante d'espnAdapter.js (60j avant / 150j après) n'a pas de notion de
+// "saison" à décaler — si pas assez de matchs dispo, repli normal sur
+// calcProno (forme récente), comme pour toute compétition sous-alimentée.
+const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA'])
 
 // Un seul fetch "saison" FD.org (season explicite optionnel) → matchs FINISHED
 // côté client (status=FINISHED non supporté par le free tier sur certains
@@ -61,6 +82,16 @@ function buildFormMap(matches) {
 // Logique de fetch factorisée — réutilisée par useTeamForm (1 compétition) et
 // useTeamFormMulti (plusieurs compétitions mélangées, voir plus bas).
 async function fetchTeamForm(selectedComp) {
+  // NL/CAN/COPA : voir ESPN_SOURCED_FORM_COMPS plus haut — FD.org ne les
+  // couvre pas, on source via ESPN à la place (même fonction que Programme/
+  // Résultats, objets déjà normalisés au format FD.org-like).
+  if (ESPN_SOURCED_FORM_COMPS.has(selectedComp)) {
+    const slug = COMPETITION_ESPN_SLUG[selectedComp]
+    const all = await fetchEspnCompMatches(selectedComp, slug)
+    const matches = all.filter(m => m.status === 'FINISHED')
+    return { formMap: buildFormMap(matches), matches, isLastSeason: false }
+  }
+
   // WC 2026 : forcer season=2026 sinon FD.org renvoie WC 2022
   // Euro : même problème (compétition non-annuelle, FD.org peut résoudre une
   // vieille édition sans ?season= explicite — voir useWcKnockout.js) — année
