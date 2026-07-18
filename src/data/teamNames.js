@@ -117,7 +117,7 @@ export const TEAM_NAMES_FR = {
   'Ajax': 'Ajax',
   'København': 'Copenhague',
   'Club Brugge': 'Bruges',
-  'Monaco': 'Monaco',
+  // 'Monaco' déjà listé plus haut, section Ligue 1
   'Sporting CP': 'Sporting CP',
   'FK Kairat': 'Kairat',
   'Galatasaray': 'Galatasaray',

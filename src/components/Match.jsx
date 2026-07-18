@@ -380,7 +380,6 @@ function BracketSvgView({ rounds, onSelect, containerRef, isDesktop = false, isC
     if (hb && hb > 0) setCardHBig(Math.ceil(hb) + BK_CARD_H_SAFETY)
     // Contenu-sonde fixe (jamais lié aux données réelles) → une seule mesure
     // au montage suffit, pas besoin de re-mesurer à chaque render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const probe = createPortal(
@@ -908,7 +907,10 @@ function Matchs() {
       setCurrentIndex(0)
       autoSwitchDone.current = true
     }
-  }, [isWC, hasCup, wcView, loading, matches.length, wcGroups.length])
+  // setWcView/setCurrentIndex (useState) : identité garantie stable par React
+  // entre les renders, sans risque à ajouter aux deps (résout juste le
+  // warning exhaustive-deps, aucun changement de comportement).
+  }, [isWC, hasCup, wcView, loading, matches.length, wcGroups.length, setWcView, setCurrentIndex])
 
   /* Auto-switch (2e garde-fou, plus fiable) : si un match à élimination directe
      est déjà TERMINÉ, on est forcément après la phase de poules — inutile
@@ -924,7 +926,7 @@ function Matchs() {
       setCurrentIndex(0)
       autoSwitchDone.current = true
     }
-  }, [isWC, wcView, bracketLoading, hasPlayedKnockout])
+  }, [isWC, wcView, bracketLoading, hasPlayedKnockout, setWcView, setCurrentIndex])
 
   /* Si l'onglet "Phase finale" d'une coupe nationale est désactivé (aucun
      match dans le tableau, voir cupBracketDisabled) mais que wcView pointe
@@ -936,7 +938,7 @@ function Matchs() {
       setWcView('matchs')
       setCurrentIndex(0)
     }
-  }, [cupBracketDisabled, wcView])
+  }, [cupBracketDisabled, wcView, setWcView, setCurrentIndex])
 
   /* Changement manuel de vue (clics utilisateur) → on considère l'auto-switch
      "consommé" pour cette compétition, il ne doit plus jamais forcer la vue. */
@@ -968,7 +970,7 @@ function Matchs() {
   // valide plutôt que de rester bloqué sur un index vide.
   useEffect(() => {
     if (total > 0 && currentIndex >= total) setCurrentIndex(total - 1)
-  }, [total, currentIndex])
+  }, [total, currentIndex, setCurrentIndex])
   const currentGroup      = filteredGrouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches    = currentGroup?.matches ?? []
@@ -978,14 +980,18 @@ function Matchs() {
   // journée : on cherche sur TOUS les matchs à venir de la compétition
   // (sinon une équipe absente de la journée affichée semblerait n'avoir
   // aucun match programmé).
-  function matchesTeamSearch(team) {
-    if (!searchNorm) return true
-    const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
-    const raw         = (team?.name ?? '').toLowerCase()
-    return translated.includes(searchNorm) || raw.includes(searchNorm)
-  }
   const filteredSearchMatches = useMemo(() => {
     if (!searchNorm) return []
+    // Définie ICI (pas au niveau du composant) : seule utilisatrice, évite le
+    // warning exhaustive-deps sans recalculer le memo à chaque render (une
+    // fonction définie au niveau du composant est une référence différente à
+    // chaque passage, ce qui aurait invalidé le memo inutilement si ajoutée
+    // aux deps — son comportement dépend uniquement de searchNorm, déjà listé).
+    function matchesTeamSearch(team) {
+      const translated = translateTeam(team?.shortName || team?.name || '').toLowerCase()
+      const raw         = (team?.name ?? '').toLowerCase()
+      return translated.includes(searchNorm) || raw.includes(searchNorm)
+    }
     // Override AVANT le filtre de recherche : sinon un match dont le vrai
     // qualifié (bracket) correspond à la recherche, mais dont le nom encore
     // caché en cache ("à déterminer") ne correspond pas, serait exclu à tort.

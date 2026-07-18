@@ -148,8 +148,8 @@ export const COUNTRY_FLAG_CODE = {
   'Burundi': 'bi',
 
   // Autres qualifiés Mondial 2026 pouvant croiser une de ces 3 compétitions
+  // ('Bosnia-H.' déjà listé plus haut, section UEFA)
   'Korea Republic': 'kr',
-  'Bosnia-H.': 'ba',
   'Qatar': 'qa',
   'Haiti': 'ht',
   'Australia': 'au',
