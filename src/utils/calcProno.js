@@ -591,9 +591,31 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // Blend : à la mi-temps (remaining ~0.5) les deux comptent autant, en fin
   // de match "now" écrase le prior, au coup d'envoi (remaining=1) diff vaut
   // toujours 0 donc pre === now de toute façon.
-  const home = pre.home * remaining + now.home * (1 - remaining)
-  const draw = pre.draw * remaining + now.draw * (1 - remaining)
-  const away = pre.away * remaining + now.away * (1 - remaining)
+  let home = pre.home * remaining + now.home * (1 - remaining)
+  let draw = pre.draw * remaining + now.draw * (1 - remaining)
+  let away = pre.away * remaining + now.away * (1 - remaining)
+
+  // Contrainte structurelle (bug réel signalé par l'utilisateur — France
+  // favorite pré-match, menée 0-3 par l'Angleterre : cote nul 6,74 mais cote
+  // victoire France 3,37, la victoire ressortait donc PLUS probable que le
+  // nul) : revenir au score demande de combler l'écart de buts, gagner
+  // demande de le combler ET de le dépasser d'au moins un but — donc
+  // toujours au moins aussi difficile que le nul, jamais plus facile. Le
+  // blend linéaire ci-dessus peut casser cette contrainte quand le prior
+  // pré-match était très favorable à l'équipe désormais menée (son avantage
+  // "victoire" d'avant-match ne s'efface pas aussi vite que son avantage
+  // "nul", qui était déjà proche de son plancher pré-match). On ne
+  // retouche pas le blend lui-même (garderait le même défaut structurel dans
+  // d'autres cas) : on plafonne juste la proba de victoire de l'équipe menée
+  // à celle du nul, l'excédent revenant à l'équipe qui mène (c'est cette
+  // probabilité-là que le blend sous-évaluait).
+  if (diff < 0 && home > draw) {
+    away += home - draw
+    home = draw
+  } else if (diff > 0 && away > draw) {
+    home += away - draw
+    away = draw
+  }
 
   return distribute(home, away, draw)
 }

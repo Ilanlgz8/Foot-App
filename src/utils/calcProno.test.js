@@ -290,6 +290,21 @@ describe('calcLiveProno', () => {
     expect(fourGoals.home).toBeGreaterThan(oneGoal.home)
   })
 
+  it('une équipe menée de plusieurs buts ne peut jamais avoir une victoire plus probable qu\'un nul (bug réel signalé : France favorite pré-match, menée 0-3 par l\'Angleterre — cote nul 6,74 mais cote victoire France 3,37)', () => {
+    const live = calcLiveProno(homeForm, awayForm, 0, 3, "30'")
+    expect(sumsTo100(live)).toBe(true)
+    // homeForm est favori pré-match (voir test ci-dessus) : sans la
+    // contrainte, le prior pré-match pouvait faire remonter home au-dessus
+    // de draw malgré les 3 buts de retard à combler EN PLUS pour gagner.
+    expect(live.home).toBeLessThanOrEqual(live.draw)
+  })
+
+  it('symétrique : l\'équipe qui mène de plusieurs buts garde bien une victoire au moins aussi probable qu\'un nul', () => {
+    const live = calcLiveProno(homeForm, awayForm, 3, 0, "30'")
+    expect(sumsTo100(live)).toBe(true)
+    expect(live.home).toBeGreaterThanOrEqual(live.draw)
+  })
+
   it('un carton rouge adverse favorise nettement l\'équipe en supériorité numérique, à score égal', () => {
     const neutral  = calcLiveProno(homeForm, awayForm, 0, 0, "60'")
     const withRed  = calcLiveProno(homeForm, awayForm, 0, 0, "60'", { awayRedCards: 1 })
