@@ -123,6 +123,11 @@ function Accueil() {
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches: rawMatches, loading: matchesLoading } = useTodayMatches(targetDate)
 
+  // Remonté ici (était plus bas, juste avant la nav cartes) pour être
+  // disponible au moment de calculer `matches` — voir l'exception minuit
+  // ci-dessous.
+  const { liveMatches, espnScores } = useLiveData()
+
   // Matchs à venir toutes compétitions, fenêtre large (30j) — sert à savoir où
   // sauter quand le jour affiché est vide (voir effet plus bas) ET, depuis le
   // correctif ci-dessous, de filet de sécurité pour les cards elles-mêmes.
@@ -169,8 +174,27 @@ function Accueil() {
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       return localStr === targetDate
     })
-    return applyKnockoutTeamOverrides([...rawMatches, ...extra], knockoutOverrides)
-  }, [rawMatches, upcomingAllComps, targetDate, knockoutOverrides])
+    let merged = [...rawMatches, ...extra]
+
+    // ⚠️ EXCEPTION minuit (retour utilisateur : "il est 0h00 et le match en
+    // live actuellement apparait plus dans accueil") : un match qui a démarré
+    // avant minuit et qui est TOUJOURS en cours après minuit a un utcDate qui
+    // correspond au jour PRÉCÉDENT — il disparaissait donc entièrement de la
+    // card "Aujourd'hui" dès que targetDate basculait sur le nouveau jour,
+    // alors qu'il est toujours en train de se jouer. liveMatches
+    // (LiveProvider/liveTracker) est indépendant de la date affichée
+    // (localStorage, pas un fetch par date) : on l'utilise comme filet de
+    // sécurité, uniquement pour dayOffset===0 (seule vue concernée par un
+    // passage de minuit en cours de match — un jour futur/passé ne peut pas
+    // avoir de match "en live" par définition).
+    if (dayOffset === 0 && liveMatches.length > 0) {
+      const mergedIds = new Set(merged.map(m => m.id))
+      const stillLive = liveMatches.filter(m => !mergedIds.has(m.id))
+      if (stillLive.length > 0) merged = [...merged, ...stillLive]
+    }
+
+    return applyKnockoutTeamOverrides(merged, knockoutOverrides)
+  }, [rawMatches, upcomingAllComps, targetDate, knockoutOverrides, dayOffset, liveMatches])
 
   // Résultats récents : jusqu'à 7 jours en arrière (était limité à
   // aujourd'hui + hier — retour utilisateur : impossible de consulter plus
@@ -229,7 +253,7 @@ function Accueil() {
   const { formMap } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
-  const { liveMatches, espnScores } = useLiveData()
+  // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
   const navigate = useNavigate()
 
   // ── Bandeau "Mon équipe" ──
