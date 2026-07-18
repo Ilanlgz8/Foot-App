@@ -329,7 +329,9 @@ export default async function handler(req, res) {
   if (!lineupResult?.home?.starters?.length) {
     if (!ids?.fifaMatchId) {
       // Diagnostic : tester directement l'accessibilité de l'API FIFA
-      let fifaDiag = 'non testé'
+      // Pas d'initialisation : toujours réassigné par le try/catch juste après
+      // avant d'être lu plus bas (voir no-useless-assignment, ESLint).
+      let fifaDiag
       try {
         const r = await fetch(`${FIFA_BASE}/competitions/${WC_COMP_ID}/seasons?language=en&count=5`, {
           headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },

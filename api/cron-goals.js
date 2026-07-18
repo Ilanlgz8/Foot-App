@@ -167,7 +167,10 @@ function matchesFavoriteStrict(subComps, slug) {
 // (appelé une fois dans runOnePass(), voir plus bas), puis le résultat est
 // réutilisé pour tous les matchs/types de notifs de cette même passe.
 async function loadSubscriptions(log) {
-  let raw = []
+  // Pas d'initialisation ([]) : toujours réassigné par le try avant lecture,
+  // ou la fonction retourne avant d'atteindre la boucle qui lit `raw` (voir
+  // no-useless-assignment, ESLint) — l'ancien `= []` initial n'était jamais lu.
+  let raw
   try { raw = (await kv.smembers('push:subscriptions')) ?? [] } catch { return [] }
   const parsed = []
   const stale  = []

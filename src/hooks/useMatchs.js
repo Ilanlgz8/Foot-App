@@ -115,7 +115,9 @@ async function fetchMatchesForComp(selectedComp, status) {
     return json.matches ?? []
   }
 
-  let matches = null
+  // Pas d'initialisation (null) : chaque branche ci-dessous assigne toujours
+  // `matches` avant toute lecture (voir no-useless-assignment, ESLint).
+  let matches
 
   if (!isClub) {
     const wcSeason = new Date().getFullYear()
