@@ -189,7 +189,9 @@ export function calcProno(homeForm, awayForm) {
 // équipes n'a pas assez de matchs joués cette saison pour un calcul fiable.
 
 const MIN_TEAM_SPLITS  = 2   // matchs mini par équipe à domicile ET à l'extérieur
-const MIN_LEAGUE_GAMES = 10  // matchs mini dispo pour une moyenne de championnat fiable
+// Exporté : réutilisé par useTeamForm.js pour déclencher le repli saison
+// précédente (source unique du seuil, pas de duplication du chiffre 10).
+export const MIN_LEAGUE_GAMES = 10  // matchs mini dispo pour une moyenne de championnat fiable
 const MAX_GOALS_GRID   = 8   // buts max simulés par équipe (au-delà, probabilité négligeable)
 const H2H_WEIGHT_PER_MATCH = 0.08  // poids d'une confrontation directe dans le mix final
 const H2H_WEIGHT_MAX       = 0.3   // jamais plus de 30% du poids final (échantillon souvent petit)
