@@ -24,7 +24,7 @@ import {
   getMatchState, trackMatchState, clearMatchState, clearFtFlags,
   setKickoffAt, setHalf2Start,
   clearAllMatchStates, setEspnData, setEspnWorking,
-  getLiveState, setLiveState,
+  getLiveState, setLiveState, markRecentlyFinished,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
@@ -210,6 +210,11 @@ function parseClockMins(clock) {
 function confirmFt(match, now, queryClient) {
   const id    = match.id
   setLiveState(id, 'ended', { endedAt: now })
+  // Pont Résultats (voir matchStateTracker.js, markRecentlyFinished) — survit
+  // à l'éviction du liveTracker 5min plus bas, pour le cas où FD.org met plus
+  // longtemps que ça à confirmer FINISHED (bug signalé : match "terminé"
+  // invisible en Résultats pendant plus d'1h).
+  markRecentlyFinished(match)
 
   // Persister le score ESPN pour MatchModal post-match
   if (espnScoresCache[id]) {
@@ -707,6 +712,32 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         // mins - 46 : la 2ème MT commence à 46', donc half2Start = now - (mins-46)min en arrière
         // (mins-45 donnait un décalage systématique de +1')
         if (mins != null) setHalf2Start(mid, now - Math.max(0, mins - 46) * 60_000)
+      }
+
+      // ── Garde : STATUS_FINAL_AET/PEN sans avoir jamais vu la prolongation ──
+      // Retour utilisateur : pendant la pause juste avant le début de la
+      // prolongation (90min+arrêts), le match a été affiché "Terminé" pendant
+      // ~2min (disparu d'Accueil, montré fini dans Résultats, mais toujours
+      // en cours sur LiveMatchPage) avant de se corriger tout seul. Root
+      // cause probable : ESPN renvoie normalement STATUS_FINAL_AET/PEN
+      // uniquement pour une VRAIE fin après prolongations/tab — mais peut, à
+      // cette transition précise, l'envoyer par erreur avant même que period
+      // ne passe à 3 (même famille de glitch que isFifaSource/etImplausible
+      // ci-dessus, sur les statuts finaux plutôt qu'en cours). Une vraie fin
+      // après prolongations ne peut logiquement survenir qu'après avoir déjà
+      // observé period=3 ou 4 sur un poll PRÉCÉDENT (`prevState.espnPeriod`,
+      // pas ce poll-ci qui peut lui-même être le glitch) — sinon ce n'est pas
+      // plausible, on garde le match en vie plutôt que de confirmer un FT.
+      if (
+        !alreadyEnded &&
+        (espnStatus === 'STATUS_FINAL_AET' || espnStatus === 'STATUS_FINAL_PEN') &&
+        prevState.espnPeriod !== 3 && prevState.espnPeriod !== 4
+      ) {
+        delete pendingFt[mid]
+        markLive(match)
+        if (!isStaleFtReversal) clearFtFlags(mid)
+        setEspnData(mid, { espnClock: '90:00', espnStatus: 'STATUS_END_PERIOD', espnPeriod: prevState.espnPeriod ?? 2 })
+        continue
       }
 
       // ════════════════════════════════════════════════════════════════════

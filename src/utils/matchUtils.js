@@ -299,16 +299,29 @@ export function calcMinute(match) {
     // continuent d'afficher une minute crédible (ex. "90+3'") pendant
     // l'attente de confirmation.
     if (state.espnStatus === 'STATUS_END_PERIOD') {
-      // STATUS_END_PERIOD = coup de sifflet de fin des 90min+arrêts, AVANT que
-      // la 1ère période de prolongation ne démarre vraiment (period passe à 3).
-      // BUG CONSTATÉ : ce statut était regroupé avec STATUS_IN_PROGRESS
-      // ci-dessous, donc l'horloge ESPN (encore sur "90:00+X:00" à ce moment)
-      // continuait d'être interpolée → le temps additionnel de la 90e minute
-      // continuait de tourner à l'écran pendant tout ce round de transition,
-      // alors que le match n'est plus vraiment "en jeu" (ni terminé). On
-      // affiche donc "Prolongation" ici, jusqu'à ce qu'ESPN confirme period=3
-      // (→ repasse par STATUS_IN_PROGRESS/EXTRA_TIME/OVERTIME ci-dessous, qui
-      // reprend alors normalement l'horloge ESPN à 91', 92'...).
+      // STATUS_END_PERIOD = coup de sifflet de fin de période, réutilisé par
+      // ESPN à 2 moments différents : fin des 90min+arrêts AVANT que la 1ère
+      // période de prolongation ne démarre vraiment (period pas encore à 3),
+      // ET fin de la 2e période de prolongation (period déjà à 4) AVANT la
+      // confirmation FT/tirs au but. BUG CONSTATÉ (retour utilisateur) : le
+      // 2e cas affichait aussi le texte statique "Prolongation" à la place de
+      // la minute (ex. "120+2'"), alors qu'on est déjà EN prolongation, pas
+      // avant son début — seul le 1er cas (period pas encore 3/4) justifie ce
+      // texte générique (aucune minute fiable avant period=3 confirmé).
+      if (state.espnPeriod === 3 || state.espnPeriod === 4) {
+        const interpolated = interpolateEspnMinute(state)
+        if (interpolated && interpolated !== 'OVERRUN') return interpolated
+        const parsed = parseEspnClock(state.espnClock)
+        if (parsed) {
+          return parsed.extra > 0
+            ? `${parsed.base}+${parsed.extra}'`
+            : `${Math.max(1, parsed.base)}'`
+        }
+      }
+      // Avant period=3 confirmé (fin des 90min+arrêts) : pas de minute fiable
+      // à afficher — voir commentaire ci-dessus. Repasse par
+      // STATUS_IN_PROGRESS/EXTRA_TIME/OVERTIME ci-dessous une fois period=3
+      // confirmé, qui reprend alors normalement l'horloge ESPN à 91', 92'...
       return 'Prolongation'
     }
     if (
@@ -410,7 +423,20 @@ export function getMatchPeriod(match) {
   const status = state.espnStatus
   const period = state.espnPeriod
 
-  if (status === 'STATUS_HALFTIME') return 'Mi-temps'
+  // STATUS_HALFTIME est réutilisé par ESPN pour 2 pauses différentes : la
+  // vraie mi-temps (45') ET la pause avant le début des prolongations (juste
+  // après 90+arrêts, avant que period passe à 3) — voir le même constat déjà
+  // fait dans calcMinute() ci-dessus (pastRegulation). getMatchPeriod() ne
+  // faisait PAS cette distinction et affichait "MT" (badge en haut à droite
+  // de la card Accueil) pendant cette pause de prolongation, jusqu'à ce
+  // qu'ESPN confirme period=3 (~2min plus tard) — bug signalé. Même logique
+  // de détection que calcMinute : period déjà connu (3/4) ou clock ≥ 90min.
+  if (status === 'STATUS_HALFTIME') {
+    const pastRegulation =
+      period === 3 || period === 4 ||
+      (() => { const p = parseEspnClock(state.espnClock); return p ? p.base >= 90 : false })()
+    return pastRegulation ? 'Prolongations' : 'Mi-temps'
+  }
   // FD.org PAUSED override — prioritaire sur espnPeriod potentiellement stale.
   // Cas : FIFA laisse period=3 en localStorage pendant la transition mi-temps
   // alors que FD.org a déjà passé le match en PAUSED → évite badge 'Prolongations'.

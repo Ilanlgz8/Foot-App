@@ -1548,13 +1548,27 @@
   text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 14px rgba(var(--red-rgb),0.4);
   line-height: 1;
 }
-/* Variante mi-temps : "Reprise dans X min" / "Reprise imminente" / "Mi-temps"
-   sont bien plus longs que "MT"/"45'" — police réduite pour rester lisible
-   sans déborder du poster. */
-.poster__min-label--reprise {
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
+/* Colonne "MT" + countdown (mi-temps) — reproduit exactement
+   .lmp__heroBadgeCol de LiveMatchPage : "MT" au-dessus, countdown en
+   dessous, pas l'un à la place de l'autre. */
+.poster__min-labelCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* "Reprise dans X min" / "Reprise imminente" / "Mi-temps" — même couleur/
+   style que .lmp__heroReprise (LiveMatchPage), au lieu du blanc/rouge du
+   badge minute normal (retour utilisateur : "même couleur que
+   LiveMatchPage"). */
+.poster__reprise-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: rgba(255,200,50,0.95);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.5);
   white-space: nowrap;
+  line-height: 1;
 }
 
 /* Heure (upcoming) — bien centrée, grosse */

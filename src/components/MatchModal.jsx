@@ -7,9 +7,9 @@ import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
-import { getLiveState } from '../utils/matchStateTracker'
+import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
-import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
+import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
 
@@ -747,9 +747,18 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
     )
   })()
 
+  // Prolongations/tirs au but (period ESPN 3/4/5) : un match à élimination
+  // directe ne peut pas se terminer sur un nul à ce stade — voir LiveProno
+  // ci-dessous, qui bascule alors en affichage "Qualification" 2 issues
+  // plutôt que 1/N/2. Simple à détecter (pas besoin de connaître le stage/la
+  // compétition : SEULS les matchs à élimination directe atteignent jamais
+  // ces périodes ESPN, un match de poules s'arrête toujours à period 2).
+  const espnPeriod       = getMatchState(match?.id)?.espnPeriod
+  const isExtraTimeOrTab = espnPeriod === 3 || espnPeriod === 4 || espnPeriod === 5
+
   return (
     <div>
-      {liveProno && <LiveProno prono={liveProno} match={match} />}
+      {liveProno && <LiveProno prono={liveProno} match={match} isQualification={isExtraTimeOrTab} />}
       {statsBody}
     </div>
   )
@@ -769,13 +778,33 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
 // utilisateur : "la bordure rouge mais que sur la côte la plus basse" — les
 // 2 autres restent neutres. Pas d'animation sur les pilules elles-mêmes : le
 // point qui pulse (kicker ci-dessus) suffit déjà à signaler "en direct".
-function LiveProno({ prono, match }) {
+function LiveProno({ prono, match, isQualification = false }) {
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
   const awayCode = (match.awayTeam?.tla || awayName).slice(0, 3).toUpperCase()
-  const favorite = pronoFavoriteKey(prono)
 
+  // Prolongations/tirs au but : le nul n'est pas une issue possible (voir
+  // qualificationOdds, calcProno.js) — 2 pilules "qui se qualifie" au lieu
+  // de 3, sa masse redistribuée aux 2 équipes.
+  if (isQualification) {
+    const qualif = qualificationOdds(prono)
+    const favorite = qualif.home >= qualif.away ? 'home' : 'away'
+    return (
+      <div className="modal__liveProno">
+        <div className="modal__liveProno__title">
+          <span className="modal__liveProno__dot" />
+          Qualification
+        </div>
+        <div className="modal__liveProno__row">
+          <LivePronoPill label={homeCode} value={pronoToOdds(qualif.home)} pct={qualif.home} isFavorite={favorite === 'home'} />
+          <LivePronoPill label={awayCode} value={pronoToOdds(qualif.away)} pct={qualif.away} isFavorite={favorite === 'away'} />
+        </div>
+      </div>
+    )
+  }
+
+  const favorite = pronoFavoriteKey(prono)
   return (
     <div className="modal__liveProno">
       <div className="modal__liveProno__title">

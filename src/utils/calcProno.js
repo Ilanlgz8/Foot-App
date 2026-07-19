@@ -66,6 +66,26 @@ export function pronoFavoriteKey(prono) {
   return 'draw'
 }
 
+// ── Qualification (prolongations/tirs au but) ───────────────────────────
+// Retour utilisateur : en prolongation, la pilule "Nul" n'a pas de sens — un
+// match à élimination directe ne peut PAS se terminer sur un nul (tirs au
+// but obligatoires si toujours à égalité après les 120min), donc afficher
+// une "cote du nul" pendant cette phase est trompeur. Convertit le 1/N/2 en
+// 2 issues "qui se qualifie" : chaque équipe garde sa proba de victoire dans
+// le temps réglementaire+prolongations, et la masse du nul (= la partie qui
+// partirait aux tirs au but) est redistribuée aux 2 équipes.
+// ⚠️ Répartition 50/50 du nul, PAS pondérée par la force des équipes : aucune
+// donnée exploitable sur la "compétence aux tirs au but" de chaque équipe
+// (série d'anciens tirs au but non trackée par l'app) — la seule hypothèse
+// qu'on peut honnêtement défendre sans donnée est un tirage à 50/50, pas une
+// estimation inventée. Reste cohérent avec le consensus habituel (les tirs
+// au but sont réputés proches d'un coin-flip, même entre équipes de niveaux
+// très différents).
+export function qualificationOdds(prono) {
+  const half = prono.draw / 2
+  return { home: prono.home + half, away: prono.away + half }
+}
+
 // Convertit 3 poids bruts (home, away, draw) en pourcentages entiers qui
 // somment à 100, avec un plancher (5% par défaut) par issue (jamais 0%
 // affiché). `floor` réglable — voir BLOWOUT_GOAL_MARGIN plus bas
@@ -727,8 +747,21 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // pour calcLiveProno) — à vérifier si un backtest live devient possible.
   const LIVE_LAMBDA_SHRINK = 0.15
   const lambdaAvg = (rawLambdaHome + rawLambdaAway) / 2
-  const baseLambdaHome = rawLambdaHome * (1 - LIVE_LAMBDA_SHRINK) + lambdaAvg * LIVE_LAMBDA_SHRINK
-  const baseLambdaAway = rawLambdaAway * (1 - LIVE_LAMBDA_SHRINK) + lambdaAvg * LIVE_LAMBDA_SHRINK
+  // Audit calcLiveProno (retour utilisateur : "à 0-0 on est trop excessif sur
+  // les côtes") — vérifié numériquement : à 0-0, ce lissage (qui rapproche
+  // lambdaHome/lambdaAway de leur moyenne) COMPOSE avec l'effet Poisson
+  // naturel du temps restant (moins de temps = plus de masse de proba sur le
+  // nul), les deux poussant dans le MÊME sens contre le favori — un favori à
+  // 75% pré-match tombait à 44% dès la 60e minute, TOUJOURS 0-0, alors qu'il
+  // ne s'est objectivement rien passé qui justifie une telle chute. Le
+  // backtest qui justifie ce lissage (voir commentaire au-dessus) visait
+  // spécifiquement la surconfiance quand le favori DÉFEND/COMBLE un écart de
+  // buts déjà acquis (diff != 0) — pas le cas où rien n'a encore bougé.
+  // Désactivé à 0-0 : l'effet Poisson du temps restant suffit déjà, seul, à
+  // faire naturellement remonter le nul au fil du match.
+  const shrinkFactor   = diff === 0 ? 0 : LIVE_LAMBDA_SHRINK
+  const baseLambdaHome = rawLambdaHome * (1 - shrinkFactor) + lambdaAvg * shrinkFactor
+  const baseLambdaAway = rawLambdaAway * (1 - shrinkFactor) + lambdaAvg * shrinkFactor
 
   // Rythme RÉEL de CE match (retour utilisateur : "4-3 à la 70e, la cote de
   // l'équipe menée d'1 seul but est à 18, pas cohérent, l'équipe est

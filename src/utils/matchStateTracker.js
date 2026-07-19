@@ -184,6 +184,12 @@ export function isRecentlyFinished(matchId, graceMs = TERMINE_GRACE_MS) {
  */
 export function clearFtFlags(matchId) {
   if (!matchId) return
+  // Le pont Résultats longue durée (voir markRecentlyFinished plus bas) n'est
+  // écrit QUE depuis confirmFt — si ESPN se corrige et qu'on efface le flag
+  // "Terminé" ici, il doit aussi disparaître de ce pont, sinon un faux FT
+  // corrigé (match en réalité toujours en cours) resterait affiché comme
+  // "Terminé" en Résultats jusqu'à expiration du TTL (45min).
+  clearRecentlyFinished(matchId)
   try {
     const stored = readState(matchId)
     if (!stored.ft && !stored.termineAt) return  // rien à faire
@@ -225,4 +231,70 @@ export function clearAllMatchStates() {
   Object.keys(localStorage)
     .filter(k => k.startsWith('foot_ms_'))
     .forEach(k => localStorage.removeItem(k))
+}
+
+// ── Pont Résultats : matchs terminés (ft confirmé) pas encore repris par
+// FD.org ──────────────────────────────────────────────────────────────────
+// Bug réel signalé : un match vraiment terminé s'affichait 1s dans la page
+// Résultats (via le pont ft/liveMatches de Resultat.jsx) puis disparaissait
+// et restait invisible même 1h+ après. Root cause : le pont s'appuie sur
+// `liveMatches` (liveTracker) + `foot_ms_{id}.ft`, tous deux effacés/évincés
+// après 5min (grace period, voir confirmFt dans useLiveMinute.js) — un délai
+// pensé pour le cas normal, mais trop court quand football-data.org met plus
+// de 5min à confirmer FINISHED (constaté sur ce match à prolongations). Passé
+// ce délai, plus aucune trace du match nulle part pour Resultat.jsx (ni dans
+// fdMatches, ni dans liveMatches) → invisible jusqu'à ce que FD.org catche up
+// PAR LUI-MÊME ET qu'un remount déclenche un nouveau fetch (staleTime 2min).
+// Ce petit magasin dédié conserve un snapshot minimal du match bien au-delà
+// de l'éviction du liveTracker (45min, largement au-delà du délai FD.org
+// observé), pour que Resultat.jsx puisse continuer à l'afficher pendant
+// l'attente — indépendant de `foot_ms_{id}` (qui, lui, reste sur son propre
+// cycle de vie 5min/3h, utilisé ailleurs pour d'autres besoins).
+const RECENT_FT_PREFIX = 'foot_recentft_'
+const RECENT_FT_TTL    = 45 * 60_000
+
+export function markRecentlyFinished(match) {
+  if (!match?.id) return
+  try {
+    localStorage.setItem(`${RECENT_FT_PREFIX}${match.id}`, JSON.stringify({
+      match: {
+        id:          match.id,
+        utcDate:     match.utcDate,
+        homeTeam:    match.homeTeam,
+        awayTeam:    match.awayTeam,
+        competition: match.competition,
+        score:       match.score,
+      },
+      ts: Date.now(),
+    }))
+  } catch {}
+}
+
+/**
+ * Matchs récemment confirmés terminés (ft) mais pas encore repris par FD.org,
+ * pour une compétition donnée (ou toutes si omis). Auto-nettoie les entrées
+ * périmées au passage.
+ */
+export function getRecentlyFinishedMatches(competitionCode) {
+  const now = Date.now()
+  const out = []
+  for (const k of Object.keys(localStorage)) {
+    if (!k.startsWith(RECENT_FT_PREFIX)) continue
+    try {
+      const entry = JSON.parse(localStorage.getItem(k) || 'null')
+      if (!entry || now - entry.ts > RECENT_FT_TTL) { localStorage.removeItem(k); continue }
+      if (competitionCode && entry.match?.competition?.code !== competitionCode) continue
+      out.push(entry.match)
+    } catch {}
+  }
+  return out
+}
+
+/**
+ * À appeler dès que le match apparaît dans les données FD.org (fdMatches) —
+ * plus besoin du pont, nettoyage immédiat sans attendre le TTL.
+ */
+export function clearRecentlyFinished(matchId) {
+  if (!matchId) return
+  try { localStorage.removeItem(`${RECENT_FT_PREFIX}${matchId}`) } catch {}
 }

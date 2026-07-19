@@ -13,7 +13,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
-import { getMatchState } from '../utils/matchStateTracker'
+import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
 import { mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { FavStarBadge } from './FavStarBadge'
@@ -191,12 +191,23 @@ function Resultats() {
   // `espnScores`/`liveMatches` entre-temps. Ticker dédié (5s), tant qu'un
   // match de la compétition affichée vient de passer `ft` mais n'est pas
   // encore repris par football-data.org (donc pas encore dans fdMatches).
+  //
+  // ⚠️ 2e BUG CORRIGÉ (constat utilisateur : un match vraiment terminé
+  // s'affiche 1s ici puis disparaît, et reste invisible même 1h+ après) :
+  // `liveMatches` (liveTracker) ET le flag `ft` sont tous deux effacés/évincés
+  // 5min après confirmFt (grace period, voir useLiveMinute.js) — trop court
+  // quand FD.org met plus longtemps que ça à confirmer FINISHED (constaté sur
+  // un match à prolongations). Passé ces 5min, plus aucune trace du match
+  // nulle part (ni fdMatches, ni liveMatches) → invisible jusqu'au retour de
+  // FD.org. `getRecentlyFinishedMatches` (matchStateTracker.js) est un pont
+  // dédié à durée de vie bien plus longue (45min), alimenté par confirmFt,
+  // qui prend le relais une fois `liveMatches` évincé. Ticker élargi en
+  // conséquence (couvre aussi ce pont, pas seulement `liveMatches`).
   const [, forceTick] = useState(0)
   useEffect(() => {
-    const pending = () => liveMatches.some(m =>
-      m.competition?.code === selectedComp &&
-      getMatchState(m.id).ft === true
-    )
+    const pending = () =>
+      liveMatches.some(m => m.competition?.code === selectedComp && getMatchState(m.id).ft === true) ||
+      getRecentlyFinishedMatches(selectedComp).length > 0
     if (!pending()) return
     const id = setInterval(() => {
       forceTick(n => n + 1)
@@ -207,10 +218,31 @@ function Resultats() {
 
   const matches = useMemo(() => {
     const known = new Set(fdMatches.map(m => m.id))
-    const extra = liveMatches
-      .filter(m => m.competition?.code === selectedComp)
+    // Pont normal (liveMatches, 5min) + pont longue durée (45min, voir
+    // commentaire ci-dessus) — dédupliqués par id, le 1er a priorité (données
+    // plus fraîches, liveMatches est activement mis à jour par LiveProvider).
+    // ⚠️ Le flag `ft` (foot_ms_{id}) est effacé après 5min (clearMatchState
+    // preserveEnded, voir confirmFt) MÊME si le match reste légitimement en
+    // attente de FD.org — un match sourcé du pont longue durée est donc
+    // accepté sans re-vérifier `ft` (sa seule présence dans ce pont suffit,
+    // il n'y est écrit QUE depuis confirmFt, et en est retiré dès que FD.org
+    // le reprend OU si ESPN se corrige, voir clearFtFlags).
+    const recentlyFinished = getRecentlyFinishedMatches(selectedComp)
+    const recentIds = new Set(recentlyFinished.map(m => m.id))
+    const bridgeSeen = new Set()
+    const bridgeSource = [
+      ...liveMatches.filter(m => m.competition?.code === selectedComp),
+      ...recentlyFinished,
+    ].filter(m => {
+      if (bridgeSeen.has(m.id)) return false
+      bridgeSeen.add(m.id)
+      return true
+    })
+    // Le match est bien repris par FD.org : plus besoin du pont longue durée.
+    for (const m of fdMatches) clearRecentlyFinished(m.id)
+    const extra = bridgeSource
       .filter(m => !known.has(m.id))
-      .filter(m => getMatchState(m.id).ft === true)
+      .filter(m => recentIds.has(m.id) || getMatchState(m.id).ft === true)
       .map(m => {
         let lsHome = null, lsAway = null
         try {

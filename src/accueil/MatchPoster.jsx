@@ -280,19 +280,26 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
 
         <div className="poster__center">
           {isLive && minute && (
-            <div className={`poster__min-label${minute === 'MT' ? ' poster__min-label--reprise' : ''}`}>
-              {/* calcMinute() renvoie déjà des libellés complets pour les états
-                  spéciaux (MT/Pause/TAB/Débute) et inclut déjà l'apostrophe pour
-                  les minutes chiffrées ("91'") — ne jamais en rajouter une.
-                  À la mi-temps : countdown "Reprise dans X min" / "Reprise
-                  imminente" (htLabel) au lieu du texte statique "Mi-temps" —
-                  htLabel repasse à null tout seul dès que la 2ème MT démarre
-                  (half2Start), minute reprend alors le relais normalement.
-                  Police plus petite (--reprise) car ce texte est bien plus
-                  long que "MT"/"45'" et doit rester lisible dans l'espace
-                  disponible sans déborder. */}
-              {minute === 'MT' ? (htLabel ?? 'Mi-temps') : minute}
-            </div>
+            minute === 'MT' ? (
+              // Retour utilisateur : reproduire EXACTEMENT le style
+              // LiveMatchPage pour la mi-temps — "MT" en évidence (même
+              // classe que le badge minute normal, voir .lmp__heroMinute) et
+              // le countdown "Reprise dans X min" / "Reprise imminente" EN
+              // DESSOUS (pas à la place), en jaune/or (.lmp__heroReprise),
+              // au lieu de remplacer "MT" par le countdown comme avant.
+              // htLabel repasse à null tout seul dès que la 2ème MT démarre
+              // (half2Start), minute reprend alors le relais normalement.
+              <div className="poster__min-labelCol">
+                <div className="poster__min-label">MT</div>
+                <div className="poster__reprise-label">{htLabel ?? 'Mi-temps'}</div>
+              </div>
+            ) : (
+              // calcMinute() renvoie déjà des libellés complets pour les états
+              // spéciaux (Pause/TAB/Débute/Prolongation) et inclut déjà
+              // l'apostrophe pour les minutes chiffrées ("91'") — ne jamais
+              // en rajouter une.
+              <div className="poster__min-label">{minute}</div>
+            )
           )}
           {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
           {isFinished  && <div className="poster__env-label">Terminé</div>}
