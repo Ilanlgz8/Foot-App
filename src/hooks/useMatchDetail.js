@@ -114,39 +114,80 @@ async function findEspnEventId(slug, match, fdHome, fdAway) {
 }
 
 // ── useEspnPregameOdds ───────────────────────────────────────────────────────
-// Cote de marché réelle (DraftKings, via le scoreboard ESPN) — CM 2026
-// UNIQUEMENT (décision utilisateur) : vérifié en direct que c'est propre et
-// fiable pour la CM, mais pour les championnats de club ESPN mélange
-// plusieurs bookmakers avec des formats différents (américain/fractionnaire/
-// décimal) et on est tombés sur une cote clairement incohérente (1/33 pour
-// une équipe milieu de tableau, probablement pas le bon marché) — pas assez
-// fiable pour remplacer calcProno là-bas. Pré-match UNIQUEMENT : la cote
-// DraftKings est un instantané figé avant le coup d'envoi (champs open/close
-// de ligne, pas un flux qui bouge pendant le match) — ESPN ne fournit aucune
-// cote live in-play.
+// Cote de marché réelle via le scoreboard ESPN, pour TOUTES les compétitions
+// COMP_ESPN (pas seulement la CM — élargi après vérification plus poussée,
+// voir plus bas). Pré-match UNIQUEMENT : c'est un instantané figé avant le
+// coup d'envoi (champs open/close de ligne), pas un flux qui bouge pendant
+// le match — le seul provider "*Live Odds*" repéré est explicitement exclu
+// (voir SKIP_PROVIDERS).
+//
+// ⚠️ Plusieurs bookmakers cohabitent dans comp.odds[], PAS tous fiables au
+// même degré (vérifié en direct sur un vrai match Bournemouth-Leicester) :
+//   - "Bet 365" (provider id 2000) : format fractionnaire dans un champ
+//     nommé "odds"/"drawOdds" imbriqué différemment, et une cote "1/33"
+//     largement hors normes pour ce match précis — écarté, pas assez fiable.
+//   - "ESPN BET" (provider id 58) : moneyLine américain direct et cohérent
+//     pour les 3 issues (homeTeamOdds.moneyLine / awayTeamOdds.moneyLine /
+//     drawOdds.moneyLine), même format que ce qu'on utilisait déjà pour la
+//     CM — RETENU.
+//   - "DraftKings" (provider id 100) : seul provider présent pour la CM
+//     (jamais vu "ESPN BET" là-bas) — retenu en repli, format un peu
+//     différent (moneyline.{home,away,draw}.close.odds).
+//   - "ESPN BET - Live Odds" (provider id 59) : cote EN DIRECT (ex. vue à
+//     "-20000" en fin de match, quasi 100% de proba implicite) — exclu, ce
+//     hook ne veut QUE la ligne pré-match.
+// Garde-fou supplémentaire (somme des probabilités implicites hors plage
+// 95%-130%) : filet de sécurité si jamais un autre provider mal identifié
+// passait entre les mailles.
+//
 // Retourne { decimal: {home,draw,away}, pct: {home,draw,away} } ou null
-// (absent/format inattendu/somme des probabilités implicites hors plage
-// plausible) — l'appelant (MatchPoster.jsx) retombe alors sur calcProno,
-// AUCUN changement nécessaire côté calcProno.js ni Pronos.jsx (jeu de
-// pronostics entre amis, doit rester sur un modèle interne cohérent, pas une
-// donnée externe qui peut manquer).
+// (absent/format inattendu/hors plage plausible) — l'appelant (MatchPoster.jsx)
+// retombe alors sur calcProno, AUCUN changement côté calcProno.js ni
+// Pronos.jsx (jeu de pronostics entre amis, doit rester sur un modèle interne
+// cohérent, pas une donnée externe qui peut manquer).
+const ODDS_PROVIDER_PRIORITY = ['ESPN BET', 'DraftKings']
+const ODDS_PROVIDER_SKIP     = p => /live/i.test(p ?? '')
+
 function americanToDecimal(american) {
   const v = parseFloat(american)
   if (isNaN(v) || v === 0) return null
   return v > 0 ? 1 + v / 100 : 1 + 100 / Math.abs(v)
 }
 
+// Deux formats rencontrés selon le provider (voir commentaire au-dessus) —
+// on essaie les deux, sans hypothèse sur lequel s'applique à quel provider
+// (plus robuste si ESPN change un format un jour).
+function extractMoneylines(oddsEntry) {
+  // Format "DraftKings" : moneyline.{home,away,draw}.close.odds (string "+135")
+  const ml = oddsEntry?.moneyline
+  if (ml?.home?.close?.odds != null || ml?.home?.open?.odds != null) {
+    return {
+      home: ml.home?.close?.odds ?? ml.home?.open?.odds,
+      away: ml.away?.close?.odds ?? ml.away?.open?.odds,
+      draw: ml.draw?.close?.odds ?? ml.draw?.open?.odds ?? oddsEntry?.drawOdds?.moneyLine,
+    }
+  }
+  // Format "ESPN BET" : {home,away}TeamOdds.moneyLine (nombre direct) + drawOdds.moneyLine
+  if (oddsEntry?.homeTeamOdds?.moneyLine != null || oddsEntry?.awayTeamOdds?.moneyLine != null) {
+    return {
+      home: oddsEntry.homeTeamOdds?.moneyLine,
+      away: oddsEntry.awayTeamOdds?.moneyLine,
+      draw: oddsEntry.drawOdds?.moneyLine,
+    }
+  }
+  return null
+}
+
 export function useEspnPregameOdds(match, enabled = true) {
   const compId = match?.competition?.id
   const slug   = COMP_ESPN[compId]
-  const isWC   = slug === 'fifa.world'
   const date   = matchDateStr(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   return useQuery({
     queryKey:  ['espnPregameOdds', match?.id],
-    enabled:   enabled && isWC && !!match?.id && !!date,
+    enabled:   enabled && !!slug && !!match?.id && !!date,
     staleTime: 15 * 60_000,   // pré-match, ligne quasi figée à l'approche du coup d'envoi
     retry: 1,
     queryFn: async () => {
@@ -160,28 +201,41 @@ export function useEspnPregameOdds(match, enabled = true) {
         const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
         if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
 
-        const ml = comp?.odds?.[0]?.moneyline
-        if (!ml) return null
-        const homeOdds = americanToDecimal(ml.home?.close?.odds ?? ml.home?.open?.odds)
-        const awayOdds = americanToDecimal(ml.away?.close?.odds ?? ml.away?.open?.odds)
-        const drawOdds = americanToDecimal(ml.draw?.close?.odds ?? ml.draw?.open?.odds)
-          ?? americanToDecimal(comp?.odds?.[0]?.drawOdds?.moneyLine)
-        if (!homeOdds || !awayOdds || !drawOdds) return null
+        const oddsList = (comp?.odds ?? []).filter(o => !ODDS_PROVIDER_SKIP(o?.provider?.name))
+        // Provider préféré d'abord (ESPN BET, puis DraftKings), sinon
+        // n'importe quel provider restant (mieux qu'aucune cote, toujours
+        // filtré par le garde-fou plus bas avant d'être affiché).
+        const ordered = [
+          ...ODDS_PROVIDER_PRIORITY.flatMap(name => oddsList.filter(o => o?.provider?.name === name)),
+          ...oddsList.filter(o => !ODDS_PROVIDER_PRIORITY.includes(o?.provider?.name)),
+        ]
 
-        // Probabilité implicite (marge bookmaker déjà incluse dans une vraie
-        // cote marché, contrairement à notre modèle) — sert à déterminer le
-        // favori/l'intensité du liseré, pas la cote AFFICHÉE (voir decimal).
-        const pHome = 1 / homeOdds, pDraw = 1 / drawOdds, pAway = 1 / awayOdds
-        const sum   = pHome + pDraw + pAway
-        // Garde-fou anti-mauvais-marché (voir commentaire plus haut : cote
-        // 1/33 trouvée par erreur ailleurs) — une vraie cote 1X2 a une marge
-        // raisonnable (95%-130%) ; en dehors, probablement pas le bon marché.
-        if (sum < 0.95 || sum > 1.3) return null
+        for (const entry of ordered) {
+          const ml = extractMoneylines(entry)
+          if (!ml) continue
+          const homeOdds = americanToDecimal(ml.home)
+          const awayOdds = americanToDecimal(ml.away)
+          const drawOdds = americanToDecimal(ml.draw)
+          if (!homeOdds || !awayOdds || !drawOdds) continue
 
-        return {
-          decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
-          pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
+          // Probabilité implicite (marge bookmaker déjà incluse dans une
+          // vraie cote marché, contrairement à notre modèle) — sert à
+          // déterminer le favori/l'intensité du liseré, pas la cote
+          // AFFICHÉE (voir decimal).
+          const pHome = 1 / homeOdds, pDraw = 1 / drawOdds, pAway = 1 / awayOdds
+          const sum   = pHome + pDraw + pAway
+          // Garde-fou anti-mauvais-marché (voir commentaire plus haut) —
+          // une vraie cote 1X2 a une marge raisonnable (95%-130%) ; en
+          // dehors, on passe au provider suivant plutôt que d'afficher
+          // n'importe quoi.
+          if (sum < 0.95 || sum > 1.3) continue
+
+          return {
+            decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
+            pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
+          }
         }
+        return null
       }
       return null
     },

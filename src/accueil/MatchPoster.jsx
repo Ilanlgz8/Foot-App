@@ -98,14 +98,14 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         neutralVenue: isNeutralVenueComp(match),
       })
 
-  // ── Cote de marché réelle (CM 2026 uniquement, pré-match) ──────────────────
-  // Remplace l'affichage calcProno par la vraie cote DraftKings quand
-  // disponible et fiable (voir useEspnPregameOdds, décision utilisateur :
-  // uniquement CM, ESPN trop incohérent pour les championnats de club).
-  // Repli automatique et silencieux sur calcProno si absente/invalide/en
-  // direct/terminé — `prono` (calculé ci-dessus) reste la source pour tout
-  // le reste (Pronos.jsx, jeu entre amis, jamais touché par ce fetch).
-  const { data: espnOdds } = useEspnPregameOdds(match, isWC && isUpcoming)
+  // ── Cote de marché réelle (pré-match, toutes compétitions ESPN) ────────────
+  // Remplace l'affichage calcProno par la vraie cote (ESPN BET/DraftKings
+  // selon la compétition) quand disponible et fiable — voir useEspnPregameOdds
+  // pour le détail des providers retenus/écartés et le garde-fou anti-cote-
+  // absurde. Repli automatique et silencieux sur calcProno si absente/
+  // invalide/en direct/terminé — `prono` (calculé ci-dessus) reste la source
+  // pour tout le reste (Pronos.jsx, jeu entre amis, jamais touché ici).
+  const { data: espnOdds } = useEspnPregameOdds(match, isUpcoming)
   const useMarketOdds = isUpcoming && !!espnOdds
   const displayPct    = useMarketOdds ? espnOdds.pct : prono
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
