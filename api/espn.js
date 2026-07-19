@@ -30,7 +30,16 @@ const ALLOWED_SLUGS = new Set([
   'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',
 ])
 
-const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)
+// ⚠️ AJOUT (retour utilisateur : "Statistiques indisponibles" sur des matchs
+// vieux d'une semaine+, alors que ça marchait juste après le match) : 7j
+// était bien trop court pour un TOURNOI (CM 2026) que les utilisateurs
+// consultent encore des semaines après un match — passé ce délai, le cache
+// expire et l'app retente un fetch ESPN EN DIRECT pour un event vieux de
+// plusieurs jours, qu'ESPN ne sert plus forcément aussi complètement
+// (boxscore/rosters). Un match TERMINÉ ne change plus jamais → aucune raison
+// de faire expirer ce cache vite. 180j couvre largement tout le tournoi +
+// consultation a posteriori, sans cache Redis illimité.
+const SUMMARY_CACHE_TTL      = 180 * 24 * 3600 // 180j — matchs TERMINÉS uniquement (donnée immuable)
 const LIVE_SUMMARY_CACHE_TTL = 45              // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
 
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois

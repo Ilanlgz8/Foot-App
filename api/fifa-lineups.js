@@ -19,6 +19,23 @@ const kv = new Redis({
 const FIFA_BASE  = 'https://api.fifa.com/api/v3'
 const WC_COMP_ID = '17'  // ID compétition Coupe du Monde (stable)
 
+// ⚠️ AJOUT (retour utilisateur : "Statistiques indisponibles" sur des matchs
+// vieux d'une semaine+, alors que ça marchait juste après le match) : fifa:ids
+// et fifa:lineup étaient déjà cachés 7j — trop court pour un tournoi consulté
+// encore des semaines après un match (CM). Repassé 7j → refetch EN DIRECT vers
+// l'API FIFA (matchlineup/matchstatistics), qui ne sert plus forcément un
+// vieux match aussi fiablement (API pensée pour le direct, pas l'archive).
+// Un match TERMINÉ ne change plus jamais → aucune raison de faire expirer vite.
+const ID_LINEUP_TTL      = 180 * 24 * 3600  // 180j — ids FIFA + compos (immuables une fois publiées)
+// fifa:stats restait bloqué à 120s MÊME pour un match terminé (TTL pensé
+// uniquement pour le direct, où les stats évoluent) : chaque consultation
+// d'un vieux match redéclenchait donc un fetch live vers l'API FIFA. Le
+// paramètre finished=1 (envoyé par useFifaStats quand live=false, voir
+// useMatchDetail.js) permet de distinguer les deux cas sans rien changer au
+// comportement live existant (finished absent/0 → TTL court inchangé).
+const STATS_LIVE_TTL     = 120              // 2min — match encore en cours, stats évoluent
+const STATS_FINISHED_TTL = 180 * 24 * 3600  // 180j — match terminé, stats définitives
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function safeJson(val) {
@@ -272,7 +289,7 @@ export default async function handler(req, res) {
     if (count > 30) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '', forceFresh = '' } = req.query
+  const { fdMatchId, home: fdHome = '', away: fdAway = '', utcDate = '', forceFresh = '', finished = '' } = req.query
   if (!fdMatchId) return res.status(400).json({ error: 'fdMatchId requis' })
   // forceFresh=1 : contourne le cache Redis stats (mais pas les IDs/lineup,
   // qui n'ont pas besoin de fraîcheur) — voir même paramètre dans
@@ -280,6 +297,11 @@ export default async function handler(req, res) {
   // sans ça, un retour d'arrière-plan pouvait retomber sur un snapshot déjà
   // vieux de près de 2min (TTL du cache stats) au lieu de données fraîches.
   const skipStatsCache = forceFresh === '1' || forceFresh === 'true'
+  // finished=1 : le client sait déjà (même logique isFinished que partout
+  // ailleurs dans l'app) que ce match est terminé → cache stats long au lieu
+  // de 120s (voir STATS_FINISHED_TTL). Absent/0 par défaut : comportement live
+  // inchangé.
+  const isFinishedMatch = finished === '1' || finished === 'true'
 
   // ── 1. IDs FIFA : cache Redis (7j) → autodiscovery → fallback legacy ───────
   // ⚠️ Résolu AVANT le lineup (contrairement à avant) : les stats en ont besoin
@@ -291,7 +313,7 @@ export default async function handler(req, res) {
   if (!ids?.fifaMatchId && utcDate) {
     ids = await discoverFifaMatch(kv, utcDate, fdHome, fdAway)
     if (ids?.fifaMatchId) {
-      try { await kv.set(idsKey, JSON.stringify(ids), { ex: 7 * 24 * 3600 }) } catch {}
+      try { await kv.set(idsKey, JSON.stringify(ids), { ex: ID_LINEUP_TTL }) } catch {}
     }
   }
 
@@ -345,8 +367,8 @@ export default async function handler(req, res) {
     } else {
       lineupResult = await fetchFifaLineup(ids)
       if (lineupResult?.home?.starters?.length) {
-        // Cache 7 jours — lineup d'un match terminé est définitive
-        try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: 7 * 24 * 3600 }) } catch {}
+        // Cache long — lineup d'un match terminé est définitive
+        try { await kv.set(lineupKey, JSON.stringify(lineupResult), { ex: ID_LINEUP_TTL }) } catch {}
       } else {
         lineupResult = null
         lineupDiag = { error: 'Compositions FIFA introuvables (pas encore publiées)' }
@@ -370,7 +392,10 @@ export default async function handler(req, res) {
           const { ok, data } = await fifaFetch(url)
           if (ok && data) { stats = parseFifaStats(data); break }
         }
-        if (stats) { try { await kv.set(`fifa:stats:${fdMatchId}`, JSON.stringify(stats), { ex: 120 }) } catch {} }
+        if (stats) {
+          const ttl = isFinishedMatch ? STATS_FINISHED_TTL : STATS_LIVE_TTL
+          try { await kv.set(`fifa:stats:${fdMatchId}`, JSON.stringify(stats), { ex: ttl }) } catch {}
+        }
       }
     } catch {}
   }

@@ -517,10 +517,17 @@ export function useFifaStats(match, enabled = true, live = true) {
       const forceFresh = typeof window !== 'undefined'
         && window.__liveStatsForceFreshUntil
         && Date.now() < window.__liveStatsForceFreshUntil
+      // finished=1 (quand live=false) : indique au serveur que ce match est
+      // terminé, pour qu'il garde les stats en cache longtemps au lieu de
+      // 120s (voir STATS_FINISHED_TTL dans api/fifa-lineups.js) — c'est
+      // précisément ce qui manquait pour un match vieux d'une semaine+
+      // ("Statistiques indisponibles" : chaque consultation retentait un
+      // fetch live vers l'API FIFA, qui ne sert plus forcément un vieux match).
       const url = `/api/fifa-lineups?fdMatchId=${match.id}`
         + `&home=${encodeURIComponent(fdHome)}`
         + `&away=${encodeURIComponent(fdAway)}`
         + (forceFresh ? '&forceFresh=1' : '')
+        + (!live ? '&finished=1' : '')
       const res = await fetch(url)
       if (!res.ok) return null
       const data = await res.json()
