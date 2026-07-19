@@ -728,8 +728,31 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // observé period=3 ou 4 sur un poll PRÉCÉDENT (`prevState.espnPeriod`,
       // pas ce poll-ci qui peut lui-même être le glitch) — sinon ce n'est pas
       // plausible, on garde le match en vie plutôt que de confirmer un FT.
+      //
+      // ⚠️ BUG CORRIGÉ (retour utilisateur : "stats/compos disparues sur des
+      // matchs terminés depuis plusieurs jours, ou fini y'a 1h" — régression
+      // introduite par ce garde-fou lui-même) : `prevState.espnPeriod` reflète
+      // l'historique LOCAL de CET appareil (localStorage), pas la réalité du
+      // match. Pour un appareil qui ouvre l'app pour la 1ère fois APRÈS la fin
+      // du match (nouvelle session, nouvel appareil, ou simplement le 1er
+      // poll de ce match ici) — cas très fréquent pour un match consulté après
+      // coup — `prevState` est vide, `espnPeriod` vaut `undefined`, JAMAIS 3
+      // ni 4 : le garde-fou traitait alors à tort une VRAIE fin de match
+      // (potentiellement vieille de plusieurs jours) comme un glitch,
+      // repassait le match en "toujours en cours" (markLive + clearFtFlags) —
+      // le empêchant indéfiniment d'atteindre l'état "Terminé" localement, ce
+      // qui bloquait les chemins de cache long-terme (finished=1) au profit
+      // des chemins courte durée "en direct", d'où les stats manquantes/
+      // incomplètes. `isTrackedLive(mid)` (déjà utilisé plus bas) distingue
+      // les 2 cas : true seulement si CET appareil suit CE match en direct de
+      // façon continue depuis un poll précédent — c'est UNIQUEMENT dans ce cas
+      // qu'un STATUS_FINAL_AET/PEN sans period 3/4 déjà vu est vraiment
+      // suspect (glitch en cours de route). Un match jamais suivi avant ce
+      // poll (nouvel appareil/session) n'a par définition aucun historique à
+      // contredire — on fait confiance à ESPN comme avant ce correctif.
       if (
         !alreadyEnded &&
+        isTrackedLive(mid) &&
         (espnStatus === 'STATUS_FINAL_AET' || espnStatus === 'STATUS_FINAL_PEN') &&
         prevState.espnPeriod !== 3 && prevState.espnPeriod !== 4
       ) {
