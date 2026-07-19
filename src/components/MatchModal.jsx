@@ -8,7 +8,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, matchOutcome, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import './../matchModal.css'
@@ -1485,46 +1485,11 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
   )
 }
 
-// Évolution du rapport de force sur l'historique H2H disponible, dans l'ordre
-// chronologique (plus ancien à gauche → plus récent à droite). Basée sur
-// matchOutcome() (même règle de départage tab que le reste de l'app :
-// useH2HRows, useTeamForm.js) pour ne pas dupliquer cette logique. Perspective
-// fixe = l'équipe qui reçoit aujourd'hui, peu importe qui recevait à l'époque.
-// Même technique (SVG polyline à la main) que ProbaCurve.jsx — pas de lib de
-// graphique pour un seul tracé.
-function H2HTrend({ rows, homeId, homeShort, awayShort }) {
-  const chrono = rows.slice().reverse() // rows = plus récent d'abord → on repasse en ordre chronologique
-  if (chrono.length < 3) return null // pas assez de points pour qu'une tendance ait un sens
-
-  const toValue = (m) => {
-    const outcome = matchOutcome(m)
-    if (outcome === 'draw') return 50
-    const wasHomeToday = m.homeTeam?.id === homeId
-    const homeWonThatMatch = outcome === 'home'
-    return wasHomeToday === homeWonThatMatch ? 100 : 0
-  }
-
-  const width  = 100
-  const height = 32
-  const n = chrono.length
-  const toX = (i) => n === 1 ? width / 2 : (i / (n - 1)) * width
-  const toY = (v) => height - (v / 100) * height
-  const points = chrono.map((m, i) => `${toX(i).toFixed(1)},${toY(toValue(m)).toFixed(1)}`).join(' ')
-
-  return (
-    <div className="h2h__trend">
-      <p className="h2h__trendTitle">Évolution du rapport de force</p>
-      <svg className="h2h__trendSvg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <line x1="0" y1={height / 2} x2={width} y2={height / 2} className="h2h__trendMid" vectorEffect="non-scaling-stroke" />
-        <polyline points={points} className="h2h__trendLine" vectorEffect="non-scaling-stroke" />
-      </svg>
-      <div className="h2h__trendLegend">
-        <span className="h2h__trendLegendItem h2h__trendLegendItem--home">{homeShort}</span>
-        <span className="h2h__trendLegendItem h2h__trendLegendItem--away">{awayShort}</span>
-      </div>
-    </div>
-  )
-}
+// H2HTrend ("Évolution du rapport de force", graphique SVG sur l'historique
+// H2H) retiré (retour utilisateur : "on comprend rien, ça sert à rien") —
+// H2HBilan (victoires/nuls/défaites + barre de domination) et H2HRowsList
+// (liste des confrontations) restent, c'était surtout ce petit graphique
+// abstrait qui n'était pas clair.
 
 // ── Bilan des confrontations : victoires / nuls / victoires + barre de
 //    domination aux couleurs réelles des deux équipes (teamPhotos) ──────────
@@ -1740,8 +1705,6 @@ function H2HRowsList({ rows, homeId, isWC }) {
 export function H2HTabContent({ match, rows, isLoading }) {
   const isWC = isNationalTeamComp(match)
   const homeId = match.homeTeam?.id
-  const homeShort = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayShort = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
   if (isLoading) return <H2HSkeleton />
   if (!rows.length) return <p className="modal__noEvents">Aucune confrontation connue entre ces deux équipes</p>
@@ -1749,7 +1712,6 @@ export function H2HTabContent({ match, rows, isLoading }) {
   return (
     <>
       <H2HBilan rows={rows} match={match} isWC={isWC} />
-      <H2HTrend rows={rows} homeId={homeId} homeShort={homeShort} awayShort={awayShort} />
       <H2HRowsList rows={rows} homeId={homeId} isWC={isWC} />
     </>
   )
