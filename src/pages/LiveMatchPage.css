@@ -576,6 +576,82 @@
   flex-shrink: 0;
 }
 
+/* ── Onglets + bouton "Infos du match" ── */
+.lmp__tabsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  margin: 1.2rem 0 0;
+  border-bottom: 1px solid rgba(var(--white-rgb),0.07);
+}
+.lmp__tabsRow .mp__tabs {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-bottom: none;
+}
+.lmp__infoBtn {
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: rgba(var(--white-rgb),0.06);
+  border: 1px solid rgba(var(--white-rgb),0.14);
+  color: rgba(var(--white-rgb),0.6);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.lmp__infoBtn:hover { color: #fff; background: rgba(var(--white-rgb),0.1); }
+.lmp__infoBtn--active {
+  color: var(--red-light);
+  border-color: var(--red);
+  background: rgba(var(--red-rgb),0.12);
+}
+
+/* Panneau "Infos du match" — même famille visuelle que StatsSubTabs/cards */
+.lmp__infoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.8rem 1rem 0;
+  padding: 0.8rem 0.9rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--sf-border);
+  border-radius: 0.75rem;
+}
+.lmp__infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+  font-size: 0.8rem;
+}
+.lmp__infoRow--muted {
+  justify-content: center;
+  color: rgba(var(--white-rgb),0.4);
+  font-size: 0.78rem;
+}
+.lmp__infoLabel {
+  flex-shrink: 0;
+  color: rgba(var(--white-rgb),0.45);
+  font-weight: 600;
+}
+.lmp__infoVal {
+  text-align: right;
+  color: rgba(var(--white-rgb),0.85);
+  font-weight: 600;
+}
+
 /* ── Onglets ── */
 .lmp__tabs {
   display: flex;

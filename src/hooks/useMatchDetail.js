@@ -780,3 +780,50 @@ export function useH2H(match) {
     },
   })
 }
+
+// ── useMatchInfo ─────────────────────────────────────────────────────────────
+// "Infos du match" (LiveMatchPage.jsx, petit bouton "i") : stade + ville +
+// affluence (ESPN — absent du summary déjà utilisé ailleurs, uniquement dans
+// le scoreboard, d'où un fetch dédié) et arbitre (football-data.org, déjà
+// chargé via useMatchDetail — React Query déduplique si déjà monté ailleurs
+// pour ce match, aucun fetch en plus dans ce cas).
+// Chargé UNIQUEMENT à la demande (enabled=false tant que le panneau n'est
+// pas ouvert) — jamais préchargé pour toute une liste de matchs.
+export function useMatchInfo(match, enabled = true) {
+  const compId = match?.competition?.id
+  const slug   = COMP_ESPN[compId]
+  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  const { detail } = useMatchDetail(match?.id)
+
+  const { data: venue, isLoading } = useQuery({
+    queryKey:  ['matchVenueInfo', match?.id],
+    enabled:   enabled && !!match?.id && !!slug,
+    staleTime: 60 * 60_000,   // stade/affluence ne changent jamais après le coup d'envoi
+    retry: 1,
+    queryFn: async () => {
+      const events = await fetchEspnEventsDual(slug, match)
+      for (const evt of events) {
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        if (!homeC || !awayC) continue
+        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+        if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
+        const v = evt.venue ?? comp?.venue
+        return {
+          name:       v?.fullName ?? null,
+          city:       v?.address?.city ?? null,
+          country:    v?.address?.country ?? null,
+          attendance: comp?.attendance || null,
+        }
+      }
+      return null
+    },
+  })
+
+  const referees = (detail?.referees ?? []).filter(r => r.type === 'REFEREE' && r.name)
+
+  return { venue: venue ?? null, referees, isLoading }
+}

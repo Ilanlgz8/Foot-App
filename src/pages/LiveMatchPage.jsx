@@ -15,6 +15,7 @@ import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
+import { useMatchInfo }     from '../hooks/useMatchDetail'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
 import { WatchBadge }       from '../components/WatchBadge'
@@ -49,6 +50,51 @@ function ShootoutDots({ scored }) {
       {Array.from({ length: 5 }, (_, i) => (
         <span key={i} className={`lmp__soDot${i < n ? ' lmp__soDot--scored' : ''}`} />
       ))}
+    </div>
+  )
+}
+
+// ── Panneau "Infos du match" ─────────────────────────────────────────────────
+// Stade, ville, affluence (ESPN) + arbitre (football-data.org) — données
+// disponibles mais jamais affichées jusqu'ici (voir useMatchInfo). Chargé
+// uniquement à l'ouverture (enabled=open), pas préchargé avec la page.
+function MatchInfoPanel({ match, open }) {
+  const { venue, referees, isLoading } = useMatchInfo(match, open)
+  if (!open) return null
+
+  const hasVenue    = !!(venue?.name)
+  const hasReferees = referees.length > 0
+
+  return (
+    <div className="lmp__infoPanel">
+      {isLoading && !hasVenue && !hasReferees ? (
+        <div className="lmp__infoRow lmp__infoRow--muted">Chargement…</div>
+      ) : !hasVenue && !hasReferees ? (
+        <div className="lmp__infoRow lmp__infoRow--muted">Infos indisponibles pour ce match.</div>
+      ) : (
+        <>
+          {hasVenue && (
+            <div className="lmp__infoRow">
+              <span className="lmp__infoLabel">Stade</span>
+              <span className="lmp__infoVal">
+                {venue.name}{venue.city ? ` · ${venue.city}` : ''}
+              </span>
+            </div>
+          )}
+          {venue?.attendance != null && (
+            <div className="lmp__infoRow">
+              <span className="lmp__infoLabel">Affluence</span>
+              <span className="lmp__infoVal">{venue.attendance.toLocaleString('fr-FR')} spectateurs</span>
+            </div>
+          )}
+          {hasReferees && (
+            <div className="lmp__infoRow">
+              <span className="lmp__infoLabel">Arbitre</span>
+              <span className="lmp__infoVal">{referees.map(r => r.name).join(', ')}</span>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -335,6 +381,10 @@ export default function LiveMatchPage() {
 
   const [activeTab, setActiveTab] = useState('stats')
   const [tabDir, setTabDir]       = useState(null)
+  // Panneau "Infos du match" (stade/affluence/arbitre) — indépendant des
+  // onglets Statistiques/Compos/Classement, pas de swipe dessus (voir bouton
+  // rond "i" à côté des onglets, plus bas).
+  const [showInfo, setShowInfo]   = useState(false)
   // Sous-onglet dans "Stats Live" : Stats live (par défaut) / Stats saison
   const [statsView, setStatsView] = useState('live')
 
@@ -403,20 +453,32 @@ export default function LiveMatchPage() {
       <div className="mp__wrap">
         <div className="mp__body" ref={swipe.ref}>
 
-          {/* Onglets */}
-          <div className="mp__tabs">
-            {TABS.map(t => (
-              <button
-                key={t}
-                className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
-                onClick={() => goTab(t, null)}
-              >
-                {t === 'stats'       ? 'Statistiques'
-               : t === 'compos'     ? 'Compos'
-               :                      'Classement'}
-              </button>
-            ))}
+          {/* Onglets + bouton "Infos du match" */}
+          <div className="lmp__tabsRow">
+            <div className="mp__tabs">
+              {TABS.map(t => (
+                <button
+                  key={t}
+                  className={`mp__tab${activeTab === t ? ' mp__tab--active' : ''}`}
+                  onClick={() => goTab(t, null)}
+                >
+                  {t === 'stats'       ? 'Statistiques'
+                 : t === 'compos'     ? 'Compos'
+                 :                      'Classement'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`lmp__infoBtn${showInfo ? ' lmp__infoBtn--active' : ''}`}
+              onClick={() => setShowInfo(v => !v)}
+              aria-label="Infos du match"
+              aria-pressed={showInfo}
+            >
+              i
+            </button>
           </div>
+          <MatchInfoPanel match={match} open={showInfo} />
           <TabDots count={TABS.length} active={TABS.indexOf(activeTab)} />
 
           {/* Contenu */}
