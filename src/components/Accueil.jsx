@@ -457,6 +457,9 @@ function Accueil() {
     // resultsSourceMatches (aujourd'hui absolu + hier) — PAS `matches`, qui dépend
     // de dayOffset : sinon ce panneau se vide/réapparaît selon le jour affiché
     // dans "Matchs" (bug signalé : le match disparaît quand on va sur "Demain").
+    // Ids déjà couverts par filteredResults (FD.org, EN TENANT COMPTE du filtre
+    // compétition compFilterResult) — voir le bug ci-dessous.
+    const filteredResultIds = new Set(filteredResults.map(r => r.id))
     const todayFt = resultsSourceMatches.filter(m => {
       // ⚠️ Bug réel signalé : score figé (3-5 au lieu de 4-6, buts marqués après
       // le FT ESPN mal détecté) alors que la page Résultat (Resultat.jsx) affichait
@@ -468,10 +471,23 @@ function Accueil() {
       // ignorait purement et simplement toute mise à jour FD.org ultérieure, même
       // plus fraîche/exacte. Resultat.jsx n'a pas ce bug car il exclut de son
       // override tout match déjà connu de fdMatches (voir `known` là-bas) — même
-      // logique reproduite ici : si FD.org a déjà le match en FINISHED, on fait
-      // confiance à SA version (déjà dans results/filteredResults plus bas), on
-      // n'applique plus jamais le patch local dessus.
-      if (m.status === 'FINISHED') return false
+      // logique reproduite ici.
+      //
+      // ⚠️ RÉGRESSION CORRIGÉE (retour utilisateur : "un match terminé n'a jamais
+      // disparu au bout de 4h avant, je comprends pas") : la 1ère version de ce
+      // fix excluait tout match FINISHED en supposant qu'il retomberait forcément
+      // sur filteredResults plus bas — FAUX quand un filtre compétition
+      // (compFilterResult) est actif sur le panneau résultats : todayFtMapped
+      // n'était PAS filtré par compétition (donc affichait le match quel que soit
+      // le filtre), alors que filteredResults, LUI, applique ce filtre. Un match
+      // exclu ici sur la seule base de son statut FINISHED, sans être dans la
+      // compétition actuellement filtrée, disparaissait purement et simplement au
+      // lieu de retomber sur filteredResults comme supposé. Fix : ne l'exclure
+      // que si on a VÉRIFIÉ qu'il est bien dans filteredResults (donc qu'il va
+      // vraiment s'afficher par cet autre chemin) — sinon on garde l'ancien
+      // comportement (affichage via l'override ci-dessous, score potentiellement
+      // pas 100% frais mais au moins visible, comme avant).
+      if (m.status === 'FINISHED' && filteredResultIds.has(m.id)) return false
       const st = getMatchState(m.id)
       // ft (confirmé par ESPN) prime toujours, même si liveTracker garde encore
       // le match dans liveMatches (grâce period de 5min avant éviction) — sinon
