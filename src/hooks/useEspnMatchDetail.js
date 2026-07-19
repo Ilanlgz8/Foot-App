@@ -91,7 +91,17 @@ function extractDetails(comp, homeTeamId, commentary) {
   const cards = []
   for (const d of (comp?.details ?? [])) {
     const teamSide = d.team?.id === homeC?.team?.id ? 'home' : 'away'
-    const ath = d.participants?.[0]?.athlete
+    // BUG CORRIGÉ (constat utilisateur : noms de joueurs affichés "?" dans le
+    // déroulement du match — vérifié sur un vrai payload ESPN, finale CM 2026
+    // Espagne-Argentine) : le champ réel est `athletesInvolved[0]`, PAS
+    // `participants[0].athlete` — ce dernier n'existe jamais dans cette
+    // réponse, donc `ath` était toujours `undefined` et `name` retombait
+    // systématiquement sur '?'. Le "filet de sécurité" plus bas (qui, lui,
+    // utilise déjà `athletesInvolved`) ne se déclenchait jamais pour corriger
+    // ça : il n'agit que si `scorers`/`cards` sont VIDES, or cette boucle
+    // remplissait déjà les tableaux (avec des noms '?'), donc sa condition de
+    // déclenchement n'était jamais remplie.
+    const ath = d.participants?.[0]?.athlete ?? d.athletesInvolved?.[0]
     const name = ath?.shortName ?? ath?.displayName ?? '?'
     const minute = d.clock?.displayValue ?? ''
     if (d.scoringPlay === true) {
