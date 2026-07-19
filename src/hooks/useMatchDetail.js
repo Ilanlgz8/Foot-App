@@ -113,6 +113,81 @@ async function findEspnEventId(slug, match, fdHome, fdAway) {
   return { eventId: null, boardComp: null }
 }
 
+// ── useEspnPregameOdds ───────────────────────────────────────────────────────
+// Cote de marché réelle (DraftKings, via le scoreboard ESPN) — CM 2026
+// UNIQUEMENT (décision utilisateur) : vérifié en direct que c'est propre et
+// fiable pour la CM, mais pour les championnats de club ESPN mélange
+// plusieurs bookmakers avec des formats différents (américain/fractionnaire/
+// décimal) et on est tombés sur une cote clairement incohérente (1/33 pour
+// une équipe milieu de tableau, probablement pas le bon marché) — pas assez
+// fiable pour remplacer calcProno là-bas. Pré-match UNIQUEMENT : la cote
+// DraftKings est un instantané figé avant le coup d'envoi (champs open/close
+// de ligne, pas un flux qui bouge pendant le match) — ESPN ne fournit aucune
+// cote live in-play.
+// Retourne { decimal: {home,draw,away}, pct: {home,draw,away} } ou null
+// (absent/format inattendu/somme des probabilités implicites hors plage
+// plausible) — l'appelant (MatchPoster.jsx) retombe alors sur calcProno,
+// AUCUN changement nécessaire côté calcProno.js ni Pronos.jsx (jeu de
+// pronostics entre amis, doit rester sur un modèle interne cohérent, pas une
+// donnée externe qui peut manquer).
+function americanToDecimal(american) {
+  const v = parseFloat(american)
+  if (isNaN(v) || v === 0) return null
+  return v > 0 ? 1 + v / 100 : 1 + 100 / Math.abs(v)
+}
+
+export function useEspnPregameOdds(match, enabled = true) {
+  const compId = match?.competition?.id
+  const slug   = COMP_ESPN[compId]
+  const isWC   = slug === 'fifa.world'
+  const date   = matchDateStr(match)
+  const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+
+  return useQuery({
+    queryKey:  ['espnPregameOdds', match?.id],
+    enabled:   enabled && isWC && !!match?.id && !!date,
+    staleTime: 15 * 60_000,   // pré-match, ligne quasi figée à l'approche du coup d'envoi
+    retry: 1,
+    queryFn: async () => {
+      const events = await fetchEspnEventsDual(slug, match)
+      for (const evt of events) {
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        if (!homeC || !awayC) continue
+        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+        if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
+
+        const ml = comp?.odds?.[0]?.moneyline
+        if (!ml) return null
+        const homeOdds = americanToDecimal(ml.home?.close?.odds ?? ml.home?.open?.odds)
+        const awayOdds = americanToDecimal(ml.away?.close?.odds ?? ml.away?.open?.odds)
+        const drawOdds = americanToDecimal(ml.draw?.close?.odds ?? ml.draw?.open?.odds)
+          ?? americanToDecimal(comp?.odds?.[0]?.drawOdds?.moneyLine)
+        if (!homeOdds || !awayOdds || !drawOdds) return null
+
+        // Probabilité implicite (marge bookmaker déjà incluse dans une vraie
+        // cote marché, contrairement à notre modèle) — sert à déterminer le
+        // favori/l'intensité du liseré, pas la cote AFFICHÉE (voir decimal).
+        const pHome = 1 / homeOdds, pDraw = 1 / drawOdds, pAway = 1 / awayOdds
+        const sum   = pHome + pDraw + pAway
+        // Garde-fou anti-mauvais-marché (voir commentaire plus haut : cote
+        // 1/33 trouvée par erreur ailleurs) — une vraie cote 1X2 a une marge
+        // raisonnable (95%-130%) ; en dehors, probablement pas le bon marché.
+        if (sum < 0.95 || sum > 1.3) return null
+
+        return {
+          decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
+          pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
+        }
+      }
+      return null
+    },
+  })
+}
+
 function parseEspnRoster(roster) {
   if (!roster) return null
   const rawColor = roster.team?.color ?? ''

@@ -5,6 +5,7 @@ import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
+import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
 import { COMPETITIONS }               from '../data/competitions'
@@ -96,9 +97,20 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
         fullH2H,
         neutralVenue: isNeutralVenueComp(match),
       })
+
+  // ── Cote de marché réelle (CM 2026 uniquement, pré-match) ──────────────────
+  // Remplace l'affichage calcProno par la vraie cote DraftKings quand
+  // disponible et fiable (voir useEspnPregameOdds, décision utilisateur :
+  // uniquement CM, ESPN trop incohérent pour les championnats de club).
+  // Repli automatique et silencieux sur calcProno si absente/invalide/en
+  // direct/terminé — `prono` (calculé ci-dessus) reste la source pour tout
+  // le reste (Pronos.jsx, jeu entre amis, jamais touché par ce fetch).
+  const { data: espnOdds } = useEspnPregameOdds(match, isWC && isUpcoming)
+  const useMarketOdds = isUpcoming && !!espnOdds
+  const displayPct    = useMarketOdds ? espnOdds.pct : prono
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
   // bordeaux, voir footer plus bas (pronoFavoriteKey, calcProno.js).
-  const pronoFavorite = pronoFavoriteKey(prono)
+  const pronoFavorite = pronoFavoriteKey(displayPct)
 
   // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
   // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine
@@ -311,17 +323,17 @@ export function MatchPoster({ match, espnScore = null, onClick }) {
           (pronoFavorite) — les 2 autres restent neutres. ── */}
       <div className="poster__footer">
         <div className="poster__prono-row">
-          <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.home)})`, boxShadow: pronoGlowShadow(prono.home) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">{homeCode}</span>
-            <span className="poster__prono-pillVal">{pronoToOdds(prono.home).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.draw)})`, boxShadow: pronoGlowShadow(prono.draw) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">Nul</span>
-            <span className="poster__prono-pillVal">{pronoToOdds(prono.draw).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(prono.away)})`, boxShadow: pronoGlowShadow(prono.away) } : { borderColor: 'transparent' }}>
+          <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">{awayCode}</span>
-            <span className="poster__prono-pillVal">{pronoToOdds(prono.away).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
           </div>
         </div>
       </div>
