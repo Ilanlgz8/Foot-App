@@ -811,6 +811,21 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     home = Math.max(1, home + swing)
     away = Math.max(1, away - swing)
   }
+  // Carton rouge (audit calcLiveProno) : contrairement à possession/tirs/
+  // corners (simples indicateurs de domination du moment, sans lien direct
+  // avec le nul), une infériorité numérique rend le résultat structurellement
+  // plus décisif — un nul devient statistiquement moins probable, pas
+  // seulement une bascule de victoire dom./ext. Sans ce correctif, 2 équipes
+  // à 0-0 avec un carton rouge de chaque côté ressortaient avec EXACTEMENT
+  // le même nul (40%) qu'à 11 contre 11, ce qui n'a pas de sens. On retire
+  // une petite part du nul vers l'équipe en supériorité, proportionnelle à
+  // l'écart de cartons — jamais plus de la moitié du nul disponible.
+  if (redDiff !== 0) {
+    const drawSteal = Math.min(draw * 0.5, Math.abs(redDiff) * 4)
+    draw -= drawSteal
+    if (redDiff > 0) home += drawSteal
+    else away += drawSteal
+  }
 
   // Garde-fou mathématique (belt and suspenders) : une projection Poisson
   // sur des λ réalistes ne peut normalement pas produire une victoire plus
