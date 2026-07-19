@@ -364,6 +364,41 @@ export function useEspnMatchStats(match) {
           hasData = Object.values(stats.home ?? {}).some(v => v != null)
         }
       }
+      // ⚠️ RÉGRESSION CORRIGÉE (constat utilisateur : stats dispos pour certains
+      // matchs terminés mais pas d'autres, incohérent) : vérifié avec un vrai
+      // payload ESPN réel — pour la CM, summary.boxscore.teams[].statistics ne
+      // contient QUE 4 stats cumulées tournoi (goalDifference/totalGoals/
+      // goalAssists/goalsConceded, jamais possession/tirs/etc), et summary.header
+      // n'existe carrément pas. Les VRAIES stats du match ne sont donc quasiment
+      // jamais dispo que via le scoreboard (boardComp) — MAIS boardComp n'est
+      // renseigné que si findEspnEventId a dû faire la recherche complète (voir
+      // son commentaire). Dès qu'UN SEUL appareil a résolu le mapping Redis une
+      // fois (espnMap, TTL 60j), TOUS les appels suivants prenaient le chemin
+      // rapide et boardComp restait null POUR TOUJOURS pour ce match — hasData
+      // restait donc bloqué à false en permanence, même si le match a de vraies
+      // stats disponibles côté ESPN. On ne le savait pas au moment du fix
+      // précédent (493c82a) : le coût de cet appel scoreboard supplémentaire
+      // était jugé "sans conséquence" à tort. Ici, dernier recours uniquement
+      // quand tout le reste a échoué ET que boardComp n'a jamais été tenté —
+      // un seul fetch de plus, seulement dans ce cas précis.
+      if (!hasData && !boardComp) {
+        try {
+          const events = await fetchEspnEventsDual(slug, match)
+          for (const evt of events) {
+            const comp  = evt.competitions?.[0]
+            const hc = comp?.competitors?.find(c => c.homeAway === 'home')
+            const ac = comp?.competitors?.find(c => c.homeAway === 'away')
+            if (!hc || !ac) continue
+            const espnHome = hc.team?.displayName ?? hc.team?.name ?? ''
+            const espnAway = ac.team?.displayName ?? ac.team?.name ?? ''
+            if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+              stats   = { home: mapStats(hc), away: mapStats(ac) }
+              hasData = Object.values(stats.home ?? {}).some(v => v != null)
+              break
+            }
+          }
+        } catch { /* pas bloquant — on retombe sur le return null ci-dessous */ }
+      }
       if (!hasData) return null
 
       // 4. Lineups depuis rosters si disponibles (ESPN ne les retourne pas toujours pour WC)
