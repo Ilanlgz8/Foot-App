@@ -144,6 +144,10 @@ const SUMMARY_CACHE_TTL = 7 * 24 * 3600
 // push:espn:ft:{eventId}) et le recap vérifie recapAlready avant d'écrire
 // — au pire un no-op silencieux, jamais un doublon visible pour l'utilisateur.
 const FINAL_RECHECK_DELAY_MS = 18_000
+// Durée de vie de finalDoneKey (voir runOnePass, garde-fou en tête de boucle) —
+// doit largement dépasser combien de temps ESPN peut continuer à lister un
+// match FINAL dans son scoreboard (le reste de la journée + marge).
+const FINAL_DONE_TTL = 26 * 3600
 
 async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, scoreStr, log) {
   await new Promise(resolve => setTimeout(resolve, FINAL_RECHECK_DELAY_MS))
@@ -176,8 +180,11 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
 
     log.push(`[final-recheck:${slug}:${eventId}] FT confirmé en avance (~${FINAL_RECHECK_DELAY_MS / 1000}s au lieu de jusqu'à 60s)`)
     try { await kv.set(`cron:espn:${eventId}`, `${status}|${freshScore}`, { ex: 12 * 3600 }) } catch {}
+    // Clos définitivement — voir finalDoneKey en tête de boucle dans runOnePass
+    // (bug corrigé : notifs "Fin de match" répétées des heures après la vraie fin).
+    try { await kv.set(`finalDone:${eventId}`, '1', { ex: FINAL_DONE_TTL }) } catch {}
     await notifyVercel(env, `push:espn:ft:${eventId}`,
-      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
+      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log, FINAL_DONE_TTL)
     await cacheEspnSummary(kv, slug, eventId, log)
     try {
       const recapKey     = `recap:${eventId}`
@@ -361,6 +368,34 @@ async function runOnePass(env) {
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
     const eventId  = evt.id
 
+    // ⚠️ BUG CRITIQUE CORRIGÉ (retour utilisateur : notif "🏁 Fin de match"
+    // reçue 3 fois à plusieurs heures d'intervalle sur un match terminé
+    // depuis longtemps) : ESPN continue de lister un match FINAL dans son
+    // scoreboard/dates=... pendant potentiellement des HEURES après la vraie
+    // fin (le reste de la journée, parfois même le lendemain via le fetch
+    // "yesterday"). Or finalConfirmKey (voir plus bas) n'a qu'un TTL de 5min
+    // — pensé pour combler l'écart entre 2 passes consécutives, PAS pour
+    // durer des heures. Une fois ces 5min passées, si ESPN liste TOUJOURS ce
+    // match comme FINAL à la passe suivante, finalConfirmKey se ré-acquiert
+    // (la clé a expiré) → le match repasse en "1ère détection, pas encore
+    // confirmé" comme si c'était un tout nouveau FT → redéclenche tout le
+    // circuit de confirmation (dont recheckFinalMatch) → et une fois que le
+    // dédup de la notif elle-même (push:espn:ft:{id}, TTL 3h par défaut) a
+    // fini par expirer depuis le DERNIER envoi réel, une vraie notif
+    // repart — en boucle, tant qu'ESPN garde le match dans son scoreboard.
+    // finalDoneKey (TTL 26h, largement au-delà de ce qu'ESPN peut lister un
+    // même jour + marge) mémorise "ce match est confirmé clos pour de bon" —
+    // dès qu'il existe, on saute TOUT traitement de cet évènement (buts,
+    // cartons, mi-temps, reprise, FT, recheck), plus aucune notif ne peut
+    // repartir, quel que soit le nombre de fois qu'ESPN le re-liste ensuite.
+    // Lue dans le MÊME pipeline groupé que le reste (voir plus bas, audit
+    // perf limite Cloudflare 50 subrequests/exécution) — PAS un await séparé
+    // ici, qui coûterait 1 subrequest de plus par match à CHAQUE passe,
+    // même pour les matchs encore en cours (le cas de très loin le plus
+    // fréquent) : gaspillage inutile du budget pour une lecture qui n'est
+    // utile QUE pour les quelques matchs déjà terminés depuis longtemps.
+    const finalDoneKey = `finalDone:${eventId}`
+
     if (slug === 'fifa.world' && fifaLiveMatches.length > 0) {
       const rawHome = homeC.team?.displayName ?? homeC.team?.shortDisplayName ?? ''
       const rawAway = awayC.team?.displayName ?? awayC.team?.shortDisplayName ?? ''
@@ -456,19 +491,26 @@ async function runOnePass(env) {
     // en push à tous les abonnés en plein temps additionnel.
     const finalConfirmKey = `finalConfirm:${eventId}`
 
+    // ⚠️ Les indices [5]/[6] ci-dessous sont OPTIONNELS (ajoutés seulement
+    // sous condition) — finalDoneKey [5] doit donc rester le DERNIER ajout
+    // INCONDITIONNEL avant eux (position fixe, toujours [5]), sinon sa
+    // position réelle dans pipeResults se décale selon isLive/isFinalNow et
+    // pick(5) lirait le mauvais résultat (bug trouvé et corrigé pendant la
+    // relecture de ce fix, avant tout déploiement).
     let pipe = kv.pipeline()
       .get(stateKey)                                          // [0] prevState
       .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [1] (résultat inutilisé)
       .get(trackKey)                                           // [2] rawTrack
       .get(cardTrackKey)                                       // [3] rawCardTrack
       .set(lockKey, '1', { px: 5_000, nx: true })              // [4] lockAcquired
-    // [5] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
+      .get(finalDoneKey)                                       // [5] alreadyDone — voir commentaire plus haut, garde-fou bug notifs répétées
+    // [6] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
     // terminé) — isLive et isFinalNow sont mutuellement exclusifs (aucun
     // statut n'appartient aux 2 ensembles à la fois), jamais les deux en
     // même temps dans le même pipeline.
     if (isLive) pipe = pipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
     else if (isFinalNow) pipe = pipe.get(recapKey)
-    // [6] optionnel : 1ère acquisition de finalConfirmKey (voir commentaire
+    // [7] optionnel : 1ère acquisition de finalConfirmKey (voir commentaire
     // ci-dessus) — uniquement pertinent quand isFinalNow.
     if (isFinalNow) pipe = pipe.set(finalConfirmKey, '1', { ex: 300, nx: true })
 
@@ -488,13 +530,21 @@ async function runOnePass(env) {
     const rawTrack      = pick(2)
     const rawCardTrack  = pick(3)
     const lockAcquired  = pick(4)
-    const koAcquired    = isLive ? pick(5) : false
-    const recapAlready  = (!isLive && isFinalNow) ? pick(5) : null
+    // Match déjà confirmé clos pour de bon lors d'une passe précédente (voir
+    // finalDoneKey plus haut, position FIXE [5]) → on s'arrête ICI, avant
+    // tout le reste (buts, cartons, mi-temps, reprise, FT, recheck). Le
+    // stateKey/trackKey/etc. ont déjà été écrits ci-dessus par le pipeline
+    // (coût déjà payé, inévitable vu qu'on ne connaît alreadyDone qu'APRÈS
+    // avoir exécuté le pipeline), mais aucune notif ne peut plus jamais
+    // repartir pour cet évènement à partir d'ici.
+    if (pick(5)) continue
+    const koAcquired    = isLive ? pick(6) : false
+    const recapAlready  = (!isLive && isFinalNow) ? pick(6) : null
     // true = c'est la 1ère fois qu'on voit ce match FINAL (clé tout juste
     // créée) → PAS encore confirmé. false/null = la clé existait déjà → au
     // moins une passe FINAL précédente → confirmation possible (sous réserve
     // du score inchangé, voir isFinalConfirmed plus bas).
-    const finalFirstSeen = isFinalNow ? pick(6) : null
+    const finalFirstSeen = isFinalNow ? pick(7) : null
 
     const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
     // Confirmé seulement à la 2e passe FINAL consécutive (ou plus), avec un
@@ -652,15 +702,23 @@ async function runOnePass(env) {
     // au cas où la passe suivante infirme ce statut.
     if (isFinalConfirmed) {
       log.push(`[espn:${slug}:${eventId}] FT (confirmé)`)
+      // Clos définitivement — voir finalDoneKey en tête de boucle (bug corrigé :
+      // notifs "Fin de match" répétées des heures après la vraie fin, tant
+      // qu'ESPN continuait à lister le match FINAL et que finalConfirmKey
+      // (TTL 5min) se ré-armait entretemps).
+      try { await kv.set(finalDoneKey, '1', { ex: FINAL_DONE_TTL }) } catch {}
       await notifyVercel(env, `push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log, FINAL_DONE_TTL)
       await cacheEspnSummary(kv, slug, eventId, log)
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
       // 1ère détection cette passe (finalConfirmKey tout juste acquis) → programmer
       // le recheck accéléré (~18s) au lieu d'attendre le tick normal (jusqu'à 60s).
       // finalFirstSeen garantit que ceci ne se déclenche qu'UNE SEULE fois par
-      // séquence FT (la clé Redis a un TTL de 5min, largement au-delà de ces 18s).
+      // 5min — voir finalDoneKey en tête de boucle pour ce qui empêche
+      // vraiment toute répétition au-delà (finalConfirmKey seul ne suffisait
+      // pas : sa courte TTL pouvait se ré-armer des heures plus tard tant
+      // qu'ESPN listait encore le match FINAL, voir bug corrigé ci-dessus).
       if (finalFirstSeen) {
         pendingFinalRechecks.push(
           recheckFinalMatch(env, kv, slug, eventId, score, homeTeam, awayTeam, scoreStr, log)
