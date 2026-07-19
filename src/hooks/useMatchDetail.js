@@ -70,6 +70,49 @@ async function fetchEspnEventsDual(slug, match) {
   return [...(board1?.events ?? []), ...(board2?.events ?? [])]
 }
 
+// ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
+// manquants ou incomplets, "des fois ça marche, des fois pas") : useLineups
+// et useEspnMatchStats retrouvaient CHACUN, à CHAQUE appel, l'eventId ESPN en
+// interrogeant le scoreboard du jour et en comparant les noms d'équipe
+// (fetchEspnEventsDual + fuzzy match ci-dessous) — refait de zéro par chaque
+// appareil de chaque utilisateur, jamais partagé, et fragile pour un vieux
+// match qu'ESPN ne liste plus forcément aussi facilement sur son scoreboard.
+// findEspnEventId() tente d'abord le mapping Redis partagé (voir api/espn.js,
+// mode lookupMap) — dès qu'UN SEUL appareil a déjà résolu ce match une fois,
+// tous les autres ensuite sautent cette recherche fragile. Si le mapping est
+// inconnu (1ère fois pour ce match) ou la lecture échoue, on retombe
+// EXACTEMENT sur l'ancienne recherche (fetchEspnEventsDual + fuzzy match,
+// inchangée) — zéro régression possible, ce chemin rapide ne fait
+// qu'accélérer/fiabiliser le cas déjà courant, jamais le seul moyen d'obtenir
+// un résultat. boardComp (stats du scoreboard, filet de sécurité déjà en
+// place dans useEspnMatchStats) n'est renseigné QUE quand la recherche
+// complète a été utilisée — normal et sans conséquence : boardComp ne sert
+// que de 3e repli, voir plus bas.
+async function findEspnEventId(slug, match, fdHome, fdAway) {
+  try {
+    const mapRes = await fetch(`/espn?slug=${slug}&lookupMap=1&fdMatchId=${match.id}`)
+    if (mapRes.ok) {
+      const { eventId: mappedId } = await mapRes.json()
+      if (mappedId) return { eventId: String(mappedId), boardComp: null }
+    }
+  } catch {}
+
+  // Repli : recherche complète par scoreboard + nom d'équipe (comportement historique)
+  const events = await fetchEspnEventsDual(slug, match)
+  for (const evt of events) {
+    const comp  = evt.competitions?.[0]
+    const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+    const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+    if (!homeC || !awayC) continue
+    const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+    const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+    if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+      return { eventId: evt.id, boardComp: comp }
+    }
+  }
+  return { eventId: null, boardComp: null }
+}
+
 function parseEspnRoster(roster) {
   if (!roster) return null
   const rawColor = roster.team?.color ?? ''
@@ -147,27 +190,13 @@ export function useLineups(match) {
 
       // ── ESPN (toutes compétitions, WC en fallback après FIFA) ─────────────────
 
-      // Étape 1 : trouver l'event ID via le scoreboard (double date, voir
-      // fetchEspnEventsDual)
-      const events = await fetchEspnEventsDual(slug, match)
-
-      let eventId = null
-      for (const evt of events) {
-        const comp  = evt.competitions?.[0]
-        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-        if (!homeC || !awayC) continue
-        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
-        if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-          eventId = evt.id
-          break
-        }
-      }
+      // Étape 1 : trouver l'event ID (mapping partagé d'abord, voir findEspnEventId)
+      const { eventId } = await findEspnEventId(slug, match, fdHome, fdAway)
       if (!eventId) return null
 
-      // Étape 2 : summary pour les rosters + formations
-      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
+      // Étape 2 : summary pour les rosters + formations — fdMatchId transmis
+      // pour mémoriser le mapping côté serveur (voir api/espn.js)
+      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 
@@ -221,28 +250,18 @@ export function useEspnMatchStats(match) {
     staleTime: 30 * 60_000,
     retry: 1,
     queryFn: async () => {
-      // 1. Scoreboard → event ID (double date, voir fetchEspnEventsDual)
-      const events = await fetchEspnEventsDual(slug, match)
-
-      let eventId   = null
-      let boardComp = null   // comp du SCOREBOARD (Passe 1) — voir pourquoi plus bas
-      for (const evt of events) {
-        const comp  = evt.competitions?.[0]
-        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-        if (!homeC || !awayC) continue
-        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
-        if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-          eventId   = evt.id
-          boardComp = comp
-          break
-        }
-      }
+      // 1. Event ID — mapping partagé d'abord, repli scoreboard+fuzzy match
+      // sinon (voir findEspnEventId ci-dessus). boardComp (stats scoreboard,
+      // filet de sécurité "3." plus bas) n'est renseigné que si le repli
+      // complet a été utilisé — sans conséquence, voir commentaire sur
+      // findEspnEventId.
+      const { eventId, boardComp } = await findEspnEventId(slug, match, fdHome, fdAway)
       if (!eventId) return null
 
-      // 2. Summary complet
-      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
+      // 2. Summary complet — fdMatchId transmis pour mémoriser le mapping
+      // côté serveur (voir api/espn.js), au bénéfice de tous les autres
+      // utilisateurs/appareils ensuite.
+      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 

@@ -33,6 +33,23 @@ const ALLOWED_SLUGS = new Set([
 const SUMMARY_CACHE_TTL      = 7 * 24 * 3600  // 7j — matchs TERMINÉS uniquement (retrospective)
 const LIVE_SUMMARY_CACHE_TTL = 45              // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
 
+// ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
+// manquants ou incomplets — "des fois ça marche, des fois pas") : jusqu'ici,
+// pour afficher les stats d'un match terminé, CHAQUE appareil de CHAQUE
+// utilisateur devait retrouver lui-même l'eventId ESPN en interrogeant le
+// scoreboard du jour et en comparant les noms d'équipe (fetchEspnEventsDual,
+// useMatchDetail.js) — refait de zéro à chaque fois, jamais partagé. Pour un
+// vieux match qu'ESPN ne liste plus aussi facilement sur son scoreboard, cette
+// recherche pouvait échouer ou mal matcher selon le moment exact de la
+// requête — d'où l'incohérence "des fois oui, des fois non" observée.
+// espnMap:{fdMatchId} mémorise ce mapping UNE FOIS résolu (par n'importe quel
+// appareil), pour que TOUS les autres ensuite sautent cette recherche fragile
+// et aillent direct au résumé ESPN (déjà mis en cache séparément ci-dessus,
+// 7j) — cohérent avec les autres caches partagés du projet (recap, summary).
+// TTL généreux (60j) : l'association match↔eventId ne change jamais une fois
+// établie, et resservie tant qu'on veut encore montrer ce match en Résultats.
+const MAP_TTL = 60 * 24 * 3600
+
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées") :
 // hasUsefulData() ne regardait QUE la présence de rosters/boxscore pour
 // décider de mettre en cache — or les rosters sont dispo dès l'AVANT-MATCH.
@@ -84,8 +101,12 @@ export default async function handler(req, res) {
     if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh } = req.query
+  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
+  // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
+  // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
+  // chaîne comme clé Redis.
+  const safeFdMatchId = fdMatchId && /^\d+$/.test(String(fdMatchId)) ? String(fdMatchId) : null
 
   if (!slug)                    return res.status(400).json({ error: 'Paramètre slug manquant' })
   if (!ALLOWED_SLUGS.has(slug)) return res.status(400).json({ error: 'Slug non autorisé' })
@@ -94,6 +115,23 @@ export default async function handler(req, res) {
   const timeoutId  = setTimeout(() => controller.abort(), 8_000)
 
   try {
+    // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
+    // Voir MAP_TTL plus haut pour le contexte. Écrit uniquement dans le mode
+    // "eventId" ci-dessous (dès qu'un fdMatchId est fourni avec un eventId
+    // déjà résolu côté client) — jamais ici, lecture seule.
+    if (lookupMap === '1' && safeFdMatchId) {
+      clearTimeout(timeoutId)
+      try {
+        const cachedEventId = await kv.get(`espnMap:${safeFdMatchId}`)
+        return res.status(200)
+          .setHeader('Content-Type', 'application/json')
+          .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0')
+          .json({ eventId: cachedEventId ?? null })
+      } catch {
+        return res.status(200).json({ eventId: null })
+      }
+    }
+
     // ── Mode recap : lecture seule du résumé auto généré par cron-goals.js ──
     // Jamais généré ici (pas de fetch ESPN direct pour ce mode) — uniquement
     // une lecture Redis. Si rien n'est en cache, { recap: null } → le client
@@ -112,6 +150,17 @@ export default async function handler(req, res) {
     }
 
     if (eventId) {
+      // ── Mémorisation du mapping fdMatchId → eventId (voir MAP_TTL plus haut) ──
+      // Le client envoie fdMatchId UNIQUEMENT après l'avoir déjà résolu lui-même
+      // (ancienne méthode scoreboard+nom d'équipe, inchangée) — on fait juste
+      // confiance à cette résolution et on la mémorise pour tout le monde
+      // ensuite. Non bloquant pour la réponse (juste awaité en parallèle, coût
+      // négligeable) : une erreur ici n'affecte jamais le résultat renvoyé au
+      // client.
+      const mapWrite = safeFdMatchId
+        ? kv.set(`espnMap:${safeFdMatchId}`, String(eventId), { ex: MAP_TTL }).catch(() => {})
+        : Promise.resolve()
+
       // ── Mode summary : cache Redis partagé d'abord ──────────────────────────
       // forceFresh=1 (retour d'arrière-plan récent côté client, voir
       // window.__liveStatsForceFreshUntil dans useLiveMinute.js) contourne
@@ -123,6 +172,7 @@ export default async function handler(req, res) {
         const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {
           clearTimeout(timeoutId)
+          await mapWrite
           const body = typeof cached === 'string' ? cached : JSON.stringify(cached)
           return res.status(200)
             .setHeader('Content-Type', 'application/json')
@@ -148,6 +198,7 @@ export default async function handler(req, res) {
           await kv.set(cacheKey, body, { ex: ttl })
         }
       } catch { /* JSON invalide ou KV en erreur → tant pis, pas bloquant pour la réponse */ }
+      await mapWrite
 
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
