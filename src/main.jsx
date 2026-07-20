@@ -60,17 +60,19 @@ const persister = createSyncStoragePersister({
   storage: window.localStorage
 })
 
-// ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur, même symptôme que le
-// correctif ci-dessus mais un autre jour : "toujours pas les buteurs" alors
-// que la donnée ESPN est vérifiée bonne en direct sur l'API — fermer/rouvrir
-// l'app ne suffit pas, voir l'explication complète juste au-dessus) : le
-// correctif du 2026-07-15 (fallback scoreboard→summary dans
-// useEspnMatchDetail.js ET useEspnMatchStats) change la donnée renvoyée par
-// ces deux requêtes déjà potentiellement en cache avec un résultat vide
-// persisté AVANT ce correctif — sans bump du buster, ce vide serait resservi
-// jusqu'à 24h malgré le fix déployé. Toujours incrémenter ce buster à chaque
-// correctif qui touche la logique/forme d'une requête déjà en cache.
-const CACHE_BUSTER = 'v4-2026-07-15-espn-scoreboard-fallback'
+// ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur : "j'ai pas autant de stats
+// que les autres matchs" sur la finale CM, alors que fermer/rouvrir l'app
+// avait déjà été fait — donc pas un problème de bundle JS/SW, voir
+// l'explication complète juste au-dessus). Deux correctifs coup sur coup
+// (buteurs/cartons vides + fusion FIFA/ESPN des stats) ont changé la forme
+// de ce que renvoient useEspnMatchDetail et useEspnMatchStats, MAIS le buster
+// n'avait pas été bumpé pour ces deux commits précis — le résultat incomplet
+// déjà persisté (jusqu'à 24h, voir gcTime) pour un match aussi consulté que
+// la finale continuait donc d'être resservi tel quel, masquant totalement le
+// fix côté serveur malgré un vrai reload complet de l'app. Toujours
+// incrémenter ce buster à chaque correctif qui touche la logique/forme d'une
+// requête déjà en cache — pas juste "des fois", à chaque fois.
+const CACHE_BUSTER = 'v5-2026-07-20-espn-stats-merge'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>
