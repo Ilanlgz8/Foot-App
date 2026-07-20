@@ -30,17 +30,20 @@ const ALLOWED_SLUGS = new Set([
   'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',
 ])
 
-// ⚠️ AJOUT (retour utilisateur : "Statistiques indisponibles" sur des matchs
-// vieux d'une semaine+, alors que ça marchait juste après le match) : 7j
-// était bien trop court pour un TOURNOI (CM 2026) que les utilisateurs
-// consultent encore des semaines après un match — passé ce délai, le cache
-// expire et l'app retente un fetch ESPN EN DIRECT pour un event vieux de
-// plusieurs jours, qu'ESPN ne sert plus forcément aussi complètement
-// (boxscore/rosters). Un match TERMINÉ ne change plus jamais → aucune raison
-// de faire expirer ce cache vite. 180j couvre largement tout le tournoi +
-// consultation a posteriori, sans cache Redis illimité.
-const SUMMARY_CACHE_TTL      = 180 * 24 * 3600 // 180j — matchs TERMINÉS uniquement (donnée immuable)
-const LIVE_SUMMARY_CACHE_TTL = 45              // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
+// ⚠️ HISTORIQUE (retour utilisateur : "Statistiques indisponibles" sur des
+// matchs vieux d'une semaine+) : 7j puis 180j — à chaque fois, passé le
+// délai, le cache expirait et l'app retentait un fetch ESPN EN DIRECT pour un
+// event vieux, qu'ESPN ne sert plus forcément aussi complètement
+// (boxscore/rosters).
+// ⚠️ AJOUT (demande utilisateur explicite : "que les stats et tout restent en
+// cache très longtemps sans jamais disparaître") : un match TERMINÉ ne change
+// plus JAMAIS — un TTL, même de 180j, reste une limite arbitraire. Ce cache
+// n'a désormais plus de `ex` du tout pour un match terminé (voir plus bas,
+// `isMatchFinished(parsed)`) : la clé Redis Upstash correspondante n'expire
+// jamais. Volume négligeable pour ce projet (quelques centaines de
+// matchs/saison). Seul le match encore EN COURS garde un TTL court
+// (LIVE_SUMMARY_CACHE_TTL) — ses stats évoluent réellement.
+const LIVE_SUMMARY_CACHE_TTL = 45 // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
 
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
 // manquants ou incomplets — "des fois ça marche, des fois pas") : jusqu'ici,
@@ -53,11 +56,9 @@ const LIVE_SUMMARY_CACHE_TTL = 45              // 45s — match encore EN COURS 
 // requête — d'où l'incohérence "des fois oui, des fois non" observée.
 // espnMap:{fdMatchId} mémorise ce mapping UNE FOIS résolu (par n'importe quel
 // appareil), pour que TOUS les autres ensuite sautent cette recherche fragile
-// et aillent direct au résumé ESPN (déjà mis en cache séparément ci-dessus,
-// 7j) — cohérent avec les autres caches partagés du projet (recap, summary).
-// TTL généreux (60j) : l'association match↔eventId ne change jamais une fois
-// établie, et resservie tant qu'on veut encore montrer ce match en Résultats.
-const MAP_TTL = 60 * 24 * 3600
+// et aillent direct au résumé ESPN. L'association match↔eventId ne change
+// jamais une fois établie → pas de TTL (voir kv.set(`espnMap:...`) plus bas),
+// même logique que les autres caches "définitifs" de ce fichier.
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées") :
 // hasUsefulData() ne regardait QUE la présence de rosters/boxscore pour
@@ -125,9 +126,9 @@ export default async function handler(req, res) {
 
   try {
     // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
-    // Voir MAP_TTL plus haut pour le contexte. Écrit uniquement dans le mode
-    // "eventId" ci-dessous (dès qu'un fdMatchId est fourni avec un eventId
-    // déjà résolu côté client) — jamais ici, lecture seule.
+    // Voir le commentaire sur espnMap plus haut pour le contexte. Écrit
+    // uniquement dans le mode "eventId" ci-dessous (dès qu'un fdMatchId est
+    // fourni avec un eventId déjà résolu côté client) — jamais ici, lecture seule.
     if (lookupMap === '1' && safeFdMatchId) {
       clearTimeout(timeoutId)
       try {
@@ -159,15 +160,15 @@ export default async function handler(req, res) {
     }
 
     if (eventId) {
-      // ── Mémorisation du mapping fdMatchId → eventId (voir MAP_TTL plus haut) ──
+      // ── Mémorisation du mapping fdMatchId → eventId (voir commentaire plus haut) ──
       // Le client envoie fdMatchId UNIQUEMENT après l'avoir déjà résolu lui-même
       // (ancienne méthode scoreboard+nom d'équipe, inchangée) — on fait juste
       // confiance à cette résolution et on la mémorise pour tout le monde
       // ensuite. Non bloquant pour la réponse (juste awaité en parallèle, coût
       // négligeable) : une erreur ici n'affecte jamais le résultat renvoyé au
-      // client.
+      // client. Pas de TTL : ce mapping ne change jamais une fois établi.
       const mapWrite = safeFdMatchId
-        ? kv.set(`espnMap:${safeFdMatchId}`, String(eventId), { ex: MAP_TTL }).catch(() => {})
+        ? kv.set(`espnMap:${safeFdMatchId}`, String(eventId)).catch(() => {})
         : Promise.resolve()
 
       // ── Mode summary : cache Redis partagé d'abord ──────────────────────────
@@ -203,8 +204,13 @@ export default async function handler(req, res) {
       try {
         const parsed = JSON.parse(body)
         if (hasUsefulData(parsed)) {
-          const ttl = isMatchFinished(parsed) ? SUMMARY_CACHE_TTL : LIVE_SUMMARY_CACHE_TTL
-          await kv.set(cacheKey, body, { ex: ttl })
+          // Match terminé : pas de `ex` (donnée immuable, cache permanent).
+          // Match en cours : TTL court (LIVE_SUMMARY_CACHE_TTL), les stats évoluent.
+          if (isMatchFinished(parsed)) {
+            await kv.set(cacheKey, body)
+          } else {
+            await kv.set(cacheKey, body, { ex: LIVE_SUMMARY_CACHE_TTL })
+          }
         }
       } catch { /* JSON invalide ou KV en erreur → tant pis, pas bloquant pour la réponse */ }
       await mapWrite

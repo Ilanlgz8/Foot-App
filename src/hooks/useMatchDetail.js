@@ -739,13 +739,18 @@ export function useFifaStats(match, enabled = true, live = true) {
       if (!s?.home && !s?.away) return null
 
       // Mapper vers le format attendu par ESPNStats
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "Hors-jeux" jamais affiché pour
+      // un match CM alors que la donnée existe) : fifaStatsToRows() (voir
+      // MatchModal.jsx) lit `h.offsides`/`a.offsides` (pluriel) — ce mapping
+      // écrivait `offside` (singulier), donc toujours undefined pour ce champ
+      // précis, silencieusement filtré par fifaStatsToRows.
       const mapTeam = (t) => ({
         poss:          t?.possession       ?? null,
         shots:         t?.shots            ?? null,
         shotsOnTarget: t?.shotsOnTarget    ?? null,
         corners:       t?.corners          ?? null,
         fouls:         t?.fouls            ?? null,
-        offside:       t?.offside          ?? null,
+        offsides:      t?.offside          ?? null,
       })
       return { home: mapTeam(s.home), away: mapTeam(s.away) }
     },

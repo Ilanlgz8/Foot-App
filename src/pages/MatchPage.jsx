@@ -392,8 +392,31 @@ function MpMatchStats({ match }) {
   // vrais 0-0) et on laisse la place à ESPN.
   const fifaSotSum  = (fifaData?.home?.shotsOnTarget ?? 0) + (fifaData?.away?.shotsOnTarget ?? 0)
   const fifaLooksOff = totalGoals > 0 && fifaSotSum === 0
-  const fifaRows = fifaLooksOff ? [] : fifaStatsToRows(fifaData)
-  const espnRows = fifaStatsToRows(espnStatsData?.stats)
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "y'a que une partie des stats" sur
+  // la finale CM 2026) : FIFA ne fournit QUE 6 champs (possession/tirs/tirs
+  // cadrés/corners/fautes/hors-jeux — voir useFifaStats), jamais
+  // passes/tacles/interceptions/centres/longs ballons/dégagements/tirs
+  // contrés/arrêts. L'ancienne logique choisissait fifaRows EN BLOC dès qu'il
+  // avait ne serait-ce qu'1 champ rempli, ce qui cachait TOUJOURS les ~12
+  // champs supplémentaires qu'ESPN a bien pour ce match (vérifié sur un vrai
+  // payload prod : summary.boxscore a totalPasses/totalTackles/interceptions/
+  // etc pour Espagne-Argentine) — pas un problème de donnée manquante, un
+  // problème de source qui en écrase une autre au lieu de les compléter.
+  // Fusion CHAMP PAR CHAMP désormais : FIFA reste prioritaire pour les champs
+  // qu'il connaît (plus réactif en live), ESPN comble le reste.
+  const mergeTeamStats = (primary, secondary) => {
+    if (!primary && !secondary) return null
+    const keys = new Set([...Object.keys(primary ?? {}), ...Object.keys(secondary ?? {})])
+    const out = {}
+    for (const k of keys) out[k] = primary?.[k] ?? secondary?.[k] ?? null
+    return out
+  }
+  const fifaSource = fifaLooksOff ? null : fifaData
+  const mergedStats = (fifaSource?.home || fifaSource?.away || espnStatsData?.stats?.home || espnStatsData?.stats?.away)
+    ? { home: mergeTeamStats(fifaSource?.home, espnStatsData?.stats?.home), away: mergeTeamStats(fifaSource?.away, espnStatsData?.stats?.away) }
+    : null
+  const mergedRows = fifaStatsToRows(mergedStats)
   const aflRows  = aflStatsToRows(aflStats)
   // Dernier filet de sécurité (demande explicite utilisateur) : l'instantané
   // ESPN capturé en direct (confirmFt(), voir matchStateTracker.js) si CE
@@ -405,8 +428,7 @@ function MpMatchStats({ match }) {
   // plus bas), pas besoin de re-vérifier isFinished ici.
   const cachedLive = getEspnData(match?.id)
   const cachedRows = fifaStatsToRows(cachedLive?.stats)
-  const rows = fifaRows.length ? fifaRows
-    : espnRows.length ? espnRows
+  const rows = mergedRows.length ? mergedRows
     : cachedRows.length ? cachedRows
     : aflRows
 

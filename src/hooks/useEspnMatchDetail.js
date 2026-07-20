@@ -191,9 +191,12 @@ function extractDetails(comp, homeTeamId, commentary) {
   return {
     scorers,
     cards,
+    // offsides (pluriel) — fifaStatsToRows (MatchModal.jsx) lit `h.offsides`/
+    // `a.offsides` ; un champ `offside` (singulier) ici serait toujours
+    // silencieusement ignoré (même bug corrigé côté useFifaStats).
     stats: (homePoss !== null || awayPoss !== null) ? {
-      home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners', 'wonCorners'), fouls: getStat(homeC, 'fouls', 'foulsCommitted'), offside: getStat(homeC, 'offsides') },
-      away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners', 'wonCorners'), fouls: getStat(awayC, 'fouls', 'foulsCommitted'), offside: getStat(awayC, 'offsides') },
+      home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners', 'wonCorners'), fouls: getStat(homeC, 'fouls', 'foulsCommitted'), offsides: getStat(homeC, 'offsides') },
+      away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners', 'wonCorners'), fouls: getStat(awayC, 'fouls', 'foulsCommitted'), offsides: getStat(awayC, 'offsides') },
     } : null,
   }
 }

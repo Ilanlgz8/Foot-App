@@ -264,10 +264,26 @@ async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600, 
 // l'écrit dans le même cache Redis partagé que api/espn.js (même clé) — donc
 // n'importe quel utilisateur consultant "Résultats" plus tard la retrouve,
 // même s'il n'a jamais ouvert le match en direct.
-const SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — même durée que api/espn.js
+// Match en cours au moment de cette capture proactive → TTL court (les stats
+// vont encore changer). Une fois le match RÉELLEMENT terminé, api/espn.js
+// (consulté par n'importe quel client ensuite) réécrit cette même clé SANS
+// TTL (voir son commentaire "cache permanent, demande utilisateur explicite")
+// — mais si personne ne rouvre jamais ce match précis après coup, cette
+// capture-ci reste la seule en place. Pour que "les stats restent en cache
+// sans jamais disparaître" (demande utilisateur explicite) tienne vraiment
+// même dans ce cas, on retire aussi le TTL ici dès que LE SUMMARY LUI-MÊME
+// indique un match terminé — même donnée immuable, même traitement.
+const LIVE_SUMMARY_CACHE_TTL = 7 * 24 * 3600  // 7j — match encore en cours au moment de la capture
 
 // hasUsefulSummaryData : importée de src/utils/liveDetection.js (voir en
 // tête de fichier) — anciennement dupliquée ici et dans cf-worker/src/index.js.
+
+function isSummaryFinished(json) {
+  const statusName = json?.header?.competitions?.[0]?.status?.type?.name
+  const completed  = json?.header?.competitions?.[0]?.status?.type?.completed
+  return completed === true || statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL'
+    || statusName === 'STATUS_FINAL_AET' || statusName === 'STATUS_FINAL_PEN'
+}
 
 async function cacheEspnSummary(slug, eventId, log) {
   try {
@@ -280,7 +296,11 @@ async function cacheEspnSummary(slug, eventId, log) {
     const body = await res.text()
     const parsed = JSON.parse(body)
     if (!hasUsefulSummaryData(parsed)) return
-    await kv.set(`espn:summary:${slug}:${eventId}`, body, { ex: SUMMARY_CACHE_TTL })
+    if (isSummaryFinished(parsed)) {
+      await kv.set(`espn:summary:${slug}:${eventId}`, body)
+    } else {
+      await kv.set(`espn:summary:${slug}:${eventId}`, body, { ex: LIVE_SUMMARY_CACHE_TTL })
+    }
   } catch (e) {
     log.push(`[espn-summary-cache:${slug}:${eventId}] error=${e.message}`)
   }
