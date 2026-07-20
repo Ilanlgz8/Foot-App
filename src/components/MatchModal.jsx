@@ -1025,18 +1025,36 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   // fini dont la vraie compo n'a jamais pu être récupérée (FIFA/ESPN/FD.org/
   // api-football tous vides) affichait "Compos non disponibles" au lieu du
   // dernier XI connu, alors que rien n'empêche de l'utiliser aussi après coup
-  // (demande explicite : "éviter de rien afficher"). Toujours activé — ne
-  // s'affiche de toute façon que si `lineups` (Source 1/2/3) est vide, voir
-  // plus bas.
+  // (demande explicite : "éviter de rien afficher"). Ne s'affiche de toute
+  // façon que si `lineups` (Source 1/2/3) est vide, voir plus bas.
+  //
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, capture réseau à l'appui : rafale de
+  // 429 sur /espn en consultant un seul match) : ce fallback partait AVANT
+  // même de savoir si les Sources 1/2/3 avaient quelque chose — jusqu'à 8
+  // requêtes ESPN gaspillées (fetchEspnLineup pour home ET away, chacune avec
+  // sa propre recherche scoreboard+summary) à CHAQUE ouverture d'un match,
+  // même quand la vraie compo était déjà trouvée juste au-dessus. Multiplié
+  // par les 2 autres hooks qui font le même genre de résolution (useLineups/
+  // useEspnMatchStats), un simple aller-retour sur un match pouvait à lui
+  // seul flirter avec le plafond de 60 req/min par IP. On ne déclenche
+  // maintenant ce filet de secours qu'une fois les vraies sources RÉELLEMENT
+  // épuisées (chargement terminé ET rien trouvé) — résultat final affiché
+  // strictement identique (le "probable" n'était de toute façon déjà utilisé
+  // que dans ce cas précis), juste plus aucune requête inutile dans le cas
+  // (largement majoritaire) où la vraie compo existe.
+  const primaryLineupsDone    = espnDone && !fdLoading && !aflLoading
+  const primaryLineupsHasData = espnOrFdHasData || aflLineups?.home?.starters?.length
+  const needsProbable         = primaryLineupsDone && !primaryLineupsHasData
+
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
-    match,
+    needsProbable ? match : null,
     compMatches
   )
 
   // Source 3b : probables via api-football (fallback si ESPN vide) — même
   // changement que Source 3a.
   const { data: aflProbableData, isLoading: aflProbableLoading } = useAflProbableLineups(
-    match,
+    needsProbable ? match : null,
     compMatches
   )
 
