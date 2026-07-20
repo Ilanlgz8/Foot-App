@@ -37,7 +37,7 @@ if ('serviceWorker' in navigator) {
   }, 10 * 60 * 1000) // 10min
 }
 import { BrowserRouter } from 'react-router-dom'
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { removeOldestQuery } from '@tanstack/query-persist-client-core'
@@ -84,6 +84,39 @@ const persister = createSyncStoragePersister({
   retry: removeOldestQuery,
 })
 
+// ⚠️ AJOUT (demande utilisateur : "je veux qu'il n'y ait AUCUN problème,
+// même en consultant plusieurs matchs" — traiter la cause plutôt que le
+// symptôme) : `retry: removeOldestQuery` ci-dessus est un filet de sécurité
+// qui empêche un dépassement de quota de tout casser, mais le blob
+// localStorage continue quand même à grossir sans limite tant qu'on ne lui
+// dit pas quoi garder. Ces requêtes précises (buteurs/cartons, compos,
+// stats détaillées d'un match) sont déjà en cache PERMANENT côté SERVEUR
+// (Redis, voir api/espn.js et api/fifa-lineups.js) — un aller-retour vers
+// notre propre backend (juste une lecture Redis, quasi instantané, pas un
+// vrai appel ESPN) suffit à les retrouver après un rechargement. Les exclure
+// de la persistance localStorage règle le problème à la racine plutôt que
+// de gérer l'accumulation : elles restent bien en cache MÉMOIRE React Query
+// pendant toute la session (navigation instantanée d'un match à l'autre,
+// zéro perte de rapidité), seule la sauvegarde disque entre 2 sessions est
+// sautée pour CES requêtes précises — celles qui grossissent vraiment vite
+// sur une compétition à beaucoup de matchs comme la Coupe du Monde (compos
+// = ~15 joueurs par équipe × 2 équipes, en plus des stats détaillées).
+// Tout le reste (classements, calendrier du jour, formulaire des équipes...)
+// continue d'être persisté normalement : ce sont des listes bornées (une
+// entrée par compétition/jour, pas une par match jamais consulté), donc
+// aucun risque de croissance illimitée de ce côté-là.
+const UNPERSISTED_QUERY_KEYS = new Set([
+  'espnMatchDetail',   // déroulement (buteurs/cartons) — useEspnMatchDetail.js
+  'espnSummary',       // stats live (MatchModal.jsx)
+  'lineups2',          // compos — useLineups
+  'espnMatchStats2',   // stats + compos (Résultat) — useEspnMatchStats
+  'probableLineups3',  // compos probables — useProbableLineups
+  'espnPregameOdds',   // cote pré-match ESPN
+  'matchVenueInfo',    // stade/ville/arbitre
+  'h2h-fd',            // confrontations directes
+  'aflFixtureInfo', 'aflLineups', 'aflStats', 'aflMatchStats', // api-football (désactivé, voir CLAUDE.md, mais même principe si jamais réactivé)
+])
+
 // ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur : "j'ai pas autant de stats
 // que les autres matchs" sur la finale CM, alors que fermer/rouvrir l'app
 // avait déjà été fait — donc pas un problème de bundle JS/SW, voir
@@ -106,14 +139,26 @@ const persister = createSyncStoragePersister({
 // simple rechargement ne redonnait pas une vraie nouvelle chance. Plafond
 // remonté à 1h. Ce bump vide tout état "abandonné" déjà persisté côté
 // client suite à ce bug, pour repartir sur un plafond propre.
-// v10 : fix quota localStorage (voir persister ci-dessus, retry:
-// removeOldestQuery) — bump pour repartir sur un blob cache propre, au cas
-// où le blob actuel de certains utilisateurs soit déjà proche/au-dessus du
-// quota suite à ce bug (une grosse CM consultée sur beaucoup de matchs).
-const CACHE_BUSTER = 'v10-2026-07-20-localstorage-quota-fix'
+// v11 : les grosses requêtes par match (compos/stats/déroulement, voir
+// UNPERSISTED_QUERY_KEYS ci-dessus) ne sont plus persistées en localStorage
+// du tout — élimine la cause racine du quota dépassé (v10 ne faisait que
+// gérer le symptôme). Bump pour repartir sur un blob propre.
+const CACHE_BUSTER = 'v11-2026-07-20-unpersist-large-match-queries'
 
 createRoot(document.getElementById('root')).render(
-  <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister,
+      buster: CACHE_BUSTER,
+      dehydrateOptions: {
+        shouldDehydrateQuery: (query) => {
+          if (UNPERSISTED_QUERY_KEYS.has(query.queryKey[0])) return false
+          return defaultShouldDehydrateQuery(query)
+        },
+      },
+    }}
+  >
     <BrowserRouter>
       <App />
     </BrowserRouter>
