@@ -9,6 +9,11 @@ import { useQuery } from '@tanstack/react-query'
 import { readCache, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
+// Depuis la compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js) :
+// /espn?eventId=... renvoie directement { scorers, cards, stats, lineups }
+// déjà parsés — extractMatchDetails ne sert plus ici que pour le repli
+// scoreboard brut (boardComp, jamais mis en cache compact).
+import { extractMatchDetails } from '../utils/espnSummaryParse'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -265,49 +270,6 @@ export function useEspnPregameOdds(match, enabled = true) {
   })
 }
 
-function parseEspnRoster(roster) {
-  if (!roster) return null
-  const rawColor = roster.team?.color ?? ''
-  const color    = /^[0-9a-fA-F]{6}$/.test(rawColor) ? `#${rawColor}` : '#1e40af'
-  const rawAlt   = roster.team?.alternateColor ?? ''
-  const altColor = /^[0-9a-fA-F]{6}$/.test(rawAlt) ? `#${rawAlt}` : '#ffffff'
-
-  const mapAthlete = a => ({
-    name:         a.athlete?.displayName ?? a.displayName ?? '?',
-    shortName:    a.athlete?.shortName ?? a.shortName ?? a.athlete?.displayName ?? '?',
-    number:       a.athlete?.jersey ?? a.jersey ?? '',
-    position:     (a.athlete?.position?.abbreviation ?? a.position?.abbreviation ?? '').toUpperCase(),
-    positionName: a.athlete?.position?.name ?? a.position?.name ?? '',
-    order:        a.order ?? 99,
-  })
-
-  const all = roster.athletes ?? roster.roster ?? []
-
-  // ESPN utilise `a.starter` (boolean) pour clubs, mais pour certains tournois
-  // le champ peut être absent. Si aucun starter explicite, on prend les 11 premiers
-  // triés par order (ils sont déjà ordonnés titulaires en premier dans l'API).
-  const explicitStarters = all.filter(a => a.starter === true)
-  const hasExplicit = explicitStarters.length > 0
-
-  const sorted = [...all].sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-  const starters = hasExplicit
-    ? explicitStarters.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete)
-    : sorted.slice(0, 11).map(mapAthlete)
-  const subs = hasExplicit
-    ? all.filter(a => !a.starter).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(mapAthlete)
-    : sorted.slice(11).map(mapAthlete)
-
-  return {
-    name:      roster.team?.displayName ?? '?',
-    shortName: roster.team?.abbreviation ?? roster.team?.displayName ?? '?',
-    color,
-    altColor,
-    formation: roster.formation ?? '',
-    starters,
-    subs,
-  }
-}
-
 export function useLineups(match, isFinished = false) {
   const compId     = match?.competition?.id
   const slug       = COMP_ESPN[compId]
@@ -361,39 +323,17 @@ export function useLineups(match, isFinished = false) {
       if (!eventId) return null
 
       // Étape 2 : summary pour les rosters + formations — fdMatchId transmis
-      // pour mémoriser le mapping côté serveur (voir api/espn.js)
+      // pour mémoriser le mapping côté serveur (voir api/espn.js). Renvoie
+      // déjà { scorers, cards, stats, lineups } compacté et pré-parsé côté
+      // serveur (voir compactEspnSummary/extractLineups dans
+      // espnSummaryParse.js) — home/away déjà résolus par ID ESPN, plus
+      // besoin de fuzzy-match ni de parseEspnRoster ici.
       const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 
-      let rosters = summary.rosters ?? []
-      // WC ESPN : rosters parfois absents de summary.rosters, présents dans header.competitions
-      if (rosters.length === 0) {
-        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
-        if (competitors.length >= 1) {
-          rosters = competitors.map(c => ({
-            team:       c.team,
-            athletes:   c.roster ?? c.athletes ?? [],
-            formation:  c.formation ?? '',
-          }))
-        }
-      }
-
-      if (rosters.length < 1) return null
-
-      // Identifier home/away
-      let homeIdx = 0
-      if (rosters.length >= 2) {
-        const name0 = rosters[0]?.team?.displayName ?? ''
-        homeIdx = fuzzyTeam(fdHome, name0) ? 0 : 1
-      }
-      const awayIdx = 1 - homeIdx
-
-      const home = parseEspnRoster(rosters[homeIdx])
-      const away = parseEspnRoster(rosters[awayIdx] ?? rosters[0])
-      if (!home?.starters?.length) return null
-
-      return { home, away }
+      if (!summary?.lineups?.home?.starters?.length) return null
+      return summary.lineups
     },
   })
 }
@@ -437,135 +377,40 @@ export function useEspnMatchStats(match, isFinished = false) {
       if (!sumRes.ok) return null
       const summary = await sumRes.json()
 
-      // 3. Stats — normalement depuis boxscore.teams, mais pour la CM ESPN
-      // laisse souvent boxscore.teams vide et place les stats dans
-      // header.competitions[0].competitors[].statistics à la place (même
-      // faille WC que pour les rosters ci-dessous — déjà gérée pour les buts/
-      // cartons/stats des matchs terminés dans useEspnMatchDetail.js, mais PAS
-      // ici : c'est CE hook qui alimente le fallback stats de MpMatchStats
-      // (page Résultat), donc ce trou privait concrètement l'utilisateur de la
-      // possession/tirs/etc. dès que ni FIFA ni boxscore ne répondaient —
-      // exactement le bug rapporté ("pas les stats si j'ai pas suivi en live").
-      const getStat = (team, ...names) => {
-        for (const n of names) {
-          const s = (team?.statistics ?? []).find(st => st.name === n)
-          if (s) { const v = parseFloat(s.displayValue); return isNaN(v) ? null : v }
-        }
-        return null
-      }
-      // BUG CORRIGÉ (constat utilisateur : "en résultat/live j'ai pas grand
-      // chose en stats qui s'affiche") : ce hook alimente MpMatchStats (page
-      // Résultat, matchs terminés) via fifaStatsToRows — cette dernière sait
-      // déjà afficher 19 lignes (Passes, Tacles, Interceptions, Centres,
-      // Longs ballons, Dégagements, Tirs contrés, Arrêts, Cartons rouges…,
-      // voir MatchModal.jsx), MAIS mapStats() ici n'en extrayait que 7
-      // (Possession/Tirs/Tirs cadrés/Corners/Fautes/Hors-jeux/Jaunes) — les
-      // 12 autres étaient donc TOUJOURS vides pour un match terminé, alors
-      // qu'ESPN les fournit (même endpoint /summary, mêmes noms de champs
-      // que useEspnSummaryStats dans MatchModal.jsx, déjà utilisé en LIVE).
-      // Même extraction ici désormais (passPct/tacklePct/etc recalculés à la
-      // main depuis les 2 compteurs bruts — les champs "*Pct" d'ESPN sont un
-      // ratio 0-1 arrondi, pas un vrai pourcentage, voir MatchModal.jsx) :
-      // une seule logique d'extraction, plus de divergence entre live et
-      // terminé.
-      const pct = (made, total) => (made != null && total != null && total > 0)
-        ? Math.round((made / total) * 100)
-        : null
-      const mapStats = (team) => {
-        const totalPasses    = getStat(team, 'totalPasses')
-        const accuratePasses = getStat(team, 'accuratePasses')
-        const totalTackles   = getStat(team, 'totalTackles')
-        const okTackles      = getStat(team, 'effectiveTackles')
-        const totalCrosses   = getStat(team, 'totalCrosses')
-        const okCrosses      = getStat(team, 'accurateCrosses')
-        const totalLongBalls = getStat(team, 'totalLongBalls')
-        const okLongBalls    = getStat(team, 'accurateLongBalls')
-        return {
-          poss:          getStat(team, 'possessionPct'),
-          shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
-          shotsOnTarget: getStat(team, 'shotsOnTarget', 'shotsOnGoal', 'onGoal'),
-          corners:       getStat(team, 'wonCorners', 'cornerKicks', 'corners'),
-          passes:        totalPasses,
-          passPct:       pct(accuratePasses, totalPasses),
-          tackles:       totalTackles,
-          tacklePct:     pct(okTackles, totalTackles),
-          interceptions: getStat(team, 'interceptions'),
-          crosses:       totalCrosses,
-          crossPct:      pct(okCrosses, totalCrosses),
-          longBalls:     totalLongBalls,
-          longBallPct:   pct(okLongBalls, totalLongBalls),
-          clearances:    getStat(team, 'totalClearance', 'effectiveClearance'),
-          blockedShots:  getStat(team, 'blockedShots'),
-          saves:         getStat(team, 'saves'),
-          fouls:         getStat(team, 'fouls', 'foulsCommitted'),
-          offsides:      getStat(team, 'offsides', 'offside'),
-          yellowCards:   getStat(team, 'yellowCards'),
-          redCards:      getStat(team, 'redCards'),
-        }
-      }
+      // 3. Stats — le serveur renvoie déjà summary.stats compacté et
+      // pré-extrait (voir compactEspnSummary/extractTeamStats dans
+      // espnSummaryParse.js, les 19 mêmes champs que ceux affichés par
+      // fifaStatsToRows dans MatchModal.jsx). Plus besoin de parser
+      // boxscore.teams/header.competitions ici — le serveur l'a déjà fait.
+      let stats   = summary.stats
+      let hasData = !!stats
 
-      const boxTeams = summary.boxscore?.teams ?? []
-      let homeTeam = boxTeams.find(t => t.homeAway === 'home')
-      let awayTeam = boxTeams.find(t => t.homeAway === 'away')
-
-      let stats    = { home: mapStats(homeTeam), away: mapStats(awayTeam) }
-      let hasData  = Object.values(stats.home ?? {}).some(v => v != null)
-
-      if (!hasData) {
-        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
-        const hc = competitors.find(c => c.homeAway === 'home')
-        const ac = competitors.find(c => c.homeAway === 'away')
-        if (hc || ac) {
-          stats   = { home: mapStats(hc), away: mapStats(ac) }
-          hasData = Object.values(stats.home ?? {}).some(v => v != null)
-        }
-      }
-      // ⚠️ BUG CORRIGÉ (constat utilisateur : "stats fausses/manquantes" sur un
-      // match CM 2026 précis — vérifié en comparant scoreboard et summary sur
-      // ce match : boxscore.teams ET header.competitions étaient TOUS LES DEUX
-      // vides côté summary, alors que le SCOREBOARD (Passe 1, `boardComp`,
-      // déjà en main) avait les stats complètes — possession/tirs/corners —
-      // pour les deux équipes). Même filet de sécurité que useEspnMatchDetail.js
-      // : on retombe sur boardComp avant d'abandonner, sans fetch en plus.
+      // ⚠️ Filet de sécurité conservé (constat utilisateur : "stats fausses/
+      // manquantes" sur un match CM 2026 précis) : le summary ESPN peut être
+      // vide alors que le SCOREBOARD (Passe 1, `boardComp`, déjà en main) a
+      // les stats complètes. extractMatchDetails (partagé avec le serveur)
+      // fait la même extraction sur le `comp` brut du scoreboard.
       if (!hasData && boardComp) {
-        const competitors = boardComp.competitors ?? []
-        const hc = competitors.find(c => c.homeAway === 'home')
-        const ac = competitors.find(c => c.homeAway === 'away')
-        if (hc || ac) {
-          stats   = { home: mapStats(hc), away: mapStats(ac) }
-          hasData = Object.values(stats.home ?? {}).some(v => v != null)
-        }
+        const boardResult = extractMatchDetails(boardComp)
+        if (boardResult.stats) { stats = boardResult.stats; hasData = true }
       }
-      // ⚠️ RÉGRESSION CORRIGÉE (constat utilisateur : stats dispos pour certains
-      // matchs terminés mais pas d'autres, incohérent) : vérifié avec un vrai
-      // payload ESPN réel — pour la CM, summary.boxscore.teams[].statistics ne
-      // contient QUE 4 stats cumulées tournoi (goalDifference/totalGoals/
-      // goalAssists/goalsConceded, jamais possession/tirs/etc), et summary.header
-      // n'existe carrément pas. Les VRAIES stats du match ne sont donc quasiment
-      // jamais dispo que via le scoreboard (boardComp) — MAIS boardComp n'est
-      // renseigné que si findEspnEventId a dû faire la recherche complète (voir
-      // son commentaire). Dès qu'UN SEUL appareil a résolu le mapping Redis une
-      // fois (espnMap, TTL 60j), TOUS les appels suivants prenaient le chemin
-      // rapide et boardComp restait null POUR TOUJOURS pour ce match — hasData
-      // restait donc bloqué à false en permanence, même si le match a de vraies
-      // stats disponibles côté ESPN. On ne le savait pas au moment du fix
-      // précédent (493c82a) : le coût de cet appel scoreboard supplémentaire
-      // était jugé "sans conséquence" à tort. Ici, dernier recours uniquement
-      // quand tout le reste a échoué ET que boardComp n'a jamais été tenté —
-      // un seul fetch de plus, seulement dans ce cas précis.
+      // Dernier recours : le mapping rapide Redis a déjà résolu l'eventId
+      // (boardComp jamais rempli) ET le summary compacté n'a rien — on
+      // retente une recherche scoreboard complète (un seul fetch de plus,
+      // seulement dans ce cas précis).
       if (!hasData && !boardComp) {
         try {
           const events = await fetchEspnEventsDual(slug, match)
           for (const evt of events) {
-            const comp  = evt.competitions?.[0]
+            const comp = evt.competitions?.[0]
             const hc = comp?.competitors?.find(c => c.homeAway === 'home')
             const ac = comp?.competitors?.find(c => c.homeAway === 'away')
             if (!hc || !ac) continue
             const espnHome = hc.team?.displayName ?? hc.team?.name ?? ''
             const espnAway = ac.team?.displayName ?? ac.team?.name ?? ''
             if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-              stats   = { home: mapStats(hc), away: mapStats(ac) }
-              hasData = Object.values(stats.home ?? {}).some(v => v != null)
+              const boardResult = extractMatchDetails(comp)
+              if (boardResult.stats) { stats = boardResult.stats; hasData = true }
               break
             }
           }
@@ -573,29 +418,9 @@ export function useEspnMatchStats(match, isFinished = false) {
       }
       if (!hasData) return null
 
-      // 4. Lineups depuis rosters si disponibles (ESPN ne les retourne pas toujours pour WC)
-      let lineups = null
-      let rosters = summary.rosters ?? []
-      // WC : rosters absents de summary.rosters, présents dans header.competitions
-      // (même fallback que useLineups/useProbableLineups plus haut — manquait
-      // ici, ce qui privait ComposTab d'une de ses 3 sources pour la CM).
-      if (rosters.length === 0) {
-        const competitors = summary.header?.competitions?.[0]?.competitors ?? []
-        if (competitors.length >= 1) {
-          rosters = competitors.map(c => ({
-            team:      c.team,
-            athletes:  c.roster ?? c.athletes ?? [],
-            formation: c.formation ?? '',
-          }))
-        }
-      }
-      if (rosters.length >= 1) {
-        const name0 = rosters[0]?.team?.displayName ?? ''
-        const homeIdx = fuzzyTeam(fdHome, name0) ? 0 : 1
-        const home = parseEspnRoster(rosters[homeIdx])
-        const away = parseEspnRoster(rosters[1 - homeIdx] ?? rosters[0])
-        if (home?.starters?.length) lineups = { home, away }
-      }
+      // 4. Lineups — déjà résolus côté serveur (summary.lineups), null si
+      // ESPN n'en a pas publié pour ce match.
+      const lineups = summary.lineups ?? null
 
       return { stats, lineups }
     },
@@ -656,31 +481,18 @@ export function useProbableLineups(match, compMatches) {
           }
           if (!eventId) return null
 
-          // 2. Summary ESPN → rosters du match précédent
+          // 2. Summary ESPN → rosters du match précédent, déjà résolus
+          // home/away par ID côté serveur (summary.lineups.home/away, voir
+          // compactEspnSummary/extractLineups dans espnSummaryParse.js) —
+          // plus besoin de fuzzy-match/parseEspnRoster ici.
           const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}`)
           if (!sumRes.ok) return null
           const summary = await sumRes.json()
-
-          let rosters = summary.rosters ?? []
-          // WC fallback : rosters dans header.competitions (pas dans summary.rosters)
-          if (rosters.length === 0) {
-            const competitors = summary.header?.competitions?.[0]?.competitors ?? []
-            if (competitors.length >= 1) {
-              rosters = competitors.map(c => ({
-                team:      c.team,
-                athletes:  c.roster ?? c.athletes ?? [],
-                formation: c.formation ?? '',
-              }))
-            }
-          }
-          if (!rosters.length) return null
+          if (!summary?.lineups) return null
 
           // 3. Extraire le roster de l'équipe concernée
-          const wasHome  = prevMatch.homeTeam?.id === teamId
-          const teamName = wasHome ? fdH : fdA
-          const name0    = rosters[0]?.team?.displayName ?? ''
-          const idx      = fuzzyTeam(teamName, name0) ? 0 : 1
-          const roster   = parseEspnRoster(rosters[idx] ?? rosters[0])
+          const wasHome = prevMatch.homeTeam?.id === teamId
+          const roster  = wasHome ? summary.lineups.home : summary.lineups.away
           if (!roster?.starters?.length) return null
 
           const opponent = wasHome

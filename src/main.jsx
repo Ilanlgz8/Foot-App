@@ -72,7 +72,14 @@ const persister = createSyncStoragePersister({
 // fix côté serveur malgré un vrai reload complet de l'app. Toujours
 // incrémenter ce buster à chaque correctif qui touche la logique/forme d'une
 // requête déjà en cache — pas juste "des fois", à chaque fois.
-const CACHE_BUSTER = 'v6-2026-07-20-matchinfo-venue-fix'
+// v7 : compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js) — la
+// forme de ce que renvoie /espn?eventId=... a changé (JSON compact
+// {scorers,cards,stats,lineups} au lieu du payload ESPN brut), donc la forme
+// de ce que persistent espnMatchDetail/lineups2/espnMatchStats2/
+// probableLineups3 a changé aussi. Sans ce bump, l'ancien payload brut déjà
+// en cache (jusqu'à 24h, gcTime) serait mal interprété par le nouveau code
+// client — même trap que documenté juste au-dessus (v6).
+const CACHE_BUSTER = 'v7-2026-07-20-espn-compact-cache'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>

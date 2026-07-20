@@ -6,22 +6,18 @@
 //
 // Le summary ESPN est la seule source fiable de buts pour les matchs passés.
 // FD.org ne fournit pas de buts pour toutes les compétitions sur le free tier.
-
+//
+// ⚠️ Depuis la compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js
+// — demande utilisateur : "les stats doivent rester en cache sans jamais
+// disparaître", sans faire exploser le stockage Redis) : la Passe 2 (summary)
+// renvoie déjà { scorers, cards, stats, lineups } directement — plus besoin
+// de parser le JSON ESPN brut ici. extractMatchDetails (partagé avec le
+// serveur, voir src/utils/espnSummaryParse.js) ne sert plus que pour la
+// Passe 1 (scoreboard, jamais mis en cache, toujours au format ESPN natif).
 import { useQuery } from '@tanstack/react-query'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
+import { extractMatchDetails } from '../utils/espnSummaryParse'
 
-// ⚠️ AJOUT (constat utilisateur : "pour les cartons jaune seulement ça met
-// le prénom en entier au lieu de la première lettre du prénom avec un point
-// comme les buts et cartons rouges") : les buts + cartons rouges viennent de
-// comp.details, où l'objet athlete a fiablement un `shortName` déjà abrégé
-// ("B. Embolo") fourni par ESPN. Les cartons jaunes viennent d'un endroit
-// différent (json.commentary[].play, voir plus bas) où l'objet athlete n'a
-// pas toujours ce même champ rempli — le code retombait alors sur
-// `displayName` (nom complet, "Breel Embolo") sans jamais l'abréger,
-// d'où l'incohérence visuelle. Ce helper abrège nous-mêmes le prénom
-// ("Breel Embolo" → "B. Embolo") quand shortName manque, pour un rendu
-// identique aux buts/rouges quelle que soit la donnée réellement fournie par
-// ESPN à cet endroit précis.
 // Résultat vide/inexploitable : soit l'event n'a pas été trouvé (`null`),
 // soit trouvé mais ESPN n'a encore rien publié comme plays/details/stats.
 function isEspnDetailEmpty(d) {
@@ -35,13 +31,6 @@ function isEspnDetailEmpty(d) {
 // sert de compteur de tentatives sans état supplémentaire à gérer.
 const EMPTY_RETRY_INTERVAL_MS = 30_000
 const MAX_EMPTY_RETRIES       = 10   // ~5min avant d'abandonner
-
-function initialName(full) {
-  if (!full) return null
-  const parts = full.trim().split(/\s+/)
-  if (parts.length < 2) return full
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`
-}
 
 function espnDate(match, offsetDays = 0) {
   if (!match?.utcDate) return null
@@ -69,142 +58,6 @@ function findEspnEvent(json, match) {
     }
   }
   return null
-}
-
-/** Extrait buts + cartons + stats à partir d'un objet "competition" ESPN (même
- *  forme dans le scoreboard ET le summary : { competitors, details }). Séparé
- *  de extractFromSummary() ci-dessous pour pouvoir l'appliquer aussi bien au
- *  `comp` du scoreboard (Passe 1, déjà en main) qu'à celui du summary
- *  (Passe 2) — voir queryFn plus bas pour pourquoi c'est nécessaire. */
-function extractDetails(comp, homeTeamId, commentary) {
-  const homeC = (comp?.competitors ?? []).find(c => c.homeAway === 'home') ??
-                (comp?.competitors ?? []).find(c => c.team?.id === homeTeamId)
-  const awayC = (comp?.competitors ?? []).find(c => c.homeAway === 'away') ??
-                (comp?.competitors ?? []).find(c => c.team?.id !== homeTeamId)
-
-  // ── Buts + cartons ──────────────────────────────────────────────────────
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide pour des matchs
-  // jamais suivis en direct — confirmé via une page de diagnostic dédiée,
-  // dump JSON réel à l'appui sur un match CM 2026) : la structure réelle des
-  // entrées de comp.details N'A JAMAIS de champ `type` — ni `type.id`, ni
-  // `type.text`. Chaque entrée porte directement des flags booléens :
-  //   scoringPlay: true/false   → c'est un but ou non
-  //   redCard:     true/false   → carton rouge (si false ET pas un but, on
-  //                                en déduit un carton jaune — comp.details
-  //                                ne contient QUE des buts et des cartons,
-  //                                vérifié sur le dump : 5 entrées pour un
-  //                                match à 4 buts + 1 carton, aucun 6e type
-  //                                d'événement mêlé)
-  //   ownGoal, penaltyKick      → qualificatifs du but
-  // L'ancien code cherchait `d.type?.id === '57'` (but) / `'93'|'94'`
-  // (carton) — des champs qui n'ont jamais existé dans cette réponse, d'où
-  // 0 résultat à chaque fois pour tout match retombant sur ce chemin (summary
-  // post-match, PAS le snapshot live confirmFt() — ce qui explique pourquoi
-  // seuls les matchs jamais suivis en direct étaient touchés).
-  const scorers = []
-  const cards = []
-  for (const d of (comp?.details ?? [])) {
-    const teamSide = d.team?.id === homeC?.team?.id ? 'home' : 'away'
-    // BUG CORRIGÉ (constat utilisateur : noms de joueurs affichés "?" dans le
-    // déroulement du match — vérifié sur un vrai payload ESPN, finale CM 2026
-    // Espagne-Argentine) : le champ réel est `athletesInvolved[0]`, PAS
-    // `participants[0].athlete` — ce dernier n'existe jamais dans cette
-    // réponse, donc `ath` était toujours `undefined` et `name` retombait
-    // systématiquement sur '?'. Le "filet de sécurité" plus bas (qui, lui,
-    // utilise déjà `athletesInvolved`) ne se déclenchait jamais pour corriger
-    // ça : il n'agit que si `scorers`/`cards` sont VIDES, or cette boucle
-    // remplissait déjà les tableaux (avec des noms '?'), donc sa condition de
-    // déclenchement n'était jamais remplie.
-    const ath = d.participants?.[0]?.athlete ?? d.athletesInvolved?.[0]
-    const name = ath?.shortName ?? ath?.displayName ?? '?'
-    const minute = d.clock?.displayValue ?? ''
-    if (d.scoringPlay === true) {
-      scorers.push({ name, minute, team: teamSide, ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false })
-    } else {
-      cards.push({ name, minute, team: teamSide, red: d.redCard === true })
-    }
-  }
-
-  // ── Cartons JAUNES ───────────────────────────────────────────────────────
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : buts + cartons rouges OK, jaunes
-  // absents — vérifié via DebugEspn.jsx sur un vrai match CM 2026) :
-  // comp.details ne contient QUE les buts et les cartons ROUGES — ESPN ne
-  // met jamais les jaunes à cet endroit. Ils sont ailleurs : dans
-  // json.commentary[i].play, avec un vrai champ `type.id === '94'`
-  // ("Yellow Card") cette fois (contrairement à comp.details qui n'a jamais
-  // eu de champ `type`, voir plus haut). Preuve concrète obtenue en dump
-  // direct : Breel Embolo (Suisse), carton jaune, 44e minute.
-  // On ne prend QUE les jaunes ici — les rouges restent sourcés depuis
-  // comp.details ci-dessus (déjà fiable) pour ne pas les compter en double.
-  // `commentary` n'existe que sur la réponse summary (pas sur le scoreboard) —
-  // undefined dans ce 2e cas, la boucle ne fait simplement rien.
-  for (const c of (commentary ?? [])) {
-    const play = c.play
-    if (play?.type?.id !== '94') continue
-    const ath = play.participants?.[0]?.athlete
-    cards.push({
-      name:   ath?.shortName ?? initialName(ath?.displayName) ?? '?',
-      minute: play.clock?.displayValue ?? c.time?.displayValue ?? '',
-      team:   fuzzyTeam(homeC?.team?.displayName ?? '', play.team?.displayName ?? '') ? 'home' : 'away',
-      red:    false,
-    })
-  }
-
-  // Filet de sécurité : si jamais une compétition renvoie encore l'ancien
-  // format à base de `type` (jamais observé en pratique, mais coût nul à
-  // garder en fallback), on complète avec cette détection historique.
-  if (scorers.length === 0 && cards.length === 0) {
-    for (const d of (comp?.details ?? [])) {
-      const id = String(d.type?.id ?? '')
-      if (d.type?.text === 'Goal' || id === '57') {
-        const ath = d.athletesInvolved?.[0]
-        scorers.push({
-          name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
-          team: d.team?.id === homeC?.team?.id ? 'home' : 'away',
-          ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false,
-        })
-      } else if (id === '93' || id === '94') {
-        const ath = d.athletesInvolved?.[0]
-        cards.push({
-          name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
-          team: d.team?.id === homeC?.team?.id ? 'home' : 'away', red: d.redCard === true || id === '93',
-        })
-      }
-    }
-  }
-
-  // ── Stats ──
-  // ⚠️ Le scoreboard (Passe 1) et le summary (Passe 2) n'utilisent pas
-  // exactement les mêmes noms de champ pour la même stat (constaté en
-  // vérifiant les deux réponses côte à côte sur un vrai match CM 2026) :
-  // le scoreboard nomme les corners "wonCorners", le summary "corners" —
-  // on accepte les deux noms pour que extractDetails() fonctionne pareil
-  // quel que soit le `comp` (scoreboard ou summary) qu'on lui passe.
-  const getStat = (c, ...names) => {
-    if (!c) return null
-    const found = (c.statistics ?? []).find(s => names.includes(s.name))
-    return found != null ? (parseFloat(found.displayValue) || 0) : null
-  }
-  const homePoss = getStat(homeC, 'possessionPct')
-  const awayPoss = getStat(awayC, 'possessionPct')
-
-  return {
-    scorers,
-    cards,
-    // offsides (pluriel) — fifaStatsToRows (MatchModal.jsx) lit `h.offsides`/
-    // `a.offsides` ; un champ `offside` (singulier) ici serait toujours
-    // silencieusement ignoré (même bug corrigé côté useFifaStats).
-    stats: (homePoss !== null || awayPoss !== null) ? {
-      home: { poss: homePoss, shots: getStat(homeC, 'totalShots'), shotsOnTarget: getStat(homeC, 'shotsOnTarget'), corners: getStat(homeC, 'corners', 'wonCorners'), fouls: getStat(homeC, 'fouls', 'foulsCommitted'), offsides: getStat(homeC, 'offsides') },
-      away: { poss: awayPoss, shots: getStat(awayC, 'totalShots'), shotsOnTarget: getStat(awayC, 'shotsOnTarget'), corners: getStat(awayC, 'corners', 'wonCorners'), fouls: getStat(awayC, 'fouls', 'foulsCommitted'), offsides: getStat(awayC, 'offsides') },
-    } : null,
-  }
-}
-
-/** Passe 2 : extrait buts + stats depuis la réponse summary ESPN. */
-function extractFromSummary(json, homeTeamId) {
-  const comp = json.header?.competitions?.[0] ?? json.competitions?.[0]
-  return extractDetails(comp, homeTeamId, json.commentary)
 }
 
 export function useEspnMatchDetail(match, compId, enabled = true) {
@@ -250,8 +103,12 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       if (!found) return null   // match non trouvé dans le scoreboard
 
       // ── Passe 2 : summary → buts + stats complets ──
+      // /espn?eventId=... renvoie désormais directement le JSON compact
+      // { scorers, cards, stats, lineups } (voir api/espn.js/
+      // espnSummaryParse.js) — plus besoin de le parser ici, le serveur l'a
+      // déjà fait (et mis en cache tel quel).
       const res2 = await fetch(`/espn?slug=${slug}&eventId=${found.eventId}`)
-      const summaryResult = res2.ok ? extractFromSummary(await res2.json(), found.homeTeamId) : null
+      const summaryResult = res2.ok ? await res2.json() : null
 
       // ⚠️ BUG CORRIGÉ (constat utilisateur, vrai payload vérifié sur la
       // finale CM 2026 Espagne-Argentine) : l'ancienne logique choisissait
@@ -270,7 +127,7 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       // champ (scorers/cards/stats) prend le summary s'il est non vide,
       // sinon le scoreboard — sans coût réseau supplémentaire, `found.comp`
       // est déjà en mémoire depuis la Passe 1.
-      const boardResult = extractDetails(found.comp, found.homeTeamId)
+      const boardResult = extractMatchDetails(found.comp, found.homeTeamId)
       const result = {
         scorers: summaryResult?.scorers?.length ? summaryResult.scorers : boardResult.scorers,
         cards:   summaryResult?.cards?.length   ? summaryResult.cards   : boardResult.cards,

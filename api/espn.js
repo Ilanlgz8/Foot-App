@@ -1,6 +1,6 @@
 // Proxy ESPN — scores live, historique daté, et summary (stats live)
 //
-// ⚠️ Cache Redis ajouté sur le mode "summary" (rosters + boxscore + events
+// ⚠️ Cache Redis ajouté sur le mode "summary" (buts/cartons + stats + compos
 // d'un match précis) : avant, chaque requête tapait ESPN en direct, sans
 // aucune mémoire partagée. Conséquence concrète pour l'utilisateur : les
 // compos/stats d'un match n'étaient dispos dans "Résultats" QUE si LUI-MÊME
@@ -11,7 +11,21 @@
 // SEUL visiteur (ou le cron, voir cron-goals.js) réussit à récupérer la
 // donnée, elle reste dispo pour tout le monde ensuite, même si ESPN cesse
 // de la servir plus tard.
+//
+// ⚠️ AJOUT (demande utilisateur explicite : "les stats et tout doivent rester
+// en cache très longtemps sans jamais disparaître" — voir plus bas pour le
+// cache permanent d'un match terminé) : un payload ESPN /summary brut pèse
+// ~90 Ko (cotes, chaînes TV, classements de meilleurs joueurs, liens vers les
+// pages joueur/club, photos... jamais lus par l'app, en plus des buts/cartons/
+// stats/compos réellement affichés). Avec un cache Redis PERMANENT, stocker
+// le payload brut pour chaque match de chaque compétition couverte
+// approcherait la limite de stockage du tier gratuit Upstash (256 Mo) en
+// environ une saison. compactEspnSummary() (voir src/utils/espnSummaryParse.js)
+// réduit CE QUI EST MIS EN CACHE ET RENVOYÉ AU CLIENT au strict nécessaire —
+// { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
+// l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
+import { compactEspnSummary } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -60,39 +74,28 @@ const LIVE_SUMMARY_CACHE_TTL = 45 // 45s — match encore EN COURS (stats poss/t
 // jamais une fois établie → pas de TTL (voir kv.set(`espnMap:...`) plus bas),
 // même logique que les autres caches "définitifs" de ce fichier.
 
-// ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées") :
-// hasUsefulData() ne regardait QUE la présence de rosters/boxscore pour
-// décider de mettre en cache — or les rosters sont dispo dès l'AVANT-MATCH.
-// Résultat : le tout premier summary fetché (souvent avant/juste après le
-// coup d'envoi, quand le boxscore est encore vide ou quasi) se retrouvait
-// caché pour 7 JOURS ENTIERS, et absolument TOUS les utilisateurs recevaient
-// ensuite ce même instantané figé pendant tout le reste du match — bien plus
-// large que le simple cas "retour d'arrière-plan". Le TTL 7j reste justifié
-// pour un match TERMINÉ (permet de revoir les stats bien après qu'ESPN les
-// retire), mais un match encore EN COURS doit garder un TTL court.
+// ⚠️ Historique (constat utilisateur : "les stats live ont l'air figées") :
+// un summary fetché juste avant/après le coup d'envoi (rosters dispo mais
+// boxscore encore vide) ne doit PAS être traité comme "match terminé" — un
+// match encore EN COURS doit garder un TTL court (LIVE_SUMMARY_CACHE_TTL),
+// seul un match réellement terminé passe en cache permanent.
 function isMatchFinished(json) {
   const statusName = json?.header?.competitions?.[0]?.status?.type?.name
   const completed  = json?.header?.competitions?.[0]?.status?.type?.completed
   return completed === true || statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL'
 }
 
-// Un summary "utile" contient au moins des rosters ou un boxscore — évite de
-// mettre en cache une réponse vide/quasi-vide qui bloquerait un refetch utile.
-function hasUsefulData(json) {
-  const hasRosters  = Array.isArray(json?.rosters) && json.rosters.length > 0
-  const hasBoxscore = Array.isArray(json?.boxscore?.teams) && json.boxscore.teams.length > 0
-  // ⚠️ BUG CORRIGÉ : pour la Coupe du Monde, ESPN ne remplit quasiment jamais
-  // json.rosters — les compos sont dans header.competitions[0].competitors[].
-  // roster à la place (déjà géré côté client, voir useLineups/useEspnMatchStats
-  // dans useMatchDetail.js). Cette fonction ne le vérifiait pas : un summary WC
-  // avec compo dispo UNIQUEMENT à cet endroit était jugé "pas utile" et jamais
-  // mis en cache Redis. Résultat concret : dès qu'ESPN cesse de servir les
-  // rosters en direct (fenêtre limitée), plus aucune compo n'était récupérable
-  // pour ce match, même pour un utilisateur qui l'avait consulté pendant qu'ESPN
-  // avait encore la donnée — rien n'avait jamais été sauvegardé.
-  const competitors  = json?.header?.competitions?.[0]?.competitors ?? []
-  const hasHeaderRoster = competitors.some(c => Array.isArray(c?.roster) && c.roster.length > 0)
-  return hasRosters || hasBoxscore || hasHeaderRoster
+// Un résultat compacté "utile" contient au moins des stats ou une compo —
+// évite de mettre en cache une réponse vide/quasi-vide qui bloquerait un
+// refetch utile plus tard (le cache serait alors permanent pour RIEN).
+// ⚠️ Historique : cette fonction vérifiait avant la présence de rosters/
+// boxscore/header-roster sur le JSON BRUT ESPN — désormais redondant, cette
+// même détection (y compris le repli header.competitions[].competitors[].roster
+// pour la CM, où ESPN ne remplit quasiment jamais json.rosters) est déjà faite
+// à l'intérieur de compactEspnSummary()/extractLineups() — on vérifie
+// directement le résultat compacté.
+function hasUsefulData(compact) {
+  return !!(compact?.stats || compact?.lineups?.home?.starters?.length)
 }
 
 export default async function handler(req, res) {
@@ -177,6 +180,11 @@ export default async function handler(req, res) {
       // cette lecture pour ne pas resservir un instantané potentiellement
       // périmé — le fetch frais ci-dessous réécrit quand même le cache après,
       // au bénéfice des autres utilisateurs.
+      //
+      // ⚠️ Ce qui est mis en cache ET renvoyé au client est désormais TOUJOURS
+      // le résultat compacté (compactEspnSummary — voir en-tête de fichier),
+      // que la réponse vienne du cache ou d'un fetch ESPN frais, match en
+      // cours ou terminé — un seul format stable, jamais le JSON brut ESPN.
       const cacheKey = `espn:summary:${slug}:${eventId}`
       try {
         const cached = skipCache ? null : await kv.get(cacheKey)
@@ -200,19 +208,21 @@ export default async function handler(req, res) {
 
       if (!response.ok) return res.status(response.status).json({ error: `ESPN a répondu ${response.status}` })
 
-      const body = await response.text()
+      const rawBody = await response.text()
+      let compact = { scorers: [], cards: [], stats: null, lineups: null }
       try {
-        const parsed = JSON.parse(body)
-        if (hasUsefulData(parsed)) {
+        const parsed = JSON.parse(rawBody)
+        compact = compactEspnSummary(parsed)
+        if (hasUsefulData(compact)) {
           // Match terminé : pas de `ex` (donnée immuable, cache permanent).
           // Match en cours : TTL court (LIVE_SUMMARY_CACHE_TTL), les stats évoluent.
           if (isMatchFinished(parsed)) {
-            await kv.set(cacheKey, body)
+            await kv.set(cacheKey, JSON.stringify(compact))
           } else {
-            await kv.set(cacheKey, body, { ex: LIVE_SUMMARY_CACHE_TTL })
+            await kv.set(cacheKey, JSON.stringify(compact), { ex: LIVE_SUMMARY_CACHE_TTL })
           }
         }
-      } catch { /* JSON invalide ou KV en erreur → tant pis, pas bloquant pour la réponse */ }
+      } catch { /* JSON invalide ESPN ou KV en erreur → on renvoie quand même le résultat compacté (vide si le parse a échoué), pas bloquant */ }
       await mapWrite
 
       return res.status(200)
@@ -220,7 +230,7 @@ export default async function handler(req, res) {
         .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
         .setHeader('Pragma', 'no-cache')
         .setHeader('Surrogate-Control', 'no-store')
-        .send(body)
+        .json(compact)
     }
 
     // ── Mode scoreboard (pas de cache — données live, doivent rester fraîches) ──
