@@ -34,7 +34,10 @@ export default function FavoritesPage() {
   const { status, subscribe, unsubscribe } = usePushNotifications()
   const { favorites: favComps, toggle: toggleComp } = useFavoriteTeams()
   const { favorites: favClubs, isFavorite: isFavClub, toggle: toggleFavClub, atLimit } = useFavoriteClubs()
-  const [selectedComp, setSelectedComp] = useState('WC')
+  // ⚠️ Défaut changé de 'WC' à 'FL1' (Ligue 1) — demande utilisateur : la CM
+  // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
+  // défaut jusqu'à la reprise des championnats de club fin août.
+  const [selectedComp, setSelectedComp] = useState('FL1')
 
   const { standings, groups, loading, error } = useStandings(selectedComp)
   const isMultiGroup = groups.length > 1

@@ -45,7 +45,12 @@ function Classement() {
   // Programme/Résultats (et inversement). Sûr car une seule de ces 3 pages
   // est montée à la fois (App.jsx remonte tout le contenu par route, voir
   // usePersistedState.js).
-  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'WC')
+  // ⚠️ Défaut changé de 'WC' à 'FL1' (Ligue 1) — demande utilisateur : la CM
+  // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
+  // défaut jusqu'à la reprise des championnats de club fin août. navCompId
+  // (venant d'une navigation explicite, ex. clic sur une équipe) garde la
+  // priorité comme avant.
+  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'FL1')
   const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
   const [search, setSearch] = usePersistedState('classement_search', '')
   const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)

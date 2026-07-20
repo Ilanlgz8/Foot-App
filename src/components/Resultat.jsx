@@ -123,7 +123,10 @@ function Resultats() {
   // (Programme) — changer de championnat ici met aussi à jour les deux
   // autres pages (et inversement). Sûr car une seule des 3 pages est montée
   // à la fois (voir usePersistedState.js).
-  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', 'WC')
+  // ⚠️ Défaut changé de 'WC' à 'FL1' (Ligue 1) — demande utilisateur : la CM
+  // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
+  // défaut jusqu'à la reprise des championnats de club fin août.
+  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', 'FL1')
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué sur une journée
   // passée puis cliqué sur un match puis "retour", on retombait sur la
   // journée la plus récente au lieu de celle consultée) : l'ancien
