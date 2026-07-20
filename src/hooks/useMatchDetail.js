@@ -36,6 +36,29 @@ export function useMatchDetail(matchId) {
   return { detail: data ?? null, loading: isLoading }
 }
 
+// ── Retente automatique tant que les données sont absentes ─────────────────
+// Retour utilisateur : "pour toutes les données qu'on met en cache, si on a
+// pas la donnée à afficher, on retente plusieurs fois tant qu'on l'a pas,
+// avec une limite (1 tentative toutes les 30s)" — la donnée peut
+// légitimement apparaître un peu après coup (ESPN qui finalise son résumé
+// post-match, FIFA qui republie après un blip d'indispo — voir la finale CM
+// 2026, constat utilisateur), sans que l'utilisateur ait besoin de recharger
+// la page. `dataUpdateCount` (React Query) compte les fetchs RÉUSSIS (y
+// compris ceux qui reviennent vides) — sert de compteur de tentatives sans
+// état supplémentaire à gérer. Plafonné à MAX_EMPTY_RETRIES : au-delà, la
+// donnée n'existe probablement simplement pas côté source (ex: FIFA n'a
+// jamais eu ce match précis) — retenter indéfiniment ne ferait que gaspiller
+// du quota API pour rien. Ne tourne QUE tant que le composant qui utilise le
+// hook est monté (comportement standard refetchInterval de React Query) —
+// jamais de sweep en arrière-plan pour des matchs que personne ne regarde.
+const EMPTY_RETRY_INTERVAL_MS = 30_000
+const MAX_EMPTY_RETRIES       = 10   // ~5min de tentatives avant d'abandonner
+
+function retryWhileEmpty(query, isEmpty) {
+  if (!isEmpty(query.state.data)) return false
+  return query.state.dataUpdateCount >= MAX_EMPTY_RETRIES ? false : EMPTY_RETRY_INTERVAL_MS
+}
+
 // ── useLineups ─────────────────────────────────────────────────────────────────
 // Source : ESPN summary pour les ligues club.
 //          FIFA API (/api/fifa-lineups) pour WC 2026 (espnSlug='fifa', compId=2000).
@@ -297,7 +320,11 @@ export function useLineups(match) {
     queryKey: ['lineups2', match?.id, slug, date],
     enabled:  !!match?.id && !!slug && !!date,
     staleTime: 2 * 60_000,        // retry rapide si données absentes (live)
-    refetchInterval: q => !q.state.data?.home?.starters?.length ? 90_000 : false,
+    // Plafonné (voir retryWhileEmpty) — avant, ce refetchInterval tournait
+    // à 90s SANS AUCUNE limite : un match qui n'a jamais eu de compo publiée
+    // (compétition mal couverte, ou match FIFA jamais résolu) le retentait
+    // indéfiniment tant que la page restait ouverte.
+    refetchInterval: q => retryWhileEmpty(q, d => !d?.home?.starters?.length),
     retry: 2,
     queryFn: async () => {
 
@@ -377,6 +404,9 @@ export function useEspnMatchStats(match) {
     queryKey:  ['espnMatchStats2', match?.id],
     enabled:   !!match?.id && !!slug && !!date,
     staleTime: 30 * 60_000,
+    // Retente tant que vide (ex: ESPN pas encore fini de publier son résumé
+    // juste après le coup de sifflet) — voir retryWhileEmpty plus haut.
+    refetchInterval: q => retryWhileEmpty(q, d => d == null),
     retry: 1,
     queryFn: async () => {
       // 1. Event ID — mapping partagé d'abord, repli scoreboard+fuzzy match
@@ -671,7 +701,17 @@ export function useFifaStats(match, enabled = true, live = true) {
     queryKey: ['fifaStats', match?.id],
     enabled:  enabled && !!match?.id,
     staleTime: live ? 30_000 : 30 * 60_000,   // live: 30s, fini: 30min
-    refetchInterval: (enabled && live) ? 45_000 : false,
+    // Live : poll 45s inchangé (déjà rapide, indépendant de la donnée reçue).
+    // Fini : pas de poll normalement (30min de staleTime suffit une fois les
+    // stats obtenues), SAUF si toujours vide — l'API FIFA peut avoir eu un
+    // blip juste après un gros match (constat utilisateur, finale CM 2026 :
+    // stats FIFA absentes précisément sur les 2 matchs les plus regardés du
+    // tournoi) — retente alors tant que vide, plafonné (retryWhileEmpty).
+    refetchInterval: q => {
+      if (!enabled) return false
+      if (live) return 45_000
+      return retryWhileEmpty(q, d => !d?.home && !d?.away)
+    },
     retry: 2,
     retryDelay: 3_000,
     queryFn: async () => {

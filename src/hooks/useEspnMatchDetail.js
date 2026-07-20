@@ -22,6 +22,20 @@ import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 // ("Breel Embolo" → "B. Embolo") quand shortName manque, pour un rendu
 // identique aux buts/rouges quelle que soit la donnée réellement fournie par
 // ESPN à cet endroit précis.
+// Résultat vide/inexploitable : soit l'event n'a pas été trouvé (`null`),
+// soit trouvé mais ESPN n'a encore rien publié comme plays/details/stats.
+function isEspnDetailEmpty(d) {
+  return d == null || (d.scorers.length === 0 && d.cards.length === 0 && d.stats === null)
+}
+
+// Retente automatique tant que vide (retour utilisateur : "on retente
+// plusieurs fois tant qu'on a pas la donnée, plafonné à 1 tentative/30s") —
+// ESPN peut mettre quelques minutes à publier son résumé complet après le
+// coup de sifflet final. `dataUpdateCount` (fetchs réussis, y compris vides)
+// sert de compteur de tentatives sans état supplémentaire à gérer.
+const EMPTY_RETRY_INTERVAL_MS = 30_000
+const MAX_EMPTY_RETRIES       = 10   // ~5min avant d'abandonner
+
 function initialName(full) {
   if (!full) return null
   const parts = full.trim().split(/\s+/)
@@ -285,10 +299,10 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
     // null` comme "falsy" → retombait sur la branche 1h par erreur au lieu de
     // 2 min. `d == null` (avec ==, pas ===) couvre explicitement null ET
     // undefined comme "pas de résultat exploitable, retry vite".
-    staleTime: (query) => {
-      const d = query.state.data
-      const empty = d == null || (d.scorers.length === 0 && d.cards.length === 0 && d.stats === null)
-      return empty ? 2 * 60_000 : 60 * 60_000
+    staleTime: (query) => isEspnDetailEmpty(query.state.data) ? 2 * 60_000 : 60 * 60_000,
+    refetchInterval: (query) => {
+      if (!isEspnDetailEmpty(query.state.data)) return false
+      return query.state.dataUpdateCount >= MAX_EMPTY_RETRIES ? false : EMPTY_RETRY_INTERVAL_MS
     },
     retry:     1,
     retryDelay: 2_000,
