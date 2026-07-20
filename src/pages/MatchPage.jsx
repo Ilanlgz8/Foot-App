@@ -365,7 +365,10 @@ function MpPageSkeleton() {
 function MpMatchStats({ match }) {
   const isWC = isNationalTeamComp(match)
   const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? match : null, isWC, false)
-  const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match)
+  // MpMatchStats n'est rendu que pour un match déjà terminé (voir l'appelant
+  // plus bas) — isFinished=true directement, stats définitives, cache jamais
+  // redemandé (voir useEspnMatchStats).
+  const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match, true)
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)
 
   // ── Fil du match : remplacements uniquement ────────────────────────────────

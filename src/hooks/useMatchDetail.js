@@ -308,7 +308,7 @@ function parseEspnRoster(roster) {
   }
 }
 
-export function useLineups(match) {
+export function useLineups(match, isFinished = false) {
   const compId     = match?.competition?.id
   const slug       = COMP_ESPN[compId]
   const date       = matchDateStr(match)
@@ -319,7 +319,17 @@ export function useLineups(match) {
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
     enabled:  !!match?.id && !!slug && !!date,
-    staleTime: 2 * 60_000,        // retry rapide si données absentes (live)
+    // ⚠️ AJOUT (constat utilisateur : "le match est terminé, la compo va pas
+    // changer, pas des appels à chaque fois") : une compo publiée pour un
+    // match TERMINÉ ne change plus jamais (le cache serveur, voir
+    // api/fifa-lineups.js et api/espn.js, est déjà permanent pour ce cas) —
+    // 2min de staleTime forçait quand même un refetch réseau à chaque
+    // remontage du composant (retour sur la page, réouverture de la modale),
+    // même si la réponse allait être identique. `Infinity` : ne redemande
+    // plus jamais tant que React Query garde cette entrée en mémoire/cache
+    // (gcTime 24h, voir main.jsx). Un match encore EN COURS/À VENIR garde le
+    // staleTime court (compo pas encore publiée, ou pourrait changer).
+    staleTime: isFinished ? Infinity : 2 * 60_000,
     // Plafonné (voir retryWhileEmpty) — avant, ce refetchInterval tournait
     // à 90s SANS AUCUNE limite : un match qui n'a jamais eu de compo publiée
     // (compétition mal couverte, ou match FIFA jamais résolu) le retentait
@@ -393,7 +403,7 @@ export function useLineups(match) {
 // Ne nécessite pas Redis. Couvre toutes les compétitions dans COMP_ESPN.
 // Retourne le même format que useFifaStats : { home, away } avec poss/shots/etc.
 
-export function useEspnMatchStats(match) {
+export function useEspnMatchStats(match, isFinished = false) {
   const compId = match?.competition?.id
   const slug   = COMP_ESPN[compId]
   const date   = matchDateStr(match)
@@ -403,7 +413,10 @@ export function useEspnMatchStats(match) {
   return useQuery({
     queryKey:  ['espnMatchStats2', match?.id],
     enabled:   !!match?.id && !!slug && !!date,
-    staleTime: 30 * 60_000,
+    // Match terminé : stats définitives, ne changent plus jamais (même
+    // raisonnement que useLineups juste au-dessus) — Infinity au lieu de
+    // 30min pour ne plus jamais redemander inutilement.
+    staleTime: isFinished ? Infinity : 30 * 60_000,
     // Retente tant que vide (ex: ESPN pas encore fini de publier son résumé
     // juste après le coup de sifflet) — voir retryWhileEmpty plus haut.
     refetchInterval: q => retryWhileEmpty(q, d => d == null),
@@ -700,7 +713,10 @@ export function useFifaStats(match, enabled = true, live = true) {
   return useQuery({
     queryKey: ['fifaStats', match?.id],
     enabled:  enabled && !!match?.id,
-    staleTime: live ? 30_000 : 30 * 60_000,   // live: 30s, fini: 30min
+    // live: 30s (les stats évoluent) — fini: Infinity, ne redemande plus
+    // jamais (stats définitives, même raisonnement que useLineups/
+    // useEspnMatchStats ci-dessus).
+    staleTime: live ? 30_000 : Infinity,
     // Live : poll 45s inchangé (déjà rapide, indépendant de la donnée reçue).
     // Fini : pas de poll normalement (30min de staleTime suffit une fois les
     // stats obtenues), SAUF si toujours vide — l'API FIFA peut avoir eu un

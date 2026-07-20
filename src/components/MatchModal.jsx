@@ -1059,8 +1059,11 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   const isWC = isNationalTeamComp(match)
 
   // Source 1 : ESPN/FIFA (useLineups essaie FIFA Redis puis ESPN — gère WC en interne)
-  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match)
-  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match)
+  // isFinished passé aux deux (voir leurs commentaires) : une fois le match
+  // terminé, compo/stats ne changent plus jamais — plus de refetch réseau
+  // inutile à chaque réouverture de la modale.
+  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match, isFinished)
+  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match, isFinished)
 
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
@@ -1825,6 +1828,7 @@ export function aflStatsToRows(statsData) {
 
 export function MatchStatsSection({ match }) {
   const isWC = isNationalTeamComp(match)
+  const isFinished = match?.status === 'FINISHED'
 
   // Source 1 — FIFA (Redis, WC uniquement, one-shot)
   const { data: fifaData, isLoading: fifaLoading } = useFifaStats(
@@ -1832,7 +1836,7 @@ export function MatchStatsSection({ match }) {
   )
 
   // Source 2 — ESPN scoreboard → summary (tous les matchs COMP_ESPN, sans Redis)
-  const { data: espnData, isLoading: espnLoading } = useEspnMatchStats(match)
+  const { data: espnData, isLoading: espnLoading } = useEspnMatchStats(match, isFinished)
 
   // Source 3 — api-football (fallback universel)
   const { data: aflStats, isLoading: aflLoading } = useAflMatchStats(match)
