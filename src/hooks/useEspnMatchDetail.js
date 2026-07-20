@@ -29,8 +29,26 @@ function isEspnDetailEmpty(d) {
 // ESPN peut mettre quelques minutes à publier son résumé complet après le
 // coup de sifflet final. `dataUpdateCount` (fetchs réussis, y compris vides)
 // sert de compteur de tentatives sans état supplémentaire à gérer.
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "ça disparaît au bout de 5min alors
+// que c'est censé être en cache permanent") : l'ancien plafond (10 × 30s =
+// 5min) donnait l'IMPRESSION d'une perte de données alors qu'en réalité rien
+// n'avait jamais fini de charger — sur un match à très fort trafic (la
+// finale CM, largement le match le plus consulté du tournoi), ESPN peut
+// mettre BIEN plus de 5min à finir de publier son résumé complet (rosters +
+// stats + détails), et une fois ce plafond atteint, la query arrête
+// DÉFINITIVEMENT de réessayer (React Query ne relance plus refetchInterval)
+// — pire, cet état "abandonné, vide" est lui-même persisté dans le cache
+// localStorage (voir main.jsx), donc même un rechargement complet de la page
+// ne redonnait pas une vraie nouvelle chance avant l'expiration du staleTime.
+// Le cache SERVEUR (Redis, voir api/espn.js) reste par ailleurs bel et bien
+// permanent — c'est uniquement le CÔTÉ CLIENT qui abandonnait trop tôt.
+// Plafond remonté à 1h (120 tentatives) : le coût réel d'une tentative en
+// trop est négligeable (lecture Redis côté serveur, quasi gratuite — un vrai
+// appel ESPN ne se déclenche que si la donnée manque encore réellement), et
+// couvre très largement le pire cas observé.
 const EMPTY_RETRY_INTERVAL_MS = 30_000
-const MAX_EMPTY_RETRIES       = 10   // ~5min avant d'abandonner
+const MAX_EMPTY_RETRIES       = 120   // ~1h avant d'abandonner (était 5min)
 
 function espnDate(match, offsetDays = 0) {
   if (!match?.utcDate) return null

@@ -50,14 +50,27 @@ export function useMatchDetail(matchId) {
 // 2026, constat utilisateur), sans que l'utilisateur ait besoin de recharger
 // la page. `dataUpdateCount` (React Query) compte les fetchs RÉUSSIS (y
 // compris ceux qui reviennent vides) — sert de compteur de tentatives sans
-// état supplémentaire à gérer. Plafonné à MAX_EMPTY_RETRIES : au-delà, la
-// donnée n'existe probablement simplement pas côté source (ex: FIFA n'a
-// jamais eu ce match précis) — retenter indéfiniment ne ferait que gaspiller
-// du quota API pour rien. Ne tourne QUE tant que le composant qui utilise le
-// hook est monté (comportement standard refetchInterval de React Query) —
-// jamais de sweep en arrière-plan pour des matchs que personne ne regarde.
+// état supplémentaire à gérer. Ne tourne QUE tant que le composant qui
+// utilise le hook est monté (comportement standard refetchInterval de React
+// Query) — jamais de sweep en arrière-plan pour des matchs que personne ne
+// regarde.
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "ça disparaît au bout de 5min alors
+// que c'est censé être en cache permanent") : l'ancien plafond (10 × 30s =
+// 5min) était bien trop court pour un match à très fort trafic (la finale
+// CM 2026) — ESPN peut mettre bien plus de 5min à finir de publier compos et
+// stats complètes, et une fois ce plafond atteint, React Query arrête
+// DÉFINITIVEMENT de réessayer. Pire : cet état "abandonné, vide" est lui-même
+// persisté dans le cache localStorage (voir main.jsx) — même un rechargement
+// complet de la page ne redonnait pas une vraie nouvelle chance avant
+// l'expiration du staleTime. Le cache SERVEUR (Redis, voir api/espn.js et
+// api/fifa-lineups.js) reste par ailleurs bel et bien permanent — c'est
+// uniquement le plafond CÔTÉ CLIENT qui abandonnait trop tôt. Remonté à 1h
+// (120 tentatives) : coût réel négligeable (lecture Redis côté serveur,
+// quasi gratuite tant que la donnée manque encore vraiment), largement
+// suffisant pour couvrir le pire cas observé.
 const EMPTY_RETRY_INTERVAL_MS = 30_000
-const MAX_EMPTY_RETRIES       = 10   // ~5min de tentatives avant d'abandonner
+const MAX_EMPTY_RETRIES       = 120   // ~1h avant d'abandonner (était 5min)
 
 function retryWhileEmpty(query, isEmpty) {
   if (!isEmpty(query.state.data)) return false
