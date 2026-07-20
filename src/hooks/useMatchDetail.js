@@ -5,7 +5,7 @@
 // Exports additionnels :
 //   useLineups(match) — compositions via ESPN summary
 //   useH2H(match)     — confrontations directes via FD.org
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { readCache, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
@@ -298,6 +298,39 @@ export function useEspnPregameOdds(match, enabled = true) {
   })
 }
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "ça marche une fois sur dix",
+// capture réseau à l'appui — rafales de 429 sur ESPN) : useLineups ET
+// useEspnMatchStats résolvaient CHACUN, de leur côté, le même eventId ESPN
+// (findEspnEventId — lookupMap puis repli scoreboard) PUIS refetchaient
+// CHACUN le même /espn?eventId=... — alors qu'ils ont besoin EXACTEMENT de
+// la même réponse serveur (summary.lineups pour l'un, summary.stats pour
+// l'autre, un seul et même objet JSON). Pour UNE SEULE ouverture de match,
+// ça faisait donc jusqu'à 2x lookupMap + 2x summary = 4 requêtes ESPN pour
+// une donnée strictement identique récupérée 2 fois — le plafond de 60/min
+// par IP (voir api/espn.js) se prenait donc 2x plus vite qu'il n'aurait dû,
+// avant même de compter le reste de l'app (scoreboard live, autres onglets,
+// useProbableLineups...). queryClient.fetchQuery() avec la MÊME clé de
+// cache dans les 2 hooks ci-dessous : React Query dédup nativement les
+// appels concurrents à la même clé (une seule requête réseau réellement
+// envoyée même si les 2 hooks la déclenchent au même instant) ET met en
+// cache le résultat (staleTime aligné sur isFinished, même raisonnement que
+// les hooks eux-mêmes) — 2x moins de requêtes ESPN pour un résultat
+// strictement identique.
+async function fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, isFinished) {
+  return queryClient.fetchQuery({
+    queryKey:  ['espnSummaryShared', match?.id, slug],
+    staleTime: isFinished ? Infinity : 30_000,
+    gcTime:    1000 * 60 * 60 * 24,
+    queryFn: async () => {
+      const { eventId, boardComp } = await findEspnEventId(slug, match, fdHome, fdAway)
+      if (!eventId) return { eventId: null, boardComp: null, summary: null }
+      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
+      const summary = sumRes.ok ? await sumRes.json() : null
+      return { eventId, boardComp, summary }
+    },
+  })
+}
+
 export function useLineups(match, isFinished = false) {
   const compId     = match?.competition?.id
   const slug       = COMP_ESPN[compId]
@@ -305,6 +338,7 @@ export function useLineups(match, isFinished = false) {
   const fdHome     = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
   const isFifaComp = slug === 'fifa.world'   // WC 2026
+  const queryClient = useQueryClient()
 
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
@@ -345,20 +379,11 @@ export function useLineups(match, isFinished = false) {
       }
 
       // ── ESPN (toutes compétitions, WC en fallback après FIFA) ─────────────────
-
-      // Étape 1 : trouver l'event ID (mapping partagé d'abord, voir findEspnEventId)
-      const { eventId } = await findEspnEventId(slug, match, fdHome, fdAway)
-      if (!eventId) return null
-
-      // Étape 2 : summary pour les rosters + formations — fdMatchId transmis
-      // pour mémoriser le mapping côté serveur (voir api/espn.js). Renvoie
-      // déjà { scorers, cards, stats, lineups } compacté et pré-parsé côté
-      // serveur (voir compactEspnSummary/extractLineups dans
-      // espnSummaryParse.js) — home/away déjà résolus par ID ESPN, plus
-      // besoin de fuzzy-match ni de parseEspnRoster ici.
-      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
-      if (!sumRes.ok) return null
-      const summary = await sumRes.json()
+      // Résolution eventId + fetch summary PARTAGÉS avec useEspnMatchStats
+      // (voir fetchSharedEspnSummary ci-dessus) — une seule requête réseau
+      // réelle même si les 2 hooks sont montés en même temps pour ce match.
+      const { eventId, summary } = await fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, isFinished)
+      if (!eventId || !summary) return null
 
       if (!summary?.lineups?.home?.starters?.length) return null
       return summary.lineups
@@ -377,6 +402,7 @@ export function useEspnMatchStats(match, isFinished = false) {
   const date   = matchDateStr(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  const queryClient = useQueryClient()
 
   return useQuery({
     queryKey:  ['espnMatchStats2', match?.id],
@@ -390,20 +416,14 @@ export function useEspnMatchStats(match, isFinished = false) {
     refetchInterval: q => retryWhileEmpty(q, d => d == null),
     retry: 1,
     queryFn: async () => {
-      // 1. Event ID — mapping partagé d'abord, repli scoreboard+fuzzy match
-      // sinon (voir findEspnEventId ci-dessus). boardComp (stats scoreboard,
-      // filet de sécurité "3." plus bas) n'est renseigné que si le repli
-      // complet a été utilisé — sans conséquence, voir commentaire sur
-      // findEspnEventId.
-      const { eventId, boardComp } = await findEspnEventId(slug, match, fdHome, fdAway)
-      if (!eventId) return null
-
-      // 2. Summary complet — fdMatchId transmis pour mémoriser le mapping
-      // côté serveur (voir api/espn.js), au bénéfice de tous les autres
-      // utilisateurs/appareils ensuite.
-      const sumRes = await fetch(`/espn?slug=${slug}&eventId=${eventId}&fdMatchId=${match.id}`)
-      if (!sumRes.ok) return null
-      const summary = await sumRes.json()
+      // 1. Event ID + summary — PARTAGÉS avec useLineups (voir
+      // fetchSharedEspnSummary plus haut) : une seule requête réseau réelle
+      // même si les 2 hooks sont montés en même temps pour ce match.
+      // boardComp (stats scoreboard, filet de sécurité "3." plus bas) n'est
+      // renseigné que si le repli complet (scoreboard+fuzzy) a été utilisé
+      // — sans conséquence, voir commentaire sur findEspnEventId.
+      const { eventId, boardComp, summary } = await fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, isFinished)
+      if (!eventId || !summary) return null
 
       // 3. Stats — le serveur renvoie déjà summary.stats compacté et
       // pré-extrait (voir compactEspnSummary/extractTeamStats dans
