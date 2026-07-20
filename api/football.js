@@ -42,7 +42,19 @@ function getKv() {
 // même principe repris ici). Le "tunnel" lui-même venait du client
 // (fdFetch.js, waitForSlot() bloquant en synchrone jusqu'à 60s) — traité
 // séparément côté client, ce budget ici est le vrai garde-fou serveur.
-const MINUTE_CAP = 7   // sur 10/min réels — marge de sécurité, même logique qu'api-football
+// ⚠️ REVU À LA BAISSE (demande explicite utilisateur suite à une VRAIE
+// suspension de compte FD.org le 20/07, malgré ce garde-fou déjà en place à
+// 7/min) : 7/min laissait passer les 7 appels en RAFALE dès le début de
+// chaque minute (le verrou d'espacement de 800ms n'empêchait qu'un
+// chevauchement de 2 appels simultanés, pas un profil "7 d'un coup puis plus
+// rien pendant 55s") — un profil de trafic en pics, plus proche d'un usage
+// automatisé/abusif aux yeux d'un système anti-abus qu'un usage humain
+// régulier, même largement sous les 10/min réels. 5/min (50% de marge sous
+// la vraie limite, au lieu de 30%) + espacement STRICTEMENT régulier sur
+// toute la minute (voir SPACING_MS plus bas, dérivé de ce plafond) : profil
+// de trafic lissé, un appel toutes les ~12s max, jamais de rafale possible
+// par construction — beaucoup plus proche d'un usage humain normal.
+const MINUTE_CAP = 5
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
 // ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
@@ -58,7 +70,16 @@ const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on
 // (5min vs ~1min pour un 429) : un signal qu'on préfère traiter avec plus de
 // prudence, quitte à servir une copie stale un peu plus longtemps.
 const DOWN_TTL_FORBIDDEN = 300
-const SPACING_MS = 800 // espacement minimum entre 2 appels upstream réels, voir commentaire ci-dessous
+// ⚠️ REVU (même incident que MINUTE_CAP ci-dessus) : passé de 800ms fixe (ne
+// faisait qu'empêcher 2 appels simultanés, laissait les 5-7 autorisés
+// s'entasser en rafale en quelques secondes) à un espacement STRICT et
+// régulier dérivé du plafond — 60s / MINUTE_CAP ≈ 12s entre 2 appels réels
+// vers FD.org, peu importe combien de requêtes différentes arrivent en même
+// temps côté app. Garantit PAR CONSTRUCTION un profil de trafic lissé sur
+// toute la minute (jamais de pic), et rend physiquement impossible de
+// dépasser MINUTE_CAP même en cas de bug ailleurs — la seule protection qui
+// ne dépend d'aucun autre code pour être fiable.
+const SPACING_MS = Math.floor(60_000 / MINUTE_CAP)
 
 // ⚠️ CORRIGÉ (auto-relecture après coup — même faille qu'api-football avant
 // son propre correctif SPACING_MS) : un compteur par MINUTE CALENDAIRE fixe
