@@ -465,15 +465,24 @@ function extractBoxscoreStats(hArr, aArr) {
 
 async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false) {
   const allEvents = []
-  await Promise.allSettled([...slugSet].map(async slug => {
+  const slugs = [...slugSet]
+  // ⚠️ AJOUT (même contexte que le verrou anti-doublon plus haut, réduire le
+  // coût Redis PAR calcul) : avant, chaque slug faisait sa PROPRE commande
+  // kv.get individuelle (jusqu'à N commandes pour N compétitions suivies en
+  // même temps — PL+Bundesliga+Serie A+Ligue 1+C1 un samedi chargé, par
+  // exemple). Un seul MGET groupé lit TOUTES les clés en 1 seule commande
+  // Redis, peu importe le nombre de compétitions — même donnée, même
+  // fraîcheur (ESPN_TTL inchangé), juste moins de commandes facturées.
+  const cachedBySlug = {}
+  if (!bypassCache && slugs.length > 0) {
+    try {
+      const cached = await kv.mget(...slugs.map(s => `espn:fb:${s}`))
+      slugs.forEach((s, i) => { if (cached[i]) cachedBySlug[s] = safeJson(cached[i]) })
+    } catch {}
+  }
+  await Promise.allSettled(slugs.map(async slug => {
     const cKey = `espn:fb:${slug}`
-    let events = null
-    if (!bypassCache) {
-      try {
-        const cached = await kv.get(cKey)
-        if (cached) events = safeJson(cached)
-      } catch {}
-    }
+    let events = cachedBySlug[slug] ?? null
 
     if (!events) {
       try {
@@ -574,6 +583,45 @@ export default async function handler(req, res) {
         return res.json(fast)
       }
     } catch {}
+  }
+
+  // ── Verrou anti-doublon (constat utilisateur : "peu importe le nombre de
+  // personnes sur l'app, ça doit consommer pareil") : sans ça, dès que la
+  // fenêtre de fraîcheur (FRESH_TTL=12s) vient d'expirer, TOUS les clients qui
+  // pollent à ce moment-là (potentiellement des dizaines/centaines sur un
+  // match très suivi) déclenchent CHACUN le pipeline complet ci-dessous en
+  // parallèle — même si chaque sous-étape retombe sur SON PROPRE cache Redis
+  // à courte durée (fifa:live, espn:fb:*, espn:sum:*, cache HIT donc aucun
+  // fetch dupliqué vers FIFA/ESPN), chaque utilisateur paie quand même sa
+  // propre commande Redis pour CHAQUE lecture ET ré-écrit fm:fresh/fm:match en
+  // double pour rien — le coût multiplie littéralement par le nombre de
+  // spectateurs simultanés dans ce trou de ~12s, exactement le problème
+  // signalé. Un verrou global (SET NX, TTL court) fait qu'un SEUL client à la
+  // fois effectue le pipeline complet ; les autres qui arrivent pendant qu'il
+  // tourne reçoivent directement storedData (déjà en main via le mget
+  // ci-dessus, aucun coût de plus) — rafraîchi de toute façon en général au
+  // prochain de LEURS polls (~30s), une fois que le premier a fini et posé
+  // fm:fresh pour tout le monde (le fast-path ci-dessus prend alors le relais
+  // normalement). Verrou GLOBAL (pas par match) délibérément : rester aussi
+  // simple que possible plutôt que fragmenter la logique de matching FIFA/ESPN
+  // (voir le commentaire juste au-dessus sur le choix "tout ou rien") — pire
+  // cas si 2 matchs sans rapport se disputent le verrou en même temps :
+  // quelques secondes de donnée légèrement moins fraîche pour l'un des deux,
+  // auto-corrigé au poll suivant, jamais une donnée fausse ou un vrai retard
+  // perçu. forceFresh (retour au premier plan) ignore ce verrou comme il
+  // ignore déjà le fast-path ci-dessus — sa garantie "toujours frais" ne doit
+  // jamais dépendre d'un verrou pris par quelqu'un d'autre.
+  const COMPUTE_LOCK_TTL_MS = 5_000
+  if (!forceFresh) {
+    let lockAcquired
+    try {
+      lockAcquired = await kv.set('fm:computelock', '1', { px: COMPUTE_LOCK_TTL_MS, nx: true })
+    } catch { lockAcquired = true /* KV indisponible → ne pas bloquer, comportement inchangé */ }
+    if (!lockAcquired) {
+      const fallback = {}
+      matches.forEach(m => { if (storedData[m.id]) fallback[m.id] = { ...storedData[m.id], fromCache: true } })
+      return res.json(fallback)
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
