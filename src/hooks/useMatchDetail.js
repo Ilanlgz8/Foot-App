@@ -331,6 +331,32 @@ async function fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, 
   })
 }
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur, très précis : "le déroulement et les
+// stats live restent en cache après avoir fermé l'app, mais la compo doit
+// TOUJOURS refaire un appel réseau à chaque réouverture") : le déroulement
+// (useEspnMatchDetail.js) et les stats (via getEspnData/foot_espn_${id} dans
+// MatchModal.jsx, écrit par confirmFt() dans useLiveMinute.js) ont chacun
+// leur PROPRE instantané localStorage indépendant du cache React Query — et
+// c'est justement CE mécanisme, pas la persistance React Query, qui leur
+// permet de survivre à une fermeture complète de l'app (voir
+// UNPERSISTED_QUERY_KEYS dans main.jsx : lineups2/espnMatchStats2 ont été
+// délibérément EXCLUS du blob React Query persisté, pour éviter le crash de
+// quota localStorage découvert plus tôt aujourd'hui). Cette exclusion était
+// justifiée, mais elle laissait les compos avec AUCUN filet de secours local
+// — contrairement aux stats/déroulement, l'instantané `foot_espn_${id}`
+// (voir espnScoresCache dans useLiveMinute.js) ne contient d'ailleurs même
+// pas de champ `lineups`, il n'a jamais été conçu pour ça.
+// Solution : un cache disque DÉDIÉ par match (readCache/writeCache, MÊME
+// utilitaire déjà utilisé sans souci par useTeamForm.js/useMatchs.js — une
+// entrée localStorage PAR CLÉ, pas un blob unique qui grossit sans limite,
+// donc aucun risque de reproduire le crash de quota d'aujourd'hui). TTL très
+// long (90j) pour un match terminé (la compo ne change jamais), court pour
+// un match en cours (peut encore changer). Résultat : une compo déjà vue une
+// fois s'affiche INSTANTANÉMENT au prochain lancement de l'app, sans aucun
+// appel réseau — exactement le même comportement que le déroulement/stats.
+const LINEUPS_DISK_TTL_FINISHED = 90 * 24 * 3600 * 1000
+const LINEUPS_DISK_TTL_LIVE     = 5 * 60_000
+
 export function useLineups(match, isFinished = false) {
   const compId     = match?.competition?.id
   const slug       = COMP_ESPN[compId]
@@ -339,10 +365,18 @@ export function useLineups(match, isFinished = false) {
   const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
   const isFifaComp = slug === 'fifa.world'   // WC 2026
   const queryClient = useQueryClient()
+  const diskCacheKey = `lineups_${match?.id}`
 
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
     enabled:  !!match?.id && !!slug && !!date,
+    // Voir le commentaire sur LINEUPS_DISK_TTL_FINISHED ci-dessus : lu au
+    // montage, sert de donnée immédiate tant qu'un vrai fetch réseau n'a pas
+    // encore répondu (ou jamais, si staleTime Infinity ci-dessous la
+    // considère déjà fraîche pour un match terminé — aucun appel réseau du
+    // tout dans ce cas).
+    initialData:          readCache(diskCacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(diskCacheKey),
     // ⚠️ AJOUT (constat utilisateur : "le match est terminé, la compo va pas
     // changer, pas des appels à chaque fois") : une compo publiée pour un
     // match TERMINÉ ne change plus jamais (le cache serveur, voir
@@ -351,8 +385,10 @@ export function useLineups(match, isFinished = false) {
     // remontage du composant (retour sur la page, réouverture de la modale),
     // même si la réponse allait être identique. `Infinity` : ne redemande
     // plus jamais tant que React Query garde cette entrée en mémoire/cache
-    // (gcTime 24h, voir main.jsx). Un match encore EN COURS/À VENIR garde le
-    // staleTime court (compo pas encore publiée, ou pourrait changer).
+    // (gcTime 24h, voir main.jsx) — et depuis initialData ci-dessus, même
+    // pas au tout premier montage si le disque a déjà la donnée. Un match
+    // encore EN COURS/À VENIR garde le staleTime court (compo pas encore
+    // publiée, ou pourrait changer).
     staleTime: isFinished ? Infinity : 2 * 60_000,
     // Plafonné (voir retryWhileEmpty) — avant, ce refetchInterval tournait
     // à 90s SANS AUCUNE limite : un match qui n'a jamais eu de compo publiée
@@ -372,7 +408,11 @@ export function useLineups(match, isFinished = false) {
           const res = await fetch(url)
           if (res.ok) {
             const data = await res.json()
-            if (data?.home?.starters?.length) return { home: data.home, away: data.away }
+            if (data?.home?.starters?.length) {
+              const result = { home: data.home, away: data.away }
+              writeCache(diskCacheKey, result, isFinished ? LINEUPS_DISK_TTL_FINISHED : LINEUPS_DISK_TTL_LIVE)
+              return result
+            }
           }
         } catch {}
         // FIFA Redis vide/absent → on tombe sur ESPN ci-dessous
@@ -386,6 +426,7 @@ export function useLineups(match, isFinished = false) {
       if (!eventId || !summary) return null
 
       if (!summary?.lineups?.home?.starters?.length) return null
+      writeCache(diskCacheKey, summary.lineups, isFinished ? LINEUPS_DISK_TTL_FINISHED : LINEUPS_DISK_TTL_LIVE)
       return summary.lineups
     },
   })
@@ -403,10 +444,17 @@ export function useEspnMatchStats(match, isFinished = false) {
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
   const queryClient = useQueryClient()
+  // Même cache disque par clé que useLineups (voir LINEUPS_DISK_TTL_* et le
+  // commentaire juste au-dessus) — stats2 est lui aussi exclu du blob React
+  // Query persisté (UNPERSISTED_QUERY_KEYS, main.jsx), donc lui aussi perdu
+  // à chaque fermeture d'app sans ce filet.
+  const diskCacheKey = `stats_${match?.id}`
 
   return useQuery({
     queryKey:  ['espnMatchStats2', match?.id],
     enabled:   !!match?.id && !!slug && !!date,
+    initialData:          readCache(diskCacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(diskCacheKey),
     // Match terminé : stats définitives, ne changent plus jamais (même
     // raisonnement que useLineups juste au-dessus) — Infinity au lieu de
     // 30min pour ne plus jamais redemander inutilement.
@@ -470,7 +518,9 @@ export function useEspnMatchStats(match, isFinished = false) {
       // ESPN n'en a pas publié pour ce match.
       const lineups = summary.lineups ?? null
 
-      return { stats, lineups }
+      const result = { stats, lineups }
+      writeCache(diskCacheKey, result, isFinished ? LINEUPS_DISK_TTL_FINISHED : LINEUPS_DISK_TTL_LIVE)
+      return result
     },
   })
 }
