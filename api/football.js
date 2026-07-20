@@ -45,6 +45,19 @@ function getKv() {
 const MINUTE_CAP = 7   // sur 10/min réels — marge de sécurité, même logique qu'api-football
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
+// ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
+// endpoints FD.org, des dizaines d'affilée) : le circuit breaker ci-dessous
+// ne se déclenchait QUE sur 429 — un 403 (souvent un blocage anti-abus plus
+// dur/plus long qu'un simple "ralentis", contrairement au 429 qui dit juste
+// "réessaie dans ta fenêtre") passait tel quel SANS jamais couper les
+// tentatives suivantes. Résultat concret : chaque nouvelle clé de cache
+// (jamais vue avant) retentait quand même un appel réel vers FD.org, qui
+// répondait encore 403 — la rafale continuait de plus belle au lieu de
+// s'arrêter, aggravant potentiellement un blocage déjà en cours plutôt que
+// de laisser sa fenêtre se réinitialiser. DOWN_TTL plus long pour un 403
+// (5min vs ~1min pour un 429) : un signal qu'on préfère traiter avec plus de
+// prudence, quitte à servir une copie stale un peu plus longtemps.
+const DOWN_TTL_FORBIDDEN = 300
 const SPACING_MS = 800 // espacement minimum entre 2 appels upstream réels, voir commentaire ci-dessous
 
 // ⚠️ CORRIGÉ (auto-relecture après coup — même faille qu'api-football avant
@@ -173,11 +186,13 @@ export default async function handler(req, res) {
         if (ttl > 0) await redis.set(cacheKey, body, { ex: ttl })
         await redis.set(staleKey, body, { ex: STALE_TTL })
       } catch { /* silently ignore — pas critique */ }
-    } else if (response.status === 429 && redis) {
-      // Vrai 429 malgré notre propre budget (autre source de trafic partageant
-      // le quota, marge insuffisante...) → circuit breaker : on arrête
-      // d'insister pendant DOWN_TTL plutôt que d'aggraver un blocage en cours.
-      try { await redis.set(downKey, '1', { ex: DOWN_TTL }) } catch {}
+    } else if ((response.status === 429 || response.status === 403) && redis) {
+      // Vrai 429 (malgré notre propre budget) OU 403 (blocage anti-abus,
+      // voir commentaire sur DOWN_TTL_FORBIDDEN plus haut) → circuit breaker :
+      // on arrête d'insister pendant un moment plutôt que d'aggraver un
+      // blocage en cours avec de nouvelles tentatives.
+      const downTtl = response.status === 403 ? DOWN_TTL_FORBIDDEN : DOWN_TTL
+      try { await redis.set(downKey, '1', { ex: downTtl }) } catch {}
       try {
         const stale = await redis.get(staleKey)
         if (stale) {
