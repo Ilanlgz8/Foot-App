@@ -72,7 +72,7 @@ const persister = createSyncStoragePersister({
 // fix côté serveur malgré un vrai reload complet de l'app. Toujours
 // incrémenter ce buster à chaque correctif qui touche la logique/forme d'une
 // requête déjà en cache — pas juste "des fois", à chaque fois.
-const CACHE_BUSTER = 'v5-2026-07-20-espn-stats-merge'
+const CACHE_BUSTER = 'v6-2026-07-20-matchinfo-venue-fix'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>

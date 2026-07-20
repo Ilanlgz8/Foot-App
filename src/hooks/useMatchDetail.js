@@ -914,7 +914,13 @@ export function useMatchInfo(match, enabled = true) {
   const { data: venue, isLoading } = useQuery({
     queryKey:  ['matchVenueInfo', match?.id],
     enabled:   enabled && !!match?.id && !!slug,
-    staleTime: 60 * 60_000,   // stade/affluence ne changent jamais après le coup d'envoi
+    // Match trouvé : le stade/la ville ne changent jamais → Infinity (jamais
+    // redemandé). Rien trouvé : voir retryWhileEmpty plus bas — avant, un
+    // staleTime fixe de 60min pouvait bloquer un échec initial (match pas
+    // encore listé côté ESPN à l'instant précis de l'ouverture du panneau)
+    // pendant une heure entière avant de retenter.
+    staleTime: q => (q.state.data ? Infinity : 0),
+    refetchInterval: q => retryWhileEmpty(q, d => d == null),
     retry: 1,
     queryFn: async () => {
       const events = await fetchEspnEventsDual(slug, match)
@@ -926,9 +932,21 @@ export function useMatchInfo(match, enabled = true) {
         const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
         const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
         if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
-        const v = evt.venue ?? comp?.venue
+        // ⚠️ BUG CORRIGÉ (constat utilisateur : "y'a que le nom de l'arbitre,
+        // rien d'autre" — panneau infos du match) : le scoreboard ESPN a DEUX
+        // objets venue différents — `evt.venue` (niveau event, seulement
+        // `displayName`, JAMAIS de `fullName` ni d'adresse — vérifié sur un
+        // vrai payload) et `comp.venue` (niveau compétition, `fullName` +
+        // `address.city/country` complets). `evt.venue ?? comp?.venue`
+        // prenait TOUJOURS le premier (quasi toujours présent, donc `??`
+        // passait rarement au second) puis lisait `v.fullName` — qui
+        // n'existe que sur `comp.venue` → toujours `null`, donc "Stade"
+        // jamais affiché quel que soit le moment. Priorité inversée (le plus
+        // complet d'abord) + repli sur `displayName` si jamais `fullName`
+        // manque aussi côté comp.
+        const v = comp?.venue ?? evt.venue
         return {
-          name:       v?.fullName ?? null,
+          name:       v?.fullName ?? v?.displayName ?? null,
           city:       v?.address?.city ?? null,
           country:    v?.address?.country ?? null,
           attendance: comp?.attendance || null,
