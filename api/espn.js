@@ -59,6 +59,29 @@ const ALLOWED_SLUGS = new Set([
 // (LIVE_SUMMARY_CACHE_TTL) — ses stats évoluent réellement.
 const LIVE_SUMMARY_CACHE_TTL = 45 // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur très précis : "les compos d'un match
+// terminé ne marchent qu'une fois sur dix, et une fois loupées ça ne
+// revient jamais même en réessayant") : le cache Redis d'un match TERMINÉ
+// était mis en PERMANENT (pas de `ex`, voir plus bas) dès que
+// hasUsefulData() était vrai — or hasUsefulData() est vrai dès que les
+// STATS SEULES sont présentes, même si la compo (lineups) est absente.
+// ESPN publie parfois la compo avec un délai après le coup de sifflet, ou
+// ne la publie jamais pour certaines rencontres (couverture variable selon
+// la compétition) — mais le premier fetch qui "gagnait la course" (souvent
+// juste après FT, rosters pas encore là) figeait alors `lineups: null`
+// DANS LE CACHE PERMANENT, et plus aucun fetch frais n'était jamais
+// retenté pour ce match, quel que soit le nombre de réouvertures de l'app :
+// le proxy servait indéfiniment ce même null depuis Redis. D'où le "une
+// fois sur dix" observé : seuls les matchs dont le TOUT PREMIER fetch avait
+// la chance de tomber sur une compo déjà publiée s'affichaient, pour
+// toujours ; tous les autres restaient bloqués sur "aucune compo
+// disponible" pour toujours aussi.
+// Fix : cache permanent réservé au cas où la compo EST là (donnée
+// définitivement complète) ; sinon TTL généreux mais fini, pour qu'une
+// consultation ultérieure ait une vraie chance de retomber sur une compo
+// entre-temps publiée par ESPN.
+const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pas encore publiée par ESPN
+
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
 // manquants ou incomplets — "des fois ça marche, des fois pas") : jusqu'ici,
 // pour afficher les stats d'un match terminé, CHAQUE appareil de CHAQUE
@@ -243,11 +266,17 @@ export default async function handler(req, res) {
         const parsed = JSON.parse(rawBody)
         compact = compactEspnSummary(parsed)
         if (hasUsefulData(compact)) {
-          // Match terminé : pas de `ex` (donnée immuable, cache permanent).
-          // Match en cours : TTL court (LIVE_SUMMARY_CACHE_TTL), les stats évoluent.
-          if (isMatchFinished(parsed)) {
+          const hasLineups = !!compact.lineups?.home?.starters?.length
+          // Match terminé + compo publiée : donnée définitivement complète et
+          // immuable → pas de `ex`, cache permanent (voir LINEUPS_PENDING_TTL
+          // ci-dessus pour le cas "pas encore" et pourquoi ce n'était PAS déjà
+          // le cas avant).
+          if (isMatchFinished(parsed) && hasLineups) {
             await kv.set(cacheKey, JSON.stringify(compact))
+          } else if (isMatchFinished(parsed)) {
+            await kv.set(cacheKey, JSON.stringify(compact), { ex: LINEUPS_PENDING_TTL })
           } else {
+            // Match en cours : TTL court (LIVE_SUMMARY_CACHE_TTL), les stats évoluent.
             await kv.set(cacheKey, JSON.stringify(compact), { ex: LIVE_SUMMARY_CACHE_TTL })
           }
         }

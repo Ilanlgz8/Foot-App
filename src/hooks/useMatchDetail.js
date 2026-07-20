@@ -519,7 +519,14 @@ export function useEspnMatchStats(match, isFinished = false) {
       const lineups = summary.lineups ?? null
 
       const result = { stats, lineups }
-      writeCache(diskCacheKey, result, isFinished ? LINEUPS_DISK_TTL_FINISHED : LINEUPS_DISK_TTL_LIVE)
+      // Voir le commentaire sur LINEUPS_PENDING_TTL dans api/espn.js : même
+      // prudence côté disque ici — un TTL long (90j) ne doit s'appliquer que
+      // si la compo est VRAIMENT là. Sinon on garde un TTL court même pour un
+      // match terminé, pour qu'un prochain lancement de l'app ait une vraie
+      // chance de retomber sur une compo entre-temps publiée par ESPN, au
+      // lieu de rester bloqué sur ce `lineups: null` pour 90 jours.
+      const hasLineups = !!lineups?.home?.starters?.length
+      writeCache(diskCacheKey, result, (isFinished && hasLineups) ? LINEUPS_DISK_TTL_FINISHED : LINEUPS_DISK_TTL_LIVE)
       return result
     },
   })
