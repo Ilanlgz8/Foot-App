@@ -139,18 +139,33 @@ async function findEspnEventId(slug, match, fdHome, fdAway) {
   } catch {}
 
   // Repli : recherche complète par scoreboard + nom d'équipe (comportement historique)
-  const events = await fetchEspnEventsDual(slug, match)
-  for (const evt of events) {
-    const comp  = evt.competitions?.[0]
-    const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-    const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-    if (!homeC || !awayC) continue
-    const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-    const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
-    if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
-      return { eventId: evt.id, boardComp: comp }
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, capture réseau à l'appui : "compo
+  // jamais dispo" sur un match où le serveur a pourtant bien les données) :
+  // contrairement à l'appel lookupMap juste au-dessus, ce fetchEspnEventsDual
+  // n'était protégé par AUCUN try/catch. Un simple raté réseau ici (visible en
+  // vrai : le 1er essai s'arrêtait net juste après le 404 FIFA, sans jamais
+  // atteindre l'appel ESPN suivant, alors qu'un 2e essai quelques dizaines de
+  // secondes plus tard passait sans problème) fait planter toute la promesse
+  // de useLineups/useEspnMatchStats d'un coup — la requête React Query part
+  // directement en erreur (isLoading redevient false très vite, sans données)
+  // au lieu de retomber proprement sur "eventId introuvable pour l'instant".
+  // Même style défensif que le bloc lookupMap ci-dessus : un raté ici ne doit
+  // jamais faire s'effondrer toute la résolution, juste passer au repli
+  // suivant (ou à la prochaine tentative de retryWhileEmpty).
+  try {
+    const events = await fetchEspnEventsDual(slug, match)
+    for (const evt of events) {
+      const comp  = evt.competitions?.[0]
+      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+      if (!homeC || !awayC) continue
+      const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+      const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+      if (fuzzyTeam(fdHome, espnHome) && fuzzyTeam(fdAway, espnAway)) {
+        return { eventId: evt.id, boardComp: comp }
+      }
     }
-  }
+  } catch {}
   return { eventId: null, boardComp: null }
 }
 
