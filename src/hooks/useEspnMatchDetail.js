@@ -250,23 +250,29 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       const res2 = await fetch(`/espn?slug=${slug}&eventId=${found.eventId}`)
       const summaryResult = res2.ok ? extractFromSummary(await res2.json(), found.homeTeamId) : null
 
-      // ⚠️ BUG CORRIGÉ (constat utilisateur : "pas de buteurs, stats fausses"
-      // sur un match CM 2026 — vérifié en comparant les 2 réponses ESPN sur ce
-      // match précis) : pour certains matchs (constaté sur une demi-finale),
-      // le summary ESPN ne contient PAS le `header.competitions[0].details`
-      // attendu (buts/cartons) alors que le SCOREBOARD (Passe 1, déjà en
-      // main via `found.comp`) l'a bien, complet et correct — même équipes,
-      // mêmes stats de match (possession/tirs/corners), même buteurs. Plutôt
-      // que de dépendre uniquement du summary (parfois incomplet pour ces
-      // matchs-là), on retombe sur `found.comp` quand le summary n'a rien
-      // donné — sans coût réseau supplémentaire, cette donnée est déjà en
-      // mémoire depuis la Passe 1.
-      const boardResult = (!summaryResult || (summaryResult.scorers.length === 0 && summaryResult.cards.length === 0 && summaryResult.stats === null))
-        ? extractDetails(found.comp, found.homeTeamId)
-        : null
-      const result = (summaryResult && (summaryResult.scorers.length > 0 || summaryResult.cards.length > 0 || summaryResult.stats !== null))
-        ? summaryResult
-        : (boardResult ?? { scorers: [], cards: [], stats: null })
+      // ⚠️ BUG CORRIGÉ (constat utilisateur, vrai payload vérifié sur la
+      // finale CM 2026 Espagne-Argentine) : l'ancienne logique choisissait
+      // ENTIÈREMENT summaryResult OU ENTIÈREMENT boardResult, jamais un mix.
+      // Or sur ce match précis, le summary a bien les STATS
+      // (header.competitions[0].competitors[].statistics) mais PAS les
+      // buts/cartons (header.competitions[0].details vide/absent côté
+      // summary) — alors que le SCOREBOARD (Passe 1, `found.comp`, déjà en
+      // main) a les buts/cartons complets ET correctement nommés. Comme
+      // `summaryResult.stats !== null` suffisait à retenir summaryResult EN
+      // BLOC, ses scorers/cards vides écrasaient les bons du scoreboard —
+      // la timeline retombait alors sur l'ancien snapshot localStorage
+      // (confirmFt, potentiellement figé avec des '?' si ESPN n'avait pas
+      // encore publié les noms au moment exact de la fin du match, voir
+      // MatchPage.jsx ligne ~167). Fusion CHAMP PAR CHAMP désormais : chaque
+      // champ (scorers/cards/stats) prend le summary s'il est non vide,
+      // sinon le scoreboard — sans coût réseau supplémentaire, `found.comp`
+      // est déjà en mémoire depuis la Passe 1.
+      const boardResult = extractDetails(found.comp, found.homeTeamId)
+      const result = {
+        scorers: summaryResult?.scorers?.length ? summaryResult.scorers : boardResult.scorers,
+        cards:   summaryResult?.cards?.length   ? summaryResult.cards   : boardResult.cards,
+        stats:   summaryResult?.stats ?? boardResult.stats,
+      }
 
       // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide sur les 2 derniers
       // matchs consultés juste après leur fin, alors que les buts existaient
