@@ -313,17 +313,30 @@ async function runOnePass(env) {
   let trackingLiveAtStart = 0
   try { trackingLiveAtStart = await kv.scard('cron:liveIds') } catch {}
 
+  // ⚠️ AJOUT (question utilisateur : "1,4M/500K commandes Upstash ce mois-ci,
+  // c'est lié aux compos ?") : ces 2 branches de skip sont de très loin le cas
+  // le plus fréquent (la grande majorité des minutes d'une journée sans match
+  // en direct/imminent) — avant ce fix, chacune renvoyait un log NON VIDE, et
+  // handlePass() persiste TOUJOURS en Redis (rpush+ltrim+expire, 3 commandes)
+  // dès que log.length > 0. Résultat concret : ~3 commandes Redis gaspillées
+  // CHAQUE MINUTE, 24h/24, 7j/7, rien que pour re-répéter en boucle "rien à
+  // faire" dans un historique de debug (/api/debug-push) que personne ne
+  // consulte en temps normal — jusqu'à ~130-190K commandes/mois pour zéro
+  // valeur (aucune logique de notif/détection live ne lit logHistory). Log
+  // vide ici : plus aucune écriture Redis pour ce cas 100% routinier — le
+  // comportement de skip lui-même (fetch ESPN sauté) est totalement inchangé,
+  // seul le log persistant de la raison disparaît.
   if (trackingLiveAtStart === 0) {
     let knownEmpty = false
     try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
     if (knownEmpty) {
-      return { events: 0, log: ['jour sans match connu (re-check <20min) — fetch ESPN sauté'] }
+      return { events: 0, log: [] }
     }
 
     let skipUntil = null
     try { skipUntil = await kv.get(nextCheckKey) } catch {}
     if (skipUntil && Number(skipUntil) > now.getTime()) {
-      return { events: 0, log: [`aucun match en direct/imminent — fetch ESPN sauté`] }
+      return { events: 0, log: [] }
     }
   }
 
@@ -831,18 +844,36 @@ async function runOnePass(env) {
   return { events: allEvents.length, log }
 }
 
+// ⚠️ AJOUT (même contexte que le log ci-dessus, quota Upstash 1,4M/500K) :
+// lastRun/lastResult ne servent qu'au diagnostic (/api/debug-push, staleness
+// "depuis combien de temps le Worker tourne encore") — une précision à la
+// minute près n'apporte rien de plus qu'une précision à 5min près pour cet
+// usage (détecter que le Worker s'est complètement arrêté, pas un monitoring
+// fin). N'écrire qu'1 minute sur 5 divise ce coût par 5 (~86K → ~17K
+// commandes/mois à elles deux) SANS lecture Redis supplémentaire pour décider
+// (gate purement local sur l'horloge, aucun coût ajouté) — au pire 5min de
+// retard sur l'affichage debug, sans aucun effet sur les notifs/détection.
+function shouldWriteDebugBookkeeping() {
+  return new Date().getMinutes() % 5 === 0
+}
+
 async function handlePass(env) {
   const kv = new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN })
   env._kv = kv
-  try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
+  const writeBookkeeping = shouldWriteDebugBookkeeping()
+  if (writeBookkeeping) {
+    try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
+  }
 
   const result = await runOnePass(env)
 
-  try {
-    await kv.set('cron:goals:lastResult', JSON.stringify({
-      at: Date.now(), events: result.events, source: 'cf-worker',
-    }), { ex: 7 * 24 * 3600 })
-  } catch {}
+  if (writeBookkeeping) {
+    try {
+      await kv.set('cron:goals:lastResult', JSON.stringify({
+        at: Date.now(), events: result.events, source: 'cf-worker',
+      }), { ex: 7 * 24 * 3600 })
+    } catch {}
+  }
 
   try {
     if (result.log.length) {
