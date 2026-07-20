@@ -40,6 +40,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { removeOldestQuery } from '@tanstack/query-persist-client-core'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,8 +57,31 @@ const queryClient = new QueryClient({
   }
 })
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "les matchs de Ligue 1 gardent bien
+// leurs stats/compos, mais pour la Coupe du Monde ça finit par disparaître
+// avec le temps, alors que le déroulement du match reste, lui" — distinction
+// clé qui a permis de trouver la vraie cause) : `createSyncStoragePersister`
+// écrit TOUT le cache React Query (toutes les requêtes actives, gcTime 24h)
+// en UN SEUL blob JSON dans localStorage à chaque mise à jour. La CM a
+// beaucoup plus de matchs consultés qu'une poignée de matchs de Ligue 1 de
+// test, et surtout des payloads bien plus gros par match (compos = ~15
+// joueurs par équipe avec nom/poste/numéro, pour les 2 équipes, plus les
+// stats détaillées) — ce blob grossit donc bien plus vite pour la CM.
+// localStorage a un quota par origine (~5-10 Mo selon navigateurs) : une
+// fois dépassé, `localStorage.setItem` lève une erreur (QuotaExceededError)
+// et l'écriture entière échoue SILENCIEUSEMENT sans `retry` — la mise à jour
+// la plus récente (compos/stats fraîchement récupérées) n'est alors jamais
+// sauvegardée, et une revisite plus tard retombe sur une version antérieure
+// du blob (voire vide) pour CES requêtes précises. Le "déroulement" (juste
+// les buteurs/cartons, un petit tableau) reste lui quasi toujours en dessous
+// du point de bascule, d'où l'écart observé entre les deux. `retry:
+// removeOldestQuery` (utilitaire officiel TanStack) réessaie l'écriture en
+// supprimant la requête la plus ancienne du blob à chaque échec, jusqu'à ce
+// que ça rentre — élimination progressive des plus vieux matchs consultés
+// plutôt qu'une perte totale/aléatoire de la donnée la plus récente.
 const persister = createSyncStoragePersister({
-  storage: window.localStorage
+  storage: window.localStorage,
+  retry: removeOldestQuery,
 })
 
 // ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur : "j'ai pas autant de stats
@@ -82,7 +106,11 @@ const persister = createSyncStoragePersister({
 // simple rechargement ne redonnait pas une vraie nouvelle chance. Plafond
 // remonté à 1h. Ce bump vide tout état "abandonné" déjà persisté côté
 // client suite à ce bug, pour repartir sur un plafond propre.
-const CACHE_BUSTER = 'v9-2026-07-20-retry-ceiling-5min-to-1h'
+// v10 : fix quota localStorage (voir persister ci-dessus, retry:
+// removeOldestQuery) — bump pour repartir sur un blob cache propre, au cas
+// où le blob actuel de certains utilisateurs soit déjà proche/au-dessus du
+// quota suite à ce bug (une grosse CM consultée sur beaucoup de matchs).
+const CACHE_BUSTER = 'v10-2026-07-20-localstorage-quota-fix'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>
