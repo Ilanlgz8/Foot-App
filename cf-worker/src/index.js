@@ -304,6 +304,24 @@ async function runOnePass(env) {
   const nextCheckKey = 'cron:nextCheck'
   const NEXT_CHECK_BUFFER_MS = 90 * 60 * 1000
   const NEXT_CHECK_MAX_MS    = 25 * 60 * 1000
+  // ⚠️ AJOUT (question utilisateur : "pourquoi revérifier toutes les 20min si
+  // on sait déjà qu'il n'y a aucun match aujourd'hui ?") : emptyDayKey ne
+  // s'arme QUE quand le scoreboard ESPN vient de confirmer, À L'INSTANT, zéro
+  // match programmé aujourd'hui pour TOUTES les compétitions couvertes (voir
+  // armement plus bas) — pas juste "rien en direct". Le seul scénario où 20min
+  // protégeait vraiment quelque chose : un match ajouté au calendrier APRÈS
+  // cette vérification pour AUJOURD'HUI MÊME — en football pro, une pratique
+  // quasi inexistante (aucune compétition n'ajoute une rencontre le jour même
+  // sans préavis d'au moins plusieurs heures, souvent des semaines). 20min
+  // était donc une prudence largement disproportionnée par rapport au risque
+  // réel, payée par un aller-retour ESPN + une réécriture Redis à CHAQUE
+  // fenêtre, 24h/24, y compris pendant les longues coupures (trêve estivale,
+  // entre 2 Coupes du Monde...). 3h : toujours réactif dans la même journée
+  // pour le cas extrême d'un ajout de dernière minute, mais ~9x moins de
+  // vérifications qu'avant — gros gain pendant les périodes creuses, aucun
+  // effet sur la détection live elle-même (cron:liveIds, voir garde-fou
+  // juste en dessous, prime de toute façon toujours sur cette optimisation).
+  const EMPTY_DAY_TTL = 3 * 60 * 60
 
   // Garde-fou (audit bug notifs groupées) : si on suit encore un match vu
   // live sans confirmation de fin (cron:liveIds non vide), on ignore les 2
@@ -809,7 +827,7 @@ async function runOnePass(env) {
 
   if (stillTrackingLive === 0) {
     if (allEvents.length === 0 && !espnFetchFailed) {
-      try { await kv.set(emptyDayKey, '1', { ex: 20 * 60 }) } catch {}
+      try { await kv.set(emptyDayKey, '1', { ex: EMPTY_DAY_TTL }) } catch {}
     } else if (allEvents.length > 0 && !espnFetchFailed) {
       const anyLive = allEvents.some(({ evt }) =>
         LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
