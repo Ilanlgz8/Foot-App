@@ -137,7 +137,17 @@ export function useTeamForm(selectedComp) {
     queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: () => {
       const result = fetchTeamForm(selectedComp)
-      result.then(r => writeCache(cacheKey, r, FORM_STALE))
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "Uncaught (in promise) Error:
+      // rate_limit" dans la console) : `result.then(...)` crée une PROMESSE
+      // DÉRIVÉE distincte de `result` — quand `result` rejette (429 FD.org,
+      // voir fetchFinishedSeasonMatches plus haut), React Query gère bien le
+      // rejet du `result` qu'on retourne (retry automatique), mais cette
+      // promesse dérivée-là rejette aussi de son côté, SANS jamais être
+      // interceptée nulle part → rejet de promesse non géré, visible en
+      // console. Le `.catch(() => {})` ne fait qu'absorber CETTE promesse
+      // dérivée précise (write en cache, best-effort) — ne change rien au
+      // `result` original ni à sa gestion d'erreur/retry par React Query.
+      result.then(r => writeCache(cacheKey, r, FORM_STALE)).catch(() => {})
       return result
     },
     enabled:              !!selectedComp,
@@ -173,7 +183,8 @@ export function useTeamFormMulti(compCodes) {
         queryKey:             ['teamForm2', code, code === 'WC' ? '2026' : 'cur'],
         queryFn:              () => {
           const result = fetchTeamForm(code)
-          result.then(r => writeCache(cacheKey, r, FORM_STALE))
+          // Voir le commentaire équivalent dans useTeamForm ci-dessus.
+          result.then(r => writeCache(cacheKey, r, FORM_STALE)).catch(() => {})
           return result
         },
         initialData:          readCache(cacheKey) ?? undefined,
