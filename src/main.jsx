@@ -72,14 +72,20 @@ const persister = createSyncStoragePersister({
 // fix côté serveur malgré un vrai reload complet de l'app. Toujours
 // incrémenter ce buster à chaque correctif qui touche la logique/forme d'une
 // requête déjà en cache — pas juste "des fois", à chaque fois.
-// v7 : compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js) — la
-// forme de ce que renvoie /espn?eventId=... a changé (JSON compact
-// {scorers,cards,stats,lineups} au lieu du payload ESPN brut), donc la forme
-// de ce que persistent espnMatchDetail/lineups2/espnMatchStats2/
-// probableLineups3 a changé aussi. Sans ce bump, l'ancien payload brut déjà
-// en cache (jusqu'à 24h, gcTime) serait mal interprété par le nouveau code
-// client — même trap que documenté juste au-dessus (v6).
-const CACHE_BUSTER = 'v7-2026-07-20-espn-compact-cache'
+// v8 : correctif urgent du v7 (constat utilisateur juste après déploiement :
+// "plus toutes les stats en live" + "plus de compos pour les matchs
+// terminés") — v7 avait 2 bugs distincts : 1) le cache Redis SERVEUR
+// resservait tel quel l'ancien format brut ESPN déjà stocké avant la
+// compaction (corrigé par isCompactShape dans api/espn.js, auto-réparation
+// progressive côté serveur, sans lien avec ce buster) ; 2) compactEspnSummary
+// ne lisait les stats QUE depuis header.competitions, jamais depuis
+// json.boxscore.teams — la source PRINCIPALE utilisée historiquement pour
+// les stats live club (voir espnSummaryParse.js). Corrigé aussi côté client
+// (useEspnSummaryStats dans MatchModal.jsx, ancien code dupliqué inutile
+// supprimé). Un résultat vide/partiel obtenu pendant la fenêtre où le bug
+// v7 était en prod a pu être persisté côté client — ce bump vide ce
+// mauvais résultat, forçant un refetch propre au format v8.
+const CACHE_BUSTER = 'v8-2026-07-20-espn-boxscore-stats-fix'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, buster: CACHE_BUSTER }}>

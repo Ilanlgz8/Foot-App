@@ -98,6 +98,29 @@ function hasUsefulData(compact) {
   return !!(compact?.stats || compact?.lineups?.home?.starters?.length)
 }
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur juste après le déploiement de la
+// compaction : "plus de stats live complètes" + "plus de compos pour les
+// matchs terminés") : tout ce qui était déjà en cache Redis AVANT ce
+// déploiement (potentiellement des centaines de matchs déjà stockés en
+// PERMANENT, voir isMatchFinished plus bas) est encore au format BRUT ESPN
+// (header/boxscore/rosters, ~90 Ko), pas au nouveau format compact. Le
+// cache-hit ci-dessous renvoyait ce JSON brut tel quel avec l'étiquette
+// "c'est le format compact" — les hooks client (qui ne savent plus lire que
+// { scorers, cards, stats, lineups }) n'y trouvaient jamais leurs champs et
+// traitaient silencieusement le match comme "sans donnée". Un objet brut
+// ESPN a toujours une clé `header` ou `boxscore` ; un objet compact n'en a
+// jamais et a TOUJOURS `scorers`/`cards` en tableaux — marqueur fiable pour
+// distinguer les deux formats sans avoir besoin de purger Redis à la main.
+// Une entrée à l'ancien format est traitée comme une absence de cache : on
+// retombe sur le fetch ESPN frais ci-dessous, qui réécrase la clé au format
+// compact — auto-réparation progressive au fil des consultations, sans
+// script de migration.
+function isCompactShape(obj) {
+  return !!obj && typeof obj === 'object'
+    && Array.isArray(obj.scorers) && Array.isArray(obj.cards)
+    && !('header' in obj) && !('boxscore' in obj)
+}
+
 export default async function handler(req, res) {
   // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : ce proxy n'avait
   // AUCUNE limite de débit — un endpoint public appelable directement
@@ -189,15 +212,21 @@ export default async function handler(req, res) {
       try {
         const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {
-          clearTimeout(timeoutId)
-          await mapWrite
-          const body = typeof cached === 'string' ? cached : JSON.stringify(cached)
-          return res.status(200)
-            .setHeader('Content-Type', 'application/json')
-            .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-            .send(body)
+          const cachedObj = typeof cached === 'string' ? JSON.parse(cached) : cached
+          // Voir isCompactShape() : une entrée à l'ancien format brut ESPN
+          // (déjà en cache avant la compaction) n'est PAS servie telle
+          // quelle — on laisse tomber jusqu'au fetch frais plus bas, qui la
+          // remplace par le format compact.
+          if (isCompactShape(cachedObj)) {
+            clearTimeout(timeoutId)
+            await mapWrite
+            return res.status(200)
+              .setHeader('Content-Type', 'application/json')
+              .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
+              .json(cachedObj)
+          }
         }
-      } catch { /* KV indisponible → on retombe sur le fetch direct ci-dessous */ }
+      } catch { /* KV indisponible/JSON invalide → on retombe sur le fetch direct ci-dessous */ }
 
       const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`
       const response = await fetch(url, {

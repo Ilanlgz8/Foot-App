@@ -269,7 +269,26 @@ export function compactEspnSummary(json) {
   if (!comp) return { scorers: [], cards: [], stats: null, lineups: null }
   const homeC = (comp.competitors ?? []).find(c => c.homeAway === 'home')
   const homeTeamId = homeC?.team?.id
-  const { scorers, cards, stats } = extractMatchDetails(comp, homeTeamId, json?.commentary)
+  const { scorers, cards, stats: headerStats } = extractMatchDetails(comp, homeTeamId, json?.commentary)
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur juste après le déploiement de la
+  // compaction : "pas toutes les stats en live") : la version compacte ne
+  // lisait les stats QUE depuis comp.competitors[].statistics (header),
+  // alors que l'ancienne implémentation (useEspnSummaryStats dans
+  // MatchModal.jsx, seule source utilisée pour les stats LIVE club) lisait
+  // json.boxscore.teams[].statistics EXCLUSIVEMENT, sans repli sur header —
+  // et l'ancien useEspnMatchStats (matchs terminés, useMatchDetail.js)
+  // essayait boxscore EN PREMIER, header seulement en repli. Pour les
+  // championnats de club, header.competitions[].competitors[].statistics
+  // est souvent absent/vide pendant le match — boxscore.teams est la
+  // source réellement peuplée. Pour la CM, c'est l'inverse (voir
+  // extractMatchDetails). On tente donc boxscore d'abord, header en repli —
+  // couvre les deux cas sans rien perdre par rapport aux 2 implémentations
+  // d'avant la fusion.
+  const boxComp   = { competitors: json?.boxscore?.teams ?? [] }
+  const boxStats  = extractMatchDetails(boxComp, homeTeamId).stats
+  const stats     = boxStats ?? headerStats
+
   const lineups = extractLineups(json, comp, homeTeamId)
   return { scorers, cards, stats, lineups }
 }

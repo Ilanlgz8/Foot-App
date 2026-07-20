@@ -178,4 +178,30 @@ describe('compactEspnSummary', () => {
     expect(compactEspnSummary({})).toEqual({ scorers: [], cards: [], stats: null, lineups: null })
     expect(compactEspnSummary(null)).toEqual({ scorers: [], cards: [], stats: null, lineups: null })
   })
+
+  // ⚠️ Régression corrigée juste après le déploiement de la compaction
+  // (constat utilisateur : "pas toutes les stats en live") : json.boxscore.
+  // teams est la source PRINCIPALE historique pour les stats live club
+  // (ancien useEspnSummaryStats dans MatchModal.jsx la lisait exclusivement,
+  // sans jamais regarder header.competitions) — compactEspnSummary doit la
+  // préférer à header.competitions[].competitors[].statistics quand les
+  // deux existent, et retomber sur header seulement si boxscore est vide
+  // (cas CM, voir extractMatchDetails).
+  it('préfère json.boxscore.teams à header.competitors quand les deux ont des stats', () => {
+    const json = {
+      header: { competitions: [makeComp({ statsHome: [{ name: 'possessionPct', displayValue: '40' }] })] },
+      boxscore: { teams: [
+        { homeAway: 'home', team: homeTeam, statistics: [{ name: 'possessionPct', displayValue: '64' }] },
+        { homeAway: 'away', team: awayTeam, statistics: [{ name: 'possessionPct', displayValue: '36' }] },
+      ] },
+    }
+    expect(compactEspnSummary(json).stats.home.poss).toBe(64)
+  })
+
+  it('retombe sur header.competitors si boxscore.teams est vide/absent', () => {
+    const json = {
+      header: { competitions: [makeComp({ statsHome: [{ name: 'possessionPct', displayValue: '64' }] })] },
+    }
+    expect(compactEspnSummary(json).stats.home.poss).toBe(64)
+  })
 })

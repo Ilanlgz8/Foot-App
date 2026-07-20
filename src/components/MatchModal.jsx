@@ -425,17 +425,16 @@ export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdS
   )
 }
 
-// ── Stats ESPN summary (endpoint summary → boxscore.teams[].statistics) ───────
+// ── Stats ESPN summary ──────────────────────────────────────────────────────
 // Fetché à la demande quand espnEventId est connu mais le scoreboard n'a pas les stats.
 //
-// ⚠️ ÉLARGI (retour utilisateur : "on avait dit qu'on ajoutait d'autres
-// stats") — ne remontait avant que possession/tirs/corners alors qu'ESPN
-// fournit bien plus dans boxscore.teams[].statistics (vérifié en direct sur
-// un vrai match Premier League — noms de champs confirmés ci-dessous : fautes,
-// cartons, hors-jeu, tirs cadrés, passes, tacles, interceptions, centres,
-// longs ballons, dégagements, tirs contrés, arrêts). Le renderer ESPNStats
-// (juste au-dessus) sait déjà afficher toutes ces lignes, seule l'extraction
-// ici était incomplète.
+// ⚠️ Depuis la compaction du cache ESPN (voir api/espn.js/
+// src/utils/espnSummaryParse.js — demande utilisateur : cache Redis
+// permanent sans exploser le stockage Upstash) : /espn?eventId=... renvoie
+// désormais directement { scorers, cards, stats, lineups } déjà extrait
+// côté serveur (boxscore.teams en priorité, header.competitions en repli —
+// voir compactEspnSummary), au format `stats.home`/`stats.away` attendu ici
+// tel quel. Plus besoin de reparser boxscore.teams à la main.
 function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
   return useQuery({
     queryKey: ['espnSummary', espnEventId],
@@ -451,73 +450,7 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
       const res = await fetch(url)
       if (!res.ok) return null
       const json = await res.json()
-
-      // Le summary ESPN retourne les stats dans boxscore.teams[]
-      const teams    = json.boxscore?.teams ?? []
-      const homeTeam = teams.find(t => t.homeAway === 'home')
-      const awayTeam = teams.find(t => t.homeAway === 'away')
-
-      const getStat = (team, ...names) => {
-        for (const name of names) {
-          const s = (team?.statistics ?? []).find(st => st.name === name)
-          if (s != null) {
-            const v = parseFloat(s.displayValue)
-            return isNaN(v) ? null : v
-          }
-        }
-        return null
-      }
-
-      // ⚠️ Les champs "*Pct" d'ESPN (passPct, tacklePct, crossPct,
-      // longballPct...) sont un RATIO 0-1 arrondi à 1 décimale dans
-      // displayValue (ex: "0.9" pour 86% de passes réussies, PAS 90%) —
-      // vérifié en direct. Affiché tel quel avec un "%" ça donnerait "0.9%"
-      // au lieu de "86%". On recalcule donc le vrai pourcentage nous-mêmes à
-      // partir des 2 compteurs bruts (réussi/total) plutôt que de faire
-      // confiance à ce champ arrondi.
-      const pct = (made, total) => (made != null && total != null && total > 0)
-        ? Math.round((made / total) * 100)
-        : null
-
-      function buildSide(team) {
-        const totalPasses    = getStat(team, 'totalPasses')
-        const accuratePasses = getStat(team, 'accuratePasses')
-        const totalTackles   = getStat(team, 'totalTackles')
-        const okTackles      = getStat(team, 'effectiveTackles')
-        const totalCrosses   = getStat(team, 'totalCrosses')
-        const okCrosses      = getStat(team, 'accurateCrosses')
-        const totalLongBalls = getStat(team, 'totalLongBalls')
-        const okLongBalls    = getStat(team, 'accurateLongBalls')
-
-        return {
-          poss:          getStat(team, 'possessionPct'),
-          shots:         getStat(team, 'totalShots', 'shotsTotal', 'shots'),
-          shotsOnTarget: getStat(team, 'shotsOnTarget'),
-          corners:       getStat(team, 'wonCorners', 'cornerKicks', 'corners'),
-          passes:        totalPasses,
-          passPct:       pct(accuratePasses, totalPasses),
-          tackles:       totalTackles,
-          tacklePct:     pct(okTackles, totalTackles),
-          interceptions: getStat(team, 'interceptions'),
-          crosses:       totalCrosses,
-          crossPct:      pct(okCrosses, totalCrosses),
-          longBalls:     totalLongBalls,
-          longBallPct:   pct(okLongBalls, totalLongBalls),
-          clearances:    getStat(team, 'totalClearance', 'effectiveClearance'),
-          blockedShots:  getStat(team, 'blockedShots'),
-          saves:         getStat(team, 'saves'),
-          fouls:         getStat(team, 'foulsCommitted', 'fouls'),
-          offsides:      getStat(team, 'offsides'),
-          redCards:      getStat(team, 'redCards'),
-        }
-      }
-
-      const home = buildSide(homeTeam)
-      const away = buildSide(awayTeam)
-
-      if (home.poss === null && home.shots === null) return null
-
-      return { home, away }
+      return json?.stats ?? null
     },
     enabled:         enabled && !!espnEventId && !!espnSlug,
     staleTime:       30_000,
