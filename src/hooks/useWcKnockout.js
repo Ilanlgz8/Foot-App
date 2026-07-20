@@ -173,7 +173,8 @@ export function useWcKnockout(compCode = 'WC') {
   return {
     rounds:  data ?? EMPTY_ROUNDS,
     loading: isLoading,
-    error:   error?.message ?? null,
+    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
+    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
   }
 }
 
@@ -251,6 +252,7 @@ export function useCupKnockout(parentCode) {
   return {
     rounds:  data ?? EMPTY_ROUNDS,
     loading: isLoading,
-    error:   error?.message ?? null,
+    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
+    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
   }
 }

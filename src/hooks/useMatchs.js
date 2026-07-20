@@ -91,6 +91,22 @@ export function getClubSeason() {
   return month <= 7 ? year - 1 : year
 }
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : le
+// chiffre brut "403" affiché en gros dans Résultats à la place de la liste
+// des matchs) : `tryFetch` ci-dessous lève une Error dont le message est le
+// code HTTP brut (429 OU 403, voir plus bas) quand FD.org rejette la
+// requête. Les 3 hooks de ce fichier (useMatches/useUpcomingMatchesAllComps/
+// useAllFinishedMatches) masquaient déjà ce message pour 429 ("429
+// silencieux" — un rate-limit est transitoire, le cache stale/circuit
+// breaker côté serveur (api/football.js) prend le relais, pas la peine
+// d'effrayer l'utilisateur) mais PAS pour 403 — qui n'existait pas encore
+// comme cas réel avant l'incident FD.org du 20/07. Un 403 est géré exactement
+// pareil côté serveur (voir DOWN_TTL_FORBIDDEN dans api/football.js) : même
+// traitement silencieux ici, pour la même raison.
+function isSilentFetchError(message) {
+  return message === '429' || message === '403'
+}
+
 // Logique de fetch partagée (extraite pour être réutilisable hors du hook,
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
 // voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
@@ -200,7 +216,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: error?.message === '429' ? null : (error?.message ?? null), // 429 silencieux
+    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
     grouped: groupRounds(data ?? [], order),
   }
 }
@@ -279,7 +295,7 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: error?.message === '429' ? null : (error?.message ?? null),
+    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
   }
 }
 
@@ -319,6 +335,6 @@ export function useFinishedMatchesAllComps(compIds, enabled = true) {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: error?.message === '429' ? null : (error?.message ?? null),
+    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
   }
 }

@@ -61,6 +61,7 @@ export function useScorers(compId) {
   return {
     scorers: data ?? [],
     loading: isLoading,
-    error:   error?.message ?? null,
+    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
+    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
   }
 }

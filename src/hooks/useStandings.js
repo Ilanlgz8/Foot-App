@@ -43,6 +43,11 @@ export function useStandings(selectedComp) {
     standings: data?.table  ?? [],
     groups:    data?.groups ?? [],
     loading:   isLoading,
-    error:     error?.message ?? null,
+    // Voir le commentaire sur isSilentFetchError dans useMatchs.js : un 429
+    // ou 403 FD.org est transitoire et déjà géré côté serveur (cache stale +
+    // circuit breaker, voir api/football.js) — inutile d'afficher le code
+    // HTTP brut à l'utilisateur (constat : "403" affiché tel quel ailleurs
+    // dans l'app avec le même throw new Error(String(status)) ci-dessus).
+    error:     (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
   }
 }
