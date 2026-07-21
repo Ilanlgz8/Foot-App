@@ -9,12 +9,24 @@
 // qui permet de les importer aussi bien depuis src/hooks/*.js (navigateur)
 // que depuis api/*.js (Node.js serverless) — même principe déjà en place
 // pour src/utils/liveDetection.js (partagé entre cron-goals.js et
-// cf-worker/). Ne PAS importer depuis useLiveMinute.js ici : ce fichier tire
+// cf-worker/). Ne PAS importer DEPUIS useLiveMinute.js ici : ce fichier tire
 // React, react-query, Ably et un Web Worker (`?worker`) — cassé hors
-// contexte Vite/navigateur. normalize()/fuzzyTeam() sont donc dupliqués ici
-// à l'identique (petites fonctions pures, coût de duplication négligeable).
+// contexte Vite/navigateur. Le sens inverse est en revanche sûr : useLiveMinute.js
+// importe normalize()/fuzzyTeam() DEPUIS ici (voir plus bas) — aucune
+// dépendance React/DOM dans ce fichier-ci, rien n'empêche de le lire depuis
+// un module qui en a.
 
-function normalize(name = '') {
+// ⚠️ EXPORTÉES (constat audit période creuse : cette paire existait en 3
+// copies — ici, useLiveMinute.js à l'identique, ET api/fifa-live.js avec une
+// implémentation DIFFÉRENTE qui supprimait les espaces AVANT de découper en
+// mots. Conséquence concrète : un nom en 2 mots comme "Ivory Coast" devenait
+// un seul bloc "ivorycoast" côté fifa-live.js au lieu de deux mots "ivory"/
+// "coast" comparés séparément côté useLiveMinute.js/useMatchDetail.js — même
+// opération conceptuelle, résultat de correspondance différent selon le
+// fichier. api/fifa-live.js importe désormais celle-ci au lieu de sa propre
+// copie divergente ; useLiveMinute.js aussi (voir son propre commentaire),
+// pour n'avoir plus qu'une seule version, testée (voir espnSummaryParse.test.js).
+export function normalize(name = '') {
   return name.toLowerCase()
     .replace(/[àáâã]/g, 'a').replace(/[éèêë]/g, 'e')
     .replace(/[ûùüú]/g, 'u').replace(/[îïí]/g, 'i')
@@ -22,7 +34,7 @@ function normalize(name = '') {
     .trim()
 }
 
-function fuzzyTeam(a, b) {
+export function fuzzyTeam(a, b) {
   const na = normalize(a), nb = normalize(b)
   if (!na || !nb) return false
   if (na.startsWith(nb.slice(0, 5)) || nb.startsWith(na.slice(0, 5))) return true

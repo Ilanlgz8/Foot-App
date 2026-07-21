@@ -9,6 +9,17 @@
 import { Redis } from '@upstash/redis'
 import Ably from 'ably'
 import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
+// ⚠️ BUG CORRIGÉ (audit période creuse) : ce fichier avait sa PROPRE copie de
+// normalize()/fuzzyTeam(), divergente de celle utilisée par
+// useLiveMinute.js/useMatchDetail.js — elle supprimait les espaces AVANT de
+// découper en mots, donc un nom en 2 mots ("Ivory Coast") devenait un seul
+// bloc ("ivorycoast") au lieu de deux mots comparés séparément. Résultat
+// concret : le même rapprochement FD.org↔ESPN pouvait réussir dans un
+// fichier et échouer dans l'autre pour EXACTEMENT le même nom d'équipe.
+// Importée depuis la source unique (voir son commentaire pour le détail) —
+// même comportement que celui déjà utilisé (et éprouvé toute la Coupe du
+// Monde) par le reste de l'app pour ce même problème.
+import { fuzzyTeam } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -52,22 +63,6 @@ function safeJson(val) {
 
 function dateStr(d) {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-}
-
-function normalize(name = '') {
-  return name.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]/g, '')
-}
-
-function fuzzyTeam(a, b) {
-  const na = normalize(a), nb = normalize(b)
-  if (!na || !nb) return false
-  if (na === nb) return true
-  if (na.startsWith(nb.slice(0, 5)) || nb.startsWith(na.slice(0, 5))) return true
-  const wa = na.match(/[a-z]{4,}/g) ?? []
-  const wb = nb.match(/[a-z]{4,}/g) ?? []
-  return wa.some(x => wb.some(y => x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4))))
 }
 
 // ── FIFA fetch + cache ─────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ import {
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
 import { isNationalTeamComp } from '../utils/matchUtils'
+import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -149,24 +150,14 @@ export const COMP_ESPN = ESPN_SLUG_BY_COMP_ID
 // Helpers communs (conservés pour api-football fallback)
 // ─────────────────────────────────────────────
 
-export function normalize(name = '') {
-  return name.toLowerCase()
-    .replace(/[àáâã]/g, 'a').replace(/[éèêë]/g, 'e')
-    .replace(/[ûùüú]/g, 'u').replace(/[îïí]/g, 'i')
-    .replace(/[ôöó]/g, 'o').replace(/ç/g, 'c')
-    .trim()
-}
-
-export function fuzzyTeam(a, b) {
-  const na = normalize(a), nb = normalize(b)
-  if (!na || !nb) return false
-  if (na.startsWith(nb.slice(0, 5)) || nb.startsWith(na.slice(0, 5))) return true
-  const wordsA = na.split(/\s+/).filter(w => w.length >= 4)
-  const wordsB = nb.split(/\s+/).filter(w => w.length >= 4)
-  return wordsA.some(wa =>
-    wordsB.some(wb => wa.startsWith(wb.slice(0, 4)) || wb.startsWith(wa.slice(0, 4)))
-  )
-}
+// ⚠️ AJOUT (audit période creuse : consolidation d'une logique dupliquée en
+// 3 copies, dont une avait divergé — voir le commentaire détaillé dans
+// espnSummaryParse.js) : normalize()/fuzzyTeam() importées depuis la source
+// unique au lieu d'être redéfinies ici. Ré-exportées pour ne rien casser côté
+// appelants existants (useMatchDetail.js notamment, qui fait
+// `import { fuzzyTeam } from './useLiveMinute'`) — même principe déjà en
+// place pour COMP_ESPN juste au-dessus.
+export { normalize, fuzzyTeam }
 
 // ── Score/buteurs : on fait confiance directement au serveur ────────────────
 // ⚠️ BUG CORRIGÉ (constat utilisateur : un but à 1-0 s'est brièvement

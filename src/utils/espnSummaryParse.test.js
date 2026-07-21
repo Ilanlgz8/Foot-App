@@ -8,7 +8,53 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, normalize, fuzzyTeam } from './espnSummaryParse'
+
+// ⚠️ Tests ajoutés (audit période creuse) pour figer le comportement de
+// normalize()/fuzzyTeam() — cette paire existait en 3 copies dont une avait
+// divergé silencieusement (api/fifa-live.js, corrigé en important celle-ci) :
+// elle supprimait les espaces AVANT de découper en mots, transformant un nom
+// en 2 mots comme "Ivory Coast" en un seul bloc "ivorycoast" au lieu de deux
+// mots "ivory"/"coast" comparés séparément — cassait le rapprochement pour
+// tout nom d'équipe composé de plusieurs mots. Ces tests couvrent
+// spécifiquement ce cas pour qu'une future modification ne puisse plus
+// réintroduire cette régression sans faire échouer la suite.
+describe('normalize', () => {
+  it('met en minuscule et retire les accents français courants', () => {
+    expect(normalize('RÉPUBLIQUE Tchèque')).toBe('republique tcheque')
+  })
+
+  it('conserve les espaces (nécessaire pour le découpage en mots de fuzzyTeam)', () => {
+    expect(normalize('Ivory Coast')).toBe('ivory coast')
+  })
+})
+
+describe('fuzzyTeam', () => {
+  it('matche un nom en 2 mots identique de part et d\'autre', () => {
+    expect(fuzzyTeam('Ivory Coast', 'Ivory Coast')).toBe(true)
+  })
+
+  it('matche via le préfixe direct (nom court vs nom complet)', () => {
+    expect(fuzzyTeam('Argentina', 'Argentine')).toBe(true)
+  })
+
+  it('matche via un mot commun de 4+ lettres même si le reste diffère', () => {
+    // Cas réel qui distingue les 2 implémentations : sans le découpage par
+    // mot (espaces conservés avant split), "South Korea" vs "Korea Republic"
+    // ne partagerait aucun préfixe direct de 5 caractères, mais partage bien
+    // le mot "korea" — doit matcher via la comparaison mot à mot.
+    expect(fuzzyTeam('South Korea', 'Korea Republic')).toBe(true)
+  })
+
+  it('ne matche pas 2 équipes réellement différentes', () => {
+    expect(fuzzyTeam('France', 'Germany')).toBe(false)
+  })
+
+  it('renvoie false si un des deux noms est vide/absent', () => {
+    expect(fuzzyTeam('', 'Norway')).toBe(false)
+    expect(fuzzyTeam('Norway', undefined)).toBe(false)
+  })
+})
 
 const homeTeam = { id: '11', displayName: 'Spain', color: '1e40af', alternateColor: 'ffffff' }
 const awayTeam = { id: '22', displayName: 'Argentina' }
