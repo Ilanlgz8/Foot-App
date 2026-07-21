@@ -15,7 +15,7 @@
 // — plus sûr pour l'utilisateur que d'afficher "429" en toutes lettres, mais
 // ça laissait retomber sur le message générique vide, indiscernable d'une
 // vraie absence de données.
-export const RATE_LIMITED_MESSAGE = 'Trop de requêtes en peu de temps — réessaie dans quelques instants.'
+export const RATE_LIMITED_MESSAGE = 'Veuillez patienter quelques instants'
 
 // Transforme le message d'erreur brut (souvent juste le code HTTP, voir
 // tryFetch() dans chaque hook) en texte affichable. Les 429/403 deviennent le
