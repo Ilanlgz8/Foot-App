@@ -12,6 +12,7 @@ import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/com
 const competitions = allCompetitions.filter(c => !NO_STANDINGS_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
+import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
@@ -589,7 +590,9 @@ function Classement() {
               </div>
             )}
             {!scorersBusy && scorersErrorMsg && (
-              <p className="classement__state">Données non disponibles.</p>
+              <p className="classement__state">
+                {scorersErrorMsg === RATE_LIMITED_MESSAGE ? scorersErrorMsg : 'Données non disponibles.'}
+              </p>
             )}
             {!scorersBusy && !scorersErrorMsg && scorerBase.length === 0 && (
               <p className="classement__state">Aucun buteur disponible.</p>
@@ -708,7 +711,9 @@ function Classement() {
           </div>
         )}
         {view === 'classement' && error && (
-          <p className="classement__state">Classement non disponible pour cette compétition.</p>
+          <p className="classement__state">
+            {error === RATE_LIMITED_MESSAGE ? error : 'Classement non disponible pour cette compétition.'}
+          </p>
         )}
 
         {/* Tableau(x) */}

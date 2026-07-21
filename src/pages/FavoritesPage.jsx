@@ -19,6 +19,7 @@ import { usePushNotifications, resyncFavoriteTeams } from '../hooks/usePushNotif
 import { useFavoriteTeams } from '../hooks/useFavoriteTeams'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { useStandings } from '../hooks/useStandings'
+import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { COMPETITIONS, COMPETITION_ESPN_SLUG, NO_STANDINGS_COMPS } from '../data/competitions'
 import { StandingsTable } from '../components/StandingsTable'
 import { translateTeam } from '../data/teamNames'
@@ -150,7 +151,11 @@ export default function FavoritesPage() {
         </div>
 
         {loading && <p className="favPage__state">Chargement du classement…</p>}
-        {error && <p className="favPage__state favPage__state--error">Classement non disponible pour cette compétition.</p>}
+        {error && (
+          <p className="favPage__state favPage__state--error">
+            {error === RATE_LIMITED_MESSAGE ? error : 'Classement non disponible pour cette compétition.'}
+          </p>
+        )}
 
         {!loading && !error && isMultiGroup && (
           <div className="favPage__groups">

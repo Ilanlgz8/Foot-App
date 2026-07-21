@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { classifyFetchError } from '../utils/fetchErrors'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -73,7 +74,7 @@ export function useScorers(compId) {
   return {
     scorers: data ?? [],
     loading: isLoading,
-    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
-    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
+    // Voir classifyFetchError (utils/fetchErrors.js).
+    error:   classifyFetchError(error?.message),
   }
 }

@@ -4,6 +4,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
+import { classifyFetchError } from '../utils/fetchErrors'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
@@ -103,9 +104,10 @@ export function getClubSeason() {
 // comme cas réel avant l'incident FD.org du 20/07. Un 403 est géré exactement
 // pareil côté serveur (voir DOWN_TTL_FORBIDDEN dans api/football.js) : même
 // traitement silencieux ici, pour la même raison.
-function isSilentFetchError(message) {
-  return message === '429' || message === '403'
-}
+// classifyFetchError (utils/fetchErrors.js) remplace l'ancien
+// isSilentFetchError() ci-dessous — même détection 429/403, mais affiche
+// désormais "réessaie plus tard" au lieu de masquer silencieusement l'erreur
+// (demande utilisateur explicite).
 
 // Logique de fetch partagée (extraite pour être réutilisable hors du hook,
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
@@ -229,7 +231,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
+    error: classifyFetchError(error?.message),
     grouped: groupRounds(data ?? [], order),
   }
 }
@@ -308,7 +310,7 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
+    error: classifyFetchError(error?.message),
   }
 }
 
@@ -348,6 +350,6 @@ export function useFinishedMatchesAllComps(compIds, enabled = true) {
   return {
     matches: data ?? [],
     loading: isLoading,
-    error: isSilentFetchError(error?.message) ? null : (error?.message ?? null),
+    error: classifyFetchError(error?.message),
   }
 }

@@ -3,6 +3,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fetchEspnCupMatches } from '../utils/espnAdapter'
 import { DOMESTIC_CUPS } from '../data/competitions'
+import { classifyFetchError } from '../utils/fetchErrors'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
@@ -186,8 +187,8 @@ export function useWcKnockout(compCode = 'WC') {
   return {
     rounds:  data ?? EMPTY_ROUNDS,
     loading: isLoading,
-    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
-    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
+    // Voir classifyFetchError (utils/fetchErrors.js).
+    error:   classifyFetchError(error?.message),
   }
 }
 
@@ -265,7 +266,7 @@ export function useCupKnockout(parentCode) {
   return {
     rounds:  data ?? EMPTY_ROUNDS,
     loading: isLoading,
-    // Voir le commentaire sur isSilentFetchError dans useMatchs.js.
-    error:   (error?.message === '429' || error?.message === '403') ? null : (error?.message ?? null),
+    // Voir classifyFetchError (utils/fetchErrors.js).
+    error:   classifyFetchError(error?.message),
   }
 }
