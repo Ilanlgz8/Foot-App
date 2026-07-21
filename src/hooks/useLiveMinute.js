@@ -26,7 +26,7 @@ import {
   clearAllMatchStates, setEspnData, setEspnWorking,
   getLiveState, setLiveState, markRecentlyFinished,
 } from '../utils/matchStateTracker'
-import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches } from './liveTracker'
+import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
 import { isNationalTeamComp } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
@@ -320,6 +320,12 @@ function confirmFt(match, now, queryClient) {
 function _checkPendingKickoffs(matches, queryClient) {
   const now = Date.now()
   let changed = false
+
+  // Voir purgeStaleTracker (liveTracker.js) : purge aussi pendant une
+  // utilisation continue de l'app, pas seulement au retour au premier plan
+  // (visibilitychange) — ce cycle de poll tourne déjà toutes les 10-30s tant
+  // que l'app est ouverte, endroit naturel pour ce nettoyage périodique.
+  purgeStaleTracker()
 
   for (const match of matches) {
     // FD.org utilise 'TIMED' pour les matchs à venir (WC inclus), pas seulement 'SCHEDULED'

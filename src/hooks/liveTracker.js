@@ -13,6 +13,20 @@ import { useState, useEffect } from 'react'
 
 const STORAGE_KEY = 'foot_live_v2'
 const TTL = 4 * 60 * 60_000   // 4h — un match ne dure pas plus longtemps
+// ⚠️ AJOUT (constat utilisateur : un match reste affiché "Débute" pendant
+// 30min+ sans jamais vraiment démarrer) : une entrée "pending" (coup d'envoi
+// prévu atteint, mais ESPN n'a JAMAIS confirmé STATUS_IN_PROGRESS — voir
+// markPendingKickoff) gardait jusqu'ici les mêmes seuils de purge qu'un
+// match confirmé EN COURS (TTL 4h / kickoff+3h30) — pensés pour couvrir un
+// vrai match qui dure (prolongations, tirs au but), pas pour une entrée qui
+// n'a JAMAIS été confirmée. Si ESPN n'a toujours rien confirmé 1h après
+// l'heure prévue, ce n'est plus un simple retard — soit la donnée d'origine
+// est fausse (match non couvert par ESPN dont le statut/l'heure aurait été
+// mal résolu), soit le match est reporté/annulé : dans les deux cas, rien à
+// gagner à continuer d'afficher "Débute" jusqu'à 3h30-4h. Seuil bien plus
+// court, uniquement pour le cas jamais confirmé (`pending: true`) — un
+// match une fois passé en direct (markLive) reste sur les seuils normaux.
+const PENDING_STALE_MS = 60 * 60_000   // 1h — largement suffisant pour un vrai KO retardé
 
 // ── État module-level ─────────────────────────────────────────────────────────
 // Partagé entre le hook React et les fonctions markLive/markEnded.
@@ -41,6 +55,9 @@ try {
       if (entry.match?.utcDate) {
         const kickoff = new Date(entry.match.utcDate).getTime()
         if (now - kickoff > 3.5 * 60 * 60_000) continue
+        // Jamais confirmé live (voir PENDING_STALE_MS ci-dessus) → seuil bien
+        // plus court qu'un vrai match en cours.
+        if (entry.pending && now - kickoff > PENDING_STALE_MS) continue
       }
       // liveState='ended' confirmé → grace period passée
       try {
@@ -139,16 +156,29 @@ function _purgeStale() {
   const now = Date.now()
   let changed = false
   for (const [id, entry] of Object.entries(_tracker)) {
-    const staleTs      = entry.ts <= now - TTL
-    const kickoff      = entry.match?.utcDate ? new Date(entry.match.utcDate).getTime() : null
-    const staleKickoff = kickoff && now - kickoff > 3.5 * 60 * 60_000
-    if (staleTs || staleKickoff) {
+    const staleTs        = entry.ts <= now - TTL
+    const kickoff         = entry.match?.utcDate ? new Date(entry.match.utcDate).getTime() : null
+    const staleKickoff    = kickoff && now - kickoff > 3.5 * 60 * 60_000
+    // Voir PENDING_STALE_MS plus haut : une entrée jamais confirmée live ne
+    // doit pas attendre 3h30 comme un vrai match en cours.
+    const stalePending    = entry.pending && kickoff && now - kickoff > PENDING_STALE_MS
+    if (staleTs || staleKickoff || stalePending) {
       delete _tracker[id]
       changed = true
     }
   }
   if (changed) { _persist(); _notify() }
 }
+
+// ⚠️ AJOUT (constat utilisateur : match resté bloqué sur "Débute" pendant
+// que l'app restait ouverte au premier plan) : _purgeStale() n'était appelé
+// QU'au réveil du PC (visibilitychange) — inutile si l'utilisateur regarde
+// l'app en continu sans jamais la mettre en arrière-plan. Exposé pour être
+// aussi appelé à chaque cycle de poll live (voir _checkPendingKickoffs dans
+// useLiveMinute.js), qui tourne déjà toutes les 10-30s pendant que l'app est
+// ouverte — purge donc désormais aussi pendant une utilisation continue, pas
+// seulement au retour au premier plan.
+export function purgeStaleTracker() { _purgeStale() }
 
 // Nettoyer automatiquement au réveil du PC
 if (typeof document !== 'undefined') {
