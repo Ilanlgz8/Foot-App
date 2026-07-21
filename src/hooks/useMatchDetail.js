@@ -316,10 +316,34 @@ export function useEspnPregameOdds(match, enabled = true) {
 // cache le résultat (staleTime aligné sur isFinished, même raisonnement que
 // les hooks eux-mêmes) — 2x moins de requêtes ESPN pour un résultat
 // strictement identique.
+// ⚠️ BUG CORRIGÉ (constat utilisateur : "quand on n'a pas réussi à avoir les
+// données à un moment, ça ne retry jamais, même après avoir fermé et rouvert
+// l'app" — pour stats live/compo spécifiquement, pas le déroulement qui lui
+// avait déjà ce correctif, voir staleTime dynamique dans
+// useEspnMatchDetail.js) : `isFinished ? Infinity : 30_000` s'appliquait
+// AVEUGLÉMENT, y compris quand le résultat est un ÉCHEC (eventId introuvable
+// dans le scoreboard à cet instant, ou summary vide) — un match terminé dont
+// la 1ère tentative échoue se retrouvait alors mis en cache comme "frais pour
+// toujours", identique à un vrai succès. Conséquence concrète : le
+// refetchInterval (retryWhileEmpty) de useLineups/useEspnMatchStats continue
+// bien de se déclencher toutes les 30s comme prévu, mais chaque tentative
+// retombe sur CE MÊME résultat vide en cache (staleTime Infinity = jamais
+// re-fetché), sans jamais retaper ESPN — un retry qui tourne dans le vide.
+// Et comme cette clé ('espnSummaryShared') n'est PAS exclue de la
+// persistance localStorage (voir UNPERSISTED_QUERY_KEYS, main.jsx), cet état
+// figé survit même à une fermeture complète de l'app. Fix : ne considérer
+// "frais pour toujours" que si le résultat contient VRAIMENT quelque chose
+// (eventId + summary trouvés) — sinon 30s, pour qu'un résultat vide ait une
+// vraie chance d'être re-tenté, exactement le même principe déjà appliqué à
+// isEspnDetailEmpty()/staleTime dynamique dans useEspnMatchDetail.js.
 async function fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, isFinished) {
   return queryClient.fetchQuery({
     queryKey:  ['espnSummaryShared', match?.id, slug],
-    staleTime: isFinished ? Infinity : 30_000,
+    staleTime: (query) => {
+      const d = query.state.data
+      const empty = !d?.eventId || !d?.summary
+      return (isFinished && !empty) ? Infinity : 30_000
+    },
     gcTime:    1000 * 60 * 60 * 24,
     queryFn: async () => {
       const { eventId, boardComp } = await findEspnEventId(slug, match, fdHome, fdAway)
