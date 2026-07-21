@@ -9,6 +9,8 @@ import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom'
 import { requestNotificationPermission } from './utils/notify'
 import { useOnline } from './hooks/useOnline'
 import { OfflineBanner } from './components/OfflineBanner'
+import { useWeakNetwork } from './hooks/useNetworkQuality'
+import { WeakNetworkBanner } from './components/WeakNetworkBanner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 const MatchAVenir = lazy(() => import('./components/Match.jsx'))
@@ -56,6 +58,10 @@ function App() {
   const location = useLocation()
   const navType  = useNavigationType() // 'PUSH' | 'POP' | 'REPLACE'
   const online   = useOnline()
+  // Signal "réseau faible" (voir useNetworkQuality.js) — inutile de l'afficher
+  // en plus de OfflineBanner quand on est carrément hors ligne, ce dernier
+  // couvre déjà et plus clairement ce cas.
+  const weakNetwork = useWeakNetwork()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -127,6 +133,7 @@ function App() {
       <LiveProvider>
         <Navbar />
         {!online && <OfflineBanner />}
+        {online && weakNetwork && <WeakNetworkBanner />}
         <div key={location.pathname} className="page-transition">
           <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<div className="routeFallback" />}>

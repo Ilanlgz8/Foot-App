@@ -34,10 +34,26 @@
  * requête échoue proprement (React Query passe isLoading:false), l'appelant
  * peut afficher une erreur / retomber sur du cache au lieu de rester figé.
  */
+// ⚠️ AJOUT (demande utilisateur : détecter un réseau trop faible/lent pour
+// afficher un message dédié — voir useNetworkQuality.js) : un timeout (15s
+// ci-dessous) ou une erreur réseau (fetch rejeté, pas de connexion établie)
+// est un signal concret de connexion dégradée — reportFetchFailure()
+// alimente la fenêtre glissante utilisée par useWeakNetwork(). Purement
+// informatif : ne change ni ne retarde le comportement de fdFetch, l'appel
+// reste rejeté exactement comme avant pour l'appelant.
+import { reportFetchFailure } from '../hooks/useNetworkQuality'
+
 export async function fdFetch(url, options = {}) {
   // Aucun appelant ne passe son propre signal aujourd'hui (vérifié) → pas besoin
   // d'AbortSignal.any (support iOS plus récent) pour l'instant, juste le timeout.
-  return fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
+  try {
+    return await fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError' || err instanceof TypeError) {
+      reportFetchFailure()
+    }
+    throw err
+  }
 }
 
 /**
