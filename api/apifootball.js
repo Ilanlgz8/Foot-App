@@ -2,11 +2,23 @@
 // Cache Redis par endpoint pour éviter de consommer le quota (100 req/jour)
 // (redeploy forcé — vérif nouvelle clé, tentative 2)
 import { Redis } from '@upstash/redis'
+import crypto from 'node:crypto'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 })
+
+// Même helper que api/debug-push.js et api/cron-goals.js (audit sécurité) —
+// évite une comparaison de secret vulnérable au timing attack. Ce fichier est
+// coupé par PERMANENTLY_DISABLED avant d'atteindre ce code (risque nul tant
+// que c'est le cas), mais reste cohérent avec le reste du code si réactivé un jour.
+function safeCompare(a, b) {
+  const bufA = Buffer.from(String(a))
+  const bufB = Buffer.from(String(b))
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
 
 // TTL cache Redis selon le type d'endpoint
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "les stats live ont l'air figées,
@@ -132,7 +144,7 @@ export default async function handler(req, res) {
   // la clé en clair dans une conversation.
   if (req.query.debugkey !== undefined) {
     const secret = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
-    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    if (!process.env.CRON_SECRET || !safeCompare(secret, process.env.CRON_SECRET)) {
       return res.status(401).json({ error: 'Non autorisé' })
     }
     const key = process.env.APIFOOTBALL_KEY ?? ''

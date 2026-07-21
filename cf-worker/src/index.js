@@ -905,6 +905,22 @@ async function handlePass(env) {
   return result
 }
 
+// Comparaison constant-time (audit sécurité, cohérent avec safeCompare côté
+// Vercel dans api/debug-push.js / api/cron-goals.js). Le runtime Worker n'a
+// pas node:crypto (donc pas crypto.timingSafeEqual) — implémentation manuelle :
+// on compare TOUJOURS la longueur du secret attendu (jamais la longueur reçue,
+// qui pourrait fuiter via son propre timing) et on XOR chaque caractère sans
+// sortir en avance sur une différence, pour ne pas laisser le temps de réponse
+// varier selon où survient le premier caractère différent.
+function safeCompare(received, expected) {
+  let diff = received.length === expected.length ? 0 : 1
+  const len = expected.length
+  for (let i = 0; i < len; i++) {
+    diff |= (received.charCodeAt(i) || 0) ^ expected.charCodeAt(i)
+  }
+  return diff === 0
+}
+
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(handlePass(env))
@@ -914,7 +930,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url)
     const secret = url.searchParams.get('secret') ?? req.headers.get('x-cron-secret') ?? ''
-    if (secret !== env.CRON_SECRET) {
+    if (!env.CRON_SECRET || !safeCompare(secret, env.CRON_SECRET)) {
       return new Response(JSON.stringify({ error: 'Non autorisé' }), { status: 401 })
     }
     const result = await handlePass(env)
