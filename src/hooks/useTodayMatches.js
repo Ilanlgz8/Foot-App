@@ -178,13 +178,34 @@ export function useRecentDaysMatches(numDays) {
     dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
   }
 
+  // ⚠️ AJOUT (constat utilisateur : "au lancement de l'app, la répartition
+  // des appels ESPN/FIFA/FD.org fait planter les appels quand on veut
+  // consulter un match juste après" — vérifié dans le code, chiffres à
+  // l'appui) : les N jours ci-dessous partent TOUS en parallèle au montage
+  // (useQueries), et fetchTodayMatches() fait à lui seul jusqu'à 6 appels
+  // ESPN par jour (3 compétitions ESPN_SOURCED_COMPS + 3 coupes nationales
+  // CUP_PARENT_COMPS) — pour 7 jours (RESULTS_DAYS_BACK dans Accueil.jsx),
+  // ça fait jusqu'à ~36 appels ESPN quasi simultanés rien que pour ce hook,
+  // en plus de useTodayMatches/useUpcomingMatchesAllComps/useWcKnockout
+  // montés en même temps sur la même page — proche voire au-dessus du
+  // plafond de 60/min PARTAGÉ PAR IP (voir api/espn.js). Si l'utilisateur
+  // ouvre un match juste après ce lancement, ses propres appels ESPN
+  // (stats/compo/déroulement) arrivent sur un budget déjà consommé par ce
+  // seul chargement de page. STAGGER_MS étale le déclenchement réel des
+  // requêtes réseau sur ~2s au lieu d'un seul instant — initialData (cache
+  // disque) continue d'afficher les données immédiatement, ce délai ne
+  // retarde que le fetch réseau de RAFRAÎCHISSEMENT, jamais l'affichage.
+  // Zéro changement de données/format, uniquement le timing.
+  const STAGGER_MS = 350
+
   const results = useQueries({
-    queries: dates.map(date => {
+    queries: dates.map((date, i) => {
       const isToday  = date === today
       const cacheKey = `matches_${date}`
       return {
         queryKey: ['todayMatches', date],
         queryFn: async () => {
+          if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
           let result
           try {
             result = await fetchTodayMatches(date)
