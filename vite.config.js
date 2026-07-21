@@ -87,14 +87,22 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       proxy: {
-        // Proxy football-data.org : la clé est ajoutée ici côté serveur Vite, pas dans le bundle
-        '/api': {
-          target: 'https://api.football-data.org',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-          headers: { 'X-Auth-Token': env.API_KEY },
-        },
+        // ⚠️ SUPPRIMÉ (cause trouvée d'une VRAIE suspension récurrente du compte
+        // football-data.org) : ce proxy '/api' → api.football-data.org datait
+        // d'avant le refacto fdUrl.js (qui appelle désormais
+        // /api/football?apiPath=... côté prod, protégé par MINUTE_CAP=5 +
+        // spacing + circuit breaker dans api/football.js). Ce proxy dev, lui,
+        // matchait encore tout /api/* et tapait DIRECTEMENT football-data.org
+        // avec la vraie clé (.env.local), sans AUCUNE protection — et son
+        // rewrite (path.replace(/^\/api/, '')) produisait en plus une route
+        // invalide (/football?apiPath=... au lieu de /v4/...) pour le schéma
+        // actuel, donc ne renvoyait jamais de vraies données. Concrètement :
+        // chaque `npm run dev` envoyait, à chaque hook (useStandings,
+        // useMatchs, useScorers, useTeamForm, useWcKnockout...), des requêtes
+        // mal formées en rafale directement sur le vrai compte — exactement le
+        // profil qu'un système anti-abus suspend. Zéro perte en le retirant :
+        // il ne servait déjà à rien (aucune donnée exploitable en dev), il ne
+        // faisait que consommer/mettre en danger le quota réel.
         // Proxy GNews : le token est injecté dans l'URL côté serveur Vite
         '/news': {
           target: 'https://gnews.io',
