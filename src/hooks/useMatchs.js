@@ -200,8 +200,21 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', selectedComp, status],
+    // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js — constat utilisateur :
+    // "j'avais tout, 5min après plus rien") : tryFetch() lève une exception sur
+    // 429/403 (voir plus haut), qui traversait fetchMatchesForComp SANS être
+    // interceptée nulle part — le repli `readCacheStale(key) ?? []` juste en
+    // dessous n'était en réalité JAMAIS exécuté dans ce cas précis (l'exception
+    // saute directement par-dessus), et `retry: false` empêchait toute
+    // nouvelle tentative. Un try/catch autour de l'appel suffit à laisser le
+    // repli déjà écrit faire son travail.
     queryFn: async () => {
-      const matches = await fetchMatchesForComp(selectedComp, status)
+      let matches
+      try {
+        matches = await fetchMatchesForComp(selectedComp, status)
+      } catch {
+        matches = null
+      }
       if (!matches) return readCacheStale(key) ?? []
       if (matches.length > 0) writeCache(key, matches, ttl)
       return matches.length > 0 ? matches : (readCacheStale(key) ?? [])

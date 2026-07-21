@@ -10,27 +10,44 @@ export function useStandings(selectedComp) {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
+    // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais le classement, 5min après
+    // plus rien, sans erreur visible") : le throw ci-dessous (429/403/!ok)
+    // n'était entouré d'AUCUN try/catch — combiné à `retry: false`, une SEULE
+    // erreur transitoire (réseau, 429/403 le temps qu'un nouveau compte
+    // FD.org se stabilise, blip Redis côté serveur...) faisait échouer la
+    // requête DÉFINITIVEMENT (React Query n'insiste pas sans retry), sans
+    // aucun repli — contrairement à l'intention du reste du fichier
+    // (readCacheStale existe déjà comme filet de secours, mais n'était en
+    // réalité jamais atteint sur ce chemin d'erreur). Même mécanisme déjà
+    // trouvé et corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
+    // espnAdapter.js) — appliqué ici pour rester cohérent.
     queryFn: async () => {
-      const res = await fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
-      if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-      if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
-      const json = await res.json()
-      const allGroups = json.standings ?? []
+      try {
+        const res = await fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
+        if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+        if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
+        const json = await res.json()
+        const allGroups = json.standings ?? []
 
-      const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
+        const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
 
-      const result = realGroups.length > 1
-        ? {
-            table: realGroups.flatMap(g => g.table ?? []),
-            groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
-          }
-        : {
-            table: allGroups[0]?.table ?? [],
-            groups: [],
-          }
+        const result = realGroups.length > 1
+          ? {
+              table: realGroups.flatMap(g => g.table ?? []),
+              groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
+            }
+          : {
+              table: allGroups[0]?.table ?? [],
+              groups: [],
+            }
 
-      writeCache(key, result, STALE_MS)
-      return result
+        writeCache(key, result, STALE_MS)
+        return result
+      } catch (err) {
+        const stale = readCacheStale(key)
+        if (stale) return stale
+        throw err
+      }
     },
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),

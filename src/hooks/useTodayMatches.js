@@ -41,19 +41,26 @@ async function fetchTodayMatches(date) {
   prevD.setDate(prevD.getDate() - 1)
   const prevDate = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
 
-  // Toutes les requêtes partent en parallèle (FD.org : MAX_RPM=25 + cache
-  // Vercel edge = aucun risque de 429 ; ESPN : rate limit 60/min/IP côté
-  // api/espn.js, très large marge — voir CLAUDE.md). fetchEspnCompMatches/
-  // fetchEspnCupMatches renvoient TOUS les statuts sur une fenêtre glissante
-  // (voir espnAdapter.js) → filtrées par VALID_STATUS ici comme les autres,
-  // puis par date locale plus bas comme le reste.
-  const [euroMatches, wcMatches, ecMatches, ...espnResults] = await Promise.all([
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais tout, 5min après plus
+  // rien" — même mécanisme que useStandings.js/useMatchs.js/useScorers.js/
+  // useWcKnockout.js, mais amplifié ici) : Promise.all() rejette DÈS QUE UN
+  // SEUL des ~10 appels parallèles échoue (safeFetch lève sur 429/403/5xx) —
+  // et fait perdre TOUS les autres résultats déjà obtenus avec succès, pas
+  // seulement celui qui a raté. Une seule compétition FD.org en erreur
+  // transitoire suffisait donc à vider toute la liste "Aujourd'hui" de
+  // l'Accueil. Promise.allSettled() (déjà utilisé ailleurs dans l'app pour
+  // exactement cette raison, voir useUpcomingMatchesAllComps dans
+  // useMatchs.js) : chaque appel réussi garde son résultat, seul celui qui a
+  // échoué contribue un tableau vide au lieu de tout faire tomber.
+  const settled = await Promise.allSettled([
     safeFetch(`/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`),
     safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
     safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
     ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id])),
     ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
   ])
+  const results = settled.map(r => r.status === 'fulfilled' ? r.value : [])
+  const [euroMatches, wcMatches, ecMatches, ...espnResults] = results
   const espnMatches = espnResults.flat().filter(m => VALID_STATUS.includes(m.status))
 
   // Dédupliquer par id et filtrer par date LOCALE
@@ -110,7 +117,12 @@ export function useTodayMatches(targetDate) {
   const { data, isLoading } = useQuery({
     queryKey: ['todayMatches', today],
     queryFn: async () => {
-      const result = await fetchTodayMatches(today)
+      let result
+      try {
+        result = await fetchTodayMatches(today)
+      } catch {
+        result = []
+      }
       if (result.length > 0) {
         const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
 
@@ -173,7 +185,12 @@ export function useRecentDaysMatches(numDays) {
       return {
         queryKey: ['todayMatches', date],
         queryFn: async () => {
-          const result = await fetchTodayMatches(date)
+          let result
+          try {
+            result = await fetchTodayMatches(date)
+          } catch {
+            result = []
+          }
           if (result.length > 0) {
             const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
             let ttl

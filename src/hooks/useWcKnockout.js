@@ -143,9 +143,22 @@ export function useWcKnockout(compCode = 'WC') {
         const j = await r.json()
         return j.matches ?? null
       }
-      let all = await tryFetch(`/api/v4/competitions/${compCode}/matches?season=${season}`)
-      if (!all || all.length === 0) {
-        all = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
+      // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js/useMatchs.js/
+      // useScorers.js — constat utilisateur : "j'avais tout, 5min après plus
+      // rien") : tryFetch lève une exception sur 403/429, jamais interceptée
+      // ici → avec `retry: false`, une seule erreur transitoire faisait
+      // disparaître le bracket CM/Euro sans repli, malgré readCacheStale déjà
+      // en place plus bas (initialData) pour le montage initial seulement.
+      let all
+      try {
+        all = await tryFetch(`/api/v4/competitions/${compCode}/matches?season=${season}`)
+        if (!all || all.length === 0) {
+          all = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
+        }
+      } catch {
+        const stale = readCacheStale(cacheKey)
+        if (stale) return stale
+        all = null
       }
       all = all ?? []
 

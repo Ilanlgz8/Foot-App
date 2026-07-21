@@ -40,12 +40,24 @@ export function useScorers(compId) {
       // buteurs différents), donc plus de raison de rater un joueur cherché
       // par équipe/pays dans la barre de recherche. Si l'API plafonne quand
       // même plus bas en interne, on récupère simplement moins — pas d'erreur.
+      // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js/useMatchs.js —
+      // constat utilisateur : "j'avais tout, 5min après plus rien") : tryFetch
+      // lève une exception sur 429/403, jamais interceptée ici → avec
+      // `retry: false`, une seule erreur transitoire faisait disparaître les
+      // buteurs sans repli, malgré readCacheStale déjà en place plus bas pour
+      // le cas "réponse vide".
       let scorers = null
-      if (isAnnualIntl) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
-      }
-      if (!scorers || scorers.length === 0) {
-        scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+      try {
+        if (isAnnualIntl) {
+          scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
+        }
+        if (!scorers || scorers.length === 0) {
+          scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+        }
+      } catch {
+        const stale = readCacheStale(key)
+        if (stale) return stale
+        scorers = null
       }
       scorers = scorers ?? []
       writeCache(key, scorers, STALE_MS)
