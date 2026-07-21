@@ -241,12 +241,40 @@ export default async function handler(req, res) {
           // quelle — on laisse tomber jusqu'au fetch frais plus bas, qui la
           // remplace par le format compact.
           if (isCompactShape(cachedObj)) {
-            clearTimeout(timeoutId)
-            await mapWrite
-            return res.status(200)
-              .setHeader('Content-Type', 'application/json')
-              .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-              .json(cachedObj)
+            // ⚠️ BUG CORRIGÉ (constat utilisateur : "les matchs déjà essayés
+            // avant le fix ne marchent toujours pas, ceux jamais ouverts
+            // marchent très bien") : mon fix précédent (LINEUPS_PENDING_TTL)
+            // ne s'applique QU'AUX NOUVELLES écritures — il ne change RIEN
+            // aux entrées DÉJÀ en cache écrites par l'ANCIEN code bugué, qui
+            // les avait mises en PERMANENT (sans aucun `ex`) avec
+            // `lineups: null`. Une entrée sans expiration ne disparaît
+            // JAMAIS toute seule — je m'étais trompé en disant que ça se
+            // réglerait "au bout de 24h" : une clé permanente n'a pas de
+            // TTL du tout, donc pas de "24h" qui s'écoule, elle reste figée
+            // pour toujours tant que personne n'intervient. kv.ttl(cacheKey)
+            // renvoie -1 pour une clé permanente (sans expiration), un
+            // nombre positif pour une clé avec TTL (donc écrite par LE
+            // NOUVEAU code, jamais concernée par ce bug). Ne vérifier le TTL
+            // QUE quand lineups est vide (cas ambigu) — inutile et un appel
+            // Redis de plus pour rien si la compo est déjà là.
+            const hasLineups = !!cachedObj.lineups?.home?.starters?.length
+            let isLegacyPermanentEmpty = false
+            if (!hasLineups) {
+              try { isLegacyPermanentEmpty = (await kv.ttl(cacheKey)) === -1 } catch {}
+            }
+            if (!isLegacyPermanentEmpty) {
+              clearTimeout(timeoutId)
+              await mapWrite
+              return res.status(200)
+                .setHeader('Content-Type', 'application/json')
+                .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
+                .json(cachedObj)
+            }
+            // Sinon : entrée legacy figée sans compo → traitée comme une
+            // absence de cache, on retombe sur le fetch frais ci-dessous, qui
+            // la réécrit avec la bonne logique de TTL (permanent seulement si
+            // la compo est vraiment là cette fois) — auto-réparation
+            // progressive au fil des consultations, sans script de purge.
           }
         }
       } catch { /* KV indisponible/JSON invalide → on retombe sur le fetch direct ci-dessous */ }
