@@ -41,6 +41,16 @@ import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { removeOldestQuery } from '@tanstack/query-persist-client-core'
+import { purgeExpiredCache } from './hooks/localCache'
+
+// ⚠️ AJOUT (question utilisateur : "on aura assez de place pour garder tout
+// ce qu'on met en cache ?") : le cache disque par match (lineups_*/stats_*,
+// voir useMatchDetail.js) n'a, contrairement au blob React Query ci-dessous,
+// aucun nettoyage automatique — une entrée expirée n'est supprimée que si on
+// la relit précisément après coup. Purge une fois au lancement, coût
+// négligeable (scan local, pas de réseau), borne la croissance à la fenêtre
+// de TTL réellement active plutôt qu'à tout l'historique jamais consulté.
+purgeExpiredCache()
 
 const queryClient = new QueryClient({
   defaultOptions: {
