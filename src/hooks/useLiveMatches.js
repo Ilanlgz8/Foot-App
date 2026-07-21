@@ -15,6 +15,22 @@ import { trackMatchState, isEspnWorking } from '../utils/matchStateTracker'
 import { markLive } from './liveTracker'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 
+// ⚠️ BUG CORRIGÉ (constat utilisateur : un match de Série A brésilienne
+// affiché sur Accueil/LiveMatchPage, bloqué sur "Débute" — "c'est peut-être
+// FD.org, ils couvrent le championnat brésilien" — vérifié en direct,
+// confirmé) : les 2 appels ci-dessous n'avaient AUCUN filtre `competitions=`
+// — /v4/matches?status=IN_PLAY renvoie TOUS les matchs en cours sur TOUT le
+// compte football-data.org (13 compétitions disponibles sur notre plan, pas
+// seulement les 8 qu'on suit — Campeonato Brasileiro Série A, Eredivisie,
+// Primeira Liga, Championship, Copa Libertadores y sont aussi). Chaque
+// résultat était passé tel quel à markLive() SANS AUCUN filtre par
+// compétition. Ce chemin n'est emprunté que quand ESPN est perçu comme "down"
+// (isEspnWorking() === false, voir plus bas) — explique pourquoi ce n'est
+// jamais arrivé avant : rare, seulement pendant les brèves fenêtres où ESPN
+// semble indisponible. Même liste de codes que EURO_COMPS (useTodayMatches.js)
+// + WC/EC — les 8 seules compétitions FD.org réellement suivies par l'app.
+const TRACKED_FD_COMPS = 'CL,PL,FL1,PD,BL1,SA,WC,EC'
+
 export function useLiveMatches() {
   const queryClient = useQueryClient()
 
@@ -39,8 +55,8 @@ export function useLiveMatches() {
 
       try {
         const [r1, r2] = await Promise.all([
-          fdFetch(fdUrl('/api/v4/matches?status=IN_PLAY')),
-          fdFetch(fdUrl('/api/v4/matches?status=PAUSED')),
+          fdFetch(fdUrl(`/api/v4/matches?status=IN_PLAY&competitions=${TRACKED_FD_COMPS}`)),
+          fdFetch(fdUrl(`/api/v4/matches?status=PAUSED&competitions=${TRACKED_FD_COMPS}`)),
         ])
 
         if (r1.status === 429 || r2.status === 429) throw new Error('429')
