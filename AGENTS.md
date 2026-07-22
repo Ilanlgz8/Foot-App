@@ -92,8 +92,8 @@ api/
   apifootball.js  — PERMANENTLY_DISABLED (voir Stack)
   pulse.js        — (fusion pulse+curve) prono/courbe post-match
   news.js         — agrégateur RSS, cache Redis 5min
-  [...path].js    — catch-all proxy FD.org non utilisé par le front, budget 5/min
-  (12/12 — plus de slot dispo, tout nouvel endpoint doit être fusionné dans un fichier existant)
+  (11/12 — [...path].js supprimé le 22/07 : catch-all FD.org non authentifié, cause probable
+  de suspensions répétées du compte football-data.org — voir CLAUDE.md)
 
 public/
   sw-push.js      — service worker push handler (vanilla JS, importé par Workbox)

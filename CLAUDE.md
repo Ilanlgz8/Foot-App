@@ -5,7 +5,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 ## Stack
 - **Frontend** : React 18, Vite, React Router, React Query, vite-plugin-pwa (Workbox)
 - **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback). xG retiré (`api/fifa-live.js`) : jamais présent en pratique dans le boxscore ESPN, aucune intégration FotMob n'a jamais existé malgré une ancienne mention ici
-- **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant)
+- **Backend Vercel** : `/api/*` serverless functions (11/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant, sauf s'il reste un slot libre)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
@@ -87,8 +87,7 @@ api/
   apifootball.js  — PERMANENTLY_DISABLED (voir Stack)
   pulse.js        — (fusion pulse+curve) prono/courbe post-match
   news.js         — agrégateur RSS, cache Redis 5min
-  [...path].js    — catch-all proxy FD.org non utilisé par le front, budget 5/min
-  (12/12 — plus de slot dispo, tout nouvel endpoint doit être fusionné dans un fichier existant)
+  (11/12 — 1 slot libre depuis la suppression de [...path].js, voir "Problèmes connus")
 
 public/
   sw-push.js      — service worker push handler (vanilla JS, importé par Workbox)
@@ -125,6 +124,18 @@ cf-worker/
   Cloudflare gratuit (`cf-worker/`, voir Stack) qui n'appelle Vercel que pour l'envoi push,
   quand il y a vraiment quelque chose à notifier — règle le problème structurellement avant
   la reprise de tous les championnats fin août, pas juste un pansement temporaire
+- ✅ Compte football-data.org suspendu à répétition (dernier cas 22/07) : plusieurs causes
+  cumulées trouvées et corrigées au fil des incidents — proxy dev Vite `/api` → FD.org direct
+  et sans protection (supprimé, voir `vite.config.js`), faille de rafale à la frontière de
+  minute dans le budget serveur (corrigée, `api/football.js`), circuit breaker qui ne réagissait
+  qu'aux 429 et pas aux 403 (corrigé) — et surtout `api/[...path].js` : un catch-all Vercel
+  `/api/v4/**` qui relayait N'IMPORTE QUELLE requête externe (curl, bot, scanner) vers
+  football-data.org avec la vraie clé API, SANS authentification, avec son propre budget
+  totalement indépendant de celui d'`api/football.js` — donc invisible pour le garde-fou
+  principal. Confirmé mort côté front (audit `fdFetch.js` : tout passe déjà par
+  `/api/football?apiPath=...`) et supprimé (22/07). S'il y a une nouvelle suspension malgré
+  ça, le compte football-data.org lui-même (page "usage"/"limits" sur leur site) reste la
+  source la plus fiable pour voir QUELLE requête a déclenché le blocage.
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
