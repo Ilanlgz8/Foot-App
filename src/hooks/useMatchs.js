@@ -210,16 +210,34 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
     // saute directement par-dessus), et `retry: false` empêchait toute
     // nouvelle tentative. Un try/catch autour de l'appel suffit à laisser le
     // repli déjà écrit faire son travail.
+    //
+    // ⚠️ 2e BUG CORRIGÉ (constat utilisateur : "Résultats → Coupe du Monde,
+    // aucun résultat" alors que les 104 matchs existent bien côté FD.org,
+    // vérifié en direct) : le `?? []` ci-dessous, quand AUCUN cache stale
+    // n'existe encore pour cette clé (1re visite sur cette compét/statut,
+    // exactement le cas d'un onglet peu consulté comme "Résultats WC" après
+    // le tournoi), transformait un vrai échec réseau (429/403/erreur) en un
+    // tableau vide traité comme un succès légitime — la page affichait
+    // silencieusement "Aucun résultat disponible" au lieu du message
+    // "réessaie plus tard", sans jamais réessayer (retry: false). Repris
+    // EXACTEMENT sur le modèle de useStandings.js : on ne rattrape le raté
+    // que s'il y a une vraie copie de secours à servir, sinon on relance
+    // l'erreur pour que error/classifyFetchError fasse son travail.
     queryFn: async () => {
-      let matches
       try {
-        matches = await fetchMatchesForComp(selectedComp, status)
-      } catch {
-        matches = null
+        const matches = await fetchMatchesForComp(selectedComp, status)
+        if (!matches) {
+          const stale = readCacheStale(key)
+          if (stale) return stale
+          throw new Error('Erreur API')
+        }
+        if (matches.length > 0) writeCache(key, matches, ttl)
+        return matches.length > 0 ? matches : (readCacheStale(key) ?? [])
+      } catch (err) {
+        const stale = readCacheStale(key)
+        if (stale) return stale
+        throw err
       }
-      if (!matches) return readCacheStale(key) ?? []
-      if (matches.length > 0) writeCache(key, matches, ttl)
-      return matches.length > 0 ? matches : (readCacheStale(key) ?? [])
     },
     initialData:          cachedData ?? undefined,
     initialDataUpdatedAt: cachedAt,
