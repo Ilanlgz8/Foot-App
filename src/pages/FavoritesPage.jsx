@@ -52,6 +52,17 @@ export default function FavoritesPage() {
     if (isSubscribed) resyncFavoriteTeams()
   }
 
+  // ⚠️ AJOUT (demande utilisateur : "si je choisis que le PSG parmi toutes
+  // les équipes, faut que j'aie que les notifs du PSG") — branche enfin
+  // useFavoriteClubs sur les notifs push (jusqu'ici purement UI, voir son
+  // commentaire d'en-tête). Même pattern que handleToggleComp ci-dessus :
+  // pousse immédiatement le changement au serveur (au lieu d'attendre le
+  // re-sync périodique de 5min) si l'utilisateur est abonné aux notifs.
+  const handleToggleClub = (team) => {
+    toggleFavClub(team)
+    if (isSubscribed) resyncFavoriteTeams()
+  }
+
   return (
     <div className="favPage">
       <div className="favPage__header">
@@ -124,7 +135,7 @@ export default function FavoritesPage() {
                   key={t.id}
                   className="favPage__clubChip"
                   style={{ '--chip-color': color, '--chip-color-rgb': rgb }}
-                  onClick={() => toggleFavClub(t)}
+                  onClick={() => handleToggleClub(t)}
                   type="button"
                 >
                   {t.crest && <img src={t.crest} alt="" />}
@@ -168,7 +179,7 @@ export default function FavoritesPage() {
                   isCountry={selectedComp === 'WC'}
                   favoritable
                   isFavorite={isFavClub}
-                  onToggleFavorite={toggleFavClub}
+                  onToggleFavorite={handleToggleClub}
                   favLimitReached={atLimit}
                   compCode={selectedComp}
                 />

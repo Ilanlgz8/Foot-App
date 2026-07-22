@@ -149,7 +149,7 @@ const FINAL_RECHECK_DELAY_MS = 18_000
 // match FINAL dans son scoreboard (le reste de la journée + marge).
 const FINAL_DONE_TTL = 26 * 3600
 
-async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, scoreStr, log) {
+async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, scoreStr, log) {
   await new Promise(resolve => setTimeout(resolve, FINAL_RECHECK_DELAY_MS))
   try {
     const today     = dateStr(new Date())
@@ -184,7 +184,7 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
     // (bug corrigé : notifs "Fin de match" répétées des heures après la vraie fin).
     try { await kv.set(`finalDone:${eventId}`, '1', { ex: FINAL_DONE_TTL }) } catch {}
     await notifyVercel(env, `push:espn:ft:${eventId}`,
-      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log, FINAL_DONE_TTL)
+      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
     await cacheEspnSummary(kv, slug, eventId, log)
     try {
       const recapKey     = `recap:${eventId}`
@@ -278,12 +278,15 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
 // Ticker live (score en direct) : PAS de dédup (même tag remplace côté SW à
 // chaque minute, voir api/cron-goals.js d'origine), donc appelle Vercel
 // directement sans passer par notifyVercel() (qui exige une clé de dédup).
-async function pushLiveTicker(env, payload, slug, log) {
+// homeTeam/awayTeam transmis en plus (voir matchesFavoriteClub côté
+// api/cron-goals.js) : un abonné avec des clubs favoris configurés doit
+// pouvoir recevoir le ticker de SON club même sans championnat suivi (comps).
+async function pushLiveTicker(env, payload, slug, log, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam) {
   try {
     const res = await fetch(env.VERCEL_NOTIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
-      body: JSON.stringify({ mode: 'notify', payload, slug, options: { onlyFavorites: true, urgency: 'high' } }),
+      body: JSON.stringify({ mode: 'notify', payload, slug, options: { onlyFavorites: true, urgency: 'high', homeTeam, awayTeam, rawHomeTeam, rawAwayTeam } }),
       signal: AbortSignal.timeout(8_000),
     })
     if (!res.ok) log?.push(`[ticker→vercel] status=${res.status}`)
@@ -397,6 +400,10 @@ async function runOnePass(env) {
     let   away     = parseInt(awayC.score ?? '0', 10) || 0
     const homeTeam = t(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
+    // Noms ESPN BRUTS (avant traduction FR) — transmis à Vercel pour le
+    // filtre par club favori (voir matchesFavoriteClub dans api/cron-goals.js).
+    const rawHomeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? ''
+    const rawAwayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? ''
     const eventId  = evt.id
 
     // ⚠️ BUG CRITIQUE CORRIGÉ (retour utilisateur : notif "🏁 Fin de match"
@@ -602,7 +609,7 @@ async function runOnePass(env) {
     // que si on vient vraiment de l'acquérir, comportement identique à avant.
     if (isLive && notPostponed && koAcquired) {
       await sendToVercel(env,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, {}, log)
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
     }
 
@@ -642,7 +649,7 @@ async function runOnePass(env) {
           const prevCount    = track[side]
           log.push(`[espn:${slug}:${eventId}] BUT ANNULÉ ${side} ${prevCount}→${newCount}`)
           await notifyVercel(env, `push:espn:goalcancel:${eventId}:${side}:${newCount}`,
-            { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, {}, log)
+            { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
           for (let i = newCount; i < prevCount; i++) {
             try { await kv.del(`push:espn:goal:${eventId}:${side}:${i + 1}`) } catch {}
           }
@@ -672,7 +679,7 @@ async function runOnePass(env) {
 
             log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}`)
             await notifyVercel(env, `push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
-              { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, {}, log)
+              { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
             track[side]++
             trackChanged = true
           }
@@ -702,7 +709,7 @@ async function runOnePass(env) {
           const minuteText = minuteLabel(card.minute)
           log.push(`[espn:${slug}:${eventId}] carton rouge ${side} ${card.name}`)
           await notifyVercel(env, `push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
-            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, {}, log)
+            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
           cardTrack[side]++
           cardTrackChanged = true
         }
@@ -716,14 +723,14 @@ async function runOnePass(env) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       await notifyVercel(env, `push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
     // ▶️ Reprise 2ème MT
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       await notifyVercel(env, `push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log)
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
     // 🏁 Fin de match — seulement une fois CONFIRMÉ (2e passe FINAL
@@ -739,7 +746,7 @@ async function runOnePass(env) {
       // (TTL 5min) se ré-armait entretemps).
       try { await kv.set(finalDoneKey, '1', { ex: FINAL_DONE_TTL }) } catch {}
       await notifyVercel(env, `push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, {}, log, FINAL_DONE_TTL)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
       await cacheEspnSummary(kv, slug, eventId, log)
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
@@ -752,7 +759,7 @@ async function runOnePass(env) {
       // qu'ESPN listait encore le match FINAL, voir bug corrigé ci-dessus).
       if (finalFirstSeen) {
         pendingFinalRechecks.push(
-          recheckFinalMatch(env, kv, slug, eventId, score, homeTeam, awayTeam, scoreStr, log)
+          recheckFinalMatch(env, kv, slug, eventId, score, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, scoreStr, log)
         )
       }
     }
@@ -791,7 +798,7 @@ async function runOnePass(env) {
         tag:     `live-${eventId}`,
         silent:  true,
         renotify: false,
-      }, slug, log)
+      }, slug, log, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam)
     }
    } catch (e) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)

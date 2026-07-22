@@ -51,6 +51,20 @@ function sanitizeComps(comps) {
     .slice(0, 20)
 }
 
+// `clubs` (optionnel) : noms d'équipes favorites (useFavoriteClubs.js côté
+// client, voir son commentaire) — filtre PRIORITAIRE sur `comps` dans
+// api/cron-goals.js (matchesFavoriteClub). Des chaînes, pas des IDs : aucun
+// mapping ID FD.org↔ID ESPN n'existe dans l'app, le matching se fait par nom
+// (fuzzyTeamFifa) côté cron-goals.js. Cap à 30 (10 clubs max côté client ×
+// jusqu'à 3 variantes de nom envoyées par usePushNotifications.js — large
+// marge de sécurité).
+function sanitizeClubs(clubs) {
+  if (!Array.isArray(clubs)) return []
+  return clubs
+    .filter(c => typeof c === 'string' && c.length > 0 && c.length <= 60)
+    .slice(0, 30)
+}
+
 export default async function handler(req, res) {
   // ── Vérification Origin (protection CSRF basique) ─────────────────────────
   // En dev local (origin undefined ou localhost), on laisse passer
@@ -109,7 +123,8 @@ export default async function handler(req, res) {
   // le body brut : évite qu'un champ superflu envoyé par le client change la
   // chaîne JSON et empêche la déduplication/remplacement ci-dessous.
   const comps = sanitizeComps(body.comps)
-  const clean = { endpoint: body.endpoint, keys: body.keys, comps }
+  const clubs = sanitizeClubs(body.clubs)
+  const clean = { endpoint: body.endpoint, keys: body.keys, comps, clubs }
   const cleanStr = JSON.stringify(clean)
 
   // ── Stockage dans Vercel KV (Set Redis) ────────────────────────────────────

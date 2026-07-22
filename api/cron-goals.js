@@ -33,7 +33,7 @@ import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
 // fonction et les tests associés (liveDetection.test.js).
 import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
-  fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
+  fuzzyTeamFifa, normalizeFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../src/utils/liveDetection.js'
@@ -156,6 +156,50 @@ function matchesFavoriteStrict(subComps, slug) {
   return subComps.includes(slug)
 }
 
+// ⚠️ AJOUT (demande utilisateur explicite : "si je choisis que le PSG parmi
+// toutes les équipes, faut que j'aie que les notifs du PSG") : filtre par
+// équipe favorite (useFavoriteClubs.js, côté client), PRIORITAIRE sur le
+// filtre par compétition ci-dessus — un abonné avec des clubs configurés ne
+// doit recevoir QUE les matchs de CES clubs, jamais un mélange avec comps.
+// Matching par NOM (aucune table de correspondance ID FD.org↔ID ESPN
+// n'existe dans l'app — useFavoriteClubs stocke des IDs FD.org, ce fichier
+// n'a que des noms/IDs ESPN — construire et maintenir une telle table pour
+// des centaines d'équipes sur 8 compétitions serait plus fragile que ce
+// matching par nom).
+//
+// ⚠️ EXACT, PAS fuzzyTeamFifa (auto-relecture avant déploiement) :
+// fuzzyTeamFifa() est conçue pour rapprocher des variantes de noms de PAYS
+// (FIFA), qui partagent rarement un préfixe — appliquée à des noms de CLUB,
+// son raccourci "5 premiers caractères en commun" produit un vrai faux
+// positif vérifié : "Paris Saint-Germain FC" (favori PSG) matche à tort
+// "Paris FC" (club DIFFÉRENT de Ligue 1) parce que les deux commencent par
+// "Paris". Un abonné qui ne suit que le PSG aurait donc aussi reçu les
+// notifs de Paris FC — contraire à la demande explicite ("QUE les notifs du
+// PSG"). Égalité EXACTE après normalisation (normalizeFifa : minuscules,
+// accents retirés, ponctuation retirée) à la place : aucun risque de
+// collision par préfixe. Compense la perte de rappel en comparant contre
+// PLUSIEURS variantes de chaque équipe (nom ESPN brut ET traduit FR, voir
+// candidateNames plus bas) — pour PSG par exemple, le nom ESPN BRUT est
+// littéralement "PSG" (vérifié : c'est la clé ESPN dans TEAM_NAMES_FR),
+// identique au `shortName` FD.org "PSG" envoyé par le client — un match
+// exact fonctionne très bien sans avoir besoin du préfixe flou.
+function matchesFavoriteClub(subClubs, candidateNames) {
+  if (!Array.isArray(subClubs) || subClubs.length === 0) return null
+  const normCandidates = candidateNames.filter(Boolean).map(normalizeFifa)
+  if (normCandidates.length === 0) return false
+  return subClubs.some(c => normCandidates.includes(normalizeFifa(c)))
+}
+
+// Point d'entrée unique utilisé par sendPushToMatch — combine les 2 filtres
+// avec la bonne priorité (club > compétition) sans dupliquer cette logique
+// à chaque call site. candidateNames : [rawHomeTeam, homeTeam, rawAwayTeam,
+// awayTeam] — home ET away, brut ET traduit, peu importe lequel matche.
+function subscriberWantsThis(sub, slug, candidateNames, strict) {
+  const clubResult = matchesFavoriteClub(sub.clubs, candidateNames ?? [])
+  if (clubResult !== null) return clubResult
+  return strict ? matchesFavoriteStrict(sub.comps, slug) : matchesFavorite(sub.comps, slug)
+}
+
 // ⚠️ AJOUT (question utilisateur : optimiser encore le CPU du cron) : avant,
 // CHAQUE appel à sendPushToMatch() (donc chaque notif ET le ticker "score en
 // direct", appelé une fois PAR MATCH EN DIRECT à CHAQUE passe) refaisait un
@@ -189,14 +233,15 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   const subs = subsCache ?? await loadSubscriptions(log)
   if (!subs.length) return 0
 
-  const matcher = options.onlyFavorites ? matchesFavoriteStrict : matchesFavorite
   const payloadStr = JSON.stringify(payload)
   const stale = []
   let sent = 0
   let failed = 0
 
+  const candidateNames = [options.rawHomeTeam, options.homeTeam, options.rawAwayTeam, options.awayTeam]
+
   await Promise.allSettled(subs.map(async ({ raw: subRaw, sub }) => {
-    if (!matcher(sub.comps, slug)) return
+    if (!subscriberWantsThis(sub, slug, candidateNames, !!options.onlyFavorites)) return
     try {
       // urgency: 'high' — sans ça, les services de push (notamment Apple sur
       // iOS, largement majoritaire chez nos abonnés) peuvent différer la
@@ -244,14 +289,16 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
 // api/pulse.js) pose la clé de façon atomique : si elle existe déjà, l'appel
 // renvoie null immédiatement sans l'écraser — une seule des exécutions
 // concurrentes peut gagner la course, l'autre voit qu'elle a perdu.
-async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600, subsCache = null) {
+async function sendDeduped(dedupKey, payload, slug, log = null, ttl = 3 * 3600, subsCache = null, teams = {}) {
   try {
     const acquired = await kv.set(dedupKey, '1', { ex: ttl, nx: true })
     if (!acquired) return 0
   } catch { return 0 }
   // urgency 'high' : ces notifs (KO/but/mi-temps/reprise/fin) sont rares et
   // importantes — priorité max pour limiter les retards/pertes en arrière-plan.
-  return sendPushToMatch(payload, slug, { urgency: 'high' }, log, subsCache)
+  // teams (homeTeam/awayTeam) : transmis pour le filtre par club favori, voir
+  // matchesFavoriteClub/subscriberWantsThis plus haut.
+  return sendPushToMatch(payload, slug, { urgency: 'high', ...teams }, log, subsCache)
 }
 
 // ── Capture proactive du summary ESPN (compos + stats + événements) ────────────
@@ -580,6 +627,11 @@ export default async function handler(req, res) {
     let   away     = parseInt(awayC.score ?? '0', 10) || 0
     const homeTeam = t(homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? '?')
     const awayTeam = t(awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? '?')
+    // Noms ESPN BRUTS (avant traduction FR) — voir matchesFavoriteClub plus
+    // haut : pour beaucoup de clubs (ex. "PSG"), le nom brut colle mieux au
+    // shortName FD.org envoyé par le client que le nom traduit.
+    const rawHomeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? ''
+    const rawAwayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? ''
     const eventId  = evt.id
 
     // ── FIX retard notif WC : ESPN lag ~10min sur le statut du slug 'fifa.world' ──
@@ -650,7 +702,7 @@ export default async function handler(req, res) {
       // TTL de dédup à 6h : marge de sécurité pour un match prolongation+tab
       // (peut dépasser 3h depuis le coup d'envoi).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache)
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`) }
     }
 
@@ -786,7 +838,7 @@ export default async function handler(req, res) {
         log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} BUT ANNULÉ ${side} ${prevCount}→${newCount}`)
 
         const sent = await sendDeduped(`push:espn:goalcancel:${eventId}:${side}:${newCount}`,
-          { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, log, undefined, subsCache)
+          { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
         if (sent > 0) notifsSent++
 
         // Libère les clés de dédup des buts retirés : si un VRAI but est
@@ -850,7 +902,7 @@ export default async function handler(req, res) {
           // l'ancienne clé basée sur le score complet, qui ne pouvait pas
           // distinguer 2 buts consécutifs du même camp).
           const sent = await sendDeduped(`push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
-            { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log, undefined, subsCache)
+            { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
           if (sent > 0) notifsSent++
 
           track[side]++
@@ -895,7 +947,7 @@ export default async function handler(req, res) {
           const teamName   = side === 'home' ? homeTeam : awayTeam
           const minuteText = minuteLabel(card.minute)
           const sent = await sendDeduped(`push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
-            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log, undefined, subsCache)
+            { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
           if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} carton rouge ${side} ${card.name}`) }
           cardTrack[side]++
           cardTrackChanged = true
@@ -910,7 +962,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
+        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) notifsSent++
     }
 
@@ -918,7 +970,7 @@ export default async function handler(req, res) {
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} reprise`)
       const sent = await sendDeduped(`push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
+        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) notifsSent++
     }
 
@@ -926,7 +978,7 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(prevStatus) && FINAL_ESPN.has(status)) {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} FT`)
       const sent = await sendDeduped(`push:espn:ft:${eventId}`,
-        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache)
+        { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) notifsSent++
       // Capture finale — le boxscore/évènements se stabilisent parfois
       // quelques secondes après le sifflet final (corrections tardives).
@@ -983,7 +1035,7 @@ export default async function handler(req, res) {
           renotify: false,
         },
         slug,
-        { onlyFavorites: true, urgency: 'high' },
+        { onlyFavorites: true, urgency: 'high', homeTeam, awayTeam, rawHomeTeam, rawAwayTeam },
         log,
         subsCache,
       )

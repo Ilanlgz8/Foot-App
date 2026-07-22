@@ -20,6 +20,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getFavoriteTeams } from './useFavoriteTeams'
+import { getFavoriteClubs } from './useFavoriteClubs'
+
+// Équipes favorites (useFavoriteClubs, IDs FD.org — voir son commentaire
+// d'en-tête) → noms envoyés au serveur pour le filtre par club (voir
+// matchesFavoriteClub dans api/cron-goals.js). Aucun mapping ID FD.org↔ID
+// ESPN n'existe dans l'app : le serveur matche par NOM (fuzzyTeamFifa, déjà
+// utilisé pour le rapprochement ESPN↔FIFA) — on envoie donc name ET
+// shortName de chaque club favori pour maximiser les chances de match (ex.
+// "Paris Saint-Germain FC" côté FD.org vs "PSG"/"Paris SG" côté ESPN),
+// dédupliqués.
+function favoriteClubNames() {
+  const names = getFavoriteClubs().flatMap(c => [c.name, c.shortName].filter(Boolean))
+  return [...new Set(names)]
+}
 
 // Clé localStorage pour mémoriser que l'utilisateur est abonné
 const LS_KEY = 'push_subscribed'
@@ -67,7 +81,7 @@ export function usePushNotifications() {
               const storeRes = await fetch('/api/subscribe', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
+                body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams(), clubs: favoriteClubNames() }),
               })
               if (storeRes.ok || storeRes.status === 201) {
                 localStorage.setItem('push_last_sync', String(Date.now()))
@@ -117,7 +131,7 @@ export function usePushNotifications() {
       const storeRes = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
+        body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams(), clubs: favoriteClubNames() }),
       })
       if (!storeRes.ok) {
         // Subscription créée côté navigateur mais pas stockée → annuler
@@ -185,7 +199,7 @@ export async function resyncFavoriteTeams() {
     await fetch('/api/subscribe', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams() }),
+      body:    JSON.stringify({ ...sub.toJSON(), comps: getFavoriteTeams(), clubs: favoriteClubNames() }),
     })
   } catch { /* silencieux — pas critique, re-sync périodique rattrapera */ }
 }
