@@ -278,7 +278,19 @@ const MIN_TEAM_SPLITS  = 2   // matchs mini par équipe à domicile ET à l'ext�
 export const MIN_LEAGUE_GAMES = 10  // matchs mini dispo pour une moyenne de championnat fiable
 const MAX_GOALS_GRID   = 8   // buts max simulés par équipe (au-delà, probabilité négligeable)
 const H2H_WEIGHT_PER_MATCH = 0.08  // poids d'une confrontation directe dans le mix final
-const H2H_WEIGHT_MAX       = 0.3   // jamais plus de 30% du poids final (échantillon souvent petit)
+// ⚠️ RELEVÉ de 0.3 à 0.4 (demande utilisateur explicite, conscient du compromis :
+// le backtest avec l'ancien plafond montrait déjà que le H2H bouge peu la
+// prédiction — voir commentaire RATIO_SHRINK_K plus bas, "67.7%→68.5%"). Choix
+// assumé : avec le plafond précédent, une paire d'équipes avec BEAUCOUP de
+// confrontations passées (10+, ex. gros clubs qui se recroisent chaque saison
+// en championnat + coupes) n'était pas mieux traitée qu'une paire avec 4
+// confrontations seulement — les deux tombaient sur le même plafond de 30%. À
+// 0.4, l'échantillon continue de peser un peu plus jusqu'à 5 confrontations
+// (0.08 × 5 = 0.4) au lieu de plafonner dès 4 (0.08 × 4 = 0.32 > 0.3) — reste
+// un correctif, jamais le facteur dominant (le modèle buts marqués/encaissés
+// garde toujours au moins 60% du poids final). À revalider avec
+// scripts/backtest-prono.mjs si la calibration se dégrade en pratique.
+const H2H_WEIGHT_MAX       = 0.4
 
 function poissonPmf(lambda, k) {
   let fact = 1
