@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -375,16 +375,10 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   )
 }
 
-// Un match est considéré "live" pour le routage du clic dès que sa card
-// passe en mode live (même logique que isLive dans MatchCard/MatchPoster) :
-// IN_PLAY/PAUSED confirmé, ou coup d'envoi imminent/en cours détecté par
-// calcMinute() (ex: "Débute"), et pas encore terminé.
-function isCardLive(match) {
-  const ms = getMatchState(match.id)
-  const isFinished = ms.ft === true || match.status === 'FINISHED'
-  if (isFinished) return false
-  return match.status === 'IN_PLAY' || match.status === 'PAUSED' || calcMinute(match) !== null
-}
+// isCardLive : déplacée vers ../utils/matchUtils.js (demande utilisateur,
+// réutilisée par Accueil.jsx — un export non-composant ici cassait le Fast
+// Refresh, voir le commentaire détaillé dans matchUtils.js). Réimportée
+// ci-dessus (voir en-tête du fichier) pour un usage 100% inchangé ici.
 
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs

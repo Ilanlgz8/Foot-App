@@ -470,6 +470,25 @@ export function isNationalTeamComp(match) {
   return NATIONAL_TEAM_COMP_IDS.has(id) || NATIONAL_TEAM_COMP_CODES.has(code)
 }
 
+// Un match est considéré "live" pour le routage du clic dès que sa card
+// passe en mode live (même logique que isLive dans accueil/MatchCard.jsx/
+// MatchPoster.jsx) : IN_PLAY/PAUSED confirmé, ou coup d'envoi imminent/en
+// cours détecté par calcMinute() (ex: "Débute"), et pas encore terminé.
+// Déplacée ici depuis accueil/MatchCard.jsx (demande utilisateur : sur
+// l'Accueil desktop, quand des matchs sont en direct, ils sont affichés une
+// seule fois — dans la grille de widgets live dédiée — donc exclus de la
+// liste "à venir", voir Accueil.jsx/matchPanelMatches) : un export non-
+// composant dans un fichier qui exporte par ailleurs des composants React
+// casse le Fast Refresh (react-refresh/only-export-components) — ce fichier
+// (matchUtils.js) est déjà le point de partage établi pour ce genre de
+// helper (calcMinute, getMatchPeriod, mergeScore…), donc sa place naturelle.
+export function isCardLive(match) {
+  const ms = getMatchState(match.id)
+  const isFinished = ms.ft === true || match.status === 'FINISHED'
+  if (isFinished) return false
+  return match.status === 'IN_PLAY' || match.status === 'PAUSED' || calcMinute(match) !== null
+}
+
 // ── Compétitions à hôte unique, terrain "neutre" pour les 2 équipes ──
 // Sous-ensemble de isNationalTeamComp ci-dessus : Coupe du Monde, Euro, CAN
 // et Copa America se jouent (quasi) intégralement dans un seul pays hôte —

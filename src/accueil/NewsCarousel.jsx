@@ -1,22 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useSwipe } from '../hooks/useSwipe'
 
-// Un seul article par page — les flèches de navigation sont dans l'en-tête
-// (à côté du titre), ce qui libère la carte pour qu'elle remplisse toute la
-// largeur disponible (donc bien plus grande sur mobile, au lieu de 3 petites
-// cards côte à côte / empilées).
-const PER_PAGE = 1
-
-export function NewsCarousel({ news, loading, error }) {
+// Un seul article par page sur mobile — les flèches de navigation sont dans
+// l'en-tête (à côté du titre), ce qui libère la carte pour qu'elle remplisse
+// toute la largeur disponible (donc bien plus grande sur mobile, au lieu de
+// 3 petites cards côte à côte / empilées).
+// Sur desktop (demande utilisateur : "un seul sur desktop ça fait trop
+// gros") : 3 articles par ligne — piloté par le parent (Accueil.jsx, déjà en
+// possession de l'état isDesktop pour le reste de la refonte) via la prop
+// `perPage`, pour éviter un 2e écouteur matchMedia redondant ici.
+export function NewsCarousel({ news, loading, error, perPage = 1 }) {
   const [page, setPage] = useState(0)
-  const pages = Math.ceil(news.length / PER_PAGE)
-  const slice = news.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE)
+  const pages = Math.ceil(news.length / perPage)
+  // Filet de sécurité calculé au render (pas via un effet + setState, pour
+  // éviter un aller-retour de rendu inutile) : si perPage change (resize
+  // croisant le breakpoint desktop pendant que l'utilisateur est sur une
+  // page > 0), `page` peut se retrouver hors bornes une fois `pages`
+  // recalculé — repli sur la dernière page valide plutôt qu'une page vide.
+  const page_ = pages === 0 ? 0 : Math.min(page, pages - 1)
+  const slice = news.slice(page_ * perPage, page_ * perPage + perPage)
 
   useEffect(() => {
     if (loading || pages <= 1) return
     const id = setInterval(() => setPage(p => (p + 1) % pages), 20000)
     return () => clearInterval(id)
-  }, [page, pages, loading])
+  }, [pages, loading])
 
   // Swipe tactile mobile (question utilisateur) — même hook que MatchPage/
   // LiveMatchPage (finger-follow, axis locking, spring-back), réutilisé ici
@@ -38,13 +46,13 @@ export function NewsCarousel({ news, loading, error }) {
             <button
               className="accueil__carouselArrow accueil__carouselArrow--sm"
               onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
+              disabled={page_ === 0}
               aria-label="Article précédent"
             >‹</button>
             <button
               className="accueil__carouselArrow accueil__carouselArrow--sm"
               onClick={() => setPage(p => Math.min(pages - 1, p + 1))}
-              disabled={page === pages - 1}
+              disabled={page_ === pages - 1}
               aria-label="Article suivant"
             >›</button>
           </div>
@@ -52,7 +60,7 @@ export function NewsCarousel({ news, loading, error }) {
       </div>
 
       {loading && (
-        <div className="accueil__grid accueil__grid--carousel">
+        <div className={`accueil__grid accueil__grid--carousel${perPage > 1 ? ' accueil__grid--carousel3' : ''}`}>
           <div className="accueil__card" style={{ pointerEvents: 'none' }}>
             <div className="sk" style={{ width: '100%', aspectRatio: '16/9' }} />
             <div className="accueil__cardBody" style={{ gap: '0.6rem' }}>
@@ -69,8 +77,8 @@ export function NewsCarousel({ news, loading, error }) {
       {!loading && !error && (
         <div
           ref={swipe.ref}
-          className="accueil__grid accueil__grid--carousel"
-          key={page}
+          className={`accueil__grid accueil__grid--carousel${perPage > 1 ? ' accueil__grid--carousel3' : ''}`}
+          key={page_}
           style={{
             transform: `translateX(${swipe.dragOffset}px)`,
             transition: swipe.isDragging ? 'none' : 'transform 0.25s ease',

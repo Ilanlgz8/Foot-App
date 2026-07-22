@@ -8,7 +8,7 @@ import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } f
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
-import { mergeScore } from '../utils/matchUtils'
+import { mergeScore, isCardLive } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
@@ -17,17 +17,23 @@ import { pickMatchDuJour } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
+import { LiveCard } from './LiveCardWidget'
 import '../accueil.css'
+import '../live.css'
 
 // Même logique de priorité que pickMatchDuJour (Mondial > Ligue des Champions
 // > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
 // compétition montrer dans le mini widget classement de l'Accueil.
 
-/** Chips de filtre par compétition */
-function CompFilter({ competitions, active, onChange }) {
+/** Chips de filtre par compétition.
+ *  layout='row' (défaut) → chips horizontales, usage existant (mobile +
+ *  desktop, dans l'en-tête des panneaux).
+ *  layout='col' → pile verticale, usage nouveau : sidebar compétitions
+ *  desktop (voir accueil__sidebar plus bas). */
+function CompFilter({ competitions, active, onChange, layout = 'row' }) {
   if (competitions.length <= 1) return null
   return (
-    <div className="accueil__compFilter">
+    <div className={`accueil__compFilter${layout === 'col' ? ' accueil__compFilter--col' : ''}`}>
       <button
         className={`accueil__compChip${active === null ? ' accueil__compChip--active' : ''}`}
         onClick={() => onChange(null)}
@@ -99,6 +105,33 @@ function Accueil() {
   const [compFilterResult, setCompFilterResult] = useState(null)
   const [resultView, setResultView] = useState('chrono') // 'chrono' | 'comp'
   const queryClient  = useQueryClient()
+
+  // ── Refonte layout desktop (demande utilisateur) ──────────────────────────
+  // Détection desktop/mobile en JS (nécessaire ici : contrairement au
+  // découpage poster/card existant dans MatchPanel — purement CSS, mêmes
+  // données affichées différemment — cette refonte change quelles données
+  // sont affichées où selon la largeur : ex. les matchs déjà en direct sont
+  // exclus de la liste "à venir" seulement sur desktop, voir matchPanelMatches
+  // plus bas). Même pattern déjà utilisé dans Match.jsx (isBracketDesktop).
+  // Seuil 1025px (PAS le seuil mobile 640px existant) : la sidebar (220px) +
+  // la colonne résultats/live (360px) ont besoin d'assez de place pour ne
+  // pas écraser la colonne centrale — en dessous de ~1024px (tablette,
+  // petite fenêtre desktop), la nouvelle disposition 3 zones dégraderait
+  // visiblement (colonne centrale trop étroite). Cette tranche 641-1024px
+  // garde donc le même comportement que le mobile pour cette refonte
+  // (1 colonne, pas de sidebar, pas de grille live dédiée, résultats
+  // toujours affichés — voir @media max-width:1024px dans accueil.css) tout
+  // en gardant par ailleurs le style poster désormais commun à toutes les
+  // largeurs (voir accueil__posterList).
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1025px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1025px)')
+    const onChange = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   // Sync les valeurs dans les variables module à chaque changement
   useEffect(() => { _savedDayOffset = dayOffset; _savedDate = getTargetDate(0) }, [dayOffset])
@@ -436,16 +469,76 @@ function Accueil() {
     return out
   }, [results])
 
+  // ── Compétitions "actives" pour la sidebar desktop (demande utilisateur) ──
+  // Contrairement à matchCompetitions ci-dessus (scopé au SEUL jour affiché),
+  // dérivée de upcomingAllComps (fenêtre 30j, toutes compétitions suivies,
+  // déjà chargée) : une compétition apparaît ici dès qu'elle a AU MOINS UN
+  // match à venir, peu importe le jour actuellement parcouru dans le panneau
+  // central. upcomingAllComps ne contient que des matchs SCHEDULED à venir
+  // (filterUpcomingWindow, voir useMatchs.js) — une compétition tout juste
+  // terminée (ex: Coupe du Monde, plus aucun match programmé) en sort donc
+  // naturellement, exactement l'exemple donné par l'utilisateur.
+  const activeCompetitions = useMemo(() => {
+    const seen = new Set()
+    const out  = []
+    for (const m of upcomingAllComps) {
+      const id = m.competition?.id
+      if (id && !seen.has(id)) {
+        seen.add(id)
+        const meta = COMPETITIONS.find(c => c.id === id)
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+      }
+    }
+    return out
+  }, [upcomingAllComps])
+
   // Réinitialiser le filtre matchs si la compétition disparaît des données (changement de jour)
+  // — sauf si elle reste sélectionnable via la sidebar desktop (activeCompetitions,
+  // fenêtre plus large que matchCompetitions) : sinon un choix fait dans la
+  // sidebar serait immédiatement effacé dès qu'il ne matche aucun match du
+  // jour actuellement affiché dans le panneau central.
   useEffect(() => {
-    if (compFilterMatch && !matchCompetitions.some(c => c.id === compFilterMatch)) {
+    if (
+      compFilterMatch &&
+      !matchCompetitions.some(c => c.id === compFilterMatch) &&
+      !activeCompetitions.some(c => c.id === compFilterMatch)
+    ) {
       setCompFilterMatch(null)
     }
-  }, [matchCompetitions, compFilterMatch])
+  }, [matchCompetitions, activeCompetitions, compFilterMatch])
 
   // Matchs + résultats filtrés
   const filteredMatches = compFilterMatch  ? matches.filter(m => m.competition?.id === compFilterMatch)  : matches
   const filteredResults = compFilterResult ? results.filter(r => r.competition?.id === compFilterResult) : results
+
+  // ── Live desktop : mêmes critères que Live.jsx (page /live) — IN_PLAY,
+  // PAUSED, SCHEDULED (coup d'envoi imminent/détecté) ou encore dans la
+  // fenêtre de grâce post-FT (isRecentlyFinished) — pour rester cohérent
+  // avec ce qui compte comme "en direct" partout ailleurs dans l'app.
+  const desktopLiveMatches = liveMatches.filter(m =>
+    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
+  )
+  const desktopHasLive = isDesktop && desktopLiveMatches.length > 0
+  const hasSidebar = activeCompetitions.length > 1
+
+  // ── Liste "à venir" du panneau central ──
+  // Desktop + matchs en direct : ces matchs sont déjà affichés dans la
+  // grille de widgets live dédiée (à droite/au-dessus) — on les exclut d'ici
+  // pour ne pas les montrer deux fois (demande utilisateur : la grille live
+  // remplace l'affichage "en place" existant, uniquement sur desktop).
+  // Mobile (desktopHasLive toujours faux ici, gardé par isDesktop) :
+  // comportement 100% inchangé, un match qui démarre reste visible à sa
+  // place dans cette même liste (isCardLive dans MatchCard.jsx).
+  const matchPanelMatches = useMemo(() => {
+    const base = dayOffset === 0
+      ? filteredMatches.filter(m => {
+          if (m.status === 'FINISHED') return false
+          if (getMatchState(m.id).ft) return isRecentlyFinished(m.id)
+          return true
+        })
+      : filteredMatches
+    return desktopHasLive ? base.filter(m => !isCardLive(m)) : base
+  }, [dayOffset, filteredMatches, desktopHasLive])
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
@@ -557,14 +650,71 @@ function Accueil() {
           />
         )}
 
-        {/* ── Grille matchs / résultats — toujours 2 colonnes sur desktop ── */}
-        <div className="accueil__mainGrid">
+        {/* ── Grille matchs / résultats ──
+            Mobile ET tablette/petite fenêtre (<1025px, voir isDesktop) :
+            inchangé — 1 colonne, panneau matchs puis résultats, sidebar et
+            grille live ci-dessous simplement masquées en CSS (display:none,
+            voir accueil.css @media max-width:1024px).
+            Desktop ≥1025px (demande utilisateur, refonte complète) :
+              - pas de live      → [sidebar compétitions] [matchs à venir, posters] [résultats récents]
+              - 1+ match en live → [sidebar compétitions] [grille "En direct" (widgets Live.jsx) au-dessus, matchs à venir en dessous] — résultats récents masqué tant qu'il y a du live.
+            Positionnement réel via CSS grid-area (accueil__mainGrid /
+            accueil__mainGrid--live / accueil__mainGrid--noSidebar) — l'ordre
+            des enfants ci-dessous n'a pas d'importance pour desktop, et
+            n'affecte l'ordre "1 colonne" que pour matchPanel/résultats
+            (sidebar et grille live étant display:none en dessous de 1025px). */}
+        <div className={`accueil__mainGrid${desktopHasLive ? ' accueil__mainGrid--live' : ''}${!hasSidebar ? ' accueil__mainGrid--noSidebar' : ''}`}>
+
+          {/* Sidebar compétitions — desktop uniquement (demande utilisateur :
+              "mettre les championnat a gauche... on met les competition la
+              ou y'a des matchs a venir sinon nn si on a rien et on rajoute
+              'tous'"). N'apparaît que s'il y a plus d'une compétition active
+              (CompFilter retourne null sinon, voir plus haut) — sinon la
+              grille repasse en accueil__mainGrid--noSidebar (2 colonnes). */}
+          {hasSidebar && (
+            <aside className="accueil__dashPanel accueil__sidebar">
+              <div className="accueil__dashPanelHeader">
+                <h2 className="accueil__dashPanelTitle">Compétitions</h2>
+              </div>
+              <div className="accueil__dashPanelDivider" />
+              <div className="accueil__dashPanelBody">
+                <CompFilter competitions={activeCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} layout="col" />
+              </div>
+            </aside>
+          )}
+
+          {/* Grille "En direct" — desktop uniquement, uniquement s'il y a au
+              moins un match en direct (demande utilisateur : "reprendre la
+              logique des widget dans la page des widget live"). Réutilise
+              EXACTEMENT LiveCard (Live.jsx), aucune réimplémentation. */}
+          {desktopHasLive && (
+            <div className="accueil__dashPanel accueil__liveWidgets">
+              <div className="accueil__dashPanelHeader">
+                <span className="accueil__liveWidgetsDot" aria-hidden="true" />
+                <h2 className="accueil__dashPanelTitle">En direct</h2>
+                <span className="accueil__liveWidgetsCount">{desktopLiveMatches.length}</span>
+              </div>
+              <div className="accueil__dashPanelDivider" />
+              <div className="accueil__dashPanelBody accueil__liveWidgetsBody">
+                <div className="accueil__liveWidgetsGrid">
+                  {desktopLiveMatches.map(m => (
+                    <LiveCard
+                      key={m.id}
+                      match={m}
+                      espn={espnScores[m.id]}
+                      onClick={() => navigate(`/live/${m.id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Matchs à venir — une card qui démarre reste à sa place et passe
-              en mode live (score/minute/statut) au lieu de disparaître au
-              profit d'un widget séparé ailleurs (demande utilisateur) : plus
-              de section "EN DIRECT" dédiée sur l'Accueil, voir isCardLive
-              dans accueil/MatchCard.jsx. Un match reste visible ici quelques
+              en mode live (score/minute/statut) au lieu de disparaître, SAUF
+              sur desktop quand la grille "En direct" ci-dessus est affichée
+              (le match y est déjà représenté, voir matchPanelMatches plus
+              haut — évite le doublon). Un match reste visible ici quelques
               secondes après son "Terminé" (isRecentlyFinished) le temps que
               la transition soit visible, avant de passer définitivement dans
               "Résultats récents". */}
@@ -597,16 +747,16 @@ function Accueil() {
                 aria-label="Jour suivant"
               >›</button>
             </div>
+            {/* Filtre horizontal — reste utilisé tel quel sur mobile
+                (matchCompetitions, scopé au jour affiché, comportement
+                inchangé). Sur desktop, remplacé visuellement par la sidebar
+                ci-dessus (masqué en CSS, voir accueil__dashPanel--matchPanel
+                dans accueil.css) — même state compFilterMatch, pas de
+                doublon de logique. */}
             <CompFilter competitions={matchCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
-              matches={dayOffset === 0
-                ? filteredMatches.filter(m => {
-                    if (m.status === 'FINISHED') return false
-                    if (getMatchState(m.id).ft) return isRecentlyFinished(m.id)
-                    return true
-                  })
-                : filteredMatches}
+              matches={matchPanelMatches}
               loading={matchesLoading}
               espnScores={espnScores}
               onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
@@ -615,26 +765,33 @@ function Accueil() {
             />
           </div>
 
-          {/* Résultats récents */}
-          <div className="accueil__dashPanel accueil__dashPanel--result">
-            <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
-              <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
-              <div className="accueil__resultHeaderRight">
-                <CompFilter competitions={resultCompetitions} active={compFilterResult} onChange={setCompFilterResult} />
-                <div className="accueil__resultTabs accueil__resultTabs--header">
-                  <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
-                  <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
+          {/* Résultats récents — masqué sur desktop tant qu'il y a du live
+              (demande utilisateur : "quand y'a un match en live... on
+              affiche le result panel que quand y'a aucun match en live").
+              Mobile : desktopHasLive toujours faux ici (gardé par isDesktop)
+              → toujours affiché, comportement 100% inchangé. */}
+          {!desktopHasLive && (
+            <div className="accueil__dashPanel accueil__dashPanel--result">
+              <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
+                <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
+                <div className="accueil__resultHeaderRight">
+                  <CompFilter competitions={resultCompetitions} active={compFilterResult} onChange={setCompFilterResult} />
+                  <div className="accueil__resultTabs accueil__resultTabs--header">
+                    <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
+                    <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
+                  </div>
                 </div>
               </div>
+              <div className="accueil__dashPanelDivider" />
+              <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
             </div>
-            <div className="accueil__dashPanelDivider" />
-            <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
-          </div>
+          )}
 
         </div>
 
-        {/* ── Actualités — inchangé ── */}
-        <NewsCarousel news={news} loading={newsLoading} error={newsError} />
+        {/* ── Actualités — 3/ligne sur desktop (demande utilisateur), 1/page
+            inchangé sur mobile ── */}
+        <NewsCarousel news={news} loading={newsLoading} error={newsError} perPage={isDesktop ? 3 : 1} />
 
       </div>
     </section>

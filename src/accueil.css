@@ -224,20 +224,124 @@
 }
 
 
-/* ── GRILLE PRINCIPALE — toujours 50/50 ── */
+/* ── GRILLE PRINCIPALE ──
+   Refonte desktop (demande utilisateur) — positionnement par grid-area,
+   indépendant de l'ordre des enfants dans le JSX :
+     - par défaut (pas de live)      : sidebar | matchs à venir | résultats
+     - --live (1+ match en direct)   : sidebar | grille "En direct" (en haut) | matchs à venir (en dessous) — résultats masqué (voir Accueil.jsx)
+     - --noSidebar (0-1 compétition active) : la colonne sidebar disparaît entièrement
+   Mobile (<640px, voir media query plus bas) : TOUJOURS 1 colonne, sidebar
+   et grille live masquées — comportement strictement inchangé. */
 .accueil__mainGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 220px 1fr 360px;
+  grid-template-areas: "sidebar center right";
   align-items: start;
   gap: 1.2rem;
   margin-bottom: 1.2rem;
   animation: fadeUp 0.5s ease both;
 }
+.accueil__mainGrid--noSidebar {
+  grid-template-columns: 1fr 360px;
+  grid-template-areas: "center right";
+}
+.accueil__mainGrid--live {
+  grid-template-columns: 220px 1fr;
+  grid-template-areas:
+    "sidebar live"
+    "sidebar upcoming";
+}
+.accueil__mainGrid--live.accueil__mainGrid--noSidebar {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "live"
+    "upcoming";
+}
 
-@media (max-width: 640px) {
+.accueil__sidebar { grid-area: sidebar; }
+.accueil__liveWidgets { grid-area: live; }
+.accueil__mainGrid .accueil__dashPanel--matchPanel { grid-area: center; }
+.accueil__mainGrid--live .accueil__dashPanel--matchPanel { grid-area: upcoming; }
+.accueil__mainGrid .accueil__dashPanel--result { grid-area: right; }
+
+/* Seuil 1024px (PAS 640px) — voir le commentaire détaillé dans Accueil.jsx
+   (isDesktop) : la sidebar (220px) + la colonne résultats/live (360px)
+   n'ont pas la place de respirer en dessous de ~1024px, donc toute la
+   tranche tablette/petite fenêtre desktop (641-1024px) reprend le même
+   comportement 1 colonne que le vrai mobile pour CETTE refonte (sidebar et
+   grille live masquées, résultats toujours affichés — Accueil.jsx gate déjà
+   ces éléments côté JS via ce même seuil, aucun match en direct ne
+   "disparaît" donc dans cette tranche). Les styles vraiment mobile-only
+   (poster en plein flux sans cadre panneau, tailles de police réduites…)
+   restent scopés à @media max-width:640px plus bas, inchangés. */
+@media (max-width: 1024px) {
   .accueil__mainGrid {
     grid-template-columns: 1fr;
+    grid-template-areas: none;
   }
+  /* Reset explicite (au lieu de compter sur la retombée navigateur d'un
+     grid-area référençant une zone qui n'existe plus une fois areas:none) :
+     matchPanel/résultats reprennent un flux document normal, dans leur
+     ordre d'origine dans le JSX — comportement identique à avant cette
+     refonte. */
+  .accueil__mainGrid .accueil__dashPanel--matchPanel,
+  .accueil__mainGrid .accueil__dashPanel--result {
+    grid-area: auto;
+  }
+  .accueil__sidebar,
+  .accueil__liveWidgets {
+    display: none;
+  }
+}
+
+/* ── Sidebar compétitions (desktop) ── */
+.accueil__sidebar .accueil__compFilter--col {
+  padding: 0.5rem;
+}
+
+/* ── Grille "En direct" (desktop) — réutilise les classes .live__* de
+   Live.jsx/live.css pour le contenu des cards elles-mêmes (widget identique,
+   voir LiveCard) ; la grille conteneur est spécifique à ce contexte
+   (auto-fill, réagit à la largeur RÉELLE de la colonne plutôt qu'aux
+   breakpoints viewport de .live__grid, pensés pour la page /live pleine
+   largeur — évite des cards trop serrées à côté de la sidebar). ── */
+.accueil__liveWidgets .accueil__dashPanelHeader {
+  gap: 0.6rem;
+}
+.accueil__liveWidgetsDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red-light, #ef4444);
+  box-shadow: 0 0 0 4px rgba(var(--red-rgb),0.18);
+  flex-shrink: 0;
+  animation: livePulseDot 1.6s ease-in-out infinite;
+}
+@keyframes livePulseDot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .accueil__liveWidgetsDot { animation: none; }
+}
+.accueil__liveWidgetsCount {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgba(var(--white-rgb),0.5);
+  background: rgba(var(--white-rgb),0.06);
+  border: 1px solid rgba(var(--white-rgb),0.1);
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.55rem;
+}
+.accueil__liveWidgetsBody {
+  max-height: none;
+}
+.accueil__liveWidgetsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+  padding: 0.6rem;
 }
 
 /* Panel individuel */
@@ -400,6 +504,23 @@
   border: 1px solid rgba(var(--white-rgb),0.12);
   background: rgba(var(--white-rgb),0.06);
   padding: 1px;
+}
+
+/* Variante verticale — sidebar compétitions desktop (layout='col' dans
+   Accueil.jsx). Mêmes chips, empilées et étirées en pleine largeur au lieu
+   d'un flex-wrap horizontal. */
+.accueil__compFilter--col {
+  flex-direction: column;
+  align-items: stretch;
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 0.3rem;
+}
+.accueil__compFilter--col .accueil__compChip {
+  justify-content: flex-start;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .accueil__dashPanelBody {
@@ -884,6 +1005,13 @@
   animation: fadeUp 0.3s ease both;
 }
 
+/* Desktop (demande utilisateur : "un seul sur desktop ça fait trop gros") :
+   3 articles par ligne — activé par NewsCarousel via perPage (piloté par
+   Accueil.jsx, isDesktop), pas par une media query ici. */
+.accueil__grid--carousel3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 /* ── Navigation carrousel news — flèches dans l'en-tête, à côté du titre
    (la card article prend alors toute la largeur disponible) ── */
 .accueil__carouselHeaderNav {
@@ -1286,31 +1414,44 @@
 }
 
 /* =========================================================
-   POSTER CARDS — affiches match mobile uniquement
+   POSTER CARDS — affiches match (panneau "à venir" de l'Accueil)
    ========================================================= */
 
-/* Conteneur de la liste de posters — visible uniquement sur mobile */
+/* Conteneur de la liste de posters — utilisé UNIQUEMENT par MatchPanel
+   (panneau "à venir"), jamais par ResultPanel (qui a ses propres
+   .accueil__matchCards / ResultHeroCard, non concernés par ce bloc).
+   ⚠️ CHANGEMENT (demande utilisateur : "mettre les match a venir au milieu
+   de la page accueil avec les cards exactment comme sur mobile") : visible
+   par défaut maintenant (mobile ET desktop) — auparavant réservé au mobile
+   (display:none par défaut, réactivé <640px). .accueil__matchCards (cards
+   "classiques") est donc désormais caché à la place à l'intérieur du
+   matchPanel uniquement (voir plus bas), sur toutes les largeurs. */
 .accueil__posterList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cards "classiques" du panneau "à venir" — remplacées par les posters
+   ci-dessus sur toutes les largeurs (ResultPanel n'est PAS concerné : ce
+   sélecteur cible spécifiquement matchPanel). */
+.accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__matchCards {
   display: none;
 }
 
-/* Skeleton posters (chargement initial mobile) — même principe que
-   .accueil__posterList : masqué par défaut, visible seulement <640px */
+/* Skeleton posters (chargement initial) — même principe que
+   .accueil__posterList ci-dessus : visible par défaut désormais. */
 .accueil__posterSkList {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .poster--sk .poster__middle { position: relative; z-index: 1; }
 
 @media (max-width: 640px) {
-  .accueil__posterSkList {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-}
-
-@media (max-width: 640px) {
-  /* Panel matchs : retire la box sur mobile, posters sortent libres */
+  /* Panel matchs : retire la box sur mobile, posters sortent libres —
+     conservé UNIQUEMENT sur mobile (desktop garde le cadre du panneau,
+     cohérent avec les nouveaux panneaux sidebar/live). */
   .accueil__dashPanel--matchPanel {
     background: transparent !important;
     border: none !important;
@@ -1332,17 +1473,6 @@
     max-height: none !important;
     overflow: visible !important;
     padding: 0;
-  }
-
-  /* Sur mobile : posters visibles, cards normales cachées
-     ⚠️ Cibler uniquement le matchPanel, pas le ResultPanel */
-  .accueil__posterList {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__matchCards {
-    display: none;
   }
 }
 
