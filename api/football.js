@@ -187,8 +187,22 @@ export default async function handler(req, res) {
               .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
           }
         } catch {}
-        // Pas de copie de secours disponible (1re requête pour cette clé) →
-        // on tente quand même l'appel réel, faute de mieux.
+        // ⚠️ CORRIGÉ (trou réel trouvé après une nouvelle suspension FD.org
+        // malgré MINUTE_CAP=5 déjà en place) : l'ancien code, faute de copie
+        // stale disponible pour une clé jamais vue (nouvelle compétition,
+        // nouvel endpoint — ex: le mini-classement ajouté sur l'Accueil,
+        // chaque championnat cliqué = une clé JAMAIS mise en cache la 1ère
+        // fois), CONTOURNAIT silencieusement tout le garde-fou et faisait
+        // quand même l'appel réel ("faute de mieux") — MINUTE_CAP n'était
+        // donc un plafond dur QUE pour les clés déjà vues au moins une fois,
+        // jamais pour une requête inédite. On bloque maintenant vraiment :
+        // mieux vaut un message "réessaie dans un instant" (déjà géré
+        // partout côté client, voir fetchErrors.js RATE_LIMITED_MESSAGE)
+        // qu'un risque réel de nouvelle suspension de compte.
+        return res
+          .status(429)
+          .setHeader('Retry-After', '15')
+          .json({ error: 'Budget football-data.org temporairement épuisé' })
       }
     }
 

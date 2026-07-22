@@ -136,6 +136,18 @@ cf-worker/
   `/api/football?apiPath=...`) et supprimé (22/07). S'il y a une nouvelle suspension malgré
   ça, le compte football-data.org lui-même (page "usage"/"limits" sur leur site) reste la
   source la plus fiable pour voir QUELLE requête a déclenché le blocage.
+- ✅ Nouvelle suspension FD.org malgré MINUTE_CAP=5 déjà en place (23/07, après recréation
+  d'une nouvelle clé/compte) : audit du garde-fou (`api/football.js`) a trouvé un vrai trou —
+  quand le budget/circuit breaker bloquait une requête mais qu'AUCUNE copie stale n'existait
+  encore pour cette clé précise (typiquement une compétition/endpoint jamais interrogé avant,
+  ex. le mini-classement ajouté sur l'Accueil), le code contournait silencieusement tout le
+  garde-fou et faisait quand même l'appel réel ("faute de mieux") — MINUTE_CAP n'était donc un
+  plafond dur QUE pour les clés déjà vues au moins une fois, jamais pour une requête inédite.
+  Corrigé : ce cas renvoie maintenant un vrai 429 (déjà géré côté client partout, message
+  "Veuillez patienter quelques instants") au lieu de taper FD.org sans limite. Honnêteté : je
+  ne peux pas confirmer avec certitude que c'est CE trou précis qui a causé CETTE suspension
+  (pas d'accès aux logs FD.org/Vercel depuis cet environnement) — mais c'est un vrai bug de
+  contournement de rate-limit, corrigé indépendamment de la cause exacte.
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
