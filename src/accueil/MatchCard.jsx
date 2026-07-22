@@ -303,19 +303,19 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
     >
       {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
 
-      {/* Bandeau live : compétition à gauche, statut de période à droite —
-          même habillage que le hero de LiveMatchPage. */}
-      {isLive && (
-        <div className="accueil__matchCardLiveBar">
-          <span className="accueil__matchCardLiveComp">
-            {liveCompEmblem && <img src={liveCompEmblem} alt="" className="accueil__matchCardLiveCompLogo" />}
-            <span className="accueil__matchCardLiveCompName">{liveCompName}</span>
-          </span>
-          {livePeriodLabel && (
-            <span className="accueil__matchCardLivePeriod">{livePeriodLabel}</span>
-          )}
-        </div>
-      )}
+      {/* Bandeau compétition (haut gauche, toujours visible — design 4★
+          approuvé : "le championnat met le en haut a gauche de la card du
+          match") + statut de période (haut droite, live uniquement) — même
+          habillage que le hero de LiveMatchPage. */}
+      <div className="accueil__matchCardLiveBar">
+        <span className="accueil__matchCardLiveComp">
+          {liveCompEmblem && <img src={liveCompEmblem} alt="" className="accueil__matchCardLiveCompLogo" />}
+          <span className="accueil__matchCardLiveCompName">{liveCompName}</span>
+        </span>
+        {isLive && livePeriodLabel && (
+          <span className="accueil__matchCardLivePeriod">{livePeriodLabel}</span>
+        )}
+      </div>
 
       {/* Équipe domicile */}
       <div className="accueil__matchCardTeam">
@@ -443,6 +443,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                     match={match}
                     espnScore={espnScores[match.id] ?? null}
                     noAnimation
+                    noGradient
                     formMap={formMap}
                   />
                 </div>

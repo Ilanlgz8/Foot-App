@@ -234,32 +234,34 @@
    et grille live masquées — comportement strictement inchangé. */
 .accueil__mainGrid {
   display: grid;
-  grid-template-columns: 220px 1fr 360px;
-  grid-template-areas: "sidebar center right";
+  grid-template-columns: 1fr 360px;
+  grid-template-areas:
+    "filters filters"
+    "center right";
   align-items: start;
   gap: 1.2rem;
   margin-bottom: 1.2rem;
   animation: fadeUp 0.5s ease both;
 }
-.accueil__mainGrid--noSidebar {
-  grid-template-columns: 1fr 360px;
+.accueil__mainGrid--noFilters {
   grid-template-areas: "center right";
 }
 .accueil__mainGrid--live {
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr 360px;
   grid-template-areas:
-    "sidebar live"
-    "sidebar upcoming";
+    "filters filters"
+    "live live"
+    "upcoming caption";
 }
-.accueil__mainGrid--live.accueil__mainGrid--noSidebar {
-  grid-template-columns: 1fr;
+.accueil__mainGrid--live.accueil__mainGrid--noFilters {
   grid-template-areas:
-    "live"
-    "upcoming";
+    "live live"
+    "upcoming caption";
 }
 
-.accueil__sidebar { grid-area: sidebar; }
+.accueil__topFilters { grid-area: filters; }
 .accueil__liveWidgets { grid-area: live; }
+.accueil__liveCaption { grid-area: caption; }
 .accueil__mainGrid .accueil__dashPanel--matchPanel { grid-area: center; }
 .accueil__mainGrid--live .accueil__dashPanel--matchPanel { grid-area: upcoming; }
 .accueil__mainGrid .accueil__dashPanel--result { grid-area: right; }
@@ -288,15 +290,56 @@
   .accueil__mainGrid .accueil__dashPanel--result {
     grid-area: auto;
   }
-  .accueil__sidebar,
-  .accueil__liveWidgets {
+  .accueil__topFilters,
+  .accueil__liveWidgets,
+  .accueil__liveCaption {
     display: none;
   }
 }
 
-/* ── Sidebar compétitions (desktop) ── */
-.accueil__sidebar .accueil__compFilter--col {
-  padding: 0.5rem;
+/* ── Barre de filtres horizontale (desktop, design 4★) — remplace l'ancienne
+   sidebar verticale (retour utilisateur : "pas fan" du rendu 3 colonnes).
+   Pleine largeur, au-dessus du split matchs/résultats. Chips identiques
+   (accueil__compFilter, layout row par défaut), simplement repositionnées. */
+.accueil__topFilters {
+  display: flex;
+  align-items: center;
+  padding: 0.2rem 0;
+}
+.accueil__topFilters .accueil__compFilter {
+  width: 100%;
+}
+
+/* ── Bandeau "résultats masqués" (desktop, en direct) — remplace le panneau
+   Résultats récents tant qu'il y a du live (design 4★ : caption neutre au
+   lieu d'un simple vide dans la grille). ── */
+.accueil__liveCaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1.5rem 1.2rem;
+  border-radius: 1.25rem;
+  border: 1px dashed rgba(var(--white-rgb),0.1);
+  color: rgba(var(--white-rgb),0.4);
+  font-size: 0.78rem;
+  font-weight: 600;
+  min-height: 8rem;
+}
+
+/* ── Mini classement (desktop, sous Résultats récents — visible uniquement
+   quand une compétition est sélectionnée, voir Accueil.jsx). Réutilise
+   StandingsTable (classement.css) : seul l'habillage conteneur est ajouté
+   ici. ── */
+.accueil__resultClassement {
+  padding: 0.6rem 0.9rem 0.9rem;
+}
+.accueil__resultClassementHint {
+  padding: 0.9rem 1.1rem 1.1rem;
+  text-align: center;
+  color: rgba(var(--white-rgb),0.35);
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
 /* ── Grille "En direct" (desktop) — réutilise les classes .live__* de
@@ -825,12 +868,20 @@
 }
 
 .accueil__matchCardLabel--live {
-  /* Même traitement que .lmp__heroMinute (LiveMatchPage) : texte blanc avec
-     halo rouge, plutôt qu'un texte rouge plein — le point pulsant à gauche
-     (accueil__matchCardLiveDot) suffit déjà à signaler "en direct". */
-  color: #ffffff;
+  /* Rouge vif (demande utilisateur, design 4★ : "la minute du match met la
+     au dessus du score en rouge vif avec une apostrophe après le chiffre") —
+     remplace l'ancien traitement blanc+halo rouge. */
+  color: var(--red-light, #ef4444);
   font-weight: 800;
   text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 12px rgba(var(--red-rgb),0.35);
+}
+
+/* Desktop : tailles agrandies (demande utilisateur : "mettre plus gros
+   l'heure ou le score ou la minute aussi ou le MT... comme on est sur
+   ordi") — mobile (posters, composant différent) non concerné. */
+@media (min-width: 1025px) {
+  .accueil__matchCardLabel { font-size: 0.64rem; }
+  .accueil__matchCardValue { font-size: 1.35rem; padding: 0.3rem 1.05rem; min-width: 6rem; }
 }
 .accueil__matchCardHTCountdown {
   font-size: 0.48rem;
@@ -1432,11 +1483,29 @@
   gap: 10px;
 }
 
-/* Cards "classiques" du panneau "à venir" — remplacées par les posters
-   ci-dessus sur toutes les largeurs (ResultPanel n'est PAS concerné : ce
-   sélecteur cible spécifiquement matchPanel). */
-.accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__matchCards {
-  display: none;
+/* Cards "classiques" du panneau "à venir" — redevenues desktop-only (design
+   4★ approuvé par l'utilisateur : cards neutres avec bandeau compétition,
+   pas de dégradé couleur club, voir MatchCard.jsx). Posters (mobile
+   uniquement désormais, comme avant Task#105) masquées ≥1025px juste en
+   dessous ; cette règle masque l'inverse (<1025px). ResultPanel n'est PAS
+   concerné : ce sélecteur cible spécifiquement matchPanel. */
+@media (max-width: 1024px) {
+  .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__matchCards {
+    display: none;
+  }
+}
+@media (min-width: 1025px) {
+  .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__posterList,
+  .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__posterSkList {
+    display: none;
+  }
+  /* Filtre inline (matchCompetitions, scopé au jour affiché) masqué sur
+     desktop : remplacé par la barre horizontale pleine largeur au-dessus du
+     split (accueil__topFilters, activeCompetitions) — évite le doublon de
+     filtres visible avant cette refonte. Mobile inchangé. */
+  .accueil__dashPanel--matchPanel > .accueil__compFilter {
+    display: none;
+  }
 }
 
 /* Skeleton posters (chargement initial) — même principe que
@@ -2009,6 +2078,47 @@
   animation: accueilMdjShake 1.3s ease-out 1;
 }
 
+/* Bandeau compétition (haut gauche) + statut période en live (haut droite)
+   — même habillage que les cards à venir/résultats (accueil__matchCardLiveBar),
+   ajouté sur la grosse card "Match du jour" (retour utilisateur : "t'as pas
+   fait aussi sur la grosse card en live du match du jour"). */
+.accueil__mdjTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.accueil__mdjComp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.accueil__mdjCompLogo {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  opacity: 0.85;
+}
+.accueil__mdjCompName {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--white-rgb),0.55);
+}
+.accueil__mdjStatus {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(var(--white-rgb),0.1);
+  border: 1px solid rgba(var(--white-rgb),0.18);
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: rgba(var(--white-rgb),0.8);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .accueil__mdjTitleWrap {
   text-align: center;
   margin-bottom: 0.85rem;
@@ -2108,6 +2218,60 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 16px rgba(var(--red-rgb),0.6);
+}
+
+/* Minute live (rouge vif, même traitement que les cards à venir/résultats)
+   / "Terminé" — affichées au-dessus du score, remplace "Aujourd'hui" une
+   fois le match commencé. */
+.accueil__mdjMinute {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red-light, #ef4444);
+  white-space: nowrap;
+}
+.accueil__mdjFinished {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--white-rgb),0.5);
+  white-space: nowrap;
+}
+
+/* Pronostic — pilules cotes bookmaker (même design que MatchPoster) */
+.accueil__mdjPronoRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+.accueil__mdjPronoPill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(var(--white-rgb),0.9);
+  border: 1.5px solid transparent;
+  border-radius: 0.6rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.accueil__mdjPronoPillLabel {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #1a1a1a;
+  text-transform: uppercase;
+}
+.accueil__mdjPronoPillVal {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #0a0a0a;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2365,6 +2529,18 @@
 .resultHero__tag b {
   color: #fff;
   font-weight: 800;
+}
+
+/* Desktop : neutralise l'accent couleur club (demande utilisateur, design
+   4★ : "pas de couleur de club dans les cards des match a venir et resultat
+   non plus stp sur deskop") — remplacé par le rouge de marque de l'app.
+   Mobile inchangé (accent couleur équipe conservé, jamais mis en cause). */
+@media (min-width: 1025px) {
+  .resultHero__accentBar { background: rgba(var(--red-rgb),0.7); }
+  .resultHero__team--winner .resultHero__crestWrap {
+    filter: drop-shadow(0 0 10px rgba(var(--red-rgb),0.3)) drop-shadow(0 2px 8px rgba(var(--black-rgb),0.7));
+  }
+  .resultHero__scoreDigit--win { text-shadow: 0 0 18px rgba(var(--red-rgb),0.35); }
 }
 
 @media (max-width: 480px) {

@@ -8,18 +8,21 @@ import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } f
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
-import { mergeScore, isCardLive } from '../utils/matchUtils'
-import { COMPETITIONS } from '../data/competitions'
+import { mergeScore, isCardLive, isNationalTeamComp } from '../utils/matchUtils'
+import { COMPETITIONS, NO_STANDINGS_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { pickMatchDuJour } from '../utils/matchDuJour'
-import { MatchPanel } from '../accueil/MatchCard'
+import { MatchPanel, PanelSkeleton } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import { LiveCard } from './LiveCardWidget'
+import { useStandings } from '../hooks/useStandings'
+import { StandingsTable } from './StandingsTable'
 import '../accueil.css'
 import '../live.css'
+import '../classement.css'
 
 // Même logique de priorité que pickMatchDuJour (Mondial > Ligue des Champions
 // > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
@@ -519,7 +522,24 @@ function Accueil() {
     m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
   )
   const desktopHasLive = isDesktop && desktopLiveMatches.length > 0
-  const hasSidebar = activeCompetitions.length > 1
+  // Barre de filtre horizontale desktop (design 4★, remplace l'ancienne
+  // sidebar verticale) — même condition qu'avant : CompFilter se masque
+  // lui-même si <= 1 compétition active, ce booléen ne sert qu'à ajuster le
+  // grid-template-areas (accueil__mainGrid--noFilters, voir accueil.css).
+  const hasCompFilter = activeCompetitions.length > 1
+
+  // ── Mini classement (design 4★, sous "Résultats récents") — visible
+  // uniquement quand une compétition précise est sélectionnée dans le filtre
+  // du panneau résultats (compFilterResult), pas sur "Tous" (demande
+  // utilisateur : "pour le classement en dessous du result panel met le
+  // uniquement quand on selectionne un championnat... quand on met tous
+  // n'affiche pas de classement"). NL/CAN/COPA exclues (pas de classement
+  // FD.org, voir NO_STANDINGS_COMPS/Classement.jsx). Hook appelé
+  // inconditionnellement (règle des Hooks) : useStandings est déjà no-op
+  // (enabled: !!selectedComp) quand compFilterResult est null.
+  const showResultClassement = isDesktop && !!compFilterResult && !NO_STANDINGS_COMPS.has(compFilterResult)
+  const { standings: resultStandings, loading: resultStandingsLoading } = useStandings(showResultClassement ? compFilterResult : null)
+  const resultClassementComp = COMPETITIONS.find(c => c.id === compFilterResult)
 
   // ── Liste "à venir" du panneau central ──
   // Desktop + matchs en direct : ces matchs sont déjà affichés dans la
@@ -642,45 +662,41 @@ function Accueil() {
           />
         )}
 
-        {/* ── Match du jour — devant tout le reste, y compris le live ── */}
+        {/* ── Match du jour — devant tout le reste, y compris le live ──
+            espnScore transmis (design 4★ : la grosse card doit elle aussi
+            passer en mode live — statut/minute/score — au lieu de rester
+            figée sur l'heure du coup d'envoi). */}
         {matchDuJour && (
           <MatchDuJourCard
             match={matchDuJour}
+            espnScore={espnScores[matchDuJour.id]}
             onClick={() => navigate(`/match/${matchDuJour.id}`, { state: { match: matchDuJour } })}
           />
         )}
 
         {/* ── Grille matchs / résultats ──
             Mobile ET tablette/petite fenêtre (<1025px, voir isDesktop) :
-            inchangé — 1 colonne, panneau matchs puis résultats, sidebar et
-            grille live ci-dessous simplement masquées en CSS (display:none,
-            voir accueil.css @media max-width:1024px).
-            Desktop ≥1025px (demande utilisateur, refonte complète) :
-              - pas de live      → [sidebar compétitions] [matchs à venir, posters] [résultats récents]
-              - 1+ match en live → [sidebar compétitions] [grille "En direct" (widgets Live.jsx) au-dessus, matchs à venir en dessous] — résultats récents masqué tant qu'il y a du live.
+            inchangé — 1 colonne, panneau matchs puis résultats, barre de
+            filtres et grille live ci-dessous simplement masquées en CSS
+            (display:none, voir accueil.css @media max-width:1024px).
+            Desktop ≥1025px (design 4★, validé par l'utilisateur après
+            plusieurs itérations de maquette) :
+              - pas de live      → [filtres horizontaux pleine largeur] [matchs à venir | résultats récents + classement]
+              - 1+ match en live → [filtres] [grille "En direct" pleine largeur] [matchs à venir | bandeau "résultats masqués"]
             Positionnement réel via CSS grid-area (accueil__mainGrid /
-            accueil__mainGrid--live / accueil__mainGrid--noSidebar) — l'ordre
-            des enfants ci-dessous n'a pas d'importance pour desktop, et
-            n'affecte l'ordre "1 colonne" que pour matchPanel/résultats
-            (sidebar et grille live étant display:none en dessous de 1025px). */}
-        <div className={`accueil__mainGrid${desktopHasLive ? ' accueil__mainGrid--live' : ''}${!hasSidebar ? ' accueil__mainGrid--noSidebar' : ''}`}>
+            accueil__mainGrid--live / accueil__mainGrid--noFilters). */}
+        <div className={`accueil__mainGrid${desktopHasLive ? ' accueil__mainGrid--live' : ''}${!hasCompFilter ? ' accueil__mainGrid--noFilters' : ''}`}>
 
-          {/* Sidebar compétitions — desktop uniquement (demande utilisateur :
-              "mettre les championnat a gauche... on met les competition la
-              ou y'a des matchs a venir sinon nn si on a rien et on rajoute
-              'tous'"). N'apparaît que s'il y a plus d'une compétition active
-              (CompFilter retourne null sinon, voir plus haut) — sinon la
-              grille repasse en accueil__mainGrid--noSidebar (2 colonnes). */}
-          {hasSidebar && (
-            <aside className="accueil__dashPanel accueil__sidebar">
-              <div className="accueil__dashPanelHeader">
-                <h2 className="accueil__dashPanelTitle">Compétitions</h2>
-              </div>
-              <div className="accueil__dashPanelDivider" />
-              <div className="accueil__dashPanelBody">
-                <CompFilter competitions={activeCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} layout="col" />
-              </div>
-            </aside>
+          {/* Barre de filtres horizontale — desktop uniquement (remplace
+              l'ancienne sidebar verticale, retour utilisateur : "pas fan" du
+              rendu 3 colonnes ; design 4★ approuvé utilise des chips
+              horizontales pleine largeur). N'apparaît que s'il y a plus
+              d'une compétition active (CompFilter retourne null sinon) —
+              sinon la grille repasse en accueil__mainGrid--noFilters. */}
+          {hasCompFilter && (
+            <div className="accueil__topFilters">
+              <CompFilter competitions={activeCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
+            </div>
           )}
 
           {/* Grille "En direct" — desktop uniquement, uniquement s'il y a au
@@ -749,10 +765,10 @@ function Accueil() {
             </div>
             {/* Filtre horizontal — reste utilisé tel quel sur mobile
                 (matchCompetitions, scopé au jour affiché, comportement
-                inchangé). Sur desktop, remplacé visuellement par la sidebar
-                ci-dessus (masqué en CSS, voir accueil__dashPanel--matchPanel
-                dans accueil.css) — même state compFilterMatch, pas de
-                doublon de logique. */}
+                inchangé). Sur desktop, remplacé visuellement par la barre de
+                filtres pleine largeur ci-dessus (masqué en CSS, voir
+                accueil__dashPanel--matchPanel dans accueil.css) — même state
+                compFilterMatch, pas de doublon de logique. */}
             <CompFilter competitions={matchCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
@@ -784,6 +800,32 @@ function Accueil() {
               </div>
               <div className="accueil__dashPanelDivider" />
               <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
+
+              {/* Mini classement — desktop uniquement, visible seulement
+                  quand une compétition précise est sélectionnée dans le
+                  filtre ci-dessus (demande utilisateur : "pour le classement
+                  en dessous du result panel met le uniquement quand on
+                  selectionne un championnat... quand on met tous n'affiche
+                  pas de classement"). */}
+              {isDesktop && !compFilterResult && (
+                <p className="accueil__resultClassementHint">Choisis un championnat ci-dessus pour voir le classement.</p>
+              )}
+              {showResultClassement && (
+                <div className="accueil__resultClassement">
+                  <div className="accueil__dashPanelDivider" />
+                  {resultStandingsLoading
+                    ? <PanelSkeleton />
+                    : <StandingsTable rows={resultStandings} compact isCountry={resultClassementComp ? isNationalTeamComp({ competition: resultClassementComp }) : false} />}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bandeau "résultats masqués" — desktop + live uniquement,
+              remplace le panneau Résultats récents ci-dessus (design 4★). */}
+          {desktopHasLive && (
+            <div className="accueil__liveCaption">
+              Résultats masqués pendant les matchs en direct.
             </div>
           )}
 
