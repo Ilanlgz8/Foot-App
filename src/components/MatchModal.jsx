@@ -11,6 +11,7 @@ import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
+import { fuzzyTeam } from '../utils/espnSummaryParse'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -1194,13 +1195,30 @@ export function ClassementTab({ match, compId }) {
   const rules = COMP_RULES[compId] ?? DEFAULT_RULES
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
+  const homeName = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const awayName = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   // WC → filtrer les groupes contenant les deux équipes
   if (groups.length > 0) {
+    // ⚠️ AJOUT (constat utilisateur, 24/07 : "ça affiche que le Groupe A à
+    // chaque fois" — persistant même après un rechargement complet, donc pas
+    // un simple souci de cache) : la comparaison par ID (homeId/awayId) peut
+    // échouer pour une raison qu'un simple bump de cache n'a pas suffi à
+    // corriger (ex: `match` sourcé d'un endpoint FD.org dont le `team.id` ne
+    // correspond pas exactement à celui de l'endpoint /standings pour un cas
+    // qui n'a pas encore été isolé avec certitude). Plutôt que de continuer à
+    // deviner la cause exacte, repli sur le NOM d'équipe (fuzzyTeam — même
+    // fonction déjà utilisée pour ce type de rapprochement inter-source
+    // ailleurs dans l'app, éprouvée toute la Coupe du Monde) dès que la
+    // comparaison par ID ne trouve rien — corrige le symptôme quelle que soit
+    // la cause exacte de l'écart d'ID.
     const relevantGroups = groups.filter(g =>
       g.table.some(r => r.team?.id === homeId || r.team?.id === awayId)
     )
-    const toShow = relevantGroups.length > 0 ? relevantGroups : groups.slice(0, 1)
+    const relevantGroupsByName = relevantGroups.length > 0 ? relevantGroups : groups.filter(g =>
+      g.table.some(r => fuzzyTeam(r.team?.name ?? '', homeName) || fuzzyTeam(r.team?.name ?? '', awayName))
+    )
+    const toShow = relevantGroupsByName.length > 0 ? relevantGroupsByName : groups.slice(0, 1)
     return (
       <div style={{ padding: '4px 0' }}>
         {toShow.map(g => (
