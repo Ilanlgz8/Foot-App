@@ -40,3 +40,33 @@ export const ESPN_SLUG_BY_COMP_ID = {
   // utilisent le code string 'EC', pas cet id numérique).
   2018: 'uefa.euro',
 }
+
+// ⚠️ AJOUT (constat utilisateur : "est-ce qu'on aura bien les matchs en live
+// pour la Coupe de France, la Copa del Rey, etc." — réponse : le score/statut
+// basique oui, mais AUCUNE notif push) : ESPN_SLUGS ci-dessus (dérivé de
+// ESPN_SLUG_BY_COMP_ID) est ce que le cron (api/cron-goals.js, cf-worker/
+// src/index.js) parcourt pour détecter but/carton/mi-temps/fin et envoyer
+// les push — les coupes nationales (Coupe de France/Copa del Rey/FA Cup,
+// voir DOMESTIC_CUPS dans competitions.js) et NL/CAN/COPA (voir
+// ESPN_SOURCED_COMPS dans useMatchs.js) n'y ont jamais eu d'entrée : ces
+// compétitions étaient invisibles pour le cron, donc 0 notif envoyée, tout en
+// s'affichant normalement (à un rythme plus lent) en Programme/Résultats/Live
+// côté client (chemin de fetch totalement différent, voir espnAdapter.js).
+// Volontairement PAS ajoutées à ESPN_SLUG_BY_COMP_ID ci-dessus : cette table
+// est indexée par le VRAI id numérique football-data.org, utilisée ailleurs
+// (api/fifa-live.js, useLiveMinute.js/COMP_ESPN) pour faire correspondre un
+// match football-data.org à l'event ESPN correspondant par nom d'équipe — un
+// usage différent, avec un vrai risque de casser ce matching (fragile, voir
+// tout l'historique CLAUDE.md dessus) si on y glisse des id synthétiques qui
+// ne représentent pas de vrais matchs football-data.org. Liste séparée,
+// fusionnée uniquement dans le tableau à plat que le cron parcourt (aucun
+// besoin d'id précis à cet endroit, voir commentaire au-dessus de ESPN_SLUGS
+// dans cron-goals.js/cf-worker).
+export const EXTRA_NOTIFY_SLUGS = [
+  'uefa.nations',          // Ligue des Nations
+  'caf.nations',           // CAN
+  'conmebol.america',      // Copa America
+  'fra.coupe_de_france',   // Coupe de France
+  'esp.copa_del_rey',      // Copa del Rey
+  'eng.fa',                // FA Cup
+]

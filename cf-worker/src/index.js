@@ -39,7 +39,7 @@
 
 import { Redis } from '@upstash/redis'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
-import { ESPN_SLUG_BY_COMP_ID } from '../../src/data/espnSlugs.js'
+import { ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS } from '../../src/data/espnSlugs.js'
 // ⚠️ Toutes ces fonctions étaient dupliquées ici ET dans api/cron-goals.js —
 // risque de divergence si un futur bug est corrigé d'un seul côté. Extraites
 // dans src/utils/liveDetection.js (fonctions pures, sans dépendance
@@ -52,7 +52,12 @@ import {
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
 } from '../../src/utils/liveDetection.js'
 
-const ESPN_SLUGS = Object.values(ESPN_SLUG_BY_COMP_ID)
+// EXTRA_NOTIFY_SLUGS (coupes nationales + NL/CAN/COPA, voir espnSlugs.js) :
+// couvertes pour les notifs ici, mais volontairement absentes de
+// ESPN_SLUG_BY_COMP_ID (utilisé ailleurs pour le matching FD.org↔ESPN par id
+// numérique, pas ce dont ce Worker a besoin — voir commentaire dans
+// espnSlugs.js).
+const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA_NOTIFY_SLUGS])]
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 

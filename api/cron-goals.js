@@ -23,7 +23,7 @@ import { Redis } from '@upstash/redis'
 import webpush   from 'web-push'
 import crypto    from 'crypto'
 import { TEAM_NAMES_FR } from '../src/data/teamNames.js'
-import { ESPN_SLUG_BY_COMP_ID } from '../src/data/espnSlugs.js'
+import { ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS } from '../src/data/espnSlugs.js'
 // ⚠️ Ces fonctions vivaient ici en dur, puis ont été DUPLIQUÉES telles
 // quelles dans cf-worker/src/index.js lors de la migration Cloudflare (voir
 // CLAUDE.md, section Stack) — 2 copies identiques = risque de divergence si
@@ -52,7 +52,12 @@ const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 // src/data/espnSlugs.js comme source unique, ce fichier n'en dérive plus
 // qu'un tableau à plat (l'id FD.org ne sert à rien ici : le cron parcourt
 // tous les événements ESPN sans les rattacher à un match FD.org précis).
-const ESPN_SLUGS = Object.values(ESPN_SLUG_BY_COMP_ID)
+// EXTRA_NOTIFY_SLUGS (coupes nationales + NL/CAN/COPA, voir espnSlugs.js) :
+// couvertes pour les notifs ici, mais volontairement absentes de
+// ESPN_SLUG_BY_COMP_ID (utilisé ailleurs pour le matching FD.org↔ESPN par id
+// numérique, pas ce dont ce cron a besoin — voir commentaire dans
+// espnSlugs.js).
+const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA_NOTIFY_SLUGS])]
 
 // ── FIFA live — couche rapide WC (même cache Redis que api/fifa-live.js) ───────
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
