@@ -54,16 +54,21 @@ function getKv() {
 // toute la minute (voir SPACING_MS plus bas, dérivé de ce plafond) : profil
 // de trafic lissé, jamais de rafale possible par construction — beaucoup
 // plus proche d'un usage humain normal.
-// ⚠️ REMONTÉ à 8/min, espacement 7,5s (demande explicite utilisateur, 23/07,
-// après mise en garde honnête de ma part : le compte a déjà été suspendu à
-// 5/min sans cause certaine identifiée — voir CLAUDE.md — donc remonter
-// vers la limite officielle FD.org (10/min) n'est pas sans risque connu,
-// juste un risque que l'utilisateur a choisi d'accepter en connaissance de
-// cause). Reste un espacement STRICTEMENT régulier (SPACING_MS dérivé
-// automatiquement de ce plafond, voir plus bas) — jamais de rafale, même à
-// 8/min. Si une nouvelle suspension survient après ce changement, revenir à
-// 5/min (ou moins) est la première chose à essayer.
-const MINUTE_CAP = 8
+// ⚠️ REVENU À 5/min (23/07, même jour) : était passé à 8/min avec espacement
+// 7,5s plus tôt aujourd'hui (décision utilisateur explicite, malgré ma mise
+// en garde). Constat quelques heures après le changement (screenshot Network
+// du navigateur) : rafale de 403 sur /api/football?apiPath=... — reproduction
+// quasi immédiate du même incident déjà documenté dans CLAUDE.md (403 en
+// rafale, circuit breaker DOWN_TTL_FORBIDDEN qui se déclenche, résultats/
+// classements vides côté app). Rollback vers 5/min conformément au plan de
+// repli déjà acté au moment du passage à 8/min ("si nouvelle suspension,
+// revenir à 5/min en premier réflexe"). Honnêteté : je ne peux pas prouver
+// avec certitude que CE changement précis est la cause de CETTE suspension
+// précise (pas d'accès aux logs FD.org depuis cet environnement, et le compte
+// a déjà été suspendu par le passé à 5/min sans cause certaine) — mais la
+// coïncidence temporelle (suspension le jour même du passage à 8/min) est
+// le signal le plus fort disponible, donc repli immédiat par prudence.
+const MINUTE_CAP = 5
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
 // ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
@@ -82,7 +87,7 @@ const DOWN_TTL_FORBIDDEN = 300
 // ⚠️ REVU (même incident que MINUTE_CAP ci-dessus) : passé de 800ms fixe (ne
 // faisait qu'empêcher 2 appels simultanés, laissait les 5-7 autorisés
 // s'entasser en rafale en quelques secondes) à un espacement STRICT et
-// régulier dérivé du plafond — 60s / MINUTE_CAP (7,5s à 8/min, calculé
+// régulier dérivé du plafond — 60s / MINUTE_CAP (12s à 5/min, calculé
 // automatiquement, pas une valeur en dur) entre 2 appels réels vers FD.org,
 // peu importe combien de requêtes différentes arrivent en même
 // temps côté app. Garantit PAR CONSTRUCTION un profil de trafic lissé sur
