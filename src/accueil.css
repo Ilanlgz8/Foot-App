@@ -277,18 +277,31 @@
    (poster en plein flux sans cadre panneau, tailles de police réduites…)
    restent scopés à @media max-width:640px plus bas, inchangés. */
 @media (max-width: 1024px) {
+  /* ⚠️ DURCI (retour utilisateur : layout desktop — colonne 360px — vu sur
+     mobile malgré le reset ci-dessous) : `grid-template-columns: 1fr` +
+     `grid-template-areas: none` désactive en théorie toute notion de 2e
+     colonne, mais reste un layout grid — n'importe quel track/area résiduel
+     mal retombé (ou un futur ajout de règle desktop mal isolé) peut encore
+     y créer une colonne fixe. `display: block` retire la grille EN ENTIER
+     sur cette tranche (mobile + tablette/petite fenêtre) : plus aucun calcul
+     de colonne n'est possible, quoi qu'il arrive côté grid-template-*.
+     matchPanel/résultats s'empilent alors en flux normal, dans leur ordre
+     JSX — comportement identique à avant cette refonte. Largeur forcée à
+     100% sur les 2 panneaux par sécurité supplémentaire (voir juste après). */
   .accueil__mainGrid {
-    grid-template-columns: 1fr;
-    grid-template-areas: none;
+    display: block;
   }
-  /* Reset explicite (au lieu de compter sur la retombée navigateur d'un
-     grid-area référençant une zone qui n'existe plus une fois areas:none) :
-     matchPanel/résultats reprennent un flux document normal, dans leur
-     ordre d'origine dans le JSX — comportement identique à avant cette
-     refonte. */
   .accueil__mainGrid .accueil__dashPanel--matchPanel,
   .accueil__mainGrid .accueil__dashPanel--result {
     grid-area: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  /* `display: block` ci-dessus retire le `gap: 1.2rem` du grid de base (ne
+     s'applique qu'à grid/flex) — remplacé par une marge explicite entre les
+     2 panneaux empilés, même valeur, pour ne rien changer visuellement. */
+  .accueil__mainGrid .accueil__dashPanel--matchPanel {
+    margin-bottom: 1.2rem;
   }
   .accueil__topFilters,
   .accueil__liveWidgets,
