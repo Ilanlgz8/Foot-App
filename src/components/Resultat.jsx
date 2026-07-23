@@ -85,7 +85,10 @@ function MatchCard({ match }) {
       </div>
       <div className="resultats__scoreCenter">
         {match.isCup && <span className="resultats__cupBadge">{match.competition?.name}</span>}
-        <span className="resultats__cardDate">{fmtDate(match.utcDate)}</span>
+        {/* ⚠️ Date retirée (demande utilisateur) — "Terminé" prend sa place ici,
+            la date se retrouve désormais à côté du libellé du round (voir
+            currentRoundDate/resultats__navLabelDate plus haut dans le fichier). */}
+        <span className="resultats__ftBadge">Terminé</span>
         <div className="resultats__scoreRow">
           <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
           <span className="resultats__scoreDash">–</span>
@@ -100,7 +103,6 @@ function MatchCard({ match }) {
         {wentToAet && (
           <span className="resultats__aet">Après prolong.</span>
         )}
-        <span className="resultats__ftBadge">Terminé</span>
       </div>
       <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
         <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
@@ -329,6 +331,23 @@ function Resultats() {
   const currentGroup    = grouped[currentIndex]
   const currentRoundLabel = currentGroup?.label ?? ''
   const currentMatches  = currentGroup?.matches ?? []
+  // ⚠️ AJOUT (demande utilisateur : la date par match a été retirée des
+  // cards — "Terminé" prend sa place, voir MatchCard plus bas — donc plus
+  // aucune date visible nulle part). Affichée à côté du libellé du round à
+  // la place ("Journée 34 · dim. 17 mai"). Un round couvre souvent
+  // plusieurs jours (vendredi→lundi) : on montre la date du match le PLUS
+  // TÔT du round, pas une plage — plus simple et non ambigu. Ignoré pour
+  // les groupes "par jour" (NL/CAN/COPA, matchs sans matchday/stage — voir
+  // groupRounds, useMatchs.js) dont le libellé EST déjà une date, pour ne
+  // pas afficher deux fois la même info.
+  const currentRoundDate = useMemo(() => {
+    if (!currentGroup || currentGroup.key?.startsWith('day-')) return null
+    const times = currentGroup.matches
+      .map(m => new Date(m.utcDate).getTime())
+      .filter(t => !Number.isNaN(t))
+    if (times.length === 0) return null
+    return fmtDate(Math.min(...times))
+  }, [currentGroup])
   // Navigue vers un index donné en persistant la CLÉ du round visé (pas
   // l'index lui-même — voir commentaire plus haut).
   const goToRoundIndex = (i) => {
@@ -494,7 +513,10 @@ function Resultats() {
               <>
                 <div className="resultats__nav">
                   <button className="resultats__navBtn" onClick={() => goToRoundIndex(currentIndex + 1)} disabled={currentIndex >= total - 1}>←</button>
-                  <span className="resultats__navLabel">{currentRoundLabel}</span>
+                  <span className="resultats__navLabel">
+                    {currentRoundLabel}
+                    {currentRoundDate && <span className="resultats__navLabelDate"> · {currentRoundDate}</span>}
+                  </span>
                   <button className="resultats__navBtn" onClick={() => goToRoundIndex(currentIndex - 1)} disabled={currentIndex <= 0}>→</button>
                 </div>
                 <div className="resultats__list">

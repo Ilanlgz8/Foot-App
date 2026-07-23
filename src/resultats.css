@@ -294,6 +294,15 @@
   letter-spacing: 0.06em;
 }
 
+/* ⚠️ AJOUT : date du round (déplacée depuis chaque card, voir MatchCard) —
+   plus discrète que le "Journée X" pour garder la hiérarchie visuelle. */
+.resultats__navLabelDate {
+  font-weight: 600;
+  color: var(--text-mid, #8b9ab0);
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
 /* ── Liste des cards ── */
 .resultats__list {
   display: flex;
@@ -449,7 +458,7 @@
 .resultats__scoreDash {
   font-size: 1rem;
   font-weight: 300;
-  color: rgba(var(--white-rgb),0.12);
+  color: #fff;
 }
 
 .resultats__ftBadge {
