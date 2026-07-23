@@ -880,7 +880,7 @@
    qu'agrandir tout le cercle (forme + contenu ensemble) sans resserrer le
    cadrage — voir même correctif sur resultats__crestWrap/accueil__matchCardCrestWrap. */
 .matchs__crestWrap {
-  width: 3.2rem; height: 3.2rem;
+  width: 3.9rem; height: 3.9rem;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -899,7 +899,7 @@
 .matchs__match:hover .matchs__crest { transform: scale(1.3); }
 
 .matchs__teamName {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #e2e8f0;
@@ -1410,8 +1410,8 @@
     padding: 0.85rem 0.85rem;
   }
 
-  .matchs__crestWrap { width: 2.5rem; height: 2.5rem; }
-  .matchs__teamName { font-size: 0.88rem; }
+  .matchs__crestWrap { width: 3rem; height: 3rem; }
+  .matchs__teamName { font-size: 1rem; }
   .matchs__scoreHour { font-size: 2.4rem; padding: 0.2rem 0.3rem; }
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
@@ -1507,8 +1507,8 @@
     gap: 0.5rem;
   }
 
-  .matchs__teamName   { font-size: 0.78rem; }
-  .matchs__crestWrap  { width: 2.2rem; height: 2.2rem; }
+  .matchs__teamName   { font-size: 0.9rem; }
+  .matchs__crestWrap  { width: 2.6rem; height: 2.6rem; }
   .matchs__scoreHour  { font-size: 2.1rem; padding: 0.15rem 0.2rem; min-width: 0; }
 
   .matchs__title { font-size: clamp(1.2rem, 5vw, 1.6rem); }
@@ -1525,7 +1525,8 @@
 
 @media (max-width: 400px) {
   .matchs { padding: 1rem 0.5rem 2rem; }
-  .matchs__match { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.6rem 0.5rem; }
-  .matchs__teamName { font-size: 0.68rem; }
+  .matchs__match { grid-template-columns: 1fr 6.6rem 1fr; padding: 0.6rem 0.5rem; }
+  .matchs__teamName { font-size: 0.82rem; }
+  .matchs__crestWrap { width: 2.3rem; height: 2.3rem; }
   .matchs__sidebarLogo { width: 1.9rem; height: 1.9rem; }
 }
