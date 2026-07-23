@@ -242,7 +242,6 @@ function confirmFt(match, now, queryClient) {
 
   // À 2s : mise à jour immédiate Accueil (recent results) + page Résultats
   setTimeout(() => {
-    const todayStr = new Date().toISOString().slice(0, 10)
     // Invalider React Query
     queryClient.invalidateQueries({ queryKey: ['todayMatches'] })
     // ⚠️ BUG CORRIGÉ (constat utilisateur : "les cards des matchs à venir dans
@@ -289,11 +288,22 @@ function confirmFt(match, now, queryClient) {
     // React Query ne refetch que les requêtes H2H ACTIVES (une page match
     // ouverte en ce moment précis), jamais en arrière-plan pour rien.
     queryClient.invalidateQueries({ queryKey: ['h2h-fd'] })
-    // Effacer les caches localStorage pour forcer un refetch propre
-    try { localStorage.removeItem(`foot_matches_${todayStr}`) } catch {}
-    if (code) {
-      try { localStorage.removeItem(`foot_matches_${code}_FINISHED`) } catch {}
-    }
+    // ⚠️ SUPPRIMÉ (constat utilisateur : "tél en veille, je le rallume, je vais
+    // sur Résultats d'un championnat, 'veuillez réessayer plus tard' — alors
+    // que j'ai rien fait depuis plus d'une minute") : ce bloc vidait EN PLUS
+    // (sans condition) le repli localStorage `foot_matches_${code}_FINISHED`
+    // lu par useMatches en cas d'échec réseau (voir useMatchs.js, catch du
+    // queryFn : `readCacheStale(key) ?? throw err`). `invalidateQueries`
+    // juste au-dessus suffit déjà à déclencher un refetch propre — s'il
+    // réussit, `writeCache` écrase de toute façon l'ancien contenu avec les
+    // données fraîches. Le vidage manuel ici ne gagnait donc rien de plus,
+    // mais ouvrait une vraie fenêtre à risque : si CE refetch précis échoue
+    // (429/403 — plausible juste après une veille, où plusieurs hooks
+    // deviennent stale en même temps et repartent tous ensemble au réveil,
+    // voir main.jsx `refetchOnReconnect`), le filet de secours qu'on venait
+    // de vider n'était plus là pour servir la dernière copie connue — d'où
+    // l'erreur visible au lieu d'un simple repli silencieux sur l'ancien
+    // score (qui se corrige de toute façon au refetch suivant).
   }, 2_000)
 
   // Éviction réelle après 5min (grace period : widget reste avec "Terminé")
