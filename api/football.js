@@ -54,21 +54,26 @@ function getKv() {
 // toute la minute (voir SPACING_MS plus bas, dérivé de ce plafond) : profil
 // de trafic lissé, jamais de rafale possible par construction — beaucoup
 // plus proche d'un usage humain normal.
-// ⚠️ REVENU À 5/min (23/07, même jour) : était passé à 8/min avec espacement
-// 7,5s plus tôt aujourd'hui (décision utilisateur explicite, malgré ma mise
-// en garde). Constat quelques heures après le changement (screenshot Network
-// du navigateur) : rafale de 403 sur /api/football?apiPath=... — reproduction
-// quasi immédiate du même incident déjà documenté dans CLAUDE.md (403 en
-// rafale, circuit breaker DOWN_TTL_FORBIDDEN qui se déclenche, résultats/
-// classements vides côté app). Rollback vers 5/min conformément au plan de
-// repli déjà acté au moment du passage à 8/min ("si nouvelle suspension,
-// revenir à 5/min en premier réflexe"). Honnêteté : je ne peux pas prouver
-// avec certitude que CE changement précis est la cause de CETTE suspension
-// précise (pas d'accès aux logs FD.org depuis cet environnement, et le compte
-// a déjà été suspendu par le passé à 5/min sans cause certaine) — mais la
-// coïncidence temporelle (suspension le jour même du passage à 8/min) est
-// le signal le plus fort disponible, donc repli immédiat par prudence.
-const MINUTE_CAP = 5
+// ⚠️ REMONTÉ à 8/min de nouveau (23/07, 3e changement de la journée — demande
+// explicite utilisateur après analyse détaillée). Contexte complet : le
+// rollback à 5/min (quelques heures plus tôt) n'a RIEN changé — les 403
+// continuaient à l'identique. Analyse d'un 2e screenshot Network (fenêtre de
+// capture ~30s) : seuls 3 vrais appels FD.org avaient atteint le serveur sur
+// cette fenêtre, cohérent avec l'espacement de 12s à 5/min — l'espacement
+// fonctionnait donc correctement, ce n'était pas une rafale non maîtrisée
+// côté serveur. Conclusion la plus probable : le compte est actuellement
+// bloqué par FD.org AU NIVEAU COMPTE, indépendamment de notre débit — même
+// des appels bien espacés (1/12s, très en dessous des 10/min officiels)
+// recevaient un vrai 403. Remonter ou redescendre le plafond ne change donc
+// rien à un blocage déjà actif. L'utilisateur privilégie une théorie
+// différente (rafale au lancement desktop) — non confirmée par le code
+// (fetchTodayMatches lance bien 3 appels FD.org simultanés par jour, mais le
+// verrou d'espacement Redis les sérialise déjà à 1 réel/12s peu importe
+// combien sont "en attente" côté client, donc FD.org ne voit jamais plus
+// qu'1 appel/12s sur le fil, qu'il y en ait 3 ou 30 en file d'attente).
+// Espacement (7,5s) toujours dérivé automatiquement du plafond, aucune
+// rafale possible par construction, quel que soit MINUTE_CAP.
+const MINUTE_CAP = 8
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
 // ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
@@ -87,7 +92,7 @@ const DOWN_TTL_FORBIDDEN = 300
 // ⚠️ REVU (même incident que MINUTE_CAP ci-dessus) : passé de 800ms fixe (ne
 // faisait qu'empêcher 2 appels simultanés, laissait les 5-7 autorisés
 // s'entasser en rafale en quelques secondes) à un espacement STRICT et
-// régulier dérivé du plafond — 60s / MINUTE_CAP (12s à 5/min, calculé
+// régulier dérivé du plafond — 60s / MINUTE_CAP (7,5s à 8/min, calculé
 // automatiquement, pas une valeur en dur) entre 2 appels réels vers FD.org,
 // peu importe combien de requêtes différentes arrivent en même
 // temps côté app. Garantit PAR CONSTRUCTION un profil de trafic lissé sur

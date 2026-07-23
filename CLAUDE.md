@@ -184,6 +184,31 @@ cf-worker/
   suspendu par le passé à 5/min sans cause certaine identifiée non plus. Si le 403 persiste
   malgré le retour à 5/min, la cause est probablement ailleurs (voir les pistes déjà explorées
   plus haut : compte lui-même, page "usage"/"limits" FD.org).
+- 🔍 Suite immédiate du point ci-dessus (23/07, même jour) : confirmé — le 403 persistait
+  IDENTIQUE après le retour à 5/min, remonté à 8/min de nouveau (demande explicite utilisateur).
+  Analyse d'un screenshot Network (fenêtre de capture ~30s) : seuls 3 vrais appels FD.org avaient
+  atteint le serveur sur cette fenêtre, cohérent avec l'espacement 12s — le verrou d'espacement
+  fonctionnait donc correctement, ce n'était pas une rafale non maîtrisée côté serveur. Conclusion
+  la plus probable : le compte est bloqué par FD.org au niveau COMPTE, indépendamment du débit —
+  même des appels bien en dessous des 10/min officiels recevaient un vrai 403. Ni 5/min ni 8/min
+  n'a donc d'effet sur un blocage déjà actif ; le curseur MINUTE_CAP influence seulement le risque
+  qu'un NOUVEAU blocage se déclenche une fois le compte débloqué. Bug annexe trouvé et corrigé au
+  passage : `api/football.js` posait un `Cache-Control` public (même TTL qu'une réponse OK) sur
+  les réponses d'erreur (403/429) faute de copie stale — le navigateur les rejouait ensuite depuis
+  son disk cache, donnant une fausse impression de "spam" dans l'onglet Network alors qu'aucune
+  requête réelle ne repartait. Corrigé (`no-store` sur tout ce qui n'est pas 2xx).
+  Théorie utilisateur non confirmée à ce stade : rafale spécifique au lancement desktop. Le code
+  vérifié (fetchTodayMatches lance bien 3 appels FD.org simultanés par jour × jusqu'à 7 jours dans
+  useRecentDaysMatches) ne le supporte pas directement — le verrou d'espacement Redis sérialise
+  déjà tout ça à 1 appel réel/12s (ou 7,5s à 8/min) peu importe combien sont "en attente" côté
+  client, donc FD.org ne voit jamais plus qu'1 appel/fenêtre sur le fil réseau. Piste alternative
+  identifiée mais pas vérifiée (nécessite un test utilisateur, pas accessible depuis cet
+  environnement) : le cache React Query est persisté dans `localStorage` (voir main.jsx) — une PWA
+  mobile installée reste ouverte/persistante longtemps (localStorage survit), alors qu'un onglet
+  Opera desktop ouvert à chaque fois peut repartir plus souvent d'un `localStorage` vide (nettoyage
+  au fermeture du navigateur, navigation privée...) → davantage de clés FD.org "jamais vues"
+  (donc sans repli stale possible) à chaque lancement desktop. Non confirmé, à vérifier côté
+  utilisateur (réglages Opera : effacement des données à la fermeture / fenêtre privée ?).
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
