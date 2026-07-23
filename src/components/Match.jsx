@@ -755,6 +755,34 @@ function Matchs() {
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
+  // ⚠️ AJOUT (retour utilisateur : "quand je scroll tout en bas du dropdown
+  // pour voir les derniers championnats puis je remonte, ça remonte la page
+  // Programme derrière au lieu du dropdown") : le dropdown est un portail
+  // position:fixed qui flotte AU-DESSUS de la page, mais rien n'empêchait le
+  // body en dessous de scroller en même temps — un geste de scroll qui
+  // atteint le haut/bas de la liste du dropdown (fin de son propre scroll
+  // interne) "traverse" et continue de scroller la page derrière. Fix :
+  // même technique de verrou de scroll déjà utilisée pour GroupModal.jsx
+  // (position:fixed sur body + restauration de la position exacte à la
+  // fermeture, pour ne pas sauter ailleurs sur la page une fois le dropdown
+  // refermé).
+  useEffect(() => {
+    if (!compOpen) return
+    const scrollY = window.scrollY
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [compOpen])
   // Conteneur du bracket — mesuré par BracketSvgView pour calculer le zoom
   // "fit-to-screen" (voir commentaire dans BracketSvgView).
   const bracketWrapRef = useRef(null)

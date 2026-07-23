@@ -93,6 +93,27 @@ function Classement() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
 
+  // ⚠️ AJOUT (retour utilisateur, même bug que Programme/Résultats — voir
+  // Match.jsx pour l'explication détaillée) : verrou de scroll body pendant
+  // que ce dropdown flottant est ouvert, même technique que GroupModal.jsx.
+  useEffect(() => {
+    if (!compOpen) return
+    const scrollY = window.scrollY
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [compOpen])
+
   // Pré-chargé ici (avant useStandings) pour calculer hasMatchToday — voir
   // juste en dessous. Même hook déjà utilisé plus bas pour la modal groupe,
   // simplement remonté : aucun appel réseau supplémentaire, juste réutilisé

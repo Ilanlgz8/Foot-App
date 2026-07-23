@@ -173,6 +173,27 @@ function Resultats() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [compOpen])
 
+  // ⚠️ AJOUT (retour utilisateur, même bug que Programme/Classement — voir
+  // Match.jsx pour l'explication détaillée) : verrou de scroll body pendant
+  // que ce dropdown flottant est ouvert, même technique que GroupModal.jsx.
+  useEffect(() => {
+    if (!compOpen) return
+    const scrollY = window.scrollY
+    document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [compOpen])
+
   // ⚠️ AJOUT (constat utilisateur : "y'a pas de cache pour la page resultat,
   // fait la même logique que Programme") : cette requête FD.org gardait le
   // staleTime par défaut de useMatches pour le statut FINISHED (2min,
