@@ -8,7 +8,7 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, compactSportsDbStandings, normalize, fuzzyTeam } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam } from './espnSummaryParse'
 
 // Payloads de test simplifiés mais avec les VRAIS noms de champs ESPN,
 // vérifiés par appel réel à site.api.espn.com/apis/v2/sports/soccer/{slug}/
@@ -100,64 +100,6 @@ describe('compactEspnStandings', () => {
   it('gère un entries manquant/malformé sans planter', () => {
     expect(compactEspnStandings({ children: [{ name: 'X' }] })).toEqual({ table: [], groups: [] })
     expect(compactEspnStandings({ children: [{ name: 'X', standings: {} }] })).toEqual({ table: [], groups: [] })
-  })
-})
-
-// Payload de test reprenant la forme RÉELLE vérifiée par appel direct à
-// thesportsdb.com/api/v1/json/3/lookuptable.php?l=4328&s=2025-2026 (23/07,
-// voir compactSportsDbStandings) — tous les champs numériques sont bien des
-// chaînes côté TheSportsDB, comme dans ce payload de test.
-describe('compactSportsDbStandings', () => {
-  it('renvoie table/groups vides si table est absent ou vide', () => {
-    expect(compactSportsDbStandings({})).toEqual({ table: [], groups: [] })
-    expect(compactSportsDbStandings({ table: [] })).toEqual({ table: [], groups: [] })
-  })
-
-  it('convertit une réponse TheSportsDB réelle (Premier League) → table triée, groups toujours vide', () => {
-    const raw = {
-      table: [
-        {
-          intRank: '2', idTeam: '133613', strTeam: 'Manchester City',
-          strBadge: 'https://example.com/city.png',
-          intPlayed: '38', intWin: '23', intLoss: '6', intDraw: '9',
-          intGoalsFor: '77', intGoalsAgainst: '35', intGoalDifference: '42', intPoints: '78',
-        },
-        {
-          intRank: '1', idTeam: '133604', strTeam: 'Arsenal',
-          strBadge: 'https://example.com/arsenal.png',
-          intPlayed: '38', intWin: '26', intLoss: '5', intDraw: '7',
-          intGoalsFor: '71', intGoalsAgainst: '27', intGoalDifference: '44', intPoints: '85',
-        },
-      ],
-    }
-    const result = compactSportsDbStandings(raw)
-    expect(result.groups).toEqual([])
-    expect(result.table).toHaveLength(2)
-    // Trié par position malgré l'ordre d'entrée inversé dans le payload.
-    expect(result.table[0]).toEqual({
-      position: 1,
-      team: { id: '133604', name: 'Arsenal', shortName: 'Arsenal', crest: 'https://example.com/arsenal.png' },
-      playedGames: 38,
-      points: 85,
-      won: 26,
-      draw: 7,
-      lost: 5,
-      goalDifference: 44,
-      goalsFor: 71,
-    })
-    expect(result.table[1].team.name).toBe('Manchester City')
-  })
-
-  it('gère un table malformé sans planter', () => {
-    expect(compactSportsDbStandings({ table: [{}] })).toEqual({
-      table: [{
-        position: 0,
-        team: { id: '', name: '', shortName: '', crest: null },
-        playedGames: 0, points: 0, won: 0, draw: 0, lost: 0, goalDifference: 0, goalsFor: 0,
-      }],
-      groups: [],
-    })
-    expect(compactSportsDbStandings(null)).toEqual({ table: [], groups: [] })
   })
 })
 

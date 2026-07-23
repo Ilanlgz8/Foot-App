@@ -96,47 +96,11 @@ export function compactEspnStandings(json) {
   }
 }
 
-// compactSportsDbStandings — convertit une réponse lookuptable.php brute de
-// TheSportsDB (thesportsdb.com/api/v1/json/3/lookuptable.php?l=...&s=...) en
-// { table, groups } — même contrat que compactEspnStandings ci-dessus,
-// consommé sans changement par StandingsTable.jsx.
-//
-// Ajouté (demande utilisateur, 23/07) : 3e repli classement, après FD.org
-// PUIS ESPN (voir useStandings.js) — pas un remplacement de l'un ou l'autre.
-// Vérifié par appel réel ce jour-là sur les 5 grands championnats
-// domestiques (voir COMPETITION_SPORTSDB_LEAGUE, data/competitions.js) :
-// données exactes et à jour (classement Premier League/La Liga 2025-2026
-// confirmés identiques aux classements finaux réels via recherche web).
-// TheSportsDB n'a PAS de notion de groupe pour ce endpoint (un seul
-// tableau plat) — `groups` reste donc toujours vide ici, contrairement à
-// compactEspnStandings qui peut en avoir.
-//
-// Structure TheSportsDB observée : { table: [ { intRank, idTeam, strTeam,
-// strBadge, intPlayed, intWin, intDraw, intLoss, intGoalsFor,
-// intGoalsAgainst, intGoalDifference, intPoints, ... } ] } — tous les champs
-// numériques sont des CHAÎNES ("1", "38"...), d'où les Number(...) ci-dessous.
-export function compactSportsDbStandings(json) {
-  const rows = Array.isArray(json?.table) ? json.table : []
-  const table = rows
-    .map(r => ({
-      position: Number(r.intRank) || 0,
-      team: {
-        id:        r.idTeam != null ? String(r.idTeam) : '',
-        name:      r.strTeam ?? '',
-        shortName: r.strTeam ?? '',
-        crest:     r.strBadge ?? null,
-      },
-      playedGames:    Number(r.intPlayed) || 0,
-      points:         Number(r.intPoints) || 0,
-      won:            Number(r.intWin) || 0,
-      draw:           Number(r.intDraw) || 0,
-      lost:           Number(r.intLoss) || 0,
-      goalDifference: Number(r.intGoalDifference) || 0,
-      goalsFor:       Number(r.intGoalsFor) || 0,
-    }))
-    .sort((a, b) => a.position - b.position)
-  return { table, groups: [] }
-}
+// ⚠️ compactSportsDbStandings (TheSportsDB) ajoutée puis RETIRÉE le même jour
+// (23/07) : la clé publique gratuite de TheSportsDB plafonne lookuptable.php
+// à 5 lignes seulement, quelle que soit la ligue (confirmé par 2 appels
+// réels indépendants) — inutilisable pour un classement complet (18-20
+// équipes attendues). Voir l'historique git pour le code retiré.
 
 export function normalize(name = '') {
   return name.toLowerCase()

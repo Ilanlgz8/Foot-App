@@ -1512,13 +1512,6 @@
   .accueil__dashPanel--matchPanel .accueil__dashPanelBody .accueil__posterSkList {
     display: none;
   }
-  /* Filtre inline (matchCompetitions, scopé au jour affiché) masqué sur
-     desktop : remplacé par la barre horizontale pleine largeur au-dessus du
-     split (accueil__topFilters, activeCompetitions) — évite le doublon de
-     filtres visible avant cette refonte. Mobile inchangé. */
-  .accueil__dashPanel--matchPanel > .accueil__compFilter {
-    display: none;
-  }
 }
 
 /* Skeleton posters (chargement initial) — même principe que

@@ -25,7 +25,7 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
-import { compactEspnSummary, compactEspnStandings, compactSportsDbStandings } from '../src/utils/espnSummaryParse.js'
+import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -43,23 +43,6 @@ const ALLOWED_SLUGS = new Set([
   // dans l'onglet du championnat parent (voir espnAdapter.js / useMatchs.js).
   'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',
 ])
-
-// ID de championnat TheSportsDB autorisés (voir mode "sportsdbLeague" plus
-// bas) — même liste que COMPETITION_SPORTSDB_LEAGUE (src/data/competitions.js),
-// dupliquée ici volontairement (fichier serveur isolé, pas d'import cross
-// api//src risqué) : évite que ce proxy serve de relais ouvert vers
-// n'importe quel idLeague TheSportsDB.
-const ALLOWED_SPORTSDB_LEAGUES = new Set(['4328', '4334', '4335', '4331', '4332'])
-
-// Saison en cours au format TheSportsDB ("2025-2026") — les championnats
-// européens démarrent mi-août, donc juillet est encore la saison N-1/N côté
-// données disponibles (constaté : au 23/07, seule 2025-2026 était renseignée,
-// pas encore 2026-2027) — seuil fixé à août plutôt que juillet pour cette
-// raison précise.
-function currentFootballSeason(d = new Date()) {
-  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1
-  return m >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`
-}
 
 // ⚠️ HISTORIQUE (retour utilisateur : "Statistiques indisponibles" sur des
 // matchs vieux d'une semaine+) : 7j puis 180j — à chaque fois, passé le
@@ -177,62 +160,12 @@ export default async function handler(req, res) {
     if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings, sportsdbLeague } = req.query
+  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
   // chaîne comme clé Redis.
   const safeFdMatchId = fdMatchId && /^\d+$/.test(String(fdMatchId)) ? String(fdMatchId) : null
-
-  // ── Mode sportsdbLeague : classement TheSportsDB — 3e repli, après FD.org
-  // PUIS ESPN (voir useStandings.js), uniquement pour les 5 grands
-  // championnats domestiques (voir ALLOWED_SPORTSDB_LEAGUES ci-dessus). Ne
-  // dépend pas d'un slug ESPN — traité AVANT la validation `!slug` ci-dessous,
-  // qui ne concerne que les modes ESPN.
-  if (sportsdbLeague) {
-    if (!ALLOWED_SPORTSDB_LEAGUES.has(String(sportsdbLeague))) {
-      return res.status(400).json({ error: 'Championnat TheSportsDB non autorisé' })
-    }
-    const sdbController = new AbortController()
-    const sdbTimeoutId  = setTimeout(() => sdbController.abort(), 8_000)
-    const cacheKey = `sportsdb:standings:${sportsdbLeague}`
-    try {
-      const cached = await kv.get(cacheKey)
-      if (cached) {
-        clearTimeout(sdbTimeoutId)
-        const cachedObj = typeof cached === 'string' ? JSON.parse(cached) : cached
-        return res.status(200)
-          .setHeader('Content-Type', 'application/json')
-          .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-          .json(cachedObj)
-      }
-    } catch { /* Redis indisponible → on continue vers le fetch direct */ }
-
-    const primarySeason = currentFootballSeason()
-    const [y1] = primarySeason.split('-').map(Number)
-    // Repli saison précédente si la saison en cours n'a pas encore de données
-    // publiées côté TheSportsDB (ex. tout début de saison).
-    const seasons = [primarySeason, `${y1 - 1}-${y1}`]
-
-    let compact = { table: [], groups: [] }
-    try {
-      for (const season of seasons) {
-        const url = `https://www.thesportsdb.com/api/v1/json/3/lookuptable.php?l=${sportsdbLeague}&s=${season}`
-        const response = await fetch(url, { signal: sdbController.signal })
-        if (!response.ok) continue
-        const json = await response.json()
-        const c = compactSportsDbStandings(json)
-        if (c.table.length > 0) { compact = c; break }
-      }
-      if (compact.table.length > 0) await kv.set(cacheKey, JSON.stringify(compact), { ex: 300 })
-    } catch { /* timeout/JSON invalide → renvoie vide, pas bloquant */ }
-    clearTimeout(sdbTimeoutId)
-
-    return res.status(200)
-      .setHeader('Content-Type', 'application/json')
-      .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-      .json(compact)
-  }
 
   if (!slug)                    return res.status(400).json({ error: 'Paramètre slug manquant' })
   if (!ALLOWED_SLUGS.has(slug)) return res.status(400).json({ error: 'Slug non autorisé' })

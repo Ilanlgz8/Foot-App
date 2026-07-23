@@ -763,13 +763,16 @@ function Accueil() {
                 aria-label="Jour suivant"
               >›</button>
             </div>
-            {/* Filtre horizontal — reste utilisé tel quel sur mobile
-                (matchCompetitions, scopé au jour affiché, comportement
-                inchangé). Sur desktop, remplacé visuellement par la barre de
-                filtres pleine largeur ci-dessus (masqué en CSS, voir
-                accueil__dashPanel--matchPanel dans accueil.css) — même state
-                compFilterMatch, pas de doublon de logique. */}
-            <CompFilter competitions={matchCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
+            {/* ⚠️ RETIRÉ (demande utilisateur, 23/07 : "enlève la barre où
+                y'a tous/[compétition]... au-dessus dans accueil sur mobile
+                et desktop aussi") : ancienne barre de filtre inline
+                (matchCompetitions, scopée au jour affiché) — redondante
+                avec la barre topFilters ci-dessus (déjà seule visible sur
+                desktop, activeCompetitions) et non désirée sur mobile non
+                plus. compFilterMatch reste utilisé par topFilters (desktop)
+                et par filteredMatches/filteredResults plus haut — retrait
+                purement visuel de ce point d'entrée mobile, pas de la
+                logique de filtrage elle-même. */}
             <div className="accueil__dashPanelDivider" />
             <MatchPanel
               matches={matchPanelMatches}

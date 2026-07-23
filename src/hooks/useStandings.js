@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
-import { COMPETITION_ESPN_SLUG, COMPETITION_SPORTSDB_LEAGUE } from '../data/competitions'
+import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -23,37 +23,20 @@ export function useStandings(selectedComp) {
     // réalité jamais atteint sur ce chemin d'erreur). Même mécanisme déjà
     // trouvé et corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
     // espnAdapter.js) — appliqué ici pour rester cohérent.
-    // ⚠️ ORDRE DES SOURCES (demande utilisateur explicite, 23/07 : "si the
-    // sport db n'a pas mis a jour on passe a espn et si espn n'a pas
-    // ftdata.org") : pour les 5 championnats où TheSportsDB est vérifié
-    // (voir COMPETITION_SPORTSDB_LEAGUE), l'ordre est désormais
-    // TheSportsDB → ESPN → FD.org → cache stale — les deux sources
-    // gratuites/sans clé/jamais suspendues sur ce projet sont épuisées
-    // AVANT de toucher FD.org, dont le budget global est fragile (comptes
-    // suspendus à répétition, voir api/football.js). FD.org reste la
-    // source PRIMAIRE pour les compétitions non couvertes par TheSportsDB
-    // (CL/WC/EC/NL/CAN/COPA), comportement inchangé pour elles : FD.org →
-    // ESPN → cache stale.
-    //
-    // Honnêteté sur le compromis : TheSportsDB est une base communautaire,
-    // pas un flux temps réel — `dateUpdated` observé lors des tests (23/07)
-    // montrait des mises à jour espacées de plusieurs jours, pas après
-    // chaque match. Si TheSportsDB est en retard, ESPN (temps quasi réel)
-    // prend le relais avant même d'envisager FD.org.
+    // ⚠️ TheSportsDB RETIRÉ (23/07, quelques heures après son ajout) : la clé
+    // publique gratuite (`3`) plafonne `lookuptable.php` à 5 lignes SEULEMENT,
+    // quelle que soit la ligue — confirmé par 2 appels réels indépendants
+    // (Premier League, French Ligue 1), toujours exactement 5 équipes malgré
+    // une vraie ligue à 18-20. Mon erreur : la vérification initiale n'avait
+    // comparé que le TOP 5 (Arsenal/Man City/... à la bonne place) sans
+    // jamais vérifier la longueur totale de la liste — donc jamais détecté
+    // que le reste du classement (relégation comprise) manquait purement et
+    // simplement. Un classement à 5 lignes est pire qu'aucun classement
+    // (trompeur), donc retiré entièrement plutôt que corrigé : rien dans
+    // l'offre gratuite de TheSportsDB ne permet d'obtenir la liste complète.
+    // Voir l'historique git pour le détail (ajouté puis retiré le même jour).
     queryFn: async () => {
-      const sportsDbLeague = COMPETITION_SPORTSDB_LEAGUE[selectedComp]
-      const espnSlug       = COMPETITION_ESPN_SLUG[selectedComp]
-
-      const tryTheSportsDb = async () => {
-        try {
-          const sdbRes = await fetch(`/espn?sportsdbLeague=${sportsDbLeague}`)
-          if (sdbRes.ok) {
-            const sdbResult = await sdbRes.json()
-            if ((sdbResult.table?.length ?? 0) > 0) return sdbResult
-          }
-        } catch { /* → repli suivant */ }
-        return null
-      }
+      const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
 
       const tryEspn = async () => {
         if (!espnSlug) return null
@@ -96,26 +79,6 @@ export function useStandings(selectedComp) {
             }
       }
 
-      if (sportsDbLeague) {
-        const sdbResult = await tryTheSportsDb()
-        if (sdbResult) { writeCache(key, sdbResult, STALE_MS); return sdbResult }
-
-        const espnResult = await tryEspn()
-        if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
-
-        try {
-          const fdResult = await tryFdOrg()
-          writeCache(key, fdResult, STALE_MS)
-          return fdResult
-        } catch (err) {
-          const stale = readCacheStale(key)
-          if (stale) return stale
-          throw err
-        }
-      }
-
-      // Compétitions non couvertes par TheSportsDB : comportement historique
-      // inchangé (FD.org primaire, ESPN en repli).
       try {
         const fdResult = await tryFdOrg()
         writeCache(key, fdResult, STALE_MS)
