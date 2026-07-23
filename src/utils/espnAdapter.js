@@ -49,7 +49,10 @@ const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'COPA'])
 // d'autres endroits de l'app regroupent/comparent les matchs par
 // match.competition.id : un id null pour TOUTES ces compétitions les aurait
 // fait fusionner ensemble dans un seul groupe "Autre".
-const SYNTHETIC_COMP_ID = { NL: -1, CAN: -2, COPA: -3, FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103 }
+const SYNTHETIC_COMP_ID = {
+  NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5,
+  FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103,
+}
 
 // Statut ESPN → statut FD.org-like utilisé partout ailleurs dans l'app.
 const ESPN_STATUS_MAP = {

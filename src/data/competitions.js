@@ -5,9 +5,13 @@ import premierLeagueLogo from '../assets/leagues/premier-league.svg'
 import serieALogo from '../assets/leagues/serie-a-enilive.svg'
 import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
-// (europa-league.png / conference-league.png : assets présents mais ces deux
-// compétitions ne sont pas suivies par l'app, voir COMPETITIONS plus bas —
-// imports morts retirés)
+// europa-league.png / conference-league.png : mêmes assets que ldc.png ci-
+// dessus (même style visuel — fond noir plein, ballon/coupe + texte "UEFA
+// ... LEAGUE", déjà validé en prod pour la C1), désormais utilisés (demande
+// utilisateur, 23/07 : "et pour la ligue europa et la ligue conference espn
+// prend ça en compte normalement ?" → intégration complète ajoutée).
+import europaLeagueLogo     from '../assets/leagues/europa-league.png'
+import conferenceLeagueLogo from '../assets/leagues/conference-league.png'
 // Vrais logos ajoutés par l'utilisateur (12/07) — tous nettoyés/détourés :
 // - CAF : logo officiel de la confédération, utilisé génériquement pour la
 //   CAN comme il n'existe pas de logo CAN intemporel (pratique standard, ex.
@@ -54,6 +58,8 @@ export const COMPETITION_ESPN_SLUG = {
   NL:  'uefa.nations',
   CAN: 'caf.nations',
   COPA: 'conmebol.america',
+  UEL:  'uefa.europa',
+  UECL: 'uefa.europa.conf',
 }
 
 // ⚠️ TheSportsDB : testé comme 3e repli classement (23/07), retiré le même
@@ -74,9 +80,16 @@ export const DOMESTIC_CUPS = {
 
 // Compétitions sourcées via ESPN (pas football-data.org, voir espnAdapter.js)
 // : pas de classement/buteurs pour l'instant (ESPN n'expose pas proprement la
-// structure de groupe sur son scoreboard) — utilisé par Classement.jsx et
-// FavoritesPage.jsx pour ne pas proposer un classement qui n'existe pas.
-export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA'])
+// structure de groupe sur son scoreboard) — utilisé par Classement.jsx pour
+// ne pas proposer un classement qui n'existe pas.
+// UEL/UECL ajoutées par prudence (même raison, jamais vérifié en direct pour
+// leur format "phase de ligue" — si ESPN s'avère exposer un classement
+// propre pour elles, à retirer d'ici).
+// ⚠️ N'est PLUS utilisé par FavoritesPage.jsx pour filtrer les favoris de
+// NOTIFS (voir son commentaire dédié) — l'absence de classement n'a aucun
+// rapport avec l'éligibilité aux notifs push, seulement avec l'onglet
+// Classement.
+export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 export const COMPETITIONS = [
   {
@@ -114,6 +127,18 @@ export const COMPETITIONS = [
     name: 'Ligue des Champions',
     shortName: 'C. League',
     emblem: championsLeagueLogo,
+  },
+  {
+    id: 'UEL',
+    name: 'Ligue Europa',
+    shortName: 'Europa L.',
+    emblem: europaLeagueLogo,
+  },
+  {
+    id: 'UECL',
+    name: 'Ligue Europa Conférence',
+    shortName: 'Conférence L.',
+    emblem: conferenceLeagueLogo,
   },
   {
     id: 'WC',

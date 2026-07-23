@@ -70,12 +70,26 @@ export const DOMESTIC_CUP_SLUGS = {
   PD:  'esp.copa_del_rey',     // Copa del Rey
   PL:  'eng.fa',                // FA Cup
 }
+// Coupes d'Europe de club, standalone (pas fusionnées dans un championnat
+// parent, contrairement à DOMESTIC_CUP_SLUGS) — ajoutées suite à la demande
+// utilisateur du 23/07 ("et pour la ligue europa et la ligue conference espn
+// prend ça en compte normalement ?"). Les valeurs 2146/2048 existaient déjà
+// dans ESPN_SLUG_BY_COMP_ID plus haut (ajoutées avant même une intégration
+// complète, pour le cron uniquement) — gardées telles quelles là-bas
+// (inertes, aucun vrai match football-data.org n'aura jamais ces id), le
+// vrai branchement pour ces matchs passe désormais par ici (code string,
+// même mécanisme que NATIONAL_COMP_SLUGS/DOMESTIC_CUP_SLUGS).
+export const EUROPEAN_CUP_SLUGS = {
+  UEL:  'uefa.europa',
+  UECL: 'uefa.europa.conf',
+}
 
 // Liste à plat pour le cron (api/cron-goals.js, cf-worker/src/index.js) —
 // aucun besoin d'id précis à cet endroit, il parcourt juste tous les slugs.
 export const EXTRA_NOTIFY_SLUGS = [
   ...Object.values(NATIONAL_COMP_SLUGS),
   ...Object.values(DOMESTIC_CUP_SLUGS),
+  ...Object.values(EUROPEAN_CUP_SLUGS),
 ]
 
 // ⚠️ AJOUT (suite directe du point ci-dessus, demande utilisateur explicite :
@@ -93,5 +107,6 @@ export const EXTRA_NOTIFY_SLUGS = [
 export function espnNativeSlug(match) {
   if (!String(match?.id ?? '').startsWith('espn-')) return null
   if (match.isCup) return DOMESTIC_CUP_SLUGS[match.competition?.code] ?? null
-  return NATIONAL_COMP_SLUGS[match.competition?.code] ?? null
+  const code = match.competition?.code
+  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? null
 }

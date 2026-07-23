@@ -9,7 +9,7 @@ import { classifyFetchError } from '../utils/fetchErrors'
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
 // pas de Poules/tableau pour l'instant, Programme+Résultats seulement).
-const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA'])
+const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)

@@ -96,11 +96,17 @@ export default function FavoritesPage() {
         <div className="favPage__chipGrid">
           {COMPETITIONS.map(comp => {
             const slug = COMPETITION_ESPN_SLUG[comp.id]
-            // NL/CAN/COPA : pas encore pollées par cron-goals.js (voir
-            // espnSlugs.js) → pas de notifs réelles possibles pour l'instant,
-            // on ne propose donc pas le toggle (éviterait une case à cocher
-            // qui ne fait rien).
-            if (!slug || NO_STANDINGS_COMPS.has(comp.id)) return null
+            // ⚠️ CORRIGÉ (23/07) : ce filtre excluait aussi NO_STANDINGS_COMPS
+            // (NL/CAN/COPA/UEL/UECL) en plus de `!slug` — pertinent au moment
+            // où ces compétitions n'étaient effectivement pas pollées par le
+            // cron (voir EXTRA_NOTIFY_SLUGS, espnSlugs.js), mais plus depuis
+            // leur ajout au cron : l'absence de classement (NO_STANDINGS_COMPS)
+            // n'a jamais eu de rapport avec l'éligibilité aux notifs — deux
+            // sujets différents qui utilisaient par erreur le même filtre.
+            // `!slug` seul suffit désormais : toute compétition avec un slug
+            // ESPN est réellement pollée par le cron (voir ESPN_SLUGS,
+            // api/cron-goals.js/cf-worker), donc notifiable.
+            if (!slug) return null
             const active = favComps.includes(slug)
             return (
               <button

@@ -152,12 +152,25 @@ export default async function handler(req, res) {
   // réel à chaque appel. Même pattern déjà utilisé ailleurs dans l'app
   // (api/fifa-live.js, api/pulse.js, api/subscribe.js) : compteur Redis par
   // IP, fenêtre glissante de 60s.
+  // ⚠️ RELEVÉ 60→100 (ajout Europa League + Conference League comme
+  // compétitions ESPN suivies à part entière) : un commentaire dans
+  // useTodayMatches.js documentait déjà ce plafond comme "proche voire
+  // au-dessus" avec seulement 3 compétitions ESPN (NL/CAN/COPA) + 3 coupes
+  // nationales — jusqu'à ~36 appels ESPN quasi simultanés rien qu'au premier
+  // chargement d'Accueil (7 jours × 6 sources). Avec 2 compétitions ESPN de
+  // plus, ce même calcul monte à ~50, dangereusement proche de l'ancien
+  // plafond de 60 pour un usage 100% légitime (une seule vraie personne, un
+  // seul chargement de page) — pas un abus. Ce plafond est une protection
+  // anti-abus MAISON (voir commentaire au-dessus, `curl/bot`), pas une
+  // limite imposée par ESPN elle-même : 100/60s reste largement en dessous
+  // de ce qu'un vrai scraping ressemblerait, tout en gardant de la marge
+  // pour un chargement de page légitime plus chargé qu'avant.
   const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
   const rlKey = `ratelimit:espn:${ip}`
   try {
     const count = await kv.incr(rlKey)
     if (count === 1) await kv.expire(rlKey, 60)
-    if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
+    if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
   const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query

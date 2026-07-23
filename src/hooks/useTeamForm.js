@@ -29,7 +29,7 @@ const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 // glissante d'espnAdapter.js (60j avant / 150j après) n'a pas de notion de
 // "saison" à décaler — si pas assez de matchs dispo, repli normal sur
 // calcProno (forme récente), comme pour toute compétition sous-alimentée.
-const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA'])
+const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // Un seul fetch "saison" FD.org (season explicite optionnel) → matchs FINISHED
 // côté client (status=FINISHED non supporté par le free tier sur certains

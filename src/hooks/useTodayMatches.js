@@ -20,7 +20,7 @@ const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA' // EL/ECL non couverts par FD.org free 
 // compétitions manquantes ici → jour trouvé, mais rien à afficher une fois
 // arrivé dessus. Complété pour couvrir exactement les mêmes compétitions
 // que la recherche de saut, afin que les deux soient toujours cohérentes.
-const ESPN_SOURCED_COMPS = ['NL', 'CAN', 'COPA'] // même liste que useMatchs.js
+const ESPN_SOURCED_COMPS = ['NL', 'CAN', 'COPA', 'UEL', 'UECL'] // même liste que useMatchs.js
 const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 
 
@@ -182,17 +182,20 @@ export function useRecentDaysMatches(numDays) {
   // des appels ESPN/FIFA/FD.org fait planter les appels quand on veut
   // consulter un match juste après" — vérifié dans le code, chiffres à
   // l'appui) : les N jours ci-dessous partent TOUS en parallèle au montage
-  // (useQueries), et fetchTodayMatches() fait à lui seul jusqu'à 6 appels
-  // ESPN par jour (3 compétitions ESPN_SOURCED_COMPS + 3 coupes nationales
+  // (useQueries), et fetchTodayMatches() fait à lui seul jusqu'à 8 appels
+  // ESPN par jour (5 compétitions ESPN_SOURCED_COMPS, dont Europa League +
+  // Conference League ajoutées ensuite + 3 coupes nationales
   // CUP_PARENT_COMPS) — pour 7 jours (RESULTS_DAYS_BACK dans Accueil.jsx),
-  // ça fait jusqu'à ~36 appels ESPN quasi simultanés rien que pour ce hook,
+  // ça fait jusqu'à ~56 appels ESPN quasi simultanés rien que pour ce hook,
   // en plus de useTodayMatches/useUpcomingMatchesAllComps/useWcKnockout
-  // montés en même temps sur la même page — proche voire au-dessus du
-  // plafond de 60/min PARTAGÉ PAR IP (voir api/espn.js). Si l'utilisateur
-  // ouvre un match juste après ce lancement, ses propres appels ESPN
-  // (stats/compo/déroulement) arrivent sur un budget déjà consommé par ce
-  // seul chargement de page. STAGGER_MS étale le déclenchement réel des
-  // requêtes réseau sur ~2s au lieu d'un seul instant — initialData (cache
+  // montés en même temps sur la même page. ⚠️ Plafond ESPN (api/espn.js)
+  // relevé 60→100 pour la même raison lors de l'ajout Europa League/
+  // Conference League — ce calcul-ci (~56, en légitime pour UN utilisateur)
+  // dépassait déjà l'ancien plafond de 60 à lui seul. Si l'utilisateur ouvre
+  // un match juste après ce lancement, ses propres appels ESPN (stats/
+  // compo/déroulement) arrivent sur un budget déjà partiellement consommé
+  // par ce seul chargement de page. STAGGER_MS étale le déclenchement réel
+  // des requêtes réseau au lieu d'un seul instant — initialData (cache
   // disque) continue d'afficher les données immédiatement, ce délai ne
   // retarde que le fetch réseau de RAFRAÎCHISSEMENT, jamais l'affichage.
   // Zéro changement de données/format, uniquement le timing.
