@@ -744,7 +744,10 @@
    resultats.css). ── */
 .matchs__match {
   display: grid;
-  grid-template-columns: 1fr 8.5rem 1fr;
+  /* Colonne centrale élargie (8.5rem -> 10.5rem) pour l'heure agrandie
+     (demande utilisateur : "double la taille au moins") — voir
+     .matchs__scoreHour plus bas, 3.2rem desktop. */
+  grid-template-columns: 1fr 10.5rem 1fr;
   grid-template-rows: auto 1fr;
   align-items: center;
   padding: 1rem 1.5rem;
@@ -965,17 +968,18 @@
 }
 
 .matchs__scoreHour {
-  padding: 0.35rem 0.9rem;
+  padding: 0.2rem 0.3rem;
   background: transparent;
   border: none;
   border-radius: 0.65rem;
-  font-size: 1.5rem;
+  font-size: 3.2rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #f1f5f9;
   text-shadow: 0 0 9px rgba(var(--red-rgb),0.4);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
   transition: text-shadow 0.2s;
 }
 
@@ -1402,13 +1406,13 @@
   .matchs__competitionLogo--sidebar { width: 2.4rem; height: 2.4rem; }
 
   .matchs__match {
-    grid-template-columns: 1fr 7rem 1fr;
+    grid-template-columns: 1fr 8.6rem 1fr;
     padding: 0.85rem 0.85rem;
   }
 
   .matchs__crestWrap { width: 2.5rem; height: 2.5rem; }
   .matchs__teamName { font-size: 0.88rem; }
-  .matchs__scoreHour { font-size: 1.15rem; padding: 0.3rem 0.65rem; }
+  .matchs__scoreHour { font-size: 2.4rem; padding: 0.2rem 0.3rem; }
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
   .matchs__wcToggle { flex-wrap: wrap; }
@@ -1498,14 +1502,14 @@
   .matchs { padding: 1.25rem 0.75rem 2.5rem; }
 
   .matchs__match {
-    grid-template-columns: 1fr 6rem 1fr;
-    padding: 0.75rem 0.65rem;
+    grid-template-columns: 1fr 7.4rem 1fr;
+    padding: 0.75rem 0.5rem;
     gap: 0.5rem;
   }
 
-  .matchs__teamName   { font-size: 0.82rem; }
-  .matchs__crestWrap  { width: 2.3rem; height: 2.3rem; }
-  .matchs__scoreHour  { font-size: 1.05rem; padding: 0.25rem 0.55rem; min-width: 4.5rem; }
+  .matchs__teamName   { font-size: 0.78rem; }
+  .matchs__crestWrap  { width: 2.2rem; height: 2.2rem; }
+  .matchs__scoreHour  { font-size: 2.1rem; padding: 0.15rem 0.2rem; min-width: 0; }
 
   .matchs__title { font-size: clamp(1.2rem, 5vw, 1.6rem); }
 
