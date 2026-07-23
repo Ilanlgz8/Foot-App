@@ -15,7 +15,36 @@ const STALE_MS = 1000 * 60 * 10  // 10min
 // des places provisoires tant que les 32es ne sont pas joués/actés, l'affiche
 // pouvait rester fausse (ex: "Canada-Paraguay" au lieu de "Paraguay-France")
 // jusqu'à ce que football-data.org mette à jour les vrais qualifiés.
+// ⚠️ AJOUT (constat utilisateur : "Ligue des Champions, phase éliminatoire
+// absente en Résultats") : la liste ne couvrait que les tours WC/Euro
+// classiques. Or `groupRounds` (useMatchs.js) capture TOUT match avec un
+// `stage` non-null (matchday=null) dans un groupe "knockout" commun, puis ne
+// garde QUE ceux dont le `stage` figure dans KNOCKOUT_ORDER — un match dont
+// le stage n'y est pas listé disparaît donc silencieusement (ni dans les
+// journées, ni dans le knockout, nulle part). Vérifié sur la doc officielle
+// football-data.org (docs.football-data.org/general/v4/match.html, enum
+// `stage`) : le nouveau format "Swiss" de la Ligue des Champions (depuis
+// 2024-25) ajoute un tour de barrages entre la phase de ligue et les
+// huitièmes, très probablement sous une des valeurs PLAYOFF_ROUND_1/2 ou
+// PLAYOFFS de cet enum officiel — aucune des trois n'était couverte ici.
+// Ajout de ces 3 + le reste de l'enum documenté par sécurité (qualifs,
+// LAST_64) : sans coût pour WC/Euro (une valeur absente des vraies données
+// de ces compétitions ne crée simplement aucune entrée, `groupRounds` filtre
+// déjà les groupes vides). Honnêteté : je n'ai pas pu vérifier en direct sur
+// un vrai payload CL laquelle de ces 3 valeurs football-data.org utilise
+// réellement pour ce tour précis (pas d'accès réseau à l'API depuis cet
+// environnement) — cette liste couvre les 3 candidats plausibles plutôt que
+// de deviner celle qui devrait normalement être la bonne.
 export const KNOCKOUT_ORDER = [
+  'PRELIMINARY_ROUND',
+  'QUALIFICATION',
+  'QUALIFICATION_ROUND_1',
+  'QUALIFICATION_ROUND_2',
+  'QUALIFICATION_ROUND_3',
+  'PLAYOFF_ROUND_1',
+  'PLAYOFF_ROUND_2',
+  'PLAYOFFS',
+  'LAST_64',
   'LAST_32',
   'LAST_16',
   'QUARTER_FINALS',
@@ -25,12 +54,21 @@ export const KNOCKOUT_ORDER = [
 ]
 
 export const KNOCKOUT_LABELS = {
-  LAST_32:        'Seizièmes de finale',
-  LAST_16:        'Huitièmes de finale',
-  QUARTER_FINALS: 'Quarts de finale',
-  SEMI_FINALS:    'Demi-finales',
-  THIRD_PLACE:    'Petite finale',
-  FINAL:          'Finale',
+  PRELIMINARY_ROUND:     'Tour préliminaire',
+  QUALIFICATION:         'Qualifications',
+  QUALIFICATION_ROUND_1: '1er tour qualificatif',
+  QUALIFICATION_ROUND_2: '2e tour qualificatif',
+  QUALIFICATION_ROUND_3: '3e tour qualificatif',
+  PLAYOFF_ROUND_1:       'Barrages',
+  PLAYOFF_ROUND_2:       'Barrages',
+  PLAYOFFS:              'Barrages',
+  LAST_64:               'Trente-deuxièmes de finale',
+  LAST_32:               'Seizièmes de finale',
+  LAST_16:               'Huitièmes de finale',
+  QUARTER_FINALS:        'Quarts de finale',
+  SEMI_FINALS:           'Demi-finales',
+  THIRD_PLACE:            'Petite finale',
+  FINAL:                 'Finale',
 }
 
 const EMPTY_ROUNDS = []
