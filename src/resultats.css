@@ -301,26 +301,34 @@
   gap: 0.45rem;
 }
 
-/* ── Card style Sofascore ── */
+/* ── Card "éditorial néon" (mockup validé par l'utilisateur, variante rouge
+   à la place du jaune de la démo initiale — voir aussi match.css pour la
+   même refonte côté Programme) : dégradé sombre à pointe rouge + liseré +
+   halo. ⚠️ Halo volontairement plus discret que dans le mockup : la démo
+   montrait UNE SEULE card isolée, mais une vraie journée de championnat
+   affiche 5-15 cards à la suite — un halo aussi fort que la démo sur
+   CHAQUE card serait lourd/fatiguant en liste, donc réduit ici tout en
+   gardant l'identité "néon" du style choisi. */
 .resultats__card {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 8.5rem 1fr;
   align-items: center;
   padding: 1rem 1.25rem;
-  background: rgba(13,19,32,0.9);
-  border: 1px solid rgba(var(--white-rgb),0.055);
-  border-radius: 0.9rem;
-  transition: background 0.15s, border-color 0.15s;
+  background: linear-gradient(160deg, rgba(var(--red-rgb),0.09) 0%, var(--bg-panel) 55%);
+  border: 1px solid rgba(var(--red-rgb),0.22);
+  border-radius: 1rem;
+  box-shadow: 0 0 22px rgba(var(--red-rgb),0.07);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .resultats__card:hover {
-  background: rgba(20,28,44,0.95);
-  border-color: rgba(var(--white-rgb),0.1);
+  border-color: rgba(var(--red-rgb),0.4);
+  box-shadow: 0 0 30px rgba(var(--red-rgb),0.14);
 }
 /* Feedback tap — le hover ci-dessus ne se déclenche jamais sur mobile. */
 .resultats__card:active {
-  background: rgba(26,36,56,0.97);
+  box-shadow: 0 0 18px rgba(var(--red-rgb),0.18);
 }
 
 /* ── Équipes ── */
@@ -349,7 +357,7 @@
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.5));
+  filter: drop-shadow(0 1px 4px rgba(var(--black-rgb),0.5)) drop-shadow(0 0 7px rgba(var(--red-rgb),0.18));
 }
 
 .resultats__crest {
@@ -375,6 +383,7 @@
 .resultats__teamName {
   font-size: 1.08rem;
   font-weight: 700;
+  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #e2e8f0;
   text-align: center;
   white-space: nowrap;
@@ -393,10 +402,10 @@
 
 .resultats__cardDate {
   font-size: 0.58rem;
-  font-weight: 600;
-  /* Retour utilisateur : #334155 (gris ardoise foncé) trop peu lisible sur
-     le fond sombre de la card. */
-  color: rgba(var(--white-rgb),0.75);
+  font-weight: 700;
+  /* ⚠️ Rouge (au lieu du blanc atténué) — style "éditorial néon", voir
+     commentaire sur .resultats__card plus haut. */
+  color: var(--red);
   letter-spacing: 0.06em;
   text-transform: capitalize;
   white-space: nowrap;
@@ -420,18 +429,22 @@
 }
 
 .resultats__scoreNum {
-  font-size: 1.55rem;
-  font-weight: 900;
-  color: #e2e8f0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
+  color: #f1f5f9;
+  text-shadow: 0 0 9px rgba(var(--red-rgb),0.4);
   min-width: 1.6rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
-.resultats__scoreNum--win  { color: #fbbf24; }
-.resultats__scoreNum--draw { color: #94a3b8; }
+/* Halo assorti à la couleur du chiffre (au lieu de garder le halo rouge par
+   défaut derrière un chiffre or/gris — incohérent visuellement). */
+.resultats__scoreNum--win  { color: #fbbf24; text-shadow: 0 0 9px rgba(245,158,11,0.4); }
+.resultats__scoreNum--draw { color: #94a3b8; text-shadow: none; }
 
 .resultats__scoreDash {
   font-size: 1rem;
@@ -444,9 +457,8 @@
   font-weight: 800;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  /* Retour utilisateur : #334155 (gris ardoise foncé) trop peu lisible sur
-     le fond sombre de la card. */
-  color: rgba(var(--white-rgb),0.75);
+  /* ⚠️ Rouge — style "éditorial néon" (mockup validé), voir .resultats__card. */
+  color: var(--red);
 }
 
 /* Tirs au but : score 120' au-dessus (déjà affiché), puis "T.A.B" + score des
