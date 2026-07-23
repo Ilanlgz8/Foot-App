@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
-import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { COMPETITION_ESPN_SLUG, COMPETITION_SPORTSDB_LEAGUE } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -66,8 +66,29 @@ export function useStandings(selectedComp) {
                 return espnResult
               }
             }
-          } catch { /* ESPN aussi indisponible → repli stale ci-dessous */ }
+          } catch { /* ESPN aussi indisponible → repli TheSportsDB puis stale ci-dessous */ }
         }
+
+        // ⚠️ AJOUT (demande utilisateur, 23/07 : "faut rien que ça casse") : 3e
+        // repli, uniquement pour les 5 grands championnats domestiques où
+        // TheSportsDB a été vérifié par appel réel (voir
+        // COMPETITION_SPORTSDB_LEAGUE + compactSportsDbStandings). N'existe
+        // que pour couvrir le cas rare où FD.org ET ESPN échouent tous les
+        // deux en même temps — n'a jamais d'effet tant qu'ESPN répond.
+        const sportsDbLeague = COMPETITION_SPORTSDB_LEAGUE[selectedComp]
+        if (sportsDbLeague) {
+          try {
+            const sdbRes = await fetch(`/espn?sportsdbLeague=${sportsDbLeague}`)
+            if (sdbRes.ok) {
+              const sdbResult = await sdbRes.json()
+              if ((sdbResult.table?.length ?? 0) > 0) {
+                writeCache(key, sdbResult, STALE_MS)
+                return sdbResult
+              }
+            }
+          } catch { /* TheSportsDB aussi indisponible → repli stale ci-dessous */ }
+        }
+
         const stale = readCacheStale(key)
         if (stale) return stale
         throw err

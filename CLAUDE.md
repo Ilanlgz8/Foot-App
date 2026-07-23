@@ -148,6 +148,17 @@ cf-worker/
   ne peux pas confirmer avec certitude que c'est CE trou précis qui a causé CETTE suspension
   (pas d'accès aux logs FD.org/Vercel depuis cet environnement) — mais c'est un vrai bug de
   contournement de rate-limit, corrigé indépendamment de la cause exacte.
+- ✅ Repli TheSportsDB ajouté comme 3e source classement (23/07, après FD.org PUIS ESPN déjà
+  en place) : `COMPETITION_SPORTSDB_LEAGUE` (`src/data/competitions.js`), mode `sportsdbLeague`
+  dans `api/espn.js`, `compactSportsDbStandings` (`src/utils/espnSummaryParse.js`), câblé dans
+  `useStandings.js`. Volontairement limité aux 5 grands championnats domestiques (FL1/PL/PD/
+  BL1/SA) — seuls IDs TheSportsDB vérifiés par appel réel (classement Premier League/La Liga
+  2025-2026 confirmés identiques aux classements finaux réels). Recherche effectuée suite à
+  une nouvelle suspension FD.org (23/07) et une demande explicite d'alternative : aucune source
+  gratuite ne couvre les BUTEURS (endpoint `lookuptopscorers.php` de TheSportsDB testé vide sur
+  la clé gratuite — probablement réservé au tier payant Patreon ; ESPN n'a jamais eu
+  d'endpoint scorers fonctionnel non plus, voir tentatives précédentes) — ce gap reste ouvert,
+  aucun repli disponible pour `useScorers.js` en cas de panne FD.org.
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org

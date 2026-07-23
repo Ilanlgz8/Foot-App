@@ -56,6 +56,24 @@ export const COMPETITION_ESPN_SLUG = {
   COPA: 'conmebol.america',
 }
 
+// ID de championnat TheSportsDB (thesportsdb.com, clé publique gratuite) —
+// 3e repli classement (après FD.org puis ESPN, voir useStandings.js),
+// UNIQUEMENT pour les compétitions vérifiées par appel réel ce jour-là
+// (23/07) : les 5 grands championnats domestiques. Volontairement PAS
+// étendu aux autres compétitions du tableau ci-dessous — Champions League
+// (l=4480) a un vrai idLeague TheSportsDB mais lookuptable.php y renvoie
+// vide (pas de classement "à plat" pour une phase de groupes/ligue côté
+// TheSportsDB) ; les tournois internationaux ponctuels (WC/EC/NL/CAN/COPA)
+// n'ont pas été vérifiés — plutôt que deviner un ID, ils restent couverts
+// par ESPN seul (COMPETITION_ESPN_SLUG), qui fonctionne déjà pour eux.
+export const COMPETITION_SPORTSDB_LEAGUE = {
+  FL1: '4334',
+  PL:  '4328',
+  PD:  '4335',
+  BL1: '4331',
+  SA:  '4332',
+}
+
 // Coupes nationales — non couvertes par football-data.org en free tier (voir
 // CLAUDE.md), sourcées via ESPN et fusionnées DANS l'onglet du championnat
 // parent (pas d'entrée sidebar dédiée, contrairement à NL/CAN/COPA/EC) —
