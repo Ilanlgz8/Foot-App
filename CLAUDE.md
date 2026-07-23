@@ -162,6 +162,20 @@ cf-worker/
   TheSportsDB testé vide sur la clé gratuite ; ESPN n'a jamais eu d'endpoint scorers fonctionnel
   non plus) — ce gap reste ouvert, aucun repli disponible pour `useScorers.js` en cas de panne
   FD.org.
+- ✅ Piste concrète trouvée pour "suspension FD.org dès que j'ouvre sur mon ordi, jamais sur mon
+  tel" (constat utilisateur, 23/07) : le mini-classement sous "Résultats récents" (desktop
+  uniquement, `showResultClassement` dans `Accueil.jsx`) appelait `useStandings` → FD.org en
+  PLUS des appels déjà communs aux deux versions — un appel FD.org qui n'existait tout
+  simplement pas côté mobile. Seule vraie différence de trafic FD.org identifiée entre desktop
+  et mobile (le reste — matchs à venir, résultats — est strictement identique). Retiré
+  entièrement (widget décoratif secondaire, pas core) plutôt que rattaché à une source
+  alternative. Honnêteté : pas de certitude à 100% que c'était LA cause (FD.org ne documente pas
+  son vrai seuil de suspension), mais la piste la plus concrète et vérifiable trouvée à ce jour —
+  un vrai appel en moins pour un coût fonctionnel minime.
+- ⚠️ `MINUTE_CAP` remonté 5→8/min le 23/07 (demande explicite utilisateur, après mise en garde :
+  le compte a déjà été suspendu à 5/min sans cause certaine identifiée) — espacement (7,5s)
+  toujours dérivé automatiquement du plafond, aucune rafale possible. Si nouvelle suspension :
+  revenir à 5/min (ou moins) en premier réflexe.
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org

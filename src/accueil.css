@@ -335,21 +335,6 @@
   min-height: 8rem;
 }
 
-/* ── Mini classement (desktop, sous Résultats récents — visible uniquement
-   quand une compétition est sélectionnée, voir Accueil.jsx). Réutilise
-   StandingsTable (classement.css) : seul l'habillage conteneur est ajouté
-   ici. ── */
-.accueil__resultClassement {
-  padding: 0.6rem 0.9rem 0.9rem;
-}
-.accueil__resultClassementHint {
-  padding: 0.9rem 1.1rem 1.1rem;
-  text-align: center;
-  color: rgba(var(--white-rgb),0.35);
-  font-size: 0.74rem;
-  font-weight: 600;
-}
-
 /* ── Grille "En direct" (desktop) — réutilise les classes .live__* de
    Live.jsx/live.css pour le contenu des cards elles-mêmes (widget identique,
    voir LiveCard) ; la grille conteneur est spécifique à ce contexte

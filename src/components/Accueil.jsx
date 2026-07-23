@@ -8,21 +8,18 @@ import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } f
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
-import { mergeScore, isCardLive, isNationalTeamComp } from '../utils/matchUtils'
-import { COMPETITIONS, NO_STANDINGS_COMPS } from '../data/competitions'
+import { mergeScore, isCardLive } from '../utils/matchUtils'
+import { COMPETITIONS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { pickMatchDuJour } from '../utils/matchDuJour'
-import { MatchPanel, PanelSkeleton } from '../accueil/MatchCard'
+import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import { LiveCard } from './LiveCardWidget'
-import { useStandings } from '../hooks/useStandings'
-import { StandingsTable } from './StandingsTable'
 import '../accueil.css'
 import '../live.css'
-import '../classement.css'
 
 // Même logique de priorité que pickMatchDuJour (Mondial > Ligue des Champions
 // > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
@@ -523,18 +520,15 @@ function Accueil() {
   )
   const desktopHasLive = isDesktop && desktopLiveMatches.length > 0
 
-  // ── Mini classement (design 4★, sous "Résultats récents") — visible
-  // uniquement quand une compétition précise est sélectionnée dans le filtre
-  // du panneau résultats (compFilterResult), pas sur "Tous" (demande
-  // utilisateur : "pour le classement en dessous du result panel met le
-  // uniquement quand on selectionne un championnat... quand on met tous
-  // n'affiche pas de classement"). NL/CAN/COPA exclues (pas de classement
-  // FD.org, voir NO_STANDINGS_COMPS/Classement.jsx). Hook appelé
-  // inconditionnellement (règle des Hooks) : useStandings est déjà no-op
-  // (enabled: !!selectedComp) quand compFilterResult est null.
-  const showResultClassement = isDesktop && !!compFilterResult && !NO_STANDINGS_COMPS.has(compFilterResult)
-  const { standings: resultStandings, loading: resultStandingsLoading } = useStandings(showResultClassement ? compFilterResult : null)
-  const resultClassementComp = COMPETITIONS.find(c => c.id === compFilterResult)
+  // ⚠️ RETIRÉ (mini-classement desktop sous "Résultats récents", 23/07) :
+  // useStandings(compFilterResult) tapait football-data.org en PLUS des
+  // appels déjà communs mobile/desktop — uniquement quand isDesktop, donc
+  // un appel FD.org que mobile ne fait jamais. Retiré suite à un constat
+  // utilisateur ("dès que je lance l'app sur mon ordi ça suspend mon compte
+  // FD.org, sur mon tel jamais") — piste la plus concrète trouvée pour
+  // expliquer cet écart, pas une certitude absolue (FD.org ne documente pas
+  // son vrai seuil de suspension), mais un vrai appel en moins qui ne
+  // coûtait qu'un widget décoratif secondaire.
 
   // ── Liste "à venir" du panneau central ──
   // Desktop + matchs en direct : ces matchs sont déjà affichés dans la
@@ -789,24 +783,6 @@ function Accueil() {
               </div>
               <div className="accueil__dashPanelDivider" />
               <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
-
-              {/* Mini classement — desktop uniquement, visible seulement
-                  quand une compétition précise est sélectionnée dans le
-                  filtre ci-dessus (demande utilisateur : "pour le classement
-                  en dessous du result panel met le uniquement quand on
-                  selectionne un championnat... quand on met tous n'affiche
-                  pas de classement"). */}
-              {isDesktop && !compFilterResult && (
-                <p className="accueil__resultClassementHint">Choisis un championnat ci-dessus pour voir le classement.</p>
-              )}
-              {showResultClassement && (
-                <div className="accueil__resultClassement">
-                  <div className="accueil__dashPanelDivider" />
-                  {resultStandingsLoading
-                    ? <PanelSkeleton />
-                    : <StandingsTable rows={resultStandings} compact isCountry={resultClassementComp ? isNationalTeamComp({ competition: resultClassementComp }) : false} />}
-                </div>
-              )}
             </div>
           )}
 
