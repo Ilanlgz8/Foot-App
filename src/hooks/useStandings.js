@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
@@ -38,8 +39,40 @@ const LIVE_REFETCH_MS = 1000 * 60 * 5  // 5min
 // call sites (FavoritesPage, MatchModal) qui n'ont pas cette info sous la main.
 const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 
+// ⚠️ AJOUT 3 (question utilisateur : "si je consulte la page un peu avant
+// minuit et que je reste dessus jusqu'à minuit 5, ça peut louper le coche
+// comment on fait pour que ça loupe jamais ?") : hasMatchToday est recalculé
+// à chaque re-render, donc correct à CHAQUE VISITE — mais un onglet resté
+// ouvert EN CONTINU sur la même page, sans jamais se démonter/remonter, ne
+// re-render jamais spontanément juste parce que minuit sonne (staleTime n'est
+// pas un minuteur vivant, juste un seuil vérifié au prochain déclencheur).
+// Minuteur dédié : programmé pour la prochaine minuit locale (+5s de marge),
+// invalide explicitement la query au passage — force une vraie réévaluation
+// (nouveau hasMatchToday calculé par le composant appelant au re-render
+// causé par l'invalidation, nouveau staleTime appliqué) même si la page n'a
+// jamais été quittée. Se reprogramme après chaque déclenchement (scheduleNext
+// récursif) : couvre aussi une page restée ouverte plusieurs jours d'affilée,
+// pas seulement la nuit suivante.
+function useMidnightInvalidation(queryClient, selectedComp) {
+  useEffect(() => {
+    let id
+    function scheduleNext() {
+      const now  = new Date()
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5)
+      id = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['standings', selectedComp] })
+        scheduleNext()
+      }, next.getTime() - now.getTime())
+    }
+    scheduleNext()
+    return () => clearTimeout(id)
+  }, [queryClient, selectedComp])
+}
+
 export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday = true) {
   const key = `standings_${selectedComp}`
+  const queryClient = useQueryClient()
+  useMidnightInvalidation(queryClient, selectedComp)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
