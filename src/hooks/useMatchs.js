@@ -284,21 +284,45 @@ function filterUpcomingWindow(matches, now, windowMs = UPCOMING_WINDOW_MS) {
 // d'être servi tel quel pendant jusqu'à 1h après le déploiement du fix.
 // windowDays fait partie de la clé de cache : une fenêtre 7j et une fenêtre
 // 30j (Accueil, voir plus bas) ne doivent jamais se marcher dessus.
-// Cache combiné dédié (TTL 1h comme le cache par-compétition SCHEDULED) : au
-// pire une rafale de N requêtes FD.org une fois par heure, lissée par le
-// budget global déjà en place dans api/football.js.
+// ⚠️ REVU (idée utilisateur, 23/07) : deux changements distincts.
+// 1) TTL dédié 24h (au lieu de TTL.SCHEDULED = 1h partagé avec useMatches/
+//    Programme, volontairement PAS touché ici — Programme doit rester plus
+//    réactif à un changement d'horaire annoncé pour UNE compétition qu'on
+//    regarde activement). Un calendrier de matchs à venir, toutes compétitions
+//    confondues rien que pour "quel est le prochain jour avec un match"
+//    (Accueil/Pronos), ne justifie pas un re-check toutes les heures — un
+//    changement d'horaire/date à moins de 24h d'préavis est quasi inexistant
+//    en football pro (même raisonnement déjà appliqué côté cf-worker pour
+//    les notifs, voir CLAUDE.md "période creuse"). Honnêteté : ça reste un
+//    compromis, pas une garantie — un report de dernière minute (terrain
+//    impraticable, ordre public...) resterait invisible ici jusqu'à 24h,
+//    mais ce cas est rare et le calendrier lui-même (pas le score) est
+//    concerné, pas une donnée critique en temps réel.
+// 2) Étalement sur ~8s (STAGGER_MS, même pattern que useRecentDaysMatches
+//    plus haut) : les 8-11 appels FD.org/ESPN partaient tous en même temps à
+//    chaque expiration du cache — déjà sans risque réel pour FD.org (le
+//    verrou d'espacement global dans api/football.js sérialise de toute
+//    façon), mais visuellement une "rafale" trompeuse dans l'onglet Network
+//    (a alimenté plusieurs fausses pistes de debug ce jour-là). Étalé, plus
+//    de rafale visible, comportement identique au final.
+const ALL_COMPS_TTL = 24 * 60 * 60 * 1000  // 24h
+const ALL_COMPS_STAGGER_MS = 800  // 800ms x jusqu'à 10 = ~8s pour la dernière compétition
+
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const windowMs   = windowDays * 24 * 60 * 60 * 1000
   const key        = cacheKey(`ALL_V2_${windowDays}`, 'SCHEDULED')
   const cachedData = readCacheStale(key)
   const cachedAt   = getCacheSavedAt(key)
-  const ttl        = TTL.SCHEDULED
+  const ttl        = ALL_COMPS_TTL
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', 'ALL_V2', 'SCHEDULED', compIds.join(','), windowDays],
     queryFn: async () => {
       const results = await Promise.allSettled(
-        compIds.map(id => fetchMatchesForComp(id, 'SCHEDULED'))
+        compIds.map(async (id, i) => {
+          if (i > 0) await new Promise(r => setTimeout(r, i * ALL_COMPS_STAGGER_MS))
+          return fetchMatchesForComp(id, 'SCHEDULED')
+        })
       )
       const now = Date.now()
       const merged = filterUpcomingWindow(
