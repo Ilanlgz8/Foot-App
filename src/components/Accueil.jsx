@@ -54,6 +54,21 @@ function CompFilter({ competitions, active, onChange, layout = 'row' }) {
   )
 }
 
+// ⚠️ AJOUT (nécessaire suite au passage de FL1/PL/PD/BL1/SA/CL sur ESPN dans
+// useTodayMatches.js, 23/07) : `rawMatches` (widget "jour", désormais ESPN
+// pour ces 6 comps, id façon `espn-FL1-123`) et `upcomingAllComps` (reste
+// FD.org pour elles, id numérique FD.org classique) peuvent désormais
+// représenter le MÊME match réel avec des `id` de format complètement
+// différent — un simple Set de `m.id` (utilisé dans les filets de sécurité
+// `extra` ci-dessous) ne détecterait pas ce doublon et afficherait la même
+// rencontre deux fois. Domicile + extérieur + jour local identifie le même
+// match réel peu importe la source.
+function matchDedupeKey(m) {
+  const d = m.utcDate ? new Date(m.utcDate) : null
+  const dateStr = d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : 'x'
+  return `${m.homeTeam?.id ?? '?'}-${m.awayTeam?.id ?? '?'}-${dateStr}`
+}
+
 function getDayLabel(offset) {
   if (offset === 0) return "Aujourd'hui"
   if (offset === 1) return 'Demain'
@@ -221,8 +236,9 @@ function Accueil() {
   // ses cards).
   const matches = useMemo(() => {
     const seen = new Set(rawMatches.map(m => m.id))
+    const seenKeys = new Set(rawMatches.map(matchDedupeKey))
     const extra = upcomingAllComps.filter(m => {
-      if (seen.has(m.id)) return false
+      if (seen.has(m.id) || seenKeys.has(matchDedupeKey(m))) return false
       if (!m.utcDate) return false
       const d = new Date(m.utcDate)
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -270,8 +286,9 @@ function Accueil() {
   // "aujourd'hui absolu" spécifiquement (peut différer de targetDate).
   const todayMatchesForResults = useMemo(() => {
     const seen = new Set(rawTodayMatchesForResults.map(m => m.id))
+    const seenKeys = new Set(rawTodayMatchesForResults.map(matchDedupeKey))
     const extra = upcomingAllComps.filter(m => {
-      if (seen.has(m.id)) return false
+      if (seen.has(m.id) || seenKeys.has(matchDedupeKey(m))) return false
       if (!m.utcDate) return false
       const d = new Date(m.utcDate)
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

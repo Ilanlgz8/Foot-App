@@ -5,22 +5,47 @@ import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
-const EURO_COMPS = 'CL,PL,FL1,PD,BL1,SA' // EL/ECL non couverts par FD.org free tier
 
 // ⚠️ AJOUT (constat utilisateur : la flèche "jour suivant" de l'Accueil
 // sautait jusqu'au 16 août — un vrai match ce jour-là — mais le panneau
 // affichait "aucun match"). Cause : cette fonction (fetchTodayMatches,
-// utilisée pour les CARDS affichées) ne couvrait que EURO_COMPS + WC, alors
-// que la recherche du "prochain jour avec un match" (useUpcomingMatchesAllComps,
-// dans useMatchs.js) couvre TOUTES les compétitions suivies (voir
-// ACCUEIL_COMP_IDS dans Accueil.jsx) — Euro, Ligue des Nations, CAN, Copa
-// America (ESPN) et les coupes nationales fusionnées (Coupe de
-// France/Copa del Rey/FA Cup, ESPN elles aussi). La flèche pouvait donc
-// sauter vers un jour dont le SEUL match provenait d'une de ces
-// compétitions manquantes ici → jour trouvé, mais rien à afficher une fois
-// arrivé dessus. Complété pour couvrir exactement les mêmes compétitions
-// que la recherche de saut, afin que les deux soient toujours cohérentes.
-const ESPN_SOURCED_COMPS = ['NL', 'CAN', 'COPA', 'UEL', 'UECL'] // même liste que useMatchs.js
+// utilisée pour les CARDS affichées) ne couvrait à l'origine que EURO_COMPS
+// (FD.org) + WC, alors que la recherche du "prochain jour avec un match"
+// (useUpcomingMatchesAllComps, dans useMatchs.js) couvre TOUTES les
+// compétitions suivies (voir ACCUEIL_COMP_IDS dans Accueil.jsx). La flèche
+// pouvait donc sauter vers un jour dont le SEUL match provenait d'une
+// compétition manquante ici → jour trouvé, mais rien à afficher une fois
+// arrivé dessus. Complété pour couvrir les mêmes compétitions.
+//
+// ⚠️ AJOUT 2 (23/07, demande explicite utilisateur suite à des 429 constatés
+// en direct sur football-data.org, screenshot Network à l'appui) : FL1/PL/
+// PD/BL1/SA/CL étaient jusqu'ici récupérés via UN SEUL appel FD.org
+// multi-compétitions (`EURO_COMPS`, désormais retiré) — mais c'était, avec
+// les appels WC/EC, le plus gros contributeur de charge FD.org de toute
+// l'app (relancé à chaque jour affiché dans Accueil). Basculés sur ESPN ici,
+// même mécanisme que NL/CAN/COPA/UEL/UECL juste en dessous.
+//
+// Volontairement LIMITÉ à ce fichier (widget "jour" de l'Accueil, simple
+// liste triée par date) : Programme.jsx (useMatches, useMatchs.js) reste sur
+// FD.org pour ces 6 comps, car sa vue "Par journée" a besoin du champ
+// `matchday`, qu'ESPN ne fournit jamais (toujours `null`, voir
+// normalizeEvent dans espnAdapter.js) — y toucher aurait cassé le
+// regroupement par journée. Ce widget-ci n'affiche qu'une liste
+// chronologique d'un jour donné, aucun besoin de matchday.
+//
+// REAL_COMP_ID : contrairement à NL/CAN/COPA/UEL/UECL (100% ESPN, aucun id
+// football-data.org n'existe pour elles), ces 6 comps ONT un vrai id
+// numérique FD.org, utilisé ailleurs dans l'app (matching live précis dans
+// api/fifa-live.js/COMP_ESPN, regroupement par compétition dans
+// ResultPanel.jsx). Sans le transmettre, ces matchs récupéreraient un
+// competition.id à `null` (voir SYNTHETIC_COMP_ID, espnAdapter.js — pensé
+// pour des comps qui n'ont justement PAS de vrai id) : plusieurs vrais
+// championnats différents se retrouveraient fusionnés dans un même groupe
+// "Autre" partout où l'app groupe par id, et le matching live perdrait ces
+// matchs (aucune correspondance possible avec un id null). Les valeurs
+// viennent des mêmes id que ESPN_SLUG_BY_COMP_ID (espnSlugs.js).
+const REAL_COMP_ID = { CL: 2001, PL: 2021, FL1: 2015, PD: 2014, BL1: 2002, SA: 2019 }
+const ESPN_SOURCED_COMPS = ['CL', 'PL', 'FL1', 'PD', 'BL1', 'SA', 'NL', 'CAN', 'COPA', 'UEL', 'UECL']
 const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 
 
@@ -53,20 +78,19 @@ async function fetchTodayMatches(date) {
   // useMatchs.js) : chaque appel réussi garde son résultat, seul celui qui a
   // échoué contribue un tableau vide au lieu de tout faire tomber.
   const settled = await Promise.allSettled([
-    safeFetch(`/api/v4/matches?dateFrom=${prevDate}&dateTo=${date}&competitions=${EURO_COMPS}`),
     safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
     safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
-    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id])),
+    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
     ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
   ])
   const results = settled.map(r => r.status === 'fulfilled' ? r.value : [])
-  const [euroMatches, wcMatches, ecMatches, ...espnResults] = results
+  const [wcMatches, ecMatches, ...espnResults] = results
   const espnMatches = espnResults.flat().filter(m => VALID_STATUS.includes(m.status))
 
   // Dédupliquer par id et filtrer par date LOCALE
   // → un match à 00:00 local (= 22:00 UTC J-1) apparaît bien dans J local seulement
   const seen = new Set()
-  const all = [...euroMatches, ...wcMatches, ...ecMatches, ...espnMatches].filter(m => {
+  const all = [...wcMatches, ...ecMatches, ...espnMatches].filter(m => {
     if (seen.has(m.id)) return false
     seen.add(m.id)
     if (m.utcDate) {

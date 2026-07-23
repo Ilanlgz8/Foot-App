@@ -204,7 +204,15 @@ const ESPN_MATCHES_TTL = 2 * 60 * 1000 // 2min — aligné sur le TTL FINISHED e
 // la fenêtre glissante — un seul fetch réseau, filtré ensuite par statut côté
 // appelant (useMatchs.js). Cache local partagé entre l'onglet Programme et
 // l'onglet Résultats pour éviter un double appel réseau simultané.
-export async function fetchEspnCompMatches(compCode, slug) {
+// `overrides` (optionnel, {} par défaut — compatible avec tous les appels
+// existants) : ajouté pour permettre à FL1/PL/PD/BL1/SA/CL (voir
+// useTodayMatches.js) de forcer leur VRAI id numérique football-data.org via
+// overrides.compId, plutôt que de tomber sur SYNTHETIC_COMP_ID/null (pensé à
+// l'origine pour NL/CAN/COPA/UEL/UECL, qui n'ont eux JAMAIS d'id FD.org). Ces
+// 6 comps EN ONT un, utilisé ailleurs (api/fifa-live.js, ResultPanel.jsx) —
+// le garder cohérent évite un id null qui casserait le regroupement par
+// compétition et le matching live pour ces matchs précis.
+export async function fetchEspnCompMatches(compCode, slug, overrides = {}) {
   const cacheKey = `matches_espn_${compCode}`
   if (!slug) return []
   try {
@@ -212,7 +220,7 @@ export async function fetchEspnCompMatches(compCode, slug) {
     if (!res.ok) return readCacheStale(cacheKey) ?? []
     const json = await res.json()
     const matches = (json.events ?? [])
-      .map(e => normalizeEvent(e, compCode))
+      .map(e => normalizeEvent(e, compCode, overrides))
       .filter(Boolean)
     if (matches.length > 0) writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
     return matches.length > 0 ? matches : (readCacheStale(cacheKey) ?? [])
