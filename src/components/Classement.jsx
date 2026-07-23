@@ -122,7 +122,7 @@ function Classement() {
 
   const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
   const { formMap } = useTeamForm(selectedComp)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday)
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement

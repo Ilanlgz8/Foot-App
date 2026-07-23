@@ -7,7 +7,16 @@ import { classifyFetchError } from '../utils/fetchErrors'
 // côté client que la donnée que le serveur peut réellement fournir.
 const STALE_MS = 1000 * 60 * 2  // 2min (était 30min)
 
-export function useScorers(compId) {
+// ⚠️ AJOUT (même optimisation que useStandings.js, 23/07 — idée utilisateur
+// appliquée par cohérence ici aussi) : les buteurs ne peuvent pas plus
+// changer que le classement sans match — 2min tout le temps, même les jours
+// sans aucun match pour cette compétition, n'avait pas de sens. hasMatchToday
+// (passé par l'appelant, même valeur déjà calculée pour useStandings dans
+// Classement.jsx — aucun calcul en double) bascule le staleTime : 24h les
+// jours sans match, 2min les jours où ça joue.
+const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
+
+export function useScorers(compId, hasMatchToday = true) {
   const key = `scorers_${compId}`
 
   const { data, isLoading, error } = useQuery({
@@ -66,7 +75,7 @@ export function useScorers(compId) {
     },
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
-    staleTime:            STALE_MS,
+    staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
     retry: false,
     enabled: !!compId,
   })
