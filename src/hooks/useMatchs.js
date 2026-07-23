@@ -13,7 +13,7 @@ const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA'])
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)
-const TTL = {
+export const TTL = {
   SCHEDULED: 60 * 60 * 1000,   // 1h — calendrier très stable
   FINISHED:   2 * 60 * 1000,   // 2min (était 5min) — aligné sur le cache serveur, résultats/classement/buteurs à jour plus vite
   IN_PLAY:    2 * 60 * 1000,   // 2min — géré ailleurs mais garde un fallback court
@@ -194,11 +194,15 @@ async function fetchMatchesForComp(selectedComp, status) {
   return matches
 }
 
-export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc') {
+// options.staleTime : repli explicite pour un appelant précis (ex: Résultats,
+// voir Resultat.jsx) — n'affecte pas les autres appelants de ce même hook sur
+// la même compét/statut (Classement.jsx notamment), chacun garde son propre
+// staleTime côté React Query même si la clé de requête est partagée.
+export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', options = {}) {
   const key         = cacheKey(selectedComp, status)
   const cachedData  = readCacheStale(key)
   const cachedAt    = getCacheSavedAt(key)
-  const ttl         = TTL[status] ?? 30 * 60 * 1000
+  const ttl         = options.staleTime ?? (TTL[status] ?? 30 * 60 * 1000)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', selectedComp, status],

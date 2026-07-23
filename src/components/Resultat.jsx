@@ -10,7 +10,7 @@ import './../compHeader.css'
 import './../match.css'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
-import { useMatches, groupRounds } from '../hooks/useMatchs'
+import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
@@ -173,7 +173,20 @@ function Resultats() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [compOpen])
 
-  const { matches: fdMatches, loading, error } = useMatches(selectedComp, 'FINISHED', 'desc')
+  // ⚠️ AJOUT (constat utilisateur : "y'a pas de cache pour la page resultat,
+  // fait la même logique que Programme") : cette requête FD.org gardait le
+  // staleTime par défaut de useMatches pour le statut FINISHED (2min,
+  // TTL.FINISHED — pensé à l'origine pour rafraîchir classement/buteurs
+  // ailleurs dans l'app, voir useMatchs.js) au lieu du cache stable 1h de
+  // Programme (TTL.SCHEDULED) — donc un appel FD.org bien plus fréquent que
+  // Programme à chaque remount de cette page, sans qu'il y ait besoin de ça :
+  // la fraîcheur "en direct" ne vient pas de ce staleTime mais du pont ESPN
+  // ci-dessous (liveMatches/getRecentlyFinishedMatches + ticker 5s), qui
+  // reste actif quel que soit le staleTime FD.org. On peut donc aligner le
+  // cache FD.org sur celui de Programme sans rien perdre en réactivité.
+  const { matches: fdMatches, loading, error } = useMatches(selectedComp, 'FINISHED', 'desc', {
+    staleTime: TTL.SCHEDULED,
+  })
 
   // ESPN détecte souvent la fin d'un match plusieurs minutes avant que
   // football-data.org ne mette à jour son statut à FINISHED (retard connu,
@@ -183,6 +196,9 @@ function Resultats() {
   // liveMatches/matchStateTracker, alimentés globalement par LiveProvider)
   // considère déjà terminés ("ft"), même si liveTracker les garde encore
   // quelques minutes dans liveMatches et que FD.org n'a pas encore basculé.
+  // C'est CE pont (pas le staleTime FD.org ci-dessus) qui fait apparaître un
+  // match "Terminé" ici immédiatement, et qui garde la page attentive tant
+  // qu'un match de cette compétition est en direct (ticker 5s plus bas).
   const { liveMatches, espnScores } = useLiveData()
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur : un match apparaît tout de suite

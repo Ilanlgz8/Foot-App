@@ -6,7 +6,7 @@
 //   useLineups(match) — compositions via ESPN summary
 //   useH2H(match)     — confrontations directes via FD.org
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { readCache, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 // Depuis la compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js) :
@@ -838,18 +838,49 @@ export function useFdLineups(match) {
 
 // ── useH2H ─────────────────────────────────────────────────────────────────────
 // Source : FD.org /matches/{id}/head2head
+// ⚠️ AJOUT (constat utilisateur, 23/07 : "y'avait des historique de
+// rencontres qui datait de 5 ou 6 ans et là je vois plus du tout de
+// historique") : contrairement à quasi tout le reste de l'app (useMatches,
+// useStandings, useMatchDetail plus haut...), ce hook n'avait AUCUN cache
+// localStorage — juste le cache mémoire React Query (staleTime 1h, perdu à
+// chaque vrai reload/remount). Un H2H déjà récupéré avec succès pouvait donc
+// disparaître entièrement dès la prochaine visite si FD.org échouait à ce
+// moment précis (403/429 — voir les nombreux incidents FD.org documentés
+// dans CLAUDE.md, dont un le jour même de ce constat), sans aucun filet de
+// secours. L'historique de confrontations directes ne change quasiment
+// jamais (au mieux +1 match par saison entre les 2 mêmes équipes) — un TTL
+// long (24h) + repli sur la dernière copie connue en cas d'échec règle ça
+// dans le même esprit que useMatches, au lieu de renvoyer null au moindre
+// accroc réseau.
+const H2H_TTL = 24 * 60 * 60 * 1000
 
 export function useH2H(match) {
+  const key       = `h2h_${match?.id}`
+  const cachedData = match?.id ? readCacheStale(key) : null
+  const cachedAt   = match?.id ? getCacheSavedAt(key) : 0
+
   return useQuery({
     queryKey: ['h2h-fd', match?.id],
     enabled:  !!match?.id,
     staleTime: 60 * 60_000,
     retry: 1,
+    initialData:          cachedData ?? undefined,
+    initialDataUpdatedAt: cachedAt,
     queryFn: async () => {
-      const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=20`)
-      if (!res.ok) return null
-      const json = await res.json()
-      return json.matches ?? []
+      try {
+        const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=20`)
+        if (!res.ok) {
+          const stale = readCacheStale(key)
+          return stale ?? null
+        }
+        const json    = await res.json()
+        const matches = json.matches ?? []
+        if (matches.length > 0) writeCache(key, matches, H2H_TTL)
+        return matches.length > 0 ? matches : (readCacheStale(key) ?? matches)
+      } catch {
+        const stale = readCacheStale(key)
+        return stale ?? null
+      }
     },
   })
 }
