@@ -23,62 +23,69 @@ export function useStandings(selectedComp) {
     // réalité jamais atteint sur ce chemin d'erreur). Même mécanisme déjà
     // trouvé et corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
     // espnAdapter.js) — appliqué ici pour rester cohérent.
+    // ⚠️ ORDRE DES SOURCES (demande utilisateur explicite, 23/07 : "si the
+    // sport db n'a pas mis a jour on passe a espn et si espn n'a pas
+    // ftdata.org") : pour les 5 championnats où TheSportsDB est vérifié
+    // (voir COMPETITION_SPORTSDB_LEAGUE), l'ordre est désormais
+    // TheSportsDB → ESPN → FD.org → cache stale — les deux sources
+    // gratuites/sans clé/jamais suspendues sur ce projet sont épuisées
+    // AVANT de toucher FD.org, dont le budget global est fragile (comptes
+    // suspendus à répétition, voir api/football.js). FD.org reste la
+    // source PRIMAIRE pour les compétitions non couvertes par TheSportsDB
+    // (CL/WC/EC/NL/CAN/COPA), comportement inchangé pour elles : FD.org →
+    // ESPN → cache stale.
+    //
+    // Honnêteté sur le compromis : TheSportsDB est une base communautaire,
+    // pas un flux temps réel — `dateUpdated` observé lors des tests (23/07)
+    // montrait des mises à jour espacées de plusieurs jours, pas après
+    // chaque match. Si TheSportsDB est en retard, ESPN (temps quasi réel)
+    // prend le relais avant même d'envisager FD.org.
     queryFn: async () => {
-      // ⚠️ REORDONNANCÉ (demande utilisateur explicite, 23/07 : "met le
-      // sportdb prioritaire meme avant football data org ... pour eviter
-      // trop de requetes vers la source") : pour les 5 championnats où
-      // TheSportsDB est vérifié (voir COMPETITION_SPORTSDB_LEAGUE), on
-      // l'interroge EN PREMIER, avant même FD.org — FD.org n'est alors plus
-      // du tout appelé pour ces championnats tant que TheSportsDB répond,
-      // ce qui retire une part significative du volume de requêtes vers un
-      // compte déjà suspendu à plusieurs reprises (budget global partagé
-      // très serré, voir api/football.js). FD.org reste la source PRIMAIRE
-      // pour toutes les autres compétitions (CL/WC/EC/NL/CAN/COPA), non
-      // couvertes par TheSportsDB.
-      //
-      // Honnêteté sur le compromis : TheSportsDB est une base communautaire,
-      // pas un flux temps réel — `dateUpdated` observé lors des tests (23/07)
-      // montrait des mises à jour espacées de plusieurs jours, pas après
-      // chaque match. Un classement peut donc rester affiché tel qu'il était
-      // AVANT les derniers résultats du jour, le temps que TheSportsDB se
-      // resynchronise — contrairement à FD.org/ESPN, plus proches du direct.
-      // Compromis assumé : moins de fraîcheur immédiate en échange de
-      // beaucoup moins de pression sur un compte FD.org fragile.
       const sportsDbLeague = COMPETITION_SPORTSDB_LEAGUE[selectedComp]
-      if (sportsDbLeague) {
+      const espnSlug       = COMPETITION_ESPN_SLUG[selectedComp]
+
+      const tryTheSportsDb = async () => {
         try {
           const sdbRes = await fetch(`/espn?sportsdbLeague=${sportsDbLeague}`)
           if (sdbRes.ok) {
             const sdbResult = await sdbRes.json()
-            if ((sdbResult.table?.length ?? 0) > 0) {
-              writeCache(key, sdbResult, STALE_MS)
-              return sdbResult
-            }
+            if ((sdbResult.table?.length ?? 0) > 0) return sdbResult
           }
-        } catch { /* TheSportsDB indisponible → repli FD.org ci-dessous, comportement historique */ }
+        } catch { /* → repli suivant */ }
+        return null
+      }
+
+      const tryEspn = async () => {
+        if (!espnSlug) return null
+        try {
+          const espnRes = await fetch(`/espn?slug=${espnSlug}&standings=1`)
+          if (espnRes.ok) {
+            const espnResult = await espnRes.json()
+            if ((espnResult.table?.length ?? 0) > 0 || (espnResult.groups?.length ?? 0) > 0) return espnResult
+          }
+        } catch { /* → repli suivant */ }
+        return null
       }
 
       // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais le classement, 5min après
-      // plus rien, sans erreur visible") : le throw ci-dessous (429/403/!ok)
-      // n'était entouré d'AUCUN try/catch — combiné à `retry: false`, une SEULE
-      // erreur transitoire (réseau, 429/403 le temps qu'un nouveau compte
-      // FD.org se stabilise, blip Redis côté serveur...) faisait échouer la
-      // requête DÉFINITIVEMENT (React Query n'insiste pas sans retry), sans
-      // aucun repli — contrairement à l'intention du reste du fichier
-      // (readCacheStale existe déjà comme filet de secours, mais n'était en
-      // réalité jamais atteint sur ce chemin d'erreur). Même mécanisme déjà
-      // trouvé et corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
+      // plus rien, sans erreur visible") : ce fetch n'était entouré d'AUCUN
+      // try/catch — combiné à `retry: false`, une SEULE erreur transitoire
+      // (réseau, 429/403 le temps qu'un nouveau compte FD.org se stabilise,
+      // blip Redis côté serveur...) faisait échouer la requête DÉFINITIVEMENT
+      // (React Query n'insiste pas sans retry), sans aucun repli —
+      // contrairement à l'intention du reste du fichier (readCacheStale
+      // existe déjà comme filet de secours, mais n'était en réalité jamais
+      // atteint sur ce chemin d'erreur). Même mécanisme déjà trouvé et
+      // corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
       // espnAdapter.js) — appliqué ici pour rester cohérent.
-      try {
+      const tryFdOrg = async () => {
         const res = await fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
         if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
         if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
         const json = await res.json()
         const allGroups = json.standings ?? []
-
         const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
-
-        const result = realGroups.length > 1
+        return realGroups.length > 1
           ? {
               table: realGroups.flatMap(g => g.table ?? []),
               groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
@@ -87,27 +94,35 @@ export function useStandings(selectedComp) {
               table: allGroups[0]?.table ?? [],
               groups: [],
             }
+      }
 
-        writeCache(key, result, STALE_MS)
-        return result
-      } catch (err) {
-        // Repli ESPN — source de secours indépendante, gratuite, sans clé,
-        // jamais suspendue sur ce projet — AVANT le repli sur le cache stale
-        // local. Aucun effet si la compétition n'a pas de slug ESPN connu
-        // (voir COMPETITION_ESPN_SLUG) ou si ESPN échoue aussi.
-        const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
-        if (espnSlug) {
-          try {
-            const espnRes = await fetch(`/espn?slug=${espnSlug}&standings=1`)
-            if (espnRes.ok) {
-              const espnResult = await espnRes.json()
-              if ((espnResult.table?.length ?? 0) > 0 || (espnResult.groups?.length ?? 0) > 0) {
-                writeCache(key, espnResult, STALE_MS)
-                return espnResult
-              }
-            }
-          } catch { /* ESPN aussi indisponible → repli stale ci-dessous */ }
+      if (sportsDbLeague) {
+        const sdbResult = await tryTheSportsDb()
+        if (sdbResult) { writeCache(key, sdbResult, STALE_MS); return sdbResult }
+
+        const espnResult = await tryEspn()
+        if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
+
+        try {
+          const fdResult = await tryFdOrg()
+          writeCache(key, fdResult, STALE_MS)
+          return fdResult
+        } catch (err) {
+          const stale = readCacheStale(key)
+          if (stale) return stale
+          throw err
         }
+      }
+
+      // Compétitions non couvertes par TheSportsDB : comportement historique
+      // inchangé (FD.org primaire, ESPN en repli).
+      try {
+        const fdResult = await tryFdOrg()
+        writeCache(key, fdResult, STALE_MS)
+        return fdResult
+      } catch (err) {
+        const espnResult = await tryEspn()
+        if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
 
         const stale = readCacheStale(key)
         if (stale) return stale
