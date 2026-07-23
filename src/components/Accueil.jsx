@@ -140,7 +140,7 @@ function Accueil() {
   // (le module-level check ne suffit pas car useState ignore les changements de sa valeur initiale)
   useEffect(() => {
     let lastDate = getTargetDate(0)
-    const id = setInterval(() => {
+    const checkDateChange = () => {
       const newDate = getTargetDate(0)
       if (newDate !== lastDate) {
         lastDate = newDate
@@ -148,8 +148,29 @@ function Accueil() {
         _savedDate         = newDate
         setDayOffset(0)
       }
-    }, 30_000) // vérifie toutes les 30s — suffisant pour ne pas rater minuit
-    return () => clearInterval(id)
+    }
+    const id = setInterval(checkDateChange, 30_000) // vérifie toutes les 30s — suffisant pour ne pas rater minuit
+
+    // ⚠️ AJOUT (bug utilisateur : app fermée sur "21 août" (vue matchs à
+    // venir), plusieurs jours plus tard elle rouvre TOUJOURS direct sur le
+    // 21 août — masquant les jours entre-temps, ex. le 16 août, pourtant
+    // avec des matchs). Cause : sur PWA mobile, "fermer" l'app suspend
+    // souvent l'onglet en arrière-plan au lieu de le tuer réellement — le
+    // composant n'est jamais démonté (l'initialiseur paresseux de dayOffset,
+    // plus haut, ne se rejoue donc jamais) ET setInterval lui-même est gelé
+    // pendant la suspension (aucun tick ne peut détecter le changement de
+    // date tant que l'app n'est pas revenue au premier plan). dayOffset
+    // restait donc bloqué indéfiniment. 'visibilitychange' est déclenché de
+    // façon fiable par le navigateur au moment exact où l'app redevient
+    // visible, suspendue ou pas — vérification immédiate au lieu d'attendre
+    // jusqu'à 30s (ou de dépendre d'un remount qui n'arrive pas dans ce cas).
+    const onVisible = () => { if (document.visibilityState === 'visible') checkDateChange() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   // ── Données ──
