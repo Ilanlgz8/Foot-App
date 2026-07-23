@@ -27,7 +27,7 @@ import {
   getLiveState, setLiveState, markRecentlyFinished,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
-import { ESPN_SLUG_BY_COMP_ID } from '../data/espnSlugs.js'
+import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
 import { isNationalTeamComp } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 
@@ -353,7 +353,10 @@ function _checkPendingKickoffs(matches, queryClient) {
     if (match.status !== 'SCHEDULED' && match.status !== 'TIMED') continue
     if (isTrackedLive(match.id)) continue
 
-    const slug = COMP_ESPN[match.competition?.id]
+    // espnNativeSlug : coupes nationales/NL/CAN/COPA (voir espnSlugs.js) — même
+    // système rapide que les compétitions football-data.org désormais (demande
+    // utilisateur), donc même besoin du placeholder "Débute" à l'heure prévue.
+    const slug = COMP_ESPN[match.competition?.id] ?? espnNativeSlug(match)
     if (!slug) continue // compétition non suivie → skip
 
     const utcMs = new Date(match.utcDate).getTime()
