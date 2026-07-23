@@ -897,6 +897,13 @@ async function handlePass(env) {
 
   const result = await runOnePass(env)
 
+  // Préchauffage FD.org (voir warmFdCache) — volontairement INDÉPENDANT de la
+  // logique ESPN ci-dessus (early-return "aucun match aujourd'hui" incluse) :
+  // Programme/Résultats/Classement sont consultés par les visiteurs même les
+  // jours sans match en direct, donc ce préchauffage doit tourner tout le
+  // temps, pas seulement pendant les fenêtres où le direct est actif.
+  await warmFdCache(result.log)
+
   if (writeBookkeeping) {
     try {
       await kv.set('cron:goals:lastResult', JSON.stringify({
@@ -915,6 +922,58 @@ async function handlePass(env) {
   } catch {}
 
   return result
+}
+
+// ── Préchauffage cache FD.org (Programme/Résultats/Classement) ─────────────
+// CONTEXTE (demande utilisateur, 23/07 — "si plusieurs personnes consultent
+// l'app en même temps faudrait trouver une solution") : le budget FD.org
+// partagé (8/min, voir MINUTE_CAP dans api/football.js) peut être épuisé
+// pile au moment où un visiteur demande une requête JAMAIS encore mise en
+// cache — dans ce cas précis, aucune copie stale n'existe pour servir de
+// secours, la requête échoue dur (403/429 visible côté utilisateur). Plus il
+// y a de visiteurs simultanés, plus ce cas devient probable.
+//
+// Solution : ce Worker (déjà actif chaque minute, gratuit, coût CPU quasi
+// nul — le réseau ne compte pas dans le budget Cloudflare) rafraîchit
+// PROACTIVEMENT, en tournante, les requêtes FD.org les plus demandées — une
+// copie récente existe alors TOUJOURS en cache avant qu'un visiteur la
+// demande, quel que soit le nombre de visiteurs simultanés. Appelle notre
+// PROPRE /api/football (jamais FD.org directement) : passe par le même
+// budget/circuit-breaker que les vrais utilisateurs, aucun chemin parallèle
+// qui contournerait la protection existante.
+//
+// Liste limitée aux 6 grands championnats (FL1/PL/PD/BL1/SA/CL) × 3
+// endpoints (résultats/calendrier/classement) — la combinaison la plus
+// consultée (Programme/Résultats/Classement). WC/EC/coupes nationales hors
+// périmètre pour l'instant (trafic plus faible, moins exposées au problème).
+const FD_WARM_COMPS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
+const FD_WARM_LIST = FD_WARM_COMPS.flatMap(id => [
+  { apiPath: `/v4/competitions/${id}/matches`, qs: 'status=FINISHED' },
+  { apiPath: `/v4/competitions/${id}/matches`, qs: 'status=SCHEDULED' },
+  { apiPath: `/v4/competitions/${id}/standings`, qs: '' },
+])
+const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
+
+// Un seul élément de la liste rafraîchi toutes les 2min (aligné sur le TTL
+// serveur le plus court, FINISHED=120s — voir getTtl() dans api/football.js,
+// inutile d'aller plus vite, ça ne ferait que consommer du budget FD.org
+// sans gagner en fraîcheur). Rotation déterministe basée sur l'horloge (pas
+// besoin de state Redis dédié) : cycle complet de la liste (18 entrées) en
+// 36min. Consomme au pire 1 des 8 créneaux/min disponibles, une seule fois
+// toutes les 2min — impact négligeable sur le budget partagé avec les vrais
+// utilisateurs.
+async function warmFdCache(log) {
+  try {
+    const now = new Date()
+    if (now.getMinutes() % 2 !== 0) return
+    const idx = Math.floor(Date.now() / 120_000) % FD_WARM_LIST.length
+    const { apiPath, qs } = FD_WARM_LIST[idx]
+    const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+    if (!res.ok) log.push(`[fd-warm:${apiPath}${qs ? '?' + qs : ''}] status=${res.status}`)
+  } catch (e) {
+    log.push(`[fd-warm] error=${e.message}`)
+  }
 }
 
 // Comparaison constant-time (audit sécurité, cohérent avec safeCompare côté
