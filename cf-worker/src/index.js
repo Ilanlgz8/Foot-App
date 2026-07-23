@@ -253,8 +253,17 @@ async function acquireDedup(kv, dedupKey, ttl) {
   } catch { return null }
 }
 
-// Envoi réel vers Vercel — extrait de notifyVercel ci-dessous, inchangé.
-async function sendToVercel(env, payload, slug, options = {}, log = null) {
+// Envoi réel vers Vercel — extrait de notifyVercel ci-dessous.
+// ⚠️ AJOUT (constat utilisateur, 24/07 : "certains matchs, rien reçu" pendant
+// un dépassement de budget CPU Vercel) : un seul essai — si Vercel répond une
+// erreur transitoire (429/5xx, souvent le signe d'un budget CPU/quota
+// temporairement épuisé) ou si le réseau glisse, la notif était perdue pour
+// de bon, sans aucune 2e tentative. Un seul retry (1,5s plus tard) rattrape
+// les ratés PONCTUELS — ne règle pas un vrai blocage persistant (ex: budget
+// CPU épuisé pour le reste du mois), seulement le cas, bien plus fréquent,
+// d'un aléa transitoire d'une seule requête. Pas de retry sur 4xx (401/403 —
+// secret invalide/refusé : réessayer donnerait exactement le même résultat).
+async function sendToVercel(env, payload, slug, options = {}, log = null, attempt = 1) {
   try {
     // Secret passé en HEADER (pas en query string) : une URL avec ?secret=
     // finit dans les logs d'accès Vercel/Cloudflare en clair — le header ne
@@ -265,9 +274,20 @@ async function sendToVercel(env, payload, slug, options = {}, log = null) {
       body: JSON.stringify({ mode: 'notify', payload, slug, options }),
       signal: AbortSignal.timeout(8_000),
     })
-    if (!res.ok) log?.push(`[notify→vercel] status=${res.status}`)
+    if (!res.ok) {
+      const transient = res.status === 429 || res.status >= 500
+      log?.push(`[notify→vercel] status=${res.status}${attempt === 1 && transient ? ' — retry dans 1.5s' : ''}`)
+      if (attempt === 1 && transient) {
+        await new Promise(r => setTimeout(r, 1_500))
+        return sendToVercel(env, payload, slug, options, log, 2)
+      }
+    }
   } catch (e) {
-    log?.push(`[notify→vercel] error=${e.message}`)
+    log?.push(`[notify→vercel] error=${e.message}${attempt === 1 ? ' — retry dans 1.5s' : ''}`)
+    if (attempt === 1) {
+      await new Promise(r => setTimeout(r, 1_500))
+      return sendToVercel(env, payload, slug, options, log, 2)
+    }
   }
 }
 
