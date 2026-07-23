@@ -321,7 +321,10 @@
 .resultats__card {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 8.5rem 1fr;
+  /* Colonne centrale élargie (8.5rem -> 10.5rem) pour le score doublé (demande
+     utilisateur) — voir .resultats__scoreNum plus bas, même traitement que
+     .matchs__scoreHour dans match.css (Programme). */
+  grid-template-columns: 1fr 10.5rem 1fr;
   align-items: center;
   padding: 1rem 1.25rem;
   background: linear-gradient(160deg, rgba(var(--red-rgb),0.09) 0%, var(--bg-panel) 55%);
@@ -440,12 +443,14 @@
 }
 
 .resultats__scoreNum {
-  font-size: 1.7rem;
+  /* Doublé (demande utilisateur), même traitement que .matchs__scoreHour
+     (Programme). */
+  font-size: 3.4rem;
   font-weight: 800;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #f1f5f9;
   text-shadow: 0 0 9px rgba(var(--red-rgb),0.4);
-  min-width: 1.6rem;
+  min-width: 2.4rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -458,7 +463,7 @@
 .resultats__scoreNum--draw { color: #94a3b8; text-shadow: none; }
 
 .resultats__scoreDash {
-  font-size: 1rem;
+  font-size: 1.8rem;
   font-weight: 300;
   color: #fff;
 }
@@ -587,23 +592,26 @@
   .resultats { padding: 1.25rem 0.75rem 2.5rem; }
 
   .resultats__card {
-    grid-template-columns: 1fr 6rem 1fr;
+    grid-template-columns: 1fr 7.5rem 1fr;
     padding: 0.65rem 0.65rem;
   }
 
   .resultats__teamName  { font-size: 0.97rem; }
   .resultats__crestWrap { width: 2.5rem; height: 2.5rem; }
   .resultats__crestFb   { width: 2.5rem; height: 2.5rem; }
-  .resultats__scoreNum  { font-size: 1.2rem; }
+  .resultats__scoreNum  { font-size: 2.4rem; }
+  .resultats__scoreDash { font-size: 1.3rem; }
 }
 
 
 @media (max-width: 400px) {
   .resultats { padding: 1rem 0.5rem 2rem; }
-  .resultats__card { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.55rem 0.5rem; }
+  .resultats__card { grid-template-columns: 1fr 6.6rem 1fr; padding: 0.55rem 0.5rem; }
   .resultats__teamName { font-size: 0.88rem; }
   .resultats__crestWrap { width: 2.2rem; height: 2.2rem; }
   .resultats__crestFb   { width: 2.2rem; height: 2.2rem; }
+  .resultats__scoreNum  { font-size: 2.1rem; }
+  .resultats__scoreDash { font-size: 1.15rem; }
 }
 
 /* ── Onglets vue (par journée / par poule) ── */
