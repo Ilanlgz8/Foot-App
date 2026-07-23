@@ -561,22 +561,20 @@ export function useEspnMatchStats(match, isFinished = false) {
 // Zéro quota — ESPN est gratuit et illimité.
 // Fonctionne pour toutes les compétitions dans COMP_ESPN.
 
-// ⚠️ AJOUT (constat utilisateur : "compo probable du 17 mai" affichée pour un
-// match d'août — la compo venait bien du DERNIER match FINISHED trouvé dans
-// compMatches, mais compMatches peut lui-même être le repli "saison
-// précédente" de useTeamForm (voir isLastSeason) en tout début de saison —
-// le seul match FINISHED disponible est alors la dernière journée de LA
-// SAISON D'AVANT, potentiellement vieille de plusieurs mois. Une compo d'il
-// y a 2-3 mois (transferts, blessures, changement d'entraîneur...) n'a plus
-// grand-chose à voir avec la compo probable réelle — trompeur de la
-// présenter comme "probable" sans le dire. Coupure à 45 jours (couvre une
-// vraie trêve internationale ou une élimination de coupe, exclut un
-// changement de saison ~2-3 mois) : au-delà, on préfère ne rien afficher
-// plutôt qu'une donnée présentée à tort comme récente — cohérent avec le
-// choix déjà fait ailleurs dans l'app de préférer un vide honnête à une
-// donnée trompeuse. Comparé à la date du match PRÉVU (pas "maintenant") :
-// reste correct même si ce match est lui-même prévu dans plusieurs semaines.
-const MAX_LINEUP_AGE_DAYS = 45
+// ⚠️ AJOUT PUIS AJUSTÉ (constat utilisateur : "compo probable du 17 mai"
+// affichée pour un match d'août — la compo venait bien du DERNIER match
+// FINISHED trouvé dans compMatches, qui peut lui-même être le repli "saison
+// précédente" de useTeamForm (isLastSeason) en tout début de saison).
+// ⚠️ Clarification utilisateur (même jour) : la saison en cours OU la
+// saison JUSTE AVANT est acceptable (typique : une compo de fin de saison
+// précédente, ~2-3 mois avant la reprise) — ce qui ne l'est pas, c'est
+// remonter à 2 saisons en arrière. 45 jours (1er réglage) excluait donc à
+// tort une compo de saison précédente pourtant valable. Remonté à 450j
+// (~saison + trêve, exclut une saison encore plus ancienne) — même seuil
+// que le garde-fou ajouté côté useTeamForm.js pour rester cohérent. Comparé
+// à la date du match PRÉVU (pas "maintenant") : reste correct même si ce
+// match est lui-même prévu dans plusieurs semaines.
+const MAX_LINEUP_AGE_DAYS = 450
 
 export function useProbableLineups(match, compMatches) {
   const homeId = match?.homeTeam?.id

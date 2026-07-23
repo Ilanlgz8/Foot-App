@@ -122,7 +122,27 @@ async function fetchTeamForm(selectedComp) {
   if (isClub && matches.length < MIN_LEAGUE_GAMES) {
     const lastSeason = getClubSeason() - 1
     const fallbackMatches = await fetchFinishedSeasonMatches(selectedComp, `?season=${lastSeason}`)
-    if (fallbackMatches.length >= MIN_LEAGUE_GAMES) {
+    // ⚠️ AJOUT (constat utilisateur : "compo probable"/"stats saison" avec des
+    // matchs vieux de 2 ans, alors que le repli ne devrait remonter QUE d'une
+    // saison — "la saison en cours ou la saison juste avant, jamais plus
+    // loin") : `?season=${lastSeason}` explicite DEVRAIT suffire à garantir
+    // ça, mais rien ne vérifiait que FD.org avait bien respecté ce
+    // paramètre — si la compétition n'a pas cette saison précise en base,
+    // le comportement de résolution par défaut de l'API n'est pas garanti
+    // (pas documenté). Vérification a posteriori sur la date du match le
+    // plus RÉCENT du lot reçu : si même celui-là est plus vieux que ~450j
+    // (saison + trève, exclut une saison encore plus ancienne), le repli
+    // n'est pas fiable → on ne l'utilise pas du tout, quel que soit le
+    // nombre de matchs reçus, et on retombe sur la saison en cours (quasi
+    // vide en tout début de saison) plutôt que d'afficher une saison
+    // d'il y a 2 ans comme si c'était "la saison juste avant".
+    const MAX_FALLBACK_AGE_DAYS = 450
+    const newestFallbackTs = fallbackMatches.reduce(
+      (max, m) => Math.max(max, new Date(m.utcDate).getTime()), 0
+    )
+    const fallbackIsRecent = newestFallbackTs > 0
+      && (Date.now() - newestFallbackTs) / 86_400_000 <= MAX_FALLBACK_AGE_DAYS
+    if (fallbackMatches.length >= MIN_LEAGUE_GAMES && fallbackIsRecent) {
       return { formMap: buildFormMap(fallbackMatches), matches: fallbackMatches, isLastSeason: true }
     }
   }
