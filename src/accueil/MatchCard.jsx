@@ -26,6 +26,18 @@ function formatHour(dateStr) {
   })
 }
 
+// Formate une date UTC en date courte locale "sam. 15 août" — même pattern
+// que Match.jsx/Resultat.jsx/Pronos.jsx. Utilisé dans le label au-dessus de
+// l'heure du coup d'envoi (voir plus bas) : avant, ce label affichait aussi
+// l'heure, donc l'heure était visible deux fois sur une même card "à venir"
+// (constat utilisateur, desktop). La date en label au-dessus reste utile
+// (repère de jour dans une liste multi-jours) sans dupliquer l'heure.
+function formatShortDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short'
+  })
+}
+
 // Construit une classe CSS avec modificateur --winner ou --loser
 // Ex: matchClass('accueil__matchCardName', true, false) → "accueil__matchCardName accueil__matchCardName--winner"
 function matchClass(base, isWinner, isLoser) {
@@ -252,12 +264,13 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
     ? (hPens != null && aPens != null && aPens > hPens)
     : (hs != null && as_ != null && as_ > hs))
 
-  // Texte affiché au centre :
-  //   - Match à venir   → heure (ex: "20:45")
-  //   - Match terminé   → "FT"
+  // Texte affiché au centre (au-dessus de la valeur principale) :
+  //   - Match à venir   → date courte (ex: "sam. 15 août") — l'heure est déjà
+  //                        affichée juste en dessous (accueil__matchCardValue),
+  //                        pas besoin/utile de la répéter ici (voir formatShortDate)
+  //   - Match terminé   → "Terminé"
   //   - Match en cours  → minute calculée (ex: "73'" ou "MT") via calcMinute()
-  // Dans le widget live, pendant les 5min post-FT : "Terminé" au lieu de "FT"
-  const label     = isFinished ? 'Terminé' : !isLive ? formatHour(match.utcDate) : null
+  const label     = isFinished ? 'Terminé' : !isLive ? formatShortDate(match.utcDate) : null
 
   // Classes CSS avec modificateur gagnant/perdant sur les noms et blasons
   const homeNameCls  = matchClass('accueil__matchCardName',  homeWins, awayWins)
