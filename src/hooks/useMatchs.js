@@ -284,28 +284,32 @@ function filterUpcomingWindow(matches, now, windowMs = UPCOMING_WINDOW_MS) {
 // d'être servi tel quel pendant jusqu'à 1h après le déploiement du fix.
 // windowDays fait partie de la clé de cache : une fenêtre 7j et une fenêtre
 // 30j (Accueil, voir plus bas) ne doivent jamais se marcher dessus.
-// ⚠️ REVU (idée utilisateur, 23/07) : deux changements distincts.
-// 1) TTL dédié 24h (au lieu de TTL.SCHEDULED = 1h partagé avec useMatches/
-//    Programme, volontairement PAS touché ici — Programme doit rester plus
-//    réactif à un changement d'horaire annoncé pour UNE compétition qu'on
-//    regarde activement). Un calendrier de matchs à venir, toutes compétitions
-//    confondues rien que pour "quel est le prochain jour avec un match"
-//    (Accueil/Pronos), ne justifie pas un re-check toutes les heures — un
-//    changement d'horaire/date à moins de 24h d'préavis est quasi inexistant
-//    en football pro (même raisonnement déjà appliqué côté cf-worker pour
-//    les notifs, voir CLAUDE.md "période creuse"). Honnêteté : ça reste un
-//    compromis, pas une garantie — un report de dernière minute (terrain
-//    impraticable, ordre public...) resterait invisible ici jusqu'à 24h,
-//    mais ce cas est rare et le calendrier lui-même (pas le score) est
-//    concerné, pas une donnée critique en temps réel.
-// 2) Étalement sur ~8s (STAGGER_MS, même pattern que useRecentDaysMatches
-//    plus haut) : les 8-11 appels FD.org/ESPN partaient tous en même temps à
-//    chaque expiration du cache — déjà sans risque réel pour FD.org (le
-//    verrou d'espacement global dans api/football.js sérialise de toute
-//    façon), mais visuellement une "rafale" trompeuse dans l'onglet Network
-//    (a alimenté plusieurs fausses pistes de debug ce jour-là). Étalé, plus
-//    de rafale visible, comportement identique au final.
-const ALL_COMPS_TTL = 24 * 60 * 60 * 1000  // 24h
+// ⚠️ REVERT (23/07, même jour) : passé à 24h plus tôt aujourd'hui (idée
+// utilisateur), puis ramené à 1h suite à un vrai bug remonté par
+// l'utilisateur — "Accueil saute direct au 21 août, des matchs le 15 et
+// entre le 15-20 août sont invisibles". Cause confirmée en lisant
+// Accueil.jsx : la flèche "jour suivant" ET le saut automatique (jour vide)
+// cherchent TOUS LES DEUX le prochain match dans upcomingAllComps (ce hook)
+// — si le cache client (24h) n'a pas encore vu les matchs du 15-20 août
+// (calendrier publié par FD.org APRÈS le dernier vrai fetch, pas un report
+// de dernière minute comme je l'avais anticipé) mais contient déjà celui du
+// 21, la flèche saute directement au 21, ces jours devenant invisibles
+// jusqu'à ce qu'un vrai refetch ait lieu — jusqu'à 24h plus tard, voire plus
+// si l'app reste peu utilisée entre-temps. Mon raisonnement initial ne
+// couvrait que le risque "reprogrammation tardive d'un match déjà connu",
+// pas celui, bien plus fréquent, d'un NOUVEAU match qui apparaît dans le
+// calendrier FD.org au fil du temps. Repassé à TTL.SCHEDULED (1h, aligné
+// sur Programme) — écarte ce bug par construction (moins d'une heure entre
+// la publication d'un match et sa prise en compte ici).
+const ALL_COMPS_TTL = TTL.SCHEDULED
+// Étalement sur ~8s (STAGGER_MS, même pattern que useRecentDaysMatches plus
+// haut) : les 8-11 appels FD.org/ESPN partaient tous en même temps à chaque
+// expiration du cache — déjà sans risque réel pour FD.org (le verrou
+// d'espacement global dans api/football.js sérialise de toute façon), mais
+// visuellement une "rafale" trompeuse dans l'onglet Network (a alimenté
+// plusieurs fausses pistes de debug). Étalé, plus de rafale visible,
+// comportement identique au final. Toujours valable indépendamment du TTL
+// ci-dessus, conservé tel quel.
 const ALL_COMPS_STAGGER_MS = 800  // 800ms x jusqu'à 10 = ~8s pour la dernière compétition
 
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
