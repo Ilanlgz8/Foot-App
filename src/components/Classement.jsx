@@ -12,6 +12,7 @@ import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/com
 const competitions = allCompetitions.filter(c => !NO_STANDINGS_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
+import { useLiveData } from '../context/LiveProvider'
 import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
@@ -92,7 +93,14 @@ function Classement() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
 
-  const { standings, groups, loading, error } = useStandings(selectedComp)
+  // ⚠️ AJOUT (idée utilisateur, 23/07) : le classement ne peut changer QUE
+  // si un match de LA compétition affichée est en cours — inutile de repoller
+  // sinon. hasLiveMatch dérivé de liveMatches (LiveProvider, déjà à jour
+  // partout ailleurs dans l'app) filtré sur selectedComp — voir useStandings.js
+  // pour le détail du refetchInterval gaté.
+  const { liveMatches } = useLiveData()
+  const hasLiveMatch = liveMatches.some(m => m.competition?.code === selectedComp)
+  const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
   // Classement des passes décisives retiré : aucune source fiable trouvée

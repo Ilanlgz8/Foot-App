@@ -7,7 +7,25 @@ import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
 
-export function useStandings(selectedComp) {
+// ⚠️ AJOUT (idée utilisateur, 23/07 : "si y'a zéro match en live le classement
+// va pas bouger donc ça sert à rien de repoller, mais dès qu'y'a un match en
+// live dans le championnat regardé on autorise à repoller") : avant ça, AUCUN
+// refetchInterval n'existait ici — rester sur la page Classement pendant un
+// match ne mettait jamais rien à jour tout seul, il fallait quitter/revenir
+// après le TTL de 2min pour voir un changement. Le classement ne peut de
+// toute façon changer QUE si un match de CETTE compétition est en train de se
+// terminer — polling gaté sur hasLiveMatch (passé par l'appelant, dérivé de
+// useLiveData().liveMatches filtré sur selectedComp) : zéro requête
+// supplémentaire les ~99% du temps où aucun match n'est en cours dans le
+// championnat affiché, et re-poll automatique toutes les 5min uniquement
+// pendant qu'un match de ce championnat est live — largement sous le TTL
+// serveur (2min) donc jamais de gaspillage, juste une mise à jour qui arrive
+// sans avoir à recharger la page. Comme toute requête React Query,
+// refetchInterval se met nativement en pause si l'onglet n'est pas au premier
+// plan (pas de refetchIntervalInBackground ici) — pas de poll en arrière-plan.
+const LIVE_REFETCH_MS = 1000 * 60 * 5  // 5min
+
+export function useStandings(selectedComp, hasLiveMatch = false) {
   const key = `standings_${selectedComp}`
 
   const { data, isLoading, error } = useQuery({
@@ -95,6 +113,7 @@ export function useStandings(selectedComp) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            STALE_MS,
+    refetchInterval:      hasLiveMatch ? LIVE_REFETCH_MS : false,
     retry: false,
     enabled: !!selectedComp,
   })
