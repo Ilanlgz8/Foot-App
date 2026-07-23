@@ -817,7 +817,9 @@
   color: var(--red);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  padding-bottom: 0.2rem;
+  /* ⚠️ Réduit (demande utilisateur : rapprocher la date de l'heure juste
+     en dessous) — était 0.2rem. */
+  padding-bottom: 0.05rem;
 }
 
 /* ── Badge coupe nationale (match de Coupe de France/Copa del Rey/FA Cup
