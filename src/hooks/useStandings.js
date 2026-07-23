@@ -46,7 +46,31 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // la page), ce qui couvre déjà l'immense majorité des cas réels sans code
 // supplémentaire.
 export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday = true) {
-  const key = `standings_${selectedComp}`
+  // ⚠️ AJOUT "v2" (constat utilisateur, 24/07 : classement Coupe du Monde
+  // affichait toujours le Groupe A au lieu du bon groupe des 2 équipes du
+  // match) : root cause confirmée — FD.org est bien prioritaire dans le code
+  // ACTUEL (voir tryFdOrg ci-dessous, ESPN n'est qu'un repli sur échec), mais
+  // à une période antérieure de ce projet l'ordre avait momentanément été
+  // inversé (ESPN/TheSportsDB prioritaires). Le cache disque (localStorage,
+  // clé partagée avec React Query via `initialData`) écrit à CETTE époque
+  // contenait donc des group.table[].team.id au format ESPN (string, ID ESPN
+  // interne — voir compactEspnStandings) — jamais purgé depuis, et la Coupe du
+  // Monde étant terminée (staleTime 24h, `hasMatchToday=false`), ce vieux
+  // cache pouvait rester servi des jours durant sans qu'un fetch frais ne
+  // vienne jamais le corriger. `ClassementTab` (MatchModal.jsx) compare
+  // ensuite ces ID ESPN à ceux, FD.org, des équipes du match affiché — ne
+  // trouve jamais de correspondance, et retombe systématiquement sur le 1er
+  // groupe de la liste (Groupe A). Bump de version : purge tout cache
+  // contaminé, force un fetch frais qui utilisera le code actuel (FD.org
+  // prioritaire, ID cohérents avec les matchs).
+  // Seule la clé du cache DISQUE (localStorage, persiste entre sessions) est
+  // bumpée — PAS le queryKey React Query : useLiveMinute.js invalide le
+  // classement après un FT via `invalidateQueries({queryKey:['standings',code]})`,
+  // qui matche par PRÉFIXE — y insérer 'v2' aurait cassé cette invalidation
+  // silencieusement. Le cache EN MÉMOIRE (queryKey) ne survit de toute façon
+  // pas au rechargement de page, aucune contamination possible à long terme
+  // là — seul le disque avait besoin d'être purgé.
+  const key = `standings_v2_${selectedComp}`
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
