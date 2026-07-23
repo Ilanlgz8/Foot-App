@@ -57,7 +57,17 @@ const ALLOWED_SLUGS = new Set([
 // jamais. Volume négligeable pour ce projet (quelques centaines de
 // matchs/saison). Seul le match encore EN COURS garde un TTL court
 // (LIVE_SUMMARY_CACHE_TTL) — ses stats évoluent réellement.
-const LIVE_SUMMARY_CACHE_TTL = 45 // 45s — match encore EN COURS (stats poss/tirs/corners évoluent)
+// ⚠️ ABAISSÉ 45s→15s (demande utilisateur, 24/07) : ce cache est PARTAGÉ (Redis,
+// côté serveur) entre TOUS les visiteurs d'un même match — le baisser augmente
+// la fréquence des vrais appels ESPN par match live, mais PAS le coût par
+// visiteur (toujours 1 seul fetch réel par fenêtre, peu importe le nombre de
+// spectateurs). Incohérence trouvée en creusant : fifa-live.js utilise déjà
+// 10s pour un fetch quasi identique (mêmes stats poss/tirs/corners, voir
+// SUMMARY_TTL) — 45s ici semblait être resté en retard sur ce même correctif
+// ("les stats live ont l'air figées", déjà traité là-bas). 15s : plus proche
+// de la fraîcheur déjà établie ailleurs, sans aller aussi vite que le 10s
+// (pas de certitude absolue que les 2 chemins sont strictement comparables).
+const LIVE_SUMMARY_CACHE_TTL = 15
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur très précis : "les compos d'un match
 // terminé ne marchent qu'une fois sur dix, et une fois loupées ça ne
