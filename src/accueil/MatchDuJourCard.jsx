@@ -137,6 +137,18 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         '--mdj-away': teamColors.away.main,
       }}
     >
+      {/* Blason en filigrane — élément de la maquette "4★ Editorial Pro"
+          jamais porté dans le vrai code (retour utilisateur : "tu ne l'as
+          pas fait"). Blason du club domicile, grand cercle translucide qui
+          déborde du bord droit du hero — .accueil__mdj a overflow:hidden
+          pour le rogner proprement. z-index négatif : sous le contenu réel
+          (topBar/titre/équipes/prono) mais au-dessus du dégradé de fond. */}
+      <div className="accueil__mdjWatermark" aria-hidden="true">
+        {match.homeTeam?.crest
+          ? <img src={match.homeTeam.crest} alt="" />
+          : <span>{homeCode}</span>}
+      </div>
+
       <div className="accueil__mdjTopBar">
         <span className="accueil__mdjComp">
           {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
