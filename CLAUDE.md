@@ -172,10 +172,18 @@ cf-worker/
   alternative. Honnêteté : pas de certitude à 100% que c'était LA cause (FD.org ne documente pas
   son vrai seuil de suspension), mais la piste la plus concrète et vérifiable trouvée à ce jour —
   un vrai appel en moins pour un coût fonctionnel minime.
-- ⚠️ `MINUTE_CAP` remonté 5→8/min le 23/07 (demande explicite utilisateur, après mise en garde :
-  le compte a déjà été suspendu à 5/min sans cause certaine identifiée) — espacement (7,5s)
-  toujours dérivé automatiquement du plafond, aucune rafale possible. Si nouvelle suspension :
-  revenir à 5/min (ou moins) en premier réflexe.
+- ✅ `MINUTE_CAP` remonté 5→8/min le 23/07 (demande explicite utilisateur, après mise en garde),
+  puis **rollback à 5/min le jour même** : rafale de 403 constatée (screenshot Network navigateur)
+  quelques heures après le passage à 8/min — reproduction quasi immédiate du même symptôme que
+  l'incident du 20/07 (403 en rafale, circuit breaker `DOWN_TTL_FORBIDDEN` déclenché, résultats/
+  classements vides sur l'Accueil). Repli appliqué conformément au plan déjà acté au moment du
+  passage à 8/min. Espacement (12s à 5/min) toujours dérivé automatiquement du plafond
+  (`SPACING_MS = 60000 / MINUTE_CAP`), aucune rafale possible par construction. Honnêteté :
+  coïncidence temporelle forte (suspension le jour même du changement) mais pas de preuve
+  formelle (pas d'accès aux logs FD.org depuis cet environnement) — le compte a déjà été
+  suspendu par le passé à 5/min sans cause certaine identifiée non plus. Si le 403 persiste
+  malgré le retour à 5/min, la cause est probablement ailleurs (voir les pistes déjà explorées
+  plus haut : compte lui-même, page "usage"/"limits" FD.org).
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
