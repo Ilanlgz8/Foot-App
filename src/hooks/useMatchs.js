@@ -275,8 +275,23 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     },
     initialData:          cachedData ?? undefined,
     initialDataUpdatedAt: cachedAt,
-    // staleTime = TTL → si le cache est encore frais, 0 requête API au montage du composant
     staleTime: ttl,
+    // ⚠️ AJOUT (constat utilisateur, 24/07 : "les matchs dans Programme sont en
+    // cache mais quand y'a une mise à jour sur l'heure ou le jour exact ça ne
+    // met pas à jour") : avec staleTime=1h (SCHEDULED) et refetchOnWindowFocus
+    // désactivé globalement (main.jsx, décision délibérée anti-429 FD.org),
+    // React Query ne retentait AUCUN fetch pendant toute cette heure, même en
+    // revenant sur Programme entre-temps — un changement d'heure/date publié
+    // par FD.org restait invisible jusqu'à 1h, quel que soit le nombre de fois
+    // où l'utilisateur rouvrait la page. 'always' : revalidation en arrière-
+    // plan à CHAQUE fois que Programme est monté (donnée déjà en cache affichée
+    // instantanément, remplacée dès que le fetch revient), SANS toucher au
+    // vrai garde-fou anti-suspension FD.org — celui-ci vit côté SERVEUR
+    // (cache Redis 5min partagé entre TOUS les utilisateurs, api/football.js)
+    // et reste strictement inchangé : la quasi-totalité de ces revalidations
+    // tombent sur ce cache serveur (X-Cache: HIT, ~0 coût), sans jamais
+    // retaper FD.org plus souvent qu'avant.
+    refetchOnMount: 'always',
     retry: false,
   })
 
