@@ -52,9 +52,18 @@ function getKv() {
 // régulier, même largement sous les 10/min réels. 5/min (50% de marge sous
 // la vraie limite, au lieu de 30%) + espacement STRICTEMENT régulier sur
 // toute la minute (voir SPACING_MS plus bas, dérivé de ce plafond) : profil
-// de trafic lissé, un appel toutes les ~12s max, jamais de rafale possible
-// par construction — beaucoup plus proche d'un usage humain normal.
-const MINUTE_CAP = 5
+// de trafic lissé, jamais de rafale possible par construction — beaucoup
+// plus proche d'un usage humain normal.
+// ⚠️ REMONTÉ à 8/min, espacement 7,5s (demande explicite utilisateur, 23/07,
+// après mise en garde honnête de ma part : le compte a déjà été suspendu à
+// 5/min sans cause certaine identifiée — voir CLAUDE.md — donc remonter
+// vers la limite officielle FD.org (10/min) n'est pas sans risque connu,
+// juste un risque que l'utilisateur a choisi d'accepter en connaissance de
+// cause). Reste un espacement STRICTEMENT régulier (SPACING_MS dérivé
+// automatiquement de ce plafond, voir plus bas) — jamais de rafale, même à
+// 8/min. Si une nouvelle suspension survient après ce changement, revenir à
+// 5/min (ou moins) est la première chose à essayer.
+const MINUTE_CAP = 8
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
 // ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
@@ -73,8 +82,9 @@ const DOWN_TTL_FORBIDDEN = 300
 // ⚠️ REVU (même incident que MINUTE_CAP ci-dessus) : passé de 800ms fixe (ne
 // faisait qu'empêcher 2 appels simultanés, laissait les 5-7 autorisés
 // s'entasser en rafale en quelques secondes) à un espacement STRICT et
-// régulier dérivé du plafond — 60s / MINUTE_CAP ≈ 12s entre 2 appels réels
-// vers FD.org, peu importe combien de requêtes différentes arrivent en même
+// régulier dérivé du plafond — 60s / MINUTE_CAP (7,5s à 8/min, calculé
+// automatiquement, pas une valeur en dur) entre 2 appels réels vers FD.org,
+// peu importe combien de requêtes différentes arrivent en même
 // temps côté app. Garantit PAR CONSTRUCTION un profil de trafic lissé sur
 // toute la minute (jamais de pic), et rend physiquement impossible de
 // dépasser MINUTE_CAP même en cas de bug ailleurs — la seule protection qui
