@@ -165,6 +165,31 @@ export default async function handler(req, res) {
     const downKey  = 'fd:down'
     const redis    = getKv()
 
+    // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : ce endpoint est
+    // PUBLIC et SANS AUTH (contrairement à cron-goals/debug-push/apifootball,
+    // protégés par CRON_SECRET) — son URL est visible par n'importe qui dans
+    // l'onglet Network du navigateur. Jusqu'ici, seule protection : le budget
+    // GLOBAL (MINUTE_CAP, partagé entre TOUS les appelants confondus) — aucune
+    // limite PAR appelant, contrairement à tous les autres proxies de l'app
+    // (api/espn.js, api/fifa-live.js, api/fifa-lineups.js, api/vapid-key.js,
+    // api/subscribe.js, api/pulse.js, qui limitent tous par IP). N'importe qui
+    // pouvait donc appeler cette URL directement (curl/bot, sans même passer
+    // par l'app) et consommer à lui seul tout le quota football-data.org de
+    // l'app — avec sa propre clé API. Vu l'historique de suspensions à
+    // répétition du compte FD.org, jamais totalement élucidé malgré plusieurs
+    // changements de clé, c'est une piste sérieuse et corrigée ici, même
+    // pattern (compteur Redis par IP, fenêtre glissante 60s) que les autres
+    // endpoints déjà protégés.
+    if (redis) {
+      const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+      const rlKey = `ratelimit:football:${ip}`
+      try {
+        const count = await redis.incr(rlKey)
+        if (count === 1) await redis.expire(rlKey, 60)
+        if (count > 30) return res.status(429).json({ error: 'Trop de requêtes' })
+      } catch {}
+    }
+
     // ── Tentative de lecture depuis Redis ────────────────────────────────────
     if (ttl > 0 && redis) {
       try {
