@@ -362,7 +362,9 @@
    zoome à l'intérieur d'un cercle de taille fixe, ce qui recadre vraiment
    (même principe que mp__hero__crestWrap/live__crestWrap/poster__crestWrap). */
 .resultats__crestWrap {
-  width: 3.1rem; height: 3.1rem;
+  /* ⚠️ Agrandi (demande utilisateur, même traitement que Programme/match.css,
+     proportionnel : ratio ~1.39x appliqué à cette page aussi). */
+  width: 4.3rem; height: 4.3rem;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -381,16 +383,16 @@
 .resultats__card:hover .resultats__crest { transform: scale(1.25); }
 
 .resultats__crestFb {
-  width: 3.1rem; height: 3.1rem;
+  width: 4.3rem; height: 4.3rem;
   border-radius: 50%;
   background: rgba(var(--white-rgb),0.05);
   border: 1px solid rgba(var(--white-rgb),0.08);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; font-weight: 800; color: #475569;
+  font-size: 0.9rem; font-weight: 800; color: #475569;
 }
 
 .resultats__teamName {
-  font-size: 1.08rem;
+  font-size: 1.4rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #e2e8f0;
@@ -589,8 +591,9 @@
     padding: 0.65rem 0.65rem;
   }
 
-  .resultats__teamName  { font-size: 0.75rem; }
-  .resultats__crestWrap { width: 1.8rem; height: 1.8rem; }
+  .resultats__teamName  { font-size: 0.97rem; }
+  .resultats__crestWrap { width: 2.5rem; height: 2.5rem; }
+  .resultats__crestFb   { width: 2.5rem; height: 2.5rem; }
   .resultats__scoreNum  { font-size: 1.2rem; }
 }
 
@@ -598,7 +601,9 @@
 @media (max-width: 400px) {
   .resultats { padding: 1rem 0.5rem 2rem; }
   .resultats__card { grid-template-columns: 1fr 5.5rem 1fr; padding: 0.55rem 0.5rem; }
-  .resultats__teamName { font-size: 0.68rem; }
+  .resultats__teamName { font-size: 0.88rem; }
+  .resultats__crestWrap { width: 2.2rem; height: 2.2rem; }
+  .resultats__crestFb   { width: 2.2rem; height: 2.2rem; }
 }
 
 /* ── Onglets vue (par journée / par poule) ── */
