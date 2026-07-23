@@ -18,6 +18,7 @@ import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import { LiveCard } from './LiveCardWidget'
+import { fuzzyTeam } from '../utils/espnSummaryParse'
 import '../accueil.css'
 import '../live.css'
 
@@ -61,12 +62,40 @@ function CompFilter({ competitions, active, onChange, layout = 'row' }) {
 // représenter le MÊME match réel avec des `id` de format complètement
 // différent — un simple Set de `m.id` (utilisé dans les filets de sécurité
 // `extra` ci-dessous) ne détecterait pas ce doublon et afficherait la même
-// rencontre deux fois. Domicile + extérieur + jour local identifie le même
-// match réel peu importe la source.
-function matchDedupeKey(m) {
-  const d = m.utcDate ? new Date(m.utcDate) : null
-  const dateStr = d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : 'x'
-  return `${m.homeTeam?.id ?? '?'}-${m.awayTeam?.id ?? '?'}-${dateStr}`
+// rencontre deux fois.
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : "j'ai que des doublons") :
+// la 1ère version de ce filet comparait `homeTeam.id`/`awayTeam.id` — mais
+// `home.team?.id` côté ESPN (espnAdapter.js, normalizeEvent) est l'ID INTERNE
+// D'ESPN, alors que le `id` côté FD.org est l'ID INTERNE DE FOOTBALL-DATA.ORG —
+// deux systèmes d'ID totalement indépendants, qui ne se recoupent JAMAIS pour
+// la même équipe réelle. Résultat : la comparaison échouait TOUJOURS pour
+// exactement le cas qu'elle devait détecter (les 6 grands championnats,
+// désormais sourcés ESPN dans rawMatches ET toujours FD.org dans
+// upcomingAllComps) — le filet de sécurité n'a jamais réellement filtré quoi
+// que ce soit depuis son ajout, chaque match de ces 6 comps s'affichait deux
+// fois. Remplacé par une comparaison sur le NOM d'équipe (fuzzyTeam, déjà
+// utilisée ailleurs dans l'app — api/fifa-live.js — pour ce même problème de
+// rapprochement inter-sources, éprouvée toute la Coupe du Monde) : les noms
+// d'équipe, contrairement aux ID, sont comparables entre sources.
+function isDuplicateMatch(m, existingMatches) {
+  if (existingMatches.some(e => e.id === m.id)) return true
+  const mDate = m.utcDate ? new Date(m.utcDate).getTime() : null
+  const mHome = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
+  const mAway = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
+  if (!mDate || !mHome || !mAway) return false
+  return existingMatches.some(e => {
+    if (!e.utcDate) return false
+    // Marge large (24h) : les 2 sources peuvent classer un match juste après
+    // minuit sur des jours locaux légèrement différents selon leur propre
+    // fuseau de référence — seuls les NOMS d'équipe garantissent vraiment
+    // qu'il s'agit du même match, la date n'est qu'un filtre grossier pour
+    // éviter de comparer les noms de TOUS les matchs de la fenêtre 30j.
+    if (Math.abs(new Date(e.utcDate).getTime() - mDate) > 24 * 60 * 60 * 1000) return false
+    const eHome = e.homeTeam?.name ?? e.homeTeam?.shortName ?? ''
+    const eAway = e.awayTeam?.name ?? e.awayTeam?.shortName ?? ''
+    return fuzzyTeam(mHome, eHome) && fuzzyTeam(mAway, eAway)
+  })
 }
 
 function getDayLabel(offset) {
@@ -235,10 +264,8 @@ function Accueil() {
   // garantit par construction que tout jour trouvé par la flèche affiche bien
   // ses cards).
   const matches = useMemo(() => {
-    const seen = new Set(rawMatches.map(m => m.id))
-    const seenKeys = new Set(rawMatches.map(matchDedupeKey))
     const extra = upcomingAllComps.filter(m => {
-      if (seen.has(m.id) || seenKeys.has(matchDedupeKey(m))) return false
+      if (isDuplicateMatch(m, rawMatches)) return false
       if (!m.utcDate) return false
       const d = new Date(m.utcDate)
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -285,10 +312,8 @@ function Accueil() {
   // Même filet de sécurité upcomingAllComps que `matches`, pour le jour
   // "aujourd'hui absolu" spécifiquement (peut différer de targetDate).
   const todayMatchesForResults = useMemo(() => {
-    const seen = new Set(rawTodayMatchesForResults.map(m => m.id))
-    const seenKeys = new Set(rawTodayMatchesForResults.map(matchDedupeKey))
     const extra = upcomingAllComps.filter(m => {
-      if (seen.has(m.id) || seenKeys.has(matchDedupeKey(m))) return false
+      if (isDuplicateMatch(m, rawTodayMatchesForResults)) return false
       if (!m.utcDate) return false
       const d = new Date(m.utcDate)
       const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
