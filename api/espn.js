@@ -25,7 +25,7 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
-import { compactEspnSummary } from '../src/utils/espnSummaryParse.js'
+import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
     if (count > 60) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap } = req.query
+  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
@@ -174,6 +174,52 @@ export default async function handler(req, res) {
   const timeoutId  = setTimeout(() => controller.abort(), 8_000)
 
   try {
+    // ── Mode standings : classement ESPN — source de secours indépendante de
+    // football-data.org (voir useStandings.js, qui l'utilise en repli si
+    // FD.org échoue) ET seule source possible pour Ligue des Nations/CAN/
+    // Copa America (absentes de football-data.org en free tier, voir
+    // NO_STANDINGS_COMPS dans data/competitions.js). Gratuite, sans clé,
+    // jamais rencontré de suspension avec ESPN sur ce projet — voir
+    // compactEspnStandings pour le détail du format ESPN et la conversion.
+    // ⚠️ /apis/v2/ (PAS /apis/site/v2/, utilisé pour summary/scoreboard
+    // ci-dessous) : ce dernier renvoie {} vide pour les standings soccer,
+    // constaté par test réel avant d'écrire ce code.
+    if (standings === '1') {
+      const cacheKey = `espn:standings:${slug}`
+      try {
+        const cached = await kv.get(cacheKey)
+        if (cached) {
+          clearTimeout(timeoutId)
+          const cachedObj = typeof cached === 'string' ? JSON.parse(cached) : cached
+          return res.status(200)
+            .setHeader('Content-Type', 'application/json')
+            .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
+            .json(cachedObj)
+        }
+      } catch { /* Redis indisponible → on continue vers le fetch direct */ }
+
+      const standingsUrl = `https://site.api.espn.com/apis/v2/sports/soccer/${slug}/standings`
+      const response = await fetch(standingsUrl, {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) return res.status(response.status).json({ error: `ESPN a répondu ${response.status}` })
+
+      const rawBody = await response.text()
+      let compact = { table: [], groups: [] }
+      try {
+        compact = compactEspnStandings(JSON.parse(rawBody))
+        await kv.set(cacheKey, JSON.stringify(compact), { ex: 300 })
+      } catch { /* JSON invalide ESPN ou KV en erreur → on renvoie quand même le résultat compacté (vide si le parse a échoué) */ }
+
+      return res.status(200)
+        .setHeader('Content-Type', 'application/json')
+        .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
+        .json(compact)
+    }
+
     // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
     // Voir le commentaire sur espnMap plus haut pour le contexte. Écrit
     // uniquement dans le mode "eventId" ci-dessous (dès qu'un fdMatchId est

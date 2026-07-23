@@ -26,6 +26,76 @@
 // fichier. api/fifa-live.js importe désormais celle-ci au lieu de sa propre
 // copie divergente ; useLiveMinute.js aussi (voir son propre commentaire),
 // pour n'avoir plus qu'une seule version, testée (voir espnSummaryParse.test.js).
+// compactEspnStandings — convertit une réponse standings ESPN brute
+// (site.api.espn.com/apis/v2/sports/soccer/{slug}/standings — ⚠️ PAS
+// /apis/site/v2/, qui renvoie {} vide pour ce endpoint) en un format
+// STRICTEMENT compatible avec celui déjà produit par useStandings.js pour
+// football-data.org : { table: [...], groups: [...] } — voir le même
+// contrat dans useStandings.js (realGroups.flatMap/table vs groups[]).
+// Permet à StandingsTable.jsx de consommer indifféremment l'une ou l'autre
+// source sans aucune modification du composant d'affichage.
+//
+// Ajouté (demande utilisateur, suite aux suspensions répétées du compte
+// football-data.org) : source de secours indépendante — gratuite, sans clé,
+// jamais suspendue sur ce projet — utilisée en repli par useStandings.js si
+// football-data.org échoue, et seule source possible pour Ligue des
+// Nations/CAN/Copa America (absentes de football-data.org en free tier).
+//
+// Structure ESPN observée (vérifiée par appel réel, pas documentée
+// officiellement par ESPN) : { children: [ { name, standings: { entries: [
+// { team: { id, displayName, shortDisplayName, abbreviation, logos:[{href}] },
+// stats: [ { name: 'points'|'wins'|'ties'|'losses'|'gamesPlayed'|
+// 'pointsFor'|'pointDifferential'|'rank'|..., value } ] } ] } } ] }.
+// Un seul enfant = classement "plat" (le nom du enfant est la saison, ex.
+// "English Premier League 2025-2026", pas un vrai groupe) → table simple.
+// Plusieurs enfants = vrais groupes (ex: Ligue des Nations "Group A1",
+// CAN, Copa America) → groups[], ET table (toutes les lignes concaténées,
+// triées par position) pour les consommateurs qui n'ont pas de rendu par
+// groupe dédié — même logique que realGroups.flatMap() côté FD.org.
+export function compactEspnStandings(json) {
+  const children = Array.isArray(json?.children) ? json.children : []
+  if (children.length === 0) return { table: [], groups: [] }
+
+  const buildTable = (entries) => {
+    if (!Array.isArray(entries)) return []
+    const rows = entries.map(e => {
+      const stat = {}
+      for (const s of (e.stats ?? [])) stat[s.name] = s.value
+      const team = e.team ?? {}
+      return {
+        position: stat.rank ?? 0,
+        team: {
+          id:        team.id != null ? String(team.id) : '',
+          name:      team.displayName ?? team.name ?? '',
+          shortName: team.shortDisplayName ?? team.abbreviation ?? team.name ?? '',
+          crest:     team.logos?.[0]?.href ?? null,
+        },
+        playedGames:    stat.gamesPlayed ?? 0,
+        points:         stat.points ?? 0,
+        won:            stat.wins ?? 0,
+        draw:           stat.ties ?? 0,
+        lost:           stat.losses ?? 0,
+        goalDifference: stat.pointDifferential ?? 0,
+        goalsFor:       stat.pointsFor ?? 0,
+      }
+    })
+    return rows.sort((a, b) => a.position - b.position)
+  }
+
+  if (children.length === 1) {
+    return { table: buildTable(children[0]?.standings?.entries), groups: [] }
+  }
+
+  const groups = children.map(c => ({
+    name:  c.name ?? c.abbreviation ?? '',
+    table: buildTable(c.standings?.entries),
+  }))
+  return {
+    table: groups.flatMap(g => g.table),
+    groups,
+  }
+}
+
 export function normalize(name = '') {
   return name.toLowerCase()
     .replace(/[àáâã]/g, 'a').replace(/[éèêë]/g, 'e')

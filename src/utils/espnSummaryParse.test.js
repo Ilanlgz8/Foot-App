@@ -8,7 +8,100 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary, normalize, fuzzyTeam } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam } from './espnSummaryParse'
+
+// Payloads de test simplifiés mais avec les VRAIS noms de champs ESPN,
+// vérifiés par appel réel à site.api.espn.com/apis/v2/sports/soccer/{slug}/
+// standings (eng.1 pour le cas plat, uefa.nations pour le cas multi-groupes)
+// avant d'écrire compactEspnStandings — voir son commentaire pour le détail.
+function espnStatEntry(teamId, name, rank, { points, wins, ties, losses, gamesPlayed, pointsFor, pointDifferential }) {
+  return {
+    team: {
+      id: String(teamId),
+      displayName: name,
+      shortDisplayName: name,
+      abbreviation: name.slice(0, 3).toUpperCase(),
+      logos: [{ href: `https://example.com/${teamId}.png` }],
+    },
+    stats: [
+      { name: 'gamesPlayed', value: gamesPlayed },
+      { name: 'wins', value: wins },
+      { name: 'losses', value: losses },
+      { name: 'ties', value: ties },
+      { name: 'points', value: points },
+      { name: 'pointsFor', value: pointsFor },
+      { name: 'pointDifferential', value: pointDifferential },
+      { name: 'rank', value: rank },
+    ],
+  }
+}
+
+describe('compactEspnStandings', () => {
+  it('renvoie table/groups vides si children est absent ou vide', () => {
+    expect(compactEspnStandings({})).toEqual({ table: [], groups: [] })
+    expect(compactEspnStandings({ children: [] })).toEqual({ table: [], groups: [] })
+  })
+
+  it('cas plat (1 seul enfant = la saison, pas un groupe) → table simple, groups vide', () => {
+    const raw = {
+      children: [{
+        name: 'English Premier League 2025-2026',
+        standings: {
+          entries: [
+            espnStatEntry(359, 'Arsenal', 1, { points: 85, wins: 26, ties: 7, losses: 5, gamesPlayed: 38, pointsFor: 71, pointDifferential: 44 }),
+            espnStatEntry(360, 'Liverpool', 2, { points: 78, wins: 23, ties: 9, losses: 6, gamesPlayed: 38, pointsFor: 77, pointDifferential: 42 }),
+          ],
+        },
+      }],
+    }
+    const result = compactEspnStandings(raw)
+    expect(result.groups).toEqual([])
+    expect(result.table).toHaveLength(2)
+    expect(result.table[0]).toEqual({
+      position: 1,
+      team: { id: '359', name: 'Arsenal', shortName: 'Arsenal', crest: 'https://example.com/359.png' },
+      playedGames: 38,
+      points: 85,
+      won: 26,
+      draw: 7,
+      lost: 5,
+      goalDifference: 44,
+      goalsFor: 71,
+    })
+  })
+
+  it('cas groupes (plusieurs enfants = vrais groupes) → groups peuplé + table concaténée triée', () => {
+    const raw = {
+      children: [
+        {
+          name: 'Group A1',
+          standings: { entries: [espnStatEntry(1, 'Italy', 2, { points: 4, wins: 1, ties: 1, losses: 0, gamesPlayed: 2, pointsFor: 3, pointDifferential: 1 })] },
+        },
+        {
+          name: 'Group A2',
+          standings: { entries: [espnStatEntry(2, 'Belgium', 1, { points: 6, wins: 2, ties: 0, losses: 0, gamesPlayed: 2, pointsFor: 5, pointDifferential: 4 })] },
+        },
+      ],
+    }
+    const result = compactEspnStandings(raw)
+    expect(result.groups).toHaveLength(2)
+    expect(result.groups[0].name).toBe('Group A1')
+    expect(result.groups[1].name).toBe('Group A2')
+    // table = toutes les lignes concaténées dans l'ordre des groupes (chaque
+    // groupe déjà trié par position EN SON SEIN — la position ESPN est
+    // relative à son groupe, un tri global la mélangerait à tort avec
+    // d'autres "position 1" d'autres groupes) — même logique que
+    // realGroups.flatMap() côté FD.org dans useStandings.js.
+    expect(result.table).toHaveLength(2)
+    expect(result.table[0].team.name).toBe('Italy')   // groupe A1
+    expect(result.table[1].team.name).toBe('Belgium') // groupe A2
+  })
+
+  it('gère un entries manquant/malformé sans planter', () => {
+    expect(compactEspnStandings({ children: [{ name: 'X' }] })).toEqual({ table: [], groups: [] })
+    expect(compactEspnStandings({ children: [{ name: 'X', standings: {} }] })).toEqual({ table: [], groups: [] })
+  })
+})
 
 // ⚠️ Tests ajoutés (audit période creuse) pour figer le comportement de
 // normalize()/fuzzyTeam() — cette paire existait en 3 copies dont une avait

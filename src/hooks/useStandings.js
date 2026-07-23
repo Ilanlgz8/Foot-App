@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
+import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -45,6 +46,28 @@ export function useStandings(selectedComp) {
         writeCache(key, result, STALE_MS)
         return result
       } catch (err) {
+        // ⚠️ AJOUT (demande utilisateur, suite aux suspensions répétées du
+        // compte football-data.org) : repli sur ESPN — source de secours
+        // indépendante, gratuite, sans clé, jamais suspendue sur ce projet —
+        // AVANT le repli sur le cache stale local. Réduit la dépendance à
+        // FD.org : un incident FD.org (429/403/panne/suspension) n'empêche
+        // plus d'afficher un classement à jour, tant qu'ESPN répond. Aucun
+        // effet si la compétition n'a pas de slug ESPN connu (voir
+        // COMPETITION_ESPN_SLUG) ou si ESPN échoue aussi — on retombe alors
+        // sur le comportement existant (cache stale, puis erreur).
+        const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
+        if (espnSlug) {
+          try {
+            const espnRes = await fetch(`/espn?slug=${espnSlug}&standings=1`)
+            if (espnRes.ok) {
+              const espnResult = await espnRes.json()
+              if ((espnResult.table?.length ?? 0) > 0 || (espnResult.groups?.length ?? 0) > 0) {
+                writeCache(key, espnResult, STALE_MS)
+                return espnResult
+              }
+            }
+          } catch { /* ESPN aussi indisponible → repli stale ci-dessous */ }
+        }
         const stale = readCacheStale(key)
         if (stale) return stale
         throw err
