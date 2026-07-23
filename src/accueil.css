@@ -259,7 +259,6 @@
     "upcoming caption";
 }
 
-.accueil__topFilters { grid-area: filters; }
 .accueil__liveWidgets { grid-area: live; }
 .accueil__liveCaption { grid-area: caption; }
 .accueil__mainGrid .accueil__dashPanel--matchPanel { grid-area: center; }
@@ -303,24 +302,20 @@
   .accueil__mainGrid .accueil__dashPanel--matchPanel {
     margin-bottom: 1.2rem;
   }
-  .accueil__topFilters,
+  /* ⚠️ !important (retour utilisateur, capture d'écran à l'appui : cette
+     même barre visible sur mobile malgré ce display:none) : la RÈGLE
+     .accueil__liveCaption ci-dessous (sans media query, donc TOUJOURS
+     active) est déclarée PLUS BAS dans ce fichier et redéfinit `display:
+     flex` sans condition — à spécificité égale, la règle qui vient EN
+     DERNIER dans le fichier gagne, peu importe qu'elle soit dans un media
+     query ou non. Ce bug exact a fait fuiter .accueil__topFilters sur
+     mobile (barre "Tous/[compétitions]" en haut de page, retirée depuis) —
+     !important ici blinde .accueil__liveCaption contre la même classe de
+     bug si sa définition de base est un jour réordonnée. */
   .accueil__liveWidgets,
   .accueil__liveCaption {
-    display: none;
+    display: none !important;
   }
-}
-
-/* ── Barre de filtres horizontale (desktop, design 4★) — remplace l'ancienne
-   sidebar verticale (retour utilisateur : "pas fan" du rendu 3 colonnes).
-   Pleine largeur, au-dessus du split matchs/résultats. Chips identiques
-   (accueil__compFilter, layout row par défaut), simplement repositionnées. */
-.accueil__topFilters {
-  display: flex;
-  align-items: center;
-  padding: 0.2rem 0;
-}
-.accueil__topFilters .accueil__compFilter {
-  width: 100%;
 }
 
 /* ── Bandeau "résultats masqués" (desktop, en direct) — remplace le panneau

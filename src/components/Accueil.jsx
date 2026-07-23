@@ -522,11 +522,6 @@ function Accueil() {
     m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
   )
   const desktopHasLive = isDesktop && desktopLiveMatches.length > 0
-  // Barre de filtre horizontale desktop (design 4★, remplace l'ancienne
-  // sidebar verticale) — même condition qu'avant : CompFilter se masque
-  // lui-même si <= 1 compétition active, ce booléen ne sert qu'à ajuster le
-  // grid-template-areas (accueil__mainGrid--noFilters, voir accueil.css).
-  const hasCompFilter = activeCompetitions.length > 1
 
   // ── Mini classement (design 4★, sous "Résultats récents") — visible
   // uniquement quand une compétition précise est sélectionnée dans le filtre
@@ -681,23 +676,14 @@ function Accueil() {
             (display:none, voir accueil.css @media max-width:1024px).
             Desktop ≥1025px (design 4★, validé par l'utilisateur après
             plusieurs itérations de maquette) :
-              - pas de live      → [filtres horizontaux pleine largeur] [matchs à venir | résultats récents + classement]
-              - 1+ match en live → [filtres] [grille "En direct" pleine largeur] [matchs à venir | bandeau "résultats masqués"]
+              - pas de live      → [matchs à venir | résultats récents + classement]
+              - 1+ match en live → [grille "En direct" pleine largeur] [matchs à venir | bandeau "résultats masqués"]
             Positionnement réel via CSS grid-area (accueil__mainGrid /
-            accueil__mainGrid--live / accueil__mainGrid--noFilters). */}
-        <div className={`accueil__mainGrid${desktopHasLive ? ' accueil__mainGrid--live' : ''}${!hasCompFilter ? ' accueil__mainGrid--noFilters' : ''}`}>
-
-          {/* Barre de filtres horizontale — desktop uniquement (remplace
-              l'ancienne sidebar verticale, retour utilisateur : "pas fan" du
-              rendu 3 colonnes ; design 4★ approuvé utilise des chips
-              horizontales pleine largeur). N'apparaît que s'il y a plus
-              d'une compétition active (CompFilter retourne null sinon) —
-              sinon la grille repasse en accueil__mainGrid--noFilters. */}
-          {hasCompFilter && (
-            <div className="accueil__topFilters">
-              <CompFilter competitions={activeCompetitions} active={compFilterMatch} onChange={setCompFilterMatch} />
-            </div>
-          )}
+            accueil__mainGrid--live). accueil__mainGrid--noFilters toujours
+            appliqué : plus de barre de filtres horizontale (retirée, demande
+            utilisateur 23/07 — bug d'affichage sur mobile + jugée inutile),
+            la grille ne réserve donc plus jamais de ligne "filtres". */}
+        <div className={`accueil__mainGrid accueil__mainGrid--noFilters${desktopHasLive ? ' accueil__mainGrid--live' : ''}`}>
 
           {/* Grille "En direct" — desktop uniquement, uniquement s'il y a au
               moins un match en direct (demande utilisateur : "reprendre la
