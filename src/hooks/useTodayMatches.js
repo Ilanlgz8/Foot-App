@@ -2,7 +2,7 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
-import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
+import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 
@@ -44,7 +44,10 @@ const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 // "Autre" partout où l'app groupe par id, et le matching live perdrait ces
 // matchs (aucune correspondance possible avec un id null). Les valeurs
 // viennent des mêmes id que ESPN_SLUG_BY_COMP_ID (espnSlugs.js).
-const REAL_COMP_ID = { CL: 2001, PL: 2021, FL1: 2015, PD: 2014, BL1: 2002, SA: 2019 }
+// ⚠️ Déplacé dans src/data/competitions.js (MAJOR_LEAGUE_FD_ID) le 24/07 :
+// réutilisé aussi par useUpcomingMatchesAllComps (useMatchs.js) pour corriger
+// un bug lié (doublons/jours manquants dans Accueil, voir son commentaire).
+const REAL_COMP_ID = MAJOR_LEAGUE_FD_ID
 const ESPN_SOURCED_COMPS = ['CL', 'PL', 'FL1', 'PD', 'BL1', 'SA', 'NL', 'CAN', 'COPA', 'UEL', 'UECL']
 const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 

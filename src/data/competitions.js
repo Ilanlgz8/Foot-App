@@ -62,6 +62,16 @@ export const COMPETITION_ESPN_SLUG = {
   UECL: 'uefa.europa.conf',
 }
 
+// ID numérique football-data.org réel des 6 grands championnats club —
+// nécessaire quand ces comps sont exceptionnellement sourcées depuis ESPN
+// (useTodayMatches.js, useUpcomingMatchesAllComps dans useMatchs.js) : sans
+// lui, elles récupéreraient un competition.id à `null` (SYNTHETIC_COMP_ID,
+// espnAdapter.js, n'a pas d'entrée pour elles — seulement pour les comps
+// 100% ESPN comme NL/CAN/COPA), cassant le matching live (api/fifa-live.js,
+// COMP_ESPN[fdMatch.competition?.id]) et le regroupement par compétition
+// ailleurs dans l'app.
+export const MAJOR_LEAGUE_FD_ID = { CL: 2001, PL: 2021, FL1: 2015, PD: 2014, BL1: 2002, SA: 2019 }
+
 // ⚠️ TheSportsDB : testé comme 3e repli classement (23/07), retiré le même
 // jour — la clé publique gratuite plafonne lookuptable.php à 5 lignes
 // seulement, quelle que soit la ligue (confirmé par appels réels), donc

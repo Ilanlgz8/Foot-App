@@ -3,13 +3,41 @@ import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
-import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS } from '../data/competitions'
+import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
 // pas de Poules/tableau pour l'instant, Programme+Résultats seulement).
+// ⚠️ Volontairement INCHANGÉ (n'inclut PAS FL1/PL/PD/BL1/SA/CL) : ce Set est
+// utilisé par fetchMatchesForComp, partagé avec useMatches (Programme.jsx),
+// dont la vue "Par journée" a besoin du champ `matchday` — qu'ESPN ne fournit
+// jamais (toujours `null`). Voir plus bas (opts.preferEspnForMajors) pour le
+// SEUL appelant qui a besoin d'ESPN pour ces 6 comps sans toucher Programme.
 const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+
+// ⚠️ AJOUT (constat utilisateur, 24/07 : "j'ai des doublons + les matchs
+// avant le 21 août n'apparaissent pas, l'app saute direct au 21 au lieu du
+// 15") : useUpcomingMatchesAllComps (ci-dessous — sert à la fois à trouver
+// "le prochain jour avec un match" ET de filet de sécurité anti-trou dans
+// Accueil.jsx) restait sur FD.org pour les 6 grands championnats via
+// fetchMatchesForComp, alors que le widget qui AFFICHE réellement ces matchs
+// dans Accueil (useTodayMatches.js) a été basculé sur ESPN pour elles le
+// 23/07 (FD.org moins complet/fiable pour elles, cause du switch à
+// l'origine). Résultat : un match connu d'ESPN mais pas encore (ou
+// différemment daté) côté FD.org — ex. une rencontre publiée plus tôt côté
+// ESPN — n'était jamais vu par ce hook, donc jamais retenu comme "jour le
+// plus proche", ET pouvait réapparaître en double avec une date différente
+// via le filet de sécurité (qui compare bien les noms d'équipe désormais,
+// mais un vrai écart de date entre les 2 sources reste possible). Le fix
+// (matchDedupeKey → fuzzyTeam, même jour) traitait le symptôme doublon mais
+// pas la cause : deux sources différentes pour la même donnée. En alignant
+// enfin les DEUX (widget d'affichage ET recherche du jour le plus proche)
+// sur la même source pour ces 6 comps, les deux bugs disparaissent à la
+// racine. `useMatches`/Programme.jsx n'est PAS concerné (voir ESPN_SOURCED_COMPS
+// ci-dessus, inchangé) — seul useUpcomingMatchesAllComps passe désormais
+// preferEspnForMajors:true à fetchMatchesForComp.
+const MAJOR_LEAGUE_COMPS = new Set(Object.keys(MAJOR_LEAGUE_FD_ID))
 
 // TTL selon le statut : les matchs à venir/terminés changent rarement → cache long
 // → évite les 429 (free tier football-data.org : 10 req/min)
@@ -112,10 +140,12 @@ export function getClubSeason() {
 // Logique de fetch partagée (extraite pour être réutilisable hors du hook,
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
 // voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
-async function fetchMatchesForComp(selectedComp, status) {
-  if (ESPN_SOURCED_COMPS.has(selectedComp)) {
+async function fetchMatchesForComp(selectedComp, status, opts = {}) {
+  const useEspn = ESPN_SOURCED_COMPS.has(selectedComp) ||
+    (opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp))
+  if (useEspn) {
     const slug = COMPETITION_ESPN_SLUG[selectedComp]
-    const all  = await fetchEspnCompMatches(selectedComp, slug)
+    const all  = await fetchEspnCompMatches(selectedComp, slug, { compId: MAJOR_LEAGUE_FD_ID[selectedComp] })
     if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
     // 'SCHEDULED' ici couvre aussi TIMED/IN_PLAY/PAUSED — même logique que
     // Programme pour WC/EC qui affiche "à venir" au sens large (voir filtre
@@ -318,18 +348,23 @@ const ALL_COMPS_STAGGER_MS = 800  // 800ms x jusqu'à 10 = ~8s pour la dernière
 
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const windowMs   = windowDays * 24 * 60 * 60 * 1000
-  const key        = cacheKey(`ALL_V2_${windowDays}`, 'SCHEDULED')
+  // ⚠️ V3 (24/07) : bascule des 6 grands championnats FD.org→ESPN pour ce
+  // hook (voir preferEspnForMajors, fetchMatchesForComp) — clé de cache
+  // bumpée pour que le fix s'applique immédiatement (même raisonnement que
+  // le passage V1→V2 documenté juste au-dessus) plutôt que d'attendre
+  // jusqu'à 1h (ALL_COMPS_TTL) que l'ancien cache FD.org expire tout seul.
+  const key        = cacheKey(`ALL_V3_${windowDays}`, 'SCHEDULED')
   const cachedData = readCacheStale(key)
   const cachedAt   = getCacheSavedAt(key)
   const ttl        = ALL_COMPS_TTL
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['matches', 'ALL_V2', 'SCHEDULED', compIds.join(','), windowDays],
+    queryKey: ['matches', 'ALL_V3', 'SCHEDULED', compIds.join(','), windowDays],
     queryFn: async () => {
       const results = await Promise.allSettled(
         compIds.map(async (id, i) => {
           if (i > 0) await new Promise(r => setTimeout(r, i * ALL_COMPS_STAGGER_MS))
-          return fetchMatchesForComp(id, 'SCHEDULED')
+          return fetchMatchesForComp(id, 'SCHEDULED', { preferEspnForMajors: true })
         })
       )
       const now = Date.now()
