@@ -776,17 +776,8 @@
 
 /* Matchs à venir : toujours cliquables */
 .matchs__match--upcoming { cursor: pointer; }
-
-.matchs__upcomingHint {
-  font-size: 0.9rem;
-  color: rgba(var(--red-rgb),0.5);
-  line-height: 1;
-  transition: transform 0.15s, color 0.15s;
-}
-.matchs__match--upcoming:hover .matchs__upcomingHint {
-  transform: translateX(2px);
-  color: var(--red);
-}
+/* ⚠️ Chevron "›" retiré (demande utilisateur) — était affiché sous l'heure
+   pour les matchs à venir, voir ancien .matchs__upcomingHint (Match.jsx). */
 
 /* Renforce le liseré/halo au survol au lieu de remplacer le dégradé de fond
    (l'ancien hover écrasait le fond neon par un simple tint plat). */
@@ -975,7 +966,9 @@
   font-size: 3.2rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
-  color: #f1f5f9;
+  /* ⚠️ Alignée sur la couleur des noms d'équipe (.matchs__teamName), demande
+     utilisateur — même teinte que le reste du texte de la card. */
+  color: #e2e8f0;
   text-shadow: 0 0 9px rgba(var(--red-rgb),0.4);
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;

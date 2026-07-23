@@ -197,7 +197,6 @@ function MatchRow({ match, index, inModal = false }) {
       </div>
       <div className="matchs__score">
         <span className="matchs__scoreHour">{_fmtH(match.utcDate)}</span>
-        {isUpcoming && <span className="matchs__upcomingHint">›</span>}
       </div>
       <div className="matchs__team matchs__team--away">
         {match.awayTeam.crest && (
