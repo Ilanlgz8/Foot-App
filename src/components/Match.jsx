@@ -1079,7 +1079,7 @@ function Matchs() {
                   >
                     <img src={comp.emblem} alt="" className="compHeader__itemLogo"
                       onError={e => e.currentTarget.style.display = 'none'} />
-                    <span className="compHeader__itemName">{comp.shortName ?? comp.name}</span>
+                    <span className="compHeader__itemName">{comp.name}</span>
                   </button>
                 ))}
               </div>
