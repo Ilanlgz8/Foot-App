@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
@@ -367,6 +367,11 @@ function Accueil() {
   // INCHANGÉE : elle doit continuer à sauter dès que le jour affiché n'a plus
   // AUCUN match à venir (jour vide OU tous les matchs déjà terminés), y
   // compris au lancement de l'app à chaque fois.
+  // Distingue un dayOffset atteint par un saut AUTOMATIQUE (peut être corrigé
+  // plus tard) d'un dayOffset choisi MANUELLEMENT par l'utilisateur (jamais
+  // recorrigé — voir l'effet de correction arrière juste en dessous).
+  const wasAutoJumped = useRef(false)
+
   useEffect(() => {
     if (matchesLoading) return
     const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
@@ -382,9 +387,43 @@ function Accueil() {
     if (diffDays <= dayOffset) return  // ne recule jamais
 
     // Petit délai pour éviter un flash si les données arrivent en deux temps
-    const id = setTimeout(() => { setDayOffset(diffDays) }, 800)
+    const id = setTimeout(() => { wasAutoJumped.current = true; setDayOffset(diffDays) }, 800)
     return () => clearTimeout(id)
   }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps])
+
+  // ⚠️ AJOUT (retour utilisateur : "y'avait plus que les matchs à partir du
+  // 22 août ... je peux pas aller avant" alors que des matchs existent bien
+  // avant — ex. LaLiga le 15 août, Premier League le 21). Cause possible :
+  // l'effet ci-dessus s'arrête net dès que le jour atteint a réellement des
+  // matchs (hasUpcoming devient vrai) — si CE jour a été atteint alors que
+  // upcomingAllComps ne connaissait pas encore un jour plus tôt (calendrier
+  // d'un autre championnat publié après coup, ou cache pas encore rafraîchi
+  // au moment du saut), rien ne revient jamais corriger le tir : le jour
+  // "trop loin" devient permanent, même une fois des données plus fraîches
+  // disponibles (voir aussi le commentaire sur ALL_COMPS_TTL plus haut —
+  // même classe de bug déjà rencontrée une fois). Ce 2e effet corrige
+  // seulement les sauts AUTOMATIQUES (wasAutoJumped, jamais un choix manuel
+  // — cliquer "jour suivant"/"jour précédent" doit toujours rester définitif)
+  // dès que des données plus fraîches révèlent un jour valide plus tôt.
+  useEffect(() => {
+    if (!wasAutoJumped.current || matchesLoading || dayOffset <= 0) return
+    const endOfToday = new Date(`${todayDateStr}T23:59:59`).getTime()
+    const earliest = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfToday)
+    if (!earliest) return
+
+    const today0    = new Date(); today0.setHours(0, 0, 0, 0)
+    const earliest0 = new Date(earliest.utcDate); earliest0.setHours(0, 0, 0, 0)
+    const diffDays  = Math.round((earliest0 - today0) / 86_400_000)
+    if (diffDays <= 0 || diffDays >= dayOffset) return  // rien de plus tôt à corriger
+
+    const id = setTimeout(() => { setDayOffset(diffDays) }, 800)
+    return () => clearTimeout(id)
+  }, [upcomingAllComps, matchesLoading, dayOffset, todayDateStr])
+
+  // Toute navigation MANUELLE (flèches jour précédent/suivant) doit être
+  // considérée définitive — reset du flag pour que l'effet de correction
+  // ci-dessus ne vienne jamais contredire un choix explicite de l'utilisateur.
+  const goToDay = (offset) => { wasAutoJumped.current = false; setDayOffset(offset) }
 
   // ── Flèche "jour suivant" : saut DIRECT au prochain jour qui a un match ──
   // (retour utilisateur : cliquer avançait d'un seul jour à la fois, et sur
@@ -749,7 +788,7 @@ function Accueil() {
                   "aujourd'hui". */}
               <button
                 className="accueil__dayArrow"
-                onClick={() => { if (prevMatchDayOffset != null) setDayOffset(prevMatchDayOffset) }}
+                onClick={() => { if (prevMatchDayOffset != null) goToDay(prevMatchDayOffset) }}
                 disabled={prevMatchDayOffset == null}
                 aria-label="Jour précédent"
               >‹</button>
@@ -759,7 +798,7 @@ function Accueil() {
                   venir n'est connu dans les 30 prochains jours. */}
               <button
                 className="accueil__dayArrow"
-                onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}
+                onClick={() => { if (nextMatchDayOffset != null) goToDay(nextMatchDayOffset) }}
                 disabled={nextMatchDayOffset == null}
                 aria-label="Jour suivant"
               >›</button>
