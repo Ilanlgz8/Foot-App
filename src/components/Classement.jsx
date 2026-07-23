@@ -93,6 +93,13 @@ function Classement() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
 
+  // Pré-chargé ici (avant useStandings) pour calculer hasMatchToday — voir
+  // juste en dessous. Même hook déjà utilisé plus bas pour la modal groupe,
+  // simplement remonté : aucun appel réseau supplémentaire, juste réutilisé
+  // plus tôt dans la fonction (ordre des hooks sans incidence sur le résultat).
+  const { matches: wcSched, loading: wcSchedLoading } = useMatches(selectedComp, 'SCHEDULED')
+  const { matches: wcFin,   loading: wcFinLoading   } = useMatches(selectedComp, 'FINISHED')
+
   // ⚠️ AJOUT (idée utilisateur, 23/07) : le classement ne peut changer QUE
   // si un match de LA compétition affichée est en cours — inutile de repoller
   // sinon. hasLiveMatch dérivé de liveMatches (LiveProvider, déjà à jour
@@ -100,7 +107,20 @@ function Classement() {
   // pour le détail du refetchInterval gaté.
   const { liveMatches } = useLiveData()
   const hasLiveMatch = liveMatches.some(m => m.competition?.code === selectedComp)
-  const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch)
+
+  // ⚠️ AJOUT 2 (suite idée utilisateur, même jour) : "si toute la journée y'a
+  // pas de match, autant garder le cache toute la journée plutôt que 2min".
+  // hasMatchToday réutilise wcSched/wcFin (déjà chargés ci-dessus, zéro coût
+  // réseau en plus) — vrai si un match SCHEDULED ou FINISHED de CE
+  // championnat tombe aujourd'hui (date locale). staleTime passe alors de
+  // 2min à 24h dans useStandings — sur un jour sans aucun match pour la
+  // compétition affichée, revisiter la page ne retape plus jamais FD.org/ESPN
+  // inutilement (le classement ne PEUT physiquement pas avoir changé).
+  const todayStr = new Date().toLocaleDateString('sv-SE') // 'YYYY-MM-DD' en heure locale
+  const hasMatchToday = !wcSchedLoading && !wcFinLoading &&
+    [...wcSched, ...wcFin].some(m => m.utcDate && new Date(m.utcDate).toLocaleDateString('sv-SE') === todayStr)
+
+  const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
   const { formMap } = useTeamForm(selectedComp)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp)
   // Classement des passes décisives retiré : aucune source fiable trouvée
@@ -157,12 +177,12 @@ function Classement() {
     ? displayScorers.slice(scorerPage * SCORERS_PER_PAGE, scorerPage * SCORERS_PER_PAGE + SCORERS_PER_PAGE)
     : displayScorers
 
-  // Pré-chargé au niveau Classement pour éviter le problème de hooks dans composant imbriqué
-  // (hooks ne peuvent pas être dans des sous-composants définis dans le même scope).
-  // Paramétré par selectedComp (avant : hardcodé 'WC') — sinon le modal groupe
-  // affichait toujours les matchs du Mondial même en consultant un groupe Euro.
-  const { matches: wcSched, loading: wcSchedLoading } = useMatches(selectedComp, 'SCHEDULED')
-  const { matches: wcFin,   loading: wcFinLoading   } = useMatches(selectedComp, 'FINISHED')
+  // wcSched/wcFin : remontés plus haut dans la fonction (voir hasMatchToday) —
+  // hooks pré-chargés au niveau Classement pour éviter le problème de hooks
+  // dans composant imbriqué (hooks ne peuvent pas être dans des
+  // sous-composants définis dans le même scope). Paramétré par selectedComp
+  // (avant : hardcodé 'WC') — sinon le modal groupe affichait toujours les
+  // matchs du Mondial même en consultant un groupe Euro.
   // Fetch dédié à l'onglet Tendances retiré avec l'onglet lui-même (mis de
   // côté, voir TendancesView.jsx) — évite un appel réseau pour rien.
 

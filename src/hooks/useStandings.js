@@ -25,7 +25,20 @@ const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendan
 // plan (pas de refetchIntervalInBackground ici) — pas de poll en arrière-plan.
 const LIVE_REFETCH_MS = 1000 * 60 * 5  // 5min
 
-export function useStandings(selectedComp, hasLiveMatch = false) {
+// ⚠️ AJOUT 2 (idée utilisateur, même jour : "si toute la journée y'a pas de
+// match, autant garder le cache toute la journée plutôt que 2min, et dès
+// qu'y'a un match [genre à 18h] on repasse en mode 2min") : STALE_MS (2min)
+// n'a de sens QUE les jours où la compétition affichée joue — un classement
+// ne peut pas changer sans match. hasMatchToday (passé par l'appelant, dérivé
+// des matchs SCHEDULED+FINISHED du jour pour cette compétition — déjà chargés
+// par ailleurs, zéro coût réseau en plus) bascule le staleTime : 24h les jours
+// sans match (revisiter la page ne retape plus jamais la source), 2min les
+// jours où ça joue (comportement actuel inchangé). Défaut à `true` (2min) si
+// l'appelant ne précise rien — comportement identique à avant pour les autres
+// call sites (FavoritesPage, MatchModal) qui n'ont pas cette info sous la main.
+const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
+
+export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday = true) {
   const key = `standings_${selectedComp}`
 
   const { data, isLoading, error } = useQuery({
@@ -112,7 +125,7 @@ export function useStandings(selectedComp, hasLiveMatch = false) {
     },
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
-    staleTime:            STALE_MS,
+    staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
     refetchInterval:      hasLiveMatch ? LIVE_REFETCH_MS : false,
     retry: false,
     enabled: !!selectedComp,
