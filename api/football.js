@@ -256,10 +256,22 @@ export default async function handler(req, res) {
       } catch {}
     }
 
+    // ⚠️ CORRIGÉ (23/07, trouvé en analysant un screenshot Network utilisateur :
+    // des 403 identiques revenaient en 2-3ms "(disk cache)" juste après un vrai
+    // 403 à ~650ms) : cette réponse finale utilisait getCacheControl(ttl) SANS
+    // regarder response.status — un vrai 403/429 upstream héritait donc du
+    // même Cache-Control public/s-maxage que les réponses 200 (jusqu'à 5min
+    // selon l'endpoint), et le NAVIGATEUR le mettait en cache disque tel quel.
+    // Résultat : une seule vraie erreur FD.org pouvait ensuite se "rejouer"
+    // plusieurs fois depuis le disque, sans le moindre appel réseau réel — ça
+    // ressemble à du spam côté onglet Network alors qu'aucune nouvelle
+    // requête n'atteint même notre serveur, encore moins FD.org. no-store
+    // sur tout ce qui n'est pas 2xx : chaque nouvelle tentative repasse
+    // vraiment par le garde-fou serveur (Redis) au lieu d'un mirage local.
     res
       .status(response.status)
       .setHeader('Content-Type', 'application/json')
-      .setHeader('Cache-Control', getCacheControl(ttl))
+      .setHeader('Cache-Control', response.ok ? getCacheControl(ttl) : 'no-store')
       .setHeader('X-Cache', 'MISS')
       .send(body)
 
