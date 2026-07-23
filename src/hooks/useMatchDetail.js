@@ -561,6 +561,23 @@ export function useEspnMatchStats(match, isFinished = false) {
 // Zéro quota — ESPN est gratuit et illimité.
 // Fonctionne pour toutes les compétitions dans COMP_ESPN.
 
+// ⚠️ AJOUT (constat utilisateur : "compo probable du 17 mai" affichée pour un
+// match d'août — la compo venait bien du DERNIER match FINISHED trouvé dans
+// compMatches, mais compMatches peut lui-même être le repli "saison
+// précédente" de useTeamForm (voir isLastSeason) en tout début de saison —
+// le seul match FINISHED disponible est alors la dernière journée de LA
+// SAISON D'AVANT, potentiellement vieille de plusieurs mois. Une compo d'il
+// y a 2-3 mois (transferts, blessures, changement d'entraîneur...) n'a plus
+// grand-chose à voir avec la compo probable réelle — trompeur de la
+// présenter comme "probable" sans le dire. Coupure à 45 jours (couvre une
+// vraie trêve internationale ou une élimination de coupe, exclut un
+// changement de saison ~2-3 mois) : au-delà, on préfère ne rien afficher
+// plutôt qu'une donnée présentée à tort comme récente — cohérent avec le
+// choix déjà fait ailleurs dans l'app de préférer un vide honnête à une
+// donnée trompeuse. Comparé à la date du match PRÉVU (pas "maintenant") :
+// reste correct même si ce match est lui-même prévu dans plusieurs semaines.
+const MAX_LINEUP_AGE_DAYS = 45
+
 export function useProbableLineups(match, compMatches) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
@@ -573,8 +590,10 @@ export function useProbableLineups(match, compMatches) {
     retry: 0,
     queryFn: async () => {
       // Trouver le dernier match terminé de chaque équipe dans les données FD.org
+      const refDate = new Date(match.utcDate).getTime()
       const sorted = [...compMatches]
         .filter(m => m.status === 'FINISHED')
+        .filter(m => (refDate - new Date(m.utcDate).getTime()) / 86_400_000 <= MAX_LINEUP_AGE_DAYS)
         .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
 
       const lastHome = sorted.find(m =>

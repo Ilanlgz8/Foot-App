@@ -557,7 +557,7 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
   }
 }
 
-function MpSeasonStats({ match, compMatches, hideForm = false }) {
+function MpSeasonStats({ match, compMatches, isLastSeason = false, hideForm = false }) {
   const homeId   = match.homeTeam?.id
   const awayId   = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -574,6 +574,44 @@ function MpSeasonStats({ match, compMatches, hideForm = false }) {
   // disparaître toute la section pour une équipe encore sans match dans ce
   // contexte précis, alors que "Global" en a).
   if (split === 'all' && !h && !a) return null
+
+  // ⚠️ AJOUT (constat utilisateur : "stats saison" affichait des moyennes
+  // calculées sur la saison 2024/2025 alors qu'il n'y avait pas encore
+  // assez de matchs 2025/2026 — présentées telles quelles sous le libellé
+  // "Saison", sans indiquer qu'il s'agit d'une saison différente).
+  // compMatches vient alors du repli "saison précédente" de useTeamForm
+  // (isLastSeason) — sciemment gardé pour la forme récente/le pronostic
+  // (voir commentaires dans useTeamForm.js), mais des MOYENNES numériques
+  // affichées comme "la saison" sans le dire seraient trompeuses. Plutôt
+  // que d'inventer une saison qu'on n'a pas, on masque ce bloc précis (le
+  // bloc "Forme récente" juste en dessous, lui, reste affiché — déjà pensé
+  // pour ce cas dès sa conception).
+  if (isLastSeason) {
+    return !hideForm ? (
+      <div className="mp__statsWrap">
+        {formSection()}
+      </div>
+    ) : null
+  }
+
+  function formSection() {
+    return (
+      <div className="pm__section modal__seasonForm">
+        <h3 className="pm__sectionTitle">Forme récente</h3>
+        <div className="pm__formGrid">
+          <div className="pm__formCol">
+            <p className="pm__formTeamName">{homeName}</p>
+            <TeamFormTable teamId={homeId} compMatches={compMatches} />
+          </div>
+          <div className="pm__formDivider" />
+          <div className="pm__formCol">
+            <p className="pm__formTeamName">{awayName}</p>
+            <TeamFormTable teamId={awayId} compMatches={compMatches} />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const streakColor = type => type === 'W' ? '#4ade80' : type === 'D' ? '#facc15' : '#f87171'
   const streakLabel = s => !s?.streak ? '–' : `${s.streak}${s.streakType === 'W' ? 'V' : s.streakType === 'D' ? 'N' : 'D'}`
@@ -623,22 +661,7 @@ function MpSeasonStats({ match, compMatches, hideForm = false }) {
           date), même bloc que l'onglet "Avant-match". Masqué quand
           PreMatchSection est rendu juste après (matchs à venir) : il a déjà
           son propre bloc Forme récente, l'afficher ici aussi le dupliquait. */}
-      {!hideForm && (
-        <div className="pm__section modal__seasonForm">
-          <h3 className="pm__sectionTitle">Forme récente</h3>
-          <div className="pm__formGrid">
-            <div className="pm__formCol">
-              <p className="pm__formTeamName">{homeName}</p>
-              <TeamFormTable teamId={homeId} compMatches={compMatches} />
-            </div>
-            <div className="pm__formDivider" />
-            <div className="pm__formCol">
-              <p className="pm__formTeamName">{awayName}</p>
-              <TeamFormTable teamId={awayId} compMatches={compMatches} />
-            </div>
-          </div>
-        </div>
-      )}
+      {!hideForm && formSection()}
     </div>
   )
 }
@@ -660,7 +683,7 @@ export default function MatchPage() {
   // compMatches est nécessaire même pour un match terminé désormais : le
   // sous-onglet "Stats saison" en a besoin (avant, seuls les matchs à venir
   // le fetchaient, ce qui rendait "Stats saison" impossible pour un match FT).
-  const { formMap, compMatches, isLoading: formLoading } = useTeamForm(compId)
+  const { formMap, compMatches, isLastSeason, isLoading: formLoading } = useTeamForm(compId)
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
 
@@ -763,7 +786,7 @@ export default function MatchPage() {
                         via MatchPoster). */}
                     {statsView === 'live'       ? <MpMatchStats match={match} />
                    : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                   :                              <MpSeasonStats match={match} compMatches={compMatches} />
+                   :                              <MpSeasonStats match={match} compMatches={compMatches} isLastSeason={isLastSeason} />
                     }
                   </>
                 : formLoading
@@ -784,6 +807,7 @@ export default function MatchPage() {
                             <MpSeasonStats
                               match={match}
                               compMatches={compMatches}
+                              isLastSeason={isLastSeason}
                               hideForm
                             />
                             <PreMatchSection
