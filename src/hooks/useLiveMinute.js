@@ -279,6 +279,16 @@ function confirmFt(match, now, queryClient) {
       queryClient.invalidateQueries({ queryKey: ['scorers', code] })
     }
     if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
+    // ⚠️ AJOUT (constat/question utilisateur : "l'historique des rencontres
+    // ça bouge quasiment jamais, juste quand le match en question est fini")
+    // : useH2H (queryKey ['h2h-fd', matchId], voir useMatchDetail.js) était
+    // le seul des 4 (Résultats/ResultPanel/forme récente/H2H) jamais
+    // invalidé ici. Clé par matchId (pas par équipe) : on ne peut pas cibler
+    // uniquement les confrontations PSG-Rennes par exemple, donc invalidation
+    // large par préfixe ['h2h-fd'] (matche tous les matchId) — sans coût réel,
+    // React Query ne refetch que les requêtes H2H ACTIVES (une page match
+    // ouverte en ce moment précis), jamais en arrière-plan pour rien.
+    queryClient.invalidateQueries({ queryKey: ['h2h-fd'] })
     // Effacer les caches localStorage pour forcer un refetch propre
     try { localStorage.removeItem(`foot_matches_${todayStr}`) } catch {}
     if (code) {
@@ -304,6 +314,7 @@ function confirmFt(match, now, queryClient) {
       queryClient.invalidateQueries({ queryKey: ['scorers', code] })
     }
     if (isWC) queryClient.invalidateQueries({ queryKey: ['wc-knockout'] })
+    queryClient.invalidateQueries({ queryKey: ['h2h-fd'] })
   }, 5 * 60_000)
 }
 
