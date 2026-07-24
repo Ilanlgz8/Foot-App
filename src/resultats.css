@@ -365,9 +365,10 @@
    zoome à l'intérieur d'un cercle de taille fixe, ce qui recadre vraiment
    (même principe que mp__hero__crestWrap/live__crestWrap/poster__crestWrap). */
 .resultats__crestWrap {
-  /* ⚠️ Agrandi (demande utilisateur, même traitement que Programme/match.css,
-     proportionnel : ratio ~1.39x appliqué à cette page aussi). */
-  width: 4.3rem; height: 4.3rem;
+  /* ⚠️ Réduit de moitié en desktop (demande utilisateur, 24/07 : "trop gros"
+     sur Programme/Résultats desktop) — la version mobile (< 640px, voir
+     override plus bas) reste inchangée. */
+  width: 2.15rem; height: 2.15rem;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -386,7 +387,8 @@
 .resultats__card:hover .resultats__crest { transform: scale(1.25); }
 
 .resultats__crestFb {
-  width: 4.3rem; height: 4.3rem;
+  /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap ci-dessus). */
+  width: 2.15rem; height: 2.15rem;
   border-radius: 50%;
   background: rgba(var(--white-rgb),0.05);
   border: 1px solid rgba(var(--white-rgb),0.08);
@@ -395,7 +397,8 @@
 }
 
 .resultats__teamName {
-  font-size: 1.4rem;
+  /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap ci-dessus). */
+  font-size: 0.7rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #e2e8f0;
@@ -443,8 +446,9 @@
 }
 
 .resultats__scoreNum {
-  /* Doublé puis réduit un peu (demande utilisateur). */
-  font-size: 2.8rem;
+  /* ⚠️ Réduit de moitié en desktop (demande utilisateur, même traitement que
+     crestWrap/teamName ci-dessus). */
+  font-size: 1.4rem;
   font-weight: 800;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #f1f5f9;

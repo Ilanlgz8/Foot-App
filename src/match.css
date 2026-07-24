@@ -873,7 +873,11 @@
    qu'agrandir tout le cercle (forme + contenu ensemble) sans resserrer le
    cadrage — voir même correctif sur resultats__crestWrap/accueil__matchCardCrestWrap. */
 .matchs__crestWrap {
-  width: 3.9rem; height: 3.9rem;
+  /* ⚠️ Réduit de moitié en desktop (demande utilisateur, 24/07 : "trop gros"
+     sur Programme/Résultats desktop) — la version mobile (< 767px, voir
+     override plus bas) reste inchangée, ces valeurs de base ne s'appliquent
+     qu'au-dessus du seuil mobile. */
+  width: 1.95rem; height: 1.95rem;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -892,7 +896,8 @@
 .matchs__match:hover .matchs__crest { transform: scale(1.3); }
 
 .matchs__teamName {
-  font-size: 1.15rem;
+  /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap ci-dessus). */
+  font-size: 0.575rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #e2e8f0;
@@ -965,7 +970,8 @@
   background: transparent;
   border: none;
   border-radius: 0.65rem;
-  font-size: 3.2rem;
+  /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap/teamName ci-dessus). */
+  font-size: 1.6rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   /* ⚠️ Alignée sur la couleur des noms d'équipe (.matchs__teamName), demande
