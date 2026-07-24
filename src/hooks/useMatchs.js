@@ -320,13 +320,49 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
   const isClubShared = selectedComp !== 'WC' && selectedComp !== 'EC' && !ESPN_SOURCED_COMPS.has(selectedComp)
 
   const key         = cacheKey(selectedComp, isClubShared ? 'RAW' : status)
-  const cachedData  = readCacheStale(key)
-  const cachedAt    = getCacheSavedAt(key)
   // RAW contient à la fois les matchs à venir et terminés — on aligne le TTL
   // disque sur la catégorie la plus volatile (FINISHED, scores/classement
   // changeants) plutôt que sur SCHEDULED (1h), pour ne pas garder une donnée
   // "à jour" trop longtemps du point de vue de Résultats.
   const ttl         = options.staleTime ?? (isClubShared ? TTL.FINISHED : (TTL[status] ?? 30 * 60 * 1000))
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que le partage de cache :
+  // "je relance l'app complètement, je vais dans Programme, ça me met
+  // 'Veuillez patienter' direct") : renommer la clé de cache en 'RAW' a
+  // instantanément vidé le filet de sécurité stale de TOUTES les compéts club
+  // d'un coup — l'ancienne clé ('matches_FL1_SCHEDULED' etc.) avait des mois
+  // d'historique accumulé, la nouvelle ('matches_FL1_RAW') n'en a AUCUN au
+  // moment du déploiement. Résultat : le tout premier vrai 429/403 rencontré
+  // après le déploiement (FD.org sous tension, indépendant de ce bug) n'avait
+  // plus aucune copie de secours à servir et remontait tel quel — exactement
+  // le piège "clé toute neuve sans historique" déjà rencontré une fois ce
+  // même jour (LaLiga, juste après la 1ère fusion). Repli : si la nouvelle
+  // clé RAW est vide, on regarde une dernière fois les ANCIENNES clés
+  // (SCHEDULED/FINISHED) — écrites par les sessions précédentes, avant ce
+  // déploiement — et on les fusionne comme copie de secours migrée, plutôt
+  // que de repartir de zéro. Purement une passerelle : dès qu'un vrai fetch
+  // réussit, tout repasse par la clé RAW normalement.
+  function readStaleWithMigration() {
+    const direct = readCacheStale(key)
+    if (direct) return direct
+    if (!isClubShared) return null
+    const oldFinished = readCacheStale(cacheKey(selectedComp, 'FINISHED'))
+    const oldScheduled = readCacheStale(cacheKey(selectedComp, 'SCHEDULED'))
+    if (!oldFinished && !oldScheduled) return null
+    const seen = new Set()
+    const merged = []
+    for (const m of [...(oldFinished ?? []), ...(oldScheduled ?? [])]) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      merged.push(m)
+    }
+    if (merged.length === 0) return null
+    writeCache(key, merged, ttl) // auto-guérison : la prochaine lecture retombe directement sur la clé RAW
+    return merged
+  }
+
+  const cachedData = readStaleWithMigration()
+  const cachedAt   = getCacheSavedAt(key)
 
   const filterByStatus = list => (list ?? []).filter(m =>
     status === 'FINISHED' ? m.status === 'FINISHED' : m.status !== 'FINISHED'
@@ -361,14 +397,14 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
           ? await fetchClubMatchesRaw(selectedComp)
           : await fetchMatchesForComp(selectedComp, status)
         if (!matches) {
-          const stale = readCacheStale(key)
+          const stale = readStaleWithMigration()
           if (stale) return stale
           throw new Error('Erreur API')
         }
         if (matches.length > 0) writeCache(key, matches, ttl)
-        return matches.length > 0 ? matches : (readCacheStale(key) ?? [])
+        return matches.length > 0 ? matches : (readStaleWithMigration() ?? [])
       } catch (err) {
-        const stale = readCacheStale(key)
+        const stale = readStaleWithMigration()
         if (stale) return stale
         throw err
       }
