@@ -166,6 +166,13 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   // Pas d'initialisation (null) : chaque branche ci-dessous assigne toujours
   // `matches` avant toute lecture (voir no-useless-assignment, ESLint).
   let matches
+  // Mémorise la dernière vraie erreur réseau (429/403) rencontrée dans la
+  // branche club ci-dessous — voir le rethrow juste avant le `return` final :
+  // sans ça, 2 tentatives bloquées finissaient en `matches: null` silencieux,
+  // perdant la distinction "vraiment bloqué" vs "vraiment aucun match", ce
+  // dont classifyFetchError (fetchErrors.js) a besoin pour afficher "Veuillez
+  // patienter quelques instants" au lieu d'un écran vide sans message.
+  let lastErr = null
 
   if (!isClub) {
     const wcSeason = new Date().getFullYear()
@@ -226,7 +233,7 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       all = await tryFetch(
         `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
       )
-    } catch { /* → repli ci-dessous, ne pas abandonner tout de suite */ }
+    } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
     matches = all == null ? null : applyStatusFilter(all)
 
     // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que la fusion : "Résultats
@@ -250,7 +257,7 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       let fallbackAll = null
       try {
         fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
-      } catch { /* les deux tentatives ont échoué — `matches` reste tel quel */ }
+      } catch (e) { lastErr = e /* les deux tentatives ont échoué — `matches` reste tel quel */ }
       if (fallbackAll != null) {
         const fallbackFiltered = applyStatusFilter(fallbackAll)
         // Ne remplacer que si ce repli apporte vraiment quelque chose — sinon
@@ -273,6 +280,22 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       : cupMatches.filter(m => m.status !== 'FINISHED')
     if (cupFiltered.length > 0) matches = [...(matches ?? []), ...cupFiltered]
   }
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : Programme Ligue 1 totalement
+  // vide, MÊME PAS de message "Veuillez patienter" — juste rien) : quand les
+  // 2 tentatives FD.org échouaient (429/403) ET qu'aucun match de coupe
+  // nationale ne venait combler le vide, `matches` finissait `null` de façon
+  // silencieuse (voir les catch locaux ci-dessus, ajoutés pour laisser une
+  // chance au repli mais qui avalaient l'erreur 429/403 d'origine). useMatches
+  // (plus haut) transforme alors ce `null` en un message générique "Erreur
+  // API" — MAIS classifyFetchError (fetchErrors.js) ne reconnaît QUE les
+  // messages exacts '429'/'403' pour afficher "Veuillez patienter quelques
+  // instants" ; un message générique passait au travers d'un autre problème
+  // (rendu conditionnel de Match.jsx) et n'affichait finalement rien du tout.
+  // On relance ici la VRAIE dernière erreur réseau rencontrée (429/403) si
+  // aucune donnée n'a pu être récupérée nulle part — préserve la
+  // classification correcte au lieu d'un null silencieux.
+  if (matches == null && lastErr) throw lastErr
 
   return matches
 }
