@@ -140,6 +140,97 @@ export function getClubSeason() {
 // Logique de fetch partagée (extraite pour être réutilisable hors du hook,
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
 // voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
+async function tryFetch(url) {
+  const res = await fdFetch(fdUrl(url))
+  if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.matches ?? []
+}
+
+// ⚠️ FUSION Programme+Résultats + PARTAGE CLIENT (demande utilisateur, 24/07,
+// en 2 temps) :
+//  1. "rassembler les requêtes pour moins gaspiller" → un seul appel FD.org
+//     par compét club (`?season=X` SANS `status=`, tous statuts confondus),
+//     au lieu de 2 appels séparés par `status=`.
+//  2. "je suis dans Programme, ça charge Programme mais pas Résultats du même
+//     championnat" → la fusion ci-dessus ne partageait QUE le cache Redis
+//     SERVEUR (api/football.js) — chaque page continuait de faire sa PROPRE
+//     requête vers NOTRE serveur (rapide, cache HIT, mais pas instantané ni
+//     partagé côté client) et surtout sa PROPRE clé de cache React
+//     Query/disque. Pire : en intersaison, `season=X` seul contient TOUT
+//     Résultats (saison qui vient de finir) mais RIEN de Programme (aucun
+//     SCHEDULED encore publié sous ce numéro de saison) — Résultats n'avait
+//     donc jamais besoin du repli sans saison, qui restait une clé JAMAIS
+//     préchauffée pour Programme. D'où l'asymétrie observée : Résultats
+//     toujours bon, Programme jamais.
+// fetchClubMatchesRaw() récupère maintenant TOUJOURS les 2 statuts dans le
+// MÊME appel logique (repli automatique dès qu'un des deux manque, fusionné
+// sans doublon) — useMatches() partage ensuite CETTE MÊME donnée brute entre
+// Programme et Résultats via une seule queryKey React Query + `select` pour
+// filtrer par statut côté chaque page (mécanisme officiel React Query,
+// aucun refetch dupliqué). Visiter l'une des deux pages peuple désormais
+// aussi l'autre pour la même compét, sans requête supplémentaire.
+async function fetchClubMatchesRaw(selectedComp) {
+  let all = null
+  // Mémorise la dernière vraie erreur réseau (429/403) — voir le rethrow en
+  // fin de fonction : sans ça, 2 tentatives bloquées finissaient en `null`
+  // silencieux, perdant la distinction "vraiment bloqué" vs "vraiment aucun
+  // match", dont classifyFetchError (fetchErrors.js) a besoin pour afficher
+  // "Veuillez patienter quelques instants" au lieu d'un écran vide.
+  let lastErr = null
+
+  try {
+    all = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
+    )
+  } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
+
+  // Complet seulement si les 2 catégories sont représentées — en intersaison,
+  // `season=${getClubSeason()}` (saison qui vient de finir) ne contient QUE
+  // des FINISHED, jamais de SCHEDULED/TIMED : il faut alors le repli pour
+  // compléter, pas juste quand la réponse est totalement vide.
+  const hasFinished = (all ?? []).some(m => m.status === 'FINISHED')
+  const hasUpcoming = (all ?? []).some(m => m.status !== 'FINISHED')
+
+  if (!all || !hasFinished || !hasUpcoming) {
+    // Repli sans season — s'appuie sur le "current season" implicite de
+    // FD.org plutôt que sur un calcul de date local : couvre justement le cas
+    // d'intersaison où le calcul par date (getClubSeason) et le vrai
+    // "courant" FD.org divergent temporairement. Fusionné (pas remplacé) avec
+    // `all` pour ne perdre ni les FINISHED déjà obtenus ni les SCHEDULED du
+    // repli, quel que soit lequel des deux appels a réussi.
+    let fallbackAll = null
+    try {
+      fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+    } catch (e) { lastErr = e /* les 2 tentatives ont échoué — `all` reste tel quel */ }
+    if (fallbackAll != null) {
+      const seen   = new Set((all ?? []).map(m => m.id))
+      const merged = [...(all ?? [])]
+      for (const m of fallbackAll) if (!seen.has(m.id)) merged.push(m)
+      if (merged.length > 0) all = merged
+    }
+  }
+
+  // Coupe nationale du championnat (Coupe de France/Copa del Rey/FA Cup) :
+  // fusionnée DANS ce même onglet plutôt que dans un onglet dédié (demande
+  // explicite) — voir DOMESTIC_CUPS (competitions.js) et fetchEspnCupMatches
+  // (espnAdapter.js), qui taggent ces matchs avec isCup:true + un nom de
+  // compétition différent pour le relabeling sur les cards. Fusionnée ICI
+  // (non filtrée par statut) plutôt qu'après filtrage : les 2 pages
+  // (Programme/Résultats) profitent du filtrage commun plus bas.
+  if (DOMESTIC_CUPS[selectedComp]) {
+    const cupMatches = await fetchEspnCupMatches(selectedComp)
+    if (cupMatches.length > 0) all = [...(all ?? []), ...cupMatches]
+  }
+
+  // Préserve la classification 429/403 (voir commentaire lastErr ci-dessus)
+  // au lieu d'un null silencieux quand rien n'a pu être récupéré nulle part.
+  if (all == null && lastErr) throw lastErr
+
+  return all
+}
+
 async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   const useEspn = ESPN_SOURCED_COMPS.has(selectedComp) ||
     (opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp))
@@ -155,124 +246,45 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
 
   const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
 
-  async function tryFetch(url) {
-    const res = await fdFetch(fdUrl(url))
-    if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-    if (!res.ok) return null
-    const json = await res.json()
-    return json.matches ?? []
+  if (isClub) {
+    const all = await fetchClubMatchesRaw(selectedComp)
+    if (all == null) return null
+    return status === 'FINISHED'
+      ? all.filter(m => m.status === 'FINISHED')
+      : all.filter(m => m.status !== 'FINISHED')
   }
 
-  // Pas d'initialisation (null) : chaque branche ci-dessous assigne toujours
-  // `matches` avant toute lecture (voir no-useless-assignment, ESLint).
+  // ── WC/EC : statuts déjà distincts par nature du tournoi (poules puis
+  // élimination directe sur quelques semaines), pas concernées par le repli
+  // saison ci-dessus ni par le partage client (chaque page garde son propre
+  // fetch, comportement historique inchangé). ──
   let matches
-  // Mémorise la dernière vraie erreur réseau (429/403) rencontrée dans la
-  // branche club ci-dessous — voir le rethrow juste avant le `return` final :
-  // sans ça, 2 tentatives bloquées finissaient en `matches: null` silencieux,
-  // perdant la distinction "vraiment bloqué" vs "vraiment aucun match", ce
-  // dont classifyFetchError (fetchErrors.js) a besoin pour afficher "Veuillez
-  // patienter quelques instants" au lieu d'un écran vide sans message.
-  let lastErr = null
-
-  if (!isClub) {
-    const wcSeason = new Date().getFullYear()
-    if (status === 'SCHEDULED') {
+  const wcSeason = new Date().getFullYear()
+  if (status === 'SCHEDULED') {
+    matches = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
+    )
+    if (!matches || matches.length === 0) {
       matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
+        `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
       )
-      if (!matches || matches.length === 0) {
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
-        )
-      }
-      if (!matches || matches.length === 0) {
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches`
-        )
-      }
-    } else {
+    }
+    if (!matches || matches.length === 0) {
       matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
+        `/api/v4/competitions/${selectedComp}/matches`
       )
-      if (!matches || matches.length === 0) {
-        matches = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
-        )
-      }
     }
   } else {
-    // ⚠️ FUSION Programme+Résultats (demande utilisateur, 24/07 : "rassembler
-    // les requêtes pour moins gaspiller") : avant, Programme (SCHEDULED) et
-    // Résultats (FINISHED) faisaient chacun leur propre appel FD.org avec un
-    // `status=` différent — 2 clés de cache Redis distinctes côté serveur
-    // (api/football.js), donc 2 vrais appels upstream par fenêtre de cache.
-    // `?season=X` SANS `status=` renvoie TOUS les statuts (scheduled + live +
-    // finished) en un seul appel — Programme et Résultats construisent
-    // désormais EXACTEMENT la même URL pour une même compét, donc tombent sur
-    // LA MÊME entrée de cache serveur : un seul vrai appel FD.org partagé
-    // entre les deux pages, au lieu de deux. Le filtre par statut se fait
-    // maintenant en LOCAL (après réception), pas dans la requête.
-    // Le regroupement "Par journée" n'est PAS affecté : chaque match garde
-    // son `matchday`/`stage` d'origine FD.org, seul le moment où on filtre
-    // par statut change (après coup plutôt que dans l'URL) — groupRounds()
-    // reçoit exactement la même forme de données qu'avant la fusion.
-    const applyStatusFilter = list => status === 'FINISHED'
-      ? list.filter(m => m.status === 'FINISHED')
-      : list.filter(m => m.status !== 'FINISHED')
-
-    // ⚠️ BUG CORRIGÉ (audit suite au constat "Programme totalement vide" —
-    // tryFetch lève une exception sur 429/403 (voir plus haut) — SANS
-    // try/catch ici, cette exception sortait immédiatement de
-    // fetchMatchesForComp et empêchait le repli ci-dessous de jamais
-    // s'exécuter, même si CE repli (clé de cache serveur différente : sans
-    // season) avait sa propre chance de réussir. Avant la fusion, la branche
-    // SCHEDULED ne faisait qu'UN seul essai (déjà sans season) — la fusion a
-    // introduit une vraie dépendance séquentielle qui n'existait pas avant.
-    let all = null
-    try {
-      all = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
-      )
-    } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
-    matches = all == null ? null : applyStatusFilter(all)
-
-    // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que la fusion : "Résultats
-    // ok, mais Programme vide" sur une comp club en pleine intersaison —
-    // LaLiga, 24/07). Le garde-fou initial (`!all || all.length === 0`) ne
-    // se déclenchait QUE si la réponse brute était totalement vide — or en
-    // intersaison, `season=${getClubSeason()}` renvoie une saison qui vient
-    // de se terminer : des CENTAINES de matchs FINISHED, mais ZÉRO SCHEDULED
-    // (les fixtures de la saison suivante ne sont pas encore publiées sous ce
-    // numéro de saison côté FD.org) — `all` n'était donc jamais vide, le repli
-    // ne se déclenchait jamais, et Programme affichait "Aucun match à venir"
-    // alors que Résultats (FINISHED, bien présent dans cette même saison)
-    // fonctionnait normalement. Il faut regarder si le résultat FILTRÉ (pas
-    // la réponse brute) est vide avant de décider s'il faut un repli.
+    matches = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
+    )
     if (!matches || matches.length === 0) {
-      // Repli sans season — comportement historique de l'ancienne branche
-      // SCHEDULED (avant la fusion), qui s'appuyait sur le "current season"
-      // implicite de FD.org plutôt que sur un calcul de date local : couvre
-      // justement ce cas d'intersaison où le calcul par date (getClubSeason)
-      // et le vrai "courant" FD.org divergent temporairement.
-      let fallbackAll = null
-      try {
-        fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
-      } catch (e) { lastErr = e /* les deux tentatives ont échoué — `matches` reste tel quel */ }
-      if (fallbackAll != null) {
-        const fallbackFiltered = applyStatusFilter(fallbackAll)
-        // Ne remplacer que si ce repli apporte vraiment quelque chose — sinon
-        // garder `matches` tel quel (respecte la distinction null/[] déjà en
-        // place pour ne pas masquer une vraie erreur réseau en "aucun match").
-        if (fallbackFiltered.length > 0 || matches == null) matches = fallbackFiltered
-      }
+      matches = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
+      )
     }
   }
 
-  // Coupe nationale du championnat (Coupe de France/Copa del Rey/FA Cup) :
-  // fusionnée DANS ce même onglet plutôt que dans un onglet dédié (demande
-  // explicite) — voir DOMESTIC_CUPS (competitions.js) et fetchEspnCupMatches
-  // (espnAdapter.js), qui taggent ces matchs avec isCup:true + un nom de
-  // compétition différent pour le relabeling sur les cards.
   if (DOMESTIC_CUPS[selectedComp]) {
     const cupMatches = await fetchEspnCupMatches(selectedComp)
     const cupFiltered = status === 'FINISHED'
@@ -280,22 +292,6 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       : cupMatches.filter(m => m.status !== 'FINISHED')
     if (cupFiltered.length > 0) matches = [...(matches ?? []), ...cupFiltered]
   }
-
-  // ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : Programme Ligue 1 totalement
-  // vide, MÊME PAS de message "Veuillez patienter" — juste rien) : quand les
-  // 2 tentatives FD.org échouaient (429/403) ET qu'aucun match de coupe
-  // nationale ne venait combler le vide, `matches` finissait `null` de façon
-  // silencieuse (voir les catch locaux ci-dessus, ajoutés pour laisser une
-  // chance au repli mais qui avalaient l'erreur 429/403 d'origine). useMatches
-  // (plus haut) transforme alors ce `null` en un message générique "Erreur
-  // API" — MAIS classifyFetchError (fetchErrors.js) ne reconnaît QUE les
-  // messages exacts '429'/'403' pour afficher "Veuillez patienter quelques
-  // instants" ; un message générique passait au travers d'un autre problème
-  // (rendu conditionnel de Match.jsx) et n'affichait finalement rien du tout.
-  // On relance ici la VRAIE dernière erreur réseau rencontrée (429/403) si
-  // aucune donnée n'a pu être récupérée nulle part — préserve la
-  // classification correcte au lieu d'un null silencieux.
-  if (matches == null && lastErr) throw lastErr
 
   return matches
 }
@@ -305,13 +301,39 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
 // la même compét/statut (Classement.jsx notamment), chacun garde son propre
 // staleTime côté React Query même si la clé de requête est partagée.
 export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', options = {}) {
-  const key         = cacheKey(selectedComp, status)
+  // ⚠️ PARTAGE CLIENT Programme/Résultats (constat utilisateur, 24/07 : "je
+  // suis dans Programme, ça charge Programme mais pas Résultats du même
+  // championnat") : pour une compét club (hors ESPN_SOURCED_COMPS, hors
+  // WC/EC — voir fetchClubMatchesRaw plus haut), Programme (SCHEDULED) et
+  // Résultats (FINISHED) utilisent maintenant LA MÊME entrée de cache React
+  // Query (même queryKey, données brutes non filtrées) au lieu de deux clés
+  // séparées — chaque page applique ensuite son propre filtre de statut via
+  // `select`, le mécanisme officiel React Query pour que plusieurs observers
+  // d'une même query se partagent UN SEUL fetch tout en affichant chacun une
+  // vue différente des mêmes données (voir doc TanStack Query : "Using select
+  // to Transform Data"). Concrètement : visiter Programme peuple aussi le
+  // cache de Résultats pour la même compét, et inversement — sans requête
+  // supplémentaire, sans refetch dupliqué.
+  // WC/EC et ESPN_SOURCED_COMPS gardent le comportement historique (clés
+  // séparées) : ces branches de fetchMatchesForComp fonctionnent différemment
+  // et n'ont pas le même besoin (voir fetchClubMatchesRaw, dédié aux clubs).
+  const isClubShared = selectedComp !== 'WC' && selectedComp !== 'EC' && !ESPN_SOURCED_COMPS.has(selectedComp)
+
+  const key         = cacheKey(selectedComp, isClubShared ? 'RAW' : status)
   const cachedData  = readCacheStale(key)
   const cachedAt    = getCacheSavedAt(key)
-  const ttl         = options.staleTime ?? (TTL[status] ?? 30 * 60 * 1000)
+  // RAW contient à la fois les matchs à venir et terminés — on aligne le TTL
+  // disque sur la catégorie la plus volatile (FINISHED, scores/classement
+  // changeants) plutôt que sur SCHEDULED (1h), pour ne pas garder une donnée
+  // "à jour" trop longtemps du point de vue de Résultats.
+  const ttl         = options.staleTime ?? (isClubShared ? TTL.FINISHED : (TTL[status] ?? 30 * 60 * 1000))
+
+  const filterByStatus = list => (list ?? []).filter(m =>
+    status === 'FINISHED' ? m.status === 'FINISHED' : m.status !== 'FINISHED'
+  )
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['matches', selectedComp, status],
+    queryKey: ['matches', selectedComp, isClubShared ? 'RAW' : status],
     // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js — constat utilisateur :
     // "j'avais tout, 5min après plus rien") : tryFetch() lève une exception sur
     // 429/403 (voir plus haut), qui traversait fetchMatchesForComp SANS être
@@ -335,7 +357,9 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // l'erreur pour que error/classifyFetchError fasse son travail.
     queryFn: async () => {
       try {
-        const matches = await fetchMatchesForComp(selectedComp, status)
+        const matches = isClubShared
+          ? await fetchClubMatchesRaw(selectedComp)
+          : await fetchMatchesForComp(selectedComp, status)
         if (!matches) {
           const stale = readCacheStale(key)
           if (stale) return stale
@@ -349,6 +373,13 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
         throw err
       }
     },
+    // Filtre par statut appliqué CÔTÉ OBSERVER (pas dans queryFn) — c'est ce
+    // qui permet à Programme et Résultats de partager le même fetch/cache
+    // brut tout en affichant chacun un sous-ensemble différent (voir
+    // commentaire isClubShared ci-dessus). undefined pour WC/EC/ESPN : ces
+    // branches renvoient déjà des données pré-filtrées par status depuis
+    // fetchMatchesForComp, comme avant.
+    select: isClubShared ? filterByStatus : undefined,
     initialData:          cachedData ?? undefined,
     initialDataUpdatedAt: cachedAt,
     staleTime: ttl,
