@@ -62,13 +62,57 @@ async function safeFetch(url) {
   return (json.matches ?? []).filter(m => VALID_STATUS.includes(m.status))
 }
 
-async function fetchTodayMatches(date) {
-  // Calculer le jour UTC précédent pour capturer les matchs après minuit local
-  // (ex: 00:00 local France UTC+2 = 22:00 UTC la veille → classé J-1 par FD.org)
+function dedupeAndFilterByDate(matches, date) {
+  const seen = new Set()
+  return matches.filter(m => {
+    if (seen.has(m.id)) return false
+    seen.add(m.id)
+    if (m.utcDate) {
+      const d = new Date(m.utcDate)
+      const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (localStr !== date) return false
+    }
+    return true
+  }).sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+}
+
+// ⚠️ SÉPARÉ d'ESPN (24/07, constat utilisateur : "au bout d'une minute il
+// affiche les résultats des 7 derniers jours, y'en a qu'un, ça ralentit de
+// fou l'app") : fetchTodayMatches() ci-dessous mergeait WC/EC (FD.org) ET les
+// compétitions ESPN dans UN SEUL Promise.allSettled — le délai anti-rafale
+// ajouté plus tôt (STAGGER_MS, voir useRecentDaysMatches) retardait alors
+// TOUT le jour, ESPN compris, alors qu'ESPN (le plus gros du contenu réel
+// affiché — 6 grands championnats + coupes) n'a AUCUN besoin d'attendre, son
+// budget (100/min par IP, api/espn.js) n'a rien à voir avec celui de FD.org.
+// Extrait à part pour pouvoir démarrer IMMÉDIATEMENT côté useRecentDaysMatches
+// (voir plus bas), pendant que seul WC/EC est éventuellement retardé.
+async function fetchEspnPortion() {
+  const settled = await Promise.allSettled([
+    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
+    ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
+  ])
+  return settled.flatMap(r => r.status === 'fulfilled' ? r.value : []).filter(m => VALID_STATUS.includes(m.status))
+}
+
+// Calculer le jour UTC précédent pour capturer les matchs après minuit local
+// (ex: 00:00 local France UTC+2 = 22:00 UTC la veille → classé J-1 par FD.org)
+function prevDateStr(date) {
   const prevD = new Date(date + 'T12:00:00')
   prevD.setDate(prevD.getDate() - 1)
-  const prevDate = `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
+  return `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`
+}
 
+async function fetchWcEcPortion(date, delayMs = 0) {
+  if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+  const prevDate = prevDateStr(date)
+  const settled = await Promise.allSettled([
+    safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
+    safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
+  ])
+  return settled.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+}
+
+async function fetchTodayMatches(date) {
   // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais tout, 5min après plus
   // rien" — même mécanisme que useStandings.js/useMatchs.js/useScorers.js/
   // useWcKnockout.js, mais amplifié ici) : Promise.all() rejette DÈS QUE UN
@@ -80,31 +124,14 @@ async function fetchTodayMatches(date) {
   // exactement cette raison, voir useUpcomingMatchesAllComps dans
   // useMatchs.js) : chaque appel réussi garde son résultat, seul celui qui a
   // échoué contribue un tableau vide au lieu de tout faire tomber.
-  const settled = await Promise.allSettled([
-    safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
-    safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
-    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
-    ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
+  // Utilisé tel quel par useTodayMatches (1 seul jour — pas de rafale
+  // possible, pas besoin de séparer ESPN/WC-EC ici, voir plus bas pour
+  // useRecentDaysMatches qui, lui, en a besoin).
+  const [espnMatches, wcEcMatches] = await Promise.all([
+    fetchEspnPortion(),
+    fetchWcEcPortion(date),
   ])
-  const results = settled.map(r => r.status === 'fulfilled' ? r.value : [])
-  const [wcMatches, ecMatches, ...espnResults] = results
-  const espnMatches = espnResults.flat().filter(m => VALID_STATUS.includes(m.status))
-
-  // Dédupliquer par id et filtrer par date LOCALE
-  // → un match à 00:00 local (= 22:00 UTC J-1) apparaît bien dans J local seulement
-  const seen = new Set()
-  const all = [...wcMatches, ...ecMatches, ...espnMatches].filter(m => {
-    if (seen.has(m.id)) return false
-    seen.add(m.id)
-    if (m.utcDate) {
-      const d = new Date(m.utcDate)
-      const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      if (localStr !== date) return false
-    }
-    return true
-  })
-
-  return all.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+  return dedupeAndFilterByDate([...wcEcMatches, ...espnMatches], date)
 }
 
 // Préchargement des jours adjacents
@@ -254,52 +281,109 @@ export function useRecentDaysMatches(numDays) {
   // immédiatement → aucune copie stale possible (clé jamais vue, un jour/
   // compétition précis) → vrai 429 renvoyé tel quel côté client. Ça explique
   // le "même la première requête" : le blocage est immédiat, pas progressif.
-  // Fix : étaler les jours sur ~15s au lieu de 350ms, pour que les paires
-  // WC/EC de chaque jour tombent dans des fenêtres d'espacement différentes
-  // au lieu de toutes se disputer le même verrou. Coût : le rafraîchissement
-  // réseau des jours les plus anciens arrive jusqu'à ~90s après le montage
-  // au lieu de ~2s — sans impact visible, l'affichage reste instantané via
-  // le cache (initialData), seul le refresh en arrière-plan est retardé.
-  const STAGGER_MS = 15_000
+  // Fix (24/07, 1ère version) : étaler les jours sur ~15s au lieu de 350ms,
+  // pour que les paires WC/EC de chaque jour tombent dans des fenêtres
+  // d'espacement différentes au lieu de toutes se disputer le même verrou.
+  //
+  // ⚠️ REFONTE (24/07, constat utilisateur juste après : "au bout d'une
+  // minute il affiche les résultats des 7 derniers jours, y'en a qu'un, ça
+  // ralentit de fou l'app") : le stagger ci-dessus retardait TOUT le jour
+  // d'un coup dès qu'il n'y avait pas encore de cache — y compris la partie
+  // ESPN (6 grands championnats + coupes, le GROS du contenu réellement
+  // affiché ici), qui n'a POURTANT aucun rapport avec le budget FD.org
+  // (seuls WC/EC y sont exposés). Sur un cache froid (1er lancement, ou
+  // après un déploiement qui invalide les clés), pire cas ~90s avant que le
+  // dernier jour n'affiche quoi que ce soit — pas "sans impact visible"
+  // comme espéré, une vraie régression de vitesse perçue.
+  //
+  // Scindé en 2 requêtes indépendantes par jour PASSÉ (voir
+  // fetchEspnPortion/fetchWcEcPortion plus haut) : la partie ESPN part
+  // IMMÉDIATEMENT, sans délai (son propre budget, 100/min PAR IP, n'a aucun
+  // risque de collision avec quoi que ce soit ici) ; seule la partie WC/EC
+  // garde un espacement, ramené à 2s (au lieu de 15s) — le cache Redis 7j
+  // posé plus tôt (voir getTtl, api/football.js) fait maintenant l'essentiel
+  // du travail anti-collision : après le tout premier chargement RÉUSSI
+  // d'un jour (par N'IMPORTE quel visiteur, cache partagé), ce jour reste
+  // protégé pendant 7 jours entiers, plus besoin d'un espacement aussi long
+  // pour s'en prémunir à chaque fois. Pire cas désormais : ~10s pour le
+  // dernier jour au lieu de ~90s, et l'essentiel du contenu (ESPN) s'affiche
+  // sans le moindre délai. "Aujourd'hui" (i=0) reste sur la requête combinée
+  // unique partagée avec useTodayMatches (même queryKey ['todayMatches',
+  // date]) — un seul jour ne pose pas ce risque de rafale, pas besoin d'y
+  // toucher.
+  const WCEC_STAGGER_MS = 2_000
 
-  const results = useQueries({
-    queries: dates.map((date, i) => {
-      const isToday  = date === today
-      const cacheKey = `matches_${date}`
-      return {
-        queryKey: ['todayMatches', date],
-        queryFn: async () => {
-          if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
-          let result
-          try {
-            result = await fetchTodayMatches(date)
-          } catch {
-            result = []
-          }
-          if (result.length > 0) {
-            const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
-            let ttl
-            // isToday=false ici = forcément un jour PASSÉ (dates ne remonte
-            // jamais dans le futur, voir la boucle plus haut) → FINISHED,
-            // immuable → 7j, même raisonnement que useTodayMatches ci-dessus.
-            if (!isToday)    ttl = 7 * 24 * 60 * 60 * 1000
-            else if (hasLive) ttl = 2 * 60 * 1000
-            else              ttl = 60 * 60 * 1000
-            writeCache(cacheKey, result, ttl)
-            return result
-          }
-          const stale = readCacheStale(cacheKey)
-          if (stale?.length > 0) return stale
-          return []
-        },
-        initialData:          readCacheStale(cacheKey) ?? undefined,
-        initialDataUpdatedAt: getCacheSavedAt(cacheKey),
-        staleTime:            isToday ? 60 * 1000 : 30 * 60 * 1000,
-        refetchInterval:      isToday ? getRefetchInterval : false,
-        retry:                false,
+  const todayCacheKey = `matches_${today}`
+  const todayQuery = {
+    queryKey: ['todayMatches', today],
+    queryFn: async () => {
+      let result
+      try {
+        result = await fetchTodayMatches(today)
+      } catch {
+        result = []
       }
-    }),
-  })
+      if (result.length > 0) {
+        const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
+        writeCache(todayCacheKey, result, hasLive ? 2 * 60 * 1000 : 60 * 60 * 1000)
+        return result
+      }
+      const stale = readCacheStale(todayCacheKey)
+      return stale?.length > 0 ? stale : []
+    },
+    initialData:          readCacheStale(todayCacheKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(todayCacheKey),
+    staleTime:            60 * 1000,
+    refetchInterval:      getRefetchInterval,
+    retry:                false,
+  }
+
+  const pastQueries = dates
+    .filter(date => date !== today)
+    .flatMap((date, idx) => {
+      const espnCacheKey = `matches_espn_${date}`
+      const wcEcCacheKey = `matches_wcec_${date}`
+      return [
+        {
+          queryKey: ['todayMatchesEspn', date],
+          queryFn: async () => {
+            let result
+            try {
+              result = dedupeAndFilterByDate(await fetchEspnPortion(), date)
+            } catch {
+              result = []
+            }
+            if (result.length > 0) { writeCache(espnCacheKey, result, 7 * 24 * 60 * 60 * 1000); return result }
+            const stale = readCacheStale(espnCacheKey)
+            return stale?.length > 0 ? stale : []
+          },
+          initialData:          readCacheStale(espnCacheKey) ?? undefined,
+          initialDataUpdatedAt: getCacheSavedAt(espnCacheKey),
+          staleTime:            30 * 60 * 1000,
+          retry:                false,
+        },
+        {
+          queryKey: ['todayMatchesWcEc', date],
+          queryFn: async () => {
+            let result
+            try {
+              result = dedupeAndFilterByDate(await fetchWcEcPortion(date, idx * WCEC_STAGGER_MS), date)
+            } catch {
+              result = []
+            }
+            if (result.length > 0) { writeCache(wcEcCacheKey, result, 7 * 24 * 60 * 60 * 1000); return result }
+            const stale = readCacheStale(wcEcCacheKey)
+            return stale?.length > 0 ? stale : []
+          },
+          initialData:          readCacheStale(wcEcCacheKey) ?? undefined,
+          initialDataUpdatedAt: getCacheSavedAt(wcEcCacheKey),
+          staleTime:            30 * 60 * 1000,
+          retry:                false,
+        },
+      ]
+    })
+
+  const results = useQueries({ queries: [todayQuery, ...pastQueries] })
 
   const seen = new Set()
   const matches = []
