@@ -468,26 +468,27 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // tombent sur ce cache serveur (X-Cache: HIT, ~0 coût), sans jamais
     // retaper FD.org plus souvent qu'avant.
     refetchOnMount: 'always',
-    // ⚠️ AJOUT (24/07, capture Network utilisateur : 2 vrais 429 sur Ligue 1,
-    // confirmés transitoires — un nouvel appel identique quelques instants
-    // plus tard réussissait normalement) : `retry: false` faisait que le
-    // moindre 429 passager (budget FD.org partagé momentanément épuisé par
-    // TOUS les utilisateurs confondus, réinitialisé toutes les 7,5s à
-    // MINUTE_CAP=8/min — voir SPACING_MS dans api/football.js) restait
-    // affiché tel quel jusqu'à ce que l'utilisateur recharge manuellement,
-    // même quand aucune copie stale n'existait encore pour se rattraper
-    // (cas des URLs de calendrier fusionnées, encore "jeunes" depuis la
-    // fusion Programme+Résultats du jour). Un 429/403 est PAR NATURE
-    // transitoire (contrairement à une vraie erreur de code) — 2 tentatives
-    // de plus, espacées de 8s (juste après la fenêtre de 7,5s), suffisent
-    // dans l'immense majorité des cas à retomber sur une fenêtre où le
-    // budget vient de se réinitialiser, sans le moindre geste de
-    // l'utilisateur. Ne s'applique qu'aux 429/403 (message brut identifié
-    // AVANT classifyFetchError) — toute autre erreur continue de ne jamais
-    // réessayer, comme avant.
-    retry: (failureCount, err) =>
-      (err?.message === '429' || err?.message === '403') && failureCount < 2,
-    retryDelay: 8000,
+    // ⚠️ REVERT (constat utilisateur, capture Network : rafale de 8 requêtes
+    // 429 vers /api/football en ~15s — "tu veux qu'on se fasse suspendre ou
+    // quoi") : le retry 429/403 ajouté plus tôt (2 tentatives, 8s d'écart)
+    // semblait raisonnable pris isolément, mais pour les compét club
+    // (isClubShared), queryFn appelle fetchClubMatchesRaw() qui fait JUSQU'À
+    // 2 vrais appels FD.org par tentative (season=X + repli sans season) —
+    // un retry ici ne rejoue pas 1 requête mais rejoue LES 2, donc jusqu'à
+    // 3 tentatives × 2 appels = 6 requêtes FD.org pour UNE seule compét,
+    // exactement au moment où FD.org nous bloque déjà (le pire moment pour
+    // insister). Vu l'historique de suspensions répétées du compte FD.org
+    // documenté dans CLAUDE.md, ce risque l'emporte largement sur le
+    // bénéfice (un 429 transitoire manqué une fois). Le vrai filet de
+    // sécurité reste ailleurs et n'a pas besoin de ce retry pour fonctionner :
+    // le circuit breaker + cache stale côté SERVEUR (api/football.js,
+    // partagé entre tous les utilisateurs) absorbe déjà l'essentiel des 429,
+    // et readStaleWithMigration() (voir plus haut, catch du queryFn) sert la
+    // dernière donnée valide en cache dès qu'une vraie erreur remonte jusqu'ici
+    // — sans requête supplémentaire. `refetchOnMount: 'always'` ci-dessus
+    // suffit à retenter naturellement à la prochaine visite de la page, sans
+    // rafale.
+    retry: false,
   })
 
   return {
