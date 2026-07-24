@@ -962,14 +962,36 @@ async function handlePass(env) {
 // budget/circuit-breaker que les vrais utilisateurs, aucun chemin parallèle
 // qui contournerait la protection existante.
 //
-// Liste limitée aux 6 grands championnats (FL1/PL/PD/BL1/SA/CL) × 3
-// endpoints (résultats/calendrier/classement) — la combinaison la plus
-// consultée (Programme/Résultats/Classement). WC/EC/coupes nationales hors
-// périmètre pour l'instant (trafic plus faible, moins exposées au problème).
+// Liste limitée aux 6 grands championnats (FL1/PL/PD/BL1/SA/CL) × 2
+// endpoints (calendrier+résultats fusionnés, classement) — la combinaison la
+// plus consultée (Programme/Résultats/Classement). WC/EC/coupes nationales
+// hors périmètre pour l'instant (trafic plus faible, moins exposées au
+// problème).
+// ⚠️ CORRIGÉ (constat utilisateur, 24/07 : "Programme LaLiga affiche Veuillez
+// réessayer quelques secondes après un retour sur la page, pas les autres
+// championnats") — Programme et Résultats ont été fusionnés le même jour en
+// UN SEUL appel FD.org par compét (`/matches?season=X`, SANS `status=`, voir
+// useMatchs.js fetchMatchesForComp) pour partager la même clé de cache Redis
+// serveur. Cette liste ici n'avait PAS été mise à jour en même temps : elle
+// continuait à préchauffer les 2 ANCIENNES clés (`status=FINISHED` et
+// `status=SCHEDULED`), qui ne sont plus jamais demandées par personne depuis
+// la fusion — la VRAIE clé désormais utilisée (`season=X`, sans status)
+// n'était donc jamais préchauffée par ce Worker, et dépendait entièrement du
+// trafic utilisateur réel pour obtenir sa toute première copie de secours
+// ("stale", voir api/football.js) — si son tout premier appel réel tombait
+// pile pendant un blocage FD.org (voir incidents 403 documentés le même
+// jour), aucun filet de secours n'existait encore pour elle, contrairement
+// aux clés plus anciennes déjà préchauffées depuis des mois. Remplacé les 2
+// entrées `status=` par la vraie clé fusionnée.
+function getClubSeasonWarm() {
+  const now = new Date()
+  const month = now.getUTCMonth() + 1
+  const year = now.getUTCFullYear()
+  return month <= 7 ? year - 1 : year
+}
 const FD_WARM_COMPS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const FD_WARM_LIST = FD_WARM_COMPS.flatMap(id => [
-  { apiPath: `/v4/competitions/${id}/matches`, qs: 'status=FINISHED' },
-  { apiPath: `/v4/competitions/${id}/matches`, qs: 'status=SCHEDULED' },
+  { apiPath: `/v4/competitions/${id}/matches`, qs: `season=${getClubSeasonWarm()}` },
   { apiPath: `/v4/competitions/${id}/standings`, qs: '' },
 ])
 const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
@@ -978,8 +1000,9 @@ const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
 // serveur le plus court, FINISHED=120s — voir getTtl() dans api/football.js,
 // inutile d'aller plus vite, ça ne ferait que consommer du budget FD.org
 // sans gagner en fraîcheur). Rotation déterministe basée sur l'horloge (pas
-// besoin de state Redis dédié) : cycle complet de la liste (18 entrées) en
-// 36min. Consomme au pire 1 des 8 créneaux/min disponibles, une seule fois
+// besoin de state Redis dédié) : cycle complet de la liste (12 entrées, 6
+// compét × 2 endpoints depuis la fusion Programme+Résultats) en 24min.
+// Consomme au pire 1 des 8 créneaux/min disponibles, une seule fois
 // toutes les 2min — impact négligeable sur le budget partagé avec les vrais
 // utilisateurs.
 async function warmFdCache(log) {
