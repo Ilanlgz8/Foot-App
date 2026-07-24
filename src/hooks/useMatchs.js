@@ -209,23 +209,42 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
     // son `matchday`/`stage` d'origine FD.org, seul le moment où on filtre
     // par statut change (après coup plutôt que dans l'URL) — groupRounds()
     // reçoit exactement la même forme de données qu'avant la fusion.
+    const applyStatusFilter = list => status === 'FINISHED'
+      ? list.filter(m => m.status === 'FINISHED')
+      : list.filter(m => m.status !== 'FINISHED')
+
     let all = await tryFetch(
       `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
     )
-    if (!all || all.length === 0) {
-      // Repli sans season (même filet de sécurité qu'avant la fusion — ex.
-      // tout début de saison, avant que FD.org bascule le numéro par défaut).
-      all = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+    matches = all == null ? null : applyStatusFilter(all)
+
+    // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que la fusion : "Résultats
+    // ok, mais Programme vide" sur une comp club en pleine intersaison —
+    // LaLiga, 24/07). Le garde-fou initial (`!all || all.length === 0`) ne
+    // se déclenchait QUE si la réponse brute était totalement vide — or en
+    // intersaison, `season=${getClubSeason()}` renvoie une saison qui vient
+    // de se terminer : des CENTAINES de matchs FINISHED, mais ZÉRO SCHEDULED
+    // (les fixtures de la saison suivante ne sont pas encore publiées sous ce
+    // numéro de saison côté FD.org) — `all` n'était donc jamais vide, le repli
+    // ne se déclenchait jamais, et Programme affichait "Aucun match à venir"
+    // alors que Résultats (FINISHED, bien présent dans cette même saison)
+    // fonctionnait normalement. Il faut regarder si le résultat FILTRÉ (pas
+    // la réponse brute) est vide avant de décider s'il faut un repli.
+    if (!matches || matches.length === 0) {
+      // Repli sans season — comportement historique de l'ancienne branche
+      // SCHEDULED (avant la fusion), qui s'appuyait sur le "current season"
+      // implicite de FD.org plutôt que sur un calcul de date local : couvre
+      // justement ce cas d'intersaison où le calcul par date (getClubSeason)
+      // et le vrai "courant" FD.org divergent temporairement.
+      const fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+      if (fallbackAll != null) {
+        const fallbackFiltered = applyStatusFilter(fallbackAll)
+        // Ne remplacer que si ce repli apporte vraiment quelque chose — sinon
+        // garder `matches` tel quel (respecte la distinction null/[] déjà en
+        // place pour ne pas masquer une vraie erreur réseau en "aucun match").
+        if (fallbackFiltered.length > 0 || matches == null) matches = fallbackFiltered
+      }
     }
-    // Distinguer "vraie erreur réseau" (all === null, propagée telle quelle
-    // pour laisser le repli stale/erreur de useMatches faire son travail) de
-    // "0 match cette saison" (all === [], résultat valide) — ne PAS coalescer
-    // en [] ici sous peine de masquer un 429/403/erreur en "aucun match".
-    matches = all == null
-      ? null
-      : (status === 'FINISHED'
-          ? all.filter(m => m.status === 'FINISHED')
-          : all.filter(m => m.status !== 'FINISHED'))
   }
 
   // Coupe nationale du championnat (Coupe de France/Copa del Rey/FA Cup) :
