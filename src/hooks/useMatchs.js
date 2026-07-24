@@ -148,6 +148,23 @@ async function tryFetch(url) {
   return json.matches ?? []
 }
 
+// ⚠️ AJOUT (24/07, constat utilisateur : switch LaLiga→Serie A après 8s
+// d'attente = 429 quand même, alors que le budget FD.org n'a rien à voir avec
+// ce délai précis) : variante de tryFetch() qui expose aussi si la réponse
+// vient d'un vrai appel FD.org à l'instant (`fresh`, absence de X-Cache) ou
+// d'un cache Redis (HIT/STALE, header présent — voir api/football.js). Sert
+// uniquement à fetchClubMatchesRaw ci-dessous, qui enchaîne 2 appels pour la
+// MÊME compétition (season + repli sans season) — les 5 autres appelants de
+// tryFetch() restent inchangés (pas besoin de cette info).
+async function tryFetchWithMeta(url) {
+  const res = await fdFetch(fdUrl(url))
+  if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+  const fresh = !res.headers.get('X-Cache')
+  if (!res.ok) return { matches: null, fresh }
+  const json = await res.json()
+  return { matches: json.matches ?? [], fresh }
+}
+
 // ⚠️ FUSION Programme+Résultats + PARTAGE CLIENT (demande utilisateur, 24/07,
 // en 2 temps) :
 //  1. "rassembler les requêtes pour moins gaspiller" → un seul appel FD.org
@@ -179,11 +196,14 @@ async function fetchClubMatchesRaw(selectedComp) {
   // match", dont classifyFetchError (fetchErrors.js) a besoin pour afficher
   // "Veuillez patienter quelques instants" au lieu d'un écran vide.
   let lastErr = null
+  let primaryFresh = false
 
   try {
-    all = await tryFetch(
+    const r = await tryFetchWithMeta(
       `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
     )
+    all = r.matches
+    primaryFresh = r.fresh
   } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
 
   // Complet seulement si les 2 catégories sont représentées — en intersaison,
@@ -224,9 +244,32 @@ async function fetchClubMatchesRaw(selectedComp) {
     // "courant" FD.org divergent temporairement. Fusionné (pas remplacé) avec
     // `all` pour ne perdre ni les FINISHED déjà obtenus ni les SCHEDULED du
     // repli, quel que soit lequel des deux appels a réussi.
+    //
+    // ⚠️ AJOUT (24/07, constat utilisateur : switch LaLiga→Serie A après 8s
+    // d'attente = 429 quand même) : ce repli et l'appel `season=` juste
+    // au-dessus visent la MÊME compétition, à quelques centaines de ms
+    // d'écart (rien ne les sépare que la latence réseau du 1er) — pendant
+    // l'intersaison actuelle (nouvelle saison pas encore publiée), ce repli
+    // est quasi TOUJOURS nécessaire, pour QUASIMENT CHAQUE compétition
+    // switchée. Si le 1er appel a dû réellement taper FD.org (primaryFresh —
+    // pas juste un cache Redis HIT/STALE), il vient de prendre le verrou
+    // d'espacement global (~7,5s, voir reserveQuota/SPACING_MS dans
+    // api/football.js, PARTAGÉ par tout l'endpoint, pas juste cette
+    // compétition) — le repli le trouve alors systématiquement occupé →
+    // bloqué → pas de copie stale possible pour ce repli précis (clé parfois
+    // jamais vue pour cette compét cette saison) → vrai 429, quel que soit le
+    // temps déjà passé sur une AUTRE compétition avant (ce délai-là ne
+    // libère PAS ce verrou, qui est global à l'app entière, pas par
+    // compétition). On laisse le verrou se libérer avant de tenter le repli,
+    // mais SEULEMENT quand le 1er appel l'a réellement pris (primaryFresh) —
+    // un cache HIT/STALE ne le consomme pas, le repli part alors
+    // immédiatement comme avant, sans latence ajoutée.
+    if (primaryFresh) await new Promise(r => setTimeout(r, 8_000))
+
     let fallbackAll = null
     try {
-      fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+      const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches`)
+      fallbackAll = r.matches
     } catch (e) { lastErr = e; fallbackErr = e /* voir bloc ci-dessous */ }
     if (fallbackAll != null) {
       const seen   = new Set((all ?? []).map(m => m.id))
