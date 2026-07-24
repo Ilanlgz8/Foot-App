@@ -193,19 +193,39 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
         )
       }
     }
-  } else if (status === 'FINISHED') {
-    matches = await tryFetch(
-      `/api/v4/competitions/${selectedComp}/matches?status=${status}&season=${getClubSeason()}`
-    )
-    if (!matches || matches.length === 0) {
-      matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=${status}`
-      )
-    }
   } else {
-    matches = await tryFetch(
-      `/api/v4/competitions/${selectedComp}/matches?status=${status}`
+    // ⚠️ FUSION Programme+Résultats (demande utilisateur, 24/07 : "rassembler
+    // les requêtes pour moins gaspiller") : avant, Programme (SCHEDULED) et
+    // Résultats (FINISHED) faisaient chacun leur propre appel FD.org avec un
+    // `status=` différent — 2 clés de cache Redis distinctes côté serveur
+    // (api/football.js), donc 2 vrais appels upstream par fenêtre de cache.
+    // `?season=X` SANS `status=` renvoie TOUS les statuts (scheduled + live +
+    // finished) en un seul appel — Programme et Résultats construisent
+    // désormais EXACTEMENT la même URL pour une même compét, donc tombent sur
+    // LA MÊME entrée de cache serveur : un seul vrai appel FD.org partagé
+    // entre les deux pages, au lieu de deux. Le filtre par statut se fait
+    // maintenant en LOCAL (après réception), pas dans la requête.
+    // Le regroupement "Par journée" n'est PAS affecté : chaque match garde
+    // son `matchday`/`stage` d'origine FD.org, seul le moment où on filtre
+    // par statut change (après coup plutôt que dans l'URL) — groupRounds()
+    // reçoit exactement la même forme de données qu'avant la fusion.
+    let all = await tryFetch(
+      `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
     )
+    if (!all || all.length === 0) {
+      // Repli sans season (même filet de sécurité qu'avant la fusion — ex.
+      // tout début de saison, avant que FD.org bascule le numéro par défaut).
+      all = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+    }
+    // Distinguer "vraie erreur réseau" (all === null, propagée telle quelle
+    // pour laisser le repli stale/erreur de useMatches faire son travail) de
+    // "0 match cette saison" (all === [], résultat valide) — ne PAS coalescer
+    // en [] ici sous peine de masquer un 429/403/erreur en "aucun match".
+    matches = all == null
+      ? null
+      : (status === 'FINISHED'
+          ? all.filter(m => m.status === 'FINISHED')
+          : all.filter(m => m.status !== 'FINISHED'))
   }
 
   // Coupe nationale du championnat (Coupe de France/Copa del Rey/FA Cup) :
