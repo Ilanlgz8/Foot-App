@@ -446,9 +446,8 @@
 }
 
 .resultats__scoreNum {
-  /* ⚠️ Réduit de moitié en desktop (demande utilisateur, même traitement que
-     crestWrap/teamName ci-dessus). */
-  font-size: 1.4rem;
+  /* ⚠️ Remonté (demande utilisateur, après réduction initiale). */
+  font-size: 1.8rem;
   font-weight: 800;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   color: #f1f5f9;

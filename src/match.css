@@ -970,8 +970,8 @@
   background: transparent;
   border: none;
   border-radius: 0.65rem;
-  /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap/teamName ci-dessus). */
-  font-size: 1.6rem;
+  /* ⚠️ Remonté (demande utilisateur, après réduction initiale). */
+  font-size: 2rem;
   font-weight: 700;
   font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   /* ⚠️ Alignée sur la couleur des noms d'équipe (.matchs__teamName), demande
