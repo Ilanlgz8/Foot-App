@@ -193,6 +193,30 @@ async function fetchClubMatchesRaw(selectedComp) {
   const hasFinished = (all ?? []).some(m => m.status === 'FINISHED')
   const hasUpcoming = (all ?? []).some(m => m.status !== 'FINISHED')
 
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : "Programme Ligue 1 vide" alors
+  // que le réseau montrait 2 appels /api/football réussis en 200 avec de
+  // vraies données — confirmé en rejouant les 2 appels directement : le 1er
+  // (season=2025, saison qui vient de finir) renvoie bien 306 matchs FINISHED,
+  // et le repli sans season (season 2026-27 "courante" côté FD.org) renvoie
+  // bien 306 matchs SCHEDULED quand il aboutit. Donc les données existent des
+  // 2 côtés — le bug n'était pas un manque de données mais une PERTE
+  // silencieuse : si CE repli précis échoue avec un vrai 429/403 (le budget
+  // partagé FD.org vient tout juste d'être entamé par le 1er appel, l'espacement
+  // serveur ~7,5-12s n'a pas eu le temps de se libérer), le catch ci-dessous
+  // n'interrompait rien — la fonction retournait quand même `all` tel quel
+  // (306 FINISHED, sans le moindre SCHEDULED), et le queryFn plus bas
+  // l'écrivait tel quel dans le cache RAW, écrasant tout ce qu'un fetch
+  // précédent avait pu fusionner correctement. Résultat : succès réseau réel,
+  // aucune erreur affichée, mais Programme (filtré sur status!=='FINISHED')
+  // vide. Fix ci-dessous : si ce repli spécifique a vraiment échoué (pas
+  // "renvoyé vide", ce qui reste un cas légitime d'intersaison avant
+  // publication du calendrier) ET qu'on n'a toujours pas les 2 catégories,
+  // on relance l'erreur au lieu de renvoyer un résultat partiel — le retry
+  // déjà en place dans useMatches (429/403, 2 tentatives/8s) et le repli sur
+  // le dernier cache RAW valide (readStaleWithMigration) prennent le relais,
+  // au lieu de remplacer silencieusement une bonne donnée par une incomplète.
+  let fallbackErr = null
+
   if (!all || !hasFinished || !hasUpcoming) {
     // Repli sans season — s'appuie sur le "current season" implicite de
     // FD.org plutôt que sur un calcul de date local : couvre justement le cas
@@ -203,7 +227,7 @@ async function fetchClubMatchesRaw(selectedComp) {
     let fallbackAll = null
     try {
       fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
-    } catch (e) { lastErr = e /* les 2 tentatives ont échoué — `all` reste tel quel */ }
+    } catch (e) { lastErr = e; fallbackErr = e /* voir bloc ci-dessous */ }
     if (fallbackAll != null) {
       const seen   = new Set((all ?? []).map(m => m.id))
       const merged = [...(all ?? [])]
@@ -227,6 +251,15 @@ async function fetchClubMatchesRaw(selectedComp) {
   // Préserve la classification 429/403 (voir commentaire lastErr ci-dessus)
   // au lieu d'un null silencieux quand rien n'a pu être récupéré nulle part.
   if (all == null && lastErr) throw lastErr
+
+  // Voir commentaire "BUG CORRIGÉ" plus haut : un échec réel (pas "vide") du
+  // repli, alors qu'il manque encore une des 2 catégories, ne doit jamais
+  // être renvoyé comme un succès partiel silencieux.
+  if (fallbackErr) {
+    const hasFinishedNow = (all ?? []).some(m => m.status === 'FINISHED')
+    const hasUpcomingNow = (all ?? []).some(m => m.status !== 'FINISHED')
+    if (!hasFinishedNow || !hasUpcomingNow) throw fallbackErr
+  }
 
   return all
 }
