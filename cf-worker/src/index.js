@@ -989,9 +989,24 @@ function getClubSeasonWarm() {
   const year = now.getUTCFullYear()
   return month <= 7 ? year - 1 : year
 }
+// ⚠️ 2e CORRECTIF le même jour (constat utilisateur : "Résultats charge,
+// Programme jamais, même après le 1er correctif ci-dessus") — le 1er
+// correctif ne réchauffait QUE `season=X`. Or fetchMatchesForComp
+// (useMatchs.js) fait un 2e essai SANS season du tout dès que le résultat
+// filtré du 1er essai est vide pour le statut demandé — exactement le cas de
+// Programme (SCHEDULED) en ce moment : `season=X` (la saison qui vient de
+// finir) ne contient QUE des matchs FINISHED, donc Programme est TOUJOURS
+// obligé de retomber sur le repli sans season pour trouver les matchs à
+// venir. Résultats (FINISHED), lui, est déjà satisfait par `season=X` seul —
+// il n'atteint donc JAMAIS ce repli, qui reste une clé de cache Redis
+// totalement différente et jamais préchauffée. D'où l'asymétrie observée :
+// Résultats toujours bon, Programme jamais. Les deux URLs (avec ET sans
+// season) sont maintenant préchauffées pour ne plus dépendre de qui, de
+// Programme ou Résultats, "gagne la course" pour warmer la bonne clé.
 const FD_WARM_COMPS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const FD_WARM_LIST = FD_WARM_COMPS.flatMap(id => [
   { apiPath: `/v4/competitions/${id}/matches`, qs: `season=${getClubSeasonWarm()}` },
+  { apiPath: `/v4/competitions/${id}/matches`, qs: '' },
   { apiPath: `/v4/competitions/${id}/standings`, qs: '' },
 ])
 const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
@@ -1000,8 +1015,8 @@ const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
 // serveur le plus court, FINISHED=120s — voir getTtl() dans api/football.js,
 // inutile d'aller plus vite, ça ne ferait que consommer du budget FD.org
 // sans gagner en fraîcheur). Rotation déterministe basée sur l'horloge (pas
-// besoin de state Redis dédié) : cycle complet de la liste (12 entrées, 6
-// compét × 2 endpoints depuis la fusion Programme+Résultats) en 24min.
+// besoin de state Redis dédié) : cycle complet de la liste (18 entrées, 6
+// compét × 3 : matches avec season, matches sans season, standings) en 36min.
 // Consomme au pire 1 des 8 créneaux/min disponibles, une seule fois
 // toutes les 2min — impact négligeable sur le budget partagé avec les vrais
 // utilisateurs.
