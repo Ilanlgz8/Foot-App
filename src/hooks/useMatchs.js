@@ -435,7 +435,26 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // tombent sur ce cache serveur (X-Cache: HIT, ~0 coût), sans jamais
     // retaper FD.org plus souvent qu'avant.
     refetchOnMount: 'always',
-    retry: false,
+    // ⚠️ AJOUT (24/07, capture Network utilisateur : 2 vrais 429 sur Ligue 1,
+    // confirmés transitoires — un nouvel appel identique quelques instants
+    // plus tard réussissait normalement) : `retry: false` faisait que le
+    // moindre 429 passager (budget FD.org partagé momentanément épuisé par
+    // TOUS les utilisateurs confondus, réinitialisé toutes les 7,5s à
+    // MINUTE_CAP=8/min — voir SPACING_MS dans api/football.js) restait
+    // affiché tel quel jusqu'à ce que l'utilisateur recharge manuellement,
+    // même quand aucune copie stale n'existait encore pour se rattraper
+    // (cas des URLs de calendrier fusionnées, encore "jeunes" depuis la
+    // fusion Programme+Résultats du jour). Un 429/403 est PAR NATURE
+    // transitoire (contrairement à une vraie erreur de code) — 2 tentatives
+    // de plus, espacées de 8s (juste après la fenêtre de 7,5s), suffisent
+    // dans l'immense majorité des cas à retomber sur une fenêtre où le
+    // budget vient de se réinitialiser, sans le moindre geste de
+    // l'utilisateur. Ne s'applique qu'aux 429/403 (message brut identifié
+    // AVANT classifyFetchError) — toute autre erreur continue de ne jamais
+    // réessayer, comme avant.
+    retry: (failureCount, err) =>
+      (err?.message === '429' || err?.message === '403') && failureCount < 2,
+    retryDelay: 8000,
   })
 
   return {
