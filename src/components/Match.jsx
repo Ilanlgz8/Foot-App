@@ -930,9 +930,24 @@ function Matchs() {
      jamais de groupes (wcGroups reste [] tant que !isWC), donc basculent
      immédiatement hors de "poules" — qui ne leur est de toute façon jamais
      proposé comme bouton (voir le toggle plus bas). */
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : Programme Ligue 1 affiche un
+  // écran totalement VIDE — pas de spinner, pas de "Aucun match à venir",
+  // rien) : ce garde-fou exigeait `matches.length > 0` pour sortir de la vue
+  // 'poules' — or 'poules' n'a de sens QUE pour WC/EC (isWC), jamais pour une
+  // coupe nationale fusionnée (hasCup, wcGroups toujours vide par construction
+  // pour elles). Si `matches` est légitimement vide (0 vrai match à venir —
+  // exactement le cas d'une compét club en pleine intersaison, voir le repli
+  // saison ajouté aujourd'hui dans fetchMatchesForComp/useMatchs.js), la
+  // condition `matches.length > 0` n'était jamais remplie : la vue restait
+  // bloquée sur 'poules' pour toujours, qui ne rend RIEN pour un hasCup (pas
+  // de bloc 'poules' pour les compets non-WC) — écran blanc permanent au lieu
+  // du message "Aucun match à venir". Retiré `matches.length > 0` : une fois
+  // le chargement terminé (`!loading`) et sans groupe détecté, on bascule sur
+  // 'matchs' que la liste soit vide ou pleine — la vue 'matchs' affiche
+  // correctement soit les matchs, soit "Aucun match à venir" dans les 2 cas.
   useEffect(() => {
     if (autoSwitchDone.current) return
-    if ((isWC || hasCup) && wcView === 'poules' && !loading && matches.length > 0 && wcGroups.length === 0) {
+    if ((isWC || hasCup) && wcView === 'poules' && !loading && wcGroups.length === 0) {
       setWcView('matchs')
       setCurrentIndex(0)
       autoSwitchDone.current = true
@@ -940,7 +955,7 @@ function Matchs() {
   // setWcView/setCurrentIndex (useState) : identité garantie stable par React
   // entre les renders, sans risque à ajouter aux deps (résout juste le
   // warning exhaustive-deps, aucun changement de comportement).
-  }, [isWC, hasCup, wcView, loading, matches.length, wcGroups.length, setWcView, setCurrentIndex])
+  }, [isWC, hasCup, wcView, loading, wcGroups.length, setWcView, setCurrentIndex])
 
   /* Auto-switch (2e garde-fou, plus fiable) : si un match à élimination directe
      est déjà TERMINÉ, on est forcément après la phase de poules — inutile

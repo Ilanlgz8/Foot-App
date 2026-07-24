@@ -213,9 +213,20 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       ? list.filter(m => m.status === 'FINISHED')
       : list.filter(m => m.status !== 'FINISHED')
 
-    let all = await tryFetch(
-      `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
-    )
+    // ⚠️ BUG CORRIGÉ (audit suite au constat "Programme totalement vide" —
+    // tryFetch lève une exception sur 429/403 (voir plus haut) — SANS
+    // try/catch ici, cette exception sortait immédiatement de
+    // fetchMatchesForComp et empêchait le repli ci-dessous de jamais
+    // s'exécuter, même si CE repli (clé de cache serveur différente : sans
+    // season) avait sa propre chance de réussir. Avant la fusion, la branche
+    // SCHEDULED ne faisait qu'UN seul essai (déjà sans season) — la fusion a
+    // introduit une vraie dépendance séquentielle qui n'existait pas avant.
+    let all = null
+    try {
+      all = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
+      )
+    } catch { /* → repli ci-dessous, ne pas abandonner tout de suite */ }
     matches = all == null ? null : applyStatusFilter(all)
 
     // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que la fusion : "Résultats
@@ -236,7 +247,10 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
       // implicite de FD.org plutôt que sur un calcul de date local : couvre
       // justement ce cas d'intersaison où le calcul par date (getClubSeason)
       // et le vrai "courant" FD.org divergent temporairement.
-      const fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+      let fallbackAll = null
+      try {
+        fallbackAll = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
+      } catch { /* les deux tentatives ont échoué — `matches` reste tel quel */ }
       if (fallbackAll != null) {
         const fallbackFiltered = applyStatusFilter(fallbackAll)
         // Ne remplacer que si ce repli apporte vraiment quelque chose — sinon
