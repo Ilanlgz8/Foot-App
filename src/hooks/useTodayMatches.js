@@ -226,7 +226,30 @@ export function useRecentDaysMatches(numDays) {
   // disque) continue d'afficher les données immédiatement, ce délai ne
   // retarde que le fetch réseau de RAFRAÎCHISSEMENT, jamais l'affichage.
   // Zéro changement de données/format, uniquement le timing.
-  const STAGGER_MS = 350
+  //
+  // ⚠️ CORRIGÉ (24/07, constat utilisateur : "429 dès le lancement, même la
+  // première requête" — reproduit et confirmé via une vraie URL fournie par
+  // l'utilisateur, /v4/competitions/WC/matches?dateFrom=...&dateTo=...) :
+  // 350ms ci-dessus étalait bien les appels ESPN (budget 100/min PAR IP,
+  // api/espn.js) mais fetchTodayMatches() fait AUSSI 2 vrais appels FD.org
+  // (WC + EC, seules compétitions encore sur FD.org ici) PAR JOUR — soit 14
+  // appels FD.org pour 7 jours, tous dans une fenêtre de ~2s (7 × 350ms).
+  // Or le budget FD.org (api/football.js, MINUTE_CAP=8/min) est GLOBAL, tous
+  // utilisateurs confondus, ET son verrou d'espacement (spaceKey) est UNIQUE
+  // pour tout l'endpoint (pas par URL/compétition) : une seule vraie requête
+  // upstream peut passer toutes les SPACING_MS (~7,5s à 8/min), TOUTES clés
+  // confondues. 14 appels envoyés en ~2s ne laissent donc passer qu'1 seule
+  // requête réelle ; les 13 autres trouvent le verrou déjà pris → bloquées
+  // immédiatement → aucune copie stale possible (clé jamais vue, un jour/
+  // compétition précis) → vrai 429 renvoyé tel quel côté client. Ça explique
+  // le "même la première requête" : le blocage est immédiat, pas progressif.
+  // Fix : étaler les jours sur ~15s au lieu de 350ms, pour que les paires
+  // WC/EC de chaque jour tombent dans des fenêtres d'espacement différentes
+  // au lieu de toutes se disputer le même verrou. Coût : le rafraîchissement
+  // réseau des jours les plus anciens arrive jusqu'à ~90s après le montage
+  // au lieu de ~2s — sans impact visible, l'affichage reste instantané via
+  // le cache (initialData), seul le refresh en arrière-plan est retardé.
+  const STAGGER_MS = 15_000
 
   const results = useQueries({
     queries: dates.map((date, i) => {
