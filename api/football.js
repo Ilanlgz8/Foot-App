@@ -136,6 +136,22 @@ function getTtl(fdPath, qs) {
   if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min
   if (qs.includes('dateFrom=') && qs.includes('dateTo=')) return 120   // matchs du jour — 2min
   if (qs.includes('status=SCHEDULED') || qs.includes('status=TIMED')) return 300 // calendrier — 5min
+  // ⚠️ TROU TROUVÉ (24/07, suite au constat utilisateur "veuillez patienter"
+  // récurrent sur Ligue 1 juste après la fusion Programme+Résultats) :
+  // l'URL fusionnée (competitions/X/matches?season=Y OU sans aucun param) n'a
+  // PLUS de status= du tout — c'est justement le but de la fusion (tous les
+  // statuts en un seul appel) — donc elle ratait TOUS les cas ci-dessus et
+  // retombait dans le défaut générique 120s (2min) au lieu des 300s (5min)
+  // que `status=SCHEDULED` avait avant la fusion. Un calendrier de matchs
+  // change rarement d'une minute à l'autre — ce TTL 2.5x trop court faisait
+  // expirer le cache Redis bien avant le prochain passage du préchauffage
+  // Cloudflare Worker (un cycle complet ~36min pour 18 URLs), donc la
+  // fenêtre où un vrai appel FD.org était nécessaire (au lieu d'un cache HIT
+  // instantané) était bien plus large que prévu — exactement le genre
+  // d'appel supplémentaire qui épuise plus vite le budget/minute partagé et
+  // déclenche "Veuillez patienter" pour des utilisateurs qui, avant la
+  // fusion, n'auraient tapé qu'un cache encore valide.
+  if (/^\/v4\/competitions\/[A-Z0-9]+\/matches$/.test(fdPath) && !qs.includes('status=')) return 300
   return 120  // défaut — 2min
 }
 
