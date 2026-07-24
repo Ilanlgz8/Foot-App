@@ -773,6 +773,10 @@ async function runOnePass(env) {
       await notifyVercel(env, `push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
       await cacheEspnSummary(kv, slug, eventId, log)
+      // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
+      // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
+      // de cette compétition au lieu d'attendre la rotation aveugle.
+      await queueFdPriorityRefresh(kv, slug, log)
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
       // 1ère détection cette passe (finalConfirmKey tout juste acquis) → programmer
@@ -922,7 +926,7 @@ async function handlePass(env) {
   // Programme/Résultats/Classement sont consultés par les visiteurs même les
   // jours sans match en direct, donc ce préchauffage doit tourner tout le
   // temps, pas seulement pendant les fenêtres où le direct est actif.
-  await warmFdCache(result.log)
+  await warmFdCache(result.log, kv)
 
   if (writeBookkeeping) {
     try {
@@ -1011,17 +1015,87 @@ const FD_WARM_LIST = FD_WARM_COMPS.flatMap(id => [
 ])
 const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
 
-// Un seul élément de la liste rafraîchi toutes les 2min (aligné sur le TTL
-// serveur le plus court, FINISHED=120s — voir getTtl() dans api/football.js,
-// inutile d'aller plus vite, ça ne ferait que consommer du budget FD.org
-// sans gagner en fraîcheur). Rotation déterministe basée sur l'horloge (pas
-// besoin de state Redis dédié) : cycle complet de la liste (18 entrées, 6
-// compét × 3 : matches avec season, matches sans season, standings) en 36min.
-// Consomme au pire 1 des 8 créneaux/min disponibles, une seule fois
-// toutes les 2min — impact négligeable sur le budget partagé avec les vrais
-// utilisateurs.
-async function warmFdCache(log) {
+// ⚠️ AJOUT (24/07, demande utilisateur : "un vrai dispositif" pour ne plus
+// jamais se prendre de 429 FD.org) : la rotation aveugle ci-dessous protège
+// les 18 clés "en moyenne" sur un cycle de 36min, mais un match qui vient de
+// finir peut laisser Programme/Résultats/Classement de SA compétition à
+// découvert jusqu'à 34min avant que la rotation ne repasse dessus par hasard
+// — exactement le genre de trou qui a produit un vrai 429 (constat
+// utilisateur, switch LaLiga→Serie A). Ce Worker sait déjà, À LA MINUTE
+// PRÈS, quand un match finit VRAIMENT (isFinalConfirmed dans runOnePass,
+// même garde-fou anti-faux-positif que la notif "Fin de match") — on
+// réutilise ce signal : dès qu'un match d'une des 6 ligues suivies par
+// FD.org (voir FD_WARM_COMPS) se termine, ses clés (calendrier ×2 +
+// classement) passent en PRIORITÉ dans les prochains ticks de warmFdCache,
+// à la place de la rotation aveugle — au lieu d'attendre le hasard du cycle.
+// Toujours 1 seul vrai appel FD.org par minute au maximum (même discipline
+// qu'avant), juste mieux ciblé sur ce qui vient RÉELLEMENT de changer plutôt
+// que sur une rotation fixe déconnectée des vrais événements du jour.
+const FD_SLUG_TO_WARM_COMP = {
+  'fra.1': 'FL1', 'eng.1': 'PL', 'esp.1': 'PD', 'ger.1': 'BL1', 'ita.1': 'SA', 'uefa.champions': 'CL',
+}
+const FD_PRIORITY_QUEUE_KEY = 'fd:warmPriority'
+
+// Appelé depuis runOnePass juste après un FT confirmé (voir isFinalConfirmed) —
+// met en file les index FD_WARM_LIST (calendrier + classement) de la
+// compétition concernée, pour que warmFdCache les traite avant la rotation
+// aveugle. Pas d'effet pour WC/EC (endpoint dateFrom/dateTo différent, voir
+// useTodayMatches.js — hors scope de FD_WARM_LIST) ni pour une compétition
+// non couverte par FD.org (NL/CAN/COPA/UEL/UECL, ESPN pur) — `comp` est alors
+// `undefined` et la fonction ne fait rien.
+async function queueFdPriorityRefresh(kv, slug, log) {
+  const comp = FD_SLUG_TO_WARM_COMP[slug]
+  if (!comp || !kv) return
   try {
+    const indices = FD_WARM_LIST
+      .map((entry, i) => ({ entry, i }))
+      .filter(({ entry }) =>
+        entry.apiPath === `/v4/competitions/${comp}/matches` ||
+        entry.apiPath === `/v4/competitions/${comp}/standings`)
+      .map(({ i }) => i)
+    if (indices.length === 0) return
+    await kv.rpush(FD_PRIORITY_QUEUE_KEY, ...indices.map(String))
+    // Garde-fou anti-croissance illimitée (ne devrait normalement jamais
+    // dépasser ~18 vu le nombre fini de clés possibles) — même pattern que
+    // cron:goals:logHistory plus haut dans ce fichier.
+    await kv.ltrim(FD_PRIORITY_QUEUE_KEY, -60, -1)
+    await kv.expire(FD_PRIORITY_QUEUE_KEY, 3600)
+    log.push(`[fd-warm:queue] ${comp} → ${indices.length} clé(s) mise(s) en priorité (FT confirmé)`)
+  } catch (e) {
+    log.push(`[fd-warm:queue] error=${e.message}`)
+  }
+}
+
+// Un seul élément traité par tick (1min) au maximum : soit une clé en attente
+// suite à un vrai FT (queueFdPriorityRefresh ci-dessus), soit — file vide —
+// l'entrée suivante de la rotation aveugle habituelle (aligné sur le TTL
+// serveur le plus court, FINISHED=120s — voir getTtl() dans api/football.js).
+// Rotation déterministe basée sur l'horloge (pas besoin de state Redis dédié)
+// pour le cas passif : cycle complet de la liste (18 entrées, 6 compét × 3 :
+// matches avec season, matches sans season, standings) en 36min. Consomme au
+// pire 1 des 8 créneaux/min disponibles par tick, jamais plus — impact
+// négligeable sur le budget partagé avec les vrais utilisateurs même les
+// jours de match chargés (plusieurs FT à la même minute se drainent sur les
+// ticks suivants, pas d'un coup).
+async function warmFdCache(log, kv) {
+  try {
+    if (kv) {
+      try {
+        const queued = await kv.lpop(FD_PRIORITY_QUEUE_KEY)
+        if (queued != null) {
+          const idx = Number(queued)
+          if (Number.isInteger(idx) && FD_WARM_LIST[idx]) {
+            const { apiPath, qs } = FD_WARM_LIST[idx]
+            const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
+            const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+            if (!res.ok) log.push(`[fd-warm:priority:${apiPath}${qs ? '?' + qs : ''}] status=${res.status}`)
+            else log.push(`[fd-warm:priority:${apiPath}${qs ? '?' + qs : ''}] ok`)
+            return
+          }
+        }
+      } catch (e) { log.push(`[fd-warm:priority] error=${e.message}`) }
+    }
+
     const now = new Date()
     if (now.getMinutes() % 2 !== 0) return
     const idx = Math.floor(Date.now() / 120_000) % FD_WARM_LIST.length
