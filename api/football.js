@@ -134,7 +134,24 @@ function getTtl(fdPath, qs) {
   if (qs.includes('status=FINISHED'))              return 120           // résultats — 2min
   if (fdPath.includes('/standings'))               return 120           // classements — 2min
   if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min
-  if (qs.includes('dateFrom=') && qs.includes('dateTo=')) return 120   // matchs du jour — 2min
+  // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
+  // Résultats récents, pourquoi pas le garder en cache 7 jours ?" — repéré
+  // en creusant la rafale de 429 au lancement de l'Accueil). Un jour
+  // ENTIÈREMENT passé (dateTo < aujourd'hui, UTC) ne contient plus que des
+  // matchs FINISHED, immuables — 120s (2min) comme "aujourd'hui" (qui peut
+  // avoir un match en cours) n'a aucune raison d'être ici. Repris à 7 jours,
+  // aligné sur RESULTS_DAYS_BACK (Accueil.jsx, panneau "Résultats récents") :
+  // au-delà du tout premier appel jamais fait pour cette date précise, PLUS
+  // AUCUN appel réel FD.org nécessaire — ni pour ce client (localStorage,
+  // voir useTodayMatches.js), ni pour aucun autre utilisateur (ce cache
+  // Redis est partagé). dateTo >= aujourd'hui garde 120s (peut contenir un
+  // match pas encore FINISHED, doit rester frais).
+  if (qs.includes('dateFrom=') && qs.includes('dateTo=')) {
+    const dateToMatch = qs.match(/dateTo=(\d{4}-\d{2}-\d{2})/)
+    const todayUtc = new Date().toISOString().slice(0, 10)
+    if (dateToMatch && dateToMatch[1] < todayUtc) return 7 * 24 * 3600   // jour passé — 7j
+    return 120                                                          // matchs du jour — 2min
+  }
   if (qs.includes('status=SCHEDULED') || qs.includes('status=TIMED')) return 300 // calendrier — 5min
   // ⚠️ TROU TROUVÉ (24/07, suite au constat utilisateur "veuillez patienter"
   // récurrent sur Ligue 1 juste après la fusion Programme+Résultats) :

@@ -136,6 +136,7 @@ function getLocalDateStr() {
 export function useTodayMatches(targetDate) {
   const today = targetDate ?? getLocalDateStr()
   const isToday = today === getLocalDateStr()
+  const isPastDay = today < getLocalDateStr()   // strictement avant aujourd'hui → FINISHED, immuable
   const cacheKey = `matches_${today}`
 
   const cachedData    = readCacheStale(cacheKey)
@@ -154,9 +155,19 @@ export function useTodayMatches(targetDate) {
         const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
 
         // Durée du cache selon le contexte
+        // ⚠️ 6h→7j pour les jours PASSÉS uniquement (24/07, question
+        // utilisateur : "ça va pas bouger, pourquoi pas 7j ?") : un jour
+        // passé n'a que des matchs FINISHED, immuables — aligné sur le TTL
+        // Redis serveur (getTtl, api/football.js) et sur RESULTS_DAYS_BACK
+        // (Accueil.jsx, fenêtre du panneau "Résultats récents"). Un jour
+        // FUTUR (dayOffset > 0 dans Accueil) reste à 6h : un match SCHEDULED
+        // peut encore être reporté/déplacé, contrairement à un résultat déjà
+        // joué — pas de raison de risquer 7j de staleness là-dessus.
         let ttl
-        if (!isToday) {
-          ttl = 6 * 60 * 60 * 1000   // autre jour → cache 6h
+        if (isPastDay) {
+          ttl = 7 * 24 * 60 * 60 * 1000   // jour passé → cache 7j
+        } else if (!isToday) {
+          ttl = 6 * 60 * 60 * 1000        // jour futur → cache 6h
         } else if (hasLive) {
           ttl = 2 * 60 * 1000         // match en cours → cache 2min
         } else {
@@ -268,7 +279,10 @@ export function useRecentDaysMatches(numDays) {
           if (result.length > 0) {
             const hasLive = result.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
             let ttl
-            if (!isToday)    ttl = 6 * 60 * 60 * 1000
+            // isToday=false ici = forcément un jour PASSÉ (dates ne remonte
+            // jamais dans le futur, voir la boucle plus haut) → FINISHED,
+            // immuable → 7j, même raisonnement que useTodayMatches ci-dessus.
+            if (!isToday)    ttl = 7 * 24 * 60 * 60 * 1000
             else if (hasLive) ttl = 2 * 60 * 1000
             else              ttl = 60 * 60 * 1000
             writeCache(cacheKey, result, ttl)
