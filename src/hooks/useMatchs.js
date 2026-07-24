@@ -311,30 +311,39 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   // élimination directe sur quelques semaines), pas concernées par le repli
   // saison ci-dessus ni par le partage client (chaque page garde son propre
   // fetch, comportement historique inchangé). ──
+  //
+  // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+  // l'utilisateur — "regarde chaque requête dans l'ordre, dis-moi si ça se
+  // croise ou ça bouche quelque part") : cette cascade (jusqu'à 3 appels
+  // FD.org pour SCHEDULED, 2 pour FINISHED) part sur CHAQUE lancement de
+  // l'Accueil via useUpcomingMatchesAllComps (WC/EC sont dans
+  // ACCUEIL_COMP_IDS) — et comme il n'y a actuellement AUCUN match SCHEDULED
+  // pour WC (Coupe du monde finie) ni EC (pas d'Euro cette année), la
+  // cascade va systématiquement jusqu'au bout, plusieurs vrais appels FD.org
+  // dos à dos pour la MÊME compétition, sans aucune protection — même
+  // collision que fetchClubMatchesRaw plus haut (verrou d'espacement global
+  // ~7,5s), jamais corrigée ici jusqu'à présent. Même remède : n'attendre
+  // que si la tentative précédente a réellement tapé FD.org (primaryFresh).
   let matches
   const wcSeason = new Date().getFullYear()
   if (status === 'SCHEDULED') {
-    matches = await tryFetch(
-      `/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`
-    )
+    let r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`)
+    matches = r.matches
     if (!matches || matches.length === 0) {
-      matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`
-      )
+      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`)
+      matches = r.matches
     }
     if (!matches || matches.length === 0) {
-      matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches`
-      )
+      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      matches = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
     }
   } else {
-    matches = await tryFetch(
-      `/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`
-    )
+    const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`)
+    matches = r.matches
     if (!matches || matches.length === 0) {
-      matches = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?status=FINISHED`
-      )
+      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      matches = await tryFetch(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED`)
     }
   }
 

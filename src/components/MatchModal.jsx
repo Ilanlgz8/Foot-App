@@ -1185,8 +1185,11 @@ const DEFAULT_RULES = [
 const COMP_RULES = { WC: WC_RULES, FL1: DEFAULT_RULES, PL: DEFAULT_RULES, PD: DEFAULT_RULES, BL1: DEFAULT_RULES, SA: DEFAULT_RULES }
 
 export function ClassementTab({ match, compId }) {
+  // ⚠️ delayMs (24/07, audit chronologique) : même collision que dans
+  // Classement.jsx — standings+form pour LA MÊME compétition au même instant
+  // à chaque ouverture de cet onglet (voir commentaire useTeamForm.js).
   const { standings, groups, loading } = useStandings(compId)
-  const { formMap } = useTeamForm(compId)
+  const { formMap } = useTeamForm(compId, 2_000)
 
   if (loading) {
     return <div style={{ padding: '4px 0' }}><ClassementSkeleton /></div>

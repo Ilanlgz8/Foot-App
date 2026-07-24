@@ -35,15 +35,24 @@ const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 // côté client (status=FINISHED non supporté par le free tier sur certains
 // endpoints). Factorisé pour être réutilisé par la saison en cours ET le
 // repli saison précédente ci-dessous.
+// ⚠️ AJOUT `fresh` (24/07, trouvé via l'audit chronologique demandé par
+// l'utilisateur) : expose si la réponse vient d'un vrai appel FD.org à
+// l'instant (absence de X-Cache, voir api/football.js) ou d'un cache Redis
+// (HIT/STALE) — sert à fetchTeamForm ci-dessous, qui enchaîne 2 appels pour
+// la MÊME compétition (saison en cours + repli saison précédente) quasi tout
+// le temps en ce moment (intersaison, saison en cours toujours vide) : même
+// collision que fetchClubMatchesRaw (useMatchs.js) sur le verrou
+// d'espacement global, jamais corrigée ici jusqu'à présent.
 async function fetchFinishedSeasonMatches(selectedComp, seasonParam) {
   const res = await fdFetch(
     fdUrl(`/api/v4/competitions/${selectedComp}/matches${seasonParam}`)
   )
   // 429 → throw pour que React Query retente (rate limit temporaire)
   if (res.status === 429) throw new Error('rate_limit')
-  if (!res.ok) return []
+  const fresh = !res.headers.get('X-Cache')
+  if (!res.ok) return { matches: [], fresh }
   const json = await res.json()
-  return (json.matches ?? []).filter(m => m.status === 'FINISHED')
+  return { matches: (json.matches ?? []).filter(m => m.status === 'FINISHED'), fresh }
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "Forme récente" de l'Angleterre
@@ -101,7 +110,8 @@ async function fetchTeamForm(selectedComp) {
   const seasonParam = selectedComp === 'WC' ? '?season=2026'
     : selectedComp === 'EC' ? `?season=${new Date().getFullYear()}`
     : ''
-  const matches = await fetchFinishedSeasonMatches(selectedComp, seasonParam)
+  const primary = await fetchFinishedSeasonMatches(selectedComp, seasonParam)
+  const matches = primary.matches
 
   // Repli saison précédente (constat utilisateur : cotes de pronos
   // identiques pour tous les matchs en tout début de saison club, ex. août)
@@ -120,8 +130,19 @@ async function fetchTeamForm(selectedComp) {
   // division) — elle reste donc neutre (strength() par défaut) plutôt que
   // comparée à tort avec un autre championnat : comportement voulu.
   if (isClub && matches.length < MIN_LEAGUE_GAMES) {
+    // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+    // l'utilisateur) : ce repli et l'appel juste au-dessus visent la MÊME
+    // compétition, quasi dos à dos — en ce moment (intersaison, saison en
+    // cours toujours vide), ce repli se déclenche pour QUASIMENT CHAQUE
+    // compétition, et useTeamFormMulti (Accueil) lance ce chemin pour
+    // PLUSIEURS compétitions EN MÊME TEMPS (aucun espacement entre elles,
+    // voir plus bas) — même collision que fetchClubMatchesRaw sur le verrou
+    // d'espacement global FD.org, jamais corrigée ici jusqu'à présent. On
+    // n'attend que si l'appel précédent a réellement tapé FD.org.
+    if (primary.fresh) await new Promise(r => setTimeout(r, 8_000))
     const lastSeason = getClubSeason() - 1
-    const fallbackMatches = await fetchFinishedSeasonMatches(selectedComp, `?season=${lastSeason}`)
+    const fallbackResult = await fetchFinishedSeasonMatches(selectedComp, `?season=${lastSeason}`)
+    const fallbackMatches = fallbackResult.matches
     // ⚠️ AJOUT (constat utilisateur : "compo probable"/"stats saison" avec des
     // matchs vieux de 2 ans, alors que le repli ne devrait remonter QUE d'une
     // saison — "la saison en cours ou la saison juste avant, jamais plus
@@ -150,13 +171,24 @@ async function fetchTeamForm(selectedComp) {
   return { formMap: buildFormMap(matches), matches, isLastSeason: false }
 }
 
-export function useTeamForm(selectedComp) {
+// ⚠️ AJOUT `delayMs` (24/07, trouvé via l'audit chronologique demandé par
+// l'utilisateur) : même collision que celle documentée dans useScorers.js —
+// Classement.jsx ET ClassementTab (MatchModal.jsx) appellent useStandings +
+// useTeamForm pour LA MÊME compétition quasi au même instant, sans le savoir
+// l'un de l'autre, sur le même verrou d'espacement FD.org global. Défaut à 0
+// (comportement inchangé pour MatchPage.jsx/MatchPoster.jsx/MatchDuJourCard.jsx/
+// LiveMatchPage.jsx, qui n'appellent jamais useStandings en parallèle).
+export function useTeamForm(selectedComp, delayMs = 0) {
   const cacheKey = `teamform2_${selectedComp}`
 
   const { data, isLoading } = useQuery({
     queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: () => {
-      const result = fetchTeamForm(selectedComp)
+      const run = async () => {
+        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+        return fetchTeamForm(selectedComp)
+      }
+      const result = run()
       // ⚠️ BUG CORRIGÉ (constat utilisateur : "Uncaught (in promise) Error:
       // rate_limit" dans la console) : `result.then(...)` crée une PROMESSE
       // DÉRIVÉE distincte de `result` — quand `result` rejette (429 FD.org,
@@ -196,15 +228,28 @@ export function useTeamForm(selectedComp) {
 export function useTeamFormMulti(compCodes) {
   const codes = [...new Set((compCodes ?? []).filter(Boolean))]
 
+  // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+  // l'utilisateur — "regarde chaque requête dans l'ordre, dis-moi si ça se
+  // croise") : AUCUN espacement n'existait ici entre les compétitions —
+  // l'Accueil affichant souvent des matchs de plusieurs grands championnats
+  // en même temps, ce hook lançait autant de fetchTeamForm() SIMULTANÉS,
+  // chacun pouvant lui-même faire jusqu'à 2 vrais appels FD.org (saison en
+  // cours + repli saison précédente, voir fetchTeamForm) — un vrai risque de
+  // rafale à chaque lancement de l'Accueil, resté invisible jusqu'ici. Même
+  // remède qu'ailleurs dans l'app (ALL_COMPS_STAGGER_MS, useMatchs.js) :
+  // léger espacement entre compétitions.
+  const STAGGER_MS = 1_000
+
   const results = useQueries({
-    queries: codes.map(code => {
+    queries: codes.map((code, i) => {
       const cacheKey = `teamform2_${code}`
       return {
         queryKey:             ['teamForm2', code, code === 'WC' ? '2026' : 'cur'],
-        queryFn:              () => {
-          const result = fetchTeamForm(code)
+        queryFn:              async () => {
+          if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
+          const result = await fetchTeamForm(code)
           // Voir le commentaire équivalent dans useTeamForm ci-dessus.
-          result.then(r => writeCache(cacheKey, r, FORM_STALE)).catch(() => {})
+          writeCache(cacheKey, result, FORM_STALE)
           return result
         },
         initialData:          readCache(cacheKey) ?? undefined,

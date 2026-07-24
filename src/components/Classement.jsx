@@ -141,9 +141,13 @@ function Classement() {
   const hasMatchToday = !wcSchedLoading && !wcFinLoading &&
     [...wcSched, ...wcFin].some(m => m.utcDate && new Date(m.utcDate).toLocaleDateString('sv-SE') === todayStr)
 
+  // ⚠️ delayMs (24/07, audit chronologique) : ces 3 hooks tapent FD.org pour
+  // LA MÊME compétition au même instant à chaque changement de championnat —
+  // espacés pour ne pas se marcher dessus sur le verrou global (voir
+  // commentaires dans useTeamForm.js/useScorers.js).
   const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
-  const { formMap } = useTeamForm(selectedComp)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday)
+  const { formMap } = useTeamForm(selectedComp, 2_000)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 4_000)
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement

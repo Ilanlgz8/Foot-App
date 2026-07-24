@@ -16,12 +16,25 @@ const STALE_MS = 1000 * 60 * 2  // 2min (était 30min)
 // jours sans match, 2min les jours où ça joue.
 const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 
-export function useScorers(compId, hasMatchToday = true) {
+// ⚠️ AJOUT `delayMs` (24/07, trouvé via l'audit chronologique demandé par
+// l'utilisateur) : Classement.jsx appelle useStandings + useTeamForm +
+// useScorers pour LA MÊME compétition quasi au même instant à chaque
+// changement de championnat — 3 hooks indépendants, aucun ne sait que les
+// autres existent, donc aucun espacement entre eux malgré le même verrou
+// FD.org global. Résultat concret : sur un championnat jamais consulté cette
+// session (pas de repli stale possible), 2 des 3 requêtes perdent la course
+// au verrou et échouent (buteurs/forme vides le temps d'un retry). Défaut à 0
+// (comportement inchangé pour tout autre appelant — MatchPage.jsx,
+// MatchPoster.jsx, LiveMatchPage.jsx... qui n'appellent jamais useStandings
+// en parallèle) — seuls Classement.jsx et ClassementTab (MatchModal.jsx, même
+// collision : standings+form ensemble) passent un délai explicite.
+export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   const key = `scorers_${compId}`
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
     queryFn: async () => {
+      if (delayMs > 0) await new Promise(res => setTimeout(res, delayMs))
       // football-data.org résout la "saison courante" comme "la saison à la date
       // de début la plus récente" (doc officielle) — pour une compétition annuelle
       // (WC, EC) qui ne revient que tous les 4 ans, ça peut pointer sur l'édition
@@ -36,9 +49,10 @@ export function useScorers(compId, hasMatchToday = true) {
       async function tryFetch(url) {
         const r = await fdFetch(fdUrl(url))
         if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
-        if (!r.ok) return null
+        const fresh = !r.headers.get('X-Cache')
+        if (!r.ok) return { scorers: null, fresh }
         const j = await r.json()
-        return j.scorers ?? null
+        return { scorers: j.scorers ?? null, fresh }
       }
 
       // limit=500 : le paramètre "limit" n'est pas documenté officiellement
@@ -58,11 +72,16 @@ export function useScorers(compId, hasMatchToday = true) {
       // le cas "réponse vide".
       let scorers = null
       try {
+        let fresh = false
         if (isAnnualIntl) {
-          scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
+          const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
+          scorers = r.scorers
+          fresh = r.fresh
         }
         if (!scorers || scorers.length === 0) {
-          scorers = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+          if (fresh) await new Promise(res => setTimeout(res, 8_000))
+          const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+          scorers = r2.scorers
         }
       } catch {
         const stale = readCacheStale(key)

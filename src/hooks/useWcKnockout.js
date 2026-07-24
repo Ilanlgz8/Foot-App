@@ -178,9 +178,10 @@ export function useWcKnockout(compCode = 'WC') {
       async function tryFetch(url) {
         const r = await fdFetch(fdUrl(url))
         if (r.status === 403 || r.status === 429) throw new Error(String(r.status))
-        if (!r.ok) return null
+        const fresh = !r.headers.get('X-Cache')
+        if (!r.ok) return { matches: null, fresh }
         const j = await r.json()
-        return j.matches ?? null
+        return { matches: j.matches ?? null, fresh }
       }
       // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js/useMatchs.js/
       // useScorers.js — constat utilisateur : "j'avais tout, 5min après plus
@@ -190,9 +191,19 @@ export function useWcKnockout(compCode = 'WC') {
       // en place plus bas (initialData) pour le montage initial seulement.
       let all
       try {
-        all = await tryFetch(`/api/v4/competitions/${compCode}/matches?season=${season}`)
+        const r1 = await tryFetch(`/api/v4/competitions/${compCode}/matches?season=${season}`)
+        all = r1.matches
         if (!all || all.length === 0) {
-          all = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
+          // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+          // l'utilisateur) : même collision potentielle que fetchClubMatchesRaw
+          // (useMatchs.js) — actuellement peu probable en pratique (la CM
+          // 2026 vient de finir, `season=2026` renvoie déjà tout), mais reste
+          // vulnérable si un jour ce 1er appel revient vide (tout début d'un
+          // tournoi, ou blip FD.org) : 2 vrais appels dos à dos pour la même
+          // compétition. Même remède, par cohérence et robustesse.
+          if (r1.fresh) await new Promise(res => setTimeout(res, 8_000))
+          const r2 = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
+          all = r2.matches
         }
       } catch {
         const stale = readCacheStale(cacheKey)
