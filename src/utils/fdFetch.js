@@ -46,8 +46,19 @@ import { reportFetchFailure } from '../hooks/useNetworkQuality'
 export async function fdFetch(url, options = {}) {
   // Aucun appelant ne passe son propre signal aujourd'hui (vérifié) → pas besoin
   // d'AbortSignal.any (support iOS plus récent) pour l'instant, juste le timeout.
+  //
+  // ⚠️ AJOUT (24/07, capture Network utilisateur : ces appels revenaient en
+  // 304, servis par le cache HTTP du NAVIGATEUR, pendant que Programme
+  // affichait "aucun match" sans la moindre erreur console — un fetch
+  // "réussi" mais dont on ne pouvait plus garantir la fraîcheur du corps).
+  // api/football.js envoie déjà `Cache-Control: no-store` (voir son
+  // getCacheControl()) — cache:'no-store' ici en plus, côté client, pour ne
+  // JAMAIS dépendre du cache HTTP du navigateur pour ces appels, quel que
+  // soit ce qu'un proxy/CDN intermédiaire ferait des en-têtes en route. La
+  // fraîcheur reste gérée par Redis (serveur, partagé) + localStorage
+  // (client, résilience hors-ligne) — les 2 couches déjà testées.
   try {
-    return await fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
+    return await fetch(url, { cache: 'no-store', ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
   } catch (err) {
     if (err.name === 'TimeoutError' || err.name === 'AbortError' || err instanceof TypeError) {
       reportFetchFailure()

@@ -155,9 +155,23 @@ function getTtl(fdPath, qs) {
   return 120  // défaut — 2min
 }
 
-function getCacheControl(ttl) {
-  if (ttl === 0) return 'no-store'
-  return `public, s-maxage=${ttl}, stale-while-revalidate=${Math.round(ttl / 2)}`
+// ⚠️ SIMPLIFIÉ (24/07, capture Network utilisateur : les requêtes
+// /api/football revenaient en 304, servies depuis le cache HTTP du
+// NAVIGATEUR, pendant que Programme affichait "aucun match" sans la moindre
+// erreur console — donc un fetch "réussi" (200 effectif, transparent pour le
+// JS) mais avec un corps qu'on ne peut plus garantir à jour). On a déjà 2
+// couches de cache qu'on contrôle et qu'on a durcies pendant des semaines :
+// Redis PARTAGÉ côté serveur (la vraie protection anti-429/anti-suspension
+// FD.org, commune à tous les utilisateurs) et localStorage côté client
+// (résilience hors-ligne, voir readCacheStale). Laisser EN PLUS le
+// navigateur gérer sa propre 3e couche de cache HTTP (ETag/304) n'apporte
+// aucun bénéfice supplémentaire — le vrai gain anti-429 vient du Redis
+// partagé, pas du cache d'un navigateur individuel — et c'est une source de
+// bugs qu'on ne peut ni observer ni déboguer depuis ce serveur. no-store
+// partout : chaque appel client repasse par notre proxy, qui lui-même sert
+// depuis Redis en quelques ms dans l'immense majorité des cas (cache HIT).
+function getCacheControl() {
+  return 'no-store'
 }
 
 export default async function handler(req, res) {
@@ -214,7 +228,7 @@ export default async function handler(req, res) {
           return res
             .status(200)
             .setHeader('Content-Type', 'application/json')
-            .setHeader('Cache-Control', getCacheControl(ttl))
+            .setHeader('Cache-Control', getCacheControl())
             .setHeader('X-Cache', 'HIT')
             .send(typeof cached === 'string' ? cached : JSON.stringify(cached))
         }
@@ -317,7 +331,7 @@ export default async function handler(req, res) {
     res
       .status(response.status)
       .setHeader('Content-Type', 'application/json')
-      .setHeader('Cache-Control', response.ok ? getCacheControl(ttl) : 'no-store')
+      .setHeader('Cache-Control', getCacheControl())
       .setHeader('X-Cache', 'MISS')
       .send(body)
 
