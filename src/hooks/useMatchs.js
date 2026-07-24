@@ -189,93 +189,70 @@ async function tryFetchWithMeta(url) {
 // aucun refetch dupliqué). Visiter l'une des deux pages peuple désormais
 // aussi l'autre pour la même compét, sans requête supplémentaire.
 async function fetchClubMatchesRaw(selectedComp) {
-  let all = null
   // Mémorise la dernière vraie erreur réseau (429/403) — voir le rethrow en
-  // fin de fonction : sans ça, 2 tentatives bloquées finissaient en `null`
-  // silencieux, perdant la distinction "vraiment bloqué" vs "vraiment aucun
-  // match", dont classifyFetchError (fetchErrors.js) a besoin pour afficher
-  // "Veuillez patienter quelques instants" au lieu d'un écran vide.
+  // fin de fonction : sans ça, une tentative bloquée finissait en résultat
+  // vide silencieux, perdant la distinction "vraiment bloqué" vs "vraiment
+  // aucun match", dont classifyFetchError (fetchErrors.js) a besoin pour
+  // afficher "Veuillez patienter quelques instants" au lieu d'un écran vide.
   let lastErr = null
   let primaryFresh = false
 
+  // ⚠️ REFONTE COMPLÈTE (24/07, idée utilisateur : "avant je n'avais AUCUN
+  // problème pour afficher les données, donc c'est nous, pas FD.org" — root
+  // cause enfin bien identifiée). L'ancienne version appelait TOUJOURS
+  // `season=${getClubSeason()}` (la saison qui vient de finir) EN PREMIER,
+  // puis — dès qu'il manquait une des 2 catégories FINISHED/SCHEDULED, quasi
+  // systématiquement en intersaison — un 2e vrai appel FD.org quasi
+  // simultané (repli sans season). Ces 2 appels se disputaient le MÊME
+  // verrou d'espacement global (~7,5s, voir SPACING_MS dans api/football.js)
+  // à CHAQUE consultation, d'où le 429 même après un switch de compétition.
+  //
+  // Nouvelle logique, inversée : `current` (sans param season — la vraie
+  // notion de "saison active" de FD.org) part EN PREMIER et suffit À LUI
+  // SEUL dès qu'une vraie saison est publiée avec au moins un résultat joué
+  // (cas normal, ~11 mois/an — contient déjà FINISHED + SCHEDULED dans la
+  // même réponse). Le 2e appel (saison qui vient de finir) n'est tenté QUE
+  // si `current` n'a encore AUCUN match FINISHED — le seul cas où c'est
+  // réellement utile : la fenêtre d'intersaison (~1 mois/an) où la nouvelle
+  // saison est déjà publiée côté calendrier mais n'a produit aucun résultat.
+  // Et même dans ce cas, ce 2e appel passe par le MÊME cache Redis partagé
+  // (TTL 300s + file prioritaire cf-worker) que tout le reste de l'app — la
+  // plupart du temps un cache HIT instantané, pas un 2e vrai appel FD.org.
+  //
+  // Bonus demandé explicitement : sert aussi de repli d'AFFICHAGE pour
+  // Résultats (derniers résultats de la saison qui vient de se terminer) tant
+  // que la nouvelle saison n'a produit aucun résultat — et s'efface tout
+  // seul dès que `current` a son 1er FINISHED, sans logique de nettoyage à
+  // part (hasFinished redevient vrai naturellement, la branche ci-dessous ne
+  // se déclenche plus).
+  let current = null
   try {
-    const r = await tryFetchWithMeta(
-      `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
-    )
-    all = r.matches
+    const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches`)
+    current = r.matches
     primaryFresh = r.fresh
   } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
 
-  // Complet seulement si les 2 catégories sont représentées — en intersaison,
-  // `season=${getClubSeason()}` (saison qui vient de finir) ne contient QUE
-  // des FINISHED, jamais de SCHEDULED/TIMED : il faut alors le repli pour
-  // compléter, pas juste quand la réponse est totalement vide.
-  const hasFinished = (all ?? []).some(m => m.status === 'FINISHED')
-  const hasUpcoming = (all ?? []).some(m => m.status !== 'FINISHED')
+  const hasFinished = (current ?? []).some(m => m.status === 'FINISHED')
+  let all = current ?? []
 
-  // ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : "Programme Ligue 1 vide" alors
-  // que le réseau montrait 2 appels /api/football réussis en 200 avec de
-  // vraies données — confirmé en rejouant les 2 appels directement : le 1er
-  // (season=2025, saison qui vient de finir) renvoie bien 306 matchs FINISHED,
-  // et le repli sans season (season 2026-27 "courante" côté FD.org) renvoie
-  // bien 306 matchs SCHEDULED quand il aboutit. Donc les données existent des
-  // 2 côtés — le bug n'était pas un manque de données mais une PERTE
-  // silencieuse : si CE repli précis échoue avec un vrai 429/403 (le budget
-  // partagé FD.org vient tout juste d'être entamé par le 1er appel, l'espacement
-  // serveur ~7,5-12s n'a pas eu le temps de se libérer), le catch ci-dessous
-  // n'interrompait rien — la fonction retournait quand même `all` tel quel
-  // (306 FINISHED, sans le moindre SCHEDULED), et le queryFn plus bas
-  // l'écrivait tel quel dans le cache RAW, écrasant tout ce qu'un fetch
-  // précédent avait pu fusionner correctement. Résultat : succès réseau réel,
-  // aucune erreur affichée, mais Programme (filtré sur status!=='FINISHED')
-  // vide. Fix ci-dessous : si ce repli spécifique a vraiment échoué (pas
-  // "renvoyé vide", ce qui reste un cas légitime d'intersaison avant
-  // publication du calendrier) ET qu'on n'a toujours pas les 2 catégories,
-  // on relance l'erreur au lieu de renvoyer un résultat partiel — le retry
-  // déjà en place dans useMatches (429/403, 2 tentatives/8s) et le repli sur
-  // le dernier cache RAW valide (readStaleWithMigration) prennent le relais,
-  // au lieu de remplacer silencieusement une bonne donnée par une incomplète.
   let fallbackErr = null
 
-  if (!all || !hasFinished || !hasUpcoming) {
-    // Repli sans season — s'appuie sur le "current season" implicite de
-    // FD.org plutôt que sur un calcul de date local : couvre justement le cas
-    // d'intersaison où le calcul par date (getClubSeason) et le vrai
-    // "courant" FD.org divergent temporairement. Fusionné (pas remplacé) avec
-    // `all` pour ne perdre ni les FINISHED déjà obtenus ni les SCHEDULED du
-    // repli, quel que soit lequel des deux appels a réussi.
-    //
-    // ⚠️ AJOUT (24/07, constat utilisateur : switch LaLiga→Serie A après 8s
-    // d'attente = 429 quand même) : ce repli et l'appel `season=` juste
-    // au-dessus visent la MÊME compétition, à quelques centaines de ms
-    // d'écart (rien ne les sépare que la latence réseau du 1er) — pendant
-    // l'intersaison actuelle (nouvelle saison pas encore publiée), ce repli
-    // est quasi TOUJOURS nécessaire, pour QUASIMENT CHAQUE compétition
-    // switchée. Si le 1er appel a dû réellement taper FD.org (primaryFresh —
-    // pas juste un cache Redis HIT/STALE), il vient de prendre le verrou
-    // d'espacement global (~7,5s, voir reserveQuota/SPACING_MS dans
-    // api/football.js, PARTAGÉ par tout l'endpoint, pas juste cette
-    // compétition) — le repli le trouve alors systématiquement occupé →
-    // bloqué → pas de copie stale possible pour ce repli précis (clé parfois
-    // jamais vue pour cette compét cette saison) → vrai 429, quel que soit le
-    // temps déjà passé sur une AUTRE compétition avant (ce délai-là ne
-    // libère PAS ce verrou, qui est global à l'app entière, pas par
-    // compétition). On laisse le verrou se libérer avant de tenter le repli,
-    // mais SEULEMENT quand le 1er appel l'a réellement pris (primaryFresh) —
-    // un cache HIT/STALE ne le consomme pas, le repli part alors
-    // immédiatement comme avant, sans latence ajoutée.
+  if (!hasFinished) {
+    // Même protection anti-collision que le switch de compétition (voir
+    // historique) : n'attend que si le 1er appel a réellement tapé FD.org
+    // (primaryFresh) — un cache HIT/STALE ne prend pas le verrou, le repli
+    // part alors immédiatement, sans latence ajoutée.
     if (primaryFresh) await new Promise(r => setTimeout(r, 8_000))
 
-    let fallbackAll = null
+    let lastSeason = null
     try {
-      const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches`)
-      fallbackAll = r.matches
+      lastSeason = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
+      )
     } catch (e) { lastErr = e; fallbackErr = e /* voir bloc ci-dessous */ }
-    if (fallbackAll != null) {
-      const seen   = new Set((all ?? []).map(m => m.id))
-      const merged = [...(all ?? [])]
-      for (const m of fallbackAll) if (!seen.has(m.id)) merged.push(m)
-      if (merged.length > 0) all = merged
+    if (lastSeason != null && lastSeason.length > 0) {
+      const seen = new Set(all.map(m => m.id))
+      all = [...all, ...lastSeason.filter(m => !seen.has(m.id))]
     }
   }
 
@@ -288,20 +265,20 @@ async function fetchClubMatchesRaw(selectedComp) {
   // (Programme/Résultats) profitent du filtrage commun plus bas.
   if (DOMESTIC_CUPS[selectedComp]) {
     const cupMatches = await fetchEspnCupMatches(selectedComp)
-    if (cupMatches.length > 0) all = [...(all ?? []), ...cupMatches]
+    if (cupMatches.length > 0) all = [...all, ...cupMatches]
   }
 
   // Préserve la classification 429/403 (voir commentaire lastErr ci-dessus)
-  // au lieu d'un null silencieux quand rien n'a pu être récupéré nulle part.
-  if (all == null && lastErr) throw lastErr
+  // au lieu d'un résultat vide silencieux quand rien n'a pu être récupéré
+  // nulle part.
+  if (all.length === 0 && lastErr) throw lastErr
 
-  // Voir commentaire "BUG CORRIGÉ" plus haut : un échec réel (pas "vide") du
-  // repli, alors qu'il manque encore une des 2 catégories, ne doit jamais
-  // être renvoyé comme un succès partiel silencieux.
+  // Un échec réel (pas "vide") du repli saison précédente, alors qu'on n'a
+  // toujours aucun résultat à montrer, ne doit jamais être renvoyé comme un
+  // succès partiel silencieux.
   if (fallbackErr) {
-    const hasFinishedNow = (all ?? []).some(m => m.status === 'FINISHED')
-    const hasUpcomingNow = (all ?? []).some(m => m.status !== 'FINISHED')
-    if (!hasFinishedNow || !hasUpcomingNow) throw fallbackErr
+    const hasFinishedNow = all.some(m => m.status === 'FINISHED')
+    if (!hasFinishedNow) throw fallbackErr
   }
 
   return all
