@@ -217,7 +217,7 @@ export function useWcKnockout(compCode = 'WC') {
           // vulnérable si un jour ce 1er appel revient vide (tout début d'un
           // tournoi, ou blip FD.org) : 2 vrais appels dos à dos pour la même
           // compétition. Même remède, par cohérence et robustesse.
-          if (r1.fresh) await new Promise(res => setTimeout(res, 8_000))
+          if (r1.fresh) await new Promise(res => setTimeout(res, 6_000))
           const r2 = await tryFetch(`/api/v4/competitions/${compCode}/matches`)
           all = r2.matches
         }

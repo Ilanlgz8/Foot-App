@@ -79,7 +79,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
           fresh = r.fresh
         }
         if (!scorers || scorers.length === 0) {
-          if (fresh) await new Promise(res => setTimeout(res, 8_000))
+          if (fresh) await new Promise(res => setTimeout(res, 6_000))
           const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
           scorers = r2.scorers
         }

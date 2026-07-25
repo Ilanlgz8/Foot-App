@@ -240,7 +240,7 @@ async function fetchClubMatchesRaw(selectedComp) {
     // historique) : n'attend que si le 1er appel a réellement tapé FD.org
     // (primaryFresh) — un cache HIT/STALE ne prend pas le verrou, le repli
     // part alors immédiatement, sans latence ajoutée.
-    if (primaryFresh) await new Promise(r => setTimeout(r, 8_000))
+    if (primaryFresh) await new Promise(r => setTimeout(r, 6_000))
 
     let lastSeason = null
     try {
@@ -349,19 +349,19 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
     let r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?season=${wcSeason}`)
     matches = r.matches
     if (!matches || matches.length === 0) {
-      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      if (r.fresh) await new Promise(res => setTimeout(res, 6_000))
       r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?status=TIMED&season=${wcSeason}`)
       matches = r.matches
     }
     if (!matches || matches.length === 0) {
-      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      if (r.fresh) await new Promise(res => setTimeout(res, 6_000))
       matches = await tryFetch(`/api/v4/competitions/${selectedComp}/matches`)
     }
   } else {
     const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED&season=${wcSeason}`)
     matches = r.matches
     if (!matches || matches.length === 0) {
-      if (r.fresh) await new Promise(res => setTimeout(res, 8_000))
+      if (r.fresh) await new Promise(res => setTimeout(res, 6_000))
       matches = await tryFetch(`/api/v4/competitions/${selectedComp}/matches?status=FINISHED`)
     }
   }

@@ -139,7 +139,7 @@ async function fetchTeamForm(selectedComp) {
     // voir plus bas) — même collision que fetchClubMatchesRaw sur le verrou
     // d'espacement global FD.org, jamais corrigée ici jusqu'à présent. On
     // n'attend que si l'appel précédent a réellement tapé FD.org.
-    if (primary.fresh) await new Promise(r => setTimeout(r, 8_000))
+    if (primary.fresh) await new Promise(r => setTimeout(r, 6_000))
     const lastSeason = getClubSeason() - 1
     const fallbackResult = await fetchFinishedSeasonMatches(selectedComp, `?season=${lastSeason}`)
     const fallbackMatches = fallbackResult.matches
