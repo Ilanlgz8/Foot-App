@@ -225,12 +225,39 @@ async function fetchClubMatchesRaw(selectedComp) {
   // seul dès que `current` a son 1er FINISHED, sans logique de nettoyage à
   // part (hasFinished redevient vrai naturellement, la branche ci-dessous ne
   // se déclenche plus).
+  // ⚠️ AJOUT cache dédié (25/07, constat utilisateur : Programme vide "Aucun
+  // match à venir" en revenant de Résultats/Classement, alors que les matchs
+  // s'étaient bien affichés juste avant) : même mécanisme que le repli
+  // "saison précédente" plus bas (voir son commentaire), mais dans l'AUTRE
+  // sens. Programme et Résultats PARTAGENT le même cache RAW (voir plus haut
+  // dans le fichier) — si l'utilisateur va sur Résultats/Classement et que
+  // CET appel précis (`current`, saison en cours) échoue sur LEUR refetch en
+  // arrière-plan (429 transitoire, budget partagé), l'ancien code repartait
+  // de zéro (`current = null`) puis ne récupérait que le repli "saison
+  // précédente" (FINISHED uniquement) — le RAW partagé se faisait écraser
+  // par une version SANS AUCUN match SCHEDULED. Retour sur Programme : le
+  // cache partagé, déjà corrompu par cette écriture, ne contient plus rien
+  // à venir → "Aucun match à venir" alors que les matchs existent bien côté
+  // FD.org. Même remède : cache dédié pour CE résultat précis, relu comme
+  // repli si l'appel échoue cette fois, pour ne jamais régresser une donnée
+  // déjà bonne.
+  const currentKey = `matches_current_${selectedComp}`
   let current = null
   try {
     const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches`)
     current = r.matches
     primaryFresh = r.fresh
   } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
+
+  if (current != null) {
+    // `current` peut légitimement être un tableau vide (vraie info : aucun
+    // match programmé actuellement) — seule l'absence de réponse exploitable
+    // (null, voir tryFetchWithMeta) déclenche le repli cache ci-dessous.
+    writeCache(currentKey, current, 24 * 3600 * 1000)
+  } else {
+    const cachedCurrent = readCacheStale(currentKey)
+    if (cachedCurrent != null) current = cachedCurrent
+  }
 
   const hasFinished = (current ?? []).some(m => m.status === 'FINISHED')
   let all = current ?? []
