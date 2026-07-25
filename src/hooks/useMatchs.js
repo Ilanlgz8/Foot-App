@@ -235,8 +235,6 @@ async function fetchClubMatchesRaw(selectedComp) {
   const hasFinished = (current ?? []).some(m => m.status === 'FINISHED')
   let all = current ?? []
 
-  let fallbackErr = null
-
   if (!hasFinished) {
     // Même protection anti-collision que le switch de compétition (voir
     // historique) : n'attend que si le 1er appel a réellement tapé FD.org
@@ -249,7 +247,16 @@ async function fetchClubMatchesRaw(selectedComp) {
       lastSeason = await tryFetch(
         `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
       )
-    } catch (e) { lastErr = e; fallbackErr = e /* voir bloc ci-dessous */ }
+    } catch (e) {
+      // ⚠️ NE PLUS PROPAGER via `lastErr` ici (25/07, voir bug détaillé plus
+      // bas) : ce repli n'est qu'un enrichissement optionnel — si `current`
+      // (juste au-dessus) a déjà réussi avec de vraies données (matchs
+      // SCHEDULED de la saison à venir), un échec ICI ne doit jamais faire
+      // disparaître ces données déjà en main. `lastErr` ne sert plus qu'au
+      // cas où `current` LUI-MÊME a échoué (voir catch plus haut) — seul cas
+      // où on n'a vraiment rien à montrer.
+      void e
+    }
     if (lastSeason != null && lastSeason.length > 0) {
       const seen = new Set(all.map(m => m.id))
       all = [...all, ...lastSeason.filter(m => !seen.has(m.id))]
@@ -268,18 +275,30 @@ async function fetchClubMatchesRaw(selectedComp) {
     if (cupMatches.length > 0) all = [...all, ...cupMatches]
   }
 
-  // Préserve la classification 429/403 (voir commentaire lastErr ci-dessus)
-  // au lieu d'un résultat vide silencieux quand rien n'a pu être récupéré
-  // nulle part.
+  // ⚠️ BUG CORRIGÉ (25/07, constat utilisateur : Serie A/LaLiga affichaient
+  // les matchs puis "Veuillez patienter" ~2s après, alors que les autres
+  // championnats non) : il existait ICI un 2e garde-fou qui vérifiait
+  // `hasFinishedNow` (un match FINISHED) au lieu de "a-t-on vraiment des
+  // données à montrer" — or on est TOUJOURS dans le bloc `if (!hasFinished)`
+  // plus haut uniquement quand la saison en cours n'a encore aucun FINISHED
+  // (intersaison, cas normal pour tous les championnats en ce moment), donc
+  // `hasFinishedNow` était FAUX PAR CONSTRUCTION. Résultat : dès que le repli
+  // saison précédente échouait (429, budget partagé déjà pris par quelqu'un
+  // d'autre) — même si `all` contenait déjà les vrais matchs SCHEDULED de la
+  // saison à venir, récupérés avec succès par le tout premier appel plus haut
+  // — cette donnée pourtant bonne était systématiquement jetée, remplacée par
+  // une erreur. Vérifié en direct sur l'API réelle : Serie A a bien des vrais
+  // matchs SCHEDULED publiés (saison 2026/27) que `current` récupère
+  // correctement — c'est CE fallback raté qui les effaçait après coup. Le
+  // repli saison précédente n'est qu'un enrichissement optionnel (repêcher
+  // des résultats affichables tant que la vraie saison n'a encore rien
+  // produit) : son échec ne doit jamais faire disparaître des données déjà en
+  // main. Le check ci-dessous (`all.length === 0 && lastErr`, `fallbackErr`
+  // inclus puisqu'il alimente aussi `lastErr`) couvre déjà entièrement le
+  // seul cas légitime — lever l'erreur quand on n'a VRAIMENT rien à montrer,
+  // peu importe la catégorie — le 2e garde-fou était donc à la fois faux ET
+  // redondant, supprimé.
   if (all.length === 0 && lastErr) throw lastErr
-
-  // Un échec réel (pas "vide") du repli saison précédente, alors qu'on n'a
-  // toujours aucun résultat à montrer, ne doit jamais être renvoyé comme un
-  // succès partiel silencieux.
-  if (fallbackErr) {
-    const hasFinishedNow = all.some(m => m.status === 'FINISHED')
-    if (!hasFinishedNow) throw fallbackErr
-  }
 
   return all
 }
