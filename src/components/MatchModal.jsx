@@ -1568,6 +1568,8 @@ export function useH2HRows(match, compMatches) {
   const { data: h2hMatches, isLoading } = useH2H(match)
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
+  const homeName = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
+  const awayName = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   // Données FD.org, du plus récent au plus vieux. ⚠️ CORRIGÉ (constat
   // utilisateur : "met en premier les plus récent" — ce n'était pas le cas)
@@ -1587,12 +1589,26 @@ export function useH2HRows(match, compMatches) {
     .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
 
   // Fallback : confrontations dans la compétition en cours (si FD.org vide)
+  // ⚠️ AJOUT match par NOM en plus de l'id (25/07, constat utilisateur :
+  // "Historique" incohérent Programme vs Accueil pour le même match) : `match`
+  // peut venir d'ESPN (6 grands championnats sourcés ESPN dans Accueil, voir
+  // useH2H ci-dessus/normalizeEvent) — ses homeId/awayId sont alors des id
+  // ESPN, tandis que `compMatches` (toujours sourcé FD.org, voir useTeamForm)
+  // porte des id football-data.org : la comparaison par id seule ne matchait
+  // donc JAMAIS dans ce cas précis, silencieusement (aucune erreur, juste 0
+  // résultat). fuzzyTeam (même utilitaire que le raccord CM/Euro plus haut
+  // dans ce fichier) compare les noms, fiable quelle que soit la source.
   const compH2H = !fdRecent.length && compMatches?.length
-    ? (compMatches).filter(m =>
-        m.status === 'FINISHED' &&
-        ((m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
-         (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId))
-      ).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+    ? (compMatches).filter(m => {
+        if (m.status !== 'FINISHED') return false
+        const mHomeName = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
+        const mAwayName = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
+        const sameOrder    = (m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
+          (fuzzyTeam(mHomeName, homeName) && fuzzyTeam(mAwayName, awayName))
+        const reverseOrder = (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId) ||
+          (fuzzyTeam(mHomeName, awayName) && fuzzyTeam(mAwayName, homeName))
+        return sameOrder || reverseOrder
+      }).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
     : []
 
   return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }

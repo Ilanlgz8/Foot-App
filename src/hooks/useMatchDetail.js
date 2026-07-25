@@ -854,6 +854,20 @@ export function useFdLineups(match) {
 // accroc réseau.
 const H2H_TTL = 24 * 60 * 60 * 1000
 
+// ⚠️ AJOUT (25/07, constat utilisateur : "Historique" affiche des résultats
+// différents selon qu'on ouvre le match depuis Programme ou depuis Accueil,
+// pour le MÊME match) : les 6 grands championnats sont sourcés ESPN dans
+// Accueil (voir preferEspnForMajors, useMatchs.js/useTodayMatches.js — choix
+// délibéré pour réduire les appels FD.org) — `match.id` reçu ici vaut alors
+// `espn-PL-401584580` (voir normalizeEvent, espnAdapter.js), PAS un vrai id
+// numérique football-data.org. L'appel `/v4/matches/${match.id}/head2head`
+// ci-dessous échouait donc silencieusement à chaque fois dans ce cas (id
+// invalide côté FD.org) — un appel FD.org gaspillé pour rien, en plus de
+// polluer potentiellement le cache local avec un résultat vide. Skip net :
+// pas la peine de taper FD.org avec un id qu'on sait invalide, le repli
+// compMatches (voir useH2HRows, MatchModal.jsx) prend le relais.
+const isRealFdMatchId = id => /^\d+$/.test(String(id ?? ''))
+
 export function useH2H(match) {
   const key       = `h2h_${match?.id}`
   const cachedData = match?.id ? readCacheStale(key) : null
@@ -861,7 +875,7 @@ export function useH2H(match) {
 
   return useQuery({
     queryKey: ['h2h-fd', match?.id],
-    enabled:  !!match?.id,
+    enabled:  !!match?.id && isRealFdMatchId(match.id),
     staleTime: 60 * 60_000,
     retry: 1,
     initialData:          cachedData ?? undefined,
