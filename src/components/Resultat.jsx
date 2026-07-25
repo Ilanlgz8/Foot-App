@@ -534,10 +534,15 @@ function Resultats() {
             </div>
           )}
 
-          {error && <p className="resultats__state resultats__state--error">{error}</p>}
+          {/* ⚠️ AJOUT `matches.length === 0` (25/07, même bug que Programme —
+              Match.jsx — voir son commentaire détaillé) : une revalidation en
+              arrière-plan peut échouer (429 transitoire, budget global) alors
+              qu'on a déjà des résultats valides à l'écran — ne plus jamais
+              remplacer un affichage valide par une erreur. */}
+          {error && matches.length === 0 && <p className="resultats__state resultats__state--error">{error}</p>}
 
           {/* Vue par journée */}
-          {!loading && !error && viewMode === 'journee' && grouped.length > 0 && (
+          {!loading && viewMode === 'journee' && grouped.length > 0 && (
             searchNorm ? (
               filteredMatches.length === 0 ? (
                 <p className="resultats__state">Aucun résultat ne correspond à « {search} ».</p>
@@ -567,7 +572,7 @@ function Resultats() {
           {!loading && !error && viewMode === 'poule' && wcGroups.length > 0 && searchNorm && filteredWcGroups.length === 0 && (
             <p className="resultats__state">Aucune équipe ne correspond à « {search} ».</p>
           )}
-          {!loading && !error && viewMode === 'poule' && wcGroups.length > 0 && (
+          {!loading && viewMode === 'poule' && wcGroups.length > 0 && (
             <div className="matchs__wcBoard">
               {filteredWcGroups.map(g => {
                 const gMatches = matchesByGroup.get(g) ?? []

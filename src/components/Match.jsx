@@ -1209,7 +1209,7 @@ function Matchs() {
           </div>
 
           {/* ═══ Vue Poules ═══ */}
-          {!loading && !error && isWC && wcView === 'poules' && (
+          {!loading && isWC && wcView === 'poules' && (
             <>
               {loading && (
                 <div className="matchs__state"><div className="matchs__spinner" /><p>Chargement...</p></div>
@@ -1249,7 +1249,7 @@ function Matchs() {
                   })}
                 </div>
               )}
-              {!loading && wcGroups.length === 0 && (
+              {!loading && !error && wcGroups.length === 0 && (
                 <p className="matchs__state">Aucune poule disponible.</p>
               )}
             </>
@@ -1259,7 +1259,18 @@ function Matchs() {
           {loading && (!hasToggle || wcView !== 'poules') && (
             <div className="matchs__state"><div className="matchs__spinner" /><p>Chargement des matchs...</p></div>
           )}
-          {error && <p className="matchs__state matchs__state--error">{error}</p>}
+          {/* ⚠️ AJOUT `matches.length === 0` (25/07, constat utilisateur : Premier
+              League s'affichait puis "Veuillez patienter" ~2s après) : une
+              revalidation en arrière-plan (refetchOnMount:'always', voir
+              useMatchs.js) peut échouer (429 transitoire, budget global partagé
+              avec d'autres utilisateurs) alors qu'on a DÉJÀ des matchs valides à
+              l'écran (cache/fetch précédent réussi) — React Query garde `data`
+              intact même quand une revalidation échoue, mais ce bandeau
+              s'affichait quand même dès que `error` passait à vrai, masquant
+              des données pourtant toujours bonnes. Ne plus jamais remplacer un
+              affichage valide par une erreur : le message n'apparaît maintenant
+              que si on n'a VRAIMENT rien d'autre à montrer. */}
+          {error && matches.length === 0 && <p className="matchs__state matchs__state--error">{error}</p>}
 
           {/* ═══ Vue Phase finale (bracket) ═══ */}
           {hasToggle && wcView === 'bracket' && (
@@ -1293,7 +1304,7 @@ function Matchs() {
           )}
 
           {/* ═══ Vue Par journée ═══ */}
-          {!loading && !error && (!hasToggle || wcView === 'matchs') && (
+          {!loading && (!hasToggle || wcView === 'matchs') && (
             <div className="matchs__searchWrap">
               <input
                 type="text"
@@ -1308,7 +1319,7 @@ function Matchs() {
             </div>
           )}
 
-          {!loading && !error && (!hasToggle || wcView === 'matchs') && searchNorm && (
+          {!loading && (!hasToggle || wcView === 'matchs') && searchNorm && (
             filteredSearchMatches.length === 0 ? (
               <p className="matchs__state">Aucun match à venir ne correspond à « {search} ».</p>
             ) : (
@@ -1318,7 +1329,7 @@ function Matchs() {
             )
           )}
 
-          {!loading && !error && (!hasToggle || wcView === 'matchs') && !searchNorm && total > 0 && (
+          {!loading && (!hasToggle || wcView === 'matchs') && !searchNorm && total > 0 && (
             <>
               <div className="matchs__nav">
                 <button className="matchs__navBtn"
