@@ -461,6 +461,27 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
   // changeants) plutôt que sur SCHEDULED (1h), pour ne pas garder une donnée
   // "à jour" trop longtemps du point de vue de Résultats.
   const ttl         = options.staleTime ?? (isClubShared ? TTL.FINISHED : (TTL[status] ?? 30 * 60 * 1000))
+  // ⚠️ AJOUT (25/07, constat utilisateur : LaLiga "Aucun match à venir" ~2min
+  // après un retour sur l'app, seule cette compét, disparu tout seul après).
+  // Bug trouvé : `ttl` ci-dessus sert à DEUX choses différentes qui n'ont
+  // aucune raison d'être identiques — le staleTime React Query (2min pour
+  // isClubShared, volontairement court) ET le TTL DISQUE de writeCache(). Or
+  // purgeExpiredCache() (appelé une fois à chaque lancement, main.jsx)
+  // SUPPRIME PHYSIQUEMENT toute entrée dont `exp` est dépassé — avec un TTL
+  // disque de 2min, le cache RAW de CHAQUE compét club repart de zéro à
+  // pratiquement CHAQUE relance de l'app (PWA relancée après avoir été tuée en
+  // arrière-plan par l'OS, très fréquent sur mobile), pile le filet de
+  // sécurité que readStaleWithMigration()/readCacheStale() sont censés fournir
+  // "peu importe l'âge" (voir localCache.js) — exactement le même principe déjà
+  // appliqué aux caches dédiés current/lastSeason plus haut (24h), qui eux
+  // survivent. Résultat concret : si le tout premier refetch après une relance
+  // tombe sur un 429/403 transitoire (budget FD.org partagé, plusieurs compéts
+  // consultées d'affilée), il n'y a plus rien à servir en repli → flash vide,
+  // qui se résout tout seul dès qu'un refetch suivant réussit. Honnêteté : je
+  // n'ai pas pu reproduire ce cas précis en direct pour le confirmer à 100%,
+  // mais c'est un vrai bug indépendant de la cause exacte de ce signalement —
+  // le TTL disque DOIT être long comme partout ailleurs dans ce fichier.
+  const diskTtl     = isClubShared ? 24 * 3600 * 1000 : ttl
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur, même jour que le partage de cache :
   // "je relance l'app complètement, je vais dans Programme, ça me met
@@ -493,7 +514,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
       merged.push(m)
     }
     if (merged.length === 0) return null
-    writeCache(key, merged, ttl) // auto-guérison : la prochaine lecture retombe directement sur la clé RAW
+    writeCache(key, merged, diskTtl) // auto-guérison : la prochaine lecture retombe directement sur la clé RAW
     return merged
   }
 
@@ -537,7 +558,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
           if (stale) return stale
           throw new Error('Erreur API')
         }
-        if (matches.length > 0) writeCache(key, matches, ttl)
+        if (matches.length > 0) writeCache(key, matches, diskTtl)
         return matches.length > 0 ? matches : (readStaleWithMigration() ?? [])
       } catch (err) {
         const stale = readStaleWithMigration()
