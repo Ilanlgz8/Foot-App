@@ -346,7 +346,20 @@ function Accueil() {
     for (const m of results) if (m.competition?.code) codes.add(m.competition.code)
     return [...codes]
   }, [matches, results])
-  const { formMap } = useTeamFormMulti(formCompCodes)
+  // ⚠️ AJOUT matchesByComp (24/07, trouvé via l'audit chronologique demandé
+  // par l'utilisateur) : déjà retourné par useTeamFormMulti mais jamais
+  // récupéré ici jusqu'à présent — MatchPoster.jsx (posters mobile, un par
+  // match affiché) appelait donc SA PROPRE useTeamForm(compCode) en plus,
+  // indépendamment, pour obtenir formMap ET compMatches. Comme les posters
+  // sont rendus dans un .map() (potentiellement plusieurs compétitions
+  // différentes affichées le même jour), c'était un vrai risque de rafale de
+  // requêtes FD.org simultanées à chaque affichage de l'Accueil — le
+  // stagger déjà mis en place dans useTeamFormMulti (voir useTeamForm.js)
+  // ne protège QUE ses propres requêtes, pas ces appels indépendants qui le
+  // contournaient complètement. Fix : formMap ET matchesByComp descendent
+  // maintenant en props jusqu'à MatchPoster (voir MatchCard.jsx/
+  // MatchPoster.jsx), qui n'a plus besoin de refetch pour rien.
+  const { formMap, matchesByComp } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
@@ -863,6 +876,7 @@ function Accueil() {
               onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
               onLiveClick={m => navigate(`/live/${m.id}`)}
               formMap={formMap}
+              matchesByComp={matchesByComp}
             />
           </div>
 

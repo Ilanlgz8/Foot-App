@@ -167,6 +167,22 @@ export function useWcKnockout(compCode = 'WC') {
     queryKey: ['wc-knockout', compCode],
     enabled: BRACKET_COMPS.has(compCode),
     queryFn: async () => {
+      // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+      // l'utilisateur) : Match.jsx (Programme) monte useMatches(selectedComp,
+      // 'SCHEDULED') ET useWcKnockout(selectedComp) EN MÊME TEMPS pour WC/EC —
+      // 2 hooks indépendants qui tapent LA MÊME URL FD.org
+      // (`/matches?season=${season}`) au même instant, sur le même verrou
+      // d'espacement global. Contrairement aux collisions déjà corrigées plus
+      // haut dans ce fichier (2 appels DANS le même hook, où on peut savoir si
+      // le 1er était "fresh"), ces 2 hooks ne se voient pas l'un l'autre —
+      // impossible de conditionner le délai sur un `fresh` partagé sans
+      // restructurer les deux fichiers. Délai fixe court à la place : laisse
+      // le temps à useMatches (contenu principal de la page) de partir en
+      // premier, réduit le cas garanti de double appel simultané. Risque
+      // actuellement faible (CM 2026 terminée, pas d'Euro cette année — voir
+      // commentaire plus haut) donc pas justifié de complexifier davantage
+      // pour un cas aujourd'hui dormant.
+      await new Promise(res => setTimeout(res, 4_000))
       // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :
       // football-data.org résout la "saison courante" comme "celle qui a la
       // date de début la plus récente", une règle ambiguë pour une compétition

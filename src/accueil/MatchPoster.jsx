@@ -14,10 +14,30 @@ function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MatchPoster({ match, espnScore = null, onClick }) {
-  // Vrai formMap depuis football-data.org pour cette compétition
+// ⚠️ AJOUT formMap/compMatches en props (24/07, trouvé via l'audit
+// chronologique demandé par l'utilisateur) : ce composant est rendu dans un
+// .map() par match affiché (voir MatchCard.jsx/MatchPanel) — l'ancien
+// `useTeamForm(compCode)` local ici tapait FD.org indépendamment PAR CARTE,
+// en plus du useTeamFormMulti déjà calculé et stagger côté Accueil.jsx pour
+// TOUTES les compétitions affichées. Si l'Accueil montre plusieurs
+// championnats le même jour (fréquent), c'était potentiellement autant de
+// requêtes FD.org simultanées que de compétitions différentes visibles,
+// sans passer par le stagger de useTeamFormMulti (contournement complet,
+// pas juste une redondance réseau). Accueil.jsx calcule déjà cette donnée
+// une seule fois pour tous les posters — elle descend maintenant en props.
+// Repli sur l'ancien comportement (fetch local) UNIQUEMENT si le composant
+// est utilisé ailleurs sans ces props (aucun autre call site connu
+// actuellement, mais garde la robustesse du composant si réutilisé).
+export function MatchPoster({ match, espnScore = null, onClick, formMap: formMapProp, compMatches: compMatchesProp }) {
   const compCode = match.competition?.code ?? null
-  const { formMap, compMatches } = useTeamForm(compCode)
+  const hasPropsData = formMapProp !== undefined
+  // Hook TOUJOURS appelé (Rules of Hooks) — mais désactivé (enabled=false)
+  // dès que les données arrivent déjà en props, pour ne jamais déclencher de
+  // requête FD.org redondante avec celle déjà faite par l'appelant (voir
+  // useTeamFormMulti, Accueil.jsx).
+  const fetched = useTeamForm(compCode, 0, !hasPropsData)
+  const formMap     = hasPropsData ? formMapProp     : fetched.formMap
+  const compMatches = hasPropsData ? (compMatchesProp ?? []) : fetched.compMatches
   // Historique complet toutes compétitions confondues (déjà chargé pour la
   // fiche d'un match précis via le même hook, voir MatchModal.jsx) — corrige
   // les pronos identiques en début de saison, quand compMatches (saison en

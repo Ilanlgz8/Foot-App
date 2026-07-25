@@ -401,7 +401,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
 // elle-même reste affichée à la même place et change juste d'affichage (voir
 // MatchCard : plus de noLive ici), au lieu de disparaître au profit d'un
 // widget séparé ailleurs sur l'Accueil (demande utilisateur).
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null }) {
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null, matchesByComp = null }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -435,6 +435,8 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                   match={match}
                   espnScore={espnScores[match.id] ?? null}
                   onClick={clickHandler}
+                  formMap={formMap}
+                  compMatches={matchesByComp?.[match.competition?.code] ?? null}
                 />
               )
             })}

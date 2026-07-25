@@ -176,9 +176,15 @@ async function fetchTeamForm(selectedComp) {
 // Classement.jsx ET ClassementTab (MatchModal.jsx) appellent useStandings +
 // useTeamForm pour LA MÊME compétition quasi au même instant, sans le savoir
 // l'un de l'autre, sur le même verrou d'espacement FD.org global. Défaut à 0
-// (comportement inchangé pour MatchPage.jsx/MatchPoster.jsx/MatchDuJourCard.jsx/
+// (comportement inchangé pour MatchPage.jsx/MatchDuJourCard.jsx/
 // LiveMatchPage.jsx, qui n'appellent jamais useStandings en parallèle).
-export function useTeamForm(selectedComp, delayMs = 0) {
+// ⚠️ AJOUT `enabled` (24/07, même audit) : permet à un appelant qui reçoit
+// déjà formMap/compMatches tout faits via props (voir MatchPoster.jsx) de
+// désactiver la requête réseau de CETTE instance sans violer les Rules of
+// Hooks (le Hook doit toujours être appelé, juste avec la query désactivée)
+// — évite un fetch FD.org redondant avec celui déjà fait ailleurs (ex.
+// useTeamFormMulti côté Accueil.jsx) pour la même compétition.
+export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
   const cacheKey = `teamform2_${selectedComp}`
 
   const { data, isLoading } = useQuery({
@@ -202,7 +208,7 @@ export function useTeamForm(selectedComp, delayMs = 0) {
       result.then(r => writeCache(cacheKey, r, FORM_STALE)).catch(() => {})
       return result
     },
-    enabled:              !!selectedComp,
+    enabled:              !!selectedComp && enabled,
     initialData:          readCache(cacheKey) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(cacheKey),
     staleTime:            FORM_STALE,
