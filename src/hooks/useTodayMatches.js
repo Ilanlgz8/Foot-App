@@ -359,7 +359,13 @@ export function useRecentDaysMatches(numDays) {
           },
           initialData:          readCacheStale(espnCacheKey) ?? undefined,
           initialDataUpdatedAt: getCacheSavedAt(espnCacheKey),
-          staleTime:            30 * 60 * 1000,
+          // Jour PASSÉ = matchs FINISHED, immuables pour toujours. 30min était
+          // un copier-coller du TTL "aujourd'hui" — ça rendait la donnée
+          // "stale" dès l'ouverture de l'app (initialDataUpdatedAt = date du
+          // dernier vrai fetch, presque toujours >30min) et redéclenchait un
+          // refetch réseau à CHAQUE relance, alors que readCacheStale (7j)
+          // suffit largement. Aligné sur le TTL du cache disque (25/07).
+          staleTime:            7 * 24 * 60 * 60 * 1000,
           retry:                false,
         },
         {
@@ -377,7 +383,11 @@ export function useRecentDaysMatches(numDays) {
           },
           initialData:          readCacheStale(wcEcCacheKey) ?? undefined,
           initialDataUpdatedAt: getCacheSavedAt(wcEcCacheKey),
-          staleTime:            30 * 60 * 1000,
+          // Même raison que le staleTime ESPN ci-dessus, mais c'est ICI que ça
+          // comptait vraiment pour l'utilisateur : c'est ce staleTime qui
+          // déclenchait un appel FD.org à chaque relance de l'app pour des
+          // résultats WC/EC déjà terminés et jamais amenés à changer (25/07).
+          staleTime:            7 * 24 * 60 * 60 * 1000,
           retry:                false,
         },
       ]
