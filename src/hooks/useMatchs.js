@@ -5,6 +5,7 @@ import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
+import { shouldQueryWcEc } from '../utils/wcEcGate'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
@@ -398,6 +399,11 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   // collision que fetchClubMatchesRaw plus haut (verrou d'espacement global
   // ~7,5s), jamais corrigée ici jusqu'à présent. Même remède : n'attendre
   // que si la tentative précédente a réellement tapé FD.org (primaryFresh).
+  // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org ci-dessous
+  // (jusqu'à 3 appels) quand on sait déjà qu'aucun match WC/EC n'existe dans
+  // une large fenêtre — cas quasi permanent hors Mondial/Euro.
+  if (!(await shouldQueryWcEc())) return []
+
   let matches
   const wcSeason = new Date().getFullYear()
   if (status === 'SCHEDULED') {

@@ -3,6 +3,7 @@ import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localC
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
+import { shouldQueryWcEc } from '../utils/wcEcGate'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 
@@ -103,6 +104,10 @@ function prevDateStr(date) {
 }
 
 async function fetchWcEcPortion(date, delayMs = 0) {
+  // Portillon partagé (voir wcEcGate.js) : évite ces 2 appels FD.org quand on
+  // sait déjà (vérifié il y a moins de 6h) qu'aucun match WC/EC n'existe dans
+  // une large fenêtre — cas quasi permanent hors Mondial/Euro.
+  if (!(await shouldQueryWcEc())) return []
   if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
   const prevDate = prevDateStr(date)
   const settled = await Promise.allSettled([

@@ -1,11 +1,12 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
-import { readCache, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { outcomeForTeam } from '../utils/matchUtils'
 import { getClubSeason } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { shouldQueryWcEc } from '../utils/wcEcGate'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
@@ -107,6 +108,19 @@ async function fetchTeamForm(selectedComp) {
   // courante plutôt qu'une valeur figée, pas d'édition Euro connue à l'avance
   // ici contrairement à WC 2026.
   const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
+
+  // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org ci-dessous
+  // (jusqu'à 2 appels) quand on sait déjà qu'aucun match WC/EC n'existe dans
+  // une large fenêtre — cas quasi permanent hors Mondial/Euro. Repli sur le
+  // cache existant (même clé que useTeamForm/useTeamFormMulti,
+  // teamform2_${comp}) plutôt qu'un objet vide, pour ne jamais régresser une
+  // forme déjà affichée.
+  if (!isClub && !(await shouldQueryWcEc())) {
+    const stale = readCacheStale(`teamform2_${selectedComp}`)
+    if (stale) return stale
+    return { formMap: {}, matches: [], isLastSeason: false }
+  }
+
   const seasonParam = selectedComp === 'WC' ? '?season=2026'
     : selectedComp === 'EC' ? `?season=${new Date().getFullYear()}`
     : ''

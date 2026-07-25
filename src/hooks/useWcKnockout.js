@@ -4,6 +4,7 @@ import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fetchEspnCupMatches } from '../utils/espnAdapter'
 import { DOMESTIC_CUPS } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
+import { shouldQueryWcEc } from '../utils/wcEcGate'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
@@ -182,6 +183,12 @@ export function useWcKnockout(compCode = 'WC') {
       // actuellement faible (CM 2026 terminée, pas d'Euro cette année — voir
       // commentaire plus haut) donc pas justifié de complexifier davantage
       // pour un cas aujourd'hui dormant.
+      // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org
+      // ci-dessous (jusqu'à 2 appels) quand on sait déjà qu'aucun match WC/EC
+      // n'existe dans une large fenêtre — cas quasi permanent hors Mondial/
+      // Euro. Repli sur le cache stale existant, comme le catch plus bas.
+      if (!(await shouldQueryWcEc())) return readCacheStale(cacheKey) ?? EMPTY_ROUNDS
+
       await new Promise(res => setTimeout(res, 4_000))
       // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :
       // football-data.org résout la "saison courante" comme "celle qui a la
