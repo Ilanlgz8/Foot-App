@@ -164,7 +164,20 @@ async function fetchTeamForm(selectedComp) {
     const fallbackIsRecent = newestFallbackTs > 0
       && (Date.now() - newestFallbackTs) / 86_400_000 <= MAX_FALLBACK_AGE_DAYS
     if (fallbackMatches.length >= MIN_LEAGUE_GAMES && fallbackIsRecent) {
-      return { formMap: buildFormMap(fallbackMatches), matches: fallbackMatches, isLastSeason: true }
+      // ⚠️ AJOUT (25/07, demande explicite utilisateur) : formMap (losanges
+      // de "forme récente" affichés sous chaque équipe) ne doit PLUS venir de
+      // la saison précédente — aucune saison club n'a encore commencé
+      // (intersaison), et les effectifs/état de forme ont pu changer entre-
+      // temps (mercato) : mieux vaut ne rien afficher que des résultats d'une
+      // saison terminée présentés comme "récents". `matches` (saison en
+      // cours, quasi vide en ce moment) donne donc un formMap vide → aucun
+      // losange affiché, jusqu'aux premiers matchs de la vraie saison 2026/27.
+      // `matches` RETOURNÉ (compMatches, 2e champ) reste `fallbackMatches`
+      // SANS changement : le modèle de pronostic/cotes (calcPronoAdvanced) et
+      // le H2H (useH2HRows, ailleurs) continuent d'utiliser la saison passée
+      // comme avant — seul l'affichage visuel de la forme est concerné,
+      // demande explicite de l'utilisateur ("on garde toutes les h2h").
+      return { formMap: buildFormMap(matches), matches: fallbackMatches, isLastSeason: true }
     }
   }
 
