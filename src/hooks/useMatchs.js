@@ -242,6 +242,26 @@ async function fetchClubMatchesRaw(selectedComp) {
     // part alors immédiatement, sans latence ajoutée.
     if (primaryFresh) await new Promise(r => setTimeout(r, 6_000))
 
+    // ⚠️ AJOUT cache dédié long terme (25/07, constat utilisateur : "on
+    // récupère les résultats de la saison juste avant, ça devrait pas
+    // repoll, ça devrait rester en cache le temps que la saison qui arrive
+    // commence") — root cause du symptôme qui persistait sur Résultats après
+    // les fix précédents : ces matchs FINISHED de la saison passée sont de
+    // l'HISTORIQUE, définitivement figé — aucune raison de les re-taper à
+    // chaque montage de page (refetchOnMount:'always'). Avant ce fix, un
+    // simple 429 transitoire sur CET appel précis (repli optionnel, contenu
+    // du RAW cache PARTAGÉ avec Programme — voir plus haut) effaçait purement
+    // et simplement les résultats déjà affichés au prochain refetch réussi
+    // (le nouveau RAW ne contenait plus que les matchs SCHEDULED de `current`,
+    // sans erreur levée nulle part donc invisible pour le filet de secours
+    // classique). Cache dédié à part (clé propre, jamais mélangée au RAW
+    // partagé) : écrit dès qu'un vrai fetch réussit, relu comme repli
+    // immédiat si CE fetch précis échoue — les résultats affichés à l'écran
+    // ne peuvent plus jamais régresser à cause d'un 429 ponctuel sur ce seul
+    // appel. Aucun risque de rester périmé : `hasFinished` redevient vrai dès
+    // que la vraie saison 2026/27 produit son 1er résultat, cette branche
+    // entière (et donc ce cache) cesse alors d'être utilisée.
+    const lastSeasonKey = `matches_lastSeason_${selectedComp}`
     let lastSeason = null
     try {
       lastSeason = await tryFetch(
@@ -256,6 +276,14 @@ async function fetchClubMatchesRaw(selectedComp) {
       // cas où `current` LUI-MÊME a échoué (voir catch plus haut) — seul cas
       // où on n'a vraiment rien à montrer.
       void e
+    }
+    if (lastSeason != null && lastSeason.length > 0) {
+      writeCache(lastSeasonKey, lastSeason, 24 * 3600 * 1000)
+    } else {
+      // Échec ou réponse vide cette fois-ci : on retombe sur la dernière
+      // version connue plutôt que de perdre ces résultats (readCacheStale
+      // sert la donnée peu importe son âge — voir localCache.js).
+      lastSeason = readCacheStale(lastSeasonKey)
     }
     if (lastSeason != null && lastSeason.length > 0) {
       const seen = new Set(all.map(m => m.id))
