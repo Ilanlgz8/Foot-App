@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
 import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
+import { prefetchTeamForm } from '../hooks/useTeamForm'
 import { useWcKnockout, useCupKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -167,6 +169,7 @@ const teamName = (team) =>
    Résultat). Les listes ici restent courtes, le coût eager est négligeable. */
 function MatchRow({ match, index, inModal = false }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { isFavorite } = useFavoriteClubs()
   const homeIsFav = isFavorite(match.homeTeam?.id)
   const awayIsFav = isFavorite(match.awayTeam?.id)
@@ -183,7 +186,16 @@ function MatchRow({ match, index, inModal = false }) {
     <div
       className={`matchs__match ${inModal ? 'matchs__match--modal' : ''}${isUpcoming ? ' matchs__match--upcoming' : ''}`}
       style={{ borderTop: index === 0 ? 'none' : undefined }}
-      onClick={() => navigate(`/match/${match.id}`, { state: { match } })}
+      onClick={() => {
+        // ⚠️ AJOUT (25/07, demande explicite utilisateur) : Programme ne
+        // précharge pas la forme (contrairement à Accueil) — la fiche match
+        // partait donc toujours d'un chargement à froid pour compMatches
+        // (prono/Stats saison/H2H, voir useTeamForm dans MatchPage.jsx).
+        // Précharge ciblée sur CE match précis, au moment du clic — jamais
+        // pour les matchs jamais cliqués.
+        prefetchTeamForm(queryClient, match.competition?.code)
+        navigate(`/match/${match.id}`, { state: { match } })
+      }}
     >
       {isFav && <FavStarBadge variant="row" color={favColor} />}
       {match.isCup && <span className="matchs__cupBadge">{match.competition?.name}</span>}

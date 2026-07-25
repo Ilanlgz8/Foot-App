@@ -251,6 +251,32 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
   }
 }
 
+// ⚠️ AJOUT (25/07, demande explicite utilisateur) : Programme (Match.jsx) ne
+// précharge PAS la forme (pas de losanges affichés là-bas, contrairement à
+// Accueil/useTeamFormMulti) — cliquer une card déclenche donc un tout premier
+// chargement à froid sur la fiche match (useTeamForm(compId), voir
+// MatchPage.jsx), dont dépendent aussi le prono, "Stats saison" et le repli
+// H2H. Plutôt que précharger la forme de TOUTES les compétitions affichées
+// dans la liste (gaspillage FD.org pour des matchs jamais cliqués — écarté
+// explicitement, voir discussion), ce helper précharge UNIQUEMENT la
+// compétition du match sur lequel l'utilisateur vient de cliquer, au moment
+// précis du clic (juste avant la navigation) — même queryKey que useTeamForm
+// ci-dessus, donc la fiche match retrouve directement le résultat déjà en
+// vol/en cache au montage, sans le redemander.
+export function prefetchTeamForm(queryClient, selectedComp) {
+  if (!selectedComp) return
+  const cacheKey = `teamform2_${selectedComp}`
+  queryClient.prefetchQuery({
+    queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
+    queryFn: async () => {
+      const result = await fetchTeamForm(selectedComp)
+      writeCache(cacheKey, result, FORM_STALE)
+      return result
+    },
+    staleTime: FORM_STALE,
+  })
+}
+
 // ── useTeamFormMulti ──────────────────────────────────────────────────────
 // L'Accueil affiche des matchs de plusieurs championnats mélangés (contrairement
 // à Classement/MatchModal/MatchPoster qui sont toujours dans le contexte d'UNE
