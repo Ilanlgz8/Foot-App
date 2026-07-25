@@ -73,7 +73,17 @@ function getKv() {
 // qu'1 appel/12s sur le fil, qu'il y en ait 3 ou 30 en file d'attente).
 // Espacement (7,5s) toujours dérivé automatiquement du plafond, aucune
 // rafale possible par construction, quel que soit MINUTE_CAP.
-const MINUTE_CAP = 8
+// ⚠️ REMONTÉ à 10/min (25/07, demande explicite utilisateur) : 10/min est la
+// vraie limite officielle du plan gratuit football-data.org — jusqu'ici on
+// restait volontairement 20% en dessous (8/min) par marge de sécurité.
+// L'historique du 23/07 (voir ci-dessus) a déjà conclu que le débit exact
+// (5 vs 8/min) n'avait pas d'effet mesurable sur les 403 rencontrés ce
+// jour-là — le compte semblait bloqué au niveau compte, indépendamment du
+// plafond choisi. Passer à 10/min ne réduit donc pas une marge qui s'était
+// avérée protectrice dans les faits ; ça se contente d'utiliser le vrai
+// budget disponible plutôt que d'en laisser 20% inutilisé. SPACING_MS suit
+// automatiquement (6s au lieu de 7,5s, dérivé juste en dessous).
+const MINUTE_CAP = 10
 const STALE_TTL  = 24 * 3600  // copie de secours longue durée, servie si budget épuisé ou 429 réel
 const DOWN_TTL   = 70  // un peu plus d'1min : si FD.org renvoie un vrai 429, on arrête d'insister le temps que sa propre fenêtre se réinitialise
 // ⚠️ AJOUT (incident réel du 20/07 : rafale de 403 Forbidden sur TOUS les
