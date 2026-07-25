@@ -54,25 +54,22 @@ export function useLiveMatches() {
       if (isEspnWorking()) return []
 
       try {
-        const [r1, r2] = await Promise.all([
-          fdFetch(fdUrl(`/api/v4/matches?status=IN_PLAY&competitions=${TRACKED_FD_COMPS}`)),
-          fdFetch(fdUrl(`/api/v4/matches?status=PAUSED&competitions=${TRACKED_FD_COMPS}`)),
-        ])
+        // ⚠️ FUSION (24/07, trouvé via l'audit chronologique demandé par
+        // l'utilisateur) : 2 appels FD.org simultanés (IN_PLAY + PAUSED) pour
+        // la même info, sur le même verrou d'espacement global — vérifié en
+        // direct sur l'API réelle que `status=` accepte une liste séparée
+        // par virgules (`IN_PLAY,PAUSED`, filters.status devient bien un
+        // tableau des 2 valeurs) : 1 seul appel au lieu de 2, aucun
+        // changement de comportement. Chemin déjà rare (uniquement quand
+        // ESPN est perçu down) mais gain net sans aucun risque.
+        const res = await fdFetch(fdUrl(`/api/v4/matches?status=IN_PLAY,PAUSED&competitions=${TRACKED_FD_COMPS}`))
 
-        if (r1.status === 429 || r2.status === 429) throw new Error('429')
-        if (r1.status === 403 || r2.status === 403) throw new Error('403')
+        if (res.status === 429) throw new Error('429')
+        if (res.status === 403) throw new Error('403')
 
-        const live   = r1.ok ? (await r1.json()).matches ?? [] : []
-        const paused = r2.ok ? (await r2.json()).matches ?? [] : []
+        const result = res.ok ? (await res.json()).matches ?? [] : []
 
-        ;[...live, ...paused].forEach(trackMatchState)
-
-        const seen = new Set()
-        const result = [...live, ...paused].filter(m => {
-          if (seen.has(m.id)) return false
-          seen.add(m.id)
-          return true
-        })
+        result.forEach(trackMatchState)
 
         // Alimenter liveTracker → widget visible même quand ESPN est down
         result.forEach(m => markLive(m))
