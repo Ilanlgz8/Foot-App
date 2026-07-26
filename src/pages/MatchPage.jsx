@@ -709,7 +709,10 @@ export default function MatchPage() {
   // replié comme 3e sous-onglet dans StatsSubTabs (voir MatchModal.jsx) —
   // showH2HTab pilote maintenant seulement l'affichage du bouton "Historique"
   // à l'intérieur de "Statistiques".
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches)
+  // delayMs=6_000 (26/07, audit anti-429) : useMatchDetail(match.id), plus
+  // haut sur cette page, tape déjà FD.org au même montage — voir commentaire
+  // détaillé dans useMatchDetail.js (useH2H).
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches, 6_000)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
   const TABS = ['statistiques', 'compos', 'classement']
 

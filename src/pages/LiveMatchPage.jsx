@@ -375,7 +375,11 @@ export default function LiveMatchPage() {
   // connue n'est confirmée (même logique que MatchPage). Replié comme 3e
   // sous-onglet dans StatsSubTabs au lieu d'un onglet top-level séparé (voir
   // MatchModal.jsx + MatchPage.jsx pour le même changement).
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches)
+  // delayMs=6_000 (26/07, audit anti-429) : useMatchInfo (plus haut sur cette
+  // page) appelle useMatchDetail(match.id) SANS condition (même si le panneau
+  // "infos" n'est pas ouvert) — tape déjà FD.org au même montage, voir
+  // commentaire détaillé dans useMatchDetail.js (useH2H).
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches, 6_000)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
   const TABS = ['stats', 'compos', 'classement']
 

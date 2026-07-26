@@ -141,13 +141,23 @@ function Classement() {
   const hasMatchToday = !wcSchedLoading && !wcFinLoading &&
     [...wcSched, ...wcFin].some(m => m.utcDate && new Date(m.utcDate).toLocaleDateString('sv-SE') === todayStr)
 
-  // ⚠️ delayMs (24/07, audit chronologique) : ces 3 hooks tapent FD.org pour
-  // LA MÊME compétition au même instant à chaque changement de championnat —
-  // espacés pour ne pas se marcher dessus sur le verrou global (voir
-  // commentaires dans useTeamForm.js/useScorers.js).
+  // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429" demandé par
+  // l'utilisateur) : le stagger précédent (2s/4s) supposait qu'espacer les 3
+  // hooks entre eux suffisait — faux : le verrou global FD.org (spaceKey
+  // unique côté serveur, voir SPACING_MS/api/football.js) dure 6s à partir du
+  // 1er appel réel (useStandings, t=0), pas une file d'attente. 2s et 4s sont
+  // TOUS LES DEUX < 6s : sur un championnat jamais consulté cette session
+  // (pas de repli stale possible), useTeamForm (t=2s) ET useScorers (t=4s)
+  // tombaient encore DANS la fenêtre de verrouillage posée par useStandings
+  // et se faisaient bloquer (429) — le stagger ne protégeait donc de rien de
+  // concret, exactement la même classe de bug que le portillon WC/EC corrigé
+  // juste avant. Espacés maintenant à des multiples exacts de 6s (0/6s/12s) :
+  // chaque hook démarre son propre appel réel seulement après l'expiration
+  // garantie du verrou posé par le précédent, plus aucune collision possible
+  // par construction (même logique que SPACING_MS lui-même).
   const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
-  const { formMap } = useTeamForm(selectedComp, 2_000)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 4_000)
+  const { formMap } = useTeamForm(selectedComp, 6_000)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement

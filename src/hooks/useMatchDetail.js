@@ -868,7 +868,18 @@ const H2H_TTL = 24 * 60 * 60 * 1000
 // compMatches (voir useH2HRows, MatchModal.jsx) prend le relais.
 const isRealFdMatchId = id => /^\d+$/.test(String(id ?? ''))
 
-export function useH2H(match) {
+// ⚠️ AJOUT `delayMs` (26/07, audit "élimine tous les 429" demandé par
+// l'utilisateur) : MatchPage.jsx et LiveMatchPage.jsx appellent CHACUN, au
+// montage de la fiche match, useMatchDetail(match.id) (directement ou via
+// useMatchInfo) ET useH2HRows→useH2H pour le MÊME match — 2 endpoints FD.org
+// DIFFÉRENTS (/v4/matches/{id} vs .../head2head, donc pas de dédup React
+// Query automatique possible comme pour useFdLineups qui partage, lui, EXACTEMENT
+// la même clé que useMatchDetail) déclenchés en même temps, sans coordination,
+// sur le même verrou d'espacement global (~6s) — même classe de bug que le
+// stagger insuffisant corrigé dans Classement.jsx/MatchModal.jsx. Défaut à 0
+// (comportement inchangé pour MatchDuJourCard.jsx/MatchPoster.jsx/Accueil, qui
+// n'appellent jamais useMatchDetail en parallèle de ceci).
+export function useH2H(match, delayMs = 0) {
   const key       = `h2h_${match?.id}`
   const cachedData = match?.id ? readCacheStale(key) : null
   const cachedAt   = match?.id ? getCacheSavedAt(key) : 0
@@ -882,6 +893,7 @@ export function useH2H(match) {
     initialDataUpdatedAt: cachedAt,
     queryFn: async () => {
       try {
+        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
         const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=20`)
         if (!res.ok) {
           const stale = readCacheStale(key)

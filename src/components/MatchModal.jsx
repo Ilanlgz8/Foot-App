@@ -1185,11 +1185,12 @@ const DEFAULT_RULES = [
 const COMP_RULES = { WC: WC_RULES, FL1: DEFAULT_RULES, PL: DEFAULT_RULES, PD: DEFAULT_RULES, BL1: DEFAULT_RULES, SA: DEFAULT_RULES }
 
 export function ClassementTab({ match, compId }) {
-  // ⚠️ delayMs (24/07, audit chronologique) : même collision que dans
-  // Classement.jsx — standings+form pour LA MÊME compétition au même instant
-  // à chaque ouverture de cet onglet (voir commentaire useTeamForm.js).
+  // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429") : 2s < verrou
+  // global 6s (voir commentaire détaillé dans Classement.jsx) — insuffisant,
+  // useTeamForm pouvait encore se faire bloquer par le verrou posé par
+  // useStandings. Passé à un multiple exact de 6s.
   const { standings, groups, loading } = useStandings(compId)
-  const { formMap } = useTeamForm(compId, 2_000)
+  const { formMap } = useTeamForm(compId, 6_000)
 
   if (loading) {
     return <div style={{ padding: '4px 0' }}><ClassementSkeleton /></div>
@@ -1564,8 +1565,11 @@ function H2HBilan({ rows, match, isWC }) {
 // piloter à la fois la visibilité du bouton d'onglet "Historique" et le
 // contenu affiché (H2HTabContent) sans dupliquer la logique FD.org +
 // fallback compMatches à deux endroits.
-export function useH2HRows(match, compMatches) {
-  const { data: h2hMatches, isLoading } = useH2H(match)
+// delayMs : voir commentaire useH2H (useMatchDetail.js) — MatchPage.jsx et
+// LiveMatchPage.jsx passent 6_000 (collision avec useMatchDetail/useMatchInfo
+// au même montage), les autres appelants (Accueil) gardent le défaut 0.
+export function useH2HRows(match, compMatches, delayMs = 0) {
+  const { data: h2hMatches, isLoading } = useH2H(match, delayMs)
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
 
