@@ -140,7 +140,7 @@ async function reserveQuota(redis) {
 function getTtl(fdPath, qs) {
   if (qs.includes('status=IN_PLAY') || qs.includes('status=PAUSED')) return 0
   if (/^\/v4\/matches\/\d+$/.test(fdPath) && !qs) return 3600         // détail FT — 1h
-  if (fdPath.includes('/head2head'))             return 3600           // H2H stable — 1h
+  if (fdPath.includes('/head2head'))             return 86400          // H2H stable, change pas avant le match — 24h (relevé 26/07)
   if (qs.includes('status=FINISHED'))              return 120           // résultats — 2min
   if (fdPath.includes('/standings'))               return 120           // classements — 2min
   if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min

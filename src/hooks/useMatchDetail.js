@@ -15,6 +15,7 @@ import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 // scoreboard brut (boardComp, jamais mis en cache compact).
 import { extractMatchDetails } from '../utils/espnSummaryParse'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
+import { isRealFdMatchId } from '../utils/matchUtils'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -858,7 +859,12 @@ export function useFdLineups(match) {
 // long (24h) + repli sur la dernière copie connue en cas d'échec règle ça
 // dans le même esprit que useMatches, au lieu de renvoyer null au moindre
 // accroc réseau.
-const H2H_TTL = 24 * 60 * 60 * 1000
+// TTL relevé 24h→7j (26/07) : suite directe du fix ci-dessous — le head2head
+// d'une confrontation précise ne peut structurellement pas changer avant le
+// coup d'envoi de CE match (il ne s'agit pas d'un classement/live qui évolue),
+// donc pas besoin de revalider aussi souvent ; réduit d'autant les appels
+// FD.org (voir aussi le TTL Redis serveur associé, api/football.js).
+const H2H_TTL = 7 * 24 * 60 * 60 * 1000
 
 // ⚠️ AJOUT (25/07, constat utilisateur : "Historique" affiche des résultats
 // différents selon qu'on ouvre le match depuis Programme ou depuis Accueil,
@@ -869,10 +875,15 @@ const H2H_TTL = 24 * 60 * 60 * 1000
 // numérique football-data.org. L'appel `/v4/matches/${match.id}/head2head`
 // ci-dessous échouait donc silencieusement à chaque fois dans ce cas (id
 // invalide côté FD.org) — un appel FD.org gaspillé pour rien, en plus de
-// polluer potentiellement le cache local avec un résultat vide. Skip net :
-// pas la peine de taper FD.org avec un id qu'on sait invalide, le repli
-// compMatches (voir useH2HRows, MatchModal.jsx) prend le relais.
-const isRealFdMatchId = id => /^\d+$/.test(String(id ?? ''))
+// polluer potentiellement le cache local avec un résultat vide.
+// ⚠️ CORRIGÉ (26/07, constat utilisateur : "dans Accueil t'as que 2 h2h,
+// dans Programme t'as le vrai historique, pour le MÊME match") : avant, le
+// skip ci-dessus tombait direct sur le repli compMatches (voir useH2HRows,
+// MatchModal.jsx) — limité à UNE saison/compétition (~2 confrontations),
+// bien plus court que le vrai historique multi-saisons FD.org. Le vrai id
+// FD.org du même match EXISTE (Programme le lit directement) — voir
+// resolveFdMatchId (matchUtils.js) qui le retrouve via compMatches (déjà
+// chargé, aucun appel réseau en plus) et le fournit ici en `fdMatchIdOverride`.
 
 // ⚠️ AJOUT `delayMs` (26/07, audit "élimine tous les 429" demandé par
 // l'utilisateur) : MatchPage.jsx et LiveMatchPage.jsx appellent CHACUN, au
@@ -885,14 +896,15 @@ const isRealFdMatchId = id => /^\d+$/.test(String(id ?? ''))
 // stagger insuffisant corrigé dans Classement.jsx/MatchModal.jsx. Défaut à 0
 // (comportement inchangé pour MatchDuJourCard.jsx/MatchPoster.jsx/Accueil, qui
 // n'appellent jamais useMatchDetail en parallèle de ceci).
-export function useH2H(match, delayMs = 0) {
-  const key       = `h2h_${match?.id}`
-  const cachedData = match?.id ? readCacheStale(key) : null
-  const cachedAt   = match?.id ? getCacheSavedAt(key) : 0
+export function useH2H(match, delayMs = 0, fdMatchIdOverride = null) {
+  const fdMatchId  = fdMatchIdOverride ?? match?.id ?? null
+  const key        = `h2h_${fdMatchId}`
+  const cachedData = fdMatchId ? readCacheStale(key) : null
+  const cachedAt   = fdMatchId ? getCacheSavedAt(key) : 0
 
   return useQuery({
-    queryKey: ['h2h-fd', match?.id],
-    enabled:  !!match?.id && isRealFdMatchId(match.id),
+    queryKey: ['h2h-fd', fdMatchId],
+    enabled:  !!fdMatchId && isRealFdMatchId(fdMatchId),
     staleTime: 60 * 60_000,
     retry: 1,
     initialData:          cachedData ?? undefined,
@@ -903,7 +915,7 @@ export function useH2H(match, delayMs = 0) {
         // délai fixe — 0ms si useMatchDetail (même page) n'a en fait rien
         // tapé de réel (cache déjà chaud pour ce match).
         if (delayMs > 0) await waitForFdSpacing(delayMs)
-        const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=20`)
+        const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${fdMatchId}%2Fhead2head&limit=20`)
         if (!res.ok) {
           const stale = readCacheStale(key)
           return stale ?? null

@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, isRealFdMatchId, resolveFdMatchId } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState } from './matchStateTracker'
 
 const MID = 1
@@ -288,5 +288,71 @@ describe('resolveFdTeamId', () => {
   it('gère une équipe absente sans planter', () => {
     expect(resolveFdTeamId(null, compMatches)).toBeNull()
     expect(resolveFdTeamId(undefined, compMatches)).toBeNull()
+  })
+})
+
+// resolveFdMatchId — bug réel (26/07) : "dans Accueil t'as que 2 h2h, dans
+// Programme t'as le vrai historique, pour le MÊME match" — un match sourcé
+// ESPN a un id `espn-PL-...`, pas un vrai id numérique FD.org, donc l'appel
+// FD.org /head2head (qui a besoin de l'id du MATCH, pas des équipes) était
+// entièrement désactivé côté Accueil.
+describe('isRealFdMatchId', () => {
+  it('reconnaît un id FD.org numérique', () => {
+    expect(isRealFdMatchId(542447)).toBe(true)
+    expect(isRealFdMatchId('542447')).toBe(true)
+  })
+
+  it('rejette un id ESPN ou vide', () => {
+    expect(isRealFdMatchId('espn-PL-401584580')).toBe(false)
+    expect(isRealFdMatchId(null)).toBe(false)
+    expect(isRealFdMatchId(undefined)).toBe(false)
+  })
+})
+
+describe('resolveFdMatchId', () => {
+  const compMatches = [
+    { id: 542447, utcDate: '2025-09-22T18:45:00Z',
+      homeTeam: { id: 516, name: 'Olympique de Marseille' },
+      awayTeam: { id: 524, name: 'Paris Saint-Germain FC' } },
+    { id: 500001, utcDate: '2025-02-01T20:00:00Z',
+      homeTeam: { id: 524, name: 'Paris Saint-Germain FC' },
+      awayTeam: { id: 516, name: 'Olympique de Marseille' } },
+  ]
+
+  it('renvoie l\'id tel quel si déjà un vrai id FD.org (match natif Programme)', () => {
+    const match = { id: 542447, homeTeam: { id: 516 }, awayTeam: { id: 524 } }
+    expect(resolveFdMatchId(match, compMatches)).toBe(542447)
+  })
+
+  it('résout l\'id FD.org réel pour un match sourcé ESPN (Accueil), au plus proche de la date', () => {
+    const match = {
+      id: 'espn-FL1-401700001',
+      utcDate: '2025-09-22T18:45:00Z',
+      homeTeam: { id: 516, name: 'Olympique de Marseille' },
+      awayTeam: { id: 524, name: 'Paris Saint-Germain FC' },
+    }
+    expect(resolveFdMatchId(match, compMatches)).toBe(542447)
+  })
+
+  it('fonctionne aussi si domicile/extérieur sont inversés dans compMatches', () => {
+    const match = {
+      id: 'espn-FL1-401700002',
+      utcDate: '2025-02-01T20:00:00Z',
+      homeTeam: { id: 524 },
+      awayTeam: { id: 516 },
+    }
+    expect(resolveFdMatchId(match, compMatches)).toBe(500001)
+  })
+
+  it('renvoie null si aucune correspondance ou compMatches vide/absent', () => {
+    const match = { id: 'espn-PL-999', homeTeam: { id: 1 }, awayTeam: { id: 2 } }
+    expect(resolveFdMatchId(match, compMatches)).toBeNull()
+    expect(resolveFdMatchId(match, [])).toBeNull()
+    expect(resolveFdMatchId(match, undefined)).toBeNull()
+  })
+
+  it('gère un match absent sans planter', () => {
+    expect(resolveFdMatchId(null, compMatches)).toBeNull()
+    expect(resolveFdMatchId(undefined, compMatches)).toBeNull()
   })
 })

@@ -533,6 +533,52 @@ export function isNeutralVenueComp(match) {
 // Retombe sur l'id d'origine si aucune correspondance (compMatches pas
 // encore chargé, ou vraiment aucune équipe correspondante) — comportement
 // inchangé pour le cas normal (id déjà FD.org, la grande majorité des cas).
+// ID de match football-data.org : purement numérique (voir normalizeEvent,
+// espnAdapter.js — un match sourcé ESPN a un id du type "espn-PL-401584580").
+export function isRealFdMatchId(id) {
+  return /^\d+$/.test(String(id ?? ''))
+}
+
+// ── Résolution id MATCH football-data.org (repli ESPN→FD.org, pour le H2H) ─
+// ⚠️ AJOUT (constat utilisateur, 26/07 : "dans Accueil t'as que 2 h2h, dans
+// Programme t'as le vrai historique, pour le MÊME match, c'est pas normal")
+// : suite directe de resolveFdTeamId ci-dessus. Un match sourcé ESPN (les 6
+// grands championnats dans Accueil) a lui-même un id `espn-PL-...`, pas un
+// vrai id numérique FD.org — l'historique complet des confrontations
+// (endpoint FD.org /v4/matches/{id}/head2head, qui remonte plusieurs
+// saisons) a justement besoin d'un vrai id FD.org pour fonctionner. Sans
+// lui, useH2H se désactivait entièrement et retombait sur une approximation
+// calculée depuis compMatches (matchs de la compétition déjà chargés) — mais
+// cette liste ne couvre qu'UNE saison, donc au mieux 2 confrontations pour un
+// championnat classique (aller-retour), beaucoup plus court que le vrai
+// historique multi-saisons. FD.org couvre pourtant bien ce même match
+// (Programme le lit directement depuis FD.org, sans passer par ESPN) — on le
+// retrouve dans compMatches (même compétition, déjà chargé, aucun appel
+// réseau en plus) en cherchant la même paire d'équipes (ids déjà résolus par
+// resolveFdTeamId) à la date la plus proche, et on utilise SON id réel pour
+// le head2head — l'historique complet redevient identique, peu importe la
+// page de départ.
+export function resolveFdMatchId(match, compMatches) {
+  const rawId = match?.id ?? null
+  if (isRealFdMatchId(rawId)) return rawId
+  if (!match || !compMatches?.length) return null
+  const homeId = resolveFdTeamId(match.homeTeam, compMatches)
+  const awayId = resolveFdTeamId(match.awayTeam, compMatches)
+  if (homeId == null || awayId == null) return null
+  const refTime = match.utcDate ? new Date(match.utcDate).getTime() : null
+  let best = null, bestDiff = Infinity
+  for (const m of compMatches) {
+    const sameFixture =
+      (m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
+      (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId)
+    if (!sameFixture) continue
+    if (refTime == null) return m.id
+    const diff = Math.abs(new Date(m.utcDate).getTime() - refTime)
+    if (diff < bestDiff) { bestDiff = diff; best = m.id }
+  }
+  return best
+}
+
 export function resolveFdTeamId(team, compMatches) {
   const rawId = team?.id ?? null
   if (!team || !compMatches?.length) return rawId

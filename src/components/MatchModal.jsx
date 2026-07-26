@@ -8,7 +8,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
@@ -1570,8 +1570,19 @@ function H2HBilan({ rows, match, isWC }) {
 // delayMs : voir commentaire useH2H (useMatchDetail.js) — MatchPage.jsx et
 // LiveMatchPage.jsx passent 6_000 (collision avec useMatchDetail/useMatchInfo
 // au même montage), les autres appelants (Accueil) gardent le défaut 0.
+// ⚠️ AJOUT `resolveFdMatchId` (26/07, constat utilisateur : "dans Accueil
+// t'as que 2 h2h, dans Programme t'as le vrai historique, pour le MÊME
+// match, c'est pas normal... si c'est pas la même source met la même que
+// celle dans Programme") : match.id est un id ESPN (`espn-PL-...`) pour les
+// matchs sourcés ESPN dans Accueil — voir commentaire useH2H
+// (useMatchDetail.js). resolveFdMatchId retrouve le VRAI id FD.org du même
+// match via compMatches (déjà chargé, aucun appel réseau en plus) et on le
+// passe à useH2H, qui peut alors taper le vrai endpoint head2head — Accueil
+// obtient exactement le même historique multi-saisons que Programme, au
+// lieu du repli compH2H limité à une saison/compétition.
 export function useH2HRows(match, compMatches, delayMs = 0) {
-  const { data: h2hMatches, isLoading } = useH2H(match, delayMs)
+  const fdMatchId = resolveFdMatchId(match, compMatches)
+  const { data: h2hMatches, isLoading } = useH2H(match, delayMs, fdMatchId)
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
 
