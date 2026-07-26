@@ -7,7 +7,7 @@ import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
-import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
@@ -46,15 +46,17 @@ const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 // collision que fetchClubMatchesRaw (useMatchs.js) sur le verrou
 // d'espacement global, jamais corrigée ici jusqu'à présent.
 async function fetchFinishedSeasonMatches(selectedComp, seasonParam) {
-  const res = await fdFetch(
+  // Enregistré AVANT le await (voir fdSpacingTracker.js) — permet à
+  // useScorers (voisin, même page) d'attendre CET appel-ci s'il a démarré
+  // après celui de useStandings.
+  const fetchPromise = fdFetch(
     fdUrl(`/api/v4/competitions/${selectedComp}/matches${seasonParam}`)
   )
+  registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+  const res = await fetchPromise
   // 429 → throw pour que React Query retente (rate limit temporaire)
   if (res.status === 429) throw new Error('rate_limit')
   const fresh = !res.headers.get('X-Cache')
-  // Signale aux hooks voisins (useStandings/useScorers, voir
-  // fdSpacingTracker.js) qu'un vrai appel FD.org vient d'avoir lieu.
-  if (fresh) markFdCallFresh()
   if (!res.ok) return { matches: [], fresh }
   const json = await res.json()
   return { matches: (json.matches ?? []).filter(m => m.status === 'FINISHED'), fresh }

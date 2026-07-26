@@ -14,7 +14,7 @@ import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 // déjà parsés — extractMatchDetails ne sert plus ici que pour le repli
 // scoreboard brut (boardComp, jamais mis en cache compact).
 import { extractMatchDetails } from '../utils/espnSummaryParse'
-import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -22,12 +22,14 @@ export function useMatchDetail(matchId) {
   const { data, isLoading } = useQuery({
     queryKey: ['matchDetail', matchId],
     queryFn: async () => {
-      const res = await fdFetch(fdUrl(`/api/v4/matches/${matchId}`))
+      // Enregistré AVANT le await (voir fdSpacingTracker.js) — permet à
+      // useH2H (même page) d'attendre CET appel-ci avant de décider s'il
+      // doit patienter.
+      const fetchPromise = fdFetch(fdUrl(`/api/v4/matches/${matchId}`))
+      registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+      const res = await fetchPromise
       if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`${res.status}`)
-      // Signale à useH2H (même page, voir fdSpacingTracker.js) qu'un vrai
-      // appel FD.org vient d'avoir lieu.
-      if (!res.headers.get('X-Cache')) markFdCallFresh()
       const json = await res.json()
       writeCache(key, json, 24 * 60 * 60 * 1000)
       return json

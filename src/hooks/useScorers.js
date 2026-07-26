@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
-import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -51,10 +51,12 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
       const season = new Date().getFullYear()
 
       async function tryFetch(url) {
-        const r = await fdFetch(fdUrl(url))
+        // Enregistré AVANT le await (voir fdSpacingTracker.js).
+        const fetchPromise = fdFetch(fdUrl(url))
+        registerFdCallAttempt(fetchPromise.then(resp => !resp.headers.get('X-Cache')).catch(() => false))
+        const r = await fetchPromise
         if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
         const fresh = !r.headers.get('X-Cache')
-        if (fresh) markFdCallFresh()
         if (!r.ok) return { scorers: null, fresh }
         const j = await r.json()
         return { scorers: j.scorers ?? null, fresh }
