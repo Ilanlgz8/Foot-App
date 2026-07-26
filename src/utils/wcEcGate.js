@@ -52,8 +52,30 @@
 // d'un délai possible de quelques heures si un match WC/EC réapparaissait
 // pile à J-7/J-8 (cas non réaliste : aucun tournoi ne reprend le lendemain
 // de sa propre finale).
+// ⚠️ AJOUT (26/07, remarque utilisateur : "la Coupe du monde c'est dans 4 ans,
+// l'Euro c'est pas pour tout de suite non plus, on peut laisser dormir cette
+// requête") : même corrigé (DAYS_BACK=7 ci-dessus), ce portillon continuait à
+// retaper FD.org pour de vrai toutes les 6h, EN PERMANENCE, même sachant que
+// le prochain match WC/EC possible est à des ANNÉES de distance — un calendrier
+// FIFA/UEFA connu très à l'avance, contrairement à la plupart des données
+// sportives. Calendriers officiels vérifiés (recherche web, 26/07) : Euro 2028
+// (Royaume-Uni/Irlande) du 9 juin au 9 juillet 2028, Coupe du Monde 2030
+// (Espagne/Maroc/Portugal) du 13 juin au 21 juillet 2030 — l'Euro 2028 est
+// donc la prochaine échéance WC/EC, quel que soit le sens dans lequel on
+// regarde. Court-circuit à COÛT ZÉRO (aucun appel réseau, aucune lecture
+// cache) tant qu'on est loin de cette fenêtre : le portillon répond "non"
+// instantanément, ne se réveille pour de vrai (reprise du check réseau
+// normal ci-dessous) que dans les ~5 mois précédant l'Euro 2028, largement
+// suffisant pour détecter le calendrier avant le moindre match.
+// Honnêteté : ces dates peuvent en théorie changer (report, litige d'accueil)
+// — RESUME_CHECKING_FROM garde volontairement plusieurs mois de marge avant
+// la date officielle, et le comportement "en cas de doute → true" du reste de
+// ce fichier reste la protection de fond si jamais une vérification reprenait
+// trop tard malgré tout.
 import { fdFetch, fdUrl } from './fdFetch'
 import { readCacheStale, writeCache, getCacheSavedAt } from '../hooks/localCache'
+
+const RESUME_CHECKING_FROM = new Date('2028-01-15T00:00:00Z')
 
 const GATE_KEY        = 'wcEcActivityGate_v1'
 const GATE_DISK_TTL   = 24 * 60 * 60 * 1000 // 24h — survie sur disque (purge)
@@ -79,6 +101,13 @@ let inFlight = null // dédup si plusieurs hooks appellent en même temps au mon
 // désormais si CET appel précis vient de vraiment taper FD.org, pour que
 // l'appelant attende les ~6s restants avant son propre appel si besoin.
 export async function shouldQueryWcEcWithMeta() {
+  // Dormance longue durée (voir RESUME_CHECKING_FROM ci-dessus) — coût zéro,
+  // ni réseau ni lecture cache, tant qu'on est loin de la prochaine échéance
+  // WC/EC connue.
+  if (Date.now() < RESUME_CHECKING_FROM.getTime()) {
+    return { should: false, fresh: false }
+  }
+
   const savedAt = getCacheSavedAt(GATE_KEY)
   const cached  = readCacheStale(GATE_KEY)
 
