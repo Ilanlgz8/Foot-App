@@ -39,12 +39,28 @@ function fmtDate(d) { return d.toISOString().slice(0, 10) }
 
 let inFlight = null // dédup si plusieurs hooks appellent en même temps au montage
 
-export async function shouldQueryWcEc() {
+// ⚠️ AJOUT `fresh` (25/07, même jour, constat utilisateur : "la Coupe du
+// monde fait un 429, pas les autres compétitions") : ce portillon fait
+// lui-même un vrai appel FD.org (dès que son cache disque a plus de 6h) —
+// mais chaque appelant enchaînait IMMÉDIATEMENT son propre vrai appel juste
+// après, sans respecter le même verrou d'espacement global (~6s) que TOUT
+// LE RESTE de ce fichier applique déjà entre 2 vraies requêtes consécutives.
+// Résultat : le portillon lui-même consommait le verrou, et l'appel de
+// données qui suivait aussitôt se faisait bloquer par NOTRE PROPRE garde-fou
+// serveur (api/football.js) — un vrai 429 auto-infligé, spécifique aux
+// hooks WC/EC (les seuls à consulter ce portillon), jamais aux compétitions
+// club. Comme pour tryFetchWithMeta ailleurs dans l'app : on expose
+// désormais si CET appel précis vient de vraiment taper FD.org, pour que
+// l'appelant attende les ~6s restants avant son propre appel si besoin.
+export async function shouldQueryWcEcWithMeta() {
   const savedAt = getCacheSavedAt(GATE_KEY)
   const cached  = readCacheStale(GATE_KEY)
 
-  // Cache encore frais (<6h) : on fait confiance sans re-taper FD.org.
-  if (cached != null && Date.now() - savedAt < GATE_REFRESH_MS) return cached
+  // Cache encore frais (<6h) : on fait confiance sans re-taper FD.org — pas
+  // d'appel réel, donc rien à espacer pour l'appelant (`fresh: false`).
+  if (cached != null && Date.now() - savedAt < GATE_REFRESH_MS) {
+    return { should: cached, fresh: false }
+  }
 
   if (inFlight) return inFlight
 
@@ -56,17 +72,25 @@ export async function shouldQueryWcEc() {
       const res  = await fdFetch(fdUrl(
         `/api/v4/matches?competitions=WC,EC&dateFrom=${fmtDate(from)}&dateTo=${fmtDate(to)}`
       ))
-      if (!res.ok) return cached ?? true // incertain → ne bloque rien
+      const fresh = !res.headers.get('X-Cache')
+      if (!res.ok) return { should: cached ?? true, fresh } // incertain → ne bloque rien
       const json = await res.json()
       const hasActivity = (json.matches ?? []).length > 0
       writeCache(GATE_KEY, hasActivity, GATE_DISK_TTL)
-      return hasActivity
+      return { should: hasActivity, fresh }
     } catch {
-      return cached ?? true // incertain → ne bloque rien
+      return { should: cached ?? true, fresh: false } // incertain → ne bloque rien
     } finally {
       inFlight = null
     }
   })()
 
   return inFlight
+}
+
+// Repli simple (booléen seul) pour un appelant qui n'a pas besoin de gérer
+// l'espacement lui-même.
+export async function shouldQueryWcEc() {
+  const { should } = await shouldQueryWcEcWithMeta()
+  return should
 }

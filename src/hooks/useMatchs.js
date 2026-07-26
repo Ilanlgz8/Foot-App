@@ -5,7 +5,7 @@ import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
-import { shouldQueryWcEc } from '../utils/wcEcGate'
+import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
@@ -402,7 +402,14 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org ci-dessous
   // (jusqu'à 3 appels) quand on sait déjà qu'aucun match WC/EC n'existe dans
   // une large fenêtre — cas quasi permanent hors Mondial/Euro.
-  if (!(await shouldQueryWcEc())) return []
+  // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à WC,
+  // jamais aux compétitions club) : sans cette attente, un portillon qui
+  // vient de vraiment taper FD.org fait bloquer l'appel juste en dessous par
+  // notre propre garde-fou serveur (verrou d'espacement ~6s) — même remède
+  // que partout ailleurs dans ce fichier.
+  const { should, fresh } = await shouldQueryWcEcWithMeta()
+  if (!should) return []
+  if (fresh) await new Promise(r => setTimeout(r, 6_000))
 
   let matches
   const wcSeason = new Date().getFullYear()

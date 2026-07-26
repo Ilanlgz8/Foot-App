@@ -4,7 +4,7 @@ import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fetchEspnCupMatches } from '../utils/espnAdapter'
 import { DOMESTIC_CUPS } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
-import { shouldQueryWcEc } from '../utils/wcEcGate'
+import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
@@ -187,7 +187,15 @@ export function useWcKnockout(compCode = 'WC') {
       // ci-dessous (jusqu'à 2 appels) quand on sait déjà qu'aucun match WC/EC
       // n'existe dans une large fenêtre — cas quasi permanent hors Mondial/
       // Euro. Repli sur le cache stale existant, comme le catch plus bas.
-      if (!(await shouldQueryWcEc())) return readCacheStale(cacheKey) ?? EMPTY_ROUNDS
+      // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à
+      // WC, jamais aux compétitions club) : sans cette attente, un portillon
+      // qui vient de vraiment taper FD.org fait bloquer l'appel plus bas par
+      // notre propre garde-fou serveur (verrou d'espacement ~6s) — le délai
+      // fixe de 4s ci-dessous (pensé pour la collision avec useMatches, pas
+      // avec ce portillon) ne suffisait pas à lui seul dans ce cas.
+      const { should, fresh } = await shouldQueryWcEcWithMeta()
+      if (!should) return readCacheStale(cacheKey) ?? EMPTY_ROUNDS
+      if (fresh) await new Promise(res => setTimeout(res, 6_000))
 
       await new Promise(res => setTimeout(res, 4_000))
       // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :

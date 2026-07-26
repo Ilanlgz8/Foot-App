@@ -3,7 +3,7 @@ import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localC
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
-import { shouldQueryWcEc } from '../utils/wcEcGate'
+import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 
@@ -107,7 +107,15 @@ async function fetchWcEcPortion(date, delayMs = 0) {
   // Portillon partagé (voir wcEcGate.js) : évite ces 2 appels FD.org quand on
   // sait déjà (vérifié il y a moins de 6h) qu'aucun match WC/EC n'existe dans
   // une large fenêtre — cas quasi permanent hors Mondial/Euro.
-  if (!(await shouldQueryWcEc())) return []
+  // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à WC/EC,
+  // jamais aux compétitions club) : le portillon peut lui-même consommer le
+  // verrou d'espacement global (~6s) s'il vient de vraiment taper FD.org —
+  // sans cette attente, l'appel de données juste en dessous se faisait
+  // bloquer par NOTRE PROPRE garde-fou serveur (api/football.js), pas par
+  // FD.org. Même remède que partout ailleurs dans ce fichier.
+  const { should, fresh } = await shouldQueryWcEcWithMeta()
+  if (!should) return []
+  if (fresh) await new Promise(r => setTimeout(r, 6_000))
   if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
   const prevDate = prevDateStr(date)
   const settled = await Promise.allSettled([

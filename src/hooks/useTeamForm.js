@@ -6,7 +6,7 @@ import { getClubSeason } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
-import { shouldQueryWcEc } from '../utils/wcEcGate'
+import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
@@ -115,10 +115,18 @@ async function fetchTeamForm(selectedComp) {
   // cache existant (même clé que useTeamForm/useTeamFormMulti,
   // teamform2_${comp}) plutôt qu'un objet vide, pour ne jamais régresser une
   // forme déjà affichée.
-  if (!isClub && !(await shouldQueryWcEc())) {
-    const stale = readCacheStale(`teamform2_${selectedComp}`)
-    if (stale) return stale
-    return { formMap: {}, matches: [], isLastSeason: false }
+  if (!isClub) {
+    // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à
+    // WC, jamais aux compétitions club) : sans cette attente, un portillon
+    // qui vient de vraiment taper FD.org fait bloquer l'appel plus bas par
+    // notre propre garde-fou serveur (verrou d'espacement ~6s).
+    const { should, fresh } = await shouldQueryWcEcWithMeta()
+    if (!should) {
+      const stale = readCacheStale(`teamform2_${selectedComp}`)
+      if (stale) return stale
+      return { formMap: {}, matches: [], isLastSeason: false }
+    }
+    if (fresh) await new Promise(r => setTimeout(r, 6_000))
   }
 
   const seasonParam = selectedComp === 'WC' ? '?season=2026'
