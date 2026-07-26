@@ -27,14 +27,14 @@ import '../splashScreen.css'
 // cache (perçu comme un bug plutôt qu'une animation) ; MAX_MS est un filet de
 // sécurité si jamais le chargement traîne (réseau lent, panne) — l'app ne
 // reste jamais bloquée derrière l'écran de lancement indéfiniment.
-// ⚠️ MIN_MS relevé 1200→1900 (26/07, portage de l'animation ballon validée en
-// maquette) : le ballon qui roule sous le nom et rebondit sur le point du "i"
-// dure ~1.3s + un court délai avant son démarrage (le temps que le texte finisse
-// son animation d'entrée, voir MEASURE_DELAY_MS) — avec l'ancien MIN_MS=1200,
-// un lancement avec données déjà en cache aurait coupé le fondu de sortie AVANT
-// que le ballon ait fini d'atterrir. 1900ms laisse toujours le temps de voir
-// l'atterrissage, même sur le lancement le plus rapide possible.
-const MIN_MS  = 1900
+// ⚠️ MIN_MS relevé 1200→1900→2800 (26/07, portage puis ralentissement de
+// l'animation ballon — retour utilisateur "le ballon est trop rapide") : le
+// ballon démarre à MEASURE_DELAY_MS (850ms) et son vol dure maintenant 1.8s
+// (voir splashBallFly, CSS) — 850+1800=2650ms pour un atterrissage complet.
+// MIN_MS doit toujours couvrir ce total + une petite marge, sinon un
+// lancement avec données déjà en cache coupe le fondu de sortie avant que le
+// ballon ait fini d'atterrir.
+const MIN_MS  = 2800
 const MAX_MS  = 3500
 const FADE_MS = 500
 // Délai avant de mesurer la position réelle du point du "i" pour y faire
@@ -134,7 +134,6 @@ export function SplashScreen() {
         {ballReady && <span className="splash__ball">⚽</span>}
         <span className="splash__underline" />
       </div>
-      <div className="splash__bar"><div className="splash__barFill" /></div>
     </div>
   )
 }

@@ -125,7 +125,7 @@
   z-index: 2;
   filter: drop-shadow(0 0 6px rgba(var(--red-rgb), 0.9));
   transform-origin: center;
-  animation: splashBallFly 1.3s cubic-bezier(.25,.65,.3,1) forwards;
+  animation: splashBallFly 1.8s cubic-bezier(.25,.65,.3,1) forwards;
 }
 
 /* Trajectoire interpolée par calc() entre le point de départ (--ball-start-*)
@@ -157,45 +157,21 @@
   }
   72%  {
     left: calc(var(--ball-ix) + 8px); top: calc(var(--ball-iy) - 9px);
-    transform: translate(-50%, -50%) rotate(1020deg) scale(0.46);
+    transform: translate(-50%, -50%) rotate(1020deg) scale(0.56);
   }
   80%  {
     left: calc(var(--ball-ix) - 4px); top: calc(var(--ball-iy) + 6px);
-    transform: translate(-50%, -50%) rotate(1044deg) scale(0.42);
+    transform: translate(-50%, -50%) rotate(1044deg) scale(0.52);
   }
   88%  {
     left: calc(var(--ball-ix) + 1px); top: calc(var(--ball-iy) - 1px);
-    transform: translate(-50%, -50%) rotate(1058deg) scale(0.41);
+    transform: translate(-50%, -50%) rotate(1058deg) scale(0.51);
   }
   100% {
     left: var(--ball-ix); top: var(--ball-iy);
-    transform: translate(-50%, -50%) rotate(1060deg) scale(0.4);
+    transform: translate(-50%, -50%) rotate(1060deg) scale(0.5);
     opacity: 1;
   }
-}
-
-/* Petite barre de progression indéterminée sous le logo */
-.splash__bar {
-  position: relative;
-  width: 140px;
-  height: 3px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.splash__barFill {
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, transparent, var(--red-light), var(--red), transparent);
-  animation: splashBarSlide 1.3s ease-in-out infinite;
-}
-
-@keyframes splashBarSlide {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(350%); }
 }
 
 /* Repli accessibilité : `animation:none` seul laisserait le texte à opacity:0
@@ -208,8 +184,7 @@
   .splash__foot,
   .splash__doti,
   .splash__x,
-  .splash__underline,
-  .splash__barFill {
+  .splash__underline {
     animation: none;
   }
   .splash__stat,
