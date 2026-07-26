@@ -1,4 +1,7 @@
-/* Écran de lancement — fond noir/gris + "StatFootix" en néon rouge.
+/* Écran de lancement — fond rouge-neige sombre + "StatFootix" en deux tons
+   (Stat en rouge, Footıx en blanc) avec un ballon qui roule sous le nom et
+   vient rebondir/atterrir exactement sur le point du "i". Design validé en
+   maquette (mcp__visualize) avant portage ici, 26/07.
    Variables reprises de theme-v2.css (--bg-deep, --red, --red-rgb…) pour
    rester cohérent avec le reste de l'app plutôt que d'inventer une palette
    à part. */
@@ -12,7 +15,7 @@
   align-items: center;
   justify-content: center;
   gap: 28px;
-  background: radial-gradient(ellipse at center, #1a1a1f 0%, #0a0a0c 65%, #050506 100%);
+  background: radial-gradient(circle at 50% 42%, #2b0a0a 0%, #170606 42%, #0b0505 100%);
   opacity: 1;
   transition: opacity 0.5s ease;
 }
@@ -30,7 +33,7 @@
   height: 60vw;
   max-height: 520px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(var(--red-rgb), 0.28) 0%, rgba(var(--red-rgb), 0) 70%);
+  background: radial-gradient(circle, rgba(var(--red-rgb), 0.35) 0%, rgba(var(--red-rgb), 0) 70%);
   filter: blur(10px);
   animation: splashGlowPulse 2.6s ease-in-out infinite;
 }
@@ -43,38 +46,131 @@
 .splash__logo {
   position: relative;
   z-index: 1;
-}
-
-.splash__text {
+  display: flex;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: clamp(2rem, 8vw, 3.4rem);
   font-weight: 800;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.splash__stat,
+.splash__foot,
+.splash__doti,
+.splash__x {
+  display: inline-block;
+  opacity: 0;
+}
+
+.splash__stat {
+  color: var(--red-light);
+  text-shadow:
+    0 0 4px rgba(var(--red-rgb), 0.9),
+    0 0 18px rgba(var(--red-rgb), 0.9),
+    0 0 36px rgba(var(--red-rgb), 0.7),
+    0 0 56px rgba(var(--red-rgb), 0.4);
+  animation: splashTextFromLeft 0.8s cubic-bezier(.2,.7,.3,1) forwards;
+}
+
+.splash__foot,
+.splash__doti,
+.splash__x {
   color: #fff;
   text-shadow:
     0 0 4px rgba(255, 255, 255, 0.9),
-    0 0 14px rgba(var(--red-rgb), 0.9),
-    0 0 28px rgba(var(--red-rgb), 0.7),
-    0 0 48px rgba(var(--red-rgb), 0.45);
-  animation: splashFlicker 2.6s ease-in-out infinite;
+    0 0 12px rgba(var(--red-rgb), 0.8),
+    0 0 26px rgba(var(--red-rgb), 0.5);
+  animation: splashTextFromRight 0.8s cubic-bezier(.2,.7,.3,1) forwards;
 }
 
-/* Flicker néon subtil — pas un clignotement franc (jugerait "cassé"), juste
-   une légère variation d'intensité du glow pour un effet vivant. */
-@keyframes splashFlicker {
-  0%, 100% {
-    text-shadow:
-      0 0 4px rgba(255, 255, 255, 0.9),
-      0 0 14px rgba(var(--red-rgb), 0.9),
-      0 0 28px rgba(var(--red-rgb), 0.7),
-      0 0 48px rgba(var(--red-rgb), 0.45);
+@keyframes splashTextFromLeft {
+  0%   { opacity: 0; transform: translateX(-42px); filter: brightness(1); }
+  60%  { opacity: 1; transform: translateX(0); }
+  72%  { filter: brightness(1.9); }
+  100% { opacity: 1; transform: translateX(0); filter: brightness(1); }
+}
+
+@keyframes splashTextFromRight {
+  0%   { opacity: 0; transform: translateX(42px); filter: brightness(1); }
+  60%  { opacity: 1; transform: translateX(0); }
+  72%  { filter: brightness(1.9); }
+  100% { opacity: 1; transform: translateX(0); filter: brightness(1); }
+}
+
+/* Petit trait rouge qui se dessine sous "Stat" une fois le texte assemblé */
+.splash__underline {
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  height: 2px;
+  width: 0;
+  background: var(--red);
+  box-shadow: 0 0 10px var(--red), 0 0 20px var(--red);
+  animation: splashUnderline 0.8s cubic-bezier(.2,.7,.3,1) 0.55s forwards;
+}
+
+@keyframes splashUnderline {
+  0%   { width: 0; opacity: 0; }
+  100% { width: 38%; opacity: 1; }
+}
+
+/* Ballon : ne monte dans le DOM qu'une fois --ball-start-x/y et --ball-ix/iy
+   posés par SplashScreen.jsx (voir ballReady) — jamais de valeur de repli à
+   deviner, l'animation démarre directement avec les bonnes coordonnées. */
+.splash__ball {
+  position: absolute;
+  left: var(--ball-start-x);
+  top: var(--ball-start-y);
+  font-size: clamp(1.5rem, 6vw, 2.5rem);
+  z-index: 2;
+  filter: drop-shadow(0 0 6px rgba(var(--red-rgb), 0.9));
+  transform-origin: center;
+  animation: splashBallFly 1.3s cubic-bezier(.25,.65,.3,1) forwards;
+}
+
+/* Trajectoire interpolée par calc() entre le point de départ (--ball-start-*)
+   et le point d'atterrissage réel (--ball-ix/iy, mesuré sur le vrai point du
+   "i") : roulé sous le texte, puis arc montant, léger rebond (dépassement +
+   retour) pour éviter un atterrissage trop "robotique", posé exactement sur
+   le i. */
+@keyframes splashBallFly {
+  0%   {
+    left: var(--ball-start-x); top: var(--ball-start-y);
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
+    opacity: 0;
   }
-  50% {
-    text-shadow:
-      0 0 6px rgba(255, 255, 255, 1),
-      0 0 20px rgba(var(--red-rgb), 1),
-      0 0 40px rgba(var(--red-rgb), 0.85),
-      0 0 70px rgba(var(--red-rgb), 0.6);
+  6%   { opacity: 1; transform: translate(-50%, -50%) rotate(40deg) scale(1); }
+  30%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.55);
+    top: var(--ball-start-y);
+    transform: translate(-50%, -50%) rotate(420deg) scale(1);
+  }
+  46%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.8);
+    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.35);
+    transform: translate(-50%, -50%) rotate(650deg) scale(0.8);
+  }
+  60%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.95);
+    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.75);
+    transform: translate(-50%, -50%) rotate(880deg) scale(0.6);
+  }
+  72%  {
+    left: calc(var(--ball-ix) + 8px); top: calc(var(--ball-iy) - 9px);
+    transform: translate(-50%, -50%) rotate(1020deg) scale(0.46);
+  }
+  80%  {
+    left: calc(var(--ball-ix) - 4px); top: calc(var(--ball-iy) + 6px);
+    transform: translate(-50%, -50%) rotate(1044deg) scale(0.42);
+  }
+  88%  {
+    left: calc(var(--ball-ix) + 1px); top: calc(var(--ball-iy) - 1px);
+    transform: translate(-50%, -50%) rotate(1058deg) scale(0.41);
+  }
+  100% {
+    left: var(--ball-ix); top: var(--ball-iy);
+    transform: translate(-50%, -50%) rotate(1060deg) scale(0.4);
+    opacity: 1;
   }
 }
 
@@ -102,10 +198,32 @@
   100% { transform: translateX(350%); }
 }
 
+/* Repli accessibilité : `animation:none` seul laisserait le texte à opacity:0
+   (état de départ de leurs keyframes) et le ballon figé sous le nom au lieu
+   d'être posé dessus — donc on fixe explicitement l'état final voulu plutôt
+   que de simplement couper les animations. */
 @media (prefers-reduced-motion: reduce) {
   .splash__glow,
-  .splash__text,
+  .splash__stat,
+  .splash__foot,
+  .splash__doti,
+  .splash__x,
+  .splash__underline,
   .splash__barFill {
     animation: none;
+  }
+  .splash__stat,
+  .splash__foot,
+  .splash__doti,
+  .splash__x {
+    opacity: 1;
+    transform: none;
+  }
+  .splash__underline {
+    width: 38%;
+    opacity: 1;
+  }
+  .splash__ball {
+    display: none;
   }
 }

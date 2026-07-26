@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import '../splashScreen.css'
 
@@ -27,13 +27,28 @@ import '../splashScreen.css'
 // cache (perçu comme un bug plutôt qu'une animation) ; MAX_MS est un filet de
 // sécurité si jamais le chargement traîne (réseau lent, panne) — l'app ne
 // reste jamais bloquée derrière l'écran de lancement indéfiniment.
-const MIN_MS  = 1200
+// ⚠️ MIN_MS relevé 1200→1900 (26/07, portage de l'animation ballon validée en
+// maquette) : le ballon qui roule sous le nom et rebondit sur le point du "i"
+// dure ~1.3s + un court délai avant son démarrage (le temps que le texte finisse
+// son animation d'entrée, voir MEASURE_DELAY_MS) — avec l'ancien MIN_MS=1200,
+// un lancement avec données déjà en cache aurait coupé le fondu de sortie AVANT
+// que le ballon ait fini d'atterrir. 1900ms laisse toujours le temps de voir
+// l'atterrissage, même sur le lancement le plus rapide possible.
+const MIN_MS  = 1900
 const MAX_MS  = 3500
 const FADE_MS = 500
+// Délai avant de mesurer la position réelle du point du "i" pour y faire
+// atterrir le ballon. Doit être POSTÉRIEUR à la fin de l'animation d'entrée du
+// texte (splashTextFromLeft/Right, 0.8s — voir CSS) : mesurer avant capterait
+// la lettre encore décalée par son propre glissement d'entrée (translateX),
+// donnant une cible fausse et un ballon qui part loin hors-cadre — bug identifié
+// et corrigé en maquette (mcp__visualize) avant ce portage.
+const MEASURE_DELAY_MS = 850
 
 export function SplashScreen() {
   const [visible, setVisible] = useState(true)
   const [fading, setFading]   = useState(false)
+  const [ballReady, setBallReady] = useState(false)
   // Lazy initializer (pas un appel direct à Date.now() dans le corps du
   // composant) : seule forme d'appel impur tolérée pendant le rendu par les
   // règles React actuelles — valeur figée dès le tout premier rendu, jamais
@@ -41,6 +56,8 @@ export function SplashScreen() {
   // rendu initial).
   const [mountedAt] = useState(() => Date.now())
   const isFetching = useIsFetching()
+  const logoRef = useRef(null)
+  const dotIRef = useRef(null)
 
   // Filet de sécurité : quoi qu'il arrive, on lance le fondu de sortie au
   // plus tard à MAX_MS.
@@ -74,13 +91,48 @@ export function SplashScreen() {
     return () => clearTimeout(t)
   }, [fading])
 
+  // Mesure la position réelle du point du "i" (dotless-ı, voir JSX) une fois
+  // le texte stabilisé, et en déduit le point de départ du ballon (sous le
+  // texte). Le ballon (span .splash__ball) n'est monté dans le DOM QU'APRÈS
+  // que ces variables CSS soient posées (voir ballReady) — pas de valeur de
+  // repli à deviner, pas de course JS/CSS : son animation démarre à 0% avec
+  // les bonnes coordonnées déjà en place dès son tout premier rendu.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const logo = logoRef.current
+      const dotI = dotIRef.current
+      if (!logo || !dotI) return
+      const logoRect = logo.getBoundingClientRect()
+      const iRect    = dotI.getBoundingClientRect()
+      if (!iRect.width) return
+      const ix = iRect.left + iRect.width / 2 - logoRect.left
+      const iy = iRect.top - logoRect.top - 2
+      // Départ : sous le texte, décalé sur la gauche (arrive en roulant).
+      const startX = -logoRect.width * 0.35
+      const startY = logoRect.height + logoRect.height * 0.55
+      logo.style.setProperty('--ball-start-x', `${startX}px`)
+      logo.style.setProperty('--ball-start-y', `${startY}px`)
+      logo.style.setProperty('--ball-ix', `${ix}px`)
+      logo.style.setProperty('--ball-iy', `${iy}px`)
+      setBallReady(true)
+    }, MEASURE_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [])
+
   if (!visible) return null
 
   return (
     <div className={`splash${fading ? ' splash--fading' : ''}`} aria-hidden="true">
       <div className="splash__glow" />
-      <div className="splash__logo">
-        <span className="splash__text" data-text="StatFootix">StatFootix</span>
+      <div className="splash__logo" ref={logoRef}>
+        <span className="splash__stat">Stat</span>
+        <span className="splash__foot">Foot</span>
+        {/* ı = dotless i (U+0131) : pas de point rendu, pour que le ballon
+            puisse "devenir" le point sans qu'un vrai point ne traîne dessous. */}
+        <span className="splash__doti" ref={dotIRef}>ı</span>
+        <span className="splash__x">x</span>
+        {ballReady && <span className="splash__ball">⚽</span>}
+        <span className="splash__underline" />
       </div>
       <div className="splash__bar"><div className="splash__barFill" /></div>
     </div>
