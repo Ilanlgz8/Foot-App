@@ -414,7 +414,11 @@ export default function LiveMatchPage() {
   // nécessaire à resolveFdMatchId (matchUtils.js) pour retrouver le vrai id
   // FD.org du match affiché.
   const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
-  const showH2HTab = !h2hLoading && h2hRows.length > 0
+  // ⚠️ RETIRÉ `!h2hLoading` (27/07, même demande/commentaire détaillé que
+  // MatchPage.jsx) : compH2H (repli instantané, 0 requête) suffit à afficher
+  // l'onglet tout de suite — le contenu se complète tout seul avec
+  // l'historique FD.org complet dès qu'il arrive.
+  const showH2HTab = h2hRows.length > 0
   const TABS = ['stats', 'compos', 'classement']
 
   const [activeTab, setActiveTab] = useState('stats')

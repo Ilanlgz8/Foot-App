@@ -754,7 +754,16 @@ export default function MatchPage() {
   // nécessaire à resolveFdMatchId (matchUtils.js, appelé par useH2HRows) pour
   // retrouver le vrai id FD.org du match affiché, y compris en intersaison.
   const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
-  const showH2HTab = !h2hLoading && h2hRows.length > 0
+  // ⚠️ RETIRÉ `!h2hLoading` (27/07, demande explicite utilisateur : "h2h
+  // arrive direct la première fois sans que ça mette plusieurs secondes") :
+  // useH2HRows retombe déjà, SANS requête supplémentaire, sur les
+  // confrontations de la saison en cours (compH2H) tant que le vrai
+  // historique FD.org n'est pas encore arrivé — attendre `!h2hLoading` avant
+  // de montrer l'onglet cachait cette donnée déjà disponible pour rien.
+  // L'onglet apparaît maintenant dès qu'il y a QUELQUE CHOSE à montrer (même
+  // partiel), et son contenu (H2HTabContent) se met à jour tout seul avec
+  // l'historique complet dès qu'il arrive.
+  const showH2HTab = h2hRows.length > 0
   const TABS = ['statistiques', 'compos', 'classement']
 
   const [activeTab, setActiveTab] = useState('statistiques')

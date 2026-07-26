@@ -1739,17 +1739,32 @@ function H2HRowsList({ rows, homeId, isWC }) {
 // fois ce contenu ET la visibilité du bouton d'onglet lui-même (masqué tant
 // qu'aucune confrontation connue — demande explicite : "si y'en a pas on le
 // hide, on affiche pas le bouton").
+// ⚠️ AJOUT affichage instantané (27/07, demande explicite utilisateur : "h2h
+// arrive direct la première fois sans que ça mette plusieurs secondes") :
+// avant, un skeleton plein écran s'affichait pendant TOUTE la durée du
+// chargement FD.org (isLoading), même quand `rows` avait déjà des données
+// utilisables — useH2HRows (ci-dessus) retombe déjà, SANS aucune requête
+// supplémentaire, sur les confrontations de la saison en cours (compH2H,
+// dérivé de données déjà chargées pour la forme/le calendrier) dès que le
+// vrai historique FD.org n'est pas encore arrivé. Le skeleton masquait donc
+// inutilement une donnée déjà disponible et correcte, juste potentiellement
+// moins complète que la version finale (qui la remplace dès qu'elle arrive,
+// voir useH2HRows : fdRecent prend le dessus sur compH2H une fois chargé).
+// Le skeleton ne s'affiche plus que si on n'a VRAIMENT rien à montrer pour
+// l'instant (1re visite, aucune donnée en cache) — pas de nouvelle requête,
+// juste un meilleur usage de ce qui est déjà en main.
 export function H2HTabContent({ match, rows, isLoading }) {
   const isWC = isNationalTeamComp(match)
   const homeId = match.homeTeam?.id
 
-  if (isLoading) return <H2HSkeleton />
+  if (isLoading && !rows.length) return <H2HSkeleton />
   if (!rows.length) return <p className="modal__noEvents">Aucune confrontation connue entre ces deux équipes</p>
 
   return (
     <>
       <H2HBilan rows={rows} match={match} isWC={isWC} />
       <H2HRowsList rows={rows} homeId={homeId} isWC={isWC} />
+      {isLoading && <p className="pm__noData" style={{ marginTop: '8px' }}>Historique complet en cours de chargement…</p>}
     </>
   )
 }
