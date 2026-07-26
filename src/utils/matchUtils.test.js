@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState } from './matchStateTracker'
 
 const MID = 1
@@ -245,5 +245,48 @@ describe('getMatchPeriod', () => {
   it('renvoie "T.A.B." pendant la séance de tirs au but', () => {
     setEspnData(MID, { espnClock: '120:00', espnStatus: 'STATUS_SHOOTOUT', espnPeriod: 5 })
     expect(getMatchPeriod(baseMatch())).toBe('T.A.B.')
+  })
+})
+
+// resolveFdTeamId — bug réel (26/07) : un match sourcé ESPN (les 6 grands
+// championnats dans Accueil, voir espnAdapter.js) a des homeTeam.id/
+// awayTeam.id dans le référentiel ESPN, incompatibles avec les id FD.org de
+// compMatches — casse tout ce qui filtre par égalité stricte d'id (Forme
+// récente/Stats saison/Compos probables), alors que le même match ouvert
+// depuis Programme (100% FD.org, mêmes id) fonctionne.
+describe('resolveFdTeamId', () => {
+  const compMatches = [
+    { homeTeam: { id: 86,  name: 'Real Madrid CF',     shortName: 'Real Madrid' },
+      awayTeam: { id: 81,  name: 'FC Barcelona',       shortName: 'Barça' } },
+    { homeTeam: { id: 78,  name: 'Club Atlético de Madrid', shortName: 'Atleti' },
+      awayTeam: { id: 86,  name: 'Real Madrid CF',     shortName: 'Real Madrid' } },
+  ]
+
+  it('renvoie l\'id tel quel si déjà connu dans compMatches (cas normal, FD.org natif)', () => {
+    expect(resolveFdTeamId({ id: 86, name: 'Real Madrid CF' }, compMatches)).toBe(86)
+  })
+
+  it('résout par nom un id ESPN incompatible (match sourcé ESPN, Accueil)', () => {
+    // id ESPN totalement différent (ex: 244 côté ESPN pour le Real Madrid),
+    // mais le nom permet de retrouver le vrai id FD.org (86) dans compMatches.
+    expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, compMatches)).toBe(86)
+  })
+
+  it('résout aussi via shortName si name ne matche pas directement', () => {
+    expect(resolveFdTeamId({ id: 999, name: 'FC Barcelona', shortName: 'Barcelona' }, compMatches)).toBe(81)
+  })
+
+  it('retombe sur l\'id d\'origine si aucune correspondance trouvée', () => {
+    expect(resolveFdTeamId({ id: 555, name: 'Équipe inconnue' }, compMatches)).toBe(555)
+  })
+
+  it('retombe sur l\'id d\'origine si compMatches est vide/pas encore chargé', () => {
+    expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, [])).toBe(244)
+    expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, undefined)).toBe(244)
+  })
+
+  it('gère une équipe absente sans planter', () => {
+    expect(resolveFdTeamId(null, compMatches)).toBeNull()
+    expect(resolveFdTeamId(undefined, compMatches)).toBeNull()
   })
 })

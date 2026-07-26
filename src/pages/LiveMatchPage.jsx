@@ -6,10 +6,10 @@
  * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -351,11 +351,28 @@ export default function LiveMatchPage() {
   const navigate               = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
 
-  const match   = liveMatches.find(m => String(m.id) === String(matchId))
-  const espn    = match ? (espnScores[match.id] ?? null) : null
-  const compId  = match?.competition?.code ?? null
+  const rawMatch = liveMatches.find(m => String(m.id) === String(matchId))
+  const espn    = rawMatch ? (espnScores[rawMatch.id] ?? null) : null
+  const compId  = rawMatch?.competition?.code ?? null
 
   const { formMap, compMatches } = useTeamForm(compId)
+
+  // Même correctif que MatchPage.jsx (voir resolveFdTeamId, matchUtils.js) :
+  // un match live sourcé ESPN (les 6 grands championnats via Accueil) a des
+  // homeTeam.id/awayTeam.id ESPN, pas FD.org — casse Forme/Stats saison/
+  // Compos probables qui filtrent compMatches par id. Résolu une fois ici.
+  const match = useMemo(() => {
+    if (!rawMatch || !compMatches?.length) return rawMatch
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, compMatches)
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, compMatches)
+    if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
+    return {
+      ...rawMatch,
+      homeTeam: { ...rawMatch.homeTeam, id: homeId },
+      awayTeam: { ...rawMatch.awayTeam, id: awayId },
+    }
+  }, [rawMatch, compMatches])
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   // Le pronostic live (calcLiveProno, score + minute + cartons rouges +

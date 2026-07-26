@@ -3,14 +3,14 @@
  * Route : /match/:matchId
  */
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useState }                from 'react'
+import { useState, useMemo }       from 'react'
 import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { finalScore, mergeScore, isNationalTeamComp } from '../utils/matchUtils'
+import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
@@ -674,16 +674,39 @@ export default function MatchPage() {
 
   const stateMatch = location.state?.match ?? null
   const { data: fetchedMatch, isLoading } = useMatchData(matchId, stateMatch)
-  const match = stateMatch ?? fetchedMatch
+  const rawMatch = stateMatch ?? fetchedMatch
 
   // Même correction que dans MatchPageHero — voir le commentaire là-bas.
-  const isFinished = match?.status === 'FINISHED' || (match?.id != null && getMatchState(match.id).ft === true)
-  const compId = match?.competition?.code ?? null
+  const isFinished = rawMatch?.status === 'FINISHED' || (rawMatch?.id != null && getMatchState(rawMatch.id).ft === true)
+  const compId = rawMatch?.competition?.code ?? null
 
   // compMatches est nécessaire même pour un match terminé désormais : le
   // sous-onglet "Stats saison" en a besoin (avant, seuls les matchs à venir
   // le fetchaient, ce qui rendait "Stats saison" impossible pour un match FT).
   const { formMap, compMatches, isLastSeason, isLoading: formLoading } = useTeamForm(compId)
+
+  // ⚠️ AJOUT (constat utilisateur, 26/07 : "quand je clique sur un match à
+  // venir dans Accueil y'a aucune donnée, mais le même match cliqué depuis
+  // Programme ça marche") : voir le commentaire détaillé sur resolveFdTeamId
+  // (matchUtils.js) — un match sourcé ESPN (les 6 grands championnats dans
+  // Accueil) a des homeTeam.id/awayTeam.id dans le référentiel ESPN, pas
+  // FD.org, ce qui casse tout ce qui filtre compMatches par id (Forme
+  // récente, Stats saison, Compos probables...) rien que pour CES matchs.
+  // On résout l'id réel une seule fois ici, dès que compMatches est chargé —
+  // tout le reste de cette page continue de lire match.homeTeam.id/
+  // match.awayTeam.id normalement, sans rien savoir de ce contournement.
+  const match = useMemo(() => {
+    if (!rawMatch || !compMatches?.length) return rawMatch
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, compMatches)
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, compMatches)
+    if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
+    return {
+      ...rawMatch,
+      homeTeam: { ...rawMatch.homeTeam, id: homeId },
+      awayTeam: { ...rawMatch.awayTeam, id: awayId },
+    }
+  }, [rawMatch, compMatches])
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
 

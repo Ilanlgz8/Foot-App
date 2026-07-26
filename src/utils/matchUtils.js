@@ -14,6 +14,7 @@
 //   4. Heuristique → calcul depuis utcDate
 // Utilisé dans Accueil.jsx (MatchCard, LiveWidget) et Match.jsx (BkCard).
 import { getMatchState } from './matchStateTracker'
+import { fuzzyTeam } from './espnSummaryParse'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
@@ -507,4 +508,48 @@ export function isNeutralVenueComp(match) {
   const id   = match?.competition?.id
   const code = match?.competition?.code
   return NATIONAL_TEAM_COMP_IDS.has(id) || NEUTRAL_VENUE_COMP_CODES.has(code)
+}
+
+// ── Résolution id équipe football-data.org (par nom, repli ESPN→FD.org) ────
+// ⚠️ AJOUT (constat utilisateur, 26/07 : "quand je clique sur un match à
+// venir dans Accueil y'a aucune donnée, mais le même match cliqué depuis
+// Programme ça marche") : les 6 grands championnats sont sourcés ESPN dans
+// Accueil (voir espnAdapter.js/normalizeEvent, useTodayMatches.js —
+// ESPN_SOURCED_COMPS, choix délibéré pour réduire les appels FD.org) — ces
+// matchs ont alors homeTeam.id/awayTeam.id dans le référentiel ESPN (l'id
+// interne ESPN de l'équipe), PAS l'id numérique football-data.org.
+// Programme, lui, reste 100% FD.org pour ces mêmes 6 comps (voir le
+// commentaire dédié dans useTodayMatches.js) — ses matchs ont donc toujours
+// le vrai id FD.org, d'où la différence de comportement constatée.
+// Or Forme récente / Stats saison / Compos probables (PreMatchSection,
+// MpSeasonStats, useProbableLineups) filtrent TOUS compMatches (liste de
+// matchs FD.org de la compétition, via useTeamForm) par ÉGALITÉ STRICTE
+// d'id — un id ESPN ne correspond jamais à rien dans cette liste : ces
+// sections retombaient silencieusement sur "aucune donnée" pour CES matchs
+// précis. ClassementTab avait déjà dû contourner exactement ce même problème
+// en comparant par NOM (fuzzyTeam) plutôt que par id (voir MatchModal.jsx) —
+// même technique ici, mais résolue UNE FOIS, en amont, pour que tout le reste
+// de la page profite d'un id correct sans dupliquer la logique partout.
+// Retombe sur l'id d'origine si aucune correspondance (compMatches pas
+// encore chargé, ou vraiment aucune équipe correspondante) — comportement
+// inchangé pour le cas normal (id déjà FD.org, la grande majorité des cas).
+export function resolveFdTeamId(team, compMatches) {
+  const rawId = team?.id ?? null
+  if (!team || !compMatches?.length) return rawId
+  // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
+  // compMatches) : rien à résoudre, on ne fait jamais de recherche par nom
+  // inutilement.
+  const idAlreadyKnown = compMatches.some(m => m.homeTeam?.id === rawId || m.awayTeam?.id === rawId)
+  if (idAlreadyKnown) return rawId
+  const name = team.name || team.shortName || ''
+  if (!name) return rawId
+  for (const m of compMatches) {
+    if (fuzzyTeam(m.homeTeam?.name ?? '', name) || fuzzyTeam(m.homeTeam?.shortName ?? '', name)) {
+      return m.homeTeam.id
+    }
+    if (fuzzyTeam(m.awayTeam?.name ?? '', name) || fuzzyTeam(m.awayTeam?.shortName ?? '', name)) {
+      return m.awayTeam.id
+    }
+  }
+  return rawId
 }

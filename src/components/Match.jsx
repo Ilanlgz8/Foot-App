@@ -957,9 +957,30 @@ function Matchs() {
   // le chargement terminé (`!loading`) et sans groupe détecté, on bascule sur
   // 'matchs' que la liste soit vide ou pleine — la vue 'matchs' affiche
   // correctement soit les matchs, soit "Aucun match à venir" dans les 2 cas.
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 26/07 : "les championnats où y'a un
+  // autre championnat à l'intérieur genre FA Cup ou Coupe de France, quand je
+  // vais dans Programme ça ne met pas automatiquement sur l'onglet 'par
+  // journée'") : ce garde-fou attendait `!loading` avant de corriger la vue
+  // — pertinent pour isWC (savoir s'il y a des groupes dépend VRAIMENT des
+  // matchs chargés), mais pas pour hasCup : qu'une coupe nationale fusionnée
+  // n'ait jamais de phase de groupes est un fait STRUCTUREL du catalogue
+  // (DOMESTIC_CUPS), connu instantanément, pas une donnée à attendre. Tant
+  // que le chargement traînait (ou juste le temps d'un aller-retour réseau),
+  // la vue restait sur 'poules' — qui ne rend RIEN pour hasCup (pas de bloc
+  // 'poules' hors isWC, voir le toggle plus bas) — écran vide/pas "Par
+  // journée" tant que ce useEffect n'avait pas eu l'occasion de corriger.
+  // Séparé en 2 branches : hasCup corrige immédiatement (aucune attente),
+  // isWC garde son garde-fou existant (dépend de wcGroups, lui-même dépendant
+  // du chargement réel).
   useEffect(() => {
     if (autoSwitchDone.current) return
-    if ((isWC || hasCup) && wcView === 'poules' && !loading && wcGroups.length === 0) {
+    if (hasCup && wcView === 'poules') {
+      setWcView('matchs')
+      setCurrentIndex(0)
+      autoSwitchDone.current = true
+      return
+    }
+    if (isWC && wcView === 'poules' && !loading && wcGroups.length === 0) {
       setWcView('matchs')
       setCurrentIndex(0)
       autoSwitchDone.current = true
@@ -1060,7 +1081,14 @@ function Matchs() {
   /* ── Helpers ── */
   const handleSelectComp = (id) => {
     autoSwitchDone.current = false
-    setSelectedComp(id); setCurrentIndex(0); setWcView('poules'); setOpenedGroup(null)
+    // Défaut choisi directement selon la compétition CIBLÉE (pas l'ancienne
+    // sélection) : seules WC/EC ont une vraie phase de groupes ('poules') —
+    // tout le reste (dont une coupe nationale fusionnée, hasCup) démarre
+    // directement sur "Par journée" ('matchs'), sans passer par 'poules' puis
+    // attendre la correction réactive ci-dessus (voir son commentaire) — zéro
+    // flash, correct dès le premier rendu, peu importe la vitesse du réseau.
+    const targetIsWC = id === 'WC' || id === 'EC'
+    setSelectedComp(id); setCurrentIndex(0); setWcView(targetIsWC ? 'poules' : 'matchs'); setOpenedGroup(null)
   }
 
   const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
