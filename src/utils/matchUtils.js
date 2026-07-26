@@ -14,7 +14,7 @@
 //   4. Heuristique → calcul depuis utcDate
 // Utilisé dans Accueil.jsx (MatchCard, LiveWidget) et Match.jsx (BkCard).
 import { getMatchState } from './matchStateTracker'
-import { fuzzyTeam } from './espnSummaryParse'
+import { clubNameMatch } from './espnSummaryParse'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
@@ -587,13 +587,21 @@ export function resolveFdTeamId(team, compMatches) {
   // inutilement.
   const idAlreadyKnown = compMatches.some(m => m.homeTeam?.id === rawId || m.awayTeam?.id === rawId)
   if (idAlreadyKnown) return rawId
-  const name = team.name || team.shortName || ''
-  if (!name) return rawId
+  // ⚠️ clubNameMatch (pas fuzzyTeam) : voir commentaire dédié dans
+  // espnSummaryParse.js — fuzzyTeam confond des clubs distincts qui
+  // partagent juste un mot générique (bug réel : Manchester City / United).
+  // On teste name ET shortName des deux côtés (4 combinaisons) puisque
+  // clubNameMatch est volontairement plus strict (préfixe complet
+  // uniquement) — plus de champs comparés compense sans réintroduire le
+  // risque de faux positif.
+  const teamNames = [team.name, team.shortName].filter(Boolean)
+  if (!teamNames.length) return rawId
+  const matches = (candidate) => teamNames.some(n => clubNameMatch(candidate ?? '', n))
   for (const m of compMatches) {
-    if (fuzzyTeam(m.homeTeam?.name ?? '', name) || fuzzyTeam(m.homeTeam?.shortName ?? '', name)) {
+    if (matches(m.homeTeam?.name) || matches(m.homeTeam?.shortName)) {
       return m.homeTeam.id
     }
-    if (fuzzyTeam(m.awayTeam?.name ?? '', name) || fuzzyTeam(m.awayTeam?.shortName ?? '', name)) {
+    if (matches(m.awayTeam?.name) || matches(m.awayTeam?.shortName)) {
       return m.awayTeam.id
     }
   }

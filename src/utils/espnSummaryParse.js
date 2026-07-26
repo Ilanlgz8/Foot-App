@@ -121,6 +121,34 @@ export function fuzzyTeam(a, b) {
   )
 }
 
+// ── clubNameMatch ────────────────────────────────────────────────────────────
+// ⚠️ AJOUT (bug réel constaté par l'utilisateur, 27/07 : match Manchester
+// City - Bournemouth affichait les données de Manchester United) : fuzzyTeam
+// ci-dessus matche dès que les 5 premiers caractères (ou un seul mot de 4+
+// lettres) sont communs — voulu pour les noms de PAYS, qui varient beaucoup
+// d'une source à l'autre ("South Korea" vs "Korea Republic", voir tests plus
+// bas) mais dangereux pour des noms de CLUB, qui partagent très souvent un
+// mot générique sans être la même équipe : la ville ("Manchester City" /
+// "Manchester United", le cas trouvé), un nom de famille de club ("Real
+// Madrid" / "Real Sociedad" / "Real Betis"), ou un mot-type ("Inter Milan" /
+// "Inter Miami", "Sporting CP" / "Sporting Gijón"). Déjà documenté une
+// première fois pour le repli H2H (voir REVERT 25/07 dans MatchModal.jsx,
+// useH2HRows : "Paris-Rennes" affichait Brest/Saint-Étienne via le mot
+// "Stade" partagé) — même classe de bug, retrouvée ici dans un endroit
+// différent (resolveFdTeamId, matchUtils.js) qui avait réutilisé fuzzyTeam
+// sans réappliquer cette leçon. clubNameMatch n'autorise que l'égalité
+// stricte après normalisation, ou qu'un des deux noms soit un PRÉFIXE
+// COMPLET de l'autre (le nom entier, pas juste ses 5 premiers caractères) —
+// couvre les vraies variantes ESPN/FD.org (suffixe "FC"/"CF" en plus, nom
+// court identique au début du nom complet, ex. "Manchester City" est un
+// préfixe complet de "Manchester City FC") sans jamais confondre 2 clubs
+// distincts qui partagent seulement un mot ou un préfixe court.
+export function clubNameMatch(a, b) {
+  const na = normalize(a), nb = normalize(b)
+  if (!na || !nb) return false
+  return na === nb || na.startsWith(nb) || nb.startsWith(na)
+}
+
 function initialName(full) {
   if (!full) return null
   const parts = full.trim().split(/\s+/)

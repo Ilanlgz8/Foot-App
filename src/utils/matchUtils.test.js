@@ -289,6 +289,32 @@ describe('resolveFdTeamId', () => {
     expect(resolveFdTeamId(null, compMatches)).toBeNull()
     expect(resolveFdTeamId(undefined, compMatches)).toBeNull()
   })
+
+  // ⚠️ Bug réel constaté par l'utilisateur (27/07) : match Manchester City -
+  // Bournemouth affichait les données de Manchester United. Cause :
+  // resolveFdTeamId utilisait fuzzyTeam (préfixe 5 caractères / mot partagé),
+  // qui matche à tort "Manchester City" et "Manchester United" via le mot
+  // commun "Manchester" — corrigé en passant à clubNameMatch (préfixe
+  // complet strict). Ce test fige le comportement correct pour ne pas
+  // régresser.
+  const plCompMatches = [
+    { homeTeam: { id: 65, name: 'Manchester City FC',   shortName: 'Man City' },
+      awayTeam: { id: 91, name: 'AFC Bournemouth',      shortName: 'Bournemouth' } },
+    { homeTeam: { id: 66, name: 'Manchester United FC', shortName: 'Man United' },
+      awayTeam: { id: 65, name: 'Manchester City FC',   shortName: 'Man City' } },
+  ]
+
+  it('ne confond pas 2 clubs qui partagent juste un mot (Manchester City vs Manchester United)', () => {
+    // id ESPN incompatible pour Man City (comme dans le vrai bug), résolu
+    // par nom — doit retrouver 65 (Man City), jamais 66 (Man United).
+    expect(resolveFdTeamId({ id: 111, name: 'Manchester City' }, plCompMatches)).toBe(65)
+    expect(resolveFdTeamId({ id: 222, name: 'Manchester United' }, plCompMatches)).toBe(66)
+  })
+
+  it('ne confond pas non plus via shortName (Man City vs Man United)', () => {
+    expect(resolveFdTeamId({ id: 111, name: '?', shortName: 'Man City' }, plCompMatches)).toBe(65)
+    expect(resolveFdTeamId({ id: 222, name: '?', shortName: 'Man United' }, plCompMatches)).toBe(66)
+  })
 })
 
 // resolveFdMatchId — bug réel (26/07) : "dans Accueil t'as que 2 h2h, dans

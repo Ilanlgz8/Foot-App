@@ -8,7 +8,7 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam, clubNameMatch } from './espnSummaryParse'
 
 // Payloads de test simplifiés mais avec les VRAIS noms de champs ESPN,
 // vérifiés par appel réel à site.api.espn.com/apis/v2/sports/soccer/{slug}/
@@ -146,6 +146,38 @@ describe('fuzzyTeam', () => {
   it('renvoie false si un des deux noms est vide/absent', () => {
     expect(fuzzyTeam('', 'Norway')).toBe(false)
     expect(fuzzyTeam('Norway', undefined)).toBe(false)
+  })
+})
+
+// clubNameMatch — bug réel constaté par l'utilisateur (27/07) : match
+// Manchester City - Bournemouth affichait les données de Manchester United.
+// fuzzyTeam (ci-dessus, voulu pour les pays) matche à tort 2 clubs qui
+// partagent juste un mot ("Manchester") ou un préfixe court — clubNameMatch
+// est la variante stricte réservée aux noms de club (voir resolveFdTeamId,
+// matchUtils.js).
+describe('clubNameMatch', () => {
+  it('matche un nom identique après normalisation', () => {
+    expect(clubNameMatch('Manchester City', 'Manchester City')).toBe(true)
+  })
+
+  it('matche un nom complet et sa variante avec suffixe FC/CF', () => {
+    expect(clubNameMatch('Manchester City FC', 'Manchester City')).toBe(true)
+    expect(clubNameMatch('Real Madrid', 'Real Madrid CF')).toBe(true)
+  })
+
+  it('ne matche PAS 2 clubs distincts qui partagent juste un mot (bug réel)', () => {
+    expect(clubNameMatch('Manchester City', 'Manchester United')).toBe(false)
+    expect(clubNameMatch('Manchester City FC', 'Manchester United FC')).toBe(false)
+  })
+
+  it('ne matche pas non plus d\'autres collisions de mot générique connues', () => {
+    expect(clubNameMatch('Real Madrid', 'Real Sociedad')).toBe(false)
+    expect(clubNameMatch('Inter Milan', 'Inter Miami')).toBe(false)
+  })
+
+  it('renvoie false si un des deux noms est vide/absent', () => {
+    expect(clubNameMatch('', 'Manchester City')).toBe(false)
+    expect(clubNameMatch('Manchester City', undefined)).toBe(false)
   })
 })
 
