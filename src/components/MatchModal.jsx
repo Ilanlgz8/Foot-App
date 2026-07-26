@@ -1568,8 +1568,6 @@ export function useH2HRows(match, compMatches) {
   const { data: h2hMatches, isLoading } = useH2H(match)
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
-  const homeName = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
-  const awayName = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
 
   // Données FD.org, du plus récent au plus vieux. ⚠️ CORRIGÉ (constat
   // utilisateur : "met en premier les plus récent" — ce n'était pas le cas)
@@ -1589,26 +1587,28 @@ export function useH2HRows(match, compMatches) {
     .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
 
   // Fallback : confrontations dans la compétition en cours (si FD.org vide)
-  // ⚠️ AJOUT match par NOM en plus de l'id (25/07, constat utilisateur :
-  // "Historique" incohérent Programme vs Accueil pour le même match) : `match`
-  // peut venir d'ESPN (6 grands championnats sourcés ESPN dans Accueil, voir
-  // useH2H ci-dessus/normalizeEvent) — ses homeId/awayId sont alors des id
-  // ESPN, tandis que `compMatches` (toujours sourcé FD.org, voir useTeamForm)
-  // porte des id football-data.org : la comparaison par id seule ne matchait
-  // donc JAMAIS dans ce cas précis, silencieusement (aucune erreur, juste 0
-  // résultat). fuzzyTeam (même utilitaire que le raccord CM/Euro plus haut
-  // dans ce fichier) compare les noms, fiable quelle que soit la source.
+  // ⚠️ REVERT (25/07, même jour, constat utilisateur avec capture à l'appui :
+  // "Paris-Rennes" affichait des rencontres Brest/Saint-Étienne/Reims sans
+  // aucun rapport) : la comparaison par NOM (fuzzyTeam) ajoutée plus tôt
+  // aujourd'hui pour contourner le mismatch id ESPN/FD.org (voir useH2H
+  // ci-dessus) génère de VRAIS faux positifs — fuzzyTeam matche sur un simple
+  // préfixe/mot partagé, beaucoup trop permissif pour des noms de club
+  // français qui partagent souvent un mot générique ("Stade Rennais" /
+  // "Stade Brestois" → même préfixe "Stade", vérifié en direct). Fiable pour
+  // son usage d'origine (noms de PAYS pour le raccord CM/Euro plus haut dans
+  // ce fichier, où ce risque de collision n'existe quasiment pas) mais pas
+  // pour des noms de club. Un Historique manquant est un moindre mal qu'un
+  // Historique FAUX (même principe déjà appliqué dans ce projet — voir
+  // CLAUDE.md, retrait de TheSportsDB : "un classement à 5 lignes est
+  // trompeur, pire qu'aucun classement"). Retour à la comparaison par id
+  // stricte uniquement — les matchs ESPN (Accueil, grands championnats)
+  // n'auront simplement pas de repli H2H disponible, comme avant ce jour.
   const compH2H = !fdRecent.length && compMatches?.length
-    ? (compMatches).filter(m => {
-        if (m.status !== 'FINISHED') return false
-        const mHomeName = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
-        const mAwayName = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
-        const sameOrder    = (m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
-          (fuzzyTeam(mHomeName, homeName) && fuzzyTeam(mAwayName, awayName))
-        const reverseOrder = (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId) ||
-          (fuzzyTeam(mHomeName, awayName) && fuzzyTeam(mAwayName, homeName))
-        return sameOrder || reverseOrder
-      }).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+    ? (compMatches).filter(m =>
+        m.status === 'FINISHED' &&
+        ((m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
+         (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId))
+      ).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
     : []
 
   return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }
