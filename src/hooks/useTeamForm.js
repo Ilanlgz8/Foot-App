@@ -269,6 +269,21 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
     formMap:     data?.formMap  ?? {},
     // Matches bruts — utilisés pour extraire le H2H en modal
     compMatches: data?.matches ?? [],
+    // ⚠️ AJOUT (bug réel trouvé le 27/07, demande explicite utilisateur :
+    // "pas la peine de recuperer la forme recente et stat saison des
+    // dernieres saison... juste h2h") : fetchTeamForm calcule bien
+    // `isLastSeason` (voir ci-dessus) et MatchPage.jsx/LiveMatchPage.jsx
+    // s'en servaient DÉJÀ (destructuré depuis ce hook, transmis à
+    // MpSeasonStats) — mais ce hook ne le renvoyait jamais dans son objet
+    // de retour : `isLastSeason` valait donc toujours `undefined` côté
+    // appelant, quelle que soit la réalité. Le garde-fou existait dans le
+    // code mais n'a jamais été branché — Stats saison/Forme récente
+    // affichaient silencieusement la saison précédente en intersaison
+    // depuis le début. Corrigé ici ; redevient automatiquement `false` dès
+    // que la vraie saison en cours atteint MIN_LEAGUE_GAMES matchs
+    // FINISHED (voir fetchTeamForm plus haut) — pas besoin d'y retoucher
+    // quand les championnats démarreront.
+    isLastSeason: data?.isLastSeason ?? false,
     isLoading,
   }
 }

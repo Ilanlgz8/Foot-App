@@ -355,7 +355,7 @@ export default function LiveMatchPage() {
   const espn    = rawMatch ? (espnScores[rawMatch.id] ?? null) : null
   const compId  = rawMatch?.competition?.code ?? null
 
-  const { formMap, compMatches } = useTeamForm(compId)
+  const { formMap, compMatches, isLastSeason } = useTeamForm(compId)
 
   // Même correctif que MatchPage.jsx (voir resolveFdTeamId, matchUtils.js) :
   // un match live sourcé ESPN (les 6 grands championnats via Accueil) a des
@@ -548,7 +548,19 @@ export default function LiveMatchPage() {
                     que perdue, mais sort du chemin direct vers les côtes en
                     direct/stats live. */}
                 <h3 className="pm__sectionTitle" style={{ marginTop: '1.5rem' }}>Stats saison</h3>
-                <SeasonStatsTab match={match} compMatches={compMatches} />
+                {/* ⚠️ AJOUT isLastSeason (27/07, demande explicite utilisateur :
+                    "pas la peine de recuperer la forme recente et stat saison
+                    des dernieres saison... juste h2h") : compMatches vient alors
+                    du repli "saison précédente" de useTeamForm — ni stats ni
+                    forme d'une saison déjà terminée ne sont affichées ici tant
+                    que la nouvelle saison n'a pas commencé (voir useTeamForm.js,
+                    redevient false automatiquement dès les premiers vrais
+                    matchs). L'Historique (onglet Statistiques, inchangé) reste
+                    disponible dans tous les cas. */}
+                {isLastSeason
+                  ? <p className="pm__noData">Disponibles dès le début de la saison</p>
+                  : <SeasonStatsTab match={match} compMatches={compMatches} />
+                }
               </>
             )}
           </div>

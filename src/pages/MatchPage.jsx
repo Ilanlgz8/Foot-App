@@ -557,7 +557,15 @@ function calcTeamStats(teamId, compMatches, split = 'all') {
   }
 }
 
-function MpSeasonStats({ match, compMatches, isLastSeason = false, hideForm = false }) {
+// ⚠️ isLastSeason retiré d'ici (27/07, demande explicite utilisateur :
+// "pas la peine de recuperer la forme recente et stat saison des dernieres
+// saison... juste h2h" — et après, quand les championnats démarreront).
+// Avant, ce composant gardait quand même "Forme récente" visible en
+// intersaison (voir historique git) — décision explicitement annulée : les
+// 2 appelants (plus bas dans ce fichier) affichent maintenant un message
+// à la place de TOUT ce composant (stats ET forme) quand isLastSeason est
+// vrai, donc ce composant n'a plus besoin de connaître ce cas.
+function MpSeasonStats({ match, compMatches, hideForm = false }) {
   const homeId   = match.homeTeam?.id
   const awayId   = match.awayTeam?.id
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
@@ -574,25 +582,6 @@ function MpSeasonStats({ match, compMatches, isLastSeason = false, hideForm = fa
   // disparaître toute la section pour une équipe encore sans match dans ce
   // contexte précis, alors que "Global" en a).
   if (split === 'all' && !h && !a) return null
-
-  // ⚠️ AJOUT (constat utilisateur : "stats saison" affichait des moyennes
-  // calculées sur la saison 2024/2025 alors qu'il n'y avait pas encore
-  // assez de matchs 2025/2026 — présentées telles quelles sous le libellé
-  // "Saison", sans indiquer qu'il s'agit d'une saison différente).
-  // compMatches vient alors du repli "saison précédente" de useTeamForm
-  // (isLastSeason) — sciemment gardé pour la forme récente/le pronostic
-  // (voir commentaires dans useTeamForm.js), mais des MOYENNES numériques
-  // affichées comme "la saison" sans le dire seraient trompeuses. Plutôt
-  // que d'inventer une saison qu'on n'a pas, on masque ce bloc précis (le
-  // bloc "Forme récente" juste en dessous, lui, reste affiché — déjà pensé
-  // pour ce cas dès sa conception).
-  if (isLastSeason) {
-    return !hideForm ? (
-      <div className="mp__statsWrap">
-        {formSection()}
-      </div>
-    ) : null
-  }
 
   function formSection() {
     return (
@@ -812,7 +801,8 @@ export default function MatchPage() {
                         via MatchPoster). */}
                     {statsView === 'live'       ? <MpMatchStats match={match} />
                    : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                   :                              <MpSeasonStats match={match} compMatches={compMatches} isLastSeason={isLastSeason} />
+                   : isLastSeason              ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
+                   :                              <MpSeasonStats match={match} compMatches={compMatches} />
                     }
                   </>
                 : formLoading
@@ -826,6 +816,21 @@ export default function MatchPage() {
                       )}
                       {statsView === 'historique' && showH2HTab
                         ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                        : isLastSeason
+                        // ⚠️ AJOUT (27/07, demande explicite utilisateur : "comme
+                        // la les championnat ont pas commencé pas la peine de
+                        // recuperer la forme recente et stat saison des dernieres
+                        // saison... juste h2h... et après on affichera forme
+                        // recente et stat saison quand les championnat
+                        // debuteront") : compMatches vient alors du repli "saison
+                        // précédente" de useTeamForm (voir isLastSeason,
+                        // useTeamForm.js) — ni les stats ni la forme d'une saison
+                        // déjà terminée ne sont affichées, seul l'Historique
+                        // (useH2HRows, ci-dessus, inchangé) reste disponible.
+                        // Redevient `false` automatiquement (voir useTeamForm.js)
+                        // dès les premiers vrais matchs de la nouvelle saison —
+                        // rien à modifier ici quand les championnats démarreront.
+                        ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
                         : <>
                             {/* Pronostic des fans — tout en haut, avant Stats saison
                                 (pas de tabs Stats Live/Stats Saison avant le
@@ -833,7 +838,6 @@ export default function MatchPage() {
                             <MpSeasonStats
                               match={match}
                               compMatches={compMatches}
-                              isLastSeason={isLastSeason}
                               hideForm
                             />
                             <PreMatchSection
