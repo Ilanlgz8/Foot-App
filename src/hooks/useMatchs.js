@@ -6,6 +6,7 @@ import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 // Compétitions sans couverture football-data.org (free tier) — servies via
 // ESPN à la place (voir src/utils/espnAdapter.js pour le détail des limites :
@@ -142,7 +143,12 @@ export function getClubSeason() {
 // ex: récupérer les matchs à venir de PLUSIEURS compétitions d'un coup —
 // voir useUpcomingMatchesAllComps ci-dessous, utilisé par Pronos.jsx).
 async function tryFetch(url) {
-  const res = await fdFetch(fdUrl(url))
+  // Enregistré AVANT le await (voir fdSpacingTracker.js) — permet à un appel
+  // voisin (ex: EC après WC dans useUpcomingMatchesAllComps) d'attendre
+  // CET appel-ci avant de décider s'il doit patienter.
+  const fetchPromise = fdFetch(fdUrl(url))
+  registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+  const res = await fetchPromise
   if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
   if (!res.ok) return null
   const json = await res.json()
@@ -158,7 +164,10 @@ async function tryFetch(url) {
 // MÊME compétition (season + repli sans season) — les 5 autres appelants de
 // tryFetch() restent inchangés (pas besoin de cette info).
 async function tryFetchWithMeta(url) {
-  const res = await fdFetch(fdUrl(url))
+  // Enregistré AVANT le await (voir fdSpacingTracker.js).
+  const fetchPromise = fdFetch(fdUrl(url))
+  registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+  const res = await fetchPromise
   if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
   const fresh = !res.headers.get('X-Cache')
   if (!res.ok) return { matches: null, fresh }
@@ -410,6 +419,14 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   const { should, fresh } = await shouldQueryWcEcWithMeta()
   if (!should) return []
   if (fresh) await new Promise(r => setTimeout(r, 6_000))
+  // ⚠️ AJOUT (26/07, audit "dis moi toutes les requêtes au lancement") :
+  // WC et EC sont voisins dans compIds (useUpcomingMatchesAllComps) mais
+  // espacés seulement de ALL_COMPS_STAGGER_MS (800ms) — largement
+  // insuffisant contre le verrou d'espacement serveur (~6s). Attente
+  // adaptative (fdSpacingTracker.js) : 0ms si aucun appel voisin réel n'est
+  // en cours (cas club, ESPN — la grande majorité), sinon le temps qui
+  // reste réellement avant l'expiration du verrou.
+  await waitForFdSpacing()
 
   let matches
   const wcSeason = new Date().getFullYear()

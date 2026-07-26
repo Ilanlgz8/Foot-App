@@ -5,6 +5,7 @@ import { fetchEspnCupMatches } from '../utils/espnAdapter'
 import { DOMESTIC_CUPS } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 const STALE_MS = 1000 * 60 * 10  // 10min
 
@@ -173,31 +174,25 @@ export function useWcKnockout(compCode = 'WC') {
       // 'SCHEDULED') ET useWcKnockout(selectedComp) EN MÊME TEMPS pour WC/EC —
       // 2 hooks indépendants qui tapent LA MÊME URL FD.org
       // (`/matches?season=${season}`) au même instant, sur le même verrou
-      // d'espacement global. Contrairement aux collisions déjà corrigées plus
-      // haut dans ce fichier (2 appels DANS le même hook, où on peut savoir si
-      // le 1er était "fresh"), ces 2 hooks ne se voient pas l'un l'autre —
-      // impossible de conditionner le délai sur un `fresh` partagé sans
-      // restructurer les deux fichiers. Délai fixe court à la place : laisse
-      // le temps à useMatches (contenu principal de la page) de partir en
-      // premier, réduit le cas garanti de double appel simultané. Risque
-      // actuellement faible (CM 2026 terminée, pas d'Euro cette année — voir
-      // commentaire plus haut) donc pas justifié de complexifier davantage
-      // pour un cas aujourd'hui dormant.
+      // d'espacement global. À l'époque (délai fixe de 4s, deviné) ces 2
+      // hooks ne pouvaient pas se voir l'un l'autre — corrigé le 26/07 (audit
+      // "dis moi toutes les requêtes au lancement") : useMatchs.js enregistre
+      // désormais ses appels réels dans le même tracker partagé
+      // (fdSpacingTracker.js) que celui-ci consulte via waitForFdSpacing()
+      // plus bas — attente RÉELLEMENT adaptative (0ms si useMatches n'a en
+      // fait rien tapé de réel), plus besoin de deviner un délai fixe.
       // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org
       // ci-dessous (jusqu'à 2 appels) quand on sait déjà qu'aucun match WC/EC
-      // n'existe dans une large fenêtre — cas quasi permanent hors Mondial/
-      // Euro. Repli sur le cache stale existant, comme le catch plus bas.
+      // n'existe dans une large fenêtre.
       // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à
       // WC, jamais aux compétitions club) : sans cette attente, un portillon
       // qui vient de vraiment taper FD.org fait bloquer l'appel plus bas par
-      // notre propre garde-fou serveur (verrou d'espacement ~6s) — le délai
-      // fixe de 4s ci-dessous (pensé pour la collision avec useMatches, pas
-      // avec ce portillon) ne suffisait pas à lui seul dans ce cas.
+      // notre propre garde-fou serveur (verrou d'espacement ~6s).
       const { should, fresh } = await shouldQueryWcEcWithMeta()
       if (!should) return readCacheStale(cacheKey) ?? EMPTY_ROUNDS
       if (fresh) await new Promise(res => setTimeout(res, 6_000))
 
-      await new Promise(res => setTimeout(res, 4_000))
+      await waitForFdSpacing()
       // Comme pour /matches et /scorers (voir useMatchs.js / useScorers.js) :
       // football-data.org résout la "saison courante" comme "celle qui a la
       // date de début la plus récente", une règle ambiguë pour une compétition
@@ -207,7 +202,10 @@ export function useWcKnockout(compCode = 'WC') {
       // déjà joués.
       const season = new Date().getFullYear()
       async function tryFetch(url) {
-        const r = await fdFetch(fdUrl(url))
+        // Enregistré AVANT le await (voir fdSpacingTracker.js).
+        const fetchPromise = fdFetch(fdUrl(url))
+        registerFdCallAttempt(fetchPromise.then(resp => !resp.headers.get('X-Cache')).catch(() => false))
+        const r = await fetchPromise
         if (r.status === 403 || r.status === 429) throw new Error(String(r.status))
         const fresh = !r.headers.get('X-Cache')
         if (!r.ok) return { matches: null, fresh }

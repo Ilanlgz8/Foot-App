@@ -4,6 +4,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
+import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 
@@ -54,7 +55,12 @@ const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 
 
 async function safeFetch(url) {
-  const res = await fdFetch(fdUrl(url))
+  // Enregistré AVANT le await (voir fdSpacingTracker.js) — permet à un
+  // appel voisin (ex: EC juste après WC, voir fetchWcEcPortion) d'attendre
+  // CET appel-ci avant de décider s'il doit patienter.
+  const fetchPromise = fdFetch(fdUrl(url))
+  registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+  const res = await fetchPromise
   // Erreurs serveur/rate-limit → throw pour que TanStack garde le dernier state valide
   if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
   if (res.status >= 500) throw new Error(`server_${res.status}`)
@@ -117,11 +123,29 @@ async function fetchWcEcPortion(date, delayMs = 0) {
   if (!should) return []
   if (fresh) await new Promise(r => setTimeout(r, 6_000))
   if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+  // ⚠️ AJOUT (26/07, même audit) : useRecentDaysMatches appelle cette
+  // fonction UNE FOIS PAR JOUR avec seulement 2s d'écart entre 2 jours
+  // (STAGGER_MS) — insuffisant contre le verrou 6s si un jour précédent
+  // vient de vraiment taper FD.org. Protège aussi contre un hook voisin
+  // totalement différent (useWcKnockout, useUpcomingMatchesAllComps...).
+  await waitForFdSpacing()
   const prevDate = prevDateStr(date)
-  const settled = await Promise.allSettled([
-    safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`),
-    safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`),
-  ])
+
+  // ⚠️ BUG CORRIGÉ (26/07, audit "dis moi toutes les requêtes au lancement")
+  // : WC et EC tapaient FD.org SIMULTANÉMENT via Promise.allSettled — les 2
+  // se disputaient le MÊME verrou d'espacement serveur (spaceKey unique,
+  // voir SPACING_MS/api/football.js) au même instant, donc l'un des deux se
+  // faisait systématiquement bloquer (429) à chaque appel (silencieusement
+  // absorbé par le .flatMap ci-dessous — pas un crash, mais une moitié des
+  // données manquante à chaque fois). Séquencé : EC attend la vraie réponse
+  // de WC (via le tracker partagé, fdSpacingTracker.js) avant de décider
+  // s'il doit patienter — 0ms si WC a été servi depuis le cache serveur.
+  const wcPromise = safeFetch(`/api/v4/competitions/WC/matches?dateFrom=${prevDate}&dateTo=${date}`)
+  wcPromise.catch(() => {}) // évite un rejet de promesse non intercepté pendant l'attente ci-dessous (même mécanisme que useTeamForm.js)
+  await waitForFdSpacing()
+  const ecPromise = safeFetch(`/api/v4/competitions/EC/matches?dateFrom=${prevDate}&dateTo=${date}`)
+
+  const settled = await Promise.allSettled([wcPromise, ecPromise])
   return settled.flatMap(r => r.status === 'fulfilled' ? r.value : [])
 }
 

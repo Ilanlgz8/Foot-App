@@ -26,13 +26,39 @@
 // faire son propre appel normalement) plutôt que de risquer de cacher un
 // vrai tournoi. Ce portillon ne fait donc jamais QUE réduire des appels
 // FD.org qui n'auraient rien trouvé — jamais supprimer un vrai match.
+//
+// ⚠️ BUG CRITIQUE CORRIGÉ (26/07, question utilisateur "au lancement de
+// l'app c quoi les requêtes... dis moi tout" — audit demandé, pas un bug
+// signalé au préalable) : `hasActivity` comptait N'IMPORTE QUEL match dans
+// la fenêtre, y compris ceux déjà `FINISHED` — DAYS_BACK=30 couvrait donc
+// tranquillement un Mondial qui vient de se terminer (finale CM 2026 le
+// 19/07, vérifié via recherche web — nous sommes le 26/07, soit seulement
+// 7 jours après). Conséquence concrète, vérifiée dans le code : le
+// portillon répondait "oui, il y a de l'activité" en ce moment précis (le
+// Mondial ENTIER, 11/06→19/07, tombe dans les 30 jours en arrière) — donc
+// il ne bloquait plus AUCUNE des cascades qu'il est censé filtrer, et les 5
+// hooks partaient tous en cascade normalement : environ 20 vrais appels
+// FD.org en moins de 20 secondes à chaque lancement à froid de l'app,
+// jusqu'à ce que le Mondial sorte enfin de la fenêtre de 30 jours (~19/08).
+// Root cause : le portillon avait été conçu et testé UNIQUEMENT en période
+// creuse (pas de tournoi récent), jamais revérifié juste après la fin d'un
+// vrai Mondial — l'hypothèse "cas quasi permanent hors Mondial/Euro" du
+// commentaire d'origine ne tenait déjà plus.
+// Fix : DAYS_BACK aligné sur le VRAI besoin le plus large des appelants —
+// RESULTS_DAYS_BACK=7 (Accueil.jsx, useRecentDaysMatches) est la fenêtre
+// arrière la plus longue réellement consultée (useTodayMatches ne regarde
+// qu'aujourd'hui/hier). 7 jours après la finale, le Mondial sort donc de
+// cette fenêtre et le portillon redevient protecteur — au prix, en théorie,
+// d'un délai possible de quelques heures si un match WC/EC réapparaissait
+// pile à J-7/J-8 (cas non réaliste : aucun tournoi ne reprend le lendemain
+// de sa propre finale).
 import { fdFetch, fdUrl } from './fdFetch'
 import { readCacheStale, writeCache, getCacheSavedAt } from '../hooks/localCache'
 
 const GATE_KEY        = 'wcEcActivityGate_v1'
 const GATE_DISK_TTL   = 24 * 60 * 60 * 1000 // 24h — survie sur disque (purge)
 const GATE_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h — au-delà, on retente un vrai check
-const DAYS_BACK        = 30
+const DAYS_BACK        = 7
 const DAYS_FORWARD     = 120
 
 function fmtDate(d) { return d.toISOString().slice(0, 10) }

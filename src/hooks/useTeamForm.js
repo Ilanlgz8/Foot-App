@@ -133,6 +133,9 @@ async function fetchTeamForm(selectedComp) {
       return { formMap: {}, matches: [], isLastSeason: false }
     }
     if (fresh) await new Promise(r => setTimeout(r, 6_000))
+    // Protège aussi contre un hook voisin totalement différent (useWcKnockout,
+    // useTodayMatches...) qui viendrait de taper FD.org — voir fdSpacingTracker.js.
+    await waitForFdSpacing()
   }
 
   const seasonParam = selectedComp === 'WC' ? '?season=2026'
