@@ -1188,7 +1188,9 @@ export function ClassementTab({ match, compId }) {
   // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429") : 2s < verrou
   // global 6s (voir commentaire détaillé dans Classement.jsx) — insuffisant,
   // useTeamForm pouvait encore se faire bloquer par le verrou posé par
-  // useStandings. Passé à un multiple exact de 6s.
+  // useStandings. `6_000` est un PLAFOND passé à waitForFdSpacing() (voir
+  // fdSpacingTracker.js) — attente adaptative (0ms si useStandings n'a rien
+  // tapé de réel), pas un délai fixe à chaque visite.
   const { standings, groups, loading } = useStandings(compId)
   const { formMap } = useTeamForm(compId, 6_000)
 

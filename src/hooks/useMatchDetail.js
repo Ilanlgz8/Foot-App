@@ -14,6 +14,7 @@ import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 // déjà parsés — extractMatchDetails ne sert plus ici que pour le repli
 // scoreboard brut (boardComp, jamais mis en cache compact).
 import { extractMatchDetails } from '../utils/espnSummaryParse'
+import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -24,6 +25,9 @@ export function useMatchDetail(matchId) {
       const res = await fdFetch(fdUrl(`/api/v4/matches/${matchId}`))
       if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
       if (!res.ok) throw new Error(`${res.status}`)
+      // Signale à useH2H (même page, voir fdSpacingTracker.js) qu'un vrai
+      // appel FD.org vient d'avoir lieu.
+      if (!res.headers.get('X-Cache')) markFdCallFresh()
       const json = await res.json()
       writeCache(key, json, 24 * 60 * 60 * 1000)
       return json
@@ -893,7 +897,10 @@ export function useH2H(match, delayMs = 0) {
     initialDataUpdatedAt: cachedAt,
     queryFn: async () => {
       try {
-        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+        // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
+        // délai fixe — 0ms si useMatchDetail (même page) n'a en fait rien
+        // tapé de réel (cache déjà chaud pour ce match).
+        if (delayMs > 0) await waitForFdSpacing(delayMs)
         const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${match.id}%2Fhead2head&limit=20`)
         if (!res.ok) {
           const stale = readCacheStale(key)

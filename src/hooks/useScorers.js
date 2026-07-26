@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
+import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -34,7 +35,10 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
     queryFn: async () => {
-      if (delayMs > 0) await new Promise(res => setTimeout(res, delayMs))
+      // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
+      // délai fixe — 0ms si aucun hook voisin (useStandings/useTeamForm,
+      // même page) n'a vraiment tapé FD.org juste avant.
+      if (delayMs > 0) await waitForFdSpacing(delayMs)
       // football-data.org résout la "saison courante" comme "la saison à la date
       // de début la plus récente" (doc officielle) — pour une compétition annuelle
       // (WC, EC) qui ne revient que tous les 4 ans, ça peut pointer sur l'édition
@@ -50,6 +54,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
         const r = await fdFetch(fdUrl(url))
         if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
         const fresh = !r.headers.get('X-Cache')
+        if (fresh) markFdCallFresh()
         if (!r.ok) return { scorers: null, fresh }
         const j = await r.json()
         return { scorers: j.scorers ?? null, fresh }

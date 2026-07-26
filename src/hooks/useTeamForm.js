@@ -7,6 +7,7 @@ import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
+import { markFdCallFresh, waitForFdSpacing } from '../utils/fdSpacingTracker'
 
 // Aligné sur le cache serveur (api/football.js retourne déjà ce endpoint avec un
 // TTL de 2min par défaut) — 30min côté client empêchait de profiter d'une donnée
@@ -51,6 +52,9 @@ async function fetchFinishedSeasonMatches(selectedComp, seasonParam) {
   // 429 → throw pour que React Query retente (rate limit temporaire)
   if (res.status === 429) throw new Error('rate_limit')
   const fresh = !res.headers.get('X-Cache')
+  // Signale aux hooks voisins (useStandings/useScorers, voir
+  // fdSpacingTracker.js) qu'un vrai appel FD.org vient d'avoir lieu.
+  if (fresh) markFdCallFresh()
   if (!res.ok) return { matches: [], fresh }
   const json = await res.json()
   return { matches: (json.matches ?? []).filter(m => m.status === 'FINISHED'), fresh }
@@ -226,7 +230,12 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
     queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: () => {
       const run = async () => {
-        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+        // delayMs>0 : signal "un hook voisin (useStandings, même page) peut
+        // avoir déjà tapé FD.org juste avant" — attente ADAPTATIVE (voir
+        // fdSpacingTracker.js), pas un délai fixe : 0ms si ce voisin n'a en
+        // fait rien tapé de réel (cache déjà chaud), sinon juste le temps
+        // qui reste avant l'expiration du verrou serveur.
+        if (delayMs > 0) await waitForFdSpacing(delayMs)
         return fetchTeamForm(selectedComp)
       }
       const result = run()

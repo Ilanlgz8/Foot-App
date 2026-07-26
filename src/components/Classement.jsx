@@ -151,10 +151,14 @@ function Classement() {
   // tombaient encore DANS la fenêtre de verrouillage posée par useStandings
   // et se faisaient bloquer (429) — le stagger ne protégeait donc de rien de
   // concret, exactement la même classe de bug que le portillon WC/EC corrigé
-  // juste avant. Espacés maintenant à des multiples exacts de 6s (0/6s/12s) :
-  // chaque hook démarre son propre appel réel seulement après l'expiration
-  // garantie du verrou posé par le précédent, plus aucune collision possible
-  // par construction (même logique que SPACING_MS lui-même).
+  // juste avant. `6_000`/`12_000` sont maintenant des PLAFONDS passés à
+  // waitForFdSpacing() (voir fdSpacingTracker.js) — attente ADAPTATIVE, pas
+  // fixe : 0ms si useStandings n'a en fait rien tapé de réel (cache serveur
+  // déjà chaud, jour sans match...), sinon juste le temps qui reste avant
+  // l'expiration réelle du verrou. Retour utilisateur (26/07, "on devra
+  // attendre 6 secondes pour chaque truc c'est chiant") : un délai fixe à
+  // chaque visite, même quand inutile, était effectivement une mauvaise
+  // expérience — corrigé ici sans réintroduire la collision.
   const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
   const { formMap } = useTeamForm(selectedComp, 6_000)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)

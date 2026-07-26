@@ -3,6 +3,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { markFdCallFresh } from '../utils/fdSpacingTracker'
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -127,6 +128,11 @@ export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday =
         const res = await fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
         if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
         if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
+        // Signale aux hooks voisins (useTeamForm/useScorers, voir
+        // fdSpacingTracker.js) qu'un vrai appel FD.org vient d'avoir lieu —
+        // seulement si CE call a vraiment tapé FD.org (pas juste servi une
+        // copie cache serveur), sinon rien à attendre pour eux.
+        if (!res.headers.get('X-Cache')) markFdCallFresh()
         const json = await res.json()
         const allGroups = json.standings ?? []
         const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
