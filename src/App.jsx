@@ -12,6 +12,7 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { useWeakNetwork } from './hooks/useNetworkQuality'
 import { WeakNetworkBanner } from './components/WeakNetworkBanner'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SplashScreen } from './components/SplashScreen'
 
 const MatchAVenir = lazy(() => import('./components/Match.jsx'))
 const Resultat = lazy(() => import('./components/Resultat.jsx'))
@@ -130,6 +131,10 @@ function App() {
     // de page (nouvelle clé = nouvelle instance = l'erreur précédente est
     // oubliée), donc pas besoin d'un rechargement complet pour s'en sortir.
     <ErrorBoundary>
+      {/* Monté une seule fois (App() ne se démonte pas en naviguant) — voir
+          SplashScreen.jsx pour le détail du déclencheur (lancement à froid
+          uniquement) et de la durée (variable, liée aux requêtes en cours). */}
+      <SplashScreen />
       <LiveProvider>
         <Navbar />
         {!online && <OfflineBanner />}
