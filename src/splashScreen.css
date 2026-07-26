@@ -121,55 +121,66 @@
   position: absolute;
   left: var(--ball-start-x);
   top: var(--ball-start-y);
-  font-size: clamp(1.5rem, 6vw, 2.5rem);
+  font-size: clamp(1.9rem, 7.5vw, 3.1rem);
   z-index: 2;
   filter: drop-shadow(0 0 6px rgba(var(--red-rgb), 0.9));
   transform-origin: center;
-  animation: splashBallFly 1.8s cubic-bezier(.25,.65,.3,1) forwards;
+  /* ⚠️ linear (pas cubic-bezier) : un easing type "ease-out" appliqué à
+     CHAQUE segment entre keyframes ralentit vers zéro à la fin de chaque
+     segment avant de réaccélérer au suivant — avec 7 segments, ça se voyait
+     comme un ballon qui "s'arrête" plusieurs fois pendant son vol (retour
+     utilisateur). linear = vitesse constante par segment, mouvement continu.
+     L'aisance n'est réintroduite QUE là où elle a un sens : sur les 2
+     derniers segments (l'atterrissage), via animation-timing-function posé
+     directement sur les keyframes 80%/90% ci-dessous. */
+  animation: splashBallFly 1.8s linear forwards;
 }
 
 /* Trajectoire interpolée par calc() entre le point de départ (--ball-start-*)
    et le point d'atterrissage réel (--ball-ix/iy, mesuré sur le vrai point du
    "i") : roulé sous le texte, puis arc montant, léger rebond (dépassement +
    retour) pour éviter un atterrissage trop "robotique", posé exactement sur
-   le i. */
+   le i. Rotation continue ~2.5 tours sur tout le vol (vitesse constante,
+   modérément rapide), qui ralentit naturellement pendant le rebond final.
+   9 keyframes → 8, pour réduire encore le risque de saccade perçue. */
 @keyframes splashBallFly {
   0%   {
     left: var(--ball-start-x); top: var(--ball-start-y);
-    transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.55);
     opacity: 0;
   }
-  6%   { opacity: 1; transform: translate(-50%, -50%) rotate(40deg) scale(1); }
-  30%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.55);
+  5%   {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(50deg) scale(1.25);
+  }
+  28%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.48);
     top: var(--ball-start-y);
-    transform: translate(-50%, -50%) rotate(420deg) scale(1);
+    transform: translate(-50%, -50%) rotate(330deg) scale(1.2);
   }
-  46%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.8);
-    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.35);
-    transform: translate(-50%, -50%) rotate(650deg) scale(0.8);
+  48%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.78);
+    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.4);
+    transform: translate(-50%, -50%) rotate(570deg) scale(1.02);
   }
-  60%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.95);
-    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.75);
-    transform: translate(-50%, -50%) rotate(880deg) scale(0.6);
-  }
-  72%  {
-    left: calc(var(--ball-ix) + 8px); top: calc(var(--ball-iy) - 9px);
-    transform: translate(-50%, -50%) rotate(1020deg) scale(0.56);
+  66%  {
+    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.97);
+    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.85);
+    transform: translate(-50%, -50%) rotate(770deg) scale(0.84);
   }
   80%  {
-    left: calc(var(--ball-ix) - 4px); top: calc(var(--ball-iy) + 6px);
-    transform: translate(-50%, -50%) rotate(1044deg) scale(0.52);
+    left: calc(var(--ball-ix) + 7px); top: calc(var(--ball-iy) - 8px);
+    transform: translate(-50%, -50%) rotate(900deg) scale(0.72);
+    animation-timing-function: ease-out;
   }
-  88%  {
-    left: calc(var(--ball-ix) + 1px); top: calc(var(--ball-iy) - 1px);
-    transform: translate(-50%, -50%) rotate(1058deg) scale(0.51);
+  90%  {
+    left: calc(var(--ball-ix) - 3px); top: calc(var(--ball-iy) + 5px);
+    transform: translate(-50%, -50%) rotate(900deg) scale(0.67);
+    animation-timing-function: ease-out;
   }
   100% {
     left: var(--ball-ix); top: var(--ball-iy);
-    transform: translate(-50%, -50%) rotate(1060deg) scale(0.5);
+    transform: translate(-50%, -50%) rotate(900deg) scale(0.64);
     opacity: 1;
   }
 }
