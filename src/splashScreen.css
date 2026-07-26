@@ -69,7 +69,7 @@
     0 0 18px rgba(var(--red-rgb), 0.9),
     0 0 36px rgba(var(--red-rgb), 0.7),
     0 0 56px rgba(var(--red-rgb), 0.4);
-  animation: splashTextFromLeft 0.8s cubic-bezier(.2,.7,.3,1) forwards;
+  animation: splashTextFromLeft 1.3s cubic-bezier(.2,.7,.3,1) forwards;
 }
 
 .splash__foot,
@@ -80,7 +80,7 @@
     0 0 4px rgba(255, 255, 255, 0.9),
     0 0 12px rgba(var(--red-rgb), 0.8),
     0 0 26px rgba(var(--red-rgb), 0.5);
-  animation: splashTextFromRight 0.8s cubic-bezier(.2,.7,.3,1) forwards;
+  animation: splashTextFromRight 1.3s cubic-bezier(.2,.7,.3,1) forwards;
 }
 
 @keyframes splashTextFromLeft {
@@ -106,7 +106,7 @@
   width: 0;
   background: var(--red);
   box-shadow: 0 0 10px var(--red), 0 0 20px var(--red);
-  animation: splashUnderline 0.8s cubic-bezier(.2,.7,.3,1) 0.55s forwards;
+  animation: splashUnderline 1.2s cubic-bezier(.2,.7,.3,1) 0.9s forwards;
 }
 
 @keyframes splashUnderline {
@@ -133,7 +133,7 @@
      L'aisance n'est réintroduite QUE là où elle a un sens : sur les 2
      derniers segments (l'atterrissage), via animation-timing-function posé
      directement sur les keyframes 80%/90% ci-dessous. */
-  animation: splashBallFly 1.8s linear forwards;
+  animation: splashBallFly 3.2s linear forwards;
 }
 
 /* Trajectoire interpolée par calc() entre le point de départ (--ball-start-*)
