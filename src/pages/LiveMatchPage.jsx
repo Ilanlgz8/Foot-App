@@ -15,6 +15,7 @@ import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
+import { useMatches }       from '../hooks/useMatchs'
 import { useMatchInfo }     from '../hooks/useMatchDetail'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -361,17 +362,30 @@ export default function LiveMatchPage() {
   // un match live sourcé ESPN (les 6 grands championnats via Accueil) a des
   // homeTeam.id/awayTeam.id ESPN, pas FD.org — casse Forme/Stats saison/
   // Compos probables qui filtrent compMatches par id. Résolu une fois ici.
+  //
+  // ⚠️ AJOUT `scheduledMatches` (27/07, même demande/commentaire détaillé que
+  // MatchPage.jsx) : compMatches (useTeamForm) est FINISHED-only (voire
+  // saison précédente en intersaison) — ne contient jamais le match précis
+  // affiché ici. useMatches(compId,'SCHEDULED') = même hook/queryKey que
+  // Programme (cache RAW partagé, voir useMatchs.js) : aucune requête FD.org
+  // en plus si Programme a déjà été visité pour cette compét.
+  const { matches: scheduledMatches } = useMatches(compId, 'SCHEDULED')
+  const resolveMatches = useMemo(
+    () => [...(scheduledMatches ?? []), ...compMatches],
+    [scheduledMatches, compMatches]
+  )
+
   const match = useMemo(() => {
-    if (!rawMatch || !compMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, compMatches)
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, compMatches)
+    if (!rawMatch || !resolveMatches?.length) return rawMatch
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,
       homeTeam: { ...rawMatch.homeTeam, id: homeId },
       awayTeam: { ...rawMatch.awayTeam, id: awayId },
     }
-  }, [rawMatch, compMatches])
+  }, [rawMatch, resolveMatches])
 
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
@@ -396,7 +410,10 @@ export default function LiveMatchPage() {
   // page) appelle useMatchDetail(match.id) SANS condition (même si le panneau
   // "infos" n'est pas ouvert) — tape déjà FD.org au même montage, voir
   // commentaire détaillé dans useMatchDetail.js (useH2H).
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches, 6_000)
+  // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
+  // nécessaire à resolveFdMatchId (matchUtils.js) pour retrouver le vrai id
+  // FD.org du match affiché.
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
   const TABS = ['stats', 'compos', 'classement']
 

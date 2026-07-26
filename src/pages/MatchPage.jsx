@@ -8,6 +8,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
+import { useMatches }              from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
@@ -684,17 +685,42 @@ export default function MatchPage() {
   // On résout l'id réel une seule fois ici, dès que compMatches est chargé —
   // tout le reste de cette page continue de lire match.homeTeam.id/
   // match.awayTeam.id normalement, sans rien savoir de ce contournement.
+  //
+  // ⚠️ AJOUT `scheduledMatches` (27/07, demande explicite utilisateur : "le
+  // h2h y'a moins de match que fd.org... si je vais dans programme faut que
+  // ça soit deja affiché... pas besoin de faire deux requetes vu que c la
+  // meme chose") : `compMatches` (useTeamForm, ci-dessus) est UNIQUEMENT des
+  // matchs FINISHED (forme/stats/pronostic) — en intersaison, c'est même la
+  // saison PRÉCÉDENTE (repli isLastSeason) : le match précis affiché ici (à
+  // venir, nouvelle saison) n'y figure jamais littéralement, seulement
+  // d'éventuelles rencontres passées entre les 2 mêmes équipes. resolveFdMatchId
+  // (useH2HRows plus bas) peut donc échouer à retrouver le match exact, et
+  // Accueil retombe sur un historique plus court que Programme pour LE MÊME
+  // match. Programme (Match.jsx), lui, utilise useMatches(compId,'SCHEDULED')
+  // — la vraie liste FD.org des matchs à venir de la compétition, CONTIENT
+  // donc ce match précis avec son vrai id. Réutilisé ici avec EXACTEMENT le
+  // même hook/queryKey (voir useMatchs.js, cache RAW partagé Programme/
+  // Résultats) : si Programme a déjà été visité pour cette compét, React
+  // Query sert le résultat déjà en cache, aucune requête FD.org
+  // supplémentaire — sinon un seul appel, strictement nécessaire de toute
+  // façon pour retrouver ce match précis.
+  const { matches: scheduledMatches } = useMatches(compId, 'SCHEDULED')
+  const resolveMatches = useMemo(
+    () => [...(scheduledMatches ?? []), ...compMatches],
+    [scheduledMatches, compMatches]
+  )
+
   const match = useMemo(() => {
-    if (!rawMatch || !compMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, compMatches)
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, compMatches)
+    if (!rawMatch || !resolveMatches?.length) return rawMatch
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,
       homeTeam: { ...rawMatch.homeTeam, id: homeId },
       awayTeam: { ...rawMatch.awayTeam, id: awayId },
     }
-  }, [rawMatch, compMatches])
+  }, [rawMatch, resolveMatches])
 
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
@@ -724,7 +750,10 @@ export default function MatchPage() {
   // delayMs=6_000 (26/07, audit anti-429) : useMatchDetail(match.id), plus
   // haut sur cette page, tape déjà FD.org au même montage — voir commentaire
   // détaillé dans useMatchDetail.js (useH2H).
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, compMatches, 6_000)
+  // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
+  // nécessaire à resolveFdMatchId (matchUtils.js, appelé par useH2HRows) pour
+  // retrouver le vrai id FD.org du match affiché, y compris en intersaison.
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
   const showH2HTab = !h2hLoading && h2hRows.length > 0
   const TABS = ['statistiques', 'compos', 'classement']
 

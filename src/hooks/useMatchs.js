@@ -643,6 +643,17 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // suffit à retenter naturellement à la prochaine visite de la page, sans
     // rafale.
     retry: false,
+    // ⚠️ AJOUT `enabled` (27/07, réutilisation de ce hook depuis
+    // MatchPage.jsx/LiveMatchPage.jsx pour la résolution H2H — voir
+    // resolveFdMatchId, matchUtils.js) : cette query n'avait JAMAIS eu de
+    // garde-fou `enabled`, sans risque tant que le seul appelant (Match.jsx/
+    // Resultat.jsx, Programme) avait toujours un `selectedComp` valide
+    // (choisi dans une liste fermée). Un nouvel appelant peut légitimement
+    // avoir un `compId` encore `null` (le temps que le match charge) — sans
+    // ce garde-fou, ça aurait tapé `/api/v4/competitions/null/matches` pour
+    // rien à chaque montage. `options.enabled` par défaut `true` : aucun
+    // changement de comportement pour les appelants existants.
+    enabled: (options.enabled ?? true) && !!selectedComp,
   })
 
   return {
