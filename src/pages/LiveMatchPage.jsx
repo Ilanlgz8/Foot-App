@@ -413,7 +413,7 @@ export default function LiveMatchPage() {
   // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
   // nécessaire à resolveFdMatchId (matchUtils.js) pour retrouver le vrai id
   // FD.org du match affiché.
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000, { looseTeamMatch: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, même demande/commentaire détaillé que
   // MatchPage.jsx) : compH2H (repli instantané, 0 requête) suffit à afficher
   // l'onglet tout de suite — le contenu se complète tout seul avec

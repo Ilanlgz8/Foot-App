@@ -1580,8 +1580,14 @@ function H2HBilan({ rows, match, isWC }) {
 // passe à useH2H, qui peut alors taper le vrai endpoint head2head — Accueil
 // obtient exactement le même historique multi-saisons que Programme, au
 // lieu du repli compH2H limité à une saison/compétition.
-export function useH2HRows(match, compMatches, delayMs = 0) {
-  const fdMatchId = resolveFdMatchId(match, compMatches)
+// `looseTeamMatch` (27/07) : voir le commentaire détaillé sur `loose` dans
+// resolveFdMatchId (matchUtils.js). Faux par défaut — MatchPoster.jsx et
+// MatchDuJourCard.jsx (cards Accueil) appellent ce hook sans ce paramètre,
+// donc gardent un comportement strictement inchangé. Seul MatchPage.jsx/
+// LiveMatchPage.jsx (page dédiée du match, où le H2H manquant a été
+// signalé) le passe à `true`.
+export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = false } = {}) {
+  const fdMatchId = resolveFdMatchId(match, compMatches, { loose: looseTeamMatch })
   const { data: h2hMatches, isLoading } = useH2H(match, delayMs, fdMatchId)
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id

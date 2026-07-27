@@ -4,6 +4,15 @@ export const TEAM_NAMES_FR = {
   'Marseille': 'Marseille',
   'RC Lens': 'Lens',
   'Olympique Lyon': 'Lyon',
+  // ⚠️ AJOUT (27/07, bug réel : H2H vide pour Toulouse-Lyon vu depuis Accueil)
+  // : le nom COMPLET football-data.org ("name", pas "shortName") est
+  // "Olympique Lyonnais" — absent de cette table jusqu'ici (seul le
+  // shortName "Olympique Lyon" y était). Utilisée par le repli `loose` de
+  // resolveFdTeamId (matchUtils.js, PAS clubNameMatch — voir son commentaire)
+  // pour rapprocher "Lyon" (nom ESPN) de la variante FD.org rencontrée,
+  // quelle qu'elle soit — ceinture et bretelles avec le shortName déjà
+  // couvert.
+  'Olympique Lyonnais': 'Lyon',
   'Monaco': 'Monaco',
   'Le Havre': 'Le Havre',
   'Nice': 'Nice',

@@ -14,7 +14,8 @@
 //   4. Heuristique → calcul depuis utcDate
 // Utilisé dans Accueil.jsx (MatchCard, LiveWidget) et Match.jsx (BkCard).
 import { getMatchState } from './matchStateTracker'
-import { clubNameMatch } from './espnSummaryParse'
+import { clubNameMatch, normalize } from './espnSummaryParse'
+import { translateTeam } from '../data/teamNames'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
@@ -558,12 +559,41 @@ export function isRealFdMatchId(id) {
 // resolveFdTeamId) à la date la plus proche, et on utilise SON id réel pour
 // le head2head — l'historique complet redevient identique, peu importe la
 // page de départ.
-export function resolveFdMatchId(match, compMatches) {
+// ⚠️ `loose` (27/07, bug réel : H2H vide pour Toulouse-Lyon vu depuis
+// Accueil, marche depuis Programme) : ESPN dit "Lyon" (nom court),
+// football-data.org dit "Olympique Lyonnais" (name) / "Olympique Lyon"
+// (shortName) — "Lyon" est un SUFFIXE de ces 2 variantes, jamais un
+// préfixe, donc clubNameMatch (préfixe complet uniquement, voir
+// espnSummaryParse.js) ne le détecte jamais. Un 1er essai avait élargi
+// clubNameMatch lui-même (repli TEAM_NAMES_FR) mais a cassé l'affichage
+// des cards dans l'Accueil à 2 reprises, MÊME protégé par un try/catch —
+// cause exacte non confirmée avec certitude, faute d'accès navigateur en
+// direct pour ce diagnostic précis. Plutôt que de continuer à deviner sur
+// une fonction partagée par TOUTE l'app (clubNameMatch, utilisée aussi par
+// MatchPoster.jsx/MatchDuJourCard.jsx pour CHAQUE card affichée sur
+// l'Accueil), clubNameMatch reste ici totalement INTACTE (exactement comme
+// avant tout ce fix, zéro changement) — le repli TEAM_NAMES_FR vit UNIQUEMENT
+// ici, dans matchUtils.js, activé seulement via ce paramètre `loose`
+// explicite. Passé à `true` UNIQUEMENT par MatchPage.jsx/LiveMatchPage.jsx
+// (page dédiée du match, où le H2H manquant a été signalé) — jamais par
+// défaut, donc jamais atteint par MatchPoster.jsx/MatchDuJourCard.jsx
+// (cards Accueil), qui gardent un comportement strictement identique à
+// avant, garanti par construction (pas juste "testé").
+function looseTeamNameMatch(a, b) {
+  try {
+    const ta = normalize(translateTeam(a)), tb = normalize(translateTeam(b))
+    return !!ta && !!tb && ta === tb
+  } catch {
+    return false
+  }
+}
+
+export function resolveFdMatchId(match, compMatches, { loose = false } = {}) {
   const rawId = match?.id ?? null
   if (isRealFdMatchId(rawId)) return rawId
   if (!match || !compMatches?.length) return null
-  const homeId = resolveFdTeamId(match.homeTeam, compMatches)
-  const awayId = resolveFdTeamId(match.awayTeam, compMatches)
+  const homeId = resolveFdTeamId(match.homeTeam, compMatches, { loose })
+  const awayId = resolveFdTeamId(match.awayTeam, compMatches, { loose })
   if (homeId == null || awayId == null) return null
   const refTime = match.utcDate ? new Date(match.utcDate).getTime() : null
   let best = null, bestDiff = Infinity
@@ -579,7 +609,7 @@ export function resolveFdMatchId(match, compMatches) {
   return best
 }
 
-export function resolveFdTeamId(team, compMatches) {
+export function resolveFdTeamId(team, compMatches, { loose = false } = {}) {
   const rawId = team?.id ?? null
   if (!team || !compMatches?.length) return rawId
   // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
@@ -596,7 +626,13 @@ export function resolveFdTeamId(team, compMatches) {
   // risque de faux positif.
   const teamNames = [team.name, team.shortName].filter(Boolean)
   if (!teamNames.length) return rawId
-  const matches = (candidate) => teamNames.some(n => clubNameMatch(candidate ?? '', n))
+  // `loose` : voir le commentaire détaillé sur resolveFdMatchId ci-dessus —
+  // clubNameMatch seule (toujours essayée en premier, comportement inchangé)
+  // ne détecte pas les noms courts ESPN qui sont un SUFFIXE (pas un préfixe)
+  // du nom FD.org, ex. "Lyon" vs "Olympique Lyon(nais)".
+  const matches = (candidate) => teamNames.some(n =>
+    clubNameMatch(candidate ?? '', n) || (loose && looseTeamNameMatch(candidate ?? '', n))
+  )
   for (const m of compMatches) {
     if (matches(m.homeTeam?.name) || matches(m.homeTeam?.shortName)) {
       return m.homeTeam.id
