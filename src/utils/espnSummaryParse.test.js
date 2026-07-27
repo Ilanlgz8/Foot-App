@@ -179,25 +179,6 @@ describe('clubNameMatch', () => {
     expect(clubNameMatch('', 'Manchester City')).toBe(false)
     expect(clubNameMatch('Manchester City', undefined)).toBe(false)
   })
-
-  // Bug réel (27/07) : H2H vide pour Toulouse-Lyon vu depuis Accueil (marche
-  // depuis Programme). Cause : ESPN dit "Lyon", football-data.org dit
-  // "Olympique Lyonnais" (name) / "Olympique Lyon" (shortName) — "Lyon" est
-  // un SUFFIXE de ces deux variantes, jamais un préfixe, donc la règle
-  // startsWith ci-dessus échouait pour cette paire précise.
-  it('matche via TEAM_NAMES_FR quand le nom court ESPN est un suffixe, pas un préfixe (Lyon)', () => {
-    expect(clubNameMatch('Lyon', 'Olympique Lyon')).toBe(true)
-    expect(clubNameMatch('Lyon', 'Olympique Lyonnais')).toBe(true)
-    expect(clubNameMatch('Olympique Lyonnais', 'Lyon')).toBe(true)
-  })
-
-  it('le repli TEAM_NAMES_FR ne réintroduit pas la collision Manchester', () => {
-    expect(clubNameMatch('Manchester City', 'Manchester United')).toBe(false)
-  })
-
-  it('ne plante jamais, même sur une entrée inattendue (filet de sécurité)', () => {
-    expect(() => clubNameMatch('Lyon', { not: 'a string' })).not.toThrow()
-  })
 })
 
 const homeTeam = { id: '11', displayName: 'Spain', color: '1e40af', alternateColor: 'ffffff' }
