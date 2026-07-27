@@ -396,16 +396,44 @@ async function fetchClubMatchesRawInner(selectedComp) {
 }
 
 async function fetchMatchesForComp(selectedComp, status, opts = {}) {
-  const useEspn = ESPN_SOURCED_COMPS.has(selectedComp) ||
-    (opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp))
+  const preferEspnMajor = !!opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp)
+  const useEspn = ESPN_SOURCED_COMPS.has(selectedComp) || preferEspnMajor
   if (useEspn) {
     const slug = COMPETITION_ESPN_SLUG[selectedComp]
     const all  = await fetchEspnCompMatches(selectedComp, slug, { compId: MAJOR_LEAGUE_FD_ID[selectedComp] })
-    if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
     // 'SCHEDULED' ici couvre aussi TIMED/IN_PLAY/PAUSED — même logique que
     // Programme pour WC/EC qui affiche "à venir" au sens large (voir filtre
     // par date/statut fait ensuite côté composant, ex: filterUpcomingWindow).
-    return all.filter(m => m.status !== 'FINISHED')
+    const filtered = status === 'FINISHED'
+      ? all.filter(m => m.status === 'FINISHED')
+      : all.filter(m => m.status !== 'FINISHED')
+
+    // ⚠️ AJOUT (27/07, bug réel : "aucun match aujourd'hui" + flèche jour
+    // suivant désactivée dans Accueil, alors que football-data.org a bien
+    // les matchs Ligue 1 2026-27 déjà publiés, vérifié en direct) : le
+    // scoreboard ESPN par PLAGE de dates (voir windowRange(),
+    // espnAdapter.js — jusqu'à 210 jours pour couvrir NL/CAN/COPA) revient
+    // VIDE au-delà d'une plage courte — vérifié en direct sur l'API réelle :
+    // une plage de 3 jours répond, la MÊME plage étendue à 4 jours ne répond
+    // plus rien. Une vraie limite/instabilité ESPN non documentée, jamais
+    // rencontrée jusqu'ici car il y avait toujours un match proche
+    // d'"aujourd'hui" pour la masquer. preferEspnMajor ne sert QU'à ce hook
+    // (useUpcomingMatchesAllComps, recherche "prochain jour avec un match"
+    // sur 30j) — justement le cas qui a le plus besoin d'une large plage,
+    // donc le plus exposé, et qui se déclenche précisément pendant les longs
+    // creux (intersaison) qu'il est censé combler. Repli sur
+    // fetchClubMatchesRaw (FD.org, déjà en cache PARTAGÉ avec Programme/
+    // useTeamForm depuis la fusion — aucun coût réseau supplémentaire dans
+    // le cas courant) uniquement si ESPN n'a RIEN renvoyé alors qu'on
+    // cherchait des matchs à venir — ne touche pas au cas normal (ESPN
+    // répond, on le garde tel quel) pour ne pas réintroduire le
+    // désync/doublon de dates entre sources que ce mode ESPN avait
+    // justement corrigé (voir ESPN_SOURCED_COMPS plus haut).
+    if (preferEspnMajor && filtered.length === 0 && status !== 'FINISHED') {
+      const raw = await fetchClubMatchesRaw(selectedComp)
+      if (raw != null) return raw.filter(m => m.status !== 'FINISHED')
+    }
+    return filtered
   }
 
   const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
