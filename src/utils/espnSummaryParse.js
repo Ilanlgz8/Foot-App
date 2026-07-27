@@ -15,6 +15,12 @@
 // importe normalize()/fuzzyTeam() DEPUIS ici (voir plus bas) — aucune
 // dépendance React/DOM dans ce fichier-ci, rien n'empêche de le lire depuis
 // un module qui en a.
+//
+// ⚠️ Import teamNames.js (27/07, voir clubNameMatch plus bas) : donnée pure
+// (aucun import dedans, vérifié — ne peut donc PAS créer de cycle avec ce
+// fichier ni aucun autre), sûre à charger aussi bien côté serveur (api/*.js)
+// que client.
+import { translateTeam } from '../data/teamNames'
 
 // ⚠️ EXPORTÉES (constat audit période creuse : cette paire existait en 3
 // copies — ici, useLiveMinute.js à l'identique, ET api/fifa-live.js avec une
@@ -143,10 +149,42 @@ export function fuzzyTeam(a, b) {
 // court identique au début du nom complet, ex. "Manchester City" est un
 // préfixe complet de "Manchester City FC") sans jamais confondre 2 clubs
 // distincts qui partagent seulement un mot ou un préfixe court.
+// ⚠️ try/catch autour de TOUTE la fonction (27/07, 2e tentative après un
+// revert — la 1ère a cassé l'affichage des cards dans Accueil, cause exacte
+// non confirmée avec certitude faute d'accès navigateur en direct pour ce
+// diagnostic précis) : cette fonction est appelée pour CHAQUE card affichée
+// sur l'Accueil (MatchPoster.jsx → useH2HRows → resolveFdTeamId), un chemin
+// que j'avais raté au 1er passage en ne vérifiant qu'Accueil.jsx directement
+// plutôt que toute sa chaîne de composants. Filet de sécurité absolu : quoi
+// qu'il arrive (y compris une entrée `a`/`b` d'un type inattendu, déjà une
+// fragilité preexistante de normalize() avant ce fix), une erreur ici ne
+// doit jamais pouvoir faire disparaître les cards de l'Accueil — au pire, ce
+// rapprochement précis échoue silencieusement, jamais un plantage.
 export function clubNameMatch(a, b) {
-  const na = normalize(a), nb = normalize(b)
-  if (!na || !nb) return false
-  return na === nb || na.startsWith(nb) || nb.startsWith(na)
+  try {
+    const na = normalize(a), nb = normalize(b)
+    if (!na || !nb) return false
+    if (na === nb || na.startsWith(nb) || nb.startsWith(na)) return true
+    // ⚠️ AJOUT (bug réel constaté par l'utilisateur, 27/07 : H2H vide pour
+    // Toulouse-Lyon depuis Accueil, mais présent depuis Programme) : ESPN
+    // renvoie "Lyon" (nom court) alors que football-data.org l'appelle
+    // "Olympique Lyonnais" (nom complet) / "Olympique Lyon" (shortName) —
+    // ni l'un ni l'autre n'est un PRÉFIXE de "Lyon" (c'est un SUFFIXE de
+    // "Lyonnais"/"Lyon", pas géré par la règle startsWith ci-dessus), donc
+    // le match échouait pour cette paire précise (Marseille n'a pas ce
+    // problème : son shortName FD.org est déjà "Marseille", identique au
+    // nom court ESPN). Repli sur TEAM_NAMES_FR (teamNames.js) : table
+    // figée, déjà vérifiée à la main pour l'affichage (aucun risque de faux
+    // positif type Manchester City/United — vérifié qu'aucune valeur
+    // canonique de CLUB n'est partagée par 2 clés différentes dans la
+    // table, contrairement aux alias PAYS qui en partagent volontairement —
+    // ex. "Turkey"/"Türkiye" → "Turquie") — si les deux noms se traduisent
+    // vers le MÊME nom canonique, ce sont la même équipe.
+    const ta = normalize(translateTeam(a)), tb = normalize(translateTeam(b))
+    return !!ta && !!tb && ta === tb
+  } catch {
+    return false
+  }
 }
 
 function initialName(full) {

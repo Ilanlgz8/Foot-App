@@ -315,6 +315,21 @@ describe('resolveFdTeamId', () => {
     expect(resolveFdTeamId({ id: 111, name: '?', shortName: 'Man City' }, plCompMatches)).toBe(65)
     expect(resolveFdTeamId({ id: 222, name: '?', shortName: 'Man United' }, plCompMatches)).toBe(66)
   })
+
+  // ⚠️ Bug réel constaté par l'utilisateur (27/07) : H2H vide pour Toulouse-
+  // Lyon vu depuis Accueil (marche depuis Programme). Cause : ESPN dit "Lyon"
+  // (nom court), football-data.org dit "Olympique Lyonnais" (name) /
+  // "Olympique Lyon" (shortName, confirmé via l'API réelle) — "Lyon" est un
+  // SUFFIXE de ces 2 variantes, jamais un préfixe.
+  const fl1CompMatches = [
+    { homeTeam: { id: 511, name: 'Toulouse FC',        shortName: 'Toulouse' },
+      awayTeam: { id: 523, name: 'Olympique Lyonnais', shortName: 'Olympique Lyon' } },
+  ]
+
+  it('résout Lyon malgré le nom FD.org "Olympique Lyon(nais)" (nom ESPN suffixe, pas préfixe)', () => {
+    expect(resolveFdTeamId({ id: 777, name: 'Lyon' }, fl1CompMatches)).toBe(523)
+    expect(resolveFdTeamId({ id: 888, name: 'Toulouse' }, fl1CompMatches)).toBe(511)
+  })
 })
 
 // resolveFdMatchId — bug réel (26/07) : "dans Accueil t'as que 2 h2h, dans
