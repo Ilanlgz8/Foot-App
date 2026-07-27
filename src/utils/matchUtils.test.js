@@ -382,3 +382,64 @@ describe('resolveFdMatchId', () => {
     expect(resolveFdMatchId(undefined, compMatches)).toBeNull()
   })
 })
+
+// Bug réel (27/07) : H2H vide pour Toulouse-Lyon vu depuis Accueil, alors que
+// ça marche depuis Programme. Cause : ESPN nomme l'OL simplement "Lyon", qui
+// est un SUFFIXE (jamais un préfixe) des variantes FD.org ("Olympique Lyon"/
+// "Olympique Lyonnais") — clubNameMatch (préfixe strict) ne matche donc
+// jamais cette paire précise.
+//
+// 2 tentatives de fix ont modifié clubNameMatch/resolveFdTeamId directement
+// et ont CASSÉ l'Accueil en prod à chaque fois (plus aucun match affiché),
+// pour une raison jamais identifiée avec certitude (la 2e tentative avait
+// pourtant toute la fonction protégée par try/catch, ce qui exclut une
+// exception non gérée comme mécanisme). clubNameMatch reste donc strictement
+// intacte.
+//
+// Design retenu à la place : un paramètre `{ loose }` optionnel, désactivé
+// par défaut, qui n'active la résolution assouplie (via translateTeam +
+// normalize, dans looseTeamNameMatch) que pour les appelants qui le
+// demandent explicitement (MatchPage.jsx / LiveMatchPage.jsx). Les cards
+// Accueil (MatchPoster.jsx, MatchDuJourCard.jsx) appellent useH2HRows sans
+// ce paramètre et ne peuvent donc structurellement jamais exécuter ce
+// nouveau chemin — garantie par construction, pas seulement par ces tests.
+describe('resolveFdTeamId — option { loose } (bug Toulouse-Lyon)', () => {
+  const fl1CompMatches = [
+    { homeTeam: { id: 511, name: 'Toulouse FC', shortName: 'Toulouse' },
+      awayTeam: { id: 523, name: 'Olympique Lyonnais', shortName: 'Olympique Lyon' } },
+  ]
+
+  it('sans { loose } (défaut), "Lyon" (nom ESPN) ne résout PAS vers l\'id FD.org — comportement inchangé', () => {
+    expect(resolveFdTeamId({ id: 777, name: 'Lyon' }, fl1CompMatches)).toBe(777)
+  })
+
+  it('avec { loose: true }, "Lyon" (nom ESPN) résout bien vers l\'id FD.org de l\'OL (523)', () => {
+    expect(resolveFdTeamId({ id: 777, name: 'Lyon' }, fl1CompMatches, { loose: true })).toBe(523)
+  })
+
+  it('avec { loose: true }, Toulouse (déjà matché par clubNameMatch) continue de résoudre normalement', () => {
+    expect(resolveFdTeamId({ id: 888, name: 'Toulouse' }, fl1CompMatches, { loose: true })).toBe(511)
+  })
+})
+
+describe('resolveFdMatchId — option { loose } (bug Toulouse-Lyon)', () => {
+  const fl1CompMatches = [
+    { id: 600001, utcDate: '2025-10-04T18:00:00Z',
+      homeTeam: { id: 511, name: 'Toulouse FC', shortName: 'Toulouse' },
+      awayTeam: { id: 523, name: 'Olympique Lyonnais', shortName: 'Olympique Lyon' } },
+  ]
+  const espnMatch = {
+    id: 'espn-FL1-401700099',
+    utcDate: '2025-10-04T18:00:00Z',
+    homeTeam: { id: 777, name: 'Toulouse' },
+    awayTeam: { id: 778, name: 'Lyon' },
+  }
+
+  it('sans { loose } (défaut), aucune correspondance trouvée — comportement inchangé (Accueil)', () => {
+    expect(resolveFdMatchId(espnMatch, fl1CompMatches)).toBeNull()
+  })
+
+  it('avec { loose: true }, résout le vrai id FD.org du match Toulouse-Lyon', () => {
+    expect(resolveFdMatchId(espnMatch, fl1CompMatches, { loose: true })).toBe(600001)
+  })
+})
