@@ -15,6 +15,12 @@
 // importe normalize()/fuzzyTeam() DEPUIS ici (voir plus bas) — aucune
 // dépendance React/DOM dans ce fichier-ci, rien n'empêche de le lire depuis
 // un module qui en a.
+//
+// ⚠️ Import teamNames.js (27/07, voir clubNameMatch plus bas) : donnée pure
+// (table d'alias), aucune dépendance React/DOM/Node non plus — sûr à charger
+// aussi bien côté serveur (api/*.js) que client, même si seul clubNameMatch
+// (client uniquement, voir matchUtils.js) s'en sert pour l'instant.
+import { translateTeam } from '../data/teamNames'
 
 // ⚠️ EXPORTÉES (constat audit période creuse : cette paire existait en 3
 // copies — ici, useLiveMinute.js à l'identique, ET api/fifa-live.js avec une
@@ -146,7 +152,22 @@ export function fuzzyTeam(a, b) {
 export function clubNameMatch(a, b) {
   const na = normalize(a), nb = normalize(b)
   if (!na || !nb) return false
-  return na === nb || na.startsWith(nb) || nb.startsWith(na)
+  if (na === nb || na.startsWith(nb) || nb.startsWith(na)) return true
+  // ⚠️ AJOUT (bug réel constaté par l'utilisateur, 27/07 : H2H vide pour
+  // Toulouse-Lyon depuis Accueil, mais présent depuis Programme) : ESPN
+  // renvoie "Lyon" (nom court) alors que football-data.org l'appelle
+  // "Olympique Lyonnais" (nom complet) / "Olympique Lyon" (shortName) — ni
+  // l'un ni l'autre n'est un PRÉFIXE de "Lyon" (c'est un SUFFIXE de
+  // "Lyonnais"/"Lyon", pas géré par la règle startsWith ci-dessus), donc le
+  // match échouait pour cette paire précise (Marseille n'a pas ce problème :
+  // son shortName FD.org est déjà "Marseille", identique au nom court ESPN).
+  // Repli sur TEAM_NAMES_FR (teamNames.js) : table figée, déjà vérifiée à la
+  // main pour l'affichage (aucun risque de faux positif type Manchester City/
+  // United — chaque entrée y est unique et volontaire, contrairement à une
+  // règle de correspondance heuristique) — si les deux noms se traduisent
+  // vers le MÊME nom canonique (`translateTeam`), ce sont la même équipe.
+  const ta = normalize(translateTeam(a)), tb = normalize(translateTeam(b))
+  return !!ta && !!tb && ta === tb
 }
 
 function initialName(full) {
