@@ -753,7 +753,7 @@ export default function MatchPage() {
   // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
   // nécessaire à resolveFdMatchId (matchUtils.js, appelé par useH2HRows) pour
   // retrouver le vrai id FD.org du match affiché, y compris en intersaison.
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000, { looseTeamMatch: true })
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000)
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, demande explicite utilisateur : "h2h
   // arrive direct la première fois sans que ça mette plusieurs secondes") :
   // useH2HRows retombe déjà, SANS requête supplémentaire, sur les
