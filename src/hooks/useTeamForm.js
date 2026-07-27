@@ -2,7 +2,7 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { outcomeForTeam } from '../utils/matchUtils'
-import { fetchClubMatchesRaw } from './useMatchs'
+import { getClubSeason } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
@@ -115,112 +115,102 @@ async function fetchTeamForm(selectedComp) {
   // ici contrairement à WC 2026.
   const isClub = selectedComp !== 'WC' && selectedComp !== 'EC'
 
-  // ⚠️ RÉÉCRIT (27/07, demande explicite utilisateur : "fusionne, moins de
-  // requêtes... et je veux que les compétitions comme coupe de france
-  // comptent dans la forme récente, c'est le but") : cette branche refaisait
-  // avant sa PROPRE séquence complète (saison en cours + repli saison
-  // précédente, 2 appels FD.org), un quasi-doublon de fetchClubMatchesRaw
-  // (useMatchs.js) qui fait EXACTEMENT la même chose pour Programme/
-  // Résultats (même repli saison précédente) — 2 implémentations séparées,
-  // jamais partagées, du même besoin. Réutilise maintenant directement
-  // fetchClubMatchesRaw (verrou anti-doublon "in-flight" ajouté là-bas) :
-  // si Programme/Résultats ont déjà tapé FD.org pour cette compétition, le
-  // cache Redis serveur (voire le verrou in-flight côté client si c'est
-  // vraiment simultané) absorbe l'appel — FD.org n'est plus jamais
-  // interrogé 2 fois pour la même donnée. Inclut aussi les coupes
-  // nationales (Coupe de France/Copa del Rey/FA Cup, déjà mergées par
-  // fetchClubMatchesRaw, source ESPN) : elles comptent maintenant dans
-  // Forme récente/Stats saison/Compos probables, comme n'importe quel autre
-  // match joué par l'équipe — demande explicite.
-  if (isClub) {
-    const raw = await fetchClubMatchesRaw(selectedComp)
-    if (raw == null) {
+  // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org ci-dessous
+  // (jusqu'à 2 appels) quand on sait déjà qu'aucun match WC/EC n'existe dans
+  // une large fenêtre — cas quasi permanent hors Mondial/Euro. Repli sur le
+  // cache existant (même clé que useTeamForm/useTeamFormMulti,
+  // teamform2_${comp}) plutôt qu'un objet vide, pour ne jamais régresser une
+  // forme déjà affichée.
+  if (!isClub) {
+    // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à
+    // WC, jamais aux compétitions club) : sans cette attente, un portillon
+    // qui vient de vraiment taper FD.org fait bloquer l'appel plus bas par
+    // notre propre garde-fou serveur (verrou d'espacement ~6s).
+    const { should, fresh } = await shouldQueryWcEcWithMeta()
+    if (!should) {
       const stale = readCacheStale(`teamform2_${selectedComp}`)
       if (stale) return stale
       return { formMap: {}, matches: [], isLastSeason: false }
     }
-
-    const cupMatches    = raw.filter(m => m.isCup)
-    const leagueMatches = raw.filter(m => !m.isCup)
-
-    // "Saison en cours" = la plus récente présente dans les données FD.org
-    // (season.startDate le plus tardif parmi les matchs de championnat).
-    // Les matchs de coupe (source ESPN, pas de champ `season` FD.org)
-    // rejoignent toujours ce lot : fetchEspnCupMatches (espnAdapter.js) ne
-    // renvoie qu'une fenêtre glissante autour d'aujourd'hui (±60/150j),
-    // jamais d'historique multi-saisons — toujours "actuel" par construction.
-    const latestStart = leagueMatches.reduce((max, m) => {
-      const s = m.season?.startDate
-      return s && s > max ? s : max
-    }, '')
-    const currentLeague = leagueMatches.filter(m => m.season?.startDate === latestStart)
-    const olderLeague   = leagueMatches.filter(m => m.season?.startDate !== latestStart)
-    const current = [...currentLeague, ...cupMatches]
-    const matches = current.filter(m => m.status === 'FINISHED')
-
-    // Repli saison précédente (constat utilisateur : cotes de pronos
-    // identiques pour tous les matchs en tout début de saison club, ex.
-    // août) — tant que la saison en cours n'a pas encore MIN_LEAGUE_GAMES
-    // matchs FINISHED, formMap est vide et compMatches ne permet pas à
-    // calcPronoAdvanced de construire un modèle de buts fiable (calcProno.js)
-    // → repli neutre identique pour tous les matchs. Cas équipe promue :
-    // aucune entrée dans la saison précédente de CETTE compétition (elle
-    // jouait dans une autre division) → reste neutre plutôt que comparée à
-    // tort à un autre championnat, comportement voulu.
-    if (matches.length < MIN_LEAGUE_GAMES) {
-      const fallbackMatches = olderLeague.filter(m => m.status === 'FINISHED')
-      // Vérification a posteriori sur la date du match le plus RÉCENT du
-      // lot : si même celui-là est plus vieux que ~450j (saison + trêve),
-      // le repli n'est pas fiable — on ne l'utilise pas, quel que soit le
-      // nombre de matchs (même logique qu'avant ce refactor).
-      const MAX_FALLBACK_AGE_DAYS = 450
-      const newestFallbackTs = fallbackMatches.reduce(
-        (max, m) => Math.max(max, new Date(m.utcDate).getTime()), 0
-      )
-      const fallbackIsRecent = newestFallbackTs > 0
-        && (Date.now() - newestFallbackTs) / 86_400_000 <= MAX_FALLBACK_AGE_DAYS
-      if (fallbackMatches.length >= MIN_LEAGUE_GAMES && fallbackIsRecent) {
-        // formMap (losanges "forme récente") ne doit PAS venir de la saison
-        // précédente — le mercato a pu tout changer entre-temps (demande
-        // explicite, 25/07). `matches` (saison en cours, quasi vide en
-        // intersaison) donne donc un formMap vide. `matches` RETOURNÉ
-        // (compMatches, 2e champ) reste `fallbackMatches` — le modèle de
-        // pronostic et le repli H2H continuent d'utiliser la saison passée.
-        return { formMap: buildFormMap(matches), matches: fallbackMatches, isLastSeason: true }
-      }
-    }
-
-    return { formMap: buildFormMap(matches), matches, isLastSeason: false }
+    if (fresh) await new Promise(r => setTimeout(r, 6_000))
+    // Protège aussi contre un hook voisin totalement différent (useWcKnockout,
+    // useTodayMatches...) qui viendrait de taper FD.org — voir fdSpacingTracker.js.
+    await waitForFdSpacing()
   }
-
-  // ── WC/EC : compétitions non-annuelles, pas de "saison précédente"
-  // comparable au sens sportif — comportement historique inchangé (propre
-  // séquence FD.org avec le portillon partagé wcEcGate.js). ──
-  // Portillon partagé (voir wcEcGate.js) : évite la cascade FD.org ci-dessous
-  // quand on sait déjà qu'aucun match WC/EC n'existe dans une large fenêtre —
-  // cas quasi permanent hors Mondial/Euro. Repli sur le cache existant (même
-  // clé que useTeamForm/useTeamFormMulti, teamform2_${comp}) plutôt qu'un
-  // objet vide, pour ne jamais régresser une forme déjà affichée.
-  // ⚠️ AJOUT wait `fresh` (25/07, constat utilisateur : 429 spécifique à WC,
-  // jamais aux compétitions club) : sans cette attente, un portillon qui
-  // vient de vraiment taper FD.org fait bloquer l'appel plus bas par notre
-  // propre garde-fou serveur (verrou d'espacement ~6s).
-  const { should, fresh } = await shouldQueryWcEcWithMeta()
-  if (!should) {
-    const stale = readCacheStale(`teamform2_${selectedComp}`)
-    if (stale) return stale
-    return { formMap: {}, matches: [], isLastSeason: false }
-  }
-  if (fresh) await new Promise(r => setTimeout(r, 6_000))
-  // Protège aussi contre un hook voisin totalement différent (useWcKnockout,
-  // useTodayMatches...) qui viendrait de taper FD.org — voir fdSpacingTracker.js.
-  await waitForFdSpacing()
 
   const seasonParam = selectedComp === 'WC' ? '?season=2026'
     : selectedComp === 'EC' ? `?season=${new Date().getFullYear()}`
     : ''
   const primary = await fetchFinishedSeasonMatches(selectedComp, seasonParam)
   const matches = primary.matches
+
+  // Repli saison précédente (constat utilisateur : cotes de pronos
+  // identiques pour tous les matchs en tout début de saison club, ex. août)
+  // — tant que la saison en cours n'a pas encore MIN_LEAGUE_GAMES matchs
+  // FINISHED, formMap est vide (aucun match joué) et compMatches ne permet
+  // pas à calcPronoAdvanced de construire un modèle de buts fiable (voir
+  // calcProno.js) → repli neutre identique pour tous les matchs. On
+  // retombe alors sur la saison précédente de CETTE compétition : un seul
+  // appel FD.org de PLUS PAR COMPÉTITION (pas par match/carte affichée),
+  // budget-safe même avec plusieurs cartes en même temps (Pronos.jsx,
+  // Accueil via useTeamFormMulti) — voir budget global 7/min, api/football.js.
+  // Non applicable à WC/EC (compétitions non-annuelles, pas de "saison
+  // précédente" comparable au sens sportif).
+  // Cas équipe promue : elle n'a par construction AUCUNE entrée dans la
+  // saison précédente de CETTE compétition (elle jouait dans une autre
+  // division) — elle reste donc neutre (strength() par défaut) plutôt que
+  // comparée à tort avec un autre championnat : comportement voulu.
+  if (isClub && matches.length < MIN_LEAGUE_GAMES) {
+    // ⚠️ AJOUT (24/07, trouvé via l'audit chronologique demandé par
+    // l'utilisateur) : ce repli et l'appel juste au-dessus visent la MÊME
+    // compétition, quasi dos à dos — en ce moment (intersaison, saison en
+    // cours toujours vide), ce repli se déclenche pour QUASIMENT CHAQUE
+    // compétition, et useTeamFormMulti (Accueil) lance ce chemin pour
+    // PLUSIEURS compétitions EN MÊME TEMPS (aucun espacement entre elles,
+    // voir plus bas) — même collision que fetchClubMatchesRaw sur le verrou
+    // d'espacement global FD.org, jamais corrigée ici jusqu'à présent. On
+    // n'attend que si l'appel précédent a réellement tapé FD.org.
+    if (primary.fresh) await new Promise(r => setTimeout(r, 6_000))
+    const lastSeason = getClubSeason() - 1
+    const fallbackResult = await fetchFinishedSeasonMatches(selectedComp, `?season=${lastSeason}`)
+    const fallbackMatches = fallbackResult.matches
+    // ⚠️ AJOUT (constat utilisateur : "compo probable"/"stats saison" avec des
+    // matchs vieux de 2 ans, alors que le repli ne devrait remonter QUE d'une
+    // saison — "la saison en cours ou la saison juste avant, jamais plus
+    // loin") : `?season=${lastSeason}` explicite DEVRAIT suffire à garantir
+    // ça, mais rien ne vérifiait que FD.org avait bien respecté ce
+    // paramètre — si la compétition n'a pas cette saison précise en base,
+    // le comportement de résolution par défaut de l'API n'est pas garanti
+    // (pas documenté). Vérification a posteriori sur la date du match le
+    // plus RÉCENT du lot reçu : si même celui-là est plus vieux que ~450j
+    // (saison + trève, exclut une saison encore plus ancienne), le repli
+    // n'est pas fiable → on ne l'utilise pas du tout, quel que soit le
+    // nombre de matchs reçus, et on retombe sur la saison en cours (quasi
+    // vide en tout début de saison) plutôt que d'afficher une saison
+    // d'il y a 2 ans comme si c'était "la saison juste avant".
+    const MAX_FALLBACK_AGE_DAYS = 450
+    const newestFallbackTs = fallbackMatches.reduce(
+      (max, m) => Math.max(max, new Date(m.utcDate).getTime()), 0
+    )
+    const fallbackIsRecent = newestFallbackTs > 0
+      && (Date.now() - newestFallbackTs) / 86_400_000 <= MAX_FALLBACK_AGE_DAYS
+    if (fallbackMatches.length >= MIN_LEAGUE_GAMES && fallbackIsRecent) {
+      // ⚠️ AJOUT (25/07, demande explicite utilisateur) : formMap (losanges
+      // de "forme récente" affichés sous chaque équipe) ne doit PLUS venir de
+      // la saison précédente — aucune saison club n'a encore commencé
+      // (intersaison), et les effectifs/état de forme ont pu changer entre-
+      // temps (mercato) : mieux vaut ne rien afficher que des résultats d'une
+      // saison terminée présentés comme "récents". `matches` (saison en
+      // cours, quasi vide en ce moment) donne donc un formMap vide → aucun
+      // losange affiché, jusqu'aux premiers matchs de la vraie saison 2026/27.
+      // `matches` RETOURNÉ (compMatches, 2e champ) reste `fallbackMatches`
+      // SANS changement : le modèle de pronostic/cotes (calcPronoAdvanced) et
+      // le H2H (useH2HRows, ailleurs) continuent d'utiliser la saison passée
+      // comme avant — seul l'affichage visuel de la forme est concerné,
+      // demande explicite de l'utilisateur ("on garde toutes les h2h").
+      return { formMap: buildFormMap(matches), matches: fallbackMatches, isLastSeason: true }
+    }
+  }
 
   return { formMap: buildFormMap(matches), matches, isLastSeason: false }
 }
