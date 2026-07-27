@@ -198,7 +198,34 @@ async function tryFetchWithMeta(url) {
 // filtrer par statut côté chaque page (mécanisme officiel React Query,
 // aucun refetch dupliqué). Visiter l'une des deux pages peuple désormais
 // aussi l'autre pour la même compét, sans requête supplémentaire.
-async function fetchClubMatchesRaw(selectedComp) {
+// ⚠️ AJOUT coalescing + export (27/07, demande explicite utilisateur :
+// "fusionne, moins de requêtes") : fetchClubMatchesRaw est maintenant aussi
+// appelée depuis useTeamForm.js (Forme récente/Stats saison/Compos
+// probables réutilisent désormais cette même donnée au lieu de refaire leur
+// propre séquence FD.org quasi-identique — voir le commentaire détaillé
+// là-bas). Une page comme MatchPage.jsx appelle useTeamForm(compId) ET
+// useMatches(compId,'SCHEDULED') quasi au même instant, au montage — sans
+// protection, les 2 pourraient déclencher 2 VRAIS appels FD.org simultanés
+// pour la MÊME compétition avant que le cache Redis serveur (api/football.js)
+// n'ait eu le temps d'absorber le premier. Ce verrou "in-flight" mémorise la
+// promesse en cours par compétition : un 2e appel pendant que le 1er est
+// encore en vol reçoit directement CETTE MÊME promesse au lieu de repartir
+// pour son compte — dédup garantie côté client, pas seulement "probable"
+// via le cache serveur.
+const inFlightRawFetches = new Map()
+
+export function fetchClubMatchesRaw(selectedComp) {
+  if (inFlightRawFetches.has(selectedComp)) {
+    return inFlightRawFetches.get(selectedComp)
+  }
+  const promise = fetchClubMatchesRawInner(selectedComp).finally(() => {
+    inFlightRawFetches.delete(selectedComp)
+  })
+  inFlightRawFetches.set(selectedComp, promise)
+  return promise
+}
+
+async function fetchClubMatchesRawInner(selectedComp) {
   // Mémorise la dernière vraie erreur réseau (429/403) — voir le rethrow en
   // fin de fonction : sans ça, une tentative bloquée finissait en résultat
   // vide silencieux, perdant la distinction "vraiment bloqué" vs "vraiment
