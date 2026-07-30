@@ -173,10 +173,23 @@ async function fetchTeamForm(selectedComp) {
       // lot : si même celui-là est plus vieux que ~450j (saison + trêve),
       // le repli n'est pas fiable — on ne l'utilise pas, quel que soit le
       // nombre de matchs (même logique qu'avant ce refactor).
+      // ⚠️ BUG CORRIGÉ (30/07, trouvé via repro test avec données réalistes) :
+      // Math.max(max, new Date(m.utcDate).getTime()) — si UN SEUL match de
+      // fallbackMatches a un utcDate invalide/absent, .getTime() renvoie NaN
+      // et Math.max(..., NaN) VAUT NaN, ce qui contamine TOUT le reduce pour
+      // toujours (NaN se propage à chaque itération suivante). Résultat :
+      // newestFallbackTs devient NaN → fallbackIsRecent devient false → le
+      // repli "saison précédente" entier est silencieusement désactivé, alors
+      // que fallbackMatches contient pourtant une saison complète valide.
+      // Un seul match mal formé (edge case FD.org réel : date reportée non
+      // confirmée, etc.) suffisait à vider Stats saison/Forme récente/Historique
+      // pour TOUS les matchs à venir de la compétition. Ignore maintenant
+      // silencieusement les dates invalides au lieu de laisser NaN se propager.
       const MAX_FALLBACK_AGE_DAYS = 450
-      const newestFallbackTs = fallbackMatches.reduce(
-        (max, m) => Math.max(max, new Date(m.utcDate).getTime()), 0
-      )
+      const newestFallbackTs = fallbackMatches.reduce((max, m) => {
+        const t = new Date(m.utcDate).getTime()
+        return Number.isFinite(t) ? Math.max(max, t) : max
+      }, 0)
       const fallbackIsRecent = newestFallbackTs > 0
         && (Date.now() - newestFallbackTs) / 86_400_000 <= MAX_FALLBACK_AGE_DAYS
       if (fallbackMatches.length >= MIN_LEAGUE_GAMES && fallbackIsRecent) {

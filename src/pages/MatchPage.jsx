@@ -839,7 +839,7 @@ export default function MatchPage() {
                         via MatchPoster). */}
                     {statsView === 'live'       ? <MpMatchStats match={match} />
                    : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                   : isLastSeason              ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
+                   : (isLastSeason || compMatches.length === 0) ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
                    :                              <MpSeasonStats match={match} compMatches={compMatches} />
                     }
                   </>
@@ -854,7 +854,7 @@ export default function MatchPage() {
                       )}
                       {statsView === 'historique' && showH2HTab
                         ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
-                        : isLastSeason
+                        : (isLastSeason || compMatches.length === 0)
                         // ⚠️ AJOUT (27/07, demande explicite utilisateur : "comme
                         // la les championnat ont pas commencé pas la peine de
                         // recuperer la forme recente et stat saison des dernieres
@@ -868,6 +868,17 @@ export default function MatchPage() {
                         // Redevient `false` automatiquement (voir useTeamForm.js)
                         // dès les premiers vrais matchs de la nouvelle saison —
                         // rien à modifier ici quand les championnats démarreront.
+                        // ⚠️ AJOUT `|| compMatches.length === 0` (30/07, constat
+                        // utilisateur : onglet Statistiques totalement vide/noir
+                        // pour des matchs à venir, ex. Toulouse-Lyon) : isLastSeason
+                        // peut être `false` alors que compMatches est quand même
+                        // vide (ex. cas limite où même le repli saison précédente
+                        // échoue, voir bug NaN corrigé dans useTeamForm.js) — dans
+                        // ce cas MpSeasonStats retourne `null` (aucune donnée pour
+                        // calcTeamStats) ET PreMatchSection ne rend rien non plus
+                        // (compMatches vide) → écran vide sans aucun message. Ce
+                        // garde-fou garantit qu'un message reste TOUJOURS visible
+                        // dès que compMatches est vide, quelle qu'en soit la cause.
                         ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
                         : <>
                             {/* Pronostic des fans — tout en haut, avant Stats saison

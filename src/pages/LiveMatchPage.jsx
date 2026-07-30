@@ -578,7 +578,11 @@ export default function LiveMatchPage() {
                     redevient false automatiquement dès les premiers vrais
                     matchs). L'Historique (onglet Statistiques, inchangé) reste
                     disponible dans tous les cas. */}
-                {isLastSeason
+                {/* ⚠️ AJOUT `|| compMatches.length === 0` (30/07, même garde-fou
+                    que MatchPage.jsx) : évite un bloc vide sans message si
+                    compMatches est vide pour une autre raison qu'isLastSeason
+                    (ex. équipe promue, tout début de saison). */}
+                {(isLastSeason || compMatches.length === 0)
                   ? <p className="pm__noData">Disponibles dès le début de la saison</p>
                   : <SeasonStatsTab match={match} compMatches={compMatches} />
                 }

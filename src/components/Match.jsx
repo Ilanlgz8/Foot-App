@@ -740,7 +740,17 @@ function Matchs() {
   // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
   // défaut jusqu'à la reprise des championnats de club fin août.
   const [selectedComp,  setSelectedComp]  = usePersistedState('shared_selectedComp', 'FL1')
-  const [currentIndex,  setCurrentIndex]  = usePersistedState('matchs_currentIndex', 0)
+  // ⚠️ FIX (30/07, constat utilisateur : "dans programme dans ligue 1 je vois
+  // que a partir de la journée 3") : clé UNIQUE globale avant ce fix — si
+  // l'utilisateur avait consulté une AUTRE compétition (ex. Ligue des
+  // Champions, journée 3) puis revenait sur Programme via un nouveau montage
+  // de page (pas via handleSelectComp, qui remet bien currentIndex à 0 —
+  // voir plus bas), la compétition par défaut (FL1) réutilisait l'index
+  // laissé par cette AUTRE compétition au lieu de repartir de la journée 1.
+  // Clé scopée par compétition : chaque compét retrouve désormais sa PROPRE
+  // position mémorisée (le but originel de usePersistedState, voir son
+  // commentaire), sans collision entre compétitions différentes.
+  const [currentIndex,  setCurrentIndex]  = usePersistedState(`matchs_currentIndex_${selectedComp}`, 0)
   const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
   const [compOpen,      setCompOpen]      = useState(false)
