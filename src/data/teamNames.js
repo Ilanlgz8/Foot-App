@@ -300,6 +300,78 @@ export const TEAM_NAMES_FR = {
   'Costa Rica': 'Costa Rica',
   'Jamaica': 'Jamaïque',
   'United States': 'États-Unis',
+
+  // ── Audit complet noms ESPN vs FD.org, 5 grands championnats club (30/07,
+  // constat utilisateur : "y'a des noms d'equipe chez espn genre... barcelona
+  // au lieu de barcelone... verifier entre espn et fd.org") ──────────────────
+  // Root cause générale : ESPN renvoie le nom OFFICIEL complet de chaque club
+  // (team.name / team.shortDisplayName sur /scoreboard) alors que FD.org
+  // utilise un nom raccourci — et clubNameMatch (espnSummaryParse.js) ne fait
+  // qu'un match de PRÉFIXE (na.startsWith(nb) || nb.startsWith(na)). Ça
+  // fonctionne quand le mot en trop est en SUFFIXE côté ESPN ("Le Havre AC"
+  // commence bien par "Le Havre") mais échoue dès qu'il est en PRÉFIXE
+  // ("Manchester City" ne commence PAS par "Man City", et vice-versa) — même
+  // famille de bug que le cas Lyon/Toulouse déjà corrigé. Vérifié en direct
+  // (api/espn.js, mode scoreboard, vraies données saison 2026-27) pour
+  // Ligue 1/Premier League/LaLiga/Bundesliga/Serie A. Ajout PUREMENT additif
+  // (aucune clé existante modifiée/supprimée, aucune logique de matching
+  // touchée) — comble juste translateTeam() pour ces noms ESPN bruts, avec la
+  // même valeur française déjà utilisée pour le nom FD.org de ce club.
+  // Ligue 1
+  'AS Monaco': 'Monaco',
+  'AJ Auxerre': 'Auxerre',
+  'Le Havre AC': 'Le Havre',
+  // LaLiga — 'Barcelona' est le cas signalé par l'utilisateur (H2H vide vu
+  // depuis Accueil pour Barcelone-Elche, entre autres).
+  'Barcelona': 'Barcelone',
+  // FD.org utilise généralement le nom officiel complet ("FC Barcelona") en
+  // plus du shortName déjà couvert ('Barça') — ajouté par sécurité, même
+  // schéma que Real Madrid/Real Betis déjà en table.
+  'FC Barcelona': 'Barcelone',
+  'Sevilla': 'Séville',
+  'Athletic Club': 'Athletic Bilbao',
+  // Premier League
+  'Manchester United': 'Man. United',
+  'Manchester City': 'Man. City',
+  'Brighton & Hove Albion': 'Brighton',
+  'AFC Bournemouth': 'Bournemouth',
+  'Nottingham Forest': 'Nottingham',
+  'Tottenham Hotspur': 'Tottenham',
+  'Newcastle United': 'Newcastle',
+  // ⚠️ Wolverhampton Wanderers / West Ham United : noms officiels standards,
+  // pas observés directement dans la fenêtre de dates interrogée (calendrier
+  // ESPN pas encore publié pour ces matchs au moment de l'audit) — ajoutés
+  // par cohérence avec le même schéma de nommage confirmé pour tout le reste
+  // de la Premier League (nom complet officiel), à revérifier si jamais pris
+  // en défaut.
+  'Wolverhampton Wanderers': 'Wolverhampton',
+  'West Ham United': 'West Ham',
+  // Bundesliga — quasi CHAQUE club allemand a un préfixe de statut (1. FC/
+  // VfB/VfL/TSG/SC/Bayer/Borussia/Werder/Eintracht/FC/Hamburg) absent du nom
+  // court FD.org déjà en table — bug quasi systématique pour cette ligue.
+  'VfB Stuttgart': 'Stuttgart',
+  '1. FC Union Berlin': 'Union Berlin',
+  'Eintracht Frankfurt': 'Francfort',
+  'FC Cologne': 'Cologne',
+  'TSG Hoffenheim': 'Hoffenheim',
+  'Borussia Mönchengladbach': 'M\'gladbach',
+  'Bayer Leverkusen': 'Leverkusen',
+  'Borussia Dortmund': 'Dortmund',
+  'Hamburg SV': 'Hambourg',
+  'SC Freiburg': 'Fribourg',
+  'Werder Bremen': 'Werder Brême',
+  'FC Augsburg': 'Augsbourg',
+  // ⚠️ Wolfsburg/St. Pauli/Heidenheim : noms officiels standards, mêmes
+  // réserves que Wolverhampton/West Ham ci-dessus (pas observés directement
+  // dans la fenêtre de dates interrogée).
+  'VfL Wolfsburg': 'Wolfsburg',
+  'FC St. Pauli': 'St. Pauli',
+  '1. FC Heidenheim': 'Heidenheim',
+  // Serie A
+  'Internazionale': 'Inter Milan',
+  'Como': 'Côme',
+  'AC Milan': 'Milan AC',
+  'AS Roma': 'Rome',
 }
 
 export const translateTeam = (name) => TEAM_NAMES_FR[name] ?? name
