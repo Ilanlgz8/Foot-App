@@ -29,7 +29,7 @@ import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -133,10 +133,17 @@ function outcomeOf(h, a) {
 // récente (formMap/matchesByComp, voir useTeamFormMulti) — même source et
 // même modèle que MatchPoster (Accueil).
 function matchProno(match, formMap, matchesByComp) {
-  const hForm = formMap?.[match?.homeTeam?.id] ?? []
-  const aForm = formMap?.[match?.awayTeam?.id] ?? []
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
-  return calcPronoAdvanced(match?.homeTeam?.id, match?.awayTeam?.id, compMatches, hForm, aForm, {
+  // ⚠️ BUG CORRIGÉ (30/07, même fix que MatchPoster.jsx/MatchDuJourCard.jsx —
+  // voir leur commentaire détaillé) : formMap/compMatches sont indexés par
+  // ids FD.org, match.homeTeam.id est un id ESPN pour les 6 grands
+  // championnats — sans résolution, prono neutre identique pour tous les
+  // matchs de cette liste.
+  const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true }) ?? match?.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true }) ?? match?.awayTeam?.id
+  const hForm = formMap?.[resolvedHomeId] ?? []
+  const aForm = formMap?.[resolvedAwayId] ?? []
+  return calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
     neutralVenue: isNeutralVenueComp(match),
   })
 }
