@@ -1,6 +1,6 @@
 import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -87,26 +87,8 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
 
   const homeName  = match.homeTeam?.name ?? ''
   const awayName  = match.awayTeam?.name ?? ''
-  // ⚠️ BUG CORRIGÉ (30/07, constat utilisateur : "c normal que c toujours les
-  // memes cotes sur les match ?") : formMap/compMatches viennent de FD.org
-  // (useTeamForm/useTeamFormMulti) et sont indexés par les ids FD.org — mais
-  // pour les 6 grands championnats, `match` vient d'ESPN (preferEspnForMajors,
-  // voir useMatchs.js) et match.homeTeam.id est un id ESPN, un espace d'ids
-  // totalement différent (aucune coïncidence garantie). `formMap?.[id ESPN]`
-  // et calcPronoAdvanced(id ESPN, ...) ne trouvaient donc PRESQUE JAMAIS la
-  // vraie donnée saison de l'équipe → repli silencieux sur un prono neutre
-  // IDENTIQUE pour absolument tous les matchs ESPN sans cote de marché
-  // disponible (confirmé par repro test avec données réalistes : deux
-  // équipes de force opposée donnaient exactement le même prono avant ce
-  // fix). resolveFdTeamId (même mécanisme déjà utilisé et éprouvé pour le
-  // H2H, voir MatchPage.jsx) convertit l'id ESPN vers l'id FD.org équivalent
-  // via compMatches déjà chargé — repli sur l'id d'origine si la résolution
-  // échoue (aucune régression possible, comportement identique à avant dans
-  // ce cas précis).
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
-  const hForm     = formMap?.[resolvedHomeId] ?? []
-  const aForm     = formMap?.[resolvedAwayId] ?? []
+  const hForm     = formMap?.[match.homeTeam?.id] ?? []
+  const aForm     = formMap?.[match.awayTeam?.id] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
   // card en live en fonction du score") : cette barre utilisait TOUJOURS
   // calcPronoAdvanced (le prior pré-match figé), même une fois le match en
@@ -119,7 +101,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // avant le coup d'envoi, résultat déjà figé une fois le match terminé).
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
-        homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
+        homeId: match.homeTeam?.id, awayId: match.awayTeam?.id, compMatches,
         fullH2H,
         neutralVenue:      isNeutralVenueComp(match),
         homeRedCards:      espnScore?.stats?.home?.redCards,
@@ -131,7 +113,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
       })
-    : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
+    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm, {
         fullH2H,
         neutralVenue: isNeutralVenueComp(match),
       })

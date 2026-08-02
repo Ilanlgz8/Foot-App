@@ -372,20 +372,6 @@ export const TEAM_NAMES_FR = {
   'Como': 'Côme',
   'AC Milan': 'Milan AC',
   'AS Roma': 'Rome',
-
-  // ── Re-vérification EXHAUSTIVE (30/07, suite user "tu es sûr ?") : l'audit
-  // ci-dessus utilisait /scoreboard sur des fenêtres de dates choisies à la
-  // main (donc pas garanti de voir CHAQUE équipe). Recroisé cette fois avec
-  // /api/espn?slug=X&standings=1 (classement complet, TOUTES les équipes
-  // d'un coup, quel que soit le calendrier) pour les 5 grands championnats
-  // club — 96 équipes vérifiées une par une (name ET shortName) contre cette
-  // table. Gaps réels trouvés (le reste était déjà couvert) :
-  'Paris Saint-Germain': 'Paris SG', // FL1 — nom complet ESPN, seul 'PSG' (shortName) était couvert
-  'C Palace': 'Crystal Palace',      // PL — shortName ESPN, filet de sécurité
-  'Nottm Forest': 'Nottingham',      // PL — idem
-  'Spurs': 'Tottenham',              // PL — idem
-  'Gladbach': 'M\'gladbach',          // BL1 — shortName ESPN ("Mönchengladbach" tronqué), différent de "M'gladbach" déjà en table
-  'Hamburg': 'Hambourg',             // BL1 — shortName ESPN, seul 'HSV' était couvert
 }
 
 export const translateTeam = (name) => TEAM_NAMES_FR[name] ?? name

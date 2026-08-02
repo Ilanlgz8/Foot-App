@@ -710,22 +710,10 @@ export default function MatchPage() {
     [scheduledMatches, compMatches]
   )
 
-  // ⚠️ AJOUT `{ loose: true }` (30/07, suite de l'audit noms ESPN/FD.org —
-  // constat utilisateur "d'autres bugs ?") : cette résolution était en
-  // strict clubNameMatch (préfixe uniquement) — trouve "Le Havre AC"→
-  // "Le Havre" (suffixe en trop côté ESPN) mais PAS "AS Monaco"→"Monaco" ni
-  // "Manchester City"→"Man City" (mot en trop en PRÉFIXE côté ESPN, voir
-  // l'audit TEAM_NAMES_FR). Pour CES équipes précises, homeId/awayId
-  // restaient l'id ESPN brut → Forme récente/Stats saison (hForm/aForm plus
-  // bas, MpSeasonStats) ne trouvaient rien pour elles spécifiquement, même
-  // si l'autre équipe du match s'affichait normalement (bug plus discret que
-  // l'onglet totalement vide déjà corrigé, mais même famille). looseTeamMatch
-  // (déjà utilisé ici même pour le H2H, voir useH2HRows plus bas) comble ce
-  // trou via translateTeam — désormais complet depuis l'audit TEAM_NAMES_FR.
   const match = useMemo(() => {
     if (!rawMatch || !resolveMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,
