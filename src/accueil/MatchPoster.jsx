@@ -45,13 +45,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // ("Match du jour") donc un seul appel FD.org supplémentaire, budget-safe
   // contrairement aux listes de plusieurs matchs (Pronos.jsx) qui restent
   // sur le repli saison précédente (voir calcProno.js, opts.fullH2H).
-  // ⚠️ AJOUT `{ looseTeamMatch: true }` (constat utilisateur : cotes "par
-  // défaut" sur Barcelone-Elche malgré un H2H visible sur la fiche match) :
-  // sans ce flag, useH2HRows ne trouvait jamais les confrontations passées
-  // ici (id ESPN brut vs compMatches indexé FD.org) — voir le commentaire
-  // détaillé dans useH2HRows (MatchModal.jsx). MatchPage.jsx utilisait déjà
-  // ce flag, jamais branché ici pour les cards Accueil.
-  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  const { rows: fullH2H } = useH2HRows(match, compMatches)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 

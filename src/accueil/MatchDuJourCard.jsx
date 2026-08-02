@@ -45,9 +45,7 @@ function formatHour(dateStr) {
 export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const compCode = match?.competition?.code ?? null
   const { formMap, compMatches } = useTeamForm(compCode)
-  // Voir le commentaire détaillé dans MatchPoster.jsx / useH2HRows
-  // (MatchModal.jsx) — même fix.
-  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  const { rows: fullH2H } = useH2HRows(match, compMatches)
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
   const _ms       = match ? getMatchState(match.id) : null
