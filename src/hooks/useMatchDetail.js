@@ -241,68 +241,108 @@ function extractMoneylines(oddsEntry) {
   return null
 }
 
+// ⚠️ AJOUT cache disque dédié (03/08, constat utilisateur : "des fois je
+// relance l'app et je regarde le même match, il a les cotes par défaut,
+// c'est instable") : cette requête (queryKey 'espnPregameOdds') est dans
+// UNPERSISTED_QUERY_KEYS (main.jsx) — exclue du gros blob React Query
+// persisté en localStorage, pour éviter que les payloads volumineux
+// (compos/stats détaillées) fassent dépasser le quota. Mais ce choix,
+// pensé pour CES payloads-là, s'appliquait aussi par défaut à celui-ci —
+// beaucoup plus petit ({decimal:3 nombres, pct:3 nombres}) et SANS aucun
+// autre filet de sécurité (contrairement à useH2H juste plus bas, déjà
+// protégé par son propre readCacheStale). Résultat concret : à CHAQUE
+// rechargement complet de l'app, cette requête repart totalement de zéro
+// — 1 seul essai (retry:1), zéro repli si ESPN est lent/indisponible à cet
+// instant précis. Sur le même match, un rechargement peut donc tomber sur
+// une vraie cote de marché et le suivant sur le repli calcProno neutre,
+// sans aucun rapport avec une vraie absence de donnée côté ESPN. Même
+// remède déjà éprouvé que useH2H (readCacheStale en initialData ET en
+// repli sur échec) — coût disque négligeable vu la taille du payload.
+// Honnêteté : une partie de l'instabilité perçue reste réelle et hors de
+// notre contrôle (ESPN publie/retire ses cotes de marché progressivement à
+// l'approche du coup d'envoi, ce n'est pas figé même côté source) — ce
+// correctif élimine la partie qui NOUS appartenait (perte de la dernière
+// valeur connue à chaque reload), pas l'autre.
+const ESPN_ODDS_TTL = 6 * 3600 * 1000  // 6h — cote pré-match bouge peu à cette échelle, mieux qu'un neutre plat même un peu daté
+
 export function useEspnPregameOdds(match, enabled = true) {
   const compId = match?.competition?.id
   const slug   = COMP_ESPN[compId]
   const date   = matchDateStr(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  const cacheKey   = match?.id ? `espnOdds_${match.id}` : null
+  const cachedOdds = cacheKey ? readCacheStale(cacheKey) : null
+  const cachedAt   = cacheKey ? getCacheSavedAt(cacheKey) : 0
 
   return useQuery({
     queryKey:  ['espnPregameOdds', match?.id],
     enabled:   enabled && !!slug && !!match?.id && !!date,
     staleTime: 15 * 60_000,   // pré-match, ligne quasi figée à l'approche du coup d'envoi
     retry: 1,
+    initialData:          cachedOdds ?? undefined,
+    initialDataUpdatedAt: cachedAt,
     queryFn: async () => {
-      const events = await fetchEspnEventsDual(slug, match)
-      for (const evt of events) {
-        const comp  = evt.competitions?.[0]
-        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-        if (!homeC || !awayC) continue
-        const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
-        const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
-        if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
-
-        const oddsList = (comp?.odds ?? []).filter(o => !ODDS_PROVIDER_SKIP(o?.provider?.name))
-        // Provider préféré d'abord (ESPN BET, puis DraftKings), sinon
-        // n'importe quel provider restant (mieux qu'aucune cote, toujours
-        // filtré par le garde-fou plus bas avant d'être affiché).
-        const ordered = [
-          ...ODDS_PROVIDER_PRIORITY.flatMap(name => oddsList.filter(o => o?.provider?.name === name)),
-          ...oddsList.filter(o => !ODDS_PROVIDER_PRIORITY.includes(o?.provider?.name)),
-        ]
-
-        for (const entry of ordered) {
-          const ml = extractMoneylines(entry)
-          if (!ml) continue
-          const homeOdds = americanToDecimal(ml.home)
-          const awayOdds = americanToDecimal(ml.away)
-          const drawOdds = americanToDecimal(ml.draw)
-          if (!homeOdds || !awayOdds || !drawOdds) continue
-
-          // Probabilité implicite (marge bookmaker déjà incluse dans une
-          // vraie cote marché, contrairement à notre modèle) — sert à
-          // déterminer le favori/l'intensité du liseré, pas la cote
-          // AFFICHÉE (voir decimal).
-          const pHome = 1 / homeOdds, pDraw = 1 / drawOdds, pAway = 1 / awayOdds
-          const sum   = pHome + pDraw + pAway
-          // Garde-fou anti-mauvais-marché (voir commentaire plus haut) —
-          // une vraie cote 1X2 a une marge raisonnable (95%-130%) ; en
-          // dehors, on passe au provider suivant plutôt que d'afficher
-          // n'importe quoi.
-          if (sum < 0.95 || sum > 1.3) continue
-
-          return {
-            decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
-            pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
-          }
-        }
-        return null
+      try {
+        const result = await fetchEspnPregameOddsResult(slug, match, fdHome, fdAway)
+        if (result && cacheKey) writeCache(cacheKey, result, ESPN_ODDS_TTL)
+        return result ?? (cacheKey ? readCacheStale(cacheKey) : null)
+      } catch (e) {
+        if (cacheKey) return readCacheStale(cacheKey)
+        throw e
       }
-      return null
     },
   })
+}
+
+async function fetchEspnPregameOddsResult(slug, match, fdHome, fdAway) {
+  const events = await fetchEspnEventsDual(slug, match)
+  for (const evt of events) {
+    const comp  = evt.competitions?.[0]
+    const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+    const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+    if (!homeC || !awayC) continue
+    const espnHome = homeC.team?.displayName ?? homeC.team?.name ?? ''
+    const espnAway = awayC.team?.displayName ?? awayC.team?.name ?? ''
+    if (!fuzzyTeam(fdHome, espnHome) || !fuzzyTeam(fdAway, espnAway)) continue
+
+    const oddsList = (comp?.odds ?? []).filter(o => !ODDS_PROVIDER_SKIP(o?.provider?.name))
+    // Provider préféré d'abord (ESPN BET, puis DraftKings), sinon
+    // n'importe quel provider restant (mieux qu'aucune cote, toujours
+    // filtré par le garde-fou plus bas avant d'être affiché).
+    const ordered = [
+      ...ODDS_PROVIDER_PRIORITY.flatMap(name => oddsList.filter(o => o?.provider?.name === name)),
+      ...oddsList.filter(o => !ODDS_PROVIDER_PRIORITY.includes(o?.provider?.name)),
+    ]
+
+    for (const entry of ordered) {
+      const ml = extractMoneylines(entry)
+      if (!ml) continue
+      const homeOdds = americanToDecimal(ml.home)
+      const awayOdds = americanToDecimal(ml.away)
+      const drawOdds = americanToDecimal(ml.draw)
+      if (!homeOdds || !awayOdds || !drawOdds) continue
+
+      // Probabilité implicite (marge bookmaker déjà incluse dans une
+      // vraie cote marché, contrairement à notre modèle) — sert à
+      // déterminer le favori/l'intensité du liseré, pas la cote
+      // AFFICHÉE (voir decimal).
+      const pHome = 1 / homeOdds, pDraw = 1 / drawOdds, pAway = 1 / awayOdds
+      const sum   = pHome + pDraw + pAway
+      // Garde-fou anti-mauvais-marché (voir commentaire plus haut) —
+      // une vraie cote 1X2 a une marge raisonnable (95%-130%) ; en
+      // dehors, on passe au provider suivant plutôt que d'afficher
+      // n'importe quoi.
+      if (sum < 0.95 || sum > 1.3) continue
+
+      return {
+        decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
+        pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
+      }
+    }
+    return null
+  }
+  return null
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "ça marche une fois sur dix",
