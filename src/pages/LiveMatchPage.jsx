@@ -15,7 +15,7 @@ import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
-import { useMatches }       from '../hooks/useMatchs'
+import { useMatches, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useMatchInfo }     from '../hooks/useMatchDetail'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -357,6 +357,9 @@ export default function LiveMatchPage() {
   const compId  = rawMatch?.competition?.code ?? null
 
   const { formMap, compMatches, isLastSeason } = useTeamForm(compId)
+  // Repli "club promu" (03/08, cohérence demandée avec Accueil/Pronos) — voir
+  // useLowerDivisionStats (useMatchs.js) et son commentaire détaillé.
+  const lowerDivMatches = useLowerDivisionStats(compId, compMatches)
 
   // Même correctif que MatchPage.jsx (voir resolveFdTeamId, matchUtils.js) :
   // un match live sourcé ESPN (les 6 grands championnats via Accueil) a des
@@ -558,6 +561,7 @@ export default function LiveMatchPage() {
                     hForm={hForm}
                     aForm={aForm}
                     h2hRows={h2hRows}
+                    lowerDivMatches={lowerDivMatches}
                   />
                 )}
               </>

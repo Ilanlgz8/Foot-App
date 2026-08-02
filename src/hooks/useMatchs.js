@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
@@ -329,6 +329,41 @@ export function useLowerDivisionStats(selectedComp, compMatches) {
     retry: 1,
   })
   return data ?? []
+}
+
+// ── useLowerDivisionStatsMulti ───────────────────────────────────────────
+// Demande utilisateur (03/08, "si c mieux oui pour etre cohérent en vrai") :
+// même repli "club promu" que useLowerDivisionStats ci-dessus, mais pour les
+// pages qui mélangent plusieurs compétitions à la fois (Pronos.jsx, même
+// besoin que useTeamFormMulti déjà utilisé là-bas) — un fetch PAR
+// COMPÉTITION affichée (jamais par match), staggeré pour éviter toute
+// rafale FD.org si plusieurs grands championnats sont affichés en même
+// temps (même principe que useTeamFormMulti, STAGGER_MS).
+export function useLowerDivisionStatsMulti(compCodes, matchesByComp) {
+  const codes = [...new Set((compCodes ?? []).filter(Boolean))]
+  const STAGGER_MS = 1_000
+
+  const results = useQueries({
+    queries: codes.map((code, i) => {
+      const lowerCode = LOWER_DIVISION_FD_CODE[code]
+      const compMatches = matchesByComp?.[code] ?? []
+      const baseYear = resolveBaseSeasonYear(compMatches)
+      return {
+        queryKey: ['lowerDivisionStats', lowerCode, baseYear],
+        queryFn: async () => {
+          if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
+          return fetchLowerDivisionStats(code, compMatches)
+        },
+        enabled: !!lowerCode,
+        staleTime: LOWER_DIV_CACHE_TTL,
+        retry: 1,
+      }
+    }),
+  })
+
+  const byComp = {}
+  codes.forEach((code, i) => { byComp[code] = results[i]?.data ?? [] })
+  return byComp
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : le

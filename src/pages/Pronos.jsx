@@ -25,7 +25,7 @@
  */
 import { useState, useEffect, useMemo } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
-import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
+import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
@@ -135,13 +135,20 @@ function outcomeOf(h, a) {
 // ⚠️ BUG CORRIGÉ (même fix que MatchPoster.jsx/MatchDuJourCard.jsx) : id ESPN
 // vs id FD.org pour les 6 grands championnats — sans résolution, calcPronoAdvanced
 // ne retrouve jamais la vraie donnée saison de l'équipe.
-function matchProno(match, formMap, matchesByComp) {
+function matchProno(match, formMap, matchesByComp, lowerDivByComp) {
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
   const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true }) ?? match?.homeTeam?.id
   const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true }) ?? match?.awayTeam?.id
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
+  // Repli "club promu" (03/08, cohérence demandée avec Accueil — voir
+  // calcProno.js computeLambdasWithPromotion) : lowerDivByComp fourni par
+  // useLowerDivisionStatsMulti, absent/vide pour toute compétition sans
+  // repli connu → aucun changement dans ce cas (comportement identique à
+  // avant).
+  const lowerDivMatches = lowerDivByComp?.[match?.competition?.code] ?? []
   return calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
+    lowerDivMatches,
     neutralVenue: isNeutralVenueComp(match),
   })
 }
@@ -256,7 +263,7 @@ function JoinCreateScreen({ onCreate, onJoin }) {
   )
 }
 
-function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp }) {
+function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerDivByComp }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -280,7 +287,7 @@ function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp }) {
   const h = parseInt(home, 10)
   const a = parseInt(away, 10)
   const hasValidPred = Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20
-  const prono = useMemo(() => matchProno(match, formMap, matchesByComp), [match, formMap, matchesByComp])
+  const prono = useMemo(() => matchProno(match, formMap, matchesByComp, lowerDivByComp), [match, formMap, matchesByComp, lowerDivByComp])
   const potentialPoints = hasValidPred ? pronoPointsForProb(prono[outcomeOf(h, a)]) : null
 
   return (
@@ -506,6 +513,9 @@ function Pronos() {
     return [...codes]
   }, [upcoming, finished, liveMatches])
   const { formMap, matchesByComp } = useTeamFormMulti(formCompCodes)
+  // Repli "club promu" (03/08, cohérence demandée avec Accueil) — voir
+  // useLowerDivisionStatsMulti (useMatchs.js) et son commentaire détaillé.
+  const lowerDivByComp = useLowerDivisionStatsMulti(formCompCodes, matchesByComp)
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur : un match venait de se terminer —
   // bon prono, score exact — mais restait affiché "En direct" dans l'onglet
@@ -608,9 +618,9 @@ function Pronos() {
   // que celui affiché avant le match (voir computePoints).
   const pronoByMatchId = useMemo(() => {
     const map = {}
-    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap, matchesByComp) })
+    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap, matchesByComp, lowerDivByComp) })
     return map
-  }, [finishedAll, formMap, matchesByComp])
+  }, [finishedAll, formMap, matchesByComp, lowerDivByComp])
 
   const leaderboard = useMemo(() => {
     return Object.entries(players)
@@ -708,6 +718,7 @@ function Pronos() {
                     onSave={handlePredict}
                     formMap={formMap}
                     matchesByComp={matchesByComp}
+                    lowerDivByComp={lowerDivByComp}
                   />
                 ))}
               </div>

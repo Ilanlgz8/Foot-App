@@ -487,7 +487,7 @@ const STAT_FR = {
 // (voir calcProno.js) — corrige les probabilités identiques en début de
 // saison (compMatches vide) en s'appuyant sur l'historique réel toutes
 // compétitions confondues plutôt que la seule forme récente neutre.
-export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows }) {
+export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows, lowerDivMatches }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -555,6 +555,7 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
     {
       homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
       fullH2H:           h2hRows,
+      lowerDivMatches,
       neutralVenue:      isNeutralVenueComp(match),
       homeRedCards:      pronoStats?.home?.redCards,
       awayRedCards:      pronoStats?.away?.redCards,
