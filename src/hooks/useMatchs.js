@@ -114,12 +114,33 @@ export function groupRounds(matches, order = 'asc') {
 // Calcule l'année de saison pour les ligues clubs (ex: juin 2026 → 2025)
 // Les ligues club tournent Août-Mai, donc en juin/juillet on est en intersaison
 // WC 2026 : saison spéciale juin-juillet 2026
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 02/08 : cotes par défaut ET H2H
+// manquant sur beaucoup de matchs — les 2 symptômes venaient de la même
+// cause) : le seuil `month <= 7` considérait le 1er août comme déjà la
+// nouvelle saison — vérifié en direct sur l'API FD.org réelle ce jour-là
+// (season=2026 pour FL1) : 306 matchs, TOUS "SCHEDULED", ZÉRO "FINISHED".
+// La vraie reprise n'a lieu qu'à partir du 15/08 (LaLiga) et du 21-22/08
+// (Ligue 1/Premier League), calendriers ESPN réels vérifiés. Résultat :
+// fetchClubMatchesRaw demandait `?season=2026` comme repli "saison
+// précédente" — exactement la MÊME saison vide que la saison en cours, donc
+// AUCUNE vraie donnée historique (2025-26) récupérée. Impact double : (1)
+// calcPronoAdvanced retombe sur un prior neutre partout (compMatches vide,
+// pas de modèle de buts) — "cotes par défaut" ; (2) useH2HRows (MatchModal.jsx)
+// perd aussi son repli compH2H (qui a besoin de compMatches rempli) — seul
+// fdRecent (appel FD.org direct par id de match) reste disponible, moins
+// complet — "H2H disparu sur beaucoup de matchs". Les deux symptômes,
+// signalés séparément par l'utilisateur, pointaient donc vers la même cause
+// unique. Décalé à `month <= 8`, sans risque de régression une fois la
+// vraie saison lancée : ce repli n'est utilisé QUE tant que la saison en
+// cours n'a encore aucun match FINISHED (hasFinished) — dès le 1er vrai
+// résultat, la branche cesse d'être utilisée automatiquement.
 export function getClubSeason() {
   const now = new Date()
   const month = now.getMonth() + 1 // 1-12
   const year = now.getFullYear()
-  // En juin et juillet, la saison précédente vient de se terminer
-  return month <= 7 ? year - 1 : year
+  // Juin à août : la saison précédente vient de se terminer, la nouvelle n'a
+  // pas encore débuté pour aucun des championnats suivis.
+  return month <= 8 ? year - 1 : year
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : le
