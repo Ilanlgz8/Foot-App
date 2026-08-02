@@ -209,19 +209,25 @@ export function fetchH2HHistory(selectedComp, compMatches) {
 
 async function fetchH2HHistoryInner(selectedComp, baseYear) {
   const results = []
-  let waited = false
+  // ⚠️ BUG CORRIGÉ (02/08, même investigation que le fix jumeau dans
+  // fetchClubMatchesRawInner ci-dessus — voir son commentaire détaillé) :
+  // l'attente adaptative n'était posée qu'avant le TOUT PREMIER vrai fetch de
+  // cette boucle (flag `waited`, jamais remis à false) — pour EXTRA_H2H_
+  // SEASONS_BACK=2, si le tour back=1 avait besoin d'un vrai fetch (cache
+  // absent), il posait lui-même le verrou d'espacement pour 6s, puis le tour
+  // back=2 (souvent aussi cache absent la 1ère fois qu'une compétition est
+  // consultée) enchaînait AUSSITÔT sans jamais l'attendre — quasiment aucune
+  // chance réelle de passer, une des 2 saisons manquait alors silencieusement
+  // (best-effort, voir le catch plus bas) sans que rien ne le signale.
+  // waitForFdSpacing() est déjà adaptative (0ms si aucun appel voisin réel
+  // n'est en cours) : l'appeler avant CHAQUE vrai fetch, pas juste le premier,
+  // ne coûte rien de plus dans le cas normal et donne une vraie chance au 2e.
   for (let back = 1; back <= EXTRA_H2H_SEASONS_BACK; back++) {
     const year = baseYear - back
     const cacheKey = `h2hHistory_${selectedComp}_${year}`
     const cached = readCache(cacheKey)
     if (cached != null) { results.push(...cached); continue }
-    // Attente ADAPTATIVE (voir fdSpacingTracker.js), UNIQUEMENT avant le 1er
-    // vrai appel réseau de cette fonction — plusieurs compétitions affichées
-    // en même temps sur l'Accueil (chacune avec son propre useH2HHistory)
-    // pourraient sinon toutes taper le verrou d'espacement serveur au même
-    // instant ; ça laisse une vraie chance à celles qui arrivent un peu après
-    // un hook voisin (useTeamFormMulti, etc.) plutôt qu'un 429 immédiat.
-    if (!waited) { await waitForFdSpacing(); waited = true }
+    await waitForFdSpacing()
     try {
       const matches = await tryFetch(
         `/api/v4/competitions/${selectedComp}/matches?dateFrom=${year}-07-01&dateTo=${year + 1}-06-30`
@@ -509,7 +515,31 @@ async function fetchClubMatchesRawInner(selectedComp) {
     // requête échoue un jour pour une autre raison, retente `season=` une
     // année plus tôt plutôt que d'abandonner — une donnée un peu plus vieille
     // reste préférable à un neutre par défaut identique sur tous les matchs.
+    // ⚠️ BUG CORRIGÉ (02/08, trouvé en investiguant le signalement utilisateur
+    // "Elche-Barcelone encore" — H2H visible mais cote par défaut) : ce 2e
+    // essai partait AUSSITÔT après l'échec du 1er (dateFrom/dateTo, juste
+    // au-dessus), sans jamais attendre le verrou d'espacement serveur
+    // (SPACING_MS, api/football.js). Or si le 1er essai a échoué À CAUSE de
+    // ce verrou (quelqu'un d'autre l'a posé juste avant — très plausible en
+    // ce moment précis : TOUS les grands championnats club ont simultanément
+    // besoin de ce même repli saison précédente, aucun n'a encore de FINISHED
+    // en 2026-27), OU si le 1er essai a lui-même RÉUSSI À TAPER FD.org (donc
+    // vient de poser ce verrou pour 6s), le 2e essai immédiat n'avait dans les
+    // deux cas quasiment aucune chance réelle de passer — gaspillé pour rien,
+    // et compMatches retombait alors sur le seul `current` (calendrier à
+    // venir, sans historique) pendant tout le staleTime du cache (2min,
+    // useTeamForm.js) : buildGoalModel/H2H n'avaient plus rien à exploiter
+    // pour CETTE compétition pendant cette fenêtre, cote neutre par défaut,
+    // alors même que le head2head dédié et h2hHistory (fetches indépendants)
+    // pouvaient très bien afficher un H2H de leur côté — exactement le
+    // symptôme rapporté ("H2H visible MAIS cote par défaut"). waitForFdSpacing
+    // (déjà utilisé pour la transition current→1er essai un peu plus haut)
+    // est adaptatif : 0ms si le 1er essai n'a en fait rien tapé de réel
+    // (cache serveur déjà chaud), sinon le temps qui reste réellement avant
+    // l'expiration du verrou — donne au 2e essai une vraie chance sans
+    // ralentir le cas déjà rapide.
     if (lastSeason == null || lastSeason.length === 0) {
+      await waitForFdSpacing()
       try {
         const olderSeason = await tryFetch(
           `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear - 1}`

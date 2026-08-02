@@ -372,6 +372,18 @@ export const TEAM_NAMES_FR = {
   'Como': 'Côme',
   'AC Milan': 'Milan AC',
   'AS Roma': 'Rome',
+
+  // ⚠️ RÉ-APPLIQUÉ (02/08, perdu par erreur dans le gros revert b0f424a du
+  // même jour — voir git log, ces 6 entrées existaient déjà dans eaa3847 et
+  // n'ont jamais été remises depuis) : audit exhaustif via /api/espn?
+  // standings=1 (classement complet, toutes les équipes) pour les 5 grands
+  // championnats club — gaps réels trouvés, le reste était déjà couvert.
+  'Paris Saint-Germain': 'Paris SG', // FL1 — nom complet ESPN, seul 'PSG' (shortName) était couvert
+  'C Palace': 'Crystal Palace',      // PL — shortName ESPN, filet de sécurité
+  'Nottm Forest': 'Nottingham',      // PL — idem
+  'Spurs': 'Tottenham',              // PL — idem
+  'Gladbach': 'M\'gladbach',          // BL1 — shortName ESPN ("Mönchengladbach" tronqué), différent de "M'gladbach" déjà en table
+  'Hamburg': 'Hambourg',             // BL1 — shortName ESPN, seul 'HSV' était couvert
 }
 
 export const translateTeam = (name) => TEAM_NAMES_FR[name] ?? name
