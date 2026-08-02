@@ -18,7 +18,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { useH2HHistory } from '../hooks/useMatchs'
+import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
 import { COMPETITIONS } from '../data/competitions'
@@ -58,6 +58,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
   const h2hHistory = useH2HHistory(compCode, compMatches)
   const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
+  // Repli "club promu" — voir commentaire détaillé dans MatchPoster.jsx.
+  const lowerDivMatches = useLowerDivisionStats(compCode, compMatches)
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
   const _ms       = match ? getMatchState(match.id) : null
@@ -128,7 +130,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const prono = isLive
     ? calcLiveProno(hForm, aForm, hs, as_, liveMinute, {
         homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
-        fullH2H,
+        fullH2H, lowerDivMatches,
         neutralVenue:      isNeutralVenueComp(match),
         homeRedCards:      espnScore?.stats?.home?.redCards,
         awayRedCards:      espnScore?.stats?.away?.redCards,
@@ -140,7 +142,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         awayCorners:       espnScore?.stats?.away?.corners,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
-        fullH2H,
+        fullH2H, lowerDivMatches,
         neutralVenue: isNeutralVenueComp(match),
       })
 

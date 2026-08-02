@@ -5,7 +5,7 @@ import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
-import { useH2HHistory }              from '../hooks/useMatchs'
+import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
@@ -61,6 +61,12 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
   const h2hHistory = useH2HHistory(compCode, compMatches)
   const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
+  // Repli "club promu" (02/08, voir calcProno.js computeLambdasWithPromotion) —
+  // fetch best-effort, une seule fois par compétition (jamais par carte), vide
+  // silencieusement pour toute comp sans division inférieure connue
+  // (LOWER_DIVISION_FD_CODE) ou toute équipe déjà bien pourvue en données
+  // saison en cours.
+  const lowerDivMatches = useLowerDivisionStats(compCode, compMatches)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
@@ -150,7 +156,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
         homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
-        fullH2H,
+        fullH2H, lowerDivMatches,
         neutralVenue:      isNeutralVenueComp(match),
         homeRedCards:      espnScore?.stats?.home?.redCards,
         awayRedCards:      espnScore?.stats?.away?.redCards,
@@ -162,7 +168,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         awayCorners:       espnScore?.stats?.away?.corners,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
-        fullH2H,
+        fullH2H, lowerDivMatches,
         neutralVenue: isNeutralVenueComp(match),
       })
 

@@ -379,8 +379,12 @@ function clampLambda(l) {
 // MIN_LEAGUE_GAMES=10), PAS encore re-testé empiriquement après ce
 // changement — à vérifier en relançant scripts/backtest-prono.mjs.
 const RATIO_SHRINK_K = 8
-function shrinkRatio(ratio, n) {
-  const w = n / (n + RATIO_SHRINK_K)
+// ⚠️ AJOUT param `k` optionnel (02/08, voir computeLambdasWithPromotion plus
+// bas) : K par défaut inchangé (RATIO_SHRINK_K) pour tout appelant existant —
+// permet à un futur appelant de fournir un K différent (plus prudent) sans
+// dupliquer cette fonction.
+function shrinkRatio(ratio, n, k = RATIO_SHRINK_K) {
+  const w = n / (n + k)
   return 1 + (ratio - 1) * w
 }
 
@@ -397,6 +401,81 @@ function computeLambdas(goalModel, homeId, awayId) {
   const defenseHome = shrinkRatio((home.hAgainst / home.hCount) / leagueAvgAway, home.hCount)
   const attackAway  = shrinkRatio((away.aFor     / away.aCount) / leagueAvgAway, away.aCount)
   const defenseAway = shrinkRatio((away.aAgainst / away.aCount) / leagueAvgHome, away.aCount)
+
+  return {
+    lambdaHome: clampLambda(attackHome * defenseAway * leagueAvgHome),
+    lambdaAway: clampLambda(attackAway * defenseHome * leagueAvgAway),
+  }
+}
+
+// ── Repli "club promu" : stats de SA division d'origine ─────────────────
+// Demande utilisateur (02/08, cas concret Hull City — promu en Premier
+// League, aucun match PL la saison passée) : "calculer les côtes par
+// rapport à la saison dernière... même pour les équipes promues, sans
+// l'afficher dans l'app, et dès que la saison en cours a commencé on
+// s'appuie plus sur elle". Le repli "saison précédente" déjà existant
+// (isLastSeason, useTeamForm.js) ne peut PAS aider ici par construction :
+// il cherche la saison passée de LA MÊME compétition (PL), et un promu n'y
+// a simplement jamais joué — peu importe à quel point ce repli est fiabilisé
+// par ailleurs. Ce repli-ci va chercher les stats de SA vraie division
+// d'origine (LOWER_DIVISION_FD_CODE, competitions.js — ex. Championship pour
+// un promu PL) — fourni par l'appelant via `lowerDivMatches` (déjà chargé,
+// voir useLowerDivisionStats, useMatchs.js, un seul fetch par compétition,
+// jamais par carte).
+// ⚠️ Shrink BEAUCOUP plus fort (LOWER_DIV_SHRINK_K=20 vs RATIO_SHRINK_K=8) :
+// le niveau d'une division inférieure ne se transpose pas tel quel à la
+// division du dessus — un promu qui a survolé sa D2 finit statistiquement
+// très souvent dans le bas de tableau la saison suivante (vérité
+// footballistique connue, pas une donnée mesurée sur ce projet). Le ratio
+// D2 brut du club pèse donc de moins en moins vite (vs les vraies stats D1
+// d'un club déjà établi) à mesure que l'échantillon grandit — mais reste
+// strictement mieux qu'un neutre plat identique pour tous les promus, qui
+// ignorerait même l'écart RELATIF entre un promu qui a dominé sa D2 et un
+// promu qui s'est maintenu de justesse.
+// ⚠️ N'entre en jeu QUE pour l'équipe (home et/ou away) qui manque
+// spécifiquement du modèle principal (goalModel) — si les DEUX équipes ont
+// déjà assez de matchs dans compMatches, computeLambdas() (ci-dessus) réussit
+// déjà tout seul et cette fonction n'est jamais appelée (voir
+// calcPronoAdvanced). Fonction séparée et NON appelée par computeLambdas
+// lui-même : zéro risque de régression sur son comportement existant (50
+// tests déjà en place) ni sur les appelants qui ne fournissent pas
+// `lowerDivMatches` (Pronos.jsx, calcLiveProno sans ce param).
+const LOWER_DIV_SHRINK_K = 20
+
+function computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches) {
+  const mainHome = goalModel.per[homeId]
+  const mainAway = goalModel.per[awayId]
+  const homeOk = mainHome && mainHome.hCount >= MIN_TEAM_SPLITS
+  const awayOk = mainAway && mainAway.aCount >= MIN_TEAM_SPLITS
+  if (homeOk && awayOk) return null   // computeLambdas() aurait déjà réussi seul
+
+  if (!lowerDivMatches?.length) return null
+  const lowerModel = buildGoalModel(lowerDivMatches)
+  if (!lowerModel) return null
+
+  const { leagueAvgHome, leagueAvgAway } = goalModel
+
+  let attackHome, defenseHome
+  if (homeOk) {
+    attackHome  = shrinkRatio((mainHome.hFor     / mainHome.hCount) / leagueAvgHome, mainHome.hCount)
+    defenseHome = shrinkRatio((mainHome.hAgainst / mainHome.hCount) / leagueAvgAway, mainHome.hCount)
+  } else {
+    const lower = lowerModel.per[homeId]
+    if (!lower || lower.hCount < MIN_TEAM_SPLITS) return null
+    attackHome  = shrinkRatio((lower.hFor     / lower.hCount) / lowerModel.leagueAvgHome, lower.hCount, LOWER_DIV_SHRINK_K)
+    defenseHome = shrinkRatio((lower.hAgainst / lower.hCount) / lowerModel.leagueAvgAway, lower.hCount, LOWER_DIV_SHRINK_K)
+  }
+
+  let attackAway, defenseAway
+  if (awayOk) {
+    attackAway  = shrinkRatio((mainAway.aFor     / mainAway.aCount) / leagueAvgAway, mainAway.aCount)
+    defenseAway = shrinkRatio((mainAway.aAgainst / mainAway.aCount) / leagueAvgHome, mainAway.aCount)
+  } else {
+    const lower = lowerModel.per[awayId]
+    if (!lower || lower.aCount < MIN_TEAM_SPLITS) return null
+    attackAway  = shrinkRatio((lower.aFor     / lower.aCount) / lowerModel.leagueAvgAway, lower.aCount, LOWER_DIV_SHRINK_K)
+    defenseAway = shrinkRatio((lower.aAgainst / lower.aCount) / lowerModel.leagueAvgHome, lower.aCount, LOWER_DIV_SHRINK_K)
+  }
 
   return {
     lambdaHome: clampLambda(attackHome * defenseAway * leagueAvgHome),
@@ -465,7 +544,7 @@ function directMeetings(compMatches, homeId, awayId) {
  *   uniquement CE bonus-là qu'il faut neutraliser.
  */
 export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
-  const { fullH2H, debug, neutralVenue } = opts
+  const { fullH2H, debug, neutralVenue, lowerDivMatches } = opts
 
   // Repli enrichi : pas (encore) assez de données saison pour le modèle buts
   // marqués/encaissés (ex. tout début de saison, compMatches quasi vide) —
@@ -497,7 +576,11 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
   const goalModel = buildGoalModel(compMatches)
   if (!goalModel) return fallback()
 
+  // opts.lowerDivMatches absent pour tout appelant existant (Pronos.jsx,
+  // etc.) → computeLambdasWithPromotion renvoie toujours null (pas de
+  // lowerDivMatches) et ce chemin ne change RIEN à leur comportement.
   const lambdas = computeLambdas(goalModel, homeId, awayId)
+    ?? computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches)
   if (!lambdas) return fallback()
 
   const poisson = poissonOutcomes(lambdas.lambdaHome, lambdas.lambdaAway)
@@ -695,7 +778,7 @@ function liveFloorFor(rawFavoritePct) {
  */
 export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, opts = {}) {
   const {
-    homeId, awayId, compMatches, fullH2H, neutralVenue,
+    homeId, awayId, compMatches, fullH2H, neutralVenue, lowerDivMatches,
     homeRedCards = 0, awayRedCards = 0,
     homePoss = null, awayPoss = null,
     homeShotsOnTarget = null, awayShotsOnTarget = null,
@@ -708,7 +791,7 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // Comportement strictement inchangé pour tout appelant qui ne passe pas
   // fullH2H (retombe exactement sur calcProno comme avant).
   const pre = (homeId != null && awayId != null)
-    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue })
+    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue, lowerDivMatches })
     : calcProno(homeForm, awayForm, { neutralVenue })
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 
@@ -728,7 +811,9 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // sur la saison) quand dispo, sinon la MÊME info que `pre` juste
   // reformulée en taux de buts.
   const goalModel = (homeId != null && awayId != null) ? buildGoalModel(compMatches) : null
-  const measuredLambdas = goalModel ? computeLambdas(goalModel, homeId, awayId) : null
+  const measuredLambdas = goalModel
+    ? (computeLambdas(goalModel, homeId, awayId) ?? computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches))
+    : null
   const { lambdaHome: rawLambdaHome, lambdaAway: rawLambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
 
   // ── Correctif surconfiance EN DIRECT (retour utilisateur : "pour l'équipe

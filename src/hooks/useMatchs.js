@@ -3,7 +3,7 @@ import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localC
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
-import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
+import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID, LOWER_DIVISION_FD_CODE } from '../data/competitions'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
@@ -262,6 +262,70 @@ export function useH2HHistory(selectedComp, compMatches) {
     queryFn: () => fetchH2HHistory(selectedComp, compMatches),
     enabled: !!selectedComp,
     staleTime: H2H_HISTORY_CACHE_TTL,
+    retry: 1,
+  })
+  return data ?? []
+}
+
+// ── Repli "club promu" : saison COMPLÈTE de la division inférieure ─────
+// Demande utilisateur (02/08, cas concret Hull City promu en PL — aucune
+// donnée PL la saison passée) : plutôt qu'un neutre plat pour un promu,
+// calcProno.js (computeLambdasWithPromotion) va chercher ses vraies stats
+// dans SA division d'origine, avec une forte décote de confiance. Ce hook
+// fournit la donnée brute nécessaire — même principe de coût que
+// fetchH2HHistory ci-dessus : UN SEUL fetch par COMPÉTITION affichée (pas
+// par carte/équipe — on récupère TOUTE la division inférieure d'un coup,
+// calcProno filtre ensuite par équipe côté client), cache long (saison
+// figée), best-effort silencieux (LOWER_DIVISION_FD_CODE peut être un code
+// non vérifié, voir son commentaire dans competitions.js — un échec ici ne
+// doit jamais remonter, juste priver ce repli de données).
+const LOWER_DIV_CACHE_TTL = 90 * 24 * 3600 * 1000  // 90j — même raisonnement que H2H_HISTORY_CACHE_TTL
+const inFlightLowerDiv = new Map()
+
+export function fetchLowerDivisionStats(selectedComp, compMatches) {
+  const lowerCode = LOWER_DIVISION_FD_CODE[selectedComp]
+  if (!lowerCode) return Promise.resolve([])
+  const baseYear = resolveBaseSeasonYear(compMatches)
+  const flightKey = `${lowerCode}_${baseYear}`
+  if (inFlightLowerDiv.has(flightKey)) return inFlightLowerDiv.get(flightKey)
+  const promise = fetchLowerDivisionStatsInner(lowerCode, baseYear).finally(() => inFlightLowerDiv.delete(flightKey))
+  inFlightLowerDiv.set(flightKey, promise)
+  return promise
+}
+
+async function fetchLowerDivisionStatsInner(lowerCode, baseYear) {
+  // Saison précédente de la division inférieure (baseYear - 1) : c'est celle
+  // où un club promu POUR la saison baseYear y jouait encore — jamais la
+  // saison en cours de cette division (qui contient le nouveau relégué, pas
+  // notre promu).
+  const year = baseYear - 1
+  const cacheKey = `lowerDiv_${lowerCode}_${year}`
+  const cached = readCache(cacheKey)
+  if (cached != null) return cached
+  await waitForFdSpacing()
+  try {
+    const matches = await tryFetch(
+      `/api/v4/competitions/${lowerCode}/matches?dateFrom=${year}-07-01&dateTo=${year + 1}-06-30`
+    )
+    const finished = (matches ?? []).filter(m => m.status === 'FINISHED')
+    if (finished.length > 0) writeCache(cacheKey, finished, LOWER_DIV_CACHE_TTL)
+    return finished
+  } catch (e) {
+    void e   // code non vérifié ou 429/403 transitoire : best-effort, jamais bloquant
+    return []
+  }
+}
+
+// Hook paresseux, même principe que useH2HHistory (staleTime long, jamais
+// dans le chemin critique du 1er rendu).
+export function useLowerDivisionStats(selectedComp, compMatches) {
+  const baseYear = resolveBaseSeasonYear(compMatches)
+  const lowerCode = LOWER_DIVISION_FD_CODE[selectedComp]
+  const { data } = useQuery({
+    queryKey: ['lowerDivisionStats', lowerCode, baseYear],
+    queryFn: () => fetchLowerDivisionStats(selectedComp, compMatches),
+    enabled: !!lowerCode,
+    staleTime: LOWER_DIV_CACHE_TTL,
     retry: 1,
   })
   return data ?? []

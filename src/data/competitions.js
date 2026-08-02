@@ -72,6 +72,30 @@ export const COMPETITION_ESPN_SLUG = {
 // ailleurs dans l'app.
 export const MAJOR_LEAGUE_FD_ID = { CL: 2001, PL: 2021, FL1: 2015, PD: 2014, BL1: 2002, SA: 2019 }
 
+// Code football-data.org de la division INFÉRIEURE directe de chaque grand
+// championnat — sert de repli pour un club fraîchement promu (aucune donnée
+// dans SA nouvelle compétition la saison passée, ex. Hull City en PL
+// 2026-27, voir calcProno.js computeLambdasWithPromotion). Demande
+// utilisateur explicite (02/08) : plutôt qu'un neutre plat pour tout promu,
+// aller chercher ses stats dans son ancienne division et les injecter avec
+// une forte décote de confiance (LOWER_DIV_SHRINK_K).
+// ⚠️ Honnêteté : PL→ELC est le SEUL code vérifié en réel (appel FD.org
+// direct, 02/08 — réponse valide, Hull absent de la liste Championship
+// actuelle, cohérent avec une promotion). Les 4 autres sont des codes
+// FD.org standards par convention (jamais eu de 403/vide en usage courant
+// sur ce projet pour PL/ELC) mais PAS testés individuellement ici — le verrou
+// d'espacement FD.org a bloqué mes tentatives de vérif (FL2 3x en échec).
+// Sans risque : useLowerDivisionStats échoue silencieusement sur un code
+// invalide (comme tout le reste des fetchs FD.org du projet), donc une
+// entrée fausse ici ne casse rien, elle prive juste ce repli de données.
+export const LOWER_DIVISION_FD_CODE = {
+  PL:  'ELC',  // Championship — vérifié 02/08
+  FL1: 'FL2',  // Ligue 2 — assumé, non vérifié (verrou FD.org)
+  PD:  'SD',   // Segunda División — assumé, non vérifié
+  BL1: 'BL2',  // 2. Bundesliga — assumé, non vérifié
+  SA:  'SB',   // Serie B — assumé, non vérifié
+}
+
 // ⚠️ TheSportsDB : testé comme 3e repli classement (23/07), retiré le même
 // jour — la clé publique gratuite plafonne lookuptable.php à 5 lignes
 // seulement, quelle que soit la ligue (confirmé par appels réels), donc

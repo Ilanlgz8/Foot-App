@@ -248,6 +248,79 @@ describe('calcPronoAdvanced — repli fullH2H (historique complet, ex. début de
   })
 })
 
+describe('calcPronoAdvanced — opts.lowerDivMatches (club promu, 02/08)', () => {
+  // Championnat principal : 4 équipes établies avec assez de matchs pour un
+  // vrai modèle buts (MIN_LEAGUE_GAMES=10, MIN_TEAM_SPLITS=2/équipe) — 'promu'
+  // n'y apparaît JAMAIS (aucune donnée saison en cours, cas Hull City/PL).
+  const mainComp = [
+    finished('t1', 't2', 1, 1), finished('t2', 't1', 1, 1),
+    finished('t3', 't4', 1, 1), finished('t4', 't3', 1, 1),
+    finished('t1', 't3', 1, 1), finished('t3', 't1', 1, 1),
+    finished('t2', 't4', 1, 1), finished('t4', 't2', 1, 1),
+    finished('t1', 't4', 2, 1), finished('t4', 't1', 1, 2),
+    finished('t2', 't3', 2, 1), finished('t3', 't2', 1, 2),
+  ]
+  // Division inférieure : 'promu' y a dominé (attaque forte/défense solide),
+  // 'faible' y a été terne — de quoi distinguer les 2 profils si le repli
+  // fonctionne vraiment (pas un neutre plat identique pour tout promu).
+  const lowerDiv = [
+    finished('promu', 'x1', 3, 0), finished('x1', 'promu', 0, 3),
+    finished('promu', 'x2', 3, 0), finished('x2', 'promu', 0, 3),
+    finished('x1', 'x2', 1, 1),    finished('x2', 'x1', 1, 1),
+    finished('faible', 'x1', 0, 3), finished('x1', 'faible', 3, 0),
+    finished('faible', 'x2', 0, 3), finished('x2', 'faible', 3, 0),
+  ]
+
+  it('sans lowerDivMatches, un club absent du championnat principal retombe sur calcProno (comportement inchangé, tout appelant existant)', () => {
+    const advanced = calcPronoAdvanced('promu', 't1', mainComp, ['W'], ['L'])
+    const base     = calcProno(['W'], ['L'])
+    expect(advanced).toEqual(base)
+  })
+
+  it('avec lowerDivMatches, utilise les stats de la division inférieure au lieu d\'un repli neutre plat', () => {
+    const withLowerDiv = calcPronoAdvanced('promu', 't1', mainComp, [], [], { lowerDivMatches: lowerDiv })
+    const neutral       = calcProno([], [])
+    expect(sumsTo100(withLowerDiv)).toBe(true)
+    // 'promu' a dominé sa division (9 buts marqués, 0 encaissés sur 4 matchs)
+    // : même fortement shrink (LOWER_DIV_SHRINK_K=20), reste proche du neutre
+    // (marge de tolérance : le pipeline Poisson+shrinkTowardBase n'utilise pas
+    // exactement le même point de repère que calcProno, un léger écart de 1-2
+    // points est normal) — jamais franchement défavorisé.
+    expect(withLowerDiv.home).toBeGreaterThanOrEqual(neutral.home - 2)
+  })
+
+  it('distingue un promu qui a dominé sa division d\'un promu qui y a été terne (le repli reflète le VRAI niveau relatif, pas juste "promu = neutre")', () => {
+    const strongPromu = calcPronoAdvanced('promu', 't1', mainComp, [], [], { lowerDivMatches: lowerDiv })
+    const weakPromu    = calcPronoAdvanced('faible', 't1', mainComp, [], [], { lowerDivMatches: lowerDiv })
+    expect(strongPromu.home).toBeGreaterThan(weakPromu.home)
+  })
+
+  it('shrink cross-division nettement plus fort que le shrink normal : même en ayant dominé sa division, un promu reste moins favorisé qu\'une équipe qui a fait pareil DANS le championnat principal', () => {
+    // 'strong' a le même profil dominant que 'promu' (3-0 à chaque fois) mais
+    // DANS le championnat principal (données directement comparables).
+    const strongInMain = [
+      ...mainComp,
+      finished('strong', 't1', 3, 0), finished('t1', 'strong', 0, 3),
+      finished('strong', 't2', 3, 0), finished('t2', 'strong', 0, 3),
+    ]
+    const viaMainLeague   = calcPronoAdvanced('strong', 't3', strongInMain, [], [])
+    const viaLowerDivision = calcPronoAdvanced('promu', 't3', mainComp, [], [], { lowerDivMatches: lowerDiv })
+    expect(viaLowerDivision.home).toBeLessThan(viaMainLeague.home)
+  })
+
+  it('ne change RIEN pour un match où les deux équipes ont déjà assez de données dans compMatches (lowerDivMatches ignoré)', () => {
+    const withLowerDiv = calcPronoAdvanced('t1', 't2', mainComp, [], [], { lowerDivMatches: lowerDiv })
+    const withoutLowerDiv = calcPronoAdvanced('t1', 't2', mainComp, [], [])
+    expect(withLowerDiv).toEqual(withoutLowerDiv)
+  })
+
+  it('lowerDivMatches vide/absent ne casse rien (repli silencieux, même résultat que sans l\'option)', () => {
+    const withEmpty = calcPronoAdvanced('promu', 't1', mainComp, ['W'], ['L'], { lowerDivMatches: [] })
+    const withUndefined = calcPronoAdvanced('promu', 't1', mainComp, ['W'], ['L'])
+    expect(withEmpty).toEqual(withUndefined)
+  })
+})
+
 describe('calcLiveProno', () => {
   const homeForm = ['W', 'W', 'D', 'L', 'W']
   const awayForm = ['L', 'D', 'L', 'W', 'L']
