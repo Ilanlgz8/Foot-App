@@ -8,7 +8,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
@@ -1589,8 +1589,21 @@ function H2HBilan({ rows, match, isWC }) {
 export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = false } = {}) {
   const fdMatchId = resolveFdMatchId(match, compMatches, { loose: looseTeamMatch })
   const { data: h2hMatches, isLoading } = useH2H(match, delayMs, fdMatchId)
-  const homeId = match?.homeTeam?.id
-  const awayId = match?.awayTeam?.id
+  // ⚠️ AJOUT (constat utilisateur : "Barcelone-Elche, je vois le H2H sur la
+  // fiche mais les cotes sur la card restent par défaut" — même famille de
+  // bug que l'audit id ESPN/FD.org du jour, retrouvée ici) : compH2H
+  // ci-dessous compare CES id à ceux de compMatches — pour les grands
+  // championnats (Accueil, sourcés ESPN), match.homeTeam.id est un id ESPN
+  // brut alors que compMatches (repli saison précédente, useTeamForm.js) est
+  // indexé par id FD.org — comparaison strict qui échoue TOUJOURS pour ces
+  // matchs, quel que soit looseTeamMatch (qui ne contrôlait avant que
+  // resolveFdMatchId ci-dessus, jamais ce fallback-ci). resolveFdTeamId
+  // (déjà utilisé ailleurs cette session, même mécanisme sûr : repli sur
+  // l'id d'origine si la résolution échoue) comble ce trou spécifiquement
+  // quand looseTeamMatch est demandé par l'appelant — comportement
+  // strictement inchangé pour les appelants existants qui ne le passent pas.
+  const homeId = looseTeamMatch ? resolveFdTeamId(match?.homeTeam, compMatches, { loose: true }) : match?.homeTeam?.id
+  const awayId = looseTeamMatch ? resolveFdTeamId(match?.awayTeam, compMatches, { loose: true }) : match?.awayTeam?.id
 
   // Données FD.org, du plus récent au plus vieux. ⚠️ CORRIGÉ (constat
   // utilisateur : "met en premier les plus récent" — ce n'était pas le cas)
