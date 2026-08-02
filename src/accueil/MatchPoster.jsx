@@ -45,7 +45,25 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // ("Match du jour") donc un seul appel FD.org supplémentaire, budget-safe
   // contrairement aux listes de plusieurs matchs (Pronos.jsx) qui restent
   // sur le repli saison précédente (voir calcProno.js, opts.fullH2H).
-  const { rows: fullH2H } = useH2HRows(match, compMatches)
+  // ⚠️ AJOUT `{ looseTeamMatch: true }` (02/08, constat utilisateur : "quand
+  // y'a des rencontres avec h2h disponible les côtes sont toujours par
+  // defaut pour certaine equipe") : ce hook résout en interne le VRAI id
+  // FD.org du match (resolveFdMatchId, matchUtils.js) pour aller chercher le
+  // head2head DÉDIÉ — jusqu'ici en mode STRICT ici alors que la résolution
+  // d'id d'ÉQUIPE juste en dessous (resolvedHomeId/resolvedAwayId) est déjà
+  // en mode loose depuis ce matin. Pour un nom ESPN qui est un SUFFIXE du nom
+  // FD.org (ex. "Lyon" vs "Olympique Lyonnais" — cas déjà documenté dans
+  // matchUtils.js), le mode strict échoue à retrouver le match → fdMatchId
+  // reste null → le head2head réel ne se charge jamais → repli compH2H (lui
+  // aussi silencieusement vide pour les 6 grands championnats, ids ESPN non
+  // résolus) → calcPronoAdvanced ne reçoit alors AUCUN H2H, alors qu'il est
+  // pourtant bien visible ailleurs (MatchPage/LiveMatchPage, déjà en loose
+  // depuis le 27/07). Ce même mode loose est stable et testé sur ces 2 pages
+  // depuis une semaine sans régression signalée — l'activer ici n'est PAS le
+  // changement qui avait cassé les cards par le passé (celui-là touchait
+  // clubNameMatch elle-même, la fonction de base partagée ; loose est un
+  // chemin additif séparé, voir son commentaire dédié dans matchUtils.js).
+  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 

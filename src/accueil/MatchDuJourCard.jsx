@@ -45,7 +45,12 @@ function formatHour(dateStr) {
 export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const compCode = match?.competition?.code ?? null
   const { formMap, compMatches } = useTeamForm(compCode)
-  const { rows: fullH2H } = useH2HRows(match, compMatches)
+  // ⚠️ AJOUT `{ looseTeamMatch: true }` (02/08, même fix que MatchPoster.jsx —
+  // voir son commentaire détaillé) : sans ça, resolveFdMatchId (appelé en
+  // interne par useH2HRows pour retrouver le head2head dédié) échoue en mode
+  // strict sur les noms ESPN qui sont un SUFFIXE du nom FD.org (ex. "Lyon"),
+  // alors que la résolution d'id d'ÉQUIPE juste en dessous est déjà en loose.
+  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
   const _ms       = match ? getMatchState(match.id) : null
