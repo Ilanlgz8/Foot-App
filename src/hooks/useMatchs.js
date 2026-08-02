@@ -349,9 +349,32 @@ async function fetchClubMatchesRawInner(selectedComp) {
     const lastSeasonKey = `matches_lastSeason_${selectedComp}`
     let lastSeason = null
     const primarySeasonYear = getClubSeason()
+    // ⚠️ CORRIGÉ (02/08, root cause enfin isolée en testant l'API réelle en
+    // direct) : `?season=${primarySeasonYear}` renvoie une réponse VIDE côté
+    // football-data.org de façon reproductible et stable sur cet endpoint
+    // PRÉCIS (`/matches?season=X`) — pas un 429/403 passager (déjà couvert
+    // par le catch ci-dessous). Preuve que ce n'est PAS un problème de
+    // donnée manquante côté FD.org : `/v4/matches/{id}/head2head` (endpoint
+    // différent, même compte) expose SANS PROBLÈME les matchs de cette même
+    // saison (vérifié en direct : 380/380 matchs joués, confrontations
+    // Barcelone-Elche de nov 2025 et jan 2026 bien présentes). Le bug est
+    // donc spécifique au PARAMÈTRE `season=` de cet endpoint précis, cause
+    // exacte côté FD.org non identifiable d'ici. Contournement testé et
+    // confirmé en direct : `dateFrom`/`dateTo` sur la même plage renvoie les
+    // 380 matchs complets (`resultSet.played:380`) — remplace `season=` au
+    // lieu d'ajouter une cascade vers une saison plus vieille (ancienne
+    // version de ce fix, moins bonne : reculait d'un an alors que la vraie
+    // donnée existe déjà, juste pas via ce paramètre). Strictement meilleur
+    // sur tous les plans : donnée plus fraîche (saison qui vient RÉELLEMENT
+    // de se terminer, pas celle d'avant) ET moins d'appels FD.org (1 requête
+    // qui réussit du 1er coup au lieu de 2, la 1ère étant systématiquement
+    // perdue). 1er juillet → 30 juin de l'année suivante : large marge avant/
+    // après la vraie saison (mi-août → fin mai) pour ne rien couper.
+    const seasonDateFrom = `${primarySeasonYear}-07-01`
+    const seasonDateTo   = `${primarySeasonYear + 1}-06-30`
     try {
       lastSeason = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear}`
+        `/api/v4/competitions/${selectedComp}/matches?dateFrom=${seasonDateFrom}&dateTo=${seasonDateTo}`
       )
     } catch (e) {
       // ⚠️ NE PLUS PROPAGER via `lastErr` ici (25/07, voir bug détaillé plus
@@ -363,28 +386,11 @@ async function fetchClubMatchesRawInner(selectedComp) {
       // où on n'a vraiment rien à montrer.
       void e
     }
-    // ⚠️ AJOUT (02/08, constat vérifié en direct sur l'API réelle football-data.org,
-    // 5 tentatives espacées de plusieurs minutes) : `season=${primarySeasonYear}`
-    // (l'exercice qui vient de se terminer) peut renvoyer une réponse VIDE côté
-    // FD.org de façon reproductible, alors que `season=${primarySeasonYear - 1}`
-    // (l'exercice encore avant) répond normalement avec de vrais matchs FINISHED.
-    // Cause exacte non identifiable depuis cet environnement (pas d'accès aux
-    // logs/quota du compte football-data.org) — mais reproductible sur PD, donc
-    // pas un simple 429/403 passager (déjà couvert par le catch ci-dessus, qui
-    // lève une vraie erreur distincte). Repli en cascade : si la saison
-    // immédiatement précédente ne renvoie rien, retente automatiquement une
-    // saison plus tôt avant d'abandonner — une vraie donnée (même un peu plus
-    // vieille) reste toujours préférable à des cotes par défaut identiques sur
-    // tous les matchs. S'auto-corrige tout seul le jour où
-    // `season=${primarySeasonYear}` refonctionne (repasse alors en 1er choix,
-    // ce 2e appel ne se déclenche même plus). Coût réseau négligeable : ce
-    // repli ne s'exécute déjà que ~1 mois/an (intersaison, voir `!hasFinished`
-    // plus haut), et passe par le même cache Redis serveur partagé (api/football.js)
-    // que tout le reste — 1 seul vrai appel FD.org pour TOUS les utilisateurs,
-    // pas par utilisateur. Limite connue : `MAX_FALLBACK_AGE_DAYS` (450j, voir
-    // useTeamForm.js) rendra ce repli-ci trop vieux pour être utilisé à partir
-    // de mi-août 2026 — sans conséquence pratique, la vraie saison 2026/27 aura
-    // alors démarré (hasFinished redevient vrai, toute cette branche s'efface).
+    // Ultime filet de sécurité (jamais déclenché en usage normal depuis le
+    // fix dateFrom/dateTo ci-dessus, vérifié en direct) : si même cette
+    // requête échoue un jour pour une autre raison, retente `season=` une
+    // année plus tôt plutôt que d'abandonner — une donnée un peu plus vieille
+    // reste préférable à un neutre par défaut identique sur tous les matchs.
     if (lastSeason == null || lastSeason.length === 0) {
       try {
         const olderSeason = await tryFetch(
