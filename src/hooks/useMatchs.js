@@ -114,12 +114,33 @@ export function groupRounds(matches, order = 'asc') {
 // Calcule l'année de saison pour les ligues clubs (ex: juin 2026 → 2025)
 // Les ligues club tournent Août-Mai, donc en juin/juillet on est en intersaison
 // WC 2026 : saison spéciale juin-juillet 2026
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 02/08 : "toutes les côtes sont par
+// défaut" — reproduit sur TOUS les grands championnats, pas juste un cas
+// isolé) : le seuil `month <= 7` considérait le 1er août comme le DÉBUT de
+// la saison en cours (renvoyait déjà l'année courante) — mais vérifié en
+// direct sur l'API FD.org réelle ce jour-là (season=2026 pour FL1) : 306
+// matchs, TOUS "SCHEDULED", ZÉRO "FINISHED" — la vraie reprise n'a lieu que
+// mi-août au plus tôt (15/08 LaLiga, 21-22/08 Ligue 1/Premier League,
+// calendriers ESPN réels vérifiés). Résultat : `fetchClubMatchesRaw`
+// (useMatchs.js) demandait `?season=2026` comme repli "saison précédente"
+// — exactement la MÊME saison vide que `current`, donc aucune vraie donnée
+// historique (saison 2025-26) n'était jamais récupérée pour calculer un
+// prono réaliste, pour AUCUN des 5 grands championnats simultanément, tout
+// le mois d'août jusqu'à la vraie reprise. Étendu à toute l'année civile
+// (month <= 12, jamais avant janvier de l'année suivante n'a de sens ici)
+// n'est pas nécessaire : aucun championnat suivi par l'app ne démarre avant
+// la mi-août — décalé à `month <= 8`, sans risque de régression une fois la
+// vraie saison lancée : ce repli n'est de toute façon utilisé QUE tant que
+// la saison en cours n'a ENCORE aucun match FINISHED (voir hasFinished plus
+// bas) — dès le tout premier résultat réel de la nouvelle saison, cette
+// branche cesse automatiquement d'être utilisée, quel que soit ce seuil.
 export function getClubSeason() {
   const now = new Date()
   const month = now.getMonth() + 1 // 1-12
   const year = now.getFullYear()
-  // En juin et juillet, la saison précédente vient de se terminer
-  return month <= 7 ? year - 1 : year
+  // Juin à août : la saison précédente vient de se terminer, la nouvelle n'a
+  // pas encore débuté pour aucun des championnats suivis.
+  return month <= 8 ? year - 1 : year
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : le
