@@ -348,9 +348,10 @@ async function fetchClubMatchesRawInner(selectedComp) {
     // entière (et donc ce cache) cesse alors d'être utilisée.
     const lastSeasonKey = `matches_lastSeason_${selectedComp}`
     let lastSeason = null
+    const primarySeasonYear = getClubSeason()
     try {
       lastSeason = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?season=${getClubSeason()}`
+        `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear}`
       )
     } catch (e) {
       // ⚠️ NE PLUS PROPAGER via `lastErr` ici (25/07, voir bug détaillé plus
@@ -361,6 +362,38 @@ async function fetchClubMatchesRawInner(selectedComp) {
       // cas où `current` LUI-MÊME a échoué (voir catch plus haut) — seul cas
       // où on n'a vraiment rien à montrer.
       void e
+    }
+    // ⚠️ AJOUT (02/08, constat vérifié en direct sur l'API réelle football-data.org,
+    // 5 tentatives espacées de plusieurs minutes) : `season=${primarySeasonYear}`
+    // (l'exercice qui vient de se terminer) peut renvoyer une réponse VIDE côté
+    // FD.org de façon reproductible, alors que `season=${primarySeasonYear - 1}`
+    // (l'exercice encore avant) répond normalement avec de vrais matchs FINISHED.
+    // Cause exacte non identifiable depuis cet environnement (pas d'accès aux
+    // logs/quota du compte football-data.org) — mais reproductible sur PD, donc
+    // pas un simple 429/403 passager (déjà couvert par le catch ci-dessus, qui
+    // lève une vraie erreur distincte). Repli en cascade : si la saison
+    // immédiatement précédente ne renvoie rien, retente automatiquement une
+    // saison plus tôt avant d'abandonner — une vraie donnée (même un peu plus
+    // vieille) reste toujours préférable à des cotes par défaut identiques sur
+    // tous les matchs. S'auto-corrige tout seul le jour où
+    // `season=${primarySeasonYear}` refonctionne (repasse alors en 1er choix,
+    // ce 2e appel ne se déclenche même plus). Coût réseau négligeable : ce
+    // repli ne s'exécute déjà que ~1 mois/an (intersaison, voir `!hasFinished`
+    // plus haut), et passe par le même cache Redis serveur partagé (api/football.js)
+    // que tout le reste — 1 seul vrai appel FD.org pour TOUS les utilisateurs,
+    // pas par utilisateur. Limite connue : `MAX_FALLBACK_AGE_DAYS` (450j, voir
+    // useTeamForm.js) rendra ce repli-ci trop vieux pour être utilisé à partir
+    // de mi-août 2026 — sans conséquence pratique, la vraie saison 2026/27 aura
+    // alors démarré (hasFinished redevient vrai, toute cette branche s'efface).
+    if (lastSeason == null || lastSeason.length === 0) {
+      try {
+        const olderSeason = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear - 1}`
+        )
+        if (olderSeason != null && olderSeason.length > 0) lastSeason = olderSeason
+      } catch (e) {
+        void e
+      }
     }
     if (lastSeason != null && lastSeason.length > 0) {
       writeCache(lastSeasonKey, lastSeason, 24 * 3600 * 1000)
