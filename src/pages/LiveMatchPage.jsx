@@ -375,10 +375,14 @@ export default function LiveMatchPage() {
     [scheduledMatches, compMatches]
   )
 
+  // ⚠️ AJOUT `{ loose: true }` (30/07, même fix que MatchPage.jsx — voir son
+  // commentaire détaillé) : strict clubNameMatch ratait "AS Monaco"→"Monaco"/
+  // "Manchester City"→"Man City" (mot en trop en préfixe côté ESPN) — comblé
+  // via looseTeamMatch/translateTeam, désormais complet (audit TEAM_NAMES_FR).
   const match = useMemo(() => {
     if (!rawMatch || !resolveMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,
