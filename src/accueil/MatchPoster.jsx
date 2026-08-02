@@ -59,7 +59,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // — 3 saisons au lieu d'1 pour toutes les cartes qui n'ont pas gagné la
   // course du head2head dédié, sans aucun appel FD.org supplémentaire par carte.
   const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
-  const h2hHistory = useH2HHistory(compCode)
+  const h2hHistory = useH2HHistory(compCode, compMatches)
   const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)

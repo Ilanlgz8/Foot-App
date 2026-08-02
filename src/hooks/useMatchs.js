@@ -169,17 +169,45 @@ export function getClubSeason() {
 const EXTRA_H2H_SEASONS_BACK = 2
 const H2H_HISTORY_CACHE_TTL = 90 * 24 * 3600 * 1000  // 90j — saison figée, jamais besoin de revalider plus souvent
 
+// ⚠️ AJOUT `currentSeasonYear` (02/08, question utilisateur : "quand le match
+// est terminé faudra mettre à jour après dans le H2H" — en vérifiant la
+// mécanique de mise à jour, trou trouvé avant qu'il ne devienne visible) :
+// `getClubSeason()` seule bascule sur un SEUIL DE MOIS fixe (1er septembre),
+// pas sur la vraie donnée — entre le vrai coup d'envoi de la saison (mi-août)
+// et ce seuil, `compMatches` (fetchClubMatchesRawInner) est déjà passé sur la
+// saison EN COURS (dès son 1er match FINISHED, hasFinished devient vrai) alors
+// que `getClubSeason()` pointe ENCORE sur l'ancienne saison pendant ces ~2-3
+// semaines. Résultat sans ce param : h2hHistory viserait alors 2 saisons TROP
+// VIEILLES, ratant complètement la saison qui vient tout juste de se terminer
+// (la plus pertinente) — un vrai trou temporel, pas un bug immédiat. Repli
+// depuis la vraie donnée déjà chargée (season.startDate du 1er match de
+// compMatches, la même info que fetchTeamForm utilise déjà pour distinguer
+// "saison en cours" de "saison précédente") quand disponible ; `getClubSeason()`
+// reste le repli tant que compMatches n'a pas encore chargé (1er rendu, ou
+// compétition sans aucun match) — les deux valeurs coïncident déjà en dehors
+// de cette fenêtre de 2-3 semaines, donc AUCUN changement de comportement le
+// reste de l'année.
+function resolveBaseSeasonYear(compMatches) {
+  const startDate = compMatches?.find(m => m.season?.startDate)?.season?.startDate
+  if (startDate) {
+    const y = new Date(startDate).getFullYear()
+    if (Number.isFinite(y)) return y
+  }
+  return getClubSeason()
+}
+
 const inFlightH2HHistory = new Map()
 
-export function fetchH2HHistory(selectedComp) {
-  if (inFlightH2HHistory.has(selectedComp)) return inFlightH2HHistory.get(selectedComp)
-  const promise = fetchH2HHistoryInner(selectedComp).finally(() => inFlightH2HHistory.delete(selectedComp))
-  inFlightH2HHistory.set(selectedComp, promise)
+export function fetchH2HHistory(selectedComp, compMatches) {
+  const baseYear = resolveBaseSeasonYear(compMatches)
+  const flightKey = `${selectedComp}_${baseYear}`
+  if (inFlightH2HHistory.has(flightKey)) return inFlightH2HHistory.get(flightKey)
+  const promise = fetchH2HHistoryInner(selectedComp, baseYear).finally(() => inFlightH2HHistory.delete(flightKey))
+  inFlightH2HHistory.set(flightKey, promise)
   return promise
 }
 
-async function fetchH2HHistoryInner(selectedComp) {
-  const baseYear = getClubSeason()  // déjà couvert par compMatches, voir plus haut
+async function fetchH2HHistoryInner(selectedComp, baseYear) {
   const results = []
   let waited = false
   for (let back = 1; back <= EXTRA_H2H_SEASONS_BACK; back++) {
@@ -217,10 +245,15 @@ async function fetchH2HHistoryInner(selectedComp) {
 // dans le chemin critique du 1er rendu) — un pur enrichissement en arrière-
 // plan, exactement le même principe "upgrade progressif" déjà utilisé pour
 // compH2H→fdRecent (useH2HRows, MatchModal.jsx).
-export function useH2HHistory(selectedComp) {
+export function useH2HHistory(selectedComp, compMatches) {
+  // baseYear dans la queryKey : voir resolveBaseSeasonYear plus haut — se
+  // re-déclenche automatiquement le jour où compMatches bascule sur la vraie
+  // saison en cours (son season.startDate change), sans quoi React Query
+  // aurait servi indéfiniment un résultat calculé sur l'ancien repère.
+  const baseYear = resolveBaseSeasonYear(compMatches)
   const { data } = useQuery({
-    queryKey: ['h2hHistory', selectedComp],
-    queryFn: () => fetchH2HHistory(selectedComp),
+    queryKey: ['h2hHistory', selectedComp, baseYear],
+    queryFn: () => fetchH2HHistory(selectedComp, compMatches),
     enabled: !!selectedComp,
     staleTime: H2H_HISTORY_CACHE_TTL,
     retry: 1,

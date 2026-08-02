@@ -56,7 +56,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // gratuit ici (une seule instance de cette carte à la fois), même logique
   // que MatchPoster.jsx.
   const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
-  const h2hHistory = useH2HHistory(compCode)
+  const h2hHistory = useH2HHistory(compCode, compMatches)
   const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
