@@ -18,6 +18,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
+import { useH2HHistory } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
 import { COMPETITIONS } from '../data/competitions'
@@ -50,7 +51,13 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // interne par useH2HRows pour retrouver le head2head dédié) échoue en mode
   // strict sur les noms ESPN qui sont un SUFFIXE du nom FD.org (ex. "Lyon"),
   // alors que la résolution d'id d'ÉQUIPE juste en dessous est déjà en loose.
-  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  // Repli h2hHistory (2 saisons de plus, chargées 1x par compétition, voir
+  // useMatchs.js) si le head2head dédié échoue malgré tout pour ce match —
+  // gratuit ici (une seule instance de cette carte à la fois), même logique
+  // que MatchPoster.jsx.
+  const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  const h2hHistory = useH2HHistory(compCode)
+  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
   const _ms       = match ? getMatchState(match.id) : null

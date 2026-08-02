@@ -5,6 +5,7 @@ import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
+import { useH2HHistory }              from '../hooks/useMatchs'
 import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
@@ -38,32 +39,28 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const fetched = useTeamForm(compCode, 0, !hasPropsData)
   const formMap     = hasPropsData ? formMapProp     : fetched.formMap
   const compMatches = hasPropsData ? (compMatchesProp ?? []) : fetched.compMatches
-  // Historique complet toutes compétitions confondues (déjà chargé pour la
-  // fiche d'un match précis via le même hook, voir MatchModal.jsx) — corrige
-  // les pronos identiques en début de saison, quand compMatches (saison en
-  // cours) est encore vide. Un seul poster affiché à la fois sur l'Accueil
-  // ("Match du jour") donc un seul appel FD.org supplémentaire, budget-safe
-  // contrairement aux listes de plusieurs matchs (Pronos.jsx) qui restent
-  // sur le repli saison précédente (voir calcProno.js, opts.fullH2H).
-  // ⚠️ AJOUT `{ looseTeamMatch: true }` (02/08, constat utilisateur : "quand
-  // y'a des rencontres avec h2h disponible les côtes sont toujours par
-  // defaut pour certaine equipe") : ce hook résout en interne le VRAI id
-  // FD.org du match (resolveFdMatchId, matchUtils.js) pour aller chercher le
-  // head2head DÉDIÉ — jusqu'ici en mode STRICT ici alors que la résolution
-  // d'id d'ÉQUIPE juste en dessous (resolvedHomeId/resolvedAwayId) est déjà
-  // en mode loose depuis ce matin. Pour un nom ESPN qui est un SUFFIXE du nom
-  // FD.org (ex. "Lyon" vs "Olympique Lyonnais" — cas déjà documenté dans
-  // matchUtils.js), le mode strict échoue à retrouver le match → fdMatchId
-  // reste null → le head2head réel ne se charge jamais → repli compH2H (lui
-  // aussi silencieusement vide pour les 6 grands championnats, ids ESPN non
-  // résolus) → calcPronoAdvanced ne reçoit alors AUCUN H2H, alors qu'il est
-  // pourtant bien visible ailleurs (MatchPage/LiveMatchPage, déjà en loose
-  // depuis le 27/07). Ce même mode loose est stable et testé sur ces 2 pages
-  // depuis une semaine sans régression signalée — l'activer ici n'est PAS le
-  // changement qui avait cassé les cards par le passé (celui-là touchait
-  // clubNameMatch elle-même, la fonction de base partagée ; loose est un
-  // chemin additif séparé, voir son commentaire dédié dans matchUtils.js).
-  const { rows: fullH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  // ── H2H utilisé par calcPronoAdvanced (pas juste affiché) ──────────────
+  // ⚠️ MIS À JOUR (02/08) : ce composant est en fait rendu UNE FOIS PAR MATCH
+  // affiché (voir MatchCard.jsx, `displayed.map(...)`), pas "un seul poster à
+  // la fois" comme l'ancien commentaire ici le disait à tort — sur une liste
+  // de plusieurs matchs, le verrou d'espacement serveur (SPACING_MS,
+  // api/football.js) ne laisse réussir qu'1 appel head2head DÉDIÉ réel toutes
+  // les 6s, peu importe combien de cartes le demandent en même temps. Priorité
+  // 1 : useH2HRows (head2head dédié réel, remonte 5-6 saisons quand il
+  // réussit) — `{ looseTeamMatch: true }` (constat utilisateur : "quand y'a
+  // des rencontres avec h2h disponible les côtes sont toujours par defaut
+  // pour certaine equipe") aligne la résolution du match sur le mode déjà
+  // stable de MatchPage/LiveMatchPage (un nom ESPN qui est un SUFFIXE du nom
+  // FD.org, ex. "Lyon" vs "Olympique Lyonnais", ratait la résolution en mode
+  // strict). Priorité 2 (repli quand le head2head dédié échoue/429, ce qui
+  // arrive pour la plupart des cartes d'une même liste) : compMatches (1
+  // saison) fusionné avec useH2HHistory (2 saisons de plus, chargées UNE FOIS
+  // par compétition — pas par carte, voir son commentaire dans useMatchs.js)
+  // — 3 saisons au lieu d'1 pour toutes les cartes qui n'ont pas gagné la
+  // course du head2head dédié, sans aucun appel FD.org supplémentaire par carte.
+  const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  const h2hHistory = useH2HHistory(compCode)
+  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 

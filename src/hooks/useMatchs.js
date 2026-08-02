@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
@@ -141,6 +141,91 @@ export function getClubSeason() {
   // Juin à août : la saison précédente vient de se terminer, la nouvelle n'a
   // pas encore débuté pour aucun des championnats suivis.
   return month <= 8 ? year - 1 : year
+}
+
+// ── H2H étendu : historique multi-saisons, chargé PAR COMPÉTITION (pas par
+// match) ────────────────────────────────────────────────────────────────
+// ⚠️ AJOUT (02/08, demande explicite utilisateur : "avoir le max d'info...
+// éviter les requêtes de h2h par match sans exploser les requêtes vers
+// FD.org"). Le head2head DÉDIÉ par match (useH2H, MatchModal.jsx) reste la
+// donnée la plus riche (remonte 5-6 saisons, vérifié en direct sur
+// Barcelone-Elche : 8 confrontations, 2021 à 2026) mais ne peut pas être
+// appelé une fois par carte affichée sur l'Accueil (MatchPoster, une
+// instance PAR match — voir MatchCard.jsx) : le verrou d'espacement serveur
+// (SPACING_MS, api/football.js) ne laisse réussir qu'1 appel réel toutes les
+// 6s, peu importe combien de cartes le demandent en même temps — sur une
+// liste de N matchs montés simultanément, une seule obtient son head2head
+// réel, les autres reçoivent un 429 immédiat (aucun risque pour le compte
+// FD.org, le verrou bloque AVANT le fetch réel — mais pas de vrai H2H non
+// plus pour elles, juste le repli plus pauvre habituel).
+// Solution qui NE SCALE PAS avec le nombre de matchs affichés : 2 appels de
+// PLUS par COMPÉTITION (au-delà de la saison déjà couverte par compMatches,
+// voir fetchClubMatchesRawInner plus haut), pas par carte — coût fixe et
+// prévisible (2 × nb de compétitions affichées, UNE SEULE FOIS, jamais par
+// match). Les 2 saisons ciblées sont ENTIÈREMENT TERMINÉES par construction
+// (jamais la saison en cours) → donnée figée, cache long légitime (même
+// principe que les autres caches "définitifs" du projet, ex. compos/stats
+// ESPN d'un match terminé).
+const EXTRA_H2H_SEASONS_BACK = 2
+const H2H_HISTORY_CACHE_TTL = 90 * 24 * 3600 * 1000  // 90j — saison figée, jamais besoin de revalider plus souvent
+
+const inFlightH2HHistory = new Map()
+
+export function fetchH2HHistory(selectedComp) {
+  if (inFlightH2HHistory.has(selectedComp)) return inFlightH2HHistory.get(selectedComp)
+  const promise = fetchH2HHistoryInner(selectedComp).finally(() => inFlightH2HHistory.delete(selectedComp))
+  inFlightH2HHistory.set(selectedComp, promise)
+  return promise
+}
+
+async function fetchH2HHistoryInner(selectedComp) {
+  const baseYear = getClubSeason()  // déjà couvert par compMatches, voir plus haut
+  const results = []
+  let waited = false
+  for (let back = 1; back <= EXTRA_H2H_SEASONS_BACK; back++) {
+    const year = baseYear - back
+    const cacheKey = `h2hHistory_${selectedComp}_${year}`
+    const cached = readCache(cacheKey)
+    if (cached != null) { results.push(...cached); continue }
+    // Attente ADAPTATIVE (voir fdSpacingTracker.js), UNIQUEMENT avant le 1er
+    // vrai appel réseau de cette fonction — plusieurs compétitions affichées
+    // en même temps sur l'Accueil (chacune avec son propre useH2HHistory)
+    // pourraient sinon toutes taper le verrou d'espacement serveur au même
+    // instant ; ça laisse une vraie chance à celles qui arrivent un peu après
+    // un hook voisin (useTeamFormMulti, etc.) plutôt qu'un 429 immédiat.
+    if (!waited) { await waitForFdSpacing(); waited = true }
+    try {
+      const matches = await tryFetch(
+        `/api/v4/competitions/${selectedComp}/matches?dateFrom=${year}-07-01&dateTo=${year + 1}-06-30`
+      )
+      if (matches != null && matches.length > 0) {
+        writeCache(cacheKey, matches, H2H_HISTORY_CACHE_TTL)
+        results.push(...matches)
+      }
+    } catch (e) {
+      // Une saison manquante (compétition trop jeune) ou un 429/403 transitoire
+      // ne doit jamais bloquer les autres — best-effort, le résultat final peut
+      // légitimement avoir moins de EXTRA_H2H_SEASONS_BACK saisons pour une
+      // compétition donnée, sans jamais faire échouer l'ensemble.
+      void e
+    }
+  }
+  return results.filter(m => m.status === 'FINISHED')
+}
+
+// Hook paresseux : n'ajoute jamais de latence perçue (staleTime long, jamais
+// dans le chemin critique du 1er rendu) — un pur enrichissement en arrière-
+// plan, exactement le même principe "upgrade progressif" déjà utilisé pour
+// compH2H→fdRecent (useH2HRows, MatchModal.jsx).
+export function useH2HHistory(selectedComp) {
+  const { data } = useQuery({
+    queryKey: ['h2hHistory', selectedComp],
+    queryFn: () => fetchH2HHistory(selectedComp),
+    enabled: !!selectedComp,
+    staleTime: H2H_HISTORY_CACHE_TTL,
+    retry: 1,
+  })
+  return data ?? []
 }
 
 // ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : le
