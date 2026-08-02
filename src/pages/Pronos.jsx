@@ -29,7 +29,7 @@ import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -132,11 +132,16 @@ function outcomeOf(h, a) {
 // confrontations directes si assez de données, sinon repli sur la forme
 // récente (formMap/matchesByComp, voir useTeamFormMulti) — même source et
 // même modèle que MatchPoster (Accueil).
+// ⚠️ BUG CORRIGÉ (même fix que MatchPoster.jsx/MatchDuJourCard.jsx) : id ESPN
+// vs id FD.org pour les 6 grands championnats — sans résolution, calcPronoAdvanced
+// ne retrouve jamais la vraie donnée saison de l'équipe.
 function matchProno(match, formMap, matchesByComp) {
-  const hForm = formMap?.[match?.homeTeam?.id] ?? []
-  const aForm = formMap?.[match?.awayTeam?.id] ?? []
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
-  return calcPronoAdvanced(match?.homeTeam?.id, match?.awayTeam?.id, compMatches, hForm, aForm, {
+  const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true }) ?? match?.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true }) ?? match?.awayTeam?.id
+  const hForm = formMap?.[resolvedHomeId] ?? []
+  const aForm = formMap?.[resolvedAwayId] ?? []
+  return calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
     neutralVenue: isNeutralVenueComp(match),
   })
 }

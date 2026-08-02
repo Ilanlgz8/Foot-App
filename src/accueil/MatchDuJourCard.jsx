@@ -14,7 +14,7 @@
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { TEAM_SHORT } from '../data/teamShortNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
@@ -100,11 +100,17 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
 
   // ── Pronostic — même modèle que MatchPoster.jsx (cote de marché ESPN en
   // priorité pré-match, sinon calcProno/calcLiveProno). ──
-  const hForm = formMap?.[match.homeTeam?.id] ?? []
-  const aForm = formMap?.[match.awayTeam?.id] ?? []
+  // ⚠️ BUG CORRIGÉ (même fix que MatchPoster.jsx — voir son commentaire
+  // détaillé) : formMap/compMatches/fullH2H indexés id FD.org, match.homeTeam.id
+  // est un id ESPN pour les 6 grands championnats → sans résolution, le calcul
+  // de côte ne peut jamais utiliser la vraie donnée saison/H2H de l'équipe.
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
+  const hForm = formMap?.[resolvedHomeId] ?? []
+  const aForm = formMap?.[resolvedAwayId] ?? []
   const prono = isLive
     ? calcLiveProno(hForm, aForm, hs, as_, liveMinute, {
-        homeId: match.homeTeam?.id, awayId: match.awayTeam?.id, compMatches,
+        homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
         fullH2H,
         neutralVenue:      isNeutralVenueComp(match),
         homeRedCards:      espnScore?.stats?.home?.redCards,
@@ -116,7 +122,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
       })
-    : calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm, aForm, {
+    : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H,
         neutralVenue: isNeutralVenueComp(match),
       })

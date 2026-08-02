@@ -377,8 +377,10 @@ export default function LiveMatchPage() {
 
   const match = useMemo(() => {
     if (!rawMatch || !resolveMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
+    // ⚠️ AJOUT `{ loose: true }` — voir le commentaire détaillé dans
+    // MatchPage.jsx (même fix).
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,

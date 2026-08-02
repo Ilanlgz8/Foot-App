@@ -712,8 +712,14 @@ export default function MatchPage() {
 
   const match = useMemo(() => {
     if (!rawMatch || !resolveMatches?.length) return rawMatch
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches)
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches)
+    // ⚠️ AJOUT `{ loose: true }` (audit noms ESPN/FD.org) : cette résolution
+    // était en strict clubNameMatch (préfixe uniquement) — trouve "Le Havre
+    // AC"→"Le Havre" (suffixe en trop côté ESPN) mais PAS "AS Monaco"→"Monaco"
+    // ni "Manchester City"→"Man City" (mot en trop en PRÉFIXE côté ESPN).
+    // looseTeamNameMatch (translateTeam + normalize) couvre ces cas — même
+    // repli sûr sur l'id d'origine si la résolution échoue.
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,

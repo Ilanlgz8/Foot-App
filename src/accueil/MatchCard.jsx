@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -114,7 +114,12 @@ export function PosterSkeleton() {
 //   noWinnerLoser → si true, pas de style gagnant/perdant (ex: dans le widget live)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
 //   noGradient    → si true, pas de dégradé couleurs équipes en fond (ex: panel Résultats)
-export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, noLive = false, noGradient = false, formMap = null }) {
+export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, noLive = false, noGradient = false, formMap = null, compMatches = null }) {
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : losanges "forme récente" vides sur
+  // desktop) : même fix que MatchPoster.jsx — id ESPN vs id FD.org pour les
+  // 6 grands championnats.
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
@@ -341,7 +346,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
         <span className={homeNameCls}>
           {translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')}
         </span>
-        <FormDiamonds form={formMap?.[match.homeTeam?.id]} />
+        <FormDiamonds form={formMap?.[resolvedHomeId]} />
       </div>
 
       {/* Centre : minute/heure/FT + score */}
@@ -382,7 +387,7 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
         <span className={awayNameCls}>
           {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')}
         </span>
-        <FormDiamonds form={formMap?.[match.awayTeam?.id]} />
+        <FormDiamonds form={formMap?.[resolvedAwayId]} />
       </div>
     </div>
   )
@@ -460,6 +465,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                     noAnimation
                     noGradient
                     formMap={formMap}
+                    compMatches={matchesByComp?.[match.competition?.code] ?? null}
                   />
                 </div>
               )
