@@ -112,8 +112,29 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // resolveFdTeamId convertit l'id ESPN vers l'id FD.org équivalent via
   // compMatches déjà chargé — repli sur l'id d'origine si la résolution
   // échoue (aucune régression possible dans ce cas précis).
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
+  // ⚠️ 2e BUG CORRIGÉ (02/08, constat utilisateur : "Barcelone a gagné 8/8
+  // dans le H2H affiché mais sa cote de victoire est 2.01, pas cohérent" —
+  // vérifié par simulation directe des formules de calcProno.js : un H2H 8/8
+  // pris en compte au poids prévu par le code donnerait une cote Barcelone
+  // bien plus basse, ~1.3-1.8, jamais 2.01 — donc ce H2H visible n'était PAS
+  // reflété dans le calcul réel) : resolveFdTeamId ci-dessous ne cherchait le
+  // nom de l'équipe QUE dans compMatches — si cette recherche par nom échouait
+  // pour une raison quelconque (silencieuse, sans qu'aucune erreur ne
+  // remonte) alors que useH2HRows, LUI, avait réussi à résoudre le fixture et
+  // charger un vrai head2head (dedicatedH2H, ce qu'on voit affiché), les ids
+  // utilisés pour AFFICHER le H2H et ceux utilisés pour le CALCUL de cote
+  // pouvaient diverger — directMeetings (calcProno.js) ne retrouvait alors
+  // aucune des 8 confrontations dans fullH2H (comparaison stricte par id) et
+  // retombait sur un mix beaucoup plus proche du neutre. dedicatedH2H, quand
+  // il est non vide, contient PAR CONSTRUCTION uniquement des matchs entre
+  // ces 2 mêmes équipes (c'est un head2head DÉDIÉ, garanti par l'endpoint
+  // FD.org lui-même) — l'ajouter au pool de recherche de resolveFdTeamId
+  // (même fonction déjà éprouvée, juste plus de données où chercher le nom)
+  // donne une 2e chance de résolution cohérente avec le H2H déjà affiché,
+  // sans introduire de nouvelle logique de matching.
+  const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true }) ?? match.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true }) ?? match.awayTeam?.id
   const hForm     = formMap?.[resolvedHomeId] ?? []
   const aForm     = formMap?.[resolvedAwayId] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la

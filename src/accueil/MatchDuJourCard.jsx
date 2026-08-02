@@ -116,8 +116,13 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // détaillé) : formMap/compMatches/fullH2H indexés id FD.org, match.homeTeam.id
   // est un id ESPN pour les 6 grands championnats → sans résolution, le calcul
   // de côte ne peut jamais utiliser la vraie donnée saison/H2H de l'équipe.
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
+  // ⚠️ 2e BUG CORRIGÉ (même fix que MatchPoster.jsx — voir son commentaire
+  // détaillé, H2H 8/8 Barcelone pas reflété dans la cote) : dedicatedH2H
+  // ajouté au pool de recherche de resolveFdTeamId, cohérence garantie avec
+  // le H2H déjà affiché.
+  const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true }) ?? match.homeTeam?.id
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true }) ?? match.awayTeam?.id
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
   const prono = isLive
