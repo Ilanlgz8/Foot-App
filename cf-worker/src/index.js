@@ -492,7 +492,7 @@ async function runOnePass(env) {
     const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
     const isFinalNow    = FINAL_ESPN.has(status)
 
-    if (isLive) {
+    if (isLive && shouldRefreshSummary()) {
       pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
     }
 
@@ -909,6 +909,27 @@ async function runOnePass(env) {
 // retard sur l'affichage debug, sans aucun effet sur les notifs/détection.
 function shouldWriteDebugBookkeeping() {
   return new Date().getMinutes() % 5 === 0
+}
+
+// ⚠️ AJOUT (03/08, demande utilisateur : réduire les commandes Upstash SANS
+// toucher à la latence du direct) : cacheEspnSummary (voir plus haut) écrit
+// espn:summary:{slug}:{eventId} dans Redis à CHAQUE passe (1min) pour CHAQUE
+// match en direct — mais ce n'est qu'un pré-chauffage de secours. La vraie
+// fraîcheur pour un spectateur actif vient d'ailleurs : api/espn.js relit
+// CETTE MÊME clé avec son propre TTL de 15s pour un match en cours
+// (LIVE_SUMMARY_CACHE_TTL) et refait un fetch ESPN dès qu'elle expire, à
+// chaque requête client (poll 10-30s, voir CLAUDE.md) — indépendamment de ce
+// Worker. cacheEspnSummary ne sert donc qu'à garder une copie "pas trop
+// vieille" pour le tout premier visiteur d'un match sans spectateur récent —
+// aucun rapport avec la détection buts/cartons/score (le pipeline juste
+// au-dessus, states/trackKey/cardTrackKey, reste à 1min, jamais touché ici)
+// ni avec les notifs push. Espacer à 1 passe sur 2 (paire uniquement) coupe
+// ce poste en 2 pendant les jours de match, avec un pré-chauffage encore
+// largement assez frais (≤2min) pour ce rôle de secours — gate purement
+// local sur l'horloge (même pattern que shouldWriteDebugBookkeeping
+// ci-dessus), zéro lecture Redis supplémentaire pour décider.
+function shouldRefreshSummary() {
+  return new Date().getMinutes() % 2 === 0
 }
 
 async function handlePass(env) {
