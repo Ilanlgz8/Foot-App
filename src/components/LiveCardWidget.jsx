@@ -14,7 +14,7 @@
  * comportement/rendu — zéro changement fonctionnel, seulement l'emplacement
  * du code.
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
@@ -141,15 +141,20 @@ export function LiveCard({ match, espn, onClick }) {
   const timerRef = useRef(null)
   const [goal, setGoal] = useState(null)
 
-  const initDone = useRef(false)
-  if (!initDone.current) {
-    initDone.current = true
+  // Initialisation one-shot depuis localStorage — useLayoutEffect (pas une
+  // mutation de ref pendant le render) : s'exécute avant peinture écran (aucun
+  // flash) et toujours avant le useEffect de détection juste en dessous (un
+  // useLayoutEffect passe systématiquement avant les useEffect classiques, quel
+  // que soit l'ordre dans le fichier) — comportement identique, mais sûr sous
+  // StrictMode/React Compiler.
+  useLayoutEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
       if (s?.home != null) prevHs.current = s.home
       if (s?.away != null) prevAs.current = s.away
     } catch {}
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const isLive = !isTermine && (match.status === 'IN_PLAY' || match.status === 'PAUSED' || minute !== null)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css

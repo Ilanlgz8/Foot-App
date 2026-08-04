@@ -6,7 +6,7 @@
  * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
@@ -232,15 +232,20 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
   const scoreKey = `foot_lv_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
-  const initDone = useRef(false)
-  if (!initDone.current) {
-    initDone.current = true
+  // Initialisation one-shot depuis localStorage — useLayoutEffect (pas une
+  // mutation de ref pendant le render) : s'exécute avant peinture écran (donc
+  // aucun flash) et toujours avant le useEffect de détection juste en dessous
+  // (les useLayoutEffect passent systématiquement avant les useEffect classiques,
+  // quel que soit l'ordre dans le fichier) — comportement identique, mais sûr
+  // sous StrictMode/React Compiler (pas de mutation pendant la phase de render).
+  useLayoutEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
       if (s?.home != null) prevHs.current = s.home
       if (s?.away != null) prevAs.current = s.away
     } catch {}
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     if (hs  != null) prevHs.current = hs
     if (as_ != null) prevAs.current = as_

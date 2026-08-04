@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
@@ -206,16 +206,20 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   const timerRef = useRef(null)
   const [goal, setGoal] = useState(null) // { team: string } | null
 
-  // Initialisation one-shot depuis localStorage pour éviter les fausses animations au reload
-  const initDone = useRef(false)
-  if (!initDone.current) {
-    initDone.current = true
+  // Initialisation one-shot depuis localStorage pour éviter les fausses animations
+  // au reload — useLayoutEffect (pas une mutation de ref pendant le render) :
+  // s'exécute avant peinture écran (aucun flash) et toujours avant le useEffect de
+  // détection juste en dessous (un useLayoutEffect passe systématiquement avant
+  // les useEffect classiques, quel que soit l'ordre dans le fichier) — comportement
+  // identique, mais sûr sous StrictMode/React Compiler.
+  useLayoutEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem(scoreKey) || 'null')
       if (s?.home != null) prevHs.current = s.home
       if (s?.away != null) prevAs.current = s.away
     } catch {}
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!isLive) {
