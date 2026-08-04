@@ -1098,9 +1098,25 @@ async function queueFdPriorityRefresh(kv, slug, log) {
 // négligeable sur le budget partagé avec les vrais utilisateurs même les
 // jours de match chargés (plusieurs FT à la même minute se drainent sur les
 // ticks suivants, pas d'un coup).
+// ⚠️ AJOUT (03/08, demande utilisateur : "le jour où y'a pas de match y'a
+// déjà 100k commandes cramées, comment optimiser sans casser le direct") —
+// AVANT ce fix, seule la rotation aveugle plus bas était déjà espacée à 1
+// tick sur 2 (voir `now.getMinutes() % 2`) — mais le kv.lpop(priorityQueue)
+// juste en dessous tournait, lui, à CHAQUE minute, INCONDITIONNELLEMENT,
+// 1440 fois/jour, MÊME les jours sans un seul match qui se termine (donc la
+// file d'attente reste vide en permanence — cas de très loin le plus
+// fréquent hors saison/période creuse). Coût : ~1440 commandes Redis/jour
+// (~43K/mois) pour vérifier une file quasi toujours vide. Alignée sur LE
+// MÊME gate horloge que la rotation juste en dessous (déjà en place, déjà
+// jugé sans risque pour Programme/Résultats/Classement — TTL le plus court
+// 120s largement au-dessus de 2min) : au pire, un match qui vient de finir
+// attend jusqu'à 1min de plus avant que SA priorité soit traitée — sans
+// aucun rapport avec le direct (score/buts/notifs, gérés entièrement par le
+// pipeline runOnePass ci-dessus, jamais touché ici) — juste un délai
+// négligeable sur la fraîcheur de Résultats/Classement juste après un FT.
 async function warmFdCache(log, kv) {
   try {
-    if (kv) {
+    if (kv && new Date().getMinutes() % 2 === 0) {
       try {
         const queued = await kv.lpop(FD_PRIORITY_QUEUE_KEY)
         if (queued != null) {
