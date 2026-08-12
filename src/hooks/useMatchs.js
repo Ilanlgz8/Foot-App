@@ -675,7 +675,12 @@ async function fetchClubMatchesRawInner(selectedComp) {
     } // fin du court-circuit cache-first ajouté le 12/08 (if (lastSeason == null))
     if (lastSeason != null && lastSeason.length > 0) {
       const seen = new Set(all.map(m => m.id))
-      all = [...all, ...lastSeason.filter(m => !seen.has(m.id))]
+      // _fromLastSeason : tag lu par fetchMatchesForComp/filterByStatus
+      // (plus bas dans ce fichier) pour EXCLURE ces matchs de l'affichage
+      // Programme/Résultats (demande explicite utilisateur, 12/08) — restent
+      // dans `all` pour que useTeamForm.js (H2H/prono, séparation déjà faite
+      // là-bas pour formMap) continue d'en disposer.
+      all = [...all, ...lastSeason.filter(m => !seen.has(m.id)).map(m => ({ ...m, _fromLastSeason: true }))]
     }
   }
 
@@ -737,9 +742,19 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   if (isClub) {
     const all = await fetchClubMatchesRaw(selectedComp)
     if (all == null) return null
+    // Ne jamais AFFICHER les matchs de la saison précédente dans les listes
+    // (demande explicite utilisateur, 12/08 : "si on a pas les données de la
+    // saison actuelle c'est que la saison a pas commencé donc on met rien")
+    // — gardés dans `all` en amont (fetchClubMatchesRawInner, tag
+    // _fromLastSeason) UNIQUEMENT pour alimenter H2H/prono (useTeamForm.js,
+    // qui les lit directement depuis fetchClubMatchesRaw sans passer par ce
+    // filtre). Si la saison en cours n'a encore rien produit, Programme/
+    // Résultats affichent "aucun match" plutôt que les résultats de l'an
+    // dernier.
+    const displayable = all.filter(m => !m._fromLastSeason)
     return status === 'FINISHED'
-      ? all.filter(m => m.status === 'FINISHED')
-      : all.filter(m => m.status !== 'FINISHED')
+      ? displayable.filter(m => m.status === 'FINISHED')
+      : displayable.filter(m => m.status !== 'FINISHED')
   }
 
   // ── WC/EC : statuts déjà distincts par nature du tournoi (poules puis
@@ -902,8 +917,14 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
   const cachedData = readStaleWithMigration()
   const cachedAt   = getCacheSavedAt(key)
 
+  // _fromLastSeason : voir fetchClubMatchesRawInner plus haut — matchs de la
+  // saison précédente injectés dans le RAW partagé UNIQUEMENT pour H2H/prono
+  // (useTeamForm.js les lit directement, sans passer par ce `select`), jamais
+  // pour l'affichage Programme/Résultats (demande explicite utilisateur,
+  // 12/08). Chemin isClubShared = les 6 grands championnats (PL/FL1/PD/BL1/
+  // SA/CL), voir plus bas.
   const filterByStatus = list => (list ?? []).filter(m =>
-    status === 'FINISHED' ? m.status === 'FINISHED' : m.status !== 'FINISHED'
+    !m._fromLastSeason && (status === 'FINISHED' ? m.status === 'FINISHED' : m.status !== 'FINISHED')
   )
 
   const { data, isLoading, error } = useQuery({
