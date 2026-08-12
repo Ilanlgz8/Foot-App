@@ -60,6 +60,7 @@ export const COMPETITION_ESPN_SLUG = {
   COPA: 'conmebol.america',
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
+  USC:  'uefa.super_cup',
 }
 
 // ID numérique football-data.org réel des 6 grands championnats club —
@@ -123,7 +124,9 @@ export const DOMESTIC_CUPS = {
 // NOTIFS (voir son commentaire dédié) — l'absence de classement n'a aucun
 // rapport avec l'éligibilité aux notifs push, seulement avec l'onglet
 // Classement.
-export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+// USC (Supercoupe UEFA) ajoutée pour la même raison — un seul match par an,
+// aucun classement n'a jamais de sens ici.
+export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC'])
 
 export const COMPETITIONS = [
   {
@@ -173,6 +176,17 @@ export const COMPETITIONS = [
     name: 'Ligue Europa Conférence',
     shortName: 'Conférence L.',
     emblem: conferenceLeagueLogo,
+  },
+  {
+    // Supercoupe de l'UEFA (vainqueur C1 vs vainqueur Ligue Europa) — un seul
+    // match par an, 100% ESPN comme NL/CAN/COPA/UEL/UECL (pas d'id
+    // football-data.org). Pas de logo dédié disponible (emblem: null, safe —
+    // tous les points d'affichage vérifient déjà `comp.emblem &&` avant
+    // d'afficher une image).
+    id: 'USC',
+    name: "Supercoupe de l'UEFA",
+    shortName: 'Supercoupe UEFA',
+    emblem: null,
   },
   {
     id: 'WC',

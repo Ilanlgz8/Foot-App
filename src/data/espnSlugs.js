@@ -82,6 +82,7 @@ export const DOMESTIC_CUP_SLUGS = {
 export const EUROPEAN_CUP_SLUGS = {
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
+  USC:  'uefa.super_cup', // Supercoupe UEFA (vainqueur C1 vs vainqueur Ligue Europa) — 1 match/an
 }
 
 // Liste à plat pour le cron (api/cron-goals.js, cf-worker/src/index.js) —

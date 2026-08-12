@@ -16,7 +16,7 @@ import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTrack
 // dont la vue "Par journée" a besoin du champ `matchday` — qu'ESPN ne fournit
 // jamais (toujours `null`). Voir plus bas (opts.preferEspnForMajors) pour le
 // SEUL appelant qui a besoin d'ESPN pour ces 6 comps sans toucher Programme.
-const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+const ESPN_SOURCED_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC'])
 
 // ⚠️ AJOUT (constat utilisateur, 24/07 : "j'ai des doublons + les matchs
 // avant le 21 août n'apparaissent pas, l'app saute direct au 21 au lieu du
