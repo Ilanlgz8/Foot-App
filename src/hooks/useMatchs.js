@@ -570,92 +570,109 @@ async function fetchClubMatchesRawInner(selectedComp) {
     // que la vraie saison 2026/27 produit son 1er résultat, cette branche
     // entière (et donc ce cache) cesse alors d'être utilisée.
     const lastSeasonKey = `matches_lastSeason_${selectedComp}`
-    let lastSeason = null
+    // ⚠️ AJOUT cache-first (12/08, constat utilisateur : trop d'appels FD.org
+    // pendant l'entre-saison actuelle, 429 en changeant de compétition dans
+    // Programme). Ces matchs sont l'historique FIGÉ de la saison qui vient de
+    // se terminer — ils ne peuvent plus jamais changer. Avant ce fix, cette
+    // fonction repartait taper FD.org à CHAQUE montage (Programme, Résultats
+    // ET useTeamForm appellent chacun fetchClubMatchesRaw indépendamment,
+    // voir plus haut) même quand un fetch réussi de moins de 24h existait déjà
+    // (writeCache(lastSeasonKey,...) plus bas) — le cache n'était lu qu'EN
+    // REPLI si CE fetch précis échouait, jamais consulté en premier pour
+    // éviter le fetch. `readCache` respecte le TTL déjà en place (24h) : au-
+    // delà, retombe naturellement sur le comportement existant (refetch).
+    // Ne touche à AUCUNE des règles d'ordre/priorité du repli ci-dessous
+    // (dateFrom/dateTo puis season-1) — zone qui a déjà causé plusieurs
+    // régressions par le passé (voir 25/07, 02/08) — uniquement un
+    // court-circuit AVANT tout ça quand un résultat récent est déjà en main.
+    let lastSeason = readCache(lastSeasonKey)
     const primarySeasonYear = getClubSeason()
-    // ⚠️ CORRIGÉ (02/08, root cause enfin isolée en testant l'API réelle en
-    // direct) : `?season=${primarySeasonYear}` renvoie une réponse VIDE côté
-    // football-data.org de façon reproductible et stable sur cet endpoint
-    // PRÉCIS (`/matches?season=X`) — pas un 429/403 passager (déjà couvert
-    // par le catch ci-dessous). Preuve que ce n'est PAS un problème de
-    // donnée manquante côté FD.org : `/v4/matches/{id}/head2head` (endpoint
-    // différent, même compte) expose SANS PROBLÈME les matchs de cette même
-    // saison (vérifié en direct : 380/380 matchs joués, confrontations
-    // Barcelone-Elche de nov 2025 et jan 2026 bien présentes). Le bug est
-    // donc spécifique au PARAMÈTRE `season=` de cet endpoint précis, cause
-    // exacte côté FD.org non identifiable d'ici. Contournement testé et
-    // confirmé en direct : `dateFrom`/`dateTo` sur la même plage renvoie les
-    // 380 matchs complets (`resultSet.played:380`) — remplace `season=` au
-    // lieu d'ajouter une cascade vers une saison plus vieille (ancienne
-    // version de ce fix, moins bonne : reculait d'un an alors que la vraie
-    // donnée existe déjà, juste pas via ce paramètre). Strictement meilleur
-    // sur tous les plans : donnée plus fraîche (saison qui vient RÉELLEMENT
-    // de se terminer, pas celle d'avant) ET moins d'appels FD.org (1 requête
-    // qui réussit du 1er coup au lieu de 2, la 1ère étant systématiquement
-    // perdue). 1er juillet → 30 juin de l'année suivante : large marge avant/
-    // après la vraie saison (mi-août → fin mai) pour ne rien couper.
-    const seasonDateFrom = `${primarySeasonYear}-07-01`
-    const seasonDateTo   = `${primarySeasonYear + 1}-06-30`
-    try {
-      lastSeason = await tryFetch(
-        `/api/v4/competitions/${selectedComp}/matches?dateFrom=${seasonDateFrom}&dateTo=${seasonDateTo}`
-      )
-    } catch (e) {
-      // ⚠️ NE PLUS PROPAGER via `lastErr` ici (25/07, voir bug détaillé plus
-      // bas) : ce repli n'est qu'un enrichissement optionnel — si `current`
-      // (juste au-dessus) a déjà réussi avec de vraies données (matchs
-      // SCHEDULED de la saison à venir), un échec ICI ne doit jamais faire
-      // disparaître ces données déjà en main. `lastErr` ne sert plus qu'au
-      // cas où `current` LUI-MÊME a échoué (voir catch plus haut) — seul cas
-      // où on n'a vraiment rien à montrer.
-      void e
-    }
-    // Ultime filet de sécurité (jamais déclenché en usage normal depuis le
-    // fix dateFrom/dateTo ci-dessus, vérifié en direct) : si même cette
-    // requête échoue un jour pour une autre raison, retente `season=` une
-    // année plus tôt plutôt que d'abandonner — une donnée un peu plus vieille
-    // reste préférable à un neutre par défaut identique sur tous les matchs.
-    // ⚠️ BUG CORRIGÉ (02/08, trouvé en investiguant le signalement utilisateur
-    // "Elche-Barcelone encore" — H2H visible mais cote par défaut) : ce 2e
-    // essai partait AUSSITÔT après l'échec du 1er (dateFrom/dateTo, juste
-    // au-dessus), sans jamais attendre le verrou d'espacement serveur
-    // (SPACING_MS, api/football.js). Or si le 1er essai a échoué À CAUSE de
-    // ce verrou (quelqu'un d'autre l'a posé juste avant — très plausible en
-    // ce moment précis : TOUS les grands championnats club ont simultanément
-    // besoin de ce même repli saison précédente, aucun n'a encore de FINISHED
-    // en 2026-27), OU si le 1er essai a lui-même RÉUSSI À TAPER FD.org (donc
-    // vient de poser ce verrou pour 6s), le 2e essai immédiat n'avait dans les
-    // deux cas quasiment aucune chance réelle de passer — gaspillé pour rien,
-    // et compMatches retombait alors sur le seul `current` (calendrier à
-    // venir, sans historique) pendant tout le staleTime du cache (2min,
-    // useTeamForm.js) : buildGoalModel/H2H n'avaient plus rien à exploiter
-    // pour CETTE compétition pendant cette fenêtre, cote neutre par défaut,
-    // alors même que le head2head dédié et h2hHistory (fetches indépendants)
-    // pouvaient très bien afficher un H2H de leur côté — exactement le
-    // symptôme rapporté ("H2H visible MAIS cote par défaut"). waitForFdSpacing
-    // (déjà utilisé pour la transition current→1er essai un peu plus haut)
-    // est adaptatif : 0ms si le 1er essai n'a en fait rien tapé de réel
-    // (cache serveur déjà chaud), sinon le temps qui reste réellement avant
-    // l'expiration du verrou — donne au 2e essai une vraie chance sans
-    // ralentir le cas déjà rapide.
-    if (lastSeason == null || lastSeason.length === 0) {
-      await waitForFdSpacing()
+    if (lastSeason == null) {
+      // ⚠️ CORRIGÉ (02/08, root cause enfin isolée en testant l'API réelle en
+      // direct) : `?season=${primarySeasonYear}` renvoie une réponse VIDE côté
+      // football-data.org de façon reproductible et stable sur cet endpoint
+      // PRÉCIS (`/matches?season=X`) — pas un 429/403 passager (déjà couvert
+      // par le catch ci-dessous). Preuve que ce n'est PAS un problème de
+      // donnée manquante côté FD.org : `/v4/matches/{id}/head2head` (endpoint
+      // différent, même compte) expose SANS PROBLÈME les matchs de cette même
+      // saison (vérifié en direct : 380/380 matchs joués, confrontations
+      // Barcelone-Elche de nov 2025 et jan 2026 bien présentes). Le bug est
+      // donc spécifique au PARAMÈTRE `season=` de cet endpoint précis, cause
+      // exacte côté FD.org non identifiable d'ici. Contournement testé et
+      // confirmé en direct : `dateFrom`/`dateTo` sur la même plage renvoie les
+      // 380 matchs complets (`resultSet.played:380`) — remplace `season=` au
+      // lieu d'ajouter une cascade vers une saison plus vieille (ancienne
+      // version de ce fix, moins bonne : reculait d'un an alors que la vraie
+      // donnée existe déjà, juste pas via ce paramètre). Strictement meilleur
+      // sur tous les plans : donnée plus fraîche (saison qui vient RÉELLEMENT
+      // de se terminer, pas celle d'avant) ET moins d'appels FD.org (1 requête
+      // qui réussit du 1er coup au lieu de 2, la 1ère étant systématiquement
+      // perdue). 1er juillet → 30 juin de l'année suivante : large marge avant/
+      // après la vraie saison (mi-août → fin mai) pour ne rien couper.
+      const seasonDateFrom = `${primarySeasonYear}-07-01`
+      const seasonDateTo   = `${primarySeasonYear + 1}-06-30`
       try {
-        const olderSeason = await tryFetch(
-          `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear - 1}`
+        lastSeason = await tryFetch(
+          `/api/v4/competitions/${selectedComp}/matches?dateFrom=${seasonDateFrom}&dateTo=${seasonDateTo}`
         )
-        if (olderSeason != null && olderSeason.length > 0) lastSeason = olderSeason
       } catch (e) {
+        // ⚠️ NE PLUS PROPAGER via `lastErr` ici (25/07, voir bug détaillé plus
+        // bas) : ce repli n'est qu'un enrichissement optionnel — si `current`
+        // (juste au-dessus) a déjà réussi avec de vraies données (matchs
+        // SCHEDULED de la saison à venir), un échec ICI ne doit jamais faire
+        // disparaître ces données déjà en main. `lastErr` ne sert plus qu'au
+        // cas où `current` LUI-MÊME a échoué (voir catch plus haut) — seul cas
+        // où on n'a vraiment rien à montrer.
         void e
       }
-    }
-    if (lastSeason != null && lastSeason.length > 0) {
-      writeCache(lastSeasonKey, lastSeason, 24 * 3600 * 1000)
-    } else {
-      // Échec ou réponse vide cette fois-ci : on retombe sur la dernière
-      // version connue plutôt que de perdre ces résultats (readCacheStale
-      // sert la donnée peu importe son âge — voir localCache.js).
-      lastSeason = readCacheStale(lastSeasonKey)
-    }
+      // Ultime filet de sécurité (jamais déclenché en usage normal depuis le
+      // fix dateFrom/dateTo ci-dessus, vérifié en direct) : si même cette
+      // requête échoue un jour pour une autre raison, retente `season=` une
+      // année plus tôt plutôt que d'abandonner — une donnée un peu plus vieille
+      // reste préférable à un neutre par défaut identique sur tous les matchs.
+      // ⚠️ BUG CORRIGÉ (02/08, trouvé en investiguant le signalement utilisateur
+      // "Elche-Barcelone encore" — H2H visible mais cote par défaut) : ce 2e
+      // essai partait AUSSITÔT après l'échec du 1er (dateFrom/dateTo, juste
+      // au-dessus), sans jamais attendre le verrou d'espacement serveur
+      // (SPACING_MS, api/football.js). Or si le 1er essai a échoué À CAUSE de
+      // ce verrou (quelqu'un d'autre l'a posé juste avant — très plausible en
+      // ce moment précis : TOUS les grands championnats club ont simultanément
+      // besoin de ce même repli saison précédente, aucun n'a encore de FINISHED
+      // en 2026-27), OU si le 1er essai a lui-même RÉUSSI À TAPER FD.org (donc
+      // vient de poser ce verrou pour 6s), le 2e essai immédiat n'avait dans les
+      // deux cas quasiment aucune chance réelle de passer — gaspillé pour rien,
+      // et compMatches retombait alors sur le seul `current` (calendrier à
+      // venir, sans historique) pendant tout le staleTime du cache (2min,
+      // useTeamForm.js) : buildGoalModel/H2H n'avaient plus rien à exploiter
+      // pour CETTE compétition pendant cette fenêtre, cote neutre par défaut,
+      // alors même que le head2head dédié et h2hHistory (fetches indépendants)
+      // pouvaient très bien afficher un H2H de leur côté — exactement le
+      // symptôme rapporté ("H2H visible MAIS cote par défaut"). waitForFdSpacing
+      // (déjà utilisé pour la transition current→1er essai un peu plus haut)
+      // est adaptatif : 0ms si le 1er essai n'a en fait rien tapé de réel
+      // (cache serveur déjà chaud), sinon le temps qui reste réellement avant
+      // l'expiration du verrou — donne au 2e essai une vraie chance sans
+      // ralentir le cas déjà rapide.
+      if (lastSeason == null || lastSeason.length === 0) {
+        await waitForFdSpacing()
+        try {
+          const olderSeason = await tryFetch(
+            `/api/v4/competitions/${selectedComp}/matches?season=${primarySeasonYear - 1}`
+          )
+          if (olderSeason != null && olderSeason.length > 0) lastSeason = olderSeason
+        } catch (e) {
+          void e
+        }
+      }
+      if (lastSeason != null && lastSeason.length > 0) {
+        writeCache(lastSeasonKey, lastSeason, 24 * 3600 * 1000)
+      } else {
+        // Échec ou réponse vide cette fois-ci : on retombe sur la dernière
+        // version connue plutôt que de perdre ces résultats (readCacheStale
+        // sert la donnée peu importe son âge — voir localCache.js).
+        lastSeason = readCacheStale(lastSeasonKey)
+      }
+    } // fin du court-circuit cache-first ajouté le 12/08 (if (lastSeason == null))
     if (lastSeason != null && lastSeason.length > 0) {
       const seen = new Set(all.map(m => m.id))
       all = [...all, ...lastSeason.filter(m => !seen.has(m.id))]
