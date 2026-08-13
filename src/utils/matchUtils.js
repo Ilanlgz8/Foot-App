@@ -16,6 +16,7 @@
 import { getMatchState } from './matchStateTracker'
 import { clubNameMatch, normalize } from './espnSummaryParse'
 import { translateTeam } from '../data/teamNames'
+import { readCacheStale, writeCache } from '../hooks/localCache'
 
 const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
@@ -588,7 +589,12 @@ function looseTeamNameMatch(a, b) {
   }
 }
 
-export function resolveFdMatchId(match, compMatches, { loose = false } = {}) {
+// Logique de résolution "live" — EXACTEMENT le corps d'origine de
+// resolveFdMatchId, inchangé au caractère près (voir wrapper juste en
+// dessous, qui ajoute uniquement une couche de mémoire par-dessus, sans
+// toucher à ces règles de matching déjà fragiles — plusieurs reverts
+// documentés dans l'historique du projet sur cette zone précise).
+function resolveFdMatchIdLive(match, compMatches, { loose = false } = {}) {
   const rawId = match?.id ?? null
   if (isRealFdMatchId(rawId)) return rawId
   if (!match || !compMatches?.length) return null
@@ -607,6 +613,34 @@ export function resolveFdMatchId(match, compMatches, { loose = false } = {}) {
     if (diff < bestDiff) { bestDiff = diff; best = m.id }
   }
   return best
+}
+
+// ⚠️ AJOUT mémoire persistante (12/08, constat utilisateur : "H2H affiche 10
+// confrontations un jour, plus que 2 le lendemain pour le même match") :
+// resolveFdMatchIdLive ci-dessus a besoin de `compMatches` (données de la
+// compétition déjà chargées) pour retrouver l'id football-data.org d'un
+// match sourcé ESPN — si `compMatches` n'est pas encore arrivé au moment
+// précis de ce calcul (ex. lancement à froid de l'app, cache local expiré),
+// la résolution échoue, retombe sur le repli pauvre (2-3 confrontations)
+// alors que le VRAI historique (7j de cache, voir useH2H/useMatchDetail.js)
+// existe toujours sous le bon id — juste inatteignable ce jour-là faute de
+// pouvoir recalculer la clé. Cette association (id ESPN → id FD.org) ne
+// change JAMAIS une fois trouvée pour un match donné — mémorisée ici dès
+// qu'elle est résolue avec succès, longue durée, relue en dernier repli
+// avant d'abandonner. Aucune règle de matching touchée (voir ci-dessus) :
+// pur ajout, ne peut jamais dégrader un cas qui marchait déjà.
+const FD_MATCH_ID_MAP_TTL = 180 * 24 * 3600 * 1000 // 180j
+
+export function resolveFdMatchId(match, compMatches, opts = {}) {
+  const rawId = match?.id ?? null
+  if (isRealFdMatchId(rawId)) return rawId
+  const cacheKey = rawId ? `fdMatchIdMap_${rawId}` : null
+  const live = resolveFdMatchIdLive(match, compMatches, opts)
+  if (live != null) {
+    if (cacheKey) writeCache(cacheKey, live, FD_MATCH_ID_MAP_TTL)
+    return live
+  }
+  return cacheKey ? (readCacheStale(cacheKey) ?? null) : null
 }
 
 export function resolveFdTeamId(team, compMatches, { loose = false } = {}) {
