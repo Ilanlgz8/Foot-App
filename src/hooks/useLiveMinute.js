@@ -63,6 +63,14 @@ let _wasEspnStruggling = false
 // import croisé entre hooks pour une simple liste de constantes.
 const KNOCKOUT_STAGES = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
 
+// Fenêtre de grâce pour corriger un faux FT (voir isFalseEndedReversal plus
+// bas) : le MÊME espnEventId qui redevient actif dans ce délai après la fin
+// déclarée est traité comme la preuve d'un faux-positif, pas une résurrection
+// illégitime. 20min = large marge (couvre même une app restée en arrière-plan
+// juste après le faux FT, qui ne rattraperait la correction qu'à son retour),
+// tout en restant bien en dessous des 3h d'auto-expiration de l'état 'ended'.
+const REVERSAL_GRACE_MS = 20 * 60_000
+
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
@@ -200,9 +208,9 @@ function parseClockMins(clock) {
 // Helper : confirmer un FT et planifier l'éviction
 // ─────────────────────────────────────────────
 
-function confirmFt(match, now, queryClient) {
+function confirmFt(match, now, queryClient, espnEventId) {
   const id    = match.id
-  setLiveState(id, 'ended', { endedAt: now })
+  setLiveState(id, 'ended', { endedAt: now, espnEventId })
   // Pont Résultats (voir matchStateTracker.js, markRecentlyFinished) — survit
   // à l'éviction du liveTracker 5min plus bas, pour le cas où FD.org met plus
   // longtemps que ça à confirmer FINISHED (bug signalé : match "terminé"
@@ -631,7 +639,38 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // le vrai FT. Un match réellement terminé ne redevient jamais légitimement
       // "en cours" dans la même journée → on verrouille : une fois 'ended', plus
       // aucun signal ultérieur ne peut faire marche arrière.
-      const alreadyEnded = getLiveState(mid).state === 'ended'
+      //
+      // ⚠️ NUANCE AJOUTÉE (constat utilisateur : "l'app dit que le match est
+      // terminé alors qu'il ne l'est pas encore" — Séville-Rayo, toujours
+      // STATUS_SECOND_HALF à 90'+8' côté ESPN au moment du signalement, juste
+      // après un penalty à la 90'+7' et un carton rouge à la 88' : exactement
+      // le genre de séquence chaotique en fin de temps additionnel où ESPN
+      // peut renvoyer FINAL par erreur 2 polls d'affilée — la confirmation
+      // pendingFt exige normalement 2 polls DIFFÉRENTS avec FINAL pour se
+      // déclencher, donc un vrai faux-positif ici, pas juste un glitch d'un
+      // seul poll déjà filtré par ce mécanisme). Le verrou ci-dessus était
+      // absolu par construction : correct pour bloquer le bug qu'il corrige
+      // (mauvais matching → données d'un event ESPN DIFFÉRENT), mais il
+      // empêchait aussi de corriger un vrai faux FT sur CE MÊME match. On
+      // distingue les deux cas via espnEventId (stocké par confirmFt) : si
+      // c'est le MÊME event ESPN qui redevient actif (pas un match différent
+      // mal matché) dans une fenêtre de grâce bornée après la fin déclarée,
+      // c'est la preuve que c'était un faux FT — on débloque. Une résurrection
+      // avec un espnEventId différent (le vrai bug d'origine) reste bloquée
+      // comme avant.
+      const liveStateInfo = getLiveState(mid)
+      const isFalseEndedReversal =
+        liveStateInfo.state === 'ended' &&
+        liveStateInfo.espnEventId != null &&
+        data.espnEventId != null &&
+        String(liveStateInfo.espnEventId) === String(data.espnEventId) &&
+        (now - (liveStateInfo.endedAt ?? 0)) < REVERSAL_GRACE_MS
+      if (isFalseEndedReversal) {
+        console.log(`[useLiveMinute] Faux FT corrigé (même espnEventId, match ${mid} toujours actif) — déblocage du verrou anti-résurrection`)
+        setLiveState(mid, 'live')
+        clearFtFlags(mid)
+      }
+      const alreadyEnded = liveStateInfo.state === 'ended' && !isFalseEndedReversal
 
       // ── Garde anti-régression "Terminé" ───────────────────────────────────────
       // BUG CORRIGÉ (constat utilisateur : "Terminé" déjà affiché correctement,
@@ -991,7 +1030,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         const pft = pendingFt[mid]
         if (pft && pft.score === currentScore) {
           delete pendingFt[mid]
-          confirmFt(match, now, queryClient)
+          confirmFt(match, now, queryClient, data.espnEventId)
         } else {
           pendingFt[mid] = { since: now, score: currentScore }
         }

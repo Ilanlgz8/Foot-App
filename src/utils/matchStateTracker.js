@@ -61,7 +61,7 @@ try {
 
 /**
  * Retourne l'état live d'un match :
- * { state: 'unknown' | 'live' | 'pendingEnd' | 'ended', since?, endedAt? }
+ * { state: 'unknown' | 'live' | 'pendingEnd' | 'ended', since?, endedAt?, espnEventId? }
  *
  * - 'unknown'    : pas encore vu comme live
  * - 'live'       : ESPN a confirmé en cours au moins une fois
@@ -69,17 +69,21 @@ try {
  * - 'ended'      : fin confirmée (espéré réel, pas un faux positif)
  *
  * L'état 'ended' auto-expire après 3h (nettoyé au module load ci-dessus).
+ * espnEventId (state='ended' uniquement) : voir setLiveState — sert à distinguer
+ * un vrai faux-positif (même event ESPN qui reprend) d'une résurrection illégitime
+ * (mauvais matching/event différent), voir useLiveMinute.js.
  */
 export function getLiveState(matchId) {
   try {
     const stored = readState(matchId)
     return {
-      state:   stored.liveState    ?? 'unknown',
-      since:   stored.pendingEndSince ?? null,
-      endedAt: stored.endedAt      ?? null,
+      state:       stored.liveState    ?? 'unknown',
+      since:       stored.pendingEndSince ?? null,
+      endedAt:     stored.endedAt      ?? null,
+      espnEventId: stored.endedEspnEventId ?? null,
     }
   } catch {
-    return { state: 'unknown', since: null, endedAt: null }
+    return { state: 'unknown', since: null, endedAt: null, espnEventId: null }
   }
 }
 
@@ -88,10 +92,15 @@ export function getLiveState(matchId) {
  *
  * @param {string} state - 'live' | 'pendingEnd' | 'ended'
  * @param {object} opts
- *   since    : timestamp de début de pendingEnd (pour state='pendingEnd')
- *   endedAt  : timestamp de fin confirmée (pour state='ended')
+ *   since       : timestamp de début de pendingEnd (pour state='pendingEnd')
+ *   endedAt     : timestamp de fin confirmée (pour state='ended')
+ *   espnEventId : id ESPN de l'event confirmé terminé (pour state='ended') — voir
+ *                 useLiveMinute.js/isFalseEndedReversal, qui compare ce champ au
+ *                 prochain poll pour détecter un faux FT (ESPN a confirmé FINAL
+ *                 2 polls d'affilée par erreur, ex. juste après un but/carton
+ *                 tardif en fin de temps additionnel, avant de reprendre le jeu).
  */
-export function setLiveState(matchId, state, { since, endedAt } = {}) {
+export function setLiveState(matchId, state, { since, endedAt, espnEventId } = {}) {
   if (!matchId) return
   try {
     const stored = readState(matchId)
@@ -105,8 +114,10 @@ export function setLiveState(matchId, state, { since, endedAt } = {}) {
 
     if (state === 'ended') {
       stored.endedAt = endedAt ?? Date.now()
+      if (espnEventId != null) stored.endedEspnEventId = espnEventId
     } else {
       delete stored.endedAt
+      delete stored.endedEspnEventId
     }
 
     localStorage.setItem(key(matchId), JSON.stringify(stored))
@@ -242,18 +253,23 @@ export function clearFtFlags(matchId) {
  *
  * @param {object} opts
  *   preserveEnded : si true et que liveState === 'ended', conserve uniquement
- *                   { liveState, endedAt } — utilisé après la grace period pour
- *                   bloquer toute ré-injection ESPN post-FT sans perdre l'info.
+ *                   { liveState, endedAt, endedEspnEventId } — utilisé après
+ *                   la grace period pour bloquer toute ré-injection ESPN
+ *                   post-FT sans perdre l'info.
  */
 export function clearMatchState(matchId, { preserveEnded = false } = {}) {
   if (preserveEnded) {
     try {
       const stored = readState(matchId)
       if (stored.liveState === 'ended') {
-        // Garder uniquement l'info de fin — efface kickoffAt, pausedAt, espnClock, ft, etc.
+        // Garder l'info de fin — efface kickoffAt, pausedAt, espnClock, ft,
+        // etc. endedEspnEventId conservé : sans lui, isFalseEndedReversal
+        // (useLiveMinute.js) ne pourrait plus détecter un faux FT au-delà de
+        // ce nettoyage à 5min (bien avant REVERSAL_GRACE_MS, 20min).
         localStorage.setItem(key(matchId), JSON.stringify({
-          liveState: 'ended',
-          endedAt:   stored.endedAt ?? Date.now(),
+          liveState:        'ended',
+          endedAt:           stored.endedAt ?? Date.now(),
+          endedEspnEventId:  stored.endedEspnEventId ?? null,
         }))
         return
       }
