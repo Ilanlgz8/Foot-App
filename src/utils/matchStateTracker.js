@@ -155,6 +155,8 @@ export function setKickoffAt(matchId, kickoffAt) {
 
 /**
  * Met à jour les données ESPN en direct (espnClock, espnStatus).
+ * Remet espnMissStreak à 0 (voir recordEspnMiss) : ce poll vient de réussir
+ * pour ce match précis, quel que soit le nombre d'échecs qui précédaient.
  */
 export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
   if (!matchId) return
@@ -162,7 +164,24 @@ export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
   stored.espnClock      = espnClock
   stored.espnStatus     = espnStatus
   stored.espnCapturedAt = Date.now()
+  stored.espnMissStreak = 0
   if (espnPeriod != null) stored.espnPeriod = espnPeriod
+  localStorage.setItem(key(matchId), JSON.stringify(stored))
+}
+
+/**
+ * Incrémente le compteur d'échecs de matching ESPN↔FD.org consécutifs pour ce
+ * match — à appeler uniquement quand un poll GLOBAL a réussi (réponse /api/
+ * fifa-live reçue) mais que CE match précis était absent de cette réponse.
+ * Consommé par calcMinute() (matchUtils.js) pour cesser de faire confiance à
+ * un espnStatus devenu obsolète après plusieurs échecs d'affilée, sans
+ * jamais pénaliser une mise en veille prolongée (aucun poll tenté du tout
+ * dans ce cas, donc cette fonction n'est simplement jamais appelée).
+ */
+export function recordEspnMiss(matchId) {
+  if (!matchId) return
+  const stored = readState(matchId)
+  stored.espnMissStreak = (stored.espnMissStreak ?? 0) + 1
   localStorage.setItem(key(matchId), JSON.stringify(stored))
 }
 

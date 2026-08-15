@@ -22,6 +22,24 @@ const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
 // donc interpoler sans limite évite les minutes gelées après un long arrière-plan iOS.
 
+// ⚠️ AJOUT (constat utilisateur : "la minute ne se recalibre jamais par
+// rapport à ESPN", ex. la reprise de la 2e MT ne repart pas à la 46e) : voir
+// le commentaire détaillé au point d'usage (calcMinute, bloc `if
+// (state.espnStatus)`). Volontairement basé sur un COMPTEUR d'échecs de
+// matching consécutifs (espnMissStreak, incrémenté par useLiveMinute.js
+// uniquement quand le poll global RÉUSSIT mais que CE match précis est
+// absent de la réponse) plutôt que sur l'âge de espnCapturedAt — un simple
+// seuil d'âge casserait le comportement DÉLIBÉRÉ de l'interpolation ci-
+// dessus (STOPPAGE_CAP, voir test dédié) qui doit au contraire continuer à
+// extrapoler sans limite après une longue mise en veille iOS (aucun poll
+// tenté du tout dans ce cas, donc espnMissStreak n'augmente pas) — seul un
+// vrai échec de matching répété, poll après poll, doit faire perdre
+// confiance à ce statut. 5 échecs d'affilée ≈ 100-150s au cycle de poll
+// normal (~20-30s) : assez pour ignorer un simple aléa isolé (ex. collision
+// usedEspnIds ponctuelle, voir api/fifa-live.js), assez court pour ne pas
+// laisser l'affichage dériver longtemps sur un vrai échec persistant.
+const MAX_ESPN_MISS_STREAK = 5
+
 /**
  * Parse un displayClock ESPN en { base, extra }.
  * "42:00"       → { base: 42, extra: 0 }
@@ -274,7 +292,39 @@ export function calcMinute(match) {
 
   // ── ESPN (primaire) ──
   // Poll toutes les 20s + interpolation temps réel → retard résiduel ~2-3s.
-  if (state.espnStatus) {
+  //
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : "la minute affichée ne se recalibre
+  // jamais par rapport à ESPN", ex. la reprise de la 2e MT ne repart pas à la
+  // 46e comme attendu) : state.espnStatus/espnClock restent "sticky" en
+  // localStorage tant qu'un poll ne les réécrit pas (voir setEspnData,
+  // useLiveMinute.js) — mais rien ici ne vérifiait qu'ils étaient toujours
+  // fiables avant de leur faire confiance. Si le matching ESPN↔FD.org échoue
+  // plusieurs polls d'affilée pour CE match précis (event déjà revendiqué par
+  // une autre entrée, sorti temporairement du scoreboard... voir
+  // api/fifa-live.js), setEspnData n'est plus jamais rappelé MAIS
+  // state.espnStatus reste truthy indéfiniment avec l'ancien clock —
+  // interpolateEspnMinute (pas de plafond par design, voir son commentaire,
+  // pour éviter les minutes gelées après une mise en veille) continue alors
+  // d'extrapoler EN AVANT depuis cette ancre figée, pour toujours, sans
+  // jamais se recaler sur la vraie horloge ESPN tant que le matching ne
+  // réussit pas de nouveau — exactement le symptôme décrit, et pas limité à
+  // une page en particulier puisque calcMinute() est la seule et même
+  // fonction utilisée par MatchCard/MatchPoster/LiveMatchPage.
+  //
+  // espnMissStreak (incrémenté par useLiveMinute.js, voir son commentaire)
+  // compte les polls globaux RÉUSSIS où CE match était absent de la réponse —
+  // délibérément PAS un simple âge de espnCapturedAt, qui casserait le
+  // comportement voulu de l'interpolation ci-dessus après une longue mise en
+  // veille (aucun poll tenté du tout dans ce cas, donc le compteur n'augmente
+  // pas). Au-delà de MAX_ESPN_MISS_STREAK échecs consécutifs, on arrête de
+  // faire confiance à ce statut et on retombe sur les heuristiques locales
+  // ci-dessous (pausedAt/half2Start/kickoffAt), ancrées sur de VRAIS
+  // timestamps observés qui avancent de façon autonome et fiable sans
+  // dépendre d'un nouveau poll ESPN. Dès qu'un poll réussit à nouveau pour ce
+  // match, setEspnData remet le compteur à 0 et ce bloc reprend la main
+  // normalement (retour au calcul le plus précis).
+  const espnTrusted = (state.espnMissStreak ?? 0) < MAX_ESPN_MISS_STREAK
+  if (state.espnStatus && espnTrusted) {
     if (state.espnStatus === 'STATUS_HALFTIME') {
       // Deux pauses distinctes partagent ce statut : la vraie mi-temps (45') ET la
       // pause avant/pendant les prolongations (juste après 90+arrêts, et entre les

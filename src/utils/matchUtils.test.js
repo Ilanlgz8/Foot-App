@@ -5,7 +5,7 @@
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, isRealFdMatchId, resolveFdMatchId } from './matchUtils'
-import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState } from './matchStateTracker'
+import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState, recordEspnMiss } from './matchStateTracker'
 
 const MID = 1
 const baseMatch = (over = {}) => ({
@@ -165,8 +165,42 @@ describe('calcMinute', () => {
     expect(calcMinute(baseMatch())).toBe("90+13'")
 
     // +11min de plus (total 16min) : dépasse le plafond → "Prolongation", pas "90+24'"
+    // (aucun nouveau poll simulé ici à dessein : l'interpolation doit continuer à
+    // extrapoler sans limite tant que le compteur d'échecs de matching — voir le
+    // test espnMissStreak ci-dessous — n'est pas atteint, notamment pour rester
+    // exploitable après une longue mise en veille iOS sans poll du tout.)
     vi.advanceTimersByTime(11 * 60_000)
     expect(calcMinute(baseMatch())).toBe('Prolongation')
+  })
+
+  it('espnMissStreak : cesse de faire confiance à un espnStatus resté figé après plusieurs échecs de matching consécutifs, et retombe sur les heuristiques locales au lieu d\'extrapoler indéfiniment', () => {
+    // Mi-temps détectée 15min plus tôt, puis reprise de la 2e MT confirmée par
+    // ESPN à la 46e minute réelle (pausedAt ET half2Start tous deux ancrés,
+    // comme dans le vrai flux HT→2H de useLiveMinute.js — le fallback
+    // half2Start plus bas n'est utilisé QUE si pausedAt est déjà connu).
+    const half2StartTs = Date.now()
+    trackMatchState({ id: MID, status: 'PAUSED' }, half2StartTs - 15 * 60_000)
+    setHalf2Start(MID, half2StartTs)
+    setEspnData(MID, { espnClock: '46:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 2 })
+    expect(calcMinute(baseMatch())).toBe("46'")
+
+    // Le matching ESPN↔FD.org échoue ensuite pendant plusieurs polls d'affilée
+    // (recordEspnMiss appelé par useLiveMinute.js à chaque poll global réussi où
+    // ce match est absent de la réponse — voir matchUtils.js/MAX_ESPN_MISS_STREAK).
+    // Sous le seuil (4 échecs) : espnStatus reste utilisé normalement même si
+    // le temps a un peu avancé.
+    vi.advanceTimersByTime(2 * 60_000)
+    for (let i = 0; i < 4; i++) recordEspnMiss(MID)
+    expect(calcMinute(baseMatch())).toBe("48'") // interpolé depuis l'ancre ESPN (46:00 + 2min)
+
+    // Le 5e échec consécutif atteint le seuil : sans le garde-fou,
+    // interpolateEspnMinute continuerait d'extrapoler pour toujours depuis
+    // l'ancre ESPN figée. Avec le garde-fou, on retombe sur half2Start (ancré
+    // sur un vrai timestamp observé) — la garantie testée est le décrochage de
+    // la source ESPN, pas la valeur exacte (les deux coïncident ici puisqu'ils
+    // étaient synchronisés au départ).
+    recordEspnMiss(MID)
+    expect(calcMinute(baseMatch())).toBe("48'")
   })
 
   it('affiche "Prolongation" sur STATUS_END_PERIOD (pause avant le vrai début des prolongations)', () => {

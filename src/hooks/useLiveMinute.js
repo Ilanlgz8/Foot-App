@@ -25,7 +25,7 @@ import EspnTimerWorker from '../workers/espnTimerWorker.js?worker'
 import {
   getMatchState, trackMatchState, clearMatchState, clearFtFlags,
   setKickoffAt, setHalf2Start,
-  clearAllMatchStates, setEspnData, setEspnWorking,
+  clearAllMatchStates, setEspnData, setEspnWorking, recordEspnMiss,
   getLiveState, setLiveState, markRecentlyFinished,
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
@@ -1024,6 +1024,21 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           markLive(match)
         }
       }
+    }
+
+    // ── Compteur d'échecs de matching consécutifs (voir matchUtils.js/calcMinute,
+    // ESPN_MISS_STREAK/MAX_ESPN_MISS_STREAK — constat utilisateur : "la minute
+    // ne se recalibre jamais par rapport à ESPN") : ce POLL GLOBAL a réussi
+    // (on est dans le bloc try, liveData a bien été parsé), mais un match déjà
+    // suivi en direct peut être absent de CETTE réponse précise (event ESPN
+    // revendiqué par une autre entrée, sorti temporairement du scoreboard...
+    // voir api/fifa-live.js). Sans ce compteur, calcMinute() n'avait aucun
+    // moyen de savoir que espnStatus/espnClock (sticky en localStorage) ne
+    // correspondaient plus à des données rafraîchies. `isTrackedLive(mid)`
+    // exclut les matchs pas encore commencés (normal qu'ils soient absents).
+    for (const match of toTrack) {
+      if (liveData[match.id] !== undefined) continue
+      if (isTrackedLive(match.id)) recordEspnMiss(match.id)
     }
 
     // ── FD.org fallback global : match IN_PLAY selon FD.org mais absent de liveData ──
