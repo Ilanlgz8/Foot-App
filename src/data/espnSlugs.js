@@ -105,9 +105,33 @@ export const EXTRA_NOTIFY_SLUGS = [
 // api/fifa-live.js) — pas besoin de deviner par nom d'équipe comme pour un
 // match football-data.org, donc pas le même risque de régression sur ce
 // matching-là, déjà fragile par ailleurs.
+// ⚠️ BUG CORRIGÉ (15/08, signalement utilisateur : match bloqué sur "Débute"
+// ~20-25min, score qui retombe faussement, minute calculée sur le coup
+// d'envoi PRÉVU plutôt que réel) : cette fonction ne reconnaissait QUE
+// NL/CAN/COPA + coupes nationales + UEL/UECL/USC — PAS les 6 grands
+// championnats club (PL/FL1/PD/BL1/SA/CL), alors qu'EUX AUSSI sont sourcés
+// depuis ESPN avec un id `espn-{code}-{eventId}` DEPUIS le 24/07 (voir
+// useTodayMatches.js/ESPN_SOURCED_COMPS + REAL_COMP_ID, fetchEspnCompMatches
+// dans espnAdapter.js) — l'id ESPN exact est donc déjà connu pour CES matchs
+// aussi, exactement comme pour NL/CAN/COPA, mais la fonction ne le
+// détectait pas : `espnNativeSlug(fdMatch)` (api/fifa-live.js, ligne dédiée
+// au raccourci id-exact) retombait à `null`/`undefined`, forçant TOUS les
+// matchs des 6 plus gros championnats (donc l'immense majorité du trafic
+// live de l'app) sur le fuzzy-match par nom — bien plus lent à se stabiliser
+// et vulnérable aux collisions usedEspnIds entre 2 matchs du même
+// championnat — alors qu'un matching 100% fiable par id était possible
+// depuis le début. Fix : repli sur ESPN_SLUG_BY_COMP_ID (même table que
+// COMP_ESPN dans api/fifa-live.js/useLiveMinute.js) via match.competition.id
+// — déjà le vrai id football-data.org pour ces 6 comps (voir REAL_COMP_ID),
+// jamais null contrairement à NL/CAN/COPA/cups. Sans impact sur les 2 autres
+// appels de cette fonction (`COMP_ESPN[id] ?? espnNativeSlug(...)`) : pour
+// ces 6 comps COMP_ESPN[id] résout déjà en 1er, ce fallback n'est jamais
+// atteint là — seul le 3e appel (raccourci id-exact, jusqu'ici jamais
+// déclenché pour ces 6 comps) change de comportement.
 export function espnNativeSlug(match) {
   if (!String(match?.id ?? '').startsWith('espn-')) return null
   if (match.isCup) return DOMESTIC_CUP_SLUGS[match.competition?.code] ?? null
   const code = match.competition?.code
-  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? null
+  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code]
+    ?? ESPN_SLUG_BY_COMP_ID[match.competition?.id] ?? null
 }
