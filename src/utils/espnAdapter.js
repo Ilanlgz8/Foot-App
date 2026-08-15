@@ -71,8 +71,41 @@ const ESPN_STATUS_MAP = {
   STATUS_CANCELED:    'CANCELLED',
 }
 
-function mapStatus(espnStatusName) {
-  return ESPN_STATUS_MAP[espnStatusName] ?? 'SCHEDULED'
+// ⚠️ BUG CORRIGÉ (15/08, confirmé en DIRECT sur Séville-Rayo, LaLiga : fetch
+// réel du scoreboard ESPN pendant la 2e MT a renvoyé type.name =
+// "STATUS_SECOND_HALF" — PAS le générique "STATUS_IN_PROGRESS" que
+// ESPN_STATUS_MAP ci-dessus attend. Cette variante avait déjà été repérée et
+// corrigée UNE FOIS ce soir, mais uniquement côté api/fifa-live.js
+// (normalizeEspnStatus, suite à un cas identique sur France-Maroc pendant le
+// Mondial) — jamais reportée ici, dans espnAdapter.js, qui alimente
+// match.status pour TOUTES les cards Accueil/Programme/Résultats des 6
+// grands championnats (voir useTodayMatches.js/fetchEspnCompMatches). Sans
+// ce fix, mapStatus('STATUS_SECOND_HALF') ne matchait rien dans la table →
+// retombait sur le défaut 'SCHEDULED' → la card affichait le match comme pas
+// encore commencé, alors qu'il tournait déjà depuis plusieurs dizaines de
+// minutes (signalé par l'utilisateur : match à la 57e minute affiché comme
+// à venir, persistant même après un rechargement complet — donc pas un
+// problème de cache, un vrai statut faux à la source).
+//
+// Corrigé plus largement qu'un simple ajout de "STATUS_SECOND_HALF" à la
+// table : même filet de sécurité générique que normalizeEspnStatus
+// (api/fifa-live.js) via `type.state` ('pre'/'in'/'post', champ fiable côté
+// ESPN quel que soit le libellé exact du statut) — pour ne pas avoir à
+// rejouer cette même chasse si ESPN introduit encore une autre variante
+// (`STATUS_FIRST_HALF` déjà couverte par le même mécanisme, jamais
+// rencontrée en direct mais symétrique et donc probable un jour).
+function normalizeEspnStatus(type) {
+  const name = type?.name
+  if (name && ESPN_STATUS_MAP[name] !== undefined) return name
+  if (name === 'STATUS_FIRST_HALF' || name === 'STATUS_SECOND_HALF') return 'STATUS_IN_PROGRESS'
+  if (type?.completed === true) return 'STATUS_FINAL'
+  if (type?.state === 'in')   return 'STATUS_IN_PROGRESS'
+  if (type?.state === 'post') return 'STATUS_FINAL'
+  return name
+}
+
+function mapStatus(type) {
+  return ESPN_STATUS_MAP[normalizeEspnStatus(type)] ?? 'SCHEDULED'
 }
 
 // event.season.slug → stage FD.org-like (même enum que useWcKnockout.js :
@@ -130,7 +163,7 @@ function normalizeEvent(event, compCode, overrides = {}) {
   const comp = event?.competitions?.[0]
   if (!comp) return null
 
-  const status = mapStatus(comp.status?.type?.name)
+  const status = mapStatus(comp.status?.type)
   const home = comp.competitors?.find(c => c.homeAway === 'home')
   const away = comp.competitors?.find(c => c.homeAway === 'away')
   if (!home || !away) return null
