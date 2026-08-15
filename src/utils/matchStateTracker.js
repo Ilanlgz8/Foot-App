@@ -318,6 +318,19 @@ export function markRecentlyFinished(match) {
         awayTeam:    match.awayTeam,
         competition: match.competition,
         score:       match.score,
+        // ⚠️ AJOUT (constat utilisateur : un match passé par ce pont — voir
+        // Resultat.jsx, "extra" — apparaissait dans SA PROPRE case "15 août"
+        // au lieu de rejoindre "Journée 1", avec un score figé au moment du
+        // pont) : ce snapshot ne portait ni matchday ni stage, alors que
+        // `match` (déjà chargé côté FD.org à ce stade — voir allMatches dans
+        // useLiveMinute.js) les a presque toujours. groupRounds (useMatchs.js)
+        // classe tout objet SANS matchday/stage dans un groupe "par jour" à
+        // part entière — exactement ce qui donnait cette 2e entrée confuse.
+        // Les reporter ici suffit à ce que ce match rejoigne directement la
+        // bonne "Journée X" dès sa création, sans attendre que FD.org
+        // confirme FINISHED.
+        matchday:    match.matchday ?? null,
+        stage:       match.stage ?? null,
       },
       ts: Date.now(),
     }))
