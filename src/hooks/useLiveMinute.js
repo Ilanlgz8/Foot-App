@@ -479,12 +479,42 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 4 : match disparu du scoreboard ESPN depuis > 5min après avoir été vu
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : une card reste bloquée à "90+1'"
+  // pendant 30min+ alors que le match est réellement terminé depuis un
+  // moment) : lastSeenInEspn est une Map EN MÉMOIRE (module-level, PAS
+  // persistée localStorage, voir sa déclaration en tête de fichier) — si
+  // l'app est rechargée/relancée APRÈS qu'un match soit passé en live, ce
+  // match n'a JAMAIS été "vu" pendant CETTE session (lastSeen === undefined
+  // dans cette nouvelle Map vide), donc `if (!lastSeen) continue` le
+  // sautait indéfiniment, quel que soit le temps réel écoulé — ce garde-fou
+  // ne pouvait ALORS JAMAIS se déclencher pour lui, peu importe combien de
+  // temps passait. Cas concret qui a révélé le bug : une entrée liveTracker
+  // "orpheline" (2 ids différents pour le même vrai match, voir le fix
+  // isEspnWorking plus tôt cette session) qui perd systématiquement le
+  // matching ESPN à chaque poll (l'autre id — le bon — gagne le verrou
+  // usedEspnIds côté serveur, voir api/fifa-live.js) ne reçoit plus que du
+  // fromCache=true (jamais lastSeenInEspn mis à jour, voir le `if
+  // (!fromCache) lastSeenInEspn[mid] = now` plus haut dans ce fichier) — et
+  // CAS 1 continue quand même d'appeler markLive() sur cette donnée périmée,
+  // rafraîchissant sans fin son TTL liveTracker : ce match ne pouvait ni se
+  // faire rattraper par ce garde-fou (jamais "vu" dans cette Map, donc
+  // sauté), ni expirer naturellement (TTL sans cesse renouvelé) → bloqué
+  // pour de bon, potentiellement indéfiniment.
+  // Fix : à la 1ère rencontre d'un match jamais vu cette session, on
+  // initialise lastSeenInEspn à maintenant plutôt que de sauter
+  // indéfiniment — le compte à rebours de 5min démarre dès cet instant au
+  // lieu de ne jamais démarrer. Sans risque pour un match VRAIMENT en cours
+  // qui matche normalement : un poll frais (fromCache=false, quelques
+  // secondes à quelques dizaines de secondes plus tard vu les TTL serveur)
+  // remet lastSeenInEspn à jour bien avant les 5min, et ageMin >= 90 reste
+  // exigé en plus — aucun risque de forcer un FT sur un match qui vient de
+  // débuter.
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
     if (pendingFt[mid]) continue
+    if (!lastSeenInEspn[mid]) lastSeenInEspn[mid] = now
     const lastSeen = lastSeenInEspn[mid]
-    if (!lastSeen) continue
     if (now - lastSeen < 5 * 60_000) continue
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
     if (ageMin < 90) continue
