@@ -774,7 +774,36 @@ export default async function handler(req, res) {
         })
       }
 
-      if (!found) continue
+      // ⚠️ AJOUT diagnostic (signalement utilisateur : match resté bloqué sur
+      // "Débute" ~20min après le vrai coup d'envoi, buts/score très en retard
+      // — même famille de symptôme que le fix ±10min juste au-dessus, mais
+      // visiblement pas toujours suffisant). Aucune certitude sur la cause
+      // exacte sans logs réels (pas d'accès Vercel/production depuis cet
+      // environnement) — ce log capture les faits utiles la PROCHAINE fois
+      // que ça se reproduit (candidats disponibles pour ce slug, déjà pris
+      // par un autre match ou vraiment absents du scoreboard ESPN) au lieu
+      // de deviner. Uniquement pour un match déjà censé être en cours
+      // (>=0min après utcDate) : avant le coup d'envoi, ne pas trouver
+      // l'event est normal, pas la peine de logguer. Lecture seule, aucun
+      // changement de comportement.
+      if (!found) {
+        const minsSinceKO = Math.round((Date.now() - new Date(fdMatch.utcDate).getTime()) / 60_000)
+        if (minsSinceKO >= 0) {
+          const slugEvents = espnEvents.filter(({ slug: s }) => s === slug)
+          const claimedByOther = slugEvents.filter(({ evt }) => usedEspnIds.has(evt.id))
+          console.log(
+            `[fifa-live] NON MATCHÉ: fdId=${fdMatch.id} "${fdHome}" - "${fdAway}" slug=${slug} ` +
+            `minsSinceKO=${minsSinceKO} eventsSlug=${slugEvents.length} déjàPris=${claimedByOther.length} ` +
+            `candidats=${JSON.stringify(slugEvents.map(({ evt }) => {
+              const c = evt.competitions?.[0]
+              const h = c?.competitors?.find(x => x.homeAway === 'home')?.team
+              const a = c?.competitors?.find(x => x.homeAway === 'away')?.team
+              return `${h?.displayName ?? h?.name}-${a?.displayName ?? a?.name}(id=${evt.id},pris=${usedEspnIds.has(evt.id)})`
+            }))}`
+          )
+        }
+        continue
+      }
     }
 
     usedEspnIds.add(found.evt.id)

@@ -9,9 +9,11 @@
 //   • Scorer preservation + stats summary côté serveur (cache 30s, séparé —
 //     voir SUMMARY_TTL dans api/fifa-live.js : les stats live comme la
 //     possession sont donc un peu moins fraîches que le score lui-même)
-//   • Poll toutes les 5s dès qu'un match approche ou est en cours (Web
+//   • Poll toutes les 30s dès qu'un match approche ou est en cours (Web
 //     Worker dédié, non throttlé même en arrière-plan — voir espnTimerWorker.js
-//     et le hook plus bas ; ⚠️ commentaire corrigé, ce n'était plus 15s)
+//     et le hook plus bas ; ⚠️ commentaire corrigé — ce n'était déjà plus 15s,
+//     puis re-corrigé : c'est bien 30s depuis le fix Fluid Active CPU, pas 5s
+//     comme l'ancien commentaire le disait encore par erreur)
 //
 // ── FALLBACK : api-football.com (/apifootball?live=all) ──
 //   • Poll toutes les 60s, UNIQUEMENT dans les 4 fenêtres critiques
