@@ -547,17 +547,29 @@ export default function LiveMatchPage() {
           >
             {activeTab === 'stats' && (
               <>
-                {/* "Stats saison" retirée d'ici (retour utilisateur : remonter
-                    les côtes en direct, pas de sous-onglets à scroller avant
-                    de les voir) — déplacée en bas de l'onglet Classement,
-                    voir plus bas. Plus de sous-onglets du tout tant qu'il n'y
-                    a pas d'Historique disponible : un seul choix ("Stats
-                    live") n'a pas besoin d'un sélecteur. */}
-                {showH2HTab && (
-                  <StatsSubTabs view={statsView} onChange={setStatsView} showSaison={false} showHistorique />
-                )}
+                {/* Stats saison ramenée ici en sous-onglet (retour utilisateur,
+                    12/08) — aux côtés de Stats live et Historique, comme sur
+                    MatchPage.jsx (voir StatsSubTabs). Affichée dès qu'il y a
+                    au moins un 2e sous-onglet à proposer (Historique dispo),
+                    sinon "Stats live" reste seule sans sélecteur inutile. */}
+                <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
                 {statsView === 'historique' ? (
                   <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                ) : statsView === 'saison' ? (
+                  // ⚠️ isLastSeason (27/07, demande explicite utilisateur :
+                  // "pas la peine de recuperer la forme recente et stat saison
+                  // des dernieres saison... juste h2h") : compMatches vient
+                  // alors du repli "saison précédente" de useTeamForm — ni
+                  // stats ni forme d'une saison déjà terminée ne sont
+                  // affichées tant que la nouvelle saison n'a pas commencé
+                  // (voir useTeamForm.js, redevient false automatiquement dès
+                  // les premiers vrais matchs). `|| compMatches.length === 0`
+                  // (30/07, même garde-fou que MatchPage.jsx) : évite un bloc
+                  // vide sans message si compMatches est vide pour une autre
+                  // raison (ex. équipe promue, tout début de saison).
+                  (isLastSeason || compMatches.length === 0)
+                    ? <p className="pm__noData">Disponibles dès le début de la saison</p>
+                    : <SeasonStatsTab match={match} compMatches={compMatches} />
                 ) : (
                   <LiveStatsTab
                     match={match}
@@ -572,33 +584,7 @@ export default function LiveMatchPage() {
               </>
             )}
             {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} scorers={espn?.scorers ?? []} />}
-            {activeTab === 'classement' && (
-              <>
-                <ClassementTab match={match} compId={compId} />
-                {/* Stats saison déplacée ici depuis l'onglet Statistiques
-                    (retour utilisateur) — regroupée avec le classement plutôt
-                    que perdue, mais sort du chemin direct vers les côtes en
-                    direct/stats live. */}
-                <h3 className="pm__sectionTitle" style={{ marginTop: '1.5rem' }}>Stats saison</h3>
-                {/* ⚠️ AJOUT isLastSeason (27/07, demande explicite utilisateur :
-                    "pas la peine de recuperer la forme recente et stat saison
-                    des dernieres saison... juste h2h") : compMatches vient alors
-                    du repli "saison précédente" de useTeamForm — ni stats ni
-                    forme d'une saison déjà terminée ne sont affichées ici tant
-                    que la nouvelle saison n'a pas commencé (voir useTeamForm.js,
-                    redevient false automatiquement dès les premiers vrais
-                    matchs). L'Historique (onglet Statistiques, inchangé) reste
-                    disponible dans tous les cas. */}
-                {/* ⚠️ AJOUT `|| compMatches.length === 0` (30/07, même garde-fou
-                    que MatchPage.jsx) : évite un bloc vide sans message si
-                    compMatches est vide pour une autre raison qu'isLastSeason
-                    (ex. équipe promue, tout début de saison). */}
-                {(isLastSeason || compMatches.length === 0)
-                  ? <p className="pm__noData">Disponibles dès le début de la saison</p>
-                  : <SeasonStatsTab match={match} compMatches={compMatches} />
-                }
-              </>
-            )}
+            {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>
       </div>
