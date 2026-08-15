@@ -2265,37 +2265,14 @@
   white-space: nowrap;
 }
 
-/* Pronostic — pilules cotes bookmaker (même design que MatchPoster) */
-.accueil__mdjPronoRow {
-  display: flex;
-  gap: 0.5rem;
+/* Pronostic — pilules cotes bookmaker : réutilise directement .poster__prono-*
+   (voir plus haut dans ce fichier) au lieu d'une copie CSS dédupliquée, pour
+   un design garanti identique à celui des cards des autres matchs (retour
+   utilisateur explicite). Seul ajustement propre au hero : l'espacement
+   au-dessus de la rangée, scopé à .accueil__mdj pour ne pas affecter
+   MatchPoster. */
+.accueil__mdj .poster__prono-row {
   margin-top: 1.1rem;
-}
-.accueil__mdjPronoPill {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-  padding: 0.45rem 0.7rem;
-  background: rgba(var(--white-rgb),0.9);
-  border: 1.5px solid transparent;
-  border-radius: 0.6rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.accueil__mdjPronoPillLabel {
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  color: #1a1a1a;
-  text-transform: uppercase;
-}
-.accueil__mdjPronoPillVal {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: #0a0a0a;
-  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {

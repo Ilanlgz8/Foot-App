@@ -218,20 +218,24 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         </div>
       </div>
 
-      {/* Pronostic — pilules "côtes bookmaker", même design que MatchPoster/
-          LiveProno : liseré + glow bordeaux réservés à la pilule favorite. */}
-      <div className="accueil__mdjPronoRow">
-        <div className="accueil__mdjPronoPill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
-          <span className="accueil__mdjPronoPillLabel">{homeCode}</span>
-          <span className="accueil__mdjPronoPillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
+      {/* Pronostic — pilules "côtes bookmaker" : classes .poster__prono-*
+          RÉUTILISÉES telles quelles (pas de copie CSS parallèle) pour un
+          design garanti identique à celui des autres cards de l'Accueil
+          (MatchPoster.jsx, retour utilisateur explicite : "même design
+          exactement que sur les cards des autres matchs"). Liseré + glow
+          bordeaux réservés à la pilule favorite. */}
+      <div className="poster__prono-row">
+        <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
+          <span className="poster__prono-pillLabel">{homeCode}</span>
+          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
         </div>
-        <div className="accueil__mdjPronoPill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
-          <span className="accueil__mdjPronoPillLabel">Nul</span>
-          <span className="accueil__mdjPronoPillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
+        <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
+          <span className="poster__prono-pillLabel">Nul</span>
+          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
         </div>
-        <div className="accueil__mdjPronoPill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
-          <span className="accueil__mdjPronoPillLabel">{awayCode}</span>
-          <span className="accueil__mdjPronoPillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
+        <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
+          <span className="poster__prono-pillLabel">{awayCode}</span>
+          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
         </div>
       </div>
     </button>
