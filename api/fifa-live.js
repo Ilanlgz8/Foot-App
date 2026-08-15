@@ -705,16 +705,33 @@ export default async function handler(req, res) {
 
     let found
 
+    // ⚠️ BUG CORRIGÉ (15/08, signalement utilisateur : "j'ai même plus de
+    // match en live" — régression apparue juste après l'ajout du raccourci
+    // id-exact ci-dessous pour les 6 grands championnats club) : ce
+    // raccourci (fiable à 100% normalement — l'event ESPN exact est déjà
+    // connu, embarqué dans fdMatch.id) faisait `continue` IMMÉDIATEMENT s'il
+    // échouait, SANS repli sur le fuzzy-match par nom plus bas — pire qu'AVANT
+    // l'ajout du raccourci, où ces mêmes matchs (avant le fix espnNativeSlug
+    // du même soir) passaient déjà par le fuzzy-match et ses 3 filets de
+    // sécurité. Un seul cas suffit à le faire échouer (l'event est déjà
+    // marqué usedEspnIds par une AUTRE entrée qui le revendique en premier —
+    // ex: une entrée liveTracker orpheline en doublon, laissée par un ancien
+    // bug déjà corrigé ce soir — voir isEspnWorking) : le match disparaissait
+    // alors ENTIÈREMENT du suivi live, plutôt que de simplement rater le
+    // raccourci rapide. Le raccourci id-exact reste tenté EN PREMIER (le cas
+    // normal, sans collision, reste aussi rapide/fiable qu'avant) — mais s'il
+    // échoue, on retombe maintenant sur EXACTEMENT le même fuzzy-match que
+    // pour un match football-data.org classique, au lieu d'abandonner.
     if (nativeSlug) {
       const nativeEventId = String(fdMatch.id).split('-').pop()
       found = espnEvents.find(({ slug: s, evt }) =>
         s === nativeSlug && String(evt.id) === nativeEventId && !usedEspnIds.has(evt.id))
-      if (!found) continue
-    } else {
-      const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
-      const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
-      if (!fdHome || !fdAway) continue
+    }
 
+    const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
+    const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
+
+    if (!found && fdHome && fdAway) {
       // ── Raccourci : ré-utiliser l'ID ESPN déjà résolu lors d'un poll précédent ──
       // Root cause d'une bonne partie des bugs "intermittents" déjà corrigés cette
       // session (matchs simultanés, noms légèrement différents...) : le fuzzy-match
@@ -773,37 +790,37 @@ export default async function handler(req, res) {
           return Math.abs(evtKickoff - fdKickoff) <= 10 * 60_000
         })
       }
+    }
 
-      // ⚠️ AJOUT diagnostic (signalement utilisateur : match resté bloqué sur
-      // "Débute" ~20min après le vrai coup d'envoi, buts/score très en retard
-      // — même famille de symptôme que le fix ±10min juste au-dessus, mais
-      // visiblement pas toujours suffisant). Aucune certitude sur la cause
-      // exacte sans logs réels (pas d'accès Vercel/production depuis cet
-      // environnement) — ce log capture les faits utiles la PROCHAINE fois
-      // que ça se reproduit (candidats disponibles pour ce slug, déjà pris
-      // par un autre match ou vraiment absents du scoreboard ESPN) au lieu
-      // de deviner. Uniquement pour un match déjà censé être en cours
-      // (>=0min après utcDate) : avant le coup d'envoi, ne pas trouver
-      // l'event est normal, pas la peine de logguer. Lecture seule, aucun
-      // changement de comportement.
-      if (!found) {
-        const minsSinceKO = Math.round((Date.now() - new Date(fdMatch.utcDate).getTime()) / 60_000)
-        if (minsSinceKO >= 0) {
-          const slugEvents = espnEvents.filter(({ slug: s }) => s === slug)
-          const claimedByOther = slugEvents.filter(({ evt }) => usedEspnIds.has(evt.id))
-          console.log(
-            `[fifa-live] NON MATCHÉ: fdId=${fdMatch.id} "${fdHome}" - "${fdAway}" slug=${slug} ` +
-            `minsSinceKO=${minsSinceKO} eventsSlug=${slugEvents.length} déjàPris=${claimedByOther.length} ` +
-            `candidats=${JSON.stringify(slugEvents.map(({ evt }) => {
-              const c = evt.competitions?.[0]
-              const h = c?.competitors?.find(x => x.homeAway === 'home')?.team
-              const a = c?.competitors?.find(x => x.homeAway === 'away')?.team
-              return `${h?.displayName ?? h?.name}-${a?.displayName ?? a?.name}(id=${evt.id},pris=${usedEspnIds.has(evt.id)})`
-            }))}`
-          )
-        }
-        continue
+    // ⚠️ AJOUT diagnostic (signalement utilisateur : match resté bloqué sur
+    // "Débute" ~20min après le vrai coup d'envoi, buts/score très en retard
+    // — même famille de symptôme que le fix ±10min juste au-dessus, mais
+    // visiblement pas toujours suffisant). Aucune certitude sur la cause
+    // exacte sans logs réels (pas d'accès Vercel/production depuis cet
+    // environnement) — ce log capture les faits utiles la PROCHAINE fois
+    // que ça se reproduit (candidats disponibles pour ce slug, déjà pris
+    // par un autre match ou vraiment absents du scoreboard ESPN) au lieu
+    // de deviner. Uniquement pour un match déjà censé être en cours
+    // (>=0min après utcDate) : avant le coup d'envoi, ne pas trouver
+    // l'event est normal, pas la peine de logguer. Lecture seule, aucun
+    // changement de comportement.
+    if (!found) {
+      const minsSinceKO = Math.round((Date.now() - new Date(fdMatch.utcDate).getTime()) / 60_000)
+      if (minsSinceKO >= 0) {
+        const slugEvents = espnEvents.filter(({ slug: s }) => s === slug)
+        const claimedByOther = slugEvents.filter(({ evt }) => usedEspnIds.has(evt.id))
+        console.log(
+          `[fifa-live] NON MATCHÉ: fdId=${fdMatch.id} "${fdHome}" - "${fdAway}" slug=${slug} ` +
+          `minsSinceKO=${minsSinceKO} eventsSlug=${slugEvents.length} déjàPris=${claimedByOther.length} ` +
+          `candidats=${JSON.stringify(slugEvents.map(({ evt }) => {
+            const c = evt.competitions?.[0]
+            const h = c?.competitors?.find(x => x.homeAway === 'home')?.team
+            const a = c?.competitors?.find(x => x.homeAway === 'away')?.team
+            return `${h?.displayName ?? h?.name}-${a?.displayName ?? a?.name}(id=${evt.id},pris=${usedEspnIds.has(evt.id)})`
+          }))}`
+        )
       }
+      continue
     }
 
     usedEspnIds.add(found.evt.id)
