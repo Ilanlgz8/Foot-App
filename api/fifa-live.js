@@ -897,11 +897,30 @@ export default async function handler(req, res) {
     //    précédente STOCKÉE, c'est un but confirmé annulé — mémorisé en
     //    PERMANENCE (compteur qui ne fait qu'augmenter, jamais réinitialisé,
     //    même si un nouveau but fait remonter bestScorers ensuite).
-    // 2. Migration : la 1ère fois que ce match est recalculé avec cette
-    //    version (homeCancelledGoals absent de prevData), un écart déjà
-    //    existant entre le numérique et bestScorers est traité comme
-    //    confirmé immédiatement — corrige un match déjà bloqué dès la
-    //    prochaine passe, sans attendre une nouvelle transition.
+    // 2. ⚠️ RETIRÉ le 15/08 (bug confirmé, signalement utilisateur : score
+    //    correct 0-1 affiché brièvement puis retombe à 0-0 quelques secondes
+    //    après, sur un match dont le matching ESPN venait tout juste de
+    //    réussir après être resté bloqué sur "Débute" un moment) : cette
+    //    "migration" comparait le numérique ESPN à bestScorers dès la TOUTE
+    //    1ère passe réussie pour un match (prevData totalement absent) et
+    //    traitait tout écart comme un but "déjà annulé avant même le début
+    //    du suivi" — pensée à l'origine pour un cas de migration ponctuel
+    //    (le jour du déploiement de ce mécanisme). Mais un match dont le
+    //    matching ESPN réussit SEULEMENT après un but déjà marqué (ex :
+    //    matching resté en échec un moment, but marqué entre-temps) vit
+    //    EXACTEMENT le même scénario à sa 1ère passe : numérique déjà à 1,
+    //    mais le tableau détaillé des buteurs (details[]) pas encore
+    //    synchro sur CETTE réponse ESPN précise → 0 but détecté côté
+    //    bestScorers → l'ancien code déduisait "1 but déjà annulé" à tort,
+    //    et ce compteur ne se réinitialisant JAMAIS, le score restait
+    //    bloqué 1 point en dessous de la réalité en permanence, même une
+    //    fois le buteur détecté au poll suivant. Sans ce terme, une 1ère
+    //    passe ne peut plus jamais générer de fausse annulation : le score
+    //    utilise directement le plancher `Math.max(numérique, buteurs)`
+    //    plus bas, correct dès l'affichage. La détection d'annulation VAR
+    //    réelle (baisse confirmée du nombre de buteurs ENTRE deux passes,
+    //    terme resté ci-dessous) n'est pas affectée, seul ce cas de
+    //    "migration" ponctuel — obsolète depuis longtemps — est retiré.
     const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
     const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
     const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
@@ -913,18 +932,8 @@ export default async function handler(req, res) {
 
     const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
     const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
-    const homeIsFirstPass = prevData?.homeCancelledGoals === undefined
-    const awayIsFirstPass = prevData?.awayCancelledGoals === undefined
-    const homeNewlyCancelled = Math.max(
-      prevHomeScorersLen - homeGoalsFromScorers,
-      homeIsFirstPass ? homeNumeric - homeGoalsFromScorers : 0,
-      0
-    )
-    const awayNewlyCancelled = Math.max(
-      prevAwayScorersLen - awayGoalsFromScorers,
-      awayIsFirstPass ? awayNumeric - awayGoalsFromScorers : 0,
-      0
-    )
+    const homeNewlyCancelled = Math.max(prevHomeScorersLen - homeGoalsFromScorers, 0)
+    const awayNewlyCancelled = Math.max(prevAwayScorersLen - awayGoalsFromScorers, 0)
     const homeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + homeNewlyCancelled
     const awayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + awayNewlyCancelled
 
@@ -946,7 +955,7 @@ export default async function handler(req, res) {
     if (homeCancelledGoals > 0 || awayCancelledGoals > 0 || homeNewlyCancelled > 0 || awayNewlyCancelled > 0) {
       console.log(`[VAR-DEBUG] ${fdMatch.id} ${fdMatch.homeTeam?.name ?? homeC?.team?.name}-${fdMatch.awayTeam?.name ?? awayC?.team?.name} ` +
         `rawHome=${rawHome} homeNumeric=${homeNumeric} prevScorersLen=${prevHomeScorersLen} bestScorersHome=${homeGoalsFromScorers} ` +
-        `homeIsFirstPass=${homeIsFirstPass} homeNewlyCancelled=${homeNewlyCancelled} homeCancelledGoals=${homeCancelledGoals} finalHome=${home}`)
+        `homeNewlyCancelled=${homeNewlyCancelled} homeCancelledGoals=${homeCancelledGoals} finalHome=${home}`)
     }
 
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
@@ -1088,18 +1097,11 @@ export default async function handler(req, res) {
     const fbAwayNumeric = rawFbAway
     const prevFbHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
     const prevFbAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
-    const fbHomeIsFirstPass = prevData?.homeCancelledGoals === undefined
-    const fbAwayIsFirstPass = prevData?.awayCancelledGoals === undefined
-    const fbHomeNewlyCancelled = Math.max(
-      prevFbHomeScorersLen - fbHomeGoals,
-      fbHomeIsFirstPass ? fbHomeNumeric - fbHomeGoals : 0,
-      0
-    )
-    const fbAwayNewlyCancelled = Math.max(
-      prevFbAwayScorersLen - fbAwayGoals,
-      fbAwayIsFirstPass ? fbAwayNumeric - fbAwayGoals : 0,
-      0
-    )
+    // ⚠️ Même retrait que dans la branche principale (voir son commentaire
+    // détaillé) : le terme "1ère passe" faisait exactement le même faux
+    // positif ici (repli FIFA, matchs WC quand ESPN n'a pas matché).
+    const fbHomeNewlyCancelled = Math.max(prevFbHomeScorersLen - fbHomeGoals, 0)
+    const fbAwayNewlyCancelled = Math.max(prevFbAwayScorersLen - fbAwayGoals, 0)
     const fbHomeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + fbHomeNewlyCancelled
     const fbAwayCancelledGoals = (prevData?.awayCancelledGoals ?? 0) + fbAwayNewlyCancelled
     const fbHome = Math.max(fbHomeNumeric - fbHomeCancelledGoals, fbHomeGoals)
