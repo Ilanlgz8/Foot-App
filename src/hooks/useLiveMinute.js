@@ -714,6 +714,27 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           espnEventId:  data.espnEventId,
           espnSlug:     data.espnSlug,
         }
+
+        // ⚠️ AJOUT (demande utilisateur : "faire un système quand y'a un but,
+        // à chaque but mettre à jour le classement") : useStandings.js a son
+        // propre staleTime (voir son fichier) qui ne se rafraîchit pas tout
+        // seul juste parce qu'un but vient d'être marqué dans un match en
+        // cours — un utilisateur resté sur l'onglet Classement pendant un
+        // match ne voyait le tableau bouger qu'au prochain cycle normal du
+        // hook, pas au moment du but. On invalide dès qu'un but (ou une
+        // annulation VAR) est détecté ici — même mécanisme déjà en place
+        // pour la fin de match (voir confirmFt plus haut dans ce fichier),
+        // juste déclenché plus tôt, à chaque changement de score plutôt
+        // qu'au FT uniquement. `prevCache` non-null exigé : sur le tout
+        // 1er poll d'un match (pas de valeur précédente en mémoire), ce
+        // n'est pas un but, juste l'arrivée du score initial — pas la peine
+        // d'invalider pour ça. Sans coût réel si personne ne regarde
+        // Classement à cet instant (React Query ne refetch que les requêtes
+        // ACTIVES, voir le même raisonnement dans confirmFt).
+        if (prevCache && (prevCache.home !== home || prevCache.away !== away)) {
+          const code = match.competition?.code
+          if (code) queryClient.invalidateQueries({ queryKey: ['standings', code] })
+        }
       }
 
       // ── KO détecté (1ère MT, kickoffAt pas encore connu) ──
