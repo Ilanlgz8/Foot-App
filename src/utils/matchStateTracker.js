@@ -3,7 +3,26 @@
 // et suivre la machine d'états live (unknown → live → pendingEnd → ended).
 
 // ─── Santé ESPN ───────────────────────────────────────────────────────────────
-let _espnWorking = false
+// ⚠️ BUG CORRIGÉ (12/08, constat utilisateur : le même match live affiché en
+// double sur Accueil/Live, avec deux minutes/statuts différents — capture à
+// l'appui, reprise LaLiga) : ce flag démarrait à `false` par défaut à chaque
+// chargement du module, jusqu'au tout premier sondage ESPN RÉUSSI
+// (setEspnWorking(true), voir useLiveMinute.js) — un aller-retour réseau, pas
+// instantané. useLiveMatches.js (repli FD.org) se déclenche lui immédiatement
+// au montage, sans attendre ce 1er sondage : s'il s'exécute avant, il lit
+// encore `false`, croit ESPN en panne à tort, et interroge football-data.org
+// — qui renvoie ses PROPRES id de match, incompatibles avec les id ESPN déjà
+// utilisés partout ailleurs pour les 6 grands championnats (voir
+// ESPN_SOURCED_COMPS). Résultat : markLive() crée une 2e entrée pour le MÊME
+// match réel, sous un id différent, jamais reconnue comme doublon (voir
+// LiveProvider.jsx, dédup par `.id` uniquement) — invisible tant qu'aucun
+// match n'était réellement en direct (semaines creuses), redevenu visible
+// dès la reprise des championnats. Défaut passé à `true` (on suppose ESPN
+// opérationnel tant que rien ne prouve le contraire, cohérent avec la vraie
+// détection de panne ci-dessous — 3 échecs consécutifs RÉELS, inchangée) —
+// un seul point de consommation de ce flag dans toute l'app (useLiveMatches.js),
+// vérifié.
+let _espnWorking = true
 export const setEspnWorking = (v) => { _espnWorking = v }
 export const isEspnWorking  = ()  => _espnWorking
 // ─────────────────────────────────────────────────────────────────────────────
