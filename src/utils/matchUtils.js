@@ -382,6 +382,36 @@ export function calcMinute(match) {
       state.espnStatus === 'STATUS_EXTRA_TIME'  ||
       state.espnStatus === 'STATUS_OVERTIME'
     ) {
+      // ⚠️ REDESIGN (demande utilisateur, 15/08 : "pourquoi on redemande pas
+      // à ESPN la minute en continu — au pire, dès qu'ESPN donne le go [KO,
+      // reprise 2e MT], on chronomètre nous-même ensuite, minute par minute,
+      // sans re-demander à ESPN entre-temps") : plus simple ET plus robuste
+      // que suivre en continu l'horloge ESPN via interpolateEspnMinute plus
+      // bas, qui a besoin d'un poll frais pour rester exacte (espnMissStreak
+      // ci-dessus n'est qu'un filet de sécurité contre la dérive, pas la
+      // vraie source de vérité). Pour le temps réglementaire (period 1/2),
+      // kickoffAt/half2Start sont déjà des ancres réelles précises — calculées
+      // depuis le clock ESPN AU MOMENT EXACT de la détection (voir "KO
+      // détecté"/"2H détecté", useLiveMinute.js) — chronométrer nous-même
+      // dessus ensuite (même formule que le repli plus bas, "1ère MT via
+      // kickoffAt"/"MI-TEMPS & 2ème MT") ne dépend plus JAMAIS d'un nouveau
+      // poll pour rester exact. ESPN garde son vrai rôle : confirmer les
+      // TRANSITIONS d'état (KO/MT/reprise/fin), pas fournir la minute qui
+      // défile seconde par seconde. Prolongations (period 3/4, sans ancre
+      // dédiée) et bootstrap (anchor pas encore posé sur CE poll précis)
+      // continuent de suivre l'horloge ESPN ci-dessous, seul cas où c'est
+      // encore vraiment nécessaire.
+      if ((state.espnPeriod ?? 1) === 1 && state.kickoffAt) {
+        const min1 = Math.floor((now - state.kickoffAt) / 60_000)
+        if (min1 <= 45) return `${Math.max(1, min1)}'`
+        return `45+${min1 - 45}'`
+      }
+      if (state.espnPeriod === 2 && state.half2Start) {
+        const min2 = Math.floor((now - state.half2Start) / 60_000) + 1
+        if (min2 <= 45) return `${45 + min2}'`
+        return `90+${min2 - 45}'`
+      }
+
       // Le clock ESPN continue naturellement de compter en prolongations
       // (91'…105', pause, 106'…120', +arrêts éventuels) : même logique
       // d'interpolation que le temps réglementaire, pas de calcul spécial requis.

@@ -141,10 +141,32 @@ describe('calcMinute', () => {
     expect(calcMinute(match)).toBe('Débute')
   })
 
-  it('interpole la minute en temps réglementaire depuis le dernier poll ESPN', () => {
+  it('interpole la minute en temps réglementaire depuis le dernier poll ESPN (bootstrap, half2Start pas encore ancré)', () => {
     setEspnData(MID, { espnClock: '42:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 2 })
     vi.advanceTimersByTime(90_000) // +1min30 depuis le poll
     expect(calcMinute(baseMatch())).toBe('43\'')
+  })
+
+  it('1ère MT : chronomètre depuis kickoffAt (ancre réelle), pas depuis le clock ESPN — reste juste même si espnClock/espnCapturedAt sont périmés', () => {
+    // kickoffAt ancré à la vraie 3e minute (comme le fait "KO détecté", useLiveMinute.js).
+    setKickoffAt(MID, Date.now() - 3 * 60_000)
+    // espnClock volontairement FAUX/PÉRIMÉ (ex. un vieux poll jamais rafraîchi) : si le
+    // calcul dépendait encore de l'interpolation ESPN, on obtiendrait un résultat basé
+    // sur "10:00", pas sur kickoffAt. La garantie testée est que ça n'arrive plus.
+    setEspnData(MID, { espnClock: '10:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 1 })
+    vi.advanceTimersByTime(10 * 60_000) // +10min réelles sans nouveau poll
+    expect(calcMinute(baseMatch())).toBe("13'") // 3 + 10, depuis kickoffAt — pas depuis "10:00"+10min
+  })
+
+  it('2e MT : chronomètre depuis half2Start (ancre réelle), pas depuis le clock ESPN — reprend bien à la 46e', () => {
+    setHalf2Start(MID, Date.now()) // reprise de la 2e MT confirmée à l'instant T
+    setEspnData(MID, { espnClock: '46:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 2 })
+    expect(calcMinute(baseMatch())).toBe("46'")
+
+    // +20min réelles SANS aucun nouveau poll (espnClock reste figé sur "46:00") : le
+    // chronométrage local doit quand même avancer normalement, minute par minute.
+    vi.advanceTimersByTime(20 * 60_000)
+    expect(calcMinute(baseMatch())).toBe("66'")
   })
 
   it('affiche "MT" à la mi-temps réglementaire', () => {
