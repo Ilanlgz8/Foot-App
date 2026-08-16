@@ -71,7 +71,7 @@ async function fetchFinishedSeasonMatches(selectedComp, seasonParam) {
 // lieu d'apparaître. outcomeForTeam() (matchUtils.js) résout ça en
 // préférant score.winner (champ catégorique, disponible plus tôt) et ne
 // retombe sur le score numérique qu'en dernier recours.
-function buildFormMap(matches) {
+export function buildFormMap(matches) {
   const formMap = {}
   matches.forEach(match => {
     const homeId = match.homeTeam.id
@@ -413,32 +413,52 @@ export function useTeamFormMulti(compCodes) {
   })
 
   // ⚠️ AJOUT (constat utilisateur : Deportivo — 0 match joué cette saison —
-  // affichait un losange vert de victoire sur sa card de match Accueil) :
-  // les compétitions ESPN-only (NL/CAN/COPA/UEL/UECL, voir
-  // ESPN_SOURCED_FORM_COMPS plus haut) ont un formMap keyé par des ids
-  // ESPN — un espace DIFFÉRENT des ids FD.org utilisés par les
-  // championnats club. Object.assign fusionnait auparavant TOUTES les
-  // compétitions affichées le même jour sur l'Accueil dans un SEUL objet
-  // plat, sans distinction d'origine — si une compétition ESPN-only avait
-  // AUSSI un match ce jour-là (fréquent en août : qualifications Ligue
-  // Europa/Conférence), un id ESPN qui coïncide par hasard avec l'id FD.org
-  // d'un club totalement différent pouvait écraser silencieusement sa
-  // vraie entrée (ou en créer une fausse pour un club qui n'a encore rien
-  // joué). Fusion en 2 passes : compétitions FD.org (ids fiables) EN
-  // PREMIER, les compétitions ESPN-only ne remplissent ensuite QUE les
-  // clés encore vides — ne peuvent plus jamais écraser une vraie entrée
-  // FD.org. Comportement strictement inchangé quand aucune compétition
-  // ESPN-only n'est affichée le même jour (cas normal, la grande majorité
-  // du temps).
+  // affichait un losange vert de victoire sur sa card de match Accueil,
+  // contre Elche, un match 100% La Liga) : les compétitions ESPN-only
+  // (NL/CAN/COPA/UEL/UECL, voir ESPN_SOURCED_FORM_COMPS plus haut) ont un
+  // formMap keyé par des ids ESPN — un espace DIFFÉRENT des ids FD.org
+  // utilisés par les championnats club. Object.assign fusionnait
+  // auparavant TOUTES les compétitions affichées le même jour sur
+  // l'Accueil dans un SEUL objet plat, sans distinction d'origine.
+  // ⚠️ 1ère version de ce fix (insuffisante, gardée en mémoire pour la
+  // suite) : ne fusionnait les compétitions ESPN-only QUE sur les clés
+  // encore vides — protège contre l'écrasement d'une vraie entrée FD.org,
+  // mais PAS contre le cas de Deportivo, justement 0 match joué : sa clé
+  // est vide côté PD (rien à écraser), donc un id ESPN coïncidant par
+  // hasard avec le sien "comblait" ce vide avec le résultat d'un club
+  // totalement différent — exactement le bug resté après ce 1er passage.
+  // Fix complet : chaque match des compétitions ESPN-only est résolu PAR
+  // NOM contre les matchs des compétitions FD.org du jour (même technique
+  // que pour les matchs de coupe, voir fetchTeamForm plus haut) AVANT de
+  // reconstruire son formMap — un id ESPN qui ne correspond au nom
+  // d'AUCUN club FD.org du jour ne peut plus jamais entrer dans le formMap
+  // partagé, qu'une clé soit déjà prise ou non.
   const formMap    = {}
   const resultByCode = Object.fromEntries(codes.map((c, i) => [c, results[i]]))
   const fdCodes   = codes.filter(c => !ESPN_SOURCED_FORM_COMPS.has(c))
   const espnCodes = codes.filter(c => ESPN_SOURCED_FORM_COMPS.has(c))
   for (const c of fdCodes) Object.assign(formMap, resultByCode[c]?.data?.formMap ?? {})
-  for (const c of espnCodes) {
-    const espnFormMap = resultByCode[c]?.data?.formMap ?? {}
-    for (const [id, form] of Object.entries(espnFormMap)) {
-      if (!(id in formMap)) formMap[id] = form
+  if (espnCodes.length) {
+    const fdTeamPool = fdCodes.flatMap(c => resultByCode[c]?.data?.matches ?? [])
+    for (const c of espnCodes) {
+      const espnMatches = resultByCode[c]?.data?.matches ?? []
+      const resolvedMatches = espnMatches
+        .filter(m => m.status === 'FINISHED')
+        .map(m => {
+          const homeId = resolveFdTeamId(m.homeTeam, fdTeamPool, { loose: true, strict: true })
+          const awayId = resolveFdTeamId(m.awayTeam, fdTeamPool, { loose: true, strict: true })
+          if (homeId == null && awayId == null) return null
+          return {
+            ...m,
+            homeTeam: { ...m.homeTeam, id: homeId ?? m.homeTeam.id },
+            awayTeam: { ...m.awayTeam, id: awayId ?? m.awayTeam.id },
+          }
+        })
+        .filter(Boolean)
+      const espnFormMap = buildFormMap(resolvedMatches)
+      for (const [id, form] of Object.entries(espnFormMap)) {
+        if (!(id in formMap)) formMap[id] = form
+      }
     }
   }
 
