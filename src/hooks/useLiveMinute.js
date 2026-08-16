@@ -415,14 +415,24 @@ function _runFtSafeguards(matches, now, queryClient) {
   }
 
   // Safeguard 1 : pendingFt timeout (45s)
+  // ⚠️ BUG CORRIGÉ : `Number(midStr)` cassait tout match dont l'id n'est pas
+  // purement numérique — cas des matchs de club sourcés via espnAdapter.js,
+  // dont l'id a la forme `espn-PD-401882920` (string). Number("espn-PD-...")
+  // = NaN, donc getLiveState/isTrackedLive/allLive.find() ne matchaient
+  // JAMAIS pour ces matchs → safeguard totalement inopérant pour tous les
+  // matchs de club (seule la Coupe du Monde, avec des ids FD.org numériques,
+  // n'était pas touchée). Fix : on résout le match d'abord (comparaison
+  // souple via String()), puis on récupère mid = match.id — donc un id
+  // numérique reste un number, un id string reste un string, cohérent avec
+  // le reste du code.
   for (const [midStr, pft] of Object.entries(pendingFt)) {
     if (now - pft.since < 45_000) continue
-    const mid = Number(midStr)
     delete pendingFt[midStr]
+    const match = allLive.find(m => String(m.id) === midStr)
+    if (!match) continue
+    const mid = match.id
     if (getLiveState(mid).state === 'ended') continue
     if (!isTrackedLive(mid)) continue
-    const match = allLive.find(m => m.id === mid)
-    if (!match) continue
     console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
     confirmFt(match, now, queryClient)
   }
@@ -634,10 +644,27 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
     // liveData = { [fdMatchId]: { espnEventId, espnSlug, espnStatus, espnClock, espnPeriod, home, away, scorers, stats, fromCache? } }
     const liveData = await res.json()
 
+    // ⚠️ BUG CORRIGÉ (root cause de "Débute" bloqué + buteurs/cartons/stats
+    // absents sur LiveMatchPage pour TOUS les matchs de club) : `Number(midStr)`
+    // convertissait l'id renvoyé par le serveur en NaN dès que ce n'était pas
+    // un nombre pur. Or api/fifa-live.js renvoie `result[fdMatch.id] = {...}`
+    // avec l'id TEL QUEL — et pour les matchs de club (sourcés via
+    // espnAdapter.js, PAS FD.org), l'id a la forme string "espn-PD-401882920"
+    // (voir normalizeEvent() dans espnAdapter.js). Number("espn-PD-...") = NaN,
+    // donc `allMatches.find(m => m.id === mid)` ne matchait JAMAIS pour ces
+    // matchs → toute la donnée live calculée côté serveur (score, minute,
+    // buteurs, cartons, stats, statut ESPN) était silencieusement jetée à
+    // chaque poll, pour chaque match de club, sans exception. Seule la Coupe
+    // du Monde (ids FD.org numériques) n'était pas affectée — d'où l'écart
+    // observé entre CDM (ça marchait) et championnats de club (ça ne marchait
+    // jamais). Fix : on résout le match par comparaison souple (String()),
+    // puis mid = match.id — un id numérique reste un number, un id string
+    // reste un string, cohérent avec le reste du fichier (pendingFt,
+    // getMatchState, espnScoresCache...).
     for (const [midStr, data] of Object.entries(liveData)) {
-      const mid   = Number(midStr)
-      const match = allMatches.find(m => m.id === mid)
+      const match = allMatches.find(m => String(m.id) === midStr)
       if (!match) continue
+      const mid = match.id
 
       const { espnStatus, espnClock, espnPeriod, home, away, scorers, cards, stats, fromCache, homeShootout, awayShootout } = data
 
