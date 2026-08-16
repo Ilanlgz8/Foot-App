@@ -282,6 +282,35 @@ function Resultats() {
     })
     // Le match est bien repris par FD.org : plus besoin du pont longue durée.
     for (const m of fdMatches) clearRecentlyFinished(m.id)
+    // ⚠️ AJOUT (constat utilisateur, 16/08 : "faut que dans résultat tu mette
+    // tout les matchs de la 1ère journée ensemble même si c'est pas le même
+    // jour") : les matchs de ce pont (`bridgeSource`) viennent d'ESPN
+    // (liveMatches/recentlyFinished, source primaire live — voir CLAUDE.md),
+    // qui n'expose jamais de numéro de journée (`matchday: null`, voir
+    // normalizeEvent() dans espnAdapter.js — champ non fourni proprement par
+    // ESPN, vérifié en direct sur un vrai scoreboard, aucune alternative
+    // trouvée : pas de "week"/"round" dans la réponse). groupRounds
+    // (useMatchs.js) sépare donc tout match sans matchday dans un groupe "par
+    // jour" à part, même quand il appartient en réalité à la même journée que
+    // le reste de `fdMatches` — un match tout juste terminé (encore dans ce
+    // pont, football-data.org pas encore à jour) se retrouvait ainsi détaché
+    // du reste de sa propre journée. On lui rattache le matchday de l'entrée
+    // FD.org la plus proche en date (même compétition, déjà filtrée en amont)
+    // — fenêtre de 5 jours, large mais raisonnable pour couvrir une journée
+    // qui s'étale du vendredi au lundi avec un peu de marge, sans risquer de
+    // capturer la journée précédente ou suivante par erreur.
+    const inferMatchday = (m) => {
+      if (m.matchday != null) return m.matchday
+      if (!m.utcDate) return null
+      const mTime = new Date(m.utcDate).getTime()
+      let best = null, bestDiff = Infinity
+      for (const f of fdMatches) {
+        if (f.matchday == null || !f.utcDate) continue
+        const diff = Math.abs(new Date(f.utcDate).getTime() - mTime)
+        if (diff < bestDiff) { bestDiff = diff; best = f.matchday }
+      }
+      return bestDiff <= 5 * 24 * 60 * 60 * 1000 ? best : null
+    }
     const extra = bridgeSource
       .filter(m => !known.has(m.id))
       .filter(m => recentIds.has(m.id) || getMatchState(m.id).ft === true)
@@ -302,6 +331,7 @@ function Resultats() {
         const wentToPens = es?.homeShootout != null && es?.awayShootout != null
         return {
           ...m,
+          matchday: inferMatchday(m),
           score: {
             ...m.score,
             fullTime: {
