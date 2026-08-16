@@ -579,7 +579,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
   // contourner le cache serveur — garantit un vrai aller-retour ESPN frais
   // au lieu de compter sur un hasard favorable. Ne s'applique qu'à ce cas
   // précis (pas de faux-positif possible sur un match déjà confirmé live).
-  const STUCK_KICKOFF_MS = 3 * 60_000
+  const STUCK_KICKOFF_MS = 1 * 60_000
   const hasStuckKickoff = toTrack.some(m => {
     if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
     const utcMs = new Date(m.utcDate).getTime()
