@@ -93,11 +93,36 @@ function dedupeAndFilterByDate(matches, date) {
 // budget (100/min par IP, api/espn.js) n'a rien à voir avec celui de FD.org.
 // Extrait à part pour pouvoir démarrer IMMÉDIATEMENT côté useRecentDaysMatches
 // (voir plus bas), pendant que seul WC/EC est éventuellement retardé.
+// ⚠️ AJOUT (constat utilisateur, logs Vercel réels à l'appui : rafale de
+// 15-20 appels /espn dans LA MÊME seconde, plusieurs en 429) : ce Promise.
+// allSettled tirait les ~15-17 appels (12 ESPN_SOURCED_COMPS + coupes) tous
+// en même temps, sans le moindre espacement — le commentaire d'origine
+// jugeait ça "sans risque" (budget 100/min par IP), mais en pratique une
+// rafale concentrée sur <1s peut déclencher le rate-limit de api/espn.js
+// même largement sous 100/min en moyenne (dépend de l'implémentation exacte
+// du compteur), et plusieurs jours (useRecentDaysMatches, voir plus bas)
+// appellent CETTE MÊME fonction en parallèle via useQueries, multipliant le
+// risque de rafale. Un appel qui échoue en 429 ici ne fait pas planter
+// l'app (Promise.allSettled), mais SA compétition reste absente/périmée
+// pour ce cycle — ce qui peut ensuite dégrader tout ce qui dépend de cette
+// liste plus loin (matching live dans api/fifa-live.js notamment).
+// Espacement léger (150ms/appel, ~2.4s pour les 17) : assez pour casser la
+// rafale concentrée sur <1s vue dans les logs, sans réintroduire le
+// ralentissement perçu déjà corrigé une fois par le passé (STAGGER_MS à
+// 15s avait causé une régression de vitesse, voir plus bas) — chaque appel
+// individuel reste rapide, seul le DÉMARRAGE est étalé.
+const ESPN_CALL_STAGGER_MS = 150
+
 async function fetchEspnPortion() {
-  const settled = await Promise.allSettled([
-    ...ESPN_SOURCED_COMPS.map(id => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
-    ...CUP_PARENT_COMPS.map(id => fetchEspnCupMatches(id)),
-  ])
+  const jobs = [
+    ...ESPN_SOURCED_COMPS.map(id => () => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
+    ...CUP_PARENT_COMPS.map(id => () => fetchEspnCupMatches(id)),
+  ]
+  const settled = await Promise.allSettled(
+    jobs.map((job, idx) =>
+      new Promise(resolve => setTimeout(resolve, idx * ESPN_CALL_STAGGER_MS)).then(job)
+    )
+  )
   return settled.flatMap(r => r.status === 'fulfilled' ? r.value : []).filter(m => VALID_STATUS.includes(m.status))
 }
 
