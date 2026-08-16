@@ -341,8 +341,22 @@ export default function LiveMatchPage() {
     if (!rawMatch || !resolveMatches?.length) return rawMatch
     // ⚠️ AJOUT `{ loose: true }` — voir le commentaire détaillé dans
     // MatchPage.jsx (même fix).
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
+    // ⚠️ AJOUT `strict:true` (16/08, constat utilisateur : losange "forme
+    // récente" d'une AUTRE équipe affiché sous le logo de Racing, match
+    // toujours en cours — même bug que MatchCard.jsx/MatchPoster.jsx/
+    // MatchPage.jsx, voir le commentaire détaillé sur resolveFdTeamId dans
+    // matchUtils.js). Sans correspondance de nom fiable, homeId/awayId
+    // restent `null` plutôt que l'id ESPN brut (coïncidence numérique
+    // possible avec l'id FD.org d'un club différent une fois utilisé comme
+    // clé de formMap/compMatches). Contrairement à MatchPage.jsx, cette page
+    // n'a PAS besoin d'un id ESPN natif séparé : les buteurs live
+    // (espn?.scorers, plus bas) sont déjà tagués 'home'/'away' en texte par
+    // le serveur (api/fifa-live.js), jamais comparés par id d'équipe — donc
+    // aucun consommateur de match.homeTeam.id sur cette page n'a besoin de
+    // l'id ESPN brut, tous veulent l'id FD.org résolu (formMap, compMatches,
+    // H2H, classement).
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true, strict: true })
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true, strict: true })
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,

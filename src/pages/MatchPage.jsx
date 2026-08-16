@@ -86,7 +86,7 @@ function formatTime(utcDate) {
 }
 
 // ── Hero gradient plein-écran ─────────────────────────────────────────────────
-function MatchPageHero({ match, navigate, hForm, aForm }) {
+function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -171,8 +171,15 @@ function MatchPageHero({ match, navigate, hForm, aForm }) {
   // match dans l'onglet Statistiques, sans les remplacements — le hero reste
   // compact). Uniquement ici (page Résultat) : demande explicite de
   // l'utilisateur, LiveMatchPage garde son affichage buts-seuls actuel.
+  // ⚠️ rawHomeId (pas match.homeTeam?.id) : espnScorers/espnCards viennent
+  // d'ESPN (useEspnMatchDetail ci-dessus) et utilisent donc l'id ESPN natif
+  // de l'équipe — jamais l'id football-data.org résolu (match.homeTeam.id,
+  // désormais `null` en cas d'échec de résolution depuis le fix strict du
+  // 16/08, voir la déclaration de `match` dans le composant parent). Utiliser
+  // l'id résolu ici casserait l'attribution buteurs/cartons à chaque fois que
+  // la résolution échoue légitimement (équipe hors compétitions suivies).
   const { home: homeEvents, away: awayEvents } = buildMatchEvents({
-    espnScorers, espnCards, homeId: match.homeTeam?.id,
+    espnScorers, espnCards, homeId: rawHomeId ?? match.homeTeam?.id,
   })
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
@@ -716,10 +723,19 @@ export default function MatchPage() {
     // était en strict clubNameMatch (préfixe uniquement) — trouve "Le Havre
     // AC"→"Le Havre" (suffixe en trop côté ESPN) mais PAS "AS Monaco"→"Monaco"
     // ni "Manchester City"→"Man City" (mot en trop en PRÉFIXE côté ESPN).
-    // looseTeamNameMatch (translateTeam + normalize) couvre ces cas — même
-    // repli sûr sur l'id d'origine si la résolution échoue.
-    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true })
-    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true })
+    // looseTeamNameMatch (translateTeam + normalize) couvre ces cas.
+    // ⚠️ AJOUT `strict:true` (16/08, constat utilisateur : losange "forme
+    // récente" d'une AUTRE équipe affiché — même bug que MatchCard.jsx/
+    // MatchPoster.jsx, voir le commentaire détaillé sur resolveFdTeamId dans
+    // matchUtils.js) : sans correspondance de nom fiable, on ne devine plus
+    // — homeId/awayId restent `null` plutôt que l'id ESPN brut (qui peut
+    // coïncider par hasard avec l'id FD.org d'un club différent une fois
+    // utilisé comme clé de formMap/compMatches). MatchPageHero a besoin du
+    // vrai id ESPN pour rattacher buteurs/cartons (espnScorers/espnCards,
+    // eux-mêmes en id ESPN) — reçoit `rawHomeId`/`rawAwayId` séparément
+    // (voir plus bas) pour ça, jamais l'id résolu ici.
+    const homeId = resolveFdTeamId(rawMatch.homeTeam, resolveMatches, { loose: true, strict: true })
+    const awayId = resolveFdTeamId(rawMatch.awayTeam, resolveMatches, { loose: true, strict: true })
     if (homeId === rawMatch.homeTeam?.id && awayId === rawMatch.awayTeam?.id) return rawMatch
     return {
       ...rawMatch,
@@ -801,7 +817,7 @@ export default function MatchPage() {
     <div className="mp__page" style={themeVars}>
 
       {/* Hero plein-écran avec gradient */}
-      <MatchPageHero match={match} navigate={navigate} hForm={hForm} aForm={aForm} />
+      <MatchPageHero match={match} navigate={navigate} hForm={hForm} aForm={aForm} rawHomeId={rawMatch?.homeTeam?.id} />
 
       <div className="mp__wrap">
         <div className="mp__body" ref={swipe.ref}>
