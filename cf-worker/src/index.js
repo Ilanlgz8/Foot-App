@@ -350,7 +350,20 @@ async function runOnePass(env) {
 
   const emptyDayKey = 'cron:emptyDay'
   const nextCheckKey = 'cron:nextCheck'
-  const NEXT_CHECK_BUFFER_MS = 90 * 60 * 1000
+  // ⚠️ AJOUT (question utilisateur : "5min avant le match, t'es sûr qu'y'aura
+  // aucun problème ?") : abaissé de 90min à 5min après vérification — tant
+  // qu'un match est encore STATUS_SCHEDULED, rien de détectable ne peut se
+  // produire (aucun but/carton/mi-temps possible avant le coup d'envoi), la
+  // SEULE chose qui compte est le changement de statut au moment même du
+  // coup d'envoi. Aucune notif "match dans X minutes" n'existe dans le code
+  // qui dépendrait d'un polling en avance (la notif liée au coup d'envoi se
+  // déclenche seulement une fois le statut réellement passé à LIVE, voir
+  // dédup koKey plus bas). Les 90min de polling 1x/min AVANT le coup d'envoi
+  // ne servaient donc à rien fonctionnellement — juste une marge large et
+  // jamais justifiée précisément. Avec 5min, le coup d'envoi reste détecté à
+  // la minute près comme avant (on repasse en 1x/min bien avant qu'il ait
+  // lieu), seul le polling inutile des ~85min précédentes disparaît.
+  const NEXT_CHECK_BUFFER_MS = 5 * 60 * 1000
   const NEXT_CHECK_MAX_MS    = 25 * 60 * 1000
   // ⚠️ AJOUT (question utilisateur : "pourquoi revérifier toutes les 20min si
   // on sait déjà qu'il n'y a aucun match aujourd'hui ?") : emptyDayKey ne
