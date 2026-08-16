@@ -158,6 +158,23 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // possession/tirs cadrés, déjà dans espnScore?.stats — aucun fetch de
   // plus) ; pré-match et FT gardent calcPronoAdvanced (rien à faire glisser
   // avant le coup d'envoi, résultat déjà figé une fois le match terminé).
+  // ── Cote de marché réelle (toutes compétitions ESPN) ────────────────────
+  // Remplace l'affichage calcProno par la vraie cote (ESPN BET/DraftKings
+  // selon la compétition) quand disponible et fiable — voir useEspnPregameOdds
+  // pour le détail des providers retenus/écartés et le garde-fou anti-cote-
+  // absurde. `prono` (calculé plus bas) reste la source pour tout le reste
+  // (Pronos.jsx, jeu entre amis, jamais touché ici).
+  // ⚠️ AJOUT (constat utilisateur, Lens-PSG : PSG favori à la vraie cote
+  // bookmaker, mais dès le coup d'envoi le direct affichait Lens favori) :
+  // enabled élargi de `isUpcoming` à `!isFinished` — la requête reste active
+  // en live (nécessaire pour l'avoir dispo si l'app est ouverte APRÈS le
+  // coup d'envoi, jamais pré-match) et est réinjectée dans calcLiveProno
+  // ci-dessous (marketPre) comme point de départ réel, au lieu du prior
+  // interne (calcPronoAdvanced) qui peut diverger du marché sur la base
+  // "forme récente" seule — surtout en tout début de saison, quand peu de
+  // matchs de la saison en cours existent encore pour affiner le modèle.
+  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
+
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
         homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
@@ -171,20 +188,13 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
+        marketPre:         espnOdds?.pct ?? null,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H, lowerDivMatches,
         neutralVenue: isNeutralVenueComp(match),
       })
 
-  // ── Cote de marché réelle (pré-match, toutes compétitions ESPN) ────────────
-  // Remplace l'affichage calcProno par la vraie cote (ESPN BET/DraftKings
-  // selon la compétition) quand disponible et fiable — voir useEspnPregameOdds
-  // pour le détail des providers retenus/écartés et le garde-fou anti-cote-
-  // absurde. Repli automatique et silencieux sur calcProno si absente/
-  // invalide/en direct/terminé — `prono` (calculé ci-dessus) reste la source
-  // pour tout le reste (Pronos.jsx, jeu entre amis, jamais touché ici).
-  const { data: espnOdds } = useEspnPregameOdds(match, isUpcoming)
   const useMarketOdds = isUpcoming && !!espnOdds
   const displayPct    = useMarketOdds ? espnOdds.pct : prono
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow

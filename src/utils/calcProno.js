@@ -783,16 +783,33 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     homePoss = null, awayPoss = null,
     homeShotsOnTarget = null, awayShotsOnTarget = null,
     homeCorners = null, awayCorners = null,
+    marketPre = null,
   } = opts
+  // ⚠️ AJOUT (constat utilisateur : Lens-PSG, PSG favori à la vraie cote
+  // bookmaker pré-match, mais dès le coup d'envoi le direct affichait Lens
+  // favori) : marketPre permet à l'appelant de fournir la VRAIE cote
+  // bookmaker pré-match (déjà en % home/draw/away, même échelle que
+  // calcPronoAdvanced) quand elle est disponible (useEspnPregameOdds) —
+  // remplace alors le prior interne (calcPronoAdvanced, qui peut diverger
+  // du marché réel sur la base "forme récente") comme point de départ du
+  // direct. Le direct continue ensuite de bouger normalement selon le score/
+  // la minute/les stats (logique Poisson ci-dessous, inchangée) — seul le
+  // POINT DE DÉPART change, pas le mécanisme de projection. Repli
+  // strictement inchangé (calcPronoAdvanced/calcProno) quand marketPre est
+  // absent — comportement identique pour tout appelant existant qui ne le
+  // passe pas (Pronos.jsx notamment, volontairement exclu : jeu entre amis,
+  // doit rester sur un modèle interne cohérent, pas une donnée externe qui
+  // peut manquer).
+  //
   // Condition élargie (avant : exigeait compMatches?.length) — calcPronoAdvanced
   // gère déjà tout seul le cas compMatches vide (repli sur fullH2H puis sur
   // calcProno), donc plus besoin de filtrer ici : ça permet à fullH2H de
   // servir de repli même quand compMatches est vide (tout début de saison).
   // Comportement strictement inchangé pour tout appelant qui ne passe pas
   // fullH2H (retombe exactement sur calcProno comme avant).
-  const pre = (homeId != null && awayId != null)
+  const pre = marketPre ?? ((homeId != null && awayId != null)
     ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue, lowerDivMatches })
-    : calcProno(homeForm, awayForm, { neutralVenue })
+    : calcProno(homeForm, awayForm, { neutralVenue }))
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 
   const min           = parseMinuteValue(minute)
