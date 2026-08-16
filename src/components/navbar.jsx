@@ -12,6 +12,7 @@
  */
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
+import { shouldShowLiveWidget } from '../utils/matchStateTracker'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
@@ -79,7 +80,17 @@ const BallIcon = () => (
 
 function Navbar() {
   const { liveMatches } = useLiveData()
-  const liveCount = liveMatches.length
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : le bouton Live mobile — l'orb ⚽ au
+  // centre de la tab bar — restait actif/pulsait alors que le match affiché
+  // était déjà fini) : liveCount comptait directement liveMatches.length, la
+  // liste BRUTE de liveTracker (qui garde volontairement l'entrée jusqu'à
+  // 5min après confirmFt, pour laisser le temps à FD.org de rattraper
+  // classement/forme — voir useLiveMinute.js) — sans jamais appliquer
+  // shouldShowLiveWidget (même décision que Live.jsx/Accueil.jsx/
+  // LiveSidebar.jsx désormais). Résultat : le badge/pulse pouvait rester
+  // actif jusqu'à 5min après la fin réelle d'un match, une incohérence
+  // visible avec la page /live elle-même (déjà vide à ce moment-là).
+  const liveCount = liveMatches.filter(shouldShowLiveWidget).length
 
   return (
     <>

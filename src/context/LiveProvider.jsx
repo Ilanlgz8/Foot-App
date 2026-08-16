@@ -23,6 +23,7 @@ import { useLiveMatches } from '../hooks/useLiveMatches'
 import { useLiveMinute } from '../hooks/useLiveMinute'
 import { useEspnScores } from '../hooks/useEspnScores'
 import { useLiveTracker } from '../hooks/liveTracker'
+import { shouldShowLiveWidget } from '../utils/matchStateTracker'
 import { requestNotificationPermission } from '../utils/notifications'
 
 const LiveCtx = createContext({
@@ -68,14 +69,20 @@ export function LiveProvider({ children }) {
   // Badge sur l'icône PWA = nombre de matchs live en cours, visible sans
   // ouvrir l'app (Badging API — supportée par Chrome/Edge desktop+Android,
   // pas par Safari/iOS : feature-detect, dégradation silencieuse sinon).
+  // ⚠️ BUG CORRIGÉ (même famille que navbar.jsx/Live.jsx/LiveSidebar.jsx) :
+  // comptait liveMatches.length brut (liste liveTracker, qui garde
+  // volontairement l'entrée jusqu'à 5min après confirmFt) au lieu de
+  // shouldShowLiveWidget — le badge sur l'icône pouvait rester affiché
+  // jusqu'à 5min après la fin réelle d'un match.
+  const liveWidgetCount = liveMatches.filter(shouldShowLiveWidget).length
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return
-    if (liveMatches.length > 0) {
-      navigator.setAppBadge(liveMatches.length).catch(() => {})
+    if (liveWidgetCount > 0) {
+      navigator.setAppBadge(liveWidgetCount).catch(() => {})
     } else {
       navigator.clearAppBadge().catch(() => {})
     }
-  }, [liveMatches.length])
+  }, [liveWidgetCount])
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur : navigation/clics "pas fluides",
   // comme si l'app buggait un peu) : la value du Provider était un littéral
