@@ -9,6 +9,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
+// ⚠️ AJOUT : COMP_ESPN (= ESPN_SLUG_BY_COMP_ID) n'est indexé QUE par les vrais
+// ids numériques football-data.org — les compétitions ESPN-only (TDC, CS, USC…
+// SYNTHETIC_COMP_ID négatif dans espnAdapter.js) n'y ont jamais d'entrée, donc
+// `COMP_ESPN[compId]` renvoie undefined pour elles et TOUS les hooks de ce
+// fichier (cotes, compos, stats, infos match) restaient silencieusement
+// désactivés pour ces compétitions (constat utilisateur : cotes bookmaker
+// absentes sur Lens-PSG/Trophée des Champions). espnNativeSlug() est le repli
+// déjà utilisé ailleurs (useLiveMinute.js ligne ~369) pour exactement ce cas —
+// repris ici pour les mêmes raisons.
+import { espnNativeSlug } from '../data/espnSlugs.js'
 // Depuis la compaction du cache ESPN (voir api/espn.js/espnSummaryParse.js) :
 // /espn?eventId=... renvoie directement { scorers, cards, stats, lineups }
 // déjà parsés — extractMatchDetails ne sert plus ici que pour le repli
@@ -267,7 +277,7 @@ const ESPN_ODDS_TTL = 6 * 3600 * 1000  // 6h — cote pré-match bouge peu à ce
 
 export function useEspnPregameOdds(match, enabled = true) {
   const compId = match?.competition?.id
-  const slug   = COMP_ESPN[compId]
+  const slug   = COMP_ESPN[compId] ?? espnNativeSlug(match)
   const date   = matchDateStr(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
@@ -430,7 +440,7 @@ const LINEUPS_DISK_TTL_LIVE     = 5 * 60_000
 
 export function useLineups(match, isFinished = false) {
   const compId     = match?.competition?.id
-  const slug       = COMP_ESPN[compId]
+  const slug       = COMP_ESPN[compId] ?? espnNativeSlug(match)
   const date       = matchDateStr(match)
   const fdHome     = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
@@ -510,7 +520,7 @@ export function useLineups(match, isFinished = false) {
 
 export function useEspnMatchStats(match, isFinished = false) {
   const compId = match?.competition?.id
-  const slug   = COMP_ESPN[compId]
+  const slug   = COMP_ESPN[compId] ?? espnNativeSlug(match)
   const date   = matchDateStr(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
@@ -626,7 +636,7 @@ const MAX_LINEUP_AGE_DAYS = 450
 export function useProbableLineups(match, compMatches) {
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
-  const slug   = COMP_ESPN[match?.competition?.id]   // ex: 'fifa.world'
+  const slug   = COMP_ESPN[match?.competition?.id] ?? espnNativeSlug(match)   // ex: 'fifa.world'
 
   return useQuery({
     queryKey:  ['probableLineups3', match?.id, (compMatches ?? []).length],
@@ -982,7 +992,7 @@ export function useH2H(match, delayMs = 0, fdMatchIdOverride = null) {
 // pas ouvert) — jamais préchargé pour toute une liste de matchs.
 export function useMatchInfo(match, enabled = true) {
   const compId = match?.competition?.id
-  const slug   = COMP_ESPN[compId]
+  const slug   = COMP_ESPN[compId] ?? espnNativeSlug(match)
   const fdHome = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const fdAway = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
   const { detail } = useMatchDetail(match?.id)
