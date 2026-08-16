@@ -427,6 +427,29 @@ describe('resolveFdTeamId', () => {
     expect(resolveFdTeamId({ id: 111, name: '?', shortName: 'Man City' }, plCompMatches)).toBe(65)
     expect(resolveFdTeamId({ id: 222, name: '?', shortName: 'Man United' }, plCompMatches)).toBe(66)
   })
+
+  // ⚠️ Bug réel constaté par l'utilisateur (17/08) : losange "forme récente"
+  // de Deportivo (0 match joué cette saison) affichait le résultat GAGNANT
+  // d'un club totalement différent, sur un match 100% La Liga (Deportivo-
+  // Elche) — donc pas la même cause que les 2 bugs du 16/08 ci-dessus
+  // (collision d'ID numérique). Cause réelle : ESPN désigne couramment le
+  // Deportivo La Corogne par le seul mot "Deportivo", qui est un préfixe
+  // COMPLET valide (au sens de clubNameMatch) du nom officiel réel d'un
+  // autre club de la même ligue, "Deportivo Alavés".
+  const pdCompMatches = [
+    { homeTeam: { id: 263, name: 'Deportivo Alavés', shortName: 'Alavés' },
+      awayTeam: { id: 559, name: 'Sevilla FC',        shortName: 'Sevilla' } },
+  ]
+
+  it('ne confond pas Deportivo (La Corogne) avec Deportivo Alavés (mot générique seul)', () => {
+    expect(resolveFdTeamId({ id: 999, name: 'Deportivo' }, pdCompMatches, { strict: true })).toBeNull()
+    expect(resolveFdTeamId({ id: 999, name: 'Deportivo' }, pdCompMatches)).toBe(999)
+  })
+
+  it('un nom multi-mots contenant "Deportivo" continue de résoudre normalement (pas de faux négatif)', () => {
+    expect(resolveFdTeamId({ id: 111, name: 'Deportivo Alavés' }, pdCompMatches)).toBe(263)
+    expect(resolveFdTeamId({ id: 111, name: 'Alavés' }, pdCompMatches)).toBe(263)
+  })
 })
 
 // resolveFdMatchId — bug réel (26/07) : "dans Accueil t'as que 2 h2h, dans

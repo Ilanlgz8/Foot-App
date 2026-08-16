@@ -669,6 +669,31 @@ function looseTeamNameMatch(a, b) {
   }
 }
 
+// ── Garde-fou : mots génériques utilisés SEULS comme nom de club ───────────
+// clubNameMatch (espnSummaryParse.js) accepte un préfixe complet — pensé pour
+// un mot RAJOUTÉ en suffixe ("Manchester City" → "Manchester City FC"). Mais
+// certains clubs sont couramment désignés par une source (souvent ESPN) par
+// un SEUL mot qui est aussi, par coïncidence, le tout début du nom OFFICIEL
+// d'un club distinct de la même ligue — ex. "Deportivo" (Deportivo La
+// Corogne) préfixe valide de "Deportivo Alavés" (club différent), ou "Real"
+// (si jamais utilisé seul) préfixe de "Real Sociedad"/"Real Betis"/"Real
+// Oviedo". N'attrape QUE le cas où le nom le plus court, après normalisation,
+// est ENTIÈREMENT égal à l'un de ces mots — un nom court à plusieurs mots
+// ("Manchester City", "Toulouse FC"...) n'est jamais concerné, aucune
+// régression possible sur les cas déjà couverts par les tests existants.
+const AMBIGUOUS_BARE_PREFIXES = new Set([
+  'deportivo', 'real', 'racing', 'sporting', 'union', 'atletico', 'dynamo',
+  'dinamo', 'inter', 'club',
+])
+
+function isAmbiguousBarePrefixMatch(a, b) {
+  const na = normalize(a), nb = normalize(b)
+  if (!na || !nb || na === nb) return false
+  const shorter = na.length <= nb.length ? na : nb
+  const longer  = na.length <= nb.length ? nb : na
+  return AMBIGUOUS_BARE_PREFIXES.has(shorter) && longer.startsWith(shorter)
+}
+
 // Logique de résolution "live" — EXACTEMENT le corps d'origine de
 // resolveFdMatchId, inchangé au caractère près (voir wrapper juste en
 // dessous, qui ajoute uniquement une couche de mémoire par-dessus, sans
@@ -762,9 +787,38 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
   // clubNameMatch est volontairement plus strict (préfixe complet
   // uniquement) — plus de champs comparés compense sans réintroduire le
   // risque de faux positif.
+  // ⚠️ AJOUT isAmbiguousBarePrefixMatch (constat utilisateur, 17/08 : losange
+  // "forme récente" toujours affiché pour Deportivo, 0 match joué cette
+  // saison, sur sa card Accueil contre Elche — 100% La Liga, donc PAS le
+  // même mécanisme que les 2 fix précédents du 16/08, qui ciblaient une
+  // collision d'ID numérique). Root cause différente, trouvée en relisant
+  // clubNameMatch (préfixe complet, espnSummaryParse.js) : ESPN utilise
+  // couramment "Deportivo" seul comme nom court du Deportivo La Corogne — et
+  // "Deportivo" est un préfixe complet VALIDE de "Deportivo Alavés" (nom
+  // officiel réel d'un club totalement différent, présent lui aussi en
+  // LaLiga). clubNameMatch était pensé pour absorber un mot RAJOUTÉ en
+  // SUFFIXE ("Manchester City" → "Manchester City FC") — jamais pour un nom
+  // court qui EST ENTIÈREMENT un mot générique partagé par plusieurs clubs
+  // distincts de la même ligue (Real Madrid/Sociedad/Betis/Oviedo,
+  // Racing.../Sporting..., et donc aussi Deportivo/Deportivo Alavés). Vu
+  // l'historique documenté juste au-dessus (2 tentatives de modifier
+  // clubNameMatch/resolveFdTeamId ont cassé l'Accueil en prod, cause jamais
+  // identifiée avec certitude), ce fix NE TOUCHE PAS clubNameMatch ni l'ordre
+  // de résolution existant : un garde-fou purement additif, qui ne fait que
+  // REFUSER un match déjà accepté par clubNameMatch quand le nom le plus
+  // court vaut EXACTEMENT l'un de ces mots ambigus connus — ne peut donc
+  // jamais transformer un cas qui échouait déjà en un nouveau succès, et ne
+  // touche aucun autre appariement (tous les tests existants portent sur des
+  // noms multi-mots, jamais un mot générique seul).
+  // Le garde-fou ne s'applique qu'à clubNameMatch (préfixe, risqué) — jamais
+  // à looseTeamNameMatch (égalité stricte après translateTeam, toujours sûre
+  // par construction) : si une vraie correspondance canonique existe un jour
+  // (ex. ajout d'une entrée TEAM_NAMES_FR pour Deportivo), `loose` doit
+  // pouvoir continuer à la trouver normalement.
   const teamNames = [team.name, team.shortName].filter(Boolean)
   const matches = (candidate) => teamNames.some(n =>
-    clubNameMatch(candidate ?? '', n) || (loose && looseTeamNameMatch(candidate ?? '', n))
+    (clubNameMatch(candidate ?? '', n) && !isAmbiguousBarePrefixMatch(candidate ?? '', n)) ||
+    (loose && looseTeamNameMatch(candidate ?? '', n))
   )
   // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
   // compMatches) : rien à résoudre, on ne fait jamais de recherche par nom
