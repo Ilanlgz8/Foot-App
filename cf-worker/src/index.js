@@ -320,6 +320,21 @@ async function pushLiveTicker(env, payload, slug, log, homeTeam, awayTeam, rawHo
   }
 }
 
+// ⚠️ AJOUT (audit perf, question utilisateur : risque de dépasser la limite
+// Cloudflare Workers gratuit 50 sous-requêtes/exécution un jour très chargé) :
+// base fixe incompressible par passe = 34 (17 compétitions suivies × 2 fetchs
+// ESPN today+yesterday) + 1 (mget finalDone) = 35. Il reste ~15 de marge.
+// Le pipeline Redis par match (détection but/carton/mi-temps/fin — l'essentiel,
+// JAMAIS coupé) coûte 1 sous-requête/match live. Le résumé ESPN
+// (cacheEspnSummary) et le ticker score discret (pushLiveTicker) coûtent
+// chacun 1 sous-requête EN PLUS, mais seulement les minutes paires — jusqu'à
+// 2 de plus par match live sur ces minutes-là. Au-delà de ce seuil de matchs
+// live traités dans la MÊME passe, on coupe ces 2 postes secondaires pour les
+// matchs suivants (ils sont juste rattrapés à la minute paire suivante, rien
+// de perdu) — garde toujours de la marge pour que le pipeline principal ne
+// soit lui jamais impacté, quel que soit le nombre de matchs.
+const SUBREQUEST_SAFE_LIVE_THRESHOLD = 6
+
 // ── Une passe complète (équivalent runOnePass() de api/cron-goals.js) ──────
 async function runOnePass(env) {
   const kv = env._kv
@@ -460,6 +475,10 @@ async function runOnePass(env) {
     } catch {}
   }
 
+  // Voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — compteur de matchs live
+  // vus DANS CETTE PASSE, sert à couper résumé+ticker au-delà du seuil sûr.
+  let liveMatchesSeenThisPass = 0
+
   for (const { slug, evt } of allEvents) {
    if (alreadyDoneIds.has(evt.id)) continue
    try {
@@ -542,7 +561,10 @@ async function runOnePass(env) {
     const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
     const isFinalNow    = FINAL_ESPN.has(status)
 
-    if (isLive && shouldRefreshSummary()) {
+    if (isLive) liveMatchesSeenThisPass++
+    const underSubrequestSafeLimit = liveMatchesSeenThisPass <= SUBREQUEST_SAFE_LIVE_THRESHOLD
+
+    if (isLive && underSubrequestSafeLimit && shouldRefreshSummary()) {
       pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
     }
 
@@ -868,7 +890,7 @@ async function runOnePass(env) {
 
     // 📊 Ticker "score en direct" — pas de dédup (même tag, remplace côté SW).
     // Espacé à 1 passe sur 2 (shouldSendLiveTicker) — voir son commentaire.
-    if (isLive && shouldSendLiveTicker()) {
+    if (isLive && underSubrequestSafeLimit && shouldSendLiveTicker()) {
       const mLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
       await pushLiveTicker(env, {
         title: `${homeTeam} ${scoreStr} ${awayTeam}`,
