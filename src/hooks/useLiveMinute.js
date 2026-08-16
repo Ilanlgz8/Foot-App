@@ -1370,6 +1370,20 @@ export function useLiveMinute(matches) {
     for (const match of matches) {
       if (match.status !== 'IN_PLAY') continue
       const state = getMatchState(match.id)
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : "à la mi-temps, la minute tourne
+      // encore, ça affiche 46' au lieu de MT") : match.status vient de
+      // useTodayMatches — un poll bien plus lent (jusqu'à 2min de retard,
+      // voir ESPN_MATCHES_TTL/refetchInterval) que le poll live rapide
+      // (~20-30s, api/fifa-live.js) qui pose pausedAt dès la confirmation
+      // ESPN de la mi-temps. Juste après le VRAI début de la mi-temps,
+      // match.status peut encore valoir 'IN_PLAY' (pas encore rafraîchi) —
+      // sans ce garde-fou, cet ancrage se déclenchait AU DÉBUT de la
+      // mi-temps au lieu d'attendre sa vraie fin, faisant tourner le chrono
+      // dès la 1ère minute de pause. state.espnStatus (source rapide et
+      // fiable, voir setEspnData) prime : tant qu'il vaut encore
+      // STATUS_HALFTIME, on n'ancre jamais half2Start, quel que soit ce que
+      // dit match.status.
+      if (state.espnStatus === 'STATUS_HALFTIME') continue
       if (state.pausedAt && !state.half2Start) {
         setHalf2Start(match.id, Date.now())
       }
