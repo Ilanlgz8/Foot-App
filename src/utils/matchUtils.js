@@ -723,9 +723,38 @@ export function resolveFdMatchId(match, compMatches, opts = {}) {
   return cacheKey ? (readCacheStale(cacheKey) ?? null) : null
 }
 
-export function resolveFdTeamId(team, compMatches, { loose = false } = {}) {
+// ⚠️ AJOUT `strict` (constat utilisateur, 16/08 : losange "forme récente"
+// affiché sous le logo de Racing — pas encore Racing lui-même, mais une
+// AUTRE équipe — alors que le match était toujours en cours, jamais terminé
+// ; même famille de bug repérée la veille sur Rayo Vallecano) : par défaut
+// (strict:false, comportement historique inchangé, toujours couvert par le
+// test "Équipe inconnue" plus bas), quand AUCUN nom ne matche dans
+// compMatches, la fonction retombe sur `rawId` — l'id ESPN BRUT de l'équipe,
+// tel quel. Le souci : cet id ESPN n'a AUCUN rapport avec le référentiel
+// football-data.org utilisé comme clé de formMap/matchesByComp — deux
+// numérotations totalement indépendantes qui peuvent parfaitement coïncider
+// par hasard (l'id ESPN d'une équipe peut valoir "87", exactement l'id FD.org
+// d'une équipe complètement différente). Tant que ce rawId sert juste de
+// "meilleur effort" pour une recherche de FIXTURE à 2 id (homeId ET awayId
+// doivent matcher ENSEMBLE, voir resolveFdMatchIdLive ci-dessus), une
+// coïncidence isolée ne suffit pas à produire un faux résultat. Mais utilisé
+// tel quel comme clé BRUTE d'un dictionnaire (formMap?.[resolvedId], voir
+// MatchCard.jsx/MatchPoster.jsx/MatchDuJourCard.jsx/Pronos.jsx/MatchPage.jsx/
+// LiveMatchPage.jsx), la moindre coïncidence numérique affiche silencieusement
+// les données (forme récente, stats saison) d'une équipe totalement
+// différente sous le logo de la bonne équipe — aucune vérification que l'id
+// obtenu représente vraiment la même équipe. `strict:true` supprime ce repli
+// dangereux : si aucun nom ne matche vraiment, on retourne `null` plutôt que
+// de deviner — un losange absent (aucune donnée) est toujours préférable à
+// un losange faux (donnée d'un autre club). Les appelants concernés ont tous
+// déjà un garde-fou naturel en aval (formMap?.[null] → undefined →
+// FormDiamonds masqué ; calcPronoAdvanced traite déjà homeId/awayId null
+// comme "pas de H2H disponible", voir calcProno.js) — aucune régression,
+// juste un vrai "je ne sais pas" au lieu d'un faux positif silencieux.
+export function resolveFdTeamId(team, compMatches, { loose = false, strict = false } = {}) {
   const rawId = team?.id ?? null
-  if (!team || !compMatches?.length) return rawId
+  const giveUp = () => (strict ? null : rawId)
+  if (!team || !compMatches?.length) return giveUp()
   // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
   // compMatches) : rien à résoudre, on ne fait jamais de recherche par nom
   // inutilement.
@@ -739,7 +768,7 @@ export function resolveFdTeamId(team, compMatches, { loose = false } = {}) {
   // uniquement) — plus de champs comparés compense sans réintroduire le
   // risque de faux positif.
   const teamNames = [team.name, team.shortName].filter(Boolean)
-  if (!teamNames.length) return rawId
+  if (!teamNames.length) return giveUp()
   // `loose` : voir le commentaire détaillé sur resolveFdMatchId ci-dessus —
   // clubNameMatch seule (toujours essayée en premier, comportement inchangé)
   // ne détecte pas les noms courts ESPN qui sont un SUFFIXE (pas un préfixe)
@@ -755,5 +784,5 @@ export function resolveFdTeamId(team, compMatches, { loose = false } = {}) {
       return m.awayTeam.id
     }
   }
-  return rawId
+  return giveUp()
 }

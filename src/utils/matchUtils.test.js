@@ -346,6 +346,33 @@ describe('resolveFdTeamId', () => {
     expect(resolveFdTeamId(undefined, compMatches)).toBeNull()
   })
 
+  // ⚠️ Bug réel constaté par l'utilisateur (16/08) : losange "forme récente"
+  // d'une AUTRE équipe affiché sous le logo de Racing, match toujours en
+  // cours (id ESPN sans correspondance qui coïncide par hasard avec l'id
+  // FD.org d'un club différent une fois utilisé comme clé de formMap).
+  // `strict:true` : le repli sur l'id brut devient dangereux dès qu'on
+  // l'utilise comme clé de dictionnaire plutôt que dans une recherche de
+  // fixture à 2 id — on préfère `null` (aucune donnée) à un id emprunté à
+  // une autre équipe par coïncidence numérique.
+  describe('option { strict }', () => {
+    it('renvoie null (pas l\'id brut) si aucune correspondance trouvée', () => {
+      expect(resolveFdTeamId({ id: 555, name: 'Équipe inconnue' }, compMatches, { strict: true })).toBeNull()
+    })
+
+    it('renvoie null si compMatches est vide/pas encore chargé', () => {
+      expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, [], { strict: true })).toBeNull()
+      expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, undefined, { strict: true })).toBeNull()
+    })
+
+    it('résout toujours normalement par nom quand une correspondance existe', () => {
+      expect(resolveFdTeamId({ id: 244, name: 'Real Madrid' }, compMatches, { strict: true })).toBe(86)
+    })
+
+    it('renvoie l\'id tel quel si déjà connu dans compMatches (chemin normal inchangé)', () => {
+      expect(resolveFdTeamId({ id: 86, name: 'Real Madrid CF' }, compMatches, { strict: true })).toBe(86)
+    })
+  })
+
   // ⚠️ Bug réel constaté par l'utilisateur (27/07) : match Manchester City -
   // Bournemouth affichait les données de Manchester United. Cause :
   // resolveFdTeamId utilisait fuzzyTeam (préfixe 5 caractères / mot partagé),

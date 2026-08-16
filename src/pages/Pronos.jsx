@@ -137,8 +137,14 @@ function outcomeOf(h, a) {
 // ne retrouve jamais la vraie donnée saison de l'équipe.
 function matchProno(match, formMap, matchesByComp, lowerDivByComp) {
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
-  const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true }) ?? match?.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true }) ?? match?.awayTeam?.id
+  // ⚠️ BUG CORRIGÉ (16/08, même fix que MatchCard.jsx/MatchPoster.jsx : id
+  // ESPN coïncidant par hasard avec l'id FD.org d'un club différent, forme/
+  // stats saison d'une AUTRE équipe utilisées dans le calcul de prono) :
+  // `strict:true` + suppression du repli `?? match.xxx.id` — calcPronoAdvanced
+  // traite déjà homeId/awayId null comme "pas de H2H disponible" (voir
+  // calcProno.js), aucune régression.
+  const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true, strict: true })
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
   // Repli "club promu" (03/08, cohérence demandée avec Accueil — voir

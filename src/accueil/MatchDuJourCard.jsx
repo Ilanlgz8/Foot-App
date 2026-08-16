@@ -123,8 +123,11 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // ajouté au pool de recherche de resolveFdTeamId, cohérence garantie avec
   // le H2H déjà affiché.
   const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true }) ?? match.awayTeam?.id
+  // ⚠️ BUG CORRIGÉ (16/08, même fix que MatchCard.jsx/MatchPoster.jsx : id
+  // ESPN coïncidant par hasard avec l'id FD.org d'un club différent) :
+  // `strict:true` + suppression du repli `?? match.xxx.id`.
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true, strict: true })
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
   const prono = isLive

@@ -118,8 +118,14 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   // ⚠️ BUG CORRIGÉ (constat utilisateur : losanges "forme récente" vides sur
   // desktop) : même fix que MatchPoster.jsx — id ESPN vs id FD.org pour les
   // 6 grands championnats.
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true }) ?? match.awayTeam?.id
+  // ⚠️ 2e BUG CORRIGÉ (16/08, constat utilisateur : losange affiché sous le
+  // logo de Racing pour un match toujours en cours — id d'une AUTRE équipe
+  // affiché par coïncidence numérique) : `strict:true` supprime le repli sur
+  // l'id ESPN brut quand aucun nom ne matche vraiment — voir le commentaire
+  // détaillé sur resolveFdTeamId (matchUtils.js). Plus de `?? match.xxx.id` :
+  // un id non résolu doit rester absent, jamais deviné.
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true })
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.

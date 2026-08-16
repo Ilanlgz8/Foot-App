@@ -139,8 +139,13 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // donne une 2e chance de résolution cohérente avec le H2H déjà affiché,
   // sans introduire de nouvelle logique de matching.
   const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
-  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true }) ?? match.homeTeam?.id
-  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true }) ?? match.awayTeam?.id
+  // ⚠️ BUG CORRIGÉ (16/08, constat utilisateur : losange "forme récente"
+  // d'une AUTRE équipe affiché sous le logo de Racing, match toujours en
+  // cours — id ESPN coïncidant par hasard avec l'id FD.org d'un club
+  // différent) : `strict:true` + suppression du repli `?? match.xxx.id` —
+  // voir le commentaire détaillé sur resolveFdTeamId (matchUtils.js).
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true, strict: true })
   const hForm     = formMap?.[resolvedHomeId] ?? []
   const aForm     = formMap?.[resolvedAwayId] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
