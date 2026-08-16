@@ -8,23 +8,21 @@ import { registerFdCallAttempt } from '../utils/fdSpacingTracker'
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
 
-// ⚠️ AJOUT (idée utilisateur, 23/07 : "si y'a zéro match en live le classement
-// va pas bouger donc ça sert à rien de repoller, mais dès qu'y'a un match en
-// live dans le championnat regardé on autorise à repoller") : avant ça, AUCUN
-// refetchInterval n'existait ici — rester sur la page Classement pendant un
-// match ne mettait jamais rien à jour tout seul, il fallait quitter/revenir
-// après le TTL de 2min pour voir un changement. Le classement ne peut de
-// toute façon changer QUE si un match de CETTE compétition est en train de se
-// terminer — polling gaté sur hasLiveMatch (passé par l'appelant, dérivé de
-// useLiveData().liveMatches filtré sur selectedComp) : zéro requête
-// supplémentaire les ~99% du temps où aucun match n'est en cours dans le
-// championnat affiché, et re-poll automatique toutes les 5min uniquement
-// pendant qu'un match de ce championnat est live — largement sous le TTL
-// serveur (2min) donc jamais de gaspillage, juste une mise à jour qui arrive
-// sans avoir à recharger la page. Comme toute requête React Query,
-// refetchInterval se met nativement en pause si l'onglet n'est pas au premier
-// plan (pas de refetchIntervalInBackground ici) — pas de poll en arrière-plan.
-const LIVE_REFETCH_MS = 1000 * 60 * 5  // 5min
+// ⚠️ RETIRÉ (idée utilisateur : "chaque but met à jour le classement, et dès
+// qu'y'a plus de match en live on garde le classement en cache jusqu'au
+// prochain match") : ce hook avait un refetchInterval de 5min gaté sur
+// hasLiveMatch (idée utilisateur du 23/07 — voir historique git), pensé à
+// l'époque comme LE mécanisme de mise à jour pendant un match en direct.
+// Devenu redondant depuis : useLiveMinute.js invalide maintenant CE query
+// (['standings', code]) directement à chaque but détecté (score qui change,
+// pas juste au FT) ET à la confirmation du FT — un mécanisme événementiel
+// précis, quasi instantané, et strictement plus réactif que ce sondage
+// aveugle toutes les 5min (qui, la plupart du temps, ne trouvait de toute
+// façon rien de nouveau — le classement ne bouge qu'aux buts/FT, jamais entre
+// deux). Le garder en plus de l'invalidation événementielle ne faisait que
+// consommer des commandes Redis en double pour le même résultat. Zéro perte
+// de réactivité perçue : l'invalidation par but/FT couvre exactement les
+// mêmes instants que ce polling visait à rattraper, en mieux.
 
 // ⚠️ AJOUT 2 (idée utilisateur, même jour : "si toute la journée y'a pas de
 // match, autant garder le cache toute la journée plutôt que 2min, et dès
@@ -46,7 +44,7 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // est recalculé à chaque re-render (donc à chaque vraie visite/remontage de
 // la page), ce qui couvre déjà l'immense majorité des cas réels sans code
 // supplémentaire.
-export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday = true) {
+export function useStandings(selectedComp, hasMatchToday = true) {
   // ⚠️ AJOUT "v2" (constat utilisateur, 24/07 : classement Coupe du Monde
   // affichait toujours le Groupe A au lieu du bon groupe des 2 équipes du
   // match) : root cause confirmée — FD.org est bien prioritaire dans le code
@@ -164,7 +162,9 @@ export function useStandings(selectedComp, hasLiveMatch = false, hasMatchToday =
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
-    refetchInterval:      hasLiveMatch ? LIVE_REFETCH_MS : false,
+    // Pas de refetchInterval : voir commentaire en tête de fichier — la mise
+    // à jour pendant un match live vient maintenant de l'invalidation
+    // événementielle (but/FT, useLiveMinute.js), pas d'un sondage périodique.
     retry: false,
     enabled: !!selectedComp,
   })

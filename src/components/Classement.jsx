@@ -12,7 +12,6 @@ import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/com
 const competitions = allCompetitions.filter(c => !NO_STANDINGS_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
-import { useLiveData } from '../context/LiveProvider'
 import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers } from '../hooks/useScorers'
@@ -121,15 +120,13 @@ function Classement() {
   const { matches: wcSched, loading: wcSchedLoading } = useMatches(selectedComp, 'SCHEDULED')
   const { matches: wcFin,   loading: wcFinLoading   } = useMatches(selectedComp, 'FINISHED')
 
-  // ⚠️ AJOUT (idée utilisateur, 23/07) : le classement ne peut changer QUE
-  // si un match de LA compétition affichée est en cours — inutile de repoller
-  // sinon. hasLiveMatch dérivé de liveMatches (LiveProvider, déjà à jour
-  // partout ailleurs dans l'app) filtré sur selectedComp — voir useStandings.js
-  // pour le détail du refetchInterval gaté.
-  const { liveMatches } = useLiveData()
-  const hasLiveMatch = liveMatches.some(m => m.competition?.code === selectedComp)
+  // ⚠️ RETIRÉ hasLiveMatch (calculé ici via useLiveData/liveMatches, passé à
+  // useStandings pour son refetchInterval de 5min) — devenu inutile, voir le
+  // commentaire détaillé dans useStandings.js : la mise à jour pendant un
+  // match live vient maintenant de l'invalidation événementielle (but/FT,
+  // useLiveMinute.js), plus précise et instantanée qu'un sondage périodique.
 
-  // ⚠️ AJOUT 2 (suite idée utilisateur, même jour) : "si toute la journée y'a
+  // ⚠️ AJOUT (idée utilisateur, même jour) : "si toute la journée y'a
   // pas de match, autant garder le cache toute la journée plutôt que 2min".
   // hasMatchToday réutilise wcSched/wcFin (déjà chargés ci-dessus, zéro coût
   // réseau en plus) — vrai si un match SCHEDULED ou FINISHED de CE
@@ -159,7 +156,7 @@ function Classement() {
   // attendre 6 secondes pour chaque truc c'est chiant") : un délai fixe à
   // chaque visite, même quand inutile, était effectivement une mauvaise
   // expérience — corrigé ici sans réintroduire la collision.
-  const { standings, groups, loading, error } = useStandings(selectedComp, hasLiveMatch, hasMatchToday)
+  const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday)
   const { formMap } = useTeamForm(selectedComp, 6_000)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
   // Classement des passes décisives retiré : aucune source fiable trouvée
