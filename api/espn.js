@@ -42,6 +42,18 @@ const ALLOWED_SLUGS = new Set([
   // Coupes nationales — absentes de football-data.org en free tier, fusionnées
   // dans l'onglet du championnat parent (voir espnAdapter.js / useMatchs.js).
   'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',
+  // ⚠️ AJOUT (16/08, bug réel trouvé en creusant "pourquoi PSG-Lens
+  // n'apparaît pas dans Accueil malgré l'intégration ESPN côté client") :
+  // supercoupes nationales/européennes à 1 match/an — espnAdapter.js/
+  // competitions.js/espnSlugs.js savaient déjà tous les 3 récupérer ces
+  // matchs (fetchEspnCompMatches → fetch('/espn?slug=...')), mais CETTE
+  // liste, séparée et jamais synchronisée avec les autres, rejetait la
+  // requête en 400 ("Slug non autorisé") avant même d'atteindre ESPN. USC
+  // (Supercoupe UEFA, déjà présente dans l'app depuis un moment) avait
+  // exactement le même problème, resté invisible jusqu'ici faute d'un match
+  // suivi de près au bon moment — pas seulement TDC/CS, un vrai bug
+  // préexistant révélé par cet ajout.
+  'uefa.super_cup', 'fra.super_cup', 'eng.charity',
 ])
 
 // ⚠️ HISTORIQUE (retour utilisateur : "Statistiques indisponibles" sur des
