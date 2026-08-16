@@ -16,9 +16,6 @@ import { prefetchTeamForm } from '../hooks/useTeamForm'
 import { useWcKnockout, useCupKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { GroupModal } from './GroupModal'
 import { usePersistedState } from '../hooks/usePersistedState'
-import { FavStarBadge } from './FavStarBadge'
-import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
-import { getTeamColor } from '../data/teamPhotos'
 import { isNationalTeamComp } from '../utils/matchUtils'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -175,14 +172,6 @@ const teamName = (team) =>
 function MatchRow({ match, index, inModal = false }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { isFavorite } = useFavoriteClubs()
-  const homeIsFav = isFavorite(match.homeTeam?.id)
-  const awayIsFav = isFavorite(match.awayTeam?.id)
-  const isFav = homeIsFav || awayIsFav
-  // Si les 2 équipes sont favorites, priorité à domicile pour la couleur du badge.
-  const favColor = isFav
-    ? getTeamColor((homeIsFav ? match.homeTeam : match.awayTeam)?.shortName || (homeIsFav ? match.homeTeam : match.awayTeam)?.name)
-    : null
   const isUpcoming = match.status === 'SCHEDULED' || match.status === 'TIMED'
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
@@ -202,7 +191,6 @@ function MatchRow({ match, index, inModal = false }) {
         navigate(`/match/${match.id}`, { state: { match } })
       }}
     >
-      {isFav && <FavStarBadge variant="row" color={favColor} />}
       {match.isCup && <span className="matchs__cupBadge">{match.competition?.name}</span>}
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
