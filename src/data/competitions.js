@@ -132,6 +132,19 @@ export const DOMESTIC_CUPS = {
 // aucun classement n'a jamais de sens ici.
 export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC', 'TDC', 'CS'])
 
+// ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
+// où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
+// championnats") : sous-ensemble de NO_STANDINGS_COMPS — contrairement à
+// NL/CAN/COPA/UEL/UECL (vrais tournois multi-matchs, juste sans classement
+// exploitable), USC/TDC/CS sont un SEUL match par an. Les lister dans le
+// sélecteur de championnat (Programme/Résultats — Match.jsx/Resultat.jsx)
+// n'a pas de sens à l'année longue (rien à y voir la quasi-totalité du
+// temps). Reste néanmoins visibles normalement partout ailleurs : card
+// Accueil le jour du match, page match dédiée au clic, favoris notifs
+// (FavoritesPage.jsx, n'utilise pas ce filtre — activer/désactiver les
+// notifs d'un match par an reste légitime).
+export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
+
 export const COMPETITIONS = [
   {
     id: 'FL1',

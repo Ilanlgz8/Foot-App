@@ -8,7 +8,14 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
+
+// ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
+// championnat (mobile + desktop) n'affiche pas les compétitions à 1 seul
+// match par an (USC/TDC/CS, voir SINGLE_MATCH_COMPS) — rien d'utile à y
+// naviguer la quasi-totalité de l'année. Le match reste normalement
+// accessible via la card Accueil le jour J et sa page dédiée au clic.
+const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
 import { GroupModal }    from './GroupModal'
@@ -466,7 +473,7 @@ function Resultats() {
             </button>
           </div>
           <div className="compHeader__dots">
-            {COMPETITIONS.map(c => (
+            {SWITCHER_COMPETITIONS.map(c => (
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
@@ -476,7 +483,7 @@ function Resultats() {
               style={{ top: compAnchor.top, left: compAnchor.left, width: compAnchor.width }}
             >
               <div className="compHeader__picker">
-                {COMPETITIONS.map(comp => (
+                {SWITCHER_COMPETITIONS.map(comp => (
                   <button
                     key={comp.id}
                     className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
@@ -497,7 +504,7 @@ function Resultats() {
         <aside className="resultats__sidebar">
           <p className="resultats__sidebarLabel">Championnats</p>
           <nav className="resultats__sidebarNav">
-            {COMPETITIONS.map(comp => (
+            {SWITCHER_COMPETITIONS.map(comp => (
               <button key={comp.id}
                 onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null) }}
                 className={`resultats__sidebarItem ${selectedComp === comp.id ? 'resultats__sidebarItem--active' : ''}`}

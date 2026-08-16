@@ -4,7 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
-import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
+import { COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS } from '../data/competitions'
+
+// ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
+// Resultat.jsx) : le sélecteur de championnat n'affiche pas les
+// compétitions à 1 seul match par an (USC/TDC/CS).
+const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches } from '../hooks/useMatchs'
 import { prefetchTeamForm } from '../hooks/useTeamForm'
@@ -1126,7 +1131,7 @@ function Matchs() {
             </button>
           </div>
           <div className="compHeader__dots">
-            {COMPETITIONS.map(c => (
+            {SWITCHER_COMPETITIONS.map(c => (
               <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
@@ -1136,7 +1141,7 @@ function Matchs() {
               style={{ top: compAnchor.top, left: compAnchor.left, width: compAnchor.width }}
             >
               <div className="compHeader__picker">
-                {COMPETITIONS.map(comp => (
+                {SWITCHER_COMPETITIONS.map(comp => (
                   <button
                     key={comp.id}
                     className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
@@ -1158,7 +1163,7 @@ function Matchs() {
         <aside className={`matchs__sidebar${bracketFullWidth ? ' matchs__sidebar--hidden' : ''}`}>
           <p className="matchs__sidebarLabel">Championnats</p>
           <nav className="matchs__sidebarNav">
-            {COMPETITIONS.map(comp => (
+            {SWITCHER_COMPETITIONS.map(comp => (
               <button key={comp.id}
                 onClick={() => handleSelectComp(comp.id)}
                 className={`matchs__sidebarItem ${selectedComp === comp.id ? 'matchs__sidebarItem--active' : ''}`}
