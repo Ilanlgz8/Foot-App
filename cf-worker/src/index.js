@@ -429,18 +429,36 @@ async function runOnePass(env) {
   // "vide confirmé"), on le mémorise en cache — les passes suivantes, pour ce
   // même jour, sautent carrément ce fetch. La clé inclut la date : elle
   // s'auto-invalide chaque jour, la TTL (20h) n'est qu'une sécurité en plus.
-  // Lecture : 1 seul mget groupé (34 clés, 1 seule sous-requête, même
-  // principe que finalDone plus bas). Écriture : 1 seul pipeline groupé en
-  // fin de fetch (peu importe combien de slugs viennent d'être découverts
-  // vides). Gain concret un jour normal : ~34 fetchs ESPN/minute → ~4-8.
+  // ⚠️ DOUBLE CONFIRMATION (relecture avant déploiement — même risque que le
+  // bug historique emptyDayKey/cron:liveIds documenté plus bas dans ce fichier,
+  // incident Angleterre-Argentine : un GLITCH ESPN ponctuel — réponse 200 mais
+  // events vide alors qu'un match est bien en cours — sur UNE SEULE passe
+  // aurait figé "aucun match" pendant 20h pour ce slug, coupant toute
+  // notif/détection pour un vrai match en cours). Donc : 1ère passe vide →
+  // simple marqueur "pending" (TTL 3min, survit à une passe ratée/lente) ; ce
+  // n'est QUE si la MÊME date+slug est retrouvée vide à une 2e passe (avec un
+  // pending déjà posé) que le skip réel (20h) s'arme. Un glitch isolé d'une
+  // seule minute ne peut donc plus jamais couper un slug pour le reste du
+  // jour — il faut 2 confirmations consécutives.
+  // Lecture : 1 seul mget groupé (68 clés — flag + pending par slug/date —
+  // toujours 1 seule sous-requête, même principe que finalDone plus bas).
+  // Écriture : 1 seul pipeline groupé en fin de fetch. Gain concret un jour
+  // normal : ~34 fetchs ESPN/minute → ~4-8 (après la 2e minute de la journée).
+  const NO_MATCH_TTL      = 20 * 3600
+  const NO_MATCH_PENDING_TTL = 3 * 60
   const slugDatePairs = ESPN_SLUGS.flatMap(slug => [
-    { slug, date: today,     key: `noMatch:${slug}:${today}` },
-    { slug, date: yesterday, key: `noMatch:${slug}:${yesterday}` },
+    { slug, date: today,     key: `noMatch:${slug}:${today}`,     pendingKey: `noMatchPending:${slug}:${today}` },
+    { slug, date: yesterday, key: `noMatch:${slug}:${yesterday}`, pendingKey: `noMatchPending:${slug}:${yesterday}` },
   ])
   let noMatchFlags = new Set()
+  let noMatchPending = new Set()
   try {
-    const flags = await kv.mget(...slugDatePairs.map(p => p.key))
-    slugDatePairs.forEach((p, i) => { if (flags[i]) noMatchFlags.add(p.key) })
+    const flatKeys = slugDatePairs.flatMap(p => [p.key, p.pendingKey])
+    const flags = await kv.mget(...flatKeys)
+    slugDatePairs.forEach((p, i) => {
+      if (flags[i * 2])     noMatchFlags.add(p.key)
+      if (flags[i * 2 + 1]) noMatchPending.add(p.pendingKey)
+    })
   } catch {}
 
   const pairsToFetch = slugDatePairs.filter(p => !noMatchFlags.has(p.key))
@@ -449,20 +467,23 @@ async function runOnePass(env) {
   )
 
   const allEvents = []
-  const newlyEmptyKeys = []
+  const newlyEmptyKeys   = [] // 2e confirmation consécutive → skip réel (20h)
+  const newlyPendingKeys = [] // 1ère confirmation seulement → juste marquer, pas encore skip
   for (const r of allResults) {
     if (r.status !== 'fulfilled') continue
     const { pair, res } = r.value
     if (res.ok && res.events.length === 0) {
-      newlyEmptyKeys.push(pair.key)
+      if (noMatchPending.has(pair.pendingKey)) newlyEmptyKeys.push(pair.key)
+      else newlyPendingKeys.push(pair.pendingKey)
     } else {
       for (const evt of res.events) allEvents.push({ slug: pair.slug, evt })
     }
   }
-  if (newlyEmptyKeys.length > 0) {
+  if (newlyEmptyKeys.length > 0 || newlyPendingKeys.length > 0) {
     try {
       let flagPipe = kv.pipeline()
-      for (const k of newlyEmptyKeys) flagPipe = flagPipe.set(k, '1', { ex: 20 * 3600 })
+      for (const k of newlyEmptyKeys)   flagPipe = flagPipe.set(k, '1', { ex: NO_MATCH_TTL })
+      for (const k of newlyPendingKeys) flagPipe = flagPipe.set(k, '1', { ex: NO_MATCH_PENDING_TTL })
       await flagPipe.exec()
     } catch {}
   }
