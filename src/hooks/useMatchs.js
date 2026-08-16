@@ -991,9 +991,29 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // vrai garde-fou anti-suspension FD.org — celui-ci vit côté SERVEUR
     // (cache Redis 5min partagé entre TOUS les utilisateurs, api/football.js)
     // et reste strictement inchangé : la quasi-totalité de ces revalidations
-    // tombent sur ce cache serveur (X-Cache: HIT, ~0 coût), sans jamais
-    // retaper FD.org plus souvent qu'avant.
-    refetchOnMount: 'always',
+    // tombent sur ce cache serveur (X-Cache: HIT, ~0 coût FD.org).
+    //
+    // ⚠️ NUANCE AJOUTÉE (question utilisateur : "pourquoi ça fait autant de
+    // commandes rien qu'en visitant les pages ?") : "~0 coût" ci-dessus était
+    // vrai pour le budget FD.org (ce qui était protégé à l'époque) mais PAS
+    // pour le nombre de commandes Upstash — même un cache HIT côté serveur
+    // consomme 1 vraie commande Redis (GET) à chaque appel, distinction qui
+    // n'était pas suivie quand ce fix a été écrit. Avec 'always' INCONDITIONNEL,
+    // remonter sur Programme/Résultats (ou Accueil, qui réutilise ce même hook
+    // pour le H2H) 3 fois de suite en 10s = 3 vraies commandes Redis, même si
+    // les données affichées sont identiques et ont 10s. Pour les 6 grands
+    // championnats (isClubShared), le staleTime réel est déjà TTL.FINISHED
+    // (2min, pas les 1h du commentaire ci-dessus qui datent d'avant la fusion
+    // Programme+Résultats) — bien plus court que ce qui avait motivé 'always'
+    // à l'origine. Repli sur le comportement standard React Query (respecte
+    // staleTime, ne re-fetch QUE si les données ont plus de 2min) pour cette
+    // branche : même fraîcheur perçue dans la quasi-totalité des cas réels
+    // (2min reste largement plus réactif que le bug d'origine, 1h), mais plus
+    // de commande Redis gaspillée sur un aller-retour rapide entre pages.
+    // 'always' conservé pour WC/EC/NL/CAN/COPA/coupes (staleTime jusqu'à 1h,
+    // SCHEDULED) — c'est justement là que 'always' apporte un vrai gain de
+    // fraîcheur, le scénario pour lequel ce fix avait été écrit à l'origine.
+    refetchOnMount: isClubShared ? true : 'always',
     // ⚠️ REVERT (constat utilisateur, capture Network : rafale de 8 requêtes
     // 429 vers /api/football en ~15s — "tu veux qu'on se fasse suspendre ou
     // quoi") : le retry 429/403 ajouté plus tôt (2 tentatives, 8s d'écart)
