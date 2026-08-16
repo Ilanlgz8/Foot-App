@@ -816,8 +816,9 @@ async function runOnePass(env) {
       }
     }
 
-    // 📊 Ticker "score en direct" — pas de dédup (même tag, remplace côté SW)
-    if (isLive) {
+    // 📊 Ticker "score en direct" — pas de dédup (même tag, remplace côté SW).
+    // Espacé à 1 passe sur 2 (shouldSendLiveTicker) — voir son commentaire.
+    if (isLive && shouldSendLiveTicker()) {
       const mLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
       await pushLiveTicker(env, {
         title: `${homeTeam} ${scoreStr} ${awayTeam}`,
@@ -929,6 +930,26 @@ function shouldWriteDebugBookkeeping() {
 // local sur l'horloge (même pattern que shouldWriteDebugBookkeeping
 // ci-dessus), zéro lecture Redis supplémentaire pour décider.
 function shouldRefreshSummary() {
+  return new Date().getMinutes() % 2 === 0
+}
+
+// ⚠️ AJOUT (question utilisateur : "225K/500K commandes Upstash alors qu'il y
+// a eu des matchs en continu depuis début août, faut optimiser") : contrairement
+// à cacheEspnSummary/warmFdCache/shouldWriteDebugBookkeeping ci-dessus (déjà
+// espacés), pushLiveTicker (score en direct silencieux, filtré par club
+// favori — voir plus bas dans la boucle) tournait encore à CHAQUE passe (1min),
+// pour CHAQUE match en direct, sans aucun espacement — 1 appel Vercel + au
+// moins 1 lecture Redis (smembers push:subscriptions) par match live et par
+// minute, même si personne ne suit ce match en favori. Espacé à 1 passe sur 2,
+// même pattern que shouldRefreshSummary : coupe ce poste en 2 les jours de
+// match chargés (plusieurs matchs simultanés). Contrepartie honnête, à
+// distinguer du reste : CETTE fonctionnalité EST directement visible par
+// l'utilisateur (le badge de notif "score en direct" silencieux, tray
+// Android/iOS) — son rafraîchissement passe de 1min à 2min. Les vraies
+// alertes (but/carton/mi-temps/fin, notifyVercel plus haut) ne sont PAS
+// concernées, restent instantanées comme avant — seul ce ticker de fond
+// ralentit légèrement.
+function shouldSendLiveTicker() {
   return new Date().getMinutes() % 2 === 0
 }
 
