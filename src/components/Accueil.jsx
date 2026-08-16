@@ -284,9 +284,20 @@ function Accueil() {
     // sécurité, uniquement pour dayOffset===0 (seule vue concernée par un
     // passage de minuit en cours de match — un jour futur/passé ne peut pas
     // avoir de match "en live" par définition).
+    // ⚠️ BUG CORRIGÉ (constat utilisateur, capture d'écran à l'appui : Racing/
+    // Villarreal affiché en double, "Racing" sur une card et "Santander" sur
+    // l'autre — même match réel, même score 2-2, minute à 1 près) : ce filet
+    // comparait `!mergedIds.has(m.id)` — égalité STRICTE d'id. `liveMatches`
+    // (liveTracker, localStorage) peut retracker le même match réel sous un id
+    // légèrement différent de celui présent dans `merged` à cet instant précis
+    // (ex. résolution ESPN/FD.org qui a divergé d'un poll à l'autre — même
+    // classe de bug déjà documentée et corrigée pour `extra` juste au-dessus
+    // via isDuplicateMatch/fuzzyTeam, voir son commentaire détaillé). Ce filet
+    // -ci, ajouté plus tard pour l'exception minuit, n'avait jamais reçu la
+    // même protection — corrigé en réutilisant isDuplicateMatch ici aussi
+    // (comparaison par nom d'équipe + date proche, pas par id).
     if (dayOffset === 0 && liveMatches.length > 0) {
-      const mergedIds = new Set(merged.map(m => m.id))
-      const stillLive = liveMatches.filter(m => !mergedIds.has(m.id))
+      const stillLive = liveMatches.filter(m => !isDuplicateMatch(m, merged))
       if (stillLive.length > 0) merged = [...merged, ...stillLive]
     }
 
