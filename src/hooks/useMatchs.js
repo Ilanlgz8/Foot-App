@@ -45,19 +45,17 @@ const MAJOR_LEAGUE_COMPS = new Set(Object.keys(MAJOR_LEAGUE_FD_ID))
 // → évite les 429 (free tier football-data.org : 10 req/min)
 export const TTL = {
   SCHEDULED: 60 * 60 * 1000,   // 1h — calendrier très stable
-  // ⚠️ RELEVÉ 2min → 10min (demande utilisateur, suite au fix refetchOnMount
-  // ci-dessous/useMatches — réduire encore les commandes Redis consommées en
+  // ⚠️ ALIGNÉ sur SCHEDULED (1h), après un passage intermédiaire par 2min puis
+  // 10min (demande utilisateur, réduire les commandes Redis consommées en
   // visitant les pages) : Resultat.jsx surchage DÉJÀ ce même staleTime à 1h
-  // (TTL.SCHEDULED, voir son propre commentaire) depuis un moment, avec
-  // exactement le même raisonnement — la fraîcheur "en direct" perçue par
-  // l'utilisateur ne vient PAS de ce staleTime FD.org mais du pont ESPN
-  // séparé (liveMatches/getRecentlyFinishedMatches + ticker, voir
-  // useLiveMinute.js/LiveProvider), qui reste actif quel que soit ce TTL.
-  // 10min reste plus prudent que le 1h déjà éprouvé sans souci pour
-  // Résultats — utilisé ici par défaut pour Programme (Match.jsx) et les
-  // résolutions H2H (MatchDuJourCard/MatchPoster), qui n'avaient pas encore
-  // cet override explicite.
-  FINISHED:   10 * 60 * 1000,
+  // depuis un moment, avec exactement le même raisonnement — la fraîcheur
+  // "en direct" perçue par l'utilisateur ne vient PAS de ce staleTime FD.org
+  // mais du pont ESPN séparé (liveMatches/getRecentlyFinishedMatches +
+  // ticker, voir useLiveMinute.js/LiveProvider), actif quel que soit ce TTL.
+  // Pas de raison de garder une valeur différente/moins optimisée pour
+  // Programme (Match.jsx) et les résolutions H2H (MatchDuJourCard/
+  // MatchPoster), qui n'avaient pas cet override explicite jusqu'ici.
+  FINISHED:   60 * 60 * 1000,
   IN_PLAY:    2 * 60 * 1000,   // 2min — géré ailleurs mais garde un fallback court
 }
 
@@ -1014,18 +1012,19 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // remonter sur Programme/Résultats (ou Accueil, qui réutilise ce même hook
     // pour le H2H) 3 fois de suite en 10s = 3 vraies commandes Redis, même si
     // les données affichées sont identiques et ont 10s. Pour les 6 grands
-    // championnats (isClubShared), le staleTime réel est TTL.FINISHED (10min
-    // — voir sa définition plus haut, relevé depuis 2min sur demande
-    // utilisateur, pas les 1h du commentaire ci-dessus qui datent d'avant la
-    // fusion Programme+Résultats) — toujours plus court que ce qui avait
-    // motivé 'always' à l'origine. Repli sur le comportement standard React
-    // Query (respecte staleTime, ne re-fetch QUE si les données ont plus de
-    // 10min) pour cette branche : même fraîcheur perçue dans la quasi-totalité
-    // des cas réels (10min reste plus réactif que le bug d'origine, 1h), mais
-    // plus de commande Redis gaspillée sur un aller-retour rapide entre pages.
-    // 'always' conservé pour WC/EC/NL/CAN/COPA/coupes (staleTime jusqu'à 1h,
-    // SCHEDULED) — c'est justement là que 'always' apporte un vrai gain de
-    // fraîcheur, le scénario pour lequel ce fix avait été écrit à l'origine.
+    // championnats (isClubShared), le staleTime réel est maintenant
+    // TTL.FINISHED, aligné sur TTL.SCHEDULED (1h — voir sa définition plus
+    // haut) : EXACTEMENT le staleTime qui avait motivé 'always' à l'origine
+    // (24/07), sauf qu'entretemps Resultat.jsx a prouvé en prod que 1h ne
+    // pose aucun souci de fraîcheur perçue — la vraie fraîcheur "en direct"
+    // vient du pont ESPN séparé (liveMatches/getRecentlyFinishedMatches +
+    // ticker), pas de ce staleTime FD.org. Repli sur le comportement standard
+    // React Query (respecte staleTime, ne re-fetch QUE si les données ont
+    // plus d'1h) pour cette branche : fini le gaspillage sur un aller-retour
+    // rapide entre pages, sans perte de fraîcheur perçue par rapport à
+    // Résultats (déjà sur ce même 1h). 'always' conservé pour WC/EC/NL/CAN/
+    // COPA/coupes : ces compétitions n'ont pas encore cette validation en
+    // prod, gardé par prudence plutôt que par nécessité démontrée.
     refetchOnMount: isClubShared ? true : 'always',
     // ⚠️ REVERT (constat utilisateur, capture Network : rafale de 8 requêtes
     // 429 vers /api/football en ~15s — "tu veux qu'on se fasse suspendre ou
