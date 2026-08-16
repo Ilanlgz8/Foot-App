@@ -12,7 +12,7 @@
 import { useState, useCallback, useEffect } from 'react'
 
 const LS_KEY  = 'fav_clubs'
-const MAX_FAV = 10 // au-delà, la mise en avant perd son sens ("favori" = quelques équipes précises)
+const MAX_FAV = 20 // relevé de 10 (demande utilisateur) — limite purement UX, pas technique
 
 export function getFavoriteClubs() {
   try {
