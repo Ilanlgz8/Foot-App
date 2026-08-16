@@ -372,15 +372,25 @@ async function runOnePass(env) {
   // vide ici : plus aucune écriture Redis pour ce cas 100% routinier — le
   // comportement de skip lui-même (fetch ESPN sauté) est totalement inchangé,
   // seul le log persistant de la raison disparaît.
+  // ⚠️ AJOUT (question utilisateur : "pourquoi ça coûte encore des milliers de
+  // commandes des jours ENTIERS sans le moindre match ?") : emptyDayKey et
+  // nextCheckKey étaient lus par 2 commandes GET séparées, CHAQUE minute où
+  // aucun match n'est suivi (donc la quasi-totalité des minutes d'un jour
+  // sans match) — un MGET groupé les lit en 1 SEULE commande Redis (même
+  // principe que le pré-filtre finalDone plus haut/api/fifa-live.js), sans
+  // changer la moindre décision : skip immédiat si emptyDayKey posé, sinon
+  // skip jusqu'à nextCheckKey si encore valide — comportement identique.
   if (trackingLiveAtStart === 0) {
     let knownEmpty = false
-    try { knownEmpty = !!(await kv.get(emptyDayKey)) } catch {}
+    let skipUntil  = null
+    try {
+      const [rawEmpty, rawNextCheck] = await kv.mget(emptyDayKey, nextCheckKey)
+      knownEmpty = !!rawEmpty
+      skipUntil  = rawNextCheck
+    } catch {}
     if (knownEmpty) {
       return { events: 0, log: [] }
     }
-
-    let skipUntil = null
-    try { skipUntil = await kv.get(nextCheckKey) } catch {}
     if (skipUntil && Number(skipUntil) > now.getTime()) {
       return { events: 0, log: [] }
     }
@@ -1175,9 +1185,30 @@ async function queueFdPriorityRefresh(kv, slug, log) {
 // aucun rapport avec le direct (score/buts/notifs, gérés entièrement par le
 // pipeline runOnePass ci-dessus, jamais touché ici) — juste un délai
 // négligeable sur la fraîcheur de Résultats/Classement juste après un FT.
+// ⚠️ AJOUT (question utilisateur : "pourquoi ça coûte encore des milliers de
+// commandes des jours ENTIERS sans le moindre match, même les heures sans
+// rien en direct ?") : ce préchauffage tourne INCONDITIONNELLEMENT 24h/24
+// (voir commentaire en tête de handlePass — Programme/Résultats/Classement
+// sont consultés même sans match en direct, donc ce warm ne peut pas dépendre
+// de l'optimisation "jour vide" ci-dessus). Espacé 1 tick sur 2 (2min) le
+// 03/08 ; repassé à 1 tick sur 4 (4min) ici — double la marge par rapport à
+// avant. Contrepartie honnête : le TTL le plus court protégé (FINISHED/
+// standings, 120s) est désormais plus court que ce cycle de préchauffage —
+// une clé peut donc rester stale jusqu'à ~2min de plus avant d'être
+// rafraîchie PROACTIVEMENT. Sans risque de casse pour autant : ce préchauffage
+// n'est qu'un FILET DE SECOURS (voir commentaire plus haut, "copie stale
+// servie en secours") — un vrai visiteur qui tombe sur une clé pas encore
+// rechauffée déclenche simplement son propre vrai appel FD.org (protégé par
+// le même budget/circuit-breaker que d'habitude, voir api/football.js), au
+// lieu d'un cache HIT instantané — juste un peu de latence en plus dans ce
+// cas précis (rare), jamais d'erreur/429 nouveau.
+function shouldWarmFdCache() {
+  return new Date().getMinutes() % 4 === 0
+}
+
 async function warmFdCache(log, kv) {
   try {
-    if (kv && new Date().getMinutes() % 2 === 0) {
+    if (kv && shouldWarmFdCache()) {
       try {
         const queued = await kv.lpop(FD_PRIORITY_QUEUE_KEY)
         if (queued != null) {
@@ -1194,9 +1225,8 @@ async function warmFdCache(log, kv) {
       } catch (e) { log.push(`[fd-warm:priority] error=${e.message}`) }
     }
 
-    const now = new Date()
-    if (now.getMinutes() % 2 !== 0) return
-    const idx = Math.floor(Date.now() / 120_000) % FD_WARM_LIST.length
+    if (!shouldWarmFdCache()) return
+    const idx = Math.floor(Date.now() / 240_000) % FD_WARM_LIST.length
     const { apiPath, qs } = FD_WARM_LIST[idx]
     const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
