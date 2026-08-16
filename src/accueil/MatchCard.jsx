@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, parseEspnClock } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
-import { getMatchState } from '../utils/matchStateTracker'
+import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
 import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
@@ -152,22 +152,45 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
     liveMinute !== null
   )
 
-  // Countdown mi-temps : "15 min" → "1 min" → "Reprise immédiate"
+  // Countdown mi-temps : "Reprise dans 15 min" → ... → "Reprise imminente"
+  // ⚠️ AJOUT du filet de sécurité + alignement du texte/de la couleur sur
+  // MatchPoster.jsx (16/08, constat utilisateur : la version desktop de
+  // cette card affichait un simple petit "X min" gris au lieu du même texte
+  // "Reprise dans X min" en jaune que sur mobile) : cette card n'avait pas
+  // le filet de sécurité déjà présent côté MatchPoster (state.pausedAt posé
+  // ici même si aucun autre hook n'a witnessé la transition IN_PLAY→PAUSED,
+  // ex. onglet/app ouvert directement en pleine mi-temps) — sans lui, une
+  // card pouvait rester bloquée sans aucun countdown. Même calcul qu'ailleurs
+  // (ESPN gèle son horloge sur la minute réelle atteinte au coup de sifflet,
+  // voir le commentaire détaillé dans MatchPoster.jsx/useLiveMinute.js).
   const [htLabel, setHtLabel] = useState(null)
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
     const compute = () => {
-      const state = getMatchState(match.id)
+      let state = getMatchState(match.id)
+      if (!state.pausedAt && !state.half2Start) {
+        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
+        const realHalfMins = parseEspnClock(state.espnClock)?.base
+        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
+        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
+        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
+        state = getMatchState(match.id)
+      }
       // Arrêter le décompte si la 2ème MT a démarré
       if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
       const elapsed = Date.now() - state.pausedAt
       const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
-      setHtLabel(remMin > 0 ? `${remMin} min` : 'Reprise immédiate')
+      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
     }
     compute()
     // Mise à jour chaque minute (le décompte est en minutes)
     const id = setInterval(compute, 60_000)
     return () => clearInterval(id)
+    // match.id (stable) sert de proxy volontaire pour le reste de `match`
+    // utilisé dans compute() (match.utcDate, fixe pour un match donné) — même
+    // pattern que MatchPoster.jsx, voir son commentaire détaillé : dépendre de
+    // `match` en entier recréerait le setInterval à chaque poll live.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMinute, match.id])
 
   // Score : fusion ESPN + football-data.org PENDANT le direct seulement (ESPN

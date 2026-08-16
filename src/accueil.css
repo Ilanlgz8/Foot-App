@@ -876,12 +876,16 @@
   .accueil__matchCardLabel { font-size: 0.64rem; }
   .accueil__matchCardValue { font-size: 1.35rem; padding: 0.3rem 1.05rem; min-width: 6rem; }
 }
+/* Jaune/or — aligné sur .poster__reprise-label (MatchPoster.jsx), même
+   information affichée en gris/blanc discret avant ce fix (constat
+   utilisateur : incohérent avec la version mobile de cette même card). */
 .accueil__matchCardHTCountdown {
   font-size: 0.48rem;
-  font-weight: 600;
-  color: rgba(var(--white-rgb), 0.45);
+  font-weight: 700;
+  color: rgba(255, 200, 50, 0.95);
   letter-spacing: 0.04em;
   line-height: 1;
+  text-shadow: 0 1px 6px rgba(var(--black-rgb), 0.5);
 }
 
 .accueil__matchCardValue {
