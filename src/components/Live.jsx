@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
-import { isRecentlyFinished } from '../utils/matchStateTracker'
+import { isRecentlyFinished, getMatchState } from '../utils/matchStateTracker'
 import { COMPETITIONS } from '../data/competitions'
 import { useState, useEffect } from 'react'
 import { LiveCard } from './LiveCardWidget'
@@ -50,9 +50,24 @@ export default function Live() {
     return () => clearInterval(id)
   }, [liveMatches])
 
-  const live = liveMatches.filter(m =>
-    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
-  )
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : le widget reste affiché ~5min après
+  // la fin du match au lieu de disparaître direct, comme la card de
+  // l'Accueil) : `m.status` vient de liveTracker.js, qui le fige à 'IN_PLAY'
+  // dès markLive() et ne le change JAMAIS ensuite (voir markLive) — seule la
+  // suppression de l'entrée (markEnded, appelé 5min après confirmFt dans
+  // useLiveMinute.js, délai volontaire pour laisser une 2e chance à FD.org
+  // de rattraper classement/forme/buteurs, pas lié à l'affichage) fait sortir
+  // le match de `liveMatches`. Tant que l'entrée existe, `m.status ===
+  // 'IN_PLAY'` est TOUJOURS vrai, donc le filtre gardait le match jusqu'à ces
+  // 5min quoi qu'il arrive — `isRecentlyFinished(m.id)` (8s) n'avait jamais
+  // vraiment d'effet, le 1er terme du OR était déjà toujours vrai. Fix : dès
+  // que `ft` est confirmé, on ne se fie plus à `m.status` — seul
+  // isRecentlyFinished (8s, même repère que la sortie auto de LiveMatchPage)
+  // décide si le widget reste encore un instant ou disparaît.
+  const live = liveMatches.filter(m => {
+    if (getMatchState(m.id).ft === true) return isRecentlyFinished(m.id)
+    return m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED'
+  })
 
   return (
     <section className="live__page">
