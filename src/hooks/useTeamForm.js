@@ -412,8 +412,35 @@ export function useTeamFormMulti(compCodes) {
     }),
   })
 
-  const formMap = {}
-  for (const r of results) Object.assign(formMap, r.data?.formMap ?? {})
+  // ⚠️ AJOUT (constat utilisateur : Deportivo — 0 match joué cette saison —
+  // affichait un losange vert de victoire sur sa card de match Accueil) :
+  // les compétitions ESPN-only (NL/CAN/COPA/UEL/UECL, voir
+  // ESPN_SOURCED_FORM_COMPS plus haut) ont un formMap keyé par des ids
+  // ESPN — un espace DIFFÉRENT des ids FD.org utilisés par les
+  // championnats club. Object.assign fusionnait auparavant TOUTES les
+  // compétitions affichées le même jour sur l'Accueil dans un SEUL objet
+  // plat, sans distinction d'origine — si une compétition ESPN-only avait
+  // AUSSI un match ce jour-là (fréquent en août : qualifications Ligue
+  // Europa/Conférence), un id ESPN qui coïncide par hasard avec l'id FD.org
+  // d'un club totalement différent pouvait écraser silencieusement sa
+  // vraie entrée (ou en créer une fausse pour un club qui n'a encore rien
+  // joué). Fusion en 2 passes : compétitions FD.org (ids fiables) EN
+  // PREMIER, les compétitions ESPN-only ne remplissent ensuite QUE les
+  // clés encore vides — ne peuvent plus jamais écraser une vraie entrée
+  // FD.org. Comportement strictement inchangé quand aucune compétition
+  // ESPN-only n'est affichée le même jour (cas normal, la grande majorité
+  // du temps).
+  const formMap    = {}
+  const resultByCode = Object.fromEntries(codes.map((c, i) => [c, results[i]]))
+  const fdCodes   = codes.filter(c => !ESPN_SOURCED_FORM_COMPS.has(c))
+  const espnCodes = codes.filter(c => ESPN_SOURCED_FORM_COMPS.has(c))
+  for (const c of fdCodes) Object.assign(formMap, resultByCode[c]?.data?.formMap ?? {})
+  for (const c of espnCodes) {
+    const espnFormMap = resultByCode[c]?.data?.formMap ?? {}
+    for (const [id, form] of Object.entries(espnFormMap)) {
+      if (!(id in formMap)) formMap[id] = form
+    }
+  }
 
   // matchesByComp : nécessaire à calcPronoAdvanced (calcProno.js) pour le
   // modèle buts marqués/encaissés — contrairement à formMap (fusionné, une
