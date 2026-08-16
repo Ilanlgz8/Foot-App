@@ -9,7 +9,7 @@ import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
 import { mergeScore, isCardLive } from '../utils/matchUtils'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
@@ -572,7 +572,7 @@ function Accueil() {
     const out  = []
     for (const m of matches) {
       const id = m.competition?.id
-      if (id && !seen.has(id)) {
+      if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
         seen.add(id)
         const meta = COMPETITIONS.find(c => c.id === id)
         out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
@@ -586,7 +586,7 @@ function Accueil() {
     const out  = []
     for (const m of results) {
       const id = m.competition?.id
-      if (id && !seen.has(id)) {
+      if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
         seen.add(id)
         const meta = COMPETITIONS.find(c => c.id === id)
         out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
