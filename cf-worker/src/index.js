@@ -411,7 +411,47 @@ async function runOnePass(env) {
   // l'ordre/timing de la logique existante, seulement prolonger la passe.
   const pendingFinalRechecks = []
 
+  // ⚠️ AJOUT (question utilisateur : "6K commandes Redis en <10h une nuit sans
+  // nouveau match, c'est pas normal") : ESPN continue de lister un match dans
+  // son scoreboard/dates=... pendant tout le reste de sa journée ET le
+  // lendemain (via le fetch "yesterday" ci-dessus), même des HEURES après sa
+  // vraie fin — donc allEvents contient encore des matchs déjà clos
+  // (finalDoneKey déjà posé, voir plus bas) pendant ~48h après chaque journée
+  // de championnat. AVANT ce fix, CHAQUE match déjà clos payait quand même le
+  // pipeline complet (5-7 commandes Redis) à CHAQUE passe où il traînait
+  // encore ici, avant de découvrir (via pick(5), plus bas) qu'il n'y avait
+  // plus rien à faire — un coût jugé "inévitable" à l'origine (voir
+  // commentaire historique sur finalDoneKey/pick(5)) parce qu'on ne
+  // connaissait alreadyDone qu'APRÈS avoir exécuté le pipeline. Avec plusieurs
+  // championnats qui reprennent la même semaine (donc souvent 10-20+ matchs
+  // clos qui traînent en même temps dans la fenêtre 48h), ce coût devient vite
+  // significatif — y compris la nuit, quand aucun nouveau match ne justifie
+  // pourtant la moindre commande.
+  //
+  // Fix : un seul MGET groupé lit le statut "clos" de TOUS les matchs de
+  // cette passe en 1 SEULE commande Redis (peu importe leur nombre — même
+  // principe déjà utilisé dans api/fifa-live.js/fetchEspnEvents) — donc aussi
+  // 1 seule sous-requête Cloudflare, pas 1 par match (important : un get()
+  // séparé par match aurait doublé le nombre de sous-requêtes pour CHAQUE
+  // match encore actif, au risque de re-cogner la limite de 50/exécution que
+  // le passage en pipeline, voir plus bas, avait justement réglée). Les
+  // matchs déjà clos sautent alors la boucle avant de payer le moindre coût
+  // du pipeline par-match. Purement ADDITIF : le pipeline par-match et son
+  // propre .get(finalDoneKey) (voir pick(5) plus bas) restent INCHANGÉS —
+  // ce pré-filtre ne fait que sauter les matchs qu'on sait DÉJÀ clos depuis
+  // AVANT cette passe ; un match qui vient tout juste d'être confirmé clos
+  // PENDANT cette passe (1ère fois) n'est pas concerné, traité normalement
+  // comme avant.
+  let alreadyDoneIds = new Set()
+  if (allEvents.length > 0) {
+    try {
+      const doneFlags = await kv.mget(...allEvents.map(({ evt }) => `finalDone:${evt.id}`))
+      allEvents.forEach(({ evt }, i) => { if (doneFlags[i]) alreadyDoneIds.add(evt.id) })
+    } catch {}
+  }
+
   for (const { slug, evt } of allEvents) {
+   if (alreadyDoneIds.has(evt.id)) continue
    try {
     const comp = evt.competitions?.[0]
     if (!comp) continue
