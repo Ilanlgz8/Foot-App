@@ -45,7 +45,19 @@ const MAJOR_LEAGUE_COMPS = new Set(Object.keys(MAJOR_LEAGUE_FD_ID))
 // → évite les 429 (free tier football-data.org : 10 req/min)
 export const TTL = {
   SCHEDULED: 60 * 60 * 1000,   // 1h — calendrier très stable
-  FINISHED:   2 * 60 * 1000,   // 2min (était 5min) — aligné sur le cache serveur, résultats/classement/buteurs à jour plus vite
+  // ⚠️ RELEVÉ 2min → 10min (demande utilisateur, suite au fix refetchOnMount
+  // ci-dessous/useMatches — réduire encore les commandes Redis consommées en
+  // visitant les pages) : Resultat.jsx surchage DÉJÀ ce même staleTime à 1h
+  // (TTL.SCHEDULED, voir son propre commentaire) depuis un moment, avec
+  // exactement le même raisonnement — la fraîcheur "en direct" perçue par
+  // l'utilisateur ne vient PAS de ce staleTime FD.org mais du pont ESPN
+  // séparé (liveMatches/getRecentlyFinishedMatches + ticker, voir
+  // useLiveMinute.js/LiveProvider), qui reste actif quel que soit ce TTL.
+  // 10min reste plus prudent que le 1h déjà éprouvé sans souci pour
+  // Résultats — utilisé ici par défaut pour Programme (Match.jsx) et les
+  // résolutions H2H (MatchDuJourCard/MatchPoster), qui n'avaient pas encore
+  // cet override explicite.
+  FINISHED:   10 * 60 * 1000,
   IN_PLAY:    2 * 60 * 1000,   // 2min — géré ailleurs mais garde un fallback court
 }
 
@@ -1002,14 +1014,15 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     // remonter sur Programme/Résultats (ou Accueil, qui réutilise ce même hook
     // pour le H2H) 3 fois de suite en 10s = 3 vraies commandes Redis, même si
     // les données affichées sont identiques et ont 10s. Pour les 6 grands
-    // championnats (isClubShared), le staleTime réel est déjà TTL.FINISHED
-    // (2min, pas les 1h du commentaire ci-dessus qui datent d'avant la fusion
-    // Programme+Résultats) — bien plus court que ce qui avait motivé 'always'
-    // à l'origine. Repli sur le comportement standard React Query (respecte
-    // staleTime, ne re-fetch QUE si les données ont plus de 2min) pour cette
-    // branche : même fraîcheur perçue dans la quasi-totalité des cas réels
-    // (2min reste largement plus réactif que le bug d'origine, 1h), mais plus
-    // de commande Redis gaspillée sur un aller-retour rapide entre pages.
+    // championnats (isClubShared), le staleTime réel est TTL.FINISHED (10min
+    // — voir sa définition plus haut, relevé depuis 2min sur demande
+    // utilisateur, pas les 1h du commentaire ci-dessus qui datent d'avant la
+    // fusion Programme+Résultats) — toujours plus court que ce qui avait
+    // motivé 'always' à l'origine. Repli sur le comportement standard React
+    // Query (respecte staleTime, ne re-fetch QUE si les données ont plus de
+    // 10min) pour cette branche : même fraîcheur perçue dans la quasi-totalité
+    // des cas réels (10min reste plus réactif que le bug d'origine, 1h), mais
+    // plus de commande Redis gaspillée sur un aller-retour rapide entre pages.
     // 'always' conservé pour WC/EC/NL/CAN/COPA/coupes (staleTime jusqu'à 1h,
     // SCHEDULED) — c'est justement là que 'always' apporte un vrai gain de
     // fraîcheur, le scénario pour lequel ce fix avait été écrit à l'origine.
@@ -1168,11 +1181,12 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
 }
 
 // Matchs FINISHED de toutes les compétitions — utilisé UNIQUEMENT par l'onglet
-// Classement de Pronos.jsx pour comparer les pronostics au score réel. TTL
-// volontairement long (10min, cache dédié "ALL_FINISHED_PRONOS", distinct du
-// cache FINISHED 2min utilisé par Résultats) et enabled=false tant que
-// l'onglet Classement n'est pas ouvert : évite une rafale répétée de N
-// requêtes FD.org, un classement pronos n'a pas besoin d'être seconde près.
+// Classement de Pronos.jsx pour comparer les pronostics au score réel. Cache
+// dédié "ALL_FINISHED_PRONOS", distinct de celui utilisé par Programme/
+// Résultats (TTL.FINISHED/TTL.SCHEDULED, voir plus haut) — et enabled=false
+// tant que l'onglet Classement n'est pas ouvert : évite une rafale répétée
+// de N requêtes FD.org, un classement pronos n'a pas besoin d'être seconde
+// près.
 export function useFinishedMatchesAllComps(compIds, enabled = true) {
   const key        = 'matches_ALL_FINISHED_PRONOS'
   const cachedData = readCacheStale(key)
