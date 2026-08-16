@@ -84,6 +84,19 @@ export const EUROPEAN_CUP_SLUGS = {
   UECL: 'uefa.europa.conf',
   USC:  'uefa.super_cup', // Supercoupe UEFA (vainqueur C1 vs vainqueur Ligue Europa) — 1 match/an
 }
+// ⚠️ AJOUT (16/08, demande explicite utilisateur : "PSG-Lens pour le trophée
+// des champions... Arsenal-Manchester City aussi") : supercoupes NATIONALES
+// (vainqueur du championnat vs vainqueur de la coupe nationale), standalone,
+// 1 match/an chacune — même famille que USC (EUROPEAN_CUP_SLUGS) mais pas
+// européennes, groupe séparé pour rester honnête sur le nommage. Slugs ESPN
+// vérifiés en direct (vrai appel scoreboard, pas une supposition) le 16/08 :
+// fra.super_cup → PSG @ Lens 16/08 (Trophée des Champions), eng.charity →
+// Manchester City @ Arsenal 16/08 (Community Shield, Arsenal 3-0), les deux
+// avec données complètes (score, buteurs, cartons, stats).
+export const NATIONAL_SUPER_CUP_SLUGS = {
+  TDC: 'fra.super_cup', // Trophée des Champions
+  CS:  'eng.charity',   // Community Shield (nom ESPN historique "Charity Shield")
+}
 
 // Liste à plat pour le cron (api/cron-goals.js, cf-worker/src/index.js) —
 // aucun besoin d'id précis à cet endroit, il parcourt juste tous les slugs.
@@ -91,6 +104,7 @@ export const EXTRA_NOTIFY_SLUGS = [
   ...Object.values(NATIONAL_COMP_SLUGS),
   ...Object.values(DOMESTIC_CUP_SLUGS),
   ...Object.values(EUROPEAN_CUP_SLUGS),
+  ...Object.values(NATIONAL_SUPER_CUP_SLUGS),
 ]
 
 // ⚠️ AJOUT (suite directe du point ci-dessus, demande utilisateur explicite :
@@ -132,6 +146,6 @@ export function espnNativeSlug(match) {
   if (!String(match?.id ?? '').startsWith('espn-')) return null
   if (match.isCup) return DOMESTIC_CUP_SLUGS[match.competition?.code] ?? null
   const code = match.competition?.code
-  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code]
+  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? NATIONAL_SUPER_CUP_SLUGS[code]
     ?? ESPN_SLUG_BY_COMP_ID[match.competition?.id] ?? null
 }

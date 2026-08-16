@@ -50,7 +50,7 @@ const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'COPA'])
 // match.competition.id : un id null pour TOUTES ces compétitions les aurait
 // fait fusionner ensemble dans un seul groupe "Autre".
 const SYNTHETIC_COMP_ID = {
-  NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5, USC: -6,
+  NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5, USC: -6, TDC: -7, CS: -8,
   FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103,
 }
 

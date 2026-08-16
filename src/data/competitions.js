@@ -61,6 +61,10 @@ export const COMPETITION_ESPN_SLUG = {
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
   USC:  'uefa.super_cup',
+  // Supercoupes nationales (16/08, demande explicite utilisateur) — voir
+  // NATIONAL_SUPER_CUP_SLUGS dans espnSlugs.js pour le détail/la vérification.
+  TDC:  'fra.super_cup',
+  CS:   'eng.charity',
 }
 
 // ID numérique football-data.org réel des 6 grands championnats club —
@@ -126,7 +130,7 @@ export const DOMESTIC_CUPS = {
 // Classement.
 // USC (Supercoupe UEFA) ajoutée pour la même raison — un seul match par an,
 // aucun classement n'a jamais de sens ici.
-export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC'])
+export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC', 'TDC', 'CS'])
 
 export const COMPETITIONS = [
   {
@@ -186,6 +190,24 @@ export const COMPETITIONS = [
     id: 'USC',
     name: "Supercoupe de l'UEFA",
     shortName: 'Supercoupe UEFA',
+    emblem: null,
+  },
+  {
+    // Trophée des Champions (vainqueur Ligue 1 vs vainqueur Coupe de France)
+    // — 1 seul match par an, 100% ESPN (fra.super_cup, vérifié en direct le
+    // 16/08), même traitement que USC. Pas de logo dédié disponible.
+    id: 'TDC',
+    name: 'Trophée des Champions',
+    shortName: 'Troph. Champions',
+    emblem: null,
+  },
+  {
+    // Community Shield (vainqueur Premier League vs vainqueur FA Cup) — 1
+    // seul match par an, 100% ESPN (eng.charity, vérifié en direct le 16/08),
+    // même traitement que USC/TDC. Pas de logo dédié disponible.
+    id: 'CS',
+    name: 'Community Shield',
+    shortName: 'Comm. Shield',
     emblem: null,
   },
   {
