@@ -30,6 +30,33 @@ function groupByCompetition(matches) {
   })
 }
 
+// ⚠️ AJOUT (constat utilisateur : un match disparu normalement — minute →
+// "Terminé" → disparition après la fenêtre de grâce — RÉAPPARAISSAIT en
+// revenant sur cette page après être passé par l'Accueil) : `isRecentlyFinished`
+// (8s, voir matchStateTracker.js) est une fenêtre de temps GLISSANTE, recalculée
+// à chaque rendu — rien ne mémorisait qu'un match donné avait déjà fini de
+// s'afficher et de disparaître une première fois. Si `liveMatches` (voir
+// liveTracker.js) contient encore l'entrée (elle survit 5min après confirmFt,
+// volontairement, pour laisser le temps à FD.org de rattraper classement/forme
+// — voir le commentaire dans useLiveMinute.js) et que N'IMPORTE QUEL chemin la
+// re-touche entre-temps (ex. un repli FD.org qui rappelle markLive() sur une
+// donnée obsolète, plusieurs existent dans useLiveMinute.js), Live.jsx n'avait
+// aucun moyen de savoir qu'il avait déjà tranché "disparu" pour CE match — la
+// fenêtre de 8s pouvait retomber "vraie" à un remount, ou la re-render suivante
+// recalculait tout depuis zéro sans mémoire du passé. Correctif : mémoriser en
+// dehors du composant (donc survit aux montages/démontages de cette page —
+// contrairement à un useState/useRef, recréé à chaque retour ici) le
+// termineAt déjà "vu disparaître" par match — un match ne réapparaît alors plus
+// pour CE MÊME événement de fin, quoi qu'il se passe ailleurs entre-temps.
+// N'empêche PAS une vraie résurrection légitime (faux FT corrigé, voir
+// isFalseEndedReversal dans useLiveMinute.js) : dans ce cas `ft` repasse à
+// false, on nettoie alors l'entrée mémorisée et le match redevient visible
+// normalement via le statut IN_PLAY/PAUSED, sans attendre un nouveau
+// événement de fin. Remis à zéro au rechargement complet de l'app (state
+// module-level, pas persisté) — comportement acceptable, un reload repart
+// sur des bases saines de toute façon.
+const _dismissedFt = new Map() // matchId → termineAt déjà affiché "disparu"
+
 // ── Page Live ─────────────────────────────────────────────────────────────────
 export default function Live() {
   const navigate = useNavigate()
@@ -65,7 +92,20 @@ export default function Live() {
   // isRecentlyFinished (8s, même repère que la sortie auto de LiveMatchPage)
   // décide si le widget reste encore un instant ou disparaît.
   const live = liveMatches.filter(m => {
-    if (getMatchState(m.id).ft === true) return isRecentlyFinished(m.id)
+    const state = getMatchState(m.id)
+    if (state.ft === true) {
+      // Déjà affiché "disparu" pour CE MÊME événement de fin (voir
+      // _dismissedFt ci-dessus) → ne jamais revenir, peu importe ce qui a pu
+      // re-toucher liveMatches entre-temps.
+      if (_dismissedFt.get(m.id) === state.termineAt) return false
+      const recent = isRecentlyFinished(m.id)
+      if (!recent) _dismissedFt.set(m.id, state.termineAt)
+      return recent
+    }
+    // ft redevenu false (résurrection légitime, faux FT corrigé) → oublier
+    // un éventuel dismiss précédent, sinon un match qui reprend vraiment
+    // resterait bloqué invisible.
+    if (_dismissedFt.has(m.id)) _dismissedFt.delete(m.id)
     return m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED'
   })
 
