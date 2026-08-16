@@ -189,19 +189,40 @@ export { normalize, fuzzyTeam }
 // protection.
 
 /**
- * Convertit un displayClock ESPN ("42:00", "45:00+2:00") en minutes entières.
+ * Convertit un displayClock ESPN ("42:07", "45:00+2:13") en minutes, AVEC la
+ * fraction de minute (précision seconde) — pas juste la minute entière.
+ *
+ * ⚠️ AJOUT (constat utilisateur : la minute affichée traîne un peu en retard
+ * sur toute la durée du match). Avant, cette fonction tronquait les secondes
+ * (parseInt sur la partie "minutes" seulement) : un coup d'envoi détecté à
+ * espnClock="1:45" donnait mins=1, donc kickoffAt = now - 1min alors que
+ * 1min45s s'étaient réellement écoulées — 45s de retard figés pour TOUTE la
+ * durée du match (kickoffAt n'est calculé qu'une seule fois à la détection,
+ * jamais recalculé ensuite, voir setKickoffAt/matchStateTracker.js). Le
+ * recalibrage "une minute après" suggéré par l'utilisateur n'aurait rien
+ * réglé : la troncature se reproduit identique à CHAQUE lecture (0 à 59s de
+ * perte selon la seconde exacte), ce n'est pas un problème de timing du poll
+ * — la vraie source était la perte des secondes elles-mêmes. Fix plus simple
+ * et qui règle la cause : garder les secondes (fraction de minute). Tous les
+ * appelants existants (kickoffAt, pausedAt mi-temps, half2Start, comparaisons
+ * de plausibilité type `< 90`/`>= 85`) multiplient déjà ce retour par 60_000
+ * ou le comparent à un seuil entier — un float (ex: 1.75 pour "1:45")
+ * fonctionne identiquement, juste plus précis, sans toucher aux appelants.
  */
 function parseClockMins(clock) {
   if (!clock) return null
-  const plusIdx = clock.indexOf('+')
-  if (plusIdx === -1) {
-    const m = parseInt(clock.split(':')[0], 10)
-    return isNaN(m) ? null : m
+  const parsePart = (str) => {
+    const [m, s] = str.split(':')
+    const mins = parseInt(m, 10)
+    const secs = parseInt(s, 10)
+    if (isNaN(mins)) return null
+    return mins + (isNaN(secs) ? 0 : secs / 60)
   }
-  const base  = parseInt(clock.slice(0, plusIdx).split(':')[0], 10)
-  const extra = parseInt(clock.slice(plusIdx + 1).split(':')[0], 10)
-  if (isNaN(base) || isNaN(extra)) return null
-  return base + extra
+  const plusIdx = clock.indexOf('+')
+  if (plusIdx === -1) return parsePart(clock)
+  const base  = parsePart(clock.slice(0, plusIdx))
+  const extra = parsePart(clock.slice(plusIdx + 1))
+  return (base == null || extra == null) ? null : base + extra
 }
 
 // ─────────────────────────────────────────────
