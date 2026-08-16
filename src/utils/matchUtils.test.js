@@ -373,6 +373,35 @@ describe('resolveFdTeamId', () => {
     })
   })
 
+  // ⚠️ Bug réel constaté par l'utilisateur (16/08, 2e occurrence) : losange
+  // "forme récente" de Deportivo (0 match joué cette saison) affichait le
+  // résultat GAGNANT d'un autre club. Root cause plus profonde que le 1er fix
+  // `strict` ci-dessus : l'ancien raccourci "id déjà connu dans compMatches"
+  // faisait confiance à `rawId` dès qu'il existait QUELQUE PART dans
+  // compMatches, MÊME associé au nom d'une équipe complètement différente —
+  // un id ESPN qui coïncide par hasard avec l'id FD.org d'un AUTRE club
+  // passait ce test AVANT même d'atteindre la recherche par nom (donc AVANT
+  // que `strict` ait la moindre chance d'intervenir). Ce test fige le
+  // comportement correct : un id "connu" mais mal attribué doit retomber sur
+  // la recherche par nom, pas être accepté aveuglément.
+  describe('id connu dans compMatches mais associé au MAUVAIS club (collision numérique)', () => {
+    // id=81 est le vrai id FD.org de FC Barcelona dans compMatches — un id
+    // ESPN pour Deportivo qui coïnciderait PAR HASARD avec 81 ne doit jamais
+    // être accepté comme "id de Deportivo" juste parce que 81 existe déjà
+    // dans compMatches (sous le nom de Barcelone, pas de Deportivo).
+    it('avec { strict: true } : ignore l\'id trouvé si le nom associé ne correspond pas → null, pas 81', () => {
+      expect(resolveFdTeamId({ id: 81, name: 'RC Deportivo' }, compMatches, { strict: true })).toBeNull()
+    })
+
+    it('sans strict : retombe sur l\'id brut (comportement par défaut inchangé, non protégé)', () => {
+      expect(resolveFdTeamId({ id: 81, name: 'RC Deportivo' }, compMatches)).toBe(81)
+    })
+
+    it('le nom associé au bon id continue de fonctionner normalement (pas de faux négatif introduit)', () => {
+      expect(resolveFdTeamId({ id: 81, name: 'FC Barcelona' }, compMatches, { strict: true })).toBe(81)
+    })
+  })
+
   // ⚠️ Bug réel constaté par l'utilisateur (27/07) : match Manchester City -
   // Bournemouth affichait les données de Manchester United. Cause :
   // resolveFdTeamId utilisait fuzzyTeam (préfixe 5 caractères / mot partagé),

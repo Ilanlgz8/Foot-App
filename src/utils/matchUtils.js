@@ -755,11 +755,6 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
   const rawId = team?.id ?? null
   const giveUp = () => (strict ? null : rawId)
   if (!team || !compMatches?.length) return giveUp()
-  // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
-  // compMatches) : rien à résoudre, on ne fait jamais de recherche par nom
-  // inutilement.
-  const idAlreadyKnown = compMatches.some(m => m.homeTeam?.id === rawId || m.awayTeam?.id === rawId)
-  if (idAlreadyKnown) return rawId
   // ⚠️ clubNameMatch (pas fuzzyTeam) : voir commentaire dédié dans
   // espnSummaryParse.js — fuzzyTeam confond des clubs distincts qui
   // partagent juste un mot générique (bug réel : Manchester City / United).
@@ -768,14 +763,33 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
   // uniquement) — plus de champs comparés compense sans réintroduire le
   // risque de faux positif.
   const teamNames = [team.name, team.shortName].filter(Boolean)
+  const matches = (candidate) => teamNames.some(n =>
+    clubNameMatch(candidate ?? '', n) || (loose && looseTeamNameMatch(candidate ?? '', n))
+  )
+  // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
+  // compMatches) : rien à résoudre, on ne fait jamais de recherche par nom
+  // inutilement.
+  // ⚠️ AJOUT vérification du nom (constat utilisateur, 16/08 : losange "forme
+  // récente" de Deportivo — 0 match joué cette saison — affichait le résultat
+  // GAGNANT d'un autre club) : cet ancien raccourci faisait confiance à
+  // `rawId` dès qu'il existait QUELQUE PART dans compMatches, MÊME sous le
+  // nom d'une équipe complètement différente — exactement le bug que `strict`
+  // était censé éviter (id ESPN qui coïncide par hasard avec l'id FD.org d'un
+  // AUTRE club, voir le commentaire strict plus bas) : `strict` empêchait
+  // bien de RETOMBER sur un id inconnu, mais ce raccourci-ci, lui, acceptait
+  // encore aveuglément un id CONNU mais attribué au mauvais club. Un id
+  // trouvé mais dont le nom associé ne correspond pas retombe maintenant sur
+  // la recherche par nom ci-dessous plutôt que d'être accepté tel quel.
+  const idMatch = compMatches.find(m => m.homeTeam?.id === rawId || m.awayTeam?.id === rawId)
+  if (idMatch) {
+    const teamAtId = idMatch.homeTeam?.id === rawId ? idMatch.homeTeam : idMatch.awayTeam
+    if (!teamNames.length || matches(teamAtId?.name) || matches(teamAtId?.shortName)) return rawId
+  }
   if (!teamNames.length) return giveUp()
   // `loose` : voir le commentaire détaillé sur resolveFdMatchId ci-dessus —
   // clubNameMatch seule (toujours essayée en premier, comportement inchangé)
   // ne détecte pas les noms courts ESPN qui sont un SUFFIXE (pas un préfixe)
   // du nom FD.org, ex. "Lyon" vs "Olympique Lyon(nais)".
-  const matches = (candidate) => teamNames.some(n =>
-    clubNameMatch(candidate ?? '', n) || (loose && looseTeamNameMatch(candidate ?? '', n))
-  )
   for (const m of compMatches) {
     if (matches(m.homeTeam?.name) || matches(m.homeTeam?.shortName)) {
       return m.homeTeam.id

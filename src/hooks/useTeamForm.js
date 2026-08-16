@@ -1,7 +1,7 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
-import { outcomeForTeam } from '../utils/matchUtils'
+import { outcomeForTeam, resolveFdTeamId } from '../utils/matchUtils'
 import { fetchClubMatchesRaw } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
@@ -140,8 +140,40 @@ async function fetchTeamForm(selectedComp) {
       return { formMap: {}, matches: [], isLastSeason: false }
     }
 
-    const cupMatches    = raw.filter(m => m.isCup)
+    const cupMatchesRaw = raw.filter(m => m.isCup)
     const leagueMatches = raw.filter(m => !m.isCup)
+
+    // ⚠️ AJOUT (constat utilisateur, 16/08 : losange "forme récente" de
+    // Deportivo — 0 match joué cette saison — affichait le résultat GAGNANT
+    // d'un autre club) : cupMatchesRaw est sourcé ESPN (fetchEspnCupMatches,
+    // espnAdapter.js) — homeTeam.id/awayTeam.id y sont donc des ids ESPN, un
+    // ESPACE D'ID DIFFÉRENT des ids FD.org utilisés par leagueMatches ET par
+    // le classement (StandingsTable.jsx fait `formMap[team.team.id]`, un vrai
+    // id FD.org). Si un id ESPN coïncide PAR HASARD avec l'id FD.org d'une
+    // AUTRE équipe (même bug de fond que resolveFdTeamId ailleurs dans
+    // l'app, voir son commentaire), le résultat de ce match de coupe
+    // s'affichait sous le mauvais club dans buildFormMap ci-dessous. Chaque
+    // équipe du match de coupe est résolue INDÉPENDAMMENT par nom contre
+    // leagueMatches (source d'ids FD.org fiable, toujours dispo dès le
+    // calendrier publié) — strict:true, une équipe sans correspondance de
+    // nom claire (ex. petit club amateur d'un 1er tour de coupe, jamais dans
+    // leagueMatches) garde son id ESPN brut plutôt que d'être écartée : ça
+    // préserve le résultat du VRAI club suivi (celui dont "forme récente"
+    // nous intéresse) même quand son adversaire de coupe n'est pas
+    // identifiable côté FD.org. Seul un match où NI L'UN NI L'AUTRE ne
+    // résout (round 100% amateur, aucun intérêt ici) est écarté.
+    const cupMatches = cupMatchesRaw
+      .map(m => {
+        const homeId = resolveFdTeamId(m.homeTeam, leagueMatches, { loose: true, strict: true })
+        const awayId = resolveFdTeamId(m.awayTeam, leagueMatches, { loose: true, strict: true })
+        if (homeId == null && awayId == null) return null
+        return {
+          ...m,
+          homeTeam: { ...m.homeTeam, id: homeId ?? m.homeTeam?.id },
+          awayTeam: { ...m.awayTeam, id: awayId ?? m.awayTeam?.id },
+        }
+      })
+      .filter(Boolean)
 
     // "Saison en cours" = la plus récente présente dans les données FD.org
     // (season.startDate le plus tardif parmi les matchs de championnat).
