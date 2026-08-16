@@ -564,6 +564,31 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
     return
   }
 
+  // ── Détection "coup d'envoi bloqué" → force un poll frais ──────────────────
+  // ⚠️ AJOUT (question utilisateur : "si ESPN nous envoie l'info mais qu'on ne
+  // la capte pas, comment on fait ?") : le cache serveur fast-path (fm:fresh,
+  // TTL 12s, voir api/fifa-live.js) sert à ÉCONOMISER des appels ESPN quand
+  // plusieurs utilisateurs regardent le même match en même temps — mais dans
+  // le pire cas, il peut aussi renvoyer une réponse "toujours programmé"
+  // légèrement périmée. Sans garde-fou, un match resterait bloqué sur
+  // "Débute" jusqu'à ce qu'un poll (le nôtre ou celui d'un autre utilisateur)
+  // tombe par hasard hors de cette fenêtre de 12s. Ici : si un match a
+  // dépassé son heure de coup d'envoi de plus de STUCK_KICKOFF_MS SANS
+  // qu'ESPN n'ait jamais été confirmé "en cours" pour LUI (state.espnStatus
+  // toujours vide/SCHEDULED, pas de kickoffAt), on force CE poll précis à
+  // contourner le cache serveur — garantit un vrai aller-retour ESPN frais
+  // au lieu de compter sur un hasard favorable. Ne s'applique qu'à ce cas
+  // précis (pas de faux-positif possible sur un match déjà confirmé live).
+  const STUCK_KICKOFF_MS = 3 * 60_000
+  const hasStuckKickoff = toTrack.some(m => {
+    if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
+    const utcMs = new Date(m.utcDate).getTime()
+    if (now - utcMs < STUCK_KICKOFF_MS) return false
+    const st = getMatchState(m.id)
+    return (!st.espnStatus || st.espnStatus === 'STATUS_SCHEDULED') && !st.kickoffAt
+  })
+  const effectiveForceFresh = forceFresh || hasStuckKickoff
+
   try {
     // ── Appel au nouvel endpoint server-side ──
     // Fetch ESPN + Redis cache + matching + stats → retourne { [fdMatchId]: { ... } }
@@ -590,7 +615,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
     const res = await fetch('/api/fifa-live', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ matches: toTrack, forceFresh }),
+      body:    JSON.stringify({ matches: toTrack, forceFresh: effectiveForceFresh }),
       signal:  AbortSignal.timeout(10_000),
     })
 
