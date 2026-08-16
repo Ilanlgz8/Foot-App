@@ -17,6 +17,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
 import { extractMatchDetails } from '../utils/espnSummaryParse'
+// ⚠️ AJOUT (constat utilisateur, 17/08 : plus de déroulé buts/cartons ET
+// stats figées en pleine "mi-temps" sur Lens-PSG/Trophée des Champions, une
+// fois le match terminé) : COMP_ESPN (= ESPN_SLUG_BY_COMP_ID) n'est indexé
+// QUE par les vrais id numériques football-data.org — jamais par les
+// SYNTHETIC_COMP_ID (négatifs) des compétitions ESPN-only (TDC/CS/USC, voir
+// competitions.js). `slug` valait donc `null` ici pour ces compétitions, la
+// query entière restait désactivée (`enabled: ... && !!slug`) — jamais de
+// résumé post-match, la page reste bloquée sur le dernier snapshot live
+// (mi-temps) au lieu de basculer sur le récap final. Même repli déjà
+// appliqué dans useMatchDetail.js (odds/compos/stats live, voir son
+// commentaire) — hook différent, manqué lors de ce 1er passage.
+import { espnNativeSlug } from '../data/espnSlugs.js'
 
 // Résultat vide/inexploitable : soit l'event n'a pas été trouvé (`null`),
 // soit trouvé mais ESPN n'a encore rien publié comme plays/details/stats.
@@ -79,7 +91,7 @@ function findEspnEvent(json, match) {
 }
 
 export function useEspnMatchDetail(match, compId, enabled = true) {
-  const slug = COMP_ESPN[compId] ?? COMP_ESPN[match?.competition?.id] ?? null
+  const slug = COMP_ESPN[compId] ?? COMP_ESPN[match?.competition?.id] ?? espnNativeSlug(match)
 
   const { data, isLoading } = useQuery({
     queryKey: ['espnMatchDetail', match?.id, slug],
