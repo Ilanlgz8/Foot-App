@@ -78,18 +78,23 @@ function safeJsonParse(raw, fallback) {
   }
 }
 
+// Renvoie { ok, events } — `ok` distingue "ESPN a confirmé 0 événement" (true,
+// utilisable pour le cache noMatch plus bas, voir runOnePass) de "on n'a pas
+// pu savoir" (false, timeout/erreur réseau/statut HTTP non-ok — surtout ne
+// PAS mettre en cache un [] dans ce cas, sinon on figerait un faux "aucun
+// match" pour le reste de la journée sur un simple aléa réseau ponctuel).
 async function fetchEspnEvents(slug, date, log) {
   try {
     const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}&limit=100`, {
       headers: { 'Cache-Control': 'no-cache' },
       signal: AbortSignal.timeout(8_000),
     })
-    if (!r.ok) { log.push(`[espn:${slug}] status=${r.status}`); return [] }
+    if (!r.ok) { log.push(`[espn:${slug}] status=${r.status}`); return { ok: false, events: [] } }
     const j = await r.json()
-    return j.events ?? []
+    return { ok: true, events: j.events ?? [] }
   } catch (e) {
     log.push(`[espn:${slug}] error=${e.message}`)
-    return []
+    return { ok: false, events: [] }
   }
 }
 
@@ -159,11 +164,11 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
   try {
     const today     = dateStr(new Date())
     const yesterday = dateStr(new Date(Date.now() - 86_400_000))
-    const [evtsToday, evtsYesterday] = await Promise.all([
+    const [resToday, resYesterday] = await Promise.all([
       fetchEspnEvents(slug, today, log),
       fetchEspnEvents(slug, yesterday, log),
     ])
-    const evt = [...evtsToday, ...evtsYesterday].find(e => e.id === eventId)
+    const evt = [...resToday.events, ...resYesterday.events].find(e => e.id === eventId)
     if (!evt) {
       log.push(`[final-recheck:${slug}:${eventId}] event introuvable au recheck — le tick normal reprendra le suivi`)
       return
@@ -411,13 +416,56 @@ async function runOnePass(env) {
     }
   }
 
+  // ⚠️ AJOUT (retour utilisateur : "35 fetchs ESPN par minute pour TOUTES les
+  // compétitions suivies, même celles sans le moindre match aujourd'hui, c'est
+  // beaucoup trop") : avant ce fix, les 17 compétitions × 2 (today+yesterday)
+  // étaient interrogées à CHAQUE passe sans exception — alors qu'en pratique
+  // les 6 grands championnats jouent rarement tous le même jour (calendriers
+  // décalés vendredi→lundi), et les coupes/compétitions européennes ne jouent
+  // que sur leurs jours de coupe d'Europe. Un jour normal, souvent seulement
+  // 2-4 des 17 slugs ont un vrai match ce jour précis.
+  // Dès qu'un slug+date est CONFIRMÉ vide par ESPN (evts.length===0 ET fetch
+  // réussi — voir fetchEspnEvents ci-dessus, un échec réseau n'est PAS un
+  // "vide confirmé"), on le mémorise en cache — les passes suivantes, pour ce
+  // même jour, sautent carrément ce fetch. La clé inclut la date : elle
+  // s'auto-invalide chaque jour, la TTL (20h) n'est qu'une sécurité en plus.
+  // Lecture : 1 seul mget groupé (34 clés, 1 seule sous-requête, même
+  // principe que finalDone plus bas). Écriture : 1 seul pipeline groupé en
+  // fin de fetch (peu importe combien de slugs viennent d'être découverts
+  // vides). Gain concret un jour normal : ~34 fetchs ESPN/minute → ~4-8.
+  const slugDatePairs = ESPN_SLUGS.flatMap(slug => [
+    { slug, date: today,     key: `noMatch:${slug}:${today}` },
+    { slug, date: yesterday, key: `noMatch:${slug}:${yesterday}` },
+  ])
+  let noMatchFlags = new Set()
+  try {
+    const flags = await kv.mget(...slugDatePairs.map(p => p.key))
+    slugDatePairs.forEach((p, i) => { if (flags[i]) noMatchFlags.add(p.key) })
+  } catch {}
+
+  const pairsToFetch = slugDatePairs.filter(p => !noMatchFlags.has(p.key))
   const allResults = await Promise.allSettled(
-    ESPN_SLUGS.flatMap(slug => [
-      fetchEspnEvents(slug, today,     log).then(evts => evts.map(e => ({ slug, evt: e }))),
-      fetchEspnEvents(slug, yesterday, log).then(evts => evts.map(e => ({ slug, evt: e }))),
-    ])
+    pairsToFetch.map(p => fetchEspnEvents(p.slug, p.date, log).then(res => ({ pair: p, res })))
   )
-  const allEvents = allResults.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+
+  const allEvents = []
+  const newlyEmptyKeys = []
+  for (const r of allResults) {
+    if (r.status !== 'fulfilled') continue
+    const { pair, res } = r.value
+    if (res.ok && res.events.length === 0) {
+      newlyEmptyKeys.push(pair.key)
+    } else {
+      for (const evt of res.events) allEvents.push({ slug: pair.slug, evt })
+    }
+  }
+  if (newlyEmptyKeys.length > 0) {
+    try {
+      let flagPipe = kv.pipeline()
+      for (const k of newlyEmptyKeys) flagPipe = flagPipe.set(k, '1', { ex: 20 * 3600 })
+      await flagPipe.exec()
+    } catch {}
+  }
 
   const espnFetchFailed = log.some(l => /^\[espn:.*\] error=/.test(l))
   // ⚠️ Armement des 2 optimisations "on peut sauter le prochain fetch"
