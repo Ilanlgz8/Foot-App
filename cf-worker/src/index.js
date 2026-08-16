@@ -1003,14 +1003,31 @@ async function runOnePass(env) {
   let stillTrackingLive = 0
   try { stillTrackingLive = await kv.scard('cron:liveIds') } catch {}
 
+  // ⚠️ AJOUT (question utilisateur : "pourquoi revérifier toutes les 25min
+  // alors qu'il n'y a plus de match jusqu'au lendemain ou plusieurs jours
+  // après ?") : ce calcul se basait sur allEvents.length — TOUT ce qu'ESPN
+  // liste aujourd'hui/hier, y COMPRIS les matchs déjà entièrement traités et
+  // clos (finalDone posé, plus aucun but/carton/recap à en tirer). Un match
+  // fini la veille reste listé par ESPN dans sa fenêtre "yesterday" jusqu'à
+  // ~24-48h après sa vraie fin — pendant tout ce temps, allEvents.length
+  // restait > 0 à cause de lui SEUL, forçant une revérification toutes les
+  // 25min (nextCheckKey) au lieu de passer au mode économie 3h (emptyDayKey)
+  // dès qu'il n'y a plus RIEN à surveiller activement. activeEvents réutilise
+  // alreadyDoneIds (déjà calculé plus haut pour le pré-filtre de la boucle
+  // principale, donc AUCUNE lecture Redis supplémentaire ici) pour exclure
+  // ces matchs clos du calcul — "plus rien à faire aujourd'hui" est détecté
+  // dès la confirmation FINAL de tous les matchs du jour, pas seulement quand
+  // ESPN cesse de les lister des heures/jours plus tard.
+  const activeEvents = allEvents.filter(({ evt }) => !alreadyDoneIds.has(evt.id))
+
   if (stillTrackingLive === 0) {
-    if (allEvents.length === 0 && !espnFetchFailed) {
+    if (activeEvents.length === 0 && !espnFetchFailed) {
       try { await kv.set(emptyDayKey, '1', { ex: EMPTY_DAY_TTL }) } catch {}
-    } else if (allEvents.length > 0 && !espnFetchFailed) {
-      const anyLive = allEvents.some(({ evt }) =>
+    } else if (activeEvents.length > 0 && !espnFetchFailed) {
+      const anyLive = activeEvents.some(({ evt }) =>
         LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))
       if (!anyLive) {
-        const upcomingKickoffs = allEvents
+        const upcomingKickoffs = activeEvents
           .filter(({ evt }) => normalizeEspnStatus(evt.competitions?.[0]?.status) === 'STATUS_SCHEDULED')
           .map(({ evt }) => Date.parse(evt.date))
           .filter(t => Number.isFinite(t))
