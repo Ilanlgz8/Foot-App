@@ -11,7 +11,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useLiveData } from '../context/LiveProvider'
-import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
+import { getMatchState, isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
 import { TEAM_SHORT } from '../data/teamShortNames'
@@ -89,8 +89,15 @@ export function LiveSidebar({ activeMatchId }) {
     return () => clearInterval(id)
   }, [liveMatches])
 
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : le widget live réapparaissait après
+  // être passé par l'Accueil et être revenu, MÊME après relancement complet
+  // de l'app) : cette sidebar (desktop, LiveMatchPage) avait sa PROPRE
+  // 3e copie de la même logique de filtrage, jamais touchée par le fix
+  // précédent (qui n'avait unifié que Live.jsx et Accueil.jsx) — c'est elle
+  // qui reproduisait le bug. shouldShowLiveWidget (matchStateTracker.js) est
+  // désormais la SEULE décision, utilisée ici aussi.
   const matches = liveMatches
-    .filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED' || isRecentlyFinished(m.id))
+    .filter(shouldShowLiveWidget)
     .map(m => ({ ...m, _espn: espnScores[m.id] ?? null }))
 
   if (matches.length === 0) return null
