@@ -225,6 +225,41 @@ export function isRecentlyFinished(matchId, graceMs = TERMINE_GRACE_MS) {
   return Date.now() - termineAt < graceMs
 }
 
+// ── Décision unique : faut-il encore afficher ce match comme "en direct" ───
+// ⚠️ AJOUT (constat utilisateur : le widget de la page Live réapparaissait
+// après être passé par l'Accueil et être revenu, alors que la card Accueil,
+// elle, avait bien disparu pour de bon) : Live.jsx et Accueil.jsx (grille
+// desktop) recalculaient chacun leur propre expression pour la même
+// décision ("m.status === IN_PLAY/PAUSED/SCHEDULED || isRecentlyFinished")
+// — deux copies dupliquées, qui pouvaient diverger entre elles ou reposer
+// différemment sur la fenêtre de 8s de isRecentlyFinished (GLISSANTE,
+// recalculée à chaque rendu, sans mémoire qu'un match avait déjà fini de
+// s'afficher une première fois). Proposition utilisateur, plus simple :
+// une seule décision, utilisée PARTOUT, pour que les deux endroits ne
+// puissent plus jamais diverger. `_dismissedFt` (module-level, partagé par
+// TOUS les appelants de cette fonction, survit aux montages/démontages de
+// n'importe quelle page) mémorise le termineAt déjà vu "disparaître" par
+// match : une fois dismiss, ne réapparaît plus pour CE MÊME événement de
+// fin, quoi qu'il arrive ailleurs entre-temps (repli FD.org qui retouche
+// liveTracker, etc. — plusieurs chemins existent, voir useLiveMinute.js).
+// Une vraie résurrection légitime (faux FT corrigé, ft repasse à false)
+// nettoie l'entrée mémorisée et réaffiche normalement via le statut
+// IN_PLAY/PAUSED.
+const _dismissedFt = new Map()
+
+export function shouldShowLiveWidget(match) {
+  if (!match?.id) return false
+  const state = getMatchState(match.id)
+  if (state.ft === true) {
+    if (_dismissedFt.get(match.id) === state.termineAt) return false
+    const recent = isRecentlyFinished(match.id)
+    if (!recent) _dismissedFt.set(match.id, state.termineAt)
+    return recent
+  }
+  if (_dismissedFt.has(match.id)) _dismissedFt.delete(match.id)
+  return match.status === 'IN_PLAY' || match.status === 'PAUSED' || match.status === 'SCHEDULED'
+}
+
 /**
  * Efface uniquement les flags ft/termineAt sans toucher le reste du state.
  * Utilisé quand ESPN revient en IN_PLAY après un faux STATUS_FINAL :

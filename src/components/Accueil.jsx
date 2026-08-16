@@ -7,7 +7,7 @@ import { useUpcomingMatchesAllComps } from '../hooks/useMatchs'
 import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
-import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
+import { getMatchState, isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
 import { mergeScore, isCardLive } from '../utils/matchUtils'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
@@ -637,13 +637,13 @@ function Accueil() {
   const filteredMatches = compFilterMatch  ? matches.filter(m => m.competition?.id === compFilterMatch)  : matches
   const filteredResults = compFilterResult ? results.filter(r => r.competition?.id === compFilterResult) : results
 
-  // ── Live desktop : mêmes critères que Live.jsx (page /live) — IN_PLAY,
-  // PAUSED, SCHEDULED (coup d'envoi imminent/détecté) ou encore dans la
-  // fenêtre de grâce post-FT (isRecentlyFinished) — pour rester cohérent
-  // avec ce qui compte comme "en direct" partout ailleurs dans l'app.
-  const desktopLiveMatches = liveMatches.filter(m =>
-    m.status === 'IN_PLAY' || m.status === 'PAUSED' || m.status === 'SCHEDULED' || isRecentlyFinished(m.id)
-  )
+  // ── Live desktop : MÊME fonction que Live.jsx (page /live) — voir
+  // shouldShowLiveWidget (matchStateTracker.js). Avant : deux expressions
+  // dupliquées séparément ici et dans Live.jsx, qui pouvaient diverger entre
+  // elles (constat utilisateur : un match disparu de cette grille pouvait
+  // réapparaître sur /live après y être retourné). Une seule fonction
+  // partagée désormais → les deux endroits ne peuvent plus jamais diverger.
+  const desktopLiveMatches = liveMatches.filter(shouldShowLiveWidget)
   const desktopHasLive = isDesktop && desktopLiveMatches.length > 0
 
   // ⚠️ RETIRÉ (mini-classement desktop sous "Résultats récents", 23/07) :
