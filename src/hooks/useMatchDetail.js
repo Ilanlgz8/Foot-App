@@ -447,7 +447,19 @@ export function useLineups(match, isFinished = false) {
   const fdAway     = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
   const isFifaComp = slug === 'fifa.world'   // WC 2026
   const queryClient = useQueryClient()
-  const diskCacheKey = `lineups_${match?.id}`
+  // ⚠️ AJOUT "_v2" (constat utilisateur, Lens-PSG toujours cassé après le
+  // correctif staleTime ci-dessous) : ce correctif empêche un NOUVEL échec de
+  // se figer, mais ne guérit pas une entrée DÉJÀ écrite sur disque avant lui
+  // — writeCache() (voir plus bas) persiste dès que `hasData`/starters est
+  // vrai, MÊME partiel, avec un TTL de 90 jours. `initialData` la relit alors
+  // immédiatement au montage ; comme cette donnée n'est pas `null`, le
+  // staleTime dynamique la considère "fraîche pour toujours" dès le tout
+  // premier rendu, sans jamais retenter — le correctif tournait donc dans le
+  // vide pour tout match déjà consulté avant lui. Changer la clé fait
+  // ignorer TOUTES les anciennes entrées d'un coup (readCache renvoie
+  // `undefined`), quel que soit le championnat concerné — un seul vrai fetch
+  // de plus, avec la bonne logique cette fois, pour chaque match déjà vu.
+  const diskCacheKey = `lineups_${match?.id}_v2`
 
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
@@ -550,7 +562,11 @@ export function useEspnMatchStats(match, isFinished = false) {
   // commentaire juste au-dessus) — stats2 est lui aussi exclu du blob React
   // Query persisté (UNPERSISTED_QUERY_KEYS, main.jsx), donc lui aussi perdu
   // à chaque fermeture d'app sans ce filet.
-  const diskCacheKey = `stats_${match?.id}`
+  // "_v2" : même raison que useLineups juste au-dessus — purge toute entrée
+  // disque déjà écrite (potentiellement partielle) avant le correctif
+  // staleTime, pour TOUS les matchs déjà consultés, tous championnats
+  // confondus (ex. Lens-PSG, TDC).
+  const diskCacheKey = `stats_${match?.id}_v2`
 
   return useQuery({
     queryKey:  ['espnMatchStats2', match?.id],
