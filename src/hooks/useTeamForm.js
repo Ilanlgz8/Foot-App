@@ -31,7 +31,21 @@ const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 // glissante d'espnAdapter.js (60j avant / 150j après) n'a pas de notion de
 // "saison" à décaler — si pas assez de matchs dispo, repli normal sur
 // calcProno (forme récente), comme pour toute compétition sous-alimentée.
-const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+// ⚠️ AJOUT TDC/CS/USC (constat utilisateur, 17/08 : "Historique" (H2H) vide/
+// figé sur Lens-PSG, Trophée des Champions) : même trou que NL/CAN/COPA/UEL/
+// UECL ci-dessus, jamais comblé pour les supercoupes nationales/européenne
+// (SINGLE_MATCH_COMPS, competitions.js — 1 match/an, aucune couverture
+// football-data.org). `fetchTeamForm('TDC')` tapait donc FD.org avec un code
+// de compétition qui n'existe pas chez eux → toujours vide → compMatches
+// TOUJOURS vide pour ces 3 comps → double conséquence : le "Historique"
+// (useH2HRows, MatchModal.jsx) n'avait aucune donnée où chercher les
+// confrontations passées (repli compH2H) NI le match du jour une fois
+// terminé, ET la Forme récente était logiquement vide aussi (pas de bug
+// visible, juste vide, contrairement au vrai bug Deportivo/Alavés — cause
+// différente, corrigée séparément — mais même trou de données sous-jacent).
+// COMPETITION_ESPN_SLUG (competitions.js) couvre déjà ces 3 codes depuis le
+// 16/08 — seule cette liste n'avait pas été mise à jour en même temps.
+const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'TDC', 'CS', 'USC'])
 
 // Un seul fetch "saison" FD.org (season explicite optionnel) → matchs FINISHED
 // côté client (status=FINISHED non supporté par le free tier sur certains
