@@ -15,6 +15,7 @@ import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
+import { useEspnMatchStats } from '../hooks/useMatchDetail'
 import { useMatches, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
@@ -365,6 +366,32 @@ export default function LiveMatchPage() {
     }
   }, [rawMatch, resolveMatches])
 
+  // ⚠️ AJOUT (18/08, constat utilisateur : "si je vais pas dans LiveMatchPage
+  // pendant tout le match... quand le match se finit les stats affichent pas
+  // toutes les stats du match mais seulement là où je suis allé" — comme si
+  // ça s'était pas mis à jour) : `espn` (ci-dessus, espnScoresCache via
+  // useLiveData) est un instantané LIVE — enrichi en stats détaillées
+  // (possession/tirs/etc, voir api/fifa-live.js) uniquement PENDANT que le
+  // match est IN_PROGRESS/HALFTIME/END_PERIOD, plus jamais une fois
+  // STATUS_FINAL atteint. Résultat : les stats affichées restent celles du
+  // DERNIER poll détaillé avant la fin — souvent incomplètes de quelques
+  // minutes (celles APRÈS le dernier poll consulté), ce qui donne
+  // l'impression trompeuse que ça dépend de la dernière fois où on est allé
+  // sur cette page. MatchPage.jsx (page Résultat) a déjà ce même correctif
+  // pour cette page-ci (MpMatchStats/useEspnMatchStats, voir son commentaire
+  // détaillé) — jamais appliqué ici. useEspnMatchStats fait une VRAIE
+  // recherche indépendante du résumé ESPN post-match (par nom d'équipe +
+  // date, pas besoin d'avoir suivi le match en direct) — définitif, stats
+  // complètes sur les 90+ minutes. Fusionné par-dessus `espn` (qui reste la
+  // seule source pour les buteurs live/minute/score, non concernés par ce
+  // bug) uniquement une fois `isTermine` vrai et si le fetch a réussi —
+  // aucun changement pour un match encore en direct.
+  const isTermine = match ? getMatchState(match.id).ft === true : false
+  const { data: espnStatsFinal } = useEspnMatchStats(isTermine ? match : null, true)
+  const espnForStats = espnStatsFinal?.stats
+    ? { ...(espn ?? {}), stats: espnStatsFinal.stats }
+    : espn
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   // Le pronostic live (calcLiveProno, score + minute + cartons rouges +
@@ -430,7 +457,8 @@ export default function LiveMatchPage() {
   // match n'est pas terminé, pour détecter le passage à ft===true sans
   // attendre le prochain remount/poll global, puis redirection vers la page
   // match classique une fois la fenêtre de grâce (TERMINE_GRACE_MS) écoulée.
-  const isTermine = match ? getMatchState(match.id).ft === true : false
+  // (isTermine déjà calculé plus haut, avant useEspnMatchStats — voir son
+  // commentaire — même expression, pas dupliquée ici.)
   const [, setLmpTick] = useState(0)
   useEffect(() => {
     if (isTermine) return
@@ -523,7 +551,7 @@ export default function LiveMatchPage() {
                 ) : (
                   <LiveStatsTab
                     match={match}
-                    espnScore={espn}
+                    espnScore={espnForStats}
                     compMatches={compMatches}
                     hForm={hForm}
                     aForm={aForm}
