@@ -26,6 +26,7 @@ import { espnNativeSlug } from '../data/espnSlugs.js'
 import { extractMatchDetails } from '../utils/espnSummaryParse'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
 import { isRealFdMatchId } from '../utils/matchUtils'
+import { getMatchState } from '../utils/matchStateTracker'
 
 export function useMatchDetail(matchId) {
   const key = `matchdetail_${matchId}`
@@ -952,10 +953,35 @@ export function useH2H(match, delayMs = 0, fdMatchIdOverride = null) {
   const cachedData = fdMatchId ? readCacheStale(key) : null
   const cachedAt   = fdMatchId ? getCacheSavedAt(key) : 0
 
+  // ⚠️ AJOUT (18/08, constat utilisateur : Historique toujours pas à jour à
+  // la fin d'un match de championnat classique — La Liga... — même après le
+  // fix précédent qui vide ce cache dans confirmFt, useLiveMinute.js) : ce
+  // vidage ne fonctionne QUE si le suivi live (poll client) a tourné sur CE
+  // MÊME appareil pendant que le match se terminait — confirmFt() est
+  // déclenché par le suivi live client, jamais par un événement serveur. Cas
+  // réel testé ici : Historique consulté APRÈS coup, sans avoir suivi le
+  // match en direct sur cet appareil — rien n'a jamais vidé ce cache précis,
+  // le fix précédent ne couvrait donc pas ce cas.
+  // Filet de sécurité indépendant de toute session live : si le match est
+  // connu comme terminé (FD.org ou ESPN, voir getMatchState) MAIS que la
+  // donnée déjà en cache ne contient PAS encore ce match dans sa propre
+  // liste de confrontations (vérifié en direct : le head2head FD.org d'un
+  // match inclut bien le match référencé lui-même une fois FINISHED — voir
+  // aggregates/matches sur un vrai payload), staleTime tombe à 2min au lieu
+  // d'1h — un simple retour sur l'onglet suffit alors à corriger, plutôt que
+  // d'attendre jusqu'à 1h après un fetch antérieur au coup d'envoi. Dès que
+  // le fetch réussit et ramène le match, staleTime revient à 1h normalement
+  // (includesThisMatch devient vrai) — pas de risque de martèlement FD.org
+  // en continu, juste UNE tentative de plus que l'ancien comportement, par
+  // consultation, tant que ce n'est pas résolu.
+  const isFinished = match?.status === 'FINISHED' || getMatchState(match?.id)?.ft === true
+  const includesThisMatch = (data) =>
+    Array.isArray(data) && data.some(m => String(m?.id) === String(fdMatchId))
+
   return useQuery({
     queryKey: ['h2h-fd', fdMatchId],
     enabled:  !!fdMatchId && isRealFdMatchId(fdMatchId),
-    staleTime: 60 * 60_000,
+    staleTime: (query) => (isFinished && !includesThisMatch(query.state.data)) ? 2 * 60_000 : 60 * 60_000,
     retry: 1,
     initialData:          cachedData ?? undefined,
     initialDataUpdatedAt: cachedAt,
