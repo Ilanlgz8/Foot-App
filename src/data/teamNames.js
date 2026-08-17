@@ -71,6 +71,33 @@ export const TEAM_NAMES_FR = {
   'Real Betis': 'Betis',
   'Real Madrid': 'Real Madrid',
   'Osasuna': 'Osasuna',
+  // ⚠️ AJOUT (constat utilisateur, 18/08 : Racing Santander promu en La Liga
+  // — aucune Forme récente/Stat saison malgré un match joué il y a 2 jours
+  // vs Villarreal, ET nom d'équipe différent entre les cards Accueil/Résultats
+  // et la page Classement pour le même club) : club promu cette saison,
+  // jamais ajouté à cette table jusqu'ici. Root cause double, même origine :
+  // ESPN renvoie name="Racing Santander"/shortDisplayName="Racing", tandis
+  // que football-data.org renvoie name="Real Racing Club de Santander"/
+  // shortName="Santander" (vérifié en direct, les 2 sources) — AUCUNE des 4
+  // combinaisons ne partage de relation de préfixe (clubNameMatch échoue),
+  // ET aucune n'était dans cette table pour que le repli `loose`
+  // (looseTeamNameMatch, matchUtils.js) les rapproche — resolveFdTeamId
+  // échouait donc silencieusement (repli neutre, formMap/compMatches jamais
+  // trouvés), en plus d'afficher un nom différent selon la page (chacune
+  // affiche `shortName` en priorité, jamais traduit faute d'entrée ici).
+  // 4 clés vers le même canonique règlent les 2 symptômes en une fois.
+  // ⚠️ 'Racing' (bare) : mot générique partagé par d'autres clubs (ex.
+  // Racing de Ferrol, Copa del Rey — pas encore programmé cette saison au
+  // moment de ce fix, qualifs dès le 27/09) — risque résiduel faible mais
+  // réel si ESPN utilise un jour EXACTEMENT le même shortDisplayName "Racing"
+  // pour ce club-là aussi. Affecte seulement l'affichage (translateTeam) et
+  // le repli `loose` (égalité stricte après traduction) — jamais clubNameMatch
+  // (préfixe), déjà protégé séparément par isAmbiguousBarePrefixMatch
+  // (matchUtils.js) pour ce mot précis.
+  'Racing Santander': 'Racing Santander',
+  'Real Racing Club de Santander': 'Racing Santander',
+  'Racing': 'Racing Santander',
+  'Santander': 'Racing Santander',
 
   // Bundesliga
   'Bayern': 'Bayern Munich',
