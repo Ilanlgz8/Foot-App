@@ -471,7 +471,27 @@ export function useLineups(match, isFinished = false) {
     // pas au tout premier montage si le disque a déjà la donnée. Un match
     // encore EN COURS/À VENIR garde le staleTime court (compo pas encore
     // publiée, ou pourrait changer).
-    staleTime: isFinished ? Infinity : 2 * 60_000,
+    // ⚠️ BUG CORRIGÉ (constat utilisateur, match Deportivo-Elche à l'appui :
+    // "stats bloquées comme si j'avais regardé le tout début du match" sur la
+    // Page Résultat) : `isFinished ? Infinity : ...` s'appliquait AVEUGLÉMENT,
+    // y compris quand la 1ère tentative échoue (queryFn retourne `null` —
+    // ESPN pas encore prêt juste après le passage à "terminé" côté app,
+    // souvent piloté par l'heuristique locale getMatchState().ft AVANT même
+    // que football-data.org confirme officiellement FINISHED). Ce `null` se
+    // retrouvait alors mis en cache "frais pour toujours" : refetchInterval/
+    // retryWhileEmpty ne retente que tant que le composant reste monté — dès
+    // que l'utilisateur quitte la page et y revient plus tard, React Query
+    // voit staleTime Infinity et ne redemande plus JAMAIS, alors qu'ESPN a
+    // depuis longtemps fini de publier (vérifié en direct : la donnée existe
+    // bel et bien côté ESPN, complète, quelques minutes après). L'app
+    // retombait alors sur l'instantané live sommaire (cachedRows) — figé pour
+    // de bon si l'utilisateur avait ne serait-ce qu'entrouvert LiveMatchPage
+    // tôt dans le match. Même principe déjà appliqué à fetchSharedEspnSummary
+    // juste au-dessus : Infinity UNIQUEMENT si le résultat contient vraiment
+    // quelque chose, sinon staleTime court — un résultat vide a une vraie
+    // chance d'être retenté à la prochaine visite de la page, pas seulement
+    // pendant que le composant reste monté en continu.
+    staleTime: (query) => (isFinished && query.state.data != null) ? Infinity : 2 * 60_000,
     // Plafonné (voir retryWhileEmpty) — avant, ce refetchInterval tournait
     // à 90s SANS AUCUNE limite : un match qui n'a jamais eu de compo publiée
     // (compétition mal couverte, ou match FIFA jamais résolu) le retentait
@@ -540,7 +560,12 @@ export function useEspnMatchStats(match, isFinished = false) {
     // Match terminé : stats définitives, ne changent plus jamais (même
     // raisonnement que useLineups juste au-dessus) — Infinity au lieu de
     // 30min pour ne plus jamais redemander inutilement.
-    staleTime: isFinished ? Infinity : 30 * 60_000,
+    // ⚠️ BUG CORRIGÉ : même correctif que useLineups juste au-dessus (voir le
+    // commentaire détaillé là-bas) — Infinity uniquement si le résultat
+    // contient vraiment des stats, jamais sur un `null` (échec), sinon un
+    // échec ponctuel juste après le passage à "terminé" reste figé pour
+    // toujours dès que l'utilisateur quitte puis revient sur la page.
+    staleTime: (query) => (isFinished && query.state.data != null) ? Infinity : 30 * 60_000,
     // Retente tant que vide (ex: ESPN pas encore fini de publier son résumé
     // juste après le coup de sifflet) — voir retryWhileEmpty plus haut.
     refetchInterval: q => retryWhileEmpty(q, d => d == null),
