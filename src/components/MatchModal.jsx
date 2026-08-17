@@ -1635,7 +1635,35 @@ export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = f
       ).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
     : []
 
-  return { rows: fdRecent.length ? fdRecent : compH2H, isLoading }
+  const baseRows = fdRecent.length ? fdRecent : compH2H
+
+  // ⚠️ AJOUT (18/08, demande explicite utilisateur : "l'app devrait le faire
+  // automatiquement grâce à l'app et au résultat final... même si personne
+  // n'a regardé le match") : plutôt que de dépendre d'un NOUVEL appel
+  // football-data.org (rate-limité, voir CLAUDE.md — plusieurs incidents de
+  // suspension du compte déjà documentés) pour faire apparaître le match qui
+  // vient de se terminer dans l'Historique, on utilise directement le
+  // résultat déjà présent dans `match` — déjà chargé pour afficher CETTE
+  // page/CETTE card (score final, date, équipes, tout ce dont H2HRowsList a
+  // besoin, même forme que fdRecent/compH2H) : ZÉRO requête réseau
+  // supplémentaire, fonctionne dès le tout premier visiteur après la fin du
+  // match, peu importe si quelqu'un a suivi ce match en direct ou non.
+  // Complète les vraies données FD.org/ESPN plutôt que de les remplacer —
+  // n'ajoute ce match que s'il n'y figure pas déjà (comparaison par date +
+  // paire d'équipes, dans le MÊME espace d'id que homeId/awayId ci-dessus —
+  // cohérent quel que soit l'appelant : id FD.org résolu pour MatchPage.jsx,
+  // id ESPN brut pour MatchPoster.jsx, jamais de mélange des deux ici).
+  const isMatchFinished = match?.status === 'FINISHED' || getMatchState(match?.id)?.ft === true
+  const alreadyIncluded = !!(homeId != null && awayId != null && match?.utcDate && baseRows.some(m =>
+    new Date(m.utcDate).toDateString() === new Date(match.utcDate).toDateString() &&
+    ((m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) ||
+     (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId))
+  ))
+  const rows = (isMatchFinished && homeId != null && awayId != null && !alreadyIncluded)
+    ? [match, ...baseRows]
+    : baseRows
+
+  return { rows, isLoading }
 }
 
 // Nombre de confrontations affichées avant repli derrière "Voir plus" —
