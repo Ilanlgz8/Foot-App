@@ -757,7 +757,15 @@ export function useFifaStats(match, enabled = true, live = true) {
     // live: 30s (les stats évoluent) — fini: Infinity, ne redemande plus
     // jamais (stats définitives, même raisonnement que useLineups/
     // useEspnMatchStats ci-dessus).
-    staleTime: live ? 30_000 : Infinity,
+    // ⚠️ BUG CORRIGÉ (même piège que useLineups/useEspnMatchStats plus haut,
+    // constat utilisateur : "ça marche mais pas pour tous les matchs" — ce
+    // hook-ci sert les matchs Coupe du Monde/sélections, jamais couvert par
+    // le 1er correctif qui ne touchait que les matchs club) : `!live ?
+    // Infinity` s'appliquait même sur un résultat `null` (API FIFA pas encore
+    // prête juste après la fin). Infinity uniquement si le résultat contient
+    // vraiment des stats, sinon ce hook reste bloqué indéfiniment dès que le
+    // composant se démonte avant l'expiration de MAX_EMPTY_RETRIES.
+    staleTime: (query) => (!live && query.state.data != null) ? Infinity : 30_000,
     // Live : poll 45s inchangé (déjà rapide, indépendant de la donnée reçue).
     // Fini : pas de poll normalement (30min de staleTime suffit une fois les
     // stats obtenues), SAUF si toujours vide — l'API FIFA peut avoir eu un
