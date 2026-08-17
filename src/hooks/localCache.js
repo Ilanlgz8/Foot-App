@@ -21,6 +21,13 @@ export function writeCache(key, data, ttlMs) {
 // Retourne les données même expirées (fallback si l'API échoue)
 export function readCacheStale(key) { return _parse(key)?.data ?? null }
 
+// ⚠️ AJOUT (18/08, besoin réel : forcer un vrai refetch H2H après la fin
+// d'un match — voir confirmFt, useLiveMinute.js) : jusqu'ici rien n'exposait
+// de suppression ciblée d'une entrée précise — seul readCache() en supprime
+// une, mais seulement en effet de bord d'une lecture d'une clé EXPIRÉE, pas
+// utilisable pour vider une entrée encore "fraîche" à la demande.
+export function removeCache(key) { try { localStorage.removeItem(PREFIX + key) } catch {} }
+
 // Retourne le timestamp d'écriture (pour initialDataUpdatedAt de TanStack)
 export function getCacheSavedAt(key) { return _parse(key)?.savedAt ?? 0 }
 

@@ -30,8 +30,9 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
-import { isNationalTeamComp } from '../utils/matchUtils'
+import { isNationalTeamComp, isRealFdMatchId } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
+import { readCacheStale, removeCache } from './localCache'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -242,6 +243,33 @@ function confirmFt(match, now, queryClient, espnEventId) {
   if (espnScoresCache[id]) {
     try { localStorage.setItem(`foot_espn_${id}`, JSON.stringify(espnScoresCache[id])) } catch {}
   }
+
+  // ⚠️ AJOUT (18/08, demande utilisateur : "Historique" doit refléter la
+  // rencontre qui vient de se terminer, comme les autres championnats déjà
+  // couverts (La Liga...) — pas juste TDC/CS/USC, voir fix précédent).
+  // `queryClient.invalidateQueries({queryKey:['h2h-fd']})` plus bas force
+  // déjà un refetch IMMÉDIAT, mais UNIQUEMENT si l'onglet Historique de CE
+  // match est activement monté à la seconde précise où le match se termine
+  // — rare en pratique. Dans tous les autres cas (l'immense majorité),
+  // l'invalidation marque juste la query "périmée" EN MÉMOIRE : ça suffit
+  // tant que l'app reste ouverte en continu jusqu'à la prochaine visite de
+  // cet onglet, mais c'est perdu au moindre rechargement complet entre-temps
+  // (PWA mise en arrière-plan puis tuée par l'OS, fermeture manuelle...).
+  // Le vrai filet qui décide alors si un refetch a lieu, c'est le cache
+  // localStorage lu comme `initialData` par useH2H (useMatchDetail.js, clé
+  // `h2h_${fdMatchId}`) : s'il contient une copie écrite AVANT la fin du
+  // match (ex. Historique consulté en direct pendant le match), son
+  // horodatage garde la query "fraîche" (staleTime 60min) même après un
+  // rechargement complet — pas depuis la fin du match, depuis CETTE écriture
+  // précise. On vide directement cette entrée ici : la prochaine consultation
+  // de l'Historique de CE match, quel que soit l'état de session, repart
+  // forcément d'un vrai fetch. `fdMatchIdMap_${id}` (matchUtils.js,
+  // resolveFdMatchId) donne le vrai id FD.org même pour un match sourcé ESPN
+  // (grands championnats dans Accueil) SI déjà résolu au moins une fois —
+  // sinon rien à vider, la query n'a de toute façon jamais été mise en cache
+  // sous ce nom.
+  const fdMatchId = isRealFdMatchId(id) ? id : readCacheStale(`fdMatchIdMap_${id}`)
+  if (fdMatchId) removeCache(`h2h_${fdMatchId}`)
 
   // ft: true → stoppe calcMinute, MatchCard passe en "Terminé"
   try {
