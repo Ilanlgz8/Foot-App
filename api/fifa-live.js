@@ -644,7 +644,22 @@ export default async function handler(req, res) {
   // FIFA est UNIQUEMENT utilisé pour les données de score/buteurs WC.
   // Les statuts (espnStatus/espnClock/espnPeriod) viennent d'ESPN — plus fiables.
   // ══════════════════════════════════════════════════════════════════════════
-  const { data: fifaLive, fromCache: fifaCached } = await fetchFifaLive(!!forceFresh)
+  // ⚠️ AJOUT (question utilisateur : "la CM 2026 est finie, l'API FIFA sert à
+  // rien maintenant, ça gaspille pas des commandes ?" — bonne intuition,
+  // confirmée en lisant le code) : fetchFifaLive() était appelé SANS
+  // CONDITION, à chaque cycle de calcul, même quand `matches` ne contient
+  // AUCUN match CM (id=2000, seul competition.id jamais consulté depuis
+  // fifaByFdId, voir le filtre juste plus bas) — un kv.get('fifa:live')
+  // systématique (1 commande Redis) + un vrai appel réseau vers l'API FIFA
+  // toutes les 6s (FIFA_TTL) partagé entre tous les utilisateurs, pour rien,
+  // tant qu'aucune CM/Euro-like FIFA n'est suivie. id=2000 est l'id
+  // PERMANENT football-data.org de la Coupe du Monde (pas propre à l'édition
+  // 2026) — resservira à la prochaine CM, ce chemin n'est donc pas supprimé,
+  // juste sauté tant qu'aucun match CM n'est dans la liste envoyée par le client.
+  const hasWcMatch = matches.some(m => m.competition?.id === 2000)
+  const { data: fifaLive, fromCache: fifaCached } = hasWcMatch
+    ? await fetchFifaLive(!!forceFresh)
+    : { data: null, fromCache: false }
 
   // Index FIFA par fdMatchId : score + buteurs + IDs FIFA pour les compos/stats
   const fifaByFdId = {}
