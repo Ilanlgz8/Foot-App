@@ -341,17 +341,31 @@ function extractEspnCards(comp, homeTeamId) {
 // utilisateurs (une requête ESPN par fenêtre de 10s, pas par utilisateur).
 const SUMMARY_TTL = 10   // Cache Redis summary (s)
 
-async function fetchEspnSummaryStats(slug, espnEventId) {
-  if (!slug || !espnEventId) return null
-  const cKey = `espn:sum:${espnEventId}`
+// ⚠️ AJOUT (constat utilisateur, chiffres réels : "33K commandes Redis pour 3
+// matchs" — même diagnostic que freshIds plus bas dans le handler) : cette
+// fonction faisait AUPARAVANT son propre `kv.get(cKey)` individuel, appelée
+// une fois par match nécessitant les stats summary — un match de plus en
+// direct simultané = une commande Redis de plus par cycle de calcul. Scindée
+// en 2 : batchGetSummaryCache() lit TOUS les matchs concernés EN UNE SEULE
+// commande (kv.mget, même principe déjà utilisé pour storedMatches/
+// espnEvents), fetchEspnSummaryStatsNetwork() ne s'occupe plus QUE du fetch
+// réseau ESPN + de l'écriture cache en cas de vrai cache miss (déjà rare et
+// bornée par SUMMARY_TTL=10s partagé entre tous les utilisateurs, pas
+// aggravée par ce changement).
+async function batchGetSummaryCache(espnEventIds) {
+  if (!espnEventIds.length) return {}
+  const byId = {}
   try {
-    const cached = await kv.get(cKey)
-    if (cached) {
-      const d = safeJson(cached)
-      return d  // peut être null si match pas encore de stats
-    }
+    const cached = await kv.mget(...espnEventIds.map(id => `espn:sum:${id}`))
+    espnEventIds.forEach((id, i) => {
+      if (cached[i] != null) byId[id] = safeJson(cached[i])  // peut être null si match pas encore de stats
+    })
   } catch {}
+  return byId
+}
 
+async function fetchEspnSummaryStatsNetwork(slug, espnEventId) {
+  if (!slug || !espnEventId) return null
   try {
     const r = await fetch(
       `${ESPN_BASE}/${slug}/summary?event=${espnEventId}`,
@@ -366,7 +380,7 @@ async function fetchEspnSummaryStats(slug, espnEventId) {
     const awayT = teams.find(t => t.homeAway === 'away')
     const stats = extractBoxscoreStats(homeT?.statistics, awayT?.statistics)
     // Stocker même si null pour éviter de re-fetcher inutilement
-    try { await kv.set(cKey, JSON.stringify(stats), { ex: SUMMARY_TTL }) } catch {}
+    try { await kv.set(`espn:sum:${espnEventId}`, JSON.stringify(stats), { ex: SUMMARY_TTL }) } catch {}
     return stats
   } catch {
     return null
@@ -570,8 +584,14 @@ export default async function handler(req, res) {
   // contourne déjà le cache ESPN/FIFA plus bas — même intention.
   if (!forceFresh) {
     try {
-      const freshFlags = await kv.mget(...matches.map(m => `fm:fresh:${m.id}`))
-      const allFresh = matches.every((m, i) => freshFlags[i] != null && storedData[m.id])
+      // ⚠️ AJOUT : lit maintenant la clé unique fm:freshbatch (voir commentaire
+      // détaillé sur freshIds plus bas, section persistance) au lieu d'un mget
+      // sur N clés fm:fresh:{id} — déjà 1 seule commande dans les deux cas
+      // (mget groupe déjà tout, peu importe le nombre de clés), donc aucun
+      // gain ici précisément, mais cohérent avec le nouveau format d'écriture.
+      const freshBatchRaw = await kv.get('fm:freshbatch')
+      const freshIdSet = new Set(safeJson(freshBatchRaw) ?? [])
+      const allFresh = matches.every(m => freshIdSet.has(String(m.id)) && storedData[m.id])
       if (allFresh) {
         const fast = {}
         matches.forEach(m => { fast[m.id] = { ...storedData[m.id], fromCache: true } })
@@ -1005,7 +1025,7 @@ export default async function handler(req, res) {
     // Si scoreboard vide (WC et beaucoup de ligues club) ET match en cours
     // → appel summary endpoint ESPN (cached 30s Redis) qui contient boxscore complet
     let matchStats = extractBoxscoreStats(homeC?.statistics, awayC?.statistics)
-    let statsPromise = null
+    let needsStatsFetch = false
     if (
       !matchStats &&
       (finalEspnStatus === 'STATUS_IN_PROGRESS' ||
@@ -1013,12 +1033,14 @@ export default async function handler(req, res) {
        finalEspnStatus === 'STATUS_END_PERIOD')
     ) {
       // found.slug = 'fifa.world' pour WC, 'fra.1' etc pour club
-      // Pas de `await` ici — voir commentaire sur pendingStatsFetches plus haut.
-      statsPromise = fetchEspnSummaryStats(found.slug, found.evt.id)
+      // Pas de fetch ici — juste noté pour être résolu APRÈS la boucle, en un
+      // seul batch (voir batchGetSummaryCache/pendingStatsFetches plus haut
+      // et le commentaire détaillé sur ce choix).
+      needsStatsFetch = true
     }
-    // Valeur temporaire tant que statsPromise n'est pas résolu (voir plus bas,
-    // après la boucle) — jamais renvoyée telle quelle au client si un fetch
-    // est en cours : écrasée par le vrai résultat une fois Promise.allSettled fini.
+    // Valeur temporaire tant que la résolution différée n'a pas eu lieu (voir
+    // plus bas, après la boucle) — jamais renvoyée telle quelle au client si
+    // un fetch est en cours : écrasée par le vrai résultat une fois résolu.
     matchStats = matchStats ?? prevData?.stats ?? null
 
     result[fdMatch.id] = {
@@ -1069,17 +1091,23 @@ export default async function handler(req, res) {
       } : {}),
     }
 
-    if (statsPromise) {
-      pendingStatsFetches.push({ fdMatchId: fdMatch.id, promise: statsPromise, prevStats: prevData?.stats ?? null })
+    if (needsStatsFetch) {
+      pendingStatsFetches.push({ fdMatchId: fdMatch.id, slug: found.slug, eventId: found.evt.id, prevStats: prevData?.stats ?? null })
     }
   }
 
-  // Résout tous les fetchs de stats ESPN collectés ci-dessus EN PARALLÈLE
-  // (voir commentaire détaillé sur pendingStatsFetches plus haut) — remplace
-  // la valeur temporaire (prevData?.stats) posée dans la boucle par le
-  // résultat réel, une fois tous les appels réseau terminés.
+  // Résout tous les fetchs de stats ESPN collectés ci-dessus.
+  // ⚠️ AJOUT : le cache Redis (espn:sum:{eventId}) est maintenant vérifié
+  // EN UN SEUL kv.mget pour TOUS les matchs qui en ont besoin (batchGetSummaryCache,
+  // voir son commentaire détaillé plus haut) au lieu d'un kv.get individuel par
+  // match — seuls les vrais cache miss déclenchent un appel réseau ESPN
+  // (fetchEspnSummaryStatsNetwork), en parallèle comme avant.
   if (pendingStatsFetches.length > 0) {
-    const settled = await Promise.allSettled(pendingStatsFetches.map(p => p.promise))
+    const summaryCache = await batchGetSummaryCache(pendingStatsFetches.map(p => p.eventId))
+    const settled = await Promise.allSettled(pendingStatsFetches.map(p => {
+      const cached = summaryCache[p.eventId]
+      return cached !== undefined ? Promise.resolve(cached) : fetchEspnSummaryStatsNetwork(p.slug, p.eventId)
+    }))
     settled.forEach((r, i) => {
       const { fdMatchId, prevStats } = pendingStatsFetches[i]
       const fresh = r.status === 'fulfilled' ? r.value : null
@@ -1197,10 +1225,33 @@ export default async function handler(req, res) {
   // seule une VRAIE tentative de calcul justifie de dire "c'est frais", pas
   // juste la persistance Redis (qui elle reste conditionnelle, volontairement,
   // pour ne pas faire remonter le nombre de commandes Redis).
-  const freshWrites = []
+  // ⚠️ AJOUT (constat utilisateur, chiffres réels : "33K commandes pour 3
+  // matchs un dimanche" — coût qui scale avec le nombre de matchs suivis EN
+  // PLUS du nombre d'utilisateurs, malgré le verrou anti-doublon déjà en
+  // place) : ce marqueur était écrit un par un, `kv.set(fm:fresh:{id})` DANS
+  // la boucle — un match de plus = une commande Redis de plus, à CHAQUE
+  // cycle de calcul (~toutes les 12s, tout au long du direct). Un MGET groupé
+  // existe déjà pour la LECTURE (voir plus haut, fast-path) — mais rien
+  // d'équivalent n'existe pour l'écriture en Redis natif (MSET ne supporte
+  // pas de TTL par clé). Regroupé dans UNE seule clé (`fm:freshbatch`,
+  // liste JSON des ids frais) avec UN seul TTL partagé — le coût de ce
+  // marqueur devient constant (1 commande), quel que soit le nombre de
+  // matchs suivis simultanément, au lieu de scaler avec N.
+  // Lu-fusionné (pas juste écrasé) avant d'écrire : 2 requêtes /api/fifa-live
+  // portant sur des matchs DIFFÉRENTS peuvent toutes les deux vouloir marquer
+  // leurs propres matchs comme frais dans la même fenêtre de 12s — un simple
+  // kv.set() qui écrase perdrait les ids de l'autre requête. Contrepartie
+  // mineure et sans risque réel assumée sciemment : comme tous les ids
+  // partagent désormais UN SEUL TTL (celui de la dernière écriture), la
+  // fraîcheur d'un match peut être prolongée de quelques secondes de plus
+  // par l'activité d'un AUTRE match sans rapport — jamais une donnée fausse
+  // affichée, juste un fast-path qui reste valide un peu plus longtemps que
+  // les 12s visées dans de rares cas, largement acceptable vu le TTL déjà
+  // très court.
+  const freshIds = []
   for (const [midStr, data] of Object.entries(result)) {
     const prev = storedData[midStr]
-    freshWrites.push(kv.set(`fm:fresh:${midStr}`, '1', { ex: FRESH_TTL }))
+    freshIds.push(midStr)
     if (prev && stableFields(data) === stableFields(prev)) continue
     writes.push(kv.set(`fm:match:${midStr}`, JSON.stringify(data), { ex: MATCH_TTL }))
     if (ablyClient) {
@@ -1210,7 +1261,17 @@ export default async function handler(req, res) {
     }
   }
   if (writes.length > 0) await Promise.allSettled(writes)
-  if (freshWrites.length > 0) await Promise.allSettled(freshWrites)
+  // Lu-fusionné avant d'écrire (voir commentaire détaillé plus haut sur
+  // freshIds) : 1 GET + 1 SET, TOUJOURS, quel que soit le nombre de matchs —
+  // remplace les N kv.set individuels d'avant.
+  if (freshIds.length > 0) {
+    try {
+      const existingRaw = await kv.get('fm:freshbatch')
+      const existingIds = safeJson(existingRaw) ?? []
+      const mergedIds = [...new Set([...existingIds, ...freshIds])]
+      await kv.set('fm:freshbatch', JSON.stringify(mergedIds), { ex: FRESH_TTL })
+    } catch {}
+  }
   if (ablyPublishes.length > 0) await Promise.allSettled(ablyPublishes)
 
   // ── Redis last-known pour matchs non trouvés ──────────────────────────────
