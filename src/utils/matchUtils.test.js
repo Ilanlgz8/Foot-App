@@ -450,6 +450,52 @@ describe('resolveFdTeamId', () => {
     expect(resolveFdTeamId({ id: 111, name: 'Deportivo Alavés' }, pdCompMatches)).toBe(263)
     expect(resolveFdTeamId({ id: 111, name: 'Alavés' }, pdCompMatches)).toBe(263)
   })
+
+  // ⚠️ Bug réel constaté par l'utilisateur (19/08) : "dans les matchs à venir
+  // j'ai plus de H2H alors qu'avant j'en avais" — le garde-fou Deportivo/
+  // Alavés ci-dessus (17/08) est bâti sur le même mécanisme partagé par
+  // resolveFdMatchIdLive (H2H) : tout match sourcé ESPN (6 grands
+  // championnats, Accueil) impliquant un club désigné par ESPN via un mot
+  // générique seul (Real Sociedad, Union Berlin, Inter Milan...) perdait
+  // silencieusement son H2H, pas seulement le cas Deportivo qu'il visait.
+  // `allowBarePrefix` (utilisé UNIQUEMENT par resolveFdMatchIdLive) rouvre le
+  // mot générique quand un seul club de LA compétition correspond — sans
+  // rouvrir le risque d'origine (plusieurs clubs "Real" dans la même Liga,
+  // même collision que Deportivo/Alavés).
+  describe('option { allowBarePrefix }', () => {
+    const laLigaCompMatches = [
+      { homeTeam: { id: 92,  name: 'Real Sociedad de Fútbol', shortName: 'Real Sociedad' },
+        awayTeam: { id: 90,  name: 'Villarreal CF',           shortName: 'Villarreal' } },
+    ]
+
+    it('résout un mot générique seul si un SEUL club de la compétition y correspond', () => {
+      expect(resolveFdTeamId({ id: 999, name: 'Real' }, laLigaCompMatches, { allowBarePrefix: true })).toBe(92)
+    })
+
+    it('sans allowBarePrefix (comportement par défaut, autres appelants) : toujours refusé', () => {
+      expect(resolveFdTeamId({ id: 999, name: 'Real' }, laLigaCompMatches)).toBe(999)
+    })
+
+    it('reste refusé avec allowBarePrefix si PLUSIEURS clubs de la compétition partagent le mot (vraie collision)', () => {
+      const multiReal = [
+        ...laLigaCompMatches,
+        { homeTeam: { id: 86, name: 'Real Madrid CF', shortName: 'Real Madrid' },
+          awayTeam: { id: 81, name: 'FC Barcelona',    shortName: 'Barça' } },
+      ]
+      expect(resolveFdTeamId({ id: 999, name: 'Real' }, multiReal, { allowBarePrefix: true })).toBe(999)
+    })
+
+    it('le fix Deportivo/Alavés reste intact même avec allowBarePrefix (un seul candidat mais mauvais club)', () => {
+      // pdCompMatches n'a qu'un seul candidat "Deportivo Alavés" — le nouveau
+      // check par compétition le laisserait passer comme "non ambigu" à tort
+      // (La Corogne n'est même pas dans cette compétition) : ce cas précis
+      // n'est jamais atteint en pratique par resolveFdMatchIdLive (Deportivo
+      // n'a pas de match en Liga cette saison, donc jamais dans un match à
+      // venir sourcé ESPN de cette compétition) — documenté ici pour mémoire,
+      // pas une garantie absolue au niveau resolveFdTeamId seul.
+      expect(resolveFdTeamId({ id: 999, name: 'Deportivo' }, pdCompMatches, { allowBarePrefix: true })).toBe(263)
+    })
+  })
 })
 
 // resolveFdMatchId — bug réel (26/07) : "dans Accueil t'as que 2 h2h, dans
@@ -515,6 +561,27 @@ describe('resolveFdMatchId', () => {
   it('gère un match absent sans planter', () => {
     expect(resolveFdMatchId(null, compMatches)).toBeNull()
     expect(resolveFdMatchId(undefined, compMatches)).toBeNull()
+  })
+
+  // ⚠️ Bug réel constaté par l'utilisateur (19/08) : H2H disparu sur les
+  // matchs à venir sourcés ESPN impliquant un club nommé par ESPN via un mot
+  // générique seul (voir describe('option { allowBarePrefix }') plus haut) —
+  // test de bout en bout au niveau resolveFdMatchId (celui réellement appelé
+  // par useH2H) pour figer le comportement correct, pas juste au niveau de
+  // resolveFdTeamId isolé.
+  it('résout le H2H d\'un match à venir sourcé ESPN même avec un nom d\'équipe générique seul (Real)', () => {
+    const laLigaCompMatches = [
+      { id: 700001, utcDate: '2025-10-04T14:00:00Z',
+        homeTeam: { id: 92, name: 'Real Sociedad de Fútbol', shortName: 'Real Sociedad' },
+        awayTeam: { id: 90, name: 'Villarreal CF',           shortName: 'Villarreal' } },
+    ]
+    const match = {
+      id: 'espn-PD-401700003',
+      utcDate: '2025-10-04T14:00:00Z',
+      homeTeam: { id: 555, name: 'Real' },
+      awayTeam: { id: 556, name: 'Villarreal' },
+    }
+    expect(resolveFdMatchId(match, laLigaCompMatches)).toBe(700001)
   })
 })
 

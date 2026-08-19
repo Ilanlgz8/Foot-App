@@ -686,12 +686,49 @@ const AMBIGUOUS_BARE_PREFIXES = new Set([
   'dinamo', 'inter', 'club',
 ])
 
-function isAmbiguousBarePrefixMatch(a, b) {
+// ⚠️ AJOUT paramètre `compMatches` (constat utilisateur, 19/08 : "du jour au
+// lendemain dans les matchs à venir j'ai plus de H2H alors qu'avant j'en
+// avais") : ce garde-fou (17/08, voir juste au-dessus) protège bien le widget
+// "forme récente"/stats contre le bug Deportivo/Alavés — mais il est appelé
+// UNIQUEMENT par le mot générique (ex. "Real" préfixe de "Real Madrid"),
+// jamais informé de la compétition réelle. Or `resolveFdMatchIdLive`
+// (H2H) l'utilise aussi via resolveFdTeamId sur homeTeam/awayTeam — pour
+// TOUT match sourcé ESPN (les 6 grands championnats dans Accueil, voir
+// isRealFdMatchId plus haut) impliquant un club qu'ESPN désigne par un mot
+// générique seul (Real Sociedad, Union Berlin, Inter Milan, Racing
+// Strasbourg...), le H2H se désactivait silencieusement (aucune régression
+// dans clubNameMatch lui-même, juste ce garde-fou trop large qui bloque
+// désormais AUSSI les cas sûrs, pas seulement Deportivo/Alavés).
+// Avec `compMatches` fourni (voir `allowBarePrefix` dans resolveFdTeamId,
+// activé UNIQUEMENT par resolveFdMatchIdLive) : le mot générique n'est refusé
+// que s'il existe VRAIMENT plusieurs clubs distincts dans CETTE compétition
+// dont le nom démarre par ce même mot (ex. Real Madrid ET Real Sociedad ET
+// Real Betis ET Real Oviedo, tous en Liga — collision réelle, même risque que
+// Deportivo/Alavés). Un seul candidat dans la compétition = aucune collision
+// possible, donc sûr d'accepter. Sans `compMatches` (tous les autres
+// appelants : PreMatchSection, MpSeasonStats, useProbableLineups,
+// ClassementTab...) : comportement 100% inchangé, refus systématique comme
+// avant — le fix Deportivo/Alavés du 17/08 reste intact pour son usage
+// d'origine, aucune régression possible sur ces appelants.
+function isAmbiguousBarePrefixMatch(a, b, compMatches = null) {
   const na = normalize(a), nb = normalize(b)
   if (!na || !nb || na === nb) return false
   const shorter = na.length <= nb.length ? na : nb
   const longer  = na.length <= nb.length ? nb : na
-  return AMBIGUOUS_BARE_PREFIXES.has(shorter) && longer.startsWith(shorter)
+  if (!AMBIGUOUS_BARE_PREFIXES.has(shorter) || !longer.startsWith(shorter)) return false
+  if (!compMatches) return true
+  // Dédoublonnage par id d'équipe (pas par nom) : name ET shortName du MÊME
+  // club matchent tous les deux souvent le préfixe ("Real Sociedad de
+  // Fútbol" + "Real Sociedad") — les compter comme 2 "candidats" créerait une
+  // fausse collision dès qu'un seul vrai club est concerné.
+  const candidates = new Set()
+  for (const m of compMatches) {
+    for (const t of [m.homeTeam, m.awayTeam]) {
+      const n1 = normalize(t?.name ?? ''), n2 = normalize(t?.shortName ?? '')
+      if (n1.startsWith(shorter) || n2.startsWith(shorter)) candidates.add(t?.id ?? `${n1}|${n2}`)
+    }
+  }
+  return candidates.size > 1
 }
 
 // Logique de résolution "live" — EXACTEMENT le corps d'origine de
@@ -703,8 +740,16 @@ function resolveFdMatchIdLive(match, compMatches, { loose = false } = {}) {
   const rawId = match?.id ?? null
   if (isRealFdMatchId(rawId)) return rawId
   if (!match || !compMatches?.length) return null
-  const homeId = resolveFdTeamId(match.homeTeam, compMatches, { loose })
-  const awayId = resolveFdTeamId(match.awayTeam, compMatches, { loose })
+  // allowBarePrefix : voir le commentaire dédié sur isAmbiguousBarePrefixMatch
+  // plus haut — sûr spécifiquement ici car homeId ET awayId doivent ENSEMBLE
+  // retrouver une vraie fixture (paire d'équipes + date la plus proche,
+  // juste en dessous) : un mauvais id issu d'une collision resterait sans
+  // fixture correspondante et retomberait sur `null` (aucun H2H) plutôt que
+  // d'afficher un H2H erroné — contrairement au widget forme récente/stats
+  // (resolveFdTeamId appelé seul, sans cette double vérification), qui garde
+  // le refus strict par défaut.
+  const homeId = resolveFdTeamId(match.homeTeam, compMatches, { loose, allowBarePrefix: true })
+  const awayId = resolveFdTeamId(match.awayTeam, compMatches, { loose, allowBarePrefix: true })
   if (homeId == null || awayId == null) return null
   const refTime = match.utcDate ? new Date(match.utcDate).getTime() : null
   let best = null, bestDiff = Infinity
@@ -776,7 +821,7 @@ export function resolveFdMatchId(match, compMatches, opts = {}) {
 // FormDiamonds masqué ; calcPronoAdvanced traite déjà homeId/awayId null
 // comme "pas de H2H disponible", voir calcProno.js) — aucune régression,
 // juste un vrai "je ne sais pas" au lieu d'un faux positif silencieux.
-export function resolveFdTeamId(team, compMatches, { loose = false, strict = false } = {}) {
+export function resolveFdTeamId(team, compMatches, { loose = false, strict = false, allowBarePrefix = false } = {}) {
   const rawId = team?.id ?? null
   const giveUp = () => (strict ? null : rawId)
   if (!team || !compMatches?.length) return giveUp()
@@ -817,7 +862,7 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
   // pouvoir continuer à la trouver normalement.
   const teamNames = [team.name, team.shortName].filter(Boolean)
   const matches = (candidate) => teamNames.some(n =>
-    (clubNameMatch(candidate ?? '', n) && !isAmbiguousBarePrefixMatch(candidate ?? '', n)) ||
+    (clubNameMatch(candidate ?? '', n) && !isAmbiguousBarePrefixMatch(candidate ?? '', n, allowBarePrefix ? compMatches : null)) ||
     (loose && looseTeamNameMatch(candidate ?? '', n))
   )
   // Chemin normal (match déjà FD.org, id déjà dans le même référentiel que
