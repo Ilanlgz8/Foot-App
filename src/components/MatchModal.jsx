@@ -8,7 +8,7 @@ import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
@@ -1590,8 +1590,29 @@ function H2HBilan({ rows, match, isWC }) {
 export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = false } = {}) {
   const fdMatchId = resolveFdMatchId(match, compMatches, { loose: looseTeamMatch })
   const { data: h2hMatches, isLoading } = useH2H(match, delayMs, fdMatchId)
-  const homeId = match?.homeTeam?.id
-  const awayId = match?.awayTeam?.id
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 20/08 : "Historique" absent sur
+  // plusieurs matchs à venir de championnats différents — Bilbao-Sevilla,
+  // Lens-Auxerre, Everton-Crystal Palace — sans rapport avec les mots
+  // génériques déjà traités) : `match?.homeTeam?.id`/`awayTeam?.id` tels
+  // quels supposaient l'id déjà dans le bon référentiel FD.org — vrai la
+  // plupart du temps pour MatchPage.jsx/LiveMatchPage.jsx (match natif
+  // FD.org), SAUF que ces 2 pages réassignent CES MÊMES champs en amont
+  // (voir leur `match = useMemo(...)`) avec `resolveFdTeamId(...,
+  // { strict: true })` — un choix VOULU là-bas pour la Forme récente/Stats
+  // saison (mieux vaut aucune donnée qu'une donnée empruntée à un autre
+  // club, voir le commentaire détaillé sur `strict` dans matchUtils.js),
+  // mais qui renvoie `null` dès qu'un club n'apparaît PAS ENCORE dans
+  // compMatches à cet instant précis — très fréquent tout début de saison,
+  // où compMatches est encore peu fourni pour beaucoup de clubs. Un homeId/
+  // awayId `null` ici annule TOUT le repli compH2H plus bas, même quand la
+  // dédiée FD.org (fdRecent) échoue aussi (429/circuit breaker, voir
+  // CLAUDE.md) — double échec silencieux. Recalculé ici séparément, en NON
+  // strict (repli sur l'id brut plutôt que null, comportement adapté à UN
+  // filtre de fixture par id, pas à une clé de dictionnaire affichée) —
+  // découplé de ce que les appelants ont pu faire de leur côté pour un
+  // usage différent.
+  const homeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: looseTeamMatch })
+  const awayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: looseTeamMatch })
 
   // Données FD.org, du plus récent au plus vieux. ⚠️ CORRIGÉ (constat
   // utilisateur : "met en premier les plus récent" — ce n'était pas le cas)
