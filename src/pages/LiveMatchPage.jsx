@@ -16,7 +16,7 @@ import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useEspnMatchStats } from '../hooks/useMatchDetail'
-import { useMatches, useLowerDivisionStats } from '../hooks/useMatchs'
+import { useMatches, useLowerDivisionStats, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }         from '../hooks/useSwipe'
 import { FormDiamonds }     from '../accueil/FormDiamonds'
 import { WatchBadge }       from '../components/WatchBadge'
@@ -414,7 +414,14 @@ export default function LiveMatchPage() {
   // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
   // nécessaire à resolveFdMatchId (matchUtils.js) pour retrouver le vrai id
   // FD.org du match affiché.
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000, { looseTeamMatch: true })
+  // ⚠️ AJOUT `useH2HHistory` (constat utilisateur, 20/08 — voir commentaire
+  // détaillé dans MatchPage.jsx, même fix) : resolveMatches perd toute trace
+  // des saisons précédentes dès le 1er match FINISHED de la nouvelle saison —
+  // h2hHistory (2 saisons de plus, indépendant de fetchClubMatchesRaw) comble
+  // ce trou pour le head2head AFFICHÉ, pas seulement pour la cote de prono.
+  const h2hHistory = useH2HHistory(compId, resolveMatches)
+  const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, même demande/commentaire détaillé que
   // MatchPage.jsx) : compH2H (repli instantané, 0 requête) suffit à afficher
   // l'onglet tout de suite — le contenu se complète tout seul avec

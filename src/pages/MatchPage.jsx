@@ -8,7 +8,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
-import { useMatches }              from '../hooks/useMatchs'
+import { useMatches, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
@@ -775,7 +775,20 @@ export default function MatchPage() {
   // resolveMatches (pas compMatches) : voir commentaire détaillé plus haut —
   // nécessaire à resolveFdMatchId (matchUtils.js, appelé par useH2HRows) pour
   // retrouver le vrai id FD.org du match affiché, y compris en intersaison.
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, resolveMatches, 6_000, { looseTeamMatch: true })
+  // ⚠️ AJOUT `useH2HHistory` (constat utilisateur, 20/08 : "Historique"
+  // absent sur des rivalités connues — Everton-Crystal Palace, Toulouse-Lyon,
+  // Sevilla-Bilbao — cette page n'utilisait pourtant PAS encore ce hook,
+  // contrairement à MatchDuJourCard.jsx/MatchPoster.jsx qui l'avaient déjà
+  // pour la cote de prono) : resolveMatches (compMatches + scheduledMatches)
+  // perd toute trace des saisons précédentes dès le 1er match FINISHED de la
+  // nouvelle saison (`hasFinished`, fetchClubMatchesRaw dans useMatchs.js) —
+  // bien avant que les 2 équipes d'un match donné n'aient eu l'occasion de se
+  // réaffronter CETTE saison. h2hHistory (2 saisons de PLUS, 1 seul fetch par
+  // compétition, indépendant de fetchClubMatchesRaw) comble ce trou — fusionné
+  // ici pour que resolveFdMatchId (le head2head AFFICHÉ) en profite aussi.
+  const h2hHistory = useH2HHistory(compId, resolveMatches)
+  const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, demande explicite utilisateur : "h2h
   // arrive direct la première fois sans que ça mette plusieurs secondes") :
   // useH2HRows retombe déjà, SANS requête supplémentaire, sur les

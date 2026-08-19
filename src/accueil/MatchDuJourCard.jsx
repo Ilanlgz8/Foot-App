@@ -46,18 +46,32 @@ function formatHour(dateStr) {
 export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const compCode = match?.competition?.code ?? null
   const { formMap, compMatches } = useTeamForm(compCode)
-  // ⚠️ AJOUT `{ looseTeamMatch: true }` (02/08, même fix que MatchPoster.jsx —
-  // voir son commentaire détaillé) : sans ça, resolveFdMatchId (appelé en
-  // interne par useH2HRows pour retrouver le head2head dédié) échoue en mode
-  // strict sur les noms ESPN qui sont un SUFFIXE du nom FD.org (ex. "Lyon"),
-  // alors que la résolution d'id d'ÉQUIPE juste en dessous est déjà en loose.
-  // Repli h2hHistory (2 saisons de plus, chargées 1x par compétition, voir
-  // useMatchs.js) si le head2head dédié échoue malgré tout pour ce match —
-  // gratuit ici (une seule instance de cette carte à la fois), même logique
-  // que MatchPoster.jsx.
-  const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
   const h2hHistory = useH2HHistory(compCode, compMatches)
-  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
+  // ⚠️ RÉORDONNÉ (constat utilisateur, 20/08 : "Historique" toujours absent
+  // sur des rivalités connues — Everton-Crystal Palace, Toulouse-Lyon,
+  // Sevilla-Bilbao — même après les 3 fix précédents du jour) : root cause
+  // plus profonde, en amont de useTeamForm.js — fetchClubMatchesRaw
+  // (useMatchs.js) n'inclut la saison précédente QUE tant qu'AUCUN match de
+  // la saison en cours n'est encore FINISHED (`hasFinished`, voir son
+  // commentaire) — dès le tout premier match joué de la nouvelle saison
+  // (généralement sous 1 semaine après le coup d'envoi), compMatches perd
+  // TOUTE trace des saisons précédentes, bien avant que les 2 équipes d'un
+  // match donné n'aient eu l'occasion de se réaffronter CETTE saison — un
+  // trou bien plus large et durable (tout le 1er tour de championnat, pas
+  // juste les tout premiers jours) que ce que les 3 fix précédents du jour
+  // corrigeaient. h2hHistory (2 saisons de PLUS, déjà fetché juste au-dessus
+  // pour la cote de prono, indépendant de fetchClubMatchesRaw/hasFinished)
+  // comble exactement ce trou — combiné à compMatches AVANT d'être transmis
+  // à useH2HRows (plus seulement en repli pour le prono comme avant), pour
+  // que le head2head AFFICHÉ en profite aussi, pas seulement le calcul de cote.
+  const h2hPool = (compMatches?.length || h2hHistory?.length) ? [...compMatches, ...h2hHistory] : compMatches
+  // `{ looseTeamMatch: true }` (02/08, même fix que MatchPoster.jsx — voir son
+  // commentaire détaillé) : sans ça, resolveFdMatchId (appelé en interne par
+  // useH2HRows pour retrouver le head2head dédié) échoue en mode strict sur
+  // les noms ESPN qui sont un SUFFIXE du nom FD.org (ex. "Lyon"), alors que la
+  // résolution d'id d'ÉQUIPE juste en dessous est déjà en loose.
+  const { rows: dedicatedH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
+  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : h2hPool
   // Repli "club promu" — voir commentaire détaillé dans MatchPoster.jsx.
   const lowerDivMatches = useLowerDivisionStats(compCode, compMatches)
 
@@ -122,7 +136,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // détaillé, H2H 8/8 Barcelone pas reflété dans la cote) : dedicatedH2H
   // ajouté au pool de recherche de resolveFdTeamId, cohérence garantie avec
   // le H2H déjà affiché.
-  const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
+  const teamIdPool = dedicatedH2H.length > 0 ? [...h2hPool, ...dedicatedH2H] : h2hPool
   // ⚠️ BUG CORRIGÉ (16/08, même fix que MatchCard.jsx/MatchPoster.jsx : id
   // ESPN coïncidant par hasard avec l'id FD.org d'un club différent) :
   // `strict:true` + suppression du repli `?? match.xxx.id`.

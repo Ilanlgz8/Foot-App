@@ -45,22 +45,31 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // la fois" comme l'ancien commentaire ici le disait à tort — sur une liste
   // de plusieurs matchs, le verrou d'espacement serveur (SPACING_MS,
   // api/football.js) ne laisse réussir qu'1 appel head2head DÉDIÉ réel toutes
-  // les 6s, peu importe combien de cartes le demandent en même temps. Priorité
-  // 1 : useH2HRows (head2head dédié réel, remonte 5-6 saisons quand il
-  // réussit) — `{ looseTeamMatch: true }` (constat utilisateur : "quand y'a
-  // des rencontres avec h2h disponible les côtes sont toujours par defaut
-  // pour certaine equipe") aligne la résolution du match sur le mode déjà
-  // stable de MatchPage/LiveMatchPage (un nom ESPN qui est un SUFFIXE du nom
-  // FD.org, ex. "Lyon" vs "Olympique Lyonnais", ratait la résolution en mode
-  // strict). Priorité 2 (repli quand le head2head dédié échoue/429, ce qui
-  // arrive pour la plupart des cartes d'une même liste) : compMatches (1
-  // saison) fusionné avec useH2HHistory (2 saisons de plus, chargées UNE FOIS
-  // par compétition — pas par carte, voir son commentaire dans useMatchs.js)
-  // — 3 saisons au lieu d'1 pour toutes les cartes qui n'ont pas gagné la
-  // course du head2head dédié, sans aucun appel FD.org supplémentaire par carte.
-  const { rows: dedicatedH2H } = useH2HRows(match, compMatches, 0, { looseTeamMatch: true })
+  // les 6s, peu importe combien de cartes le demandent en même temps.
   const h2hHistory = useH2HHistory(compCode, compMatches)
-  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : [...compMatches, ...h2hHistory]
+  // ⚠️ RÉORDONNÉ (constat utilisateur, 20/08 : "Historique" toujours absent
+  // sur des rivalités connues — Everton-Crystal Palace, Toulouse-Lyon,
+  // Sevilla-Bilbao) : h2hHistory n'était utilisé QU'en repli pour la cote de
+  // prono (fullH2H), jamais transmis à useH2HRows — le head2head AFFICHÉ,
+  // lui, ne voyait donc que compMatches (1 saison, souvent MOINS d'1 saison
+  // dès le 1er match FINISHED de la nouvelle saison — voir hasFinished dans
+  // fetchClubMatchesRaw, useMatchs.js) même quand h2hHistory avait déjà les 2
+  // saisons précédentes en mémoire, gratuitement, juste au-dessus. Fusionné
+  // AVANT d'être transmis à useH2HRows : priorité 1 reste le head2head dédié
+  // réel (remonte 5-6 saisons quand il réussit) — `{ looseTeamMatch: true }`
+  // (constat utilisateur : "quand y'a des rencontres avec h2h disponible les
+  // côtes sont toujours par defaut pour certaine equipe") aligne la
+  // résolution du match sur le mode déjà stable de MatchPage/LiveMatchPage
+  // (un nom ESPN qui est un SUFFIXE du nom FD.org, ex. "Lyon" vs "Olympique
+  // Lyonnais", ratait la résolution en mode strict). Priorité 2 (repli quand
+  // le head2head dédié échoue/429, ce qui arrive pour la plupart des cartes
+  // d'une même liste) : ce pool fusionné (3 saisons au lieu d'1, chargées UNE
+  // FOIS par compétition — pas par carte) pour toutes les cartes qui n'ont
+  // pas gagné la course du head2head dédié, sans aucun appel FD.org
+  // supplémentaire par carte.
+  const h2hPool = (compMatches?.length || h2hHistory?.length) ? [...compMatches, ...h2hHistory] : compMatches
+  const { rows: dedicatedH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
+  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : h2hPool
   // Repli "club promu" (02/08, voir calcProno.js computeLambdasWithPromotion) —
   // fetch best-effort, une seule fois par compétition (jamais par carte), vide
   // silencieusement pour toute comp sans division inférieure connue
@@ -138,7 +147,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // (même fonction déjà éprouvée, juste plus de données où chercher le nom)
   // donne une 2e chance de résolution cohérente avec le H2H déjà affiché,
   // sans introduire de nouvelle logique de matching.
-  const teamIdPool = dedicatedH2H.length > 0 ? [...compMatches, ...dedicatedH2H] : compMatches
+  const teamIdPool = dedicatedH2H.length > 0 ? [...h2hPool, ...dedicatedH2H] : h2hPool
   // ⚠️ BUG CORRIGÉ (16/08, constat utilisateur : losange "forme récente"
   // d'une AUTRE équipe affiché sous le logo de Racing, match toujours en
   // cours — id ESPN coïncidant par hasard avec l'id FD.org d'un club
