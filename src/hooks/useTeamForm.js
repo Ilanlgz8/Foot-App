@@ -245,39 +245,31 @@ async function fetchTeamForm(selectedComp) {
         // intersaison) donne donc un formMap vide. `matches` RETOURNÉ
         // (compMatches, 2e champ) reste `fallbackMatches` — le modèle de
         // pronostic et le repli H2H continuent d'utiliser la saison passée.
-        // ⚠️ AJOUT `...current` (constat utilisateur, 20/08 : Rayo-Alavés,
-        // 2 clubs pourtant dans la même Liga la saison passée, sans H2H —
-        // voir commentaire détaillé juste en dessous sur le retour normal)
-        // : même trou ici, en plus critique — c'est justement LA fenêtre où
-        // ce repli se déclenche (tout début de saison, <10 matchs joués)
-        // qu'un match à venir a le plus besoin de retrouver son vrai id
-        // FD.org pour son H2H. `current` (non filtré FINISHED, voir plus
-        // haut) contient déjà ce match précis (SCHEDULED) sans aucun appel
-        // réseau en plus — simple ajout au pool déjà en mémoire.
-        return { formMap: buildFormMap(matches), matches: [...fallbackMatches, ...current], isLastSeason: true }
+        return { formMap: buildFormMap(matches), matches: fallbackMatches, isLastSeason: true }
       }
     }
 
-    // ⚠️ AJOUT `current` au lieu de `matches` (constat utilisateur, 20/08 :
-    // "Rayo contre Alavés y'a pas de H2H alors que la saison passée il était
-    // dans la même ligue") : `matches` ci-dessus est filtré FINISHED
-    // uniquement — un match À VENIR (SCHEDULED) entre 2 équipes qui n'ont pas
-    // encore rejoué l'une contre l'autre CETTE saison n'y figure jamais, donc
-    // resolveFdMatchIdLive (matchUtils.js, utilisé par useH2H) ne pouvait
-    // jamais retrouver le vrai id FD.org de CE match précis — repli sur
-    // l'historique pauvre (compMatches seul, 1 saison) ou rien du tout,
-    // MÊME quand les 2 clubs se sont VRAIMENT affrontés récemment. `current`
-    // (juste au-dessus) contient le calendrier COMPLET de la saison en cours
-    // (FINISHED + SCHEDULED + TIMED...), déjà entièrement chargé ici — aucun
-    // appel FD.org supplémentaire, juste ne plus jeter la moitié de ce qu'on
-    // a déjà. Tous les consommateurs de ce champ (buildGoalModel/
-    // directMeetings dans calcProno.js, calcSeasonTeamStats/TeamFormTable/
-    // compH2H dans MatchModal.jsx et MatchPage.jsx, calcTeamStats dans
-    // MatchPage.jsx) filtrent déjà `status === 'FINISHED'` en interne pour
-    // leurs propres besoins statistiques — vérifié un par un avant ce
-    // changement — donc aucun effet sur eux, seule la résolution d'id/H2H
-    // (qui, elle, ne filtre jamais par statut) profite des entrées en plus.
-    return { formMap: buildFormMap(matches), matches: current, isLastSeason: false }
+    // ⚠️ REVERT (constat utilisateur, 20/08 : "tu as remis la forme récente
+    // de la saison d'avant sur certaines équipes, surtout la Serie A") :
+    // une tentative plus tôt le même jour retournait `current` (non filtré
+    // FINISHED, saison en cours + SCHEDULED) au lieu de `matches` ici, pour
+    // que le H2H d'un match à venir se résolve même sans confrontation
+    // encore jouée CETTE saison (cas Rayo-Alavés). Mais TeamFormTable/
+    // calcSeasonTeamStats (MatchModal.jsx/MatchPage.jsx) filtrent bien
+    // FINISHED — vérifié — mais ne filtrent PAS par SAISON : une fois fusionné
+    // avec `fallbackMatches` (saison précédente) dans la branche juste
+    // au-dessus, `.slice(-5)` de TeamFormTable pouvait piocher des matchs des
+    // 2 saisons mélangés (ex. Serie A, saison en cours encore trop jeune) —
+    // exactement le mélange que le commentaire "formMap ne doit PAS venir de
+    // la saison précédente" (25/07, juste au-dessus) était censé empêcher.
+    // Le H2H reste corrigé malgré ce revert : useH2HHistory (fetch 100%
+    // indépendant de ce hook, voir MatchDuJourCard.jsx/MatchPoster.jsx/
+    // MatchPage.jsx/LiveMatchPage.jsx, commit dédié du même jour) fournit
+    // déjà les saisons passées SPÉCIFIQUEMENT au pool de résolution H2H, sans
+    // jamais toucher au `compMatches` utilisé ici pour Forme récente/Stats
+    // saison — la bonne séparation était d'utiliser ce hook-là pour ce
+    // besoin-là, pas d'élargir ce que ce fichier-ci expose partout.
+    return { formMap: buildFormMap(matches), matches, isLastSeason: false }
   }
 
   // ── WC/EC : compétitions non-annuelles, pas de "saison précédente"
