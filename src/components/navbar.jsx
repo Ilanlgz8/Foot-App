@@ -10,9 +10,10 @@
  * en desktop quand rien n'est en cours) : badge + pulsation/rouge
  * uniquement quand des matchs sont en cours.
  */
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
-import { shouldShowLiveWidget } from '../utils/matchStateTracker'
+import { shouldShowLiveWidget, isRecentlyFinished } from '../utils/matchStateTracker'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
@@ -91,6 +92,31 @@ function Navbar() {
   // actif jusqu'à 5min après la fin réelle d'un match, une incohérence
   // visible avec la page /live elle-même (déjà vide à ce moment-là).
   const liveCount = liveMatches.filter(shouldShowLiveWidget).length
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur : l'orb Live clignote — apparaît/
+  // disparaît/revient — de façon incohérente à la fin d'un match, contrairement
+  // aux cards live de l'Accueil/page Live qui gèrent cette transition
+  // proprement) : shouldShowLiveWidget ci-dessus utilise bien la même fonction
+  // de décision que Live.jsx/Accueil.jsx/LiveSidebar.jsx (déjà unifiée, voir
+  // commentaire plus haut) — mais CE composant-ci n'avait aucun ticker dédié
+  // pour forcer un re-render au bon moment. Sans lui, `liveCount` ne se
+  // recalcule qu'au rythme du polling ESPN (10-30s, LiveProvider), jamais
+  // synchronisé avec la fenêtre de grâce de 8s (TERMINE_GRACE_MS,
+  // matchStateTracker.js) qui détermine QUAND un match vient de basculer
+  // "terminé" — Navbar pouvait donc "attraper" un état intermédiaire différent
+  // de celui affiché au même instant sur l'Accueil, d'où l'impression de
+  // clignotement. Même ticker EXACT que Live.jsx/Accueil.jsx/LiveSidebar.jsx :
+  // force un re-render chaque seconde tant qu'un match est dans sa fenêtre de
+  // grâce, s'arrête tout seul dès qu'il n'y en a plus.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!liveMatches.some(m => isRecentlyFinished(m.id))) return
+    const id = setInterval(() => {
+      forceTick(n => n + 1)
+      if (!liveMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [liveMatches])
 
   return (
     <>
