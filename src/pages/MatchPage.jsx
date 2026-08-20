@@ -11,7 +11,7 @@ import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
-import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
+import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import {
@@ -370,13 +370,20 @@ function MpPageSkeleton() {
 // re-divergence entre les deux pages.
 
 // ── Stats match terminé ───────────────────────────────────────────────────────
-function MpMatchStats({ match }) {
+function MpMatchStats({ match, dataMatch }) {
+  // dataMatch (voir son commentaire détaillé plus haut, calcul de `dataMatch`
+  // dans MatchPage()) : même match, mais avec le vrai id football-data.org
+  // résolu quand `match.id` est un id synthétique ESPN (venu du panneau
+  // Résultats de l'Accueil) — indispensable pour useMatchDetail (appel FD.org
+  // direct par id) et pour que le cache Redis partagé (useEspnMatchStats/
+  // useFifaStats) profite de ce qui a déjà été résolu ailleurs pour ce match.
+  const dm = dataMatch ?? match
   const isWC = isNationalTeamComp(match)
-  const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? match : null, isWC, false)
+  const { data: fifaData,  isLoading: fifaLoading  } = useFifaStats(isWC ? dm : null, isWC, false)
   // MpMatchStats n'est rendu que pour un match déjà terminé (voir l'appelant
   // plus bas) — isFinished=true directement, stats définitives, cache jamais
   // redemandé (voir useEspnMatchStats).
-  const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(match, true)
+  const { data: espnStatsData, isLoading: espnLoading } = useEspnMatchStats(dm, true)
   const { data: aflStats,  isLoading: aflLoading   } = useAflMatchStats(match)
 
   // ── Fil du match : remplacements uniquement ────────────────────────────────
@@ -384,8 +391,10 @@ function MpMatchStats({ match }) {
   // les fusionne triés par minute) — les remontrer ici faisait doublon
   // (constat utilisateur : d'abord pour les buts, puis pour les cartons
   // "vu qu'on les a déplacés dans le header"). FD.org (useMatchDetail) reste
-  // l'unique source des remplacements (ESPN n'en expose aucune).
-  const { detail, loading: detailLoading } = useMatchDetail(match?.id)
+  // l'unique source des remplacements (ESPN n'en expose aucune) — a
+  // impérativement besoin du VRAI id FD.org (dm.id), pas de l'id ESPN
+  // synthétique, sinon l'appel /v4/matches/{id} échoue silencieusement.
+  const { detail, loading: detailLoading } = useMatchDetail(dm?.id)
 
   const fdSubs      = detail?.substitutions ?? []
   const hasEvents   = fdSubs.length > 0
@@ -744,6 +753,42 @@ export default function MatchPage() {
     }
   }, [rawMatch, resolveMatches])
 
+  // ⚠️ AJOUT `dataMatch` (21/08, constat utilisateur : "des fois j'ai un bug
+  // genre quand je clique sur un match [depuis le panneau Résultats de
+  // l'Accueil] ça a du mal à afficher le déroulement du match ou les stats
+  // live alors que dans la page Résultats j'ai pas de problème" + demande
+  // explicite de partage de données entre les deux entrées) : un match
+  // affiché par ResultPanel (Accueil, useRecentDaysMatches → fetchEspnPortion)
+  // porte un id SYNTHÉTIQUE `espn-{comp}-{eventId}` (voir espnAdapter.js,
+  // normalizeEvent) — jamais un vrai id football-data.org — alors que
+  // Resultat.jsx (page Résultats) source ses matchs via useMatches (FD.org
+  // direct), toujours avec le vrai id numérique. `match.id` synthétique
+  // cassait DEUX choses en aval, vérifiées dans le code : (1) useMatchDetail
+  // (déroulement/remplacements, dans MpMatchStats ci-dessous) appelle
+  // directement /v4/matches/{id} — un id non-numérique fait échouer cet appel
+  // FD.org silencieusement, d'où "déroulement" toujours vide venant
+  // d'Accueil ; (2) useLineups/useEspnMatchStats/useFifaStats envoient
+  // `fdMatchId={match.id}` comme clé de cache Redis PARTAGÉE côté serveur
+  // (api/espn.js lookupMap, api/fifa-lineups.js) — avec un id différent de
+  // celui utilisé par Résultats/Programme/cf-worker pour CE MÊME match réel,
+  // les deux entrées ne partagent jamais ce cache déjà chaud, exactement le
+  // partage manquant demandé. resolveFdMatchId (matchUtils.js) — déjà
+  // éprouvé pour résoudre l'Historique H2H dans ce même cas de figure —
+  // retrouve le vrai id FD.org via la paire d'équipes + date la plus proche
+  // dans resolveMatches. Volontairement une copie SÉPARÉE (`dataMatch`), pas
+  // une réécriture de `match.id` lui-même : match.id reste le référentiel
+  // ESPN utilisé partout ailleurs sur cette page (getMatchState/ft,
+  // getEspnData — le suivi live/`Terminé` déjà stabilisé cette session) —
+  // seuls les hooks de données FD.org/ESPN partagées reçoivent dataMatch.
+  // Aucun changement pour un match déjà sourcé FD.org (Résultats/Programme) :
+  // resolveFdMatchId renvoie alors rawId tel quel (isRealFdMatchId), donc
+  // dataMatch === match, strictement rien ne change pour ce chemin déjà fiable.
+  const dataMatch = useMemo(() => {
+    if (!match) return match
+    const resolvedId = resolveFdMatchId(match, resolveMatches, { loose: true })
+    return (resolvedId != null && resolvedId !== match.id) ? { ...match, id: resolvedId } : match
+  }, [match, resolveMatches])
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
 
@@ -872,7 +917,7 @@ export default function MatchPage() {
                         contenu des stats (remplace l'ancienne barre de
                         proba algorithmique, déjà visible sur l'Accueil
                         via MatchPoster). */}
-                    {statsView === 'live'       ? <MpMatchStats match={match} />
+                    {statsView === 'live'       ? <MpMatchStats match={match} dataMatch={dataMatch} />
                    : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
                    : (isLastSeason || compMatches.length === 0) ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
                    :                              <MpSeasonStats match={match} compMatches={compMatches} />
@@ -937,7 +982,7 @@ export default function MatchPage() {
                 fallback "compositions probables" de ComposTab (dernier XI
                 connu), maintenant aussi actif après-coup si la vraie compo
                 n'a jamais pu être récupérée. */}
-            {activeTab === 'compos'     && <ComposTab match={match} compMatches={compMatches} scorers={composScorers} />}
+            {activeTab === 'compos'     && <ComposTab match={match} dataMatch={dataMatch} compMatches={compMatches} scorers={composScorers} />}
             {activeTab === 'classement' && <ClassementTab match={match} compId={compId} />}
           </div>
         </div>

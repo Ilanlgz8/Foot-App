@@ -996,9 +996,19 @@ function buildGoalCounts(scorers = []) {
   return counts
 }
 
-export function ComposTab({ match, compMatches, scorers = [] }) {
+export function ComposTab({ match, dataMatch, compMatches, scorers = [] }) {
   const isFinished = match?.status === 'FINISHED'
   const isUpcoming = !isFinished
+
+  // dataMatch (optionnel, voir son calcul détaillé dans MatchPage.jsx) : même
+  // match, mais avec le vrai id football-data.org résolu quand `match.id` est
+  // un id synthétique ESPN (panneau Résultats de l'Accueil) — indispensable
+  // pour useFdLineups (appel FD.org direct par id) et pour que le cache Redis
+  // partagé (useLineups/useEspnMatchStats/useProbableLineups) soit le MÊME que
+  // celui déjà construit ailleurs (Résultats/Programme/cf-worker) pour ce
+  // match. Repli sur `match` si non fourni (appelants existants — MatchModal
+  // inline sur les cards Accueil, LiveMatchPage.jsx — inchangés, zéro risque).
+  const dm = dataMatch ?? match
 
   // WC 2026 : useLineups gère FIFA API en interne (redis fm:match:) puis ESPN fallback.
   // Pour WC on lance api-football EN PARALLÈLE d'ESPN (ESPN/FIFA souvent vides si hors cron).
@@ -1009,8 +1019,8 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   // isFinished passé aux deux (voir leurs commentaires) : une fois le match
   // terminé, compo/stats ne changent plus jamais — plus de refetch réseau
   // inutile à chaque réouverture de la modale.
-  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(match, isFinished)
-  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(match, isFinished)
+  const { data: espnLineups,   isLoading: espnLoading    } = useLineups(dm, isFinished)
+  const { data: espnMatchData, isLoading: espnMatchLoading } = useEspnMatchStats(dm, isFinished)
 
   const espnDone    = !espnLoading && !espnMatchLoading
   const espnHasData = espnLineups?.home?.starters?.length || espnMatchData?.lineups?.home?.starters?.length
@@ -1024,7 +1034,7 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   // direct que FIFA (cache lazy, pas toujours peuplé) et ESPN (rosters
   // incomplets pour la CM) peuvent être vides — probable cause du "pas de
   // compo même en direct" : on perdait un filet de sécurité gratuit.
-  const { data: fdLineups, isLoading: fdLoading } = useFdLineups(match)
+  const { data: fdLineups, isLoading: fdLoading } = useFdLineups(dm)
 
   // Source 3 : api-football
   // WC : en parallèle (ESPN/FIFA souvent vides sans cron)
@@ -1061,7 +1071,7 @@ export function ComposTab({ match, compMatches, scorers = [] }) {
   const needsProbable         = primaryLineupsDone && !primaryLineupsHasData
 
   const { data: probableData, isLoading: probableLoading } = useProbableLineups(
-    needsProbable ? match : null,
+    needsProbable ? dm : null,
     compMatches
   )
 
