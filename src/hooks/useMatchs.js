@@ -1116,15 +1116,24 @@ function filterUpcomingWindow(matches, now, windowMs = UPCOMING_WINDOW_MS) {
 // sur Programme) — écarte ce bug par construction (moins d'une heure entre
 // la publication d'un match et sa prise en compte ici).
 const ALL_COMPS_TTL = TTL.SCHEDULED
-// Étalement sur ~8s (STAGGER_MS, même pattern que useRecentDaysMatches plus
-// haut) : les 8-11 appels FD.org/ESPN partaient tous en même temps à chaque
-// expiration du cache — déjà sans risque réel pour FD.org (le verrou
-// d'espacement global dans api/football.js sérialise de toute façon), mais
-// visuellement une "rafale" trompeuse dans l'onglet Network (a alimenté
-// plusieurs fausses pistes de debug). Étalé, plus de rafale visible,
-// comportement identique au final. Toujours valable indépendamment du TTL
-// ci-dessus, conservé tel quel.
-const ALL_COMPS_STAGGER_MS = 800  // 800ms x jusqu'à 10 = ~8s pour la dernière compétition
+// ⚠️ RÉDUIT 800ms→150ms (21/08, constat utilisateur : "les matchs mettent du
+// temps à s'afficher" sur la page Pronos, qui appelle ce hook avec ~14
+// compétitions — jusqu'à 800×13 ≈ 10,4s avant même que le fetch de la
+// DERNIÈRE compétition ne démarre, sur un cache froid) : le commentaire
+// d'origine ci-dessous le disait déjà explicitement — ce stagger n'a jamais
+// été nécessaire pour la sécurité FD.org (le verrou d'espacement serveur,
+// api/football.js, sérialise de toute façon les vrais appels FD.org quel que
+// soit le timing client), seulement pensé pour la LISIBILITÉ du Network tab
+// pendant du debug. La quasi-totalité de ces compétitions sont 100% ESPN
+// (budget 100/min/IP, généreux) — seules WC/EC touchent FD.org, et ont déjà
+// leur propre protection dédiée (shouldQueryWcEcWithMeta + waitForFdSpacing,
+// voir fetchMatchesForComp plus haut), indépendante de CE stagger-ci. 150ms
+// reprend la même valeur déjà validée ailleurs dans l'app pour casser un vrai
+// risque de rafale ESPN sur la même seconde (voir ESPN_CALL_STAGGER_MS,
+// useTodayMatches.js, né d'un incident réel de 429 en rafale) — même
+// protection utile, sans le délai artificiel de 800ms qui n'apportait rien
+// de plus qu'un Network tab plus lisible.
+const ALL_COMPS_STAGGER_MS = 150  // 150ms x jusqu'à 13 ≈ 2s pour la dernière compétition
 
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const windowMs   = windowDays * 24 * 60 * 60 * 1000
@@ -1206,14 +1215,21 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
 // début à la fin), donc le pronostic se retrouve bien sous la même clé des
 // deux côtés. Fonction UNIQUEMENT utilisée par Pronos.jsx (voir commentaire
 // ci-dessus) — aucun autre appelant (Accueil/Programme/Résultats) affecté.
+// ⚠️ Clé de cache bumpée "_V2" (constat utilisateur juste après ce fix : "les
+// points j'ai l'impression ils sont pas comptés dans le classement") — même
+// leçon déjà tirée pour useUpcomingMatchesAllComps (voir commentaire "ALL_V2"
+// plus haut) : sans changer la clé, un navigateur ayant déjà visité Pronos
+// AVANT ce fix garde son ancien cache localStorage (ids FD.org pour les 6
+// grands championnats) valide jusqu'à 10min (staleTime) après le déploiement
+// — donc 0 point compté pendant tout ce temps malgré le fix déjà en place.
 export function useFinishedMatchesAllComps(compIds, enabled = true) {
-  const key        = 'matches_ALL_FINISHED_PRONOS'
+  const key        = 'matches_ALL_FINISHED_PRONOS_V2'
   const cachedData = readCacheStale(key)
   const cachedAt   = getCacheSavedAt(key)
   const ttl        = 10 * 60 * 1000
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['matches', 'ALL', 'FINISHED_PRONOS', compIds.join(',')],
+    queryKey: ['matches', 'ALL', 'FINISHED_PRONOS_V2', compIds.join(',')],
     queryFn: async () => {
       const results = await Promise.allSettled(
         compIds.map(id => fetchMatchesForComp(id, 'FINISHED', { preferEspnForMajors: true }))
