@@ -95,6 +95,31 @@ function retryWhileEmpty(query, isEmpty) {
   return query.state.dataUpdateCount >= MAX_EMPTY_RETRIES ? false : EMPTY_RETRY_INTERVAL_MS
 }
 
+// ⚠️ AJOUT (constat utilisateur, 20/08 : "les stats live sont pas appelées
+// dès qu'on clique sur un match terminé depuis Résultats — ça affiche les
+// stats du début du match") : `staleTime: Infinity` (useEspnMatchStats/
+// useFifaStats plus bas) protège déjà contre un ÉCHEC (`null`) figé pour
+// toujours — mais pas contre un résultat NON-null capturé TROP TÔT. Un match
+// suivi en direct dès ses premières minutes écrit un instantané précoce en
+// cache disque (`initialData`, staleTime court tant que le match est encore
+// en cours — comportement normal et correct À CE MOMENT-LÀ). Si personne ne
+// rouvre ce match avant sa fin, cet instantané précoce reste le SEUL jamais
+// écrit ; une fois `isFinished` vrai, l'ancien test (`data != null`) le
+// validait à tort comme définitif, sans jamais vérifier QUAND il avait été
+// capturé par rapport à la fin réelle — d'où les stats des premières minutes
+// figées pour toujours, typiquement rencontré en ouvrant un match pour la
+// 1ère fois depuis Résultats (jamais suivi en direct par CET appareil).
+// Marge large (130min, prolongations + tirs au but compris) : un simple
+// garde-fou temporel, pas une certitude absolue, mais élimine le cas réel
+// rencontré ici sans risquer de rejeter une donnée réellement finale.
+function isStaleEarlySnapshot(match, query) {
+  const kickoff = match?.utcDate ? new Date(match.utcDate).getTime() : null
+  if (kickoff == null) return false
+  const plausibleEnd = kickoff + 130 * 60_000
+  const fetchedAt = query.state.dataUpdatedAt ?? 0
+  return fetchedAt < plausibleEnd
+}
+
 // ── useLineups ─────────────────────────────────────────────────────────────────
 // Source : ESPN summary pour les ligues club.
 //          FIFA API (/api/fifa-lineups) pour WC 2026 (espnSlug='fifa', compId=2000).
@@ -581,7 +606,7 @@ export function useEspnMatchStats(match, isFinished = false) {
     // contient vraiment des stats, jamais sur un `null` (échec), sinon un
     // échec ponctuel juste après le passage à "terminé" reste figé pour
     // toujours dès que l'utilisateur quitte puis revient sur la page.
-    staleTime: (query) => (isFinished && query.state.data != null) ? Infinity : 30 * 60_000,
+    staleTime: (query) => (isFinished && query.state.data != null && !isStaleEarlySnapshot(match, query)) ? Infinity : 30 * 60_000,
     // Retente tant que vide (ex: ESPN pas encore fini de publier son résumé
     // juste après le coup de sifflet) — voir retryWhileEmpty plus haut.
     refetchInterval: q => retryWhileEmpty(q, d => d == null),
@@ -781,7 +806,7 @@ export function useFifaStats(match, enabled = true, live = true) {
     // prête juste après la fin). Infinity uniquement si le résultat contient
     // vraiment des stats, sinon ce hook reste bloqué indéfiniment dès que le
     // composant se démonte avant l'expiration de MAX_EMPTY_RETRIES.
-    staleTime: (query) => (!live && query.state.data != null) ? Infinity : 30_000,
+    staleTime: (query) => (!live && query.state.data != null && !isStaleEarlySnapshot(match, query)) ? Infinity : 30_000,
     // Live : poll 45s inchangé (déjà rapide, indépendant de la donnée reçue).
     // Fini : pas de poll normalement (30min de staleTime suffit une fois les
     // stats obtenues), SAUF si toujours vide — l'API FIFA peut avoir eu un

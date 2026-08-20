@@ -1,6 +1,6 @@
 import { useState }      from 'react'
 import { useQuery }                from '@tanstack/react-query'
-import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups } from '../hooks/useMatchDetail'
+import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups, useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
@@ -550,6 +550,17 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
   const homeGoals   = mergeScore(espnScore?.home, fsLive.home ?? match.score?.halfTime?.home)
   const awayGoals   = mergeScore(espnScore?.away, fsLive.away ?? match.score?.halfTime?.away)
   const pronoStats  = espnScore?.stats
+  // ⚠️ AJOUT `marketPre` (constat utilisateur, 20/08 : "les pronos côte en
+  // live dans la page LiveMatchPage sont pas les mêmes que dans Accueil sur
+  // les cards des matchs en live") : MatchPoster.jsx/MatchDuJourCard.jsx
+  // (cards Accueil) réinjectent déjà la vraie cote de marché ESPN comme point
+  // de départ du calcul live (fix Lens-PSG, voir leur commentaire détaillé) —
+  // ce composant-ci (LiveStatsTab, partagé par MatchModal ET LiveMatchPage.jsx)
+  // ne l'a jamais fait, donc calculait toujours à partir du seul prior interne
+  // (calcPronoAdvanced/forme récente), qui peut diverger du marché — d'où des
+  // pourcentages différents pour EXACTEMENT le même match selon l'endroit
+  // consulté. Même hook, même TTL, même repli — juste jamais branché ici.
+  const { data: espnOdds } = useEspnPregameOdds(match, isLive)
   const liveProno   = (hForm != null || aForm != null) ? calcLiveProno(
     hForm, aForm, homeGoals, awayGoals, liveMinute,
     {
@@ -565,6 +576,7 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
       awayShotsOnTarget: pronoStats?.away?.shotsOnTarget,
       homeCorners:       pronoStats?.home?.corners,
       awayCorners:       pronoStats?.away?.corners,
+      marketPre:         espnOdds?.pct ?? null,
     }
   ) : null
 
