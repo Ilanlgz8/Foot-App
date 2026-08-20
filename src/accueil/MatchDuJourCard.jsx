@@ -14,7 +14,7 @@
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { TEAM_SHORT } from '../data/teamShortNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
@@ -142,6 +142,12 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // `strict:true` + suppression du repli `?? match.xxx.id`.
   const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true, strict: true })
   const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true, strict: true })
+  // ⚠️ AJOUT (21/08, constat utilisateur : logos différents entre Accueil et
+  // Programme/Résultats) : même principe que MatchCard.jsx/MatchPoster.jsx —
+  // préfère l'écusson FD.org (déjà dans teamIdPool, zéro appel réseau en
+  // plus) à celui du match lui-même (ESPN pour ces 6 championnats).
+  const homeCrest = resolveFdCrest(match.homeTeam, resolvedHomeId, teamIdPool)
+  const awayCrest = resolveFdCrest(match.awayTeam, resolvedAwayId, teamIdPool)
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
   const prono = isLive
@@ -186,8 +192,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
           pour le rogner proprement. z-index négatif : sous le contenu réel
           (topBar/titre/équipes/prono) mais au-dessus du dégradé de fond. */}
       <div className="accueil__mdjWatermark" aria-hidden="true">
-        {match.homeTeam?.crest
-          ? <img src={match.homeTeam.crest} alt="" />
+        {homeCrest
+          ? <img src={homeCrest} alt="" />
           : <span>{homeCode}</span>}
       </div>
 
@@ -208,8 +214,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
 
       <div className="accueil__mdjTeams">
         <div className="accueil__mdjTeam">
-          {match.homeTeam?.crest
-            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
+          {homeCrest
+            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={homeCrest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{homeName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{homeName}</span>
         </div>
@@ -228,8 +234,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         </div>
 
         <div className="accueil__mdjTeam">
-          {match.awayTeam?.crest
-            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
+          {awayCrest
+            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={awayCrest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
             : <div className="accueil__mdjCrestFb">{awayName?.[0] ?? ''}</div>}
           <span className="accueil__mdjTeamName">{awayName}</span>
         </div>

@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -116,7 +116,7 @@ function LmpPageSkeleton() {
 }
 
 // ── Hero live (style MatchPage + éléments live) ───────────────────────────────
-function MatchHeader({ match, espn, onBack, hForm, aForm }) {
+function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }) {
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 
@@ -252,8 +252,8 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
       <div className="mp__hero__mid">
         <div className="mp__hero__team">
           {showLivePens && <ShootoutDots scored={homeShootout} />}
-          {match.homeTeam?.crest
-            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="mp__hero__crest" data-team={match.homeTeam?.name} /></div>
+          {(homeCrest ?? match.homeTeam?.crest)
+            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={homeCrest ?? match.homeTeam?.crest} alt="" className="mp__hero__crest" data-team={match.homeTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{homeName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{homeName}</span>
           <FormDiamonds form={hForm} />
@@ -272,8 +272,8 @@ function MatchHeader({ match, espn, onBack, hForm, aForm }) {
 
         <div className="mp__hero__team mp__hero__team--away">
           {showLivePens && <ShootoutDots scored={awayShootout} />}
-          {match.awayTeam?.crest
-            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="mp__hero__crest" data-team={match.awayTeam?.name} /></div>
+          {(awayCrest ?? match.awayTeam?.crest)
+            ? <div className="mp__hero__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={awayCrest ?? match.awayTeam?.crest} alt="" className="mp__hero__crest" data-team={match.awayTeam?.name} /></div>
             : <div className="mp__hero__crestFb">{awayName?.[0] ?? ''}</div>}
           <span className="mp__hero__name">{awayName}</span>
           <FormDiamonds form={aForm} />
@@ -392,6 +392,15 @@ export default function LiveMatchPage() {
     ? { ...(espn ?? {}), stats: espnStatsFinal.stats }
     : espn
 
+  // ⚠️ AJOUT (21/08, constat utilisateur : logos différents entre les cards
+  // Accueil/LiveMatchPage et Programme/Résultats) : même principe que
+  // MatchCard.jsx/MatchPoster.jsx/MatchDuJourCard.jsx — préfère l'écusson
+  // FD.org (déjà dans resolveMatches, zéro appel réseau en plus, chargé
+  // juste au-dessus pour la résolution d'id) à celui du match lui-même (ESPN
+  // pour ces 6 championnats, voir espnAdapter.js).
+  const homeCrest = resolveFdCrest(match?.homeTeam, match?.homeTeam?.id, resolveMatches)
+  const awayCrest = resolveFdCrest(match?.awayTeam, match?.awayTeam?.id, resolveMatches)
+
   const hForm = formMap?.[match?.homeTeam?.id]
   const aForm = formMap?.[match?.awayTeam?.id]
   // Le pronostic live (calcLiveProno, score + minute + cartons rouges +
@@ -492,7 +501,7 @@ export default function LiveMatchPage() {
     <div className="mp__page lmp__main" style={themeVars}>
 
       {/* Hero gradient avec score live */}
-      <MatchHeader match={match} espn={espn} hForm={hForm} aForm={aForm} onBack={() => {
+      <MatchHeader match={match} espn={espn} hForm={hForm} aForm={aForm} homeCrest={homeCrest} awayCrest={awayCrest} onBack={() => {
         if (window.history.length > 1) navigate(-1)
         else navigate('/live')
       }} />

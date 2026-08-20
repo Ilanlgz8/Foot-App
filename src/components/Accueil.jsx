@@ -909,7 +909,7 @@ function Accueil() {
                 </div>
               </div>
               <div className="accueil__dashPanelDivider" />
-              <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} />
+              <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} matchesByComp={matchesByComp} />
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, parseEspnClock } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, parseEspnClock } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -126,6 +126,14 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   // un id non résolu doit rester absent, jamais deviné.
   const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true })
   const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true })
+  // ⚠️ AJOUT (21/08, constat utilisateur : "les logos des clubs c'est pas les
+  // mêmes que sur Programme/Résultats") : compMatches (FD.org, déjà chargé
+  // juste au-dessus pour resolveFdTeamId) contient aussi le VRAI écusson
+  // FD.org de chaque équipe — on le préfère à celui du match lui-même (ESPN
+  // pour ces 6 championnats, voir espnAdapter.js) dès qu'on le connaît déjà,
+  // sans aucun appel réseau supplémentaire (voir resolveFdCrest, matchUtils.js).
+  const homeCrest = resolveFdCrest(match.homeTeam, resolvedHomeId, compMatches)
+  const awayCrest = resolveFdCrest(match.awayTeam, resolvedAwayId, compMatches)
   // FD.org a 1-5min de retard sur les FT → si ESPN a déjà détecté la fin du match
   // (flag ft dans localStorage), on traite le match comme terminé immédiatement
   // au lieu d'attendre la mise à jour FD.org. Affiche "FT" + arrête le compteur.
@@ -371,8 +379,8 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
       {/* Équipe domicile */}
       <div className="accueil__matchCardTeam">
         <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
-          {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className={homeCrestCls} data-team={match.homeTeam?.name}
+          {homeCrest
+            ? <img src={homeCrest} alt="" className={homeCrestCls} data-team={match.homeTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>
@@ -412,8 +420,8 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
       {/* Équipe extérieure */}
       <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
         <div className="accueil__matchCardCrestWrap" data-crest={isWC ? 'country' : 'club'}>
-          {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className={awayCrestCls} data-team={match.awayTeam?.name}
+          {awayCrest
+            ? <img src={awayCrest} alt="" className={awayCrestCls} data-team={match.awayTeam?.name}
                 onError={e => e.currentTarget.style.display = 'none'} />
             : <div className="accueil__matchCardCrestEmpty" />}
         </div>

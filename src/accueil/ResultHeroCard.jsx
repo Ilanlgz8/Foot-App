@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { translateTeam } from '../data/teamNames'
-import { finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { COMPETITIONS } from '../data/competitions'
 import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
@@ -13,8 +13,23 @@ import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
 // uniquement sur le panneau Résultats de l'Accueil. Ce composant ne gère QUE des
 // matchs terminés (aucune logique live/minute/animation de but nécessaire — la
 // donnée vient toujours de football-data.org, jamais d'ESPN ici).
-export function ResultHeroCard({ match }) {
+export function ResultHeroCard({ match, compMatches = null }) {
   const navigate = useNavigate()
+
+  // ⚠️ AJOUT (21/08, constat utilisateur : "les logos des clubs c'est pas les
+  // mêmes que sur Programme/Résultats") : ce composant est le seul, parmi les
+  // cards Accueil, à n'avoir jamais eu besoin de résoudre l'id FD.org d'une
+  // équipe (aucune forme récente/prono ici, juste un résultat figé) — mais
+  // `compMatches` (matchesByComp, déjà chargé au niveau Accueil.jsx pour les
+  // AUTRES cards, voir MatchCard.jsx) est maintenant transmis jusqu'ici
+  // (ResultPanel.jsx) spécifiquement pour ça, zéro appel réseau
+  // supplémentaire. Même résolution que MatchCard.jsx (strict:true — un
+  // écusson non résolu retombe simplement sur celui du match, jamais un id
+  // deviné à tort).
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true })
+  const homeCrestUrl = resolveFdCrest(match.homeTeam, resolvedHomeId, compMatches)
+  const awayCrestUrl = resolveFdCrest(match.awayTeam, resolvedAwayId, compMatches)
 
   const fs  = finalScore(match.score)
   const hs  = fs.home ?? match.score?.halfTime?.home ?? 0
@@ -80,8 +95,8 @@ export function ResultHeroCard({ match }) {
       <div className="resultHero__body">
         <div className={`resultHero__team${homeWins ? ' resultHero__team--winner' : ''}${awayWins ? ' resultHero__team--loser' : ''}`}>
           <div className="resultHero__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-            {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" className="resultHero__crest" data-team={match.homeTeam?.name}
+            {homeCrestUrl
+              ? <img src={homeCrestUrl} alt="" className="resultHero__crest" data-team={match.homeTeam?.name}
                   onError={e => e.currentTarget.style.display = 'none'} />
               : <div className="resultHero__crestEmpty" />}
           </div>
@@ -105,8 +120,8 @@ export function ResultHeroCard({ match }) {
 
         <div className={`resultHero__team resultHero__team--away${awayWins ? ' resultHero__team--winner' : ''}${homeWins ? ' resultHero__team--loser' : ''}`}>
           <div className="resultHero__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-            {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" className="resultHero__crest" data-team={match.awayTeam?.name}
+            {awayCrestUrl
+              ? <img src={awayCrestUrl} alt="" className="resultHero__crest" data-team={match.awayTeam?.name}
                   onError={e => e.currentTarget.style.display = 'none'} />
               : <div className="resultHero__crestEmpty" />}
           </div>

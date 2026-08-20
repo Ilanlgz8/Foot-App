@@ -1,6 +1,6 @@
 import { useState, useEffect }        from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
@@ -155,6 +155,12 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // voir le commentaire détaillé sur resolveFdTeamId (matchUtils.js).
   const resolvedHomeId = resolveFdTeamId(match.homeTeam, teamIdPool, { loose: true, strict: true })
   const resolvedAwayId = resolveFdTeamId(match.awayTeam, teamIdPool, { loose: true, strict: true })
+  // ⚠️ AJOUT (21/08, constat utilisateur : logos différents entre Accueil et
+  // Programme/Résultats) : même principe que MatchCard.jsx — préfère
+  // l'écusson FD.org (déjà dans teamIdPool, zéro appel réseau en plus) à
+  // celui du match lui-même (ESPN pour ces 6 championnats).
+  const homeCrest = resolveFdCrest(match.homeTeam, resolvedHomeId, teamIdPool)
+  const awayCrest = resolveFdCrest(match.awayTeam, resolvedAwayId, teamIdPool)
   const hForm     = formMap?.[resolvedHomeId] ?? []
   const aForm     = formMap?.[resolvedAwayId] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
@@ -366,8 +372,8 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               que soit la longueur du nom, tandis que le groupe entier reste
               plaqué au bord extérieur via l'align-items hérité de team-col. */}
           <div className="poster__nameGroup">
-            {match.homeTeam?.crest && !homeCrestError
-              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.homeTeam.crest} alt="" data-team={homeName}
+            {homeCrest && !homeCrestError
+              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={homeCrest} alt="" data-team={homeName}
                   onError={() => setHomeCrestError(true)} /></div>
               : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
             }
@@ -409,8 +415,8 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
 
         <div className="poster__team-col poster__team-col--away">
           <div className="poster__nameGroup">
-            {match.awayTeam?.crest && !awayCrestError
-              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={match.awayTeam.crest} alt="" data-team={awayName}
+            {awayCrest && !awayCrestError
+              ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={awayCrest} alt="" data-team={awayName}
                   onError={() => setAwayCrestError(true)} /></div>
               : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
             }

@@ -36,7 +36,7 @@ function formatDayLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function ResultPanel({ results, loading, view = 'chrono' }) {
+export function ResultPanel({ results, loading, view = 'chrono', matchesByComp = null }) {
   const grouped  = groupByDay(results)
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué jusqu'à un
   // jour précédent (ex: 8 juillet), cliqué sur un match, puis "retour",
@@ -94,7 +94,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
-              <ResultHeroCard key={match.id ?? i} match={match} />
+              <ResultHeroCard key={match.id ?? i} match={match} compMatches={matchesByComp?.[match.competition?.code] ?? null} />
             ))}
           </div>
         )}
@@ -107,7 +107,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
                 <p className="accueil__compGroupTitle">{name}</p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
-                    <ResultHeroCard key={match.id ?? i} match={match} />
+                    <ResultHeroCard key={match.id ?? i} match={match} compMatches={matchesByComp?.[match.competition?.code] ?? null} />
                   ))}
                 </div>
               </div>

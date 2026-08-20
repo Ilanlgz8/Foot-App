@@ -899,3 +899,28 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
   }
   return giveUp()
 }
+
+// ⚠️ AJOUT (21/08, constat utilisateur : "les logos des clubs dans Programme/
+// Résultats c'est pas les mêmes que sur les cards des matchs dans Accueil")
+// : les 6 grands championnats affichés en cards Accueil (MatchCard/
+// MatchPoster/MatchDuJourCard/ResultHeroCard) sont sourcés ESPN
+// (fetchEspnPortion, useTodayMatches.js) — leur `team.crest` vient donc de
+// `home.team.logo` (ESPN, voir espnAdapter.js), un CDN et un style d'écusson
+// différents de celui de football-data.org qu'utilisent Programme/Résultats
+// (`useMatches`, FD.org direct). Pas un bug — deux sources d'images
+// légitimes mais distinctes pour le même club. resolveFdCrest permet de
+// PRÉFÉRER l'écusson FD.org quand on le connaît déjà (compMatches, déjà
+// chargé pour la résolution d'id/forme récente — AUCUN appel FD.org
+// supplémentaire) : cherche l'écusson associé à `resolvedId` (voir
+// resolveFdTeamId ci-dessus, déjà appelé par tous ces composants) dans
+// compMatches, retombe sur l'écusson d'origine du match (`team.crest`,
+// ESPN ou déjà FD.org selon la source) si non trouvé — jamais de blason vide.
+export function resolveFdCrest(team, resolvedId, compMatches) {
+  if (resolvedId != null && compMatches?.length) {
+    for (const m of compMatches) {
+      if (m.homeTeam?.id === resolvedId && m.homeTeam?.crest) return m.homeTeam.crest
+      if (m.awayTeam?.id === resolvedId && m.awayTeam?.crest) return m.awayTeam.crest
+    }
+  }
+  return team?.crest ?? null
+}

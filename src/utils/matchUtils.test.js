@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, isRealFdMatchId, resolveFdMatchId } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState, recordEspnMiss } from './matchStateTracker'
 
 const MID = 1
@@ -495,6 +495,39 @@ describe('resolveFdTeamId', () => {
       // pas une garantie absolue au niveau resolveFdTeamId seul.
       expect(resolveFdTeamId({ id: 999, name: 'Deportivo' }, pdCompMatches, { allowBarePrefix: true })).toBe(263)
     })
+  })
+})
+
+// resolveFdCrest — constat utilisateur (21/08) : les logos de clubs dans les
+// cards Accueil (sourcées ESPN pour les 6 grands championnats) ne sont pas
+// les mêmes que ceux de Programme/Résultats (FD.org direct) pour le MÊME
+// club — deux CDN/styles d'écusson différents. resolveFdCrest préfère
+// l'écusson FD.org (déjà présent dans compMatches, chargé pour d'autres
+// besoins) dès qu'il est identifiable via l'id résolu, sans jamais renvoyer
+// un blason vide.
+describe('resolveFdCrest', () => {
+  const compMatches = [
+    { homeTeam: { id: 86, name: 'Real Madrid CF', crest: 'https://fd.org/86.svg' },
+      awayTeam: { id: 81, name: 'FC Barcelona',   crest: 'https://fd.org/81.svg' } },
+  ]
+
+  it('renvoie l\'écusson FD.org trouvé via l\'id résolu', () => {
+    expect(resolveFdCrest({ crest: 'https://espn.com/rm.png' }, 86, compMatches)).toBe('https://fd.org/86.svg')
+  })
+
+  it('retombe sur l\'écusson d\'origine si l\'id résolu ne correspond à aucun club connu', () => {
+    expect(resolveFdCrest({ crest: 'https://espn.com/x.png' }, null, compMatches)).toBe('https://espn.com/x.png')
+    expect(resolveFdCrest({ crest: 'https://espn.com/x.png' }, 999, compMatches)).toBe('https://espn.com/x.png')
+  })
+
+  it('retombe sur l\'écusson d\'origine si compMatches est vide/pas encore chargé', () => {
+    expect(resolveFdCrest({ crest: 'https://espn.com/x.png' }, 86, [])).toBe('https://espn.com/x.png')
+    expect(resolveFdCrest({ crest: 'https://espn.com/x.png' }, 86, undefined)).toBe('https://espn.com/x.png')
+  })
+
+  it('renvoie null sans planter si ni l\'équipe ni compMatches ne donnent d\'écusson', () => {
+    expect(resolveFdCrest(null, null, compMatches)).toBeNull()
+    expect(resolveFdCrest({}, 999, compMatches)).toBeNull()
   })
 })
 
