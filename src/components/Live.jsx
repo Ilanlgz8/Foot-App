@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 import { useLiveData } from '../context/LiveProvider'
 import { isCardLive } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
@@ -50,13 +51,57 @@ export default function Live() {
   // n'a jamais ce problème — parce qu'elle utilise `isCardLive` (matchUtils.js),
   // un simple dérivé STATELESS de l'état courant (`ft === true` → plus live,
   // point final), sans fenêtre de temps ni mémoire à synchroniser entre
-  // plusieurs pages. Repris ici à l'identique : ce widget disparaît
-  // maintenant instantanément dès que `ft` passe à `true` (perd le court
-  // affichage "Terminé" avant disparition, un compromis assumé pour ne plus
-  // jamais revoir ce flicker) — plus besoin de ticker dédié non plus, un
-  // nouveau statut arrive de toute façon au rythme normal du poll ESPN/FD.org
-  // (LiveProvider), exactement comme pour la card Accueil.
-  const live = liveMatches.filter(isCardLive)
+  // plusieurs pages.
+  //
+  // ⚠️ AJUSTEMENT (constat utilisateur, même jour : "affiche 'Terminé' si on
+  // est sur la page au moment où le match se termine, et une seconde après
+  // ça disparaît — comme ça l'utilisateur comprend bien que le match est
+  // fini") : le stateless pur ci-dessus (isCardLive seul) fait disparaître le
+  // widget instantanément, sans transition visible, même quand on regarde la
+  // page en direct au moment précis où ça se termine — moins clair pour
+  // l'utilisateur que "Terminé" un court instant. Différence clé avec l'ancien
+  // `shouldShowLiveWidget` (qui causait le flicker) : cette mémoire est
+  // 100% LOCALE à ce montage de page (useState/useRef, jamais partagée avec
+  // navbar.jsx/Accueil.jsx, jamais lue au premier rendu) — un match déjà
+  // terminé AVANT l'ouverture de cette page n'y entre jamais (justEndedIds
+  // démarre vide, prevLiveIds aussi), donc aucun risque de rejouer une
+  // transition déjà vue ailleurs ni de resynchroniser un état entre pages —
+  // exactement la source du bug précédent. Seule une transition VUE EN DIRECT
+  // pendant que cette page reste montée (live → plus dans isCardLive d'un
+  // render à l'autre) déclenche le délai d'1s avant retrait.
+  const [justEndedIds, setJustEndedIds] = useState(() => new Set())
+  const prevLiveIdsRef = useRef(new Set())
+  // Map id → handle setTimeout, dans un ref pour survivre aux re-renders SANS
+  // être annulée à chaque nouveau poll ESPN (voir 2e effet plus bas — un
+  // cleanup ici, à chaque ré-exécution de CET effet, annulerait le timer d'un
+  // match déjà "justEnded" si un poll arrive dans la même seconde, le
+  // laissant bloqué sur "Terminé" pour toujours, plus aucun code pour le
+  // retirer).
+  const timersRef = useRef(new Map())
+  useEffect(() => {
+    const currentlyLiveIds = new Set(liveMatches.filter(isCardLive).map(m => m.id))
+    const justEnded = [...prevLiveIdsRef.current].filter(id => !currentlyLiveIds.has(id))
+    prevLiveIdsRef.current = currentlyLiveIds
+    if (justEnded.length === 0) return
+    setJustEndedIds(prev => new Set([...prev, ...justEnded]))
+    justEnded.forEach(id => {
+      const handle = setTimeout(() => {
+        timersRef.current.delete(id)
+        setJustEndedIds(prev => {
+          if (!prev.has(id)) return prev
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }, 1_000)
+      timersRef.current.set(id, handle)
+    })
+  }, [liveMatches])
+  // Cleanup uniquement au démontage de la page (deps vides) — pas à chaque
+  // poll, voir le commentaire ci-dessus.
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), [])
+
+  const live = liveMatches.filter(m => isCardLive(m) || justEndedIds.has(m.id))
 
   return (
     <section className="live__page">
