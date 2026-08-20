@@ -23,7 +23,7 @@
  * Identité : deviceId + pseudo persistés en localStorage (usePronosGroup),
  * aucune donnée sensible, groupe rejoint via un code à 6 caractères.
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
@@ -300,7 +300,17 @@ function JoinCreateScreen({ onCreate, onJoin }) {
   )
 }
 
-function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerDivByComp }) {
+// ⚠️ AJOUT auto-avance (21/08, demande explicite utilisateur : "quand
+// l'utilisateur remplit une case avec un chiffre ça switch direct à la case
+// suivante ... et si les cases A et B sont remplies ça passe au match en
+// dessous sur la case A") : dès qu'UN chiffre est tapé (pas un effacement —
+// `value.length === 1` exclut le backspace, qui vide le champ à 0 caractère,
+// donc jamais de saut arrière indésirable pendant une correction), le focus
+// saute directement Domicile → Extérieur, puis Extérieur (match courant) →
+// Domicile (match SUIVANT dans la liste affichée). `registerInputRef`/
+// `focusInput`/`nextMatchId` viennent de Pronos() (une seule Map de refs
+// pour toute la liste, pas un état local par ligne).
+function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -309,11 +319,26 @@ function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerD
     setAway(myPred?.away ?? '')
   }, [myPred?.home, myPred?.away, match.id])
 
-  const commit = () => {
-    const h = parseInt(home, 10)
-    const a = parseInt(away, 10)
+  const commitScore = (h, a) => {
     if (Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20) {
       onSave(match.id, h, a)
+    }
+  }
+  const commit = () => commitScore(parseInt(home, 10), parseInt(away, 10))
+
+  const isFreshDigit = (v) => v.length === 1 && /^[0-9]$/.test(v)
+
+  const handleHomeChange = (e) => {
+    const v = e.target.value
+    setHome(v)
+    if (isFreshDigit(v)) focusInput(match.id, 'away')
+  }
+  const handleAwayChange = (e) => {
+    const v = e.target.value
+    setAway(v)
+    if (isFreshDigit(v)) {
+      commitScore(parseInt(home, 10), parseInt(v, 10))
+      if (nextMatchId) focusInput(nextMatchId, 'home')
     }
   }
 
@@ -344,16 +369,18 @@ function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerD
               type="number" inputMode="numeric" min="0" max="20"
               className="pronos__scoreInput"
               value={home}
-              onChange={e => setHome(e.target.value)}
+              onChange={handleHomeChange}
               onBlur={commit}
+              ref={el => registerInputRef(match.id, 'home', el)}
             />
             <span className="pronos__scoreSep">-</span>
             <input
               type="number" inputMode="numeric" min="0" max="20"
               className="pronos__scoreInput"
               value={away}
-              onChange={e => setAway(e.target.value)}
+              onChange={handleAwayChange}
               onBlur={commit}
+              ref={el => registerInputRef(match.id, 'away', el)}
             />
           </div>
           {potentialPoints != null && (
@@ -681,6 +708,29 @@ function Pronos() {
 
   const grouped = useMemo(() => groupByDay(filteredUpcoming), [filteredUpcoming])
 
+  // ── Auto-avance des cases de score (voir commentaire détaillé sur
+  // MatchPredictRow) : une seule Map de refs DOM pour toute la liste
+  // (useRef, jamais recréée), plutôt qu'un état React par ligne — un focus()
+  // programmatique n'a pas besoin de déclencher de re-render. `nextIdByMatchId`
+  // capture l'ordre RÉELLEMENT affiché (jours puis matchs, celui de `grouped`
+  // ci-dessus) : dernier match d'un jour → 1er match du jour suivant, jamais
+  // un id issu d'un ordre différent.
+  const inputRefsMap = useRef(new Map())
+  const registerInputRef = (matchId, field, el) => {
+    if (!el) return
+    if (!inputRefsMap.current.has(matchId)) inputRefsMap.current.set(matchId, {})
+    inputRefsMap.current.get(matchId)[field] = el
+  }
+  const focusInput = (matchId, field) => {
+    inputRefsMap.current.get(matchId)?.[field]?.focus()
+  }
+  const nextIdByMatchId = useMemo(() => {
+    const flat = grouped.flatMap(g => g.matches.map(m => m.id))
+    const map = {}
+    for (let i = 0; i < flat.length - 1; i++) map[flat[i]] = flat[i + 1]
+    return map
+  }, [grouped])
+
   const finishedById = useMemo(() => {
     const map = {}
     finishedAll.forEach(m => { map[String(m.id)] = m.score?.fullTime ?? null })
@@ -796,6 +846,9 @@ function Pronos() {
                     formMap={formMap}
                     matchesByComp={matchesByComp}
                     lowerDivByComp={lowerDivByComp}
+                    nextMatchId={nextIdByMatchId[m.id] ?? null}
+                    registerInputRef={registerInputRef}
+                    focusInput={focusInput}
                   />
                 ))}
               </div>
