@@ -31,7 +31,7 @@ import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { calcPronoAdvanced } from '../utils/calcProno'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
 import '../../pronos.css'
@@ -74,6 +74,37 @@ function CompLabel({ match }) {
       {emblem && <img src={emblem} alt="" className="pronos__compLogo" />}
       {name}
     </span>
+  )
+}
+
+// ── Filtre championnat (demande utilisateur, 21/08 : "possible de trier les
+// matchs par championnat, un filtre simple et moderne") — même pattern que
+// CompFilter (Accueil.jsx : rangée de pastilles logo+nom, "Tous" en premier,
+// pastille active surlignée en rouge), repris ici en local pour ne pas
+// coupler Pronos.jsx à Accueil.jsx. Un seul filtre partagé entre l'onglet
+// "Pronos" et "Résultat" (pas un par onglet) — plus simple à comprendre :
+// "je ne veux voir que la Ligue 1" reste vrai en changeant d'onglet.
+function CompFilterBar({ competitions, active, onChange }) {
+  if (competitions.length <= 1) return null
+  return (
+    <div className="pronos__compFilter">
+      <button
+        className={`pronos__compChip${active === null ? ' pronos__compChip--active' : ''}`}
+        onClick={() => onChange(null)}
+      >
+        Tous
+      </button>
+      {competitions.map(c => (
+        <button
+          key={c.id}
+          className={`pronos__compChip${active === c.id ? ' pronos__compChip--active' : ''}`}
+          onClick={() => onChange(c.id)}
+        >
+          {c.emblem && <img src={c.emblem} alt="" />}
+          {c.shortName}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -493,6 +524,9 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
 function Pronos() {
   const { deviceId, groupCode, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   const [activeTab, setActiveTab] = useState('pronos')
+  // Filtre championnat (demande utilisateur, 21/08) — partagé entre les
+  // onglets Pronos et Résultat, voir CompFilterBar plus haut.
+  const [compFilter, setCompFilter] = useState(null)
 
   const { matches: upcoming, loading: loadingUpcoming } = useUpcomingMatchesAllComps(COMP_IDS)
   // Requis par Résultat (matchs finis <24h à afficher) ET Classement (calcul des points).
@@ -606,13 +640,46 @@ function Pronos() {
       .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
   }, [finishedAll])
 
+  // Championnats disponibles pour le filtre — union de tout ce qui est
+  // réellement affichable (à venir + en cours + terminé récent), même
+  // pattern que resultCompetitions/matchCompetitions (Accueil.jsx) : exclut
+  // les compétitions à 1 seul match par an (USC/TDC/CS, voir
+  // SINGLE_MATCH_COMPS) — rien d'utile à filtrer dessus.
+  const filterableComps = useMemo(() => {
+    const seen = new Set()
+    const out  = []
+    for (const m of [...upcoming, ...inProgress, ...recentFinished]) {
+      const id = m.competition?.id
+      if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
+        seen.add(id)
+        const meta = COMPETITIONS.find(c => c.id === id)
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+      }
+    }
+    return out
+  }, [upcoming, inProgress, recentFinished])
+
+  // Filtre ignoré (sans jamais réinitialiser l'état) si la compétition
+  // sélectionnée disparaît des données (ex: dernier match de cette
+  // compétition vient de sortir de la fenêtre affichée) — dérivé directement
+  // au rendu plutôt qu'un useEffect + setState (même résultat pour
+  // l'utilisateur : plus bloqué sur une liste vide sans s'en rendre compte,
+  // mais sans le rendu en cascade d'un setState dans un effet). Si la
+  // compétition réapparaît plus tard (ex: nouveau match programmé), le choix
+  // déjà fait par l'utilisateur redevient actif tout seul.
+  const effectiveCompFilter = (compFilter && filterableComps.some(c => c.id === compFilter)) ? compFilter : null
+
+  const filteredUpcoming       = effectiveCompFilter ? upcoming.filter(m => m.competition?.id === effectiveCompFilter)       : upcoming
+  const filteredInProgress     = effectiveCompFilter ? inProgress.filter(m => m.competition?.id === effectiveCompFilter)     : inProgress
+  const filteredRecentFinished = effectiveCompFilter ? recentFinished.filter(m => m.competition?.id === effectiveCompFilter) : recentFinished
+
   const goTab = (t) => setActiveTab(t)
   const swipe = useSwipe(
     () => { const i = TABS.indexOf(activeTab); if (i < TABS.length - 1) goTab(TABS[i + 1]) },
     () => { const i = TABS.indexOf(activeTab); if (i > 0) goTab(TABS[i - 1]) }
   )
 
-  const grouped = useMemo(() => groupByDay(upcoming), [upcoming])
+  const grouped = useMemo(() => groupByDay(filteredUpcoming), [filteredUpcoming])
 
   const finishedById = useMemo(() => {
     const map = {}
@@ -691,7 +758,7 @@ function Pronos() {
           className={`pronos__tab${activeTab === 'resultat' ? ' pronos__tab--active' : ''}`}
           onClick={() => goTab('resultat')}
         >
-          Résultat{inProgress.length > 0 ? ` (${inProgress.length})` : ''}
+          Résultat{filteredInProgress.length > 0 ? ` (${filteredInProgress.length})` : ''}
         </button>
         <button
           className={`pronos__tab${activeTab === 'classement' ? ' pronos__tab--active' : ''}`}
@@ -700,6 +767,10 @@ function Pronos() {
           Classement
         </button>
       </div>
+
+      {activeTab !== 'classement' && (
+        <CompFilterBar competitions={filterableComps} active={effectiveCompFilter} onChange={setCompFilter} />
+      )}
 
       <div ref={swipe.ref} className="pronos__tabContent">
         {activeTab === 'pronos' && (
@@ -733,17 +804,17 @@ function Pronos() {
         )}
 
         {activeTab === 'resultat' && (
-          inProgress.length === 0 && recentFinished.length === 0 ? (
+          filteredInProgress.length === 0 && filteredRecentFinished.length === 0 ? (
             <div className="pronos__empty">
               <span className="pronos__emptyIcon">⚽</span>
               <span className="pronos__emptyTitle">Aucun match en cours ou terminé récemment</span>
             </div>
           ) : (
             <>
-              {inProgress.length > 0 && (
+              {filteredInProgress.length > 0 && (
                 <div className="pronos__day">
                   <div className="pronos__dayLabel">En cours</div>
-                  {inProgress.map(m => (
+                  {filteredInProgress.map(m => (
                     <LiveResultRow
                       key={m.id} match={m} espn={espnScores[m.id] ?? null}
                       players={players} predictions={predictions} deviceId={deviceId}
@@ -751,10 +822,10 @@ function Pronos() {
                   ))}
                 </div>
               )}
-              {recentFinished.length > 0 && (
+              {filteredRecentFinished.length > 0 && (
                 <div className="pronos__day">
                   <div className="pronos__dayLabel">Terminés (24h)</div>
-                  {recentFinished.map(m => (
+                  {filteredRecentFinished.map(m => (
                     <FinishedResultRow
                       key={m.id} match={m}
                       players={players} predictions={predictions} deviceId={deviceId}

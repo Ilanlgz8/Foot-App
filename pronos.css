@@ -141,6 +141,51 @@
 .pronos__tab:hover { color: var(--text-main); }
 .pronos__tab--active { color: var(--red-vivid); border-bottom-color: var(--red-vivid); }
 
+/* ── Filtre championnat (demande utilisateur, 21/08) — pastilles logo+nom,
+   "Tous" en premier, partagé entre les onglets Pronos et Résultat, masqué
+   en Classement (voir Pronos.jsx). Même pattern visuel que CompFilter
+   (Accueil.jsx) mais avec les tokens déjà utilisés dans ce fichier
+   (--bg-card/--border/--text-mid/--red-vivid) pour rester cohérent avec le
+   reste de la page. */
+.pronos__compFilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.pronos__compChip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-mid);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.pronos__compChip:hover:not(.pronos__compChip--active) {
+  color: var(--text-main);
+  border-color: rgba(var(--red-rgb), 0.25);
+}
+.pronos__compChip--active {
+  background: rgba(var(--red-rgb), 0.16);
+  border-color: rgba(var(--red-rgb), 0.5);
+  color: var(--red-vivid);
+}
+.pronos__compChip img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .pronos__tabContent { min-height: 200px; }
 
 /* ── Liste matchs à venir ── */
