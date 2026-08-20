@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
-import { isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
+import { isCardLive } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
-import { useState, useEffect } from 'react'
 import { LiveCard } from './LiveCardWidget'
 import '../live.css'
 
@@ -35,33 +34,29 @@ export default function Live() {
   const navigate = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
 
-  // Ticker dédié : force un re-render toutes les secondes tant qu'un match
-  // vient de passer "Terminé" (fenêtre de grâce, voir isRecentlyFinished) —
-  // sans ça, rien ne déclenche le retrait de la card une fois la fenêtre
-  // passée (le ticker interne de LiveCard s'arrête lui-même dès isTermine).
-  // S'arrête tout seul dès qu'il n'y a plus aucun match dans la fenêtre.
-  const [, forceTick] = useState(0)
-  useEffect(() => {
-    if (!liveMatches.some(m => isRecentlyFinished(m.id))) return
-    const id = setInterval(() => {
-      forceTick(n => n + 1)
-      if (!liveMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
-    }, 1000)
-    return () => clearInterval(id)
-  }, [liveMatches])
-
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : le widget reste affiché ~5min après
-  // la fin du match au lieu de disparaître direct, comme la card de
-  // l'Accueil ; puis re-corrigé, constat utilisateur : le widget disparu
-  // réapparaissait en revenant sur cette page après être passé par l'Accueil)
-  // : `shouldShowLiveWidget` (matchStateTracker.js) est désormais la SEULE
-  // fonction qui décide si un match compte encore comme "en direct" à
-  // afficher — utilisée ICI et dans Accueil.jsx (desktopLiveMatches) — pour
-  // que les deux endroits ne puissent plus jamais diverger entre eux (avant :
-  // deux expressions dupliquées séparément). Voir son commentaire pour le
-  // détail (mémorisation anti-réapparition + repli statut IN_PLAY/PAUSED/
-  // SCHEDULED).
-  const live = liveMatches.filter(shouldShowLiveWidget)
+  // ⚠️ REVU EN PROFONDEUR (constat utilisateur, 20/08 : "quand le match est
+  // terminé, la card du match dans Accueil a le bon comportement [même si
+  // l'app était en arrière-plan à ce moment-là] — fait en sorte que le
+  // widget dans la page live ait le même comportement") : l'ancienne version
+  // utilisait `shouldShowLiveWidget` (matchStateTracker.js) — une fenêtre de
+  // grâce de 8s avec mémoire anti-réapparition (`_dismissedFt`), pensée pour
+  // afficher "Terminé" un court instant avant de disparaître. Complexité
+  // avec état PARTAGÉ entre plusieurs pages + dépendante du bon minutage
+  // d'un ticker dédié sur CHAQUE page qui l'utilise — plusieurs correctifs
+  // successifs sur cette même zone n'ont jamais éliminé le flicker
+  // "continue / Terminé mais reste / disparaît puis revient" que
+  // l'utilisateur continuait de constater précisément ici.
+  // La card classique de l'Accueil (MatchCard.jsx/MatchPoster.jsx), elle,
+  // n'a jamais ce problème — parce qu'elle utilise `isCardLive` (matchUtils.js),
+  // un simple dérivé STATELESS de l'état courant (`ft === true` → plus live,
+  // point final), sans fenêtre de temps ni mémoire à synchroniser entre
+  // plusieurs pages. Repris ici à l'identique : ce widget disparaît
+  // maintenant instantanément dès que `ft` passe à `true` (perd le court
+  // affichage "Terminé" avant disparition, un compromis assumé pour ne plus
+  // jamais revoir ce flicker) — plus besoin de ticker dédié non plus, un
+  // nouveau statut arrive de toute façon au rythme normal du poll ESPN/FD.org
+  // (LiveProvider), exactement comme pour la card Accueil.
+  const live = liveMatches.filter(isCardLive)
 
   return (
     <section className="live__page">

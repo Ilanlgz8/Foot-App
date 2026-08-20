@@ -10,10 +10,9 @@
  * en desktop quand rien n'est en cours) : badge + pulsation/rouge
  * uniquement quand des matchs sont en cours.
  */
-import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
-import { shouldShowLiveWidget, isRecentlyFinished } from '../utils/matchStateTracker'
+import { isCardLive } from '../utils/matchUtils'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
@@ -81,42 +80,22 @@ const BallIcon = () => (
 
 function Navbar() {
   const { liveMatches } = useLiveData()
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : le bouton Live mobile — l'orb ⚽ au
-  // centre de la tab bar — restait actif/pulsait alors que le match affiché
-  // était déjà fini) : liveCount comptait directement liveMatches.length, la
-  // liste BRUTE de liveTracker (qui garde volontairement l'entrée jusqu'à
-  // 5min après confirmFt, pour laisser le temps à FD.org de rattraper
-  // classement/forme — voir useLiveMinute.js) — sans jamais appliquer
-  // shouldShowLiveWidget (même décision que Live.jsx/Accueil.jsx/
-  // LiveSidebar.jsx désormais). Résultat : le badge/pulse pouvait rester
-  // actif jusqu'à 5min après la fin réelle d'un match, une incohérence
-  // visible avec la page /live elle-même (déjà vide à ce moment-là).
-  const liveCount = liveMatches.filter(shouldShowLiveWidget).length
-
-  // ⚠️ BUG CORRIGÉ (constat utilisateur : l'orb Live clignote — apparaît/
-  // disparaît/revient — de façon incohérente à la fin d'un match, contrairement
-  // aux cards live de l'Accueil/page Live qui gèrent cette transition
-  // proprement) : shouldShowLiveWidget ci-dessus utilise bien la même fonction
-  // de décision que Live.jsx/Accueil.jsx/LiveSidebar.jsx (déjà unifiée, voir
-  // commentaire plus haut) — mais CE composant-ci n'avait aucun ticker dédié
-  // pour forcer un re-render au bon moment. Sans lui, `liveCount` ne se
-  // recalcule qu'au rythme du polling ESPN (10-30s, LiveProvider), jamais
-  // synchronisé avec la fenêtre de grâce de 8s (TERMINE_GRACE_MS,
-  // matchStateTracker.js) qui détermine QUAND un match vient de basculer
-  // "terminé" — Navbar pouvait donc "attraper" un état intermédiaire différent
-  // de celui affiché au même instant sur l'Accueil, d'où l'impression de
-  // clignotement. Même ticker EXACT que Live.jsx/Accueil.jsx/LiveSidebar.jsx :
-  // force un re-render chaque seconde tant qu'un match est dans sa fenêtre de
-  // grâce, s'arrête tout seul dès qu'il n'y en a plus.
-  const [, forceTick] = useState(0)
-  useEffect(() => {
-    if (!liveMatches.some(m => isRecentlyFinished(m.id))) return
-    const id = setInterval(() => {
-      forceTick(n => n + 1)
-      if (!liveMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
-    }, 1000)
-    return () => clearInterval(id)
-  }, [liveMatches])
+  // ⚠️ REVU EN PROFONDEUR (constat utilisateur, 20/08 — voir le commentaire
+  // détaillé dans Live.jsx, même fix) : `shouldShowLiveWidget` (fenêtre de
+  // grâce 8s + mémoire anti-réapparition partagée entre pages) restait
+  // instable malgré plusieurs correctifs successifs sur cette même zone
+  // (flicker "continue / Terminé mais reste / disparaît puis revient",
+  // surtout après une fenêtre où l'app était en arrière-plan). `isCardLive`
+  // (matchUtils.js) — le même dérivé STATELESS déjà utilisé par la card
+  // classique de l'Accueil, qui elle n'a jamais eu ce problème — remplace la
+  // décision ici : `liveCount` reflète l'état courant à chaque render, sans
+  // fenêtre de temps ni état à synchroniser entre navbar/Live.jsx/Accueil.jsx.
+  // Perd le court affichage "Terminé" avant disparition (l'orb disparaît
+  // instantanément dès `ft: true`) — compromis assumé pour ne plus jamais
+  // revoir ce flicker. Plus besoin de ticker dédié : `liveCount` se
+  // recalcule déjà naturellement au rythme du polling ESPN/FD.org
+  // (LiveProvider), exactement comme la card Accueil.
+  const liveCount = liveMatches.filter(isCardLive).length
 
   return (
     <>
