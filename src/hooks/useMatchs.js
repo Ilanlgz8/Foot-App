@@ -1186,6 +1186,26 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
 // tant que l'onglet Classement n'est pas ouvert : évite une rafale répétée
 // de N requêtes FD.org, un classement pronos n'a pas besoin d'être seconde
 // près.
+// ⚠️ BUG CORRIGÉ (21/08, constat utilisateur : "le classement du groupe [Pronos]
+// c'est un peu cassé") : un pronostic est saisi dans l'onglet "Pronos" sur un
+// match SCHEDULED venant de useUpcomingMatchesAllComps, qui passe
+// `preferEspnForMajors: true` à fetchMatchesForComp — pour les 6 grands
+// championnats (FL1/PL/PD/BL1/SA/CL), l'id du match est donc l'id ESPN
+// synthétique (`espn-{comp}-{eventId}`, voir espnAdapter.js), pas l'id
+// numérique football-data.org. Ce hook-ci (useFinishedMatchesAllComps), lui,
+// appelait fetchMatchesForComp SANS cette option — pour les 6 mêmes
+// championnats, il retombait donc sur FD.org direct, avec le VRAI id
+// numérique pour le MÊME match réel. Résultat : `predictions[matchId]` (clé =
+// id ESPN, saisi avant le match) et `finishedById[matchId]` (clé = id FD.org,
+// une fois le match FINISHED) ne se rencontrent JAMAIS pour ces 6
+// championnats — le classement ne comptait donc quasiment aucun point pour
+// eux, et "Ton prono" restait invisible sur la card du match terminé alors
+// que le prono avait bien été enregistré. Même `preferEspnForMajors: true`
+// ici aligne parfaitement les deux hooks : l'id ESPN d'un match donné est
+// stable entre son statut SCHEDULED et FINISHED (c'est le même event ESPN du
+// début à la fin), donc le pronostic se retrouve bien sous la même clé des
+// deux côtés. Fonction UNIQUEMENT utilisée par Pronos.jsx (voir commentaire
+// ci-dessus) — aucun autre appelant (Accueil/Programme/Résultats) affecté.
 export function useFinishedMatchesAllComps(compIds, enabled = true) {
   const key        = 'matches_ALL_FINISHED_PRONOS'
   const cachedData = readCacheStale(key)
@@ -1196,7 +1216,7 @@ export function useFinishedMatchesAllComps(compIds, enabled = true) {
     queryKey: ['matches', 'ALL', 'FINISHED_PRONOS', compIds.join(',')],
     queryFn: async () => {
       const results = await Promise.allSettled(
-        compIds.map(id => fetchMatchesForComp(id, 'FINISHED'))
+        compIds.map(id => fetchMatchesForComp(id, 'FINISHED', { preferEspnForMajors: true }))
       )
       const merged = results
         .filter(r => r.status === 'fulfilled' && Array.isArray(r.value))
