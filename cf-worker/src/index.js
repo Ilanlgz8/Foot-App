@@ -1079,8 +1079,15 @@ async function runOnePass(env) {
 // commandes/mois à elles deux) SANS lecture Redis supplémentaire pour décider
 // (gate purement local sur l'horloge, aucun coût ajouté) — au pire 5min de
 // retard sur l'affichage debug, sans aucun effet sur les notifs/détection.
+// ⚠️ REVU (investigation "~10K commandes un jour sans match") : même
+// raisonnement poussé plus loin — 15min de retard max sur un diagnostic qui
+// sert uniquement à détecter "le Worker s'est arrêté depuis combien de
+// temps" reste largement suffisant (personne ne consulte ça en temps réel,
+// et un vrai arrêt du Worker se voit de toute façon dans les minutes qui
+// suivent, pas besoin de précision à 5min près pour ça). ~17K → ~5,8K
+// commandes/mois à elles deux, sans aucun changement fonctionnel.
 function shouldWriteDebugBookkeeping() {
-  return new Date().getMinutes() % 5 === 0
+  return new Date().getMinutes() % 15 === 0
 }
 
 // ⚠️ AJOUT (03/08, demande utilisateur : réduire les commandes Upstash SANS
@@ -1330,15 +1337,20 @@ async function queueFdPriorityRefresh(kv, slug, log) {
 // du skip-fast-path ci-dessus), quand la journée est confirmée sans match ni
 // reprise imminente. Programme/Résultats/Classement ne bougent pas entre 2
 // matchs — pas besoin de les réchauffer aussi souvent dans ce cas précis.
-// Cadence ralentie à 1 tick/20min (au lieu de 4min) quand `quiet` est vrai :
-// divise ce poste par 5 les jours creux (lpop file de priorité + fetch
+// Cadence ralentie à 1 tick/30min (au lieu de 4min) quand `quiet` est vrai :
+// divise ce poste par 7,5 les jours creux (lpop file de priorité + fetch
 // warm → ~6-8 commandes Redis côté api/football.js à chaque tick, voir son
 // rate-limit/cache), sans aucun effet les jours de match (`quiet` redevient
 // faux dès qu'un match est suivi ou programmé sous peu — TTL le plus court
-// protégé, 120s, reste largement couvert par les 2 cadences).
+// protégé, 120s, reste largement couvert par les 2 cadences). 30min plutôt
+// qu'un intervalle encore plus long : un jour "quiet" reste réversible à tout
+// moment (nouveau match ajouté au calendrier en dernière minute, voir
+// emptyDayKey plus haut) — on garde une marge de fraîcheur raisonnable pour
+// le tout premier visiteur de la journée, plutôt que de pousser l'économie
+// au maximum théorique au prix d'un 1er chargement plus souvent en cache MISS.
 function shouldWarmFdCache(quiet) {
   const m = new Date().getMinutes()
-  return quiet ? m % 20 === 0 : m % 4 === 0
+  return quiet ? m % 30 === 0 : m % 4 === 0
 }
 
 async function warmFdCache(log, kv, quiet) {
