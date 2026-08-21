@@ -47,8 +47,13 @@ export default async function handler(req, res) {
   }
 
   // 2. Subscriptions dans Redis
+  // ⚠️ AJOUT (migration Set -> Hash, voir api/subscribe.js + api/cron-goals.js
+  // migrateLegacySubscriptions) : stockage désormais en Hash ('push:subs',
+  // clé=endpoint) au lieu d'un Set ('push:subscriptions') — la migration est
+  // déclenchée par le cron, pas par ce endpoint de debug (lecture seule ici).
   try {
-    const subs = (await kv.smembers('push:subscriptions')) ?? []
+    const hashObj = (await kv.hgetall('push:subs')) ?? {}
+    const subs = Object.values(hashObj)
     info.subscriptions = {
       count:     subs.length,
       endpoints: subs.map(s => {

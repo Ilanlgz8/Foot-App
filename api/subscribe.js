@@ -15,6 +15,10 @@ const kv = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 })
 
+// Hash Redis (clé = endpoint) — voir commentaire détaillé plus bas sur le
+// stockage, et api/cron-goals.js (loadSubscriptions) pour la lecture/migration.
+const SUBS_KEY = 'push:subs'
+
 // Domaines autorisés — production + previews Vercel propres au projet
 const ALLOWED_ORIGINS = new Set([
   'https://statfootix.vercel.app',
@@ -127,21 +131,26 @@ export default async function handler(req, res) {
   const clean = { endpoint: body.endpoint, keys: body.keys, comps, clubs }
   const cleanStr = JSON.stringify(clean)
 
-  // ── Stockage dans Vercel KV (Set Redis) ────────────────────────────────────
-  // Le Set est dédupliqué par CONTENU EXACT — si l'utilisateur change ses
-  // équipes suivies, le nouveau JSON diffère de l'ancien (même endpoint) et
-  // sadd() créerait un doublon au lieu de remplacer. On retire donc d'abord
-  // toute entrée existante avec le même endpoint avant d'ajouter la nouvelle.
+  // ── Stockage dans Vercel KV (Hash Redis, clé = endpoint) ───────────────────
+  // ⚠️ AJOUT (retour utilisateur : chaque appareil resynchronise son
+  // abonnement toutes les 5min, 24h/24, peu importe s'il y a un match — voir
+  // usePushNotifications.js). Avant : stockage en Set Redis, dédupliqué par
+  // CONTENU EXACT (pas par endpoint) — donc pour remplacer SA PROPRE entrée
+  // (ex: équipes favorites modifiées), il fallait relire TOUTE la liste des
+  // abonnés (smembers), la parser, retrouver la sienne par endpoint, la
+  // supprimer (srem), puis rajouter la nouvelle (sadd) — 3 commandes DONT une
+  // qui grossit avec le nombre total d'abonnés, à chaque resync de CHAQUE
+  // appareil actif. Hash Redis (clé=endpoint) : hset() cible directement et
+  // ATOMIQUEMENT l'entrée de CET endpoint, écrase l'ancienne valeur si elle
+  // existe déjà — plus besoin de lire/filtrer/supprimer avant d'écrire.
+  // 3 commandes → 1, coût qui ne dépend plus du nombre total d'abonnés.
+  // Migration des abonnés déjà stockés dans l'ancien Set ('push:subscriptions') :
+  // voir migrateLegacySubscriptions() dans api/cron-goals.js, déclenchée
+  // automatiquement au 1er passage du cron après ce déploiement — aucune
+  // coupure de notif, même pour un appareil qui ne rouvre pas l'app tout de
+  // suite.
   try {
-    const existing = (await kv.smembers('push:subscriptions')) ?? []
-    const stale = existing.filter(raw => {
-      try {
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-        return parsed?.endpoint === body.endpoint
-      } catch { return false }
-    })
-    if (stale.length) await Promise.all(stale.map(s => kv.srem('push:subscriptions', s)))
-    await kv.sadd('push:subscriptions', cleanStr)
+    await kv.hset(SUBS_KEY, { [body.endpoint]: cleanStr })
   } catch (kvErr) {
     console.error('[subscribe] KV store error:', kvErr.message)
     return res.status(503).json({ error: 'Stockage temporairement indisponible' })

@@ -215,21 +215,61 @@ function subscriberWantsThis(sub, slug, candidateNames, strict) {
 // loadSubscriptions() la récupère et la parse UNE SEULE FOIS par passe
 // (appelé une fois dans runOnePass(), voir plus bas), puis le résultat est
 // réutilisé pour tous les matchs/types de notifs de cette même passe.
-async function loadSubscriptions(log) {
-  // Pas d'initialisation ([]) : toujours réassigné par le try avant lecture,
-  // ou la fonction retourne avant d'atteindre la boucle qui lit `raw` (voir
-  // no-useless-assignment, ESLint) — l'ancien `= []` initial n'était jamais lu.
-  let raw
-  try { raw = (await kv.smembers('push:subscriptions')) ?? [] } catch { return [] }
-  const parsed = []
-  const stale  = []
-  for (const subRaw of raw) {
-    try { parsed.push({ raw: subRaw, sub: typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw }) }
-    catch { stale.push(subRaw) }
+const SUBS_KEY        = 'push:subs'            // Hash (clé=endpoint) — voir api/subscribe.js
+const LEGACY_SUBS_KEY = 'push:subscriptions'   // ancien Set, migré une fois puis supprimé
+
+// ⚠️ AJOUT (migration Set -> Hash, retour utilisateur : le resync 5min de
+// chaque appareil actif relisait toute la liste des abonnés juste pour
+// remplacer SA PROPRE entrée — voir api/subscribe.js pour le détail complet).
+// Déclenchée automatiquement ici dès que le Hash est vide mais que l'ancien
+// Set contient encore des abonnés (donc au tout 1er passage du cron après ce
+// déploiement) — copie tout d'un coup (1 seul hset multi-champs), puis
+// supprime l'ancien Set. Aucune coupure de notif : un abonné existant reste
+// visible via l'ancien Set jusqu'à l'instant précis de cette migration
+// (déclenchée par le cron lui-même, pas par l'appareil de l'utilisateur —
+// donc pas besoin qu'il rouvre l'app pour continuer à recevoir ses notifs).
+// Coût : 3 commandes UNE SEULE FOIS (smembers+hset+del) — jamais répété,
+// LEGACY_SUBS_KEY n'existe plus après.
+async function migrateLegacySubscriptions(log) {
+  try {
+    const legacy = await kv.smembers(LEGACY_SUBS_KEY)
+    if (!legacy || !legacy.length) return
+    const entries = {}
+    for (const raw of legacy) {
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        if (parsed?.endpoint) entries[parsed.endpoint] = JSON.stringify(parsed)
+      } catch { /* entrée illisible — abandonnée, pas migrée */ }
+    }
+    if (Object.keys(entries).length) await kv.hset(SUBS_KEY, entries)
+    await kv.del(LEGACY_SUBS_KEY)
+    log?.push(`[push:migrate] ${Object.keys(entries).length} abonnement(s) migré(s) Set->Hash`)
+  } catch (e) {
+    log?.push(`[push:migrate] error=${e.message}`)
   }
-  if (stale.length) {
-    try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
-    log?.push(`[push] ${stale.length} abonnement(s) illisible(s) retiré(s)`)
+}
+
+async function loadSubscriptions(log) {
+  let hashObj
+  try { hashObj = (await kv.hgetall(SUBS_KEY)) ?? {} } catch { return [] }
+
+  // Hash vide : soit vraiment aucun abonné, soit migration pas encore faite
+  // (voir migrateLegacySubscriptions ci-dessus) — dans le doute on tente la
+  // migration (coût nul si l'ancien Set est lui aussi vide, voir son 1er if).
+  if (!Object.keys(hashObj).length) {
+    await migrateLegacySubscriptions(log)
+    try { hashObj = (await kv.hgetall(SUBS_KEY)) ?? {} } catch { return [] }
+  }
+
+  const parsed = []
+  const staleEndpoints = []
+  for (const [endpoint, raw] of Object.entries(hashObj)) {
+    try { parsed.push({ endpoint, sub: typeof raw === 'string' ? JSON.parse(raw) : raw }) }
+    catch { staleEndpoints.push(endpoint) }
+  }
+  if (staleEndpoints.length) {
+    try { await kv.hdel(SUBS_KEY, ...staleEndpoints) } catch {}
+    log?.push(`[push] ${staleEndpoints.length} abonnement(s) illisible(s) retiré(s)`)
   }
   return parsed
 }
@@ -245,7 +285,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
 
   const candidateNames = [options.rawHomeTeam, options.homeTeam, options.rawAwayTeam, options.awayTeam]
 
-  await Promise.allSettled(subs.map(async ({ raw: subRaw, sub }) => {
+  await Promise.allSettled(subs.map(async ({ endpoint, sub }) => {
     if (!subscriberWantsThis(sub, slug, candidateNames, !!options.onlyFavorites)) return
     try {
       // urgency: 'high' — sans ça, les services de push (notamment Apple sur
@@ -260,7 +300,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
       sent++
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) {
-        stale.push(typeof subRaw === 'string' ? subRaw : JSON.stringify(subRaw))
+        stale.push(endpoint)
       } else {
         // Avant : erreur silencieusement ignorée (aucune trace) → impossible de
         // savoir pourquoi une notif n'arrive pas chez un abonné donné. On log
@@ -273,7 +313,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   }))
 
   if (stale.length) {
-    try { await Promise.all(stale.map(s => kv.srem('push:subscriptions', s))) } catch {}
+    try { await kv.hdel(SUBS_KEY, ...stale) } catch {}
   }
   // Log systématique (avant : seulement si échec) — permet de distinguer "le
   // serveur a bien envoyé et le service de push a accepté" (sent=X, rien à
