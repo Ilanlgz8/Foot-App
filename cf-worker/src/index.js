@@ -61,6 +61,32 @@ const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 
+// ⚠️ AJOUT (retour utilisateur, log réel : 403 systématique d'ESPN sur TOUS
+// les slugs, à chaque vraie passe, depuis plusieurs heures) : ce Worker
+// fetchait ESPN sans le moindre en-tête "navigateur" (juste Cache-Control),
+// contrairement à api/espn.js et api/fifa-live.js (côté Vercel) qui
+// atteignent le MÊME endpoint ESPN sans souci apparent — seule vraie
+// différence observée entre les deux : l'origine réseau (IPs partagées
+// Cloudflare Workers vs IPs Vercel). Piste la plus probable : ESPN applique
+// un filtrage anti-bot qui cible soit l'absence d'en-têtes "navigateur"
+// standards, soit les plages IP Cloudflare connues comme largement
+// utilisées par des scrapers — la 1ère est corrigeable ici, la 2e ne l'est
+// pas par du code. User-Agent + Accept + Accept-Language "réalistes" : sans
+// risque (aucun effet si la cause est un blocage IP pur), et directement
+// utile si c'est bien l'absence d'en-têtes qui déclenche le filtrage.
+// Honnêteté : pas de certitude sur la cause exacte, pas d'accès aux logs
+// ESPN — à vérifier après déploiement (le prochain [espn:...] dans le log
+// cf-worker doit repasser à un vrai statut 200, sinon la cause est bien un
+// blocage IP et il faudra une autre approche, ex. router ce fetch via
+// api/espn.js/Vercel au lieu d'ESPN directement).
+const ESPN_FETCH_HEADERS = {
+  'Cache-Control': 'no-cache',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://www.espn.com/',
+}
+
 function t(name) { return TEAM_NAMES_FR[name] ?? name }
 
 // Lecture protégée d'une valeur Redis censée être du JSON (goalTrack/cardTrack) :
@@ -86,7 +112,7 @@ function safeJsonParse(raw, fallback) {
 async function fetchEspnEvents(slug, date, log) {
   try {
     const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}&limit=100`, {
-      headers: { 'Cache-Control': 'no-cache' },
+      headers: ESPN_FETCH_HEADERS,
       signal: AbortSignal.timeout(8_000),
     })
     if (!r.ok) { log.push(`[espn:${slug}] status=${r.status}`); return { ok: false, events: [] } }
@@ -223,7 +249,7 @@ async function cacheEspnSummary(kv, slug, eventId, log) {
   try {
     const url = `${ESPN_BASE}/${slug}/summary?event=${eventId}`
     const res = await fetch(url, {
-      headers: { 'Cache-Control': 'no-cache' },
+      headers: ESPN_FETCH_HEADERS,
       signal:  AbortSignal.timeout(8_000),
     })
     if (!res.ok) return
@@ -1269,13 +1295,35 @@ function getClubSeasonWarm() {
 // Résultats toujours bon, Programme jamais. Les deux URLs (avec ET sans
 // season) sont maintenant préchauffées pour ne plus dépendre de qui, de
 // Programme ou Résultats, "gagne la course" pour warmer la bonne clé.
+// ⚠️ BUG TROUVÉ ET CORRIGÉ (retour utilisateur, log réel : tous les appels
+// `season=1969`, échec systématique 403/404 depuis des heures) : FD_WARM_LIST
+// est un `const` de PORTÉE MODULE — évalué UNE SEULE FOIS, au chargement du
+// script par l'isolate Cloudflare, jamais réévalué ensuite. `getClubSeasonWarm()`
+// était appelée directement DANS cette évaluation, donc `new Date()` s'exécutait
+// à ce moment précis — hors de tout event/handler. Cloudflare Workers ne
+// garantit PAS l'heure réelle pour `Date`/`Date.now()` en dehors d'un handler
+// (fetch/scheduled) : par mesure de sécurité (anti timing side-channel), le
+// scope module peut voir une horloge figée à l'epoch Unix (1970) — d'où
+// `getUTCFullYear() - 1 = 1969`, gelé pour toute la durée de vie de l'isolate
+// (potentiellement des heures/jours). Fix : season calculée PARESSEUSEMENT,
+// à l'intérieur de warmFdCache() (appelée depuis handlePass(), donc dans le
+// contexte réel du scheduled() handler — Date y est fiable). FD_WARM_LIST ne
+// stocke plus qu'un marqueur `dynamicSeason: true`, résolu au moment de l'appel.
 const FD_WARM_COMPS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const FD_WARM_LIST = FD_WARM_COMPS.flatMap(id => [
-  { apiPath: `/v4/competitions/${id}/matches`, qs: `season=${getClubSeasonWarm()}` },
+  { apiPath: `/v4/competitions/${id}/matches`, qs: '', dynamicSeason: true },
   { apiPath: `/v4/competitions/${id}/matches`, qs: '' },
   { apiPath: `/v4/competitions/${id}/standings`, qs: '' },
 ])
 const FD_WARM_BASE_URL = 'https://statfootix.vercel.app/api/football'
+
+// Construit l'URL de préchauffage — résout dynamicSeason ICI (temps réel,
+// dans le contexte du handler), jamais au chargement du module. Voir
+// commentaire ci-dessus sur FD_WARM_LIST.
+function buildWarmUrl({ apiPath, qs, dynamicSeason }) {
+  const effectiveQs = dynamicSeason ? `season=${getClubSeasonWarm()}` : qs
+  return `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${effectiveQs ? `&${effectiveQs}` : ''}`
+}
 
 // ⚠️ AJOUT (24/07, demande utilisateur : "un vrai dispositif" pour ne plus
 // jamais se prendre de 429 FD.org) : la rotation aveugle ci-dessous protège
@@ -1403,11 +1451,11 @@ async function warmFdCache(log, kv, quiet) {
         if (queued != null) {
           const idx = Number(queued)
           if (Number.isInteger(idx) && FD_WARM_LIST[idx]) {
-            const { apiPath, qs } = FD_WARM_LIST[idx]
-            const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
+            const entry = FD_WARM_LIST[idx]
+            const url = buildWarmUrl(entry)
             const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
-            if (!res.ok) log.push(`[fd-warm:priority:${apiPath}${qs ? '?' + qs : ''}] status=${res.status}`)
-            else log.push(`[fd-warm:priority:${apiPath}${qs ? '?' + qs : ''}] ok`)
+            if (!res.ok) log.push(`[fd-warm:priority:${entry.apiPath}] status=${res.status} url=${url}`)
+            else log.push(`[fd-warm:priority:${entry.apiPath}] ok`)
             return
           }
         }
@@ -1416,10 +1464,10 @@ async function warmFdCache(log, kv, quiet) {
 
     if (!shouldWarmFdCache(quiet)) return
     const idx = Math.floor(Date.now() / 240_000) % FD_WARM_LIST.length
-    const { apiPath, qs } = FD_WARM_LIST[idx]
-    const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
+    const entry = FD_WARM_LIST[idx]
+    const url = buildWarmUrl(entry)
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
-    if (!res.ok) log.push(`[fd-warm:${apiPath}${qs ? '?' + qs : ''}] status=${res.status}`)
+    if (!res.ok) log.push(`[fd-warm:${entry.apiPath}] status=${res.status} url=${url}`)
   } catch (e) {
     log.push(`[fd-warm] error=${e.message}`)
   }

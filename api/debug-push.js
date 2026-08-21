@@ -49,11 +49,20 @@ export default async function handler(req, res) {
   // 2. Subscriptions dans Redis
   // ⚠️ AJOUT (migration Set -> Hash, voir api/subscribe.js + api/cron-goals.js
   // migrateLegacySubscriptions) : stockage désormais en Hash ('push:subs',
-  // clé=endpoint) au lieu d'un Set ('push:subscriptions') — la migration est
-  // déclenchée par le cron, pas par ce endpoint de debug (lecture seule ici).
+  // clé=endpoint) au lieu d'un Set ('push:subscriptions') — mais la migration
+  // ne se déclenche QUE lors d'un vrai envoi de notif (but/KO/mi-temps/fin),
+  // pas à chaque minute du cron. Tant qu'aucun événement de ce type n'a eu
+  // lieu depuis le déploiement, le Hash peut légitimement être vide alors que
+  // de vrais abonnés existent encore dans l'ancien Set — `count: 0` seul
+  // prêtait à confusion (impossible de distinguer "vraiment aucun abonné" de
+  // "migration pas encore déclenchée"). `legacyPendingMigration` expose
+  // maintenant les 2 compteurs séparément pour lever l'ambiguïté sans deviner.
   try {
-    const hashObj = (await kv.hgetall('push:subs')) ?? {}
-    const subs = Object.values(hashObj)
+    const [hashObj, legacyCount] = await Promise.all([
+      kv.hgetall('push:subs'),
+      kv.scard('push:subscriptions'),
+    ])
+    const subs = Object.values(hashObj ?? {})
     info.subscriptions = {
       count:     subs.length,
       endpoints: subs.map(s => {
@@ -63,6 +72,7 @@ export default async function handler(req, res) {
           return url.hostname // ex: fcm.googleapis.com
         } catch { return '(parse error)' }
       }),
+      legacyPendingMigration: legacyCount ?? 0,
     }
   } catch (e) {
     info.subscriptions = { error: e.message }
