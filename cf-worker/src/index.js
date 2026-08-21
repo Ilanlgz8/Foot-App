@@ -389,9 +389,7 @@ async function runOnePass(env) {
   // clés de skip ci-dessous même si l'une d'elles était déjà armée — un
   // match en cours qu'on connaît prime toujours sur une optimisation "aucun
   // match" potentiellement erronée.
-  let trackingLiveAtStart = 0
-  try { trackingLiveAtStart = await kv.scard('cron:liveIds') } catch {}
-
+  //
   // ⚠️ AJOUT (question utilisateur : "1,4M/500K commandes Upstash ce mois-ci,
   // c'est lié aux compos ?") : ces 2 branches de skip sont de très loin le cas
   // le plus fréquent (la grande majorité des minutes d'une journée sans match
@@ -413,14 +411,32 @@ async function runOnePass(env) {
   // principe que le pré-filtre finalDone plus haut/api/fifa-live.js), sans
   // changer la moindre décision : skip immédiat si emptyDayKey posé, sinon
   // skip jusqu'à nextCheckKey si encore valide — comportement identique.
+  // ⚠️ AJOUT (question utilisateur : "86K commandes/mois rien que pour ce
+  // check, c'est beaucoup sur 500K") : ce check faisait encore 2 commandes
+  // séparées CHAQUE minute — scard('cron:liveIds') PUIS, si vide, le mget
+  // ci-dessus. MGET ne peut pas lire un Set (scard) directement, donc
+  // impossible de le fusionner tel quel — mais cron:liveIds n'est JAMAIS
+  // consulté nulle part ailleurs autrement que par sa cardinalité (aucun
+  // smembers/sismember dans tout le fichier, vérifié), donc sa VALEUR
+  // exacte (quels matchs précisément) n'a jamais d'importance ici, seulement
+  // "vide ou pas". cron:anyLive (voir anyStillLive, recalculé à CHAQUE passe
+  // complète, jamais sur ce chemin skip) est un simple flag string dérivé de
+  // cron:liveIds, qui LUI peut rejoindre emptyDayKey/nextCheckKey dans le
+  // MÊME mget — 1 seule commande au lieu de 2, dans le cas de très loin le
+  // plus fréquent. cron:liveIds (le vrai Set) reste intact et reste la seule
+  // source utilisée pour la décision plus sensible (armement d'emptyDayKey/
+  // nextCheckKey, scard direct conservé plus bas dans ce fichier).
+  let trackingLiveAtStart = 0
+  let knownEmpty = false
+  let skipUntil  = null
+  try {
+    const [rawAnyLive, rawEmpty, rawNextCheck] = await kv.mget('cron:anyLive', emptyDayKey, nextCheckKey)
+    trackingLiveAtStart = rawAnyLive ? 1 : 0
+    knownEmpty = !!rawEmpty
+    skipUntil  = rawNextCheck
+  } catch {}
+
   if (trackingLiveAtStart === 0) {
-    let knownEmpty = false
-    let skipUntil  = null
-    try {
-      const [rawEmpty, rawNextCheck] = await kv.mget(emptyDayKey, nextCheckKey)
-      knownEmpty = !!rawEmpty
-      skipUntil  = rawNextCheck
-    } catch {}
     if (knownEmpty) {
       return { events: 0, log: [], quiet: true }
     }
@@ -560,6 +576,23 @@ async function runOnePass(env) {
   // Voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — compteur de matchs live
   // vus DANS CETTE PASSE, sert à couper résumé+ticker au-delà du seuil sûr.
   let liveMatchesSeenThisPass = 0
+
+  // ⚠️ AJOUT (investigation "~10K commandes/jour sans match") : drapeau
+  // dénormalisé, recalculé à CHAQUE passe complète (jamais sur le
+  // skip-fast-path, voir plus bas) à partir de cron:liveIds — sert
+  // UNIQUEMENT à fusionner le `scard('cron:liveIds')` du skip-fast-path avec
+  // le `mget(emptyDayKey, nextCheckKey)` juste à côté en UNE seule commande
+  // Redis au lieu de 2 (MGET porte sur des clés string, pas sur un Set —
+  // scard ne peut pas y être inclus directement). cron:liveIds (le vrai Set,
+  // source de vérité) n'est PAS touché, reste utilisé tel quel pour
+  // l'armement d'emptyDayKey/nextCheckKey (voir stillTrackingLive plus bas,
+  // scard direct conservé à cet endroit précis — décision plus sensible,
+  // autant rester sur la source authentique). Auto-réparateur en pire cas :
+  // recalculé à chaque passe complète (pas seulement au moment où un match
+  // démarre/finit), donc un échec d'écriture isolé s'auto-corrige au plus
+  // tard à la passe suivante (60s), largement sous les marges de sécurité
+  // déjà en place ailleurs dans ce fichier (grâce 45s-5min).
+  let anyStillLive = false
 
   for (const { slug, evt } of allEvents) {
    if (alreadyDoneIds.has(evt.id)) continue
@@ -777,6 +810,7 @@ async function runOnePass(env) {
     // en pleine confusion, empêchant toute correction rapide si c'était
     // effectivement un faux FINAL.
     const stayTrackedAsLive = isLive || (isFinalNow && !isFinalConfirmed)
+    if (stayTrackedAsLive) anyStillLive = true
     try {
       if (stayTrackedAsLive) await kv.sadd('cron:liveIds', String(eventId))
       else await kv.srem('cron:liveIds', String(eventId))
@@ -988,6 +1022,14 @@ async function runOnePass(env) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
    }
   }
+
+  // Voir anyStillLive plus haut — 1 seule commande, 1 seule fois par passe
+  // complète (jamais sur le skip-fast-path). ex 3h : purement défensif, se
+  // réarme de toute façon à chaque passe complète tant qu'un match est suivi.
+  try {
+    if (anyStillLive) await kv.set('cron:anyLive', '1', { ex: 3 * 3600 })
+    else await kv.del('cron:anyLive')
+  } catch {}
 
   if (pendingSummaryFetches.length > 0) {
     await Promise.allSettled(pendingSummaryFetches)
