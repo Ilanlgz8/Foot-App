@@ -422,10 +422,10 @@ async function runOnePass(env) {
       skipUntil  = rawNextCheck
     } catch {}
     if (knownEmpty) {
-      return { events: 0, log: [] }
+      return { events: 0, log: [], quiet: true }
     }
     if (skipUntil && Number(skipUntil) > now.getTime()) {
-      return { events: 0, log: [] }
+      return { events: 0, log: [], quiet: true }
     }
   }
 
@@ -1139,7 +1139,7 @@ async function handlePass(env) {
   // Programme/Résultats/Classement sont consultés par les visiteurs même les
   // jours sans match en direct, donc ce préchauffage doit tourner tout le
   // temps, pas seulement pendant les fenêtres où le direct est actif.
-  await warmFdCache(result.log, kv)
+  await warmFdCache(result.log, kv, result.quiet)
 
   if (writeBookkeeping) {
     try {
@@ -1323,13 +1323,27 @@ async function queueFdPriorityRefresh(kv, slug, log) {
 // le même budget/circuit-breaker que d'habitude, voir api/football.js), au
 // lieu d'un cache HIT instantané — juste un peu de latence en plus dans ce
 // cas précis (rare), jamais d'erreur/429 nouveau.
-function shouldWarmFdCache() {
-  return new Date().getMinutes() % 4 === 0
+// ⚠️ AJOUT (investigation : "~10K commandes Upstash un mardi SANS aucun
+// match") : ce warm tournait à la même cadence (1 tick/4min, 24h/24) qu'il y
+// ait match ou non — alors que runOnePass SAIT déjà, sans lecture Redis
+// supplémentaire (résultat déjà calculé, voir `quiet` sur les 2 early-return
+// du skip-fast-path ci-dessus), quand la journée est confirmée sans match ni
+// reprise imminente. Programme/Résultats/Classement ne bougent pas entre 2
+// matchs — pas besoin de les réchauffer aussi souvent dans ce cas précis.
+// Cadence ralentie à 1 tick/20min (au lieu de 4min) quand `quiet` est vrai :
+// divise ce poste par 5 les jours creux (lpop file de priorité + fetch
+// warm → ~6-8 commandes Redis côté api/football.js à chaque tick, voir son
+// rate-limit/cache), sans aucun effet les jours de match (`quiet` redevient
+// faux dès qu'un match est suivi ou programmé sous peu — TTL le plus court
+// protégé, 120s, reste largement couvert par les 2 cadences).
+function shouldWarmFdCache(quiet) {
+  const m = new Date().getMinutes()
+  return quiet ? m % 20 === 0 : m % 4 === 0
 }
 
-async function warmFdCache(log, kv) {
+async function warmFdCache(log, kv, quiet) {
   try {
-    if (kv && shouldWarmFdCache()) {
+    if (kv && shouldWarmFdCache(quiet)) {
       try {
         const queued = await kv.lpop(FD_PRIORITY_QUEUE_KEY)
         if (queued != null) {
@@ -1346,7 +1360,7 @@ async function warmFdCache(log, kv) {
       } catch (e) { log.push(`[fd-warm:priority] error=${e.message}`) }
     }
 
-    if (!shouldWarmFdCache()) return
+    if (!shouldWarmFdCache(quiet)) return
     const idx = Math.floor(Date.now() / 240_000) % FD_WARM_LIST.length
     const { apiPath, qs } = FD_WARM_LIST[idx]
     const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(apiPath)}${qs ? `&${qs}` : ''}`
