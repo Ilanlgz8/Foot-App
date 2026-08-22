@@ -1201,6 +1201,39 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       console.log(`[useLiveMinute] FD.org fallback → markLive match ${mid} (${match.homeTeam?.name} vs ${match.awayTeam?.name})`)
       markLive(match)
     }
+
+    // ⚠️ AJOUT (demande utilisateur : "au retour d'arrière-plan, si le match
+    // est déjà à plus de 90' et qu'on ne reçoit plus rien sur lui, faire
+    // disparaître direct plutôt que d'attendre") : Safeguard 4 plus bas
+    // (_runFtSafeguards, "disparu du scoreboard ESPN depuis > 5min") existe
+    // déjà pour ce cas précis, mais exige 5min d'ABSENCE ACCUMULÉE via
+    // lastSeenInEspn — inadapté après une longue mise en arrière-plan : le
+    // polling est suspendu tout ce temps (aucun tick ne tourne), donc rien ne
+    // s'accumule — le TOUT PREMIER poll au retour (forceFresh, voir onVisible
+    // plus bas dans ce fichier) peut légitimement ne rien montrer pour un
+    // match qui a fini PENDANT la pause, sans jamais avoir eu l'occasion
+    // d'accumuler ces 5min de tentatives réelles.
+    // Seulement si CE poll précis vient d'un retour au premier plan
+    // (forceFresh — jamais sur un tick normal 10-30s, pas de vérification
+    // systématique à chaque poll comme demandé) ET le match suivi est absent
+    // de CETTE réponse fraîche ET son âge dépasse 90min (donc déjà en temps
+    // additionnel de la 2e MT au plus tôt, jamais avant un match qui tarde
+    // simplement à démarrer ou une pause mi-temps normale) : on recule
+    // artificiellement lastSeenInEspn pour que Safeguard 4 déclenche
+    // IMMÉDIATEMENT sur cette même passe au lieu d'attendre 5min de plus —
+    // réutilise telle quelle sa double garde (âge + absence) déjà éprouvée,
+    // seul le délai d'accumulation est court-circuité pour ce cas précis.
+    if (forceFresh) {
+      for (const match of toTrack) {
+        if (liveData[match.id] !== undefined) continue
+        if (!isTrackedLive(match.id)) continue
+        const ageMin = (now - new Date(match.utcDate)) / 60_000
+        if (ageMin < 90) continue
+        const lastSeen = lastSeenInEspn[match.id]
+        if (lastSeen != null && now - lastSeen >= 5 * 60_000) continue // déjà acquis normalement
+        lastSeenInEspn[match.id] = now - 5 * 60_000 - 1_000
+      }
+    }
   } catch (err) {
     console.warn('[useLiveMinute] /api/fifa-live erreur :', err.message)
     espnFailStreak++
