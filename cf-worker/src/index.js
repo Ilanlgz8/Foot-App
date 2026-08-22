@@ -60,6 +60,24 @@ import {
 const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA_NOTIFY_SLUGS])]
 const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
+// ⚠️ SOLUTION AU BLOCAGE 403 (constat confirmé, 22/08 : ESPN bloque 100% des
+// requêtes venant de Cloudflare Workers — testé en direct, la MÊME requête
+// depuis Vercel réussit sans problème, header par header identiques via
+// ESPN_FETCH_HEADERS ci-dessous, qui n'avait donc rien changé). C'est un
+// blocage réseau (IP/plage Cloudflare), pas un problème d'en-têtes — aucun
+// en-tête ne peut le contourner depuis ce Worker. api/espn.js (Vercel) sait
+// déjà atteindre ESPN sans souci (utilisé par toute l'app côté client) — son
+// mode "scoreboard" renvoie le JSON ESPN BRUT, tel quel, SANS transformation
+// (voir api/espn.js, mode scoreboard : `res.send(body)`, pas de compaction —
+// contrairement au mode "summary" qui compacte pour le client) : donc
+// compatible tel quel avec fetchEspnEvents ci-dessous, aucun changement de
+// parsing nécessaire. Le calcul/la décision (comparaison scores, détection
+// buts/cartons/FT) restent intégralement ici, dans le Worker — seul le SAUT
+// RÉSEAU vers ESPN passe désormais par Vercel plutôt que direct, un simple
+// relais sans le coût CPU qui avait motivé le passage à Cloudflare (voir
+// CLAUDE.md "Fluid Active CPU dépassé") : api/espn.js est un pass-through
+// léger (fetch + forward), pas la logique complète de l'ancien cron.
+const VERCEL_ESPN_PROXY = 'https://statfootix.vercel.app/api/espn'
 
 // ⚠️ AJOUT (retour utilisateur, log réel : 403 systématique d'ESPN sur TOUS
 // les slugs, à chaque vraie passe, depuis plusieurs heures) : ce Worker
@@ -109,10 +127,16 @@ function safeJsonParse(raw, fallback) {
 // pu savoir" (false, timeout/erreur réseau/statut HTTP non-ok — surtout ne
 // PAS mettre en cache un [] dans ce cas, sinon on figerait un faux "aucun
 // match" pour le reste de la journée sur un simple aléa réseau ponctuel).
+// ⚠️ Route désormais via VERCEL_ESPN_PROXY (voir commentaire à sa
+// déclaration) au lieu d'ESPN en direct — ESPN bloque 100% des requêtes
+// Cloudflare Workers (403 confirmé), Vercel non. `?dates=` et le format
+// JSON en retour (`{events:[...]}`) sont identiques à un appel ESPN direct
+// (mode scoreboard d'api/espn.js = passthrough brut, aucune transformation)
+// — aucun changement de parsing nécessaire ici.
 async function fetchEspnEvents(slug, date, log) {
   try {
-    const r = await fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${date}&limit=100`, {
-      headers: ESPN_FETCH_HEADERS,
+    const r = await fetch(`${VERCEL_ESPN_PROXY}?slug=${slug}&dates=${date}`, {
+      headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(8_000),
     })
     if (!r.ok) { log.push(`[espn:${slug}] status=${r.status}`); return { ok: false, events: [] } }

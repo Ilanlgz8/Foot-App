@@ -148,6 +148,34 @@ export function useStandings(selectedComp, hasMatchToday = true) {
 
       try {
         const fdResult = await tryFdOrg()
+        // ⚠️ BUG CORRIGÉ (constat utilisateur, 22/08 : Ligue 1 affichait 0
+        // point pour TOUTES les équipes alors que la 1ère journée était déjà
+        // jouée) : pas un problème de cache — vérifié en interrogeant FD.org
+        // en direct, leur classement renvoyait bien playedGames:0/points:0
+        // partout (réponse 200 valide, donc jamais dans le catch ci-dessous)
+        // pendant qu'ESPN, interrogé en parallèle, avait déjà les bons
+        // résultats de journée 1. FD.org peut mettre du retard à recalculer
+        // son classement juste après le début d'une saison — un classement
+        // "valide mais pas encore à jour" n'est jamais traité comme une
+        // erreur par tryFdOrg() (pas de throw), donc le repli ESPN
+        // (catch ci-dessous) ne se déclenchait jamais dans ce cas précis.
+        // Filet supplémentaire : si AUCUNE équipe n'a de match joué dans la
+        // réponse FD.org, on vérifie ESPN — si LUI montre au moins un match
+        // joué quelque part, c'est la preuve concrète que FD.org est en
+        // retard, on utilise ESPN à la place. Si ESPN est LUI AUSSI à 0
+        // partout (vrai 1er jour de saison, avant le tout premier match),
+        // les deux sources concordent de toute façon — sans risque de
+        // rendre pire un cas où c'est légitimement 0 partout.
+        const allZeroPlayed = fdResult.table.length > 0
+          && fdResult.table.every(t => (t.playedGames ?? 0) === 0)
+        if (allZeroPlayed) {
+          const espnResult = await tryEspn()
+          const espnHasProgress = espnResult?.table?.some(t => (t.playedGames ?? 0) > 0)
+          if (espnHasProgress) {
+            writeCache(key, espnResult, STALE_MS)
+            return espnResult
+          }
+        }
         writeCache(key, fdResult, STALE_MS)
         return fdResult
       } catch (err) {
