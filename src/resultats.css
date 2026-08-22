@@ -284,17 +284,16 @@
   .resultats__allGrid { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* Cards agrandies (≈1.3x les dimensions de base d'accueil.css) — mêmes
-   proportions, juste plus grand, pour profiter du scroll dédié de cette page
-   au lieu du petit espace compact du panneau Accueil. */
-.resultats__allGrid .resultHero { padding: 1.15rem 1.3rem 1.2rem; }
-.resultats__allGrid .resultHero__crestWrap { width: 3.4rem; height: 3.4rem; }
-.resultats__allGrid .resultHero__name { font-size: 0.95rem; }
-.resultats__allGrid .resultHero__score { font-size: 2.5rem; }
-.resultats__allGrid .resultHero__comp { font-size: 0.72rem; }
-.resultats__allGrid .resultHero__compLogo { width: 20px; height: 20px; }
-.resultats__allGrid .resultHero__status { font-size: 0.66rem; }
-.resultats__allGrid .resultHero__round { font-size: 0.68rem; }
+/* Cards agrandies par rapport à accueil.css, mais réduites d'1/3 (retour
+   utilisateur : la 1ère version était trop grosse) par rapport au 1er jet. */
+.resultats__allGrid .resultHero { padding: 0.77rem 0.87rem 0.8rem; }
+.resultats__allGrid .resultHero__crestWrap { width: 2.25rem; height: 2.25rem; }
+.resultats__allGrid .resultHero__name { font-size: 0.63rem; }
+.resultats__allGrid .resultHero__score { font-size: 1.65rem; }
+.resultats__allGrid .resultHero__comp { font-size: 0.48rem; }
+.resultats__allGrid .resultHero__compLogo { width: 13px; height: 13px; }
+.resultats__allGrid .resultHero__status { font-size: 0.44rem; }
+.resultats__allGrid .resultHero__round { font-size: 0.45rem; }
 
 .resultats__title {
   display: flex;
