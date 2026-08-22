@@ -1,5 +1,12 @@
 import { PanelSkeleton } from './MatchCard'
-import { ResultHeroCard } from './ResultHeroCard'
+// ⚠️ REVU (retour utilisateur : "même style que les cards dans résultats")
+// : ResultHeroCard.jsx (propre à ce panneau) remplacé par ResultCard.jsx —
+// même card que la page Résultats (Resultat.jsx, navigation par championnat
+// ET onglet "Tous"), extraite dans components/ pour être partagée par les
+// deux. showComp passé partout ici : ce panneau mélange déjà plusieurs
+// compétitions (comme l'onglet "Tous"), le badge championnat y a donc sa
+// place — voir ResultCard.jsx pour le détail complet.
+import { ResultCard } from '../components/ResultCard'
 import { usePersistedState } from '../hooks/usePersistedState'
 
 // Rétabli (retour utilisateur : la navigation par jour — aujourd'hui ⇄ hier —
@@ -36,7 +43,12 @@ function formatDayLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-export function ResultPanel({ results, loading, view = 'chrono', matchesByComp = null }) {
+// matchesByComp n'est plus utilisé ici : ResultCard résout les blasons
+// directement depuis match.homeTeam/awayTeam (pas besoin de cross-matching
+// FD.org comme ResultHeroCard avant). Accueil.jsx continue de le passer
+// (encore utilisé par MatchPanel pour les matchs à venir) — prop simplement
+// ignorée ici, rien à casser côté appelant.
+export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped  = groupByDay(results)
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué jusqu'à un
   // jour précédent (ex: 8 juillet), cliqué sur un match, puis "retour",
@@ -94,7 +106,7 @@ export function ResultPanel({ results, loading, view = 'chrono', matchesByComp =
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
             {currentMatches.map((match, i) => (
-              <ResultHeroCard key={match.id ?? i} match={match} compMatches={matchesByComp?.[match.competition?.code] ?? null} />
+              <ResultCard key={match.id ?? i} match={match} showComp />
             ))}
           </div>
         )}
@@ -107,7 +119,7 @@ export function ResultPanel({ results, loading, view = 'chrono', matchesByComp =
                 <p className="accueil__compGroupTitle">{name}</p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
-                    <ResultHeroCard key={match.id ?? i} match={match} compMatches={matchesByComp?.[match.competition?.code] ?? null} />
+                    <ResultCard key={match.id ?? i} match={match} showComp />
                   ))}
                 </div>
               </div>

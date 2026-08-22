@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
 import './../resultats.css'
 import './../compHeader.css'
 // La vue "Par poule" réutilise les classes matchs__wc* définies dans match.css
@@ -19,17 +18,18 @@ const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
 import { useRecentDaysMatches } from '../hooks/useTodayMatches'
+// ⚠️ MatchCard extrait dans ResultCard.jsx (demande utilisateur : même style
+// de card réutilisé aussi par le panneau Résultats récents de l'Accueil,
+// voir accueil/ResultPanel.jsx) — alias conservé ici pour ne pas renommer
+// tous les points d'appel de ce fichier (journée/poule/GroupModal/Tous).
+import { ResultCard as MatchCard } from './ResultCard'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
-import { mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { mergeScore } from '../utils/matchUtils'
 import { usePersistedState } from '../hooks/usePersistedState'
-import { FavStarBadge } from './FavStarBadge'
-import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
-import { getTeamColor } from '../data/teamPhotos'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
-const tName = (t) => translateTeam(t?.shortName || t?.name || '?')
 const fmtDate = (d) => {
   const today = new Date(); today.setHours(0,0,0,0)
   const date  = new Date(d); date.setHours(0,0,0,0)
@@ -37,117 +37,8 @@ const fmtDate = (d) => {
   return new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
-/* Carte de match — définie AU NIVEAU MODULE : sinon, recréée à chaque render
-   de Resultats() (or celui-ci re-render toutes les ~15s via espnScores/
-   useLiveData), React perd l'identité du composant et démonte/remonte tous
-   les <img> crest → flicker/rechargement visible des drapeaux à intervalle
-   régulier (constat utilisateur : "ça fait comme un refresh à chaque fois").
-   Pas de loading="lazy" ici : cette page est de toute façon démontée/remontée
-   en entier à chaque navigation vers /match/:id puis retour (comportement
-   normal du routeur) — recrée les <img> à chaque fois. Avec "lazy", même une
-   image déjà en cache navigateur repasse par l'IntersectionObserver avant de
-   se charger, ce qui ajoute un flash "vide → image" perceptible à chaque
-   retour (constat utilisateur). Les listes ici sont courtes (une journée/
-   poule à la fois), le coût du chargement eager est négligeable. */
-// ⚠️ showComp (retour utilisateur : le badge championnat n'a de sens QUE
-// dans l'onglet "Tous", où plusieurs compétitions se mélangent — sur la
-// navigation normale par championnat, l'info est déjà connue/redondante,
-// affichée sur chaque card ça n'apportait rien). false par défaut : la
-// navigation normale (journée/poule/GroupModal) n'a rien à changer, seul
-// TousResultsView passe explicitement showComp.
-function MatchCard({ match, showComp = false }) {
-  const navigate = useNavigate()
-  const { isFavorite } = useFavoriteClubs()
-  const homeIsFav = isFavorite(match.homeTeam?.id)
-  const awayIsFav = isFavorite(match.awayTeam?.id)
-  const isFav = homeIsFav || awayIsFav
-  const favColor = isFav
-    ? getTeamColor((homeIsFav ? match.homeTeam : match.awayTeam)?.shortName || (homeIsFav ? match.homeTeam : match.awayTeam)?.name)
-    : null
-  // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
-  const isWC = isNationalTeamComp(match)
-  // finalScore() = score 120min (prolongations incluses, tirs au but exclus).
-  // ⚠️ NE PAS lire match.score.fullTime directement : pour un match décidé aux
-  // tab, FD.org y met regularTime+extraTime+penalties CUMULÉS (bug confirmé en
-  // prod), pas le score 120min — voir finalScore() dans matchUtils.js. Un match
-  // décidé aux tab est TOUJOURS à égalité en score 120min → le vainqueur doit
-  // se déterminer via le score des tab (score.penalties), pas via ce score.
-  const fsRes = finalScore(match.score)
-  const hs   = fsRes.home ?? 0
-  const as_  = fsRes.away ?? 0
-  const wentToPens = match.score?.duration === 'PENALTY_SHOOTOUT'
-  // Décidé en prolongation SANS tirs au but (score.duration ne vaut
-  // 'EXTRA_TIME' que dans ce cas précis — si ça s'est joué aux tab, duration
-  // vaut déjà 'PENALTY_SHOOTOUT', donc les deux sont mutuellement exclusifs).
-  const wentToAet = match.score?.duration === 'EXTRA_TIME'
-  const hp   = match.score?.penalties?.home ?? null
-  const ap   = match.score?.penalties?.away ?? null
-  const hWin = wentToPens ? (hp != null && ap != null && hp > ap) : hs > as_
-  const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
-  const draw = !wentToPens && hs === as_
-
-  // ⚠️ AJOUT (demande utilisateur : championnat en haut à gauche de la card,
-  // uniquement dans l'onglet "Tous" — voir showComp) : même source que
-  // ResultHeroCard.jsx (accueil/), COMPETITIONS déjà importé en tête de ce
-  // fichier. Remplace l'ancien resultats__cupBadge (texte seul, uniquement
-  // pour les coupes nationales fusionnées dans l'onglet du championnat
-  // parent) — ce badge couvre TOUS les matchs, logo compris, donc l'info
-  // coupe nationale (match.isCup) reste affichée mais via ce badge unique
-  // plutôt qu'en double.
-  const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
-  const compName = match.isCup ? match.competition?.name : (comp?.name ?? match.competition?.name ?? '')
-  const compLogo = comp?.emblem ?? match.competition?.emblem
-
-  return (
-    <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
-      {isFav && <FavStarBadge variant="row" color={favColor} />}
-      {showComp && compName && (
-        <div className="resultats__cardCompBadge">
-          {compLogo && <img src={compLogo} alt="" className="resultats__cardCompLogo" onError={e => e.currentTarget.style.display = 'none'} />}
-          <span className="resultats__cardCompName">{compName}</span>
-        </div>
-      )}
-      <div className="resultats__cardBody">
-        <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
-          <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-            {match.homeTeam?.crest
-              ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
-              : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
-          </div>
-          <span className="resultats__teamName">{tName(match.homeTeam)}</span>
-        </div>
-        <div className="resultats__scoreCenter">
-          {/* ⚠️ Date retirée (demande utilisateur) — "Terminé" prend sa place ici,
-              la date se retrouve désormais à côté du libellé du round (voir
-              currentRoundDate/resultats__navLabelDate plus haut dans le fichier). */}
-          <span className="resultats__ftBadge">Terminé</span>
-          <div className="resultats__scoreRow">
-            <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
-            <span className="resultats__scoreDash">–</span>
-            <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
-          </div>
-          {wentToPens && hp != null && ap != null && (
-            <div className="resultats__pensBlock">
-              <span className="resultats__pensLabel">T.A.B</span>
-              <span className="resultats__pensScore">({hp}-{ap})</span>
-            </div>
-          )}
-          {wentToAet && (
-            <span className="resultats__aet">Après prolong.</span>
-          )}
-        </div>
-        <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
-          <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-            {match.awayTeam?.crest
-              ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
-              : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
-          </div>
-          <span className="resultats__teamName">{tName(match.awayTeam)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
+// MatchCard = alias vers ResultCard (voir import en tête de fichier) —
+// extrait dans ResultCard.jsx pour être réutilisable par accueil/ResultPanel.jsx.
 
 // ── Onglet "Tous" (Resultat.jsx) : historique des révisions successives ──
 // N'utilise plus <ResultPanel>/ResultHeroCard (accueil.css) — après plusieurs
