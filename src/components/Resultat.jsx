@@ -8,13 +8,6 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
-// ⚠️ AJOUT (onglet "Tous", voir TousResultsView plus bas) : réutilise
-// ResultPanel/ResultHeroCard tels quels (panneau "Résultats récents" de
-// l'Accueil) — leurs classes (accueil__*, resultHero__*) vivent dans ce
-// fichier, jamais importé jusqu'ici par cette page (même raison que
-// match.css juste au-dessus : sans lui, ces classes restent sans style tant
-// qu'on n'a pas visité l'Accueil au moins une fois dans la session).
-import './../accueil.css'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
@@ -26,7 +19,6 @@ const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
 import { useRecentDaysMatches } from '../hooks/useTodayMatches'
-import { ResultHeroCard } from '../accueil/ResultHeroCard'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
@@ -88,67 +80,80 @@ function MatchCard({ match }) {
   const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
   const draw = !wentToPens && hs === as_
 
+  // ⚠️ AJOUT (demande utilisateur : championnat en haut à gauche de la card
+  // — surtout utile dans l'onglet "Tous", où plusieurs compétitions se
+  // mélangent) : même source que ResultHeroCard.jsx (accueil/), COMPETITIONS
+  // déjà importé en tête de ce fichier. Remplace l'ancien resultats__cupBadge
+  // (texte seul, uniquement pour les coupes nationales fusionnées dans
+  // l'onglet du championnat parent) — ce nouveau badge couvre TOUS les
+  // matchs, logo compris, donc l'info coupe nationale (match.isCup) reste
+  // affichée mais via ce badge unique plutôt qu'en double.
+  const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const compName = match.isCup ? match.competition?.name : (comp?.name ?? match.competition?.name ?? '')
+  const compLogo = comp?.emblem ?? match.competition?.emblem
+
   return (
     <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
       {isFav && <FavStarBadge variant="row" color={favColor} />}
-      <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
-        <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-          {match.homeTeam?.crest
-            ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
-            : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
+      {compName && (
+        <div className="resultats__cardCompBadge">
+          {compLogo && <img src={compLogo} alt="" className="resultats__cardCompLogo" onError={e => e.currentTarget.style.display = 'none'} />}
+          <span className="resultats__cardCompName">{compName}</span>
         </div>
-        <span className="resultats__teamName">{tName(match.homeTeam)}</span>
-      </div>
-      <div className="resultats__scoreCenter">
-        {match.isCup && <span className="resultats__cupBadge">{match.competition?.name}</span>}
-        {/* ⚠️ Date retirée (demande utilisateur) — "Terminé" prend sa place ici,
-            la date se retrouve désormais à côté du libellé du round (voir
-            currentRoundDate/resultats__navLabelDate plus haut dans le fichier). */}
-        <span className="resultats__ftBadge">Terminé</span>
-        <div className="resultats__scoreRow">
-          <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
-          <span className="resultats__scoreDash">–</span>
-          <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
-        </div>
-        {wentToPens && hp != null && ap != null && (
-          <div className="resultats__pensBlock">
-            <span className="resultats__pensLabel">T.A.B</span>
-            <span className="resultats__pensScore">({hp}-{ap})</span>
+      )}
+      <div className="resultats__cardBody">
+        <div className={`resultats__team resultats__team--home ${aWin ? 'resultats__team--loser' : ''}`}>
+          <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
+            {match.homeTeam?.crest
+              ? <img src={match.homeTeam.crest} alt="" className="resultats__crest" data-team={match.homeTeam?.name} onError={e => e.target.style.display='none'} />
+              : <span className="resultats__crestFb">{tName(match.homeTeam)[0]}</span>}
           </div>
-        )}
-        {wentToAet && (
-          <span className="resultats__aet">Après prolong.</span>
-        )}
-      </div>
-      <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
-        <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-          {match.awayTeam?.crest
-            ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
-            : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
+          <span className="resultats__teamName">{tName(match.homeTeam)}</span>
         </div>
-        <span className="resultats__teamName">{tName(match.awayTeam)}</span>
+        <div className="resultats__scoreCenter">
+          {/* ⚠️ Date retirée (demande utilisateur) — "Terminé" prend sa place ici,
+              la date se retrouve désormais à côté du libellé du round (voir
+              currentRoundDate/resultats__navLabelDate plus haut dans le fichier). */}
+          <span className="resultats__ftBadge">Terminé</span>
+          <div className="resultats__scoreRow">
+            <span className={`resultats__scoreNum ${hWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{hs}</span>
+            <span className="resultats__scoreDash">–</span>
+            <span className={`resultats__scoreNum ${aWin ? 'resultats__scoreNum--win' : ''} ${draw ? 'resultats__scoreNum--draw' : ''}`}>{as_}</span>
+          </div>
+          {wentToPens && hp != null && ap != null && (
+            <div className="resultats__pensBlock">
+              <span className="resultats__pensLabel">T.A.B</span>
+              <span className="resultats__pensScore">({hp}-{ap})</span>
+            </div>
+          )}
+          {wentToAet && (
+            <span className="resultats__aet">Après prolong.</span>
+          )}
+        </div>
+        <div className={`resultats__team resultats__team--away ${hWin ? 'resultats__team--loser' : ''}`}>
+          <div className="resultats__crestWrap" data-crest={isWC ? 'country' : 'club'}>
+            {match.awayTeam?.crest
+              ? <img src={match.awayTeam.crest} alt="" className="resultats__crest" data-team={match.awayTeam?.name} onError={e => e.target.style.display='none'} />
+              : <span className="resultats__crestFb">{tName(match.awayTeam)[0]}</span>}
+          </div>
+          <span className="resultats__teamName">{tName(match.awayTeam)}</span>
+        </div>
       </div>
     </div>
   )
 }
 
-// ⚠️ REVU (retour utilisateur : "pas besoin de recopier-coller le panel de
-// l'Accueil, celui-là on peut le modifier") : n'utilise plus <ResultPanel>
-// (son système de pagination jour-par-jour avec flèches ← → est pensé pour un
-// petit panneau compact sur l'Accueil, pas pour une page dédiée) — ici,
-// TOUS les jours sont affichés à la suite, en une seule liste que l'utilisateur
-// descend au scroll, avec des cards volontairement plus grandes (voir
-// .resultats__allGrid/.resultats__allPanel dans resultats.css) : c'est
-// justement le but de cette page par rapport au petit panneau de l'Accueil.
-// ResultHeroCard (accueil/ResultHeroCard.jsx) reste réutilisé tel quel (la
-// card elle-même, pas la mise en page autour) — générique, autonome, agrandie
-// ici via un simple override CSS scopé à cette page (aucun risque pour
-// l'Accueil, ses propres classes/tailles restent inchangées).
-// groupByDay/groupByComp : mêmes noms/logique que ResultPanel.jsx mais
-// dupliqués ici à dessein — ResultPanel groupe seulement DANS le jour courant
-// pour son mode "Par compétition" (pagination oblige), alors qu'ici on veut
-// TOUS les jours mélangés par compétition d'un coup, un besoin différent qui
-// n'aurait pas pu réutiliser sa fonction telle quelle de toute façon.
+// ── Onglet "Tous" (Resultat.jsx) : historique des révisions successives ──
+// N'utilise plus <ResultPanel>/ResultHeroCard (accueil.css) — après plusieurs
+// retours utilisateur, la version actuelle : navigation jour par jour (comme
+// le reste de cette page, voir TousResultsView plus bas) + MatchCard (même
+// card que la navigation par championnat plus bas dans ce fichier, avec un
+// badge championnat en plus en haut à gauche, seule vraie différence — voir
+// son commentaire dédié). groupByDayAll/groupByCompAll : regroupent TOUS les
+// jours chargés (RESULTS_DAYS_BACK) — utilisés uniquement pour construire la
+// navigation jour par jour et le sous-groupement par compétition DANS le
+// jour affiché, pas pour un rendu "tout mélangé" (abandonné, voir retour
+// utilisateur "sinon on s'y perd").
 function groupByDayAll(matches) {
   const groups = {}
   matches.forEach(m => {
@@ -234,17 +239,25 @@ function TousResultsView() {
         <p className="resultats__state">Aucun résultat ce jour-là.</p>
       )}
 
+      {/* ⚠️ REVU (retour utilisateur : mêmes cards que le reste de la page
+          Résultats, MatchCard — pas ResultHeroCard/accueil.css) : MatchCard
+          affiche désormais le badge championnat en haut à gauche (ajouté
+          pour cet onglet précisément, voir son commentaire dédié), donc
+          plus besoin d'un composant différent ici pour distinguer les
+          compétitions mélangées — .resultats__list, même classe/liste
+          simple qu'utilise déjà la vue "par journée" plus bas dans ce
+          fichier. */}
       {!loading && view === 'chrono' && dayMatches.length > 0 && (
-        <div className="resultats__allGrid">
-          {dayMatches.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
+        <div className="resultats__list">
+          {dayMatches.map(m => <MatchCard key={m.id} match={m} />)}
         </div>
       )}
 
       {!loading && view === 'comp' && compGroupsForDay.map(({ name, matches: ms }) => (
         <div key={name} className="resultats__allGroup">
           <p className="resultats__allGroupLabel">{name}</p>
-          <div className="resultats__allGrid">
-            {ms.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
+          <div className="resultats__list">
+            {ms.map(m => <MatchCard key={m.id} match={m} />)}
           </div>
         </div>
       ))}
