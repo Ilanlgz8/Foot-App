@@ -413,12 +413,19 @@
    cette marge fixe, le badge championnat se décalerait d'une card à l'autre
    selon qu'un favori joue ou non sur CETTE card, ce qui aurait été
    incohérent visuellement dans une liste. */
+/* ⚠️ REVU (retour utilisateur : "bien serrer à gauche, le plus gauche
+   possible, en laissant un petit espace") : plus de padding-left réservé
+   pour FavStarBadge (constat : le badge championnat est désormais réservé à
+   l'onglet "Tous" via showComp — les 2 badges peuvent en théorie coexister
+   sur une card d'équipe favorite, mais priorité donnée au rendu "collé à
+   gauche" explicitement demandé). Colle au bord gauche du padding de la
+   card (même alignement que le reste du contenu), petit espace minimal. */
 .resultats__cardCompBadge {
   display: flex;
   align-items: center;
   gap: 0.3rem;
   margin-bottom: 0.6rem;
-  padding-left: 1.35rem;
+  padding-left: 0.1rem;
 }
 .resultats__cardCompLogo {
   width: 15px;

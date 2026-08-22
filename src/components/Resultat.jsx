@@ -49,7 +49,13 @@ const fmtDate = (d) => {
    se charger, ce qui ajoute un flash "vide → image" perceptible à chaque
    retour (constat utilisateur). Les listes ici sont courtes (une journée/
    poule à la fois), le coût du chargement eager est négligeable. */
-function MatchCard({ match }) {
+// ⚠️ showComp (retour utilisateur : le badge championnat n'a de sens QUE
+// dans l'onglet "Tous", où plusieurs compétitions se mélangent — sur la
+// navigation normale par championnat, l'info est déjà connue/redondante,
+// affichée sur chaque card ça n'apportait rien). false par défaut : la
+// navigation normale (journée/poule/GroupModal) n'a rien à changer, seul
+// TousResultsView passe explicitement showComp.
+function MatchCard({ match, showComp = false }) {
   const navigate = useNavigate()
   const { isFavorite } = useFavoriteClubs()
   const homeIsFav = isFavorite(match.homeTeam?.id)
@@ -80,14 +86,14 @@ function MatchCard({ match }) {
   const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
   const draw = !wentToPens && hs === as_
 
-  // ⚠️ AJOUT (demande utilisateur : championnat en haut à gauche de la card
-  // — surtout utile dans l'onglet "Tous", où plusieurs compétitions se
-  // mélangent) : même source que ResultHeroCard.jsx (accueil/), COMPETITIONS
-  // déjà importé en tête de ce fichier. Remplace l'ancien resultats__cupBadge
-  // (texte seul, uniquement pour les coupes nationales fusionnées dans
-  // l'onglet du championnat parent) — ce nouveau badge couvre TOUS les
-  // matchs, logo compris, donc l'info coupe nationale (match.isCup) reste
-  // affichée mais via ce badge unique plutôt qu'en double.
+  // ⚠️ AJOUT (demande utilisateur : championnat en haut à gauche de la card,
+  // uniquement dans l'onglet "Tous" — voir showComp) : même source que
+  // ResultHeroCard.jsx (accueil/), COMPETITIONS déjà importé en tête de ce
+  // fichier. Remplace l'ancien resultats__cupBadge (texte seul, uniquement
+  // pour les coupes nationales fusionnées dans l'onglet du championnat
+  // parent) — ce badge couvre TOUS les matchs, logo compris, donc l'info
+  // coupe nationale (match.isCup) reste affichée mais via ce badge unique
+  // plutôt qu'en double.
   const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
   const compName = match.isCup ? match.competition?.name : (comp?.name ?? match.competition?.name ?? '')
   const compLogo = comp?.emblem ?? match.competition?.emblem
@@ -95,7 +101,7 @@ function MatchCard({ match }) {
   return (
     <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
       {isFav && <FavStarBadge variant="row" color={favColor} />}
-      {compName && (
+      {showComp && compName && (
         <div className="resultats__cardCompBadge">
           {compLogo && <img src={compLogo} alt="" className="resultats__cardCompLogo" onError={e => e.currentTarget.style.display = 'none'} />}
           <span className="resultats__cardCompName">{compName}</span>
@@ -249,7 +255,7 @@ function TousResultsView() {
           fichier. */}
       {!loading && view === 'chrono' && dayMatches.length > 0 && (
         <div className="resultats__list">
-          {dayMatches.map(m => <MatchCard key={m.id} match={m} />)}
+          {dayMatches.map(m => <MatchCard key={m.id} match={m} showComp />)}
         </div>
       )}
 
@@ -257,7 +263,7 @@ function TousResultsView() {
         <div key={name} className="resultats__allGroup">
           <p className="resultats__allGroupLabel">{name}</p>
           <div className="resultats__list">
-            {ms.map(m => <MatchCard key={m.id} match={m} />)}
+            {ms.map(m => <MatchCard key={m.id} match={m} showComp />)}
           </div>
         </div>
       ))}
