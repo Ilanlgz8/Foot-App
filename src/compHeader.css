@@ -82,6 +82,17 @@
     margin-top: 2px;
   }
 
+  /* ⚠️ AJOUT (demande utilisateur : bouton "Tous" collé au bouton "Changer",
+     4px d'écart, même style) : groupe les deux boutons, 4px de gap entre eux
+     — remplace le gap:10px hérité de .compHeader__hero (info/logo vs ce
+     groupe) qui aurait sinon aussi séparé "Tous" et "Changer" entre eux. */
+  .compHeader__btnGroup {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
   .compHeader__btn {
     display: inline-flex;
     align-items: center;
@@ -100,6 +111,12 @@
     flex-shrink: 0;
     transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
     font-family: inherit;
+  }
+
+  .compHeader__btn--active {
+    background: rgba(var(--red-rgb),0.3);
+    border-color: rgba(var(--red-rgb),0.7);
+    color: #fff;
   }
 
   .compHeader--open .compHeader__btn,

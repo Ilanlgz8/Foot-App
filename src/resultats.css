@@ -89,6 +89,17 @@
   text-transform: uppercase;
   color: var(--red);
 }
+/* Onglet "Tous" (desktop) : à côté du label "Championnats" — même bouton que
+   le mobile (.resultats__allBtn), seul endroit équivalent au bouton "Changer"
+   puisque ce dernier n'existe qu'en mobile (compHeader). */
+.resultats__sidebarLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 0.8rem;
+}
+.resultats__sidebarLabelRow .resultats__sidebarLabel { margin: 0; }
 
 .resultats__sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; }
 
@@ -208,23 +219,16 @@
   color: var(--red);
 }
 
-/* ⚠️ AJOUT (demande utilisateur : onglet "Tous", même niveau que le kicker
-   "Résultats" mais à droite) : `.resultats__header` reste text-align:center
-   (inchangé, pour ne pas décaler le titre/les tabs existants) — le bouton est
-   positionné en absolute par rapport à ce wrapper, sans influencer le
-   centrage du kicker lui-même. */
-.resultats__kickerRow {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.resultats__kickerRow .resultats__kicker { margin: 0; }
+/* ⚠️ REVU (retour utilisateur : le bouton "Tous" doit être à côté du bouton
+   "Changer" mobile, 4px d'écart, MÊME style que lui — pas flottant à côté du
+   kicker "Résultats") : `.resultats__allBtn` n'est donc plus positionné en
+   absolute — bouton "normal" dans le flux, réutilisé desktop (à côté du label
+   "Championnats" dans la sidebar, seul endroit équivalent puisque le bouton
+   "Changer" n'existe qu'en mobile — voir resultats__sidebarLabelRow) ET mobile
+   (compHeader__btnGroup, voir compHeader.css — là il reprend directement le
+   style .compHeader__btn existant, PAS celui-ci, pour être identique au
+   pixel près au bouton "Changer" comme demandé). */
 .resultats__allBtn {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -237,12 +241,60 @@
   white-space: nowrap;
   font-family: inherit;
   transition: filter 0.15s, transform 0.15s;
+  flex-shrink: 0;
 }
 .resultats__allBtn:hover { filter: brightness(1.12); }
-.resultats__allBtn:active { transform: translateY(-50%) scale(0.94); }
+.resultats__allBtn:active { transform: scale(0.94); }
 .resultats__allBtn--active {
   box-shadow: 0 0 0 2px rgba(var(--white-rgb),0.5);
 }
+
+/* ── Onglet "Tous" : panneau plein page (TousResultsView, Resultat.jsx) ──
+   ⚠️ Contrairement au panneau "Résultats récents" de l'Accueil (compact,
+   pagination jour par jour), ici TOUS les jours s'enchaînent en une seule
+   liste qu'on descend au scroll — c'est le but de cette page (retour
+   utilisateur explicite). Les cards (ResultHeroCard, accueil/ResultHeroCard.jsx,
+   réutilisée telle quelle) sont volontairement agrandies via l'override
+   ci-dessous, scopé à .resultats__allGrid — n'affecte JAMAIS les tailles du
+   panneau Accueil (classes accueil.css inchangées, seule cette page les
+   surcharge localement). */
+.resultats__allPanel { margin-top: 0.25rem; }
+
+.resultats__allGroup { margin-bottom: 1.75rem; }
+.resultats__allGroup:last-child { margin-bottom: 0; }
+
+.resultats__allGroupLabel {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: capitalize;
+  color: rgba(var(--white-rgb),0.82);
+  padding-left: 0.15rem;
+}
+
+.resultats__allGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+@media (min-width: 720px) {
+  .resultats__allGrid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1200px) {
+  .resultats__allGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Cards agrandies (≈1.3x les dimensions de base d'accueil.css) — mêmes
+   proportions, juste plus grand, pour profiter du scroll dédié de cette page
+   au lieu du petit espace compact du panneau Accueil. */
+.resultats__allGrid .resultHero { padding: 1.15rem 1.3rem 1.2rem; }
+.resultats__allGrid .resultHero__crestWrap { width: 3.4rem; height: 3.4rem; }
+.resultats__allGrid .resultHero__name { font-size: 0.95rem; }
+.resultats__allGrid .resultHero__score { font-size: 2.5rem; }
+.resultats__allGrid .resultHero__comp { font-size: 0.72rem; }
+.resultats__allGrid .resultHero__compLogo { width: 20px; height: 20px; }
+.resultats__allGrid .resultHero__status { font-size: 0.66rem; }
+.resultats__allGrid .resultHero__round { font-size: 0.68rem; }
 
 .resultats__title {
   display: flex;

@@ -26,7 +26,7 @@ const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
 import { useRecentDaysMatches } from '../hooks/useTodayMatches'
-import { ResultPanel } from '../accueil/ResultPanel'
+import { ResultHeroCard } from '../accueil/ResultHeroCard'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
@@ -132,39 +132,97 @@ function MatchCard({ match }) {
   )
 }
 
-// ── Onglet "Tous" (demande utilisateur) ─────────────────────────────────────
-// Tous les résultats, toutes compétitions confondues, du plus récent au plus
-// vieux, groupés par jour, avec un tri "Tous"/"Par compétition" — réutilise
-// TEL QUEL ResultPanel + useRecentDaysMatches (même composant, même hook, même
-// donnée que le panneau "Résultats récents" de l'Accueil) plutôt que de
-// redévelopper le regroupement par jour/tri par compétition qui existe déjà
-// et est déjà éprouvé là-bas. Composant à PART (pas un simple `if` dans
-// Resultats()) : useRecentDaysMatches ne doit tourner QUE quand cet onglet
-// est réellement affiché — un appel conditionnel direct dans Resultats()
-// violerait les Rules of Hooks (nombre de hooks qui varierait d'un render à
-// l'autre) ; un composant séparé, monté seulement quand mainView==='tous', a
-// le même effet (le hook n'est appelé QUE pendant que ce composant existe)
-// sans les violer.
-// matchesByComp=null : ResultHeroCard retombe alors sur le crest directement
-// fourni par football-data.org dans chaque match (resolveFdCrest, voir son
-// commentaire dédié dans matchUtils.js) — déjà présent sur un résultat
-// FINISHED, aucune perte visuelle, pas besoin de reconstruire cette map ici.
+// ⚠️ REVU (retour utilisateur : "pas besoin de recopier-coller le panel de
+// l'Accueil, celui-là on peut le modifier") : n'utilise plus <ResultPanel>
+// (son système de pagination jour-par-jour avec flèches ← → est pensé pour un
+// petit panneau compact sur l'Accueil, pas pour une page dédiée) — ici,
+// TOUS les jours sont affichés à la suite, en une seule liste que l'utilisateur
+// descend au scroll, avec des cards volontairement plus grandes (voir
+// .resultats__allGrid/.resultats__allPanel dans resultats.css) : c'est
+// justement le but de cette page par rapport au petit panneau de l'Accueil.
+// ResultHeroCard (accueil/ResultHeroCard.jsx) reste réutilisé tel quel (la
+// card elle-même, pas la mise en page autour) — générique, autonome, agrandie
+// ici via un simple override CSS scopé à cette page (aucun risque pour
+// l'Accueil, ses propres classes/tailles restent inchangées).
+// groupByDay/groupByComp : mêmes noms/logique que ResultPanel.jsx mais
+// dupliqués ici à dessein — ResultPanel groupe seulement DANS le jour courant
+// pour son mode "Par compétition" (pagination oblige), alors qu'ici on veut
+// TOUS les jours mélangés par compétition d'un coup, un besoin différent qui
+// n'aurait pas pu réutiliser sa fonction telle quelle de toute façon.
+function groupByDayAll(matches) {
+  const groups = {}
+  matches.forEach(m => {
+    const day = m.utcDate.slice(0, 10)
+    if (!groups[day]) groups[day] = []
+    groups[day].push(m)
+  })
+  return Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([day, ms]) => [day, ms.sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))])
+}
+function groupByCompAll(matches) {
+  const groups = {}
+  matches.forEach(m => {
+    const key  = m.competition?.id ?? 'other'
+    const name = m.competition?.name ?? 'Autre'
+    if (!groups[key]) groups[key] = { name, matches: [] }
+    groups[key].matches.push(m)
+  })
+  return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))
+}
+function formatAllDayLabel(dateStr) {
+  const today     = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10)
+  if (dateStr === today)     return "Aujourd'hui"
+  if (dateStr === yesterday) return 'Hier'
+  return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+// Composant à PART (pas un simple `if` dans Resultats()) : useRecentDaysMatches
+// ne doit tourner QUE quand cet onglet est réellement affiché — un appel
+// conditionnel direct dans Resultats() violerait les Rules of Hooks (nombre de
+// hooks qui varierait d'un render à l'autre) ; un composant séparé, monté
+// seulement quand mainView==='tous', a le même effet sans les violer.
 function TousResultsView() {
   const RESULTS_DAYS_BACK = 7
   const { matches, loading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
   const [view, setView] = useState('chrono') // 'chrono' | 'comp'
   const results = useMemo(() => matches.filter(m => m.status === 'FINISHED'), [matches])
+  const dayGroups  = useMemo(() => groupByDayAll(results), [results])
+  const compGroups = useMemo(() => groupByCompAll(results), [results])
 
   return (
-    <>
+    <div className="resultats__allPanel">
       <div className="resultats__titleRow">
         <div className="resultats__viewTabs">
           <button className={'resultats__viewTab' + (view === 'chrono' ? ' resultats__viewTab--active' : '')} onClick={() => setView('chrono')}>Tous</button>
           <button className={'resultats__viewTab' + (view === 'comp' ? ' resultats__viewTab--active' : '')} onClick={() => setView('comp')}>Par compétition</button>
         </div>
       </div>
-      <ResultPanel results={results} loading={loading} view={view} matchesByComp={null} />
-    </>
+
+      {loading && <p className="resultats__state">Chargement…</p>}
+      {!loading && results.length === 0 && (
+        <p className="resultats__state">Aucun résultat disponible.</p>
+      )}
+
+      {!loading && view === 'chrono' && dayGroups.map(([day, ms]) => (
+        <div key={day} className="resultats__allGroup">
+          <p className="resultats__allGroupLabel">{formatAllDayLabel(day)}</p>
+          <div className="resultats__allGrid">
+            {ms.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
+          </div>
+        </div>
+      ))}
+
+      {!loading && view === 'comp' && compGroups.map(({ name, matches: ms }) => (
+        <div key={name} className="resultats__allGroup">
+          <p className="resultats__allGroupLabel">{name}</p>
+          <div className="resultats__allGrid">
+            {ms.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -521,9 +579,22 @@ function Resultats() {
             <div className="compHeader__info">
               <span className="compHeader__name">{currentComp?.name}</span>
             </div>
-            <button className="compHeader__btn" aria-label="Changer de compétition">
-              {compOpen ? 'Fermer ✕' : 'Changer ›'}
-            </button>
+            <div className="compHeader__btnGroup">
+              {/* ⚠️ AJOUT (demande utilisateur : bouton "Tous" collé au
+                  bouton "Changer", 4px d'écart, même style) : stopPropagation
+                  indispensable — .compHeader__hero (parent) a son propre
+                  onClick qui ouvre/ferme le picker de compétition, sans ça ce
+                  clic ouvrirait AUSSI le picker en plus de basculer la vue. */}
+              <button
+                className={'compHeader__btn' + (mainView === 'tous' ? ' compHeader__btn--active' : '')}
+                onClick={e => { e.stopPropagation(); setMainView(v => v === 'tous' ? 'comp' : 'tous') }}
+              >
+                Tous
+              </button>
+              <button className="compHeader__btn" aria-label="Changer de compétition">
+                {compOpen ? 'Fermer ✕' : 'Changer ›'}
+              </button>
+            </div>
           </div>
           <div className="compHeader__dots">
             {SWITCHER_COMPETITIONS.map(c => (
@@ -555,7 +626,21 @@ function Resultats() {
 
         {/* ── Desktop : sidebar liste ── */}
         <aside className="resultats__sidebar">
-          <p className="resultats__sidebarLabel">Championnats</p>
+          <div className="resultats__sidebarLabelRow">
+            <p className="resultats__sidebarLabel">Championnats</p>
+            {/* ⚠️ AJOUT (demande utilisateur) : onglet "Tous" — seul endroit
+                équivalent au bouton "Changer" côté desktop (qui n'existe qu'en
+                mobile, voir compHeader__btnGroup plus bas). Bascule vers
+                TousResultsView (tous les résultats, toutes compétitions, du
+                plus récent au plus vieux) ; re-cliquer ou choisir un
+                championnat revient à la navigation habituelle. */}
+            <button
+              className={'resultats__allBtn' + (mainView === 'tous' ? ' resultats__allBtn--active' : '')}
+              onClick={() => setMainView(v => v === 'tous' ? 'comp' : 'tous')}
+            >
+              Tous
+            </button>
+          </div>
           <nav className="resultats__sidebarNav">
             {SWITCHER_COMPETITIONS.map(comp => (
               <button key={comp.id}
@@ -577,22 +662,7 @@ function Resultats() {
         <main className="resultats__main">
 
           <div className="resultats__header">
-            <div className="resultats__kickerRow">
-              <h1 className="resultats__kicker">Résultats</h1>
-              {/* ⚠️ AJOUT (demande utilisateur) : onglet "Tous" — bascule entre
-                  la navigation habituelle (1 championnat à la fois, journée
-                  par journée) et TousResultsView (tous les résultats, toutes
-                  compétitions, du plus récent au plus vieux). Toggle simple :
-                  un second clic revient à la vue par championnat ; choisir un
-                  championnat dans la sidebar/le sélecteur mobile y revient
-                  aussi automatiquement (voir leurs onClick, setMainView). */}
-              <button
-                className={'resultats__allBtn' + (mainView === 'tous' ? ' resultats__allBtn--active' : '')}
-                onClick={() => setMainView(v => v === 'tous' ? 'comp' : 'tous')}
-              >
-                Tous
-              </button>
-            </div>
+            <h1 className="resultats__kicker">Résultats</h1>
             {mainView === 'comp' && (
               <div className="resultats__titleRow">
                 {isWC && wcGroups.length > 0 && (
