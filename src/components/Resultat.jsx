@@ -188,11 +188,40 @@ function TousResultsView() {
   const { matches, loading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
   const [view, setView] = useState('chrono') // 'chrono' | 'comp'
   const results = useMemo(() => matches.filter(m => m.status === 'FINISHED'), [matches])
-  const dayGroups  = useMemo(() => groupByDayAll(results), [results])
-  const compGroups = useMemo(() => groupByCompAll(results), [results])
+  const dayGroups = useMemo(() => groupByDayAll(results), [results])
+
+  // ⚠️ AJOUT (retour utilisateur : "sinon on s'y perd" — tous les jours
+  // mélangés d'un coup en scroll continu redevenait confus une fois
+  // plusieurs compétitions affichées ensemble) : navigation jour par jour,
+  // même principe que le reste de cette page (voir currentRoundKey plus bas
+  // dans Resultats()) et que l'ancien ResultPanel de l'Accueil — un jour à
+  // la fois, flèche ← vers le passé (jusqu'à RESULTS_DAYS_BACK jours en
+  // arrière), flèche → vers aujourd'hui (dayGroups est trié du plus récent
+  // au plus vieux, donc index 0 = aujourd'hui/le plus récent avec un
+  // résultat). Persisté (même raison que currentRoundKey) pour ne pas
+  // repartir d'aujourd'hui à chaque réouverture de l'onglet "Tous".
+  const [currentDayStr, setCurrentDayStr] = usePersistedState('resultats_allDay', null)
+  const foundIdx  = currentDayStr != null ? dayGroups.findIndex(([day]) => day === currentDayStr) : -1
+  const dayIndex  = foundIdx >= 0 ? foundIdx : 0
+  const dayGroup  = dayGroups[dayIndex]
+  const dayLabel  = dayGroup ? formatAllDayLabel(dayGroup[0]) : null
+  const dayMatches = useMemo(() => dayGroup ? dayGroup[1] : [], [dayGroup])
+  const canGoOlder = dayIndex < dayGroups.length - 1
+  const canGoNewer = dayIndex > 0
+  const goToDayIndex = (i) => {
+    const g = dayGroups[i]
+    if (g) setCurrentDayStr(g[0])
+  }
+  const compGroupsForDay = useMemo(() => groupByCompAll(dayMatches), [dayMatches])
 
   return (
     <div className="resultats__allPanel">
+      <div className="resultats__nav">
+        <button className="resultats__navBtn" onClick={() => goToDayIndex(dayIndex + 1)} disabled={!canGoOlder} aria-label="Jour précédent">←</button>
+        <span className="resultats__navLabel">{dayLabel ?? '—'}</span>
+        <button className="resultats__navBtn" onClick={() => goToDayIndex(dayIndex - 1)} disabled={!canGoNewer} aria-label="Jour suivant">→</button>
+      </div>
+
       <div className="resultats__titleRow">
         <div className="resultats__viewTabs">
           <button className={'resultats__viewTab' + (view === 'chrono' ? ' resultats__viewTab--active' : '')} onClick={() => setView('chrono')}>Tous</button>
@@ -201,20 +230,17 @@ function TousResultsView() {
       </div>
 
       {loading && <p className="resultats__state">Chargement…</p>}
-      {!loading && results.length === 0 && (
-        <p className="resultats__state">Aucun résultat disponible.</p>
+      {!loading && dayMatches.length === 0 && (
+        <p className="resultats__state">Aucun résultat ce jour-là.</p>
       )}
 
-      {!loading && view === 'chrono' && dayGroups.map(([day, ms]) => (
-        <div key={day} className="resultats__allGroup">
-          <p className="resultats__allGroupLabel">{formatAllDayLabel(day)}</p>
-          <div className="resultats__allGrid">
-            {ms.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
-          </div>
+      {!loading && view === 'chrono' && dayMatches.length > 0 && (
+        <div className="resultats__allGrid">
+          {dayMatches.map(m => <ResultHeroCard key={m.id} match={m} compMatches={null} />)}
         </div>
-      ))}
+      )}
 
-      {!loading && view === 'comp' && compGroups.map(({ name, matches: ms }) => (
+      {!loading && view === 'comp' && compGroupsForDay.map(({ name, matches: ms }) => (
         <div key={name} className="resultats__allGroup">
           <p className="resultats__allGroupLabel">{name}</p>
           <div className="resultats__allGrid">
