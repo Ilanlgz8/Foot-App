@@ -9,7 +9,7 @@
 // test unitaire simple — seule la plomberie de stockage (matchStateTracker.js,
 // consommée directement par isFalseEndedReversal) est testée.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getLiveState, setLiveState, clearMatchState, getMatchState, markRecentlyFinished, getRecentlyFinishedMatches, shouldShowLiveWidget } from './matchStateTracker'
+import { getLiveState, setLiveState, clearMatchState, getMatchState, markRecentlyFinished, getRecentlyFinishedMatches, shouldShowLiveWidget, clearFtFlags } from './matchStateTracker'
 
 const MID = 1
 
@@ -106,14 +106,48 @@ describe('shouldShowLiveWidget — décision unique Live.jsx/Accueil.jsx (anti-r
     expect(shouldShowLiveWidget(match)).toBe(false)
   })
 
-  it('résurrection légitime (faux FT corrigé, ft repasse à false) : redevient visible normalement', () => {
+  it('ré-confirmations multiples de la MÊME vraie fin (termineAt différent à chaque fois) : reste invisible, ne clignote plus', () => {
+    // Root cause du clignotement signalé (jusqu'à 2min après la vraie fin) :
+    // confirmFt() peut être ré-appelé plusieurs fois pour le même match par
+    // différents garde-fous (pendingFt timeout, durée max live, FD.org
+    // FINISHED, disparu du scoreboard...) — chacun pose un termineAt FRAIS.
+    // L'ancien dismiss (matché sur la valeur exacte de termineAt) traitait
+    // chaque nouveau termineAt comme un tout nouvel événement de fin, donc
+    // réarmait la fenêtre de grâce de 8s à chaque fois → clignotement.
+    const match = { id: 507, status: 'IN_PLAY' }
+    const termineAt1 = Date.now() - 60_000
+    localStorage.setItem('foot_ms_507', JSON.stringify({ ft: true, termineAt: termineAt1 }))
+    expect(shouldShowLiveWidget(match)).toBe(false) // 1ère confirmation, dismiss
+
+    // Re-confirmation par un autre garde-fou, quelques dizaines de secondes
+    // plus tard, NOUVEAU termineAt — doit rester invisible, pas se réarmer.
+    const termineAt2 = Date.now() - 30_000
+    localStorage.setItem('foot_ms_507', JSON.stringify({ ft: true, termineAt: termineAt2 }))
+    expect(shouldShowLiveWidget(match)).toBe(false)
+
+    // Encore une 3e re-confirmation, termineAt tout frais (< 8s) — même une
+    // fenêtre de grâce "techniquement valide" ne doit pas suffire à
+    // réafficher un match déjà dismiss cette session.
+    localStorage.setItem('foot_ms_507', JSON.stringify({ ft: true, termineAt: Date.now() }))
+    expect(shouldShowLiveWidget(match)).toBe(false)
+  })
+
+  it('résurrection légitime (clearFtFlags — faux FT vérifié) : redevient visible normalement', () => {
     const termineAt = Date.now() - 60_000
     localStorage.setItem('foot_ms_506', JSON.stringify({ ft: true, termineAt }))
     const match = { id: 506, status: 'IN_PLAY' }
     expect(shouldShowLiveWidget(match)).toBe(false) // dismiss
 
-    // clearFtFlags equivalent : ft effacé, match repasse en cours
+    // Une simple réécriture localStorage qui efface ft SANS passer par
+    // clearFtFlags() ne doit PLUS suffire à réautoriser le réaffichage —
+    // exactement le comportement qui causait le clignotement (voir test
+    // précédent).
     localStorage.setItem('foot_ms_506', JSON.stringify({}))
+    expect(shouldShowLiveWidget(match)).toBe(false)
+
+    // Seule vraie sortie légitime : clearFtFlags() (faux FT VÉRIFIÉ, voir
+    // isFalseEndedReversal dans useLiveMinute.js).
+    clearFtFlags(506)
     expect(shouldShowLiveWidget(match)).toBe(true)
 
     // Une 2e vraie fin, NOUVEAU termineAt : redémarre normalement le cycle

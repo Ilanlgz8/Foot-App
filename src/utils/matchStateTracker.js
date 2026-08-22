@@ -245,18 +245,42 @@ export function isRecentlyFinished(matchId, graceMs = TERMINE_GRACE_MS) {
 // Une vraie résurrection légitime (faux FT corrigé, ft repasse à false)
 // nettoie l'entrée mémorisée et réaffiche normalement via le statut
 // IN_PLAY/PAUSED.
-const _dismissedFt = new Map()
+// ⚠️ RENFORCÉ (constat utilisateur : le widget clignote — disparaît/
+// réapparaît — pendant jusqu'à 2min après la vraie fin d'un match, au lieu
+// de disparaître une fois pour de bon). Root cause : `_dismissedFt` était un
+// Map matchId→termineAt EXACT, mais `confirmFt()` (useLiveMinute.js) peut
+// être ré-appelé plusieurs fois pour la MÊME fin de match réelle par
+// différents garde-fous/chemins (pendingFt timeout, durée max live, FD.org
+// FINISHED, disparu du scoreboard ESPN...) — CHAQUE appel pose un `termineAt:
+// Date.now()` FRAIS, donc une valeur DIFFÉRENTE à chaque fois. Un dismiss
+// matché sur la valeur exacte de termineAt ne protégeait donc jamais contre
+// une re-confirmation : chaque nouveau termineAt réarmait la fenêtre de 8s
+// (isRecentlyFinished) comme si c'était un tout nouvel événement de fin,
+// d'où le clignotement répété observé sur toute la fenêtre où ces
+// re-confirmations arrivent (jusqu'à plusieurs minutes). Fix : `_dismissedFt`
+// est maintenant un Set (juste matchId, plus de valeur associée) — dismiss
+// PAR MATCH, sticky pour toute la session, quel que soit le nombre de
+// re-confirmations ultérieures de la même fin. Seule sortie légitime :
+// clearFtFlags() (faux FT VÉRIFIÉ et corrigé, voir plus bas) — pas un simple
+// flip ft=false coïncident (ex: éviction 5min via clearMatchState), qui ne
+// doit PAS réautoriser le réaffichage d'un match réellement terminé.
+const _dismissedFt = new Set()
 
 export function shouldShowLiveWidget(match) {
   if (!match?.id) return false
+  // Vérifié EN PREMIER, avant même de regarder l'état ft/status courant :
+  // sinon un ft qui redevient falsy par un autre chemin que clearFtFlags()
+  // (ex: éviction 5min, `match.status` figé "IN_PLAY" côté liveTracker comme
+  // c'est le cas en prod) retomberait sur la branche status ci-dessous SANS
+  // jamais consulter le dismiss — recréant exactement le clignotement que ce
+  // Set est censé empêcher.
+  if (_dismissedFt.has(match.id)) return false
   const state = getMatchState(match.id)
   if (state.ft === true) {
-    if (_dismissedFt.get(match.id) === state.termineAt) return false
     const recent = isRecentlyFinished(match.id)
-    if (!recent) _dismissedFt.set(match.id, state.termineAt)
+    if (!recent) _dismissedFt.add(match.id)
     return recent
   }
-  if (_dismissedFt.has(match.id)) _dismissedFt.delete(match.id)
   return match.status === 'IN_PLAY' || match.status === 'PAUSED' || match.status === 'SCHEDULED'
 }
 
@@ -274,6 +298,12 @@ export function clearFtFlags(matchId) {
   // corrigé (match en réalité toujours en cours) resterait affiché comme
   // "Terminé" en Résultats jusqu'à expiration du TTL (45min).
   clearRecentlyFinished(matchId)
+  // Voir _dismissedFt/shouldShowLiveWidget plus haut — seule sortie légitime
+  // du dismiss sticky : un faux FT VÉRIFIÉ (même espnEventId qui redevient
+  // actif, voir isFalseEndedReversal dans useLiveMinute.js) doit pouvoir
+  // réautoriser le widget à réapparaître, contrairement à une simple
+  // re-confirmation coïncidente de la même vraie fin.
+  _dismissedFt.delete(matchId)
   try {
     const stored = readState(matchId)
     if (!stored.ft && !stored.termineAt) return  // rien à faire

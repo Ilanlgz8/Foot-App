@@ -165,6 +165,23 @@ export function useStandings(selectedComp, hasMatchToday = true) {
     // Pas de refetchInterval : voir commentaire en tête de fichier — la mise
     // à jour pendant un match live vient maintenant de l'invalidation
     // événementielle (but/FT, useLiveMinute.js), pas d'un sondage périodique.
+    // ⚠️ AJOUT (constat utilisateur : classement affiché périmé — "de départ"
+    // — en revenant sur l'onglet Classement de LiveMatchPage après un moment,
+    // alors qu'il était à jour ailleurs peu avant). Cause probable : ce
+    // composant reste MONTÉ en mémoire (pas de vraie navigation qui le
+    // recrée) pendant que l'onglet/app passe en arrière-plan — l'invalidation
+    // événementielle (but détecté) dépend du poll ESPN (useLiveMinute.js),
+    // lui-même throttlé/suspendu par l'OS/navigateur en arrière-plan
+    // prolongé (plusieurs minutes+) : un but marqué pendant cette fenêtre ne
+    // déclenche alors jamais l'invalidation, et rien d'autre ne revérifie
+    // (refetchOnWindowFocus est désactivé par défaut globalement, voir
+    // main.jsx — décision volontaire pour éviter une rafale de refetch sur
+    // TOUTES les requêtes actives à chaque changement d'onglet, vu la
+    // fragilité connue du budget FD.org). Réactivé ICI seulement, pour cette
+    // requête précise : au retour au premier plan, un SEUL refetch (respecte
+    // toujours staleTime — no-op si déjà frais) remet le classement à jour
+    // sans toucher au comportement des autres requêtes de l'app.
+    refetchOnWindowFocus: true,
     retry: false,
     enabled: !!selectedComp,
   })

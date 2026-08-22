@@ -26,34 +26,10 @@ import '../live.css'
 // > les 5 grands championnats à égalité) — réutilisée ici pour choisir quelle
 // compétition montrer dans le mini widget classement de l'Accueil.
 
-/** Chips de filtre par compétition.
- *  layout='row' (défaut) → chips horizontales, usage existant (mobile +
- *  desktop, dans l'en-tête des panneaux).
- *  layout='col' → pile verticale, usage nouveau : sidebar compétitions
- *  desktop (voir accueil__sidebar plus bas). */
-function CompFilter({ competitions, active, onChange, layout = 'row' }) {
-  if (competitions.length <= 1) return null
-  return (
-    <div className={`accueil__compFilter${layout === 'col' ? ' accueil__compFilter--col' : ''}`}>
-      <button
-        className={`accueil__compChip${active === null ? ' accueil__compChip--active' : ''}`}
-        onClick={() => onChange(null)}
-      >
-        Tous
-      </button>
-      {competitions.map(c => (
-        <button
-          key={c.id}
-          className={`accueil__compChip${active === c.id ? ' accueil__compChip--active' : ''}`}
-          onClick={() => onChange(c.id)}
-        >
-          {c.emblem && <img src={c.emblem} alt="" />}
-          {c.shortName}
-        </button>
-      ))}
-    </div>
-  )
-}
+// ⚠️ RETIRÉ (chips de filtre par compétition, redondantes avec le toggle
+// "Tous"/"Par compétition" du panneau Résultats — voir compFilterResult) :
+// CompFilter n'a plus aucun appelant depuis ce retrait, supprimée pour
+// éviter le code mort.
 
 // ⚠️ AJOUT (nécessaire suite au passage de FL1/PL/PD/BL1/SA/CL sur ESPN dans
 // useTodayMatches.js, 23/07) : `rawMatches` (widget "jour", désormais ESPN
@@ -146,7 +122,15 @@ function Accueil() {
 
   // ── Filtres compétition ──
   const [compFilterMatch,  setCompFilterMatch]  = useState(null)
-  const [compFilterResult, setCompFilterResult] = useState(null)
+  // ⚠️ RETIRÉ (retour utilisateur : les chips de filtre par compétition sur
+  // "Résultats récents" faisaient doublon avec le toggle "Tous"/"Par
+  // compétition" juste à côté (resultView ci-dessous) — 2 façons différentes
+  // de faire une chose proche, jugé redondant. compFilterResult reste à
+  // `null` en dur (jamais réglable) plutôt que supprimé partout : tout le
+  // reste du fichier (filteredResults, resultPanel/filteredResultIds plus
+  // bas) traite déjà `null` comme le cas "aucun filtre" — chemin déjà
+  // existant et éprouvé, zéro risque de casser cette logique en la touchant.
+  const compFilterResult = null
   const [resultView, setResultView] = useState('chrono') // 'chrono' | 'comp'
   const queryClient  = useQueryClient()
 
@@ -581,20 +565,6 @@ function Accueil() {
     return out
   }, [matches])
 
-  const resultCompetitions = useMemo(() => {
-    const seen = new Set()
-    const out  = []
-    for (const m of results) {
-      const id = m.competition?.id
-      if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
-        seen.add(id)
-        const meta = COMPETITIONS.find(c => c.id === id)
-        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
-      }
-    }
-    return out
-  }, [results])
-
   // ── Compétitions "actives" pour la sidebar desktop (demande utilisateur) ──
   // Contrairement à matchCompetitions ci-dessus (scopé au SEUL jour affiché),
   // dérivée de upcomingAllComps (fenêtre 30j, toutes compétitions suivies,
@@ -901,7 +871,8 @@ function Accueil() {
               <div className="accueil__dashPanelHeader accueil__dashPanelHeader--withFilter">
                 <h2 className="accueil__dashPanelTitle">Résultats récents</h2>
                 <div className="accueil__resultHeaderRight">
-                  <CompFilter competitions={resultCompetitions} active={compFilterResult} onChange={setCompFilterResult} />
+                  {/* Chips par compétition retirées (redondant avec le toggle
+                      Tous/Par compétition juste en dessous) — voir compFilterResult. */}
                   <div className="accueil__resultTabs accueil__resultTabs--header">
                     <button className={'accueil__resultTab' + (resultView === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('chrono')}>Tous</button>
                     <button className={'accueil__resultTab' + (resultView === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setResultView('comp')}>Par compétition</button>
