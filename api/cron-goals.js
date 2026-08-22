@@ -249,17 +249,31 @@ async function migrateLegacySubscriptions(log) {
   }
 }
 
+const MIGRATION_DONE_KEY = 'push:migrated'
+
 async function loadSubscriptions(log) {
   let hashObj
   try { hashObj = (await kv.hgetall(SUBS_KEY)) ?? {} } catch { return [] }
 
-  // Hash vide : soit vraiment aucun abonné, soit migration pas encore faite
-  // (voir migrateLegacySubscriptions ci-dessus) — dans le doute on tente la
-  // migration (coût nul si l'ancien Set est lui aussi vide, voir son 1er if).
-  if (!Object.keys(hashObj).length) {
-    await migrateLegacySubscriptions(log)
-    try { hashObj = (await kv.hgetall(SUBS_KEY)) ?? {} } catch { return [] }
-  }
+  // ⚠️ BUG CORRIGÉ (constat : debug-push affichait subscriptions.count:1 mais
+  // legacyPendingMigration:15 — 15 abonnés jamais migrés) : la migration ne
+  // se déclenchait QUE si la Hash était complètement VIDE. Dès qu'UN SEUL
+  // abonné rejoint la Hash directement (résubscribe via /api/subscribe.js,
+  // qui écrit désormais dans la Hash — voir son fichier), la Hash n'est plus
+  // vide, donc migrateLegacySubscriptions() n'était plus JAMAIS appelée —
+  // les 15 autres abonnés de l'ancien Set restaient orphelins pour de bon,
+  // sans aucune notif, indéfiniment. Remplacé par un flag Redis dédié
+  // ('push:migrated', posé une seule fois pour de bon) : la migration est
+  // tentée tant qu'elle n'a jamais réussi, peu importe l'état de la Hash au
+  // moment T — indépendant du nombre d'abonnés déjà présents.
+  try {
+    const migrated = await kv.get(MIGRATION_DONE_KEY)
+    if (!migrated) {
+      await migrateLegacySubscriptions(log)
+      await kv.set(MIGRATION_DONE_KEY, '1')
+      hashObj = (await kv.hgetall(SUBS_KEY)) ?? {}
+    }
+  } catch {}
 
   const parsed = []
   const staleEndpoints = []
