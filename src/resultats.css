@@ -208,6 +208,42 @@
   color: var(--red);
 }
 
+/* ⚠️ AJOUT (demande utilisateur : onglet "Tous", même niveau que le kicker
+   "Résultats" mais à droite) : `.resultats__header` reste text-align:center
+   (inchangé, pour ne pas décaler le titre/les tabs existants) — le bouton est
+   positionné en absolute par rapport à ce wrapper, sans influencer le
+   centrage du kicker lui-même. */
+.resultats__kickerRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.resultats__kickerRow .resultats__kicker { margin: 0; }
+.resultats__allBtn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: filter 0.15s, transform 0.15s;
+}
+.resultats__allBtn:hover { filter: brightness(1.12); }
+.resultats__allBtn:active { transform: translateY(-50%) scale(0.94); }
+.resultats__allBtn--active {
+  box-shadow: 0 0 0 2px rgba(var(--white-rgb),0.5);
+}
+
 .resultats__title {
   display: flex;
   align-items: center;

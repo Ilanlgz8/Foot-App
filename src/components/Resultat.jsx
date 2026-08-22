@@ -8,6 +8,13 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
+// ⚠️ AJOUT (onglet "Tous", voir TousResultsView plus bas) : réutilise
+// ResultPanel/ResultHeroCard tels quels (panneau "Résultats récents" de
+// l'Accueil) — leurs classes (accueil__*, resultHero__*) vivent dans ce
+// fichier, jamais importé jusqu'ici par cette page (même raison que
+// match.css juste au-dessus : sans lui, ces classes restent sans style tant
+// qu'on n'a pas visité l'Accueil au moins une fois dans la session).
+import './../accueil.css'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
@@ -18,6 +25,8 @@ import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds, TTL } from '../hooks/useMatchs'
+import { useRecentDaysMatches } from '../hooks/useTodayMatches'
+import { ResultPanel } from '../accueil/ResultPanel'
 import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
@@ -123,6 +132,42 @@ function MatchCard({ match }) {
   )
 }
 
+// ── Onglet "Tous" (demande utilisateur) ─────────────────────────────────────
+// Tous les résultats, toutes compétitions confondues, du plus récent au plus
+// vieux, groupés par jour, avec un tri "Tous"/"Par compétition" — réutilise
+// TEL QUEL ResultPanel + useRecentDaysMatches (même composant, même hook, même
+// donnée que le panneau "Résultats récents" de l'Accueil) plutôt que de
+// redévelopper le regroupement par jour/tri par compétition qui existe déjà
+// et est déjà éprouvé là-bas. Composant à PART (pas un simple `if` dans
+// Resultats()) : useRecentDaysMatches ne doit tourner QUE quand cet onglet
+// est réellement affiché — un appel conditionnel direct dans Resultats()
+// violerait les Rules of Hooks (nombre de hooks qui varierait d'un render à
+// l'autre) ; un composant séparé, monté seulement quand mainView==='tous', a
+// le même effet (le hook n'est appelé QUE pendant que ce composant existe)
+// sans les violer.
+// matchesByComp=null : ResultHeroCard retombe alors sur le crest directement
+// fourni par football-data.org dans chaque match (resolveFdCrest, voir son
+// commentaire dédié dans matchUtils.js) — déjà présent sur un résultat
+// FINISHED, aucune perte visuelle, pas besoin de reconstruire cette map ici.
+function TousResultsView() {
+  const RESULTS_DAYS_BACK = 7
+  const { matches, loading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
+  const [view, setView] = useState('chrono') // 'chrono' | 'comp'
+  const results = useMemo(() => matches.filter(m => m.status === 'FINISHED'), [matches])
+
+  return (
+    <>
+      <div className="resultats__titleRow">
+        <div className="resultats__viewTabs">
+          <button className={'resultats__viewTab' + (view === 'chrono' ? ' resultats__viewTab--active' : '')} onClick={() => setView('chrono')}>Tous</button>
+          <button className={'resultats__viewTab' + (view === 'comp' ? ' resultats__viewTab--active' : '')} onClick={() => setView('comp')}>Par compétition</button>
+        </div>
+      </div>
+      <ResultPanel results={results} loading={loading} view={view} matchesByComp={null} />
+    </>
+  )
+}
+
 function Resultats() {
   // Persistés dans sessionStorage : App.jsx remonte cette page à chaque
   // retour depuis /match/:id (voir usePersistedState) — sans ça, revenir
@@ -153,6 +198,14 @@ function Resultats() {
   // affichée reste la bonne.
   const [currentRoundKey, setCurrentRoundKey] = usePersistedState('resultats_currentRoundKey', null)
   const [viewMode, setViewMode]         = usePersistedState('resultats_viewMode', 'journee') // 'journee' | 'poule'
+  // ⚠️ AJOUT (demande utilisateur : onglet "Tous" — tous les résultats,
+  // toutes compétitions confondues, voir TousResultsView plus haut) : 'comp'
+  // = comportement actuel inchangé (parcourt UNE compétition à la fois,
+  // journée par journée) ; 'tous' = TousResultsView. Persisté (même raison
+  // que viewMode/currentRoundKey juste au-dessus : cette page est remontée à
+  // chaque retour depuis /match/:id) pour ne pas retomber sur 'comp' à
+  // chaque clic sur un résultat depuis l'onglet "Tous".
+  const [mainView, setMainView] = usePersistedState('resultats_mainView', 'comp') // 'comp' | 'tous'
   const [openedGroup, setOpenedGroup]   = useState(null)
   const [compOpen, setCompOpen]         = useState(false)
   const [search, setSearch]             = useState('')
@@ -487,7 +540,7 @@ function Resultats() {
                   <button
                     key={comp.id}
                     className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
-                    onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null); setCompOpen(false) }}
+                    onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null); setCompOpen(false); setMainView('comp') }}
                   >
                     <img src={comp.emblem} alt="" className="compHeader__itemLogo"
                       onError={e => e.currentTarget.style.display = 'none'} />
@@ -506,7 +559,7 @@ function Resultats() {
           <nav className="resultats__sidebarNav">
             {SWITCHER_COMPETITIONS.map(comp => (
               <button key={comp.id}
-                onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null) }}
+                onClick={() => { setSelectedComp(comp.id); setCurrentRoundKey(null); setViewMode('journee'); setOpenedGroup(null); setMainView('comp') }}
                 className={`resultats__sidebarItem ${selectedComp === comp.id ? 'resultats__sidebarItem--active' : ''}`}
               >
                 <img src={comp.emblem} alt=""
@@ -524,17 +577,38 @@ function Resultats() {
         <main className="resultats__main">
 
           <div className="resultats__header">
-            <h1 className="resultats__kicker">Résultats</h1>
-            <div className="resultats__titleRow">
-              {isWC && wcGroups.length > 0 && (
-                <div className="resultats__viewTabs">
-                  <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
-                  <button className={'resultats__viewTab' + (viewMode === 'poule' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('poule')}>Par poule</button>
-                </div>
-              )}
+            <div className="resultats__kickerRow">
+              <h1 className="resultats__kicker">Résultats</h1>
+              {/* ⚠️ AJOUT (demande utilisateur) : onglet "Tous" — bascule entre
+                  la navigation habituelle (1 championnat à la fois, journée
+                  par journée) et TousResultsView (tous les résultats, toutes
+                  compétitions, du plus récent au plus vieux). Toggle simple :
+                  un second clic revient à la vue par championnat ; choisir un
+                  championnat dans la sidebar/le sélecteur mobile y revient
+                  aussi automatiquement (voir leurs onClick, setMainView). */}
+              <button
+                className={'resultats__allBtn' + (mainView === 'tous' ? ' resultats__allBtn--active' : '')}
+                onClick={() => setMainView(v => v === 'tous' ? 'comp' : 'tous')}
+              >
+                Tous
+              </button>
             </div>
+            {mainView === 'comp' && (
+              <div className="resultats__titleRow">
+                {isWC && wcGroups.length > 0 && (
+                  <div className="resultats__viewTabs">
+                    <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
+                    <button className={'resultats__viewTab' + (viewMode === 'poule' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('poule')}>Par poule</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
+          {mainView === 'tous' && <TousResultsView />}
+
+          {mainView === 'comp' && (
+          <>
           {/* Recherche équipe — filtre côté client */}
           <div className="resultats__searchWrap">
             <input
@@ -643,6 +717,8 @@ function Resultats() {
 
           {!loading && !error && matches.length === 0 && (
             <p className="resultats__state">Aucun résultat disponible.</p>
+          )}
+          </>
           )}
         </main>
       </div>
