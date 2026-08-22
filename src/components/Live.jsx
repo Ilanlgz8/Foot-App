@@ -78,11 +78,35 @@ export default function Live() {
   // laissant bloqué sur "Terminé" pour toujours, plus aucun code pour le
   // retirer).
   const timersRef = useRef(new Map())
+  // ⚠️ AJOUT (retour utilisateur direct : ça clignote ENCORE — disparaît/
+  // réapparaît plusieurs fois sur ~2min après la vraie fin, malgré isCardLive
+  // stateless) : isCardLive dépend de `ms.ft` (matchStateTracker, écrit par
+  // confirmFt côté useLiveMinute.js) — confirmFt peut être ré-invoqué
+  // plusieurs fois pour LA MÊME fin réelle par différents garde-fous
+  // (pendingFt timeout, durée max live, FD.org FINISHED, disparu du
+  // scoreboard...), avec une fenêtre de latence entre chacun où l'état
+  // sous-jacent peut transitoirement redevenir ambigu. isCardLive seul n'a
+  // aucune mémoire : chaque poll (10-30s) le réévalue à zéro, donc un aller-
+  // retour même bref dans la donnée source se répercute directement à
+  // l'écran. permanentlyEndedIds mémorise, pour la durée du montage de CETTE
+  // page (même principe déjà appliqué à justEndedIds/timersRef juste
+  // au-dessus — état 100% local, aucun risque de resynchronisation entre
+  // pages), tout match déjà vu transitionner live→fini au moins une fois :
+  // une fois dedans, il n'est plus jamais réintégré à l'affichage pour ce
+  // montage de page, quoi que rapporte isCardLive ensuite.
+  // État (pas un ref) : sa valeur conditionne directement ce qui s'affiche
+  // (currentlyLiveIds/live plus bas) — un ref ne déclenche aucun re-render à
+  // sa mutation et ne doit de toute façon pas être lu pendant le rendu
+  // (react-hooks/refs).
+  const [permanentlyEndedIds, setPermanentlyEndedIds] = useState(() => new Set())
   useEffect(() => {
-    const currentlyLiveIds = new Set(liveMatches.filter(isCardLive).map(m => m.id))
+    const currentlyLiveIds = new Set(
+      liveMatches.filter(m => isCardLive(m) && !permanentlyEndedIds.has(m.id)).map(m => m.id)
+    )
     const justEnded = [...prevLiveIdsRef.current].filter(id => !currentlyLiveIds.has(id))
     prevLiveIdsRef.current = currentlyLiveIds
     if (justEnded.length === 0) return
+    setPermanentlyEndedIds(prev => new Set([...prev, ...justEnded]))
     setJustEndedIds(prev => new Set([...prev, ...justEnded]))
     justEnded.forEach(id => {
       const handle = setTimeout(() => {
@@ -96,12 +120,14 @@ export default function Live() {
       }, 1_000)
       timersRef.current.set(id, handle)
     })
-  }, [liveMatches])
+  }, [liveMatches, permanentlyEndedIds])
   // Cleanup uniquement au démontage de la page (deps vides) — pas à chaque
   // poll, voir le commentaire ci-dessus.
   useEffect(() => () => timersRef.current.forEach(clearTimeout), [])
 
-  const live = liveMatches.filter(m => isCardLive(m) || justEndedIds.has(m.id))
+  const live = liveMatches.filter(m =>
+    (isCardLive(m) && !permanentlyEndedIds.has(m.id)) || justEndedIds.has(m.id)
+  )
 
   return (
     <section className="live__page">
