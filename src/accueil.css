@@ -2326,7 +2326,10 @@
   overflow: hidden;
   border-radius: 14px;
   padding: 0.85rem 1rem 0.9rem;
-  background: #0a0a0a;
+  /* Retour utilisateur : noir pur (#0a0a0a) pas apprécié, fond gris foncé
+     plutôt — même teinte déjà utilisée juste plus bas dans ce fichier pour
+     .resultHero__crestEmpty, cohérent avec le reste de la card. */
+  background: #1a1a1a;
   border: 1px solid rgba(var(--white-rgb),0.06);
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, background 0.15s;
@@ -2459,10 +2462,16 @@
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--result-hero-accent) 35%, transparent)) drop-shadow(0 2px 8px rgba(var(--black-rgb),0.7));
 }
 
+/* ⚠️ AJOUT (retour utilisateur : un match nul grisait les 2 noms d'équipe,
+   aucune classe --winner/--loser ne s'applique dans ce cas — voir
+   ResultHeroCard.jsx, homeWins/awayWins restent tous les deux faux) : couleur
+   par défaut passée à blanc plein, comme le perdant juste en dessous — un nul
+   n'est plus visuellement différent d'un résultat décisif à ce niveau, seul
+   le poids de police (800 vs 700) distingue encore un vainqueur. */
 .resultHero__name {
   font-size: 0.76rem;
   font-weight: 700;
-  color: rgba(var(--white-rgb),0.62);
+  color: #ffffff;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -2500,8 +2509,11 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
+/* ⚠️ AJOUT (retour utilisateur : même bug que resultHero__name juste au-
+   dessus — un match nul grisait aussi les 2 chiffres du score, ni --win ni
+   --lose ne s'applique dans ce cas) : blanc plein par défaut, comme --lose. */
 .resultHero__scoreDigit {
-  color: rgba(var(--white-rgb),0.4);
+  color: #ffffff;
   transition: color 0.2s, text-shadow 0.2s;
 }
 .resultHero__scoreDigit--win {
