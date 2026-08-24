@@ -63,72 +63,6 @@
   text-align: center;
 }
 
-.mesParis__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.mesParis__card {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 0.85rem 1rem;
-  color: var(--text-main);
-  cursor: pointer;
-  position: relative;
-}
-
-.mesParis__cardMeta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.68rem;
-  color: var(--text-mid);
-  margin-bottom: 0.5rem;
-}
-
-.mesParis__cardComp {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.mesParis__cardCompLogo {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-}
-
-.mesParis__cardTeams {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.85rem;
-}
-
-.mesParis__cardTeam {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.mesParis__cardTeam span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mesParis__cardVs {
-  color: var(--text-dim);
-}
-
 .mesParis__crestWrap, .mesParis__crestFb {
   width: 22px;
   height: 22px;
@@ -145,48 +79,6 @@
   border-radius: 50%;
   font-size: 0.65rem;
   color: var(--text-mid);
-}
-
-.mesParis__oddsRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.4rem;
-}
-
-.mesParis__oddPill {
-  background: rgba(var(--white-rgb), 0.05);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  text-align: center;
-  font-size: 0.7rem;
-  color: var(--text-mid);
-  padding: 0.4rem 0.2rem;
-}
-
-.mesParis__oddPill b {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-main);
-  margin-top: 0.1rem;
-}
-
-.mesParis__oddsUnavailable {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 0.4rem 0;
-}
-
-.mesParis__cardBadge {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.8rem;
-  background: var(--red);
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-pill);
 }
 
 .mesParis__detail { margin-bottom: 1rem; }
@@ -225,6 +117,24 @@
   font-size: 0.72rem;
   color: var(--text-mid);
   margin: 0 0 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Badge honnête : distingue une cote réelle (bookmaker, via ESPN) d'une
+   cote calculée par notre propre modèle (calcPronoAdvanced) quand ESPN n'a
+   rien pour ce match — jamais présenté comme une vraie cote marché. */
+.mesParis__computedBadge {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
 }
 
 .mesParis__market {

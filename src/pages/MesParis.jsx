@@ -2,18 +2,33 @@
  * MesParis — paris fictifs, aucun argent réel.
  * Route : /mes-paris
  *
- * Réutilise les cotes RÉELLES déjà présentes sur les cards de l'Accueil
- * (useEspnPregameOdds, voir MatchPoster.jsx) — aucune cote inventée. Solde
- * fictif + historique 100% locaux (voir utils/betsStore.js, décision
- * utilisateur explicite : pas de compte/backend).
+ * ⚠️ REVU (retour utilisateur : "t'as pas mis les cards comme dans accueil,
+ * t'as pas mis les cotes pour tous les matchs, t'as pas mis les cotes
+ * calculées grâce à notre système") : la 1ère version avait sa PROPRE card
+ * simplifiée (style Pronos) au lieu de réutiliser telle quelle MatchPanel/
+ * MatchPoster (accueil/MatchCard.jsx) — qui gère déjà tout ça nativement :
+ * poster mobile "Betclic-style" + card desktop, ET le repli automatique sur
+ * calcPronoAdvanced (notre modèle Poisson, "cotes calculées grâce à notre
+ * système") dès qu'ESPN n'a pas de cote marché réelle pour ce match — donc
+ * une cote 1N2 pour LITTÉRALEMENT tous les matchs, jamais de card vide.
+ * Ici on réutilise MatchPanel directement pour la liste, exactement comme
+ * Accueil.jsx (même wrapper .accueil__dashPanel--matchPanel, nécessaire
+ * pour que le CSS bascule poster/mobile ↔ card/desktop comme partout
+ * ailleurs — voir accueil.css). Cotes réelles (useEspnPregameOdds) toujours
+ * utilisées pour le marché "Total buts" de la page détail (aucune cote
+ * inventée pour CE marché précis — voir useMatchDetail.js/extractTotal).
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
+import { useTeamForm } from '../hooks/useTeamForm'
+import { calcPronoAdvanced, pronoToOdds } from '../utils/calcProno'
+import { MatchPanel } from '../accueil/MatchCard'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
-import { isNationalTeamComp } from '../utils/matchUtils'
+import { isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { getBalance, getBets, placeBet, settlePendingBets } from '../utils/betsStore'
+import '../accueil.css'
 import '../mesParis.css'
 
 const COMP_IDS = COMPETITIONS.map(c => c.id)
@@ -30,13 +45,11 @@ const _fmtD = (d) => {
 
 const teamName  = (team) => team?.name ? translateTeam(team.shortName || team.name) : 'À déterminer'
 const shortCode = (team) => (team?.shortName || team?.tla || team?.name || '?').slice(0, 3).toUpperCase()
-const compInfo  = (match) => {
-  const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
-  return { name: comp?.name ?? match.competition?.name ?? '', emblem: comp?.emblem ?? null }
-}
 
 // Blason/drapeau — même attribut data-crest global que le reste de l'app
-// (voir index.css), pas de CSS dupliqué ici.
+// (voir index.css), pas de CSS dupliqué ici. Encore utilisé par
+// BetDetailScreen ci-dessous (la liste, elle, passe maintenant par
+// MatchPanel/MatchPoster — voir commentaire en tête de fichier).
 function TeamCrest({ team, isWC }) {
   if (!team?.crest) return <span className="mesParis__crestFb">{teamName(team)[0]}</span>
   return (
@@ -44,47 +57,6 @@ function TeamCrest({ team, isWC }) {
       <img src={team.crest} alt="" className="mesParis__crest" data-team={team?.name}
         onError={e => { e.currentTarget.style.display = 'none' }} />
     </div>
-  )
-}
-
-// Card liste — pilules 1N2 avec les VRAIES cotes marché (même hook/logique
-// que MatchPoster.jsx sur l'Accueil, un seul point de vérité pour ce
-// marché) : chaque card appelle son propre hook (Règles des Hooks — pas de
-// hook dans une boucle du composant parent), React Query dédup/partage déjà
-// le résultat si l'Accueil a déjà chargé ce même match.
-function BetMatchCard({ match, picks, onOpen }) {
-  const isWC = isNationalTeamComp(match)
-  const { data: odds } = useEspnPregameOdds(match)
-  const home = teamName(match.homeTeam)
-  const away = teamName(match.awayTeam)
-  const myPicks = picks.filter(p => p.matchId === match.id)
-  const { name: compName, emblem } = compInfo(match)
-
-  return (
-    <button className="mesParis__card" onClick={() => onOpen(match)}>
-      <div className="mesParis__cardMeta">
-        <span className="mesParis__cardComp">
-          {emblem && <img src={emblem} alt="" className="mesParis__cardCompLogo" />}
-          {compName}
-        </span>
-        <span>{_fmtD(match.utcDate)} · {_fmtH(match.utcDate)}</span>
-      </div>
-      <div className="mesParis__cardTeams">
-        <div className="mesParis__cardTeam"><TeamCrest team={match.homeTeam} isWC={isWC} /><span>{home}</span></div>
-        <span className="mesParis__cardVs">–</span>
-        <div className="mesParis__cardTeam"><TeamCrest team={match.awayTeam} isWC={isWC} /><span>{away}</span></div>
-      </div>
-      {odds ? (
-        <div className="mesParis__oddsRow">
-          <span className="mesParis__oddPill">{shortCode(match.homeTeam)} <b>{odds.decimal.home.toFixed(2)}</b></span>
-          <span className="mesParis__oddPill">Nul <b>{odds.decimal.draw.toFixed(2)}</b></span>
-          <span className="mesParis__oddPill">{shortCode(match.awayTeam)} <b>{odds.decimal.away.toFixed(2)}</b></span>
-        </div>
-      ) : (
-        <div className="mesParis__oddsUnavailable">Cotes indisponibles pour ce match</div>
-      )}
-      {myPicks.length > 0 && <span className="mesParis__cardBadge">{myPicks.length} sélection{myPicks.length > 1 ? 's' : ''}</span>}
-    </button>
   )
 }
 
@@ -100,6 +72,41 @@ function oddBtnClass(current, market, key) {
 function BetDetailScreen({ match, picks, onPick, onBack }) {
   const isWC = isNationalTeamComp(match)
   const { data: odds, isLoading } = useEspnPregameOdds(match)
+
+  // Repli "cote calculée par notre système" (calcPronoAdvanced — même modèle
+  // Poisson que la card Accueil, voir MatchPoster.jsx) dès qu'ESPN n'a pas de
+  // cote marché réelle pour CE match précis : sans ça, un match visible avec
+  // une cote dans la liste (MatchPanel/MatchPoster, qui a déjà ce repli)
+  // pouvait quand même arriver ici en "Cotes indisponibles" — incohérence
+  // signalée par l'utilisateur. Version simplifiée par rapport à MatchPoster
+  // (pas de H2H dédié / repli club promu, juste forme + stats saison) :
+  // suffisant pour un repli de cote 1N2, jamais de chiffre inventé — calcul
+  // réel du même modèle. Hook désactivé tant qu'ESPN n'a pas répondu, pour ne
+  // jamais taper FD.org pour rien quand la vraie cote existe déjà.
+  const needsFallback = !isLoading && !odds
+  const compCode = match.competition?.code ?? null
+  const { formMap, compMatches } = useTeamForm(compCode, 0, needsFallback)
+  const resolvedHomeId = needsFallback
+    ? resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true }) : null
+  const resolvedAwayId = needsFallback
+    ? resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true }) : null
+  const hForm = formMap?.[resolvedHomeId] ?? []
+  const aForm = formMap?.[resolvedAwayId] ?? []
+  const prono = needsFallback
+    ? calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
+        neutralVenue: isNeutralVenueComp(match),
+      })
+    : null
+  // Pas de marché "Total buts" en repli : le modèle interne ne veut pas
+  // exposer publiquement ses lambdas de buts pour ce marché précis pour
+  // l'instant — plutôt aucune cote que d'en inventer une (voir CLAUDE.md,
+  // "n'invente rien"). Le marché reste dispo dès qu'ESPN a une vraie cote.
+  const fallbackOdds = prono
+    ? { decimal: { home: pronoToOdds(prono.home), draw: pronoToOdds(prono.draw), away: pronoToOdds(prono.away) }, total: null }
+    : null
+  const effectiveOdds = odds ?? fallbackOdds
+  const isComputedOdds = !odds && !!fallbackOdds
+
   const home = teamName(match.homeTeam)
   const away = teamName(match.awayTeam)
   const current = picks.find(p => p.matchId === match.id)
@@ -120,32 +127,35 @@ function BetDetailScreen({ match, picks, onPick, onBack }) {
       </div>
 
       {isLoading && <p className="mesParis__state">Chargement des cotes…</p>}
-      {!isLoading && !odds && <p className="mesParis__state">Cotes indisponibles pour ce match.</p>}
+      {!isLoading && !effectiveOdds && <p className="mesParis__state">Cotes indisponibles pour ce match.</p>}
 
-      {odds && (
+      {effectiveOdds && (
         <>
-          <p className="mesParis__marketLabel">Résultat du match</p>
+          <p className="mesParis__marketLabel">
+            Résultat du match
+            {isComputedOdds && <span className="mesParis__computedBadge">cote calculée par notre modèle</span>}
+          </p>
           <div className="mesParis__market mesParis__market--3">
-            <button className={oddBtnClass(current, '1N2', 'home')} onClick={() => pick1N2('home', `${home} gagne`, odds.decimal.home)}>
-              <span>{shortCode(match.homeTeam)}</span><b>{odds.decimal.home.toFixed(2)}</b>
+            <button className={oddBtnClass(current, '1N2', 'home')} onClick={() => pick1N2('home', `${home} gagne`, effectiveOdds.decimal.home)}>
+              <span>{shortCode(match.homeTeam)}</span><b>{effectiveOdds.decimal.home.toFixed(2)}</b>
             </button>
-            <button className={oddBtnClass(current, '1N2', 'draw')} onClick={() => pick1N2('draw', 'Match nul', odds.decimal.draw)}>
-              <span>Nul</span><b>{odds.decimal.draw.toFixed(2)}</b>
+            <button className={oddBtnClass(current, '1N2', 'draw')} onClick={() => pick1N2('draw', 'Match nul', effectiveOdds.decimal.draw)}>
+              <span>Nul</span><b>{effectiveOdds.decimal.draw.toFixed(2)}</b>
             </button>
-            <button className={oddBtnClass(current, '1N2', 'away')} onClick={() => pick1N2('away', `${away} gagne`, odds.decimal.away)}>
-              <span>{shortCode(match.awayTeam)}</span><b>{odds.decimal.away.toFixed(2)}</b>
+            <button className={oddBtnClass(current, '1N2', 'away')} onClick={() => pick1N2('away', `${away} gagne`, effectiveOdds.decimal.away)}>
+              <span>{shortCode(match.awayTeam)}</span><b>{effectiveOdds.decimal.away.toFixed(2)}</b>
             </button>
           </div>
 
-          {odds.total && (
+          {effectiveOdds.total && (
             <>
               <p className="mesParis__marketLabel">Total buts</p>
               <div className="mesParis__market mesParis__market--2">
-                <button className={oddBtnClass(current, 'TOTAL', 'OVER')} onClick={() => pickTotal('OVER', `+ de ${odds.total.line} buts`, odds.total.over, odds.total.line)}>
-                  <span>+ de {odds.total.line} buts</span><b>{odds.total.over.toFixed(2)}</b>
+                <button className={oddBtnClass(current, 'TOTAL', 'OVER')} onClick={() => pickTotal('OVER', `+ de ${effectiveOdds.total.line} buts`, effectiveOdds.total.over, effectiveOdds.total.line)}>
+                  <span>+ de {effectiveOdds.total.line} buts</span><b>{effectiveOdds.total.over.toFixed(2)}</b>
                 </button>
-                <button className={oddBtnClass(current, 'TOTAL', 'UNDER')} onClick={() => pickTotal('UNDER', `− de ${odds.total.line} buts`, odds.total.under, odds.total.line)}>
-                  <span>− de {odds.total.line} buts</span><b>{odds.total.under.toFixed(2)}</b>
+                <button className={oddBtnClass(current, 'TOTAL', 'UNDER')} onClick={() => pickTotal('UNDER', `− de ${effectiveOdds.total.line} buts`, effectiveOdds.total.under, effectiveOdds.total.line)}>
+                  <span>− de {effectiveOdds.total.line} buts</span><b>{effectiveOdds.total.under.toFixed(2)}</b>
                 </button>
               </div>
             </>
@@ -301,15 +311,18 @@ export default function MesParis() {
       {tab === 'parier' && (
         <>
           {view === 'list' && (
-            <>
-              {loading && <p className="mesParis__state">Chargement…</p>}
-              {!loading && upcomingSorted.length === 0 && <p className="mesParis__state">Aucun match à venir.</p>}
-              <div className="mesParis__list">
-                {upcomingSorted.map(m => (
-                  <BetMatchCard key={m.id} match={m} picks={picks} onOpen={openMatch} />
-                ))}
-              </div>
-            </>
+            // Wrapper identique à Accueil.jsx (voir commentaire en tête de
+            // fichier) : nécessaire pour que le CSS d'accueil.css bascule
+            // poster mobile ↔ card desktop. onLiveClick délibérément omis —
+            // un match déjà en direct n'a plus de cote pré-match figée,
+            // MatchPanel le rend alors simplement non-cliquable ici.
+            <div className="accueil__dashPanel--matchPanel">
+              <MatchPanel
+                matches={upcomingSorted}
+                loading={loading}
+                onMatchClick={openMatch}
+              />
+            </div>
           )}
           {view === 'detail' && activeMatch && (
             <BetDetailScreen match={activeMatch} picks={picks} onPick={handlePick} onBack={backToList} />
