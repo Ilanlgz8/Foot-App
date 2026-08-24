@@ -121,9 +121,12 @@ function Navbar() {
               <span>Pronos</span>
             </NavLink>
 
-            {/* Mes Paris — icône ticket + coche (style bulletin de pari,
-                demande utilisateur : "comme Betclic"), juste à droite de
-                Pronos, entre lui et "StatFootix". */}
+            {/* Mes Paris — MASQUÉ (demande utilisateur, 25/08 : "pas au point
+                pour le moment") — la page/route (/mes-paris) reste
+                fonctionnelle et accessible par URL directe, seul le point
+                d'entrée dans la nav est retiré. Redécommenter ce bloc pour
+                le remettre. */}
+            {/*
             <NavLink
               to="/mes-paris"
               className={({ isActive }) =>
@@ -137,6 +140,7 @@ function Navbar() {
               </svg>
               <span>Mes Paris</span>
             </NavLink>
+            */}
           </div>
 
           <NavLink to="/" className="sfHeader__brand">
