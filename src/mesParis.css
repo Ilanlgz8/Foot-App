@@ -56,6 +56,27 @@
   font-weight: 600;
 }
 
+.mesParis__tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.mesParis__tab--active .mesParis__tabBadge {
+  background: #fff;
+  color: var(--red);
+}
+
 .mesParis__state {
   color: var(--text-mid);
   font-size: 0.85rem;
@@ -145,6 +166,19 @@
 
 .mesParis__market--3 { grid-template-columns: 1fr 1fr 1fr; }
 .mesParis__market--2 { grid-template-columns: 1fr 1fr; }
+/* Buteur — liste verticale (noms de joueurs, trop longs pour la grille 3
+   colonnes) : ligne pleine largeur, nom à gauche/cote à droite au lieu du
+   pill centré des autres marchés. */
+.mesParis__market--list { grid-template-columns: 1fr; gap: 0.4rem; }
+.mesParis__market--list .mesParis__oddBtn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+}
+.mesParis__market--list .mesParis__oddBtn span { font-size: 0.8rem; }
+.mesParis__market--list .mesParis__oddBtn b { margin-top: 0; }
 
 .mesParis__oddBtn {
   background: rgba(var(--white-rgb), 0.05);
@@ -291,9 +325,35 @@
 .mesParis__histCard--lost .mesParis__histStatus { color: var(--red-light); }
 
 .mesParis__histPick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
   font-size: 0.78rem;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.35rem;
 }
+
+/* Confirmation manuelle "buteur" (voir betsStore.js/resolveManualPick) —
+   décision utilisateur explicite : aucun résultat deviné automatiquement,
+   l'utilisateur tranche lui-même une fois qu'il connaît le vrai résultat. */
+.mesParis__manualRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-mid);
+}
+
+.mesParis__manualBtn {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mesParis__manualBtn--yes { background: rgba(22,163,74,0.18); color: var(--green-light); }
+.mesParis__manualBtn--no  { background: rgba(var(--red-rgb),0.18); color: var(--red-light); }
 
 .mesParis__histPayout {
   font-size: 0.85rem;

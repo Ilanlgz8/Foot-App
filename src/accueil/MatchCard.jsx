@@ -447,7 +447,14 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
 // elle-même reste affichée à la même place et change juste d'affichage (voir
 // MatchCard : plus de noLive ici), au lieu de disparaître au profit d'un
 // widget séparé ailleurs sur l'Accueil (demande utilisateur).
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null, matchesByComp = null }) {
+// ⚠️ AJOUT onOddPick (Mes Paris) : simple passthrough vers MatchPoster (voir
+// son propre commentaire) — absent pour tout appelant existant (Accueil,
+// Pronos...) donc comportement 100% inchangé partout ailleurs. Volontairement
+// PAS transmis à MatchCard (desktop) : cette variante n'affiche aucune cote
+// aujourd'hui (pas de footer prono), rien à rendre cliquable dessus pour
+// l'instant — clic sur la card desktop continue d'ouvrir la page détail,
+// comme avant.
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null, matchesByComp = null, onOddPick = null }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -483,6 +490,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                   onClick={clickHandler}
                   formMap={formMap}
                   compMatches={matchesByComp?.[match.competition?.code] ?? null}
+                  onOddPick={onOddPick}
                 />
               )
             })}

@@ -523,6 +523,94 @@ export function bttsProbability(lambdaHome, lambdaAway) {
   return Math.max(0, Math.min(100, (1 - pBttsNo) * 100))
 }
 
+// Score exact — probabilité de 9 scores usuels (mêmes 9 que Betclic : la
+// grille complète (0-8 buts × 0-8 buts) existe déjà en interne (poissonPmf)
+// mais l'afficher EN ENTIER (81 cases) serait illisible sur mobile ; ces 9
+// scores couvrent déjà la quasi-totalité de la masse de probabilité pour un
+// match "normal" (0 à 2 buts par équipe). Retourne un % par score (0-100),
+// même échelle que pronoToOdds().
+const SCORE_EXACT_GRID = [
+  [1, 0], [0, 0], [0, 1],
+  [2, 0], [1, 1], [0, 2],
+  [2, 1], [2, 2], [1, 2],
+]
+export function scoreExactProbabilities(lambdaHome, lambdaAway) {
+  if (!Number.isFinite(lambdaHome) || !Number.isFinite(lambdaAway)) return null
+  return SCORE_EXACT_GRID.map(([h, a]) => ({
+    home: h,
+    away: a,
+    pct: poissonPmf(lambdaHome, h) * poissonPmf(lambdaAway, a) * 100,
+  }))
+}
+
+// Écart de buts — 3 tranches (au lieu des 6-8 lignes fines d'un vrai
+// bookmaker, volontairement simplifié pour rester lisible sur une page de
+// paris fictifs) : match serré (écart de 0 ou 1 but, n'importe quelle
+// équipe), ou l'une des 2 équipes qui l'emporte avec 2 buts d'écart ou plus.
+// Même grille Poisson (dom. × ext.) que poissonOutcomes ci-dessus, juste
+// regroupée différemment (par écart plutôt que par issue 1N2).
+export function goalMarginProbabilities(lambdaHome, lambdaAway, maxGoals = MAX_GOALS_GRID) {
+  if (!Number.isFinite(lambdaHome) || !Number.isFinite(lambdaAway)) return null
+  let close = 0, homeBig = 0, awayBig = 0
+  for (let i = 0; i <= maxGoals; i++) {
+    const pi = poissonPmf(lambdaHome, i)
+    for (let j = 0; j <= maxGoals; j++) {
+      const p = pi * poissonPmf(lambdaAway, j)
+      const diff = i - j
+      if (Math.abs(diff) <= 1) close += p
+      else if (diff >= 2) homeBig += p
+      else awayBig += p
+    }
+  }
+  const total = close + homeBig + awayBig || 1  // normalise la queue tronquée au-delà de maxGoals
+  return { close: (close / total) * 100, homeBig: (homeBig / total) * 100, awayBig: (awayBig / total) * 100 }
+}
+
+// Total buts d'UNE équipe (marginal, indépendant de l'adversaire) — P(buts
+// équipe > ligne), ligne demi-entière (0.5/1.5/2.5...) puisque les buts sont
+// des entiers. P(X > k+0.5) = 1 - Σ_{i=0}^{k} pmf(λ,i) — complémentaire de la
+// fonction de répartition Poisson jusqu'à la ligne.
+export function teamGoalsOverProbability(lambda, line) {
+  if (!Number.isFinite(lambda)) return null
+  const k = Math.floor(line)
+  let cumulative = 0
+  for (let i = 0; i <= k; i++) cumulative += poissonPmf(lambda, i)
+  return Math.max(0, Math.min(100, (1 - cumulative) * 100))
+}
+
+// ── Buteur (Mes Paris) — cote "marque à un moment du match", à partir du
+// vrai taux buts/matchs joués de la saison en cours (football-data.org, voir
+// useScorers.js — confirmé en pratique : goals/playedMatches/team.id bien
+// présents dans la réponse réelle de l'API). PAS la forme récente (série de
+// matchs sans marquer) : confirmée non disponible nulle part dans l'app
+// (aucune agrégation but-par-match par joueur, une tentative a déjà échoué —
+// voir Classement.jsx) — volontairement absente ici plutôt que devinée.
+//
+// Même principe de shrinkage que shrinkRatio plus haut (petit échantillon
+// ramené vers une moyenne) — mais ici la moyenne de référence (leagueAvgRate)
+// est calculée directement à partir de la VRAIE liste de buteurs déjà
+// récupérée pour cette compétition, jamais une constante choisie à
+// l'avance : un joueur avec 1 seul match joué (ex. tout début de saison)
+// n'obtient donc pas une cote absurde juste parce qu'il a marqué son seul
+// but disputé. K réutilisé identique à RATIO_SHRINK_K (buts d'équipe) par
+// cohérence — pas recalibré spécifiquement pour la variance but/joueur
+// (plus rare, probablement plus bruitée qu'un score d'équipe), à vérifier
+// à l'usage comme le reste des K de ce fichier.
+export function scorerOddsPct(scorer, allScorers) {
+  if (!scorer || !(scorer.goals >= 0) || !(scorer.playedMatches > 0)) return null
+  const valid = (allScorers ?? []).filter(s => s.playedMatches > 0 && s.goals != null)
+  if (!valid.length) return null
+  const totalGoals   = valid.reduce((s, x) => s + x.goals, 0)
+  const totalMatches = valid.reduce((s, x) => s + x.playedMatches, 0)
+  if (totalMatches <= 0) return null
+  const leagueAvgRate = totalGoals / totalMatches
+  if (leagueAvgRate <= 0) return null
+  const rawRate = scorer.goals / scorer.playedMatches
+  const w = scorer.playedMatches / (scorer.playedMatches + RATIO_SHRINK_K)
+  const shrunkRate = Math.max(0.01, (1 + (rawRate / leagueAvgRate - 1) * w) * leagueAvgRate)
+  return Math.max(0, Math.min(100, (1 - Math.exp(-shrunkRate)) * 100))
+}
+
 // Confrontations directes déjà présentes dans compMatches (gratuit, aucun
 // appel réseau) — utilisées comme léger correctif, pas comme source
 // principale (échantillon quasi toujours petit : 0 à quelques matchs).

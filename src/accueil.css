@@ -1909,6 +1909,16 @@
   border: 2.5px solid transparent;
   background: #ffffff;
 }
+/* Pilules cliquables (Mes Paris uniquement — onOddPick, voir MatchPoster.jsx)
+   : léger affordance tactile, sans toucher au design par défaut (Accueil ne
+   passe jamais onOddPick, donc jamais ce modificateur). */
+.poster__prono-row--pickable .poster__prono-pill {
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.poster__prono-row--pickable .poster__prono-pill:active {
+  transform: scale(0.94);
+}
 .poster__prono-pillLabel {
   font-size: 0.5rem;
   font-weight: 700;

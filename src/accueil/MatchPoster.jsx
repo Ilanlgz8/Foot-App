@@ -29,7 +29,15 @@ function formatHour(dateStr) {
 // Repli sur l'ancien comportement (fetch local) UNIQUEMENT si le composant
 // est utilisé ailleurs sans ces props (aucun autre call site connu
 // actuellement, mais garde la robustesse du composant si réutilisé).
-export function MatchPoster({ match, espnScore = null, onClick, formMap: formMapProp, compMatches: compMatchesProp }) {
+// ⚠️ AJOUT onOddPick (Mes Paris, demande utilisateur : "cliquer sur les
+// côtes directement sur la card comme dans Accueil, mais dans la page Mes
+// Paris") : prop optionnelle, absente pour tout appelant existant (Accueil,
+// Pronos...) → comportement 100% inchangé partout ailleurs. Quand fournie,
+// transforme les 3 pilules de cote (déjà affichées ici, réelles ou repli
+// calcPronoAdvanced — voir useMarketOdds plus haut) en boutons cliquables
+// SANS déclencher le clic de la card entière (stopPropagation) — évite de
+// dupliquer tout le calcul de cote déjà fait ici pour l'affichage.
+export function MatchPoster({ match, espnScore = null, onClick, formMap: formMapProp, compMatches: compMatchesProp, onOddPick = null }) {
   const compCode = match.competition?.code ?? null
   const hasPropsData = formMapProp !== undefined
   // Hook TOUJOURS appelé (Rules of Hooks) — mais désactivé (enabled=false)
@@ -215,6 +223,13 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
   // bordeaux, voir footer plus bas (pronoFavoriteKey, calcProno.js).
   const pronoFavorite = pronoFavoriteKey(displayPct)
+  // Cotes affichées — calculées une seule fois ici (au lieu du ternaire
+  // répété 3x dans le footer) : réutilisées à la fois pour l'affichage ET
+  // pour onOddPick (Mes Paris), qui a besoin de la même valeur numérique
+  // exacte que celle montrée à l'écran.
+  const homeOdd = useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)
+  const drawOdd = useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)
+  const awayOdd = useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)
 
   // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
   // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine
@@ -433,18 +448,36 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
           (pronoIntensity/pronoGlowShadow) réservé à la pilule FAVORITE
           (pronoFavorite) — les 2 autres restent neutres. ── */}
       <div className="poster__footer">
-        <div className="poster__prono-row">
-          <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
+        <div className={`poster__prono-row${onOddPick ? ' poster__prono-row--pickable' : ''}`}>
+          <div
+            className="poster__prono-pill"
+            role={onOddPick ? 'button' : undefined}
+            tabIndex={onOddPick ? 0 : undefined}
+            style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}
+            onClick={onOddPick ? (e) => { e.stopPropagation(); onOddPick(match, 'home', homeOdd) } : undefined}
+          >
             <span className="poster__prono-pillLabel">{homeCode}</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{homeOdd.toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
+          <div
+            className="poster__prono-pill"
+            role={onOddPick ? 'button' : undefined}
+            tabIndex={onOddPick ? 0 : undefined}
+            style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}
+            onClick={onOddPick ? (e) => { e.stopPropagation(); onOddPick(match, 'draw', drawOdd) } : undefined}
+          >
             <span className="poster__prono-pillLabel">Nul</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{drawOdd.toFixed(2)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
+          <div
+            className="poster__prono-pill"
+            role={onOddPick ? 'button' : undefined}
+            tabIndex={onOddPick ? 0 : undefined}
+            style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}
+            onClick={onOddPick ? (e) => { e.stopPropagation(); onOddPick(match, 'away', awayOdd) } : undefined}
+          >
             <span className="poster__prono-pillLabel">{awayCode}</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal">{awayOdd.toFixed(2)}</span>
           </div>
         </div>
       </div>

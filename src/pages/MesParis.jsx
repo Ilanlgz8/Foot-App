@@ -22,12 +22,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { calcPronoAdvanced, pronoToOdds, getGoalExpectancy, bttsProbability } from '../utils/calcProno'
+import { useScorers } from '../hooks/useScorers'
+import { calcPronoAdvanced, pronoToOdds, getGoalExpectancy, bttsProbability, scoreExactProbabilities, goalMarginProbabilities, teamGoalsOverProbability, scorerOddsPct } from '../utils/calcProno'
 import { MatchPanel } from '../accueil/MatchCard'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
-import { getBalance, getBets, placeBet, settlePendingBets } from '../utils/betsStore'
+import { getBalance, getBets, placeBet, settlePendingBets, resolveManualPick } from '../utils/betsStore'
 import '../accueil.css'
 import '../mesParis.css'
 
@@ -119,21 +120,43 @@ function BetDetailScreen({ match, picks, onPick, onBack }) {
   const dcAway = pctSource ? pronoToOdds(pctSource.draw + pctSource.away) : null // X2
   const dc12   = pctSource ? pronoToOdds(pctSource.home + pctSource.away) : null // 12
 
-  // BTTS — absent (pas juste "indisponible") si les λ ne sont pas calculables
-  // (pas assez de matchs saison pour l'une des 2 équipes, voir
-  // getGoalExpectancy/MIN_TEAM_SPLITS).
-  const lambdas  = compMatches?.length ? getGoalExpectancy(resolvedHomeId, resolvedAwayId, compMatches) : null
-  const bttsYes  = lambdas ? bttsProbability(lambdas.lambdaHome, lambdas.lambdaAway) : null
-  const bttsOdds = bttsYes != null ? { yes: pronoToOdds(bttsYes), no: pronoToOdds(100 - bttsYes) } : null
+  // BTTS/Score exact/Écart de buts/Total par équipe — tous dérivés des mêmes
+  // λ (getGoalExpectancy) : absents (pas juste "indisponibles") si les λ ne
+  // sont pas calculables (pas assez de matchs saison pour l'une des 2
+  // équipes, voir MIN_TEAM_SPLITS) — jamais de chiffre deviné.
+  const lambdas    = compMatches?.length ? getGoalExpectancy(resolvedHomeId, resolvedAwayId, compMatches) : null
+  const bttsYes    = lambdas ? bttsProbability(lambdas.lambdaHome, lambdas.lambdaAway) : null
+  const bttsOdds   = bttsYes != null ? { yes: pronoToOdds(bttsYes), no: pronoToOdds(100 - bttsYes) } : null
+  const scoreExact = lambdas ? scoreExactProbabilities(lambdas.lambdaHome, lambdas.lambdaAway) : null
+  const margins    = lambdas ? goalMarginProbabilities(lambdas.lambdaHome, lambdas.lambdaAway) : null
+  // Ligne fixe à +1.5 (la plus courante chez les vrais bookmakers pour ce
+  // marché) — volontairement une seule ligne par équipe plutôt que 3
+  // (0.5/1.5/2.5) pour ne pas surcharger l'écran, voir retour utilisateur
+  // "les plus pertinents".
+  const homeOver15 = lambdas ? teamGoalsOverProbability(lambdas.lambdaHome, 1.5) : null
+  const awayOver15 = lambdas ? teamGoalsOverProbability(lambdas.lambdaAway, 1.5) : null
+
+  // Buteur — cote réelle (taux buts/matchs joués saison, football-data.org),
+  // MAIS réglé À LA MAIN après le match (décision utilisateur explicite,
+  // 25/08) : aucune donnée fiable dans l'app pour vérifier automatiquement
+  // qui a marqué dans un match précis (voir betsStore.js/resolveManualPick).
+  // Top 3 buteurs par équipe (même nombre que l'aperçu Betclic d'origine).
+  const { scorers } = useScorers(compCode)
+  const homeScorers = scorers.filter(s => s.team?.id === resolvedHomeId).sort((a, b) => (b.goals ?? 0) - (a.goals ?? 0)).slice(0, 3)
+  const awayScorers = scorers.filter(s => s.team?.id === resolvedAwayId).sort((a, b) => (b.goals ?? 0) - (a.goals ?? 0)).slice(0, 3)
 
   const home = teamName(match.homeTeam)
   const away = teamName(match.awayTeam)
   const current = picks.find(p => p.matchId === match.id)
 
-  const pick1N2   = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: '1N2', key, label, odd })
-  const pickTotal = (key, label, odd, line) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'TOTAL', key, label, odd, line })
-  const pickDC    = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'DC', key, label, odd })
-  const pickBtts  = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'BTTS', key, label, odd })
+  const pick1N2       = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: '1N2', key, label, odd })
+  const pickTotal      = (key, label, odd, line) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'TOTAL', key, label, odd, line })
+  const pickDC         = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'DC', key, label, odd })
+  const pickBtts       = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'BTTS', key, label, odd })
+  const pickScoreExact = (h, a, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'SCORE_EXACT', key: `${h}-${a}`, label: `Score exact ${h}-${a}`, odd })
+  const pickMargin     = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'MARGIN', key, label, odd })
+  const pickTeamTotal  = (key, label, odd, line) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'TEAM_TOTAL', key, label, odd, line })
+  const pickScorer     = (player, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'SCORER', key: String(player.id), label: `${player.name} marque`, odd })
 
   return (
     <div className="mesParis__detail">
@@ -218,6 +241,109 @@ function BetDetailScreen({ match, picks, onPick, onBack }) {
               </div>
             </>
           )}
+
+          {margins && (
+            <>
+              <p className="mesParis__marketLabel">
+                Écart de buts
+                <span className="mesParis__computedBadge">cote calculée par notre modèle</span>
+              </p>
+              <div className="mesParis__market mesParis__market--3">
+                <button className={oddBtnClass(current, 'MARGIN', 'HOME_BIG')} onClick={() => pickMargin('HOME_BIG', `${home} gagne de 2 buts ou +`, pronoToOdds(margins.homeBig))}>
+                  <span>{shortCode(match.homeTeam)} +2</span><b>{pronoToOdds(margins.homeBig).toFixed(2)}</b>
+                </button>
+                <button className={oddBtnClass(current, 'MARGIN', 'CLOSE')} onClick={() => pickMargin('CLOSE', 'Écart serré (0 ou 1 but)', pronoToOdds(margins.close))}>
+                  <span>Écart serré</span><b>{pronoToOdds(margins.close).toFixed(2)}</b>
+                </button>
+                <button className={oddBtnClass(current, 'MARGIN', 'AWAY_BIG')} onClick={() => pickMargin('AWAY_BIG', `${away} gagne de 2 buts ou +`, pronoToOdds(margins.awayBig))}>
+                  <span>{shortCode(match.awayTeam)} +2</span><b>{pronoToOdds(margins.awayBig).toFixed(2)}</b>
+                </button>
+              </div>
+            </>
+          )}
+
+          {(homeOver15 != null || awayOver15 != null) && (
+            <>
+              <p className="mesParis__marketLabel">
+                Total buts par équipe (+1,5)
+                <span className="mesParis__computedBadge">cote calculée par notre modèle</span>
+              </p>
+              {homeOver15 != null && (
+                <div className="mesParis__market mesParis__market--2">
+                  <button className={oddBtnClass(current, 'TEAM_TOTAL', 'HOME_OVER')} onClick={() => pickTeamTotal('HOME_OVER', `${home} : + de 1,5 but`, pronoToOdds(homeOver15), 1.5)}>
+                    <span>{shortCode(match.homeTeam)} + de 1,5</span><b>{pronoToOdds(homeOver15).toFixed(2)}</b>
+                  </button>
+                  <button className={oddBtnClass(current, 'TEAM_TOTAL', 'HOME_UNDER')} onClick={() => pickTeamTotal('HOME_UNDER', `${home} : − de 1,5 but`, pronoToOdds(100 - homeOver15), 1.5)}>
+                    <span>{shortCode(match.homeTeam)} − de 1,5</span><b>{pronoToOdds(100 - homeOver15).toFixed(2)}</b>
+                  </button>
+                </div>
+              )}
+              {awayOver15 != null && (
+                <div className="mesParis__market mesParis__market--2">
+                  <button className={oddBtnClass(current, 'TEAM_TOTAL', 'AWAY_OVER')} onClick={() => pickTeamTotal('AWAY_OVER', `${away} : + de 1,5 but`, pronoToOdds(awayOver15), 1.5)}>
+                    <span>{shortCode(match.awayTeam)} + de 1,5</span><b>{pronoToOdds(awayOver15).toFixed(2)}</b>
+                  </button>
+                  <button className={oddBtnClass(current, 'TEAM_TOTAL', 'AWAY_UNDER')} onClick={() => pickTeamTotal('AWAY_UNDER', `${away} : − de 1,5 but`, pronoToOdds(100 - awayOver15), 1.5)}>
+                    <span>{shortCode(match.awayTeam)} − de 1,5</span><b>{pronoToOdds(100 - awayOver15).toFixed(2)}</b>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {scoreExact && (
+            <>
+              <p className="mesParis__marketLabel">
+                Score exact
+                <span className="mesParis__computedBadge">cote calculée par notre modèle</span>
+              </p>
+              <div className="mesParis__market mesParis__market--3">
+                {scoreExact.map(s => (
+                  <button key={`${s.home}-${s.away}`} className={oddBtnClass(current, 'SCORE_EXACT', `${s.home}-${s.away}`)}
+                    onClick={() => pickScoreExact(s.home, s.away, pronoToOdds(s.pct))}>
+                    <span>{s.home}-{s.away}</span><b>{pronoToOdds(s.pct).toFixed(2)}</b>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {(homeScorers.length > 0 || awayScorers.length > 0) && (
+            <>
+              <p className="mesParis__marketLabel">
+                Buteur
+                <span className="mesParis__computedBadge">cote calculée, réglé à la main après le match</span>
+              </p>
+              {homeScorers.length > 0 && (
+                <div className="mesParis__market mesParis__market--list">
+                  {homeScorers.map(s => {
+                    const pct = scorerOddsPct(s, scorers)
+                    if (pct == null) return null
+                    const odd = pronoToOdds(pct)
+                    return (
+                      <button key={s.player.id} className={oddBtnClass(current, 'SCORER', String(s.player.id))} onClick={() => pickScorer(s.player, odd)}>
+                        <span>{s.player.name}</span><b>{odd.toFixed(2)}</b>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {awayScorers.length > 0 && (
+                <div className="mesParis__market mesParis__market--list">
+                  {awayScorers.map(s => {
+                    const pct = scorerOddsPct(s, scorers)
+                    if (pct == null) return null
+                    const odd = pronoToOdds(pct)
+                    return (
+                      <button key={s.player.id} className={oddBtnClass(current, 'SCORER', String(s.player.id))} onClick={() => pickScorer(s.player, odd)}>
+                        <span>{s.player.name}</span><b>{odd.toFixed(2)}</b>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
     </div>
@@ -261,20 +387,39 @@ function BetSlip({ picks, onRemove, stake, onStakeChange, balance, onValidate, e
   )
 }
 
-function BetHistory({ bets }) {
-  if (bets.length === 0) return <p className="mesParis__state">Aucun pari pour l'instant.</p>
+// Réutilisé pour les 2 onglets "En cours"/"Historique" (retour utilisateur :
+// "on ne voit pas notre pari en cours" — l'ancien onglet unique "Historique"
+// mélangeait paris en attente et réglés sous un intitulé qui n'évoque que le
+// passé, pas assez visible). `emptyLabel` distingue le message vide propre à
+// chaque onglet. `onResolveManual` (optionnel) : demande de confirmation
+// manuelle pour un pick "buteur" (voir betsStore.js/resolveManualPick) —
+// omis dans l'onglet Historique (les paris déjà réglés n'en ont plus besoin).
+function BetHistory({ bets, emptyLabel, onResolveManual }) {
+  if (bets.length === 0) return <p className="mesParis__state">{emptyLabel}</p>
   const STATUS_LABEL = { pending: 'En cours', won: 'Gagné', lost: 'Perdu' }
   return (
     <div className="mesParis__history">
       {bets.map(bet => (
         <div key={bet.id} className={`mesParis__histCard mesParis__histCard--${bet.status}`}>
           <div className="mesParis__histTop">
-            <span className="mesParis__histStatus">{STATUS_LABEL[bet.status]}</span>
+            <span className="mesParis__histStatus">{bet.needsManual ? 'Confirmation requise' : STATUS_LABEL[bet.status]}</span>
             <span>{bet.stake.toFixed(2)} € · cote {bet.combinedOdd.toFixed(2)}</span>
           </div>
-          {bet.picks.map((p, i) => (
-            <div key={i} className="mesParis__histPick">{p.homeTeam} – {p.awayTeam} : {p.label}</div>
-          ))}
+          {bet.picks.map((p, i) => {
+            const needsThisOne = bet.needsManual && p.market === 'SCORER' && p.manualResult == null && onResolveManual
+            return (
+              <div key={i} className="mesParis__histPick">
+                <span>{p.homeTeam} – {p.awayTeam} : {p.label}</span>
+                {needsThisOne && (
+                  <span className="mesParis__manualRow">
+                    A-t-il marqué ?
+                    <button className="mesParis__manualBtn mesParis__manualBtn--yes" onClick={() => onResolveManual(bet.id, i, true)}>Oui</button>
+                    <button className="mesParis__manualBtn mesParis__manualBtn--no" onClick={() => onResolveManual(bet.id, i, false)}>Non</button>
+                  </span>
+                )}
+              </div>
+            )
+          })}
           {bet.status === 'won' && <div className="mesParis__histPayout">+{bet.payout.toFixed(2)} €</div>}
         </div>
       ))}
@@ -283,7 +428,7 @@ function BetHistory({ bets }) {
 }
 
 export default function MesParis() {
-  const [tab, setTab]                 = useState('parier') // 'parier' | 'historique'
+  const [tab, setTab]                 = useState('parier') // 'parier' | 'encours' | 'historique'
   const [view, setView]               = useState('list')   // 'list' | 'detail'
   const [activeMatch, setActiveMatch] = useState(null)
   const [picks, setPicks]             = useState([])
@@ -321,6 +466,8 @@ export default function MesParis() {
     () => [...upcoming].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
     [upcoming]
   )
+  const pendingBets = useMemo(() => bets.filter(b => b.status === 'pending'), [bets])
+  const settledBets = useMemo(() => bets.filter(b => b.status !== 'pending'), [bets])
 
   function openMatch(match) {
     setActiveMatch(match)
@@ -339,6 +486,28 @@ export default function MesParis() {
   }
   function removePick(matchId) {
     setPicks(prev => prev.filter(p => p.matchId !== matchId))
+  }
+  // Clic direct sur une pilule de cote de la card (liste, sans passer par la
+  // page détail) — demande utilisateur : "cliquer sur les côtes directement
+  // sur la card comme dans Accueil". Construit le même type de pick que
+  // pick1N2 dans BetDetailScreen (marché '1N2'), à partir du match complet
+  // passé par MatchPoster (onOddPick, voir MatchCard.jsx/MatchPoster.jsx) —
+  // la cote elle-même (`odd`) est celle DÉJÀ affichée sur la card (réelle ou
+  // repli calcPronoAdvanced), jamais recalculée séparément ici.
+  function handleOddPick(match, key, odd) {
+    const home = teamName(match.homeTeam)
+    const away = teamName(match.awayTeam)
+    const label = key === 'home' ? `${home} gagne` : key === 'away' ? `${away} gagne` : 'Match nul'
+    handlePick({ matchId: match.id, homeTeam: home, awayTeam: away, market: '1N2', key, label, odd })
+  }
+  // Confirmation manuelle d'un pick "buteur" (voir betsStore.js/resolveManualPick
+  // — décision utilisateur explicite : aucune vérification automatique fiable
+  // dispo pour ce marché précis).
+  function handleResolveManual(betId, pickIndex, won) {
+    const result = resolveManualPick(betId, pickIndex, won)
+    if (!result.ok) return
+    setBets(getBets())
+    setBalance(getBalance())
   }
   function handleValidate() {
     const result = placeBet(picks, stake)
@@ -363,6 +532,10 @@ export default function MesParis() {
 
       <div className="mesParis__tabs">
         <button className={`mesParis__tab${tab === 'parier' ? ' mesParis__tab--active' : ''}`} onClick={() => setTab('parier')}>Parier</button>
+        <button className={`mesParis__tab${tab === 'encours' ? ' mesParis__tab--active' : ''}`} onClick={() => setTab('encours')}>
+          En cours
+          {pendingBets.length > 0 && <span className="mesParis__tabBadge">{pendingBets.length}</span>}
+        </button>
         <button className={`mesParis__tab${tab === 'historique' ? ' mesParis__tab--active' : ''}`} onClick={() => setTab('historique')}>Historique</button>
       </div>
 
@@ -379,6 +552,7 @@ export default function MesParis() {
                 matches={upcomingSorted}
                 loading={loading}
                 onMatchClick={openMatch}
+                onOddPick={handleOddPick}
               />
             </div>
           )}
@@ -390,7 +564,8 @@ export default function MesParis() {
         </>
       )}
 
-      {tab === 'historique' && <BetHistory bets={bets} />}
+      {tab === 'encours' && <BetHistory bets={pendingBets} emptyLabel="Aucun pari en cours." onResolveManual={handleResolveManual} />}
+      {tab === 'historique' && <BetHistory bets={settledBets} emptyLabel="Aucun pari réglé pour l'instant." />}
     </div>
   )
 }

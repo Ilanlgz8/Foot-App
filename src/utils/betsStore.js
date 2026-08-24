@@ -124,6 +124,42 @@ function evaluatePick(pick, match) {
     if (pick.key === 'NO') return !bothScored
     return null
   }
+  // Score exact — key au format "H-A" (ex. "2-1"), comparé au score final
+  // exact (120min exclu, tirs au but exclus — mêmes garde-fous que
+  // finalScore()).
+  if (pick.market === 'SCORE_EXACT') {
+    const fs = finalScore(match.score)
+    if (fs.home == null || fs.away == null) return null
+    return pick.key === `${fs.home}-${fs.away}`
+  }
+  // Écart de buts — même découpage que goalMarginProbabilities (calcProno.js) :
+  // CLOSE = écart de 0 ou 1 but, HOME_BIG/AWAY_BIG = 2 buts d'écart ou plus.
+  if (pick.market === 'MARGIN') {
+    const fs = finalScore(match.score)
+    if (fs.home == null || fs.away == null) return null
+    const diff = fs.home - fs.away
+    if (pick.key === 'CLOSE')    return Math.abs(diff) <= 1
+    if (pick.key === 'HOME_BIG') return diff >= 2
+    if (pick.key === 'AWAY_BIG') return diff <= -2
+    return null
+  }
+  // Total buts d'UNE équipe (ligne fixe +1,5, voir teamGoalsOverProbability).
+  if (pick.market === 'TEAM_TOTAL') {
+    const fs = finalScore(match.score)
+    if (fs.home == null || fs.away == null) return null
+    if (pick.key === 'HOME_OVER')  return fs.home > pick.line
+    if (pick.key === 'HOME_UNDER') return fs.home < pick.line
+    if (pick.key === 'AWAY_OVER')  return fs.away > pick.line
+    if (pick.key === 'AWAY_UNDER') return fs.away < pick.line
+    return null
+  }
+  // Buteur (SCORER) — VOLONTAIREMENT jamais résolu ici, même une fois le
+  // match terminé : aucune donnée fiable dans l'app ne dit qui a marqué dans
+  // CE match précis (voir calcProno.js/scorerOddsPct — la cote, elle, est
+  // réelle ; seule la vérification après-coup manque). Retourne null à vie
+  // pour ce marché → réglé à la main par l'utilisateur, voir
+  // resolveManualPick ci-dessous (jamais un verdict deviné, décision
+  // explicite utilisateur du 25/08).
   return null
 }
 
@@ -134,6 +170,22 @@ function evaluatePick(pick, match) {
  * appelé depuis MesParis.jsx). Un pari combiné dont un seul match n'est pas
  * encore terminé reste "pending" en entier — repassera au prochain appel.
  * Idempotent : ne touche jamais un pari déjà 'won'/'lost'.
+ *
+ * ⚠️ Marché buteur (SCORER, voir evaluatePick) : evaluatePick renvoie
+ * toujours null pour ce marché, même une fois le match terminé — impossible
+ * de savoir automatiquement si le joueur a marqué (aucune donnée fiable dans
+ * l'app). Logique en 3 temps par pari, tous les matchs étant terminés :
+ *  1. Une SEULE jambe perdue (résultat false, pick normal OU déjà confirmé à
+ *     la main) suffit à perdre tout le combiné — pas besoin d'attendre une
+ *     jambe buteur encore floue pour annoncer une défaite déjà acquise.
+ *  2. Toutes les jambes gagnées (aucun null) → gagné, réglé normalement.
+ *  3. Au moins une jambe encore floue (buteur, résultat null) et aucune
+ *     perdue par ailleurs → `needsManual: true`, reste "pending" — l'UI
+ *     (BetHistory/MesParis.jsx) propose alors à l'utilisateur de confirmer
+ *     lui-même cette jambe précise (resolveManualPick ci-dessous). Décision
+ *     explicite utilisateur (25/08) plutôt qu'un règlement automatique
+ *     risqué (matching de noms de joueurs ESPN/FD.org, plus fragile qu'un
+ *     matching d'équipes — déjà source de bugs réels dans ce projet).
  *
  * Retourne { bets, changed } — `changed` explicite (pas juste une nouvelle
  * référence de tableau) pour que l'appelant React (MesParis.jsx, effet
@@ -150,21 +202,74 @@ export function settlePendingBets(finishedById) {
     const matches = bet.picks.map(p => finishedById[p.matchId])
     if (matches.some(m => !m)) return bet
 
-    const results = bet.picks.map((p, i) => evaluatePick(p, matches[i]))
-    if (results.some(r => r == null)) return bet
+    const results = bet.picks.map((p, i) => p.manualResult ?? evaluatePick(p, matches[i]))
 
-    changed = true
-    const won = results.every(r => r === true)
-    if (won) {
+    if (results.some(r => r === false)) {
+      changed = true
+      return { ...bet, status: 'lost', payout: 0, settledAt: Date.now(), needsManual: false }
+    }
+    if (results.every(r => r === true)) {
+      changed = true
       const payout = Math.round(bet.stake * bet.combinedOdd * 100) / 100
       balance += payout
-      return { ...bet, status: 'won', payout, settledAt: Date.now() }
+      return { ...bet, status: 'won', payout, settledAt: Date.now(), needsManual: false }
     }
-    return { ...bet, status: 'lost', payout: 0, settledAt: Date.now() }
+    // Reste au moins une jambe null (buteur) — signale needsManual une seule
+    // fois (évite un `changed`/setState à chaque poll de `finished` tant que
+    // l'utilisateur n'a rien confirmé).
+    if (!bet.needsManual) { changed = true; return { ...bet, needsManual: true } }
+    return bet
   })
 
   if (!changed) return { bets, changed: false }
   writeBets(updated)
   writeBalance(balance)
   return { bets: updated, changed: true }
+}
+
+/**
+ * Confirmation manuelle d'UNE jambe buteur (voir settlePendingBets ci-dessus)
+ * — l'utilisateur indique lui-même si le joueur a marqué, une fois qu'il
+ * connaît le vrai résultat. Ne s'applique qu'à un pari déjà `needsManual`
+ * (tous ses matchs sont terminés, toutes ses autres jambes sont déjà
+ * garanties gagnantes — sinon le pari aurait déjà été réglé "lost" par
+ * settlePendingBets avant d'atteindre l'état needsManual).
+ *
+ * @param {string} betId
+ * @param {number} pickIndex  index du pick buteur dans bet.picks
+ * @param {boolean} won       true = "il a marqué", false = "il n'a pas marqué"
+ */
+export function resolveManualPick(betId, pickIndex, won) {
+  const bets = readBets()
+  const idx = bets.findIndex(b => b.id === betId)
+  if (idx === -1 || bets[idx].status !== 'pending' || !bets[idx].picks[pickIndex]) {
+    return { ok: false }
+  }
+  const bet = bets[idx]
+  const picks = bet.picks.map((p, i) => i === pickIndex ? { ...p, manualResult: won } : p)
+
+  if (!won) {
+    const updated = { ...bet, picks, status: 'lost', payout: 0, settledAt: Date.now(), needsManual: false }
+    const next = bets.map((b, i) => i === idx ? updated : b)
+    writeBets(next)
+    return { ok: true, bet: updated }
+  }
+
+  const stillPending = picks.some(p => p.market === 'SCORER' && p.manualResult == null)
+  if (stillPending) {
+    const updated = { ...bet, picks }
+    const next = bets.map((b, i) => i === idx ? updated : b)
+    writeBets(next)
+    return { ok: true, bet: updated }
+  }
+
+  // Toutes les jambes buteur du combiné sont maintenant confirmées gagnantes
+  // (les autres jambes étaient déjà garanties gagnantes avant needsManual,
+  // voir settlePendingBets) → tout le combiné est gagné.
+  const payout = Math.round(bet.stake * bet.combinedOdd * 100) / 100
+  const updated = { ...bet, picks, status: 'won', payout, settledAt: Date.now(), needsManual: false }
+  const next = bets.map((b, i) => i === idx ? updated : b)
+  writeBets(next)
+  writeBalance(readBalance() + payout)
+  return { ok: true, bet: updated }
 }

@@ -7,7 +7,7 @@
 // plusieurs facteurs (Poisson + H2H), une valeur exacte serait fragile au
 // moindre ajustement de pondération sans rien prouver de plus utile.
 import { describe, it, expect } from 'vitest'
-import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, getGoalExpectancy, bttsProbability } from './calcProno'
+import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, getGoalExpectancy, bttsProbability, scoreExactProbabilities, goalMarginProbabilities, teamGoalsOverProbability, scorerOddsPct } from './calcProno'
 
 function sumsTo100(p) {
   return p.home + p.draw + p.away === 100
@@ -639,5 +639,97 @@ describe('bttsProbability', () => {
   it('renvoie null sur une entrée invalide (jamais un % deviné)', () => {
     expect(bttsProbability(null, 1.2)).toBeNull()
     expect(bttsProbability(NaN, 1.2)).toBeNull()
+  })
+})
+
+describe('scoreExactProbabilities', () => {
+  it('renvoie 9 scores, sommant à moins de 100% (le reste étant les scores non listés)', () => {
+    const scores = scoreExactProbabilities(1.4, 1.1)
+    expect(scores).toHaveLength(9)
+    const sum = scores.reduce((s, x) => s + x.pct, 0)
+    expect(sum).toBeGreaterThan(0)
+    expect(sum).toBeLessThan(100)
+  })
+
+  it('0-0 est plus probable avec 2 λ faibles qu\'avec 2 λ élevés', () => {
+    const low  = scoreExactProbabilities(0.6, 0.6).find(s => s.home === 0 && s.away === 0)
+    const high = scoreExactProbabilities(2.5, 2.5).find(s => s.home === 0 && s.away === 0)
+    expect(low.pct).toBeGreaterThan(high.pct)
+  })
+
+  it('renvoie null sur une entrée invalide', () => {
+    expect(scoreExactProbabilities(null, 1)).toBeNull()
+  })
+})
+
+describe('goalMarginProbabilities', () => {
+  it('les 3 tranches somment à ~100%', () => {
+    const m = goalMarginProbabilities(1.4, 1.1)
+    expect(m.close + m.homeBig + m.awayBig).toBeCloseTo(100, 5)
+  })
+
+  it('homeBig domine nettement quand le domicile est bien plus fort', () => {
+    const m = goalMarginProbabilities(3.2, 0.5)
+    expect(m.homeBig).toBeGreaterThan(m.awayBig)
+    expect(m.homeBig).toBeGreaterThan(m.close)
+  })
+
+  it('close domine quand les 2 équipes ont des λ proches et faibles', () => {
+    const m = goalMarginProbabilities(1.0, 1.0)
+    expect(m.close).toBeGreaterThan(m.homeBig)
+    expect(m.close).toBeGreaterThan(m.awayBig)
+  })
+
+  it('renvoie null sur une entrée invalide', () => {
+    expect(goalMarginProbabilities(NaN, 1)).toBeNull()
+  })
+})
+
+describe('teamGoalsOverProbability', () => {
+  it('décroît strictement quand la ligne monte (0.5 < 1.5 < 2.5)', () => {
+    const over05 = teamGoalsOverProbability(1.6, 0.5)
+    const over15 = teamGoalsOverProbability(1.6, 1.5)
+    const over25 = teamGoalsOverProbability(1.6, 2.5)
+    expect(over05).toBeGreaterThan(over15)
+    expect(over15).toBeGreaterThan(over25)
+  })
+
+  it('un λ plus élevé donne une proba "over" plus élevée à ligne fixe', () => {
+    expect(teamGoalsOverProbability(2.5, 1.5)).toBeGreaterThan(teamGoalsOverProbability(0.8, 1.5))
+  })
+
+  it('renvoie null sur un λ invalide', () => {
+    expect(teamGoalsOverProbability(null, 1.5)).toBeNull()
+  })
+})
+
+describe('scorerOddsPct', () => {
+  const allScorers = [
+    { goals: 15, playedMatches: 20 },
+    { goals: 10, playedMatches: 20 },
+    { goals: 3,  playedMatches: 20 },
+    { goals: 2,  playedMatches: 1 },  // gros taux brut, échantillon minuscule
+  ]
+
+  it('un attaquant prolifique avec un gros échantillon a une cote (proba) élevée', () => {
+    const p = scorerOddsPct(allScorers[0], allScorers)
+    expect(p).toBeGreaterThan(30)
+  })
+
+  it('un joueur avec 1 seul match joué est fortement ramené vers la moyenne (pas de cote absurde)', () => {
+    // Taux brut du 4e joueur (2 buts / 1 match = 2.0) très supérieur à la
+    // moyenne de la ligue calculée sur allScorers — le shrinkage doit
+    // fortement le rapprocher d'un joueur "moyen", pas rester à un extrême.
+    const shrunk = scorerOddsPct(allScorers[3], allScorers)
+    const establishedTopScorer = scorerOddsPct(allScorers[0], allScorers)
+    expect(shrunk).toBeLessThan(establishedTopScorer)
+  })
+
+  it('renvoie null si le joueur n\'a pas encore de matchs joués', () => {
+    expect(scorerOddsPct({ goals: 0, playedMatches: 0 }, allScorers)).toBeNull()
+  })
+
+  it('renvoie null si la liste de référence est vide', () => {
+    expect(scorerOddsPct(allScorers[0], [])).toBeNull()
   })
 })
