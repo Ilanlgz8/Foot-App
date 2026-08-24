@@ -103,6 +103,27 @@ function evaluatePick(pick, match) {
     if (pick.key === 'UNDER') return total < pick.line
     return null
   }
+  // Double chance — recombinaison du résultat final (matchOutcome, déjà
+  // fiable sur les tirs au but) : '1X' gagne si dom. ou nul, '12' si pas de
+  // nul, 'X2' si ext. ou nul.
+  if (pick.market === 'DC') {
+    const outcome = matchOutcome(match)
+    if (outcome == null) return null
+    if (pick.key === '1X') return outcome === 'home' || outcome === 'draw'
+    if (pick.key === '12') return outcome === 'home' || outcome === 'away'
+    if (pick.key === 'X2') return outcome === 'away' || outcome === 'draw'
+    return null
+  }
+  // BTTS — les 2 équipes ont marqué au moins 1 but (score du temps
+  // réglementaire, mêmes garde-fous que finalScore()).
+  if (pick.market === 'BTTS') {
+    const fs = finalScore(match.score)
+    if (fs.home == null || fs.away == null) return null
+    const bothScored = fs.home > 0 && fs.away > 0
+    if (pick.key === 'YES') return bothScored
+    if (pick.key === 'NO') return !bothScored
+    return null
+  }
   return null
 }
 

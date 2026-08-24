@@ -483,6 +483,46 @@ function computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches)
   }
 }
 
+// ── Exports pour marchés dérivés (Mes Paris) ────────────────────────────
+// Retour utilisateur (Mes Paris, comparaison avec Betclic/Winamax) : demande
+// de marchés supplémentaires que ceux déjà affichés (1N2 seul). Deux ajoutés,
+// tous deux calculés à partir de données/modèle RÉELS déjà en place ici —
+// aucun chiffre inventé (voir CLAUDE.md) :
+//  - Double chance (1X/12/X2) : simple recombinaison de home/draw/away déjà
+//    calculés (réel ESPN ou repli calcPronoAdvanced) — voir MesParis.jsx.
+//  - BTTS (les 2 équipes marquent) : a besoin des λ (buts espérés) du modèle
+//    Poisson, jusqu'ici gardés internes à calcPronoAdvanced — exposés ici
+//    séparément pour être réutilisables (mêmes buildGoalModel/computeLambdas
+//    que calcPronoAdvanced, aucune duplication de logique).
+//
+// getGoalExpectancy : renvoie null si les données saison sont insuffisantes
+// (même seuils que calcPronoAdvanced, MIN_LEAGUE_GAMES/MIN_TEAM_SPLITS) — dans
+// ce cas, aucun marché BTTS n'est affiché plutôt qu'une valeur devinée
+// (même logique que "Total buts" côté ESPN, voir useMatchDetail.js).
+export function getGoalExpectancy(homeId, awayId, compMatches, opts = {}) {
+  if (homeId == null || awayId == null) return null
+  const goalModel = buildGoalModel(compMatches)
+  if (!goalModel) return null
+  return computeLambdas(goalModel, homeId, awayId)
+    ?? computeLambdasWithPromotion(goalModel, homeId, awayId, opts.lowerDivMatches)
+}
+
+// P(BTTS=Oui) à partir des λ — buts des 2 équipes toujours modélisés comme
+// des variables de Poisson indépendantes dans tout ce fichier (même
+// hypothèse que poissonOutcomes ci-dessus, pas une nouvelle approximation) :
+// P(BTTS=Non) = P(dom.=0) + P(ext.=0) - P(dom.=0)×P(ext.=0) (union de 2
+// événements, dont l'intersection "aucune équipe ne marque" est retirée une
+// fois pour ne pas être comptée deux fois). Retourne un %, même échelle que
+// calcPronoAdvanced (0-100) pour être réutilisable telle quelle avec
+// pronoToOdds().
+export function bttsProbability(lambdaHome, lambdaAway) {
+  if (!Number.isFinite(lambdaHome) || !Number.isFinite(lambdaAway)) return null
+  const pNoHome = Math.exp(-lambdaHome)
+  const pNoAway = Math.exp(-lambdaAway)
+  const pBttsNo = pNoHome + pNoAway - pNoHome * pNoAway
+  return Math.max(0, Math.min(100, (1 - pBttsNo) * 100))
+}
+
 // Confrontations directes déjà présentes dans compMatches (gratuit, aucun
 // appel réseau) — utilisées comme léger correctif, pas comme source
 // principale (échantillon quasi toujours petit : 0 à quelques matchs).

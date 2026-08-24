@@ -22,7 +22,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { calcPronoAdvanced, pronoToOdds } from '../utils/calcProno'
+import { calcPronoAdvanced, pronoToOdds, getGoalExpectancy, bttsProbability } from '../utils/calcProno'
 import { MatchPanel } from '../accueil/MatchCard'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -65,33 +65,38 @@ function oddBtnClass(current, market, key) {
   return `mesParis__oddBtn${active ? ' mesParis__oddBtn--active' : ''}`
 }
 
-// Détail d'un match — marchés disponibles UNIQUEMENT si une vraie cote
-// existe (1N2 quasi toujours dispo ; "Total buts" pas garanti, voir
-// extractTotal dans useMatchDetail.js — provider ESPN BET pas encore
-// vérifié pour ce marché précis, jamais de cote devinée).
+// Détail d'un match — marchés disponibles UNIQUEMENT si une vraie donnée ou
+// un calcul réel existe (jamais de cote devinée, voir CLAUDE.md) :
+//  - 1N2       : cote ESPN si dispo, sinon repli calcPronoAdvanced.
+//  - Total buts: cote ESPN UNIQUEMENT (pas de ligne dérivée du modèle interne
+//    pour l'instant — voir extractTotal, useMatchDetail.js).
+//  - Double chance (1X/12/X2) : recombinaison mathématique exacte des
+//    probabilités 1N2 déjà en main (réelles ou calculées) — aucune nouvelle
+//    donnée, juste une addition de probabilités.
+//  - BTTS (les 2 marquent) : dérivé des λ (buts espérés) du même modèle
+//    Poisson que calcPronoAdvanced (getGoalExpectancy/bttsProbability,
+//    calcProno.js) — affiché UNIQUEMENT quand assez de données saison sont
+//    dispo pour ces λ, sinon le marché est simplement absent.
 function BetDetailScreen({ match, picks, onPick, onBack }) {
   const isWC = isNationalTeamComp(match)
   const { data: odds, isLoading } = useEspnPregameOdds(match)
 
-  // Repli "cote calculée par notre système" (calcPronoAdvanced — même modèle
-  // Poisson que la card Accueil, voir MatchPoster.jsx) dès qu'ESPN n'a pas de
-  // cote marché réelle pour CE match précis : sans ça, un match visible avec
-  // une cote dans la liste (MatchPanel/MatchPoster, qui a déjà ce repli)
-  // pouvait quand même arriver ici en "Cotes indisponibles" — incohérence
-  // signalée par l'utilisateur. Version simplifiée par rapport à MatchPoster
-  // (pas de H2H dédié / repli club promu, juste forme + stats saison) :
-  // suffisant pour un repli de cote 1N2, jamais de chiffre inventé — calcul
-  // réel du même modèle. Hook désactivé tant qu'ESPN n'a pas répondu, pour ne
-  // jamais taper FD.org pour rien quand la vraie cote existe déjà.
-  const needsFallback = !isLoading && !odds
+  // ⚠️ Toujours activé (plus de gate sur needsFallback) — nécessaire pour
+  // calculer le marché BTTS même quand ESPN a déjà une vraie cote 1N2 (voir
+  // ci-dessus). Coût réseau réel quasi nul malgré ce changement : même
+  // queryKey React Query (['teamForm2', compCode, ...]) que celle DÉJÀ
+  // chauffée par MatchPoster/MatchPanel sur la liste "Mes matchs" juste
+  // avant que l'utilisateur clique sur ce match — la requête arrive donc
+  // déjà en cache la quasi-totalité du temps (même pattern que
+  // MatchPoster.jsx, qui fait exactement ce même appel sans jamais le gater).
   const compCode = match.competition?.code ?? null
-  const { formMap, compMatches } = useTeamForm(compCode, 0, needsFallback)
-  const resolvedHomeId = needsFallback
-    ? resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true }) : null
-  const resolvedAwayId = needsFallback
-    ? resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true }) : null
+  const { formMap, compMatches } = useTeamForm(compCode, 0, true)
+  const resolvedHomeId = resolveFdTeamId(match.homeTeam, compMatches, { loose: true, strict: true })
+  const resolvedAwayId = resolveFdTeamId(match.awayTeam, compMatches, { loose: true, strict: true })
   const hForm = formMap?.[resolvedHomeId] ?? []
   const aForm = formMap?.[resolvedAwayId] ?? []
+
+  const needsFallback = !isLoading && !odds
   const prono = needsFallback
     ? calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         neutralVenue: isNeutralVenueComp(match),
@@ -107,12 +112,28 @@ function BetDetailScreen({ match, picks, onPick, onBack }) {
   const effectiveOdds = odds ?? fallbackOdds
   const isComputedOdds = !odds && !!fallbackOdds
 
+  // Double chance — recombine le % actif (réel ESPN ou repli), quelle que
+  // soit sa source (déjà géré par effectiveOdds ci-dessus pour le 1N2).
+  const pctSource = odds?.pct ?? prono ?? null
+  const dcHome = pctSource ? pronoToOdds(pctSource.home + pctSource.draw) : null // 1X
+  const dcAway = pctSource ? pronoToOdds(pctSource.draw + pctSource.away) : null // X2
+  const dc12   = pctSource ? pronoToOdds(pctSource.home + pctSource.away) : null // 12
+
+  // BTTS — absent (pas juste "indisponible") si les λ ne sont pas calculables
+  // (pas assez de matchs saison pour l'une des 2 équipes, voir
+  // getGoalExpectancy/MIN_TEAM_SPLITS).
+  const lambdas  = compMatches?.length ? getGoalExpectancy(resolvedHomeId, resolvedAwayId, compMatches) : null
+  const bttsYes  = lambdas ? bttsProbability(lambdas.lambdaHome, lambdas.lambdaAway) : null
+  const bttsOdds = bttsYes != null ? { yes: pronoToOdds(bttsYes), no: pronoToOdds(100 - bttsYes) } : null
+
   const home = teamName(match.homeTeam)
   const away = teamName(match.awayTeam)
   const current = picks.find(p => p.matchId === match.id)
 
   const pick1N2   = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: '1N2', key, label, odd })
   const pickTotal = (key, label, odd, line) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'TOTAL', key, label, odd, line })
+  const pickDC    = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'DC', key, label, odd })
+  const pickBtts  = (key, label, odd) => onPick({ matchId: match.id, homeTeam: home, awayTeam: away, market: 'BTTS', key, label, odd })
 
   return (
     <div className="mesParis__detail">
@@ -156,6 +177,43 @@ function BetDetailScreen({ match, picks, onPick, onBack }) {
                 </button>
                 <button className={oddBtnClass(current, 'TOTAL', 'UNDER')} onClick={() => pickTotal('UNDER', `− de ${effectiveOdds.total.line} buts`, effectiveOdds.total.under, effectiveOdds.total.line)}>
                   <span>− de {effectiveOdds.total.line} buts</span><b>{effectiveOdds.total.under.toFixed(2)}</b>
+                </button>
+              </div>
+            </>
+          )}
+
+          {pctSource && (
+            <>
+              <p className="mesParis__marketLabel">
+                Double chance
+                <span className="mesParis__computedBadge">calculée à partir du 1N2</span>
+              </p>
+              <div className="mesParis__market mesParis__market--3">
+                <button className={oddBtnClass(current, 'DC', '1X')} onClick={() => pickDC('1X', `${home} ou nul`, dcHome)}>
+                  <span>{shortCode(match.homeTeam)} ou Nul</span><b>{dcHome.toFixed(2)}</b>
+                </button>
+                <button className={oddBtnClass(current, 'DC', '12')} onClick={() => pickDC('12', `${home} ou ${away}`, dc12)}>
+                  <span>{shortCode(match.homeTeam)} ou {shortCode(match.awayTeam)}</span><b>{dc12.toFixed(2)}</b>
+                </button>
+                <button className={oddBtnClass(current, 'DC', 'X2')} onClick={() => pickDC('X2', `Nul ou ${away}`, dcAway)}>
+                  <span>Nul ou {shortCode(match.awayTeam)}</span><b>{dcAway.toFixed(2)}</b>
+                </button>
+              </div>
+            </>
+          )}
+
+          {bttsOdds && (
+            <>
+              <p className="mesParis__marketLabel">
+                Les 2 équipes marquent
+                <span className="mesParis__computedBadge">cote calculée par notre modèle</span>
+              </p>
+              <div className="mesParis__market mesParis__market--2">
+                <button className={oddBtnClass(current, 'BTTS', 'YES')} onClick={() => pickBtts('YES', 'Les 2 équipes marquent : Oui', bttsOdds.yes)}>
+                  <span>Oui</span><b>{bttsOdds.yes.toFixed(2)}</b>
+                </button>
+                <button className={oddBtnClass(current, 'BTTS', 'NO')} onClick={() => pickBtts('NO', 'Les 2 équipes marquent : Non', bttsOdds.no)}>
+                  <span>Non</span><b>{bttsOdds.no.toFixed(2)}</b>
                 </button>
               </div>
             </>

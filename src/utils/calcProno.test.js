@@ -7,7 +7,7 @@
 // plusieurs facteurs (Poisson + H2H), une valeur exacte serait fragile au
 // moindre ajustement de pondération sans rien prouver de plus utile.
 import { describe, it, expect } from 'vitest'
-import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from './calcProno'
+import { calcProno, calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, getGoalExpectancy, bttsProbability } from './calcProno'
 
 function sumsTo100(p) {
   return p.home + p.draw + p.away === 100
@@ -579,5 +579,65 @@ describe('pronoFavoriteKey', () => {
 
   it('identifie le nul comme favori quand son % est le plus haut', () => {
     expect(pronoFavoriteKey({ home: 30, draw: 40, away: 30 })).toBe('draw')
+  })
+})
+
+// getGoalExpectancy/bttsProbability — ajoutés pour les marchés "Double
+// chance"/"BTTS" de Mes Paris (retour utilisateur, comparaison Betclic).
+describe('getGoalExpectancy', () => {
+  const compMatches = [
+    finished('t1', 't2', 1, 1), finished('t2', 't1', 1, 1),
+    finished('t3', 't4', 1, 1), finished('t4', 't3', 1, 1),
+    finished('t1', 't3', 1, 1), finished('t3', 't1', 1, 1),
+    finished('strong', 't1', 3, 0), finished('strong', 't2', 3, 0),
+    finished('t3', 'strong', 0, 3), finished('t4', 'strong', 0, 3),
+    finished('weak', 't1', 0, 3), finished('weak', 't2', 0, 3),
+    finished('t3', 'weak', 3, 0), finished('t4', 'weak', 3, 0),
+  ]
+
+  it('renvoie des λ positifs et finis pour 2 équipes avec assez de données saison', () => {
+    const l = getGoalExpectancy('strong', 'weak', compMatches)
+    expect(l).not.toBeNull()
+    expect(l.lambdaHome).toBeGreaterThan(0)
+    expect(l.lambdaAway).toBeGreaterThan(0)
+    expect(Number.isFinite(l.lambdaHome)).toBe(true)
+    expect(Number.isFinite(l.lambdaAway)).toBe(true)
+  })
+
+  it('l\'équipe statistiquement forte a un λ domicile plus élevé qu\'une équipe faible en déplacement', () => {
+    const l = getGoalExpectancy('strong', 'weak', compMatches)
+    expect(l.lambdaHome).toBeGreaterThan(l.lambdaAway)
+  })
+
+  it('renvoie null si pas assez de matchs saison (même seuil que calcPronoAdvanced)', () => {
+    expect(getGoalExpectancy('strong', 'weak', [])).toBeNull()
+  })
+
+  it('renvoie null si un id est manquant (jamais de λ deviné)', () => {
+    expect(getGoalExpectancy(null, 'weak', compMatches)).toBeNull()
+  })
+})
+
+describe('bttsProbability', () => {
+  it('renvoie un % entre 0 et 100', () => {
+    const p = bttsProbability(1.4, 1.1)
+    expect(p).toBeGreaterThan(0)
+    expect(p).toBeLessThan(100)
+  })
+
+  it('monte quand les 2 λ montent (2 attaques prolifiques plus susceptibles de marquer toutes les 2)', () => {
+    const low  = bttsProbability(0.5, 0.5)
+    const high = bttsProbability(2.5, 2.5)
+    expect(high).toBeGreaterThan(low)
+  })
+
+  it('tend vers 0 quand une équipe n\'est presque jamais censée marquer', () => {
+    const p = bttsProbability(2, 0.01)
+    expect(p).toBeLessThan(5)
+  })
+
+  it('renvoie null sur une entrée invalide (jamais un % deviné)', () => {
+    expect(bttsProbability(null, 1.2)).toBeNull()
+    expect(bttsProbability(NaN, 1.2)).toBeNull()
   })
 })
