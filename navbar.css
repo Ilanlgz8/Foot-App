@@ -29,10 +29,20 @@
   padding-top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
+/* Wrapper Pronos + Mes Paris — mobile uniquement, occupe la même cellule de
+   grille (1fr, "justify-self:start") que l'ancien bouton Pronos seul, pour
+   ne pas toucher au grid-template-columns de .sfHeader__inner. */
+.sfHeader__leftGroup {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
 /* Bouton Pronos — mobile uniquement, à la place de l'ancienne date.
    Icône au-dessus, libellé "Pronos" en blanc en dessous. */
-.sfHeader__pronosBtn {
-  justify-self: start;
+.sfHeader__pronosBtn,
+.sfHeader__betsBtn {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -52,9 +62,14 @@
   color: rgba(255, 255, 255, 0.85);
   transition: color 0.15s;
 }
-.sfHeader__pronosBtn:hover .sfHeader__pronosIcon { color: #fff; }
+.sfHeader__pronosBtn:hover .sfHeader__pronosIcon,
+.sfHeader__betsBtn:hover .sfHeader__pronosIcon {
+  color: #fff;
+}
 .sfHeader__pronosBtn--active,
-.sfHeader__pronosBtn--active .sfHeader__pronosIcon {
+.sfHeader__pronosBtn--active .sfHeader__pronosIcon,
+.sfHeader__betsBtn--active,
+.sfHeader__betsBtn--active .sfHeader__pronosIcon {
   color: var(--sf-red);
 }
 
@@ -285,7 +300,7 @@
     padding: 14px 24px;
   }
 
-  .sfHeader__pronosBtn { display: none; }
+  .sfHeader__leftGroup { display: none; }
   .sfHeader__brand { text-align: left; font-size: 22px; }
 
   .sfHeader__nav {

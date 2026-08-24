@@ -102,20 +102,42 @@ function Navbar() {
       {/* ── Header ── */}
       <header className="sfHeader">
         <div className="sfHeader__inner">
-          {/* Pronos — mobile uniquement, à la place de la date (voir sfHeader__pronosBtn) */}
-          <NavLink
-            to="/pronos"
-            className={({ isActive }) =>
-              isActive ? 'sfHeader__pronosBtn sfHeader__pronosBtn--active' : 'sfHeader__pronosBtn'
-            }
-          >
-            <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <circle cx="12" cy="12" r="4.5" />
-              <circle cx="12" cy="12" r="0.6" fill="currentColor" />
-            </svg>
-            <span>Pronos</span>
-          </NavLink>
+          {/* Pronos + Mes Paris — mobile uniquement, à la place de la date
+              (voir sfHeader__pronosBtn/sfHeader__betsBtn). Regroupés dans un
+              wrapper flex pour tenir dans la même cellule de grille (1fr)
+              sans toucher au grid-template-columns existant. */}
+          <div className="sfHeader__leftGroup">
+            <NavLink
+              to="/pronos"
+              className={({ isActive }) =>
+                isActive ? 'sfHeader__pronosBtn sfHeader__pronosBtn--active' : 'sfHeader__pronosBtn'
+              }
+            >
+              <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="4.5" />
+                <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+              </svg>
+              <span>Pronos</span>
+            </NavLink>
+
+            {/* Mes Paris — icône ticket + coche (style bulletin de pari,
+                demande utilisateur : "comme Betclic"), juste à droite de
+                Pronos, entre lui et "StatFootix". */}
+            <NavLink
+              to="/mes-paris"
+              className={({ isActive }) =>
+                isActive ? 'sfHeader__betsBtn sfHeader__betsBtn--active' : 'sfHeader__betsBtn'
+              }
+            >
+              <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 10h18" strokeDasharray="2 2" />
+                <path d="M9 15l2 2 4-4" />
+              </svg>
+              <span>Mes Paris</span>
+            </NavLink>
+          </div>
 
           <NavLink to="/" className="sfHeader__brand">
             <span>Stat</span>Footix

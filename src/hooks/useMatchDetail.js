@@ -239,11 +239,15 @@ async function findEspnEventId(slug, match, fdHome, fdAway) {
 // 95%-130%) : filet de sécurité si jamais un autre provider mal identifié
 // passait entre les mailles.
 //
-// Retourne { decimal: {home,draw,away}, pct: {home,draw,away} } ou null
+// Retourne { decimal: {home,draw,away}, pct: {home,draw,away}, total } ou null
 // (absent/format inattendu/hors plage plausible) — l'appelant (MatchPoster.jsx)
 // retombe alors sur calcProno, AUCUN changement côté calcProno.js ni
 // Pronos.jsx (jeu de pronostics entre amis, doit rester sur un modèle interne
 // cohérent, pas une donnée externe qui peut manquer).
+// `total` (marché "+/- de X.5 buts", voir extractTotal ci-dessous) est
+// souvent null même quand decimal/pct sont valides (provider "ESPN BET" pas
+// encore vérifié pour ce marché) — pages consommatrices (Mes Paris) doivent
+// masquer ce marché plutôt que planter/afficher une valeur bidon si absent.
 const ODDS_PROVIDER_PRIORITY = ['ESPN BET', 'DraftKings']
 const ODDS_PROVIDER_SKIP     = p => /live/i.test(p ?? '')
 
@@ -251,6 +255,29 @@ function americanToDecimal(american) {
   const v = parseFloat(american)
   if (isNaN(v) || v === 0) return null
   return v > 0 ? 1 + v / 100 : 1 + 100 / Math.abs(v)
+}
+
+// ── Total buts (over/under) — AJOUT pour "Mes Paris" ────────────────────────
+// Même entrée/bookmaker déjà retenu pour le 1N2 ci-dessus (une seule ligne
+// cohérente par match, pas de mélange DraftKings/ESPN BET entre les 2
+// marchés). Format confirmé sur données réelles (DraftKings, Málaga-
+// Deportivo, 24/08) : entry.overUnder = ligne courante (ex. 2.5),
+// entry.total.{over,under}.close.odds = cote américaine ("+125"/"-155").
+// Format "ESPN BET" pour ce marché précis jamais vérifié sur données
+// réelles — pas de 2e tentative à l'aveugle ici (contrairement à
+// extractMoneylines, où les 2 formats ont chacun été confirmés en prod) :
+// on préfère retourner null (marché "Total buts" simplement absent de la
+// card) plutôt que de deviner un nom de champ et risquer d'afficher une
+// fausse cote.
+function extractTotal(oddsEntry) {
+  const line = oddsEntry?.overUnder
+  const overRaw  = oddsEntry?.total?.over?.close?.odds  ?? oddsEntry?.total?.over?.open?.odds
+  const underRaw = oddsEntry?.total?.under?.close?.odds ?? oddsEntry?.total?.under?.open?.odds
+  if (line == null || overRaw == null || underRaw == null) return null
+  const over  = americanToDecimal(overRaw)
+  const under = americanToDecimal(underRaw)
+  if (!over || !under) return null
+  return { line, over, under }
 }
 
 // Deux formats rencontrés selon le provider (voir commentaire au-dessus) —
@@ -374,6 +401,7 @@ async function fetchEspnPregameOddsResult(slug, match, fdHome, fdAway) {
       return {
         decimal: { home: homeOdds, draw: drawOdds, away: awayOdds },
         pct:     { home: (pHome / sum) * 100, draw: (pDraw / sum) * 100, away: (pAway / sum) * 100 },
+        total:   extractTotal(entry),
       }
     }
     return null

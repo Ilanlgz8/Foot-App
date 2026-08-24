@@ -23,6 +23,7 @@ const LiveMatchPage = lazy(() => import('./pages/LiveMatchPage.jsx'))
 const MatchPage = lazy(() => import('./pages/MatchPage.jsx'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
 const Pronos = lazy(() => import('./pages/Pronos.jsx'))
+const MesParis = lazy(() => import('./pages/MesParis.jsx'))
 // DebugEspn : route désactivée (audit sécurité — page de diagnostic accessible
 // publiquement sans auth). Fichier gardé tel quel dans src/pages/DebugEspn.jsx
 // pour la remonter facilement si un bug ESPN similaire réapparaît : il suffit
@@ -48,6 +49,7 @@ function preloadRoutes() {
   import('./pages/MatchPage.jsx')
   import('./pages/FavoritesPage.jsx')
   import('./pages/Pronos.jsx')
+  import('./pages/MesParis.jsx')
   import('./components/MentionsLegales.jsx')
 }
 
@@ -152,6 +154,7 @@ function App() {
                 <Route path="/match/:matchId" element={<MatchPage />} />
                 <Route path="/favoris" element={<FavoritesPage />} />
                 <Route path="/pronos" element={<Pronos />} />
+                <Route path="/mes-paris" element={<MesParis />} />
                 <Route path="/mentions-legales" element={<MentionsLegales />} />
                 {/* <Route path="/debug-espn" element={<DebugEspn />} /> — voir commentaire import ci-dessus */}
               </Routes>
