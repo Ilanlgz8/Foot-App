@@ -8,8 +8,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
-import { getMatchState, TERMINE_GRACE_MS } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
+import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -148,6 +148,40 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
   const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
     ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
+
+  // ⚠️ FILET DE SÉCURITÉ (bug signalé : "reprise dans Xmin" jamais affiché,
+  // juste "Mi-temps" statique, ET la minute affichée ensuite en 2e MT décalée
+  // de +15min ou plus) — même fix déjà en place sur MatchCard.jsx/
+  // MatchPoster.jsx (16/08) mais oublié ici. Root cause : pausedAt n'est posé
+  // par useLiveMinute.js QUE s'il détecte la transition IN_PLAY→PAUSED en
+  // temps réel (app ouverte à ce moment précis) ; MatchCard.jsx/MatchPoster.jsx
+  // le posent aussi eux-mêmes en filet de sécurité dès qu'ils witnessent 'MT',
+  // mais cette page (LiveMatchPage) ne le faisait pas — un appareil resté
+  // exclusivement sur CETTE page pendant toute la mi-temps (jamais passé par
+  // Accueil) ne voyait donc jamais pausedAt posé nulle part. Conséquence en
+  // cascade : les 2 détections qui posent half2Start (useLiveMinute.js,
+  // "2H détecté" + "ancrage précoce") exigent TOUTES LES DEUX pausedAt déjà
+  // présent — sans lui, jamais posé non plus, et calcMinute() retombe sur les
+  // heuristiques kickoffAt/utcDate (moins précises que l'horloge ESPN réelle)
+  // plus longtemps que prévu une fois la 2e MT reprise, d'où le décalage.
+  // Même estimation qu'ailleurs : ESPN GÈLE son horloge sur la minute réelle
+  // atteinte au coup de sifflet — jamais Date.now() (ferait repartir le
+  // countdown à 15min au lieu du temps de pause déjà écoulé).
+  useEffect(() => {
+    if (!isHalftime) return
+    const state = getMatchState(match.id)
+    if (state.pausedAt || state.half2Start) return
+    const koReference   = state.kickoffAt ?? new Date(match.utcDate).getTime()
+    const realHalfMins  = parseEspnClock(state.espnClock)?.base
+    const halfMins      = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
+    const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
+    trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
+    // match.id sert de proxy stable pour match.utcDate (fixe pour un match
+    // donné) — même pattern que MatchCard.jsx/MatchPoster.jsx, voir leur
+    // commentaire détaillé : dépendre de `match` en entier redéclencherait
+    // cet effet à chaque poll live (nouvel objet à chaque update de score).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHalftime, match.id])
 
   const fsLive = finalScore(match.score)
   const hs  = mergeScore(espn?.home, fsLive.home ?? match.score?.halfTime?.home)
