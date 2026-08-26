@@ -30,7 +30,15 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // en parallèle) — seuls Classement.jsx et ClassementTab (MatchModal.jsx, même
 // collision : standings+form ensemble) passent un délai explicite.
 export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
-  const key = `scorers_${compId}`
+  // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
+  // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
+  // (tryFetch) a pu déjà écrire un [] en cache localStorage AVANT ce
+  // déploiement, avec un staleTime allant jusqu'à 24h (NO_MATCH_STALE_MS) —
+  // sans ce bump, un appareil déjà "empoisonné" continuerait d'afficher
+  // "Aucun buteur disponible" jusqu'à l'expiration naturelle de ce cache
+  // périmé. Changer la clé fait repartir de zéro instantanément pour tout
+  // le monde, sans jamais devoir attendre.
+  const key = `scorers2_${compId}`
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
@@ -57,7 +65,19 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
         const r = await fetchPromise
         if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
         const fresh = !r.headers.get('X-Cache')
-        if (!r.ok) return { scorers: null, fresh }
+        // ⚠️ BUG CORRIGÉ (constat utilisateur : "aucun buteur disponible" sur
+        // La Liga/Serie A alors que l'API a bien de vraies données — confirmé
+        // par appel réel direct sur /api/football?...scorers&limit=500,
+        // timeout backend FD.org reproduit plusieurs fois sur CES 2 comps
+        // précises à ce volume, alors que PL/FL1 répondent normalement) :
+        // un !r.ok (timeout, 500...) retournait { scorers: null } SANS lever
+        // d'exception — `scorers` finissait réécrit en [] plus bas et ÉCRIT
+        // EN CACHE comme une vraie réponse "0 buteur" (2min, ou 24h si
+        // NO_MATCH_STALE_MS) : un échec transitoire devenait un faux "aucun
+        // buteur" persistant. Lève maintenant une exception sur TOUT !r.ok,
+        // pas seulement 429/403 — tombe dans le vrai filet plus bas (repli
+        // limit=100, puis readCacheStale), jamais un [] inventé.
+        if (!r.ok) throw new Error(String(r.status))
         const j = await r.json()
         return { scorers: j.scorers ?? null, fresh }
       }
@@ -87,8 +107,26 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
         }
         if (!scorers || scorers.length === 0) {
           if (fresh) await new Promise(res => setTimeout(res, 6_000))
-          const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
-          scorers = r2.scorers
+          try {
+            const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+            scorers = r2.scorers
+          } catch (e) {
+            // 429/403 : problème de compte/quota, pas de volume — retenter à
+            // un limit plus bas n'y changerait rien, direction le filet
+            // readCacheStale du catch englobant, comme avant.
+            if (e.message === '429' || e.message === '403') throw e
+            // ⚠️ AJOUT — filet spécifique au bug ci-dessus (voir tryFetch) :
+            // limit=500 a été vu timeout côté backend FD.org précisément sur
+            // La Liga et la Serie A (reproduit plusieurs fois, appel réel),
+            // alors qu'un limit plus bas répond instantanément avec de vraies
+            // données. Un dernier essai à limit=100 avant d'abandonner —
+            // couvre largement les buteurs réellement utiles à l'affichage
+            // (voir Classement.jsx), sans rien changer pour les compétitions
+            // où limit=500 marchait déjà (tenté en 1er, ce repli n'est qu'un
+            // 2e filet, jamais utilisé si le 1er essai réussit).
+            const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
+            scorers = r3.scorers
+          }
         }
       } catch {
         const stale = readCacheStale(key)

@@ -153,7 +153,16 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // UNPERSISTED_QUERY_KEYS ci-dessus) ne sont plus persistées en localStorage
 // du tout — élimine la cause racine du quota dépassé (v10 ne faisait que
 // gérer le symptôme). Bump pour repartir sur un blob propre.
-const CACHE_BUSTER = 'v11-2026-07-20-unpersist-large-match-queries'
+// v12 : useScorers.js (constat utilisateur : "aucun buteur disponible" sur
+// La Liga/Serie A alors que football-data.org a bien de vraies données,
+// confirmé par appel réel direct sur l'API déployée) — un échec transitoire
+// (timeout backend FD.org, reproduit plusieurs fois précisément sur ces 2
+// compétitions à limit=500) n'était pas distingué d'un vrai "0 buteur" et
+// pouvait être persisté tel quel jusqu'à 24h (NO_MATCH_STALE_MS). Corrigé
+// côté hook (tryFetch lève désormais sur tout échec, repli limit=100 avant
+// d'abandonner) — ce bump vide tout résultat "[]" déjà persisté pour ce
+// query key précis suite à ce bug, pour repartir sur un vrai fetch propre.
+const CACHE_BUSTER = 'v12-2026-08-27-fix-scorers-empty-cache'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider
