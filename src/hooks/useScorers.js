@@ -38,7 +38,14 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // "Aucun buteur disponible" jusqu'à l'expiration naturelle de ce cache
   // périmé. Changer la clé fait repartir de zéro instantanément pour tout
   // le monde, sans jamais devoir attendre.
-  const key = `scorers2_${compId}`
+  // ⚠️ Re-bumpée scorers2_ → scorers3_ (28/08, 2e bug trouvé le même jour,
+  // voir le `throw err` ci-dessous) : le tout premier déploiement du fix
+  // précédent a pu, sur certains appareils, essuyer un 429 (budget FD.org
+  // partagé, cf CLAUDE.md) juste après le changement de clé — cet ancien
+  // code avalait alors l'erreur et écrivait quand même un faux [] sous
+  // scorers2_. TTL court (2min) donc pas critique, mais autant repartir
+  // propre plutôt que d'attendre une expiration naturelle.
+  const key = `scorers3_${compId}`
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
@@ -128,10 +135,29 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
             scorers = r3.scorers
           }
         }
-      } catch {
+      } catch (err) {
+        // ⚠️ BUG CORRIGÉ (constat utilisateur, 28/08 : "y'a aucun buteur" sur
+        // La Liga/Serie A juste après le déploiement du fix précédent — testé
+        // en direct sur l'API prod, les DEUX ont pourtant de vraies données)
+        // : ce catch avalait TOUT échec (y compris 429/403 — budget FD.org
+        // dépassé, cf CLAUDE.md) en un simple `scorers = null` → `[]`, sans
+        // jamais relancer l'erreur. Résultat : `error` ne remontait jamais à
+        // useQuery, `classifyFetchError` ne pouvait donc jamais afficher le
+        // vrai message "Veuillez patienter quelques instants" — l'UI
+        // affichait "Aucun buteur disponible" (repli readCacheStale absent)
+        // exactement comme un vrai 0 buteur, indiscernable. Pire : ce faux []
+        // était ensuite écrit en cache (writeCache 2min plus bas), donc même
+        // un rechargement immédiat restait bloqué sur le faux résultat tant
+        // que ce cache ne périmait pas. FL1/PL n'étaient jamais touchées
+        // (comp par défaut, chargée en 1er, gagne toujours la course au
+        // budget partagé) — La Liga/Serie A, chargées après un changement
+        // d'onglet, perdent plus souvent cette course. Même mécanisme déjà
+        // correct dans useStandings.js (`throw err` en dernier recours) —
+        // aligné ici : sans cache de secours, on relance l'erreur au lieu de
+        // fabriquer un faux "0 buteur".
         const stale = readCacheStale(key)
         if (stale) return stale
-        scorers = null
+        throw err
       }
       scorers = scorers ?? []
       writeCache(key, scorers, STALE_MS)

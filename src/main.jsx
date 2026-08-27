@@ -162,7 +162,14 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // côté hook (tryFetch lève désormais sur tout échec, repli limit=100 avant
 // d'abandonner) — ce bump vide tout résultat "[]" déjà persisté pour ce
 // query key précis suite à ce bug, pour repartir sur un vrai fetch propre.
-const CACHE_BUSTER = 'v12-2026-08-27-fix-scorers-empty-cache'
+// v13 : 2e bug useScorers.js trouvé le même jour (constat utilisateur :
+// "aucun buteur" sur La Liga/Serie A malgré le fix v12) — le catch englobant
+// avalait un 429 (budget FD.org partagé) sans jamais le relancer, écrivant un
+// faux [] au lieu d'afficher "Veuillez patienter quelques instants" comme le
+// fait déjà useStandings.js. Corrigé (`throw err` en dernier recours, aligné
+// sur useStandings.js). Bump pour vider tout faux [] déjà écrit sous ce
+// mécanisme avant le fix.
+const CACHE_BUSTER = 'v13-2026-08-28-fix-scorers-429-swallowed'
 
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider
