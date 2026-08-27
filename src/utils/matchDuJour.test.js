@@ -39,4 +39,22 @@ describe('pickMatchDuJour', () => {
     const tard = makeMatch('FL1', 'Toulouse', 'Nantes', 20)
     expect(pickMatchDuJour([tot, tard])).toBe(tard)
   })
+
+  it('une compétition auparavant absente (Euro, Ligue des Nations, CAN, Copa America, Ligue Europa, Supercoupe UEFA, TDC/CS) peut désormais devenir match du jour', () => {
+    const nl = makeMatch('NL', 'France', 'Allemagne', 13)
+    const autreNl = makeMatch('NL', 'Malte', 'Andorre', 20)
+    expect(pickMatchDuJour([nl, autreNl])).toBe(nl)
+  })
+
+  it('la Coupe du monde garde la priorité sur l\'Euro et la Ligue des Champions', () => {
+    const wc = makeMatch('WC', 'Panama', 'Curaçao', 13)
+    const clasico = makeMatch('CL', 'Real Madrid', 'Barcelona', 20)
+    expect(pickMatchDuJour([wc, clasico])).toBe(wc)
+  })
+
+  it('un match Ligue Europa avec 2 grands clubs bat un match CAN sans grande nation, même tier', () => {
+    const uel = makeMatch('UEL', 'Ajax', 'Benfica', 13)
+    const can = makeMatch('CAN', 'Comores', 'Eswatini', 20)
+    expect(pickMatchDuJour([uel, can])).toBe(uel)
+  })
 })
