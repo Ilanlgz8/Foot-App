@@ -135,9 +135,20 @@ export function extractEspnCards(comp, homeTeamId) {
 }
 
 // ── Formatage ───────────────────────────────────────────────────────────
+// ⚠️ BUG CORRIGÉ (constat utilisateur : minute des notifs de but/carton
+// affichée avec 2 apostrophes, ex. "45''") : supposait que `raw` (clock
+// brut ESPN) était toujours au format "45:00" sans apostrophe — mais ESPN
+// renvoie en pratique déjà la minute pré-formatée AVEC son apostrophe
+// ("36'", "45'+2'", voir espnSummaryParse.test.js). Comme il n'y a pas de
+// ":" dans ce format, split(':')[0] renvoyait la string déjà terminée par
+// une apostrophe, à laquelle on en rajoutait une 2e derrière. Même correctif
+// idempotent déjà appliqué côté client pour ce cas précis (voir
+// espnMinuteLabel, MatchModal.jsx) — n'ajoute une apostrophe que si elle
+// n'y est pas déjà.
 export function minuteLabel(raw) {
   const base = String(raw ?? '').split(':')[0]
-  return base ? `${base}'` : ''
+  if (!base) return ''
+  return base.endsWith("'") ? base : `${base}'`
 }
 
 export function dateStr(d) {

@@ -194,6 +194,12 @@ describe('formatage', () => {
     expect(minuteLabel(null)).toBe('')
   })
 
+  it('minuteLabel n\'ajoute pas une 2e apostrophe si ESPN en fournit déjà une (constat utilisateur : notifs de but affichant "45\'\'")', () => {
+    expect(minuteLabel("36'")).toBe("36'")
+    expect(minuteLabel("45'+2'")).toBe("45'+2'")
+    expect(minuteLabel("93'")).toBe("93'")
+  })
+
   it('dateStr formate en YYYYMMDD', () => {
     expect(dateStr(new Date(2026, 6, 15))).toBe('20260715') // mois JS 0-indexé (juillet=6)
   })
