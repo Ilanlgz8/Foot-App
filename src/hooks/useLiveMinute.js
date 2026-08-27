@@ -72,6 +72,16 @@ const KNOCKOUT_STAGES = ['LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 
 // tout en restant bien en dessous des 3h d'auto-expiration de l'état 'ended'.
 const REVERSAL_GRACE_MS = 20 * 60_000
 
+// Statuts ESPN considérés "match en cours" — même liste que la condition
+// CAS 1 plus bas, extraite ici pour être réutilisée par isFalseEndedReversal
+// (voir le bug corrigé juste à côté : sans vérifier le statut réel, la
+// fenêtre de grâce à elle seule "débloquait" n'importe quel match VRAIMENT
+// terminé rouvert dans les 20min suivant sa fin, pas seulement un faux FT).
+const LIVE_ISH_STATUSES = new Set([
+  'STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD',
+  'STATUS_EXTRA_TIME', 'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
+])
+
 // Cache module-level des scores ESPN (scores + buteurs + stats).
 const espnScoresCache = {}
 
@@ -759,13 +769,49 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // c'est la preuve que c'était un faux FT — on débloque. Une résurrection
       // avec un espnEventId différent (le vrai bug d'origine) reste bloquée
       // comme avant.
+      // ── Correction statuts FIFA implausibles ─────────────────────────────────
+      // FIFA retourne parfois STATUS_EXTRA_TIME/OVERTIME lors de transitions normales
+      // (halftime, début 2e MT) — même bug que le faux STATUS_FINAL à la 21e min.
+      // Condition : clock < 90' ET matchAge < 90min → impossible d'être en prolongations.
+      // ⚠️ DÉPLACÉ avant isFalseEndedReversal (voir juste en dessous) : ce
+      // dernier a besoin de safeStatus pour vérifier que le match est VRAIMENT
+      // encore en cours avant de lever le verrou anti-résurrection.
+      let safeStatus = espnStatus
+      let safePeriod = espnPeriod ?? null
+      if (safeStatus === 'STATUS_EXTRA_TIME' || safeStatus === 'STATUS_OVERTIME') {
+        const clockMins = parseClockMins(espnClock)
+        const etImplausible = (clockMins === null || clockMins < 90) && matchAge < 90
+        if (etImplausible) {
+          safeStatus = 'STATUS_IN_PROGRESS'
+          // Période estimée depuis matchAge (1re MT si < 50min depuis utcDate, 2e MT sinon)
+          safePeriod = matchAge < 50 ? 1 : 2
+        }
+      }
+
       const liveStateInfo = getLiveState(mid)
+      // ⚠️ BUG CORRIGÉ (constat utilisateur : un match VRAIMENT terminé
+      // depuis longtemps réapparaît "en cours" quand on rouvre l'app
+      // quelques minutes après, avant de redisparaître peu après) : cette
+      // condition ne vérifiait QUE "même espnEventId + moins de 20min depuis
+      // la fin déclarée" — sans jamais regarder le statut ESPN reçu à CE
+      // poll précis. Résultat : rouvrir l'app sur N'IMPORTE QUEL match
+      // correctement terminé, tant que c'était il y a moins de 20min,
+      // débloquait TOUJOURS le verrou anti-résurrection (`clearFtFlags`),
+      // même quand la donnée fraîche reçue disait encore FINAL — ce n'est
+      // que le poll SUIVANT (2e confirmation FINAL nécessaire, voir
+      // pendingFt) qui refermait le match, d'où le flash "réapparaît puis
+      // redisparaît". Ajout de `LIVE_ISH_STATUSES.has(safeStatus)` : le
+      // verrou n'est levé QUE si la donnée reçue à CET instant montre
+      // réellement un match encore actif (le vrai cas "faux FT" que ce
+      // mécanisme est censé corriger) — un FINAL fraîchement reconfirmé ne
+      // lève plus jamais le verrou pour rien.
       const isFalseEndedReversal =
         liveStateInfo.state === 'ended' &&
         liveStateInfo.espnEventId != null &&
         data.espnEventId != null &&
         String(liveStateInfo.espnEventId) === String(data.espnEventId) &&
-        (now - (liveStateInfo.endedAt ?? 0)) < REVERSAL_GRACE_MS
+        (now - (liveStateInfo.endedAt ?? 0)) < REVERSAL_GRACE_MS &&
+        LIVE_ISH_STATUSES.has(safeStatus)
       if (isFalseEndedReversal) {
         console.log(`[useLiveMinute] Faux FT corrigé (même espnEventId, match ${mid} toujours actif) — déblocage du verrou anti-résurrection`)
         setLiveState(mid, 'live')
@@ -794,37 +840,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         && prevState.termineAt != null
         && now < prevState.termineAt
 
-      // ── Correction statuts FIFA implausibles ─────────────────────────────────
-      // FIFA retourne parfois STATUS_EXTRA_TIME/OVERTIME lors de transitions normales
-      // (halftime, début 2e MT) — même bug que le faux STATUS_FINAL à la 21e min.
-      // Condition : clock < 90' ET matchAge < 90min → impossible d'être en prolongations.
-      let safeStatus = espnStatus
-      let safePeriod = espnPeriod ?? null
-      if (safeStatus === 'STATUS_EXTRA_TIME' || safeStatus === 'STATUS_OVERTIME') {
-        const clockMins = parseClockMins(espnClock)
-        const etImplausible = (clockMins === null || clockMins < 90) && matchAge < 90
-        if (etImplausible) {
-          safeStatus = 'STATUS_IN_PROGRESS'
-          // Période estimée depuis matchAge (1re MT si < 50min depuis utcDate, 2e MT sinon)
-          safePeriod = matchAge < 50 ? 1 : 2
-        }
-      }
-
       // Toujours écrire les données ESPN (pour calcMinute + interpolation)
       setEspnData(mid, { espnClock, espnStatus: safeStatus, espnPeriod: safePeriod })
 
       // ════════════════════════════════════════════════════════════════════
       // CAS 1 : Match EN COURS — utilise safeStatus (statuts corrigés inclus)
       // ════════════════════════════════════════════════════════════════════
-      if (
-        !alreadyEnded && (
-        safeStatus === 'STATUS_IN_PROGRESS' ||
-        safeStatus === 'STATUS_HALFTIME'    ||
-        safeStatus === 'STATUS_END_PERIOD'  ||
-        safeStatus === 'STATUS_EXTRA_TIME'  ||
-        safeStatus === 'STATUS_OVERTIME'    ||
-        safeStatus === 'STATUS_SHOOTOUT'
-      )) {
+      if (!alreadyEnded && LIVE_ISH_STATUSES.has(safeStatus)) {
         if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
         delete pendingFt[mid]
         if (!isStaleFtReversal) clearFtFlags(mid)
