@@ -770,33 +770,34 @@ function Pronos() {
     }
   }
 
-  if (!hasGroup) {
-    return (
-      <div className="pronos__page">
-        <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
-      </div>
-    )
-  }
-
+  // ⚠️ Le simulateur (28/08, demande utilisateur) ne dépend d'aucune donnée
+  // de groupe — accessible directement, sans avoir à créer/rejoindre un
+  // groupe. Seuls les 3 onglets historiques (Pronos/Résultat/Classement)
+  // restent derrière l'écran groupe (JoinCreateScreen), affiché à la place
+  // du contenu de l'onglet tant qu'aucun groupe n'est rejoint — la barre
+  // d'onglets, elle, reste toujours visible pour que le Simulateur soit
+  // découvrable avant même de rejoindre un groupe.
   const playerCount = Object.keys(players).length || 1
 
   return (
     <div className="pronos__page">
-      <div className="pronos__header">
-        <div>
-          <div className="pronos__headerLabel">Groupe</div>
-          <div className="pronos__headerCode">{groupCode}</div>
+      {hasGroup && (
+        <div className="pronos__header">
+          <div>
+            <div className="pronos__headerLabel">Groupe</div>
+            <div className="pronos__headerCode">{groupCode}</div>
+          </div>
+          <div className="pronos__headerRight">
+            <span className="pronos__playerCount">{playerCount} joueur{playerCount > 1 ? 's' : ''}</span>
+            <button
+              className="pronos__leaveBtn"
+              onClick={() => { if (window.confirm('Quitter ce groupe de pronos ?')) leaveGroup() }}
+            >
+              Quitter
+            </button>
+          </div>
         </div>
-        <div className="pronos__headerRight">
-          <span className="pronos__playerCount">{playerCount} joueur{playerCount > 1 ? 's' : ''}</span>
-          <button
-            className="pronos__leaveBtn"
-            onClick={() => { if (window.confirm('Quitter ce groupe de pronos ?')) leaveGroup() }}
-          >
-            Quitter
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="pronos__tabs">
         <button
@@ -825,12 +826,16 @@ function Pronos() {
         </button>
       </div>
 
-      {activeTab !== 'classement' && activeTab !== 'simulateur' && (
+      {hasGroup && activeTab !== 'classement' && activeTab !== 'simulateur' && (
         <CompFilterBar competitions={filterableComps} active={effectiveCompFilter} onChange={setCompFilter} />
       )}
 
       <div ref={swipe.ref} className="pronos__tabContent">
-        {activeTab === 'pronos' && (
+        {!hasGroup && activeTab !== 'simulateur' && (
+          <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
+        )}
+
+        {hasGroup && activeTab === 'pronos' && (
           loadingUpcoming ? (
             <div className="pronos__empty">
               <span className="pronos__emptyTitle">Chargement…</span>
@@ -863,7 +868,7 @@ function Pronos() {
           )
         )}
 
-        {activeTab === 'resultat' && (
+        {hasGroup && activeTab === 'resultat' && (
           filteredInProgress.length === 0 && filteredRecentFinished.length === 0 ? (
             <div className="pronos__empty">
               <span className="pronos__emptyIcon">⚽</span>
@@ -898,7 +903,7 @@ function Pronos() {
           )
         )}
 
-        {activeTab === 'classement' && (
+        {hasGroup && activeTab === 'classement' && (
           leaderboard.length === 0 ? (
             <div className="pronos__empty">
               <span className="pronos__emptyIcon">🏆</span>
