@@ -1,49 +1,43 @@
-/* WatchBadge — pastille "Gratuit sur {chaîne}", auto-portée (CSS dédié, pas de
-   dépendance aux styles de la page hôte) pour être réutilisable telle quelle
-   sur LiveMatchPage/MatchPage et sur les lignes de Match.jsx. */
+/* WatchBadge — info diffuseur, auto-portée (CSS dédié, pas de dépendance aux
+   styles de la page hôte) pour être réutilisable telle quelle sur
+   LiveMatchPage/MatchPage et sur les lignes de Match.jsx.
+   ⚠️ REDESIGN (28/08, demande utilisateur : "j'aime pas le style... texte en
+   blanc... sans bordure arrondie... un truc propre") : ancien style pastille
+   (fond coloré + bordure + pilule) retiré — texte blanc/gris clair en flux
+   normal, sans fond ni bordure. Icône réelle par diffuseur écartée
+   (impossible de garantir un logo officiel fiable pour chacun des 6
+   diffuseurs concernés depuis cet environnement — voir broadcasters.js) au
+   profit d'un pictogramme "écran" générique, identique partout, pour rester
+   honnête plutôt que d'improviser un logo qui pourrait être faux. */
 .watchBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill, 999px);
-  background: rgba(34, 197, 94, 0.16);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #4ade80;
-  font-size: 0.72rem;
-  font-weight: 700;
+  gap: 6px;
   text-decoration: none;
   white-space: nowrap;
-  transition: background 0.15s, transform 0.15s;
+  color: #f4f4f5;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s;
 }
 
 .watchBadge:hover,
 .watchBadge:active {
-  background: rgba(34, 197, 94, 0.26);
-  transform: translateY(-1px);
+  opacity: 0.8;
 }
 
-.watchBadge__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4ade80;
+.watchBadge__icon {
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
+  color: #a1a1aa;
 }
 
-/* Diffuseur payant (28/08) : jamais le même vert que "Gratuit" — couleur
-   neutre (identité rouge de l'app plutôt que vert "disponible gratuitement",
-   qui induirait en erreur pour un abonnement payant). Pas de curseur pointer
-   quand ce n'est pas un lien (voir WatchBadge.jsx, url absent). */
-.watchBadge--paid {
-  background: rgba(var(--red-rgb), 0.12);
-  border: 1px solid rgba(var(--red-rgb), 0.3);
-  color: var(--red-light, #f87171);
-  cursor: default;
-}
-
-.watchBadge--paid .watchBadge__dot {
-  background: var(--red-light, #f87171);
+/* Seul cas gratuit confirmé (M6/Coupe du Monde) : le mot "Gratuit" en vert,
+   pour rester repérable au premier coup d'œil sans revenir à une pastille. */
+.watchBadge__free {
+  color: #4ade80;
 }
 
 /* Variante "hero" (LiveMatchPage/MatchPage) : coin haut-droit du bandeau
@@ -66,15 +60,14 @@
   top: 0.5rem;
   right: 0.6rem;
   font-size: 0.62rem;
-  padding: 3px 8px;
   z-index: 2;
 }
 
 /* Variante "score" (28/08, demande utilisateur : sous le score dans
-   LiveMatchPage plutôt qu'en coin haut-droit) : en flux normal (pas
-   absolute) — le parent .mp__hero__center est déjà un flex column centré
-   (voir MatchPage.css), pas besoin de re-centrer ici, juste un peu d'air
-   au-dessus pour le détacher visuellement du score/pens.
+   LiveMatchPage/MatchPage plutôt qu'en coin haut-droit) : en flux normal
+   (pas absolute) — le parent .mp__hero__center est déjà un flex column
+   centré (voir MatchPage.css), pas besoin de re-centrer ici, juste un peu
+   d'air au-dessus pour le détacher visuellement du score/pens.
    `gap: 2px` du parent suffit — margin-top pour un espacement plus net que
    ce gap, pensé pour des éléments plus proches (score/badge période). */
 .watchBadge--score {
