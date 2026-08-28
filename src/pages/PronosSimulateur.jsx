@@ -50,7 +50,7 @@
  */
 import { useState, useMemo } from 'react'
 import { useStandings } from '../hooks/useStandings'
-import { useTeamFormMulti } from '../hooks/useTeamForm'
+import { useTeamFormMulti, buildFormMap } from '../hooks/useTeamForm'
 import { useCrossCompH2H } from '../hooks/useCrossCompH2H'
 import { calcPronoAdvanced, fitLambdasToPreMatch, scoreExactProbabilities } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
@@ -58,6 +58,41 @@ import { translateTeam } from '../data/teamNames'
 
 const SIM_COMP_IDS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const SIM_COMPS = COMPETITIONS.filter(c => SIM_COMP_IDS.includes(c.id))
+
+// ⚠️ AJOUT (28/08, constat utilisateur : "ça me donne a chaque fois le score
+// 1-1") — root cause vérifiée (pas devinée) : on est à J1-J2 de la saison
+// 2026-2027 (playedGames:1 sur la quasi-totalité des clubs PL au moment de
+// cet ajout, confirmé via /api/football standings réel). useTeamForm.js ne
+// construit JAMAIS formMap depuis la saison précédente (décision explicite
+// du 25/07, "le mercato a pu tout changer entre-temps", voir son
+// commentaire) — formMap est donc PRESQUE VIDE pour la quasi-totalité des
+// clubs de TOUS les championnats en ce moment précis, pas juste ici. Avec 2
+// équipes en forme neutre des 2 côtés, le modèle Poisson converge presque
+// toujours sur 1-1 (score le plus probable pour 2 λ proches et modérés) —
+// vérifié empiriquement (voir historique) : le H2H multi-années ci-dessus
+// fonctionne bel et bien et déplace la prédiction dès qu'il y a un vrai
+// signal (testé Arsenal-Chelsea, H2H dominant → 1-0 devient le score le
+// plus probable), mais ne peut rien faire quand il n'y a NI H2H NI forme
+// des 2 côtés.
+// Fix scopé UNIQUEMENT au Simulateur (jamais useTeamForm.js/calcProno.js/
+// Pronos réel — la décision du 25/07 reste intacte pour tout le reste de
+// l'app) : si la forme CETTE saison est trop courte pour être utile (<3
+// matchs), on reconstruit une forme de repli depuis la saison précédente de
+// CETTE compétition (déjà chargée par useTeamFormMulti dans matchesByComp,
+// aucun appel réseau en plus — c'est exactement fallbackMatches que
+// useTeamForm.js calcule déjà pour le modèle buts/H2H, juste jamais utilisé
+// pour formMap jusqu'ici). Compromis assumé et différent du reste de
+// l'app : le Simulateur est un outil de curiosité (score hypothétique),
+// pas un pronostic "argent réel" (Mes Paris) — accepter un léger risque
+// mercato ici pour éviter un 1-1 systématique et sans intérêt en tout début
+// de saison est le bon arbitrage, mais PAS pour Mes Paris/Pronos.
+const MIN_FORM_GAMES = 3
+function effectiveForm(formMap, matchesByComp, comp, teamId) {
+  const current = formMap?.[teamId] ?? []
+  if (current.length >= MIN_FORM_GAMES) return current
+  const fallback = buildFormMap(matchesByComp?.[comp] ?? [])[teamId] ?? []
+  return fallback.length > current.length ? fallback : current
+}
 
 // Cherche la ligne standings (nom + crest) d'une équipe déjà sélectionnée —
 // un seul point de vérité pour TeamPicker (crest dans le cercle) ET le
@@ -143,7 +178,7 @@ export function PronosSimulateur() {
   // sélection dans les menus).
   const [compared, setCompared] = useState(null)
 
-  const { formMap } = useTeamFormMulti([homeComp, awayComp].filter(Boolean))
+  const { formMap, matchesByComp } = useTeamFormMulti([homeComp, awayComp].filter(Boolean))
 
   // Toujours appelés (règle des Hooks) — useStandings gère déjà en interne
   // le cas `compId` absent (enabled: !!selectedComp), retourne [] sans fetch.
@@ -170,13 +205,23 @@ export function PronosSimulateur() {
 
   const prono = useMemo(() => {
     if (!isComparing) return null
-    const homeForm = formMap?.[homeTeamId] ?? []
-    const awayForm = formMap?.[awayTeamId] ?? []
+    // effectiveForm : repli saison précédente si la forme CETTE saison est
+    // trop courte (début de saison, voir commentaire MIN_FORM_GAMES plus
+    // haut) — scopé au Simulateur uniquement.
+    const homeForm = effectiveForm(formMap, matchesByComp, homeComp, homeTeamId)
+    const awayForm = effectiveForm(formMap, matchesByComp, awayComp, awayTeamId)
     // compMatches=[] force le repli forme+H2H (voir commentaire en tête de
     // fichier) — jamais le modèle "buts marqués/encaissés" (a besoin d'un
     // seul championnat de référence commun aux 2 équipes).
     return calcPronoAdvanced(homeTeamId, awayTeamId, [], homeForm, awayForm, { fullH2H: meetings })
-  }, [isComparing, formMap, homeTeamId, awayTeamId, meetings])
+  }, [isComparing, formMap, matchesByComp, homeComp, awayComp, homeTeamId, awayTeamId, meetings])
+
+  // Juste pour la transparence de la note affichée plus bas (voir
+  // MIN_FORM_GAMES) — pas utilisé dans le calcul lui-même.
+  const usingFallbackForm = isComparing && (
+    (formMap?.[homeTeamId]?.length ?? 0) < MIN_FORM_GAMES ||
+    (formMap?.[awayTeamId]?.length ?? 0) < MIN_FORM_GAMES
+  )
 
   // Scores les plus probables — dérivés du même pronostic forme+H2H
   // (voir commentaire en tête de fichier), triés par probabilité décroissante.
@@ -262,6 +307,7 @@ export function PronosSimulateur() {
               : meetings.length > 0
                 ? `Basé sur la forme récente des 2 équipes + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''}${sameCompInfo ? ' (plusieurs saisons)' : ' (toutes compétitions, saison en cours)'}.`
                 : 'Basé sur la forme récente des 2 équipes — aucune confrontation directe trouvée dans leur historique.'}
+            {usingFallbackForm && ' Championnat tout juste relancé : forme partiellement basée sur la saison précédente.'}
           </p>
         </div>
       )}
