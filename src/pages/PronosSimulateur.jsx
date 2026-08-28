@@ -15,31 +15,47 @@
  * NO_STANDINGS_COMPS dans data/competitions.js) n'ont pas de liste
  * d'équipes exploitable ici — pas ajoutées plutôt que bricolées.
  *
- * ⚠️ Modèle utilisé, choix fait avec l'utilisateur (28/08) : PAS le modèle
- * "buts marqués/encaissés" (calcPronoAdvanced avec compMatches) — il compare
- * chaque équipe à la MOYENNE DE BUTS DE SON CHAMPIONNAT, ce qui n'a de sens
- * que si les 2 équipes sont dans LE MÊME championnat. Comparer 2 équipes de
- * championnats différents avec ce modèle demanderait d'inventer un facteur
- * de conversion entre championnats — aucune donnée fiable pour le justifier.
- * À la place : forme récente (V/N/D, pareil pour toutes les équipes, aucune
- * dépendance à un championnat) + confrontations directes toutes compétitions
- * confondues si elles existent (useCrossCompH2H, nouveau — voir son
- * commentaire). C'est exactement le chemin de repli déjà existant et testé
- * dans calcPronoAdvanced (`fallback()`, utilisé normalement en tout début de
- * saison) — réutilisé tel quel en passant compMatches=[] pour le forcer à
- * s'y engager systématiquement, aucune nouvelle logique de calcul écrite.
+ * ⚠️ Modèle RÉÉCRIT (28/08, constat utilisateur : "souvent le meme score...
+ * ça monte rarement au dessu de 2 buts... enleve ça a moins que tu es une
+ * alternative") — root cause de la platitude : l'ancien modèle passait par
+ * calcPronoAdvanced(compMatches=[]) qui ne donne QUE 3 % (dom./nul/ext.),
+ * puis fitLambdasToPreMatch reconstruisait des buts espérés (λ) en
+ * cherchant, par bissection, N'IMPORTE QUELLE paire qui reproduit ces 3 %
+ * (bornée à 1.2-4.5 buts TOTAL, voir FIT_TOTAL_GOALS_MIN/MAX dans
+ * calcProno.js) — un aller-retour avec perte : 2 équipes qui marquent
+ * beaucoup mais dont le % 1/N/2 final ressemble à n'importe quel autre match
+ * "équilibré" retombaient sur les mêmes λ modérés que n'importe quelle autre
+ * paire, quelle que soit leur vraie intensité offensive. Les vrais λ
+ * n'étaient JAMAIS utilisés pour l'affichage, seulement en interne par
+ * calcPronoAdvanced puis jetés.
+ *
+ * Nouveau modèle : buts marqués/encaissés RÉELS de chaque équipe (3 saisons
+ * pooled, voir pooledForm/useH2HHistory plus bas), MAIS chaque équipe
+ * normalisée contre SA PROPRE moyenne de championnat (buildGoalModel,
+ * calcProno.js, exporté pour l'occasion — même fonction/mêmes constantes que
+ * le modèle "réel" utilisé par Pronos/Mes Paris, aucune logique dupliquée) —
+ * c'est précisément ce qui manquait pour ne pas comparer 2 équipes de
+ * championnats différents à l'aveugle (l'objection d'origine, 28/08 plus
+ * haut dans l'historique) : Bundesliga et Ligue 1 n'ont pas le même niveau
+ * de scoring moyen, donc une équipe est mesurée par rapport AUX AUTRES
+ * ÉQUIPES DE SON PROPRE CHAMPIONNAT (ratio attaque/défense, shrinkRatio),
+ * puis ce ratio est appliqué à une base neutre commune = MOYENNE DES 2
+ * CHAMPIONNATS (ni l'un ni l'autre favorisé) plutôt qu'à la moyenne d'un
+ * seul — voir crossLeagueLambdas plus bas. Repli automatique sur l'ancien
+ * chemin forme+H2H (fitLambdasToPreMatch) uniquement si les données sont
+ * insuffisantes pour un championnat donné (buildGoalModel renvoie null,
+ * <10 matchs même après pooling 3 saisons — cas rarissime).
+ *
+ * H2H (useCrossCompH2H) mélangé DIRECTEMENT dans les λ (blendH2HIntoLambdas,
+ * moyenne réelle des buts marqués lors des vraies confrontations, pondérée
+ * comme H2H_WEIGHT_MAX/H2H_WEIGHT_PER_MATCH — mêmes constantes que le reste
+ * de l'app, exportées) plutôt qu'au niveau des %, pour ne plus jamais perdre
+ * l'info "combien de buts" en cours de route.
  *
  * ⚠️ Affichage du résultat (28/08, demande utilisateur : "je demande de
  * simulé le score exact et tout... pas les côtes on s'en fou de ça") — PAS
- * de pilules de cotes 1/N/2. Le pronostic forme+H2H ci-dessus donne 3 %
- * (victoire dom./nul/victoire ext.), pas un score : fitLambdasToPreMatch
- * (calcProno.js, déjà utilisée par calcLiveProno dans le même cas — pas de
- * vraies stats buts marqués/encaissés dispo) retrouve une paire de buts
- * espérés (λ) qui REPRODUIT fidèlement ces mêmes 3 %, puis
- * scoreExactProbabilities (déjà utilisée dans Mes Paris, grille Poisson) en
- * tire une probabilité par score. Ce n'est pas une nouvelle prédiction ni un
- * nombre inventé : c'est le même pronostic forme+H2H, juste reformulé en
- * scores plutôt qu'en 1/N/2.
+ * de pilules de cotes 1/N/2 : scoreExactProbabilities (déjà utilisée dans
+ * Mes Paris, grille Poisson) appliquée DIRECTEMENT aux λ réels ci-dessus.
  *
  * ⚠️ Design (28/08, demande utilisateur : "ça fait pas design du tout") —
  * vrais logos de club (row.team.crest, déjà exposé par football-data.org via
@@ -53,7 +69,12 @@ import { useStandings } from '../hooks/useStandings'
 import { useTeamFormMulti, buildFormMap } from '../hooks/useTeamForm'
 import { useH2HHistory } from '../hooks/useMatchs'
 import { useCrossCompH2H } from '../hooks/useCrossCompH2H'
-import { calcPronoAdvanced, fitLambdasToPreMatch, scoreExactProbabilities } from '../utils/calcProno'
+import {
+  calcPronoAdvanced, fitLambdasToPreMatch, poissonPmf,
+  buildGoalModel, clampLambda, shrinkRatio, MIN_TEAM_SPLITS,
+  H2H_WEIGHT_MAX, H2H_WEIGHT_PER_MATCH,
+} from '../utils/calcProno'
+import { finalScore } from '../utils/matchUtils'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 
@@ -104,12 +125,94 @@ const SIM_COMPS = COMPETITIONS.filter(c => SIM_COMP_IDS.includes(c.id))
 // outil de curiosité (score hypothétique), pas un pronostic "argent réel"
 // (Mes Paris) — accepter un léger risque mercato ici pour éviter un 1-1
 // systématique et sans intérêt en tout début de saison est le bon arbitrage.
-function pooledForm(currentSeasonMatches, extraSeasonsMatches, teamId) {
-  if (teamId == null) return []
-  const merged = [...(currentSeasonMatches ?? []), ...(extraSeasonsMatches ?? [])]
+function pooledMatches(currentSeasonMatches, extraSeasonsMatches) {
+  return [...(currentSeasonMatches ?? []), ...(extraSeasonsMatches ?? [])]
     .filter(m => m.status === 'FINISHED')
     .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
-  return buildFormMap(merged)[teamId] ?? []
+}
+
+function pooledForm(currentSeasonMatches, extraSeasonsMatches, teamId) {
+  if (teamId == null) return []
+  return buildFormMap(pooledMatches(currentSeasonMatches, extraSeasonsMatches))[teamId] ?? []
+}
+
+// ⚠️ AJOUT (28/08, voir commentaire "Modèle RÉÉCRIT" en tête de fichier) —
+// buildGoalModel(homeMatches)/buildGoalModel(awayMatches) donnent chacun
+// leur PROPRE per-team stats + leur PROPRE moyenne de championnat
+// (leagueAvgHome/Away) — jamais les mêmes 2 objets si homeComp≠awayComp
+// (contrairement à computeLambdas, calcProno.js, qui suppose un seul
+// goalModel partagé par les 2 équipes). Cette fonction fait le pont :
+// chaque équipe normalisée contre SA PROPRE moyenne (shrinkRatio, comme
+// calcProno.js), puis ancrée sur la MOYENNE DES 2 championnats plutôt que
+// celle d'un seul — neutre, ne favorise ni l'un ni l'autre. Si
+// homeComp===awayComp, homeModel et awayModel sont construits sur les MÊMES
+// matchs (même moyenne des 2 côtés) → dégénère exactement vers le modèle
+// "1 seul championnat" existant, aucun changement de comportement dans ce
+// cas.
+function crossLeagueLambdas(homeModel, awayModel, homeId, awayId) {
+  if (!homeModel || !awayModel) return null
+  const home = homeModel.per[homeId]
+  const away = awayModel.per[awayId]
+  if (!home || !away || home.hCount < MIN_TEAM_SPLITS || away.aCount < MIN_TEAM_SPLITS) return null
+
+  const attackHome  = shrinkRatio((home.hFor     / home.hCount) / homeModel.leagueAvgHome, home.hCount)
+  const defenseHome = shrinkRatio((home.hAgainst / home.hCount) / homeModel.leagueAvgAway, home.hCount)
+  const attackAway  = shrinkRatio((away.aFor     / away.aCount) / awayModel.leagueAvgAway, away.aCount)
+  const defenseAway = shrinkRatio((away.aAgainst / away.aCount) / awayModel.leagueAvgHome, away.aCount)
+
+  const neutralHomeBase = (homeModel.leagueAvgHome + awayModel.leagueAvgHome) / 2
+  const neutralAwayBase = (homeModel.leagueAvgAway + awayModel.leagueAvgAway) / 2
+
+  return {
+    lambdaHome: clampLambda(attackHome * defenseAway * neutralHomeBase),
+    lambdaAway: clampLambda(attackAway * defenseHome * neutralAwayBase),
+  }
+}
+
+// ⚠️ AJOUT (28/08, constat utilisateur : "ça monte rarement au dessus de 2
+// buts pour une equipe") — 2e cause trouvée, indépendante du fitLambdas
+// remplacé plus haut : scoreExactProbabilities (calcProno.js) est bornée à
+// une grille FIXE de 9 scores usuels (SCORE_EXACT_GRID), dont AUCUN n'a plus
+// de 2 buts pour une équipe (max présent : 2-2) — un plafond structurel qui
+// s'appliquait même à de vrais λ élevés. Cette grille reste inchangée pour
+// Mes Paris (convention "top scores bookmaker", jamais touchée) ; le
+// Simulateur construit ici sa propre grille plus large (0 à 6 buts par
+// équipe, 49 cases), pour ne jamais plafonner artificiellement une paire à
+// forte intensité offensive.
+const SIM_MAX_GOALS = 6
+function fullScoreGrid(lambdaHome, lambdaAway) {
+  const scores = []
+  for (let h = 0; h <= SIM_MAX_GOALS; h++) {
+    for (let a = 0; a <= SIM_MAX_GOALS; a++) {
+      scores.push({ home: h, away: a, pct: poissonPmf(lambdaHome, h) * poissonPmf(lambdaAway, a) * 100 })
+    }
+  }
+  return scores
+}
+
+// H2H mélangé DIRECTEMENT sur les λ (moyenne réelle des buts marqués lors
+// des vraies confrontations, toutes compétitions/saisons — meetings vient de
+// useCrossCompH2H) plutôt qu'au niveau des % — voir commentaire en tête de
+// fichier ("l'info combien de buts ne doit plus jamais se perdre"). Même
+// pondération que le reste de l'app (H2H_WEIGHT_MAX/H2H_WEIGHT_PER_MATCH,
+// calcProno.js, exportées) : un léger correctif, jamais dominant (plafonné à
+// 40% même avec beaucoup de confrontations).
+function blendH2HIntoLambdas(lambdaHome, lambdaAway, meetings, homeId, awayId) {
+  if (!meetings?.length || homeId == null || awayId == null) return { lambdaHome, lambdaAway }
+  let homeGoalsSum = 0, awayGoalsSum = 0, n = 0
+  meetings.forEach(m => {
+    if (m.status !== 'FINISHED') return
+    const fs = finalScore(m.score)
+    if (fs.home == null || fs.away == null) return
+    if (m.homeTeam?.id === homeId && m.awayTeam?.id === awayId) { homeGoalsSum += fs.home; awayGoalsSum += fs.away; n++ }
+    else if (m.homeTeam?.id === awayId && m.awayTeam?.id === homeId) { homeGoalsSum += fs.away; awayGoalsSum += fs.home; n++ }
+  })
+  if (n === 0) return { lambdaHome, lambdaAway }
+  const w = Math.min(H2H_WEIGHT_MAX, n * H2H_WEIGHT_PER_MATCH)
+  return {
+    lambdaHome: clampLambda(lambdaHome * (1 - w) + (homeGoalsSum / n) * w),
+    lambdaAway: clampLambda(lambdaAway * (1 - w) + (awayGoalsSum / n) * w),
+  }
 }
 
 // Cherche la ligne standings (nom + crest) d'une équipe déjà sélectionnée —
@@ -196,7 +299,7 @@ export function PronosSimulateur() {
   // sélection dans les menus).
   const [compared, setCompared] = useState(null)
 
-  const { formMap, matchesByComp } = useTeamFormMulti([homeComp, awayComp].filter(Boolean))
+  const { matchesByComp } = useTeamFormMulti([homeComp, awayComp].filter(Boolean))
 
   // 2 saisons précédentes en plus de la saison en cours (matchesByComp
   // ci-dessus) — voir commentaire pooledForm en tête de fichier. Hook déjà
@@ -228,38 +331,40 @@ export function PronosSimulateur() {
     sameCompInfo
   )
 
-  const prono = useMemo(() => {
+  // λ (buts espérés dom./ext.) — voir "Modèle RÉÉCRIT" en tête de fichier.
+  // Chemin principal : buts marqués/encaissés réels (3 saisons pooled),
+  // chaque équipe normalisée contre SON PROPRE championnat, ancrée sur la
+  // moyenne des 2 championnats (crossLeagueLambdas). Repli forme+H2H
+  // (l'ancien modèle, fitLambdasToPreMatch) UNIQUEMENT si les données sont
+  // insuffisantes pour un des 2 championnats (buildGoalModel renvoie null).
+  const model = useMemo(() => {
     if (!isComparing) return null
-    // pooledForm : saison en cours + 2 précédentes fusionnées, 5 derniers
-    // matchs (voir commentaire en tête de fichier) — scopé au Simulateur
-    // uniquement.
+    const homeMatches = pooledMatches(matchesByComp?.[homeComp], homeExtraHistory)
+    const awayMatches = pooledMatches(matchesByComp?.[awayComp], awayExtraHistory)
+    const homeModel = buildGoalModel(homeMatches)
+    const awayModel = buildGoalModel(awayMatches)
+    const goalBased = crossLeagueLambdas(homeModel, awayModel, homeTeamId, awayTeamId)
+
+    if (goalBased) {
+      return { ...blendH2HIntoLambdas(goalBased.lambdaHome, goalBased.lambdaAway, meetings, homeTeamId, awayTeamId), source: 'goals' }
+    }
+
+    // Repli forme+H2H — données saison insuffisantes même après pooling (cas
+    // rare : promu tout juste monté, ou fetch des saisons précédentes en
+    // échec). compMatches=[] force calcPronoAdvanced sur son propre repli
+    // forme+H2H (chemin déjà existant, inchangé).
     const homeForm = pooledForm(matchesByComp?.[homeComp], homeExtraHistory, homeTeamId)
     const awayForm = pooledForm(matchesByComp?.[awayComp], awayExtraHistory, awayTeamId)
-    // compMatches=[] force le repli forme+H2H (voir commentaire en tête de
-    // fichier) — jamais le modèle "buts marqués/encaissés" (a besoin d'un
-    // seul championnat de référence commun aux 2 équipes).
-    return calcPronoAdvanced(homeTeamId, awayTeamId, [], homeForm, awayForm, { fullH2H: meetings })
+    const pre = calcPronoAdvanced(homeTeamId, awayTeamId, [], homeForm, awayForm, { fullH2H: meetings })
+    return { ...fitLambdasToPreMatch(pre), source: 'form' }
   }, [isComparing, matchesByComp, homeComp, awayComp, homeExtraHistory, awayExtraHistory, homeTeamId, awayTeamId, meetings])
 
-  // Juste pour la transparence de la note affichée plus bas — la forme
-  // "pure saison en cours" (formMap, useTeamFormMulti) est plus courte que
-  // ce que pooledForm a réellement utilisé : signe que les saisons
-  // précédentes ont été mises à contribution. Pas utilisé dans le calcul
-  // lui-même.
-  const usingFallbackForm = isComparing && (
-    (formMap?.[homeTeamId]?.length ?? 0) < 5 ||
-    (formMap?.[awayTeamId]?.length ?? 0) < 5
-  )
-
-  // Scores les plus probables — dérivés du même pronostic forme+H2H
-  // (voir commentaire en tête de fichier), triés par probabilité décroissante.
+  // Scores les plus probables — dérivés directement des λ ci-dessus (grille
+  // large, voir fullScoreGrid plus haut), triés par probabilité décroissante.
   const topScores = useMemo(() => {
-    if (!prono) return null
-    const { lambdaHome, lambdaAway } = fitLambdasToPreMatch(prono)
-    const scores = scoreExactProbabilities(lambdaHome, lambdaAway)
-    if (!scores) return null
-    return [...scores].sort((a, b) => b.pct - a.pct)
-  }, [prono])
+    if (!model) return null
+    return fullScoreGrid(model.lambdaHome, model.lambdaAway).sort((a, b) => b.pct - a.pct)
+  }, [model])
 
   const sameTeamPicked = homeTeamId != null && homeTeamId === awayTeamId
 
@@ -267,8 +372,9 @@ export function PronosSimulateur() {
     <div className="simulateur">
       <p className="simulateur__intro">
         Choisis 2 équipes, même de championnats différents, pour voir ce que
-        donnerait un match entre elles aujourd'hui — basé sur leur forme
-        récente et leurs confrontations passées si elles existent.
+        donnerait un match entre elles aujourd'hui — basé sur leurs buts
+        marqués/encaissés réels et leurs confrontations passées si elles
+        existent.
       </p>
 
       <div className="simulateur__card">
@@ -301,7 +407,7 @@ export function PronosSimulateur() {
         </button>
       </div>
 
-      {isComparing && prono && topScores && (
+      {isComparing && model && topScores && (
         <div className="simulateur__result">
           <div className="simulateur__resultTeams">
             <div className="simulateur__resultTeam">
@@ -330,12 +436,14 @@ export function PronosSimulateur() {
           </div>
 
           <p className="simulateur__h2hNote">
+            {model.source === 'goals'
+              ? 'Basé sur les buts marqués/encaissés réels des 2 équipes (jusqu\'à 3 saisons)'
+              : 'Basé sur la forme récente des 2 équipes (données buts insuffisantes)'}
             {h2hLoading
-              ? 'Recherche des confrontations passées…'
+              ? ', recherche des confrontations passées…'
               : meetings.length > 0
-                ? `Basé sur la forme récente des 2 équipes + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''}${sameCompInfo ? ' (plusieurs saisons)' : ' (toutes compétitions, saison en cours)'}.`
-                : 'Basé sur la forme récente des 2 équipes — aucune confrontation directe trouvée dans leur historique.'}
-            {usingFallbackForm && ' Championnat tout juste relancé : forme partiellement basée sur les saisons précédentes.'}
+                ? ` + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''}${sameCompInfo ? ' (plusieurs saisons)' : ' (toutes compétitions, saison en cours)'}.`
+                : ' — aucune confrontation directe trouvée dans leur historique.'}
           </p>
         </div>
       )}
