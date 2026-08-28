@@ -9,8 +9,9 @@
 }
 
 /* ── Switcher tout en haut de page : "Pronos" (page groupe existante) vs
-   "Simulateur" (confrontation hypothétique, aucune donnée de groupe) — 2
-   pages distinctes, pas 2 onglets parmi Pronos/Résultat/Classement. */
+   "Assistant IA" (chat foot, remplace l'ancien Simulateur — voir
+   AiAssistant.jsx, 28/08) — 2 pages distinctes, pas 2 onglets parmi
+   Pronos/Résultat/Classement. */
 .pronos__modeSwitch {
   display: flex;
   gap: 6px;
@@ -515,242 +516,124 @@
 .pronos__emptyIcon { font-size: 1.8rem; opacity: 0.4; }
 .pronos__emptyTitle { font-size: 0.85rem; color: var(--text-mid); font-weight: 600; }
 
-/* ── Page Simulateur (confrontation hypothétique, 2 équipes, même de
-   championnats différents) — voir PronosSimulateur.jsx. Affiche un score
-   exact simulé (pas des cotes 1/N/2), auto-porté comme le reste de
-   pronos.css. Refonte visuelle (28/08, retour utilisateur : "ça fait pas
-   design du tout") : vrais logos de club (crest FD.org), card wrapper,
-   select avec chevron custom (repris du pattern .classement__selectShell). */
-.simulateur { padding-top: 0.2rem; }
-.simulateur__intro {
+/* ── Assistant IA foot (28/08, remplace le Simulateur — voir
+   AiAssistant.jsx et api/apifootball.js mode=ask). Chat simple : liste de
+   bulles user/assistant, input fixe en bas, même vocabulaire visuel que le
+   reste de l'app (--bg-card/--border/--red-vivid). */
+.aiAssistant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.aiAssistant__intro {
   font-size: 0.85rem;
   color: var(--text-mid);
   line-height: 1.5;
   text-align: center;
-  margin: 0 0 1.2rem;
+  margin: 0 0 0.2rem;
 }
-
-.simulateur__card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.25rem 1rem 1.4rem;
-}
-
-.simulateur__picker {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.simulateur__side {
-  flex: 1;
+.aiAssistant__thread {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.55rem;
-  min-width: 0;
+  gap: 0.6rem;
+  min-height: 120px;
 }
-.simulateur__sideLabel {
-  font-size: 0.68rem;
-  font-weight: 700;
+.aiAssistant__emptyHint {
+  font-size: 0.8rem;
   color: var(--text-mid);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   text-align: center;
+  padding: 1.5rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
-
-/* Cercle logo club — vrai crest FD.org (même source que Classement.jsx/
-   Match.jsx) quand une équipe est choisie, silhouette maillot neutre sinon. */
-.simulateur__crestWrap {
+.aiAssistant__bubbleRow {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.04);
+}
+.aiAssistant__bubbleRow--user { justify-content: flex-end; }
+.aiAssistant__bubbleRow--assistant { justify-content: flex-start; }
+.aiAssistant__bubble {
+  max-width: 85%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.aiAssistant__bubble--user {
+  background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.aiAssistant__bubble--assistant {
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  flex-shrink: 0;
+  color: var(--text-main);
+  border-bottom-left-radius: 4px;
 }
-.simulateur__crestWrap--md { width: 64px; height: 64px; }
-.simulateur__crestWrap--sm { width: 34px; height: 34px; }
-.simulateur__crest {
-  width: 72%;
-  height: 72%;
-  object-fit: contain;
-  object-position: center;
-  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.6));
+.aiAssistant__bubble--error {
+  background: rgba(var(--red-rgb), 0.1);
+  border: 1px solid rgba(var(--red-rgb), 0.35);
+  color: var(--red-vivid);
 }
-.simulateur__crestPlaceholder {
-  width: 46%;
-  height: 46%;
+.aiAssistant__bubble--loading {
   color: var(--text-mid);
-  opacity: 0.6;
+  font-style: italic;
 }
 
-.simulateur__selectShell { position: relative; width: 100%; }
-.simulateur__select {
-  width: 100%;
-  padding: 0.62rem 1.6rem 0.62rem 0.6rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.03);
-  color: var(--text-main);
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-align: center;
-  text-overflow: ellipsis;
-  appearance: none;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+.aiAssistant__form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  position: sticky;
+  bottom: 0.5rem;
+  background: var(--bg);
+  padding-top: 0.4rem;
 }
-.simulateur__select:focus {
+.aiAssistant__input {
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.aiAssistant__input:focus {
   outline: none;
   border-color: rgba(var(--red-rgb), 0.45);
   box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.12);
 }
-.simulateur__select:disabled { opacity: 0.5; cursor: not-allowed; }
-.simulateur__selectIcon {
-  position: absolute;
-  right: 0.8rem;
-  top: 50%;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-right: 2px solid var(--text-mid);
-  border-bottom: 2px solid var(--text-mid);
-  transform: translateY(-70%) rotate(45deg);
-  pointer-events: none;
-}
-
-.simulateur__vs {
+.aiAssistant__sendBtn {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.simulateur__hint {
-  font-size: 0.78rem;
-  color: var(--red-vivid);
-  text-align: center;
-  margin: 0.9rem 0 0;
-}
-.simulateur__compareBtn {
-  display: block;
-  width: 100%;
-  max-width: 260px;
-  margin: 1.25rem auto 0;
-  padding: 0.8rem 1rem;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   border: none;
   background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.simulateur__compareBtn:disabled {
+.aiAssistant__sendBtn:disabled {
   background: rgba(255,255,255,0.05);
   color: var(--text-mid);
   cursor: not-allowed;
 }
-
-.simulateur__result {
-  margin-top: 1.1rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.25rem 1rem 1.4rem;
-}
-.simulateur__resultTeams {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.simulateur__resultTeam {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-}
-.simulateur__resultTeamName {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-main);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-/* Score simulé (28/08, remplace les pilules de cotes 1/N/2 — demande
-   utilisateur : "je demande de simulé le score exact... pas les côtes"). */
-.simulateur__scoreHero {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 0 0.4rem;
-}
-.simulateur__scoreHeroVal {
-  font-family: 'Russo One', sans-serif;
-  font-size: 2.1rem;
-  font-weight: 400;
-  color: var(--red-vivid);
-  line-height: 1;
-  white-space: nowrap;
-}
-.simulateur__scoreHeroLabel {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--text-mid);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-}
-.simulateur__scoreAlts {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 1.2rem;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--border);
-}
-.simulateur__scoreAlt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 48px;
-  padding: 0.5rem 0.4rem;
-  border-radius: 9px;
-  background: rgba(255,255,255,0.04);
-}
-.simulateur__scoreAltVal {
-  font-family: 'Russo One', sans-serif;
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--text-main);
-}
-.simulateur__scoreAltPct {
-  font-size: 0.68rem;
-  color: var(--text-mid);
-  font-weight: 600;
-}
-.simulateur__h2hNote {
-  font-size: 0.78rem;
+.aiAssistant__note {
+  font-size: 0.72rem;
   color: var(--text-mid);
   text-align: center;
   line-height: 1.4;
-  margin: 0.9rem 0 0;
+  margin: 0.2rem 0 0;
 }

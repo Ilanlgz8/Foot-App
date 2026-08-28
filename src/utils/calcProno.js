@@ -272,18 +272,12 @@ export function calcProno(homeForm, awayForm, opts = {}) {
 // Retombe automatiquement sur calcProno() (forme récente) si l'une des deux
 // équipes n'a pas assez de matchs joués cette saison pour un calcul fiable.
 
-// Exportés : réutilisés par PronosSimulateur.jsx (28/08) pour un modèle buts
-// marqués/encaissés cross-championnat (chaque équipe normalisée contre SA
-// PROPRE moyenne de championnat, ancrées sur une base neutre commune plutôt
-// que comparées brutes) — mêmes constantes/fonctions que le modèle "réel"
-// ci-dessous, aucune divergence de comportement, juste réutilisées pour 2
-// goalModel distincts (1 par championnat) au lieu d'un seul partagé.
-export const MIN_TEAM_SPLITS  = 2   // matchs mini par équipe à domicile ET à l'extérieur
+const MIN_TEAM_SPLITS  = 2   // matchs mini par équipe à domicile ET à l'extérieur
 // Exporté : réutilisé par useTeamForm.js pour déclencher le repli saison
 // précédente (source unique du seuil, pas de duplication du chiffre 10).
 export const MIN_LEAGUE_GAMES = 10  // matchs mini dispo pour une moyenne de championnat fiable
 const MAX_GOALS_GRID   = 8   // buts max simulés par équipe (au-delà, probabilité négligeable)
-export const H2H_WEIGHT_PER_MATCH = 0.08  // poids d'une confrontation directe dans le mix final
+const H2H_WEIGHT_PER_MATCH = 0.08  // poids d'une confrontation directe dans le mix final
 // ⚠️ RELEVÉ de 0.3 à 0.4 (demande utilisateur explicite, conscient du compromis :
 // le backtest avec l'ancien plafond montrait déjà que le H2H bouge peu la
 // prédiction — voir commentaire RATIO_SHRINK_K plus bas, "67.7%→68.5%"). Choix
@@ -296,14 +290,9 @@ export const H2H_WEIGHT_PER_MATCH = 0.08  // poids d'une confrontation directe d
 // un correctif, jamais le facteur dominant (le modèle buts marqués/encaissés
 // garde toujours au moins 60% du poids final). À revalider avec
 // scripts/backtest-prono.mjs si la calibration se dégrade en pratique.
-export const H2H_WEIGHT_MAX = 0.4
+const H2H_WEIGHT_MAX = 0.4
 
-// Exportée : réutilisée par PronosSimulateur.jsx (28/08) pour construire sa
-// PROPRE grille de scores plus large (voir son commentaire) — la grille fixe
-// à 9 scores usuels ci-dessous (SCORE_EXACT_GRID, scoreExactProbabilities)
-// reste inchangée pour Mes Paris (convention "top scores bookmaker"), jamais
-// modifiée ici.
-export function poissonPmf(lambda, k) {
+function poissonPmf(lambda, k) {
   let fact = 1
   for (let i = 2; i <= k; i++) fact *= i
   return Math.exp(-lambda) * Math.pow(lambda, k) / fact
@@ -327,7 +316,7 @@ function poissonOutcomes(lambdaHome, lambdaAway) {
 
 // Buts marqués/encaissés par équipe (domicile/extérieur séparés) + moyennes
 // du championnat, à partir des matchs FINISHED de compMatches.
-export function buildGoalModel(compMatches) {
+function buildGoalModel(compMatches) {
   const per = {}
   let leagueHomeGoals = 0, leagueAwayGoals = 0, counted = 0
 
@@ -353,7 +342,7 @@ export function buildGoalModel(compMatches) {
   return { per, leagueAvgHome: leagueHomeGoals / counted, leagueAvgAway: leagueAwayGoals / counted }
 }
 
-export function clampLambda(l) {
+function clampLambda(l) {
   if (!Number.isFinite(l) || l <= 0) return 1
   return Math.min(5, Math.max(0.15, l))  // évite les extrêmes irréalistes sur petit échantillon
 }
@@ -394,7 +383,7 @@ const RATIO_SHRINK_K = 8
 // bas) : K par défaut inchangé (RATIO_SHRINK_K) pour tout appelant existant —
 // permet à un futur appelant de fournir un K différent (plus prudent) sans
 // dupliquer cette fonction.
-export function shrinkRatio(ratio, n, k = RATIO_SHRINK_K) {
+function shrinkRatio(ratio, n, k = RATIO_SHRINK_K) {
   const w = n / (n + k)
   return 1 + (ratio - 1) * w
 }

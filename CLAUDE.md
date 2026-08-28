@@ -29,11 +29,14 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - `NotificationBell.jsx` — dans la navbar, utilise `usePushNotifications`
 - `public/sw-push.js` — handler `push` event dans le service worker (importé via `importScripts`)
 
-### Simulateur (Pronos)
-- `Pronos.jsx` — switcher top-level `mode` (`pronos`/`simulateur`, 2 boutons tout en haut de la page, indépendant de `activeTab`) ; Simulateur accessible sans rejoindre de groupe
-- `PronosSimulateur.jsx` — confrontation hypothétique entre 2 équipes (même de championnats différents), scope limité aux 6 grands championnats club (FL1/PL/PD/BL1/SA/CL, seuls avec classement+forme exploitables). Modèle forme+H2H (`calcPronoAdvanced` avec `compMatches=[]`, PAS le modèle buts marqués/encaissés qui suppose un championnat commun). Résultat affiché en score exact simulé (`fitLambdasToPreMatch` + `scoreExactProbabilities`, PAS des cotes)
-- `useCrossCompH2H.js` — H2H toutes compétitions confondues via `/v4/teams/{id}/matches` (FD.org, saison en cours uniquement en compte gratuit) + extension multi-années `/api/h2h` (football-data.co.uk, voir ci-dessous) quand les 2 équipes sont du même championnat
-- `api/h2h.js` + `src/data/fdcoukTeamNames.js` — H2H multi-années (jusqu'à 6 saisons), football-data.co.uk (site distinct de football-data.org, CSV statiques sans clé API). Limite honnête : fichiers PAR championnat national, aucune confrontation européenne (ex. PSG-Bayern) n'y figure jamais
+### Assistant IA (Pronos)
+- `Pronos.jsx` — switcher top-level `mode` (`pronos`/`ia`, 2 boutons tout en haut de la page, indépendant de `activeTab`) ; Assistant accessible sans rejoindre de groupe
+- `AiAssistant.jsx` — chat foot uniquement (règles, historique, clubs, joueurs, tactique). **Remplace l'ancien Simulateur** (confrontation hypothétique 2 équipes, score exact simulé) — retiré le 28/08 après 2 réécritures du modèle statistique qui donnait encore trop souvent des scores plats (1-1), demande explicite utilisateur de passer à une IA plutôt que continuer à bricoler le modèle
+- Backend : `api/apifootball.js` mode `ask` (POST `{mode:'ask', question}`) — fichier déjà mort en pratique (`PERMANENTLY_DISABLED`, voir Stack), slot réutilisé sans toucher son comportement GET existant (12/12 fonctions, aucun autre slot libre)
+- Modèle : Cloudflare Workers AI (`@cf/meta/llama-3.1-8b-instruct`), REST API (`api.cloudflare.com/client/v4/accounts/{id}/ai/run/...`), même compte Cloudflare que `cf-worker/`. Gratuit jusqu'à 10 000 neurones/jour (~15-25 réponses) — **aucun fallback payant** au-delà, erreur claire côté client une fois le quota atteint (cohérent avec le reste de l'app, 100% APIs gratuites)
+- Rate limit Redis : cap global 15/jour + cap 3/jour/IP (`ai:ask:day:*` dans Upstash), reset 00:00 UTC
+- System prompt scope strictement le foot et interdit explicitement d'inventer un score/classement — le modèle n'a AUCUN accès aux données live de l'app (rappelé aussi dans l'UI, `AI_NOTE`)
+- `api/h2h.js` + `src/data/fdcoukTeamNames.js` — H2H multi-années (jusqu'à 6 saisons), football-data.co.uk (site distinct de football-data.org, CSV statiques sans clé API), utilisé par l'onglet H2H réel d'un match (`useH2HRows`, `MatchModal.jsx`, opt-in `extendedH2H`). Limite honnête : fichiers PAR championnat national, aucune confrontation européenne (ex. PSG-Bayern) n'y figure jamais
 
 ### Modal / Onglets
 - `MatchModal.jsx` — modal pré-match avec onglets (Stats/Compos/Classement/Prono)
@@ -90,11 +93,13 @@ api/
   fifa-live.js    — live WC+club (FIFA+ESPN), fast-path cache partagé (voir Stack)
   fifa-lineups.js — compos/stats FIFA (WC), rate limit 30/min/IP (amplification)
   football.js     — proxy football-data.org, budget global 7/min + spacing
-  apifootball.js  — PERMANENTLY_DISABLED (voir Stack)
+  apifootball.js  — PERMANENTLY_DISABLED pour les compos (voir Stack) + mode
+                    `ask` fusionné (Assistant IA foot, Cloudflare Workers AI,
+                    voir Architecture clé > Assistant IA)
   pulse.js        — (fusion pulse+curve) prono/courbe post-match
   news.js         — agrégateur RSS, cache Redis 5min
   h2h.js          — H2H multi-années même championnat (football-data.co.uk,
-                    CSV statiques sans clé, voir Architecture clé > Simulateur)
+                    CSV statiques sans clé, voir Architecture clé > Assistant IA)
   (12/12 — dernier slot libre utilisé, plus aucune marge : tout nouvel
   endpoint doit être fusionné dans un fichier existant)
 
@@ -115,6 +120,7 @@ cf-worker/
 - `FOOTBALL_DATA_API_KEY` — football-data.org
 - `API_FOOTBALL_KEY` — api-football (clé toujours présente mais inutilisée, voir `PERMANENTLY_DISABLED`)
 - `ABLY_API_KEY` — pub/sub temps quasi réel (token borné généré via `/api/vapid-key?ably=1`)
+- `CF_ACCOUNT_ID`, `CF_AI_API_TOKEN` — Cloudflare Workers AI (Assistant IA, `api/apifootball.js` mode `ask`). Même compte Cloudflare que `cf-worker/` : ID de compte visible dans le dashboard Cloudflare (barre latérale droite) ; token créé dans dashboard Cloudflare → "Manage Account" → "Account API Tokens" → "Create Token" → template "Workers AI" (ou permission personnalisée "Account.Workers AI: Read/Edit")
 
 ## Problèmes connus / résolus
 - ✅ Doublons notifs : suppression des appels client-side dans useLiveMinute
@@ -221,6 +227,19 @@ cf-worker/
 - ⚠️ "from StatFootix" dans notifs : comportement Chrome non modifiable
 - 🔍 Notifs app fermée : architecture VAPID ok, à vérifier via /api/debug-push?secret=...
 - 🔍 Erreur 401 sur /cron-goals : CRON_SECRET absent ou mauvais dans cron-job.org
+- ✅ Simulateur (Pronos) toujours 1-1/scores plats malgré 2 réécritures du modèle le même jour
+  (28/08) : vérifié avec de vraies données production (PL 2024-25, ex. Liverpool-Ipswich →
+  λ≈1.84/0.93, donc le modèle POUVAIT diverger de 1-1 avec assez de données) — pas de bug
+  mathématique trouvé dans le modèle lui-même. Demande explicite utilisateur : remplacer plutôt
+  que continuer à corriger. Simulateur entièrement retiré, remplacé par un Assistant IA foot
+  (voir Architecture clé > Assistant IA) — `useCrossCompH2H.js` et `PronosSimulateur.jsx`
+  supprimés, exports `calcProno.js` ajoutés pour l'occasion (buildGoalModel, clampLambda,
+  shrinkRatio, poissonPmf, MIN_TEAM_SPLITS, H2H_WEIGHT_*) revertis en non-exportés (plus aucun
+  appelant externe).
+- 🔍 Assistant IA (CF_ACCOUNT_ID/CF_AI_API_TOKEN) : env vars pas encore configurées sur Vercel
+  au moment de l'implémentation (28/08) — tant qu'elles sont absentes, `handleAsk` renvoie une
+  500 "pas encore configuré côté serveur" (dégradation propre, pas de crash). Voir Env vars
+  Vercel ci-dessus pour la procédure de création du token.
 
 ## Conventions
 - Noms français partout dans l'UI

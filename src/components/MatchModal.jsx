@@ -1612,9 +1612,8 @@ function H2HBilan({ rows, match, isWC }) {
 // signalé) le passe à `true`.
 // ⚠️ `extendedH2H` (28/08, demande utilisateur : "on relie pas le h2h qu'on
 // vient d'ajouter... on a beaucoup plus de match") — extension football-
-// data.co.uk (api/h2h.js, déjà utilisée par le Simulateur/useCrossCompH2H)
-// réutilisée ici pour la fiche d'UN match précis, quand les 2 équipes sont
-// du même championnat. Volontairement PAS activée pour toutes les cards
+// data.co.uk (api/h2h.js) réutilisée ici pour la fiche d'UN match précis,
+// quand les 2 équipes sont du même championnat. Volontairement PAS activée pour toutes les cards
 // (Accueil : MatchDuJourCard.jsx/MatchPoster.jsx, 10-20 en même temps) —
 // opt-in, seuls MatchPage.jsx/LiveMatchPage.jsx (page dédiée, 1 seul match à
 // la fois) le passent à `true`, même prudence que `looseTeamMatch` déjà en

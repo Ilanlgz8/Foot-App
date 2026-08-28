@@ -34,7 +34,7 @@ import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
-import { PronosSimulateur } from './PronosSimulateur'
+import { AiAssistant } from './AiAssistant'
 import '../../pronos.css'
 
 const TABS = ['pronos', 'resultat', 'classement']
@@ -554,8 +554,12 @@ function Pronos() {
   // Switcher tout en haut de page (demande utilisateur, 28/08 : "faudrait que
   // tout en haut de la page on puisse switch entre la page actuel prono et
   // une page simulateur") — PAS un 4e onglet mélangé à Pronos/Résultat/
-  // Classement (1er essai, corrigé) : le Simulateur est une page à part
-  // entière, avec son propre switcher au-dessus des onglets historiques.
+  // Classement (1er essai, corrigé) : page à part entière, avec son propre
+  // switcher au-dessus des onglets historiques. Le Simulateur (confrontation
+  // hypothétique) a ensuite été remplacé par un Assistant IA (même jour,
+  // constat utilisateur : scores encore trop plats malgré 2 réécritures du
+  // modèle) — voir AiAssistant.jsx. Valeur d'état 'ia' gardée courte comme
+  // 'pronos', même convention.
   const [mode, setMode] = useState('pronos')
   const [activeTab, setActiveTab] = useState('pronos')
   // Filtre championnat (demande utilisateur, 21/08) — partagé entre les
@@ -788,15 +792,15 @@ function Pronos() {
           Pronos
         </button>
         <button
-          className={`pronos__modeBtn${mode === 'simulateur' ? ' pronos__modeBtn--active' : ''}`}
-          onClick={() => setMode('simulateur')}
+          className={`pronos__modeBtn${mode === 'ia' ? ' pronos__modeBtn--active' : ''}`}
+          onClick={() => setMode('ia')}
         >
-          Simulateur
+          Assistant IA
         </button>
       </div>
 
-      {mode === 'simulateur' ? (
-        <PronosSimulateur />
+      {mode === 'ia' ? (
+        <AiAssistant />
       ) : !hasGroup ? (
         <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
       ) : (

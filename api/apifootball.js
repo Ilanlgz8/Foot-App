@@ -126,7 +126,121 @@ async function trackRealRemaining(remaining) {
 // quota) redevient actif tel quel sans rien à réécrire.
 const PERMANENTLY_DISABLED = true
 
+// ── Assistant IA foot (28/08, remplace le Simulateur — demande utilisateur :
+// "les scores sont pas convaincants... si on remplace ça par une ia
+// integrer qui repond au question de n'importe quelle personne", scopé à
+// "foot uniquement" après clarification) — fusionné ICI (Vercel 12/12
+// fonctions, aucun slot libre, voir CLAUDE.md) : ce fichier est déjà mort en
+// pratique (PERMANENTLY_DISABLED ci-dessus, api-football coupé pour de bon
+// après 8 suspensions) — le slot est réutilisé sans jamais toucher le
+// comportement existant des 5 appelants encore en place (useApiFootball.js
+// et consorts, qui reçoivent toujours exactement la même réponse "disabled"
+// qu'avant) : ce bloc s'exécute AVANT le court-circuit PERMANENTLY_DISABLED,
+// mais uniquement sur un contrat totalement différent (POST + body.mode ===
+// 'ask'), jamais sur leurs appels GET habituels (_ep=...).
+//
+// Modèle : Cloudflare Workers AI (@cf/meta/llama-3.1-8b-instruct) — même
+// compte Cloudflare que cf-worker/ (déjà utilisé pour le cron ESPN), aucun
+// nouveau fournisseur à créer. Gratuit jusqu'à 10 000 "neurones"/jour
+// (≈15-25 réponses selon leur longueur, reset 00:00 UTC), source :
+// developers.cloudflare.com/workers-ai (vérifié 28/08). Volontairement AUCUN
+// fallback payant au-delà de ce quota gratuit — cohérent avec le reste de
+// l'app (100% APIs gratuites jusqu'ici, jamais un coût engagé sans validation
+// explicite) : une fois les plafonds ci-dessous atteints, message d'erreur
+// clair côté client plutôt qu'un vrai appel facturé.
+//
+// ⚠️ Honnêteté sur les limites (à faire savoir à l'utilisateur, pas juste ici
+// en commentaire) : ce modèle N'A PAS accès aux données live/temps réel de
+// l'app (scores en cours, calendrier...) — connaissance générale sur le foot
+// uniquement (règles, historique, clubs, joueurs, tactique...), d'où la
+// consigne explicite dans le system prompt de ne jamais inventer un score
+// et de renvoyer vers les pages Live/Résultats de l'app pour ça.
+const AI_DAILY_GLOBAL_CAP = 15   // ~ quota Workers AI gratuit (10k neurones/j), prudent
+const AI_DAILY_IP_CAP     = 3    // évite qu'un seul visiteur épuise le quota partagé
+const AI_MAX_QUESTION_LEN = 300  // limite la taille du prompt (coût + abus)
+
+const FOOT_SYSTEM_PROMPT = [
+  "Tu es l'assistant football de l'app StatFootix.",
+  'Tu réponds UNIQUEMENT à des questions sur le football : règles, clubs, joueurs, compétitions, histoire, statistiques générales, tactique.',
+  "Si la question ne concerne pas le football, réponds poliment que tu ne réponds qu'aux questions de football, sans y répondre.",
+  "Tu n'as PAS accès aux scores ou données en direct de StatFootix (pas de flux temps réel) : n'invente JAMAIS un score, un classement ou un résultat récent — dis à l'utilisateur de consulter les pages Live/Résultats/Classement de l'app pour ça.",
+  'Réponds toujours en français, de façon concise (quelques phrases, pas un essai).',
+].join(' ')
+
+async function handleAsk(req, res) {
+  const question = String(req.body?.question ?? '').trim()
+  if (!question) return res.status(400).json({ error: 'Question vide' })
+  if (question.length > AI_MAX_QUESTION_LEN) {
+    return res.status(400).json({ error: `Question trop longue (max ${AI_MAX_QUESTION_LEN} caractères)` })
+  }
+
+  const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+  const today = new Date().toISOString().slice(0, 10)
+  try {
+    const [globalCount, ipCount] = await Promise.all([
+      kv.incr(`ai:ask:day:${today}`),
+      kv.incr(`ai:ask:day:${today}:${ip}`),
+    ])
+    if (globalCount === 1) { try { await kv.expire(`ai:ask:day:${today}`, 26 * 3600) } catch {} }
+    if (ipCount === 1)     { try { await kv.expire(`ai:ask:day:${today}:${ip}`, 26 * 3600) } catch {} }
+    if (globalCount > AI_DAILY_GLOBAL_CAP) {
+      return res.status(429).json({ error: 'Quota IA gratuit du jour atteint, réessaie demain' })
+    }
+    if (ipCount > AI_DAILY_IP_CAP) {
+      return res.status(429).json({ error: 'Limite quotidienne atteinte pour cet appareil, réessaie demain' })
+    }
+  } catch {
+    // Redis down → best-effort, on laisse passer plutôt que de bloquer toute
+    // la fonctionnalité pour un souci de comptage (même logique que
+    // reserveQuota() plus bas dans ce fichier).
+  }
+
+  const accountId = process.env.CF_ACCOUNT_ID
+  const apiToken  = process.env.CF_AI_API_TOKEN
+  if (!accountId || !apiToken) {
+    return res.status(500).json({ error: "Assistant IA pas encore configuré côté serveur" })
+  }
+
+  try {
+    const cfRes = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: FOOT_SYSTEM_PROMPT },
+            { role: 'user', content: question },
+          ],
+          max_tokens: 400,
+        }),
+        signal: AbortSignal.timeout(15000),
+      }
+    )
+    const json = await cfRes.json().catch(() => null)
+    if (!cfRes.ok || !json?.success) {
+      return res.status(502).json({ error: "L'assistant IA n'a pas pu répondre, réessaie" })
+    }
+    const answer = json.result?.response?.trim()
+    if (!answer) return res.status(502).json({ error: "Réponse vide de l'assistant" })
+    return res.status(200).json({ answer })
+  } catch {
+    return res.status(500).json({ error: 'Erreur assistant IA, réessaie' })
+  }
+}
+
 export default async function handler(req, res) {
+  // Même parsing défensif que cron-goals.js (mode POST) : req.body arrive en
+  // string si le client n'a pas posé Content-Type: application/json.
+  let body = null
+  if (req.method === 'POST') {
+    try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body } catch { body = null }
+  }
+  if (body?.mode === 'ask') {
+    req.body = body
+    return handleAsk(req, res)
+  }
+
   if (PERMANENTLY_DISABLED) {
     res.status(200).setHeader('Content-Type', 'application/json')
     res.setHeader('x-cache', 'DISABLED')
