@@ -29,8 +29,8 @@ export function WatchBadge({ match, variant = 'hero' }) {
         <rect x="3" y="5" width="18" height="13" rx="2" />
         <path d="M8 21h8M12 18v3" />
       </svg>
-      {b.free ? <span className="watchBadge__free">Gratuit</span> : 'Sur'}
-      {' '}{b.name}
+      {b.free && <span className="watchBadge__free">Gratuit{' '}</span>}
+      {b.name}
     </>
   )
   if (!b.url) {
