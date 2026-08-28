@@ -262,7 +262,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           {emblem && <img src={emblem} alt="" className="mp__hero__compLogo" />}
           <span className="mp__hero__compName">{compName}</span>
         </div>
-        <WatchBadge match={match} variant="hero" />
       </div>
 
       {/* Badge minute live + reprise (reprise SOUS "MT", pas au-dessus) */}
@@ -302,6 +301,12 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           {showLivePens && (
             <span className="lmp__heroPens">({homeShootout ?? 0}-{awayShootout ?? 0} tab)</span>
           )}
+          {/* ⚠️ DÉPLACÉ (28/08, demande utilisateur : "en haut à droite y'a
+              le statut du match... on pourrait le mettre en dessous du
+              score") : était dans .mp__hero__top (coin haut-droit, à côté du
+              badge compétition) — déplacé ici, sous le score, pour ne jamais
+              se disputer l'espace avec un indicateur de statut là-haut. */}
+          <WatchBadge match={match} variant="score" />
         </div>
 
         <div className="mp__hero__team mp__hero__team--away">

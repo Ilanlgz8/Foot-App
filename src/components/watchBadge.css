@@ -31,6 +31,21 @@
   flex-shrink: 0;
 }
 
+/* Diffuseur payant (28/08) : jamais le même vert que "Gratuit" — couleur
+   neutre (identité rouge de l'app plutôt que vert "disponible gratuitement",
+   qui induirait en erreur pour un abonnement payant). Pas de curseur pointer
+   quand ce n'est pas un lien (voir WatchBadge.jsx, url absent). */
+.watchBadge--paid {
+  background: rgba(var(--red-rgb), 0.12);
+  border: 1px solid rgba(var(--red-rgb), 0.3);
+  color: var(--red-light, #f87171);
+  cursor: default;
+}
+
+.watchBadge--paid .watchBadge__dot {
+  background: var(--red-light, #f87171);
+}
+
 /* Variante "hero" (LiveMatchPage/MatchPage) : coin haut-droit du bandeau
    .mp__hero__top, déjà position:relative — positionnement absolu pour ne
    toucher ni au bouton retour ni au badge compétition existants.
@@ -53,4 +68,15 @@
   font-size: 0.62rem;
   padding: 3px 8px;
   z-index: 2;
+}
+
+/* Variante "score" (28/08, demande utilisateur : sous le score dans
+   LiveMatchPage plutôt qu'en coin haut-droit) : en flux normal (pas
+   absolute) — le parent .mp__hero__center est déjà un flex column centré
+   (voir MatchPage.css), pas besoin de re-centrer ici, juste un peu d'air
+   au-dessus pour le détacher visuellement du score/pens.
+   `gap: 2px` du parent suffit — margin-top pour un espacement plus net que
+   ce gap, pensé pour des éléments plus proches (score/badge période). */
+.watchBadge--score {
+  margin-top: 6px;
 }
