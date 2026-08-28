@@ -239,12 +239,28 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
     }
 
     log.push(`[final-recheck:${slug}:${eventId}] FT confirmé en avance (~${FINAL_RECHECK_DELAY_MS / 1000}s au lieu de jusqu'à 60s)`)
+    // ⚠️ BUG CORRIGÉ (même investigation que sendToVercel/notifyVercel et le
+    // bloc FT de runOnePass, voir leurs commentaires) : finalDoneKey +
+    // cron:liveIds étaient touchés AVANT même de savoir si notifyVercel
+    // allait réussir — un échec ici fermait le match pour de bon (finalDone)
+    // ET le retirait du suivi actif (srem), alors que sa notif "Fin de
+    // match" n'était jamais réellement partie. Si c'était le dernier match
+    // live du jour, le Worker pouvait ensuite sauter jusqu'à 20-25min de
+    // fetchs ESPN avant de s'en rendre compte — exactement le symptôme
+    // remonté par l'utilisateur. Désormais : en cas d'échec, on ne touche à
+    // RIEN (le match reste tel quel dans cron:liveIds, ajouté par le tick
+    // normal qui a détecté ce FT potentiel) — le tick normal suivant (60s)
+    // retentera tout seul via son propre bloc isFinalConfirmed.
+    const ftSent = await notifyVercel(env, `push:espn:ft:${eventId}`,
+      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
+    if (!ftSent) {
+      log.push(`[final-recheck:${slug}:${eventId}] échec envoi FT — rien de figé, le tick normal (60s) retentera`)
+      return
+    }
     try { await kv.set(`cron:espn:${eventId}`, `${status}|${freshScore}`, { ex: 12 * 3600 }) } catch {}
     // Clos définitivement — voir finalDoneKey en tête de boucle dans runOnePass
     // (bug corrigé : notifs "Fin de match" répétées des heures après la vraie fin).
     try { await kv.set(`finalDone:${eventId}`, '1', { ex: FINAL_DONE_TTL }) } catch {}
-    await notifyVercel(env, `push:espn:ft:${eventId}`,
-      { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
     await cacheEspnSummary(kv, slug, eventId, log)
     try {
       const recapKey     = `recap:${eventId}`
@@ -318,6 +334,23 @@ async function acquireDedup(kv, dedupKey, ttl) {
 // CPU épuisé pour le reste du mois), seulement le cas, bien plus fréquent,
 // d'un aléa transitoire d'une seule requête. Pas de retry sur 4xx (401/403 —
 // secret invalide/refusé : réessayer donnerait exactement le même résultat).
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 28/08 : "2-3 buts presque en même
+// temps + fin de match, pas de notif pour ça, et 10min après pour un autre
+// but j'ai tout reçu d'un coup") — root cause trouvée en relisant ce fichier
+// et ses appelants : `sendToVercel` ne renvoyait RIEN (void), donc TOUS les
+// appelants (notifyVercel ci-dessous, mais aussi le KO plus bas) traitaient
+// un échec (timeout Vercel sous charge, 429/5xx même après le seul retry
+// déjà en place) EXACTEMENT comme un succès — la clé de dédup Redis restait
+// posée pour de bon (3h, ou 26h pour un FT) et les compteurs track[side]/
+// cardTrack[side] avançaient quand même (voir plus bas), rendant CET
+// évènement précis irrécupérable pour toujours, sans la moindre 2e chance.
+// Un pic de plusieurs évènements dans la même passe (le scénario même du
+// signalement : 2-3 buts + fin de match quasi simultanés) est justement le
+// moment où plusieurs appels Vercel enchaînés en série ont le plus de risque
+// qu'un seul d'entre eux tombe sur un aléa transitoire — un seul perdu au
+// milieu d'une rafale suffit à reproduire exactement le symptôme. Renvoie
+// désormais `true`/`false` : chaque appelant peut alors choisir de NE PAS
+// faire avancer son propre état tant que l'envoi n'est pas confirmé.
 async function sendToVercel(env, payload, slug, options = {}, log = null, attempt = 1) {
   try {
     // Secret passé en HEADER (pas en query string) : une URL avec ?secret=
@@ -329,30 +362,40 @@ async function sendToVercel(env, payload, slug, options = {}, log = null, attemp
       body: JSON.stringify({ mode: 'notify', payload, slug, options }),
       signal: AbortSignal.timeout(8_000),
     })
-    if (!res.ok) {
-      const transient = res.status === 429 || res.status >= 500
-      log?.push(`[notify→vercel] status=${res.status}${attempt === 1 && transient ? ' — retry dans 1.5s' : ''}`)
-      if (attempt === 1 && transient) {
-        await new Promise(r => setTimeout(r, 1_500))
-        return sendToVercel(env, payload, slug, options, log, 2)
-      }
+    if (res.ok) return true
+    const transient = res.status === 429 || res.status >= 500
+    log?.push(`[notify→vercel] status=${res.status}${attempt === 1 && transient ? ' — retry dans 1.5s' : ''}`)
+    if (attempt === 1 && transient) {
+      await new Promise(r => setTimeout(r, 1_500))
+      return sendToVercel(env, payload, slug, options, log, 2)
     }
+    return false
   } catch (e) {
     log?.push(`[notify→vercel] error=${e.message}${attempt === 1 ? ' — retry dans 1.5s' : ''}`)
     if (attempt === 1) {
       await new Promise(r => setTimeout(r, 1_500))
       return sendToVercel(env, payload, slug, options, log, 2)
     }
+    return false
   }
 }
 
-// Inchangé pour TOUS les appelants existants (goal/goalcancel/red/ht/reprise/
-// ft) : acquiert le dédup puis envoie, exactement comme avant — seule la
-// mécanique interne a été découpée en 2 fonctions réutilisables séparément.
+// ⚠️ MODIFIÉ (même bug, voir commentaire sendToVercel ci-dessus) : renvoie
+// désormais `true` (déjà envoyé — soit à l'instant, soit par un passage
+// précédent qui détenait déjà la clé de dédup) ou `false` (échec confirmé,
+// après le retry de sendToVercel). Sur `false`, la clé de dédup vient d'être
+// RELÂCHÉE (del) — un futur passage (60s plus tard) peut donc réellement
+// retenter cet envoi précis, au lieu de rester bloqué pour de bon derrière
+// une clé posée mais jamais honorée.
 async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = null, ttl = 3 * 3600) {
   const acquired = await acquireDedup(env._kv, dedupKey, ttl)
-  if (!acquired) return
-  await sendToVercel(env, payload, slug, options, log)
+  if (!acquired) return true
+  const ok = await sendToVercel(env, payload, slug, options, log)
+  if (!ok) {
+    try { await env._kv.del(dedupKey) } catch {}
+    return false
+  }
+  return true
 }
 
 // Ticker live (score en direct) : PAS de dédup (même tag remplace côté SW à
@@ -871,9 +914,18 @@ async function runOnePass(env) {
     // 🔴 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
     // que si on vient vraiment de l'acquérir, comportement identique à avant.
     if (isLive && notPostponed && koAcquired) {
-      await sendToVercel(env,
+      const koSent = await sendToVercel(env,
         { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
-      log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
+      if (koSent) {
+        log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
+      } else {
+        // Échec confirmé — koKey a été posé dans le pipeline plus haut (SET
+        // NX) AVANT de savoir si l'envoi allait réussir ; on le relâche pour
+        // qu'un futur passage puisse retenter, même bug/même fix que
+        // notifyVercel ci-dessus.
+        try { await kv.del(koKey) } catch {}
+        log.push(`[espn:${slug}:${eventId}] échec envoi KO — retenté au prochain passage`)
+      }
     }
 
     if (prevState === null) {
@@ -911,8 +963,16 @@ async function runOnePass(env) {
           const newCount     = side === 'home' ? home : away
           const prevCount    = track[side]
           log.push(`[espn:${slug}:${eventId}] BUT ANNULÉ ${side} ${prevCount}→${newCount}`)
-          await notifyVercel(env, `push:espn:goalcancel:${eventId}:${side}:${newCount}`,
+          const cancelSent = await notifyVercel(env, `push:espn:goalcancel:${eventId}:${side}:${newCount}`,
             { title: `❌ But annulé (${scoringTeam})`, body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live', matchId: eventId, tag: `goal-cancel-${eventId}-${side}-${newCount}` }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+          if (!cancelSent) {
+            // Échec confirmé — voir commentaire sendToVercel/notifyVercel en
+            // tête de fichier : on ne touche PAS track[side]/les anciennes
+            // clés de dédup "but", le prochain passage retentera cette même
+            // annulation depuis le début.
+            log.push(`[espn:${slug}:${eventId}] échec envoi but annulé ${side} — retenté au prochain passage`)
+            continue
+          }
           for (let i = newCount; i < prevCount; i++) {
             try { await kv.del(`push:espn:goal:${eventId}:${side}:${i + 1}`) } catch {}
           }
@@ -941,8 +1001,18 @@ async function runOnePass(env) {
             const goalBody     = `${scorerLine}\n${homeTeam} ${scoreStr} ${awayTeam}`
 
             log.push(`[espn:${slug}:${eventId}] BUT ${side} ${goalIndex + 1}/${targetCount}`)
-            await notifyVercel(env, `push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
+            const goalSent = await notifyVercel(env, `push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
               { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+            if (!goalSent) {
+              // Échec confirmé — voir commentaire sendToVercel/notifyVercel en
+              // tête de fichier : on N'AVANCE PAS track[side], sinon ce but
+              // précis ne serait plus jamais redétecté (le prochain passage
+              // comparerait le score à un compteur déjà à jour). On arrête ici
+              // pour ce côté cette passe (garde l'ordre chronologique des
+              // buts) — retenté depuis ce même but au prochain passage (60s).
+              log.push(`[espn:${slug}:${eventId}] échec envoi but ${side} ${goalIndex + 1} — retenté au prochain passage`)
+              break
+            }
             track[side]++
             trackChanged = true
           }
@@ -971,8 +1041,15 @@ async function runOnePass(env) {
           const teamName   = side === 'home' ? homeTeam : awayTeam
           const minuteText = minuteLabel(card.minute)
           log.push(`[espn:${slug}:${eventId}] carton rouge ${side} ${card.name}`)
-          await notifyVercel(env, `push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
+          const redSent = await notifyVercel(env, `push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
             { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+          if (!redSent) {
+            // Même fix que le but ci-dessus : ne pas avancer cardTrack[side]
+            // tant que l'envoi n'est pas confirmé, sinon ce carton précis ne
+            // serait plus jamais redétecté.
+            log.push(`[espn:${slug}:${eventId}] échec envoi carton rouge ${side} — retenté au prochain passage`)
+            break
+          }
           cardTrack[side]++
           cardTrackChanged = true
         }
@@ -1003,18 +1080,35 @@ async function runOnePass(env) {
     // au cas où la passe suivante infirme ce statut.
     if (isFinalConfirmed) {
       log.push(`[espn:${slug}:${eventId}] FT (confirmé)`)
-      // Clos définitivement — voir finalDoneKey en tête de boucle (bug corrigé :
-      // notifs "Fin de match" répétées des heures après la vraie fin, tant
-      // qu'ESPN continuait à lister le match FINAL et que finalConfirmKey
-      // (TTL 5min) se ré-armait entretemps).
-      try { await kv.set(finalDoneKey, '1', { ex: FINAL_DONE_TTL }) } catch {}
-      await notifyVercel(env, `push:espn:ft:${eventId}`,
+      // ⚠️ BUG CORRIGÉ (même investigation que sendToVercel/notifyVercel en
+      // tête de fichier) : finalDoneKey était posé AVANT même de savoir si
+      // l'envoi allait réussir — un échec (timeout/429/5xx) laissait quand
+      // même le match "clos pour de bon" (plus aucun traitement possible,
+      // voir `if (pick(5)) continue` en tête de boucle), la notif "Fin de
+      // match" perdue pour toujours. Posé désormais SEULEMENT si l'envoi est
+      // confirmé.
+      const ftSent = await notifyVercel(env, `push:espn:ft:${eventId}`,
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
-      await cacheEspnSummary(kv, slug, eventId, log)
-      // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
-      // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
-      // de cette compétition au lieu d'attendre la rotation aveugle.
-      await queueFdPriorityRefresh(kv, slug, log)
+      if (ftSent) {
+        try { await kv.set(finalDoneKey, '1', { ex: FINAL_DONE_TTL }) } catch {}
+        await cacheEspnSummary(kv, slug, eventId, log)
+        // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
+        // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
+        // de cette compétition au lieu d'attendre la rotation aveugle.
+        await queueFdPriorityRefresh(kv, slug, log)
+      } else {
+        // Échec confirmé — ANNULE le retrait de cron:liveIds fait plus haut
+        // (stayTrackedAsLive, calculé uniquement sur le statut/score ESPN,
+        // pas sur le succès de l'envoi) : sinon ce match serait considéré
+        // "plus rien à surveiller", et si c'était le DERNIER match live du
+        // jour, le Worker pourrait sauter jusqu'à 20-25min de fetchs ESPN
+        // (optimisation "aucun match en direct", voir plus haut dans ce
+        // fichier) avant de retenter — exactement le symptôme remonté par
+        // l'utilisateur ("notifs reçues d'un coup ~10min plus tard").
+        log.push(`[espn:${slug}:${eventId}] échec envoi FT — match gardé "en direct", retenté au prochain passage`)
+        anyStillLive = true
+        try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
+      }
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
       // 1ère détection cette passe (finalConfirmKey tout juste acquis) → programmer
