@@ -14,6 +14,7 @@ import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
+import { WatchBadge }              from '../components/WatchBadge'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -229,6 +230,14 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <span className="mp__hero__time">{formatTime(match.utcDate)}</span>
             </>
           )}
+          {/* ⚠️ AJOUT (28/08, demande utilisateur : "quand les matchs ont
+              pas commencé y'a pas le badge alors qu'on le sait d'avance") :
+              MatchPage.jsx est justement la page consultée AVANT le coup
+              d'envoi (pas seulement une fois le match terminé) — le
+              diffuseur est connu dès la programmation de la saison, pas
+              besoin d'attendre que le match commence pour l'afficher. Même
+              variant "score" que LiveMatchPage (sous le score/heure). */}
+          <WatchBadge match={match} variant="score" />
         </div>
 
         <div className="mp__hero__team mp__hero__team--away">
