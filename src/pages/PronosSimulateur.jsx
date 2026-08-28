@@ -51,6 +51,7 @@
 import { useState, useMemo } from 'react'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamFormMulti, buildFormMap } from '../hooks/useTeamForm'
+import { useH2HHistory } from '../hooks/useMatchs'
 import { useCrossCompH2H } from '../hooks/useCrossCompH2H'
 import { calcPronoAdvanced, fitLambdasToPreMatch, scoreExactProbabilities } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
@@ -74,24 +75,41 @@ const SIM_COMPS = COMPETITIONS.filter(c => SIM_COMP_IDS.includes(c.id))
 // signal (testé Arsenal-Chelsea, H2H dominant → 1-0 devient le score le
 // plus probable), mais ne peut rien faire quand il n'y a NI H2H NI forme
 // des 2 côtés.
-// Fix scopé UNIQUEMENT au Simulateur (jamais useTeamForm.js/calcProno.js/
-// Pronos réel — la décision du 25/07 reste intacte pour tout le reste de
-// l'app) : si la forme CETTE saison est trop courte pour être utile (<3
-// matchs), on reconstruit une forme de repli depuis la saison précédente de
-// CETTE compétition (déjà chargée par useTeamFormMulti dans matchesByComp,
-// aucun appel réseau en plus — c'est exactement fallbackMatches que
-// useTeamForm.js calcule déjà pour le modèle buts/H2H, juste jamais utilisé
-// pour formMap jusqu'ici). Compromis assumé et différent du reste de
-// l'app : le Simulateur est un outil de curiosité (score hypothétique),
-// pas un pronostic "argent réel" (Mes Paris) — accepter un léger risque
-// mercato ici pour éviter un 1-1 systématique et sans intérêt en tout début
-// de saison est le bon arbitrage, mais PAS pour Mes Paris/Pronos.
-const MIN_FORM_GAMES = 3
-function effectiveForm(formMap, matchesByComp, comp, teamId) {
-  const current = formMap?.[teamId] ?? []
-  if (current.length >= MIN_FORM_GAMES) return current
-  const fallback = buildFormMap(matchesByComp?.[comp] ?? [])[teamId] ?? []
-  return fallback.length > current.length ? fallback : current
+//
+// ⚠️ AFFINÉ (28/08, demande utilisateur : "fait un assemblage de la saison
+// en cours et des 2 ou 3 saisons precedentes... regroupé ça en une requete
+// pour pas embeter fTdata") — plutôt qu'un nouveau mécanisme, réutilise
+// useH2HHistory (useMatchs.js), DÉJÀ existant et utilisé ailleurs (Historique
+// H2H sur la fiche match) : 1 fetch PAR SAISON supplémentaire (2 max,
+// EXTRA_H2H_SEASONS_BACK dans ce fichier), jamais par équipe/comparaison, et
+// surtout caché 90 JOURS et PARTAGÉ avec tout le reste de l'app (si un autre
+// utilisateur a déjà ouvert un match de ce championnat récemment, ces 2
+// appels sont déjà en cache — aucun nouvel appel FD.org). Testé en direct
+// (fetch réel PL, dateFrom=2024-07-01&dateTo=2026-06-30, en UN SEUL appel) :
+// FD.org accepte bien ~2 saisons dans une même requête (760 matchs reçus,
+// 2024-08-16 → 2026-05-24) mais renvoie VIDE au-delà (3 saisons pleines en 1
+// seul appel testé, échoue) — d'où le choix de réutiliser useH2HHistory tel
+// quel (2 appels séparés, déjà la bonne limite trouvée par le passé) plutôt
+// que de retenter une fusion en 1 seule requête qui ne marche pas de toute
+// façon au-delà de 2 saisons.
+// Forme reconstruite en fusionnant saison en cours (déjà chargée par
+// useTeamFormMulti, matchesByComp) + ces 2 saisons précédentes, triées
+// chronologiquement, puis les 5 DERNIERS matchs (buildFormMap, comme
+// partout ailleurs) — si la saison en cours a déjà 5 matchs joués, elle
+// suffit seule (les plus anciens ne sont jamais pris) ; sinon on pioche
+// naturellement dans les saisons d'avant jusqu'à en avoir 5. Scopé
+// UNIQUEMENT au Simulateur (jamais useTeamForm.js/calcProno.js/Pronos réel —
+// la décision du 25/07 reste intacte pour tout le reste de l'app) :
+// compromis assumé, différent du reste de l'app — le Simulateur est un
+// outil de curiosité (score hypothétique), pas un pronostic "argent réel"
+// (Mes Paris) — accepter un léger risque mercato ici pour éviter un 1-1
+// systématique et sans intérêt en tout début de saison est le bon arbitrage.
+function pooledForm(currentSeasonMatches, extraSeasonsMatches, teamId) {
+  if (teamId == null) return []
+  const merged = [...(currentSeasonMatches ?? []), ...(extraSeasonsMatches ?? [])]
+    .filter(m => m.status === 'FINISHED')
+    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+  return buildFormMap(merged)[teamId] ?? []
 }
 
 // Cherche la ligne standings (nom + crest) d'une équipe déjà sélectionnée —
@@ -180,6 +198,13 @@ export function PronosSimulateur() {
 
   const { formMap, matchesByComp } = useTeamFormMulti([homeComp, awayComp].filter(Boolean))
 
+  // 2 saisons précédentes en plus de la saison en cours (matchesByComp
+  // ci-dessus) — voir commentaire pooledForm en tête de fichier. Hook déjà
+  // existant/partagé (useMatchs.js), toujours appelé (règle des Hooks),
+  // `enabled: !!selectedComp` gère déjà en interne le cas compId absent.
+  const homeExtraHistory = useH2HHistory(homeComp, matchesByComp?.[homeComp])
+  const awayExtraHistory = useH2HHistory(awayComp, matchesByComp?.[awayComp])
+
   // Toujours appelés (règle des Hooks) — useStandings gère déjà en interne
   // le cas `compId` absent (enabled: !!selectedComp), retourne [] sans fetch.
   const home = useTeamRow(homeComp, homeTeamId)
@@ -205,22 +230,25 @@ export function PronosSimulateur() {
 
   const prono = useMemo(() => {
     if (!isComparing) return null
-    // effectiveForm : repli saison précédente si la forme CETTE saison est
-    // trop courte (début de saison, voir commentaire MIN_FORM_GAMES plus
-    // haut) — scopé au Simulateur uniquement.
-    const homeForm = effectiveForm(formMap, matchesByComp, homeComp, homeTeamId)
-    const awayForm = effectiveForm(formMap, matchesByComp, awayComp, awayTeamId)
+    // pooledForm : saison en cours + 2 précédentes fusionnées, 5 derniers
+    // matchs (voir commentaire en tête de fichier) — scopé au Simulateur
+    // uniquement.
+    const homeForm = pooledForm(matchesByComp?.[homeComp], homeExtraHistory, homeTeamId)
+    const awayForm = pooledForm(matchesByComp?.[awayComp], awayExtraHistory, awayTeamId)
     // compMatches=[] force le repli forme+H2H (voir commentaire en tête de
     // fichier) — jamais le modèle "buts marqués/encaissés" (a besoin d'un
     // seul championnat de référence commun aux 2 équipes).
     return calcPronoAdvanced(homeTeamId, awayTeamId, [], homeForm, awayForm, { fullH2H: meetings })
-  }, [isComparing, formMap, matchesByComp, homeComp, awayComp, homeTeamId, awayTeamId, meetings])
+  }, [isComparing, matchesByComp, homeComp, awayComp, homeExtraHistory, awayExtraHistory, homeTeamId, awayTeamId, meetings])
 
-  // Juste pour la transparence de la note affichée plus bas (voir
-  // MIN_FORM_GAMES) — pas utilisé dans le calcul lui-même.
+  // Juste pour la transparence de la note affichée plus bas — la forme
+  // "pure saison en cours" (formMap, useTeamFormMulti) est plus courte que
+  // ce que pooledForm a réellement utilisé : signe que les saisons
+  // précédentes ont été mises à contribution. Pas utilisé dans le calcul
+  // lui-même.
   const usingFallbackForm = isComparing && (
-    (formMap?.[homeTeamId]?.length ?? 0) < MIN_FORM_GAMES ||
-    (formMap?.[awayTeamId]?.length ?? 0) < MIN_FORM_GAMES
+    (formMap?.[homeTeamId]?.length ?? 0) < 5 ||
+    (formMap?.[awayTeamId]?.length ?? 0) < 5
   )
 
   // Scores les plus probables — dérivés du même pronostic forme+H2H
@@ -307,7 +335,7 @@ export function PronosSimulateur() {
               : meetings.length > 0
                 ? `Basé sur la forme récente des 2 équipes + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''}${sameCompInfo ? ' (plusieurs saisons)' : ' (toutes compétitions, saison en cours)'}.`
                 : 'Basé sur la forme récente des 2 équipes — aucune confrontation directe trouvée dans leur historique.'}
-            {usingFallbackForm && ' Championnat tout juste relancé : forme partiellement basée sur la saison précédente.'}
+            {usingFallbackForm && ' Championnat tout juste relancé : forme partiellement basée sur les saisons précédentes.'}
           </p>
         </div>
       )}
