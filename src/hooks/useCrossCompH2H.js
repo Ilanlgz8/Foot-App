@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
+import { toFdcoukName } from '../data/fdcoukTeamNames'
 
 // ── useCrossCompH2H — confrontations directes entre 2 équipes, PEU IMPORTE
 // leur championnat respectif ──────────────────────────────────────────────
@@ -28,8 +29,21 @@ import { classifyFetchError } from '../utils/fetchErrors'
 // changement de sélection dans les menus déroulants.
 const STALE_MS = 1000 * 60 * 60 * 24  // 24h — un historique de confrontations ne change qu'après un nouveau match entre les 2, rarissime
 
-export function useCrossCompH2H(homeId, awayId, enabled) {
+// ── Extension multi-années football-data.co.uk (28/08, voir api/h2h.js) ──
+// FD.org (ci-dessus) ne couvre QUE la saison en cours en compte gratuit —
+// quasi toujours vide pour un H2H. Requête SÉPARÉE (queryKey distincte,
+// n'affecte jamais le chemin FD.org existant), déclenchée UNIQUEMENT quand
+// les 2 équipes sont du MÊME championnat (paramètre `sameCompInfo`, fourni
+// par l'appelant — ce hook ne devine rien) parmi les 5 couverts par
+// FDCOUK_LEAGUE_FILE (pas de fichier pour les compétitions européennes).
+// Fusionnée avec `meetings` plutôt que substituée : les 2 sources sont
+// complémentaires, jamais en doublon (api/h2h.js exclut lui-même la saison
+// en cours, déjà couverte côté FD.org).
+const H2H_STALE_MS = 1000 * 60 * 60 * 24 // 24h — historique de saisons terminées, immuable
+
+export function useCrossCompH2H(homeId, awayId, enabled, sameCompInfo) {
   const key = `crossH2H_${homeId}_${awayId}`
+  const { comp, homeShortName, awayShortName } = sameCompInfo ?? {}
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['crossCompH2H', homeId, awayId],
@@ -54,9 +68,51 @@ export function useCrossCompH2H(homeId, awayId, enabled) {
     enabled:               enabled && homeId != null && awayId != null,
   })
 
+  const extendedEnabled = enabled && !!comp && !!homeShortName && !!awayShortName && homeId != null && awayId != null
+  const extKey = `h2hExt_${comp}_${homeId}_${awayId}`
+
+  const { data: extended, isLoading: extLoading } = useQuery({
+    queryKey: ['fdcoukH2H', comp, homeId, awayId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ comp, home: homeShortName, away: awayShortName })
+      const res = await fetch(`/api/h2h?${params.toString()}`)
+      if (!res.ok) throw new Error(String(res.status))
+      const json = await res.json()
+      const rows = json.meetings ?? []
+      // Reconstruit le même format que les meetings FD.org ci-dessus
+      // ({status, homeTeam:{id}, awayTeam:{id}, score:{fullTime}}), seul
+      // format lu par directMeetings()/outcomeForTeam() (calcProno.js,
+      // matchUtils.js) — aucune nouvelle logique de lecture à écrire côté
+      // consommateur. `m.home`/`m.away` (noms football-data.co.uk) sont
+      // remis en correspondance avec les VRAIS ids FD.org homeId/awayId en
+      // comparant au nom déjà résolu de CE côté-ci (homeShortName →
+      // fdcouk), garantissant le bon sens domicile/extérieur historique
+      // (pas juste "homeId d'un côté, awayId de l'autre" à l'aveugle).
+      const homeFdcouk = toFdcoukName(homeShortName)
+      const converted = rows.map(m => {
+        const literalHomeIsOurHome = m.home === homeFdcouk
+        return {
+          status: 'FINISHED',
+          homeTeam: { id: literalHomeIsOurHome ? homeId : awayId },
+          awayTeam: { id: literalHomeIsOurHome ? awayId : homeId },
+          score: { fullTime: { home: m.homeGoals, away: m.awayGoals } },
+        }
+      })
+      writeCache(extKey, converted, H2H_STALE_MS)
+      return converted
+    },
+    initialData:          readCacheStale(extKey) ?? undefined,
+    initialDataUpdatedAt: getCacheSavedAt(extKey),
+    staleTime:            H2H_STALE_MS,
+    retry:                false,
+    enabled:               extendedEnabled,
+  })
+
+  const meetings = [...(data ?? []), ...(extended ?? [])]
+
   return {
-    meetings: data ?? [],
-    loading:  isLoading,
+    meetings,
+    loading:  isLoading || (extendedEnabled && extLoading),
     error:    classifyFetchError(error?.message),
   }
 }

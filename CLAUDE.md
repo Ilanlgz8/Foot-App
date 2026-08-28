@@ -5,7 +5,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 ## Stack
 - **Frontend** : React 18, Vite, React Router, React Query, vite-plugin-pwa (Workbox)
 - **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback). xG retiré (`api/fifa-live.js`) : jamais présent en pratique dans le boxscore ESPN, aucune intégration FotMob n'a jamais existé malgré une ancienne mention ici
-- **Backend Vercel** : `/api/*` serverless functions (11/12 — limite dure Hobby, tout nouvel endpoint doit être fusionné dans un fichier existant, sauf s'il reste un slot libre)
+- **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, plus aucun slot libre : tout nouvel endpoint doit être fusionné dans un fichier existant)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
@@ -28,6 +28,12 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - `usePushNotifications.js` — hook d'abonnement, auto-subscribe au 1er lancement, re-sync Redis toutes les 5 min
 - `NotificationBell.jsx` — dans la navbar, utilise `usePushNotifications`
 - `public/sw-push.js` — handler `push` event dans le service worker (importé via `importScripts`)
+
+### Simulateur (Pronos)
+- `Pronos.jsx` — switcher top-level `mode` (`pronos`/`simulateur`, 2 boutons tout en haut de la page, indépendant de `activeTab`) ; Simulateur accessible sans rejoindre de groupe
+- `PronosSimulateur.jsx` — confrontation hypothétique entre 2 équipes (même de championnats différents), scope limité aux 6 grands championnats club (FL1/PL/PD/BL1/SA/CL, seuls avec classement+forme exploitables). Modèle forme+H2H (`calcPronoAdvanced` avec `compMatches=[]`, PAS le modèle buts marqués/encaissés qui suppose un championnat commun). Résultat affiché en score exact simulé (`fitLambdasToPreMatch` + `scoreExactProbabilities`, PAS des cotes)
+- `useCrossCompH2H.js` — H2H toutes compétitions confondues via `/v4/teams/{id}/matches` (FD.org, saison en cours uniquement en compte gratuit) + extension multi-années `/api/h2h` (football-data.co.uk, voir ci-dessous) quand les 2 équipes sont du même championnat
+- `api/h2h.js` + `src/data/fdcoukTeamNames.js` — H2H multi-années (jusqu'à 6 saisons), football-data.co.uk (site distinct de football-data.org, CSV statiques sans clé API). Limite honnête : fichiers PAR championnat national, aucune confrontation européenne (ex. PSG-Bayern) n'y figure jamais
 
 ### Modal / Onglets
 - `MatchModal.jsx` — modal pré-match avec onglets (Stats/Compos/Classement/Prono)
@@ -87,7 +93,10 @@ api/
   apifootball.js  — PERMANENTLY_DISABLED (voir Stack)
   pulse.js        — (fusion pulse+curve) prono/courbe post-match
   news.js         — agrégateur RSS, cache Redis 5min
-  (11/12 — 1 slot libre depuis la suppression de [...path].js, voir "Problèmes connus")
+  h2h.js          — H2H multi-années même championnat (football-data.co.uk,
+                    CSV statiques sans clé, voir Architecture clé > Simulateur)
+  (12/12 — dernier slot libre utilisé, plus aucune marge : tout nouvel
+  endpoint doit être fusionné dans un fichier existant)
 
 public/
   sw-push.js      — service worker push handler (vanilla JS, importé par Workbox)

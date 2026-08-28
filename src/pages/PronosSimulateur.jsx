@@ -68,8 +68,11 @@ function useTeamRow(compId, teamId) {
   const row = standings.find(r => String(r.team.id) === String(teamId))
   return {
     loading,
-    name:  row ? translateTeam(row.team.shortName || row.team.name) : null,
-    crest: row?.team?.crest ?? null,
+    name:      row ? translateTeam(row.team.shortName || row.team.name) : null,
+    crest:     row?.team?.crest ?? null,
+    // shortName brut FD.org (pas traduit) — clé utilisée par TEAM_NAMES_FR
+    // ET fdcoukTeamNames.js (voir useCrossCompH2H, extension multi-années).
+    shortName: row?.team?.shortName ?? null,
   }
 }
 
@@ -150,10 +153,19 @@ export function PronosSimulateur() {
   const canCompare = homeTeamId != null && awayTeamId != null && homeTeamId !== awayTeamId
   const isComparing = compared?.homeId === homeTeamId && compared?.awayId === awayTeamId
 
+  // Extension multi-années (football-data.co.uk, voir api/h2h.js) — QUE si
+  // les 2 équipes sont du même championnat (sinon aucun fichier ne peut les
+  // contenir toutes les deux, voir commentaire FDCOUK_LEAGUE_FILE). Passé
+  // en plus du H2H FD.org existant, jamais à sa place.
+  const sameCompInfo = isComparing && homeComp && homeComp === awayComp
+    ? { comp: homeComp, homeShortName: home.shortName, awayShortName: away.shortName }
+    : null
+
   const { meetings, loading: h2hLoading } = useCrossCompH2H(
     isComparing ? homeTeamId : null,
     isComparing ? awayTeamId : null,
-    isComparing
+    isComparing,
+    sameCompInfo
   )
 
   const prono = useMemo(() => {
@@ -248,7 +260,7 @@ export function PronosSimulateur() {
             {h2hLoading
               ? 'Recherche des confrontations passées…'
               : meetings.length > 0
-                ? `Basé sur la forme récente des 2 équipes + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''} (toutes compétitions).`
+                ? `Basé sur la forme récente des 2 équipes + ${meetings.length} confrontation${meetings.length > 1 ? 's' : ''} directe${meetings.length > 1 ? 's' : ''} trouvée${meetings.length > 1 ? 's' : ''}${sameCompInfo ? ' (plusieurs saisons)' : ' (toutes compétitions, saison en cours)'}.`
                 : 'Basé sur la forme récente des 2 équipes — aucune confrontation directe trouvée dans leur historique.'}
           </p>
         </div>
