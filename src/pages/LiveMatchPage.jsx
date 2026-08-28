@@ -489,7 +489,7 @@ export default function LiveMatchPage() {
   // ce trou pour le head2head AFFICHÉ, pas seulement pour la cote de prono.
   const h2hHistory = useH2HHistory(compId, resolveMatches)
   const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true })
+  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, même demande/commentaire détaillé que
   // MatchPage.jsx) : compH2H (repli instantané, 0 requête) suffit à afficher
   // l'onglet tout de suite — le contenu se complète tout seul avec

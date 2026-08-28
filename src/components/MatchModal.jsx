@@ -12,6 +12,7 @@ import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp,
 import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
+import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -1609,7 +1610,16 @@ function H2HBilan({ rows, match, isWC }) {
 // donc gardent un comportement strictement inchangé. Seul MatchPage.jsx/
 // LiveMatchPage.jsx (page dédiée du match, où le H2H manquant a été
 // signalé) le passe à `true`.
-export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = false } = {}) {
+// ⚠️ `extendedH2H` (28/08, demande utilisateur : "on relie pas le h2h qu'on
+// vient d'ajouter... on a beaucoup plus de match") — extension football-
+// data.co.uk (api/h2h.js, déjà utilisée par le Simulateur/useCrossCompH2H)
+// réutilisée ici pour la fiche d'UN match précis, quand les 2 équipes sont
+// du même championnat. Volontairement PAS activée pour toutes les cards
+// (Accueil : MatchDuJourCard.jsx/MatchPoster.jsx, 10-20 en même temps) —
+// opt-in, seuls MatchPage.jsx/LiveMatchPage.jsx (page dédiée, 1 seul match à
+// la fois) le passent à `true`, même prudence que `looseTeamMatch` déjà en
+// place ci-dessous.
+export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = false, extendedH2H = false } = {}) {
   const fdMatchId = resolveFdMatchId(match, compMatches, { loose: looseTeamMatch })
   const { data: h2hMatches, isLoading } = useH2H(match, delayMs, fdMatchId)
   // ⚠️ BUG CORRIGÉ (constat utilisateur, 20/08 : "Historique" absent sur
@@ -1678,7 +1688,62 @@ export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = f
       ).slice().sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
     : []
 
-  const baseRows = fdRecent.length ? fdRecent : compH2H
+  // Extension football-data.co.uk (voir commentaire extendedH2H ci-dessus) —
+  // même championnat uniquement (fichiers par championnat national, aucune
+  // confrontation européenne dedans). Query séparée (queryKey propre),
+  // n'affecte jamais useH2H/fdRecent ci-dessus.
+  const compCode      = match?.competition?.code
+  const fdcoukLeague  = extendedH2H ? FDCOUK_LEAGUE_FILE[compCode] : null
+  const homeShortName = match?.homeTeam?.shortName
+  const awayShortName = match?.awayTeam?.shortName
+  const homeFdcouk    = fdcoukLeague ? toFdcoukName(homeShortName) : null
+  const awayFdcouk    = fdcoukLeague ? toFdcoukName(awayShortName) : null
+  const fdcoukEnabled = !!(fdcoukLeague && homeFdcouk && awayFdcouk)
+
+  const { data: fdcoukMeetings } = useQuery({
+    queryKey: ['fdcoukH2H', compCode, homeShortName, awayShortName],
+    queryFn: async () => {
+      const params = new URLSearchParams({ comp: compCode, home: homeShortName, away: awayShortName })
+      const res = await fetch(`/api/h2h?${params.toString()}`)
+      if (!res.ok) return []
+      const json = await res.json()
+      return json.meetings ?? []
+    },
+    enabled: fdcoukEnabled,
+    staleTime: 1000 * 60 * 60 * 24, // 24h — historique de saisons terminées, immuable
+    retry: false,
+  })
+
+  const usedBase = fdRecent.length ? fdRecent : compH2H
+  // `m.home`/`m.away` (noms football-data.co.uk) remis en correspondance
+  // avec les VRAIS objets équipe déjà chargés (match.homeTeam/awayTeam,
+  // crest+shortName inclus) — H2HRowsList/H2HBilan en ont besoin telles
+  // quelles, aucune logique d'affichage à dupliquer pour ces lignes.
+  const fdcoukRows = (fdcoukMeetings ?? []).map(m => {
+    const literalHomeIsCurrentHome = m.home === homeFdcouk
+    const [d, mo, y] = (m.date ?? '').split('/')
+    const utcDate = d && mo && y ? `${y}-${mo}-${d}` : null
+    if (!utcDate) return null
+    return {
+      status: 'FINISHED',
+      utcDate,
+      competition: match?.competition ?? null,
+      homeTeam: literalHomeIsCurrentHome ? match.homeTeam : match.awayTeam,
+      awayTeam: literalHomeIsCurrentHome ? match.awayTeam : match.homeTeam,
+      score: { fullTime: { home: m.homeGoals, away: m.awayGoals } },
+    }
+  }).filter(Boolean)
+
+  // Dédoublonnage : le head2head FD.org (fdRecent) remonte déjà 5-6 saisons
+  // pour beaucoup de paires — évite de compter 2x le même match si les 2
+  // sources le connaissent (comparaison par jour, jamais 2 confrontations
+  // entre les mêmes 2 équipes le même jour).
+  const existingDays = new Set(usedBase.map(m => m.utcDate ? new Date(m.utcDate).toDateString() : null))
+  const dedupedFdcouk = fdcoukRows.filter(m => !existingDays.has(new Date(m.utcDate).toDateString()))
+
+  const baseRows = dedupedFdcouk.length
+    ? [...usedBase, ...dedupedFdcouk].sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+    : usedBase
 
   // ⚠️ AJOUT (18/08, demande explicite utilisateur : "l'app devrait le faire
   // automatiquement grâce à l'app et au résultat final... même si personne
