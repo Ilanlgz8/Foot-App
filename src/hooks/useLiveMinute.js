@@ -1372,8 +1372,29 @@ export function useLiveMinute(matches) {
   }, [])
 
   // ── ESPN : Web Worker timer (non throttlé même en arrière-plan) ──
+  // ⚠️ AJOUT (28/08, optimisation live/batterie) : ce tick tournait à 30s en
+  // PERMANENCE, même app en arrière-plan — alors que les notifs ne dépendent
+  // plus du tout de ce poll client depuis longtemps (100% côté cf-worker,
+  // voir CLAUDE.md), et que la reprise au premier plan force déjà un poll
+  // immédiat (voir onVisible plus bas, forceFresh). Un onglet/PWA laissé
+  // ouvert en arrière-plan payait donc une invocation Vercel (le poste de
+  // coût le plus lourd de toute l'app, une par CLIENT) + un réveil réseau
+  // (batterie) toutes les 30s pour un écran que personne ne regarde.
+  // Sans risque de fraîcheur perçue : si un AUTRE utilisateur suit le même
+  // match au premier plan pendant que celui-ci est en arrière-plan, c'est
+  // SON poll à lui qui détecte le changement et déclenche la publication
+  // Ably — reçue ici même en arrière-plan (l'abonnement Ably plus bas ne
+  // dépend pas de la visibilité, seul CE poll local est mis en pause). Seul
+  // cas réellement moins frais : plus personne du tout (celui-ci compris,
+  // vu qu'il ne regarde pas) ne suit ce match précis — et dans ce cas
+  // précis, personne ne peut de toute façon constater le retard tant que
+  // l'app reste en arrière-plan ; le retour au premier plan rattrape
+  // immédiatement (forceFresh, déjà en place).
   useEffect(() => {
-    const tick = () => pollESPN(matchesRef.current, queryClient)
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return
+      pollESPN(matchesRef.current, queryClient)
+    }
     tick()
 
     let worker = null
