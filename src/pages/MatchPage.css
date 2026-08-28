@@ -209,6 +209,153 @@
   margin-top: 0.25rem;
 }
 
+/* ── Rejouer le match ─────────────────────────────────────────────────────── */
+.mp__replayWrap {
+  position: relative;
+  z-index: 2;
+  margin: 0.9rem 1rem 0;
+}
+.mp__replayToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  background: rgba(var(--black-rgb),.32);
+  border: 1px solid rgba(var(--white-rgb),.14);
+  border-radius: 20px;
+  color: rgba(var(--white-rgb),.85);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.mp__replayToggle:hover { background: rgba(var(--black-rgb),.5); }
+.mp__replayToggleIcon { font-size: 0.95rem; line-height: 1; }
+
+.mp__replay {
+  margin-top: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+}
+.mp__replayTop {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+.mp__replayMinute {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.mp__replayScore {
+  text-align: center;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mp__replayTrack {
+  position: relative;
+  height: 4px;
+  background: rgba(var(--white-rgb),.1);
+  border-radius: 4px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.mp__replayTrackFill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--red-vivid);
+  border-radius: 4px;
+}
+.mp__replaySeek {
+  width: 100%;
+  margin: 0 0 14px;
+  accent-color: var(--red-vivid);
+}
+.mp__replayControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.mp__replayBtn {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(var(--white-rgb),.06);
+  border: 1px solid var(--border);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.mp__replaySpeeds {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.mp__replaySpeedBtn {
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.mp__replaySpeedBtn--active {
+  background: var(--red-dim);
+  border-color: var(--border-red);
+  color: var(--red-vivid);
+}
+.mp__replayPens {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  margin: 0 0 10px;
+}
+.mp__replayFeed {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.mp__replayFeedEmpty {
+  font-size: 0.8rem;
+  color: var(--text-mid);
+  text-align: center;
+  margin: 0;
+  padding: 6px 0;
+}
+.mp__replayFeedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.8rem;
+}
+.mp__replayFeedRow--away { flex-direction: row-reverse; text-align: right; }
+.mp__replayFeedIcon { font-size: 0.85rem; }
+.mp__replayFeedName { flex: 1; color: #fff; }
+.mp__replayFeedMin {
+  font-size: 0.72rem;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────────*/
 .mp__wrap {
   flex: 1;
