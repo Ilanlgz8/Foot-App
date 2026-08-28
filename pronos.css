@@ -486,3 +486,132 @@
 }
 .pronos__emptyIcon { font-size: 1.8rem; opacity: 0.4; }
 .pronos__emptyTitle { font-size: 0.85rem; color: var(--text-mid); font-weight: 600; }
+
+/* ── Onglet Simulateur (confrontation hypothétique, 2 équipes, même de
+   championnats différents) — voir PronosSimulateur.jsx. Pilules 1/N/2
+   redéfinies en propre ici (.simulateur__pill*) plutôt que réutiliser
+   .poster__prono-pill (accueil.css, jamais importé dans Pronos.jsx) — même
+   traitement visuel (fond blanc, valeur bordeaux, liseré glow sur la
+   favorite), auto-porté comme le reste de pronos.css. */
+.simulateur { padding-top: 0.2rem; }
+.simulateur__intro {
+  font-size: 0.85rem;
+  color: var(--text-mid);
+  line-height: 1.5;
+  text-align: center;
+  margin: 0 0 1.2rem;
+}
+.simulateur__picker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.simulateur__side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.simulateur__sideLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.simulateur__select {
+  width: 100%;
+  padding: 0.6rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+.simulateur__select:disabled { opacity: 0.5; }
+.simulateur__vs {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-mid);
+  padding-top: 1.3rem;
+}
+.simulateur__hint {
+  font-size: 0.78rem;
+  color: var(--red-vivid);
+  text-align: center;
+  margin: 0.6rem 0 0;
+}
+.simulateur__compareBtn {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  margin: 1.1rem auto 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.simulateur__compareBtn:disabled {
+  background: var(--bg-card);
+  color: var(--text-mid);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.simulateur__result {
+  margin-top: 1.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+.simulateur__resultTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-align: center;
+  margin: 0 0 0.8rem;
+}
+.simulateur__pillRow {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.simulateur__pill {
+  flex: 1;
+  max-width: 102px;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 9px;
+  border: 2.5px solid transparent;
+  background: #ffffff;
+}
+.simulateur__pillLabel {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #111111;
+}
+.simulateur__pillVal {
+  font-family: 'Russo One', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 400;
+  color: #9f1e34;
+}
+.simulateur__h2hNote {
+  font-size: 0.78rem;
+  color: var(--text-mid);
+  text-align: center;
+  line-height: 1.4;
+  margin: 0.9rem 0 0;
+}

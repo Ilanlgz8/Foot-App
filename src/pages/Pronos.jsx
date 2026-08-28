@@ -34,9 +34,10 @@ import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
+import { PronosSimulateur } from './PronosSimulateur'
 import '../../pronos.css'
 
-const TABS = ['pronos', 'resultat', 'classement']
+const TABS = ['pronos', 'resultat', 'classement', 'simulateur']
 
 const COMP_IDS = COMPETITIONS.map(c => c.id)
 
@@ -816,9 +817,15 @@ function Pronos() {
         >
           Classement
         </button>
+        <button
+          className={`pronos__tab${activeTab === 'simulateur' ? ' pronos__tab--active' : ''}`}
+          onClick={() => goTab('simulateur')}
+        >
+          Simulateur
+        </button>
       </div>
 
-      {activeTab !== 'classement' && (
+      {activeTab !== 'classement' && activeTab !== 'simulateur' && (
         <CompFilterBar competitions={filterableComps} active={effectiveCompFilter} onChange={setCompFilter} />
       )}
 
@@ -909,6 +916,8 @@ function Pronos() {
             </div>
           )
         )}
+
+        {activeTab === 'simulateur' && <PronosSimulateur />}
       </div>
     </div>
   )
