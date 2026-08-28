@@ -1234,6 +1234,18 @@ export default async function handler(req, res) {
   // sur un cache Redis tout juste rafraîchi (rapide, pas cher) — évite de
   // dupliquer toute la logique de traitement (regression guards, etc.) côté
   // serveur ET côté client sur 2 chemins différents.
+  // ⚠️ ÉTUDIÉ ET ABANDONNÉ (28/08, piste "envoyer le payload complet ici pour
+  // se passer du refetch") : lu en détail useLiveMinute.js/_doPollESPN — le
+  // traitement par match (verrou anti-résurrection post-FT, correction des
+  // statuts FIFA implausibles, confirmation FT à 2 polls différents...) est
+  // une grosse machine à états durcie au fil de nombreux bugs réels. Le
+  // dupliquer pour consommer le payload Ably directement (au lieu de
+  // redéclencher pollESPN()) aurait réintroduit un risque de régression sur
+  // du code déjà éprouvé, pour un gain réel minime : Ably déclenche déjà un
+  // refetch IMMÉDIAT (pas d'attente du prochain cycle 10-30s) — le seul gain
+  // possible aurait été le temps d'un aller-retour HTTP en plus (~100-300ms),
+  // pas "un cycle de poll entier" comme évalué trop vite au départ. Pas assez
+  // pour justifier de dupliquer cette logique. Signal minimal conservé tel quel.
   const ablyPublishes = []
   // Marqueurs de fraîcheur (voir FRESH_TTL/fast-path plus haut) — pour TOUS les
   // matchs réellement (re)calculés cette passe (phases 1-3), changés ou pas :
