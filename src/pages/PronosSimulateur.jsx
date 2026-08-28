@@ -27,12 +27,23 @@
  * dans calcPronoAdvanced (`fallback()`, utilisé normalement en tout début de
  * saison) — réutilisé tel quel en passant compMatches=[] pour le forcer à
  * s'y engager systématiquement, aucune nouvelle logique de calcul écrite.
+ *
+ * ⚠️ Affichage (28/08, demande utilisateur : "je demande de simulé le score
+ * exact et tout... pas les côtes on s'en fou de ça") — PAS de pilules de
+ * cotes 1/N/2. Le pronostic forme+H2H ci-dessus donne 3 % (victoire dom./
+ * nul/victoire ext.), pas un score : fitLambdasToPreMatch (calcProno.js,
+ * déjà utilisée par calcLiveProno dans le même cas — pas de vraies stats
+ * buts marqués/encaissés dispo) retrouve une paire de buts espérés (λ) qui
+ * REPRODUIT fidèlement ces mêmes 3 %, puis scoreExactProbabilities (déjà
+ * utilisée dans Mes Paris, grille Poisson) en tire une probabilité par
+ * score. Ce n'est pas une nouvelle prédiction ni un nombre inventé : c'est
+ * le même pronostic forme+H2H, juste reformulé en scores plutôt qu'en 1/N/2.
  */
 import { useState, useMemo } from 'react'
 import { useStandings } from '../hooks/useStandings'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useCrossCompH2H } from '../hooks/useCrossCompH2H'
-import { calcPronoAdvanced, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
+import { calcPronoAdvanced, fitLambdasToPreMatch, scoreExactProbabilities } from '../utils/calcProno'
 import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 
@@ -74,21 +85,6 @@ function TeamPicker({ side, label, compId, teamId, onCompChange, onTeamChange })
   )
 }
 
-// Classes CSS locales (simulateur__pill*), PAS poster__prono-pill (accueil.css,
-// jamais importé dans Pronos.jsx) — même traitement visuel (pilule blanche,
-// liseré bordeaux glow sur la favorite) redéfini en propre dans pronos.css
-// pour rester auto-porté, comme le reste des styles pronos.
-function PronoPill({ label, value, favorite }) {
-  return (
-    <div
-      className="simulateur__pill"
-      style={favorite ? { borderColor: `rgba(159,30,52,${pronoIntensity(value)})`, boxShadow: pronoGlowShadow(value) } : { borderColor: 'transparent' }}
-    >
-      <span className="simulateur__pillLabel">{label}</span>
-      <span className="simulateur__pillVal">{pronoToOdds(value).toFixed(2)}</span>
-    </div>
-  )
-}
 
 export function PronosSimulateur() {
   const [homeComp, setHomeComp] = useState(null)
@@ -126,7 +122,16 @@ export function PronosSimulateur() {
     return calcPronoAdvanced(homeTeamId, awayTeamId, [], homeForm, awayForm, { fullH2H: meetings })
   }, [isComparing, formMap, homeTeamId, awayTeamId, meetings])
 
-  const favorite = prono ? pronoFavoriteKey(prono) : null
+  // Scores les plus probables — dérivés du même pronostic forme+H2H
+  // (voir commentaire en tête de fichier), triés par probabilité décroissante.
+  const topScores = useMemo(() => {
+    if (!prono) return null
+    const { lambdaHome, lambdaAway } = fitLambdasToPreMatch(prono)
+    const scores = scoreExactProbabilities(lambdaHome, lambdaAway)
+    if (!scores) return null
+    return [...scores].sort((a, b) => b.pct - a.pct)
+  }, [prono])
+
   const sameTeamPicked = homeTeamId != null && homeTeamId === awayTeamId
 
   return (
@@ -165,14 +170,26 @@ export function PronosSimulateur() {
         Comparer
       </button>
 
-      {isComparing && prono && (
+      {isComparing && prono && topScores && (
         <div className="simulateur__result">
           <div className="simulateur__resultTitle">{homeName} — {awayName}</div>
-          <div className="simulateur__pillRow">
-            <PronoPill label="1" value={prono.home} favorite={favorite === 'home'} />
-            <PronoPill label="N" value={prono.draw} favorite={favorite === 'draw'} />
-            <PronoPill label="2" value={prono.away} favorite={favorite === 'away'} />
+
+          <div className="simulateur__scoreHero">
+            <span className="simulateur__scoreHeroVal">
+              {topScores[0].home} - {topScores[0].away}
+            </span>
+            <span className="simulateur__scoreHeroLabel">Score le plus probable</span>
           </div>
+
+          <div className="simulateur__scoreAlts">
+            {topScores.slice(1, 4).map(s => (
+              <div key={`${s.home}-${s.away}`} className="simulateur__scoreAlt">
+                <span className="simulateur__scoreAltVal">{s.home}-{s.away}</span>
+                <span className="simulateur__scoreAltPct">{Math.round(s.pct)}%</span>
+              </div>
+            ))}
+          </div>
+
           <p className="simulateur__h2hNote">
             {h2hLoading
               ? 'Recherche des confrontations passées…'

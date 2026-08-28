@@ -8,6 +8,34 @@
   padding: 1.25rem 1rem 2rem;
 }
 
+/* ── Switcher tout en haut de page : "Pronos" (page groupe existante) vs
+   "Simulateur" (confrontation hypothétique, aucune donnée de groupe) — 2
+   pages distinctes, pas 2 onglets parmi Pronos/Résultat/Classement. */
+.pronos__modeSwitch {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 1rem;
+}
+.pronos__modeBtn {
+  flex: 1;
+  padding: 0.55rem 0;
+  border-radius: 9px;
+  border: none;
+  background: none;
+  color: var(--text-mid);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pronos__modeBtn--active {
+  background: linear-gradient(135deg, var(--red-vivid), var(--red-deep));
+  color: #fff;
+}
+
 /* ── Écran d'intro (créer/rejoindre) ── */
 .pronos__intro {
   display: flex;
@@ -487,12 +515,10 @@
 .pronos__emptyIcon { font-size: 1.8rem; opacity: 0.4; }
 .pronos__emptyTitle { font-size: 0.85rem; color: var(--text-mid); font-weight: 600; }
 
-/* ── Onglet Simulateur (confrontation hypothétique, 2 équipes, même de
-   championnats différents) — voir PronosSimulateur.jsx. Pilules 1/N/2
-   redéfinies en propre ici (.simulateur__pill*) plutôt que réutiliser
-   .poster__prono-pill (accueil.css, jamais importé dans Pronos.jsx) — même
-   traitement visuel (fond blanc, valeur bordeaux, liseré glow sur la
-   favorite), auto-porté comme le reste de pronos.css. */
+/* ── Page Simulateur (confrontation hypothétique, 2 équipes, même de
+   championnats différents) — voir PronosSimulateur.jsx. Affiche un score
+   exact simulé (pas des cotes 1/N/2), auto-porté comme le reste de
+   pronos.css. */
 .simulateur { padding-top: 0.2rem; }
 .simulateur__intro {
   font-size: 0.85rem;
@@ -577,36 +603,54 @@
   text-align: center;
   margin: 0 0 0.8rem;
 }
-.simulateur__pillRow {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-.simulateur__pill {
-  flex: 1;
-  max-width: 102px;
-  height: 54px;
+/* Score simulé (28/08, remplace les pilules de cotes 1/N/2 — demande
+   utilisateur : "je demande de simulé le score exact... pas les côtes"). */
+.simulateur__scoreHero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 2px;
-  border-radius: 9px;
-  border: 2.5px solid transparent;
-  background: #ffffff;
+  padding: 0.9rem 0 0.7rem;
 }
-.simulateur__pillLabel {
-  font-size: 0.5rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: #111111;
-}
-.simulateur__pillVal {
+.simulateur__scoreHeroVal {
   font-family: 'Russo One', sans-serif;
-  font-size: 1.05rem;
+  font-size: 2.4rem;
   font-weight: 400;
-  color: #9f1e34;
+  color: var(--red-vivid);
+  line-height: 1;
+}
+.simulateur__scoreHeroLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.simulateur__scoreAlts {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.simulateur__scoreAlt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 48px;
+  padding: 0.5rem 0.4rem;
+  border-radius: 9px;
+  background: var(--bg-card);
+}
+.simulateur__scoreAltVal {
+  font-family: 'Russo One', sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-main);
+}
+.simulateur__scoreAltPct {
+  font-size: 0.68rem;
+  color: var(--text-mid);
+  font-weight: 600;
 }
 .simulateur__h2hNote {
   font-size: 0.78rem;

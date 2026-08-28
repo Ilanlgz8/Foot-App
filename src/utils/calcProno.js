@@ -812,7 +812,7 @@ const FIT_TOTAL_GOALS_MAX = 4.5
 // ~350 évaluations de poissonOutcomes (grille 9×9) au total — largement
 // négligeable en coût (pas d'appel réseau, calcul pur), même appelé à
 // chaque re-render live.
-function fitLambdasToPreMatch(pre) {
+export function fitLambdasToPreMatch(pre) {
   const targetHome = pre.home / 100
   const targetDraw = pre.draw / 100
 

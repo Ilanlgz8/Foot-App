@@ -37,7 +37,7 @@ import { useSwipe } from '../hooks/useSwipe'
 import { PronosSimulateur } from './PronosSimulateur'
 import '../../pronos.css'
 
-const TABS = ['pronos', 'resultat', 'classement', 'simulateur']
+const TABS = ['pronos', 'resultat', 'classement']
 
 const COMP_IDS = COMPETITIONS.map(c => c.id)
 
@@ -551,6 +551,12 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
 
 function Pronos() {
   const { deviceId, groupCode, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
+  // Switcher tout en haut de page (demande utilisateur, 28/08 : "faudrait que
+  // tout en haut de la page on puisse switch entre la page actuel prono et
+  // une page simulateur") — PAS un 4e onglet mélangé à Pronos/Résultat/
+  // Classement (1er essai, corrigé) : le Simulateur est une page à part
+  // entière, avec son propre switcher au-dessus des onglets historiques.
+  const [mode, setMode] = useState('pronos')
   const [activeTab, setActiveTab] = useState('pronos')
   // Filtre championnat (demande utilisateur, 21/08) — partagé entre les
   // onglets Pronos et Résultat, voir CompFilterBar plus haut.
@@ -770,160 +776,162 @@ function Pronos() {
     }
   }
 
-  // ⚠️ Le simulateur (28/08, demande utilisateur) ne dépend d'aucune donnée
-  // de groupe — accessible directement, sans avoir à créer/rejoindre un
-  // groupe. Seuls les 3 onglets historiques (Pronos/Résultat/Classement)
-  // restent derrière l'écran groupe (JoinCreateScreen), affiché à la place
-  // du contenu de l'onglet tant qu'aucun groupe n'est rejoint — la barre
-  // d'onglets, elle, reste toujours visible pour que le Simulateur soit
-  // découvrable avant même de rejoindre un groupe.
   const playerCount = Object.keys(players).length || 1
 
   return (
     <div className="pronos__page">
-      {hasGroup && (
-        <div className="pronos__header">
-          <div>
-            <div className="pronos__headerLabel">Groupe</div>
-            <div className="pronos__headerCode">{groupCode}</div>
-          </div>
-          <div className="pronos__headerRight">
-            <span className="pronos__playerCount">{playerCount} joueur{playerCount > 1 ? 's' : ''}</span>
-            <button
-              className="pronos__leaveBtn"
-              onClick={() => { if (window.confirm('Quitter ce groupe de pronos ?')) leaveGroup() }}
-            >
-              Quitter
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="pronos__tabs">
+      <div className="pronos__modeSwitch">
         <button
-          className={`pronos__tab${activeTab === 'pronos' ? ' pronos__tab--active' : ''}`}
-          onClick={() => goTab('pronos')}
+          className={`pronos__modeBtn${mode === 'pronos' ? ' pronos__modeBtn--active' : ''}`}
+          onClick={() => setMode('pronos')}
         >
           Pronos
         </button>
         <button
-          className={`pronos__tab${activeTab === 'resultat' ? ' pronos__tab--active' : ''}`}
-          onClick={() => goTab('resultat')}
-        >
-          Résultat{filteredInProgress.length > 0 ? ` (${filteredInProgress.length})` : ''}
-        </button>
-        <button
-          className={`pronos__tab${activeTab === 'classement' ? ' pronos__tab--active' : ''}`}
-          onClick={() => goTab('classement')}
-        >
-          Classement
-        </button>
-        <button
-          className={`pronos__tab${activeTab === 'simulateur' ? ' pronos__tab--active' : ''}`}
-          onClick={() => goTab('simulateur')}
+          className={`pronos__modeBtn${mode === 'simulateur' ? ' pronos__modeBtn--active' : ''}`}
+          onClick={() => setMode('simulateur')}
         >
           Simulateur
         </button>
       </div>
 
-      {hasGroup && activeTab !== 'classement' && activeTab !== 'simulateur' && (
-        <CompFilterBar competitions={filterableComps} active={effectiveCompFilter} onChange={setCompFilter} />
+      {mode === 'simulateur' ? (
+        <PronosSimulateur />
+      ) : !hasGroup ? (
+        <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
+      ) : (
+        <>
+          <div className="pronos__header">
+            <div>
+              <div className="pronos__headerLabel">Groupe</div>
+              <div className="pronos__headerCode">{groupCode}</div>
+            </div>
+            <div className="pronos__headerRight">
+              <span className="pronos__playerCount">{playerCount} joueur{playerCount > 1 ? 's' : ''}</span>
+              <button
+                className="pronos__leaveBtn"
+                onClick={() => { if (window.confirm('Quitter ce groupe de pronos ?')) leaveGroup() }}
+              >
+                Quitter
+              </button>
+            </div>
+          </div>
+
+          <div className="pronos__tabs">
+            <button
+              className={`pronos__tab${activeTab === 'pronos' ? ' pronos__tab--active' : ''}`}
+              onClick={() => goTab('pronos')}
+            >
+              Pronos
+            </button>
+            <button
+              className={`pronos__tab${activeTab === 'resultat' ? ' pronos__tab--active' : ''}`}
+              onClick={() => goTab('resultat')}
+            >
+              Résultat{filteredInProgress.length > 0 ? ` (${filteredInProgress.length})` : ''}
+            </button>
+            <button
+              className={`pronos__tab${activeTab === 'classement' ? ' pronos__tab--active' : ''}`}
+              onClick={() => goTab('classement')}
+            >
+              Classement
+            </button>
+          </div>
+
+          {activeTab !== 'classement' && (
+            <CompFilterBar competitions={filterableComps} active={effectiveCompFilter} onChange={setCompFilter} />
+          )}
+
+          <div ref={swipe.ref} className="pronos__tabContent">
+            {activeTab === 'pronos' && (
+              loadingUpcoming ? (
+                <div className="pronos__empty">
+                  <span className="pronos__emptyTitle">Chargement…</span>
+                </div>
+              ) : grouped.length === 0 ? (
+                <div className="pronos__empty">
+                  <span className="pronos__emptyIcon">⚽</span>
+                  <span className="pronos__emptyTitle">Aucun match à venir pour le moment</span>
+                </div>
+              ) : (
+                grouped.map(g => (
+                  <div key={g.key} className="pronos__day">
+                    <div className="pronos__dayLabel">{g.label}</div>
+                    {g.matches.map(m => (
+                      <MatchPredictRow
+                        key={m.id}
+                        match={m}
+                        myPred={predictions[String(m.id)]?.[deviceId]}
+                        onSave={handlePredict}
+                        formMap={formMap}
+                        matchesByComp={matchesByComp}
+                        lowerDivByComp={lowerDivByComp}
+                        nextMatchId={nextIdByMatchId[m.id] ?? null}
+                        registerInputRef={registerInputRef}
+                        focusInput={focusInput}
+                      />
+                    ))}
+                  </div>
+                ))
+              )
+            )}
+
+            {activeTab === 'resultat' && (
+              filteredInProgress.length === 0 && filteredRecentFinished.length === 0 ? (
+                <div className="pronos__empty">
+                  <span className="pronos__emptyIcon">⚽</span>
+                  <span className="pronos__emptyTitle">Aucun match en cours ou terminé récemment</span>
+                </div>
+              ) : (
+                <>
+                  {filteredInProgress.length > 0 && (
+                    <div className="pronos__day">
+                      <div className="pronos__dayLabel">En cours</div>
+                      {filteredInProgress.map(m => (
+                        <LiveResultRow
+                          key={m.id} match={m} espn={espnScores[m.id] ?? null}
+                          players={players} predictions={predictions} deviceId={deviceId}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {filteredRecentFinished.length > 0 && (
+                    <div className="pronos__day">
+                      <div className="pronos__dayLabel">Terminés (24h)</div>
+                      {filteredRecentFinished.map(m => (
+                        <FinishedResultRow
+                          key={m.id} match={m}
+                          players={players} predictions={predictions} deviceId={deviceId}
+                          prono={pronoByMatchId[String(m.id)]}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            )}
+
+            {activeTab === 'classement' && (
+              leaderboard.length === 0 ? (
+                <div className="pronos__empty">
+                  <span className="pronos__emptyIcon">🏆</span>
+                  <span className="pronos__emptyTitle">Personne n'a encore pronostiqué</span>
+                </div>
+              ) : (
+                <div className="pronos__leaderboard">
+                  {leaderboard.map((p, i) => (
+                    <div key={p.id} className={`pronos__lbRow${p.id === deviceId ? ' pronos__lbRow--me' : ''}`}>
+                      <span className="pronos__lbRank">{i + 1}</span>
+                      <span className="pronos__lbName">{p.name}{p.id === deviceId ? ' (toi)' : ''}</span>
+                      <span className="pronos__lbPoints">{p.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </>
       )}
-
-      <div ref={swipe.ref} className="pronos__tabContent">
-        {!hasGroup && activeTab !== 'simulateur' && (
-          <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
-        )}
-
-        {hasGroup && activeTab === 'pronos' && (
-          loadingUpcoming ? (
-            <div className="pronos__empty">
-              <span className="pronos__emptyTitle">Chargement…</span>
-            </div>
-          ) : grouped.length === 0 ? (
-            <div className="pronos__empty">
-              <span className="pronos__emptyIcon">⚽</span>
-              <span className="pronos__emptyTitle">Aucun match à venir pour le moment</span>
-            </div>
-          ) : (
-            grouped.map(g => (
-              <div key={g.key} className="pronos__day">
-                <div className="pronos__dayLabel">{g.label}</div>
-                {g.matches.map(m => (
-                  <MatchPredictRow
-                    key={m.id}
-                    match={m}
-                    myPred={predictions[String(m.id)]?.[deviceId]}
-                    onSave={handlePredict}
-                    formMap={formMap}
-                    matchesByComp={matchesByComp}
-                    lowerDivByComp={lowerDivByComp}
-                    nextMatchId={nextIdByMatchId[m.id] ?? null}
-                    registerInputRef={registerInputRef}
-                    focusInput={focusInput}
-                  />
-                ))}
-              </div>
-            ))
-          )
-        )}
-
-        {hasGroup && activeTab === 'resultat' && (
-          filteredInProgress.length === 0 && filteredRecentFinished.length === 0 ? (
-            <div className="pronos__empty">
-              <span className="pronos__emptyIcon">⚽</span>
-              <span className="pronos__emptyTitle">Aucun match en cours ou terminé récemment</span>
-            </div>
-          ) : (
-            <>
-              {filteredInProgress.length > 0 && (
-                <div className="pronos__day">
-                  <div className="pronos__dayLabel">En cours</div>
-                  {filteredInProgress.map(m => (
-                    <LiveResultRow
-                      key={m.id} match={m} espn={espnScores[m.id] ?? null}
-                      players={players} predictions={predictions} deviceId={deviceId}
-                    />
-                  ))}
-                </div>
-              )}
-              {filteredRecentFinished.length > 0 && (
-                <div className="pronos__day">
-                  <div className="pronos__dayLabel">Terminés (24h)</div>
-                  {filteredRecentFinished.map(m => (
-                    <FinishedResultRow
-                      key={m.id} match={m}
-                      players={players} predictions={predictions} deviceId={deviceId}
-                      prono={pronoByMatchId[String(m.id)]}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )
-        )}
-
-        {hasGroup && activeTab === 'classement' && (
-          leaderboard.length === 0 ? (
-            <div className="pronos__empty">
-              <span className="pronos__emptyIcon">🏆</span>
-              <span className="pronos__emptyTitle">Personne n'a encore pronostiqué</span>
-            </div>
-          ) : (
-            <div className="pronos__leaderboard">
-              {leaderboard.map((p, i) => (
-                <div key={p.id} className={`pronos__lbRow${p.id === deviceId ? ' pronos__lbRow--me' : ''}`}>
-                  <span className="pronos__lbRank">{i + 1}</span>
-                  <span className="pronos__lbName">{p.name}{p.id === deviceId ? ' (toi)' : ''}</span>
-                  <span className="pronos__lbPoints">{p.points} pts</span>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {activeTab === 'simulateur' && <PronosSimulateur />}
-      </div>
     </div>
   )
 }
