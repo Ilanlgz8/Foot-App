@@ -15,7 +15,6 @@ import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdM
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { WatchBadge }              from '../components/WatchBadge'
-import { MatchReplay }             from '../components/MatchReplay'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -89,11 +88,6 @@ function formatTime(utcDate) {
 
 // ── Hero gradient plein-écran ─────────────────────────────────────────────────
 function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
-  // Bouton "Rejouer" (28/08, demande utilisateur : "dans la page du match
-  // qu'on a cliquer en dessous du score final y'a le bouton rejouer") —
-  // état local, fermé par défaut, jamais monté (donc aucun coût) tant que
-  // le match n'est pas terminé ou que l'utilisateur n'a pas cliqué.
-  const [showReplay, setShowReplay] = useState(false)
   const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -282,33 +276,6 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               </span>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Rejouer le match — événement par événement, voir MatchReplay.jsx.
-          Uniquement sur un match TERMINÉ (revivre un match qui n'a pas
-          encore de résultat n'a pas de sens). Panneau démonté (pas juste
-          caché) tant que fermé — aucun setInterval qui tourne pour rien. */}
-      {isFinished && (
-        <div className="mp__replayWrap">
-          <button
-            type="button"
-            className="mp__replayToggle"
-            onClick={() => setShowReplay(v => !v)}
-          >
-            <span className="mp__replayToggleIcon" aria-hidden="true">↻</span>
-            {showReplay ? 'Fermer' : 'Rejouer'}
-          </button>
-          {showReplay && (
-            <MatchReplay
-              homeEvents={homeEvents}
-              awayEvents={awayEvents}
-              homeName={homeName}
-              awayName={awayName}
-              wentToAet={wentToAet}
-              pens={wentToPens && hPens != null && aPens != null ? { home: hPens, away: aPens } : null}
-            />
-          )}
         </div>
       )}
     </div>
