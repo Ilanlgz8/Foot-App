@@ -1,5 +1,6 @@
 /**
- * PronosSimulateur — onglet "Simulateur" de Pronos.jsx.
+ * PronosSimulateur — page "Simulateur" (switcher tout en haut de Pronos.jsx,
+ * PAS un onglet parmi Pronos/Résultat/Classement).
  *
  * Confrontation hypothétique entre 2 équipes, MÊME si elles ne se jouent pas
  * cette saison (ex. Real Madrid vs Bayern Munich) — demande utilisateur
@@ -28,16 +29,24 @@
  * saison) — réutilisé tel quel en passant compMatches=[] pour le forcer à
  * s'y engager systématiquement, aucune nouvelle logique de calcul écrite.
  *
- * ⚠️ Affichage (28/08, demande utilisateur : "je demande de simulé le score
- * exact et tout... pas les côtes on s'en fou de ça") — PAS de pilules de
- * cotes 1/N/2. Le pronostic forme+H2H ci-dessus donne 3 % (victoire dom./
- * nul/victoire ext.), pas un score : fitLambdasToPreMatch (calcProno.js,
- * déjà utilisée par calcLiveProno dans le même cas — pas de vraies stats
- * buts marqués/encaissés dispo) retrouve une paire de buts espérés (λ) qui
- * REPRODUIT fidèlement ces mêmes 3 %, puis scoreExactProbabilities (déjà
- * utilisée dans Mes Paris, grille Poisson) en tire une probabilité par
- * score. Ce n'est pas une nouvelle prédiction ni un nombre inventé : c'est
- * le même pronostic forme+H2H, juste reformulé en scores plutôt qu'en 1/N/2.
+ * ⚠️ Affichage du résultat (28/08, demande utilisateur : "je demande de
+ * simulé le score exact et tout... pas les côtes on s'en fou de ça") — PAS
+ * de pilules de cotes 1/N/2. Le pronostic forme+H2H ci-dessus donne 3 %
+ * (victoire dom./nul/victoire ext.), pas un score : fitLambdasToPreMatch
+ * (calcProno.js, déjà utilisée par calcLiveProno dans le même cas — pas de
+ * vraies stats buts marqués/encaissés dispo) retrouve une paire de buts
+ * espérés (λ) qui REPRODUIT fidèlement ces mêmes 3 %, puis
+ * scoreExactProbabilities (déjà utilisée dans Mes Paris, grille Poisson) en
+ * tire une probabilité par score. Ce n'est pas une nouvelle prédiction ni un
+ * nombre inventé : c'est le même pronostic forme+H2H, juste reformulé en
+ * scores plutôt qu'en 1/N/2.
+ *
+ * ⚠️ Design (28/08, demande utilisateur : "ça fait pas design du tout") —
+ * vrais logos de club (row.team.crest, déjà exposé par football-data.org via
+ * useStandings, même source que Classement.jsx/Match.jsx) plutôt que du
+ * texte seul, card wrapper cohérent avec le reste de l'app (--bg-card/
+ * --border), select stylé avec chevron custom (repris du pattern
+ * .classement__selectShell/Icon déjà utilisé sur la page Classement).
  */
 import { useState, useMemo } from 'react'
 import { useStandings } from '../hooks/useStandings'
@@ -50,41 +59,76 @@ import { translateTeam } from '../data/teamNames'
 const SIM_COMP_IDS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const SIM_COMPS = COMPETITIONS.filter(c => SIM_COMP_IDS.includes(c.id))
 
+// Cherche la ligne standings (nom + crest) d'une équipe déjà sélectionnée —
+// un seul point de vérité pour TeamPicker (crest dans le cercle) ET le
+// résultat final (crests + noms dans le scoreboard), React Query déduplique
+// l'appel réseau (même queryKey partout).
+function useTeamRow(compId, teamId) {
+  const { standings, loading } = useStandings(compId, true)
+  const row = standings.find(r => String(r.team.id) === String(teamId))
+  return {
+    loading,
+    name:  row ? translateTeam(row.team.shortName || row.team.name) : null,
+    crest: row?.team?.crest ?? null,
+  }
+}
+
+function CrestCircle({ crest, size = 'md' }) {
+  return (
+    <div className={`simulateur__crestWrap simulateur__crestWrap--${size}`}>
+      {crest
+        ? <img src={crest} alt="" className="simulateur__crest" />
+        : (
+          <svg className="simulateur__crestPlaceholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 4l4 2 4-2 3 3-2 3v9a1 1 0 01-1 1H8a1 1 0 01-1-1v-9L5 7l3-3z" />
+          </svg>
+        )}
+    </div>
+  )
+}
+
 function TeamPicker({ side, label, compId, teamId, onCompChange, onTeamChange }) {
   const { standings, loading } = useStandings(compId, true)
+  const { crest } = useTeamRow(compId, teamId)
   // Trié par position au classement (déjà l'ordre renvoyé par FD.org) — plus
   // parlant qu'un tri alphabétique pour repérer une équipe (les cadors en
   // haut de liste, pas noyés au milieu d'un ordre A-Z).
   return (
     <div className={`simulateur__side simulateur__side--${side}`}>
       <span className="simulateur__sideLabel">{label}</span>
-      <select
-        className="simulateur__select"
-        value={compId ?? ''}
-        onChange={e => onCompChange(e.target.value || null)}
-      >
-        <option value="">Championnat…</option>
-        {SIM_COMPS.map(c => (
-          <option key={c.id} value={c.id}>{c.shortName}</option>
-        ))}
-      </select>
-      <select
-        className="simulateur__select"
-        value={teamId ?? ''}
-        onChange={e => onTeamChange(e.target.value || null)}
-        disabled={!compId || loading}
-      >
-        <option value="">{loading ? 'Chargement…' : 'Équipe…'}</option>
-        {standings.map(row => (
-          <option key={row.team.id} value={row.team.id}>
-            {translateTeam(row.team.shortName || row.team.name)}
-          </option>
-        ))}
-      </select>
+      <CrestCircle crest={crest} />
+      <div className="simulateur__selectShell">
+        <select
+          className="simulateur__select"
+          value={compId ?? ''}
+          onChange={e => onCompChange(e.target.value || null)}
+        >
+          <option value="">Championnat…</option>
+          {SIM_COMPS.map(c => (
+            <option key={c.id} value={c.id}>{c.shortName}</option>
+          ))}
+        </select>
+        <span className="simulateur__selectIcon" aria-hidden="true" />
+      </div>
+      <div className="simulateur__selectShell">
+        <select
+          className="simulateur__select"
+          value={teamId ?? ''}
+          onChange={e => onTeamChange(e.target.value || null)}
+          disabled={!compId || loading}
+        >
+          <option value="">{loading ? 'Chargement…' : 'Équipe…'}</option>
+          {standings.map(row => (
+            <option key={row.team.id} value={row.team.id}>
+              {translateTeam(row.team.shortName || row.team.name)}
+            </option>
+          ))}
+        </select>
+        <span className="simulateur__selectIcon" aria-hidden="true" />
+      </div>
     </div>
   )
 }
-
 
 export function PronosSimulateur() {
   const [homeComp, setHomeComp] = useState(null)
@@ -100,8 +144,8 @@ export function PronosSimulateur() {
 
   // Toujours appelés (règle des Hooks) — useStandings gère déjà en interne
   // le cas `compId` absent (enabled: !!selectedComp), retourne [] sans fetch.
-  const homeName = useStandingsTeamName(homeComp, homeTeamId)
-  const awayName = useStandingsTeamName(awayComp, awayTeamId)
+  const home = useTeamRow(homeComp, homeTeamId)
+  const away = useTeamRow(awayComp, awayTeamId)
 
   const canCompare = homeTeamId != null && awayTeamId != null && homeTeamId !== awayTeamId
   const isComparing = compared?.homeId === homeTeamId && compared?.awayId === awayTeamId
@@ -142,43 +186,53 @@ export function PronosSimulateur() {
         récente et leurs confrontations passées si elles existent.
       </p>
 
-      <div className="simulateur__picker">
-        <TeamPicker
-          side="home" label="Équipe 1"
-          compId={homeComp} teamId={homeTeamId}
-          onCompChange={c => { setHomeComp(c); setHomeTeamId(null); setCompared(null) }}
-          onTeamChange={t => { setHomeTeamId(t); setCompared(null) }}
-        />
-        <span className="simulateur__vs">VS</span>
-        <TeamPicker
-          side="away" label="Équipe 2"
-          compId={awayComp} teamId={awayTeamId}
-          onCompChange={c => { setAwayComp(c); setAwayTeamId(null); setCompared(null) }}
-          onTeamChange={t => { setAwayTeamId(t); setCompared(null) }}
-        />
+      <div className="simulateur__card">
+        <div className="simulateur__picker">
+          <TeamPicker
+            side="home" label="Équipe 1"
+            compId={homeComp} teamId={homeTeamId}
+            onCompChange={c => { setHomeComp(c); setHomeTeamId(null); setCompared(null) }}
+            onTeamChange={t => { setHomeTeamId(t); setCompared(null) }}
+          />
+          <span className="simulateur__vs">VS</span>
+          <TeamPicker
+            side="away" label="Équipe 2"
+            compId={awayComp} teamId={awayTeamId}
+            onCompChange={c => { setAwayComp(c); setAwayTeamId(null); setCompared(null) }}
+            onTeamChange={t => { setAwayTeamId(t); setCompared(null) }}
+          />
+        </div>
+
+        {sameTeamPicked && (
+          <p className="simulateur__hint">Choisis 2 équipes différentes.</p>
+        )}
+
+        <button
+          className="simulateur__compareBtn"
+          disabled={!canCompare}
+          onClick={() => setCompared({ homeId: homeTeamId, awayId: awayTeamId })}
+        >
+          Comparer
+        </button>
       </div>
-
-      {sameTeamPicked && (
-        <p className="simulateur__hint">Choisis 2 équipes différentes.</p>
-      )}
-
-      <button
-        className="simulateur__compareBtn"
-        disabled={!canCompare}
-        onClick={() => setCompared({ homeId: homeTeamId, awayId: awayTeamId })}
-      >
-        Comparer
-      </button>
 
       {isComparing && prono && topScores && (
         <div className="simulateur__result">
-          <div className="simulateur__resultTitle">{homeName} — {awayName}</div>
-
-          <div className="simulateur__scoreHero">
-            <span className="simulateur__scoreHeroVal">
-              {topScores[0].home} - {topScores[0].away}
-            </span>
-            <span className="simulateur__scoreHeroLabel">Score le plus probable</span>
+          <div className="simulateur__resultTeams">
+            <div className="simulateur__resultTeam">
+              <CrestCircle crest={home.crest} size="sm" />
+              <span className="simulateur__resultTeamName">{home.name}</span>
+            </div>
+            <div className="simulateur__scoreHero">
+              <span className="simulateur__scoreHeroVal">
+                {topScores[0].home} - {topScores[0].away}
+              </span>
+              <span className="simulateur__scoreHeroLabel">Score le plus probable</span>
+            </div>
+            <div className="simulateur__resultTeam">
+              <CrestCircle crest={away.crest} size="sm" />
+              <span className="simulateur__resultTeamName">{away.name}</span>
+            </div>
           </div>
 
           <div className="simulateur__scoreAlts">
@@ -201,13 +255,4 @@ export function PronosSimulateur() {
       )}
     </div>
   )
-}
-
-// Petit helper local : nom d'équipe déjà connu via TeamPicker (standings),
-// pas besoin d'un 2e fetch — lit simplement le même hook avec le même
-// paramètre (React Query déduplique par queryKey, coût réseau nul en plus).
-function useStandingsTeamName(compId, teamId) {
-  const { standings } = useStandings(compId, true)
-  const row = standings.find(r => String(r.team.id) === String(teamId))
-  return row ? translateTeam(row.team.shortName || row.team.name) : null
 }
