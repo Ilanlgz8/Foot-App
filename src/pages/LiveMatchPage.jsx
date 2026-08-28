@@ -30,6 +30,7 @@ import {
   TabDots,
   useH2HRows,
   H2HTabContent,
+  buildMatchEvents,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
 import './MatchPage.css'
@@ -319,28 +320,47 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
         </div>
       </div>
 
-      {/* Buteurs */}
-      {espn?.scorers?.length > 0 && (
-        <div className="lmp__heroScorers">
-          <div className="lmp__heroScorersHome">
-            {espn.scorers.filter(s => s.team === 'home').map((s, i) => (
-              <span key={i} className="lmp__heroScorerItem">
-                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
-                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
-              </span>
-            ))}
+      {/* Buts + cartons — fusionnés et triés par minute (même logique/mêmes
+          icônes que MatchPage.jsx, voir buildMatchEvents dans MatchModal.jsx).
+          ⚠️ BUG CORRIGÉ (28/08, constat utilisateur : "y'a que les buteurs
+          qui y sont, quand y'a un carton jaune ou rouge il s'affiche
+          qu'après le match dans résultat") : ce hero n'affichait QUE
+          espn.scorers, jamais espn.cards — alors que espn.cards est déjà
+          rempli EN DIRECT par le même poll (voir espnScoresCache dans
+          useLiveMinute.js, cards: cards écrit au même endroit que scorers).
+          Ce n'était donc pas un manque de donnée, juste un rendu qui
+          l'ignorait — un choix explicite d'une session précédente ("buts
+          seuls" volontaire à l'époque), changé ici sur demande explicite. */}
+      {(() => {
+        const { home: homeEvents, away: awayEvents } = buildMatchEvents({
+          espnScorers: espn?.scorers ?? [],
+          espnCards:   espn?.cards   ?? [],
+        })
+        if (homeEvents.length === 0 && awayEvents.length === 0) return null
+        return (
+          <div className="lmp__heroScorers">
+            <div className="lmp__heroScorersHome">
+              {homeEvents.map(e => (
+                <span key={e.key} className="lmp__heroScorerItem">
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                  {e.name}
+                  {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
+                </span>
+              ))}
+            </div>
+            <div className="lmp__heroScorersDiv" />
+            <div className="lmp__heroScorersAway">
+              {awayEvents.map(e => (
+                <span key={e.key} className="lmp__heroScorerItem">
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                  {e.name}
+                  {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="lmp__heroScorersDiv" />
-          <div className="lmp__heroScorersAway">
-            {espn.scorers.filter(s => s.team === 'away').map((s, i) => (
-              <span key={i} className="lmp__heroScorerItem">
-                {s.name}{s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''}
-                {s.minute && <span className="lmp__heroScorerMin"> {s.minute}</span>}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
