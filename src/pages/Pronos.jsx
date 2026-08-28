@@ -549,6 +549,13 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
   )
 }
 
+// ⚠️ AI_ASSISTANT_ENABLED = false (28/08, demande utilisateur : "on garde
+// l'assistant ia de côté pour le moment... qu'on le voit plus sur l'app") —
+// masque juste le switcher/l'accès UI, AiAssistant.jsx et api/apifootball.js
+// (mode=ask) restent intacts. Réactivation triviale : repasser cette
+// constante à true, aucun autre changement nécessaire.
+const AI_ASSISTANT_ENABLED = false
+
 function Pronos() {
   const { deviceId, groupCode, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   // Switcher tout en haut de page (demande utilisateur, 28/08 : "faudrait que
@@ -559,7 +566,8 @@ function Pronos() {
   // hypothétique) a ensuite été remplacé par un Assistant IA (même jour,
   // constat utilisateur : scores encore trop plats malgré 2 réécritures du
   // modèle) — voir AiAssistant.jsx. Valeur d'état 'ia' gardée courte comme
-  // 'pronos', même convention.
+  // 'pronos', même convention. Masqué de l'UI pour le moment (voir
+  // AI_ASSISTANT_ENABLED ci-dessus).
   const [mode, setMode] = useState('pronos')
   const [activeTab, setActiveTab] = useState('pronos')
   // Filtre championnat (demande utilisateur, 21/08) — partagé entre les
@@ -784,22 +792,24 @@ function Pronos() {
 
   return (
     <div className="pronos__page">
-      <div className="pronos__modeSwitch">
-        <button
-          className={`pronos__modeBtn${mode === 'pronos' ? ' pronos__modeBtn--active' : ''}`}
-          onClick={() => setMode('pronos')}
-        >
-          Pronos
-        </button>
-        <button
-          className={`pronos__modeBtn${mode === 'ia' ? ' pronos__modeBtn--active' : ''}`}
-          onClick={() => setMode('ia')}
-        >
-          Assistant IA
-        </button>
-      </div>
+      {AI_ASSISTANT_ENABLED && (
+        <div className="pronos__modeSwitch">
+          <button
+            className={`pronos__modeBtn${mode === 'pronos' ? ' pronos__modeBtn--active' : ''}`}
+            onClick={() => setMode('pronos')}
+          >
+            Pronos
+          </button>
+          <button
+            className={`pronos__modeBtn${mode === 'ia' ? ' pronos__modeBtn--active' : ''}`}
+            onClick={() => setMode('ia')}
+          >
+            Assistant IA
+          </button>
+        </div>
+      )}
 
-      {mode === 'ia' ? (
+      {AI_ASSISTANT_ENABLED && mode === 'ia' ? (
         <AiAssistant />
       ) : !hasGroup ? (
         <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
