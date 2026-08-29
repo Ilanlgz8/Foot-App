@@ -1317,31 +1317,29 @@ function shouldSendLiveTicker() {
   return new Date().getMinutes() % 2 === 0
 }
 
-// ⚠️ AJOUT (28/08, optimisation latence notifs) : le Cron Trigger reste
-// bloqué à 1 déclenchement/minute (plancher de la plateforme, tous plans
-// confondus) — mais RIEN n'empêche de faire tourner runOnePass() plusieurs
-// fois DANS la même invocation, avec une pause entre les deux (même
-// technique que recheckFinalMatch un peu plus haut : un vrai `setTimeout`
-// dans un `ctx.waitUntil`, le temps d'attente réseau ne compte pas dans le
-// budget CPU facturé). Effet : un but détectable à la 2e passe au lieu
-// d'attendre le tick suivant réduit la latence moyenne de détection d'environ
-// moitié (~30s → ~15s en moyenne), sans invocation Worker supplémentaire et
-// sans appel Vercel en plus (toujours uniquement si un vrai événement est
-// détecté, logique de notifyVercel() totalement inchangée).
-// Limité à 2 passes (pas 3+) après vérification d'une limite CONCRÈTE, pas
-// juste le budget CPU : le plan gratuit Workers plafonne à 50 SOUS-REQUÊTES
-// externes par invocation — et ce plafond compte À LA FOIS les fetchs ESPN
-// ET les appels Upstash Redis (le client Redis fait lui aussi un fetch HTTP
-// par commande), pas seulement le réseau "visible". Une passe chargée (
-// plusieurs matchs suivis, plusieurs slugs ESPN, événements à notifier) peut
-// déjà consommer une part non négligeable de ces 50 — tripler ce coût
-// (3 passes) ferait courir un vrai risque de dépasser le plafond pendant les
-// moments les plus chargés, c'est-à-dire exactement quand la fiabilité
-// compte le plus. 2 passes reste un gain réel et concret tout en gardant une
-// marge de sécurité raisonnable. À confirmer/ajuster après un vrai match
-// chargé (métriques Cloudflare → Workers → sous-requêtes par invocation).
-const PASS_SPACING_MS = 25_000
-
+// ⚠️ ÉTUDIÉ, DÉPLOYÉ PUIS REVERTÉ (28/08, optimisation latence notifs) :
+// l'idée était de faire tourner runOnePass() 2 fois dans la même invocation
+// (même technique que recheckFinalMatch : setTimeout dans un ctx.waitUntil)
+// pour réduire la latence moyenne de détection (~30s → ~15s), sans
+// invocation Worker ni appel Vercel supplémentaire.
+// Reverté après un vrai incident (retour utilisateur : silence total sur les
+// notifs pendant un pic de 5 matchs simultanés, puis rattrapage isolé et très
+// en retard). Root cause identifiée : le plafond Workers gratuit de 50
+// sous-requêtes externes par invocation (ESPN + Upstash Redis confondus,
+// voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — déjà calé par une session
+// précédente pour 1 SEULE passe) était compté correctement pour 1 passe,
+// mais le passage à 2 passes fait consommer ce même budget 2x DANS LA MÊME
+// invocation. Un seul match chargé (plusieurs buts + FT confirmé) coûte à
+// lui seul ~15 sous-requêtes (dédup+envoi Vercel par but/carton, écritures
+// finalDone/résumé/warm FD.org sur le FT) — avec 5 matchs simultanés, une
+// passe peut déjà approcher les 30-35, la 2e passe 25s après pousse au-delà
+// des 50 → Cloudflare interrompt l'exécution EN PLEIN TRAITEMENT, expliquant
+// exactement les 2 symptômes remontés (silence pendant le pic, rattrapage
+// tardif une fois qu'une passe finit par passer sous le plafond).
+// Gain réel (~15s de latence en moins) pas assez pour justifier de re-tenter
+// tant qu'aucune réduction fiable du coût par match n'est trouvée d'abord
+// (ex: grouper les écritures but/carton restantes en pipeline, comme déjà
+// fait pour les lectures).
 async function handlePass(env) {
   const kv = new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN })
   env._kv = kv
@@ -1350,49 +1348,33 @@ async function handlePass(env) {
     try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
   }
 
-  let combinedEvents = 0
-  let combinedLog    = []
-  let lastResult      = null
-
-  for (let pass = 0; pass < 2; pass++) {
-    if (pass > 0) await new Promise(resolve => setTimeout(resolve, PASS_SPACING_MS))
-    lastResult = await runOnePass(env)
-    combinedEvents += lastResult.events
-    combinedLog = combinedLog.concat(lastResult.log)
-    // Journée/minute confirmée "rien à suivre" (voir les 2 early-return dans
-    // runOnePass) : une 2e passe ne changerait rien (mêmes clés de skip
-    // encore valides 25s plus tard) — inutile de payer son coût (même
-    // minime) pour ce cas, de très loin le plus fréquent.
-    if (lastResult.quiet) break
-  }
+  const result = await runOnePass(env)
 
   // Préchauffage FD.org (voir warmFdCache) — volontairement INDÉPENDANT de la
   // logique ESPN ci-dessus (early-return "aucun match aujourd'hui" incluse) :
   // Programme/Résultats/Classement sont consultés par les visiteurs même les
   // jours sans match en direct, donc ce préchauffage doit tourner tout le
   // temps, pas seulement pendant les fenêtres où le direct est actif.
-  // Une seule fois par invocation (pas une fois par passe) : pas de rapport
-  // avec le nombre de passes ESPN ci-dessus.
-  await warmFdCache(combinedLog, kv, lastResult.quiet)
+  await warmFdCache(result.log, kv, result.quiet)
 
   if (writeBookkeeping) {
     try {
       await kv.set('cron:goals:lastResult', JSON.stringify({
-        at: Date.now(), events: combinedEvents, source: 'cf-worker',
+        at: Date.now(), events: result.events, source: 'cf-worker',
       }), { ex: 7 * 24 * 3600 })
     } catch {}
   }
 
   try {
-    if (combinedLog.length) {
-      const stamped = combinedLog.map(l => `${new Date().toISOString()} ${l}`)
+    if (result.log.length) {
+      const stamped = result.log.map(l => `${new Date().toISOString()} ${l}`)
       await kv.rpush('cron:goals:logHistory', ...stamped)
       await kv.ltrim('cron:goals:logHistory', -30_000, -1)
       await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     }
   } catch {}
 
-  return { events: combinedEvents, log: combinedLog, quiet: lastResult.quiet }
+  return result
 }
 
 // ── Préchauffage cache FD.org (Programme/Résultats/Classement) ─────────────

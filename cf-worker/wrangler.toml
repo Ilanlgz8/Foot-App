@@ -5,13 +5,13 @@ compatibility_date = "2026-07-01"
 # Cron Trigger : toutes les minutes — équivalent de ce que faisait
 # cron-job.org sur Vercel, sauf que le calcul tourne maintenant ici
 # (gratuit, pas de budget CPU Vercel consommé). Cloudflare Cron Triggers ont
-# la même granularité minimale (1 minute) que cron-job.org — MAIS depuis le
-# 28/08, handlePass() fait 2 passes espacées de 25s À L'INTÉRIEUR de la même
-# invocation (voir PASS_SPACING_MS dans src/index.js) pour réduire la latence
-# moyenne de détection, sans invocation supplémentaire. Limité à 2 passes
-# (pas plus) à cause du plafond Workers gratuit de 50 sous-requêtes externes
-# par invocation (ESPN + Upstash Redis confondus) — voir le commentaire
-# détaillé dans src/index.js.
+# la même granularité minimale (1 minute) que cron-job.org, donc aucune boucle
+# multi-passes interne n'est utilisée (contrairement à l'ancien
+# api/cron-goals.js qui essayait de compenser la limite de cron-job.org) —
+# une piste "2 passes/invocation" a été testée le 28/08 puis revertée après
+# un incident réel (dépassement du plafond de 50 sous-requêtes Workers
+# pendant un pic de plusieurs matchs simultanés, voir le commentaire détaillé
+# sur handlePass() dans src/index.js).
 [triggers]
 crons = ["* * * * *"]
 
