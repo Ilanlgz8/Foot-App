@@ -257,14 +257,31 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
       log.push(`[final-recheck:${slug}:${eventId}] échec envoi FT — rien de figé, le tick normal (60s) retentera`)
       return
     }
-    try { await kv.set(`cron:espn:${eventId}`, `${status}|${freshScore}`, { ex: 12 * 3600 }) } catch {}
-    // Clos définitivement — voir finalDoneKey en tête de boucle dans runOnePass
-    // (bug corrigé : notifs "Fin de match" répétées des heures après la vraie fin).
-    try { await kv.set(`finalDone:${eventId}`, '1', { ex: FINAL_DONE_TTL }) } catch {}
+    // ⚠️ REGROUPÉ EN PIPELINE (même audit perf que runOnePass, voir
+    // SUBREQUEST_SAFE_LIVE_THRESHOLD/FINAL_SAFE_THRESHOLD plus haut) : ces 4
+    // écritures/lecture étaient 4 sous-requêtes séparées — ce recheck à lui
+    // seul en coûtait ~11, l'un des postes les plus chers de toute la passe.
+    // Comportement identique (commandes indépendantes, aucune n'a besoin du
+    // résultat d'une autre pour être ENVOYÉE), juste 1 aller-retour réseau au
+    // lieu de 4.
+    const recapKey = `recap:${eventId}`
+    let recapAlready = null
+    try {
+      const pipeResults = await kv.pipeline()
+        .set(`cron:espn:${eventId}`, `${status}|${freshScore}`, { ex: 12 * 3600 })
+        // Clos définitivement — voir finalDoneKey en tête de boucle dans
+        // runOnePass (bug corrigé : notifs "Fin de match" répétées des heures
+        // après la vraie fin).
+        .set(`finalDone:${eventId}`, '1', { ex: FINAL_DONE_TTL })
+        .get(recapKey)
+        .srem('cron:liveIds', String(eventId))
+        .exec({ keepErrors: true })
+      recapAlready = (pipeResults[2] && !pipeResults[2].error) ? pipeResults[2].result : null
+    } catch (e) {
+      log.push(`[final-recheck:${slug}:${eventId}] pipeline error=${e.message}`)
+    }
     await cacheEspnSummary(kv, slug, eventId, log)
     try {
-      const recapKey     = `recap:${eventId}`
-      const recapAlready = await kv.get(recapKey)
       if (!recapAlready) {
         const scorers = extractEspnScorers(comp, homeC.team?.id)
         const cards   = extractEspnCards(comp, homeC.team?.id)
@@ -276,9 +293,6 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
       }
     } catch (e) {
       log.push(`[recap:${eventId}] error (recheck)=${e.message}`)
-    }
-    try { await kv.srem('cron:liveIds', String(eventId)) } catch (e) {
-      log.push(`[cron:liveIds:${eventId}] error (recheck)=${e.message}`)
     }
   } catch (e) {
     log.push(`[final-recheck:${slug}:${eventId}] error=${e.message}`)
@@ -431,7 +445,32 @@ async function pushLiveTicker(env, payload, slug, log, homeTeam, awayTeam, rawHo
 // matchs suivants (ils sont juste rattrapés à la minute paire suivante, rien
 // de perdu) — garde toujours de la marge pour que le pipeline principal ne
 // soit lui jamais impacté, quel que soit le nombre de matchs.
-const SUBREQUEST_SAFE_LIVE_THRESHOLD = 6
+// ⚠️ ABAISSÉ 6 → 3 (28/08, incident réel : silence notifs + rattrapage très
+// en retard sur un pic de 5-8 matchs simultanés) : un recalcul complet du
+// budget (voir FINAL_SAFE_LIVE_THRESHOLD juste en dessous) a montré qu'avec
+// 8 matchs suivis et un minimum d'activité normale (quelques buts + une fin
+// de match), le total dépasse déjà 50 même à 1 seule passe/minute. Le seuil
+// de 6 laissait passer trop de résumés/tickers avant de couper — 3 laisse
+// beaucoup plus de marge au pipeline ESSENTIEL (but/carton/mi-temps/fin,
+// JAMAIS coupé par ce seuil) les jours chargés, au prix d'un résumé/ticker
+// un peu moins souvent rafraîchi au-delà des 3 premiers matchs vus dans
+// cette passe précise (rattrapé de toute façon à la minute paire suivante).
+const SUBREQUEST_SAFE_LIVE_THRESHOLD = 3
+
+// ⚠️ AJOUT (même incident, même audit) : les postes "bonus" liés à une fin de
+// match confirmée (résumé auto, priorisation warm FD.org, recap texte) et le
+// recheck ESPN accéléré à 18s (voir recheckFinalMatch) coûtent à eux seuls
+// ~8-11 sous-requêtes PAR match qui termine — et n'étaient protégés par
+// AUCUN seuil (contrairement à SUBREQUEST_SAFE_LIVE_THRESHOLD ci-dessus, qui
+// ne couvre que résumé "en cours"/ticker). Sur une passe où plusieurs matchs
+// finissent à peu près en même temps (très plausible : beaucoup de
+// championnats calent leurs coups d'envoi à la même heure), ce poste peut à
+// lui seul faire dépasser 50. Au-delà de ce seuil de fins de match traitées
+// dans la MÊME passe, on garde TOUJOURS l'envoi de la notif "Fin de match"
+// elle-même (jamais coupé) mais on saute les 3 bonus + le recheck accéléré —
+// rattrapés normalement au cycle suivant (60s) sans rien perdre, juste un
+// peu moins vite.
+const FINAL_SAFE_THRESHOLD = 3
 
 // ── Une passe complète (équivalent runOnePass() de api/cron-goals.js) ──────
 async function runOnePass(env) {
@@ -669,6 +708,11 @@ async function runOnePass(env) {
   // Voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — compteur de matchs live
   // vus DANS CETTE PASSE, sert à couper résumé+ticker au-delà du seuil sûr.
   let liveMatchesSeenThisPass = 0
+  // Voir FINAL_SAFE_THRESHOLD plus haut — même principe, mais pour les
+  // matchs qui FINISSENT dans cette passe (résumé/FD-warm/recap/recheck
+  // accéléré), compteur séparé de liveMatchesSeenThisPass ci-dessus (un match
+  // FINAL n'est pas "isLive").
+  let finalEventsSeenThisPass = 0
 
   // ⚠️ AJOUT (investigation "~10K commandes/jour sans match") : drapeau
   // dénormalisé, recalculé à CHAQUE passe complète (jamais sur le
@@ -771,6 +815,11 @@ async function runOnePass(env) {
 
     if (isLive) liveMatchesSeenThisPass++
     const underSubrequestSafeLimit = liveMatchesSeenThisPass <= SUBREQUEST_SAFE_LIVE_THRESHOLD
+    // Voir FINAL_SAFE_THRESHOLD plus haut — même principe pour les bonus liés
+    // à une fin de match (résumé/FD-warm/recap/recheck accéléré), jamais pour
+    // la notif "Fin de match" elle-même (toujours envoyée, voir plus bas).
+    if (isFinalNow) finalEventsSeenThisPass++
+    const underFinalSafeLimit = finalEventsSeenThisPass <= FINAL_SAFE_THRESHOLD
 
     if (isLive && underSubrequestSafeLimit && shouldRefreshSummary()) {
       pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
@@ -1091,11 +1140,20 @@ async function runOnePass(env) {
         { title: '🏁 Fin de match', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log, FINAL_DONE_TTL)
       if (ftSent) {
         try { await kv.set(finalDoneKey, '1', { ex: FINAL_DONE_TTL }) } catch {}
-        await cacheEspnSummary(kv, slug, eventId, log)
-        // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
-        // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
-        // de cette compétition au lieu d'attendre la rotation aveugle.
-        await queueFdPriorityRefresh(kv, slug, log)
+        // ⚠️ Gaté par underFinalSafeLimit (voir FINAL_SAFE_THRESHOLD) — bonus
+        // non-essentiels (résumé/warm FD.org), JAMAIS la notif "Fin de match"
+        // elle-même (ftSent ci-dessus, déjà envoyée à ce stade, inconditionnel).
+        // Au-delà du seuil, simplement pas fait pour CE match cette passe —
+        // aucune notif perdue, juste le résumé/classement un peu moins vite à jour.
+        if (underFinalSafeLimit) {
+          await cacheEspnSummary(kv, slug, eventId, log)
+          // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
+          // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
+          // de cette compétition au lieu d'attendre la rotation aveugle.
+          await queueFdPriorityRefresh(kv, slug, log)
+        } else {
+          log.push(`[espn:${slug}:${eventId}] résumé/warm FD.org sautés (seuil sous-requêtes, ${finalEventsSeenThisPass}e fin de match cette passe)`)
+        }
       } else {
         // Échec confirmé — ANNULE le retrait de cron:liveIds fait plus haut
         // (stayTrackedAsLive, calculé uniquement sur le statut/score ESPN,
@@ -1118,10 +1176,18 @@ async function runOnePass(env) {
       // vraiment toute répétition au-delà (finalConfirmKey seul ne suffisait
       // pas : sa courte TTL pouvait se ré-armer des heures plus tard tant
       // qu'ESPN listait encore le match FINAL, voir bug corrigé ci-dessus).
-      if (finalFirstSeen) {
+      // ⚠️ Gaté par underFinalSafeLimit (voir FINAL_SAFE_THRESHOLD) : ce
+      // recheck coûte à lui seul ~11 sous-requêtes (2 fetchs ESPN + envoi +
+      // plusieurs écritures Redis) — au-delà du seuil, on saute juste
+      // l'accélération, le tick normal (60s) confirmera et enverra la vraie
+      // notif "Fin de match" comme d'habitude via isFinalConfirmed ci-dessus,
+      // seulement un peu moins vite (jusqu'à ~60s au lieu de ~18s).
+      if (finalFirstSeen && underFinalSafeLimit) {
         pendingFinalRechecks.push(
           recheckFinalMatch(env, kv, slug, eventId, score, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, scoreStr, log)
         )
+      } else if (finalFirstSeen) {
+        log.push(`[espn:${slug}:${eventId}] recheck accéléré sauté (seuil sous-requêtes) — confirmation normale au prochain tick (60s)`)
       }
     }
 
@@ -1131,8 +1197,10 @@ async function runOnePass(env) {
     // ensuite puisque recapAlready sera non-null derrière). Gêné derrière le
     // même garde-fou isFinalConfirmed — un résumé généré sur un faux FT
     // (temps additionnel toujours en cours) risquerait d'omettre un
-    // but/carton arrivé juste après.
-    if (isFinalConfirmed) {
+    // but/carton arrivé juste après. Gaté aussi par underFinalSafeLimit (voir
+    // FINAL_SAFE_THRESHOLD) — bonus non-essentiel, rattrapé par le résumé
+    // ESPN classique (cacheEspnSummary) une fois sous le seuil.
+    if (isFinalConfirmed && underFinalSafeLimit) {
       try {
         if (!recapAlready) {
           const scorers = extractEspnScorers(comp, homeC.team?.id)
