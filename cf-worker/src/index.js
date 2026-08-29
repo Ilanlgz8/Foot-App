@@ -640,6 +640,28 @@ async function runOnePass(env) {
       for (const evt of res.events) allEvents.push({ slug: pair.slug, evt })
     }
   }
+
+  // ⚠️ AJOUT (28/08, demande utilisateur : "si on dépasse la limite, que ça
+  // bouchonne pas tout, faut laisser passer les autres") : allEvents était
+  // toujours traité dans le MÊME ordre fixe (ESPN_SLUGS, toujours les mêmes
+  // compétitions en tête) — si jamais le plafond de 50 sous-requêtes finit
+  // par être atteint en cours de passe (résiduel possible malgré les
+  // garde-fous ci-dessus, voir SUBREQUEST_SAFE_LIVE_THRESHOLD/
+  // FINAL_SAFE_THRESHOLD), ce sont TOUJOURS les mêmes matchs (les derniers de
+  // la liste) qui se retrouvent pénalisés, minute après minute. Rotation
+  // simple et déterministe (basée sur l'horloge, pas de random) : le point de
+  // départ change chaque minute, donc un match désavantagé une minute a de
+  // bonnes chances d'être traité en premier la minute suivante — sur la
+  // durée, aucune compétition n'est structurellement toujours la dernière
+  // servie. Chaque match reste traité dans son propre try/catch (voir plus
+  // bas, `ERREUR match ignoré`) : un plafond atteint sur un match n'empêche
+  // déjà PAS les autres déjà traités avant lui d'avoir été notifiés
+  // normalement cette même passe — cette rotation ne fait qu'assurer que ce
+  // ne sont pas toujours les mêmes qui passent en dernier.
+  if (allEvents.length > 1) {
+    const offset = Math.floor(Date.now() / 60_000) % allEvents.length
+    allEvents.push(...allEvents.splice(0, offset))
+  }
   if (newlyEmptyKeys.length > 0 || newlyPendingKeys.length > 0) {
     try {
       let flagPipe = kv.pipeline()
