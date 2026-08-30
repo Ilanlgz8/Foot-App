@@ -561,11 +561,17 @@ async function runOnePass(env) {
   let trackingLiveAtStart = 0
   let knownEmpty = false
   let skipUntil  = null
+  // Voir "cron:liveSlugs" plus bas (audit CPU, "Exceeded CPU Limit" en prod
+  // confirmé via npm run tail) — lu ici, dans le MÊME mget que le reste
+  // (aucune sous-requête en plus), même si ce chemin fait un early-return :
+  // coût négligeable, évite un aller-retour Redis séparé plus bas.
+  let rawLiveSlugs = null
   try {
-    const [rawAnyLive, rawEmpty, rawNextCheck] = await kv.mget('cron:anyLive', emptyDayKey, nextCheckKey)
+    const [rawAnyLive, rawEmpty, rawNextCheck, rawSlugs] = await kv.mget('cron:anyLive', emptyDayKey, nextCheckKey, 'cron:liveSlugs')
     trackingLiveAtStart = rawAnyLive ? 1 : 0
     knownEmpty = !!rawEmpty
     skipUntil  = rawNextCheck
+    rawLiveSlugs = rawSlugs
   } catch {}
 
   if (trackingLiveAtStart === 0) {
@@ -622,7 +628,36 @@ async function runOnePass(env) {
     })
   } catch {}
 
-  const pairsToFetch = slugDatePairs.filter(p => !noMatchFlags.has(p.key))
+  // ⚠️ AJOUT (28/08, "Exceeded CPU Limit" confirmé en prod via npm run tail —
+  // limite RÉELLE de calcul du plan gratuit, 10ms/exécution, complètement
+  // différente du plafond de 50 sous-requêtes vu plus haut) : même une fois
+  // le fetch ESPN sauté par noMatchFlags, TOUS les slugs restants (souvent
+  // 10-15+ un jour de match, la plupart sans rien en direct) étaient quand
+  // même fetchés ET parsés (JSON.parse) à CHAQUE minute — ce parsing est du
+  // vrai calcul CPU (contrairement au réseau, gratuit sur Cloudflare), et
+  // s'additionne vite avec plusieurs championnats actifs en même temps.
+  // Distinction : un championnat qui a VRAIMENT un match en cours (ou une fin
+  // pas encore confirmée) reste vérifié CHAQUE minute, sans exception — voir
+  // hotSlugs/cron:liveSlugs plus bas dans ce fichier, alimenté à la fin de
+  // CHAQUE passe complète. Les championnats SANS rien en cours (aucun match
+  // aujourd'hui, ou match pas encore commencé/déjà fini) alternent 1 minute
+  // sur 2 — répartis en 2 groupes fixes selon la position du slug dans
+  // ESPN_SLUGS (déterministe, aucun état Redis supplémentaire nécessaire).
+  // Contrepartie : un match qui démarre PENDANT la minute "off" de son
+  // championnat peut avoir jusqu'à 1min de retard sur le tout premier coup
+  // d'envoi détecté (rattrapé dès la minute suivante, puis ce championnat
+  // devient "hot" et n'est plus jamais ralenti tant qu'il a un match actif) —
+  // largement préférable à zéro notif pendant des heures.
+  let hotSlugs = new Set()
+  try { hotSlugs = new Set(JSON.parse(rawLiveSlugs) ?? []) } catch {}
+  const coldMinuteParity = now.getMinutes() % 2
+  const isColdSlugActiveThisMinute = (slug) => (ESPN_SLUGS.indexOf(slug) % 2) === coldMinuteParity
+
+  const pairsToFetch = slugDatePairs.filter(p => {
+    if (noMatchFlags.has(p.key)) return false
+    if (hotSlugs.has(p.slug)) return true
+    return isColdSlugActiveThisMinute(p.slug)
+  })
   const allResults = await Promise.allSettled(
     pairsToFetch.map(p => fetchEspnEvents(p.slug, p.date, log).then(res => ({ pair: p, res })))
   )
@@ -752,6 +787,10 @@ async function runOnePass(env) {
   // tard à la passe suivante (60s), largement sous les marges de sécurité
   // déjà en place ailleurs dans ce fichier (grâce 45s-5min).
   let anyStillLive = false
+  // Voir hotSlugs/isColdSlugActiveThisMinute plus haut — mémorise quels
+  // championnats ont un match tracké live/final-pas-confirmé DANS CETTE
+  // passe, pour que la prochaine passe sache lesquels ne jamais ralentir.
+  const hotSlugsThisPass = new Set()
 
   for (const { slug, evt } of allEvents) {
    if (alreadyDoneIds.has(evt.id)) continue
@@ -975,6 +1014,7 @@ async function runOnePass(env) {
     // effectivement un faux FINAL.
     const stayTrackedAsLive = isLive || (isFinalNow && !isFinalConfirmed)
     if (stayTrackedAsLive) anyStillLive = true
+    if (stayTrackedAsLive) hotSlugsThisPass.add(slug)
     try {
       if (stayTrackedAsLive) await kv.sadd('cron:liveIds', String(eventId))
       else await kv.srem('cron:liveIds', String(eventId))
@@ -1260,9 +1300,16 @@ async function runOnePass(env) {
   // Voir anyStillLive plus haut — 1 seule commande, 1 seule fois par passe
   // complète (jamais sur le skip-fast-path). ex 3h : purement défensif, se
   // réarme de toute façon à chaque passe complète tant qu'un match est suivi.
+  // Regroupés en pipeline (voir hotSlugsThisPass/cron:liveSlugs plus haut,
+  // audit CPU "Exceeded CPU Limit") — 2 écritures indépendantes, 1 seul
+  // aller-retour au lieu de 2.
   try {
-    if (anyStillLive) await kv.set('cron:anyLive', '1', { ex: 3 * 3600 })
-    else await kv.del('cron:anyLive')
+    let pipe = kv.pipeline()
+    pipe = anyStillLive ? pipe.set('cron:anyLive', '1', { ex: 3 * 3600 }) : pipe.del('cron:anyLive')
+    pipe = hotSlugsThisPass.size > 0
+      ? pipe.set('cron:liveSlugs', JSON.stringify([...hotSlugsThisPass]), { ex: 3 * 3600 })
+      : pipe.del('cron:liveSlugs')
+    await pipe.exec()
   } catch {}
 
   if (pendingSummaryFetches.length > 0) {
