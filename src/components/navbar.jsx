@@ -102,10 +102,14 @@ function Navbar() {
       {/* ── Header ── */}
       <header className="sfHeader">
         <div className="sfHeader__inner">
-          {/* Pronos + Mes Paris — mobile uniquement, à la place de la date
-              (voir sfHeader__pronosBtn/sfHeader__betsBtn). Regroupés dans un
-              wrapper flex pour tenir dans la même cellule de grille (1fr)
-              sans toucher au grid-template-columns existant. */}
+          {/* Pronos — mobile uniquement, à la place de la date (voir
+              sfHeader__pronosBtn). Le wrapper flex date de l'époque où
+              "Mes Paris" l'accompagnait ici (fonctionnalité entièrement
+              retirée le 02/09, décision produit : simulation de paris hors
+              du périmètre stats/live/notifs de l'app, et sujet sensible
+              — classement 18+ des stores, cadre ANJ en France) ; il est
+              conservé tel quel pour ne pas toucher au grid-template-columns
+              existant du header. */}
           <div className="sfHeader__leftGroup">
             <NavLink
               to="/pronos"
@@ -120,27 +124,6 @@ function Navbar() {
               </svg>
               <span>Pronos</span>
             </NavLink>
-
-            {/* Mes Paris — MASQUÉ (demande utilisateur, 25/08 : "pas au point
-                pour le moment") — la page/route (/mes-paris) reste
-                fonctionnelle et accessible par URL directe, seul le point
-                d'entrée dans la nav est retiré. Redécommenter ce bloc pour
-                le remettre. */}
-            {/*
-            <NavLink
-              to="/mes-paris"
-              className={({ isActive }) =>
-                isActive ? 'sfHeader__betsBtn sfHeader__betsBtn--active' : 'sfHeader__betsBtn'
-              }
-            >
-              <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <path d="M3 10h18" strokeDasharray="2 2" />
-                <path d="M9 15l2 2 4-4" />
-              </svg>
-              <span>Mes Paris</span>
-            </NavLink>
-            */}
           </div>
 
           <NavLink to="/" className="sfHeader__brand">

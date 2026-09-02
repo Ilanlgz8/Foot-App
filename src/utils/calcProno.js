@@ -483,13 +483,25 @@ function computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches)
   }
 }
 
-// ── Exports pour marchés dérivés (Mes Paris) ────────────────────────────
+// ── Marchés dérivés — PLUS AUCUN APPELANT DANS L'APP depuis le 02/09 ─────
+// Ces 6 fonctions (getGoalExpectancy, bttsProbability, scoreExactProbabilities,
+// goalMarginProbabilities, teamGoalsOverProbability, scorerOddsPct) avaient
+// été écrites POUR la page "Mes Paris", supprimée le 02/09 (décision produit :
+// simulation de paris hors du périmètre stats/live/notifs de l'app). Elles ne
+// sont plus appelées que par calcProno.test.js.
+// Volontairement CONSERVÉES plutôt que supprimées avec le reste : ce sont des
+// calculs de probabilité purs (Poisson), entièrement couverts par les tests,
+// sans aucun lien avec l'habillage "paris" — directement réutilisables si les
+// groupes Pronos gagnent un jour des pronostics à points (score exact, BTTS,
+// écart de buts). Aucun coût sur le bundle livré : exports ESM non appelés,
+// donc éliminés au tree-shaking par Rollup/Vite.
+// ── Contexte d'origine (conservé) ────────────────────────────────────────
 // Retour utilisateur (Mes Paris, comparaison avec Betclic/Winamax) : demande
 // de marchés supplémentaires que ceux déjà affichés (1N2 seul). Deux ajoutés,
 // tous deux calculés à partir de données/modèle RÉELS déjà en place ici —
 // aucun chiffre inventé (voir CLAUDE.md) :
 //  - Double chance (1X/12/X2) : simple recombinaison de home/draw/away déjà
-//    calculés (réel ESPN ou repli calcPronoAdvanced) — voir MesParis.jsx.
+//    calculés (réel ESPN ou repli calcPronoAdvanced).
 //  - BTTS (les 2 équipes marquent) : a besoin des λ (buts espérés) du modèle
 //    Poisson, jusqu'ici gardés internes à calcPronoAdvanced — exposés ici
 //    séparément pour être réutilisables (mêmes buildGoalModel/computeLambdas
