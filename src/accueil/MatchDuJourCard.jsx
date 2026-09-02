@@ -255,15 +255,18 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             explicite : "assez voyant pour qu'on sache le championnat sans
             plisser les yeux"). Logo dans une pastille claire + nom en gros
             et en blanc, journée en sous-titre.
-            ⚠️ Pastille de droite AFFICHÉE SEULEMENT si elle a quelque chose à
-            signaler (demande 02/09 : "enlève le badge match du jour en haut à
-            droite"). Avant le match elle disait "Match du jour", ce que la
-            carte dit déjà d'elle-même par sa taille et sa place en tête de
-            page — bruit pur. Elle reste en revanche indispensable en direct
-            et après la fin : c'est le seul marqueur de ces deux états.
-            Bénéfice secondaire : le nom du championnat récupère toute la
-            largeur, donc la journée cesse d'être poussée hors du bandeau par
-            un nom long ("Ligue 1 McDonald's", constaté en capture réelle).
+            ⚠️ PASTILLE DE STATUT SUPPRIMÉE (02/09) — elle occupait le haut
+            droite du bandeau et ne servait à rien dans AUCUN des 3 états :
+              • avant le match, elle disait "Match du jour", ce que la carte
+                dit déjà d'elle-même par sa taille et sa place en tête de page ;
+              • en direct, la période est affichée au-dessus du VS et la minute
+                en rouge au-dessus du score — l'état est déjà évident ;
+              • après la fin, elle écrivait "Terminé"… alors que le libellé
+                au-dessus du score écrit DÉJÀ "Terminé" : le mot apparaissait
+                littéralement deux fois à l'écran.
+            Le bandeau se réduit donc au championnat, qui récupère toute la
+            largeur — la journée cesse d'être poussée hors du cadre par un nom
+            long ("Ligue 1 McDonald's", constaté en capture réelle).
             Piste du filigrane "MATCH DU JOUR" en fond ÉCARTÉE après essai sur
             maquette (4 intensités/placements comparés) : à une opacité
             réellement voyante il passe derrière les noms d'équipe et les
@@ -281,12 +284,6 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
               {matchdayLabel && <span className="accueil__mdjLeagueSub">{matchdayLabel}</span>}
             </span>
           </span>
-          {(isLive || isFinished) && (
-            <span className={`accueil__mdjStatus${isLive ? ' accueil__mdjStatus--live' : ''}`}>
-              {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
-              {isLive ? 'En direct' : 'Terminé'}
-            </span>
-          )}
         </div>
 
         {/* Période EN COURS au-dessus du VS (demande explicite : "plus
@@ -316,7 +313,16 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             affiche "Aujourd'hui" ou "Terminé". */}
         <div className="accueil__mdjWhen">
           {isLive
-            ? <span className="accueil__mdjMinute">{liveMinute ?? 'En cours'}</span>
+            ? (
+              /* Le point rouge qui pulse suit la minute plutôt que de rester
+                 dans l'ancienne pastille de statut (supprimée, voir bandeau
+                 haut) : c'est le signal "ça bouge en ce moment", il a plus de
+                 sens collé au chrono que perdu dans un coin. */
+              <span className="accueil__mdjMinute">
+                <span className="accueil__mdjLiveDot" aria-hidden="true" />
+                {liveMinute ?? 'En cours'}
+              </span>
+            )
             : <span className="accueil__mdjWhenLabel">{isFinished ? 'Terminé' : "Aujourd'hui"}</span>}
           {(isLive || isFinished) ? (
             <div className="accueil__mdjScore">

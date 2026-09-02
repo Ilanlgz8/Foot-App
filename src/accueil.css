@@ -2219,23 +2219,6 @@
   margin-top: 1px;
   white-space: nowrap;
 }
-.accueil__mdjStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 5px 9px;
-  border-radius: 20px;
-  font-size: 0.55rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--red);
-  background: rgba(var(--red-rgb),0.13);
-  border: 1px solid rgba(var(--red-rgb),0.4);
-  text-shadow: 0 0 10px rgba(var(--red-rgb),0.5);
-  white-space: nowrap;
-}
 .accueil__mdjLiveDot {
   width: 6px;
   height: 6px;
@@ -2373,6 +2356,9 @@
 /* Minute de jeu : prend la place du libellé, avec un vrai espace avant le
    score pour qu'elle respire (demande explicite "un peu plus haut"). */
 .accueil__mdjMinute {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 1rem;
   font-weight: 800;
