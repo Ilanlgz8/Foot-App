@@ -2054,17 +2054,17 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MATCH DU JOUR — AFFICHE (refonte 3, 02/09)
-   Demande explicite après 2 essais : "faut pas que ce soit le même
-   design que les autres cards, une belle affiche qui donne envie, un
-   vrai affrontement, c'est LE match du jour".
-   Format haut type affiche de match : deux camps séparés en diagonale,
-   chacun teinté de la couleur de SON équipe, gros blasons face à face,
-   "VS" central bien visible, ligne d'affrontement lumineuse au milieu.
-   Détails demandés point par point et appliqués ici : libellé
-   ("Aujourd'hui") AU-DESSUS de l'heure, "MATCH DU JOUR" en ROUGE (plus
-   en or), deux-points de l'heure en ROUGE, "VS" plus visible, cotes
-   plus petites, et de l'animation À L'INTÉRIEUR de la carte.
+   MATCH DU JOUR — AFFICHE (v4, 02/09)
+   Itérations validées une par une avec l'utilisateur sur maquette :
+     • championnat en HAUT À GAUCHE, logo en pastille claire + nom en
+       gros et en blanc ("assez voyant pour qu'on sache le championnat
+       sans plisser les yeux") ; statut à droite en pastille rouge.
+     • période en cours ("2ème mi-temps") centrée AU-DESSUS du VS, en
+       gras et plus grosse.
+     • VS en CONTOUR lumineux (2 calques + halo) plutôt qu'en pastille.
+     • minute de jeu à la place du libellé, juste au-dessus du score.
+     • score/heure en Bebas Neue, nettement agrandis.
+     • cotes revenues à la taille exacte des cards de la liste.
    ══════════════════════════════════════════════════════════════════ */
 .accueil__mdj {
   display: block;
@@ -2114,9 +2114,6 @@
   clip-path: polygon(38% 0, 100% 0, 100% 100%, 0 100%);
   animation: mdjCampAway 14s ease-in-out infinite;
 }
-/* Ligne d'affrontement : trait lumineux en diagonale entre les 2 camps,
-   qui balaie doucement de haut en bas — c'est l'animation "à l'intérieur
-   de la carte" demandée, en plus de la respiration des deux camps. */
 .accueil__mdjClash {
   position: absolute;
   top: -20%;
@@ -2132,14 +2129,15 @@
     transparent);
   animation: mdjClash 7s ease-in-out infinite;
 }
-/* Voile de lisibilité : assombrit haut et bas pour que le texte blanc
-   reste lisible quelles que soient les 2 couleurs d'équipes. */
+/* Voile de lisibilité : le haut est plus assombri que dans la v3 — le
+   bandeau championnat en blanc doit rester lisible même sur une équipe
+   aux couleurs très claires. */
 .accueil__mdjVeil {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(var(--black-rgb),0.82) 0%, rgba(var(--black-rgb),0.05) 30%, rgba(var(--black-rgb),0.12) 55%, rgba(var(--black-rgb),0.9) 100%),
+    linear-gradient(180deg, rgba(var(--black-rgb),0.86) 0%, rgba(var(--black-rgb),0.05) 32%, rgba(var(--black-rgb),0.12) 55%, rgba(var(--black-rgb),0.9) 100%),
     radial-gradient(ellipse 70% 45% at 50% 46%, rgba(var(--black-rgb),0.55), transparent 72%);
 }
 
@@ -2155,78 +2153,110 @@
   0%, 100% { opacity: 0.25; transform: rotate(9deg) translateY(-4%); }
   50%      { opacity: 0.75; transform: rotate(9deg) translateY(4%); }
 }
+@keyframes mdjPulse {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
 
 .accueil__mdjContent {
   position: relative;
   z-index: 2;
-  padding: 1rem 1rem 0.95rem;
+  padding: 0.85rem 1rem 0.95rem;
 }
 
-/* ── En-tête : "MATCH DU JOUR" en ROUGE (demande explicite, plus en or) ── */
-.accueil__mdjHeader {
+/* ── Bandeau haut : championnat à gauche, statut à droite ── */
+.accueil__mdjTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 0.7rem;
+}
+.accueil__mdjLeague {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.accueil__mdjLeagueIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(var(--white-rgb),0.94);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  margin-bottom: 4px;
+  box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
 }
-.accueil__mdjHeaderRule {
-  width: 20px;
-  height: 1px;
+.accueil__mdjLeagueIcon img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
 }
-.accueil__mdjHeaderRule:first-child {
-  background: linear-gradient(90deg, transparent, var(--red));
+.accueil__mdjLeagueText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
-.accueil__mdjHeaderRule:last-child {
-  background: linear-gradient(90deg, var(--red), transparent);
-}
-.accueil__mdjKicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.63rem;
+.accueil__mdjLeagueName {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.26em;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(var(--black-rgb),0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.accueil__mdjLeagueSub {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--red);
-  text-shadow: 0 0 14px rgba(var(--red-rgb),0.65), 0 1px 5px rgba(var(--black-rgb),0.9);
+  color: rgba(var(--white-rgb),0.45);
+  margin-top: 1px;
   white-space: nowrap;
 }
-.accueil__mdjKicker--live { letter-spacing: 0.2em; }
+.accueil__mdjStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+  background: rgba(var(--red-rgb),0.13);
+  border: 1px solid rgba(var(--red-rgb),0.4);
+  text-shadow: 0 0 10px rgba(var(--red-rgb),0.5);
+  white-space: nowrap;
+}
 .accueil__mdjLiveDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--red);
-  box-shadow: 0 0 10px var(--red);
+  box-shadow: 0 0 8px var(--red);
   flex-shrink: 0;
   animation: mdjPulse 1.6s ease-in-out infinite;
 }
-@keyframes mdjPulse {
-  0%, 100% { opacity: 1;   transform: scale(1); }
-  50%      { opacity: 0.45; transform: scale(0.82); }
-}
 
-.accueil__mdjSub {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 1.15rem;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.5);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+/* ── Période en cours, au-dessus du VS ── */
+.accueil__mdjPeriod {
   text-align: center;
-}
-.accueil__mdjCompLogo {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-  opacity: 0.85;
-  flex-shrink: 0;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 16px rgba(var(--white-rgb),0.35), 0 2px 8px rgba(var(--black-rgb),0.95);
+  margin-bottom: 0.5rem;
 }
 
 /* ── Le duel ── */
@@ -2235,8 +2265,12 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
-  margin-bottom: 1.1rem;
+  margin-bottom: 1rem;
 }
+/* Hors live il n'y a pas de ligne "période" : le duel récupère un peu de
+   l'espace laissé libre au lieu de creuser un vide. */
+.accueil__mdjDuel--noPeriod { margin-top: 0.35rem; }
+
 .accueil__mdjSide {
   flex: 1;
   display: flex;
@@ -2286,35 +2320,66 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
-/* "VS" bien visible (demande explicite) : pastille sombre cerclée de rouge,
-   posée au milieu de la ligne d'affrontement. */
+
+/* ── VS en contour lumineux ──
+   3 calques : halo rond diffus, noyau translucide, contour tracé. Le
+   -webkit-text-stroke n'est pas standardisé mais est supporté par tous les
+   navigateurs visés (Chromium/WebKit/Firefox) ; si jamais il ne l'était
+   pas, le calque "core" reste visible — dégradation propre, jamais un
+   trou blanc. */
 .accueil__mdjVs {
+  position: relative;
   flex-shrink: 0;
   align-self: center;
-  margin-top: 12px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  margin-top: 14px;
+  width: 74px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: #fff;
-  background: rgba(8, 8, 12, 0.9);
-  border: 1.5px solid rgba(var(--red-rgb),0.75);
-  box-shadow: 0 0 18px rgba(var(--red-rgb),0.5), inset 0 0 12px rgba(var(--red-rgb),0.18);
+}
+.accueil__mdjVsGlow {
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--white-rgb),0.2), transparent 68%);
+}
+.accueil__mdjVsCore,
+.accueil__mdjVsOutline {
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+.accueil__mdjVsCore {
+  position: absolute;
+  color: rgba(var(--white-rgb),0.14);
+}
+.accueil__mdjVsOutline {
+  position: relative;
+  color: transparent;
+  -webkit-text-stroke: 1.6px rgba(var(--white-rgb),0.95);
+  filter: drop-shadow(0 0 16px rgba(var(--white-rgb),0.4));
 }
 
-/* ── Heure / score — libellé AU-DESSUS (demande explicite) ── */
+/* ── Minute / heure / score ── */
 .accueil__mdjWhen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  margin-bottom: 0.95rem;
+  margin-bottom: 1rem;
+}
+/* Minute de jeu : prend la place du libellé, avec un vrai espace avant le
+   score pour qu'elle respire (demande explicite "un peu plus haut"). */
+.accueil__mdjMinute {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--red);
+  text-shadow: 0 0 14px rgba(var(--red-rgb),0.7), 0 1px 5px rgba(var(--black-rgb),0.9);
+  margin-bottom: 11px;
 }
 .accueil__mdjWhenLabel {
   font-size: 0.57rem;
@@ -2323,57 +2388,47 @@
   text-transform: uppercase;
   color: rgba(var(--white-rgb),0.5);
   text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+  margin-bottom: 4px;
   white-space: nowrap;
 }
 .accueil__mdjClock,
 .accueil__mdjScore {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
 }
-.accueil__mdjScore { gap: 10px; }
+.accueil__mdjClock { gap: 6px; }
+/* Bebas Neue : condensée display, référence des affiches de match — monte
+   plus haut donc le score paraît plus imposant à taille de carte égale,
+   tout en restant élancée sur un score à 2 chiffres. `tabular-nums` évite
+   que la mise en page bouge quand le score change en direct. */
 .accueil__mdjBigNum {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.5rem;
-  font-weight: 800;
-  line-height: 1;
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 4.7rem;
+  line-height: 0.85;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 3px 18px rgba(var(--black-rgb),0.95);
+  text-shadow: 0 0 12px rgba(var(--white-rgb),0.24), 0 4px 22px rgba(var(--black-rgb),0.95);
 }
-/* Deux-points en ROUGE (demande explicite : "pas en jaune, en rouge"), et
-   détachés des chiffres (gap ci-dessus) — d'où le split en 3 spans côté JSX,
-   aucune règle CSS ne pouvant cibler un caractère au milieu d'un nœud texte. */
 .accueil__mdjClockSep {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.05rem;
-  font-weight: 800;
-  line-height: 1;
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 3.6rem;
+  line-height: 0.85;
   color: var(--red);
   text-shadow: 0 0 16px rgba(var(--red-rgb),0.8);
 }
 .accueil__mdjScoreSep {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: rgba(var(--white-rgb),0.38);
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2rem;
+  color: rgba(var(--white-rgb),0.32);
 }
 
-/* ── Cotes : volontairement DISCRÈTES (demande explicite "la cote plus
-   petite") — ce n'est pas le sujet de l'affiche. Balisage .poster__prono-*
-   réutilisé, rétréci ici seulement (MatchPoster n'est pas touché). ── */
+/* ── Cotes : taille IDENTIQUE aux cards de la liste (demande explicite
+   après les avoir vues rétrécies). Aucune surcharge de dimension ici —
+   .poster__prono-* s'applique tel quel, seul l'espacement reste ajusté. ── */
 .accueil__mdj .poster__prono-row {
-  gap: 7px;
+  gap: 8px;
 }
-.accueil__mdj .poster__prono-pill {
-  max-width: 86px;
-  height: 40px;
-  border-width: 2px;
-  border-radius: 8px;
-  gap: 1px;
-}
-.accueil__mdj .poster__prono-pillLabel { font-size: 0.44rem; }
-.accueil__mdj .poster__prono-pillVal   { font-size: 0.85rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .accueil__mdj,

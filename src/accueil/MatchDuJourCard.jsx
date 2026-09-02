@@ -211,6 +211,17 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const homeColor = teamColors.home.main
   const awayColor = teamColors.away.main
 
+  // Journée de championnat — affichée en sous-titre du bandeau compétition.
+  // `matchday` vient de football-data.org (vérifié sur les données réelles de
+  // l'app : présent et correct sur les 5 grands championnats) ; il n'existe
+  // pas pour les compétitions à élimination directe ni pour certaines
+  // sources ESPN — d'où l'affichage conditionnel plutôt qu'un "Journée
+  // undefined". `stage` n'est utilisé que pour ne PAS écrire "Journée" sur
+  // un tour de coupe, où le numéro ne veut rien dire.
+  const matchdayLabel = (match.matchday != null && match.stage === 'REGULAR_SEASON')
+    ? `Journée ${match.matchday}`
+    : null
+
   const renderSide = (side, name, crest, rawName, form, code) => (
     <div className={`accueil__mdjSide accueil__mdjSide--${side}`}>
       <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
@@ -240,34 +251,58 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
       <span className="accueil__mdjVeil" aria-hidden="true" />
 
       <div className="accueil__mdjContent">
-        <div className="accueil__mdjHeader">
-          <span className="accueil__mdjHeaderRule" aria-hidden="true" />
-          <span className={`accueil__mdjKicker${isLive ? ' accueil__mdjKicker--live' : ''}`}>
-            {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
-            {isLive
-              ? `En direct${liveMinute ? ` · ${liveMinute}` : ''}`
-              : isFinished ? 'Match du jour · terminé' : 'Match du jour'}
+        {/* Bandeau haut : championnat À GAUCHE, bien lisible (demande
+            explicite : "assez voyant pour qu'on sache le championnat sans
+            plisser les yeux"). Logo dans une pastille claire + nom en gros
+            et en blanc, journée en sous-titre. Le statut ("Match du jour" /
+            "En direct") passe à droite en pastille rouge. */}
+        <div className="accueil__mdjTopBar">
+          <span className="accueil__mdjLeague">
+            {mdjCompEmblem && (
+              <span className="accueil__mdjLeagueIcon">
+                <img src={mdjCompEmblem} alt="" />
+              </span>
+            )}
+            <span className="accueil__mdjLeagueText">
+              <span className="accueil__mdjLeagueName">{mdjCompName}</span>
+              {matchdayLabel && <span className="accueil__mdjLeagueSub">{matchdayLabel}</span>}
+            </span>
           </span>
-          <span className="accueil__mdjHeaderRule" aria-hidden="true" />
+          <span className={`accueil__mdjStatus${isLive ? ' accueil__mdjStatus--live' : ''}`}>
+            {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
+            {isLive ? 'En direct' : isFinished ? 'Terminé' : 'Match du jour'}
+          </span>
         </div>
 
-        <div className="accueil__mdjSub">
-          {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
-          <span>{[mdjCompName, isLive ? livePeriodLabel : null].filter(Boolean).join(' · ')}</span>
-        </div>
+        {/* Période EN COURS au-dessus du VS (demande explicite : "plus
+            visible, un peu plus gros et en gras"). Rien en pré-match : le
+            duel remonte simplement, plutôt que de laisser une ligne vide. */}
+        {isLive && livePeriodLabel && (
+          <div className="accueil__mdjPeriod">{livePeriodLabel}</div>
+        )}
 
-        <div className="accueil__mdjDuel">
+        <div className={`accueil__mdjDuel${isLive && livePeriodLabel ? '' : ' accueil__mdjDuel--noPeriod'}`}>
           {renderSide('home', homeName, homeCrest, match.homeTeam?.name, homeForm, homeCode)}
-          <span className="accueil__mdjVs" aria-hidden="true">VS</span>
+          {/* VS en CONTOUR lumineux : 2 calques superposés (noyau translucide
+              + contour tracé via -webkit-text-stroke) + halo rond derrière.
+              aria-hidden : purement décoratif, l'affrontement est déjà porté
+              par les 2 noms d'équipe lus juste avant/après. */}
+          <span className="accueil__mdjVs" aria-hidden="true">
+            <span className="accueil__mdjVsGlow" />
+            <span className="accueil__mdjVsCore">VS</span>
+            <span className="accueil__mdjVsOutline">VS</span>
+          </span>
           {renderSide('away', awayName, awayCrest, match.awayTeam?.name, awayForm, awayCode)}
         </div>
 
-        {/* Libellé AU-DESSUS de l'heure (demande explicite) — l'ordre inverse
-            de l'essai précédent, où "Aujourd'hui" passait sous l'heure. */}
+        {/* Minute de jeu à la place du libellé, juste au-dessus du score
+            (demande explicite) — d'où son retrait du bandeau haut, sinon
+            elle apparaissait deux fois. Hors live, ce même emplacement
+            affiche "Aujourd'hui" ou "Terminé". */}
         <div className="accueil__mdjWhen">
-          <span className="accueil__mdjWhenLabel">
-            {isFinished ? 'Terminé' : isLive ? 'Score' : "Aujourd'hui"}
-          </span>
+          {isLive
+            ? <span className="accueil__mdjMinute">{liveMinute ?? 'En cours'}</span>
+            : <span className="accueil__mdjWhenLabel">{isFinished ? 'Terminé' : "Aujourd'hui"}</span>}
           {(isLive || isFinished) ? (
             <div className="accueil__mdjScore">
               <span className="accueil__mdjBigNum">{hs ?? 0}</span>
@@ -283,10 +318,9 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
           )}
         </div>
 
-        {/* Cotes volontairement discrètes (demande explicite : "la cote plus
-            petite") — classes .poster__prono-* réutilisées pour ne pas
-            dupliquer le balisage, rétrécies via des règles scopées à
-            .accueil__mdj (voir accueil.css). Liseré/glow du favori conservé. */}
+        {/* Cotes : classes .poster__prono-* réutilisées, à la MÊME taille que
+            les cards de la liste (demande explicite après les avoir vues
+            rétrécies) — plus aucune surcharge de dimension ici. */}
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel">{homeCode}</span>
