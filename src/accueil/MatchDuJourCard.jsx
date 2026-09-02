@@ -12,7 +12,8 @@
 // calcul que MatchPoster.jsx — cote de marché ESPN si disponible, sinon
 // calcProno/calcLiveProno).
 import { translateTeam } from '../data/teamNames'
-import { getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
+import { FormDiamonds } from './FormDiamonds'
 import { TEAM_SHORT } from '../data/teamShortNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
@@ -22,10 +23,6 @@ import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
 import { COMPETITIONS } from '../data/competitions'
-
-// Libellés FR des losanges de forme récente — même convention que
-// StandingsTable.jsx (V/N/D), source 'W'/'D'/'L' (buildFormMap).
-const MDJ_FORM_LABEL = { W: 'V', D: 'N', L: 'D' }
 
 function shortenName(name) {
   if (!name) return name
@@ -197,112 +194,109 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const homeForm = (hForm ?? []).slice(-5)
   const awayForm = (aForm ?? []).slice(-5)
 
-  const renderForm = (results) => (
-    results.length > 0 ? (
-      <div className="accueil__mdjForm">
-        {results.map((r, i) => (
-          <span key={i} className={`accueil__mdjFormBadge accueil__mdjFormBadge--${r}`}>
-            {MDJ_FORM_LABEL[r] ?? r}
-          </span>
-        ))}
-      </div>
-    ) : null
-  )
+  // Fond : EXACTEMENT la même recette que les cards de match de l'Accueil
+  // (MatchPoster.jsx) — 2 calques de dégradé aux couleurs réelles des deux
+  // équipes, peints une seule fois inline, le mouvement/crossfade venant du
+  // CSS (transform + opacity uniquement, composés sur le GPU sans repaint).
+  const gradient    = buildMatchGradient(teamColors.home, teamColors.away)
+  const gradientAlt = buildMatchGradientAlt(teamColors.home, teamColors.away)
 
-  const renderTeam = (side, name, crest, rawName, form) => (
+  const renderTeam = (name, crest, rawName, form) => (
     <div className="accueil__mdjTeam">
-      <div className="accueil__mdjCrestSlot" data-side={side}>
-        <span className="accueil__mdjCrestGlow" aria-hidden="true" />
-        {crest
-          ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} /></div>
-          : <div className="accueil__mdjCrestFb">{name?.[0] ?? ''}</div>}
-      </div>
+      {crest
+        ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} /></div>
+        : <div className="accueil__mdjCrestFb">{name?.[0] ?? ''}</div>}
       <span className="accueil__mdjTeamName">{name}</span>
-      {renderForm(form)}
+      <FormDiamonds form={form} />
     </div>
   )
 
   return (
-    <button
-      className="accueil__mdj"
-      onClick={onClick}
-      style={{
-        '--mdj-home': teamColors.home.main,
-        '--mdj-away': teamColors.away.main,
-      }}
+    <div
+      className="accueil__mdjFrame"
+      style={{ '--hc': teamColors.home.main, '--ac': teamColors.away.main }}
     >
-      {/* Habillage lumineux (maquette validée 02/09) — halos flous aux
-          couleurs RÉELLES des deux équipes (--mdj-home/--mdj-away, dico
-          curé teamPhotos) + liseré dégradé en haut de carte. Purement
-          décoratifs, d'où aria-hidden. Remplacent l'ancien blason en
-          filigrane, retiré : il chargeait visuellement le fond juste
-          derrière la forme récente et les noms d'équipe, désormais placés
-          là. */}
-      <span className="accueil__mdjTopLine" aria-hidden="true" />
-      <span className="accueil__mdjGlowTop" aria-hidden="true" />
-      <span className="accueil__mdjGlowBottom" aria-hidden="true" />
+      <button className="accueil__mdj" onClick={onClick}>
+        {/* ── REFONTE 2 (02/09, retour utilisateur : "le fond et même certains
+            trucs, ça fait pas propre, pas vraie app") ────────────────────
+            Constat fait en regardant l'app déployée sur mobile plutôt qu'en
+            imaginant : la carte "match du jour" était plus TERNE que les
+            cards de match ordinaires juste en dessous. Elle avait son propre
+            langage visuel (fond quasi noir + halos flous, blasons dans des
+            carrés, pilules de cotes sombres, badges de forme carrés) là où
+            le reste de l'Accueil utilise un fond dégradé vif aux couleurs des
+            équipes, des blasons ronds détourés, des pilules blanches et des
+            losanges de forme. Deux langages sur le même écran = l'impression
+            de "pas vraie app". Elle reprend donc maintenant EXACTEMENT la
+            base des autres cards (fond, cadre dégradé, blasons, losanges,
+            pilules) et ne s'en distingue que par ce qui doit signaler un
+            hero : le bandeau doré "MATCH DU JOUR", des blasons et une heure
+            plus grands, et la forme récente (absente des cards normales). */}
+        <div className="accueil__mdjBg accueil__mdjBg--grad"    style={{ background: gradient }} aria-hidden="true" />
+        <div className="accueil__mdjBg accueil__mdjBg--gradAlt" style={{ background: gradientAlt }} aria-hidden="true" />
+        <div className="accueil__mdjOverlay" aria-hidden="true" />
 
-      <div className="accueil__mdjHeader">
-        <span className="accueil__mdjHeaderRule" aria-hidden="true" />
-        <span className={`accueil__mdjKicker${isLive ? ' accueil__mdjKicker--live' : ''}`}>
-          {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
-          {isLive
-            ? `En direct${liveMinute ? ` · ${liveMinute}` : ''}`
-            : isFinished ? 'Match du jour · terminé' : 'Match du jour'}
-        </span>
-        <span className="accueil__mdjHeaderRule" aria-hidden="true" />
-      </div>
+        <div className="accueil__mdjContent">
+          <div className="accueil__mdjHeader">
+            <span className="accueil__mdjHeaderRule" aria-hidden="true" />
+            <span className={`accueil__mdjKicker${isLive ? ' accueil__mdjKicker--live' : ''}`}>
+              {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
+              {isLive
+                ? `En direct${liveMinute ? ` · ${liveMinute}` : ''}`
+                : isFinished ? 'Match du jour · terminé' : 'Match du jour'}
+            </span>
+            <span className="accueil__mdjHeaderRule" aria-hidden="true" />
+          </div>
 
-      <div className="accueil__mdjSub">
-        {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
-        <span>{[mdjCompName, isLive ? livePeriodLabel : null].filter(Boolean).join(' · ')}</span>
-      </div>
+          <div className="accueil__mdjSub">
+            {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
+            <span>{[mdjCompName, isLive ? livePeriodLabel : null].filter(Boolean).join(' · ')}</span>
+          </div>
 
-      <div className="accueil__mdjTeams">
-        {renderTeam('home', homeName, homeCrest, match.homeTeam?.name, homeForm)}
+          <div className="accueil__mdjTeams">
+            {renderTeam(homeName, homeCrest, match.homeTeam?.name, homeForm)}
 
-        <div className="accueil__mdjCenter">
-          {(isLive || isFinished) ? (
-            <div className="accueil__mdjScore">
-              <span className="accueil__mdjScoreNum">{hs ?? 0}</span>
-              <span className="accueil__mdjScoreSep">–</span>
-              <span className="accueil__mdjScoreNum">{as_ ?? 0}</span>
+            <div className="accueil__mdjCenter">
+              {(isLive || isFinished) ? (
+                <div className="accueil__mdjScore">
+                  <span className="accueil__mdjScoreNum">{hs ?? 0}</span>
+                  <span className="accueil__mdjScoreSep">–</span>
+                  <span className="accueil__mdjScoreNum">{as_ ?? 0}</span>
+                </div>
+              ) : (
+                <div className="accueil__mdjClock">
+                  <span className="accueil__mdjClockNum">{kickH}</span>
+                  <span className="accueil__mdjClockSep">:</span>
+                  <span className="accueil__mdjClockNum">{kickM}</span>
+                </div>
+              )}
+              <span className="accueil__mdjCenterLabel">
+                {isFinished ? 'Terminé' : isLive ? 'Score' : "Aujourd'hui"}
+              </span>
             </div>
-          ) : (
-            <div className="accueil__mdjClock">
-              <span className="accueil__mdjClockNum">{kickH}</span>
-              <span className="accueil__mdjClockSep">:</span>
-              <span className="accueil__mdjClockNum">{kickM}</span>
+
+            {renderTeam(awayName, awayCrest, match.awayTeam?.name, awayForm)}
+          </div>
+
+          {/* Pronostic — classes .poster__prono-* réutilisées TELLES QUELLES,
+              sans plus aucune surcharge de style locale : les pilules blanches
+              à chiffres bordeaux sont exactement celles des autres cards. */}
+          <div className="poster__prono-row">
+            <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
+              <span className="poster__prono-pillLabel">{homeCode}</span>
+              <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
             </div>
-          )}
-          <span className="accueil__mdjCenterLabel">
-            {isFinished ? 'Terminé' : isLive ? 'Score' : "Aujourd'hui"}
-          </span>
+            <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
+              <span className="poster__prono-pillLabel">Nul</span>
+              <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
+            </div>
+            <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
+              <span className="poster__prono-pillLabel">{awayCode}</span>
+              <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
+            </div>
+          </div>
         </div>
-
-        {renderTeam('away', awayName, awayCrest, match.awayTeam?.name, awayForm)}
-      </div>
-
-      {/* Pronostic — pilules "côtes bookmaker" : classes .poster__prono-*
-          RÉUTILISÉES telles quelles (pas de copie CSS parallèle) pour un
-          design garanti identique à celui des autres cards de l'Accueil
-          (MatchPoster.jsx, retour utilisateur explicite : "même design
-          exactement que sur les cards des autres matchs"). Liseré + glow
-          bordeaux réservés à la pilule favorite. */}
-      <div className="poster__prono-row">
-        <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}>
-          <span className="poster__prono-pillLabel">{homeCode}</span>
-          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
-        </div>
-        <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}>
-          <span className="poster__prono-pillLabel">Nul</span>
-          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
-        </div>
-        <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}>
-          <span className="poster__prono-pillLabel">{awayCode}</span>
-          <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
-        </div>
-      </div>
-    </button>
+      </button>
+    </div>
   )
 }

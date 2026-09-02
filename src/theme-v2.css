@@ -169,18 +169,14 @@ html body {
    PHASE 3 — hero aux couleurs des équipes + or champagne
    ═══════════════════════════════════════════════════════════════ */
 
-/* Match du jour : les halos aux couleurs des deux équipes sont désormais
-   portés par de vrais éléments flous (.accueil__mdjGlowTop/GlowBottom, voir
-   accueil.css — refonte 02/09) plutôt que par des radial-gradients de fond,
-   ce qui permet le flou (filter:blur) impossible sur un background. Ce bloc
-   ne garde donc que l'accord de la base sombre et de la bordure avec le
-   thème v2 — surtout PAS un `background` complet, qui écraserait
-   silencieusement le fond de la nouvelle maquette (spécificité #root plus
-   forte que la règle de accueil.css). */
-#root .accueil__mdj {
-  border-color: var(--sf-border);
-  background: #0b0b10;
-}
+/* Match du jour : plus AUCUNE surcharge de fond ici depuis la refonte 2 du
+   02/09. La carte utilise maintenant exactement la même mécanique que les
+   cards de match (.poster) — 2 calques de dégradé aux couleurs des équipes
+   posés inline par le composant, par-dessus une base sombre définie dans
+   accueil.css. Toute règle `background` sur `#root .accueil__mdj` ici
+   écraserait cette base en silence (spécificité #root plus forte), et une
+   règle `border-color` n'aurait plus d'objet : la bordure colorée est portée
+   par le cadre dégradé .accueil__mdjFrame, pas par la carte elle-même. */
 
 /* ── Or champagne unifié : vainqueurs & leader ── */
 
