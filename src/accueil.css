@@ -2178,9 +2178,25 @@
   gap: 9px;
   min-width: 0;
 }
+/* ⚠️ CONTENEUR À LARGEUR VARIABLE, PAS UN CARRÉ (constat utilisateur, 02/09 :
+   "pour certaines images c'est trop petit pour le carré blanc").
+   Cause mesurée sur les fichiers réels (src/assets/leagues), ce n'est pas un
+   problème de qualité d'image : les ratios largeur/hauteur vont de 0,59
+   (Serie A, logo haut) à 3,40 (Ligue 1, un logotype très large). Dans un
+   carré avec `object-fit: contain`, un logo large se cale sur la largeur et
+   sa hauteur s'effondre — le logo Ligue 1 ne faisait plus que 6,2 px de haut
+   dans les 21 px disponibles, d'où l'impression qu'il est minuscule.
+   Aucune image de remplacement ne réglerait ça : un logotype horizontal ne
+   peut PAS remplir un carré, c'est de la géométrie.
+   Le conteneur adopte donc une HAUTEUR fixe et une largeur libre : chaque
+   logo est rendu à pleine hauteur quel que soit son ratio, et la pastille
+   s'élargit d'elle-même pour les logotypes horizontaux. `max-width` borne le
+   cas extrême pour que le nom du championnat garde sa place. */
 .accueil__mdjLeagueIcon {
-  width: 30px;
   height: 30px;
+  min-width: 30px;
+  max-width: 88px;
+  padding: 4px 6px;
   border-radius: 8px;
   flex-shrink: 0;
   background: rgba(var(--white-rgb),0.94);
@@ -2190,8 +2206,9 @@
   box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
 }
 .accueil__mdjLeagueIcon img {
-  width: 21px;
-  height: 21px;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 .accueil__mdjLeagueText {
