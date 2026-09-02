@@ -109,10 +109,67 @@ const BIG_TEAMS = new Set([
   'Cameroun', 'Ghana', 'Tunisie', 'Afrique du Sud',
 ])
 
+// ⚠️ AJOUT 2e NIVEAU (constat utilisateur, 02/09 : "Toulouse et Lille sont
+// plus intéressants que Real Sociedad et Celta Vigo"). Avant ce fix, AUCUNE
+// de ces 4 équipes n'était listée : le score d'affiche valait 0 des deux
+// côtés, et c'est le coup d'envoi le plus tardif qui tranchait (21:00 contre
+// 20:45) — un départage sans le moindre sens sportif, purement horaire.
+//
+// Honnêteté sur ce que c'est : aucune donnée disponible dans l'app ne permet
+// de mesurer qu'un match est "plus intéressant" qu'un autre (la position au
+// classement ou la cote de chaque match exigeraient un appel réseau
+// supplémentaire par match — budget football-data.org déjà fragile, voir
+// CLAUDE.md). C'est donc une liste CURÉE, un jugement assumé, pas un score
+// calculé. D'où ce 2e niveau : des clubs qui comptent réellement dans le
+// paysage de leur championnat sans être des géants européens (habitués du
+// haut de tableau, de la coupe d'Europe ou vainqueurs récents d'un trophée
+// national). Ils pèsent moitié moins qu'un club du 1er niveau — un vrai choc
+// entre géants reste donc toujours devant.
+// Si un choix te paraît à côté de la plaque, dis-le : c'est une liste, elle
+// s'ajuste en une ligne.
+// ⚠️ Les libellés ci-dessous doivent être ceux que renvoie translateTeam()
+// (vérifiés un par un en exécutant translateTeam sur les noms réels FD.org
+// ET ESPN — c'est comme ça que "Real Betis" a été corrigé en "Betis", la
+// table de traduction raccourcissant ce nom-là). Voir aussi teamMatchesSet()
+// juste en dessous : selon la source, `shortName` peut être absent ou déjà
+// être le nom long, donc les deux champs sont testés.
+const NOTABLE_TEAMS = new Set([
+  // Ligue 1
+  'Lille', 'Lens', 'Nice', 'Rennes', 'Toulouse', 'Strasbourg',
+  // Premier League
+  'Newcastle', 'Aston Villa', 'West Ham', 'Everton',
+  // La Liga
+  'Villarreal', 'Betis', 'Athletic Bilbao', 'Valence',
+  // Bundesliga
+  'Francfort', 'Stuttgart', "M'gladbach", 'Wolfsburg',
+  // Serie A
+  'Rome', 'Lazio', 'Atalanta', 'Fiorentina',
+])
+
+// ⚠️ Teste `shortName` ET `name` (bug évité de justesse en vérifiant sur les
+// vrais noms) : selon la source du match, l'un ou l'autre peut être le seul
+// à correspondre. Exemples réels mesurés — FD.org donne shortName "Lille" et
+// name "LOSC Lille" ; côté ESPN certains matchs n'ont pas de shortName du
+// tout et arrivent en "Toulouse FC". Ne regarder qu'un seul des deux champs
+// (l'ancien comportement) faisait silencieusement rater la moitié des clubs
+// de la liste selon la compétition, sans que rien ne le signale.
+function teamMatchesSet(team, set) {
+  const short = translateTeam(team?.shortName || '')
+  const full  = translateTeam(team?.name || '')
+  return set.has(short) || set.has(full)
+}
+
+// Score d'affiche : 2 points par club du 1er niveau, 1 point par club du 2e.
+// Un match entre 2 géants (4) devance un géant + un club notable (3), qui
+// devance 2 clubs notables (2), etc. — la hiérarchie reste lisible sans
+// jamais inverser l'ordre des tiers de COMP_PRIORITY (ce score ne sert qu'à
+// départager DANS un même tier).
 function bigTeamScore(match) {
-  const home = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
-  const away = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
-  return (BIG_TEAMS.has(home) ? 1 : 0) + (BIG_TEAMS.has(away) ? 1 : 0)
+  const rank = (team) =>
+    teamMatchesSet(team, BIG_TEAMS) ? 2
+      : teamMatchesSet(team, NOTABLE_TEAMS) ? 1
+      : 0
+  return rank(match.homeTeam) + rank(match.awayTeam)
 }
 
 /**

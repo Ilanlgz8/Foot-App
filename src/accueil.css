@@ -2054,120 +2054,145 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MATCH DU JOUR — REFONTE 2 (02/09, retour utilisateur : "le fond et
-   même certains trucs, ça fait pas propre, pas vraie app").
-   Constat fait en REGARDANT l'app déployée sur mobile, pas en imaginant :
-   la carte hero était plus terne que les cards de match ordinaires juste
-   en dessous, parce qu'elle avait son propre langage visuel (fond quasi
-   noir + halos flous, blasons dans des carrés colorés, pilules de cotes
-   sombres, badges de forme carrés) là où tout le reste de l'Accueil
-   utilise un fond dégradé vif aux couleurs des équipes, des blasons
-   ronds, des pilules blanches et des losanges de forme. Deux langages
-   visuels sur le même écran = exactement l'impression de "pas vraie app".
-   Elle reprend donc maintenant la MÊME base que .poster (cadre dégradé,
-   double calque de fond animé, overlay, blasons ronds, losanges, pilules
-   blanches) et ne s'en distingue que par ce qui doit signaler un hero :
-   bandeau doré "MATCH DU JOUR", blasons et heure plus grands, forme
-   récente (absente des cards normales).
+   MATCH DU JOUR — AFFICHE (refonte 3, 02/09)
+   Demande explicite après 2 essais : "faut pas que ce soit le même
+   design que les autres cards, une belle affiche qui donne envie, un
+   vrai affrontement, c'est LE match du jour".
+   Format haut type affiche de match : deux camps séparés en diagonale,
+   chacun teinté de la couleur de SON équipe, gros blasons face à face,
+   "VS" central bien visible, ligne d'affrontement lumineuse au milieu.
+   Détails demandés point par point et appliqués ici : libellé
+   ("Aujourd'hui") AU-DESSUS de l'heure, "MATCH DU JOUR" en ROUGE (plus
+   en or), deux-points de l'heure en ROUGE, "VS" plus visible, cotes
+   plus petites, et de l'animation À L'INTÉRIEUR de la carte.
    ══════════════════════════════════════════════════════════════════ */
-
-/* Cadre : même recette que .poster__frame (bordure dégradée 1px et demi aux
-   couleurs des 2 équipes), en un peu plus large/marqué pour le hero. */
-.accueil__mdjFrame {
-  width: 100%;
-  margin-bottom: 1rem;
-  padding: 2px;
-  border-radius: 19px;
-  background: linear-gradient(135deg, var(--hc, #2a3a4a) 0%, var(--ac, #2a3a4a) 100%);
-  box-shadow: 0 6px 28px rgba(var(--black-rgb),0.55);
-}
-
 .accueil__mdj {
   display: block;
   position: relative;
   width: 100%;
   overflow: hidden;
-  border: 0;
-  border-radius: 17px;
+  margin-bottom: 1rem;
   padding: 0;
-  background: #0e0e0e;
+  border: 1px solid rgba(var(--white-rgb),0.1);
+  border-radius: 20px;
+  background: #08080b;
   cursor: pointer;
   font-family: inherit;
   text-align: left;
+  box-shadow: 0 20px 46px -20px rgba(var(--black-rgb),0.9);
   animation: accueilMdjShake 1.3s ease-out 1;
 }
 
-/* Fond : 2 calques STATIQUES peints une seule fois (background inline depuis
-   le JSX), animés uniquement en transform/opacity — mêmes keyframes que les
-   cards de match (posterDrift/posterMorph), donc aucun repaint. */
-.accueil__mdjBg {
+/* ── Les deux camps ──
+   Chaque moitié est un élément à part (et non un seul background) : ça
+   permet de les animer en transform/opacity uniquement — les 2 seules
+   propriétés que le navigateur compose sur le GPU sans jamais
+   redéclencher de repaint (même principe que les cards de match). */
+.accueil__mdjCamp {
   position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-.accueil__mdjBg--grad {
-  transform-origin: center;
+  top: -10%;
+  bottom: -10%;
+  width: 68%;
+  pointer-events: none;
   will-change: transform;
-  animation: posterDrift 18s ease-in-out infinite;
 }
-.accueil__mdjBg--gradAlt {
+.accueil__mdjCamp--home {
+  left: -6%;
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--hc, #ef4444) 92%, #000) 0%,
+    color-mix(in srgb, var(--hc, #ef4444) 55%, #000) 45%,
+    transparent 78%);
+  clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%);
+  animation: mdjCampHome 14s ease-in-out infinite;
+}
+.accueil__mdjCamp--away {
+  right: -6%;
+  background: linear-gradient(210deg,
+    color-mix(in srgb, var(--ac, #3b5bfd) 92%, #000) 0%,
+    color-mix(in srgb, var(--ac, #3b5bfd) 55%, #000) 45%,
+    transparent 78%);
+  clip-path: polygon(38% 0, 100% 0, 100% 100%, 0 100%);
+  animation: mdjCampAway 14s ease-in-out infinite;
+}
+/* Ligne d'affrontement : trait lumineux en diagonale entre les 2 camps,
+   qui balaie doucement de haut en bas — c'est l'animation "à l'intérieur
+   de la carte" demandée, en plus de la respiration des deux camps. */
+.accueil__mdjClash {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  width: 2px;
+  height: 140%;
   transform-origin: center;
-  will-change: transform, opacity;
-  opacity: 0;
-  animation:
-    posterDrift 18s ease-in-out infinite reverse,
-    posterMorph  9s ease-in-out infinite;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent,
+    rgba(var(--white-rgb),0.5) 35%,
+    rgba(var(--white-rgb),0.5) 65%,
+    transparent);
+  animation: mdjClash 7s ease-in-out infinite;
 }
-/* Voile sombre : garantit la lisibilité du texte blanc quelles que soient
-   les couleurs des 2 équipes (certaines paires sont très claires). Un peu
-   plus léger que .poster__overlay au centre : le hero a le droit de laisser
-   respirer davantage la couleur. */
-.accueil__mdjOverlay {
+/* Voile de lisibilité : assombrit haut et bas pour que le texte blanc
+   reste lisible quelles que soient les 2 couleurs d'équipes. */
+.accueil__mdjVeil {
   position: absolute;
   inset: 0;
-  z-index: 1;
-  background: linear-gradient(to bottom,
-    rgba(var(--black-rgb),0.58) 0%,
-    rgba(var(--black-rgb),0.20) 42%,
-    rgba(var(--black-rgb),0.74) 100%);
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(var(--black-rgb),0.82) 0%, rgba(var(--black-rgb),0.05) 30%, rgba(var(--black-rgb),0.12) 55%, rgba(var(--black-rgb),0.9) 100%),
+    radial-gradient(ellipse 70% 45% at 50% 46%, rgba(var(--black-rgb),0.55), transparent 72%);
 }
+
+@keyframes mdjCampHome {
+  0%, 100% { transform: translateX(0) scale(1); }
+  50%      { transform: translateX(1.5%) scale(1.05); }
+}
+@keyframes mdjCampAway {
+  0%, 100% { transform: translateX(0) scale(1); }
+  50%      { transform: translateX(-1.5%) scale(1.05); }
+}
+@keyframes mdjClash {
+  0%, 100% { opacity: 0.25; transform: rotate(9deg) translateY(-4%); }
+  50%      { opacity: 0.75; transform: rotate(9deg) translateY(4%); }
+}
+
 .accueil__mdjContent {
   position: relative;
   z-index: 2;
-  padding: 1rem 1rem 1.05rem;
+  padding: 1rem 1rem 0.95rem;
 }
 
-/* ── En-tête doré : le seul vrai marqueur "hero" du bloc ── */
+/* ── En-tête : "MATCH DU JOUR" en ROUGE (demande explicite, plus en or) ── */
 .accueil__mdjHeader {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .accueil__mdjHeaderRule {
-  width: 18px;
+  width: 20px;
   height: 1px;
 }
 .accueil__mdjHeaderRule:first-child {
-  background: linear-gradient(90deg, transparent, var(--sf-gold, #f6c667));
+  background: linear-gradient(90deg, transparent, var(--red));
 }
 .accueil__mdjHeaderRule:last-child {
-  background: linear-gradient(90deg, var(--sf-gold, #f6c667), transparent);
+  background: linear-gradient(90deg, var(--red), transparent);
 }
 .accueil__mdjKicker {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.6rem;
+  font-size: 0.63rem;
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: var(--sf-gold, #f6c667);
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.8);
+  color: var(--red);
+  text-shadow: 0 0 14px rgba(var(--red-rgb),0.65), 0 1px 5px rgba(var(--black-rgb),0.9);
   white-space: nowrap;
 }
-.accueil__mdjKicker--live { color: #fff; letter-spacing: 0.18em; }
+.accueil__mdjKicker--live { letter-spacing: 0.2em; }
 .accueil__mdjLiveDot {
   width: 7px;
   height: 7px;
@@ -2175,6 +2200,11 @@
   background: var(--red);
   box-shadow: 0 0 10px var(--red);
   flex-shrink: 0;
+  animation: mdjPulse 1.6s ease-in-out infinite;
+}
+@keyframes mdjPulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
 }
 
 .accueil__mdjSub {
@@ -2182,51 +2212,51 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-bottom: 1.05rem;
-  font-size: 0.66rem;
+  margin-bottom: 1.15rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.6);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.85);
+  color: rgba(var(--white-rgb),0.5);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
   text-align: center;
 }
 .accueil__mdjCompLogo {
   width: 14px;
   height: 14px;
   object-fit: contain;
-  opacity: 0.9;
+  opacity: 0.85;
   flex-shrink: 0;
 }
 
-/* ── Équipes ── */
-.accueil__mdjTeams {
+/* ── Le duel ── */
+.accueil__mdjDuel {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 1.05rem;
+  gap: 4px;
+  margin-bottom: 1.1rem;
 }
-.accueil__mdjTeam {
+.accueil__mdjSide {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
-/* Blasons ronds détourés, comme .poster__crestWrap — en 60px au lieu de 44
-   (le hero doit être plus imposant que les cards normales). */
-.accueil__mdjCrestWrap,
-.accueil__mdjCrestFb {
-  width: 60px;
-  height: 60px;
+.accueil__mdjCrestWrap {
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1.5px solid rgba(200,210,225,0.3);
-  box-shadow: 0 0 0 4px rgba(200,210,225,0.07), 0 4px 14px rgba(var(--black-rgb),0.65);
-  background: rgba(10, 14, 24, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 16, 0.82);
+  border: 2px solid rgba(var(--white-rgb),0.26);
+  box-shadow: 0 0 0 5px rgba(var(--black-rgb),0.28), 0 12px 30px rgba(var(--black-rgb),0.7);
 }
 .accueil__mdjCrest {
   width: 100%;
@@ -2238,94 +2268,120 @@
   transform: scale(1.18);
 }
 .accueil__mdjCrestFb {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: rgba(235,240,250,0.7);
+}
+.accueil__mdjTeamName {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 10px rgba(var(--black-rgb),0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+/* "VS" bien visible (demande explicite) : pastille sombre cerclée de rouge,
+   posée au milieu de la ligne d'affrontement. */
+.accueil__mdjVs {
+  flex-shrink: 0;
+  align-self: center;
+  margin-top: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 1.05rem;
   font-weight: 800;
-  color: rgba(230,235,245,0.6);
-}
-.accueil__mdjTeamName {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: rgba(var(--white-rgb),0.95);
-  text-align: center;
-  line-height: 1.2;
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.9);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(8, 8, 12, 0.9);
+  border: 1.5px solid rgba(var(--red-rgb),0.75);
+  box-shadow: 0 0 18px rgba(var(--red-rgb),0.5), inset 0 0 12px rgba(var(--red-rgb),0.18);
 }
 
-/* ── Bloc central : heure (pré-match) ou score (live/terminé) ── */
-.accueil__mdjCenter {
+/* ── Heure / score — libellé AU-DESSUS (demande explicite) ── */
+.accueil__mdjWhen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px 0;
-  flex-shrink: 0;
+  gap: 3px;
+  margin-bottom: 0.95rem;
 }
-/* Heure éclatée en 3 spans (voir MatchDuJourCard.jsx) : chiffres plus gros
-   et deux-points rouges DÉTACHÉS — demande explicite ("plus gros et moins
-   collé avec les deux points rouges"), impossible en CSS sur un seul nœud
-   texte "20:45". */
+.accueil__mdjWhenLabel {
+  font-size: 0.57rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--white-rgb),0.5);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+  white-space: nowrap;
+}
 .accueil__mdjClock,
 .accueil__mdjScore {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
-.accueil__mdjScore { gap: 9px; }
-.accueil__mdjClockNum,
-.accueil__mdjScoreNum {
+.accueil__mdjScore { gap: 10px; }
+.accueil__mdjBigNum {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2.3rem;
+  font-size: 2.5rem;
   font-weight: 800;
   line-height: 1;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 14px rgba(var(--black-rgb),0.95);
+  text-shadow: 0 3px 18px rgba(var(--black-rgb),0.95);
 }
+/* Deux-points en ROUGE (demande explicite : "pas en jaune, en rouge"), et
+   détachés des chiffres (gap ci-dessus) — d'où le split en 3 spans côté JSX,
+   aucune règle CSS ne pouvant cibler un caractère au milieu d'un nœud texte. */
 .accueil__mdjClockSep {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.95rem;
+  font-size: 2.05rem;
   font-weight: 800;
   line-height: 1;
   color: var(--red);
-  text-shadow: 0 0 14px rgba(var(--red-rgb),0.7);
+  text-shadow: 0 0 16px rgba(var(--red-rgb),0.8);
 }
 .accueil__mdjScoreSep {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  color: rgba(var(--white-rgb),0.4);
-}
-.accueil__mdjCenterLabel {
-  font-size: 0.55rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.55);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.85);
-  white-space: nowrap;
+  color: rgba(var(--white-rgb),0.38);
 }
 
-/* Pronostic : .poster__prono-* réutilisées TELLES QUELLES (pilules blanches
-   à chiffres bordeaux, identiques aux autres cards) — plus aucune surcharge
-   de couleur/taille ici, c'était précisément ce qui faisait "deux apps
-   différentes sur le même écran". Seul l'espacement reste ajusté. */
+/* ── Cotes : volontairement DISCRÈTES (demande explicite "la cote plus
+   petite") — ce n'est pas le sujet de l'affiche. Balisage .poster__prono-*
+   réutilisé, rétréci ici seulement (MatchPoster n'est pas touché). ── */
 .accueil__mdj .poster__prono-row {
-  margin-top: 0;
+  gap: 7px;
 }
+.accueil__mdj .poster__prono-pill {
+  max-width: 86px;
+  height: 40px;
+  border-width: 2px;
+  border-radius: 8px;
+  gap: 1px;
+}
+.accueil__mdj .poster__prono-pillLabel { font-size: 0.44rem; }
+.accueil__mdj .poster__prono-pillVal   { font-size: 0.85rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .accueil__mdj { animation: none; }
-  .accueil__mdjBg--grad,
-  .accueil__mdjBg--gradAlt { animation: none; }
-  .accueil__mdjBg--gradAlt { opacity: 0.45; }
+  .accueil__mdj,
+  .accueil__mdjCamp--home,
+  .accueil__mdjCamp--away,
+  .accueil__mdjClash,
+  .accueil__mdjLiveDot { animation: none; }
+  .accueil__mdjClash { opacity: 0.5; transform: rotate(9deg); }
 }
 
 /* ── Forme (5 derniers résultats) — losanges sous le nom d'équipe ──────────

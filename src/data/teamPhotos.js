@@ -802,22 +802,24 @@ export function getMatchTeamColors(homeName, awayName) {
   const famAway = colorFamily(ap)
 
   if (famHome && famHome === famAway) {
-    // La couleur la moins saturée (moins "pure") cède la place à sa secondaire
-    const satHome = hexToHsl(hp).s
-    const satAway = hexToHsl(ap).s
-    if (satAway > satHome) {
-      const alt = ensureVisible(rawHome.s ?? fallbackHome.s ?? fallbackHome.p, fallbackHome.p)
-      // Équipe connue : même si "alt" reste dans la même famille que l'adversaire
-      // (double collision, cas rare), on garde une vraie couleur de cette équipe
-      // plutôt que d'inventer une teinte au hasard. Le repli aléatoire ne
-      // s'applique qu'aux équipes réellement absentes du dico de couleurs.
-      hp = (colorFamily(alt) !== famAway || knownHome) ? alt : fallbackHome.p
-      hAccent = ensureAccentVisible(rawHome.p ?? fallbackHome.p, '#eef2f7')
-    } else {
-      const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
-      ap = (colorFamily(alt) !== famHome || knownAway) ? alt : fallbackAway.p
-      aAccent = ensureAccentVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
-    }
+    // ⚠️ RÈGLE CHANGÉE (02/09, demande explicite utilisateur : "si jamais deux
+    // équipes ont la même couleur, tu fais en sorte que l'équipe à l'extérieur
+    // on mette la deuxième couleur") : c'est TOUJOURS l'équipe à l'EXTÉRIEUR
+    // qui cède et bascule sur sa couleur secondaire, l'équipe à domicile garde
+    // sa couleur principale.
+    // Avant, l'arbitrage se faisait sur la saturation (la couleur la moins
+    // "pure" cédait) — donc l'équipe qui changeait de couleur variait d'un
+    // match à l'autre, y compris à domicile. La nouvelle règle est plus simple,
+    // stable (une équipe à domicile est toujours affichée dans SES couleurs),
+    // et c'est exactement la convention du football réel : c'est le club qui
+    // reçoit qui garde son maillot principal, le visiteur qui change.
+    const alt = ensureVisible(rawAway.s ?? fallbackAway.s ?? fallbackAway.p, fallbackAway.p)
+    // Équipe connue : même si "alt" reste dans la même famille que l'adversaire
+    // (double collision, cas rare), on garde une vraie couleur de cette équipe
+    // plutôt que d'inventer une teinte au hasard. Le repli aléatoire ne
+    // s'applique qu'aux équipes réellement absentes du dico de couleurs.
+    ap = (colorFamily(alt) !== famHome || knownAway) ? alt : fallbackAway.p
+    aAccent = ensureAccentVisible(rawAway.p ?? fallbackAway.p, '#eef2f7')
   }
 
   return {
