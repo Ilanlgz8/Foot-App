@@ -71,15 +71,29 @@ const COMP_PRIORITY = {
 // plus 2 clubs européens historiques hors "5 grands championnats" qui
 // reviennent régulièrement en Ligue Europa/Ligue des Champions (Ajax, Benfica
 // — plusieurs Coupes d'Europe chacun, palmarès objectif, pas une préférence).
+// ⚠️ REBALANCÉ (constat utilisateur, 02/09 : "le match du jour choisi entre
+// les 5 grands championnats n'est pas terrible") : root cause identifiée en
+// comptant les entrées par championnat — Premier League (6 clubs) et Serie A
+// (4) avaient beaucoup plus de clubs "gros" que Ligue 1 (2) ou Bundesliga (2),
+// donc statistiquement bien plus de chances de sortir un bigScore élevé un
+// week-end donné (plus de paires possibles entre clubs listés), peu importe
+// si le vrai choc du jour était ailleurs. Complété avec des clubs au
+// palmarès européen/domestique objectivement comparable (mêmes critères que
+// le reste de la liste, aucune préférence personnelle) : Lyon (7 titres de
+// champion consécutifs 2002-2008, habitué des soirées européennes) et Monaco
+// (finaliste C1 2004, champion 2017) pour la Ligue 1 ; RB Leipzig (habitué
+// de la phase à élimination directe de C1, finaliste de coupe d'Allemagne) et
+// Leverkusen (champion d'Allemagne invaincu 2023-24) pour la Bundesliga ;
+// Séville (club le plus titré en Ligue Europa, 7 trophées) pour la Liga.
 const BIG_TEAMS = new Set([
   // Ligue 1
-  'Paris SG', 'Marseille',
+  'Paris SG', 'Marseille', 'Lyon', 'Monaco',
   // Premier League
   'Man. City', 'Man. United', 'Liverpool', 'Arsenal', 'Chelsea', 'Tottenham',
   // La Liga
-  'Real Madrid', 'Barcelone', 'Atlético Madrid',
+  'Real Madrid', 'Barcelone', 'Atlético Madrid', 'Séville',
   // Bundesliga
-  'Bayern Munich', 'Dortmund',
+  'Bayern Munich', 'Dortmund', 'RB Leipzig', 'Leverkusen',
   // Serie A
   'Juventus', 'Inter Milan', 'Milan AC', 'Naples',
   // Autres clubs européens historiques (Ligue Europa/Ligue des Champions)
