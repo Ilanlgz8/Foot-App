@@ -254,8 +254,21 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         {/* Bandeau haut : championnat À GAUCHE, bien lisible (demande
             explicite : "assez voyant pour qu'on sache le championnat sans
             plisser les yeux"). Logo dans une pastille claire + nom en gros
-            et en blanc, journée en sous-titre. Le statut ("Match du jour" /
-            "En direct") passe à droite en pastille rouge. */}
+            et en blanc, journée en sous-titre.
+            ⚠️ Pastille de droite AFFICHÉE SEULEMENT si elle a quelque chose à
+            signaler (demande 02/09 : "enlève le badge match du jour en haut à
+            droite"). Avant le match elle disait "Match du jour", ce que la
+            carte dit déjà d'elle-même par sa taille et sa place en tête de
+            page — bruit pur. Elle reste en revanche indispensable en direct
+            et après la fin : c'est le seul marqueur de ces deux états.
+            Bénéfice secondaire : le nom du championnat récupère toute la
+            largeur, donc la journée cesse d'être poussée hors du bandeau par
+            un nom long ("Ligue 1 McDonald's", constaté en capture réelle).
+            Piste du filigrane "MATCH DU JOUR" en fond ÉCARTÉE après essai sur
+            maquette (4 intensités/placements comparés) : à une opacité
+            réellement voyante il passe derrière les noms d'équipe et les
+            blasons — exactement ce qui avait déjà fait retirer le blason en
+            filigrane de la version précédente. */}
         <div className="accueil__mdjTopBar">
           <span className="accueil__mdjLeague">
             {mdjCompEmblem && (
@@ -268,10 +281,12 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
               {matchdayLabel && <span className="accueil__mdjLeagueSub">{matchdayLabel}</span>}
             </span>
           </span>
-          <span className={`accueil__mdjStatus${isLive ? ' accueil__mdjStatus--live' : ''}`}>
-            {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
-            {isLive ? 'En direct' : isFinished ? 'Terminé' : 'Match du jour'}
-          </span>
+          {(isLive || isFinished) && (
+            <span className={`accueil__mdjStatus${isLive ? ' accueil__mdjStatus--live' : ''}`}>
+              {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
+              {isLive ? 'En direct' : 'Terminé'}
+            </span>
+          )}
         </div>
 
         {/* Période EN COURS au-dessus du VS (demande explicite : "plus
