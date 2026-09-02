@@ -26,14 +26,24 @@ self.addEventListener('push', event => {
   }
 
   const {
-    // ⚠️ BUG CORRIGÉ : chaîne simple au lieu d'un template literal — affichait
-    // littéralement "${matchId}" (avec les caractères $, {, }) au lieu
-    // d'interpoler l'id. Sans gravité en pratique (le serveur fournit toujours
-    // un vrai titre pour une notif de but), mais faux si jamais ce fallback
-    // est atteint.
-    title    = `But ! ${matchId}`,
-    body     = '',
+    // ⚠️ BUG CORRIGÉ (02/09, trouvé en audit, reproduit avec node) : la valeur
+    // par défaut de `title` était `` `But ! ${matchId}` `` — un template
+    // literal qui lit `matchId`, déclaré PLUS BAS dans la MÊME déstructuration.
+    // Les valeurs par défaut sont évaluées dans l'ordre d'écriture, donc
+    // `matchId` était encore dans sa zone morte temporelle (TDZ) à ce
+    // moment-là : tout payload push SANS `title` faisait lever un
+    // `ReferenceError: Cannot access 'matchId' before initialization` AVANT
+    // le showNotification — le filet de sécurité censé rattraper un payload
+    // incomplet faisait donc exactement l'inverse : il supprimait la notif,
+    // silencieusement (une exception dans un handler `push` de Service Worker
+    // n'est visible nulle part côté utilisateur).
+    // Latent aujourd'hui (api/cron-goals.js envoie toujours un `title`), mais
+    // c'est précisément le genre de piège qui se déclenche le jour où un
+    // nouveau type de notif est ajouté sans titre. `matchId` est maintenant
+    // extrait AVANT (ligne du dessus) : plus aucune dépendance en avant.
     matchId  = null,
+    title    = matchId ? `But ! ${matchId}` : 'But !',
+    body     = '',
     url      = '/',
     // `tag`/`silent`/`renotify` pilotables depuis le payload serveur (ex: le
     // ticker "score en direct" de cron-goals.js les fixe explicitement pour
