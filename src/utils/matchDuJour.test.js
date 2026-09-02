@@ -109,6 +109,43 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([parLongNameSeul, anonyme2])).toBe(parLongNameSeul)
   })
 
+  it('deux clubs élite battent deux gros clubs, même à une heure plus tôt (constat utilisateur : Arsenal-Chelsea > Juventus-Milan)', () => {
+    // Cas réel du dimanche 06/09 : les 2 matchs valaient exactement 4 avant
+    // le 3e niveau, et seul le coup d'envoi le plus tardif tranchait — la
+    // Juventus (20h45) passait devant Arsenal-Chelsea (17h30) sans aucune
+    // raison sportive.
+    const arsChe = makeMatch('PL', 'Arsenal', 'Chelsea', 15)
+    const juvMil = makeMatch('SA', 'Juventus', 'Milan', 20)
+    expect(pickMatchDuJour([arsChe, juvMil])).toBe(arsChe)
+  })
+
+  it('une élite + un gros club devance deux gros clubs', () => {
+    const mixte = makeMatch('PD', 'Real Madrid', 'Séville', 13)
+    const gros  = makeMatch('SA', 'Juventus', 'Milan', 20)
+    expect(pickMatchDuJour([mixte, gros])).toBe(mixte)
+  })
+
+  it('garde le match du jour ÉPINGLÉ une fois lancé, au lieu de sauter au suivant', () => {
+    // Avant ce fix, seuls SCHEDULED/TIMED étaient candidats : au coup d'envoi
+    // le match élu quittait le lot et la carte basculait sur un autre match.
+    const enCours = { ...makeMatch('PL', 'Arsenal', 'Chelsea', 15), status: 'IN_PLAY' }
+    const aVenir1 = makeMatch('SA', 'Juventus', 'Milan', 20)
+    const aVenir2 = makeMatch('FL1', 'Paris SG', 'Monaco', 21)
+    expect(pickMatchDuJour([enCours, aVenir1, aVenir2])).toBe(enCours)
+  })
+
+  it('reste sur le match terminé plutôt que de vider la carte, tant que rien n\'est en cours', () => {
+    const termine = { ...makeMatch('PL', 'Arsenal', 'Chelsea', 15), status: 'FINISHED' }
+    const aVenir  = makeMatch('SA', 'Fiorentina', 'Torino', 20)
+    expect(pickMatchDuJour([termine, aVenir])).toBe(termine)
+  })
+
+  it('un match EN COURS passe devant un match déjà terminé', () => {
+    const termine = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'FINISHED' }
+    const enCours = { ...makeMatch('FL1', 'Toulouse', 'Lille', 20), status: 'IN_PLAY' }
+    expect(pickMatchDuJour([termine, enCours])).toBe(enCours)
+  })
+
   it('un match Ligue Europa avec 2 grands clubs bat un match CAN sans grande nation, même tier', () => {
     const uel = makeMatch('UEL', 'Ajax', 'Benfica', 13)
     const can = makeMatch('CAN', 'Comores', 'Eswatini', 20)

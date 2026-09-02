@@ -159,33 +159,53 @@ function teamMatchesSet(team, set) {
   return set.has(short) || set.has(full)
 }
 
-// Score d'affiche : 2 points par club du 1er niveau, 1 point par club du 2e.
-// Un match entre 2 géants (4) devance un géant + un club notable (3), qui
-// devance 2 clubs notables (2), etc. — la hiérarchie reste lisible sans
-// jamais inverser l'ordre des tiers de COMP_PRIORITY (ce score ne sert qu'à
+// ⚠️ AJOUT 3e NIVEAU "ÉLITE" (constat utilisateur, 02/09 : "Arsenal-Chelsea,
+// même si c'est pas le soir, c'est plus intéressant" que Juventus-Milan).
+// Root cause : les deux matchs avaient EXACTEMENT le même score (2 clubs du
+// 1er niveau chacun = 4), et le seul départage restant était le coup d'envoi
+// le plus tardif — Juventus-Milan à 20h45 passait donc devant Arsenal-Chelsea
+// à 17h30 pour une raison purement horaire, sans aucun sens sportif. Le vrai
+// problème n'était pas la règle de départage mais le manque de granularité :
+// un seul niveau "gros club" mettait Arsenal au même rang que la Juventus.
+// Ce 3e niveau (3 points) est réservé aux clubs qui remplissent un stade
+// n'importe où dans le monde. Choisi avec l'utilisateur, assumé comme un
+// jugement : il n'existe aucune donnée dans l'app pour mesurer ça (voir le
+// commentaire de NOTABLE_TEAMS). Tout le reste de BIG_TEAMS reste à 2.
+const ELITE_TEAMS = new Set([
+  'Real Madrid', 'Barcelone', 'Bayern Munich', 'Paris SG',
+  'Man. City', 'Liverpool', 'Arsenal', 'Chelsea',
+])
+
+// Score d'affiche : 3 points par club "élite", 2 par club du 1er niveau,
+// 1 par club du 2e. Deux élites (6) devancent une élite + un gros (5), qui
+// devance deux gros (4), etc. — la hiérarchie reste lisible sans jamais
+// inverser l'ordre des tiers de COMP_PRIORITY (ce score ne sert qu'à
 // départager DANS un même tier).
 function bigTeamScore(match) {
   const rank = (team) =>
-    teamMatchesSet(team, BIG_TEAMS) ? 2
+    teamMatchesSet(team, ELITE_TEAMS) ? 3
+      : teamMatchesSet(team, BIG_TEAMS) ? 2
       : teamMatchesSet(team, NOTABLE_TEAMS) ? 1
       : 0
   return rank(match.homeTeam) + rank(match.awayTeam)
 }
 
-/**
- * Retourne le match à mettre en avant parmi les matchs pas encore commencés
- * aujourd'hui, ou null s'il n'y en a aucun dans une compétition couverte, ou
- * s'il n'y a qu'un seul match à venir (la carte n'a alors aucun intérêt :
- * c'est déjà le seul match visible partout ailleurs sur la page).
- */
-export function pickMatchDuJour(matches) {
-  const upcoming = (matches ?? []).filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
-  if (upcoming.length < 2) return null
+const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
+// Statuts d'un match commencé mais pas terminé (football-data.org). Le match
+// du jour ÉPINGLÉ reste affiché tant qu'il est dans un de ces états, puis
+// pendant la fenêtre "terminé" gérée par l'appelant.
+const ONGOING_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'SUSPENDED'])
 
+// Élit le meilleur match d'une liste selon les 3 critères, dans l'ordre :
+// prestige de la compétition, puis score d'affiche, puis coup d'envoi le plus
+// tardif. Les 2 premiers portent tout le sens ; le 3e n'est qu'un dernier
+// recours (voir ELITE_TEAMS : c'est justement pour éviter d'y arriver trop
+// souvent que le 3e niveau a été ajouté).
+function electBest(candidates) {
   let best = null
   let bestPriority = Infinity
   let bestBigScore = -1
-  for (const m of upcoming) {
+  for (const m of candidates) {
     const priority = COMP_PRIORITY[m.competition?.code]
     if (priority == null) continue
     const bigScore = bigTeamScore(m)
@@ -203,4 +223,51 @@ export function pickMatchDuJour(matches) {
     }
   }
   return best
+}
+
+/**
+ * Retourne le match à mettre en avant aujourd'hui, ou null s'il n'y a rien à
+ * mettre en avant.
+ *
+ * ⚠️ ÉPINGLAGE (constat/demande utilisateur, 02/09 : "c'est possible que la
+ * card du match du jour reste pour le match en question, pour après avoir la
+ * card en mode live avec le score ?"). C'était un vrai trou, pas un ajout :
+ * cette fonction ne regardait QUE les matchs pas encore commencés
+ * (SCHEDULED/TIMED). Dès le coup d'envoi, le match élu quittait donc le lot
+ * de candidats et la carte sautait à un AUTRE match (ou disparaissait s'il
+ * en restait moins de 2) — alors que MatchDuJourCard.jsx contient tout le
+ * rendu live (pastille "En direct", minute, score géant) et le rendu
+ * "Terminé", du code qui ne pouvait quasiment jamais s'afficher pour le
+ * match choisi.
+ *
+ * Nouveau comportement : dès qu'un match en cours (ou terminé aujourd'hui)
+ * est présent, on élit le meilleur PARMI CES MATCHS-LÀ en priorité — donc
+ * une fois lancé, le match du jour reste affiché et bascule naturellement en
+ * mode live puis "Terminé", au lieu d'être remplacé. On ne repart sur les
+ * matchs à venir que quand plus rien n'est en cours ou fini.
+ * Un match en cours l'emporte toujours sur un match à venir : c'est celui
+ * qu'on veut voir en direct sur l'Accueil.
+ *
+ * Le garde-fou historique "moins de 2 matchs à venir = pas de carte" (la
+ * carte n'apporte rien si elle double le seul match visible ailleurs sur la
+ * page) ne s'applique donc plus qu'au cas pré-match.
+ */
+export function pickMatchDuJour(matches) {
+  const all = matches ?? []
+
+  // 1) Priorité au direct : un match en cours, sinon un match déjà terminé
+  //    aujourd'hui (garde la carte pleine jusqu'au bout de la journée plutôt
+  //    que de la vider dès le coup de sifflet final).
+  const live     = all.filter(m => ONGOING_STATUSES.has(m.status))
+  const finished = all.filter(m => m.status === 'FINISHED')
+  const started  = live.length > 0 ? live : finished
+  if (started.length > 0) {
+    const bestStarted = electBest(started)
+    if (bestStarted) return bestStarted
+  }
+
+  // 2) Sinon, comportement pré-match d'origine (inchangé).
+  const upcoming = all.filter(m => UPCOMING_STATUSES.has(m.status))
+  if (upcoming.length < 2) return null
+  return electBest(upcoming)
 }

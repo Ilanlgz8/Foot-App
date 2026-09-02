@@ -634,16 +634,25 @@ function Accueil() {
   // Mobile (desktopHasLive toujours faux ici, gardé par isDesktop) :
   // comportement 100% inchangé, un match qui démarre reste visible à sa
   // place dans cette même liste (isCardLive dans MatchCard.jsx).
+  // ⚠️ AJOUT anti-doublon match du jour (décision utilisateur, 02/09 : le
+  // match mis en avant par l'affiche apparaissait AUSSI dans cette liste,
+  // juste en dessous — très visible les jours à 2-3 matchs, ex. Toulouse-Lille
+  // affiché deux fois à l'écran). L'affiche montre déjà strictement plus que
+  // la card de la liste (mêmes cotes + forme récente + blasons XL), donc la
+  // card doublon n'apporte rien. Retiré UNIQUEMENT le jour courant
+  // (dayOffset === 0) : l'affiche ne concerne qu'aujourd'hui, la liste des
+  // autres jours reste complète.
   const matchPanelMatches = useMemo(() => {
     const base = dayOffset === 0
       ? filteredMatches.filter(m => {
+          if (m.id === matchDuJour?.id) return false
           if (m.status === 'FINISHED') return false
           if (getMatchState(m.id).ft) return isRecentlyFinished(m.id)
           return true
         })
       : filteredMatches
     return desktopHasLive ? base.filter(m => !isCardLive(m)) : base
-  }, [dayOffset, filteredMatches, desktopHasLive])
+  }, [dayOffset, filteredMatches, desktopHasLive, matchDuJour])
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {
