@@ -2060,233 +2060,369 @@
   100% { transform: translate(0,0) rotate(0deg); }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   MATCH DU JOUR — refonte 02/09 (maquette validée avec l'utilisateur
+   après plusieurs itérations : "un truc vraiment travaillé, joue avec
+   les couleurs, dégradés, et que tout soit bien disposé").
+   Principes retenus : fond sombre neutre + halos flous aux couleurs
+   RÉELLES des deux équipes (--mdj-home/--mdj-away, injectées par
+   MatchDuJourCard depuis le dico curé teamPhotos), liseré dégradé en
+   haut, blasons en carrés arrondis avec halo propre, heure très
+   lisible, forme récente sous chaque équipe.
+   Écartés explicitement en cours de maquette : la barre de tendance
+   segmentée (refus utilisateur) et l'ancien blason en filigrane (il
+   chargeait le fond juste derrière les noms/forme, qui occupent
+   maintenant cette zone).
+   ══════════════════════════════════════════════════════════════════ */
 .accueil__mdj {
   display: block;
   width: 100%;
   position: relative;
-  z-index: 0; /* établit un contexte d'empilement propre pour le filigrane (z-index négatif ci-dessous) */
-  overflow: hidden; /* rogne le blason en filigrane qui déborde volontairement du bord droit */
+  z-index: 0; /* contexte d'empilement propre pour les halos décoratifs */
+  overflow: hidden; /* rogne les halos qui débordent volontairement des bords */
   margin-bottom: 1rem;
-  padding: 1.35rem 1rem 1.1rem;
-  border-radius: 1.1rem;
-  border: 1px solid rgba(var(--red-rgb),0.5);
-  background:
-    radial-gradient(ellipse 100% 90% at 50% -5%, rgba(var(--red-rgb),0.55) 0%, rgba(153,44,44,0.25) 45%, transparent 75%),
-    linear-gradient(180deg, #140505 0%, #000 100%);
-  box-shadow: 0 0 20px 2px rgba(var(--red-rgb),0.4);
+  padding: 1.2rem 1rem 1.05rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(var(--white-rgb),0.1);
+  background: #0b0b10;
+  box-shadow: 0 22px 50px -22px rgba(var(--red-rgb),0.55);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   animation: accueilMdjShake 1.3s ease-out 1;
 }
 
-/* Blason en filigrane — élément de la maquette "4★ Editorial Pro" ("hero...
-   + blason en filigrane plutôt qu'un rouge plat générique") jamais porté
-   dans le vrai code jusqu'ici. Cercle géant translucide, blason du club
-   domicile, qui déborde du bord droit (rogné par overflow:hidden ci-dessus).
-   z-index négatif : sous le contenu réel (bandeau/titre/équipes/prono, tous
-   passés en z-index:1 ci-dessous) mais au-dessus du dégradé de fond. */
-.accueil__mdjWatermark {
+/* Liseré dégradé haut — rouge de marque + or champagne (--sf-gold, même
+   or que le leader du classement/les vainqueurs, voir theme-v2.css). */
+.accueil__mdjTopLine {
   position: absolute;
-  z-index: -1;
-  right: -12%;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 62%;
-  max-width: 230px;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
-  overflow: hidden;
-  opacity: 0.08;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
   pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent,
+    var(--red) 25%,
+    var(--sf-gold, #f6c667) 50%,
+    var(--red) 75%,
+    transparent);
+}
+
+/* Halos flous : couleur de l'équipe à domicile en haut (au centre, derrière
+   le titre), couleur de l'extérieur en bas à gauche — donne à chaque affiche
+   une ambiance différente sans changer une ligne de code. Repli rouge/bleu
+   si une équipe n'est pas dans le dico de couleurs. */
+.accueil__mdjGlowTop,
+.accueil__mdjGlowBottom {
+  position: absolute;
+  pointer-events: none;
+  filter: blur(14px);
+}
+.accueil__mdjGlowTop {
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  height: 220px;
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--mdj-home, #ef4444) 55%, transparent), transparent 62%);
+}
+.accueil__mdjGlowBottom {
+  bottom: -80px;
+  left: -40px;
+  width: 200px;
+  height: 180px;
+  filter: blur(16px);
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 24%, transparent), transparent 65%);
+}
+
+/* Le contenu réel passe au-dessus des halos (qui sont en flux normal
+   `position:absolute` sans z-index, donc sous tout élément positionné). */
+.accueil__mdjHeader,
+.accueil__mdjSub,
+.accueil__mdjTeams,
+.accueil__mdj .poster__prono-row {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── En-tête : "MATCH DU JOUR" doré entre deux filets en fondu ── */
+.accueil__mdjHeader {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 9px;
+  margin-bottom: 4px;
 }
-.accueil__mdjWatermark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: grayscale(1) brightness(2.4);
+.accueil__mdjHeaderRule {
+  width: 16px;
+  height: 1px;
+  background: var(--sf-gold, #f6c667);
 }
-.accueil__mdjWatermark span {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 3.4rem;
+.accueil__mdjHeaderRule:first-child {
+  background: linear-gradient(90deg, transparent, var(--sf-gold, #f6c667));
+}
+.accueil__mdjHeaderRule:last-child {
+  background: linear-gradient(90deg, var(--sf-gold, #f6c667), transparent);
+}
+.accueil__mdjKicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.6rem;
   font-weight: 800;
-  color: #fff;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--sf-gold, #f6c667);
+  white-space: nowrap;
+}
+.accueil__mdjKicker--live { color: var(--red); letter-spacing: 0.2em; }
+.accueil__mdjLiveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 10px var(--red);
+  flex-shrink: 0;
 }
 
-/* Bandeau compétition (haut gauche) + statut période en live (haut droite)
-   — même habillage que les cards à venir/résultats (accueil__matchCardLiveBar),
-   ajouté sur la grosse card "Match du jour" (retour utilisateur : "t'as pas
-   fait aussi sur la grosse card en live du match du jour"). */
-.accueil__mdjTopBar {
+.accueil__mdjSub {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-.accueil__mdjComp {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 1.25rem;
+  font-size: 0.69rem;
+  font-weight: 600;
+  color: rgba(var(--white-rgb),0.42);
+  text-align: center;
 }
 .accueil__mdjCompLogo {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   object-fit: contain;
-  opacity: 0.85;
-}
-.accueil__mdjCompName {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.55);
-}
-.accueil__mdjStatus {
-  display: inline-block;
-  padding: 2px 8px;
-  background: rgba(var(--white-rgb),0.1);
-  border: 1px solid rgba(var(--white-rgb),0.18);
-  border-radius: 4px;
-  font-size: 0.58rem;
-  font-weight: 800;
-  color: rgba(var(--white-rgb),0.8);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  opacity: 0.75;
+  flex-shrink: 0;
 }
 
-.accueil__mdjTitleWrap {
-  text-align: center;
-  margin-bottom: 0.85rem;
-}
-.accueil__mdjTitle {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #fff;
-  text-transform: uppercase;
-}
-.accueil__mdjUnderline {
-  height: 3px;
-  width: 100%;
-  margin: 6px auto 0;
-  background: var(--red);
-}
-
+/* ── Équipes ── */
 .accueil__mdjTeams {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: 1.15rem;
 }
 .accueil__mdjTeam {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
-.accueil__mdjCrestWrap {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid rgba(var(--white-rgb),0.15);
+
+/* Halo coloré derrière le blason — même couleur d'équipe que le halo de
+   fond correspondant, en plus concentré. */
+.accueil__mdjCrestSlot {
+  position: relative;
+  width: 74px;
+  height: 74px;
   flex-shrink: 0;
+}
+.accueil__mdjCrestGlow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 22px;
+  pointer-events: none;
+  filter: blur(7px);
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--mdj-home, #ef4444) 70%, transparent), transparent 70%);
+}
+.accueil__mdjCrestSlot[data-side="away"] .accueil__mdjCrestGlow {
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 55%, transparent), transparent 70%);
+}
+.accueil__mdjCrestWrap,
+.accueil__mdjCrestFb {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  border-radius: 21px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--mdj-home, #ef4444) 55%, transparent);
+  background: linear-gradient(155deg,
+    color-mix(in srgb, var(--mdj-home, #ef4444) 45%, transparent),
+    color-mix(in srgb, var(--mdj-home, #ef4444) 6%, transparent));
+}
+.accueil__mdjCrestSlot[data-side="away"] .accueil__mdjCrestWrap,
+.accueil__mdjCrestSlot[data-side="away"] .accueil__mdjCrestFb {
+  border-color: color-mix(in srgb, var(--mdj-away, #3b5bfd) 45%, transparent);
+  background: linear-gradient(155deg,
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 35%, transparent),
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 5%, transparent));
 }
 .accueil__mdjCrest {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
-  /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau
-     (même pattern que live__crest/mp__hero__crest). */
-  transform: scale(1.18);
+  padding: 9px;
+}
+/* Drapeaux (sélections) : remplissent le carré, contrairement aux écussons
+   de club qui gardent leur marge interne (même distinction que partout
+   ailleurs dans l'app via data-crest). */
+.accueil__mdjCrestWrap[data-crest="country"] .accueil__mdjCrest {
+  object-fit: cover;
+  padding: 0;
+  transform: scale(1.02);
 }
 .accueil__mdjCrestFb {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(var(--white-rgb),0.08);
-  border: 2px solid rgba(var(--white-rgb),0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: #fff;
 }
 .accueil__mdjTeamName {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #fff;
   text-align: center;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
-.accueil__mdjVs {
+
+/* Forme récente (5 derniers) — données DÉJÀ chargées par la card pour le
+   pronostic (formMap), donc zéro appel réseau supplémentaire. */
+.accueil__mdjForm {
+  display: flex;
+  gap: 3px;
+}
+.accueil__mdjFormBadge {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.53rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.accueil__mdjFormBadge--W { background: rgba(34,197,94,0.9);   color: #052e16; }
+.accueil__mdjFormBadge--D { background: rgba(148,163,184,0.55); color: #0f172a; }
+.accueil__mdjFormBadge--L { background: rgba(239,68,68,0.85);  color: #450a0a; }
+
+/* ── Bloc central : heure (pré-match) ou score (live/terminé) ── */
+.accueil__mdjCenter {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 0 4px;
-  min-width: 64px;
+  gap: 7px;
+  padding: 8px 6px 0;
   flex-shrink: 0;
 }
-.accueil__mdjToday {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.45);
-  white-space: nowrap;
+/* Heure éclatée en 3 spans (voir MatchDuJourCard.jsx) : chiffres plus gros
+   et deux-points rouges DÉTACHÉS — demande explicite ("plus gros et moins
+   collé avec les deux points rouges"), impossible en CSS sur un seul nœud
+   texte "20:45". */
+.accueil__mdjClock {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
-.accueil__mdjTime {
+.accueil__mdjClockNum {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.6rem;
+  font-size: 2.35rem;
   font-weight: 800;
   line-height: 1;
   color: #fff;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 16px rgba(var(--red-rgb),0.6);
+  text-shadow: 0 0 30px rgba(var(--red-rgb),0.6);
 }
-
-/* Minute live (rouge vif, même traitement que les cards à venir/résultats)
-   / "Terminé" — affichées au-dessus du score, remplace "Aujourd'hui" une
-   fois le match commencé. */
-.accueil__mdjMinute {
+.accueil__mdjClockSep {
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.68rem;
+  font-size: 2rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--red-light, #ef4444);
-  white-space: nowrap;
+  line-height: 1;
+  color: var(--red);
 }
-.accueil__mdjFinished {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.accueil__mdjScore {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.accueil__mdjScoreNum {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 2.35rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 30px rgba(var(--red-rgb),0.65);
+}
+.accueil__mdjScoreSep {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: rgba(var(--white-rgb),0.3);
+}
+.accueil__mdjCenterLabel {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.5);
+  color: rgba(var(--white-rgb),0.38);
   white-space: nowrap;
 }
 
-/* Pronostic — pilules cotes bookmaker : réutilise directement .poster__prono-*
-   (voir plus haut dans ce fichier) au lieu d'une copie CSS dédupliquée, pour
-   un design garanti identique à celui des cards des autres matchs (retour
-   utilisateur explicite). Seul ajustement propre au hero : l'espacement
-   au-dessus de la rangée, scopé à .accueil__mdj pour ne pas affecter
-   MatchPoster. */
+/* Pronostic — mêmes classes .poster__prono-* que les autres cards (pas de
+   duplication de balisage), mais rhabillées ICI seulement : les pilules
+   blanches d'origine (voir plus haut dans ce fichier) juraient avec le fond
+   sombre de la nouvelle maquette. La favorite garde son liseré/glow rouge
+   posé en style inline par le composant (pronoIntensity/pronoGlowShadow) —
+   ces règles ne touchent donc pas à l'indication du favori. */
 .accueil__mdj .poster__prono-row {
-  margin-top: 1.1rem;
+  margin-top: 0;
+  gap: 9px;
+}
+.accueil__mdj .poster__prono-pill {
+  max-width: none;
+  height: auto;
+  padding: 11px 5px;
+  gap: 3px;
+  border-width: 1.5px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(var(--white-rgb),0.09), rgba(var(--white-rgb),0.02));
+}
+.accueil__mdj .poster__prono-pill:first-child {
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--mdj-home, #ef4444) 28%, transparent),
+    color-mix(in srgb, var(--mdj-home, #ef4444) 7%, transparent));
+}
+.accueil__mdj .poster__prono-pill:last-child {
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 20%, transparent),
+    color-mix(in srgb, var(--mdj-away, #3b5bfd) 4%, transparent));
+}
+.accueil__mdj .poster__prono-pillLabel {
+  font-size: 0.58rem;
+  color: rgba(var(--white-rgb),0.7);
+  letter-spacing: 0.05em;
+}
+.accueil__mdj .poster__prono-pillVal {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {

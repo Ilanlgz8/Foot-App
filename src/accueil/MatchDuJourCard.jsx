@@ -23,6 +23,10 @@ import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
 import { COMPETITIONS } from '../data/competitions'
 
+// Libellés FR des losanges de forme récente — même convention que
+// StandingsTable.jsx (V/N/D), source 'W'/'D'/'L' (buildFormMap).
+const MDJ_FORM_LABEL = { W: 'V', D: 'N', L: 'D' }
+
 function shortenName(name) {
   if (!name) return name
   if (TEAM_SHORT[name]) return TEAM_SHORT[name]
@@ -176,6 +180,48 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const homeCode = (homeName || match.homeTeam?.tla || '').slice(0, 3).toUpperCase()
   const awayCode = (awayName || match.awayTeam?.tla || '').slice(0, 3).toUpperCase()
 
+  // ── Heure éclatée en 3 morceaux (heures / deux-points / minutes) ──
+  // Demande explicite (02/09) : chiffres plus gros ET deux-points rouges
+  // "moins collés". Un seul <span> avec le texte "20:45" ne permet ni
+  // d'espacer ni de recolorer le séparateur — d'où le split ici plutôt
+  // qu'en CSS (aucune règle CSS ne peut cibler un caractère au milieu
+  // d'un nœud texte).
+  const [kickH, kickM] = kickoff.split(':')
+
+  // Forme récente (5 derniers résultats) — hForm/aForm sont DÉJÀ calculés
+  // plus haut pour le pronostic (formMap de useTeamForm, résolu par id
+  // FD.org) : les afficher ici ne coûte AUCUN appel réseau supplémentaire,
+  // contrairement à la position au classement ou au stade (qui exigeraient
+  // un appel football-data.org de plus depuis l'Accueil — budget déjà
+  // fragile, voir CLAUDE.md, donc volontairement non affichés).
+  const homeForm = (hForm ?? []).slice(-5)
+  const awayForm = (aForm ?? []).slice(-5)
+
+  const renderForm = (results) => (
+    results.length > 0 ? (
+      <div className="accueil__mdjForm">
+        {results.map((r, i) => (
+          <span key={i} className={`accueil__mdjFormBadge accueil__mdjFormBadge--${r}`}>
+            {MDJ_FORM_LABEL[r] ?? r}
+          </span>
+        ))}
+      </div>
+    ) : null
+  )
+
+  const renderTeam = (side, name, crest, rawName, form) => (
+    <div className="accueil__mdjTeam">
+      <div className="accueil__mdjCrestSlot" data-side={side}>
+        <span className="accueil__mdjCrestGlow" aria-hidden="true" />
+        {crest
+          ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} /></div>
+          : <div className="accueil__mdjCrestFb">{name?.[0] ?? ''}</div>}
+      </div>
+      <span className="accueil__mdjTeamName">{name}</span>
+      {renderForm(form)}
+    </div>
+  )
+
   return (
     <button
       className="accueil__mdj"
@@ -185,60 +231,56 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         '--mdj-away': teamColors.away.main,
       }}
     >
-      {/* Blason en filigrane — élément de la maquette "4★ Editorial Pro"
-          jamais porté dans le vrai code (retour utilisateur : "tu ne l'as
-          pas fait"). Blason du club domicile, grand cercle translucide qui
-          déborde du bord droit du hero — .accueil__mdj a overflow:hidden
-          pour le rogner proprement. z-index négatif : sous le contenu réel
-          (topBar/titre/équipes/prono) mais au-dessus du dégradé de fond. */}
-      <div className="accueil__mdjWatermark" aria-hidden="true">
-        {homeCrest
-          ? <img src={homeCrest} alt="" />
-          : <span>{homeCode}</span>}
-      </div>
+      {/* Habillage lumineux (maquette validée 02/09) — halos flous aux
+          couleurs RÉELLES des deux équipes (--mdj-home/--mdj-away, dico
+          curé teamPhotos) + liseré dégradé en haut de carte. Purement
+          décoratifs, d'où aria-hidden. Remplacent l'ancien blason en
+          filigrane, retiré : il chargeait visuellement le fond juste
+          derrière la forme récente et les noms d'équipe, désormais placés
+          là. */}
+      <span className="accueil__mdjTopLine" aria-hidden="true" />
+      <span className="accueil__mdjGlowTop" aria-hidden="true" />
+      <span className="accueil__mdjGlowBottom" aria-hidden="true" />
 
-      <div className="accueil__mdjTopBar">
-        <span className="accueil__mdjComp">
-          {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
-          <span className="accueil__mdjCompName">{mdjCompName}</span>
+      <div className="accueil__mdjHeader">
+        <span className="accueil__mdjHeaderRule" aria-hidden="true" />
+        <span className={`accueil__mdjKicker${isLive ? ' accueil__mdjKicker--live' : ''}`}>
+          {isLive && <span className="accueil__mdjLiveDot" aria-hidden="true" />}
+          {isLive
+            ? `En direct${liveMinute ? ` · ${liveMinute}` : ''}`
+            : isFinished ? 'Match du jour · terminé' : 'Match du jour'}
         </span>
-        {isLive && livePeriodLabel && (
-          <span className="accueil__mdjStatus">{livePeriodLabel}</span>
-        )}
+        <span className="accueil__mdjHeaderRule" aria-hidden="true" />
       </div>
 
-      <div className="accueil__mdjTitleWrap">
-        <span className="accueil__mdjTitle">Match du jour</span>
-        <div className="accueil__mdjUnderline" />
+      <div className="accueil__mdjSub">
+        {mdjCompEmblem && <img src={mdjCompEmblem} alt="" className="accueil__mdjCompLogo" />}
+        <span>{[mdjCompName, isLive ? livePeriodLabel : null].filter(Boolean).join(' · ')}</span>
       </div>
 
       <div className="accueil__mdjTeams">
-        <div className="accueil__mdjTeam">
-          {homeCrest
-            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={homeCrest} alt="" className="accueil__mdjCrest" data-team={match.homeTeam?.name} /></div>
-            : <div className="accueil__mdjCrestFb">{homeName?.[0] ?? ''}</div>}
-          <span className="accueil__mdjTeamName">{homeName}</span>
-        </div>
+        {renderTeam('home', homeName, homeCrest, match.homeTeam?.name, homeForm)}
 
-        <div className="accueil__mdjVs">
-          {isLive ? (
-            <span className="accueil__mdjMinute">{liveMinute ?? 'En cours'}</span>
-          ) : isFinished ? (
-            <span className="accueil__mdjFinished">Terminé</span>
+        <div className="accueil__mdjCenter">
+          {(isLive || isFinished) ? (
+            <div className="accueil__mdjScore">
+              <span className="accueil__mdjScoreNum">{hs ?? 0}</span>
+              <span className="accueil__mdjScoreSep">–</span>
+              <span className="accueil__mdjScoreNum">{as_ ?? 0}</span>
+            </div>
           ) : (
-            <span className="accueil__mdjToday">Aujourd'hui</span>
+            <div className="accueil__mdjClock">
+              <span className="accueil__mdjClockNum">{kickH}</span>
+              <span className="accueil__mdjClockSep">:</span>
+              <span className="accueil__mdjClockNum">{kickM}</span>
+            </div>
           )}
-          {(isLive || isFinished)
-            ? <span className="accueil__mdjTime">{hs ?? 0} – {as_ ?? 0}</span>
-            : <span className="accueil__mdjTime">{kickoff}</span>}
+          <span className="accueil__mdjCenterLabel">
+            {isFinished ? 'Terminé' : isLive ? 'Score' : "Aujourd'hui"}
+          </span>
         </div>
 
-        <div className="accueil__mdjTeam">
-          {awayCrest
-            ? <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}><img src={awayCrest} alt="" className="accueil__mdjCrest" data-team={match.awayTeam?.name} /></div>
-            : <div className="accueil__mdjCrestFb">{awayName?.[0] ?? ''}</div>}
-          <span className="accueil__mdjTeamName">{awayName}</span>
-        </div>
+        {renderTeam('away', awayName, awayCrest, match.awayTeam?.name, awayForm)}
       </div>
 
       {/* Pronostic — pilules "côtes bookmaker" : classes .poster__prono-*

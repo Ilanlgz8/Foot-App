@@ -169,18 +169,17 @@ html body {
    PHASE 3 — hero aux couleurs des équipes + or champagne
    ═══════════════════════════════════════════════════════════════ */
 
-/* Match du jour : halos aux couleurs des DEUX équipes (injectées par
-   MatchDuJourCard via --mdj-home/--mdj-away), ADN rouge conservé au
-   centre, base noir grisé. Repli rouge si équipe inconnue. */
+/* Match du jour : les halos aux couleurs des deux équipes sont désormais
+   portés par de vrais éléments flous (.accueil__mdjGlowTop/GlowBottom, voir
+   accueil.css — refonte 02/09) plutôt que par des radial-gradients de fond,
+   ce qui permet le flou (filter:blur) impossible sur un background. Ce bloc
+   ne garde donc que l'accord de la base sombre et de la bordure avec le
+   thème v2 — surtout PAS un `background` complet, qui écraserait
+   silencieusement le fond de la nouvelle maquette (spécificité #root plus
+   forte que la règle de accueil.css). */
 #root .accueil__mdj {
   border-color: var(--sf-border);
-  background:
-    radial-gradient(110% 95% at 0% 0%,
-      color-mix(in srgb, var(--mdj-home, #fb3b4e) 34%, transparent), transparent 55%),
-    radial-gradient(110% 95% at 100% 0%,
-      color-mix(in srgb, var(--mdj-away, #fb3b4e) 30%, transparent), transparent 55%),
-    radial-gradient(ellipse 100% 80% at 50% -10%, rgba(var(--sf-red-rgb), 0.14), transparent 65%),
-    linear-gradient(180deg, #17171d 0%, #0c0c10 100%);
+  background: #0b0b10;
 }
 
 /* ── Or champagne unifié : vainqueurs & leader ── */
