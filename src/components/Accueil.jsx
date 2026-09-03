@@ -642,14 +642,24 @@ function Accueil() {
   // card doublon n'apporte rien. Retiré UNIQUEMENT le jour courant
   // (dayOffset === 0) : l'affiche ne concerne qu'aujourd'hui, la liste des
   // autres jours reste complète.
+  // ⚠️ EXTRAIT (02/09, constat utilisateur : "la card du match du jour ne
+  // disparaît pas quand le match est fini, contrairement aux autres cards").
+  // Cette règle vivait uniquement dans le filtre de la liste ci-dessous ; la
+  // carte du match du jour, elle, n'en avait aucune et restait affichée
+  // indéfiniment. Extraite ici pour que les DEUX s'appuient exactement sur la
+  // même décision — sinon elles redivergeront au prochain ajustement.
+  // `isRecentlyFinished` laisse une courte fenêtre après le coup de sifflet
+  // final (TERMINE_GRACE_MS) pour qu'on ait le temps de voir le score final
+  // avant que la card ne s'efface — comportement déjà en place pour la liste,
+  // conservé tel quel.
+  const stillVisibleToday = m =>
+    m != null &&
+    m.status !== 'FINISHED' &&
+    (getMatchState(m.id).ft ? isRecentlyFinished(m.id) : true)
+
   const matchPanelMatches = useMemo(() => {
     const base = dayOffset === 0
-      ? filteredMatches.filter(m => {
-          if (m.id === matchDuJour?.id) return false
-          if (m.status === 'FINISHED') return false
-          if (getMatchState(m.id).ft) return isRecentlyFinished(m.id)
-          return true
-        })
+      ? filteredMatches.filter(m => m.id !== matchDuJour?.id && stillVisibleToday(m))
       : filteredMatches
     return desktopHasLive ? base.filter(m => !isCardLive(m)) : base
   }, [dayOffset, filteredMatches, desktopHasLive, matchDuJour])
@@ -775,7 +785,7 @@ function Accueil() {
             fonction partagée de matchUtils.js) — pas une condition
             réinventée ici, sinon les deux comportements divergeraient au
             prochain ajustement. */}
-        {matchDuJour && (
+        {matchDuJour && stillVisibleToday(matchDuJour) && (
           <MatchDuJourCard
             match={matchDuJour}
             espnScore={espnScores[matchDuJour.id]}
