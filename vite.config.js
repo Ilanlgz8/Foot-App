@@ -35,6 +35,19 @@ export default defineConfig(({ mode }) => {
           // Nouveau SW prend le contrôle immédiatement → pas besoin de vider le cache Safari
           skipWaiting: true,
           clientsClaim: true,
+          // ⚠️ AJOUT (constat utilisateur, 02/09 : "pourquoi j'ai un écran
+          // blanc quand je lance l'app ?"). Il manquait, et c'est exactement
+          // le cas qu'il couvre : sans lui, workbox NE SUPPRIME PAS les
+          // anciens précaches à chaque nouvelle version. Ils s'empilent, et
+          // une version installée peut se retrouver à servir un index.html
+          // gardé en cache qui référence des fichiers JS dont le hash n'existe
+          // plus sur le serveur — le module ne charge pas, React ne monte
+          // jamais, page blanche. L'ErrorBoundary ne peut rien y faire : il
+          // n'attrape que les erreurs de rendu d'une app DÉJÀ montée.
+          // Le risque est proportionnel au nombre de déploiements rapprochés
+          // (une quinzaine aujourd'hui), ce qui colle au moment où le problème
+          // est apparu.
+          cleanupOutdatedCaches: true,
           // Injecte les handlers push dans le SW généré par workbox
           // sw-push.js est un fichier vanilla JS pur (pas d'import) → compatible generateSW
           importScripts: ['/sw-push.js'],
