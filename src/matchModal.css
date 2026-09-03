@@ -528,10 +528,18 @@
 /* ── Toggle Global/Domicile/Extérieur — stats saison (retour utilisateur) ──
    Même famille visuelle que .statsSubTabs mais plus discret (secondaire à
    l'intérieur d'une section, pas une navigation principale). */
+/* ⚠️ CENTRÉ (02/09, demande utilisateur : "ce bloc tu peux le centraliser,
+   qu'il soit pile au centre"). `width: fit-content` sans marge auto le collait
+   à gauche — d'autant plus visible depuis le retrait du bandeau de noms qui le
+   précédait, il est devenu le premier élément du bloc.
+   Les 3 emplacements de ce sélecteur (stats saison de MatchPage, et les 2 de
+   MatchModal partagés avec LiveMatchPage) sont le MÊME contrôle dans le même
+   contexte : ils sont centrés ensemble, plutôt que d'en centrer un seul et de
+   créer une incohérence entre pages. */
 .homeAwayToggle {
   display: flex;
   gap: 0.25rem;
-  margin: 0 0 0.75rem;
+  margin: 0 auto 0.75rem;
   padding: 2px;
   background: rgba(var(--white-rgb),0.035);
   border: 1px solid rgba(var(--white-rgb),0.06);
