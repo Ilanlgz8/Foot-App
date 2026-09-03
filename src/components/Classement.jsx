@@ -276,7 +276,55 @@ function Classement() {
   const formatGroupName = (raw = '') =>
     raw.replace('GROUP_', 'Groupe ')
 
-  const qualificationRules = competitionRules[selectedComp] ?? competitionRules.default
+  // ── Zones de relégation (02/09, demande utilisateur) ────────────────────
+  // Règles réelles en vigueur dans les 5 grands championnats :
+  //   • Ligue 1 et Bundesliga (18 clubs) : les 2 derniers descendent
+  //     directement, le 16e joue un BARRAGE contre un club de 2e division ;
+  //   • Premier League, LaLiga et Serie A (20 clubs) : les 3 derniers
+  //     descendent, aucun barrage.
+  // ⚠️ Positions calculées à partir du NOMBRE RÉEL d'équipes du classement
+  // affiché, jamais codées en dur : la Ligue 1 est passée de 20 à 18 clubs en
+  // 2023, et un jour où FD.org renverrait un classement incomplet, des
+  // positions figées colleraient des pastilles rouges sur les mauvaises
+  // lignes. Ici, pas de classement chargé (ou trop court) = pas de zone
+  // affichée, plutôt qu'une information fausse.
+  const RELEGATION_RULES = {
+    FL1: { direct: 2, playoff: 1 },
+    BL1: { direct: 2, playoff: 1 },
+    PL:  { direct: 3, playoff: 0 },
+    PD:  { direct: 3, playoff: 0 },
+    SA:  { direct: 3, playoff: 0 },
+  }
+
+  const buildRelegationRules = (compId, teamCount) => {
+    const r = RELEGATION_RULES[compId]
+    // Garde-fou : il faut au moins de quoi placer les zones sans mordre sur le
+    // haut de tableau (seuil large à 10, aucun championnat concerné n'est
+    // proche de cette taille).
+    if (!r || !teamCount || teamCount < 10) return []
+    const out = []
+    if (r.playoff > 0) {
+      const start = teamCount - r.direct - r.playoff + 1
+      out.push({
+        label: 'Barrage relégation',
+        start, end: start + r.playoff - 1,
+        dotClassName:  'classement__zoneDot classement__zoneDot--relegBarrage',
+        cardClassName: 'classement__zoneCard--relegBarrage',
+      })
+    }
+    out.push({
+      label: 'Relégation',
+      start: teamCount - r.direct + 1, end: teamCount,
+      dotClassName:  'classement__zoneDot classement__zoneDot--relegation',
+      cardClassName: 'classement__zoneCard--relegation',
+    })
+    return out
+  }
+
+  const qualificationRules = [
+    ...(competitionRules[selectedComp] ?? competitionRules.default),
+    ...buildRelegationRules(selectedComp, standings.length),
+  ]
 
   /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
   function GroupModal({ group, onClose, schedMatches, finMatches, loadingM }) {

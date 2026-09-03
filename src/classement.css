@@ -1457,3 +1457,14 @@
   .classement__modalBox--tabs { max-width: 100%; }
   .gm__tab { font-size: 0.7rem; padding: 0.6rem 0.8rem; }
 }
+
+/* ── Zones de relégation (02/09) ───────────────────────────────────────────
+   Rouge plein pour la descente directe, orange pour le barrage : deux tons
+   distincts et lisibles côte à côte. L'orange (#f97316) est volontairement
+   différent de l'ambre des places européennes (#f59e0b, .--uel) — les deux
+   sont aux extrémités opposées du tableau, mais autant qu'ils ne se
+   ressemblent pas dans la légende où ils voisinent. */
+.classement__zoneDot--relegation    { background: var(--red);  box-shadow: 0 0 6px rgba(var(--red-rgb),0.55); }
+.classement__zoneDot--relegBarrage  { background: #f97316;     box-shadow: 0 0 6px rgba(249,115,22,0.5); }
+.classement__zoneCard--relegation   { border-color: rgba(var(--red-rgb),0.35); }
+.classement__zoneCard--relegBarrage { border-color: rgba(249,115,22,0.35); }
