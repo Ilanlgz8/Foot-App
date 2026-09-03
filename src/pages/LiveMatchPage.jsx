@@ -490,6 +490,18 @@ export default function LiveMatchPage() {
   const h2hHistory = useH2HHistory(compId, resolveMatches)
   const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
   const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
+  // ⚠️ AJOUT (constat utilisateur, 02/09 : cotes différentes entre les cards
+  // de l'Accueil et cette page). Le prono live ne doit PAS être nourri du
+  // même historique que l'onglet "Historique" : celui-ci est volontairement
+  // ÉTENDU (extendedH2H, jusqu'à 6 saisons via football-data.co.uk) alors que
+  // les cards de l'Accueil (MatchPoster.jsx) n'utilisent que l'historique
+  // court. Même modèle, même cote de marché, mais un prior bien plus profond
+  // d'un côté → cotes divergentes pour le même match.
+  // Ces rows-ci reprennent EXACTEMENT les options des cards (non étendu, même
+  // delay 0) et ne servent qu'au CALCUL, transmis en `pronoH2H`. Aucun appel
+  // réseau supplémentaire : c'est le même hook sur le même pool déjà chargé,
+  // simplement sans l'extension football-data.co.uk.
+  const { rows: pronoH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, même demande/commentaire détaillé que
   // MatchPage.jsx) : compH2H (repli instantané, 0 requête) suffit à afficher
   // l'onglet tout de suite — le contenu se complète tout seul avec
@@ -631,6 +643,7 @@ export default function LiveMatchPage() {
                     hForm={hForm}
                     aForm={aForm}
                     h2hRows={h2hRows}
+                    pronoH2H={pronoH2H}
                     lowerDivMatches={lowerDivMatches}
                   />
                 )}

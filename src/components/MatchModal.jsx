@@ -488,7 +488,10 @@ const STAT_FR = {
 // (voir calcProno.js) — corrige les probabilités identiques en début de
 // saison (compMatches vide) en s'appuyant sur l'historique réel toutes
 // compétitions confondues plutôt que la seule forme récente neutre.
-export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows, lowerDivMatches }) {
+// ⚠️ `pronoH2H` (ajouté 02/09) — voir le commentaire détaillé sur `fullH2H`
+// plus bas, au niveau de calcLiveProno : l'historique utilisé pour CALCULER
+// la cote n'est pas forcément celui AFFICHÉ dans l'onglet Historique.
+export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows, pronoH2H = null, lowerDivMatches }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -566,7 +569,24 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
     hForm, aForm, homeGoals, awayGoals, liveMinute,
     {
       homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
-      fullH2H:           h2hRows,
+      // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "c'est pas les mêmes
+      // cotes dans les cards de l'Accueil que sur la page live/:matchId").
+      // Root cause trouvée en comparant les entrées des deux calculs, ligne à
+      // ligne : ce n'était NI le modèle, NI la cote de marché (les deux
+      // passent bien `marketPre`), mais la PROFONDEUR D'HISTORIQUE fournie au
+      // modèle. LiveMatchPage construit ses `h2hRows` avec
+      // `extendedH2H: true` — jusqu'à 6 saisons via football-data.co.uk —
+      // alors que les cards de l'Accueil (MatchPoster.jsx) n'utilisent que
+      // l'historique court, non étendu. Même match, même minute, même score,
+      // mais un prior nourri de 6 saisons d'un côté et de quelques matchs de
+      // l'autre : les cotes divergent forcément.
+      // Décision (demande explicite) : la référence, c'est la cote des cards
+      // de l'Accueil. Le calcul utilise donc `pronoH2H` (historique COURT,
+      // identique à celui des cards) quand l'appelant le fournit. L'onglet
+      // "Historique" AFFICHÉ continue lui d'utiliser `h2hRows` étendu : plus
+      // de confrontations à lire est un plus pour l'utilisateur, ça n'a
+      // aucune raison d'être aligné sur le calcul.
+      fullH2H:           pronoH2H ?? h2hRows,
       lowerDivMatches,
       neutralVenue:      isNeutralVenueComp(match),
       homeRedCards:      pronoStats?.home?.redCards,
