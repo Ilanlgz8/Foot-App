@@ -2261,17 +2261,19 @@
   animation: mdjPulse 1.6s ease-in-out infinite;
 }
 
-/* ── Période en cours, au-dessus du VS ── */
+/* ── Période en cours — coin haut droit du bandeau (02/09 : elle était
+   centrée au-dessus du VS, "ça fait moche" ; elle reprend le coin laissé
+   libre par la pastille de statut supprimée). ── */
 .accueil__mdjPeriod {
-  text-align: center;
+  flex-shrink: 0;
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: #fff;
-  text-shadow: 0 0 16px rgba(var(--white-rgb),0.35), 0 2px 8px rgba(var(--black-rgb),0.95);
-  margin-bottom: 0.5rem;
+  text-shadow: 0 0 14px rgba(var(--white-rgb),0.3), 0 2px 8px rgba(var(--black-rgb),0.95);
+  white-space: nowrap;
 }
 
 /* ── Le duel ── */
@@ -2280,12 +2282,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
-  margin-bottom: 1rem;
+  margin: 0.35rem 0 1rem;
 }
-/* Hors live il n'y a pas de ligne "période" : le duel récupère un peu de
-   l'espace laissé libre au lieu de creuser un vide. */
-.accueil__mdjDuel--noPeriod { margin-top: 0.35rem; }
-
 .accueil__mdjSide {
   flex: 1;
   display: flex;

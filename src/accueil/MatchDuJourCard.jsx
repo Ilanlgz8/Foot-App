@@ -222,8 +222,10 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
     ? `Journée ${match.matchday}`
     : null
 
-  const renderSide = (side, name, crest, rawName, form, code) => (
-    <div className={`accueil__mdjSide accueil__mdjSide--${side}`}>
+  // (plus de modificateur --home/--away : depuis que les couleurs de camp sont
+  // portées par les calques de fond, aucun style ne dépend plus du côté.)
+  const renderSide = (name, crest, rawName, form, code) => (
+    <div className="accueil__mdjSide">
       <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
         {crest
           ? <img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} />
@@ -289,17 +291,19 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
               {matchdayLabel && <span className="accueil__mdjLeagueSub">{matchdayLabel}</span>}
             </span>
           </span>
+
+          {/* Période en cours EN HAUT À DROITE (02/09) — elle était centrée
+              au-dessus du VS, jugée peu esthétique à cet endroit. Elle occupe
+              maintenant le coin laissé libre par la pastille de statut
+              supprimée, ce qui équilibre le bandeau au lieu d'ajouter une
+              ligne au milieu de l'affiche. */}
+          {isLive && livePeriodLabel && (
+            <span className="accueil__mdjPeriod">{livePeriodLabel}</span>
+          )}
         </div>
 
-        {/* Période EN COURS au-dessus du VS (demande explicite : "plus
-            visible, un peu plus gros et en gras"). Rien en pré-match : le
-            duel remonte simplement, plutôt que de laisser une ligne vide. */}
-        {isLive && livePeriodLabel && (
-          <div className="accueil__mdjPeriod">{livePeriodLabel}</div>
-        )}
-
-        <div className={`accueil__mdjDuel${isLive && livePeriodLabel ? '' : ' accueil__mdjDuel--noPeriod'}`}>
-          {renderSide('home', homeName, homeCrest, match.homeTeam?.name, homeForm, homeCode)}
+        <div className="accueil__mdjDuel">
+          {renderSide(homeName, homeCrest, match.homeTeam?.name, homeForm, homeCode)}
           {/* VS en CONTOUR lumineux : 2 calques superposés (noyau translucide
               + contour tracé via -webkit-text-stroke) + halo rond derrière.
               aria-hidden : purement décoratif, l'affrontement est déjà porté
@@ -309,7 +313,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             <span className="accueil__mdjVsCore">VS</span>
             <span className="accueil__mdjVsOutline">VS</span>
           </span>
-          {renderSide('away', awayName, awayCrest, match.awayTeam?.name, awayForm, awayCode)}
+          {renderSide(awayName, awayCrest, match.awayTeam?.name, awayForm, awayCode)}
         </div>
 
         {/* Minute de jeu à la place du libellé, juste au-dessus du score
