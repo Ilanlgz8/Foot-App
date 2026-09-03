@@ -712,6 +712,18 @@
   border-radius: 20px;
   background: linear-gradient(158deg, #16171f 0%, #0e0f14 62%, #0b0c10 100%);
   box-shadow: 0 18px 40px -20px rgba(var(--black-rgb),0.95);
+  /* ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "en haut de la page, au
+     niveau du championnat, la couleur ne s'arrête pas aux arrondis, elle
+     continue en angle droit — alors qu'en bas les arrondis sont respectés").
+     Cause : `overflow: hidden` + `border-radius` ne rogne PAS de façon fiable
+     un enfant qui porte un `filter: blur()` — le navigateur le compose sur une
+     couche séparée qui déborde du rayon. Ça ne se voyait qu'en HAUT parce que
+     les deux halos y sont ancrés (top: -42%) : en bas il n'y a rien à rogner,
+     d'où les arrondis corrects de ce côté.
+     `clip-path: inset(0 round …)` rogne géométriquement, filtres compris. Il
+     est posé EN PLUS de overflow/border-radius (et non à leur place) : le
+     rayon reste nécessaire au rendu de la bordure et du fond. */
+  clip-path: inset(0 round 20px);
 }
 /* Halos très diffus aux couleurs des 2 équipes : garde l'identité du match
    sans que le texte ait à lutter contre un aplat saturé. */
@@ -748,7 +760,7 @@
   height: 20px;
   width: max-content;
   max-width: 62px;
-  padding: 0;
+  padding: 2px;
   border-radius: 5px;
   flex-shrink: 0;
   background: rgba(var(--white-rgb),0.94);
@@ -762,6 +774,13 @@
   width: auto;
   max-width: 100%;
   object-fit: contain;
+}
+/* Logo à fond plein (Ligue 1, Premier League, Serie A) : la tuile EST la
+   pastille — même règle que sur la carte "Match du jour", elle manquait ici. */
+.lmp__heroCompIcon[data-opaque="1"] {
+  padding: 0;
+  background: none;
+  overflow: hidden;
 }
 #root .lmp__heroCompName {
   font-family: 'Chakra Petch', system-ui, sans-serif;

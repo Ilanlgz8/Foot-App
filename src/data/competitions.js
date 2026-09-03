@@ -197,6 +197,13 @@ export const COMPETITIONS = [
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
+    // ⚠️ FOND NOIR (02/09, demande explicite : "mets un fond noir pour ce
+    // championnat uniquement"). Le fichier LaLiga est un tracé MONOCHROME
+    // rouge corail (#ff4b44, vérifié : c'est la seule couleur du SVG) — sur la
+    // pastille blanche commune il ressort mal. Sur fond sombre il retrouve son
+    // rendu de marque. Seule compétition concernée, d'où un réglage par
+    // compétition plutôt qu'une règle globale.
+    emblemBg: '#0b0b0e',
   },
   {
     id: 'BL1',

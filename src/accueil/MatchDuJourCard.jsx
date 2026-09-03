@@ -301,7 +301,14 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
                  competitions.js). Dans ce cas la tuile sert elle-même de
                  pastille : pas de fond blanc ni de marge, sinon on obtient un
                  carré de couleur dans un carré blanc. */
-              <span className="accueil__mdjLeagueIcon" data-opaque={mdjComp?.emblemOpaque ? '1' : undefined}>
+              <span
+                className="accueil__mdjLeagueIcon"
+                data-opaque={mdjComp?.emblemOpaque ? '1' : undefined}
+                /* emblemBg : fond imposé par la compétition (LaLiga = noir,
+                   son logo étant un tracé monochrome rouge illisible sur
+                   blanc). Absent pour toutes les autres → pastille blanche. */
+                style={mdjComp?.emblemBg ? { background: mdjComp.emblemBg } : undefined}
+              >
                 <img src={mdjCompEmblem} alt="" />
               </span>
             )}

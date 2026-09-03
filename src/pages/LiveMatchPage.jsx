@@ -281,7 +281,18 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
       <div className="mp__hero__top lmp__heroTop">
         <div className="mp__hero__comp lmp__heroComp">
           {emblem && (
-            <span className="lmp__heroCompIcon"><img src={emblem} alt="" /></span>
+            <span
+              className="lmp__heroCompIcon"
+              /* ⚠️ data-opaque/emblemBg manquaient ici alors qu'ils existaient
+                 déjà sur la carte "Match du jour" : les logos à fond plein
+                 (Ligue 1, Premier League, Serie A) se retrouvaient donc dans
+                 une pastille blanche sur CES pages — un carré de couleur dans
+                 un carré blanc, le défaut corrigé ailleurs mais pas ici. */
+              data-opaque={comp?.emblemOpaque ? '1' : undefined}
+              style={comp?.emblemBg ? { background: comp.emblemBg } : undefined}
+            >
+              <img src={emblem} alt="" />
+            </span>
           )}
           <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
         </div>
