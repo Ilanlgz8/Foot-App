@@ -140,10 +140,41 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([termine, aVenir])).toBe(termine)
   })
 
-  it('un match EN COURS passe devant un match déjà terminé', () => {
+  // ⚠️ Ce test remplace un ancien ("un match EN COURS passe devant un match
+  // déjà terminé") devenu FAUX volontairement : le statut ne doit plus
+  // influencer l'élection, sinon le match du jour change en cours de journée
+  // (constat utilisateur, 02/09). C'est bien l'affiche qui gagne, pas l'état.
+  it('le statut n\'influence PAS le choix : la meilleure affiche gagne, même terminée', () => {
     const termine = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'FINISHED' }
     const enCours = { ...makeMatch('FL1', 'Toulouse', 'Lille', 20), status: 'IN_PLAY' }
-    expect(pickMatchDuJour([termine, enCours])).toBe(enCours)
+    expect(pickMatchDuJour([termine, enCours])).toBe(termine)
+  })
+
+  it('LE MÊME match reste élu toute la journée, quels que soient les changements de statut', () => {
+    // Cas réel signalé : le match du jour se termine et un AUTRE match, encore
+    // en cours, prend sa place sur l'Accueil. La journée est rejouée ici étape
+    // par étape — l'élu ne doit jamais changer.
+    const faire = (statutChoc, statutAutre) => ([
+      { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: statutChoc },
+      { ...makeMatch('FL1', 'Toulouse', 'Lille', 20), status: statutAutre },
+    ])
+    const etapes = [
+      faire('SCHEDULED', 'SCHEDULED'),  // matin
+      faire('IN_PLAY',   'SCHEDULED'),  // le choc démarre
+      faire('FINISHED',  'IN_PLAY'),    // le choc se termine, l'autre joue
+      faire('FINISHED',  'FINISHED'),   // fin de journée
+    ]
+    for (const jour of etapes) {
+      const elu = pickMatchDuJour(jour)
+      expect(elu.homeTeam.name).toBe('Real Madrid')
+    }
+  })
+
+  it('ignore un match reporté ou annulé (la carte resterait bloquée dessus)', () => {
+    const reporte = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'POSTPONED' }
+    const joue1   = makeMatch('FL1', 'Toulouse', 'Lille', 20)
+    const joue2   = makeMatch('FL1', 'Auxerre', 'Metz', 15)
+    expect(pickMatchDuJour([reporte, joue1, joue2])).toBe(joue1)
   })
 
   it('un match Ligue Europa avec 2 grands clubs bat un match CAN sans grande nation, même tier', () => {

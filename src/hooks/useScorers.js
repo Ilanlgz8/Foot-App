@@ -166,7 +166,27 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
-    retry: false,
+    // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "le classement des buteurs
+    // a du mal à se charger, faut changer de championnat et revenir sur celui
+    // qu'on voulait voir"). Ce `retry: false` était la cause exacte du
+    // symptôme décrit : sur la page Classement, TROIS hooks visent
+    // football-data.org pour la même compétition au même instant (standings,
+    // forme récente, buteurs) et se disputent le verrou d'espacement global.
+    // Les buteurs partent EN DERNIER (delayMs 12s, le plus gros stagger), donc
+    // c'est celui qui perd le plus souvent la course et se prend un 429.
+    // Sans retry, un seul échec transitoire laissait la liste vide DÉFINITIVEMENT
+    // — jusqu'à ce que l'utilisateur quitte le championnat et y revienne, ce
+    // qui remonte le composant et relance la requête. D'où sa manip.
+    // Les deux autres hooks avaient déjà leur filet (useStandings a un repli
+    // ESPN + copie stale, useTeamForm a `retry: 2`) ; les buteurs étaient les
+    // seuls à n'en avoir aucun — et c'est justement la donnée pour laquelle il
+    // n'existe AUCUNE source de secours gratuite (voir CLAUDE.md, gap connu).
+    // Backoff volontairement LONG (8s puis 16s) : le verrou d'espacement
+    // serveur dure ~7,5s (SPACING_MS = 60000/MINUTE_CAP, voir api/football.js).
+    // Retenter plus tôt retomberait dans le même verrou et gâcherait l'essai
+    // sans rien tenter de réel.
+    retry: 2,
+    retryDelay: attempt => 8_000 * (attempt + 1),
     enabled: !!compId,
   })
 

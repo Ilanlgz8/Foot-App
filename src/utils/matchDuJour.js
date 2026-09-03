@@ -191,10 +191,10 @@ function bigTeamScore(match) {
 }
 
 const UPCOMING_STATUSES = new Set(['SCHEDULED', 'TIMED'])
-// Statuts d'un match commencé mais pas terminé (football-data.org). Le match
-// du jour ÉPINGLÉ reste affiché tant qu'il est dans un de ces états, puis
-// pendant la fenêtre "terminé" gérée par l'appelant.
-const ONGOING_STATUSES = new Set(['IN_PLAY', 'PAUSED', 'SUSPENDED'])
+const ONGOING_STATUSES  = new Set(['IN_PLAY', 'PAUSED', 'SUSPENDED'])
+// Un match REPORTÉ/ANNULÉ ne doit jamais pouvoir être élu match du jour : il
+// n'aura pas lieu, la carte resterait bloquée dessus toute la journée.
+const DEAD_STATUSES = new Set(['POSTPONED', 'CANCELLED', 'SUSPENDED_INDEFINITELY'])
 
 // Élit le meilleur match d'une liste selon les 3 critères, dans l'ordre :
 // prestige de la compétition, puis score d'affiche, puis coup d'envoi le plus
@@ -253,21 +253,34 @@ function electBest(candidates) {
  * page) ne s'applique donc plus qu'au cas pré-match.
  */
 export function pickMatchDuJour(matches) {
-  const all = matches ?? []
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "le match du jour vient de se
+  // finir et maintenant c'est l'autre match qui est affiché comme match du
+  // jour, c'est pas bon — il faut qu'il y en ait UN SEUL par jour").
+  // Cause : cette fonction classait les candidats par STATUT (un match en
+  // cours passait devant, sinon un terminé, sinon les à venir). Le lot de
+  // candidats changeait donc au fil de la journée, et l'élu avec — au coup de
+  // sifflet final du match du jour, un autre match en cours prenait sa place.
+  // C'était une conséquence non vue de l'épinglage ajouté plus tôt (dc4c8cd),
+  // qui visait justement à garder la carte sur SON match une fois lancé.
+  //
+  // L'élection porte maintenant sur TOUS les matchs du jour d'un coup, quel
+  // que soit leur statut. Le résultat ne dépend donc plus que de la liste du
+  // jour (compétition, affiche, coup d'envoi) — des données qui ne bougent pas
+  // de la journée. Un seul match du jour, du matin jusqu'au soir, qui passe
+  // naturellement de "à venir" à "en direct" puis "terminé" sans jamais être
+  // remplacé.
+  const all = (matches ?? []).filter(m => !DEAD_STATUSES.has(m.status))
 
-  // 1) Priorité au direct : un match en cours, sinon un match déjà terminé
-  //    aujourd'hui (garde la carte pleine jusqu'au bout de la journée plutôt
-  //    que de la vider dès le coup de sifflet final).
-  const live     = all.filter(m => ONGOING_STATUSES.has(m.status))
-  const finished = all.filter(m => m.status === 'FINISHED')
-  const started  = live.length > 0 ? live : finished
-  if (started.length > 0) {
-    const bestStarted = electBest(started)
-    if (bestStarted) return bestStarted
-  }
+  // Garde-fou historique conservé : une carte qui met en avant le seul match
+  // de la journée n'apporte rien, il est déjà visible partout ailleurs sur la
+  // page. Compté sur TOUS les matchs du jour (et non plus les seuls "à venir")
+  // — sinon la carte disparaissait dès qu'il ne restait qu'un match à jouer,
+  // alors que la journée en comptait plusieurs.
+  if (all.length < 2) return null
 
-  // 2) Sinon, comportement pré-match d'origine (inchangé).
-  const upcoming = all.filter(m => UPCOMING_STATUSES.has(m.status))
-  if (upcoming.length < 2) return null
-  return electBest(upcoming)
+  return electBest(all)
 }
+
+// Statuts exportés pour les tests (et pour éviter qu'un appelant réinvente
+// sa propre liste ailleurs).
+export const MDJ_STATUSES = { UPCOMING_STATUSES, ONGOING_STATUSES, DEAD_STATUSES }
