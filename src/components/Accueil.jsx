@@ -760,22 +760,22 @@ function Accueil() {
             espnScore transmis (design 4★ : la grosse card doit elle aussi
             passer en mode live — statut/minute/score — au lieu de rester
             figée sur l'heure du coup d'envoi). */}
+        {/* ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "quand j'appuie sur
+            la card du match du jour je n'ai pas accès aux compos ni aux
+            stats live") : cette carte envoyait TOUJOURS vers /match/:id,
+            même pendant le match. Or la page dédiée au direct (compos,
+            stats live, minute par minute) est /live/:id — c'est justement
+            pour ça que les cards de la liste juste en dessous utilisent
+            DEUX gestionnaires distincts (onMatchClick / onLiveClick, voir
+            MatchPanel plus bas). Le trou ne se voyait pas avant l'épinglage
+            de la carte sur un match en cours (commit dc4c8cd) : jusque-là
+            elle disparaissait au coup d'envoi, donc on ne pouvait jamais
+            cliquer dessus pendant le direct.
+            Même règle exactement que les cards normales (isCardLive, la
+            fonction partagée de matchUtils.js) — pas une condition
+            réinventée ici, sinon les deux comportements divergeraient au
+            prochain ajustement. */}
         {matchDuJour && (
-          {/* ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "quand j'appuie sur
-              la card du match du jour je n'ai pas accès aux compos ni aux
-              stats live") : cette carte envoyait TOUJOURS vers /match/:id,
-              même pendant le match. Or la page dédiée au direct (compos,
-              stats live, minute par minute) est /live/:id — c'est justement
-              pour ça que les cards de la liste juste en dessous utilisent
-              DEUX gestionnaires distincts (onMatchClick / onLiveClick, voir
-              MatchPanel plus bas). Le trou ne se voyait pas avant l'épinglage
-              de la carte sur un match en cours (commit dc4c8cd) : jusque-là
-              elle disparaissait au coup d'envoi, donc on ne pouvait jamais
-              cliquer dessus pendant le direct.
-              Même règle exactement que les cards normales (isCardLive, la
-              fonction partagée de matchUtils.js) — pas une condition
-              réinventée ici, sinon les deux comportements divergeraient au
-              prochain ajustement. */}
           <MatchDuJourCard
             match={matchDuJour}
             espnScore={espnScores[matchDuJour.id]}
