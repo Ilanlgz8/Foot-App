@@ -10,6 +10,16 @@
 //     blanc lui-même (736x736 → 172x256)
 //   • Bundesliga : recadré sur sa zone non transparente (300x300 → 246x246)
 //
+// ⚠️ RECADRAGE ÉTENDU (02/09, constat utilisateur : "le carré blanc, faut
+// qu'il s'adapte à chaque logo, qu'il n'y ait pas de blanc autour"). Le CSS
+// ne peut pas deviner la marge TRANSPARENTE cuite dans un fichier : elle
+// s'affiche comme du blanc dans la pastille. Mesurée sur tous les logos, puis
+// recadrée sur le contenu réel là où elle était visible :
+//   • coupe-du-monde.png : 28% de marge (640x640 → 286x604) — de loin le pire
+//   • caf-can.png        : 3%  (347x326 → 327x306)
+//   • euro-generic.png   : 3%  (413x500 → 388x475)
+// Les autres étaient déjà collés à leur contenu (vérifié un par un).
+//
 // `emblemOpaque` distingue les logos à FOND PLEIN — vérifié sur les pixels :
 // tuile bleue Ligue 1 (#085DFE), violette Premier League (#39003D), badge
 // blanc Serie A, aucune transparence — de ceux tracés sur fond transparent

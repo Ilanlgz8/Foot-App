@@ -742,11 +742,13 @@
   margin-bottom: 26px;
 }
 .lmp__heroComp { gap: 9px; }
+/* Pastille collée au logo — même raison et même recette que
+   .accueil__mdjLeagueIcon (voir son commentaire détaillé dans accueil.css). */
 .lmp__heroCompIcon {
   height: 20px;
-  min-width: 20px;
+  width: max-content;
   max-width: 62px;
-  padding: 3px 4px;
+  padding: 0;
   border-radius: 5px;
   flex-shrink: 0;
   background: rgba(var(--white-rgb),0.94);

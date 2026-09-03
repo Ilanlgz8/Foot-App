@@ -2200,11 +2200,22 @@
    taille le logo est de la hauteur du texte "Ligue 1" à côté, sans le
    dominer. Voir le commentaire ci-dessous pour la raison de la largeur
    libre. */
+/* ⚠️ La pastille COLLE au logo (02/09, demande utilisateur : "faut qu'il
+   s'adapte pour chaque logo, qu'il n'y ait pas de blanc autour, sinon ça fait
+   moche"). Deux causes au blanc résiduel, traitées ensemble :
+     • du padding + une min-width imposaient une marge blanche autour de tout
+       logo, et une pastille plus large que le logo lui-même dès qu'il était
+       étroit (Serie A) — supprimés ici ;
+     • plusieurs fichiers avaient de la marge TRANSPARENTE cuite dans l'image
+       (Coupe du monde : 28% du fichier !), que le CSS ne peut pas deviner —
+       ils ont été recadrés sur leur contenu réel (voir competitions.js).
+   `width: max-content` : la pastille prend exactement la largeur du logo une
+   fois mis à la hauteur voulue, ni plus ni moins. */
 .accueil__mdjLeagueIcon {
   height: 20px;
-  min-width: 20px;
+  width: max-content;
   max-width: 62px;
-  padding: 3px 4px;
+  padding: 0;
   border-radius: 5px;
   flex-shrink: 0;
   background: rgba(var(--white-rgb),0.94);
