@@ -2170,7 +2170,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 0.7rem;
+  /* L'écart avec les blasons est porté UNIQUEMENT par .accueil__mdjDuel
+     (margin-top: 40px) — une seule valeur à régler, plutôt que deux marges
+     qui s'additionnent et qu'il faut recalculer à chaque ajustement. */
+  margin-bottom: 0;
 }
 .accueil__mdjLeague {
   display: flex;
@@ -2282,7 +2285,10 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
-  margin: 0.35rem 0 1rem;
+  /* 40px d'air entre le bandeau championnat et les blasons (demande
+     explicite, 02/09) — l'affiche respire au lieu d'avoir le bandeau collé
+     au duel. */
+  margin: 40px 0 1rem;
 }
 .accueil__mdjSide {
   flex: 1;
