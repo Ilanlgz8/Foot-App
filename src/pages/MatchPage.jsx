@@ -10,7 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
-import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
+import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
@@ -127,10 +127,9 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) — même correction
   // que LiveMatchPage.jsx, voir le commentaire là-bas.
   const compName   = comp?.name ?? match.competition?.name ?? ''
-  const gradient   = getMatchGradient(
-    match.homeTeam?.name || homeName,
-    match.awayTeam?.name || awayName
-  )
+  // (plus de dégradé plein injecté ici : depuis le passage en panneau
+  // flottant, le fond est une base sombre + 2 halos diffus portés par le CSS.
+  // Voir .lmp__hero, réutilisé par cette page.)
 
   // Score tirs au but : fusion FD.org (match.score.penalties) + snapshot ESPN
   // persisté au moment du FT (cachedEspn.home/awayShootout), même garde
@@ -186,17 +185,43 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
-  return (
-    <div className="mp__hero" style={{ background: gradient }}>
-      <div className="mp__hero__overlay" />
+  // ── PANNEAU FLOTTANT (02/09, demande utilisateur : "fais ça aussi pour les
+  // matchs terminés et les matchs à venir, comme ça c'est partout pareil").
+  // Exactement le même habillage que LiveMatchPage : carte posée sur la page
+  // au lieu d'un bandeau plein écran, fond sombre calme + 2 halos diffus aux
+  // couleurs des équipes à la place du dégradé plein, championnat en haut à
+  // gauche avec sa pastille de logo, statut en haut à droite, retour sorti du
+  // panneau. Les classes .lmp__hero* sont RÉUTILISÉES telles quelles (elles
+  // sont déjà chargées ici, MatchPage.css et LiveMatchPage.css étant importés
+  // ensemble par les deux pages) — pas de copie parallèle qui divergerait au
+  // prochain ajustement.
+  const heroColors = getMatchTeamColors(match.homeTeam?.name, match.awayTeam?.name)
 
-      {/* Top bar : retour + badge compét */}
-      <div className="mp__hero__top">
-        <button className="mp__hero__back" onClick={() => navigate(-1)}>‹ Retour</button>
-        <div className="mp__hero__comp">
-          {emblem && <img src={emblem} alt="" className="mp__hero__compLogo" />}
-          <span className="mp__hero__compName">{compName}</span>
+  return (
+    <div className="lmp__heroOuter">
+      <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
+
+      <div
+        className="mp__hero lmp__hero"
+        style={{ '--lmp-hc': heroColors.home.main, '--lmp-hc2': heroColors.away.main }}
+      >
+        <span className="lmp__heroGlowL" aria-hidden="true" />
+        <span className="lmp__heroGlowR" aria-hidden="true" />
+
+      {/* Bandeau : championnat à gauche, statut du match à droite */}
+      <div className="mp__hero__top lmp__heroTop">
+        <div className="mp__hero__comp lmp__heroComp">
+          {emblem && (
+            <span className="lmp__heroCompIcon"><img src={emblem} alt="" /></span>
+          )}
+          <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
         </div>
+        {/* Statut à droite, même emplacement que la période sur la page du
+            direct et sur l'affiche "Match du jour" : "Terminé" pour un match
+            joué, la date pour un match à venir. */}
+        <span className="lmp__heroPeriodBadge">
+          {isFinished ? 'Terminé' : formatDate(match.utcDate)}
+        </span>
       </div>
 
       {/* Centre : crests + score/heure */}
@@ -212,7 +237,9 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         <div className="mp__hero__center">
           {isFinished ? (
             <>
-              <span className="mp__hero__label">Terminé</span>
+              {/* "Terminé" et la date sont désormais dans le badge en haut à
+                  droite : les répéter ici ferait doublon (même problème que
+                  celui corrigé sur l'affiche "Match du jour"). */}
               <span className="mp__hero__score">{hs} – {as_}</span>
               {wentToPens && hPens != null && aPens != null && (
                 <div className="mp__hero__pensBlock">
@@ -226,7 +253,6 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
             </>
           ) : (
             <>
-              <span className="mp__hero__label">{formatDate(match.utcDate)}</span>
               <span className="mp__hero__time">{formatTime(match.utcDate)}</span>
             </>
           )}
@@ -278,6 +304,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

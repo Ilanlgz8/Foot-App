@@ -772,7 +772,9 @@
 }
 
 /* Score en Bebas Neue — même police que l'affiche "Match du jour", pour que
-   les deux écrans se répondent. tabular-nums : la mise en page ne bouge pas
+   tous les écrans se répondent. S'applique aussi à MatchPage (match terminé
+   ou à venir) depuis le 02/09 : cette page porte désormais les mêmes classes
+   .mp__hero.lmp__hero, donc un seul jeu de règles pour les trois états. tabular-nums : la mise en page ne bouge pas
    quand le score change en direct. */
 #root .lmp__hero .mp__hero__score {
   font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
