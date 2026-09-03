@@ -799,7 +799,12 @@
    quand le score change en direct. */
 #root .lmp__hero .mp__hero__score {
   font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
-  font-size: 4.1rem;
+  /* 4.1 → 3.6rem (retour utilisateur, 02/09 : "un chouia trop gros").
+     S'applique aux pages match ET direct, qui partagent ce panneau — donc
+     aussi bien au score d'un match terminé (Résultats) qu'à celui d'un match
+     en cours. L'heure d'un match à venir (.mp__hero__time, 3rem) n'est pas
+     touchée : elle était déjà plus petite et n'a pas été signalée. */
+  font-size: 3.6rem;
   font-weight: 400;
   line-height: 0.82;
   letter-spacing: 0.02em;
