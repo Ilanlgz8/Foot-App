@@ -2215,6 +2215,16 @@
   max-width: 100%;
   object-fit: contain;
 }
+/* Logo à fond plein (Ligue 1, Premier League) : la tuile EST la pastille.
+   Pas de fond blanc ni de marge — sinon carré de couleur dans un carré
+   blanc. Le fond blanc est conservé pour les autres, dont les tracés
+   seraient invisibles sur le fond sombre de la carte. */
+.accueil__mdjLeagueIcon[data-opaque="1"] {
+  padding: 0;
+  background: none;
+  box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
+  overflow: hidden;
+}
 .accueil__mdjLeagueText {
   display: flex;
   flex-direction: column;

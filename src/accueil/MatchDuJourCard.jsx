@@ -275,7 +275,12 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         <div className="accueil__mdjTopBar">
           <span className="accueil__mdjLeague">
             {mdjCompEmblem && (
-              <span className="accueil__mdjLeagueIcon">
+              /* data-opaque : le logo a son PROPRE fond plein (tuile Ligue 1
+                 bleue, Premier League violette — voir emblemOpaque dans
+                 competitions.js). Dans ce cas la tuile sert elle-même de
+                 pastille : pas de fond blanc ni de marge, sinon on obtient un
+                 carré de couleur dans un carré blanc. */
+              <span className="accueil__mdjLeagueIcon" data-opaque={mdjComp?.emblemOpaque ? '1' : undefined}>
                 <img src={mdjCompEmblem} alt="" />
               </span>
             )}

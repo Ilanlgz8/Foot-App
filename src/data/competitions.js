@@ -1,7 +1,19 @@
-import bundesligaLogo from '../assets/leagues/bundesliga.svg'
+// ⚠️ LOGOS MIS À JOUR (02/09, fournis par l'utilisateur) : Ligue 1 (nouvelle
+// identité), Premier League et Bundesliga. Recadrés au plus près du contenu
+// avant intégration — le fichier Premier League d'origine faisait 1024x600
+// avec le lion perdu au milieu d'un aplat violet, il aurait été rendu
+// minuscule par `object-fit: contain`.
+//
+// `emblemOpaque` (voir FL1/PL plus bas) distingue les logos à FOND PLEIN
+// (tuile bleue Ligue 1, tuile violette Premier League — aucune transparence,
+// vérifié sur les pixels) de ceux tracés sur fond transparent (Bundesliga,
+// LaLiga, Serie A…). Les premiers ne doivent PAS être posés dans une
+// pastille blanche : ça ferait un carré de couleur dans un carré blanc. Ils
+// remplissent leur cadre eux-mêmes, la tuile EST la pastille.
+import bundesligaLogo from '../assets/leagues/bundesliga-2026.png'
 import laligaLogo from '../assets/leagues/laliga-ea-sports.svg'
-import ligue1Logo from '../assets/leagues/ligue-1-mcdonalds.svg'
-import premierLeagueLogo from '../assets/leagues/premier-league.svg'
+import ligue1Logo from '../assets/leagues/ligue1-2026.png'
+import premierLeagueLogo from '../assets/leagues/premier-league-2026.png'
 import serieALogo from '../assets/leagues/serie-a-enilive.svg'
 import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
@@ -151,12 +163,16 @@ export const COMPETITIONS = [
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
+    // ⚠️ Logo à FOND PLEIN (tuile bleue), pas un tracé sur transparent —
+    // voir emblemOpaque plus bas dans ce fichier.
+    emblemOpaque: true,
   },
   {
     id: 'PL',
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
+    emblemOpaque: true,
   },
   {
     id: 'PD',
