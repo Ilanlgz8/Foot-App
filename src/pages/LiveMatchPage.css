@@ -806,3 +806,20 @@
   font-variant-numeric: tabular-nums;
   text-shadow: 0 4px 20px rgba(var(--black-rgb),0.9);
 }
+
+/* Heure de coup d'envoi (match à venir) — MÊME police que le score, pour que
+   les trois états de la page se répondent : à venir, en direct, terminé
+   (choix "A", 02/09). Bebas est condensée, donc l'heure gagne en taille sans
+   prendre plus de largeur qu'avant (2 → 3rem). `tabular-nums` par cohérence
+   avec le score, même si une heure ne change pas en cours de route.
+   Aucune police supplémentaire chargée : Bebas l'est déjà pour le score et
+   le VS. */
+#root .lmp__hero .mp__hero__time {
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
+  line-height: 0.85;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 4px 20px rgba(var(--black-rgb),0.9);
+}

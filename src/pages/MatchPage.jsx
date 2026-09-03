@@ -682,12 +682,17 @@ function MpSeasonStats({ match, compMatches, hideForm = false }) {
 
   return (
     <div className="mp__statsWrap">
-      <div className="mp__statsHeader">
-        <span className="mp__statsTeam">{homeName}</span>
-        <span className="mp__statsCenter">Saison</span>
-        <span className="mp__statsTeam mp__statsTeam--r">{awayName}</span>
-      </div>
-
+      {/* ⚠️ RETIRÉ (02/09, demande utilisateur, même raison que le bandeau des
+          stats de match juste au-dessus dans ce fichier) : les noms d'équipe y
+          étaient répétés une 3e fois sur la page (hero + sous-onglets + ici),
+          et le mot "Saison" au centre disait ce que l'onglet "Stats saison"
+          déjà sélectionné annonce à 20 pixels de là. Les lignes en dessous
+          portent chacune leur libellé au milieu et une valeur de chaque côté,
+          dans le même ordre que le hero — le repérage ne dépendait pas de cet
+          en-tête.
+          Le sélecteur Global/Domicile/Extérieur juste en dessous devient donc
+          le premier élément du bloc, ce qui rapproche le réglage de ce qu'il
+          règle. */}
       <div className="homeAwayToggle">
         <button className={`homeAwayToggle__btn${split === 'all' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('all')}>Global</button>
         <button className={`homeAwayToggle__btn${split === 'home' ? ' homeAwayToggle__btn--active' : ''}`} onClick={() => setSplit('home')}>Domicile</button>
