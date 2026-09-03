@@ -441,11 +441,13 @@ function MpMatchStats({ match, dataMatch }) {
   // l'unique source des remplacements (ESPN n'en expose aucune) — a
   // impérativement besoin du VRAI id FD.org (dm.id), pas de l'id ESPN
   // synthétique, sinon l'appel /v4/matches/{id} échoue silencieusement.
-  const { detail, loading: detailLoading } = useMatchDetail(dm?.id)
+  const { detail } = useMatchDetail(dm?.id)
 
   const fdSubs      = detail?.substitutions ?? []
   const hasEvents   = fdSubs.length > 0
-  const eventsLoading = detailLoading
+  // (`detailLoading` n'est plus lu ici depuis le retrait du message "Match
+  // sans but", qui était le seul à distinguer "pas encore chargé" de
+  // "vraiment aucun événement".)
 
   const { home: hs, away: as_ } = finalScore(match.score)
   const totalGoals = (hs ?? 0) + (as_ ?? 0)
@@ -499,30 +501,28 @@ function MpMatchStats({ match, dataMatch }) {
     : cachedRows.length ? cachedRows
     : aflRows
 
-  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
-  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
-
   const isLoading = !rows.length && ((isWC && fifaLoading) || espnLoading || aflLoading)
 
   return (
     <div className="mp__statsWrap">
-      <div className="mp__statsHeader">
-        <span className="mp__statsTeam">{homeName}{hs != null ? ` ${hs}` : ''}</span>
-        <span className="mp__statsCenter">Match</span>
-        <span className="mp__statsTeam mp__statsTeam--r">{as_ != null ? `${as_} ` : ''}{awayName}</span>
-      </div>
+      {/* ⚠️ RETIRÉ (02/09, demande utilisateur : "y'a 'Toulouse 0' et '1
+          Lille' et 'Match' au milieu, c'est inutile") : ce bandeau répétait
+          les noms des deux équipes ET le score, à quelques centimètres du
+          hero qui affiche déjà exactement la même chose en bien plus gros —
+          avec les blasons en plus. Le mot "Match" au centre ne désignait rien
+          du tout. Les colonnes de stats juste en dessous sont déjà lisibles
+          sans en-tête : chaque ligne porte son libellé au milieu et les deux
+          valeurs de part et d'autre, dans le même ordre que le hero.
+          Les noms d'équipe traduits ne servaient QUE à ce bandeau : ils sont
+          donc supprimés avec lui (vérifié — plus aucun autre usage dans ce
+          composant).
 
-      {/* Fil du match — remplacements seulement (buts + cartons déjà dans le
-          hero, voir plus haut). S'il n'y a aucun remplacement à montrer ET
-          aucun but marqué, on le précise ; s'il y a des buts/cartons mais pas
-          de remplacement, on n'affiche rien ici (pas d'erreur : tout est déjà
-          visible dans le hero). */}
-      {hasEvents
-        ? <MatchTimeline fdSubs={fdSubs} homeId={match.homeTeam?.id} />
-        : (!eventsLoading && totalGoals === 0)
-          ? <p className="pm__noData">Match sans but (0 – 0)</p>
-          : null
-      }
+          ⚠️ RETIRÉ AUSSI : le message "Match sans but (0 – 0)". Il apparaissait
+          quand il n'y avait ni remplacement ni but à lister — mais le score
+          0-0 est déjà affiché en grand juste au-dessus, donc la phrase
+          n'apprenait rien. Le cas "aucun remplacement mais des buts" ne
+          montrait déjà rien ici, on est simplement cohérent avec ça. */}
+      {hasEvents && <MatchTimeline fdSubs={fdSubs} homeId={match.homeTeam?.id} />}
 
       {isLoading ? (
         <MpStatsSkeleton />
