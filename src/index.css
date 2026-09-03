@@ -308,3 +308,67 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .sf-liveBorder::before { animation: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   POLICE UNIQUE DES SCORES ET DES HEURES (02/09)
+   Constat utilisateur : "je sais pas si c'est bien que les chiffres pour
+   l'heure et le score soient pas de la même police partout". Inventaire
+   fait avant de toucher quoi que ce soit — il y avait TROIS traitements
+   différents pour la même information :
+     • Bebas Neue     → affiche "Match du jour", panneau des pages match/direct
+     • Chakra Petch   → résultats récents (Accueil), page Résultats, /live,
+                        page Programme
+     • aucune police définie (donc police système héritée) → les cards de
+       match de l'Accueil, pourtant les plus vues de l'app
+   J'ai moi-même creusé une partie de l'écart en passant les panneaux en
+   Bebas sans toucher au reste.
+
+   Tout est désormais unifié ici, en un seul endroit plutôt qu'en réglant
+   chaque fichier séparément (c'est exactement comme ça que les 3 versions
+   ont divergé). Bebas était déjà chargée pour le score et le VS : aucun
+   poids réseau supplémentaire.
+
+   ⚠️ `-webkit-text-stroke` : Bebas n'existe qu'en UNE seule graisse —
+   `font-weight: bold` n'a donc aucun effet, ou déclenche un faux gras
+   crénelé selon le navigateur. Un contour de la MÊME couleur que le texte
+   est la façon propre de l'épaissir : il ne déforme pas la lettre et ne
+   change pas sa largeur d'avance, donc rien ne bouge dans la mise en page.
+   1,1px retenu après comparaison de 4 épaisseurs (0 / 0,6 / 1,1 / 1,7) :
+   retrouve la présence de l'ancienne Chakra Petch 800 sans empâter
+   l'intérieur des chiffres, ce que fait 1,7 sur le 8 et le 0 en petit.
+
+   `currentColor` (et non #fff) : plusieurs de ces scores sont colorés
+   (vainqueur en or sur la page Résultats, rouge en live…) — un contour blanc
+   en dur créerait un liseré clair autour d'un chiffre coloré.
+   ══════════════════════════════════════════════════════════════════ */
+#root .accueil__mdjBigNum,
+#root .accueil__mdjClockSep,
+#root .accueil__mdjScoreSep,
+#root .lmp__hero .mp__hero__score,
+#root .lmp__hero .mp__hero__time,
+#root .poster__score,
+#root .poster__time,
+#root .resultHero__score,
+#root .resultHero__scoreSep,
+#root .resultats__scoreNum,
+#root .resultats__scoreDash,
+#root .live__pill,
+#root .matchs__scoreHour,
+#root .lmpSide__score,
+#root .myTeamBanner__score {
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-weight: 400;
+  -webkit-text-stroke: 1.1px currentColor;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+
+/* Bebas est CONDENSÉE : à taille égale un chiffre y paraît plus petit qu'en
+   Chakra Petch ou en police système grasse. Chaque emplacement est donc
+   remonté d'environ 20% pour garder la présence qu'il avait — la largeur
+   reste inférieure ou égale à l'ancienne, aucune mise en page ne déborde. */
+#root .poster__score,
+#root .poster__time      { font-size: 3.1rem; line-height: 0.85; }
+#root .resultats__scoreNum { font-size: 2rem; line-height: 0.9; }
+#root .live__pill        { font-size: 2.4rem; }
+#root .matchs__scoreHour { font-size: 2.4rem; }
