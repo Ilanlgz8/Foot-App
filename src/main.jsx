@@ -171,6 +171,56 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // mécanisme avant le fix.
 const CACHE_BUSTER = 'v13-2026-08-28-fix-scorers-429-swallowed'
 
+// ══════════════════════════════════════════════════════════════════════
+// FILET ANTI-ÉCRAN BLANC (02/09, constat utilisateur : "pourquoi j'ai un
+// écran blanc quand je lance l'app ?", toujours présent après réinstallation
+// de la PWA — donc sans rapport avec le cache du service worker).
+//
+// L'ErrorBoundary (App.jsx) ne couvre QUE les erreurs de rendu d'une app déjà
+// montée. Si quelque chose échoue AVANT — un module qui ne charge pas, une
+// donnée persistée illisible, une API non supportée par le navigateur — React
+// ne monte jamais et l'écran reste vide, sans le moindre message. C'est
+// exactement ce que décrit l'utilisateur, et c'est aussi ce qui m'empêchait
+// de diagnostiquer à distance : aucune information ne remonte.
+//
+// Ce filet affiche l'erreur réelle à l'écran et propose de repartir propre.
+// Le bouton vide TOUT le stockage du site (localStorage, sessionStorage,
+// caches du service worker) : le cache React Query persisté et les caches par
+// match survivent à une réinstallation de la PWA, ils font donc partie des
+// suspects qu'une réinstallation seule n'élimine pas.
+function showBootError(err) {
+  const root = document.getElementById('root')
+  if (!root || root.childElementCount > 0) return   // l'app tourne, rien à faire
+  const msg = (err && (err.message || err.reason?.message || String(err))) || 'Erreur inconnue'
+  root.innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:#0a0a0d;color:#fff;font-family:system-ui,sans-serif;text-align:center">
+      <div style="font-size:19px;font-weight:700">StatFootix n'a pas pu démarrer</div>
+      <div style="font-size:13px;color:#9aa3bb;max-width:340px;line-height:1.5">Voici l'erreur exacte, utile pour la corriger :</div>
+      <code style="font-size:12px;color:#ff9aa2;background:rgba(255,255,255,.06);padding:10px 12px;border-radius:8px;max-width:340px;word-break:break-word">${String(msg).slice(0, 300)}</code>
+      <button id="sfReset" style="margin-top:6px;padding:11px 18px;border-radius:22px;border:1px solid rgba(255,255,255,.2);background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit">Vider les données et relancer</button>
+    </div>`
+  document.getElementById('sfReset')?.addEventListener('click', async () => {
+    try { localStorage.clear() } catch { /* stockage inaccessible */ }
+    try { sessionStorage.clear() } catch { /* idem */ }
+    try {
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+      const regs = await navigator.serviceWorker?.getRegistrations?.() ?? []
+      await Promise.all(regs.map(r => r.unregister()))
+    } catch { /* pas de SW/caches : rien à nettoyer */ }
+    location.reload()
+  })
+}
+
+// Un module qui ne charge pas remonte en `error`, une promesse rejetée au
+// démarrage en `unhandledrejection` — les deux mènent au même écran vide.
+window.addEventListener('error', e => showBootError(e.error ?? e))
+window.addEventListener('unhandledrejection', e => showBootError(e.reason))
+// Filet de dernier recours : si rien n'a levé d'erreur mais que React n'a
+// toujours rien monté au bout de 8s, c'est un blocage silencieux.
+setTimeout(() => showBootError(new Error('L\'application n\'a pas fini de démarrer (aucune erreur remontée).')), 8000)
+
+try {
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider
     client={queryClient}
@@ -190,3 +240,8 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </PersistQueryClientProvider>
 )
+} catch (err) {
+  // Échec synchrone du montage (persister illisible, API manquante...) :
+  // sans ce catch, la page resterait blanche sans aucune explication.
+  showBootError(err)
+}
