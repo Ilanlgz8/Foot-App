@@ -92,7 +92,21 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   )
   const isUpcoming = !!match && !isFinished && !isLive
 
-  const { data: espnOdds } = useEspnPregameOdds(match, isUpcoming)
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "c'est pas les mêmes cotes
+  // dans les cards des matchs en live que sur la page live/:matchId") :
+  // `enabled` était limité à `isUpcoming`, donc la cote de marché ESPN
+  // n'était PAS chargée pendant le match et `marketPre` n'était jamais
+  // transmis à calcLiveProno plus bas. Résultat : cette carte partait du seul
+  // prior interne (forme récente) alors que MatchPoster.jsx (les autres cards
+  // de l'Accueil) ET LiveStatsTab (MatchModal.jsx, la page du direct)
+  // réinjectent tous les deux la cote de marché — d'où trois affichages pour
+  // le même match, dont un seul divergeait.
+  // Exactement le même correctif que celui déjà appliqué à MatchPoster.jsx
+  // pour le cas Lens-PSG (voir son commentaire) : `!isFinished` garde la
+  // requête active en live, indispensable si l'app est ouverte APRÈS le coup
+  // d'envoi et jamais avant. Même hook, même cache, aucun appel réseau en
+  // plus — juste jamais branché ici.
+  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
 
   if (!match) return null
 
@@ -164,6 +178,11 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
+        // Point de départ RÉEL du calcul live : la cote de marché ESPN, comme
+        // dans MatchPoster.jsx et LiveStatsTab. Sans elle, cette carte partait
+        // du prior interne (forme récente) et divergeait des deux autres pour
+        // le même match — voir le commentaire de useEspnPregameOdds plus haut.
+        marketPre:         espnOdds?.pct ?? null,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H, lowerDivMatches,
