@@ -1,20 +1,28 @@
 // ⚠️ LOGOS MIS À JOUR (02/09, fournis par l'utilisateur) : Ligue 1 (nouvelle
-// identité), Premier League et Bundesliga. Recadrés au plus près du contenu
-// avant intégration — le fichier Premier League d'origine faisait 1024x600
-// avec le lion perdu au milieu d'un aplat violet, il aurait été rendu
-// minuscule par `object-fit: contain`.
+// identité), Premier League, Bundesliga et Serie A. Tous recadrés au plus
+// près du contenu avant intégration, et compressés en palette (aplats à peu
+// de couleurs, aucune perte visible) — le poids compte, c'est une PWA :
+//   • Premier League : 1024x600 avec le lion perdu au milieu d'un aplat
+//     violet → recadré 256x256 (tel quel, `object-fit: contain` l'aurait
+//     rendu minuscule, exactement le défaut corrigé le même jour) ; 45 → 16 ko
+//   • Ligue 1 : 960x1200 → 256x256 ; 15,6 → 5,7 ko
+//   • Serie A : marge noire du fichier source retirée, recadré sur le badge
+//     blanc lui-même (736x736 → 172x256)
+//   • Bundesliga : recadré sur sa zone non transparente (300x300 → 246x246)
 //
-// `emblemOpaque` (voir FL1/PL plus bas) distingue les logos à FOND PLEIN
-// (tuile bleue Ligue 1, tuile violette Premier League — aucune transparence,
-// vérifié sur les pixels) de ceux tracés sur fond transparent (Bundesliga,
-// LaLiga, Serie A…). Les premiers ne doivent PAS être posés dans une
-// pastille blanche : ça ferait un carré de couleur dans un carré blanc. Ils
-// remplissent leur cadre eux-mêmes, la tuile EST la pastille.
+// `emblemOpaque` distingue les logos à FOND PLEIN — vérifié sur les pixels :
+// tuile bleue Ligue 1 (#085DFE), violette Premier League (#39003D), badge
+// blanc Serie A, aucune transparence — de ceux tracés sur fond transparent
+// (Bundesliga, LaLiga…). Les premiers ne doivent PAS être posés dans la
+// pastille blanche de la carte "Match du jour" : ça ferait un carré de
+// couleur dans un carré blanc. Ils remplissent leur cadre eux-mêmes, la
+// tuile EST la pastille. Les seconds gardent le fond blanc, sans quoi leurs
+// tracés sombres seraient invisibles sur le fond sombre de la carte.
 import bundesligaLogo from '../assets/leagues/bundesliga-2026.png'
 import laligaLogo from '../assets/leagues/laliga-ea-sports.svg'
 import ligue1Logo from '../assets/leagues/ligue1-2026.png'
 import premierLeagueLogo from '../assets/leagues/premier-league-2026.png'
-import serieALogo from '../assets/leagues/serie-a-enilive.svg'
+import serieALogo from '../assets/leagues/serie-a-2026.png'
 import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
 import championsLeagueLogo from '../assets/leagues/ldc.png'
 // europa-league.png / conference-league.png : mêmes assets que ldc.png ci-
@@ -191,6 +199,9 @@ export const COMPETITIONS = [
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
+    // Badge BLANC plein (pas un tracé sur transparent) : la tuile sert
+    // elle-même de pastille, voir emblemOpaque en tête de fichier.
+    emblemOpaque: true,
   },
   {
     id: 'CL',
