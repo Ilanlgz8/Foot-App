@@ -13,7 +13,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
-import { getMatchGradient, getMatchThemeVars } from '../data/teamPhotos'
+import { getMatchGradient, getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useEspnMatchStats } from '../hooks/useMatchDetail'
 import { useMatches, useLowerDivisionStats, useH2HHistory } from '../hooks/useMatchs'
@@ -252,16 +252,39 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
-  return (
-    <div className="mp__hero lmp__hero" style={{ background: gradient }}>
-      <div className="mp__hero__overlay" />
+  // ── PANNEAU FLOTTANT (refonte 02/09, maquette validée) ─────────────────
+  // Constat de départ (utilisateur) : "le score et tout, c'est un peu
+  // brouillon". Diagnostic fait sur la page réelle : cinq éléments centrés
+  // empilés (minute, score, pastille de période, diffuseur, buteurs), chacun
+  // avec son style, aucun ne dominant — et le tout posé sur un dégradé plein
+  // très saturé contre lequel chaque texte devait lutter.
+  // Trois changements : le hero devient une CARTE posée sur la page (marges,
+  // coins arrondis) ; le dégradé plein cède la place à un fond sombre calme
+  // avec deux halos très diffus aux couleurs des équipes ; le championnat
+  // passe en haut à GAUCHE avec sa pastille de logo, exactement comme
+  // l'affiche du match du jour — les deux écrans se répondent.
+  const heroColors = getMatchTeamColors(match.homeTeam?.name, match.awayTeam?.name)
 
-      {/* Top bar : retour + badge compétition */}
-      <div className="mp__hero__top">
-        <button className="mp__hero__back" onClick={onBack}>‹ En Direct</button>
-        <div className="mp__hero__comp">
-          {emblem && <img src={emblem} alt="" className="mp__hero__compLogo" />}
-          <span className="mp__hero__compName">{compName}</span>
+  return (
+    <div className="lmp__heroOuter">
+      {/* Le retour sort du panneau : c'est une action de navigation, pas une
+          info du match — il n'a rien à faire dans la carte. */}
+      <button className="lmp__heroBack" onClick={onBack}>‹ En Direct</button>
+
+      <div
+        className="mp__hero lmp__hero"
+        style={{ '--lmp-hc': heroColors.home.main, '--lmp-hc2': heroColors.away.main }}
+      >
+        <span className="lmp__heroGlowL" aria-hidden="true" />
+        <span className="lmp__heroGlowR" aria-hidden="true" />
+
+      {/* Bandeau : championnat à gauche, bien lisible */}
+      <div className="mp__hero__top lmp__heroTop">
+        <div className="mp__hero__comp lmp__heroComp">
+          {emblem && (
+            <span className="lmp__heroCompIcon"><img src={emblem} alt="" /></span>
+          )}
+          <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
         </div>
       </div>
 
@@ -369,6 +392,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           </div>
         )
       })()}
+      </div>
     </div>
   )
 }

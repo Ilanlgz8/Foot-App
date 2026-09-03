@@ -670,3 +670,115 @@
   color: rgba(var(--white-rgb),0.4);
   font-size: 0.9rem;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   PANNEAU FLOTTANT (refonte 02/09, maquette validée avec l'utilisateur)
+   Constat de départ : "le score et tout, c'est un peu brouillon".
+   Diagnostic sur la page réelle : cinq éléments centrés empilés (minute,
+   score, période, diffuseur, buteurs), chacun avec son style, aucun ne
+   dominant — le tout sur un dégradé plein très saturé contre lequel
+   chaque texte devait lutter.
+   Trois changements : le hero devient une CARTE posée sur la page ; le
+   dégradé plein cède la place à un fond sombre calme + deux halos très
+   diffus aux couleurs des équipes ; le championnat passe en haut à GAUCHE
+   avec sa pastille de logo, comme l'affiche du match du jour.
+   Tout est scopé .lmp__ : MatchPage (qui partage .mp__hero) n'est pas
+   touché.
+   ══════════════════════════════════════════════════════════════════ */
+.lmp__heroOuter {
+  padding: 0.75rem 0.85rem 0;
+}
+.lmp__heroBack {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  padding: 6px 13px;
+  border: 1px solid rgba(var(--white-rgb),0.12);
+  border-radius: 20px;
+  background: rgba(var(--white-rgb),0.05);
+  color: rgba(var(--white-rgb),0.85);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* La carte elle-même — surcharge le hero plein écran hérité de MatchPage. */
+#root .lmp__hero {
+  position: relative;
+  overflow: hidden;
+  padding: 0.9rem 1rem 1.05rem;
+  border: 1px solid rgba(var(--white-rgb),0.09);
+  border-radius: 20px;
+  background: linear-gradient(158deg, #16171f 0%, #0e0f14 62%, #0b0c10 100%);
+  box-shadow: 0 18px 40px -20px rgba(var(--black-rgb),0.95);
+}
+/* Halos très diffus aux couleurs des 2 équipes : garde l'identité du match
+   sans que le texte ait à lutter contre un aplat saturé. */
+.lmp__heroGlowL,
+.lmp__heroGlowR {
+  position: absolute;
+  top: -42%;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  filter: blur(46px);
+  pointer-events: none;
+}
+.lmp__heroGlowL {
+  left: -18%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc, #ef4444) 55%, transparent), transparent 70%);
+}
+.lmp__heroGlowR {
+  right: -18%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc2, #3b5bfd) 50%, transparent), transparent 70%);
+}
+
+/* Bandeau : championnat à gauche, lisible (même traitement que la carte
+   "Match du jour" de l'Accueil). Le retour est sorti du panneau. */
+.lmp__heroTop {
+  justify-content: flex-start;
+  margin-bottom: 26px;
+}
+.lmp__heroComp { gap: 9px; }
+.lmp__heroCompIcon {
+  height: 20px;
+  min-width: 20px;
+  max-width: 62px;
+  padding: 3px 4px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  background: rgba(var(--white-rgb),0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
+}
+.lmp__heroCompIcon img {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+#root .lmp__heroCompName {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-transform: none;
+  opacity: 1;
+}
+
+/* Score en Bebas Neue — même police que l'affiche "Match du jour", pour que
+   les deux écrans se répondent. tabular-nums : la mise en page ne bouge pas
+   quand le score change en direct. */
+#root .lmp__hero .mp__hero__score {
+  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
+  font-size: 4.1rem;
+  font-weight: 400;
+  line-height: 0.82;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 4px 20px rgba(var(--black-rgb),0.9);
+}
