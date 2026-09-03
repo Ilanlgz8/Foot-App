@@ -285,6 +285,12 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           )}
           <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
         </div>
+        {/* Période en HAUT À DROITE (02/09, demande explicite) — même
+            emplacement que sur l'affiche "Match du jour" de l'Accueil, donc
+            même repère d'un écran à l'autre. La minute, elle, reste juste
+            au-dessus du score : c'est la seule des deux qui change en
+            permanence, elle a sa place à côté du chiffre qu'elle qualifie. */}
+        {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
       </div>
 
       {/* Centre : crests + score */}
@@ -317,7 +323,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               <span className="lmp__heroMinuteText">{minuteLabel}</span>
               {!isTermine && <span className="lmp__heroLiveDot lmp__heroLiveDot--ghost" aria-hidden="true" />}
             </span>
-            {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
             {(repriseImminente || repriseDans != null) && (
               <span className="lmp__heroReprise">
                 {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}

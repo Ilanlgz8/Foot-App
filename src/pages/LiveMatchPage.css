@@ -737,7 +737,8 @@
 /* Bandeau : championnat à gauche, lisible (même traitement que la carte
    "Match du jour" de l'Accueil). Le retour est sorti du panneau. */
 .lmp__heroTop {
-  justify-content: flex-start;
+  /* Championnat à gauche, période à droite (space-between par défaut du
+     .mp__hero__top hérité) — même équilibre que la carte "Match du jour". */
   margin-bottom: 26px;
 }
 .lmp__heroComp { gap: 9px; }
