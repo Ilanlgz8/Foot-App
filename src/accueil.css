@@ -2192,15 +2192,16 @@
    logo est rendu à pleine hauteur quel que soit son ratio, et la pastille
    s'élargit d'elle-même pour les logotypes horizontaux. `max-width` borne le
    cas extrême pour que le nom du championnat garde sa place. */
-/* ⚠️ Hauteur demandée explicitement (02/09) : 8px de LOGO. La pastille fait
-   donc 14px (8 + 6 de padding). C'est volontairement très discret — plus
-   petit que le texte "Journée X" juste à côté. Voir le commentaire ci-dessous
-   pour la raison de la largeur libre. */
+/* ⚠️ Hauteur du LOGO fixée à 14px (02/09, après une passe à 8px jugée trop
+   discrète). La pastille fait donc 20px (14 + 6 de padding vertical). À cette
+   taille le logo est de la hauteur du texte "Ligue 1" à côté, sans le
+   dominer. Voir le commentaire ci-dessous pour la raison de la largeur
+   libre. */
 .accueil__mdjLeagueIcon {
-  height: 14px;
-  min-width: 14px;
-  max-width: 42px;
-  padding: 0 3px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 62px;
+  padding: 3px 4px;
   border-radius: 5px;
   flex-shrink: 0;
   background: rgba(var(--white-rgb),0.94);
