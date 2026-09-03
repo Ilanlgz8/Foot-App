@@ -13,7 +13,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
-import { getMatchGradient, getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useEspnMatchStats } from '../hooks/useMatchDetail'
 import { useMatches, useLowerDivisionStats, useH2HHistory } from '../hooks/useMatchs'
@@ -244,10 +244,9 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
     }
   }, [hs, as_, scoreKey])
 
-  const gradient = getMatchGradient(
-    match.homeTeam?.name || match.homeTeam?.shortName || '',
-    match.awayTeam?.name || match.awayTeam?.shortName || ''
-  )
+  // (getMatchGradient n'est plus utilisé ici : depuis le passage en panneau
+  // flottant, le fond est une base sombre + 2 halos diffus portés par le CSS,
+  // plus un dégradé plein injecté en style inline. Voir .lmp__hero.)
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
