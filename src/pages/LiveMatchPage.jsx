@@ -265,23 +265,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
         </div>
       </div>
 
-      {/* Badge minute live + reprise (reprise SOUS "MT", pas au-dessus) */}
-      <div className="lmp__heroBadgeCol">
-        <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
-          {/* Dot fantôme symétrique à droite : sans lui, le point live à
-              gauche décale visuellement le texte de la minute par rapport
-              au score en dessous (qui, lui, n'a pas cet élément asymétrique). */}
-          {!isTermine && <span className="lmp__heroLiveDot" />}
-          <span className="lmp__heroMinuteText">{minuteLabel}</span>
-          {!isTermine && <span className="lmp__heroLiveDot lmp__heroLiveDot--ghost" aria-hidden="true" />}
-        </span>
-        {(repriseImminente || repriseDans != null) && (
-          <span className="lmp__heroReprise">
-            {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}
-          </span>
-        )}
-      </div>
-
       {/* Centre : crests + score */}
       <div className="mp__hero__mid">
         <div className="mp__hero__team">
@@ -294,8 +277,33 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
         </div>
 
         <div className="mp__hero__center">
+          {/* ⚠️ REGROUPÉ AU-DESSUS DU SCORE (02/09, demande utilisateur) :
+              la minute était dans un bloc séparé AVANT toute la rangée (donc
+              au-dessus des blasons, pas du score) et la période s'affichait
+              SOUS le score. Les deux disaient pourtant la même chose — où en
+              est le match — et encadraient le score sans le servir.
+              Elles forment maintenant un seul groupe de statut juste au-dessus
+              du score, centré. Le diffuseur (WatchBadge) reste sous le score,
+              conformément à la demande : c'est une info d'une autre nature,
+              pas un état de match. */}
+          <div className="lmp__heroStatus">
+            <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
+              {/* Dot fantôme symétrique à droite : sans lui, le point live à
+                  gauche décale visuellement le texte de la minute par rapport
+                  au score en dessous (qui, lui, n'a pas cet élément asymétrique). */}
+              {!isTermine && <span className="lmp__heroLiveDot" />}
+              <span className="lmp__heroMinuteText">{minuteLabel}</span>
+              {!isTermine && <span className="lmp__heroLiveDot lmp__heroLiveDot--ghost" aria-hidden="true" />}
+            </span>
+            {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
+            {(repriseImminente || repriseDans != null) && (
+              <span className="lmp__heroReprise">
+                {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}
+              </span>
+            )}
+          </div>
+
           <span className="mp__hero__score">{h} – {a}</span>
-          {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
           {/* Score des tab en direct — ESPN expose un champ shootoutScore dédié
               par compétiteur (voir api/fifa-live.js), déjà tracké côté client
               dans espnScoresCache (useLiveMinute.js) mais pas encore affiché ici. */}

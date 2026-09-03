@@ -176,14 +176,18 @@
 }
 
 /* Colonne : reprise (si présente) AU-DESSUS de la minute */
-.lmp__heroBadgeCol {
+/* ⚠️ REMPLACE .lmp__heroBadgeCol (02/09) : la minute vivait dans un bloc
+   place AVANT toute la rangee du milieu, donc au-dessus des BLASONS et pas du
+   score, tandis que la periode s'affichait SOUS le score. Les deux disent la
+   meme chose (ou en est le match) et encadraient le score sans le servir.
+   Elles forment maintenant un seul groupe centre juste au-dessus du score.
+   Le diffuseur (WatchBadge) reste sous le score : autre nature d'info. */
+.lmp__heroStatus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  margin: 0.45rem 0 0.25rem;
-  position: relative;
-  z-index: 2;
+  gap: 0.25rem;
+  margin-bottom: 0.45rem;
 }
 
 /* Minute live : pas de pill/bordure (peu lisible sur le dégradé) — un texte
@@ -250,7 +254,6 @@
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
 .lmp__heroPeriodBadge {
   display: inline-block;
-  margin-top: 0.3rem;
   padding: 2px 8px;
   background: rgba(var(--white-rgb),0.1);
   border: 1px solid rgba(var(--white-rgb),0.18);
