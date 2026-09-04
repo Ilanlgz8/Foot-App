@@ -843,6 +843,14 @@
      rayon reste nécessaire au rendu de la bordure et du fond. */
   clip-path: inset(0 round 20px);
 }
+
+/* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
+   -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
+   `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé
+   amputé. Ramené à l'intérieur pour cette carte précise. */
+#root .lmp__hero.sf-liveBorder::before {
+  inset: 0;
+}
 /* Halos très diffus aux couleurs des 2 équipes : garde l'identité du match
    sans que le texte ait à lutter contre un aplat saturé. */
 .lmp__heroGlowL,

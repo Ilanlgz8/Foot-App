@@ -274,8 +274,18 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           info du match — il n'a rien à faire dans la carte. */}
       <button className="lmp__heroBack" onClick={onBack}>‹ En Direct</button>
 
+      {/* ⚠️ .sf-liveBorder UNIQUEMENT tant que le match n'est pas terminé
+          (05/09). Le contour rouge fixe du panneau est désormais présent sur
+          les trois pages (match à venir, direct, terminé), ce qui lui a fait
+          perdre sa valeur de signal ; l'animation la lui rend, mais seulement
+          là où elle veut dire quelque chose. Un mouvement se repère seul, là
+          où un rouge simplement plus vif ne se voit qu'en comparaison.
+          .sf-liveBorder existait déjà dans index.css, écrite pour cet usage
+          exact et branchée nulle part — elle respecte aussi
+          prefers-reduced-motion, l'animation s'arrête pour qui a désactivé les
+          animations dans son système. */}
       <div
-        className="mp__hero lmp__hero"
+        className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}`}
         style={{ '--lmp-hc': heroColors.home.main, '--lmp-hc2': heroColors.away.main }}
       >
         <span className="lmp__heroGlowL" aria-hidden="true" />
