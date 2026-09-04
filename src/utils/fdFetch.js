@@ -42,6 +42,37 @@
 // informatif : ne change ni ne retarde le comportement de fdFetch, l'appel
 // reste rejeté exactement comme avant pour l'appelant.
 import { reportFetchFailure } from '../hooks/useNetworkQuality'
+// ⚠️ AJOUT (04/09, constat utilisateur "le logo Monaco a l'air flou") : 8 clubs
+// de l'élite n'ont qu'un écusson 70×70 chez football-data.org. Voir
+// crestOverrides.js pour la liste vérifiée et le raisonnement complet.
+import { overrideCrestUrls } from '../data/crestOverrides'
+
+/**
+ * Réécrit les URLs d'écusson basse résolution dans le corps de la réponse.
+ *
+ * Point d'application unique et volontaire : TOUT le trafic football-data.org
+ * de l'app passe par fdFetch (vérifié), donc corriger ici couvre matchs,
+ * classements, buteurs et confrontations d'un seul coup, sans toucher aux
+ * ~20 composants qui affichent un `team.crest`.
+ *
+ * Le corps est lu puis réemballé dans une nouvelle Response : les appelants
+ * continuent d'utiliser `.json()`, `.ok`, `.status` et surtout l'en-tête
+ * `X-Cache` (lu par registerFdCallAttempt dans plusieurs hooks) exactement
+ * comme avant — les en-têtes sont recopiés tels quels, à l'exception de
+ * content-length / content-encoding qui décrivaient le corps compressé
+ * d'origine et n'ont plus de sens sur un corps reconstruit.
+ */
+async function withSharpCrests(res) {
+  const text = await res.text()
+  const headers = new Headers(res.headers)
+  headers.delete('content-length')
+  headers.delete('content-encoding')
+  return new Response(overrideCrestUrls(text), {
+    status:     res.status,
+    statusText: res.statusText,
+    headers,
+  })
+}
 
 export async function fdFetch(url, options = {}) {
   // Aucun appelant ne passe son propre signal aujourd'hui (vérifié) → pas besoin
@@ -58,7 +89,11 @@ export async function fdFetch(url, options = {}) {
   // fraîcheur reste gérée par Redis (serveur, partagé) + localStorage
   // (client, résilience hors-ligne) — les 2 couches déjà testées.
   try {
-    return await fetch(url, { cache: 'no-store', ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
+    const res = await fetch(url, { cache: 'no-store', ...options, signal: options.signal ?? AbortSignal.timeout(15000) })
+    // Réponses en erreur (429/403 du garde-fou, 5xx) : renvoyées telles quelles,
+    // sans toucher au corps — elles ne contiennent aucun écusson, et les
+    // appelants gèrent déjà ces cas à l'identique depuis toujours.
+    return res.ok ? await withSharpCrests(res) : res
   } catch (err) {
     if (err.name === 'TimeoutError' || err.name === 'AbortError' || err instanceof TypeError) {
       reportFetchFailure()
