@@ -261,7 +261,11 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         <div className="mp__hero__center">
           {/* Statut AU-DESSUS de l'heure/du score, sans cadre — même
               disposition que la minute sur la page du direct. */}
-          <span className="lmp__heroWhenLabel">
+          {/* Modificateur --ft (04/09, demande utilisateur : "Terminé" en rouge)
+              plutôt qu'une couleur posée sur .lmp__heroWhenLabel : cette même
+              classe sert AUSSI à la date d'un match à venir ("Aujourd'hui",
+              "Demain"…), qui n'a aucune raison de passer en rouge. */}
+          <span className={`lmp__heroWhenLabel${isFinished ? ' lmp__heroWhenLabel--ft' : ''}`}>
             {isFinished ? 'Terminé' : formatDate(match.utcDate)}
           </span>
           {isFinished ? (

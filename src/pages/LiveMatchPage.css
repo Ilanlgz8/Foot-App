@@ -188,6 +188,13 @@
    Texte nu, sans fond ni bordure : la version précédente utilisait
    .lmp__heroPeriodBadge, dont l'encadré translucide a été signalé comme un
    "cadre verre dépoli" gênant. */
+/* "Terminé", sur la page d'un match joué (04/09, demande utilisateur). Rouge
+   de l'app, comme la minute sur la page du direct — la date d'un match à venir
+   garde son gris, elle utilise la même classe SANS ce modificateur. */
+.lmp__heroWhenLabel--ft {
+  color: var(--red);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
+}
 .lmp__heroWhenLabel {
   font-size: 0.6rem;
   font-weight: 800;
