@@ -315,6 +315,12 @@
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
 /* ⚠️ Encadré translucide RETIRÉ (04/09, demande utilisateur) — voir le même
    commentaire sur .poster__topbarPeriod (accueil.css). */
+/* Période en rouge pendant le match — même famille que la minute juste en
+   dessous (--red-light, lisible sur n'importe quel dégradé d'équipes). */
+.lmp__heroPeriodBadge--live {
+  color: var(--red-light);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.85);
+}
 .lmp__heroPeriodBadge {
   display: inline-block;
   font-size: 0.62rem;

@@ -303,7 +303,18 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
             même repère d'un écran à l'autre. La minute, elle, reste juste
             au-dessus du score : c'est la seule des deux qui change en
             permanence, elle a sa place à côté du chiffre qu'elle qualifie. */}
-        {periodBadge && <span className="lmp__heroPeriodBadge">{periodBadge}</span>}
+        {/* Rouge tant que le match est en cours (04/09, demande utilisateur :
+            "les minutes du match en rouge, et quand c'est la mi-temps le MT
+            aussi"). La minute et le "MT" du centre l'étaient déjà ; ce badge
+            de période était le dernier élément d'état resté blanc. Le
+            modificateur est conditionné à `!isTermine` pour qu'un match qui
+            vient de se terminer ne garde pas une mention rouge, qui signale
+            "ça se joue en ce moment". */}
+        {periodBadge && (
+          <span className={`lmp__heroPeriodBadge${isTermine ? '' : ' lmp__heroPeriodBadge--live'}`}>
+            {periodBadge}
+          </span>
+        )}
       </div>
 
       {/* Centre : crests + score */}
