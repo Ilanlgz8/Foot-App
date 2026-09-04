@@ -745,11 +745,10 @@
   display: inline-block;
   font-size: 0.56rem;
   font-weight: 800;
-  /* Rouge, et sans le cadre "verre dépoli" (fond translucide + bordure +
-     arrondi) : c'est le même libellé de période que sur les affiches de
-     l'Accueil et la page du direct, il suit donc le même traitement. */
-  color: var(--red);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+  /* Blanc comme .poster__topbarPeriod (voir son commentaire), et sans le cadre
+     "verre dépoli" (fond translucide + bordure + arrondi) qui avait été oublié
+     ici lors du nettoyage des autres surfaces. */
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1680,11 +1679,14 @@
   flex-shrink: 0;
   font-size: 0.56rem;
   font-weight: 800;
-  /* Rouge comme la minute juste en dessous, et comme le badge de période de la
-     page du direct. Aucune condition à poser : cet élément n'est rendu que
-     pendant un match en cours (MatchPoster.jsx, `isLive && posterPeriodLabel`). */
-  color: var(--red);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+  /* ⚠️ REVENU AU BLANC (04/09), en même temps que la minute juste en dessous :
+     "même le statut du match laisse en blanc aussi". Sur ces cards, le rouge
+     ne passait pas — elles sont petites et posées sur un dégradé aux deux
+     couleurs d'équipe, souvent déjà chargé.
+     La page du direct, elle, garde sa minute et son badge de période en rouge :
+     bandeau plus grand, plus sombre, le rouge y fonctionne. L'écart est un
+     choix assumé, pas un oubli — ne pas "harmoniser" sans redemander. */
+  color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
