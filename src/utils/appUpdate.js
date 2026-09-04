@@ -33,41 +33,48 @@
  */
 
 /**
- * ⚠️ CORRIGÉ AVANT MISE EN LIGNE (04/09) : une 1re version ne comparait que le
- * bundle JS. Testée en conditions réelles (déploiement d'une modification CSS
- * puis retour au premier plan sans rien purger), elle ne détectait RIEN — un
- * changement de CSS seul ne modifie pas le hash du JS, et l'immense majorité
- * des modifications de cette journée étaient précisément du CSS. On compare
- * donc TOUS les assets référencés, JS comme CSS.
+ * ⚠️ DEUX ERREURS SUCCESSIVES ICI, corrigées — à lire avant de retoucher.
+ *
+ * 1. La 1re version ne comparait que le bundle JS. Un changement de CSS seul
+ *    ne modifie pas son hash, et l'essentiel des modifications de la journée
+ *    était précisément du CSS : elle ne détectait rien.
+ *
+ * 2. La 2e comparait TOUS les assets référencés. C'est elle qui a fait
+ *    "tourner l'app en boucle" chez l'utilisateur : index.html contient huit
+ *    balises `<link rel="modulepreload">` vers des morceaux de code, or la
+ *    page en cours ne les expose PAS sous cette forme. Ces huit assets étaient
+ *    donc toujours "présents côté serveur, absents côté page" — la page était
+ *    jugée périmée en permanence, y compris juste après un rechargement, d'où
+ *    rechargement → purge → rechargement… sans fin.
+ *
+ * D'où la règle actuelle, volontairement étroite : on ne compare QUE les deux
+ * assets d'entrée (`/assets/index-*.js` et `/assets/index-*.css`). Ce sont les
+ * seuls dont on est certain qu'ils figurent des deux côtés, et ils suffisent
+ * comme empreinte de version : le bundle d'entrée référence les noms de tous
+ * les morceaux, donc son hash change dès que n'importe lequel change.
  */
 
-/** Assets référencés par le HTML servi par le serveur. */
+const ENTRY_RE = /\/assets\/index-[A-Za-z0-9._-]+\.(?:js|css)/g
+
+/** Assets d'entrée référencés par le HTML servi par le serveur. */
 export function assetsFromHtml(html) {
   if (typeof html !== 'string') return []
-  const found = html.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) ?? []
-  return [...new Set(found)].sort()
+  return [...new Set(html.match(ENTRY_RE) ?? [])].sort()
 }
 
-/** Assets réellement chargés par la page en cours. */
+/** Assets d'entrée réellement chargés par la page en cours. */
 export function assetsFromDocument(doc = document) {
-  const nodes = doc.querySelectorAll('script[src], link[rel="stylesheet"][href]')
+  const nodes = doc.querySelectorAll('script[src], link[href]')
   const found = [...nodes]
     .map(el => el.getAttribute('src') || el.getAttribute('href') || '')
-    .map(u => (u.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/) ?? [])[0])
-    .filter(Boolean)
+    .flatMap(u => u.match(ENTRY_RE) ?? [])
   return [...new Set(found)].sort()
 }
 
 /**
  * @returns 'ok' | 'reload' | 'purge'  — l'action à mener.
  * Séparé du reste (et testé) : c'est la seule décision qui puisse être fausse,
- * et une erreur ici coûterait cher (boucle de rechargement).
- *
- * Comparaison par INCLUSION et non par égalité : le HTML servi ne référence
- * que les assets d'entrée, tandis que la page en cours a pu charger en plus
- * des morceaux à la demande (une route visitée). La question est donc "la page
- * a-t-elle bien tout ce que le serveur sert aujourd'hui ?", pas "a-t-elle
- * exactement la même liste ?".
+ * et une erreur ici coûte cher — la preuve.
  */
 export function decideUpdateAction(running, deployed, alreadyReloaded) {
   // Une des deux listes est vide (HTML inattendu, réseau coupé, mode dev) :
@@ -78,29 +85,6 @@ export function decideUpdateAction(running, deployed, alreadyReloaded) {
   return alreadyReloaded ? 'purge' : 'reload'
 }
 
-/**
- * ⚠️⚠️ GARDE-FOU AJOUTÉ EN URGENCE (04/09, utilisateur : "c'est le start de
- * l'app qui tourne en boucle, qu'est-ce que tu fais là").
- *
- * La 1re version pouvait boucler à l'infini, et c'est ma faute : le drapeau
- * de session suivait l'ÉTAPE (rechargement simple, puis purge) mais rien ne
- * comptait les tentatives. Enchaînement réel : rechargement → toujours
- * périmé → purge (qui efface le drapeau) → toujours périmé → drapeau absent
- * donc on repart sur un rechargement simple → purge → … sans fin. Il suffisait
- * que la page ne PUISSE pas devenir fraîche — exactement le cas d'un service
- * worker servant un index.html périmé, c'est-à-dire le bug qu'on essayait de
- * corriger — pour que l'app redémarre en boucle.
- *
- * Deux protections désormais, et la règle est simple : au pire 2 tentatives,
- * puis on laisse l'app tranquille. Une app légèrement périmée reste très
- * préférable à une app qui redémarre sans arrêt.
- *   • un compteur de tentatives en localStorage (il survit aux rechargements,
- *     contrairement au drapeau de session qui était remis à zéro par la purge
- *     elle-même — la faille exacte) ;
- *   • une mise en sommeil de 6h une fois ces tentatives épuisées.
- * Le compteur est remis à zéro dès qu'un contrôle constate que la page est à
- * jour, donc une vraie mise à jour ultérieure sera bien prise en compte.
- */
 const FLAG = 'sf_update_reload'
 const ATTEMPTS_KEY = 'sf_update_attempts'
 const MAX_ATTEMPTS = 2

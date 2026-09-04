@@ -78,3 +78,39 @@ describe('la décision seule ne s’arrête jamais — d’où le compteur', () 
     expect(decideUpdateAction([JS_A], [CSS_B], false)).toBe('reload')
   })
 })
+
+// ── Régression : c'est CE cas qui faisait tourner l'app en boucle ────────────
+describe('modulepreload — la cause reelle de la boucle', () => {
+  // index.html reference 8 morceaux en <link rel="modulepreload">. La page en
+  // cours ne les expose pas sous cette forme : les compter rendait la page
+  // "perimee" a jamais, donc rechargement -> purge -> rechargement sans fin.
+  const HTML_REEL = `
+    <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-DGeXAQPT.js">
+    <link rel="modulepreload" crossorigin href="/assets/teamNames-TJLvLqxR.js">
+    <link rel="modulepreload" crossorigin href="/assets/matchUtils-BVUuUbas.js">
+    <script type="module" crossorigin src="/assets/index-CdFAkyTU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-nR9YW97c.css">`
+
+  const PAGE = {
+    querySelectorAll: () => [
+      { getAttribute: k => (k === 'src' ? '/assets/index-CdFAkyTU.js' : null) },
+      { getAttribute: k => (k === 'href' ? '/assets/index-nR9YW97c.css' : null) },
+    ],
+  }
+
+  it('ignore les morceaux preloades des deux cotes', () => {
+    expect(assetsFromHtml(HTML_REEL)).toEqual([
+      '/assets/index-CdFAkyTU.js', '/assets/index-nR9YW97c.css',
+    ].sort())
+  })
+
+  it('une page A JOUR est bien reconnue comme a jour (plus de boucle)', () => {
+    expect(decideUpdateAction(assetsFromDocument(PAGE), assetsFromHtml(HTML_REEL), false)).toBe('ok')
+    expect(decideUpdateAction(assetsFromDocument(PAGE), assetsFromHtml(HTML_REEL), true)).toBe('ok')
+  })
+
+  it('une vraie mise a jour reste detectee', () => {
+    const neuf = HTML_REEL.replace('index-nR9YW97c.css', 'index-ZZZZZZZZ.css')
+    expect(decideUpdateAction(assetsFromDocument(PAGE), assetsFromHtml(neuf), false)).toBe('reload')
+  })
+})
