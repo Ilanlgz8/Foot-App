@@ -749,7 +749,11 @@
   border-radius: 4px;
   font-size: 0.56rem;
   font-weight: 800;
-  color: rgba(var(--white-rgb),0.75);
+  /* Rouge comme la minute, et comme le badge de période de la page du direct.
+     Cet élément n'est rendu QUE pendant un match en cours (voir MatchPoster.jsx,
+     `isLive && posterPeriodLabel`) : aucune condition supplémentaire à poser. */
+  color: var(--red);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1751,14 +1755,17 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  /* Blanc avec halo rouge — même traitement que .lmp__heroMinute
-     (LiveMatchPage), au lieu du rose plein utilisé avant (retour
-     utilisateur : "c'est pas le même CSS que LiveMatchPage"). */
+  /* ⚠️ ROUGE (04/09, demande utilisateur : après la page du direct, "fais dans
+     les cards accueil aussi"). Même traitement exactement que
+     .lmp__heroMinute là-bas : --red, l'ombre noire portée garantissant la
+     lisibilité sur le dégradé aux couleurs des deux équipes. L'affiche "Match
+     du jour" (.accueil__mdjMinute) était déjà dans ce rouge — les trois
+     surfaces qui affichent une minute de jeu sont donc enfin identiques. */
   font-size: 1rem;
   font-weight: 900;
-  color: #ffffff;
+  color: var(--red);
   letter-spacing: 0.06em;
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 14px rgba(var(--red-rgb),0.4);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.95), 0 1px 3px rgba(var(--black-rgb),0.9), 0 0 14px rgba(var(--red-rgb),0.5);
   line-height: 1;
 }
 /* Colonne "MT" + countdown (mi-temps) — reproduit exactement
