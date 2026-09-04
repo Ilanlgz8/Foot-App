@@ -59,3 +59,22 @@ describe('decideUpdateAction', () => {
     expect(decideUpdateAction(undefined, [JS_A], true)).toBe('ok')
   })
 })
+
+// ── Garde-fou anti-boucle ────────────────────────────────────────────────────
+// Reproduit l'enchaînement qui bouclait : rechargement → toujours périmé →
+// purge → toujours périmé → … La décision seule ne peut pas s'arrêter, c'est
+// bien le COMPTEUR de tentatives (localStorage, hors de cette fonction pure)
+// qui doit couper. Ce test documente la limite de decideUpdateAction pour que
+// personne ne la croie suffisante à elle seule.
+describe('la décision seule ne s’arrête jamais — d’où le compteur', () => {
+  it('reste sur "purge" tant que la page est périmée', () => {
+    expect(decideUpdateAction([JS_A], [CSS_B], true)).toBe('purge')
+    expect(decideUpdateAction([JS_A], [CSS_B], true)).toBe('purge')
+  })
+
+  it('revient à "reload" si le drapeau de session a été effacé — la faille exacte', () => {
+    // La purge effaçait elle-même le drapeau : le contrôle suivant repartait
+    // donc du début, d'où la boucle infinie.
+    expect(decideUpdateAction([JS_A], [CSS_B], false)).toBe('reload')
+  })
+})
