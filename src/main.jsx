@@ -2,6 +2,7 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { checkAppVersion } from './utils/appUpdate'
 
 // Auto-reload quand le SW prend le contrôle (skipWaiting + clientsClaim)
 // → plus besoin de vider le cache Safari après chaque déploiement
@@ -36,6 +37,22 @@ if ('serviceWorker' in navigator) {
     if (document.visibilityState === 'visible') checkForUpdate()
   }, 10 * 60 * 1000) // 10min
 }
+
+// ⚠️ AJOUT (04/09, utilisateur : "pourquoi sur mon tel en PWA je vois encore
+// comme avant ?") : tout ce qui précède dépend du navigateur qui redécouvre un
+// nouveau /sw.js. Ça n'a pas suffi une seule fois de la session — il a fallu
+// purger le service worker à la main après chaque déploiement. Cette
+// vérification-ci ne dépend d'aucun mécanisme de service worker : elle compare
+// le bundle qui tourne à celui que le serveur sert. Voir appUpdate.js.
+const runningAsset = import.meta.url
+const runVersionCheck = () => {
+  if (document.visibilityState === 'visible') checkAppVersion(runningAsset)
+}
+document.addEventListener('visibilitychange', runVersionCheck)
+window.addEventListener('focus', runVersionCheck)
+// Au démarrage, mais pas avant que React ait eu le temps de monter : recharger
+// pendant le tout premier rendu donnerait un écran qui clignote.
+setTimeout(runVersionCheck, 4000)
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'

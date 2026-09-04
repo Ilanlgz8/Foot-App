@@ -239,8 +239,12 @@
    min"), supprimée le même jour, et la minute est passée de 1,3 à 1,1rem.
    Le bloc mesure donc ~24 px de moins qu'avant, ce qui libère d'autant la
    marge sous le bandeau du haut qui limitait la valeur. */
+/* 42 → 34 px (04/09, demande utilisateur : "baisse le bloc minute + score +
+   diffuseur, pas beaucoup mais un peu"). Le bloc entier descend donc de 8 px ;
+   le score reste au niveau des écussons, il passe simplement d'un poil
+   au-dessus de leur centre à un poil en dessous. */
 #root .lmp__hero .mp__hero__center {
-  margin-top: -42px;
+  margin-top: -34px;
 }
 
 /* Minute live : pas de pill/bordure (peu lisible sur le dégradé) — un texte
