@@ -175,7 +175,6 @@
   padding-bottom: 1.2rem;
 }
 
-/* Colonne : reprise (si présente) AU-DESSUS de la minute */
 /* ⚠️ REMPLACE .lmp__heroBadgeCol (02/09) : la minute vivait dans un bloc
    place AVANT toute la rangee du milieu, donc au-dessus des BLASONS et pas du
    score, tandis que la periode s'affichait SOUS le score. Les deux disent la
@@ -235,8 +234,13 @@
    compte deux lignes (période + minute), soit ~26 px de plus qu'une simple
    date — c'est ce cas-là qui limite, et à 32 px il reste encore de la marge
    avant de toucher le nom du championnat. */
+/* 32 → 42 px (04/09) : le score restait bas. Deux raisons, et la 2e a
+   disparu depuis — le bloc de statut comptait une 2e ligne ("Reprise dans X
+   min"), supprimée le même jour, et la minute est passée de 1,3 à 1,1rem.
+   Le bloc mesure donc ~24 px de moins qu'avant, ce qui libère d'autant la
+   marge sous le bandeau du haut qui limitait la valeur. */
 #root .lmp__hero .mp__hero__center {
-  margin-top: -32px;
+  margin-top: -42px;
 }
 
 /* Minute live : pas de pill/bordure (peu lisible sur le dégradé) — un texte
@@ -249,7 +253,8 @@
   justify-content: center;
   gap: 0.4rem;
   font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.3rem;
+  /* 1.3 → 1.1rem (04/09, retour utilisateur : "le MT est trop gros"). */
+  font-size: 1.1rem;
   font-weight: 800;
   color: #fff;
   letter-spacing: 0.04em;
@@ -287,18 +292,13 @@
 }
 
 /* Reprise label */
-.lmp__heroReprise {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: rgba(255,200,50,0.95);
-  letter-spacing: 0.04em;
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.5);
-  animation: lmpPulse 1.8s ease-in-out infinite;
-}
-@keyframes lmpPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
-}
+/* ⚠️ .lmp__heroReprise et son animation lmpPulse ont été SUPPRIMÉS (04/09) :
+   le compte à rebours "Reprise dans X min" a été retiré de cette page à la
+   demande de l'utilisateur, plus aucun élément ne portait ces règles (vérifié
+   par grep : lmpPulse n'était utilisée que là). Le compte à rebours existe
+   toujours sur les cards de l'Accueil, avec ses propres classes
+   (.poster__reprise-label). */
+
 
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
 /* ⚠️ Encadré translucide RETIRÉ (04/09, demande utilisateur) — voir le même

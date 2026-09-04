@@ -143,12 +143,14 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
   // Une seule valeur, utilisée de façon cohérente pour tout ce render (même
   // pattern que Live.jsx/MatchCard.jsx) — recalculée au prochain re-render live.
-  const pauseElapsed = (isHalftime && matchSt.pausedAt && !matchSt.half2Start)
-    // eslint-disable-next-line react-hooks/purity
-    ? Date.now() - matchSt.pausedAt : null
-  const repriseImminente = pauseElapsed != null && pauseElapsed >= 15 * 60_000
-  const repriseDans = pauseElapsed != null && pauseElapsed < 15 * 60_000
-    ? Math.max(1, Math.ceil((15 * 60_000 - pauseElapsed) / 60_000)) : null
+  // ⚠️ SUPPRIMÉ (04/09, demande utilisateur : "enlève le 'reprise dans x
+  // minutes', juste dans livematchpage") : le compte à rebours de mi-temps
+  // (pauseElapsed / repriseImminente / repriseDans) n'était lu QUE par le
+  // bloc .lmp__heroReprise de cette page — retirer l'affichage rendait donc
+  // ces trois calculs morts, ils partent avec.
+  // ⚠️ Uniquement ICI : l'affiche "Match du jour" et les cards de l'Accueil
+  // (MatchPoster.jsx, .poster__reprise-label) gardent ce compte à rebours,
+  // demande explicitement limitée à cette page.
 
   // ⚠️ FILET DE SÉCURITÉ (bug signalé : "reprise dans Xmin" jamais affiché,
   // juste "Mi-temps" statique, ET la minute affichée ensuite en 2e MT décalée
@@ -334,11 +336,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               <span className="lmp__heroMinuteText">{minuteLabel}</span>
               {!isTermine && <span className="lmp__heroLiveDot lmp__heroLiveDot--ghost" aria-hidden="true" />}
             </span>
-            {(repriseImminente || repriseDans != null) && (
-              <span className="lmp__heroReprise">
-                {repriseImminente ? 'Reprise imminente' : `Reprise dans ${repriseDans} min`}
-              </span>
-            )}
           </div>
 
           <span className="mp__hero__score">{h} – {a}</span>
