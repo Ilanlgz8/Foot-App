@@ -304,6 +304,9 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
               <span
                 className="accueil__mdjLeagueIcon"
                 data-opaque={mdjComp?.emblemOpaque ? '1' : undefined}
+                /* Logo détouré (Premier League) : pas d'ombre portée de tuile,
+                   elle serait rectangulaire derrière une image sans fond. */
+                data-transparent={mdjComp?.emblemTransparent ? '1' : undefined}
                 /* emblemBg : fond imposé par la compétition (LaLiga = noir,
                    son logo étant un tracé monochrome rouge illisible sur
                    blanc). Absent pour toutes les autres → pastille blanche. */

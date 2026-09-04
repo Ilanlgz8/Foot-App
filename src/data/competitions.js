@@ -190,7 +190,24 @@ export const COMPETITIONS = [
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
+    // ⚠️ L'APLAT VIOLET A ÉTÉ DÉTOURÉ (04/09, demande utilisateur) : le fichier
+    // ne contient plus que le lion blanc sur transparent. Le violet était un
+    // fond plein baké dans l'image (#39003D), et le lion étant blanc, aucune
+    // couleur ne se confondait — le détourage est net, bords anticrénelés
+    // compris (opacité résolue par pixel plutôt que découpée au seuil).
+    // `emblemOpaque` reste à true : ce drapeau ne dit pas "l'image a un fond",
+    // il commande "pas de pastille blanche derrière". Le retirer collerait le
+    // lion BLANC sur une pastille BLANCHE, donc invisible — exactement
+    // l'inverse du but.
     emblemOpaque: true,
+    // Une ombre sombre est bakée dans l'image : invisible sur les fonds
+    // sombres de l'app, elle détache le lion si la card affiche une équipe aux
+    // couleurs claires. `emblemTransparent` sert uniquement à retirer l'ombre
+    // portée du conteneur sur l'affiche "Match du jour" : dessinée autour d'une
+    // image sans fond, elle produirait un halo RECTANGULAIRE derrière un logo
+    // détouré. Elle reste en place pour Ligue 1 et Serie A, qui sont de vraies
+    // tuiles pleines.
+    emblemTransparent: true,
   },
   {
     id: 'PD',

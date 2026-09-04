@@ -2289,6 +2289,14 @@
   box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
   overflow: hidden;
 }
+/* Logo détouré (Premier League) : l'ombre ci-dessus est dessinée autour de la
+   BOÎTE, elle produirait donc un halo rectangulaire derrière une image sans
+   fond. La lisibilité sur fond clair est déjà assurée par l'ombre bakée dans
+   le fichier lui-même. Doit rester APRÈS la règle ci-dessus (même
+   spécificité, c'est l'ordre qui tranche). */
+.accueil__mdjLeagueIcon[data-transparent="1"] {
+  box-shadow: none;
+}
 .accueil__mdjLeagueText {
   display: flex;
   flex-direction: column;
