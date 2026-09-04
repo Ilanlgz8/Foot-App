@@ -1,42 +1,61 @@
 import { describe, it, expect } from 'vitest'
-import { assetFromHtml, assetFromUrl, decideUpdateAction } from './appUpdate'
+import { assetsFromHtml, assetsFromDocument, decideUpdateAction } from './appUpdate'
 
-const A = '/assets/index-BOo-19lt.js'
-const B = '/assets/index-C5jGGBgq.js'
+const JS_A  = '/assets/index-AAAAAAAA.js'
+const CSS_A = '/assets/index-CCCCCCCC.css'
+const CSS_B = '/assets/index-DDDDDDDD.css'
+const LAZY  = '/assets/LiveMatchPage-EEEEEEEE.js'
 
-describe('extraction du bundle', () => {
-  it('lit l’asset dans le HTML servi', () => {
-    expect(assetFromHtml(`<script type="module" crossorigin src="${A}"></script>`)).toBe(A)
+const html = (...assets) =>
+  `<!doctype html><html><head>${assets.map(a =>
+    a.endsWith('.css') ? `<link rel="stylesheet" crossorigin href="${a}">`
+                       : `<script type="module" crossorigin src="${a}"></script>`
+  ).join('')}</head><body><div id="root"></div></body></html>`
+
+const fakeDoc = (...assets) => ({
+  querySelectorAll: () => assets.map(a => ({
+    getAttribute: (k) => (a.endsWith('.css') ? (k === 'href' ? a : null)
+                                             : (k === 'src'  ? a : null)),
+  })),
+})
+
+describe('extraction des assets', () => {
+  it('lit le JS ET le CSS du HTML servi', () => {
+    expect(assetsFromHtml(html(JS_A, CSS_A))).toEqual([CSS_A, JS_A].sort())
   })
-  it('lit l’asset dans l’URL du module courant', () => {
-    expect(assetFromUrl(`https://statfootix.vercel.app${A}`)).toBe(A)
+  it('lit le JS ET le CSS de la page en cours', () => {
+    expect(assetsFromDocument(fakeDoc(JS_A, CSS_A))).toEqual([CSS_A, JS_A].sort())
   })
-  it('renvoie null sur une entrée sans asset (dev, HTML inattendu)', () => {
-    expect(assetFromHtml('<html></html>')).toBeNull()
-    expect(assetFromUrl('http://localhost:5173/src/main.jsx')).toBeNull()
-    expect(assetFromHtml(null)).toBeNull()
-    expect(assetFromUrl(undefined)).toBeNull()
+  it('dédoublonne', () => {
+    expect(assetsFromHtml(html(JS_A, JS_A, CSS_A))).toHaveLength(2)
+  })
+  it('renvoie une liste vide sur une entrée sans asset haché (mode dev)', () => {
+    expect(assetsFromHtml('<html><script src="/src/main.jsx"></script></html>')).toEqual([])
+    expect(assetsFromHtml(null)).toEqual([])
   })
 })
 
 describe('decideUpdateAction', () => {
-  it('même bundle → on ne touche à rien', () => {
-    expect(decideUpdateAction(A, A, false)).toBe('ok')
-    expect(decideUpdateAction(A, A, true)).toBe('ok')
+  it('mêmes assets → on ne touche à rien', () => {
+    expect(decideUpdateAction([JS_A, CSS_A], [JS_A, CSS_A], false)).toBe('ok')
   })
 
-  it('bundle différent → rechargement simple d’abord', () => {
-    expect(decideUpdateAction(A, B, false)).toBe('reload')
+  it('CSS différent, MÊME JS → détecté (le cas qui échappait à la 1re version)', () => {
+    expect(decideUpdateAction([JS_A, CSS_A], [JS_A, CSS_B], false)).toBe('reload')
   })
 
-  it('toujours différent APRÈS un rechargement → purge du service worker', () => {
-    expect(decideUpdateAction(A, B, true)).toBe('purge')
+  it('toujours périmé APRÈS un rechargement → purge du service worker', () => {
+    expect(decideUpdateAction([JS_A, CSS_A], [JS_A, CSS_B], true)).toBe('purge')
+  })
+
+  it('un morceau chargé en plus (route visitée) n’est PAS une mise à jour', () => {
+    expect(decideUpdateAction([JS_A, CSS_A, LAZY], [JS_A, CSS_A], false)).toBe('ok')
   })
 
   it('ne recharge JAMAIS sur une information manquante (pas de boucle)', () => {
-    expect(decideUpdateAction(null, B, false)).toBe('ok')
-    expect(decideUpdateAction(A, null, false)).toBe('ok')
+    expect(decideUpdateAction([], [JS_A], false)).toBe('ok')
+    expect(decideUpdateAction([JS_A], [], false)).toBe('ok')
     expect(decideUpdateAction(null, null, true)).toBe('ok')
-    expect(decideUpdateAction('', B, true)).toBe('ok')
+    expect(decideUpdateAction(undefined, [JS_A], true)).toBe('ok')
   })
 })

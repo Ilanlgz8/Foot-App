@@ -32,30 +32,49 @@
  * possible, une tentative par étape.
  */
 
-/** URL de l'asset servi par le serveur, extraite du HTML. */
-export function assetFromHtml(html) {
-  if (typeof html !== 'string') return null
-  const m = html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)
-  return m ? m[0] : null
+/**
+ * ⚠️ CORRIGÉ AVANT MISE EN LIGNE (04/09) : une 1re version ne comparait que le
+ * bundle JS. Testée en conditions réelles (déploiement d'une modification CSS
+ * puis retour au premier plan sans rien purger), elle ne détectait RIEN — un
+ * changement de CSS seul ne modifie pas le hash du JS, et l'immense majorité
+ * des modifications de cette journée étaient précisément du CSS. On compare
+ * donc TOUS les assets référencés, JS comme CSS.
+ */
+
+/** Assets référencés par le HTML servi par le serveur. */
+export function assetsFromHtml(html) {
+  if (typeof html !== 'string') return []
+  const found = html.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/g) ?? []
+  return [...new Set(found)].sort()
 }
 
-/** Chemin de l'asset réellement en train de tourner. */
-export function assetFromUrl(url) {
-  if (typeof url !== 'string') return null
-  const m = url.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)
-  return m ? m[0] : null
+/** Assets réellement chargés par la page en cours. */
+export function assetsFromDocument(doc = document) {
+  const nodes = doc.querySelectorAll('script[src], link[rel="stylesheet"][href]')
+  const found = [...nodes]
+    .map(el => el.getAttribute('src') || el.getAttribute('href') || '')
+    .map(u => (u.match(/\/assets\/[A-Za-z0-9._-]+\.(?:js|css)/) ?? [])[0])
+    .filter(Boolean)
+  return [...new Set(found)].sort()
 }
 
 /**
  * @returns 'ok' | 'reload' | 'purge'  — l'action à mener.
  * Séparé du reste (et testé) : c'est la seule décision qui puisse être fausse,
  * et une erreur ici coûterait cher (boucle de rechargement).
+ *
+ * Comparaison par INCLUSION et non par égalité : le HTML servi ne référence
+ * que les assets d'entrée, tandis que la page en cours a pu charger en plus
+ * des morceaux à la demande (une route visitée). La question est donc "la page
+ * a-t-elle bien tout ce que le serveur sert aujourd'hui ?", pas "a-t-elle
+ * exactement la même liste ?".
  */
 export function decideUpdateAction(running, deployed, alreadyReloaded) {
-  // Une des deux valeurs manque (HTML inattendu, réseau coupé) : on ne touche
-  // à rien. Ne jamais recharger sur une simple incertitude.
-  if (!running || !deployed) return 'ok'
-  if (running === deployed) return 'ok'
+  // Une des deux listes est vide (HTML inattendu, réseau coupé, mode dev) :
+  // on ne touche à rien. Ne jamais recharger sur une simple incertitude.
+  if (!running?.length || !deployed?.length) return 'ok'
+  const present = new Set(running)
+  if (deployed.every(a => present.has(a))) return 'ok'
   return alreadyReloaded ? 'purge' : 'reload'
 }
 
@@ -80,15 +99,14 @@ async function purgeAndReload() {
 /**
  * Vérifie une fois si la page tourne sur le bundle déployé, et se remet à
  * jour toute seule sinon.
- * @param {string} runningUrl  typiquement import.meta.url
  */
-export async function checkAppVersion(runningUrl) {
+export async function checkAppVersion() {
   const now = Date.now()
   if (now - lastCheck < MIN_INTERVAL_MS) return
   lastCheck = now
 
-  const running = assetFromUrl(runningUrl)
-  if (!running) return   // build inattendu (dev) : on ne fait rien
+  const running = assetsFromDocument()
+  if (running.length === 0) return   // serveur de dev : aucun asset haché
 
   let deployed
   try {
@@ -98,7 +116,7 @@ export async function checkAppVersion(runningUrl) {
     // garde justement en cache, et on ne verrait jamais la différence.
     const res  = await fetch(`/index.html?v=${now}`, { cache: 'no-store' })
     if (!res.ok) return
-    deployed = assetFromHtml(await res.text())
+    deployed = assetsFromHtml(await res.text())
   } catch {
     return   // hors ligne : surtout ne rien casser
   }

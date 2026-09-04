@@ -44,9 +44,8 @@ if ('serviceWorker' in navigator) {
 // purger le service worker à la main après chaque déploiement. Cette
 // vérification-ci ne dépend d'aucun mécanisme de service worker : elle compare
 // le bundle qui tourne à celui que le serveur sert. Voir appUpdate.js.
-const runningAsset = import.meta.url
 const runVersionCheck = () => {
-  if (document.visibilityState === 'visible') checkAppVersion(runningAsset)
+  if (document.visibilityState === 'visible') checkAppVersion()
 }
 document.addEventListener('visibilitychange', runVersionCheck)
 window.addEventListener('focus', runVersionCheck)
