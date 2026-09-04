@@ -27,7 +27,7 @@ import { GroupModal }    from './GroupModal'
 import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
 import { mergeScore } from '../utils/matchUtils'
-import { usePersistedState } from '../hooks/usePersistedState'
+import { usePersistedState, NAV_POSITION_TTL } from '../hooks/usePersistedState'
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 const fmtDate = (d) => {
@@ -102,7 +102,9 @@ function TousResultsView() {
   // au plus vieux, donc index 0 = aujourd'hui/le plus récent avec un
   // résultat). Persisté (même raison que currentRoundKey) pour ne pas
   // repartir d'aujourd'hui à chaque réouverture de l'onglet "Tous".
-  const [currentDayStr, setCurrentDayStr] = usePersistedState('resultats_allDay', null)
+  // TTL : un JOUR mémorisé vieillit encore plus mal qu'une journée de
+  // championnat — au bout de 24h il désigne forcément une date passée.
+  const [currentDayStr, setCurrentDayStr] = usePersistedState('resultats_allDay', null, NAV_POSITION_TTL)
   const foundIdx  = currentDayStr != null ? dayGroups.findIndex(([day]) => day === currentDayStr) : -1
   const dayIndex  = foundIdx >= 0 ? foundIdx : 0
   const dayGroup  = dayGroups[dayIndex]
@@ -190,7 +192,8 @@ function Resultats() {
   // lieu de sa position, et on recalcule l'index à chaque render en la
   // recherchant dans `grouped` — la position peut changer, la journée
   // affichée reste la bonne.
-  const [currentRoundKey, setCurrentRoundKey] = usePersistedState('resultats_currentRoundKey', null)
+  // TTL : voir usePersistedState.js (même raison que Match.jsx).
+  const [currentRoundKey, setCurrentRoundKey] = usePersistedState('resultats_currentRoundKey', null, NAV_POSITION_TTL)
   const [viewMode, setViewMode]         = usePersistedState('resultats_viewMode', 'journee') // 'journee' | 'poule'
   // ⚠️ AJOUT (demande utilisateur : onglet "Tous" — tous les résultats,
   // toutes compétitions confondues, voir TousResultsView plus haut) : 'comp'

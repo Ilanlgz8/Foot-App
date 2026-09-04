@@ -7,7 +7,7 @@ import { PanelSkeleton } from './MatchCard'
 // compétitions (comme l'onglet "Tous"), le badge championnat y a donc sa
 // place — voir ResultCard.jsx pour le détail complet.
 import { ResultCard } from '../components/ResultCard'
-import { usePersistedState } from '../hooks/usePersistedState'
+import { usePersistedState, NAV_POSITION_TTL } from '../hooks/usePersistedState'
 
 // Rétabli (retour utilisateur : la navigation par jour — aujourd'hui ⇄ hier —
 // avait été retirée par erreur suite à un malentendu ; l'utilisateur veut
@@ -63,7 +63,10 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
   // résultats apparaît, ce qui décalerait tous les index suivants — même
   // raison que le fix équivalent dans Resultat.jsx) et on retrouve l'index
   // correspondant à chaque render.
-  const [currentDayStr, setCurrentDayStr] = usePersistedState('accueil_resultDay', null)
+  // TTL : voir usePersistedState.js. C'est aussi la cause la plus probable du
+  // "je n'ai que les résultats d'aujourd'hui" signalé après une réinstallation
+  // de la PWA : le jour affiché restait figé sur celui de la dernière visite.
+  const [currentDayStr, setCurrentDayStr] = usePersistedState('accueil_resultDay', null, NAV_POSITION_TTL)
   const foundIdx = currentDayStr != null ? grouped.findIndex(([day]) => day === currentDayStr) : -1
   const dayIndex = foundIdx >= 0 ? foundIdx : 0
 

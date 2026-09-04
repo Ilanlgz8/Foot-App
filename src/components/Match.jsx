@@ -15,7 +15,7 @@ import { useMatches } from '../hooks/useMatchs'
 import { prefetchTeamForm } from '../hooks/useTeamForm'
 import { useWcKnockout, useCupKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { GroupModal } from './GroupModal'
-import { usePersistedState } from '../hooks/usePersistedState'
+import { usePersistedState, NAV_POSITION_TTL } from '../hooks/usePersistedState'
 import { isNationalTeamComp } from '../utils/matchUtils'
 
 /* ═══════════════════════════════════════════════════════════════
@@ -743,7 +743,10 @@ function Matchs() {
   // Clé scopée par compétition : chaque compét retrouve désormais sa PROPRE
   // position mémorisée (le but originel de usePersistedState, voir son
   // commentaire), sans collision entre compétitions différentes.
-  const [currentIndex,  setCurrentIndex]  = usePersistedState(`matchs_currentIndex_${selectedComp}`, 0)
+  // TTL : voir usePersistedState.js — une position de journée mémorisée sert
+  // à retrouver sa place en revenant d'une fiche match, pas à figer la page
+  // sur une journée consultée il y a plusieurs jours.
+  const [currentIndex,  setCurrentIndex]  = usePersistedState(`matchs_currentIndex_${selectedComp}`, 0, NAV_POSITION_TTL)
   const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
   const [compOpen,      setCompOpen]      = useState(false)
