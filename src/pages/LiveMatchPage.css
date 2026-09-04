@@ -188,13 +188,6 @@
    Texte nu, sans fond ni bordure : la version précédente utilisait
    .lmp__heroPeriodBadge, dont l'encadré translucide a été signalé comme un
    "cadre verre dépoli" gênant. */
-/* "Terminé", sur la page d'un match joué (04/09, demande utilisateur). Rouge
-   de l'app, comme la minute sur la page du direct — la date d'un match à venir
-   garde son gris, elle utilise la même classe SANS ce modificateur. */
-.lmp__heroWhenLabel--ft {
-  color: var(--red);
-  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
-}
 .lmp__heroWhenLabel {
   font-size: 0.6rem;
   font-weight: 800;
@@ -204,6 +197,19 @@
   text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
   margin-bottom: 6px;
   white-space: nowrap;
+}
+/* "Terminé", sur la page d'un match joué (04/09, demande utilisateur). Rouge
+   de l'app, comme la minute sur la page du direct — la date d'un match à venir
+   garde son gris, elle utilise la même classe SANS ce modificateur.
+   ⚠️ DOIT rester APRÈS la règle de base : même spécificité (une classe
+   chacune), c'est donc l'ordre qui tranche. Placé avant, comme dans ma
+   première version, le modificateur était bel et bien appliqué à l'élément
+   mais sa couleur restait écrasée par le blanc — constaté en mesurant la
+   couleur calculée en production, l'inspection du HTML seule n'aurait rien
+   montré d'anormal. */
+.lmp__heroWhenLabel--ft {
+  color: var(--red);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
 }
 
 .lmp__heroStatus {
@@ -325,12 +331,6 @@
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
 /* ⚠️ Encadré translucide RETIRÉ (04/09, demande utilisateur) — voir le même
    commentaire sur .poster__topbarPeriod (accueil.css). */
-/* Période en rouge pendant le match — même famille que la minute juste en
-   dessous (--red-light, lisible sur n'importe quel dégradé d'équipes). */
-.lmp__heroPeriodBadge--live {
-  color: var(--red);
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
-}
 .lmp__heroPeriodBadge {
   display: inline-block;
   font-size: 0.62rem;
@@ -338,6 +338,13 @@
   color: rgba(var(--white-rgb),0.75);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+/* Période en rouge pendant le match. Même contrainte d'ordre que
+   .lmp__heroWhenLabel--ft ci-dessus : APRÈS la règle de base, sans quoi le
+   blanc l'emporte. */
+.lmp__heroPeriodBadge--live {
+  color: var(--red);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
 }
 
 /* 5 pastilles tab par équipe : gris = pas encore tiré, vert = marqué */
