@@ -182,6 +182,24 @@
    meme chose (ou en est le match) et encadraient le score sans le servir.
    Elles forment maintenant un seul groupe centre juste au-dessus du score.
    Le diffuseur (WatchBadge) reste sous le score : autre nature d'info. */
+/* Statut du match (date d'un match à venir, "Terminé" d'un match joué) placé
+   AU-DESSUS de l'heure/du score, au centre — même position que la minute en
+   direct (03/09, demande utilisateur : le statut a quitté le coin haut droit,
+   remplacé là-haut par le diffuseur).
+   Texte nu, sans fond ni bordure : la version précédente utilisait
+   .lmp__heroPeriodBadge, dont l'encadré translucide a été signalé comme un
+   "cadre verre dépoli" gênant. */
+.lmp__heroWhenLabel {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(var(--white-rgb),0.55);
+  text-shadow: 0 1px 5px rgba(var(--black-rgb),0.9);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
 .lmp__heroStatus {
   display: flex;
   flex-direction: column;

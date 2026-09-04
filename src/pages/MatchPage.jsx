@@ -227,12 +227,17 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           )}
           <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
         </div>
-        {/* Statut à droite, même emplacement que la période sur la page du
-            direct et sur l'affiche "Match du jour" : "Terminé" pour un match
-            joué, la date pour un match à venir. */}
-        <span className="lmp__heroPeriodBadge">
-          {isFinished ? 'Terminé' : formatDate(match.utcDate)}
-        </span>
+        {/* ⚠️ ÉCHANGÉ avec le statut (03/09, demande utilisateur) : c'est le
+            DIFFUSEUR qui occupe le coin haut droit, et le statut (date ou
+            "Terminé") qui passe au centre, juste au-dessus de l'heure.
+            Logique : le statut qualifie l'heure/le score, sa place est collée
+            à eux — exactement comme la minute sur la page du direct. Le
+            diffuseur, lui, est une info annexe, il a sa place dans le bandeau.
+            Le WatchBadge est du texte simple avec une icône, sans cadre : il
+            fait donc disparaître au passage l'encadré "verre dépoli" qui
+            entourait la date ici (fond translucide + bordure), signalé comme
+            gênant. */}
+        <WatchBadge match={match} variant="hero" />
       </div>
 
       {/* Centre : crests + score/heure */}
@@ -246,11 +251,13 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         </div>
 
         <div className="mp__hero__center">
+          {/* Statut AU-DESSUS de l'heure/du score, sans cadre — même
+              disposition que la minute sur la page du direct. */}
+          <span className="lmp__heroWhenLabel">
+            {isFinished ? 'Terminé' : formatDate(match.utcDate)}
+          </span>
           {isFinished ? (
             <>
-              {/* "Terminé" et la date sont désormais dans le badge en haut à
-                  droite : les répéter ici ferait doublon (même problème que
-                  celui corrigé sur l'affiche "Match du jour"). */}
               <span className="mp__hero__score">{hs} – {as_}</span>
               {wentToPens && hPens != null && aPens != null && (
                 <div className="mp__hero__pensBlock">
@@ -272,9 +279,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               MatchPage.jsx est justement la page consultée AVANT le coup
               d'envoi (pas seulement une fois le match terminé) — le
               diffuseur est connu dès la programmation de la saison, pas
-              besoin d'attendre que le match commence pour l'afficher. Même
-              variant "score" que LiveMatchPage (sous le score/heure). */}
-          <WatchBadge match={match} variant="score" />
+              besoin d'attendre que le match commence pour l'afficher.
+              ⚠️ DÉPLACÉ (03/09) dans le bandeau du haut, voir plus haut. */}
         </div>
 
         <div className="mp__hero__team mp__hero__team--away">
