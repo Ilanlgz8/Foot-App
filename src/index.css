@@ -382,14 +382,28 @@ body::before {
 
 #root .accueil__mdjBigNum,
 #root .accueil__mdjClockSep,
-#root .accueil__mdjScoreSep,
-#root .lmp__hero .mp__hero__score,
-#root .lmp__hero .mp__hero__time {
+#root .accueil__mdjScoreSep {
   font-family: 'Archivo Black', 'Archivo', system-ui, sans-serif;
   font-weight: 400;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+}
+
+/* ⚠️ Le PANNEAU des pages match / direct / résultats se sépare de l'affiche
+   "Match du jour" (05/09, choix explicite de l'utilisateur après une 2e série
+   de comparaisons) : Archivo Black lui a été reprochée ici, Rajdhani 700 la
+   remplace — chiffres carrés, registre tableau d'affichage.
+   L'affiche "Match du jour" garde Archivo Black pour le score et Orbitron pour
+   l'heure : ce sont deux surfaces de tailles très différentes, l'écart est
+   assumé et non un oubli d'harmonisation. */
+#root .lmp__hero .mp__hero__score,
+#root .lmp__hero .mp__hero__time {
+  font-family: 'Rajdhani', 'Archivo Black', system-ui, sans-serif;
+  font-weight: 700;
+  -webkit-text-stroke: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 /* Le +20% qui compensait l'étroitesse de Bebas n'a plus lieu d'être : ces
@@ -408,8 +422,11 @@ body::before {
 #root .accueil__mdjBigNum  { font-size: 3.6rem; line-height: 1; }
 #root .accueil__mdjClockSep { font-size: 2.8rem; }
 #root .accueil__mdjScoreSep { font-size: 1.8rem; }
-#root .lmp__hero .mp__hero__score { font-size: 2.8rem; line-height: 1.05; }
-#root .lmp__hero .mp__hero__time  { font-size: 2.4rem; line-height: 1.05; }
+/* Rajdhani est plus étroite et moins pleine qu'Archivo Black : +25% pour
+   occuper la même place à l'écran (rapport relevé sur la comparaison visuelle,
+   50px de Rajdhani pour 40px d'Archivo Black). */
+#root .lmp__hero .mp__hero__score { font-size: 3.5rem; line-height: 1; }
+#root .lmp__hero .mp__hero__time  { font-size: 3rem;   line-height: 1; }
 
 /* ⚠️ EXCEPTION assumée (04/09, demande utilisateur : "changer juste pour match
    du jour la police de l'heure") : sur l'affiche "Match du jour" UNIQUEMENT,
