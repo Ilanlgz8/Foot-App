@@ -149,6 +149,45 @@ export function clubNameMatch(a, b) {
   return na === nb || na.startsWith(nb) || nb.startsWith(na)
 }
 
+// ── Attribution d'un événement à une équipe ──────────────────────────────────
+// ⚠️ BUG RÉEL SIGNALÉ (04/09) : "des cartons jaunes ont été mis du côté du Real
+// Betis au lieu du Real Madrid". Deux causes distinctes, toutes deux traitées
+// ici, et une seule fonction désormais pour les trois endroits qui attribuaient
+// un but ou un carton — ils avaient dérivé séparément.
+//
+//  1. Le repli `commentary` comparait les noms avec fuzzyTeam(), qui matche dès
+//     que les 5 premiers caractères sont communs. normalize() conserve les
+//     espaces, donc "real madrid".startsWith("real ") est VRAI : tout carton du
+//     Real Betis basculait côté Real Madrid. Ce piège est documenté depuis le
+//     27/07 en tête de clubNameMatch (Manchester City/United, Real Madrid/
+//     Sociedad/Betis y sont même cités nommément) — cet endroit-là n'avait
+//     simplement jamais été repris. fuzzyTeam reste volontairement en place
+//     pour les SÉLECTIONS, dont les noms varient beaucoup d'une source à
+//     l'autre ; pour des clubs, seul clubNameMatch est sûr.
+//
+//  2. Les deux autres endroits écrivaient `d.team?.id === homeC?.team?.id ?
+//     'home' : 'away'`. Quand l'événement n'a PAS de team (champ absent),
+//     `undefined === "83"` est faux et l'événement partait donc
+//     systématiquement chez l'équipe à l'EXTÉRIEUR — une attribution inventée,
+//     juste une fois sur deux par hasard.
+//
+// L'identifiant est essayé en premier (seul critère réellement fiable), le nom
+// ensuite, et en dernier recours on renvoie null : un carton qu'on ne sait pas
+// attribuer n'est pas affiché, plutôt que collé à la mauvaise équipe.
+export function sideForTeam(homeC, awayC, team) {
+  const id = team?.id
+  if (id != null) {
+    if (String(id) === String(homeC?.team?.id)) return 'home'
+    if (String(id) === String(awayC?.team?.id)) return 'away'
+  }
+  const name = team?.displayName ?? team?.name ?? ''
+  if (name) {
+    if (clubNameMatch(homeC?.team?.displayName ?? '', name)) return 'home'
+    if (clubNameMatch(awayC?.team?.displayName ?? '', name)) return 'away'
+  }
+  return null
+}
+
 function initialName(full) {
   if (!full) return null
   const parts = full.trim().split(/\s+/)
@@ -233,7 +272,10 @@ export function extractMatchDetails(comp, homeTeamId, commentary) {
   const scorers = []
   const cards = []
   for (const d of (comp?.details ?? [])) {
-    const teamSide = d.team?.id === homeC?.team?.id ? 'home' : 'away'
+    const teamSide = sideForTeam(homeC, awayC, d.team)
+    // Événement non attribuable : ignoré. Avant, il partait d'office à
+    // l'extérieur — voir le commentaire de sideForTeam.
+    if (!teamSide) continue
     const ath = d.participants?.[0]?.athlete ?? d.athletesInvolved?.[0]
     const name = ath?.shortName ?? ath?.displayName ?? '?'
     const minute = d.clock?.displayValue ?? ''
@@ -258,10 +300,12 @@ export function extractMatchDetails(comp, homeTeamId, commentary) {
     const ath = play.participants?.[0]?.athlete
     const alreadyHave = cards.some(k => k.minute === (play.clock?.displayValue ?? c.time?.displayValue ?? '') && k.name === (ath?.shortName ?? initialName(ath?.displayName) ?? '?'))
     if (alreadyHave) continue
+    const side = sideForTeam(homeC, awayC, play.team)
+    if (!side) continue
     cards.push({
       name:   ath?.shortName ?? initialName(ath?.displayName) ?? '?',
       minute: play.clock?.displayValue ?? c.time?.displayValue ?? '',
-      team:   fuzzyTeam(homeC?.team?.displayName ?? '', play.team?.displayName ?? '') ? 'home' : 'away',
+      team:   side,
       red:    false,
     })
   }
@@ -273,16 +317,20 @@ export function extractMatchDetails(comp, homeTeamId, commentary) {
       const id = String(d.type?.id ?? '')
       if (d.type?.text === 'Goal' || id === '57') {
         const ath = d.athletesInvolved?.[0]
+        const side = sideForTeam(homeC, awayC, d.team)
+        if (!side) continue
         scorers.push({
           name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
-          team: d.team?.id === homeC?.team?.id ? 'home' : 'away',
+          team: side,
           ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false,
         })
       } else if (id === '93' || id === '94') {
         const ath = d.athletesInvolved?.[0]
+        const side = sideForTeam(homeC, awayC, d.team)
+        if (!side) continue
         cards.push({
           name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
-          team: d.team?.id === homeC?.team?.id ? 'home' : 'away', red: d.redCard === true || id === '93',
+          team: side, red: d.redCard === true || id === '93',
         })
       }
     }
