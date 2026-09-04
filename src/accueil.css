@@ -1779,7 +1779,12 @@
   letter-spacing: 0.04em;
   line-height: 1;
   text-align: center;
-  text-shadow: 0 2px 24px rgba(var(--black-rgb),0.7);
+  /* ⚠️ Ombre noire retirée (demande utilisateur, 03/09). Elle datait de
+     l'époque où l'heure était en police système fine sur un fond d'équipe
+     très clair ; depuis le passage en Bebas avec contour, le chiffre a son
+     propre relief et l'ombre ne faisait plus que le salir.
+     Le score (.poster__score) garde la sienne : il peut s'afficher sur la
+     zone la plus claire du dégradé pendant un match. */
 }
 
 /* Score (live / terminé) */
@@ -2459,14 +2464,19 @@
   line-height: 0.85;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 12px rgba(var(--white-rgb),0.24), 0 4px 22px rgba(var(--black-rgb),0.95);
+  /* Halo blanc/ombre noire retirés (03/09, même raison que .poster__time) :
+     le contour de 1,1px posé par le bloc unifié d'index.css donne déjà le
+     relief, l'ombre ne faisait qu'empâter les chiffres. */
 }
+/* ⚠️ Deux-points BLANCS (demande utilisateur, 03/09) — ils étaient rouges
+   avec un halo rouge, seul reste du traitement d'origine de cette carte. Tout
+   le reste des scores et heures a été unifié hier ; c'était la dernière
+   exception, et elle sautait aux yeux à côté d'une heure blanche. */
 .accueil__mdjClockSep {
   font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
   font-size: 3.6rem;
   line-height: 0.85;
-  color: var(--red);
-  text-shadow: 0 0 16px rgba(var(--red-rgb),0.8);
+  color: #fff;
 }
 .accueil__mdjScoreSep {
   font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
