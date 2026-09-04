@@ -1,4 +1,5 @@
 import { useState }      from 'react'
+import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { useQuery }                from '@tanstack/react-query'
 import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups, useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
@@ -2028,7 +2029,14 @@ export function MatchStatsSection({ match }) {
   const { data: fullMatch } = useQuery({
     queryKey: ['matchFull', match?.id],
     queryFn:  async () => {
-      const res = await fetch(`/api/football?apiPath=/v4/matches/${match.id}`)
+      // ⚠️ fdFetch et NON fetch() brut (04/09) : cet appel était le seul de la
+      // page à contourner le wrapper — il n'avait donc ni le timeout de 15s
+      // (une requête partie mais jamais revenue laissait la page en
+      // chargement indéfini), ni la substitution des écussons basse
+      // résolution (voir crestOverrides.js). Découvert en constatant que
+      // l'écusson de Monaco restait flou ICI alors qu'il était corrigé dans
+      // le classement, qui passe bien par fdFetch.
+      const res = await fdFetch(fdUrl(`/api/v4/matches/${match.id}`))
       if (!res.ok) return null
       return res.json()
     },

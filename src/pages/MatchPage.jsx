@@ -15,6 +15,7 @@ import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdM
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { WatchBadge }              from '../components/WatchBadge'
+import { fdFetch, fdUrl }          from '../utils/fdFetch'
 import {
   useEspnMatchStats,
   useFifaStats,
@@ -56,7 +57,14 @@ function useMatchData(matchId, initialMatch) {
   return useQuery({
     queryKey:  ['match', matchId],
     queryFn:   async () => {
-      const res = await fetch(`/api/football?apiPath=/v4/matches/${matchId}`)
+      // ⚠️ fdFetch et NON fetch() brut (04/09) : cet appel était le seul de la
+      // page à contourner le wrapper — il n'avait donc ni le timeout de 15s
+      // (une requête partie mais jamais revenue laissait la page en
+      // chargement indéfini), ni la substitution des écussons basse
+      // résolution (voir crestOverrides.js). Découvert en constatant que
+      // l'écusson de Monaco restait flou ICI alors qu'il était corrigé dans
+      // le classement, qui passe bien par fdFetch.
+      const res = await fdFetch(fdUrl(`/api/v4/matches/${matchId}`))
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
     },

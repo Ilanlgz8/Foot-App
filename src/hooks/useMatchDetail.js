@@ -1093,7 +1093,14 @@ export function useH2H(match, delayMs = 0, fdMatchIdOverride = null) {
         // délai fixe — 0ms si useMatchDetail (même page) n'a en fait rien
         // tapé de réel (cache déjà chaud pour ce match).
         if (delayMs > 0) await waitForFdSpacing(delayMs)
-        const res = await fetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${fdMatchId}%2Fhead2head&limit=20`)
+        // ⚠️ fdFetch et NON fetch() brut (04/09) : cet appel était le seul de la
+        // page à contourner le wrapper — il n'avait donc ni le timeout de 15s
+        // (une requête partie mais jamais revenue laissait la page en
+        // chargement indéfini), ni la substitution des écussons basse
+        // résolution (voir crestOverrides.js). Découvert en constatant que
+        // l'écusson de Monaco restait flou ICI alors qu'il était corrigé dans
+        // le classement, qui passe bien par fdFetch.
+        const res = await fdFetch(`/api/football?apiPath=%2Fv4%2Fmatches%2F${fdMatchId}%2Fhead2head&limit=20`)
         if (!res.ok) {
           const stale = readCacheStale(key)
           return stale ?? null
