@@ -1670,13 +1670,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* ⚠️ Encadré translucide RETIRÉ (04/09, demande utilisateur : "enlève le
+   cadre transparent effet glasses pour le statut du match") — le fond blanc
+   à 10%, la bordure à 18% et l'arrondi sont supprimés, il ne reste que le
+   texte. Même traitement au même moment sur .lmp__heroPeriodBadge
+   (LiveMatchPage), pour que les deux surfaces restent identiques. */
 .poster__topbarPeriod {
   display: inline-block;
   flex-shrink: 0;
-  padding: 2px 8px;
-  background: rgba(var(--white-rgb),0.1);
-  border: 1px solid rgba(var(--white-rgb),0.18);
-  border-radius: 4px;
   font-size: 0.56rem;
   font-weight: 800;
   color: rgba(var(--white-rgb),0.75);
@@ -1737,7 +1738,12 @@
      décaler différemment ferait sauter la ligne au coup d'envoi. */
   margin-bottom: 10px;
 }
+/* inline-flex + gap : accueille le point rouge pulsant déplacé ici depuis le
+   bandeau du haut (voir MatchPoster.jsx). */
 .poster__min-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   /* Blanc avec halo rouge — même traitement que .lmp__heroMinute
      (LiveMatchPage), au lieu du rose plein utilisé avant (retour
      utilisateur : "c'est pas le même CSS que LiveMatchPage"). */

@@ -341,11 +341,22 @@ body::before {
    (vainqueur en or sur la page Résultats, rouge en live…) — un contour blanc
    en dur créerait un liseré clair autour d'un chiffre coloré.
    ══════════════════════════════════════════════════════════════════ */
-#root .accueil__mdjBigNum,
-#root .accueil__mdjClockSep,
-#root .accueil__mdjScoreSep,
-#root .lmp__hero .mp__hero__score,
-#root .lmp__hero .mp__hero__time,
+/* ⚠️ RETOUR EN ARRIÈRE SUR BEBAS (04/09, constat utilisateur : "c'est trop
+   étroit et long et fin"). Bebas est une condensée à graisse unique : le
+   contour synthétique (-webkit-text-stroke) l'épaississait sans jamais
+   l'élargir, et il fallait monter chaque taille d'environ 20% pour compenser
+   — d'où des chiffres hauts, serrés et fins. Le diagnostic était le bon (une
+   seule police pour tous les scores et toutes les heures), le choix de
+   police ne l'était pas.
+
+   DEUX traitements désormais, tous deux non condensés :
+     1. la police de l'app en graisse 900 — c'est exactement ce qu'il y avait
+        avant Bebas — pour les cards de l'Accueil, Programme, Résultats et le
+        classement ;
+     2. Russo One (déjà chargée par index.html, aucune requête en plus) sur
+        les deux grandes surfaces où le chiffre est l'élément principal :
+        l'affiche "Match du jour" et le panneau des pages match/direct.
+   Choix explicite de l'utilisateur pour chacun des deux. */
 #root .poster__score,
 #root .poster__time,
 #root .resultHero__score,
@@ -356,19 +367,39 @@ body::before {
 #root .matchs__scoreHour,
 #root .lmpSide__score,
 #root .myTeamBanner__score {
-  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 400;
-  -webkit-text-stroke: 1.1px currentColor;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 900;
+  -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
-/* Bebas est CONDENSÉE : à taille égale un chiffre y paraît plus petit qu'en
-   Chakra Petch ou en police système grasse. Chaque emplacement est donc
-   remonté d'environ 20% pour garder la présence qu'il avait — la largeur
-   reste inférieure ou égale à l'ancienne, aucune mise en page ne déborde. */
+#root .accueil__mdjBigNum,
+#root .accueil__mdjClockSep,
+#root .accueil__mdjScoreSep,
+#root .lmp__hero .mp__hero__score,
+#root .lmp__hero .mp__hero__time {
+  font-family: 'Russo One', 'Archivo', system-ui, sans-serif;
+  font-weight: 400;
+  -webkit-text-stroke: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Le +20% qui compensait l'étroitesse de Bebas n'a plus lieu d'être : ces
+   emplacements retrouvent EXACTEMENT la taille qu'ils avaient avant le
+   passage à Bebas (valeurs relevées dans l'historique, pas réinventées). */
 #root .poster__score,
-#root .poster__time      { font-size: 3.1rem; line-height: 0.85; }
-#root .resultats__scoreNum { font-size: 2rem; line-height: 0.9; }
-#root .live__pill        { font-size: 2.4rem; }
-#root .matchs__scoreHour { font-size: 2.4rem; }
+#root .poster__time        { font-size: 2.6rem; line-height: 1; }
+#root .resultats__scoreNum { font-size: 1.8rem; line-height: 1; }
+#root .live__pill          { font-size: 2rem; }
+#root .matchs__scoreHour   { font-size: 2rem; }
+
+/* Russo One est nettement plus LARGE que Bebas à taille égale : les deux
+   grandes surfaces sont redescendues d'environ 25% pour occuper la même
+   place qu'avant, sans déborder de la colonne centrale. */
+#root .accueil__mdjBigNum  { font-size: 3.4rem; line-height: 0.95; }
+#root .accueil__mdjClockSep { font-size: 2.6rem; }
+#root .accueil__mdjScoreSep { font-size: 1.7rem; }
+#root .lmp__hero .mp__hero__score { font-size: 2.6rem; line-height: 1; }
+#root .lmp__hero .mp__hero__time  { font-size: 2.2rem; line-height: 1; }

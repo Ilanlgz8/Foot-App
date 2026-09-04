@@ -354,7 +354,11 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
       {/* ── Badge compét (gauche, logo + nom FR) + statut période en live (droite) ── */}
       <div className="poster__topbar">
         <span className="poster__topbarComp">
-          {isLive && <span className="poster__live-dot" />}
+          {/* ⚠️ Le point rouge pulsant a QUITTÉ cet emplacement (04/09, demande
+              utilisateur) : accolé au nom du championnat il désignait la
+              compétition, ce qui n'a pas de sens — c'est le signal "ça bouge
+              en ce moment", il appartient au chrono. Déplacé sur la minute de
+              jeu, plus bas, exactement comme sur l'affiche "Match du jour". */}
           {posterCompEmblem && <img src={posterCompEmblem} alt="" className="poster__topbarCompLogo" />}
           <span className="poster__comp-name">{posterCompName}</span>
         </span>
@@ -405,7 +409,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               // htLabel repasse à null tout seul dès que la 2ème MT démarre
               // (half2Start), minute reprend alors le relais normalement.
               <div className="poster__min-labelCol">
-                <div className="poster__min-label">MT</div>
+                <div className="poster__min-label"><span className="poster__live-dot" />MT</div>
                 <div className="poster__reprise-label">{htLabel ?? 'Mi-temps'}</div>
               </div>
             ) : (
@@ -413,7 +417,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               // spéciaux (Pause/TAB/Débute/Prolongation) et inclut déjà
               // l'apostrophe pour les minutes chiffrées ("91'") — ne jamais
               // en rajouter une.
-              <div className="poster__min-label">{minute}</div>
+              <div className="poster__min-label"><span className="poster__live-dot" />{minute}</div>
             )
           )}
           {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}

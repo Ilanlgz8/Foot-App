@@ -208,6 +208,22 @@
   margin-bottom: 0.45rem;
 }
 
+/* ⚠️ REMONTÉE de la colonne centrale (04/09, constat utilisateur : "le score
+   est trop bas comparé aux crests").
+   Cause mesurée en production avant de toucher au CSS : les 3 colonnes du
+   panneau sont alignées en haut, et l'écusson est le PREMIER élément de sa
+   colonne alors que le score est précédé du statut ("1ère mi-temps", la
+   minute, ou la date). Ce bloc de statut pousse donc le score vers le bas —
+   32 px de décalage relevés entre le centre de l'écusson et celui du chiffre.
+   Une marge négative sur la colonne entière la remonte d'un bloc, statut
+   compris, sans rien changer à l'ordre d'affichage demandé (statut au-dessus
+   du score). 24 px et non 32 : à 32 le statut venait toucher le bandeau du
+   haut (nom du championnat / diffuseur) ; à 24 il reste ~10 px de marge et
+   l'écart résiduel avec l'écusson n'est plus perceptible. */
+#root .lmp__hero .mp__hero__center {
+  margin-top: -24px;
+}
+
 /* Minute live : pas de pill/bordure (peu lisible sur le dégradé) — un texte
    net, en grand, avec juste un point rouge pulsant pour l'indicateur "live",
    et un léger text-shadow pour rester lisible quel que soit le dégradé
@@ -270,12 +286,10 @@
 }
 
 /* Period badge (MI-TEMPS, TERMINÉ, etc.) */
+/* ⚠️ Encadré translucide RETIRÉ (04/09, demande utilisateur) — voir le même
+   commentaire sur .poster__topbarPeriod (accueil.css). */
 .lmp__heroPeriodBadge {
   display: inline-block;
-  padding: 2px 8px;
-  background: rgba(var(--white-rgb),0.1);
-  border: 1px solid rgba(var(--white-rgb),0.18);
-  border-radius: 4px;
   font-size: 0.62rem;
   font-weight: 800;
   color: rgba(var(--white-rgb),0.75);
