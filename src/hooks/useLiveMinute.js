@@ -893,10 +893,16 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         // d'invalider pour ça. Sans coût réel si personne ne regarde
         // Classement à cet instant (React Query ne refetch que les requêtes
         // ACTIVES, voir le même raisonnement dans confirmFt).
-        if (prevCache && (prevCache.home !== home || prevCache.away !== away)) {
-          const code = match.competition?.code
-          if (code) queryClient.invalidateQueries({ queryKey: ['standings', code] })
-        }
+        // ⚠️ RETIRÉ (04/09, choix explicite de l'utilisateur après diagnostic) :
+        // on invalidait ici le classement à chaque but. C'était précisément ce
+        // qui rendait le tableau incohérent — football-data.org compte un match
+        // en cours dans son classement (matchs joués, victoires/nuls/défaites,
+        // points), alors que la colonne Forme récente ne peut afficher que des
+        // matchs TERMINÉS. Le tableau se mettait donc à jour colonne par
+        // colonne. Le classement est désormais gelé tant qu'un match de la
+        // compétition est en cours, et tout repart ensemble à la fin (voir
+        // hasLiveMatchFor dans useStandings.js).
+        void prevCache
       }
 
       // ── KO détecté (1ère MT, kickoffAt pas encore connu) ──

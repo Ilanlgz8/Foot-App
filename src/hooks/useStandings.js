@@ -1,9 +1,37 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { registerFdCallAttempt } from '../utils/fdSpacingTracker'
+import { useLiveTracker } from './liveTracker'
+
+/**
+ * Y a-t-il un match de CETTE compétition en cours en ce moment ?
+ *
+ * ⚠️ RAISON D'ÊTRE (04/09, constat utilisateur : "dans le classement, des fois
+ * certaines données sont à jour mais pas toutes — matchs joués est à jour mais
+ * pas la forme récente, rien n'est mis à jour en même temps").
+ *
+ * Diagnostic fait sur les données réelles, pendant PSG-Monaco en cours :
+ * football-data.org compte DÉJÀ un match en direct dans son classement (PSG et
+ * Monaco affichaient 3 matchs joués, avec un résultat provisoire attribué),
+ * alors que la colonne Forme se construit uniquement à partir des matchs
+ * TERMINÉS et ne peut donc en montrer que 2. Sur les 18 équipes, les seules
+ * lignes en désaccord étaient exactement les deux qui jouaient. Ce n'était donc
+ * pas un problème de cache : le tableau mélangeait deux définitions de "joué".
+ *
+ * Choix de l'utilisateur, après lui avoir présenté l'arbitrage : le classement
+ * ne bouge plus tant qu'un match de la compétition est en cours, et tout se met
+ * à jour ensemble à la fin. Contrepartie assumée : la mise à jour du classement
+ * à chaque but, demandée précédemment, disparaît — c'était elle qui rendait
+ * l'incohérence visible.
+ */
+export function hasLiveMatchFor(liveMatches, comp) {
+  if (!comp) return false
+  return (liveMatches ?? []).some(m => m?.competition?.code === comp)
+}
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -70,6 +98,26 @@ export function useStandings(selectedComp, hasMatchToday = true) {
   // pas au rechargement de page, aucune contamination possible à long terme
   // là — seul le disque avait besoin d'être purgé.
   const key = `standings_v2_${selectedComp}`
+
+  const liveMatches = useLiveTracker()
+  const liveNow     = hasLiveMatchFor(liveMatches, selectedComp)
+  const hasCached   = readCacheStale(key) != null
+  const frozen      = liveNow && hasCached
+
+  // Dégel : quand le DERNIER match en cours de la compétition se termine, on
+  // rafraîchit le classement, la forme récente et les buteurs EN MÊME TEMPS.
+  // C'est le point clé de la demande — avant, chacun repartait sur son propre
+  // cycle et le tableau se remplissait colonne par colonne.
+  const queryClient = useQueryClient()
+  const wasLive = useRef(liveNow)
+  useEffect(() => {
+    if (wasLive.current && !liveNow && selectedComp) {
+      queryClient.invalidateQueries({ queryKey: ['standings', selectedComp] })
+      queryClient.invalidateQueries({ queryKey: ['teamForm2', selectedComp] })
+      queryClient.invalidateQueries({ queryKey: ['scorers',   selectedComp] })
+    }
+    wasLive.current = liveNow
+  }, [liveNow, selectedComp, queryClient])
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['standings', selectedComp],
@@ -189,7 +237,10 @@ export function useStandings(selectedComp, hasMatchToday = true) {
     },
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
-    staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
+    // Gelé tant qu'un match de la compétition est en cours (voir
+    // hasLiveMatchFor plus haut) : aucune donnée partiellement à jour ne peut
+    // s'afficher pendant ce temps.
+    staleTime:            frozen ? Infinity : (hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS),
     // Pas de refetchInterval : voir commentaire en tête de fichier — la mise
     // à jour pendant un match live vient maintenant de l'invalidation
     // événementielle (but/FT, useLiveMinute.js), pas d'un sondage périodique.
@@ -209,9 +260,12 @@ export function useStandings(selectedComp, hasMatchToday = true) {
     // requête précise : au retour au premier plan, un SEUL refetch (respecte
     // toujours staleTime — no-op si déjà frais) remet le classement à jour
     // sans toucher au comportement des autres requêtes de l'app.
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: !frozen,
     retry: false,
-    enabled: !!selectedComp,
+    // Désactivé pendant le gel — SAUF si on n'a rien du tout à afficher : un
+    // tableau imparfait vaut mieux qu'un tableau vide pour qui ouvre l'app en
+    // pleine soirée de matchs sans cache local.
+    enabled: !!selectedComp && (!frozen || !hasCached),
   })
 
   return {
