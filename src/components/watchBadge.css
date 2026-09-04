@@ -46,11 +46,16 @@
    top décalé (pas 0) : .mp__hero__comp occupe déjà exactement ce coin
    haut-droit (logo + nom compétition) — se superposer par-dessus le
    rendrait illisible. On se place juste EN DESSOUS, toujours coin droit. */
+/* Variante "hero" (MatchPage.jsx) : le badge est un enfant direct de
+   .lmp__heroTop, un flex row en space-between / align-items:center qui gère
+   déjà lui-même le placement à droite ET l'alignement vertical sur le nom du
+   championnat. Donc AUCUN positionnement propre ici — il reste dans le flux.
+   Historique : la règle était `position:absolute; top:1.9rem; right:0`, héritée
+   de l'époque où le badge était posé sous le bandeau ; conservée telle quelle
+   après le déplacement dans le bandeau (03/09), elle le décalait ~30px trop
+   bas, désaligné du nom du championnat. */
 .watchBadge--hero {
-  position: absolute;
-  top: 1.9rem;
-  right: 0;
-  z-index: 3;
+  flex: 0 0 auto;
 }
 
 /* Variante "row" (Match.jsx, liste des matchs à venir) : coin haut-droit de
