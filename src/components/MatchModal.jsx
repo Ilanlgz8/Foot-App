@@ -7,6 +7,8 @@ import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
 import { useStandings }       from '../hooks/useStandings'
+import { useMatches }         from '../hooks/useMatchs'
+import { reconcileStandings } from '../utils/standingsLive'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
@@ -1239,6 +1241,27 @@ export function ClassementTab({ match, compId }) {
   const { standings, groups, loading } = useStandings(compId)
   const { formMap } = useTeamForm(compId, 6_000)
 
+  // ⚠️ AJOUT (04/09, demande utilisateur : appliquer ici la même correction que
+  // sur la page Classement). football-data.org intègre le match en cours au
+  // classement mais ne rafraîchit pas les points et les compteurs V/N/D au même
+  // instant : il existe des fenêtres où une victoire en cours est déjà comptée
+  // en points mais encore rangée dans les nuls. reconcileStandings remet les
+  // deux d'accord, uniquement pour les équipes qui jouent et uniquement si la
+  // ligne est réellement incohérente — voir standingsLive.js.
+  //
+  // Source des matchs en cours : useMatches(comp,'SCHEDULED') renvoie tout ce
+  // qui n'est pas terminé, EN COURS compris, avec les identifiants
+  // football-data (ceux du classement) et le score du moment. C'est
+  // indispensable : `match` vient ici d'ESPN sur cette page (id de la forme
+  // `espn-FL1-…`), ses identifiants d'équipe ne correspondent donc PAS à ceux
+  // du classement — s'en servir directement ne rapprocherait aucune ligne.
+  // Coût : cette requête partage sa clé React Query avec Programme et
+  // Résultats (voir useMatchs.js), elle est donc déjà en cache dès qu'une de
+  // ces pages a été visitée ; au pire un seul appel, celui-là même que
+  // Programme aurait fait.
+  const { matches: compSched } = useMatches(compId, 'SCHEDULED')
+  const liveNow = (compSched ?? []).filter(m => m?.status === 'IN_PLAY' || m?.status === 'PAUSED')
+
   if (loading) {
     return <div style={{ padding: '4px 0' }}><ClassementSkeleton /></div>
   }
@@ -1293,7 +1316,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={standings} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
+      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
     </div>
   )
 }
