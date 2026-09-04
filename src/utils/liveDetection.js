@@ -94,8 +94,33 @@ export function fifaConfirmsShootoutOver(m) {
   return m.MatchStatus === 3 && m.Period === 8
 }
 
+// ── Côté (domicile/extérieur) d'un événement ESPN ────────────────────────────
+// ⚠️ AJOUT (05/09, même classe de bug que celle corrigée dans
+// espnSummaryParse.js le 04/09) : ces deux extracteurs écrivaient
+// `d.team?.id === homeTeamId ? 'home' : 'away'`. Deux façons de se tromper :
+//   • `d.team` absent et homeTeamId absent → `undefined === undefined` est
+//     VRAI, donc TOUS les événements du match partaient côté domicile. C'est
+//     exactement ce qu'affichait Betis-Real Madrid : les 9 événements du
+//     côté de Betis, cartons du Real compris.
+//   • `d.team` absent mais homeTeamId présent → tout part côté extérieur.
+// Dans les deux cas l'attribution est inventée. On compare désormais aux DEUX
+// identifiants, et on renvoie null quand aucun ne correspond : l'appelant
+// écarte alors l'événement plutôt que de l'attribuer au hasard.
+export function espnEventSide(detail, homeTeamId, awayTeamId) {
+  const id = detail?.team?.id
+  if (id == null) return null
+  if (homeTeamId != null && String(id) === String(homeTeamId)) return 'home'
+  if (awayTeamId != null && String(id) === String(awayTeamId)) return 'away'
+  // Identifiant extérieur non fourni par l'appelant : on garde l'ancien
+  // raisonnement (tout ce qui n'est pas domicile est extérieur), qui reste
+  // juste dès lors que `d.team` existe — le seul cas réellement dangereux
+  // était l'absence d'identifiant, désormais écartée plus haut.
+  if (awayTeamId == null && homeTeamId != null) return 'away'
+  return null
+}
+
 // ── Extraction buteurs/cartons depuis comp.details (scoreboard ESPN) ──────
-export function extractEspnScorers(comp, homeTeamId) {
+export function extractEspnScorers(comp, homeTeamId, awayTeamId) {
   return (comp.details ?? [])
     .filter(d => {
       const txt = (d.type?.text ?? '').toLowerCase()
@@ -107,17 +132,20 @@ export function extractEspnScorers(comp, homeTeamId) {
     .map(d => {
       const ath = d.athletesInvolved?.[0]
       const txt = (d.type?.text ?? '').toLowerCase()
+      const side = espnEventSide(d, homeTeamId, awayTeamId)
+      if (!side) return null
       return {
         name:        ath?.shortName ?? ath?.displayName ?? '?',
         minute:      d.clock?.displayValue ?? '',
-        team:        d.team?.id === homeTeamId ? 'home' : 'away',
+        team:        side,
         ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
         penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
       }
     })
+    .filter(Boolean)
 }
 
-export function extractEspnCards(comp, homeTeamId) {
+export function extractEspnCards(comp, homeTeamId, awayTeamId) {
   return (comp.details ?? [])
     .filter(d => {
       const id = String(d.type?.id ?? '')
@@ -125,13 +153,16 @@ export function extractEspnCards(comp, homeTeamId) {
     })
     .map(d => {
       const ath = d.athletesInvolved?.[0]
+      const side = espnEventSide(d, homeTeamId, awayTeamId)
+      if (!side) return null
       return {
         name:   ath?.shortName ?? ath?.displayName ?? '?',
         minute: d.clock?.displayValue ?? '',
-        team:   d.team?.id === homeTeamId ? 'home' : 'away',
+        team:   side,
         red:    d.redCard === true || String(d.type?.id) === '93',
       }
     })
+    .filter(Boolean)
 }
 
 // ── Formatage ───────────────────────────────────────────────────────────

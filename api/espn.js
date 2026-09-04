@@ -312,7 +312,21 @@ export default async function handler(req, res) {
       // le résultat compacté (compactEspnSummary — voir en-tête de fichier),
       // que la réponse vienne du cache ou d'un fetch ESPN frais, match en
       // cours ou terminé — un seul format stable, jamais le JSON brut ESPN.
-      const cacheKey = `espn:summary:${slug}:${eventId}`
+      // ⚠️ VERSION "v2" DANS LA CLÉ (05/09) — indispensable, et voici pourquoi.
+      // Pour un match TERMINÉ dont la compo est publiée, l'entrée est écrite
+      // SANS expiration (voir plus bas) : donnée réputée définitive. Or le
+      // correctif d'attribution des buts et cartons (sideForTeam,
+      // espnSummaryParse.js) change le RÉSULTAT de l'analyse pour des matchs
+      // déjà en cache — Betis-Real Madrid du 04/09 renvoyait encore ses 9
+      // événements du côté de Betis, cartons de Güler, Camavinga et Vinícius
+      // compris, alors que la source ESPN portait bien le bon identifiant
+      // d'équipe sur chacun (vérifié sur le scoreboard brut).
+      // Un cache permanent rend donc tout correctif d'analyse invisible sur
+      // l'historique : sans bump de version, le bug aurait été corrigé pour
+      // les matchs à venir seulement, et l'utilisateur aurait continué à voir
+      // le même défaut sur tous les matchs déjà consultés.
+      // À REFAIRE à chaque fois que compactEspnSummary change de résultat.
+      const cacheKey = `espn:summary:v2:${slug}:${eventId}`
       try {
         const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {

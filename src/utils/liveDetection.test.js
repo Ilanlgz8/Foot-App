@@ -10,6 +10,7 @@ import {
   fuzzyTeamFifa, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
+  espnEventSide,
 } from './liveDetection'
 
 describe('normalizeEspnStatus', () => {
@@ -244,5 +245,54 @@ describe('hasUsefulSummaryData', () => {
       ] }] },
     }
     expect(hasUsefulSummaryData(wcSummary)).toBe(true)
+  })
+})
+
+// ── espnEventSide ────────────────────────────────────────────────────────────
+// Betis (domicile, id 244) - Real Madrid (extérieur, id 86), 04/09 : l'app
+// affichait les 9 événements du côté de Betis, cartons du Real compris.
+describe('espnEventSide — attribution d’un événement ESPN', () => {
+  it('attribue par identifiant', () => {
+    expect(espnEventSide({ team: { id: '244' } }, '244', '86')).toBe('home')
+    expect(espnEventSide({ team: { id: '86' } },  '244', '86')).toBe('away')
+  })
+
+  it('tolère un identifiant numérique face à une chaîne', () => {
+    expect(espnEventSide({ team: { id: 86 } }, '244', '86')).toBe('away')
+  })
+
+  it('AUCUN identifiant : ne devine pas — c’est la cause du bug', () => {
+    // Avant : `undefined === undefined` était vrai, donc TOUT partait à domicile.
+    expect(espnEventSide({}, undefined, undefined)).toBeNull()
+    expect(espnEventSide({ team: {} }, '244', '86')).toBeNull()
+    expect(espnEventSide(undefined, '244', '86')).toBeNull()
+  })
+
+  it('événement d’une équipe étrangère au match : écarté', () => {
+    expect(espnEventSide({ team: { id: '999' } }, '244', '86')).toBeNull()
+  })
+
+  it('sans identifiant extérieur, garde l’ancien raisonnement', () => {
+    // Reste juste dès lors que d.team existe : le cas dangereux (identifiant
+    // absent) est déjà écarté plus haut.
+    expect(espnEventSide({ team: { id: '86' } }, '244')).toBe('away')
+    expect(espnEventSide({ team: { id: '244' } }, '244')).toBe('home')
+  })
+})
+
+describe('extractEspnCards — bout en bout sur Betis - Real Madrid', () => {
+  const comp = {
+    details: [
+      { type: { id: '94' }, team: { id: '86' },  athletesInvolved: [{ shortName: 'A. Güler' }],   clock: { displayValue: "45'+3'" } },
+      { type: { id: '94' }, team: { id: '244' }, athletesInvolved: [{ shortName: 'F. Bernal' }],  clock: { displayValue: "64'" } },
+      { type: { id: '94' }, athletesInvolved: [{ shortName: 'Sans équipe' }],                     clock: { displayValue: "70'" } },
+    ],
+  }
+  it('rend chaque carton à son équipe et écarte l’inattribuable', () => {
+    const cards = extractEspnCards(comp, '244', '86')
+    expect(cards.map(c => [c.name, c.team])).toEqual([
+      ['A. Güler', 'away'],     // Real Madrid, extérieur
+      ['F. Bernal', 'home'],    // Betis, domicile
+    ])
   })
 })

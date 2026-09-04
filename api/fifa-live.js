@@ -278,7 +278,21 @@ function confirmedListOrLonger(fresh, cached, prevRawLen) {
   return freshList.length >= cachedList.length ? freshList : cachedList
 }
 
-function extractEspnScorers(comp, homeTeamId) {
+// ⚠️ Copie locale de espnEventSide (src/utils/liveDetection.js) : ce fichier
+// est une fonction serverless Vercel qui ne peut pas importer depuis src/ sans
+// alourdir son bundle, d'où les extracteurs déjà dupliqués ici. La logique et
+// le commentaire de référence sont dans liveDetection.js — toute correction
+// doit être reportée aux deux endroits.
+function espnEventSide(detail, homeTeamId, awayTeamId) {
+  const id = detail?.team?.id
+  if (id == null) return null
+  if (homeTeamId != null && String(id) === String(homeTeamId)) return 'home'
+  if (awayTeamId != null && String(id) === String(awayTeamId)) return 'away'
+  if (awayTeamId == null && homeTeamId != null) return 'away'
+  return null
+}
+
+function extractEspnScorers(comp, homeTeamId, awayTeamId) {
   return (comp.details ?? [])
     .filter(d => {
       const txt = (d.type?.text ?? '').toLowerCase()
@@ -298,20 +312,23 @@ function extractEspnScorers(comp, homeTeamId) {
     .map(d => {
       const ath = d.athletesInvolved?.[0]
       const txt = (d.type?.text ?? '').toLowerCase()
+      const side = espnEventSide(d, homeTeamId, awayTeamId)
+      if (!side) return null
       return {
         name:        ath?.shortName ?? ath?.displayName ?? '?',
         minute:      d.clock?.displayValue ?? '',
-        team:        d.team?.id === homeTeamId ? 'home' : 'away',
+        team:        side,
         ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
         penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
       }
     })
+    .filter(Boolean)
 }
 
 // Cartons (jaune/rouge) — mêmes ids ESPN que ceux vérifiés en direct sur de vrais
 // matchs (type.id "94"="Yellow Card", "93"="Red Card"). Pas d'équivalent FIFA
 // fiable pour les cartons (contrairement aux buts) → ESPN uniquement.
-function extractEspnCards(comp, homeTeamId) {
+function extractEspnCards(comp, homeTeamId, awayTeamId) {
   return (comp.details ?? [])
     .filter(d => {
       const id = String(d.type?.id ?? '')
@@ -319,13 +336,16 @@ function extractEspnCards(comp, homeTeamId) {
     })
     .map(d => {
       const ath = d.athletesInvolved?.[0]
+      const side = espnEventSide(d, homeTeamId, awayTeamId)
+      if (!side) return null
       return {
         name:   ath?.shortName ?? ath?.displayName ?? '?',
         minute: d.clock?.displayValue ?? '',
-        team:   d.team?.id === homeTeamId ? 'home' : 'away',
+        team:   side,
         red:    d.redCard === true || String(d.type?.id) === '93',
       }
     })
+    .filter(Boolean)
 }
 
 // ── ESPN summary → stats live (possession, tirs, corners) ─────────────────────
@@ -920,12 +940,12 @@ export default async function handler(req, res) {
       // FIFA et ESPN, à égalité on garde FIFA (déjà jugé plus fiable pour les
       // noms sur la CM).
       const fifaScorers = fifaD.scorers
-      const espnScorersNow = extractEspnScorers(comp, homeC?.team?.id)
+      const espnScorersNow = extractEspnScorers(comp, homeC?.team?.id, awayC?.team?.id)
       scorers = fifaScorers.length >= espnScorersNow.length ? fifaScorers : espnScorersNow
     } else {
       rawHome = parseEspnScore(homeC?.score)
       rawAway = parseEspnScore(awayC?.score)
-      scorers = extractEspnScorers(comp, homeC?.team?.id)
+      scorers = extractEspnScorers(comp, homeC?.team?.id, awayC?.team?.id)
     }
 
     // ⚠️ BUT ANNULÉ VAR (constat utilisateur, plusieurs itérations — 2
@@ -1013,7 +1033,7 @@ export default async function handler(req, res) {
     // Cartons — ESPN uniquement (voir extractEspnCards ci-dessus). Pas de
     // scénario VAR réaliste pour un carton annulé → confirmation non requise,
     // même garde simple qu'avant.
-    const cards = extractEspnCards(comp, homeC?.team?.id)
+    const cards = extractEspnCards(comp, homeC?.team?.id, awayC?.team?.id)
     const bestCards = cards.length >= (prevData?.cards?.length ?? 0)
       ? cards : (prevData?.cards ?? [])
 

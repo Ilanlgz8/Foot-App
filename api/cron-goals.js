@@ -924,7 +924,7 @@ export default async function handler(req, res) {
         }
 
         const scoringTeam = side === 'home' ? homeTeam : awayTeam
-        const goalScorers = extractEspnScorers(comp, homeC.team?.id)
+        const goalScorers = extractEspnScorers(comp, homeC.team?.id, awayC.team?.id)
           .filter(g => g.team === side)
           .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
 
@@ -989,7 +989,7 @@ export default async function handler(req, res) {
     // ~869) — sinon un carton ajouté tardivement par ESPN à comp.details après
     // la fin du match déclenche une notif "hors match" des heures plus tard.
     if (LIVE_ESPN.has(status) || LIVE_ESPN.has(prevStatus)) {
-      const reds = extractEspnCards(comp, homeC.team?.id).filter(c => c.red)
+      const reds = extractEspnCards(comp, homeC.team?.id, awayC.team?.id).filter(c => c.red)
         .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
       const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
 
@@ -1054,8 +1054,8 @@ export default async function handler(req, res) {
       try {
         const already = await kv.get(`recap:${eventId}`)
         if (!already) {
-          const scorers = extractEspnScorers(comp, homeC.team?.id)
-          const cards   = extractEspnCards(comp, homeC.team?.id)
+          const scorers = extractEspnScorers(comp, homeC.team?.id, awayC.team?.id)
+          const cards   = extractEspnCards(comp, homeC.team?.id, awayC.team?.id)
           const recap   = generateRecap({ homeTeam, awayTeam, home, away, scorers, cards })
           if (recap) {
             await kv.set(`recap:${eventId}`, recap, { ex: RECAP_TTL })
