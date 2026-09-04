@@ -1692,6 +1692,13 @@
   flex-shrink: 0;
   animation: posterLivePulse 1.2s ease-in-out infinite;
 }
+/* Copie invisible du point à droite du texte — voir MatchPoster.jsx. Elle
+   occupe exactement la même place que le point visible de gauche sans rien
+   afficher, ce qui recentre le texte de la minute sur le score. */
+.poster__live-dot--ghost {
+  visibility: hidden;
+  animation: none;
+}
 @keyframes posterLivePulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%       { opacity: 0.35; transform: scale(0.7); }

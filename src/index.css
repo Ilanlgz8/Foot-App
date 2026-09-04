@@ -353,9 +353,15 @@ body::before {
      1. la police de l'app en graisse 900 — c'est exactement ce qu'il y avait
         avant Bebas — pour les cards de l'Accueil, Programme, Résultats et le
         classement ;
-     2. Russo One (déjà chargée par index.html, aucune requête en plus) sur
-        les deux grandes surfaces où le chiffre est l'élément principal :
-        l'affiche "Match du jour" et le panneau des pages match/direct.
+     2. Archivo Black sur les deux grandes surfaces où le chiffre est
+        l'élément principal : l'affiche "Match du jour" et le panneau des
+        pages match/direct. C'est la plus large et la plus épaisse des six
+        candidates comparées avec l'utilisateur — l'inverse exact du reproche
+        fait à Bebas. Même famille qu'Archivo, déjà chargée par index.html.
+        Russo One, essayée juste avant sur ces deux surfaces, reste chargée :
+        elle sert ailleurs (le "VS" de l'affiche et les onglets de la modale
+        de match), il ne fallait donc surtout pas la retirer de la requête
+        Google Fonts en passant.
    Choix explicite de l'utilisateur pour chacun des deux. */
 #root .poster__score,
 #root .poster__time,
@@ -379,7 +385,7 @@ body::before {
 #root .accueil__mdjScoreSep,
 #root .lmp__hero .mp__hero__score,
 #root .lmp__hero .mp__hero__time {
-  font-family: 'Russo One', 'Archivo', system-ui, sans-serif;
+  font-family: 'Archivo Black', 'Archivo', system-ui, sans-serif;
   font-weight: 400;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
@@ -395,11 +401,12 @@ body::before {
 #root .live__pill          { font-size: 2rem; }
 #root .matchs__scoreHour   { font-size: 2rem; }
 
-/* Russo One est nettement plus LARGE que Bebas à taille égale : les deux
-   grandes surfaces sont redescendues d'environ 25% pour occuper la même
-   place qu'avant, sans déborder de la colonne centrale. */
-#root .accueil__mdjBigNum  { font-size: 3.4rem; line-height: 0.95; }
-#root .accueil__mdjClockSep { font-size: 2.6rem; }
-#root .accueil__mdjScoreSep { font-size: 1.7rem; }
-#root .lmp__hero .mp__hero__score { font-size: 2.6rem; line-height: 1; }
-#root .lmp__hero .mp__hero__time  { font-size: 2.2rem; line-height: 1; }
+/* Archivo Black est large et pleine : à taille égale elle occupe nettement
+   plus de place qu'une condensée. Ces tailles sont celles réglées pour Russo
+   One, remontées d'environ 8% — Archivo Black a une hauteur d'x plus faible,
+   donc à taille de police identique le chiffre paraît un peu plus petit. */
+#root .accueil__mdjBigNum  { font-size: 3.6rem; line-height: 1; }
+#root .accueil__mdjClockSep { font-size: 2.8rem; }
+#root .accueil__mdjScoreSep { font-size: 1.8rem; }
+#root .lmp__hero .mp__hero__score { font-size: 2.8rem; line-height: 1.05; }
+#root .lmp__hero .mp__hero__time  { font-size: 2.4rem; line-height: 1.05; }

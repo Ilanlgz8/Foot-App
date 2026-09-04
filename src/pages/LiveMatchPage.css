@@ -205,7 +205,17 @@
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  margin-bottom: 0.45rem;
+  /* ⚠️ La minute est DESCENDUE de 12 px (04/09, demande utilisateur) : après
+     la remontée de toute la colonne centrale, elle se retrouvait très près du
+     bandeau du haut et loin du score qu'elle qualifie. L'espace est repris
+     sous elle (margin-bottom 0.45rem → 0) plutôt qu'ajouté au total, pour que
+     le score, lui, ne redescende quasiment pas — il ne bouge que de ~5 px, ce
+     qui est invisible à l'œil, et reste au niveau des écussons.
+     Cette règle ne concerne QUE le direct : un match à venir ou terminé
+     n'affiche pas ce bloc (il utilise .lmp__heroWhenLabel), sa mise en page
+     est donc strictement inchangée. */
+  margin-top: 12px;
+  margin-bottom: 0;
 }
 
 /* ⚠️ REMONTÉE de la colonne centrale (04/09, constat utilisateur : "le score

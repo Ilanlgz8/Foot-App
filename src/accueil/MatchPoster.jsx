@@ -409,7 +409,10 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               // htLabel repasse à null tout seul dès que la 2ème MT démarre
               // (half2Start), minute reprend alors le relais normalement.
               <div className="poster__min-labelCol">
-                <div className="poster__min-label"><span className="poster__live-dot" />MT</div>
+                <div className="poster__min-label">
+                  <span className="poster__live-dot" />MT
+                  <span className="poster__live-dot poster__live-dot--ghost" aria-hidden="true" />
+                </div>
                 <div className="poster__reprise-label">{htLabel ?? 'Mi-temps'}</div>
               </div>
             ) : (
@@ -417,7 +420,19 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               // spéciaux (Pause/TAB/Débute/Prolongation) et inclut déjà
               // l'apostrophe pour les minutes chiffrées ("91'") — ne jamais
               // en rajouter une.
-              <div className="poster__min-label"><span className="poster__live-dot" />{minute}</div>
+              // Le point rouge est doublé d'une copie INVISIBLE à droite
+              // (04/09, constat utilisateur : "c'est pas exactement
+              // centralisé"). Le conteneur est bien centré, mais il contient
+              // "point + texte" : c'est donc ce GROUPE qui est centré, et le
+              // texte seul se retrouve poussé vers la droite de la largeur du
+              // point. La copie invisible rétablit la symétrie, si bien que le
+              // texte de la minute tombe pile au-dessus du score. Même
+              // solution que .lmp__heroLiveDot--ghost sur la page du direct,
+              // où le problème s'était déjà posé.
+              <div className="poster__min-label">
+                <span className="poster__live-dot" />{minute}
+                <span className="poster__live-dot poster__live-dot--ghost" aria-hidden="true" />
+              </div>
             )
           )}
           {isUpcoming && <div className="poster__env-label">Coup d&apos;envoi</div>}
