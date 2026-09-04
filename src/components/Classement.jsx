@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { reconcileStandings } from '../utils/standingsLive'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
@@ -177,7 +178,21 @@ function Classement() {
     const player = (s.player?.name ?? '').toLowerCase()
     return player.includes(searchNorm) || matchesTeamSearch(s.team)
   }
-  const filteredStandings = standings.filter(row => matchesTeamSearch(row.team))
+  // ⚠️ AJOUT (04/09, constat utilisateur : "même si l'équipe gagne ça comptait
+  // comme un nul dans le compteur de matchs nuls, alors que les points sont
+  // comptabilisés quand l'équipe est en train de gagner").
+  // football-data.org intègre bien le match en cours au classement, mais ne
+  // rafraîchit pas points et compteurs au même instant : il existe des
+  // fenêtres où les points ont bougé et pas encore les V/N/D. reconcileStandings
+  // remet les compteurs d'accord avec les points, uniquement pour les équipes
+  // qui jouent et uniquement si la ligne est réellement incohérente — voir
+  // standingsLive.js pour la déduction, elle ne devine rien.
+  // `wcSched` (useMatches(comp,'SCHEDULED')) contient tout ce qui n'est pas
+  // terminé, matchs EN COURS compris, avec les identifiants football-data et
+  // le score du moment : aucune requête supplémentaire.
+  const liveNow = (wcSched ?? []).filter(m => m?.status === 'IN_PLAY' || m?.status === 'PAUSED')
+  const standingsLive = reconcileStandings(standings, liveNow)
+  const filteredStandings = standingsLive.filter(row => matchesTeamSearch(row.team))
 
   const scorerBase = scorers
 
@@ -844,7 +859,7 @@ function Classement() {
                   formMap={formMap}
                   qualificationRules={qualificationRules}
                   snapshotKey={`standings_prev_${selectedComp}`}
-                  snapshotRows={standings}
+                  snapshotRows={standingsLive}
                   isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
