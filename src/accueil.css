@@ -1755,17 +1755,21 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  /* ⚠️ ROUGE (04/09, demande utilisateur : après la page du direct, "fais dans
-     les cards accueil aussi"). Même traitement exactement que
-     .lmp__heroMinute là-bas : --red, l'ombre noire portée garantissant la
-     lisibilité sur le dégradé aux couleurs des deux équipes. L'affiche "Match
-     du jour" (.accueil__mdjMinute) était déjà dans ce rouge — les trois
-     surfaces qui affichent une minute de jeu sont donc enfin identiques. */
+  /* ⚠️ REVENU AU BLANC (04/09). Essai de rouge le même jour, à la demande de
+     l'utilisateur après l'avoir fait sur la page du direct — puis retour
+     immédiat en voyant le résultat : "dans les cards accueil la minute en
+     rouge ça passe pas". Ces cards sont plus petites et le chiffre y est posé
+     au milieu d'un dégradé aux deux couleurs d'équipe, souvent déjà chargé :
+     le blanc s'y détache nettement mieux. Le halo rouge du text-shadow suffit
+     à signaler le direct.
+     À NE PAS "harmoniser" avec la page du direct sans le lui redemander :
+     l'écart entre les deux est un choix, pas un oubli. Le point rouge pulsant
+     à gauche et le libellé de période en haut, eux, restent rouges. */
   font-size: 1rem;
   font-weight: 900;
-  color: var(--red);
+  color: #ffffff;
   letter-spacing: 0.06em;
-  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.95), 0 1px 3px rgba(var(--black-rgb),0.9), 0 0 14px rgba(var(--red-rgb),0.5);
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 14px rgba(var(--red-rgb),0.4);
   line-height: 1;
 }
 /* Colonne "MT" + countdown (mi-temps) — reproduit exactement
