@@ -410,3 +410,27 @@ body::before {
 #root .accueil__mdjScoreSep { font-size: 1.8rem; }
 #root .lmp__hero .mp__hero__score { font-size: 2.8rem; line-height: 1.05; }
 #root .lmp__hero .mp__hero__time  { font-size: 2.4rem; line-height: 1.05; }
+
+/* ⚠️ EXCEPTION assumée (04/09, demande utilisateur : "changer juste pour match
+   du jour la police de l'heure") : sur l'affiche "Match du jour" UNIQUEMENT,
+   l'heure de coup d'envoi passe en Orbitron, pendant que le score de cette
+   même carte reste en Archivo Black. Les deux ne s'affichent jamais en même
+   temps (un match est soit à venir, soit commencé), il n'y a donc aucun
+   mélange de polices à l'écran — c'est la même case qui change d'allure selon
+   l'état du match.
+   Sélecteur volontairement porté par .accueil__mdjClock, le conteneur de
+   l'heure : .accueil__mdjBigNum sert AUSSI aux chiffres du score (dans
+   .accueil__mdjScore), qui ne doivent surtout pas être touchés.
+   Orbitron a des glyphes larges et une grande hauteur d'x : taille réduite
+   d'environ 20% par rapport à Archivo Black pour occuper la même place. */
+#root .accueil__mdjClock .accueil__mdjBigNum {
+  font-family: 'Orbitron', 'Archivo Black', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 2.9rem;
+  letter-spacing: 0.01em;
+}
+#root .accueil__mdjClock .accueil__mdjClockSep {
+  font-family: 'Orbitron', 'Archivo Black', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 2.3rem;
+}
