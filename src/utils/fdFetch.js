@@ -46,6 +46,11 @@ import { reportFetchFailure } from '../hooks/useNetworkQuality'
 // de l'élite n'ont qu'un écusson 70×70 chez football-data.org. Voir
 // crestOverrides.js pour la liste vérifiée et le raisonnement complet.
 import { overrideCrestUrls } from '../data/crestOverrides'
+// ⚠️ AJOUT (04/09) : football-data.org renvoyait une DATE dans le champ
+// `status` de 92 matchs de Ligue 1, ce qui les faisait disparaître de
+// Programme, Résultats et de la forme récente. Voir fdRepair.js pour le
+// diagnostic complet — la réparation est inerte quand la source va bien.
+import { repairFdBody } from './fdRepair'
 
 /**
  * Réécrit les URLs d'écusson basse résolution dans le corps de la réponse.
@@ -67,7 +72,10 @@ async function withSharpCrests(res) {
   const headers = new Headers(res.headers)
   headers.delete('content-length')
   headers.delete('content-encoding')
-  return new Response(overrideCrestUrls(text), {
+  // Deux réécritures enchaînées sur le même corps, toutes deux sans effet
+  // quand il n'y a rien à corriger : écussons basse résolution, puis statuts
+  // de match invalides.
+  return new Response(repairFdBody(overrideCrestUrls(text)), {
     status:     res.status,
     statusText: res.statusText,
     headers,
