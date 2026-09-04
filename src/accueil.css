@@ -2460,33 +2460,22 @@
   gap: 12px;
 }
 .accueil__mdjClock { gap: 6px; }
-/* Bebas Neue : condensée display, référence des affiches de match — monte
-   plus haut donc le score paraît plus imposant à taille de carte égale,
-   tout en restant élancée sur un score à 2 chiffres. `tabular-nums` évite
-   que la mise en page bouge quand le score change en direct. */
+/* ⚠️ Police et taille RETIRÉES d'ici (04/09) : elles étaient déclarées à la
+   fois dans ce fichier et dans le bloc "police unique des scores et des
+   heures" d'index.css, qui l'emportait déjà (sélecteur préfixé #root). Deux
+   déclarations pour la même chose finissent toujours par diverger — index.css
+   est la seule source de vérité, il ne reste ici que la couleur.
+   Halo blanc/ombre noire retirés le 03/09 : sans eux les chiffres restent
+   nets, l'ombre ne faisait que les empâter. */
 .accueil__mdjBigNum {
-  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
-  font-size: 4.7rem;
-  line-height: 0.85;
   color: #fff;
-  font-variant-numeric: tabular-nums;
-  /* Halo blanc/ombre noire retirés (03/09, même raison que .poster__time) :
-     le contour de 1,1px posé par le bloc unifié d'index.css donne déjà le
-     relief, l'ombre ne faisait qu'empâter les chiffres. */
 }
 /* ⚠️ Deux-points BLANCS (demande utilisateur, 03/09) — ils étaient rouges
-   avec un halo rouge, seul reste du traitement d'origine de cette carte. Tout
-   le reste des scores et heures a été unifié hier ; c'était la dernière
-   exception, et elle sautait aux yeux à côté d'une heure blanche. */
+   avec un halo rouge, seul reste du traitement d'origine de cette carte. */
 .accueil__mdjClockSep {
-  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
-  font-size: 3.6rem;
-  line-height: 0.85;
   color: #fff;
 }
 .accueil__mdjScoreSep {
-  font-family: 'Bebas Neue', 'Chakra Petch', system-ui, sans-serif;
-  font-size: 2rem;
   color: rgba(var(--white-rgb),0.32);
 }
 
