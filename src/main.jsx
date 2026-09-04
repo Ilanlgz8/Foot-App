@@ -7,8 +7,14 @@ import { checkAppVersion } from './utils/appUpdate'
 // Auto-reload quand le SW prend le contrôle (skipWaiting + clientsClaim)
 // → plus besoin de vider le cache Safari après chaque déploiement
 if ('serviceWorker' in navigator) {
+  // ⚠️ GARDE-FOU (04/09) : `controllerchange` se déclenche AUSSI à la toute
+  // première installation, quand le service worker prend la main sur une page
+  // qui n'en avait aucun (effet de clientsClaim). Recharger dans ce cas n'a
+  // aucun sens — il n'y a pas d'ancienne version à remplacer — et ça infligeait
+  // un rechargement gratuit à chaque première visite.
+  const avaitDejaUnSW = !!navigator.serviceWorker.controller
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload()
+    if (avaitDejaUnSW) window.location.reload()
   })
 
   // Le check natif du navigateur ne se déclenche que sur une vraie navigation.

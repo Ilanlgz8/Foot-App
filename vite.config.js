@@ -30,8 +30,35 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api\//, /^\/cron-goals/, /^\/news$/, /^\/espn$/, /^\/apifootball$/],
+          // ⚠️ `navigateFallback: '/index.html'` RETIRÉ (04/09). C'était la
+          // cause racine de "sur mon tel en PWA je vois encore comme avant" :
+          // il faisait servir TOUTE navigation par l'index.html du PRÉCACHE,
+          // donc celui figé à l'installation du service worker. Or index.html
+          // est le seul fichier qui désigne les bundles à charger (leurs noms
+          // sont hachés) — servir un index.html périmé, c'est charger
+          // indéfiniment l'ancienne app, quel que soit le nombre de
+          // déploiements. Reproduit en direct : la page tournait sur
+          // index-Do0CXG98.js pendant que le serveur servait index-CacS4bbB.js.
+          // Il est remplacé par une route NetworkFirst sur les navigations
+          // (voir runtimeCaching plus bas). Il FALLAIT le retirer et pas
+          // seulement ajouter la route : workbox enregistre la NavigationRoute
+          // de navigateFallback EN PREMIER (vérifié dans le sw.js généré), et
+          // comme elle capte toutes les navigations, aucune règle ajoutée
+          // après n'aurait jamais été atteinte.
+          //
+          // Contrepartie assumée : hors ligne, une navigation vers une URL
+          // jamais ouverte en ligne depuis l'installation n'a plus de repli et
+          // échouera. L'accueil, lui, fonctionne dès la première ouverture en
+          // ligne (la route met le HTML en cache au passage). Compromis
+          // raisonnable pour une app de scores en direct, qui n'a de toute
+          // façon pas grand-chose à montrer sans réseau — et sans commune
+          // mesure avec le fait de rester bloqué sur une vieille version.
+          //
+          // `null` explicite et non simple omission : vite-plugin-pwa réinjecte
+          // sa valeur par défaut ('index.html') quand la clé est absente — la
+          // première tentative, qui se contentait de supprimer la ligne,
+          // laissait la NavigationRoute en place dans le sw.js généré.
+          navigateFallback: null,
           // Nouveau SW prend le contrôle immédiatement → pas besoin de vider le cache Safari
           skipWaiting: true,
           clientsClaim: true,
@@ -52,6 +79,41 @@ export default defineConfig(({ mode }) => {
           // sw-push.js est un fichier vanilla JS pur (pas d'import) → compatible generateSW
           importScripts: ['/sw-push.js'],
           runtimeCaching: [
+            // ⚠️ AJOUT (04/09, cause RACINE de "sur mon tel en PWA je vois
+            // encore comme avant", reproduite en direct dans un navigateur :
+            // la page tournait sur index-Do0CXG98.js pendant que le serveur
+            // servait index-CacS4bbB.js, avec un service worker actif).
+            //
+            // Sans cette règle, une navigation était servie par
+            // `navigateFallback` — c'est-à-dire par l'index.html du PRÉCACHE,
+            // donc toujours la version figée au moment où le service worker a
+            // été installé. Or index.html est le seul fichier qui désigne les
+            // bundles à charger (leurs noms sont hachés) : servir un index.html
+            // périmé, c'est charger indéfiniment l'ancienne app, même après dix
+            // déploiements. Tout le reste du dispositif (skipWaiting,
+            // clientsClaim, update() au premier plan) ne sert à rien tant que
+            // ce point-là n'est pas réglé : il faut d'abord que le navigateur
+            // remarque un nouveau /sw.js, ce qu'une PWA installée peut
+            // retarder très longtemps.
+            //
+            // NetworkFirst inverse la priorité : le HTML est demandé au réseau
+            // à chaque ouverture (une requête d'environ 1 Ko), et le précache
+            // ne sert plus que de repli — hors ligne, ou si le réseau ne
+            // répond pas sous 3 s. On garde donc le fonctionnement hors ligne
+            // sans jamais servir une app périmée quand la connexion est là.
+            // Le HTML est demandé au réseau à chaque ouverture (environ 1 Ko)
+            // et le cache ne sert que de repli, hors ligne ou si le réseau ne
+            // répond pas sous 3 s.
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'html-navigations',
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 8 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
             // Fonts Google → cache long, jamais de fetch inutile
             {
               urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
