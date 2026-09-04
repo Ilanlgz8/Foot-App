@@ -217,11 +217,16 @@
    32 px de décalage relevés entre le centre de l'écusson et celui du chiffre.
    Une marge négative sur la colonne entière la remonte d'un bloc, statut
    compris, sans rien changer à l'ordre d'affichage demandé (statut au-dessus
-   du score). 24 px et non 32 : à 32 le statut venait toucher le bandeau du
-   haut (nom du championnat / diffuseur) ; à 24 il reste ~10 px de marge et
-   l'écart résiduel avec l'écusson n'est plus perceptible. */
+   du score).
+   Valeur : 32 px. Une 1re passe à 24 px n'a repris que 12 px des 32 (mesuré
+   en production) — le passage de Bebas à Russo One, moins haute, avait
+   déplacé le centre du chiffre entre-temps. Le plafond n'est pas l'écart
+   restant mais le bandeau du haut : sur la page du DIRECT le bloc de statut
+   compte deux lignes (période + minute), soit ~26 px de plus qu'une simple
+   date — c'est ce cas-là qui limite, et à 32 px il reste encore de la marge
+   avant de toucher le nom du championnat. */
 #root .lmp__hero .mp__hero__center {
-  margin-top: -24px;
+  margin-top: -32px;
 }
 
 /* Minute live : pas de pill/bordure (peu lisible sur le dégradé) — un texte
