@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId, buildHeroSubline } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState, recordEspnMiss } from './matchStateTracker'
 
 const MID = 1
@@ -676,5 +676,36 @@ describe('resolveFdMatchId — option { loose } (bug Toulouse-Lyon)', () => {
 
   it('avec { loose: true }, résout le vrai id FD.org du match Toulouse-Lyon', () => {
     expect(resolveFdMatchId(espnMatch, fl1CompMatches, { loose: true })).toBe(600001)
+  })
+})
+
+// ── buildHeroSubline ─────────────────────────────────────────────────────────
+describe('buildHeroSubline — ligne "Journée N · date" du bandeau', () => {
+  it('assemble journée et date', () => {
+    expect(buildHeroSubline({ matchday: 2, utcDate: '2026-08-28T18:45:00Z' }))
+      .toBe('Journée 2 · vendredi 28 août')
+  })
+
+  it('se réduit à la date quand la journée manque (match sourcé ESPN)', () => {
+    expect(buildHeroSubline({ utcDate: '2026-08-28T18:45:00Z' })).toBe('vendredi 28 août')
+  })
+
+  it('se réduit à la journée quand la date manque', () => {
+    expect(buildHeroSubline({ matchday: 7 })).toBe('Journée 7')
+  })
+
+  it('renvoie null si on n’a ni l’une ni l’autre — la ligne n’est pas rendue', () => {
+    expect(buildHeroSubline({})).toBeNull()
+    expect(buildHeroSubline(null)).toBeNull()
+    expect(buildHeroSubline(undefined)).toBeNull()
+  })
+
+  it('ignore une date illisible plutôt que d’afficher "Invalid Date"', () => {
+    expect(buildHeroSubline({ matchday: 3, utcDate: 'pas une date' })).toBe('Journée 3')
+    expect(buildHeroSubline({ utcDate: 'pas une date' })).toBeNull()
+  })
+
+  it('ignore une journée non numérique', () => {
+    expect(buildHeroSubline({ matchday: null, utcDate: '2026-08-28T18:45:00Z' })).toBe('vendredi 28 août')
   })
 })

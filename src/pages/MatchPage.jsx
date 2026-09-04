@@ -11,7 +11,7 @@ import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
-import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId } from '../utils/matchUtils'
+import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId, buildHeroSubline } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
 import { WatchBadge }              from '../components/WatchBadge'
@@ -135,6 +135,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) — même correction
   // que LiveMatchPage.jsx, voir le commentaire là-bas.
   const compName   = comp?.name ?? match.competition?.name ?? ''
+  // "Journée N · date" sous le nom du championnat — voir buildHeroSubline.
+  const heroSubline = buildHeroSubline(match)
   // (plus de dégradé plein injecté ici : depuis le passage en panneau
   // flottant, le fond est une base sombre + 2 halos diffus portés par le CSS.
   // Voir .lmp__hero, réutilisé par cette page.)
@@ -233,7 +235,20 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <img src={emblem} alt="" />
             </span>
           )}
-          <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
+          {/* ⚠️ AJOUT (05/09, constat utilisateur : "sur ces pages j'ai
+              l'impression qu'il manque quelque chose"). Ce qui manquait est
+              QUAND le match se joue : depuis que "Terminé" a remplacé la date
+              au centre, plus rien n'indiquait ni le jour ni la journée de
+              championnat — sur un match passé, impossible de savoir si c'était
+              vendredi dernier ou il y a un mois.
+              Les deux valeurs viennent du match déjà chargé, aucun appel
+              supplémentaire. La journée peut manquer (un match sourcé ESPN n'a
+              pas toujours `matchday`) : la ligne se réduit alors à la date, et
+              disparaît complètement si les deux manquent. */}
+          <span className="lmp__heroCompCol">
+            <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
+            {heroSubline && <span className="lmp__heroCompSub">{heroSubline}</span>}
+          </span>
         </div>
         {/* ⚠️ ÉCHANGÉ avec le statut (03/09, demande utilisateur) : c'est le
             DIFFUSEUR qui occupe le coin haut droit, et le statut (date ou

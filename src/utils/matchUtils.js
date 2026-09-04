@@ -924,3 +924,22 @@ export function resolveFdCrest(team, resolvedId, compMatches) {
   }
   return team?.crest ?? null
 }
+
+// ── Ligne "Journée N · date" du bandeau ──────────────────────────────────────
+// Partagée par MatchPage et LiveMatchPage, qui affichent le MÊME bandeau : la
+// dupliquer aurait garanti qu'elles divergent (c'est déjà arrivé sur
+// data-opaque, présent d'un côté et pas de l'autre pendant des semaines).
+// Renvoie null si on n'a ni journée ni date — la ligne n'est alors pas rendue
+// du tout plutôt que d'afficher un séparateur vide.
+export function buildHeroSubline(match) {
+  const md = match?.matchday
+  const journee = Number.isFinite(md) ? `Journée ${md}` : null
+  let date = null
+  if (match?.utcDate) {
+    const d = new Date(match.utcDate)
+    if (!isNaN(d)) {
+      date = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    }
+  }
+  return [journee, date].filter(Boolean).join(' · ') || null
+}

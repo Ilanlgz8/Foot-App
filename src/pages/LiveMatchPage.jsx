@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock, buildHeroSubline } from '../utils/matchUtils'
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -139,6 +139,8 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   // prioritaire, comme partout ailleurs dans l'app (convention "Noms français
   // partout dans l'UI", voir CLAUDE.md ; même ordre que ResultHeroCard.jsx/Pronos.jsx).
   const compName = comp?.name ?? match.competition?.name ?? ''
+  // "Journée N · date" sous le nom du championnat — voir buildHeroSubline.
+  const heroSubline = buildHeroSubline(match)
 
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
   // Une seule valeur, utilisée de façon cohérente pour tout ce render (même
@@ -296,7 +298,20 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               <img src={emblem} alt="" />
             </span>
           )}
-          <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
+          {/* ⚠️ AJOUT (05/09, constat utilisateur : "sur ces pages j'ai
+              l'impression qu'il manque quelque chose"). Ce qui manquait est
+              QUAND le match se joue : depuis que "Terminé" a remplacé la date
+              au centre, plus rien n'indiquait ni le jour ni la journée de
+              championnat — sur un match passé, impossible de savoir si c'était
+              vendredi dernier ou il y a un mois.
+              Les deux valeurs viennent du match déjà chargé, aucun appel
+              supplémentaire. La journée peut manquer (un match sourcé ESPN n'a
+              pas toujours `matchday`) : la ligne se réduit alors à la date, et
+              disparaît complètement si les deux manquent. */}
+          <span className="lmp__heroCompCol">
+            <span className="mp__hero__compName lmp__heroCompName">{compName}</span>
+            {heroSubline && <span className="lmp__heroCompSub">{heroSubline}</span>}
+          </span>
         </div>
         {/* Période en HAUT À DROITE (02/09, demande explicite) — même
             emplacement que sur l'affiche "Match du jour" de l'Accueil, donc

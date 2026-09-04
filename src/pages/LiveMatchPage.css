@@ -188,6 +188,31 @@
    Texte nu, sans fond ni bordure : la version précédente utilisait
    .lmp__heroPeriodBadge, dont l'encadré translucide a été signalé comme un
    "cadre verre dépoli" gênant. */
+/* Colonne du bandeau : nom du championnat, puis "Journée N · date" en dessous
+   (05/09). Le bandeau était jusque-là une simple ligne ; il porte maintenant
+   deux niveaux à gauche, d'où ce conteneur en colonne. */
+.lmp__heroCompCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.lmp__heroCompSub {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(var(--white-rgb),0.5);
+  text-shadow: 0 1px 4px rgba(var(--black-rgb),0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Majuscule initiale seulement : toLocaleDateString rend "vendredi 28 août",
+     on ne veut ni du tout-majuscules (trop lourd sous le nom du championnat)
+     ni un "v" minuscule en début de ligne. */
+  text-transform: none;
+}
+.lmp__heroCompSub::first-letter { text-transform: uppercase; }
+
 .lmp__heroWhenLabel {
   font-size: 0.6rem;
   font-weight: 800;
