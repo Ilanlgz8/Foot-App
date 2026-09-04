@@ -436,4 +436,6 @@ body::before {
 }
 
 
-/* marqueur temporaire de test — retire juste apres */
+
+/* sonde temporaire de test (retiree juste apres) */
+#root .__sfUpdateProbe { color: #ff00ff; }
