@@ -210,11 +210,27 @@
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────────────*/
+/* ⚠️ AJOUT (05/09, constat utilisateur : "on voit les carrés et octogones en
+   fond" sur LiveMatchPage/MatchPage/Résultat) : IDENTIFIÉ — pas un nouveau
+   bug, la texture ballon de foot en filigrane (body::before, index.css,
+   hexagones tracés à l'opacité 0.022, présente sur TOUTE l'app depuis un
+   moment) n'a jamais été repeinte par-dessus ici. Sur Accueil/Live, la grille
+   de cards opaques la recouvre presque entièrement — invisible en pratique.
+   Sur cette page, la zone sous le panneau (Statistiques/Compos/Classement)
+   est une grande surface vide sans aucun fond propre (`.mp__wrap` n'avait
+   jamais de `background`, contrairement à `body` lui-même, seul endroit où
+   c'est posé — vérifié, aucune autre page ne le fait non plus, elles s'en
+   sortent uniquement par densité de contenu) : le filigrane y devient visible
+   sans rien pour l'occulter. Un simple aplat (même couleur que `body`, voir
+   index.css) au niveau de ce conteneur suffit à la repeindre, exactement
+   "comme avant" — la texture elle-même n'est pas touchée, elle reste en place
+   partout ailleurs dans l'app. */
 .mp__wrap {
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 0 1rem 2rem;
+  background: var(--bg-deep);
 }
 
 .mp__body {
