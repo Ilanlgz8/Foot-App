@@ -286,7 +286,14 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           animations dans son système. */}
       <div
         className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}`}
-        style={{ '--lmp-hc': heroColors.home.main, '--lmp-hc2': heroColors.away.main }}
+        style={{
+          '--lmp-hc': heroColors.home.main,
+          '--lmp-hc2': heroColors.away.main,
+          // Teinte du championnat (voir `tint`, competitions.js). Absente pour
+          // une compétition sans couleur identifiable : le CSS retombe alors
+          // sur le fond sombre d'origine.
+          ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
+        }}
       >
         <span className="lmp__heroGlowL" aria-hidden="true" />
         <span className="lmp__heroGlowR" aria-hidden="true" />

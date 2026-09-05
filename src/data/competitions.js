@@ -175,9 +175,21 @@ export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', '
 // notifs d'un match par an reste légitime).
 export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 
+// ── Couleur d'ambiance par championnat ───────────────────────────────────────
+// ⚠️ AJOUT (05/09, demande utilisateur : "le fond de la card sur la page du
+// direct aux couleurs du championnat, genre Ligue 1 en bleu comme le logo").
+// Chaque valeur est EXTRAITE du logo réellement utilisé par l'app, pas choisie
+// à la main : couleur dominante des pixels du fichier, en ignorant blancs,
+// noirs et gris (jamais la couleur d'identité d'un logo). Le détail par
+// championnat est noté sur chaque entrée.
+// Une compétition sans `tint` garde le fond sombre neutre — c'est le cas de la
+// Ligue des champions, dont le logo est strictement noir et blanc : il n'y a
+// aucune couleur à en tirer, et en inventer une n'aurait aucun fondement.
 export const COMPETITIONS = [
   {
     id: 'FL1',
+    // bleu dominant du logo Ligue 1 (20 526 pixels)
+    tint: '#0054fc',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -187,6 +199,8 @@ export const COMPETITIONS = [
   },
   {
     id: 'PL',
+    // violet du logo Premier League, relevé sur le fichier d'origine avant son détourage (voir git)
+    tint: '#39003d',
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
@@ -211,6 +225,8 @@ export const COMPETITIONS = [
   },
   {
     id: 'PD',
+    // unique couleur déclarée dans le SVG LaLiga EA Sports
+    tint: '#ff4b44',
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
@@ -224,12 +240,16 @@ export const COMPETITIONS = [
   },
   {
     id: 'BL1',
+    // rouge dominant du logo Bundesliga (16 158 pixels)
+    tint: '#cc000c',
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
   },
   {
     id: 'SA',
+    // bleu dominant du logo Serie A (2 571 pixels)
+    tint: '#0084cc',
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
