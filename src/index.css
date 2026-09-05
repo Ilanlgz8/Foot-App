@@ -78,17 +78,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Texture ballon de foot en filigrane sur tout le site ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.022;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='92'%3E%3Cpolygon points='40,3 77,23 77,69 40,89 3,69 3,23' fill='none' stroke='%23ffffff' stroke-width='1.2'/%3E%3C/svg%3E");
-  background-size: 80px 92px;
-}
+/* ⚠️ RETIRÉE (05/09, demande explicite utilisateur : "enlever ce fond de
+   l'app... juste mettre un fond noir"). Il y avait ici une texture ballon de
+   foot en filigrane (hexagones à 0.022 d'opacité, `body::before`) posée sur
+   tout le site depuis un moment — masquée en pratique sur Accueil/Live/
+   Programme par la densité de cards, mais bien visible sur LiveMatchPage/
+   MatchPage/Résultat (grande zone vide sous le panneau, jamais repeinte —
+   voir le patch `.mp__wrap` dans MatchPage.css, désormais redondant avec ce
+   retrait mais laissé en place, sans effet visible ni coût). Fond uni
+   `var(--bg-deep)` (posé sur `body` juste au-dessus) partout, sans filigrane,
+   comme demandé. Voir git log pour retrouver le SVG d'origine si besoin. */
 
 
 /* ── Blason club vs drapeau pays — traitement unique, partagé par TOUS les
