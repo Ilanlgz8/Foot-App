@@ -213,7 +213,17 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
 
       <div
         className="mp__hero lmp__hero"
-        style={{ '--lmp-hc': heroColors.home.main, '--lmp-hc2': heroColors.away.main }}
+        style={{
+          '--lmp-hc': heroColors.home.main,
+          '--lmp-hc2': heroColors.away.main,
+          // Teinte du championnat (voir `tint`, competitions.js), déjà posée
+          // sur LiveMatchPage.jsx — manquait ici (constat utilisateur 05/09 :
+          // "dans match page aussi et resultat page"). Résultat.jsx et le
+          // Match Page partagent tous les deux ce même composant (navigate
+          // vers /match/:id dans les deux cas), donc un seul endroit à
+          // corriger couvre les deux demandes.
+          ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
+        }}
       >
         <span className="lmp__heroGlowL" aria-hidden="true" />
         <span className="lmp__heroGlowR" aria-hidden="true" />
