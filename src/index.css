@@ -404,23 +404,27 @@ body::before {
   letter-spacing: 0.01em;
 }
 
-/* ⚠️ Le PANNEAU des pages match / direct / résultats se sépare de l'affiche
-   "Match du jour" : l'affiche garde Archivo Black pour le score et Orbitron
-   pour l'heure. Deux surfaces de tailles très différentes, l'écart est assumé
-   et non un oubli d'harmonisation.
-   HISTORIQUE de cet emplacement, pour ne pas refaire le tour : Bebas Neue
-   (trop étroite et fine), Russo One, Archivo Black (trop massive ici),
-   Rajdhani 700 (chiffres carrés, écartée à son tour). Anybody 800 est le
-   choix retenu après quatre séries de comparaisons montrées dans le contexte
-   réel de la card — sportive, pleine, sans être une police "à effet" du type
-   diodes ou italique, écartées explicitement. */
+/* ⚠️ RETOUR À LA POLICE D'ORIGINE (05/09, demande utilisateur : "au final je
+   veux comme avant, genre au début"). Chakra Petch, exactement ce qu'affichait
+   ce panneau avant qu'on y touche le 02/09 — et déjà la police de la minute
+   juste au-dessus, donc le bloc central redevient homogène.
+   Graisse 700 et non 900 : la déclaration d'origine demandait 900, mais
+   index.html ne charge cette famille qu'en 600 et 700 — le 900 était donc
+   synthétisé par le navigateur. 700 est la graisse réellement affichée à
+   l'époque, on restaure ce qui était vu, pas ce qui était écrit.
+   HISTORIQUE de cet emplacement, pour ne pas refaire le tour : Chakra Petch
+   (origine) → Bebas Neue (trop étroite et fine) → Russo One → Archivo Black
+   (trop massive ici) → Rajdhani 700 → Anybody 800 → retour à Chakra Petch.
+   Six essais : le point de départ était le bon.
+   L'affiche "Match du jour" garde Archivo Black pour le score et Orbitron pour
+   l'heure — surface bien plus grande, l'écart reste assumé. */
 #root .lmp__hero .mp__hero__score,
 #root .lmp__hero .mp__hero__time {
-  font-family: 'Anybody', 'Archivo Black', system-ui, sans-serif;
-  font-weight: 800;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-weight: 700;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
 }
 
 /* Le +20% qui compensait l'étroitesse de Bebas n'a plus lieu d'être : ces
@@ -442,12 +446,12 @@ body::before {
 /* Rajdhani est plus étroite et moins pleine qu'Archivo Black : +25% pour
    occuper la même place à l'écran (rapport relevé sur la comparaison visuelle,
    50px de Rajdhani pour 40px d'Archivo Black). */
-/* Anybody est plus pleine et plus large que Rajdhani : -10% pour occuper la
-   même place à l'écran (rapport relevé sur la comparaison en contexte, 42px
-   d'Anybody pour 48px de Rajdhani). Le score avait par ailleurs été réduit à
-   la demande de l'utilisateur, ce réglage-là est conservé. */
-#root .lmp__hero .mp__hero__score { font-size: 2.7rem; line-height: 1; }
-#root .lmp__hero .mp__hero__time  { font-size: 2.35rem; line-height: 1; }
+/* Tailles d'origine elles aussi, relevées dans l'historique git (MatchPage.css
+   avant le 02/09) : 2.4rem pour le score, 2rem pour l'heure. C'est plus petit
+   que tout ce qu'on a essayé depuis — cohérent avec la demande de réduire le
+   score faite plus tôt dans la journée. */
+#root .lmp__hero .mp__hero__score { font-size: 2.4rem; line-height: 1; }
+#root .lmp__hero .mp__hero__time  { font-size: 2rem;   line-height: 1; }
 
 /* ⚠️ EXCEPTION assumée (04/09, demande utilisateur : "changer juste pour match
    du jour la police de l'heure") : sur l'affiche "Match du jour" UNIQUEMENT,
