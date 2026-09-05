@@ -50,8 +50,22 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
-/* Prevent horizontal overflow on all screens */
-html, body { overflow-x: hidden; max-width: 100vw; }
+/* ⚠️ `overflow-x: clip` ET NON `hidden` (05/09, bug signalé : "des fois la
+   barre de navigation du bas se décolle et se retrouve au milieu de l'écran
+   quand je swipe").
+   C'est la cause classique de ce symptôme. `overflow-x: hidden` sur l'élément
+   RACINE en fait un conteneur de défilement : à partir de là, un élément en
+   `position: fixed` n'est plus garanti d'être ancré au viewport — sur iOS il
+   se raccroche à ce conteneur et part en vrille pendant le rebond élastique
+   d'un swipe. La barre du bas (.sfTabbar, position: fixed) est exactement dans
+   ce cas.
+   `clip` fait le même travail — empêcher tout débordement horizontal — SANS
+   créer de conteneur de défilement : les éléments fixes restent donc ancrés au
+   viewport. C'est précisément l'usage pour lequel cette valeur a été ajoutée
+   au CSS. Supportée par Safari 16+ et Chrome 90+ ; sur un navigateur plus
+   ancien la déclaration est ignorée et on retombe sur le comportement par
+   défaut (débordement possible), jamais sur quelque chose de cassé. */
+html, body { overflow-x: clip; max-width: 100vw; }
 
 body {
   margin: 0;

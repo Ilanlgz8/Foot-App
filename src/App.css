@@ -5,7 +5,28 @@
 }
 
 .page-transition {
-  animation: pageIn 0.22s ease both;
+  /* ⚠️ `backwards` ET NON `both` (05/09, trouvé en cherchant pourquoi la barre
+     du bas se décollait).
+     `both` conserve l'état FINAL de l'animation une fois celle-ci terminée —
+     donc `transform: translateY(0)` reste appliqué en permanence sur ce
+     conteneur. Or un élément porteur d'un transform devient le bloc conteneur
+     de ses descendants en `position: fixed` : toutes les surfaces fixes
+     RENDUES DANS UNE PAGE s'ancraient donc sur ce conteneur au lieu du
+     viewport — l'overlay des modales (match, groupe de classement, poule) et
+     le sélecteur de compétition en plein écran. Sur une page longue, un
+     overlay en `inset: 0` couvre alors toute la hauteur de la page et non
+     l'écran, ce qui le fait apparaître décalé.
+     `backwards` applique l'état de départ AVANT le lancement (donc aucun
+     scintillement au changement de page, ce que `both` apportait) mais ne
+     laisse rien derrière lui : plus aucun transform résiduel une fois la
+     transition finie. L'état final de l'animation est de toute façon
+     identique à l'état naturel de l'élément (opacité 1, pas de décalage),
+     il n'y a donc rien à conserver.
+     Reste une fenêtre de 0,22 s pendant laquelle le transform existe
+     réellement — une modale ouverte dans cet intervalle serait mal placée.
+     Inévitable sans supprimer l'animation, et sans commune mesure avec le
+     défaut permanent qu'on corrige ici. */
+  animation: pageIn 0.22s ease backwards;
 }
 
 .routeFallback {
