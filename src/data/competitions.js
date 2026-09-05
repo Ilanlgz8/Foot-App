@@ -189,12 +189,34 @@ export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 //     surface) ;
 //   • la luminosité est ramenée dans 0,24–0,44 : plus clair, le texte blanc
 //     ne passe plus ; plus sombre, la teinte ne se voit plus.
-// Chaque entrée note la couleur brute ET la couleur corrigée, pour qu'on
-// puisse refaire le calcul.
-// Limite connue et assumée : Bundesliga et LaLiga restent proches après
-// correction (#b8141e et #ca1d16) — leurs deux logos sont rouges, à 6° de
-// teinte l'un de l'autre. Les écarter davantage reviendrait à inventer une
-// couleur que ces championnats n'ont pas.
+//
+// ⚠️ 2e CORRECTION (05/09, même jour, nouveau retour : "la ligue 1 c'est censé
+// être bleu et c'est tout sauf bleu, et la Bundesliga le rouge est trop vif").
+// Deux problèmes distincts trouvés au calcul (pas au jugé, voir le détail du
+// dégradé dans LiveMatchPage.css) :
+//   1. Bleu et rouge à la MÊME saturation/luminosité ne se perçoivent pas
+//      pareil. Le fond de carte est un dégradé qui s'assombrit vers le bas
+//      (zone la plus visible) : un bleu à L=44% y devenait rgb(12,34,78),
+//      trop sombre pour être identifié comme bleu — pendant qu'un rouge à la
+//      même L restait vif et entrait en conflit avec le rouge déjà utilisé
+//      partout ailleurs dans l'UI (bordure live, minute, pastille "live").
+//      Un plafond uniforme en HSL ne peut pas corriger ça : la correction a
+//      donc été refaite par famille de teinte plutôt qu'avec une seule règle
+//      pour les 5 —
+//        • bleus (Ligue 1, Serie A) : légèrement éclaircis/saturés (L≈47%,
+//          S≈78%) pour rester lisibles même dilués dans le bas du dégradé ;
+//        • le dégradé lui-même a aussi été moins dilué (voir
+//          LiveMatchPage.css) pour que la teinte porte sur toute la carte,
+//          pas seulement le coin haut.
+//   2. Bundesliga et LaLiga sont TOUTES LES DEUX rouges (6° de teinte
+//      d'écart) : aucune correction de luminosité/saturation ne les rend
+//      moins "criardes" sans les écarter en teinte, ce qui inventerait une
+//      couleur que ces logos n'ont pas. Et un rouge assez sombre pour ne pas
+//      crier se confond de toute façon avec les accents rouges de l'app
+//      (bordure live, minute). Plutôt qu'un compromis raté, ces deux
+//      championnats n'ont PLUS de `tint` : fond neutre, comme la Ligue des
+//      champions — décision reprise de la proposition de l'utilisateur lui-
+//      même ("le reste on fait du noir").
 // ⚠️ AJOUT (05/09, demande utilisateur : "le fond de la card sur la page du
 // direct aux couleurs du championnat, genre Ligue 1 en bleu comme le logo").
 // Chaque valeur est EXTRAITE du logo réellement utilisé par l'app, pas choisie
@@ -207,8 +229,10 @@ export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 export const COMPETITIONS = [
   {
     id: 'FL1',
-    // brut #0054fc (bleu dominant du logo, 20 526 px) → corrigé
-    tint: '#1652ca',
+    // brut #0054fc (bleu dominant du logo, 20 526 px) → corrigé, puis affiné
+    // (05/09, 2e passe) pour rester lisible comme bleu même dilué en bas du
+    // dégradé — voir le commentaire au-dessus de COMPETITIONS
+    tint: '#1a5cd6',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -244,8 +268,8 @@ export const COMPETITIONS = [
   },
   {
     id: 'PD',
-    // brut #ff4b44 (unique couleur du SVG LaLiga) → corrigé
-    tint: '#ca1d16',
+    // Pas de `tint` (05/09, 2e passe) : logo rouge, comme Bundesliga — voir le
+    // commentaire au-dessus de COMPETITIONS (point 2).
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
@@ -259,16 +283,17 @@ export const COMPETITIONS = [
   },
   {
     id: 'BL1',
-    // brut #cc000c (rouge dominant du logo, 16 158 px) → corrigé
-    tint: '#b8141e',
+    // Pas de `tint` (05/09, 2e passe) : logo rouge, retiré — voir le
+    // commentaire au-dessus de COMPETITIONS (point 2). Brut #cc000c.
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
   },
   {
     id: 'SA',
-    // brut #0084cc (bleu dominant du logo, 2 571 px) → corrigé
-    tint: '#147eb8',
+    // brut #0084cc (bleu dominant du logo, 2 571 px) → corrigé, puis affiné
+    // (05/09, 2e passe) même raison que Ligue 1
+    tint: '#1a8fd6',
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
