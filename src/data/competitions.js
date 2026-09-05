@@ -217,6 +217,18 @@ export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 //      championnats n'ont PLUS de `tint` : fond neutre, comme la Ligue des
 //      champions — décision reprise de la proposition de l'utilisateur lui-
 //      même ("le reste on fait du noir").
+//
+// ⚠️ 3e CORRECTION (05/09, même jour, retour utilisateur après coup : "en tout
+// noir c'est moche, essaye un mélange de rouge et blanc"). Bundesliga et
+// LaLiga retrouvent un `tint`, mais rouge mélangé au BLANC (rosé/saumon) et
+// non plus au noir (bordeaux, déjà essayé et rejeté juste avant — "pas trop
+// fan", "mauvaise teinte") : même teinte que chaque logo, luminosité/
+// saturation remontées vers le blanc plutôt qu'assombries. Ne règle pas le
+// point 2 ci-dessus (toujours la même famille de rouge, donc encore assez
+// proche du rouge live) — mais un rosé assez clair s'en distingue déjà
+// beaucoup mieux visuellement qu'un rouge sombre ou vif. `tintLight: true`
+// (comme Ligue 1/Serie A) : la minute passe en blanc, le rouge du point live
+// se fondrait sinon dans ce fond.
 // ⚠️ AJOUT (05/09, demande utilisateur : "le fond de la card sur la page du
 // direct aux couleurs du championnat, genre Ligue 1 en bleu comme le logo").
 // Chaque valeur est EXTRAITE du logo réellement utilisé par l'app, pas choisie
@@ -274,8 +286,13 @@ export const COMPETITIONS = [
   },
   {
     id: 'PD',
-    // Pas de `tint` (05/09, 2e passe) : logo rouge, comme Bundesliga — voir le
-    // commentaire au-dessus de COMPETITIONS (point 2).
+    // brut #ff4b44 (unique couleur du SVG) → le rouge pur/assombri (mélangé
+    // au noir) avait été essayé puis retiré (05/09, "pas fan", "mauvaise
+    // teinte") — repris en rosé (rouge mélangé au BLANC plutôt qu'au noir,
+    // demande explicite : "un mélange de rouge et blanc"), même teinte que le
+    // logo, juste éclairci/désaturé au lieu d'assombri.
+    tint: '#d96c68',
+    tintLight: true, // fond rosé, pas neutre sombre : la minute reste blanche
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
@@ -289,8 +306,10 @@ export const COMPETITIONS = [
   },
   {
     id: 'BL1',
-    // Pas de `tint` (05/09, 2e passe) : logo rouge, retiré — voir le
-    // commentaire au-dessus de COMPETITIONS (point 2). Brut #cc000c.
+    // brut #cc000c → rosé (même raison/même demande que PD ci-dessus, rouge
+    // mélangé au blanc plutôt qu'au noir).
+    tint: '#d16168',
+    tintLight: true,
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
