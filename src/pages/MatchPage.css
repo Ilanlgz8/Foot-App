@@ -263,7 +263,15 @@
   text-align: center;
 }
 .mp__tab:hover { color: rgba(var(--white-rgb),.65); }
-.mp__tab--active { color: var(--match-home, var(--red-light)); border-bottom-color: var(--match-home, var(--red)); }
+/* ⚠️ ROUGE PAR DÉFAUT, PLUS LA COULEUR DE L'ÉQUIPE (06/09, demande explicite :
+   "enlever les couleurs assorties aux équipes pour les onglets Statistiques et
+   tout, dans MatchPage/LiveMatchPage/Résultat, et remettre par défaut, c'est
+   à dire rouge"). L'onglet actif prenait `--match-home` (couleur de l'équipe
+   à domicile, posée par teamPhotos.js) — d'où un onglet bleu sur Schalke,
+   jaune sur Villarreal… incohérent avec le rouge qui est la couleur d'accent
+   de toute l'app. `--match-home` reste utilisé ailleurs (courbes de proba,
+   stats domicile/extérieur) où distinguer les 2 équipes a du sens. */
+.mp__tab--active { color: var(--red-light); border-bottom-color: var(--red); }
 
 /* ── Contenu ──────────────────────────────────────────────────────────────────*/
 .mp__tabContent {

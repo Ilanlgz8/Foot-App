@@ -1750,8 +1750,13 @@
   background: rgba(var(--white-rgb),0.18);
   transition: background 0.2s, transform 0.2s, width 0.2s;
 }
+/* Rouge par défaut, plus la couleur de l'équipe — même demande et même raison
+   que .mp__tab--active (voir MatchPage.css). `TabDots` est défini ici mais
+   n'est rendu QUE par MatchPage.jsx et LiveMatchPage.jsx (vérifié) : la modale
+   pré-match ne l'utilise pas, ce changement reste donc bien limité aux pages
+   visées par la demande. */
 .tabDots__dot--active {
-  background: var(--match-home, var(--red));
+  background: var(--red);
   width: 14px;
   border-radius: 3px;
 }
