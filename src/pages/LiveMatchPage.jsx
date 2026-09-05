@@ -304,6 +304,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           // auto-calculée de `--lmp-comp`.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
+          // `tint3` (optionnel) : couleur du 2e calque de taches, quand une
+          // compétition en veut une DIFFÉRENTE de tint2 (Bundesliga : blanc
+          // + un peu de rouge). Absent ailleurs → le CSS retombe sur tint2,
+          // les 2 calques portent alors la même couleur (cas LaLiga).
+          ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
         }}
       >
       {/* ⚠️ Calques de la texture animée (05/09) — voir le commentaire

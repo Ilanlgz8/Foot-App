@@ -227,6 +227,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           // détail, même mécanisme partagé.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
+          // `tint3` : voir LiveMatchPage.jsx (2e calque de taches, optionnel).
+          ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
         }}
       >
       <span className="lmp__heroTintB" aria-hidden="true" />

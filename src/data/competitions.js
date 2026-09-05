@@ -326,18 +326,25 @@ export const COMPETITIONS = [
   },
   {
     id: 'BL1',
-    // brut #cc000c → rosé (même raison/même demande que PD ci-dessus, rouge
-    // mélangé au blanc plutôt qu'au noir).
-    // ⚠️ "TACHES" ROUGE+BLANC ANIMÉES (05/09, demande explicite : "le rouge et
-    // blanc pour bundesliga", puis précisé le même jour : pas un fondu de
-    // couleur plate mais "un melange de blanc et rouge... des taches
-    // blanche" + reflet façon verre/eau) — tint (rouge) reste le fond
-    // dominant, tint2 (blanc) alimente les taches organiques + le reflet
-    // animés dans .lmp__heroTintB/C (LiveMatchPage.css) et
-    // .poster__bg--gradientAlt/--gradientTri (accueil.css).
-    tint: '#d16168',
+    // ⚠️ NOIR + BLANC + UN PEU DE ROUGE (05/09, demande explicite finale :
+    // "pour bundesliga fait pareil mais en noir blanc et un peu de rouge" —
+    // "pareil" = le traitement validé sur LaLiga juste au-dessus).
+    // Essais précédents sur CETTE compétition, pour ne pas les refaire :
+    // rouge vif brut (#cc000c, trop agressif), puis rosé (rouge + blanc),
+    // puis rosé avec taches blanches fondues en `overlay` — cette dernière
+    // donnait un rose délavé, le blanc se diluant dans le rouge.
+    // Retenu : base quasi noire (`tint`), taches blanches (`tint2`, calque
+    // principal) et taches rouges plus discrètes (`tint3`, 2e calque) — d'où
+    // les trois couleurs demandées, sans qu'aucune ne se fonde dans les
+    // autres. `tintSoft` coupe le `mix-blend-mode: overlay` (voir
+    // LiveMatchPage.css) : indispensable ici, `overlay` sur une base sombre
+    // écraserait aussi bien le blanc que le rouge.
+    tint: '#16151a',
     tint2: '#ffffff',
-    tintLight: true,
+    tint3: '#b81f26',
+    tintSoft: true,
+    // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
+    // standard de l'app (même raison que LaLiga ci-dessus).
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,

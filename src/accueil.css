@@ -1671,13 +1671,15 @@
     radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 80%, transparent) 0%, transparent 19%),
     radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 70%, transparent) 0%, transparent 16%);
 }
+/* `--poster-comp3` : 2e couleur de taches quand elle diffère de comp2
+   (Bundesliga : blanc + un peu de rouge) — voir LiveMatchPage.css. */
 .poster--softTint .poster__bg--gradientTri {
   background:
-    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 80%, transparent) 0%, transparent 20%),
-    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 70%, transparent) 0%, transparent 17%);
+    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 85%, transparent) 0%, transparent 20%),
+    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 75%, transparent) 0%, transparent 17%);
 }
-.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.55; }
-.poster--softTint.poster--tinted .poster__bg--gradientTri { opacity: 0.4;  }
+.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.5;  }
+.poster--softTint.poster--tinted .poster__bg--gradientTri { opacity: 0.45; }
 
 @keyframes posterTextureSpin {
   from { transform: rotate(0deg);   }

@@ -972,13 +972,17 @@
     radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 80%, transparent) 0%, transparent 19%),
     radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 70%, transparent) 0%, transparent 16%);
 }
+/* `--lmp-comp3` (optionnel, `tint3` dans competitions.js) : permet au 2e
+   calque de porter une couleur DIFFÉRENTE du 1er — Bundesliga = taches
+   blanches (comp2) + quelques taches rouges (comp3). Sans lui, les 2 calques
+   partagent la même couleur (cas LaLiga), comportement d'origine inchangé. */
 .lmp__hero--softTint .lmp__heroTintC {
   background:
-    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 80%, transparent) 0%, transparent 20%),
-    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 70%, transparent) 0%, transparent 17%);
+    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 85%, transparent) 0%, transparent 20%),
+    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 75%, transparent) 0%, transparent 17%);
 }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.55; }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC { opacity: 0.4;  }
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.5;  }
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC { opacity: 0.45; }
 
 @keyframes lmpTextureSpin {
   from { transform: rotate(0deg);   }
