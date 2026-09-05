@@ -1538,11 +1538,19 @@
    POSTER — structure et couches
    ========================================================= */
 
-/* Wrapper gradient border (1px padding = contour dégradé) */
+/* Wrapper gradient border (1px padding = contour dégradé)
+   ⚠️ REMPLACÉ (05/09, demande utilisateur : "les cards accueil sur mobile
+   pareil que livematchpage, les couleurs du championnat au lieu des
+   équipes") : `--hc`/`--ac` (couleurs des 2 équipes) → `--poster-comp`
+   (teinte du championnat, posée par MatchPoster.jsx depuis `tint`,
+   competitions.js). Fallback neutre identique à `.lmp__hero` (LiveMatchPage.css)
+   pour les compétitions sans tint (Bundesliga/LaLiga/Ligue des champions…). */
 .poster__frame {
   border-radius: 17px;
   padding: 1.5px;
-  background: linear-gradient(135deg, var(--hc, #2a3a4a) 0%, var(--ac, #2a3a4a) 100%);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--poster-comp, #232a35) 75%, #0a0b10) 0%,
+    color-mix(in srgb, var(--poster-comp, #171b22) 45%, #08090d) 100%);
   box-shadow: 0 4px 24px rgba(var(--black-rgb),0.5);
   width: 100%;
 }
@@ -1570,18 +1578,30 @@
   background-position: center 25%;
   filter: brightness(0.38) saturate(1.15);
 }
-/* Dégradé couleurs équipes — 2 calques STATIQUES (peints une seule fois,
-   jamais réanimés eux-mêmes) qui se fondent l'un dans l'autre :
-     - .poster__bg--gradient    : couleur "main" de chaque équipe, toujours
-       visible, léger mouvement de zoom/pan.
-     - .poster__bg--gradientAlt : couleur "accent" de chaque équipe,
-       apparaît/disparaît en fondu par-dessus, mouvement en sens inverse.
+/* ⚠️ REMPLACÉ (05/09, demande utilisateur : "les cards accueil sur mobile
+   pareil que livematchpage, les couleurs du championnat au lieu des
+   équipes"). Avant : dégradé des couleurs des 2 équipes, posé inline en JS.
+   Maintenant : teinte du championnat (`--poster-comp`, posée par
+   MatchPoster.jsx) — MÊME recette de dégradé (color-mix, 3 paliers
+   85/68/48%) que `.lmp__hero` sur LiveMatchPage/MatchPage/Résultat, pour un
+   rendu identique entre les deux pages. Les 2 calques affichent désormais la
+   MÊME couleur (plus 2 couleurs d'équipe différentes) — gardés séparés
+   uniquement pour conserver le léger mouvement de dérive existant :
+     - .poster__bg--gradient    : toujours visible, léger mouvement de zoom/pan.
+     - .poster__bg--gradientAlt : identique en couleur, dérive en sens inverse
+       (le fondu façon "2e équipe qui apparaît" n'a plus de sens ici et n'est
+       plus perceptible — la teinte étant la même des deux côtés — mais reste
+       inoffensif à garder, la carte n'est jamais parfaitement statique).
    Les DEUX calques n'animent QUE transform et opacity — ce sont les 2 seules
    propriétés qu'un navigateur peut composer sur le GPU sans jamais
-   redéclencher de repaint (contrairement à background-position ou à une
-   couleur de dégradé qui change dans le temps, qui repaint à chaque frame
-   même sur un seul calque). Le background (couleurs) est posé une seule
-   fois inline via JS (MatchPoster.jsx) et ne bouge plus jamais ensuite. */
+   redéclencher de repaint. */
+.poster__bg--gradient,
+.poster__bg--gradientAlt {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--poster-comp, #16171f) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--poster-comp, #0e0f14) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--poster-comp, #0b0c10) 48%, #07080b) 100%);
+}
 .poster__bg--gradient {
   transform-origin: center;
   will-change: transform;

@@ -3,7 +3,6 @@ import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
-import { getMatchTeamColors, buildMatchGradient, buildMatchGradientAlt } from '../data/teamPhotos'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
@@ -227,19 +226,19 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const drawOdd = useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)
   const awayOdd = useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)
 
-  // Fond : dégradé couleurs des deux équipes (anti-collision) — plus de photo
-  // hardcodée : elle masquait systématiquement les couleurs pour toute la trentaine
-  // de pays "populaires" pré-photographiés (très fréquent en Coupe du Monde), ce qui
-  // donnait l'impression que "les couleurs ne s'affichent jamais".
-  const { home: homeColors, away: awayColors } = getMatchTeamColors(homeName, awayName)
-  const hColor      = homeColors.main
-  const aColor      = awayColors.main
-  // 2 dégradés STATIQUES (peints une seule fois, jamais réanimés eux-mêmes) :
-  // le crossfade et le mouvement ci-dessous n'animent que opacity/transform,
-  // les 2 seules propriétés que le navigateur compose sur le GPU sans jamais
-  // redéclencher de repaint — voir accueil.css .poster__bg--gradient(Alt).
-  const gradient    = buildMatchGradient(homeColors, awayColors)
-  const gradientAlt = buildMatchGradientAlt(homeColors, awayColors)
+  // ⚠️ REMPLACÉ (05/09, demande explicite utilisateur : "les cards accueil
+  // sur mobile pareil que livematchpage, les couleurs du championnat au lieu
+  // des équipes"). Le fond n'est plus le dégradé des couleurs des 2 équipes
+  // (calculé via getMatchTeamColors/buildMatchGradient — retiré) mais la
+  // teinte du championnat (`tint`, competitions.js), posée comme variable CSS
+  // `--poster-comp` — même mécanisme et même recette de dégradé (color-mix,
+  // 3 paliers 85/68/48%) que `.lmp__hero` sur LiveMatchPage/MatchPage/
+  // Résultat (voir accueil.css `.poster__bg--gradient`), pour un rendu
+  // identique. `posterComp` (nom + logo du championnat) était déjà calculé
+  // plus bas dans ce fichier — remonté ici pour être réutilisé aux deux
+  // endroits sans dupliquer la recherche dans COMPETITIONS.
+  const posterComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const compTint    = posterComp?.tint ?? null
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -267,7 +266,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // déjà traduit en français) est prioritaire sur match.competition?.name
   // (football-data.org, toujours en anglais) — voir le fix équivalent dans
   // MatchCard.jsx/LiveMatchPage.jsx/MatchPage.jsx.
-  const posterComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  // (posterComp lui-même est calculé plus haut, voir compTint.)
   const posterCompEmblem = posterComp?.emblem ?? match.competition?.emblem
   const posterCompName   = posterComp?.name ?? match.competition?.name ?? ''
   const rawPosterPeriod = getMatchPeriod(match)
@@ -345,18 +344,20 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   }, [liveMinute, match.id])
 
   return (
-    <div className="poster__frame" style={{ '--hc': hColor ?? '#2a3a4a', '--ac': aColor ?? '#2a3a4a' }}>
+    <div className="poster__frame" style={compTint ? { '--poster-comp': compTint } : undefined}>
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
 
-      {/* ── Fond : dégradé couleurs des équipes, 2 calques STATIQUES ──
-          Chaque dégradé est peint une seule fois (background posé inline,
-          jamais réanimé). Tout le mouvement/morph vient du CSS (transform +
-          opacity uniquement — voir accueil.css) : ce sont les 2 seules
-          propriétés qu'un navigateur anime sur le compositeur GPU sans
-          jamais redéclencher de repaint, contrairement à background-position
-          ou à une couleur de dégradé qui change dans le temps. */}
-      <div className="poster__bg poster__bg--gradient"    style={{ background: gradient }} />
-      <div className="poster__bg poster__bg--gradientAlt" style={{ background: gradientAlt }} />
+      {/* ── Fond : teinte du championnat, 2 calques STATIQUES ──
+          Même recette que le fond de LiveMatchPage/MatchPage/Résultat
+          (`.lmp__hero`, LiveMatchPage.css) : la couleur (`--poster-comp`) est
+          posée une seule fois ci-dessus, tout le dégradé (color-mix) vit dans
+          accueil.css, pas ici. Les 2 calques restent séparés uniquement pour
+          garder le léger mouvement de dérive existant (transform/opacity,
+          seules propriétés composées sur le GPU sans repaint) — ils
+          affichent désormais la MÊME teinte, plus deux couleurs d'équipe
+          différentes. */}
+      <div className="poster__bg poster__bg--gradient" />
+      <div className="poster__bg poster__bg--gradientAlt" />
       <div className="poster__overlay" />
 
       {/* ── Badge compét (gauche, logo + nom FR) + statut période en live (droite) ── */}
