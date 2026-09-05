@@ -338,6 +338,27 @@
   color: rgba(var(--white-rgb),0.55);
   text-shadow: 0 2px 8px rgba(var(--black-rgb),0.5);
 }
+/* ⚠️ BLANC ARGENTÉ POUR LALIGA ET BUNDESLIGA (06/09, demande explicite : "pour
+   la liga et bundesliga uniquement, dans MatchPage/LiveMatchPage/Résultat, le
+   'Terminé' en blanc silver et les minutes du match aussi").
+   Ce sont les deux seules compétitions dont le fond noir est traversé de
+   rouge : le rouge du chrono s'y confond avec le fond, alors qu'il ressort
+   bien sur les fonds bleus des autres championnats. Le gris argenté s'en
+   détache sans introduire une 4e couleur.
+   Drapeau DÉDIÉ (`tintSilverText`) et non `tintSoft` : depuis le 06/09,
+   Ligue 1 / Premier League / Serie A partagent aussi `tintSoft` (même recette
+   de dégradé propre) alors que la demande visait explicitement "la liga et
+   bundesliga uniquement" — s'appuyer sur `tintSoft` les aurait embarquées.
+   Placé APRÈS toutes les règles de base (même spécificité de classe : c'est
+   l'ordre qui tranche — piège déjà rencontré sur .lmp__heroWhenLabel--ft,
+   voir son commentaire). Le point rouge pulsant du direct n'est pas touché :
+   c'est un indicateur, pas du texte à lire. */
+.lmp__hero--silverText .lmp__heroMinute,
+.lmp__hero--silverText .lmp__heroMinute--ft,
+.lmp__hero--silverText .lmp__heroWhenLabel--ft {
+  color: #dfe3e8;
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.6), 0 0 10px rgba(var(--black-rgb),0.35);
+}
 
 /* Point live pulsant devant la minute (remplace le fond/bordure rouge) */
 .lmp__heroLiveDot {

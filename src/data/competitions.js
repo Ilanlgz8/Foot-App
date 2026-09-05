@@ -251,6 +251,21 @@ export const COMPETITIONS = [
     // fond déjà assez clair/saturé — seuls les tints assez CLAIRS sont
     // concernés, pas un fond neutre sombre où le rouge tranche bien.
     tintLight: true,
+    // ⚠️ TEXTURE REPRISE (06/09, demande : "pour les cards des matchs de Ligue 1
+    // et Premier League faut revoir les couleurs, et Serie A aussi — c'est les
+    // bonnes couleurs mais faut améliorer la texture et la couleur").
+    // La teinte de base était donc validée : seul le RENDU changeait. Ces
+    // championnats utilisaient encore l'ancienne recette (calque fondu en
+    // `overlay` avec une variante éclaircie auto-calculée), qui donnait un
+    // aplat un peu terne et subissait en plus le voile noir du poster sur
+    // l'Accueil. Ils passent sur la même recette que Bundesliga/LaLiga, déjà
+    // validée : zones de couleur distinctes (base → couleur 2 → couleur 3),
+    // aucune fusion, voile allégé. Bleu Ligue 1 en base, bleu plus vif au
+    // centre, blanc en fin de dégradé (couleurs de marque du championnat).
+    tint2: '#2f7ff5',
+    tint3: '#ffffff',
+    tintSoft: true,
+    tintStops: { base: '22%', c2: '52%', c3: '82%' },
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -262,6 +277,13 @@ export const COMPETITIONS = [
     id: 'PL',
     // brut #39003d (violet du logo d'origine, avant détourage) → corrigé
     tint: '#680c6e',
+    // Même reprise de texture que Ligue 1 (voir son commentaire) : violet de
+    // marque en base, violet plus vif au centre, puis le vert-menthe qui est
+    // la 2e couleur officielle de la Premier League en fin de dégradé.
+    tint2: '#9d1fa8',
+    tint3: '#00d9a3',
+    tintSoft: true,
+    tintStops: { base: '22%', c2: '52%', c3: '84%' },
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
@@ -323,6 +345,9 @@ export const COMPETITIONS = [
     tint3: '#e0b040',
     tintSoft: true,
     tintStops: { base: '26%', c2: '60%', c3: '88%' },
+    // Chrono ("Terminé", minute) en blanc argenté plutôt qu'en rouge — le
+    // rouge se confondrait avec le rouge du fond. Voir LiveMatchPage.css.
+    tintSilverText: true,
     // Pas de `tintLight` ici : le fond est redevenu sombre, la minute reprend
     // donc le rouge standard de l'app (le blanc n'était nécessaire que sur
     // les fonds clairs/rosés des versions précédentes).
@@ -375,11 +400,22 @@ export const COMPETITIONS = [
     tint3: '#ffffff',
     tintSoft: true,
     tintStops: { base: '20%', c2: '48%', c3: '76%' },
+    // Voir LaLiga : chrono en blanc argenté, même raison (fond noir + rouge).
+    tintSilverText: true,
     // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
     // standard de l'app (même raison que LaLiga ci-dessus).
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
+    // ⚠️ AJOUTÉ (06/09, constat utilisateur : "le logo Bundesliga à côté du nom
+    // du championnat, y'a trop de blanc en fond qui se voit"). Vérifié sur le
+    // fichier lui-même (PNG 246x246, coins à rgb(209,3,19), seulement 13% de
+    // pixels transparents) : c'est une TUILE ROUGE PLEINE, pas un tracé
+    // détouré. Sans ce drapeau elle recevait en plus la pastille blanche
+    // commune (`background: rgba(white,.94)` + 2px de marge), d'où un liseré
+    // blanc tout autour. `emblemOpaque` retire pastille et marge : la tuile
+    // fait elle-même office de pastille, comme pour Ligue 1 / Serie A.
+    emblemOpaque: true,
   },
   {
     id: 'SA',
@@ -387,6 +423,12 @@ export const COMPETITIONS = [
     // (05/09, 2e passe) même raison que Ligue 1
     tint: '#1a8fd6',
     tintLight: true, // voir le commentaire sur FL1 (même raison)
+    // Même reprise de texture que Ligue 1 (voir son commentaire) : bleu de
+    // marque en base, bleu plus clair au centre, blanc en fin de dégradé.
+    tint2: '#3fb0ee',
+    tint3: '#ffffff',
+    tintSoft: true,
+    tintStops: { base: '22%', c2: '52%', c3: '82%' },
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
