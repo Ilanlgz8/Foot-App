@@ -391,19 +391,22 @@ body::before {
 }
 
 /* ⚠️ Le PANNEAU des pages match / direct / résultats se sépare de l'affiche
-   "Match du jour" (05/09, choix explicite de l'utilisateur après une 2e série
-   de comparaisons) : Archivo Black lui a été reprochée ici, Rajdhani 700 la
-   remplace — chiffres carrés, registre tableau d'affichage.
-   L'affiche "Match du jour" garde Archivo Black pour le score et Orbitron pour
-   l'heure : ce sont deux surfaces de tailles très différentes, l'écart est
-   assumé et non un oubli d'harmonisation. */
+   "Match du jour" : l'affiche garde Archivo Black pour le score et Orbitron
+   pour l'heure. Deux surfaces de tailles très différentes, l'écart est assumé
+   et non un oubli d'harmonisation.
+   HISTORIQUE de cet emplacement, pour ne pas refaire le tour : Bebas Neue
+   (trop étroite et fine), Russo One, Archivo Black (trop massive ici),
+   Rajdhani 700 (chiffres carrés, écartée à son tour). Anybody 800 est le
+   choix retenu après quatre séries de comparaisons montrées dans le contexte
+   réel de la card — sportive, pleine, sans être une police "à effet" du type
+   diodes ou italique, écartées explicitement. */
 #root .lmp__hero .mp__hero__score,
 #root .lmp__hero .mp__hero__time {
-  font-family: 'Rajdhani', 'Archivo Black', system-ui, sans-serif;
-  font-weight: 700;
+  font-family: 'Anybody', 'Archivo Black', system-ui, sans-serif;
+  font-weight: 800;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 /* Le +20% qui compensait l'étroitesse de Bebas n'a plus lieu d'être : ces
@@ -425,11 +428,12 @@ body::before {
 /* Rajdhani est plus étroite et moins pleine qu'Archivo Black : +25% pour
    occuper la même place à l'écran (rapport relevé sur la comparaison visuelle,
    50px de Rajdhani pour 40px d'Archivo Black). */
-/* 3.5 → 3rem (05/09, retour utilisateur : "rends le score plus petit").
-   L'heure d'un match à venir suit proportionnellement pour que les deux états
-   de la page gardent le même rapport. */
-#root .lmp__hero .mp__hero__score { font-size: 3rem;   line-height: 1; }
-#root .lmp__hero .mp__hero__time  { font-size: 2.6rem; line-height: 1; }
+/* Anybody est plus pleine et plus large que Rajdhani : -10% pour occuper la
+   même place à l'écran (rapport relevé sur la comparaison en contexte, 42px
+   d'Anybody pour 48px de Rajdhani). Le score avait par ailleurs été réduit à
+   la demande de l'utilisateur, ce réglage-là est conservé. */
+#root .lmp__hero .mp__hero__score { font-size: 2.7rem; line-height: 1; }
+#root .lmp__hero .mp__hero__time  { font-size: 2.35rem; line-height: 1; }
 
 /* ⚠️ EXCEPTION assumée (04/09, demande utilisateur : "changer juste pour match
    du jour la police de l'heure") : sur l'affiche "Match du jour" UNIQUEMENT,
