@@ -286,23 +286,33 @@ export const COMPETITIONS = [
   },
   {
     id: 'PD',
-    // brut #ff4b44 (unique couleur du SVG) → le rouge pur/assombri (mélangé
-    // au noir) avait été essayé puis retiré (05/09, "pas fan", "mauvaise
-    // teinte") — repris en rosé (rouge mélangé au BLANC plutôt qu'au noir,
-    // demande explicite : "un mélange de rouge et blanc").
-    // ⚠️ CORRIGÉ EN "TACHES" ROUGE+JAUNE (05/09, même jour) : 1ère version
-    // (rouge/rose/jaune en crossfade uniforme, 3 couleurs) explicitement
-    // rejetée ("c pas un changement de couleur que je voulais... vraiment un
-    // mélange... des taches... la texture en mode glasses vitré eau" —
-    // demande un effet de taches organiques + reflet façon verre/eau, pas un
-    // simple fondu de couleur plate). Repassé à 2 couleurs, même principe que
-    // Bundesliga ("comme bundesliga mais en rouge et jaune") : tint = rouge
-    // (dominant), tint2 = jaune vif façon "Bumblebee" (demande explicite),
-    // consommés par .lmp__heroTintB (taches, LiveMatchPage.css) et
-    // .poster__bg--gradientAlt (accueil.css). tint3 retiré (plus utilisé).
-    tint: '#c8433f',
-    tint2: '#f2b705',
-    tintLight: true, // fond rosé, pas neutre sombre : la minute reste blanche
+    // ⚠️ NOIR + LÉGÈRE COUCHE DE ROUGE (05/09, demande explicite finale :
+    // "nn remet en noir avec une légère couche de rouge"). Historique complet
+    // des essais rejetés sur CETTE compétition, pour ne pas les refaire :
+    //   1. rouge pur assombri (mélangé au noir)  → "pas fan", "mauvaise teinte"
+    //   2. rosé (rouge mélangé au blanc)         → remplacé par le rouge+jaune
+    //   3. rouge/rose/jaune en fondu uniforme    → "c pas un changement de
+    //      couleur que je voulais... vraiment un mélange... des taches"
+    //   4. rouge + taches jaunes                 → "ça ressort du orange,
+    //      c'est pas ouf" — cause réelle vérifiée : `mix-blend-mode: overlay`
+    //      faisait FONDRE le jaune dans le rouge, et rouge+jaune fondus
+    //      donnent mécaniquement de l'orange, quelle que soit la nuance de
+    //      jaune choisie. 3 alternatives (taches jaunes nettes sur rouge
+    //      foncé / bordeaux+or / rouge+blanc) ont été montrées en rendu réel
+    //      et toutes écartées au profit du noir ci-dessous.
+    // Résultat retenu : `tint` quasi noir (le dégradé partagé le mélange
+    // ensuite à du noir pur, voir .lmp__hero) et `tint2` rouge sourd pour les
+    // taches en mouvement — d'où un fond noir parcouru d'un voile rouge
+    // discret, jamais un aplat coloré. `tintSoft` (voir LiveMatchPage.css)
+    // désactive le mode de fusion `overlay` pour cette compétition et adoucit
+    // les taches : sur une base aussi sombre, `overlay` écraserait le rouge
+    // au lieu de le laisser transparaître.
+    tint: '#2b0e11',
+    tint2: '#962026',
+    tintSoft: true,
+    // Pas de `tintLight` ici : le fond est redevenu sombre, la minute reprend
+    // donc le rouge standard de l'app (le blanc n'était nécessaire que sur
+    // les fonds clairs/rosés des versions précédentes).
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,

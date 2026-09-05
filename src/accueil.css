@@ -1658,6 +1658,27 @@
   0%, 100% { transform: scale(1.12) translate(0%, 0%); }
   50%      { transform: scale(1.18) translate(-2%, 2%); }
 }
+/* Variante "douce" (`tintSoft`, LaLiga) — voir le commentaire détaillé dans
+   LiveMatchPage.css (.lmp__hero--softTint) : même mécanisme, gardé identique
+   des deux côtés. */
+.poster--softTint .poster__bg--gradientAlt,
+.poster--softTint .poster__bg--gradientTri {
+  mix-blend-mode: normal;
+}
+.poster--softTint .poster__bg--gradientAlt {
+  background:
+    radial-gradient(circle at 32% 31%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 90%, transparent) 0%, transparent 22%),
+    radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 80%, transparent) 0%, transparent 19%),
+    radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 70%, transparent) 0%, transparent 16%);
+}
+.poster--softTint .poster__bg--gradientTri {
+  background:
+    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 80%, transparent) 0%, transparent 20%),
+    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 70%, transparent) 0%, transparent 17%);
+}
+.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.55; }
+.poster--softTint.poster--tinted .poster__bg--gradientTri { opacity: 0.4;  }
+
 @keyframes posterTextureSpin {
   from { transform: rotate(0deg);   }
   to   { transform: rotate(360deg); }

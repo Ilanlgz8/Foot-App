@@ -246,6 +246,10 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // `--poster-comp2`, lu par .poster__bg--gradientAlt/--gradientTri
   // (accueil.css).
   const compTint2   = posterComp?.tint2 ?? null
+  // `tintSoft` : voir competitions.js (LaLiga) et LiveMatchPage.css — coupe
+  // la fusion `overlay` et adoucit les taches, nécessaire sur une base quasi
+  // noire où `overlay` écraserait la couleur au lieu de la révéler.
+  const compTintSoft = posterComp?.tintSoft === true
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -267,6 +271,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const cls = 'poster'
     + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
     + (compTint ? ' poster--tinted' : '')
+    + (compTintSoft ? ' poster--softTint' : '')
 
   // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
   // Même contenu/logique que le hero de LiveMatchPage et que la version

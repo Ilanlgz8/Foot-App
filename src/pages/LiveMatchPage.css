@@ -953,6 +953,33 @@
   animation: lmpTextureSpin 47s linear infinite reverse;
   will-change: transform;
 }
+/* ⚠️ VARIANTE "DOUCE" (05/09, `tintSoft` dans competitions.js — LaLiga
+   uniquement pour l'instant). Sur une base quasi noire, `mix-blend-mode:
+   overlay` écrase la couleur des taches au lieu de la laisser transparaître
+   (overlay assombrit tout ce qui est posé sur un fond sombre) : la couche de
+   rouge demandée deviendrait invisible. Fusion désactivée, taches plus
+   larges et plus diffuses, opacités réduites → un voile rouge discret qui
+   circule sur le noir, au lieu de taches marquées. C'est aussi ce qui règle
+   le problème d'orange constaté sur la version rouge+jaune : sans `overlay`,
+   deux couleurs ne se fondent plus l'une dans l'autre. */
+.lmp__hero--softTint .lmp__heroTintB,
+.lmp__hero--softTint .lmp__heroTintC {
+  mix-blend-mode: normal;
+}
+.lmp__hero--softTint .lmp__heroTintB {
+  background:
+    radial-gradient(circle at 32% 31%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 90%, transparent) 0%, transparent 22%),
+    radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 80%, transparent) 0%, transparent 19%),
+    radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 70%, transparent) 0%, transparent 16%);
+}
+.lmp__hero--softTint .lmp__heroTintC {
+  background:
+    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 80%, transparent) 0%, transparent 20%),
+    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 70%, transparent) 0%, transparent 17%);
+}
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.55; }
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC { opacity: 0.4;  }
+
 @keyframes lmpTextureSpin {
   from { transform: rotate(0deg);   }
   to   { transform: rotate(360deg); }
