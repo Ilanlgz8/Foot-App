@@ -1595,25 +1595,65 @@
    Les DEUX calques n'animent QUE transform et opacity — ce sont les 2 seules
    propriétés qu'un navigateur peut composer sur le GPU sans jamais
    redéclencher de repaint. */
-.poster__bg--gradient,
-.poster__bg--gradientAlt {
+.poster {
+  /* Variante éclaircie auto de la couleur de base, utilisée par gradientAlt
+     quand la compétition n'a pas de `tint2` dédié (voir plus bas) —
+     embellissement générique valable pour toute compétition teintée. */
+  --poster-comp2-auto: color-mix(in srgb, var(--poster-comp, #2a2d38) 58%, white 42%);
+}
+.poster__bg--gradient {
   background: linear-gradient(158deg,
     color-mix(in srgb, var(--poster-comp, #16171f) 85%, #0a0b10) 0%,
     color-mix(in srgb, var(--poster-comp, #0e0f14) 68%, #08090d) 62%,
     color-mix(in srgb, var(--poster-comp, #0b0c10) 48%, #07080b) 100%);
-}
-.poster__bg--gradient {
   transform-origin: center;
   will-change: transform;
   animation: posterDrift 18s ease-in-out infinite;
 }
+/* ⚠️ RÉANIMÉ (05/09, demande explicite : "animer les couleurs... comme avant
+   avec les couleurs des équipes... en embellissant la couleur") — portait la
+   MÊME couleur que gradient juste après le passage aux teintes championnat
+   (05/09, plus tôt le même jour) : le fondu d'opacité ne changeait donc plus
+   rien à l'écran, contrairement à l'ancien crossfade équipe domicile/extérieur
+   qu'il remplaçait. Porte maintenant `--poster-comp2` (2e couleur dédiée
+   Bundesliga/LaLiga, sinon variante éclaircie auto ci-dessus) — le fondu
+   redevient visible. Actif uniquement sur `.poster--tinted` (comp.tint
+   présent) : sans ce garde-fou, la variante éclaircie par défaut ferait
+   pulser un gris parasite même sur les compétitions volontairement neutres
+   (Ligue des champions…). */
 .poster__bg--gradientAlt {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 48%, #07080b) 100%);
   transform-origin: center;
   will-change: transform, opacity;
   opacity: 0;
+}
+.poster--tinted .poster__bg--gradientAlt {
   animation:
     posterDrift 18s ease-in-out infinite reverse,
     posterMorph  9s ease-in-out infinite;
+}
+/* 3e couche — LaLiga uniquement pour l'instant (jaune, `tint3`). Le calque
+   existe toujours (évite un rendu JSX conditionnel de plus) mais reste
+   invisible tant que `.poster--triColor` n'est pas posé (comp.tint3 absent :
+   la plupart des compétitions n'ont que 1 ou 2 couleurs). Décalage de durée/
+   délai volontairement non multiple de celui de gradientAlt : les 2 pics ne
+   retombent jamais en phase, un vrai mouvement organique entre les 3
+   couleurs plutôt qu'un cycle qui se répète à l'identique. */
+.poster__bg--gradientTri {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--poster-comp3, transparent) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--poster-comp3, transparent) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--poster-comp3, transparent) 48%, #07080b) 100%);
+  transform-origin: center;
+  will-change: opacity;
+  opacity: 0;
+}
+.poster--triColor .poster__bg--gradientTri {
+  animation: posterMorphTri 12s ease-in-out infinite;
+  animation-delay: -5s;
 }
 
 /* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
@@ -1627,11 +1667,17 @@
   0%, 100% { opacity: 0; }
   50%      { opacity: 0.9; }
 }
+@keyframes posterMorphTri {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.85; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .poster__bg--gradient,
-  .poster__bg--gradientAlt { animation: none; }
-  .poster__bg--gradientAlt { opacity: 0; }
+  .poster__bg--gradientAlt,
+  .poster__bg--gradientTri { animation: none; }
+  .poster__bg--gradientAlt,
+  .poster__bg--gradientTri { opacity: 0; }
 }
 
 /* Overlay sombre + dégradé directional */

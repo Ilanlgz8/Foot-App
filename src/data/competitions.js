@@ -289,9 +289,25 @@ export const COMPETITIONS = [
     // brut #ff4b44 (unique couleur du SVG) → le rouge pur/assombri (mélangé
     // au noir) avait été essayé puis retiré (05/09, "pas fan", "mauvaise
     // teinte") — repris en rosé (rouge mélangé au BLANC plutôt qu'au noir,
-    // demande explicite : "un mélange de rouge et blanc"), même teinte que le
-    // logo, juste éclairci/désaturé au lieu d'assombri.
-    tint: '#d96c68',
+    // demande explicite : "un mélange de rouge et blanc").
+    // ⚠️ ANIMÉ EN 3 COULEURS (05/09, même jour, demande explicite : "faudrait
+    // animé les couleurs... pour la liga en rouge rose et jaune") — tint reste
+    // le rouge (pôle "1"), tint2/tint3 sont les 2 couleurs supplémentaires que
+    // LiveMatchPage.css/accueil.css font crossfader en boucle par-dessus (voir
+    // .lmp__heroTintB/C, .poster__bg--gradientAlt/Tri). Rouge légèrement
+    // repincé vers le corail d'origine (#ff4b44) par rapport à l'ancien
+    // #d96c68 — nécessaire pour rester visuellement distinct du rose (tint2)
+    // une fois les 3 couleurs posées côte à côte, sinon les 2 se confondaient
+    // (vérifié par calcul color-mix aux 3 paliers du dégradé). Rose et jaune :
+    // choix stylistiques assumés (aucune couleur "officielle" LaLiga rose/or
+    // à extraire d'un logo ici, contrairement au rouge) — mêmes gamme de
+    // saturation/luminosité que le reste de la palette de l'app (désaturée,
+    // jamais un jaune/rose flashy) pour rester cohérent avec le style déjà en
+    // place. Vérifié : les 3 couleurs restent nettement distinctes aux 3
+    // paliers du dégradé (85/68/48%), aucune ne devient invisible.
+    tint: '#c8433f',
+    tint2: '#d9738f',
+    tint3: '#d1a94a',
     tintLight: true, // fond rosé, pas neutre sombre : la minute reste blanche
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
@@ -308,7 +324,12 @@ export const COMPETITIONS = [
     id: 'BL1',
     // brut #cc000c → rosé (même raison/même demande que PD ci-dessus, rouge
     // mélangé au blanc plutôt qu'au noir).
+    // ⚠️ ANIMÉ EN 2 COULEURS (05/09, demande explicite : "le rouge et blanc
+    // pour bundesliga") — tint (rouge) reste inchangé, tint2 (blanc) est la
+    // 2e couleur que LiveMatchPage.css/accueil.css font crossfader en boucle
+    // par-dessus (voir .lmp__heroTintB, .poster__bg--gradientAlt).
     tint: '#d16168',
+    tint2: '#ffffff',
     tintLight: true,
     name: 'Bundesliga',
     shortName: 'Bundesliga',

@@ -887,6 +887,77 @@
   clip-path: inset(0 round 20px);
 }
 
+/* ⚠️ ANIMATION DE LA TEINTE (05/09, demande utilisateur : "faudrait animer
+   les couleurs dans ces pages comme avant dans les cards de accueil avec les
+   couleurs des équipes... mais avec les couleurs du championnat, en
+   embellissant la couleur"). Même principe que l'ancien crossfade équipe de
+   l'Accueil (poster__bg--gradient/gradientAlt, accueil.css) : 2 calques
+   (spans JSX, voir LiveMatchPage.jsx/MatchPage.jsx) superposés au fond
+   statique ci-dessus, dont l'opacité respire en boucle. Durées volontairement
+   non multiples l'une de l'autre (6.5s / 8.5s + décalage négatif) pour que
+   les 2 pics ne retombent jamais en phase — un vrai mouvement organique,
+   jamais un cycle qui se répète à l'identique toutes les X secondes.
+   N'anime QUE `opacity` (GPU, aucun repaint) — même contrainte déjà en place
+   partout ailleurs dans l'app pour ce type de fond animé.
+   - lmp__heroTintB : 2e couleur. Par défaut (`--lmp-comp2` non fourni par
+     competitions.js) une variante EXPLICITEMENT ÉCLAIRCIE de la couleur de
+     base (color-mix avec du blanc) — un embellissement automatique valable
+     pour TOUTE compétition teintée, sans configuration par championnat.
+     Bundesliga (blanc) et LaLiga (rose) ont une vraie 2e couleur dédiée
+     (voir competitions.js, tint2).
+   - lmp__heroTintC : 3e couleur, LaLiga uniquement pour l'instant (jaune,
+     tint3) — le calque existe toujours (évite un rendu JSX conditionnel de
+     plus) mais reste invisible (opacity jamais animée) tant que
+     `.lmp__hero--triColor` n'est pas posé par le JSX.
+   Actif uniquement sur les compétitions déjà teintées (`.lmp__hero--tinted`,
+   posé quand `comp.tint` existe) — les championnats volontairement neutres
+   (Ligue des champions…) restent parfaitement statiques, comme avant : sans
+   ce garde-fou, la variante éclaircie par défaut ferait pulser un gris
+   parasite même sur un fond censé rester noir uni. */
+.lmp__hero {
+  --lmp-comp2-auto: color-mix(in srgb, var(--lmp-comp, #2a2d38) 58%, white 42%);
+}
+.lmp__heroTintB,
+.lmp__heroTintC {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.lmp__heroTintB {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 48%, #07080b) 100%);
+}
+.lmp__heroTintC {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--lmp-comp3, transparent) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--lmp-comp3, transparent) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--lmp-comp3, transparent) 48%, #07080b) 100%);
+}
+.lmp__hero--tinted .lmp__heroTintB {
+  animation: lmpHeroTintB 6.5s ease-in-out infinite;
+  will-change: opacity;
+}
+.lmp__hero--triColor .lmp__heroTintC {
+  animation: lmpHeroTintC 8.5s ease-in-out infinite;
+  animation-delay: -3.2s;
+  will-change: opacity;
+}
+@keyframes lmpHeroTintB {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.85; }
+}
+@keyframes lmpHeroTintC {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.8; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
+}
+
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
    -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
    `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé
