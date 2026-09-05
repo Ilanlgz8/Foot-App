@@ -1020,9 +1020,9 @@
   background: linear-gradient(135deg,
     transparent 0%,
     transparent var(--lmp-stop-base, 48%),
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 74%, transparent) var(--lmp-stop-c2, 77%),
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 62%, transparent) var(--lmp-stop-c3, 100%),
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 85%, transparent) 100%);
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 85%, transparent) var(--lmp-stop-c2, 77%),
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 70%, transparent) var(--lmp-stop-c3, 100%),
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 90%, transparent) 100%);
 }
 .lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB {
   opacity: 0.9;

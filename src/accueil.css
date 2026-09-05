@@ -1687,9 +1687,9 @@
   background: linear-gradient(135deg,
     transparent 0%,
     transparent var(--poster-stop-base, 48%),
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 74%, transparent) var(--poster-stop-c2, 77%),
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 62%, transparent) var(--poster-stop-c3, 100%),
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 85%, transparent) 100%);
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 85%, transparent) var(--poster-stop-c2, 77%),
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 70%, transparent) var(--poster-stop-c3, 100%),
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 90%, transparent) 100%);
 }
 .poster--softTint.poster--tinted .poster__bg--gradientAlt {
   opacity: 0.9;
@@ -1731,6 +1731,27 @@
       rgba(var(--black-rgb),0.25) 45%,
       rgba(var(--black-rgb),0.70) 100%);
   z-index: 1;
+}
+/* ⚠️ CAUSE DE L'ÉCART ACCUEIL / PAGE MATCH (05/09, constat utilisateur : "les
+   dégradés atténuent un peu la couleur... c'est pas exactement pareil dans
+   Accueil, et c'est dans Accueil que ça me dérange").
+   Diagnostic : le panneau des pages match (.lmp__hero) n'a AUCUN voile
+   sombre — `.mp__hero__overlay` existe dans MatchPage.css mais n'est rendu
+   par aucun JSX (vérifié). Le poster de l'Accueil, lui, empile ce
+   `.poster__overlay` à 55%/25%/70% de noir par-dessus le fond. Sur les
+   teintes déjà sombres (`tintSoft` : Bundesliga, LaLiga) ce voile écrasait
+   presque entièrement la couleur, d'où deux cards quasi noires sur l'Accueil
+   alors que les mêmes compétitions ressortaient bien sur la page match.
+   Allégé pour ces seules compétitions, en gardant assez de contraste en haut
+   et en bas pour que le texte (nom du championnat, horaire, cotes) reste
+   lisible. Les compétitions à teinte claire (Ligue 1, Serie A…) conservent le
+   voile d'origine : il ne les gênait pas et il protège leur lisibilité. */
+.poster--softTint .poster__overlay {
+  background:
+    linear-gradient(to bottom,
+      rgba(var(--black-rgb),0.28) 0%,
+      rgba(var(--black-rgb),0.06) 45%,
+      rgba(var(--black-rgb),0.42) 100%);
 }
 
 /* Tout le contenu passe au-dessus des calques de fond */

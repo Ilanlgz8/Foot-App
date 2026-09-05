@@ -313,10 +313,16 @@ export const COMPETITIONS = [
     // et plus de noir". `tint` est donc quasi noir pur (plus sombre qu'avant),
     // `tint2` le rouge, `tint3` le jaune (posé en toute fin de dégradé et à
     // faible opacité, d'où son côté "léger" — voir LiveMatchPage.css).
+    // ⚠️ MOINS DE NOIR (05/09, 2e réglage : "pour la liga y'a un peu trop de
+    // noir, rajoute du rouge et un peu de jaune"). Le noir s'arrête maintenant
+    // à 26% (au lieu des 48% par défaut), le rouge est un peu plus clair et
+    // occupe une large plage centrale, et le jaune démarre à 88% pour rester
+    // une pointe sans devenir dominant.
     tint: '#140f11',
-    tint2: '#962026',
-    tint3: '#d9a83c',
+    tint2: '#b3242b',
+    tint3: '#e0b040',
     tintSoft: true,
+    tintStops: { base: '26%', c2: '60%', c3: '88%' },
     // Pas de `tintLight` ici : le fond est redevenu sombre, la minute reprend
     // donc le rouge standard de l'app (le blanc n'était nécessaire que sur
     // les fonds clairs/rosés des versions précédentes).
@@ -356,11 +362,19 @@ export const COMPETITIONS = [
     // toute la première moitié et la 3e couleur n'est qu'une pointe finale ;
     // ici le noir s'arrête bien plus tôt et le blanc occupe tout le dernier
     // tiers. Voir .lmp__hero--softTint (LiveMatchPage.css).
+    // ⚠️ ROUGE VIF + PLUS DE BLANC (05/09, demande : "mets un rouge plus vif,
+    // vraiment rouge bien prononcé, et plus de blanc, parce que là les
+    // dégradés atténuent un peu la couleur"). `tint2` passe du rouge sourd
+    // #b81f26 au rouge franc #e30613 (proche du rouge de marque Bundesliga),
+    // et les arrêts sont avancés : le noir s'arrête à 20% au lieu de 26%, le
+    // blanc démarre à 76% au lieu de 82% et occupe donc tout le dernier quart.
+    // L'atténuation venait aussi du voile noir du poster, corrigé séparément
+    // (voir .poster--softTint .poster__overlay dans accueil.css).
     tint: '#131217',
-    tint2: '#b81f26',
+    tint2: '#e30613',
     tint3: '#ffffff',
     tintSoft: true,
-    tintStops: { base: '26%', c2: '55%', c3: '82%' },
+    tintStops: { base: '20%', c2: '48%', c3: '76%' },
     // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
     // standard de l'app (même raison que LaLiga ci-dessus).
     name: 'Bundesliga',
