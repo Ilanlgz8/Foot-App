@@ -943,3 +943,37 @@ export function buildHeroSubline(match) {
   }
   return [journee, date].filter(Boolean).join(' · ') || null
 }
+
+// ── Peut-on ancrer le début de la 2ème mi-temps ? ────────────────────────────
+// ⚠️ BUG RÉEL (05/09, constat utilisateur : "à la mi-temps ça a juste mis
+// 'Mi-temps' sans le 'Reprise dans X minutes', et à la reprise ça a repris à
+// la 50' au lieu de la 46'"). Un seul défaut explique les DEUX.
+//
+// useLiveMinute.js pose half2Start dès que football-data.org annonce IN_PLAY
+// alors qu'une pause est connue — filet de sécurité utile quand ESPN ne
+// confirme jamais la période 2. Mais le statut football-data a jusqu'à 2 min
+// de retard : au tout début de la mi-temps il vaut ENCORE 'IN_PLAY'. Le seul
+// garde-fou était `espnStatus !== 'STATUS_HALFTIME'`, or ESPN passe d'abord
+// par STATUS_END_PERIOD (coup de sifflet) avant STATUS_HALFTIME — pendant
+// cette fenêtre, half2Start était donc ancré AU DÉBUT DE LA PAUSE.
+// Conséquences, exactement celles observées :
+//   • le compte à rebours de mi-temps s'arrête net (il se coupe dès que
+//     half2Start existe), d'où le "Mi-temps" figé sans "Reprise dans X min" ;
+//   • à la vraie reprise, la minute est calculée depuis cet ancrage faux,
+//     donc gonflée de toute la durée déjà écoulée de la pause — d'où une
+//     reprise à la 50' au lieu de la 46'.
+//
+// Deux conditions désormais, au lieu d'une :
+//   • aucun statut ESPN indiquant que le jeu est encore arrêté ;
+//   • et surtout une pause d'au moins MIN_HT_MS. Une mi-temps dure 15 min ;
+//     une reprise après moins de 10 n'existe pas dans les championnats suivis.
+//     C'est ce seuil qui protège vraiment, quel que soit le libellé ESPN.
+const MIN_HT_MS = 10 * 60_000
+const ESPN_PAUSED_STATUSES = new Set(['STATUS_HALFTIME', 'STATUS_END_PERIOD'])
+
+export function canAnchorHalf2(state, now = Date.now()) {
+  if (!state?.pausedAt) return false          // pas de pause connue
+  if (state.half2Start) return false          // déjà ancré
+  if (ESPN_PAUSED_STATUSES.has(state.espnStatus)) return false
+  return now - state.pausedAt >= MIN_HT_MS
+}

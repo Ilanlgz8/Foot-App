@@ -367,8 +367,13 @@
 /* Période en rouge pendant le match. Même contrainte d'ordre que
    .lmp__heroWhenLabel--ft ci-dessus : APRÈS la règle de base, sans quoi le
    blanc l'emporte. */
+/* ⚠️ ARGENT et non rouge (05/09, retour utilisateur : "remets-le en blanc mais
+   pas complètement blanc, plutôt silver"). Le contour rouge de la card et la
+   minute rouge portent déjà le signal du direct ; un troisième élément rouge
+   dans le même bandeau saturait la lecture. #c8ccd4 : gris clair légèrement
+   bleuté, lisible sur le dégradé sans rivaliser avec la minute. */
 .lmp__heroPeriodBadge--live {
-  color: var(--red);
+  color: #c8ccd4;
   text-shadow: 0 1px 6px rgba(var(--black-rgb),0.95), 0 1px 2px rgba(var(--black-rgb),0.9);
 }
 

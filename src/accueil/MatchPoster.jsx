@@ -312,7 +312,15 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
       // nous-mêmes. pausedAt = kickoff + cette vraie durée jouée.
       if (!state.pausedAt && !state.half2Start) {
         const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
-        const realHalfMins = parseEspnClock(state.espnClock)?.base
+        // ⚠️ `base + extra` et non `base` seul (05/09) : parseEspnClock rend
+        // "45'+3'" comme { base: 45, extra: 3 }. En ne gardant que la base, la
+        // pause était estimée 3 minutes trop tôt — et comme la 2ème mi-temps
+        // se déduit ensuite de `pausedAt + 15 min`, tout le temps additionnel
+        // de la 1ère période se retrouvait ajouté à la minute affichée à la
+        // reprise. C'est la seconde moitié du "ça a repris à la 50' au lieu
+        // de la 46'" (l'autre étant canAnchorHalf2, voir matchUtils.js).
+        const parsedClock  = parseEspnClock(state.espnClock)
+        const realHalfMins = parsedClock ? parsedClock.base + (parsedClock.extra ?? 0) : null
         const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
         const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
         trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)

@@ -30,7 +30,7 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
-import { isNationalTeamComp, isRealFdMatchId } from '../utils/matchUtils'
+import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2 } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 import { readCacheStale, removeCache } from './localCache'
 
@@ -1535,8 +1535,13 @@ export function useLiveMinute(matches) {
       // fiable, voir setEspnData) prime : tant qu'il vaut encore
       // STATUS_HALFTIME, on n'ancre jamais half2Start, quel que soit ce que
       // dit match.status.
-      if (state.espnStatus === 'STATUS_HALFTIME') continue
-      if (state.pausedAt && !state.half2Start) {
+      // ⚠️ canAnchorHalf2 REMPLACE le garde-fou d'origine
+      // (`espnStatus !== 'STATUS_HALFTIME'` + pausedAt sans half2Start), qui
+      // laissait ancrer half2Start DÈS LE DÉBUT de la mi-temps — voir le
+      // commentaire détaillé de canAnchorHalf2 (matchUtils.js) pour les deux
+      // symptômes que ça provoquait. Il exige maintenant une pause d'au moins
+      // 10 min, ce qui rend l'ancrage impossible avant une vraie reprise.
+      if (canAnchorHalf2(state)) {
         setHalf2Start(match.id, Date.now())
       }
     }

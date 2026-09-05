@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId, buildHeroSubline } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId, buildHeroSubline, canAnchorHalf2 } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState, recordEspnMiss } from './matchStateTracker'
 
 const MID = 1
@@ -707,5 +707,43 @@ describe('buildHeroSubline — ligne "Journée N · date" du bandeau', () => {
 
   it('ignore une journée non numérique', () => {
     expect(buildHeroSubline({ matchday: null, utcDate: '2026-08-28T18:45:00Z' })).toBe('vendredi 28 août')
+  })
+})
+
+// ── canAnchorHalf2 ───────────────────────────────────────────────────────────
+describe('canAnchorHalf2 — ne jamais ancrer la 2ème MT pendant la pause', () => {
+  const T = 1_700_000_000_000
+  const enPause = (over = {}) => ({ pausedAt: T, ...over })
+
+  it('refuse tant que la pause est trop courte pour être finie', () => {
+    expect(canAnchorHalf2(enPause(), T + 1_000)).toBe(false)          // 1s
+    expect(canAnchorHalf2(enPause(), T + 5 * 60_000)).toBe(false)     // 5 min
+    expect(canAnchorHalf2(enPause(), T + 9 * 60_000)).toBe(false)     // 9 min
+  })
+
+  it('accepte une fois la durée plausible d’une mi-temps atteinte', () => {
+    expect(canAnchorHalf2(enPause(), T + 10 * 60_000)).toBe(true)
+    expect(canAnchorHalf2(enPause(), T + 16 * 60_000)).toBe(true)
+  })
+
+  it('refuse tant qu’ESPN dit que le jeu est arrêté', () => {
+    // STATUS_END_PERIOD est le trou du garde-fou d'origine : ESPN y passe
+    // AVANT STATUS_HALFTIME, et seul STATUS_HALFTIME était testé.
+    expect(canAnchorHalf2(enPause({ espnStatus: 'STATUS_END_PERIOD' }), T + 20 * 60_000)).toBe(false)
+    expect(canAnchorHalf2(enPause({ espnStatus: 'STATUS_HALFTIME' }),   T + 20 * 60_000)).toBe(false)
+  })
+
+  it('accepte quand ESPN annonce le jeu repris', () => {
+    expect(canAnchorHalf2(enPause({ espnStatus: 'STATUS_IN_PROGRESS' }), T + 16 * 60_000)).toBe(true)
+  })
+
+  it('n’ancre pas deux fois', () => {
+    expect(canAnchorHalf2(enPause({ half2Start: T + 15 * 60_000 }), T + 20 * 60_000)).toBe(false)
+  })
+
+  it('ne fait rien sans pause connue', () => {
+    expect(canAnchorHalf2({}, T)).toBe(false)
+    expect(canAnchorHalf2(null, T)).toBe(false)
+    expect(canAnchorHalf2(undefined, T)).toBe(false)
   })
 })
