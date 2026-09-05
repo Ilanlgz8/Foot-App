@@ -69,6 +69,38 @@ function espnDate(match, offsetDays = 0) {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+// ⚠️ AJOUT (05/09, constat utilisateur : "message d'erreur, réessayer ça fait
+// rien" — 429 en rafale sur /espn, capture réseau à l'appui) : le scoreboard
+// dual (date + date-1) de la Passe 1 ci-dessous ne dépend que de `slug` + les
+// 2 dates, jamais du match précis — mais était refait PAR MATCH. Plusieurs
+// matchs de la même compétition affichés le même jour (ex. plusieurs cards
+// Bundesliga) déclenchaient donc chacun leur propre paire d'appels
+// identiques, en même temps. Même correctif que useMatchDetail.js (même
+// idiome "in-flight" que fetchClubMatchesRaw, useMatchs.js) : keyé sur
+// slug+dates, PAS sur le match, pour que deux matchs simultanés de la même
+// compétition/jour partagent une seule requête réseau au lieu d'une chacun.
+const inFlightEspnScoreboardDual = new Map()
+
+async function fetchEspnScoreboardDual(slug, date0, date1) {
+  const key = `${slug}:${date0}:${date1}`
+  if (inFlightEspnScoreboardDual.has(key)) return inFlightEspnScoreboardDual.get(key)
+
+  const promise = (async () => {
+    const [sbRes1, sbRes2] = await Promise.all([
+      fetch(`/espn?slug=${slug}&dates=${date0}`),
+      fetch(`/espn?slug=${slug}&dates=${date1}`),
+    ])
+    const [board1, board2] = await Promise.all([
+      sbRes1.ok ? sbRes1.json() : null,
+      sbRes2.ok ? sbRes2.json() : null,
+    ])
+    return [...(board1?.events ?? []), ...(board2?.events ?? [])]
+  })().finally(() => inFlightEspnScoreboardDual.delete(key))
+
+  inFlightEspnScoreboardDual.set(key, promise)
+  return promise
+}
+
 /** Passe 1 : trouve l'event ESPN dans le scoreboard et retourne { eventId, homeTeamId, comp }. */
 function findEspnEvent(json, match) {
   for (const evt of json.events ?? []) {
@@ -119,15 +151,7 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
       // reproduit exactement le bug rapporté. Toujours utiliser le double
       // appel daté, plus fiable, coût négligeable (1 requête HTTP de plus,
       // uniquement pour un match déjà terminé).
-      const [sbRes1, sbRes2] = await Promise.all([
-        fetch(`/espn?slug=${slug}&dates=${espnDate(match, 0)}`),
-        fetch(`/espn?slug=${slug}&dates=${espnDate(match, -1)}`),
-      ])
-      const [board1, board2] = await Promise.all([
-        sbRes1.ok ? sbRes1.json() : null,
-        sbRes2.ok ? sbRes2.json() : null,
-      ])
-      const events = [...(board1?.events ?? []), ...(board2?.events ?? [])]
+      const events = await fetchEspnScoreboardDual(slug, espnDate(match, 0), espnDate(match, -1))
 
       const found = findEspnEvent({ events }, match)
       if (!found) return null   // match non trouvé dans le scoreboard

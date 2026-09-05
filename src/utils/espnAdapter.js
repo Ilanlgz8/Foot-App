@@ -245,13 +245,37 @@ const ESPN_MATCHES_TTL = 2 * 60 * 1000 // 2min — aligné sur le TTL FINISHED e
 // 6 comps EN ONT un, utilisé ailleurs (api/fifa-live.js, ResultPanel.jsx) —
 // le garder cohérent évite un id null qui casserait le regroupement par
 // compétition et le matching live pour ces matchs précis.
+// ⚠️ AJOUT (05/09, constat utilisateur : "message d'erreur, réessayer ça fait
+// rien" — 429 en rafale sur /espn confirmés en réel, capture réseau à
+// l'appui) : `dates=${windowRange()}` est TOUJOURS la même fenêtre glissante
+// pour un `slug` donné (indépendante du compCode/overrides/caller) — mais
+// AUCUN partage n'existait entre les nombreux appelants de ce fichier
+// (useTodayMatches.js, useTeamForm.js, useWcKnockout.js, useMatchs.js…), qui
+// peuvent tous être montés EN MÊME TEMPS sur une même page. Résultat mesuré :
+// le même `slug=ger.1&dates=...` redemandé jusqu'à 5-7 fois en une seule
+// salve réseau, rien que pour des données strictement identiques. Verrou
+// "in-flight" (même idiome que fetchClubMatchesRaw, useMatchs.js) keyé sur le
+// SLUG SEUL (la partie réellement partagée) : chaque appelant garde sa propre
+// logique de cache/normalisation/overrides, seul le fetch réseau brut est
+// désormais mutualisé entre tous les appels concurrents pour le même slug.
+const inFlightEspnWindowFetch = new Map()
+
+async function fetchEspnWindowJson(slug) {
+  if (inFlightEspnWindowFetch.has(slug)) return inFlightEspnWindowFetch.get(slug)
+  const promise = fetch(`/espn?slug=${slug}&dates=${windowRange()}`)
+    .then(res => (res.ok ? res.json() : null))
+    .catch(() => null)
+    .finally(() => inFlightEspnWindowFetch.delete(slug))
+  inFlightEspnWindowFetch.set(slug, promise)
+  return promise
+}
+
 export async function fetchEspnCompMatches(compCode, slug, overrides = {}) {
   const cacheKey = `matches_espn_${compCode}`
   if (!slug) return []
   try {
-    const res = await fetch(`/espn?slug=${slug}&dates=${windowRange()}`)
-    if (!res.ok) return readCacheStale(cacheKey) ?? []
-    const json = await res.json()
+    const json = await fetchEspnWindowJson(slug)
+    if (!json) return readCacheStale(cacheKey) ?? []
     const matches = (json.events ?? [])
       .map(e => normalizeEvent(e, compCode, overrides))
       .filter(Boolean)
@@ -273,9 +297,8 @@ export async function fetchEspnCupMatches(parentCode) {
   if (!cup) return []
   const cacheKey = `matches_espn_cup_${parentCode}`
   try {
-    const res = await fetch(`/espn?slug=${cup.slug}&dates=${windowRange()}`)
-    if (!res.ok) return readCacheStale(cacheKey) ?? []
-    const json = await res.json()
+    const json = await fetchEspnWindowJson(cup.slug)
+    if (!json) return readCacheStale(cacheKey) ?? []
     const matches = (json.events ?? [])
       .map(e => normalizeEvent(e, parentCode, {
         idPrefix: `${parentCode}-cup`,

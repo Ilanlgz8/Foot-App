@@ -142,16 +142,47 @@ function matchDateStr(match, offsetDays = 0) {
 // compos manquantes uniquement pour les utilisateurs n'ayant pas regardé le
 // match jusqu'au bout (constat utilisateur). Interroge toujours date + date-1
 // et fusionne, au lieu de deviner laquelle est la bonne.
+// ⚠️ AJOUT (05/09, constat utilisateur : "message d'erreur, réessayer ça fait
+// rien" — 429 en rafale sur /espn confirmés en réel, capture réseau à
+// l'appui) : ce scoreboard dual (date + date-1) est refait PAR MATCH, sans
+// aucune protection — mais le résultat ne dépend QUE de `slug` + les 2 dates,
+// jamais du match précis. Plusieurs matchs de la MÊME compétition affichés le
+// même jour (typique : plusieurs cards Bundesliga sur "Résultats récents")
+// déclenchent donc chacun leur propre paire d'appels identiques, en même
+// temps, pour la MÊME donnée — observé en réel : jusqu'à 5 fois le même
+// `ger.1&dates=...` dans une seule salve réseau. Avec ~100 appels ESPN déjà
+// nécessaires par chargement de page (voir useTodayMatches.js), cette
+// redondance suffit à elle seule à dépasser le plafond de l'IP (100/60s,
+// api/espn.js) — et "Réessayer" ne change rien puisqu'il relance exactement
+// la même salve contre un plafond pas encore reconstitué.
+// Verrou "in-flight" (même idiome que fetchClubMatchesRaw/fetchH2HHistory,
+// useMatchs.js) keyé sur slug+dates, PAS sur le match : deux matchs
+// simultanés de la même compétition/jour partagent désormais la même
+// promesse réseau au lieu d'en relancer une chacun. Pas de TTL après
+// résolution (juste un in-flight) : un appel ultérieur non concurrent
+// refetch normalement, aucune fraîcheur perdue.
+const inFlightEspnScoreboardDual = new Map()
+
 async function fetchEspnEventsDual(slug, match) {
-  const [res1, res2] = await Promise.all([
-    fetch(`/espn?slug=${slug}&dates=${matchDateStr(match, 0)}`),
-    fetch(`/espn?slug=${slug}&dates=${matchDateStr(match, -1)}`),
-  ])
-  const [board1, board2] = await Promise.all([
-    res1.ok ? res1.json() : null,
-    res2.ok ? res2.json() : null,
-  ])
-  return [...(board1?.events ?? []), ...(board2?.events ?? [])]
+  const date0 = matchDateStr(match, 0)
+  const date1 = matchDateStr(match, -1)
+  const key = `${slug}:${date0}:${date1}`
+  if (inFlightEspnScoreboardDual.has(key)) return inFlightEspnScoreboardDual.get(key)
+
+  const promise = (async () => {
+    const [res1, res2] = await Promise.all([
+      fetch(`/espn?slug=${slug}&dates=${date0}`),
+      fetch(`/espn?slug=${slug}&dates=${date1}`),
+    ])
+    const [board1, board2] = await Promise.all([
+      res1.ok ? res1.json() : null,
+      res2.ok ? res2.json() : null,
+    ])
+    return [...(board1?.events ?? []), ...(board2?.events ?? [])]
+  })().finally(() => inFlightEspnScoreboardDual.delete(key))
+
+  inFlightEspnScoreboardDual.set(key, promise)
+  return promise
 }
 
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois

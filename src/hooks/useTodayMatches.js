@@ -113,17 +113,37 @@ function dedupeAndFilterByDate(matches, date) {
 // individuel reste rapide, seul le DÉMARRAGE est étalé.
 const ESPN_CALL_STAGGER_MS = 150
 
+// ⚠️ AJOUT (05/09, constat utilisateur : "message d'erreur, réessayer ça fait
+// rien" — 429 en rafale sur /espn, capture réseau à l'appui) : cette fonction
+// interroge toujours la MÊME fenêtre glissante (windowRange(), indépendante
+// de tout argument — voir espnAdapter.js), jamais un jour précis en
+// particulier. Or useRecentDaysMatches (Accueil, "Résultats récents") l'appelle
+// UNE FOIS PAR JOUR affiché (jusqu'à 7) avec un queryKey DIFFÉRENT par jour
+// (`['todayMatchesEspn', date]`) — React Query ne peut donc pas dédupliquer
+// entre ces appels, alors qu'ils redemandent tous, réseau compris, EXACTEMENT
+// le même résultat. ~17 appels ESPN par jour × jusqu'à 7 jours = jusqu'à ~120
+// requêtes réseau réelles pour une seule ouverture de l'app, rien que pour ce
+// panneau — déjà au-dessus du plafond de l'IP (100/60s, api/espn.js) à lui
+// seul. Verrou "in-flight" (même idiome que fetchClubMatchesRaw,
+// useMatchs.js), sans argument puisque le résultat ne dépend de rien : tous
+// les appels concurrents (les 7 jours montent en même temps via useQueries)
+// partagent désormais UNE seule salve réseau au lieu de 7.
+let espnPortionInFlight = null
+
 async function fetchEspnPortion() {
+  if (espnPortionInFlight) return espnPortionInFlight
   const jobs = [
     ...ESPN_SOURCED_COMPS.map(id => () => fetchEspnCompMatches(id, COMPETITION_ESPN_SLUG[id], { compId: REAL_COMP_ID[id] })),
     ...CUP_PARENT_COMPS.map(id => () => fetchEspnCupMatches(id)),
   ]
-  const settled = await Promise.allSettled(
+  espnPortionInFlight = Promise.allSettled(
     jobs.map((job, idx) =>
       new Promise(resolve => setTimeout(resolve, idx * ESPN_CALL_STAGGER_MS)).then(job)
     )
   )
-  return settled.flatMap(r => r.status === 'fulfilled' ? r.value : []).filter(m => VALID_STATUS.includes(m.status))
+    .then(settled => settled.flatMap(r => r.status === 'fulfilled' ? r.value : []).filter(m => VALID_STATUS.includes(m.status)))
+    .finally(() => { espnPortionInFlight = null })
+  return espnPortionInFlight
 }
 
 // Calculer le jour UTC précédent pour capturer les matchs après minuit local
