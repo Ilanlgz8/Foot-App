@@ -158,15 +158,25 @@ function matchDateStr(match, offsetDays = 0) {
 // Verrou "in-flight" (même idiome que fetchClubMatchesRaw/fetchH2HHistory,
 // useMatchs.js) keyé sur slug+dates, PAS sur le match : deux matchs
 // simultanés de la même compétition/jour partagent désormais la même
-// promesse réseau au lieu d'en relancer une chacun. Pas de TTL après
-// résolution (juste un in-flight) : un appel ultérieur non concurrent
-// refetch normalement, aucune fraîcheur perdue.
+// promesse réseau au lieu d'en relancer une chacun.
+// ⚠️ AJOUT court cache mémoire (05/09, même jour) : le in-flight seul ne
+// suffisait pas — vérifié en réel après déploiement, doublons persistants.
+// Plusieurs cards de match ne se montent pas toutes dans le MÊME tick React
+// (rendus étalés) — hors fenêtre du verrou, qui ne protège que les appels
+// VRAIMENT simultanés. 8s de cache en plus, même valeur que le fix jumeau
+// dans espnAdapter.js (fetchEspnWindowJson) — couvre l'étalement réel observé
+// sans rien changer à la fraîcheur perçue.
 const inFlightEspnScoreboardDual = new Map()
+const ESPN_SCOREBOARD_DUAL_CACHE_MS = 8_000
+const espnScoreboardDualCache = new Map() // key → { events, ts }
 
 async function fetchEspnEventsDual(slug, match) {
   const date0 = matchDateStr(match, 0)
   const date1 = matchDateStr(match, -1)
   const key = `${slug}:${date0}:${date1}`
+
+  const cached = espnScoreboardDualCache.get(key)
+  if (cached && Date.now() - cached.ts < ESPN_SCOREBOARD_DUAL_CACHE_MS) return cached.events
   if (inFlightEspnScoreboardDual.has(key)) return inFlightEspnScoreboardDual.get(key)
 
   const promise = (async () => {
@@ -178,7 +188,9 @@ async function fetchEspnEventsDual(slug, match) {
       res1.ok ? res1.json() : null,
       res2.ok ? res2.json() : null,
     ])
-    return [...(board1?.events ?? []), ...(board2?.events ?? [])]
+    const events = [...(board1?.events ?? []), ...(board2?.events ?? [])]
+    espnScoreboardDualCache.set(key, { events, ts: Date.now() })
+    return events
   })().finally(() => inFlightEspnScoreboardDual.delete(key))
 
   inFlightEspnScoreboardDual.set(key, promise)

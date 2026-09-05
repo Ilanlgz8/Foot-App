@@ -260,11 +260,32 @@ const ESPN_MATCHES_TTL = 2 * 60 * 1000 // 2min — aligné sur le TTL FINISHED e
 // désormais mutualisé entre tous les appels concurrents pour le même slug.
 const inFlightEspnWindowFetch = new Map()
 
+// ⚠️ AJOUT (05/09, même jour) : le verrou in-flight seul ne suffisait pas —
+// vérifié en réel après déploiement, les doublons persistaient. Cause : les
+// ~13 requêtes de useRecentDaysMatches (7 jours × jusqu'à 2 requêtes) ne
+// démarrent pas toutes dans le MÊME tick — React Query les monte étalées sur
+// plusieurs rendus, et une salve interne (17 slugs espacés de
+// ESPN_CALL_STAGGER_MS=150ms, ~2,5s au total) peut donc avoir déjà fini pour
+// un slug donné avant qu'une salve "voisine" (quelques centaines de ms plus
+// tard) ne le redemande — hors fenêtre du verrou in-flight, qui ne protège
+// que les appels VRAIMENT simultanés. Court cache mémoire (8s) en plus du
+// verrou : couvre l'étalement réel observé sans rien changer à la fraîcheur
+// perçue (le direct passe par un mécanisme dédié, LiveProvider/
+// useLiveMinute, jamais par cette liste "matchs du jour").
+const ESPN_WINDOW_CACHE_MS = 8_000
+const espnWindowCache = new Map() // slug → { json, ts }
+
 async function fetchEspnWindowJson(slug) {
+  const cached = espnWindowCache.get(slug)
+  if (cached && Date.now() - cached.ts < ESPN_WINDOW_CACHE_MS) return cached.json
   if (inFlightEspnWindowFetch.has(slug)) return inFlightEspnWindowFetch.get(slug)
   const promise = fetch(`/espn?slug=${slug}&dates=${windowRange()}`)
     .then(res => (res.ok ? res.json() : null))
     .catch(() => null)
+    .then(json => {
+      if (json) espnWindowCache.set(slug, { json, ts: Date.now() })
+      return json
+    })
     .finally(() => inFlightEspnWindowFetch.delete(slug))
   inFlightEspnWindowFetch.set(slug, promise)
   return promise
