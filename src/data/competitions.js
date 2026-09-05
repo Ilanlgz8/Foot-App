@@ -176,6 +176,25 @@ export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', '
 export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 
 // ── Couleur d'ambiance par championnat ───────────────────────────────────────
+// ⚠️ RENFORCÉE ET CORRIGÉE (05/09, retour utilisateur : "c'est pas comme je
+// t'avais dit, je voulais la couleur du logo du championnat, et si la couleur
+// est moche tu l'embellis un chouia").
+// La couleur brute du logo est pensée pour un petit aplat, pas pour une grande
+// surface sombre : à cette échelle elle devient criarde (bleu Ligue 1 à
+// saturation 100%) ou illisible (violet Premier League presque noir).
+// D'où une correction SYSTÉMATIQUE, pas un choix au jugé :
+//   • la TEINTE n'est jamais touchée — c'est elle qui fait reconnaître le
+//     championnat ;
+//   • la saturation est plafonnée à 0,80 (au-delà, effet néon sur une grande
+//     surface) ;
+//   • la luminosité est ramenée dans 0,24–0,44 : plus clair, le texte blanc
+//     ne passe plus ; plus sombre, la teinte ne se voit plus.
+// Chaque entrée note la couleur brute ET la couleur corrigée, pour qu'on
+// puisse refaire le calcul.
+// Limite connue et assumée : Bundesliga et LaLiga restent proches après
+// correction (#b8141e et #ca1d16) — leurs deux logos sont rouges, à 6° de
+// teinte l'un de l'autre. Les écarter davantage reviendrait à inventer une
+// couleur que ces championnats n'ont pas.
 // ⚠️ AJOUT (05/09, demande utilisateur : "le fond de la card sur la page du
 // direct aux couleurs du championnat, genre Ligue 1 en bleu comme le logo").
 // Chaque valeur est EXTRAITE du logo réellement utilisé par l'app, pas choisie
@@ -188,8 +207,8 @@ export const SINGLE_MATCH_COMPS = new Set(['USC', 'TDC', 'CS'])
 export const COMPETITIONS = [
   {
     id: 'FL1',
-    // bleu dominant du logo Ligue 1 (20 526 pixels)
-    tint: '#0054fc',
+    // brut #0054fc (bleu dominant du logo, 20 526 px) → corrigé
+    tint: '#1652ca',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -199,8 +218,8 @@ export const COMPETITIONS = [
   },
   {
     id: 'PL',
-    // violet du logo Premier League, relevé sur le fichier d'origine avant son détourage (voir git)
-    tint: '#39003d',
+    // brut #39003d (violet du logo d'origine, avant détourage) → corrigé
+    tint: '#680c6e',
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
@@ -225,8 +244,8 @@ export const COMPETITIONS = [
   },
   {
     id: 'PD',
-    // unique couleur déclarée dans le SVG LaLiga EA Sports
-    tint: '#ff4b44',
+    // brut #ff4b44 (unique couleur du SVG LaLiga) → corrigé
+    tint: '#ca1d16',
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
@@ -240,16 +259,16 @@ export const COMPETITIONS = [
   },
   {
     id: 'BL1',
-    // rouge dominant du logo Bundesliga (16 158 pixels)
-    tint: '#cc000c',
+    // brut #cc000c (rouge dominant du logo, 16 158 px) → corrigé
+    tint: '#b8141e',
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
   },
   {
     id: 'SA',
-    // bleu dominant du logo Serie A (2 571 pixels)
-    tint: '#0084cc',
+    // brut #0084cc (bleu dominant du logo, 2 571 px) → corrigé
+    tint: '#147eb8',
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,

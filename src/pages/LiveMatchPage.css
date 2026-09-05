@@ -853,9 +853,9 @@
      pour ne pas écraser les halos aux couleurs des deux équipes, qui restent
      ce qui distingue un match d'un autre. */
   background: linear-gradient(158deg,
-    color-mix(in srgb, var(--lmp-comp, #16171f) 30%, #16171f) 0%,
-    color-mix(in srgb, var(--lmp-comp, #0e0f14) 20%, #0e0f14) 62%,
-    color-mix(in srgb, var(--lmp-comp, #0b0c10) 12%, #0b0c10) 100%);
+    color-mix(in srgb, var(--lmp-comp, #16171f) 75%, #0a0b10) 0%,
+    color-mix(in srgb, var(--lmp-comp, #0e0f14) 55%, #08090d) 62%,
+    color-mix(in srgb, var(--lmp-comp, #0b0c10) 35%, #07080b) 100%);
   box-shadow: 0 18px 40px -20px rgba(var(--black-rgb),0.95),
               0 0 22px -8px rgba(var(--red-rgb),0.38);
   /* ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "en haut de la page, au
@@ -893,11 +893,14 @@
 }
 .lmp__heroGlowL {
   left: -18%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc, #ef4444) 55%, transparent), transparent 70%);
+  /* Halos ATTÉNUÉS (55→32%) depuis que le fond porte la couleur du
+     championnat : à pleine intensité ils la brouillaient. Ils restent là pour
+     signer le match, mais en second plan. */
+  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc, #ef4444) 32%, transparent), transparent 70%);
 }
 .lmp__heroGlowR {
   right: -18%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc2, #3b5bfd) 50%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc2, #3b5bfd) 30%, transparent), transparent 70%);
 }
 
 /* Bandeau : championnat à gauche, lisible (même traitement que la carte
