@@ -1634,23 +1634,23 @@
   mix-blend-mode: overlay;
   opacity: 0;
 }
+/* ⚠️ Aucun arrêt `transparent` au milieu — voir le commentaire détaillé dans
+   LiveMatchPage.css (c'est ce qui produisait une bande noire en diagonale). */
 .poster__bg--gradientAlt {
   background: linear-gradient(135deg,
     var(--poster-comp2, var(--poster-comp2-auto)) 0%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 78%,
-    var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 100%);
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto)))) 30%,
+    var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 54%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, var(--poster-comp2, var(--poster-comp2-auto))) 78%,
+    var(--poster-comp2, var(--poster-comp2-auto)) 100%);
 }
 .poster__bg--gradientTri {
   background: linear-gradient(135deg,
     var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 0%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 78%,
-    var(--poster-comp2, var(--poster-comp2-auto)) 100%);
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, var(--poster-comp2, var(--poster-comp2-auto))) 30%,
+    var(--poster-comp2, var(--poster-comp2-auto)) 54%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto)))) 78%,
+    var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 100%);
 }
 .poster--tinted .poster__bg--gradientAlt {
   opacity: 0.6;
@@ -1677,32 +1677,29 @@
   mix-blend-mode: normal;
 }
 /* `--poster-comp3` : 2e couleur d'accent quand elle diffère de comp2
-   (Bundesliga : blanc + un peu de rouge) — voir LiveMatchPage.css. */
-.poster--softTint .poster__bg--gradientAlt {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 26%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 30%, transparent) 78%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 60%, transparent) 100%);
-}
+   (Bundesliga : blanc + un peu de rouge). Dégradés inchangés (déjà continus),
+   seuls la fusion et le dosage diffèrent — voir LiveMatchPage.css. */
+.poster--softTint .poster__bg--gradientAlt,
 .poster--softTint .poster__bg--gradientTri {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 0%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 26%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 30%, transparent) 78%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 60%, transparent) 100%);
+  mix-blend-mode: normal;
 }
-.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.55; }
+.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.26; }
+.poster--softTint.poster--tinted .poster__bg--gradientTri {
+  animation:
+    posterDrift 18s ease-in-out infinite reverse,
+    posterMorphSoft 9s ease-in-out infinite;
+}
 
 /* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
    Repris à l'identique de l'animation d'origine (couleurs des équipes). */
 @keyframes posterMorph {
   0%, 100% { opacity: 0; }
   50%      { opacity: 0.9; }
+}
+/* Pic plus bas pour les fonds sombres (`tintSoft`) — voir LiveMatchPage.css. */
+@keyframes posterMorphSoft {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.34; }
 }
 
 @media (prefers-reduced-motion: reduce) {

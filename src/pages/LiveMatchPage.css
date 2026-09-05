@@ -930,23 +930,30 @@
   mix-blend-mode: overlay;
   opacity: 0;
 }
+/* ⚠️ AUCUN ARRÊT `transparent` AU MILIEU (05/09, constat utilisateur : "une
+   bande noire en diagonale c'est moche"). Un `transparent` posé à une
+   POSITION précise du dégradé laisse voir le fond noir en bande nette à cet
+   endroit — c'est ce qui produisait la bande. Ici tous les arrêts portent une
+   couleur, le dégradé est donc continu de bout en bout : les couleurs se
+   fondent les unes dans les autres sans jamais découvrir le fond.
+   C'est l'OPACITÉ DU CALQUE (uniforme, donc sans position) qui laisse le noir
+   de base transparaître partout à parts égales — d'où les 3 couleurs
+   présentes en même temps et mélangées, au lieu de zones séparées. */
 .lmp__heroTintB {
   background: linear-gradient(135deg,
     var(--lmp-comp2, var(--lmp-comp2-auto)) 0%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 78%,
-    var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 100%);
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto)))) 30%,
+    var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 54%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, var(--lmp-comp2, var(--lmp-comp2-auto))) 78%,
+    var(--lmp-comp2, var(--lmp-comp2-auto)) 100%);
 }
 .lmp__heroTintC {
   background: linear-gradient(135deg,
     var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 0%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 78%,
-    var(--lmp-comp2, var(--lmp-comp2-auto)) 100%);
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, var(--lmp-comp2, var(--lmp-comp2-auto))) 30%,
+    var(--lmp-comp2, var(--lmp-comp2-auto)) 54%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto)))) 78%,
+    var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 100%);
 }
 .lmp__hero--tinted .lmp__heroTintB {
   opacity: 0.6;
@@ -979,25 +986,21 @@
 .lmp__hero--softTint .lmp__heroTintC {
   mix-blend-mode: normal;
 }
-.lmp__hero--softTint .lmp__heroTintB {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 0%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 26%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 30%, transparent) 78%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 60%, transparent) 100%);
-}
+/* Les dégradés de base (ci-dessus) conviennent tels quels : ils sont déjà
+   continus. Seuls la fusion et le dosage changent ici — sur une base quasi
+   noire, `overlay` écraserait les couleurs au lieu de les révéler, et le pic
+   de fondu standard (0.9) couvrirait complètement le noir, alors qu'on veut
+   justement qu'il reste l'une des trois couleurs perçues. */
+.lmp__hero--softTint .lmp__heroTintB,
 .lmp__hero--softTint .lmp__heroTintC {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 0%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 26%, transparent) 24%,
-    transparent 46%,
-    transparent 58%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 30%, transparent) 78%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 60%, transparent) 100%);
+  mix-blend-mode: normal;
 }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.55; }
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.26; }
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC {
+  animation:
+    lmpHeroDrift 18s ease-in-out infinite reverse,
+    lmpHeroMorphSoft 9s ease-in-out infinite;
+}
 
 /* Mouvement et fondu repris À L'IDENTIQUE de l'animation d'origine des
    posters Accueil (posterDrift / posterMorph, accueil.css) — même durées,
@@ -1010,6 +1013,13 @@
 @keyframes lmpHeroMorph {
   0%, 100% { opacity: 0; }
   50%      { opacity: 0.9; }
+}
+/* Pic volontairement plus bas pour les fonds sombres (`tintSoft`) : à 0.9 le
+   2e calque recouvrirait entièrement le noir de base au sommet du fondu,
+   alors qu'il doit rester visible — c'est l'une des 3 couleurs demandées. */
+@keyframes lmpHeroMorphSoft {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.34; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
