@@ -887,29 +887,36 @@
   clip-path: inset(0 round 20px);
 }
 
-/* ⚠️ ANIMATION DE LA TEINTE — TACHES + REFLET VERRE/EAU (05/09, 2e passe,
-   demande utilisateur). 1ère version (fondu uniforme entre 2 couleurs
-   plates) explicitement rejetée : "c pas un changement de couleur que je
-   voulais c vraiment un melange de blanc et rouge couleur dominante rouge
-   avec des taches blanche et la texture en mode glasses vitré eau".
-   Remplacée par 2 calques bien distincts, tous les deux UNIQUEMENT animés en
-   `transform` (GPU, aucun repaint — même contrainte déjà en place partout
-   ailleurs dans l'app pour ce type de fond animé) :
-   - lmp__heroTintB : plusieurs radial-gradient (2e couleur, `--lmp-comp2` —
-     blanc pour Bundesliga, jaune pour LaLiga, sinon une variante éclaircie
-     auto-calculée) posés à des positions/tailles différentes → des TACHES
-     organiques plutôt qu'un fondu plat. `mix-blend-mode: overlay` les fait
-     fusionner dans le rouge au lieu de flotter dessus en aplat, et une
-     opacité de calque <1 garde le rouge dominant (demande explicite). Le
-     calque entier dérive lentement (translate+scale) pour un mouvement
-     organique — jamais un décor figé.
-   - lmp__heroSheen : bande diagonale claire, façon reflet sur une surface de
-     verre/eau ("glasses vitré eau"), qui balaie lentement la carte
-     (translate) — `mix-blend-mode: screen` l'éclaircit sans jamais poser un
-     aplat opaque.
-   Le conteneur (`.lmp__hero`) porte déjà `overflow:hidden` + `clip-path` :
-   les 2 calques débordent volontairement (`inset: -20%`) pour que la dérive
-   ne révèle jamais un bord net.
+/* ⚠️ TEXTURE ANIMÉE EN CONTINU (05/09, 3e passe, demande utilisateur).
+   Historique des 2 versions rejetées, pour ne pas les refaire :
+     1. Fondu d'opacité entre 2 couleurs plates → "c pas un changement de
+        couleur que je voulais".
+     2. Taches + bande de reflet diagonale qui balaie la carte ("glasses
+        vitré eau") → "nn pa cette effet animé là... c comme une texture qui
+        bouge en permanence rouge de couleur avec des taches jaune".
+   Ce qui est attendu : une TEXTURE, pas un effet ponctuel — un fond rouge
+   (couleur dominante, `--lmp-comp`) parcouru de taches (`--lmp-comp2` :
+   blanc Bundesliga, jaune LaLiga, sinon variante éclaircie auto) qui
+   bougent SANS ARRÊT, sans début ni fin perceptibles.
+   Réalisation : 2 calques de radial-gradient qui tournent lentement, en sens
+   INVERSE et à des vitesses non multiples (31s / 47s). Points clés :
+   - `rotate` sur un calque volontairement surdimensionné (`inset: -55%`) :
+     les taches décrivent une orbite, donc un mouvement parfaitement continu
+     et sans à-coup. Un translate en keyframes, lui, change de direction à
+     chaque palier — c'est ce qui donnait l'impression d'un "effet" qui
+     rejoue plutôt que d'une matière qui coule.
+   - `linear` (et non ease-in-out) : aucune décélération, donc jamais de
+     temps mort où l'animation semble s'arrêter.
+   - 2 vitesses non multiples et de sens opposés : les taches des 2 calques
+     se recouvrent différemment en permanence, la texture ne se répète
+     visuellement qu'au bout de très longtemps (PPCM des 2 périodes).
+   - `mix-blend-mode: overlay` : les taches se fondent DANS le rouge au lieu
+     de flotter dessus en aplat ; l'opacité <1 garde le rouge dominant
+     (demande explicite).
+   N'anime QUE `transform` (GPU, aucun repaint) — même contrainte que partout
+   ailleurs dans l'app pour ce type de fond.
+   Le conteneur porte déjà `overflow:hidden` + `clip-path` : le débordement
+   des calques garantit qu'aucun coin ne se découvre pendant la rotation.
    Actif uniquement sur les compétitions déjà teintées (`.lmp__hero--tinted`,
    posé quand `comp.tint` existe) — les championnats volontairement neutres
    (Ligue des champions…) restent parfaitement statiques, comme avant. */
@@ -917,50 +924,41 @@
   --lmp-comp2-auto: color-mix(in srgb, var(--lmp-comp, #2a2d38) 58%, white 42%);
 }
 .lmp__heroTintB,
-.lmp__heroSheen {
+.lmp__heroTintC {
   position: absolute;
-  inset: -20%;
+  inset: -55%;
   z-index: 0;
   pointer-events: none;
+  mix-blend-mode: overlay;
   opacity: 0;
 }
 .lmp__heroTintB {
   background:
-    radial-gradient(circle at 22% 26%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 42%),
-    radial-gradient(circle at 80% 62%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 38%),
-    radial-gradient(circle at 42% 90%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 34%);
-  mix-blend-mode: overlay;
+    radial-gradient(circle at 34% 32%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 26%),
+    radial-gradient(circle at 66% 58%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 22%),
+    radial-gradient(circle at 48% 72%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 19%);
 }
-.lmp__heroSheen {
-  background: linear-gradient(115deg,
-    transparent 30%,
-    rgba(255,255,255,0.16) 46%,
-    rgba(255,255,255,0.28) 50%,
-    rgba(255,255,255,0.16) 54%,
-    transparent 70%);
-  mix-blend-mode: screen;
+.lmp__heroTintC {
+  background:
+    radial-gradient(circle at 62% 34%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 24%),
+    radial-gradient(circle at 36% 62%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 20%);
 }
 .lmp__hero--tinted .lmp__heroTintB {
-  opacity: 0.65;
-  animation: lmpHeroBlobDrift 16s ease-in-out infinite;
+  opacity: 0.6;
+  animation: lmpTextureSpin 31s linear infinite;
   will-change: transform;
 }
-.lmp__hero--tinted .lmp__heroSheen {
-  opacity: 1;
-  animation: lmpHeroSheenSweep 9s ease-in-out infinite;
+.lmp__hero--tinted .lmp__heroTintC {
+  opacity: 0.45;
+  animation: lmpTextureSpin 47s linear infinite reverse;
   will-change: transform;
 }
-@keyframes lmpHeroBlobDrift {
-  0%, 100% { transform: translate(0%, 0%)   scale(1);    }
-  33%      { transform: translate(-4%, 3%)  scale(1.06); }
-  66%      { transform: translate(3%, -3%)  scale(0.97); }
-}
-@keyframes lmpHeroSheenSweep {
-  0%, 100% { transform: translate(-30%, -12%); }
-  50%      { transform: translate(18%, 10%);   }
+@keyframes lmpTextureSpin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lmp__heroTintB, .lmp__heroSheen { animation: none !important; opacity: 0; }
+  .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
 }
 
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:

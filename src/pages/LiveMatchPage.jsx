@@ -299,19 +299,19 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           // mélange de blanc et rouge... des taches blanche" + reflet façon
           // verre/eau, PAS un simple fondu de couleur plate — voir le
           // commentaire détaillé dans LiveMatchPage.css) — alimente
-          // .lmp__heroTintB/.lmp__heroSheen. Absent pour la plupart des
+          // .lmp__heroTintB/C. Absent pour la plupart des
           // compétitions : le CSS retombe sur une variante éclaircie
           // auto-calculée de `--lmp-comp`.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
         }}
       >
-      {/* ⚠️ Calques d'animation de la teinte (05/09) — voir le commentaire
-          détaillé dans LiveMatchPage.css (.lmp__heroTintB/.lmp__heroSheen).
-          Purement décoratifs (aria-hidden), n'affectent jamais la mise en
-          page : le contenu réel garde son z-index au-dessus. */}
+      {/* ⚠️ Calques de la texture animée (05/09) — voir le commentaire
+          détaillé dans LiveMatchPage.css (.lmp__heroTintB/C). Purement
+          décoratifs (aria-hidden), n'affectent jamais la mise en page : le
+          contenu réel garde son z-index au-dessus. */}
       <span className="lmp__heroTintB" aria-hidden="true" />
-      <span className="lmp__heroSheen" aria-hidden="true" />
+      <span className="lmp__heroTintC" aria-hidden="true" />
 
       {/* Bandeau : championnat à gauche, bien lisible */}
       <div className="mp__hero__top lmp__heroTop">

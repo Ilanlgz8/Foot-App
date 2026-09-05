@@ -323,8 +323,8 @@ export const COMPETITIONS = [
     // couleur plate mais "un melange de blanc et rouge... des taches
     // blanche" + reflet façon verre/eau) — tint (rouge) reste le fond
     // dominant, tint2 (blanc) alimente les taches organiques + le reflet
-    // animés dans .lmp__heroTintB/.lmp__heroSheen (LiveMatchPage.css) et
-    // .poster__bg--gradientAlt/.poster__sheen (accueil.css).
+    // animés dans .lmp__heroTintB/C (LiveMatchPage.css) et
+    // .poster__bg--gradientAlt/--gradientTri (accueil.css).
     tint: '#d16168',
     tint2: '#ffffff',
     tintLight: true,

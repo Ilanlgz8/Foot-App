@@ -1610,55 +1610,47 @@
   will-change: transform;
   animation: posterDrift 18s ease-in-out infinite;
 }
-/* ⚠️ TACHES + REFLET VERRE/EAU (05/09, 2e passe, demande explicite : "c pas
-   un changement de couleur que je voulais... vraiment un mélange... des
-   taches... la texture en mode glasses vitré eau") — la 1ère version
-   (fondu uniforme entre 2 couleurs plates) a été explicitement rejetée.
-   gradientAlt porte maintenant plusieurs radial-gradient (2e couleur,
-   `--poster-comp2` — blanc Bundesliga, jaune LaLiga, sinon variante
-   éclaircie auto ci-dessus) posés à des positions/tailles différentes → des
-   TACHES organiques plutôt qu'un dégradé plein. `mix-blend-mode: overlay`
-   les fait fusionner dans la couleur de base au lieu de flotter dessus en
-   aplat ; une opacité de calque <1 garde cette base dominante (demande
-   explicite). poster__sheen (calque séparé, juste après) ajoute le reflet
-   diagonal façon verre/eau qui balaie lentement la carte. Seuls `transform`/
-   `opacity` sont animés (GPU, aucun repaint) — même contrainte que le reste
-   de l'app pour ce type de fond animé. Actif uniquement sur `.poster--tinted`
-   (comp.tint présent) : sans ce garde-fou, la variante éclaircie par défaut
-   ferait apparaître des taches grises parasites même sur les compétitions
-   volontairement neutres (Ligue des champions…). */
-.poster__bg--gradientAlt {
-  inset: -20%;
-  background:
-    radial-gradient(circle at 22% 26%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 42%),
-    radial-gradient(circle at 80% 62%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 38%),
-    radial-gradient(circle at 42% 90%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 34%);
+/* ⚠️ TEXTURE ANIMÉE EN CONTINU (05/09, 3e passe). Deux versions précédentes
+   rejetées par l'utilisateur — fondu d'opacité entre 2 couleurs plates, puis
+   taches + bande de reflet diagonale qui balaie la carte ("nn pa cette effet
+   animé là... c comme une texture qui bouge en permanence"). Voir le
+   commentaire détaillé dans LiveMatchPage.css (.lmp__heroTintB/C) : même
+   mécanisme exactement, gardé identique des deux côtés pour que l'Accueil et
+   les pages match ne divergent pas au prochain ajustement.
+   En résumé : 2 calques de taches (`--poster-comp2` — blanc Bundesliga,
+   jaune LaLiga, sinon variante éclaircie auto ci-dessus) qui TOURNENT en
+   continu, en sens inverse et à des vitesses non multiples (31s/47s) →
+   mouvement perpétuel sans à-coup ni temps mort, la couleur de base restant
+   dominante (opacité <1 + `mix-blend-mode: overlay`).
+   Actif uniquement sur `.poster--tinted` (comp.tint présent) : sans ce
+   garde-fou, la variante éclaircie par défaut ferait apparaître des taches
+   grises parasites même sur les compétitions volontairement neutres (Ligue
+   des champions…). */
+.poster__bg--gradientAlt,
+.poster__bg--gradientTri {
+  inset: -55%;
   mix-blend-mode: overlay;
   will-change: transform;
   opacity: 0;
 }
+.poster__bg--gradientAlt {
+  background:
+    radial-gradient(circle at 34% 32%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 26%),
+    radial-gradient(circle at 66% 58%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 22%),
+    radial-gradient(circle at 48% 72%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 19%);
+}
+.poster__bg--gradientTri {
+  background:
+    radial-gradient(circle at 62% 34%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 24%),
+    radial-gradient(circle at 36% 62%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 20%);
+}
 .poster--tinted .poster__bg--gradientAlt {
-  opacity: 0.65;
-  animation: posterBlobDrift 16s ease-in-out infinite;
+  opacity: 0.6;
+  animation: posterTextureSpin 31s linear infinite;
 }
-.poster__sheen {
-  position: absolute;
-  inset: -20%;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(115deg,
-    transparent 30%,
-    rgba(255,255,255,0.16) 46%,
-    rgba(255,255,255,0.28) 50%,
-    rgba(255,255,255,0.16) 54%,
-    transparent 70%);
-  mix-blend-mode: screen;
-  will-change: transform;
-  opacity: 0;
-}
-.poster--tinted .poster__sheen {
-  opacity: 1;
-  animation: posterSheenSweep 9s ease-in-out infinite;
+.poster--tinted .poster__bg--gradientTri {
+  opacity: 0.45;
+  animation: posterTextureSpin 47s linear infinite reverse;
 }
 
 /* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
@@ -1666,22 +1658,17 @@
   0%, 100% { transform: scale(1.12) translate(0%, 0%); }
   50%      { transform: scale(1.18) translate(-2%, 2%); }
 }
-@keyframes posterBlobDrift {
-  0%, 100% { transform: translate(0%, 0%)  scale(1);    }
-  33%      { transform: translate(-4%, 3%) scale(1.06); }
-  66%      { transform: translate(3%, -3%) scale(0.97); }
-}
-@keyframes posterSheenSweep {
-  0%, 100% { transform: translate(-30%, -12%); }
-  50%      { transform: translate(18%, 10%);   }
+@keyframes posterTextureSpin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .poster__bg--gradient,
   .poster__bg--gradientAlt,
-  .poster__sheen { animation: none; }
+  .poster__bg--gradientTri { animation: none; }
   .poster__bg--gradientAlt,
-  .poster__sheen { opacity: 0; }
+  .poster__bg--gradientTri { opacity: 0; }
 }
 
 /* Overlay sombre + dégradé directional */

@@ -230,7 +230,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         }}
       >
       <span className="lmp__heroTintB" aria-hidden="true" />
-      <span className="lmp__heroSheen" aria-hidden="true" />
+      <span className="lmp__heroTintC" aria-hidden="true" />
 
       {/* Bandeau : championnat à gauche, statut du match à droite */}
       <div className="mp__hero__top lmp__heroTop">

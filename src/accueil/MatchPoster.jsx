@@ -243,7 +243,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // rouge... des taches blanche" + reflet façon verre/eau, PAS un fondu de
   // couleur plate — voir le commentaire détaillé dans accueil.css) — voir
   // LiveMatchPage.jsx pour le même mécanisme (`--lmp-comp2`). Ici alimente
-  // `--poster-comp2`, lu par .poster__bg--gradientAlt/.poster__sheen
+  // `--poster-comp2`, lu par .poster__bg--gradientAlt/--gradientTri
   // (accueil.css).
   const compTint2   = posterComp?.tint2 ?? null
 
@@ -367,18 +367,16 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
           (`.lmp__hero`, LiveMatchPage.css) : la couleur (`--poster-comp`) est
           posée une seule fois ci-dessus, tout le dégradé (color-mix) vit dans
           accueil.css, pas ici.
-          ⚠️ TACHES + REFLET VERRE/EAU (05/09, 2e passe, demande explicite :
-          "c pas un changement de couleur que je voulais... vraiment un
-          mélange... des taches... la texture en mode glasses vitré eau") —
-          une 1ère version en simple fondu de couleur plate a été rejetée.
-          gradientAlt porte maintenant plusieurs radial-gradient (taches
-          organiques, `--poster-comp2`) plutôt qu'un dégradé plein, et
-          poster__sheen ajoute un reflet diagonal qui balaie la carte. Seul
-          `transform`/`opacity` sont animés (GPU, aucun repaint) — même
-          contrainte que le reste de l'app pour ce type de fond animé. */}
+          ⚠️ TEXTURE ANIMÉE EN CONTINU (05/09, 3e passe) — 2 versions
+          précédentes rejetées (fondu de couleur plate, puis taches + reflet
+          qui balaie) : voir l'historique détaillé dans LiveMatchPage.css,
+          même mécanisme partagé. gradientAlt/gradientTri portent des taches
+          (`--poster-comp2`) qui tournent en continu, en sens inverse et à
+          des vitesses non multiples, pour une matière qui bouge en
+          permanence. Seul `transform` est animé (GPU, aucun repaint). */}
       <div className="poster__bg poster__bg--gradient" />
       <div className="poster__bg poster__bg--gradientAlt" />
-      <div className="poster__sheen" />
+      <div className="poster__bg poster__bg--gradientTri" />
       <div className="poster__overlay" />
 
       {/* ── Badge compét (gauche, logo + nom FR) + statut période en live (droite) ── */}
