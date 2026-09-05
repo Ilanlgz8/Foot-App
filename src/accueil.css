@@ -1676,18 +1676,26 @@
 .poster--softTint .poster__bg--gradientTri {
   mix-blend-mode: normal;
 }
-/* `--poster-comp3` : 2e couleur d'accent quand elle diffère de comp2
-   (Bundesliga : blanc + un peu de rouge). Dégradés inchangés (déjà continus),
-   seuls la fusion et le dosage diffèrent — voir LiveMatchPage.css. */
-.poster--softTint .poster__bg--gradientAlt,
-.poster--softTint .poster__bg--gradientTri {
+/* ⚠️ Aucun changement de couleur, 3 couleurs distinctes, mouvement léger —
+   voir le commentaire détaillé dans LiveMatchPage.css (.lmp__hero--softTint).
+   Le 2e calque est désactivé (c'était lui qui faisait varier les couleurs),
+   il ne reste qu'un dégradé fixe noir → rouge → blanc/jaune qui glisse
+   très légèrement. */
+.poster--softTint .poster__bg--gradientAlt {
   mix-blend-mode: normal;
+  background: linear-gradient(135deg,
+    transparent 0%,
+    transparent 48%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 75%, transparent) 77%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 60%, transparent) 100%);
 }
-.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.26; }
-.poster--softTint.poster--tinted .poster__bg--gradientTri {
-  animation:
-    posterDrift 18s ease-in-out infinite reverse,
-    posterMorphSoft 9s ease-in-out infinite;
+.poster--softTint.poster--tinted .poster__bg--gradientAlt {
+  opacity: 0.9;
+  animation: posterDriftLeger 20s ease-in-out infinite;
+}
+.poster--softTint .poster__bg--gradientTri {
+  opacity: 0;
+  animation: none;
 }
 
 /* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
@@ -1696,10 +1704,11 @@
   0%, 100% { opacity: 0; }
   50%      { opacity: 0.9; }
 }
-/* Pic plus bas pour les fonds sombres (`tintSoft`) — voir LiveMatchPage.css. */
-@keyframes posterMorphSoft {
-  0%, 100% { opacity: 0; }
-  50%      { opacity: 0.34; }
+/* Mouvement discret pour les fonds sombres (`tintSoft`) — voir
+   LiveMatchPage.css (lmpHeroDriftLeger), mêmes valeurs. */
+@keyframes posterDriftLeger {
+  0%, 100% { transform: scale(1.06) translate(0%, 0%); }
+  50%      { transform: scale(1.10) translate(-1.5%, 1.5%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

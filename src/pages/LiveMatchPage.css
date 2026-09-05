@@ -986,20 +986,46 @@
 .lmp__hero--softTint .lmp__heroTintC {
   mix-blend-mode: normal;
 }
-/* Les dégradés de base (ci-dessus) conviennent tels quels : ils sont déjà
-   continus. Seuls la fusion et le dosage changent ici — sur une base quasi
-   noire, `overlay` écraserait les couleurs au lieu de les révéler, et le pic
-   de fondu standard (0.9) couvrirait complètement le noir, alors qu'on veut
-   justement qu'il reste l'une des trois couleurs perçues. */
-.lmp__hero--softTint .lmp__heroTintB,
-.lmp__hero--softTint .lmp__heroTintC {
+/* ⚠️ AUCUN CHANGEMENT DE COULEUR, 3 COULEURS DISTINCTES (05/09, demande
+   finale) : "faut pas que ça change de couleur comme ça, faut juste qu'il y
+   ait du mouvement mais léger, c'est tout, sans changer de couleur, et en
+   gardant toujours le noir le blanc et le rouge bien distincts — couleur
+   primaire noir puis rouge puis blanc".
+   Conséquences, par rapport à toutes les versions précédentes :
+   - Le 2e calque (`lmp__heroTintC`) est DÉSACTIVÉ : c'était lui qui, en
+     apparaissant/disparaissant en fondu (`lmpHeroMorph`), faisait changer les
+     couleurs au fil du temps. Sans lui, la carte garde exactement la même
+     couleur en permanence.
+   - Il ne reste qu'UN dégradé fixe, parcouru dans l'ordre demandé : le fond
+     reste nu (donc noir, la couleur primaire) sur toute la première moitié,
+     puis vient le rouge (`--lmp-comp2`), puis le blanc (`--lmp-comp3`) tout
+     à la fin. Chaque couleur occupe sa propre zone → elles restent bien
+     distinctes, au lieu de se mélanger en une teinte unique.
+   - Les arrêts `transparent` sont ici au DÉBUT (et non au milieu) : ils
+     laissent voir le noir de base sur une large plage continue, ce qui se lit
+     comme "beaucoup de noir" et non comme la bande diagonale du correctif
+     précédent (une transparence encadrée des deux côtés par de la couleur).
+   - Seul le mouvement subsiste, volontairement discret (`lmpHeroDriftLeger` :
+     amplitude de zoom/translation réduite de moitié par rapport à
+     `lmpHeroDrift`), et il n'anime que `transform` — donc aucune couleur ne
+     bouge, seule la position du dégradé change très légèrement. */
+.lmp__hero--softTint .lmp__heroTintB {
   mix-blend-mode: normal;
+  background: linear-gradient(135deg,
+    transparent 0%,
+    transparent 48%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 75%, transparent) 77%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 60%, transparent) 100%);
 }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.26; }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC {
-  animation:
-    lmpHeroDrift 18s ease-in-out infinite reverse,
-    lmpHeroMorphSoft 9s ease-in-out infinite;
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB {
+  opacity: 0.9;
+  animation: lmpHeroDriftLeger 20s ease-in-out infinite;
+}
+/* Calque 2 neutralisé (voir ci-dessus) — conservé dans le DOM pour ne pas
+   toucher au JSX partagé avec les compétitions non `tintSoft`. */
+.lmp__hero--softTint .lmp__heroTintC {
+  opacity: 0;
+  animation: none;
 }
 
 /* Mouvement et fondu repris À L'IDENTIQUE de l'animation d'origine des
@@ -1014,12 +1040,13 @@
   0%, 100% { opacity: 0; }
   50%      { opacity: 0.9; }
 }
-/* Pic volontairement plus bas pour les fonds sombres (`tintSoft`) : à 0.9 le
-   2e calque recouvrirait entièrement le noir de base au sommet du fondu,
-   alors qu'il doit rester visible — c'est l'une des 3 couleurs demandées. */
-@keyframes lmpHeroMorphSoft {
-  0%, 100% { opacity: 0; }
-  50%      { opacity: 0.34; }
+/* Mouvement volontairement DISCRET pour les fonds sombres (`tintSoft`) :
+   amplitude de zoom et de translation réduite de moitié par rapport à
+   `lmpHeroDrift` — "juste du mouvement mais léger". N'anime que `transform`,
+   donc aucune couleur ne change, seule la position du dégradé glisse. */
+@keyframes lmpHeroDriftLeger {
+  0%, 100% { transform: scale(1.06) translate(0%, 0%); }
+  50%      { transform: scale(1.10) translate(-1.5%, 1.5%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }

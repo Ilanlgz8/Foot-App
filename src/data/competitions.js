@@ -307,8 +307,15 @@ export const COMPETITIONS = [
     // désactive le mode de fusion `overlay` pour cette compétition et adoucit
     // les taches : sur une base aussi sombre, `overlay` écraserait le rouge
     // au lieu de le laisser transparaître.
-    tint: '#2b0e11',
+    // ⚠️ ORDRE DES 3 COULEURS (05/09, demande finale) : noir en couleur
+    // PRIMAIRE (le plus présent), puis rouge, puis une pointe de jaune —
+    // "pour la liga il manque du noir et du jaune, légèrement pour le jaune
+    // et plus de noir". `tint` est donc quasi noir pur (plus sombre qu'avant),
+    // `tint2` le rouge, `tint3` le jaune (posé en toute fin de dégradé et à
+    // faible opacité, d'où son côté "léger" — voir LiveMatchPage.css).
+    tint: '#140f11',
     tint2: '#962026',
+    tint3: '#d9a83c',
     tintSoft: true,
     // Pas de `tintLight` ici : le fond est redevenu sombre, la minute reprend
     // donc le rouge standard de l'app (le blanc n'était nécessaire que sur
@@ -339,9 +346,13 @@ export const COMPETITIONS = [
     // autres. `tintSoft` coupe le `mix-blend-mode: overlay` (voir
     // LiveMatchPage.css) : indispensable ici, `overlay` sur une base sombre
     // écraserait aussi bien le blanc que le rouge.
-    tint: '#16151a',
-    tint2: '#ffffff',
-    tint3: '#b81f26',
+    // ⚠️ ORDRE DES 3 COULEURS (05/09, demande finale) : "couleur primaire
+    // noir puis rouge puis blanc". tint2/tint3 ont été ÉCHANGÉS par rapport à
+    // la version précédente (blanc puis rouge) pour respecter cet ordre : le
+    // dégradé va du noir (dominant) vers le rouge, puis finit sur le blanc.
+    tint: '#131217',
+    tint2: '#b81f26',
+    tint3: '#ffffff',
     tintSoft: true,
     // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
     // standard de l'app (même raison que LaLiga ci-dessus).
