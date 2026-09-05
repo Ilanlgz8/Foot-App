@@ -322,6 +322,16 @@
      et il ne noircit rien. */
   text-shadow: 0 1px 5px rgba(var(--black-rgb),0.5), 0 0 16px rgba(var(--red-rgb),0.45);
 }
+/* ⚠️ AJOUT (05/09, demande utilisateur : "fond bleu clair comme Serie A ou
+   Ligue 1, la minute doit être en blanc pas en rouge"). Le rouge se noie sur
+   un fond déjà clair/saturé — voir `tintLight` dans competitions.js pour
+   savoir quels championnats sont concernés. Le point rouge pulsant à côté
+   (.lmp__heroLiveDot) reste rouge : c'est un simple indicateur "direct", pas
+   du texte à lire, il ne pose pas le même problème de contraste. */
+.lmp__hero--lightTint .lmp__heroMinute {
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 10px rgba(var(--black-rgb),0.35);
+}
 .lmp__heroMinute--ft {
   font-size: 1rem;
   font-weight: 700;

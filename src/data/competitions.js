@@ -233,6 +233,12 @@ export const COMPETITIONS = [
     // (05/09, 2e passe) pour rester lisible comme bleu même dilué en bas du
     // dégradé — voir le commentaire au-dessus de COMPETITIONS
     tint: '#1a5cd6',
+    // ⚠️ AJOUT (05/09, demande utilisateur : "fond bleu clair comme Serie A ou
+    // Ligue 1, la minute doit être en blanc pas en rouge"). Le rouge de la
+    // minute (voir .lmp__heroMinute, LiveMatchPage.css) se lit mal sur un
+    // fond déjà assez clair/saturé — seuls les tints assez CLAIRS sont
+    // concernés, pas un fond neutre sombre où le rouge tranche bien.
+    tintLight: true,
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -294,6 +300,7 @@ export const COMPETITIONS = [
     // brut #0084cc (bleu dominant du logo, 2 571 px) → corrigé, puis affiné
     // (05/09, 2e passe) même raison que Ligue 1
     tint: '#1a8fd6',
+    tintLight: true, // voir le commentaire sur FL1 (même raison)
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,

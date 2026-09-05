@@ -210,7 +210,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
       <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
 
       <div
-        className="mp__hero lmp__hero"
+        className={`mp__hero lmp__hero${comp?.tintLight ? ' lmp__hero--lightTint' : ''}`}
         style={{
           // Teinte du championnat (voir `tint`, competitions.js), déjà posée
           // sur LiveMatchPage.jsx — manquait ici (constat utilisateur 05/09 :

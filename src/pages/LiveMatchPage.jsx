@@ -283,7 +283,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           prefers-reduced-motion, l'animation s'arrête pour qui a désactivé les
           animations dans son système. */}
       <div
-        className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}`}
+        className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}${comp?.tintLight ? ' lmp__hero--lightTint' : ''}`}
         style={{
           // Teinte du championnat (voir `tint`, competitions.js). Absente pour
           // une compétition sans couleur identifiable : le CSS retombe alors
