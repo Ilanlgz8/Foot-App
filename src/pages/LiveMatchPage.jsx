@@ -309,6 +309,15 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           // + un peu de rouge). Absent ailleurs → le CSS retombe sur tint2,
           // les 2 calques portent alors la même couleur (cas LaLiga).
           ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
+          // `tintStops` (optionnel) : positions des arrêts du dégradé, donc
+          // la PART occupée par chacune des 3 couleurs. Absent → valeurs par
+          // défaut du CSS (celles de LaLiga). Bundesliga s'en sert pour avoir
+          // moins de noir et plus de blanc.
+          ...(comp?.tintStops ? {
+            '--lmp-stop-base': comp.tintStops.base,
+            '--lmp-stop-c2':   comp.tintStops.c2,
+            '--lmp-stop-c3':   comp.tintStops.c3,
+          } : {}),
         }}
       >
       {/* ⚠️ Calques de la texture animée (05/09) — voir le commentaire

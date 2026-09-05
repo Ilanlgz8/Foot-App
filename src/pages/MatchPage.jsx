@@ -227,8 +227,14 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           // détail, même mécanisme partagé.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
-          // `tint3` : voir LiveMatchPage.jsx (2e calque de taches, optionnel).
+          // `tint3` / `tintStops` : voir LiveMatchPage.jsx (3e couleur et
+          // positions des arrêts du dégradé, toutes deux optionnelles).
           ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
+          ...(comp?.tintStops ? {
+            '--lmp-stop-base': comp.tintStops.base,
+            '--lmp-stop-c2':   comp.tintStops.c2,
+            '--lmp-stop-c3':   comp.tintStops.c3,
+          } : {}),
         }}
       >
       <span className="lmp__heroTintB" aria-hidden="true" />

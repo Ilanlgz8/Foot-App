@@ -350,10 +350,17 @@ export const COMPETITIONS = [
     // noir puis rouge puis blanc". tint2/tint3 ont été ÉCHANGÉS par rapport à
     // la version précédente (blanc puis rouge) pour respecter cet ordre : le
     // dégradé va du noir (dominant) vers le rouge, puis finit sur le blanc.
+    // ⚠️ `tintStops` (05/09, demande : "pour la bundesliga mets plus de blanc
+    // et moins de noir") : positions des arrêts du dégradé, propres à cette
+    // compétition. Par défaut (LaLiga, validée telle quelle) le noir occupe
+    // toute la première moitié et la 3e couleur n'est qu'une pointe finale ;
+    // ici le noir s'arrête bien plus tôt et le blanc occupe tout le dernier
+    // tiers. Voir .lmp__hero--softTint (LiveMatchPage.css).
     tint: '#131217',
     tint2: '#b81f26',
     tint3: '#ffffff',
     tintSoft: true,
+    tintStops: { base: '26%', c2: '55%', c3: '82%' },
     // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
     // standard de l'app (même raison que LaLiga ci-dessus).
     name: 'Bundesliga',

@@ -253,6 +253,8 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // `tint3` (optionnel) : couleur du 2e calque de taches quand elle diffère
   // de tint2 — voir LiveMatchPage.jsx.
   const compTint3   = posterComp?.tint3 ?? null
+  // `tintStops` : part occupée par chaque couleur — voir LiveMatchPage.jsx.
+  const compStops   = posterComp?.tintStops ?? null
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -367,6 +369,11 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         '--poster-comp': compTint,
         ...(compTint2 ? { '--poster-comp2': compTint2 } : {}),
         ...(compTint3 ? { '--poster-comp3': compTint3 } : {}),
+        ...(compStops ? {
+          '--poster-stop-base': compStops.base,
+          '--poster-stop-c2':   compStops.c2,
+          '--poster-stop-c3':   compStops.c3,
+        } : {}),
       } : undefined}
     >
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>

@@ -1009,13 +1009,20 @@
      amplitude de zoom/translation réduite de moitié par rapport à
      `lmpHeroDrift`), et il n'anime que `transform` — donc aucune couleur ne
      bouge, seule la position du dégradé change très légèrement. */
+/* Les 3 positions d'arrêt sont paramétrables par compétition (`tintStops`,
+   competitions.js → `--lmp-stop-*`) : c'est ce qui règle la PART de chaque
+   couleur. Valeurs par défaut = celles de LaLiga (beaucoup de noir, 3e
+   couleur réduite à une pointe finale) ; Bundesliga les surcharge pour avoir
+   moins de noir et plus de blanc. Le 4e arrêt (100%) renforce la dernière
+   couleur pour qu'elle occupe une vraie zone au lieu du seul angle. */
 .lmp__hero--softTint .lmp__heroTintB {
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
     transparent 0%,
-    transparent 48%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 75%, transparent) 77%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 60%, transparent) 100%);
+    transparent var(--lmp-stop-base, 48%),
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 74%, transparent) var(--lmp-stop-c2, 77%),
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 62%, transparent) var(--lmp-stop-c3, 100%),
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 85%, transparent) 100%);
 }
 .lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB {
   opacity: 0.9;
