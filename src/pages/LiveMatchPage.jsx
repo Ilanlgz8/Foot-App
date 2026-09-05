@@ -13,7 +13,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { COMPETITIONS }     from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
-import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchThemeVars } from '../data/teamPhotos'
 import { useTeamForm }      from '../hooks/useTeamForm'
 import { useEspnMatchStats } from '../hooks/useMatchDetail'
 import { useMatches, useLowerDivisionStats, useH2HHistory } from '../hooks/useMatchs'
@@ -266,8 +266,6 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   // avec deux halos très diffus aux couleurs des équipes ; le championnat
   // passe en haut à GAUCHE avec sa pastille de logo, exactement comme
   // l'affiche du match du jour — les deux écrans se répondent.
-  const heroColors = getMatchTeamColors(match.homeTeam?.name, match.awayTeam?.name)
-
   return (
     <div className="lmp__heroOuter">
       {/* Le retour sort du panneau : c'est une action de navigation, pas une
@@ -287,17 +285,19 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
       <div
         className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}`}
         style={{
-          '--lmp-hc': heroColors.home.main,
-          '--lmp-hc2': heroColors.away.main,
           // Teinte du championnat (voir `tint`, competitions.js). Absente pour
           // une compétition sans couleur identifiable : le CSS retombe alors
           // sur le fond sombre d'origine.
+          // ⚠️ HALOS COULEUR CLUB RETIRÉS (05/09, demande explicite : "enlève
+          // les couleurs du club dans livematchpage/matchpage/résultat page
+          // pour bien garder la couleur [du championnat]") — les halos
+          // --lmp-hc/--lmp-hc2 entraient en conflit avec la teinte du
+          // championnat au lieu de la compléter. `getMatchTeamColors` et les
+          // spans .lmp__heroGlowL/R ont été retirés avec (voir git log si
+          // besoin de les retrouver).
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
         }}
       >
-        <span className="lmp__heroGlowL" aria-hidden="true" />
-        <span className="lmp__heroGlowR" aria-hidden="true" />
-
       {/* Bandeau : championnat à gauche, bien lisible */}
       <div className="mp__hero__top lmp__heroTop">
         <div className="mp__hero__comp lmp__heroComp">

@@ -884,29 +884,13 @@
 #root .lmp__hero.sf-liveBorder::before {
   inset: 0;
 }
-/* Halos très diffus aux couleurs des 2 équipes : garde l'identité du match
-   sans que le texte ait à lutter contre un aplat saturé. */
-.lmp__heroGlowL,
-.lmp__heroGlowR {
-  position: absolute;
-  top: -42%;
-  width: 190px;
-  height: 190px;
-  border-radius: 50%;
-  filter: blur(46px);
-  pointer-events: none;
-}
-.lmp__heroGlowL {
-  left: -18%;
-  /* Halos ATTÉNUÉS (55→32%) depuis que le fond porte la couleur du
-     championnat : à pleine intensité ils la brouillaient. Ils restent là pour
-     signer le match, mais en second plan. */
-  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc, #ef4444) 32%, transparent), transparent 70%);
-}
-.lmp__heroGlowR {
-  right: -18%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--lmp-hc2, #3b5bfd) 30%, transparent), transparent 70%);
-}
+/* ⚠️ HALOS COULEUR CLUB RETIRÉS (05/09, demande explicite : "enlève les
+   couleurs du club dans livematchpage/matchpage/résultat page pour bien
+   garder la couleur [du championnat]") — .lmp__heroGlowL/R (halos radiaux
+   --lmp-hc/--lmp-hc2) entraient en conflit avec la teinte de championnat au
+   lieu de la compléter. Règles retirées avec les spans JSX correspondants
+   (LiveMatchPage.jsx/MatchPage.jsx) — voir git log si besoin de les
+   retrouver. */
 
 /* Bandeau : championnat à gauche, lisible (même traitement que la carte
    "Match du jour" de l'Accueil). Le retour est sorti du panneau. */

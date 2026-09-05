@@ -10,7 +10,7 @@ import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
-import { getMatchThemeVars, getMatchTeamColors } from '../data/teamPhotos'
+import { getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId, buildHeroSubline } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { FormDiamonds }            from '../accueil/FormDiamonds'
@@ -205,8 +205,6 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // sont déjà chargées ici, MatchPage.css et LiveMatchPage.css étant importés
   // ensemble par les deux pages) — pas de copie parallèle qui divergerait au
   // prochain ajustement.
-  const heroColors = getMatchTeamColors(match.homeTeam?.name, match.awayTeam?.name)
-
   return (
     <div className="lmp__heroOuter">
       <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
@@ -214,19 +212,19 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
       <div
         className="mp__hero lmp__hero"
         style={{
-          '--lmp-hc': heroColors.home.main,
-          '--lmp-hc2': heroColors.away.main,
           // Teinte du championnat (voir `tint`, competitions.js), déjà posée
           // sur LiveMatchPage.jsx — manquait ici (constat utilisateur 05/09 :
           // "dans match page aussi et resultat page"). Résultat.jsx et le
           // Match Page partagent tous les deux ce même composant (navigate
           // vers /match/:id dans les deux cas), donc un seul endroit à
           // corriger couvre les deux demandes.
+          // ⚠️ HALOS COULEUR CLUB RETIRÉS (05/09, même jour, demande
+          // explicite : "enlève les couleurs du club dans livematchpage/
+          // matchpage/résultat page pour bien garder la couleur [du
+          // championnat]") — voir LiveMatchPage.jsx pour le détail.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
         }}
       >
-        <span className="lmp__heroGlowL" aria-hidden="true" />
-        <span className="lmp__heroGlowR" aria-hidden="true" />
 
       {/* Bandeau : championnat à gauche, statut du match à droite */}
       <div className="mp__hero__top lmp__heroTop">
