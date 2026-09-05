@@ -887,36 +887,36 @@
   clip-path: inset(0 round 20px);
 }
 
-/* ⚠️ TEXTURE ANIMÉE EN CONTINU (05/09, 3e passe, demande utilisateur).
-   Historique des 2 versions rejetées, pour ne pas les refaire :
+/* ⚠️ DÉGRADÉ QUI PIVOTE LENTEMENT (05/09, 4e et dernière passe).
+   Historique des 3 versions rejetées, pour ne pas les refaire :
      1. Fondu d'opacité entre 2 couleurs plates → "c pas un changement de
         couleur que je voulais".
-     2. Taches + bande de reflet diagonale qui balaie la carte ("glasses
-        vitré eau") → "nn pa cette effet animé là... c comme une texture qui
-        bouge en permanence rouge de couleur avec des taches jaune".
-   Ce qui est attendu : une TEXTURE, pas un effet ponctuel — un fond rouge
-   (couleur dominante, `--lmp-comp`) parcouru de taches (`--lmp-comp2` :
-   blanc Bundesliga, jaune LaLiga, sinon variante éclaircie auto) qui
-   bougent SANS ARRÊT, sans début ni fin perceptibles.
-   Réalisation : 2 calques de radial-gradient qui tournent lentement, en sens
-   INVERSE et à des vitesses non multiples (31s / 47s). Points clés :
-   - `rotate` sur un calque volontairement surdimensionné (`inset: -55%`) :
-     les taches décrivent une orbite, donc un mouvement parfaitement continu
-     et sans à-coup. Un translate en keyframes, lui, change de direction à
-     chaque palier — c'est ce qui donnait l'impression d'un "effet" qui
-     rejoue plutôt que d'une matière qui coule.
+     2. Taches + bande de reflet diagonale qui balaie la carte → "nn pa cette
+        effet animé là".
+     3. Taches (radial-gradient) tournant en continu → "les truc qui bouge ça
+        fait pas pro". Diagnostic partagé avec l'utilisateur et retenu : des
+        FORMES identifiables qui se déplacent sur une carte se lisent comme
+        de la décoration ; les apps foot de référence n'animent pas leurs
+        fonds de carte.
+   Retenu (choix explicite de l'utilisateur parmi 3 propositions, les 2 autres
+   étant "aucune animation" et "lueur qui respire en direct uniquement") : un
+   dégradé PLEINE SURFACE qui pivote très lentement. Aucune forme
+   identifiable ne peut donc bouger — c'est le champ de couleur entier qui se
+   déplace, on perçoit que ça vit sans jamais voir un objet se déplacer.
+   Points clés :
+   - `linear-gradient` très diffus (bandes larges, extrémités transparentes)
+     au lieu de `radial-gradient` : pas de contour, donc pas de "tache".
+   - `rotate` sur un calque surdimensionné (`inset: -55%`) : rotation
+     parfaitement continue, sans point de rebond. Le conteneur porte déjà
+     `overflow:hidden` + `clip-path`, le débordement garantit qu'aucun coin
+     ne se découvre pendant la rotation.
    - `linear` (et non ease-in-out) : aucune décélération, donc jamais de
-     temps mort où l'animation semble s'arrêter.
-   - 2 vitesses non multiples et de sens opposés : les taches des 2 calques
-     se recouvrent différemment en permanence, la texture ne se répète
-     visuellement qu'au bout de très longtemps (PPCM des 2 périodes).
-   - `mix-blend-mode: overlay` : les taches se fondent DANS le rouge au lieu
-     de flotter dessus en aplat ; l'opacité <1 garde le rouge dominant
-     (demande explicite).
+     temps mort où l'animation semble s'arrêter et repartir.
+   - 2 vitesses lentes, non multiples et de sens opposés (44s / 67s) : le
+     rendu ne se répète visuellement qu'au bout de très longtemps (PPCM des
+     2 périodes), sans jamais donner de rythme perceptible.
    N'anime QUE `transform` (GPU, aucun repaint) — même contrainte que partout
    ailleurs dans l'app pour ce type de fond.
-   Le conteneur porte déjà `overflow:hidden` + `clip-path` : le débordement
-   des calques garantit qu'aucun coin ne se découvre pendant la rotation.
    Actif uniquement sur les compétitions déjà teintées (`.lmp__hero--tinted`,
    posé quand `comp.tint` existe) — les championnats volontairement neutres
    (Ligue des champions…) restent parfaitement statiques, comme avant. */
@@ -933,53 +933,57 @@
   opacity: 0;
 }
 .lmp__heroTintB {
-  background:
-    radial-gradient(circle at 34% 32%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 26%),
-    radial-gradient(circle at 66% 58%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 22%),
-    radial-gradient(circle at 48% 72%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 19%);
+  background: linear-gradient(128deg,
+    transparent 6%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 60%, transparent) 40%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 75%, transparent) 54%,
+    transparent 90%);
 }
 .lmp__heroTintC {
-  background:
-    radial-gradient(circle at 62% 34%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 24%),
-    radial-gradient(circle at 36% 62%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 20%);
+  background: linear-gradient(214deg,
+    transparent 10%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 46%,
+    transparent 86%);
 }
 .lmp__hero--tinted .lmp__heroTintB {
   opacity: 0.6;
-  animation: lmpTextureSpin 31s linear infinite;
+  animation: lmpTextureSpin 44s linear infinite;
   will-change: transform;
 }
 .lmp__hero--tinted .lmp__heroTintC {
   opacity: 0.45;
-  animation: lmpTextureSpin 47s linear infinite reverse;
+  animation: lmpTextureSpin 67s linear infinite reverse;
   will-change: transform;
 }
 /* ⚠️ VARIANTE "DOUCE" (05/09, `tintSoft` dans competitions.js — LaLiga
    uniquement pour l'instant). Sur une base quasi noire, `mix-blend-mode:
-   overlay` écrase la couleur des taches au lieu de la laisser transparaître
-   (overlay assombrit tout ce qui est posé sur un fond sombre) : la couche de
-   rouge demandée deviendrait invisible. Fusion désactivée, taches plus
-   larges et plus diffuses, opacités réduites → un voile rouge discret qui
-   circule sur le noir, au lieu de taches marquées. C'est aussi ce qui règle
-   le problème d'orange constaté sur la version rouge+jaune : sans `overlay`,
-   deux couleurs ne se fondent plus l'une dans l'autre. */
+   overlay` écrase la couleur posée dessus au lieu de la laisser
+   transparaître (overlay assombrit tout ce qui est posé sur un fond sombre) :
+   le voile de couleur demandé deviendrait invisible. Fusion désactivée,
+   dégradés plus diffus, opacités réduites → un voile de couleur discret qui
+   glisse sur le noir. C'est aussi ce qui règle le problème d'orange constaté
+   sur l'ancienne version rouge+jaune de LaLiga : sans `overlay`, deux
+   couleurs ne se fondent plus l'une dans l'autre. */
 .lmp__hero--softTint .lmp__heroTintB,
 .lmp__hero--softTint .lmp__heroTintC {
   mix-blend-mode: normal;
 }
 .lmp__hero--softTint .lmp__heroTintB {
-  background:
-    radial-gradient(circle at 32% 31%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 90%, transparent) 0%, transparent 22%),
-    radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 80%, transparent) 0%, transparent 19%),
-    radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 70%, transparent) 0%, transparent 16%);
+  background: linear-gradient(128deg,
+    transparent 4%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 45%, transparent) 38%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 62%, transparent) 54%,
+    transparent 92%);
 }
 /* `--lmp-comp3` (optionnel, `tint3` dans competitions.js) : permet au 2e
-   calque de porter une couleur DIFFÉRENTE du 1er — Bundesliga = taches
-   blanches (comp2) + quelques taches rouges (comp3). Sans lui, les 2 calques
-   partagent la même couleur (cas LaLiga), comportement d'origine inchangé. */
+   calque de porter une couleur DIFFÉRENTE du 1er — Bundesliga = voile blanc
+   (comp2) + un peu de rouge (comp3). Sans lui, les 2 calques partagent la
+   même couleur (cas LaLiga), comportement d'origine inchangé. */
 .lmp__hero--softTint .lmp__heroTintC {
-  background:
-    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 85%, transparent) 0%, transparent 20%),
-    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 75%, transparent) 0%, transparent 17%);
+  background: linear-gradient(214deg,
+    transparent 8%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 58%, transparent) 46%,
+    transparent 88%);
 }
 .lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.5;  }
 .lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC { opacity: 0.45; }

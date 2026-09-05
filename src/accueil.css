@@ -1610,17 +1610,17 @@
   will-change: transform;
   animation: posterDrift 18s ease-in-out infinite;
 }
-/* ⚠️ TEXTURE ANIMÉE EN CONTINU (05/09, 3e passe). Deux versions précédentes
-   rejetées par l'utilisateur — fondu d'opacité entre 2 couleurs plates, puis
-   taches + bande de reflet diagonale qui balaie la carte ("nn pa cette effet
-   animé là... c comme une texture qui bouge en permanence"). Voir le
+/* ⚠️ DÉGRADÉ QUI PIVOTE LENTEMENT (05/09, 4e et dernière passe). Trois
+   versions précédentes rejetées par l'utilisateur — fondu d'opacité entre 2
+   couleurs plates, puis taches + reflet diagonale qui balaie la carte, puis
+   taches tournant en continu ("les truc qui bouge ça fait pas pro"). Voir le
    commentaire détaillé dans LiveMatchPage.css (.lmp__heroTintB/C) : même
    mécanisme exactement, gardé identique des deux côtés pour que l'Accueil et
    les pages match ne divergent pas au prochain ajustement.
-   En résumé : 2 calques de taches (`--poster-comp2` — blanc Bundesliga,
-   jaune LaLiga, sinon variante éclaircie auto ci-dessus) qui TOURNENT en
-   continu, en sens inverse et à des vitesses non multiples (31s/47s) →
-   mouvement perpétuel sans à-coup ni temps mort, la couleur de base restant
+   En résumé : 2 calques de dégradé PLEINE SURFACE (donc aucune forme
+   identifiable qui puisse "bouger") qui pivotent très lentement, en sens
+   inverse et à des vitesses non multiples (44s/67s) → on perçoit que le fond
+   vit, sans jamais voir un objet se déplacer. La couleur de base reste
    dominante (opacité <1 + `mix-blend-mode: overlay`).
    Actif uniquement sur `.poster--tinted` (comp.tint présent) : sans ce
    garde-fou, la variante éclaircie par défaut ferait apparaître des taches
@@ -1634,23 +1634,25 @@
   opacity: 0;
 }
 .poster__bg--gradientAlt {
-  background:
-    radial-gradient(circle at 34% 32%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 26%),
-    radial-gradient(circle at 66% 58%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 22%),
-    radial-gradient(circle at 48% 72%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 19%);
+  background: linear-gradient(128deg,
+    transparent 6%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 60%, transparent) 40%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 75%, transparent) 54%,
+    transparent 90%);
 }
 .poster__bg--gradientTri {
-  background:
-    radial-gradient(circle at 62% 34%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 24%),
-    radial-gradient(circle at 36% 62%, var(--poster-comp2, var(--poster-comp2-auto)) 0%, transparent 20%);
+  background: linear-gradient(214deg,
+    transparent 10%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 46%,
+    transparent 86%);
 }
 .poster--tinted .poster__bg--gradientAlt {
   opacity: 0.6;
-  animation: posterTextureSpin 31s linear infinite;
+  animation: posterTextureSpin 44s linear infinite;
 }
 .poster--tinted .poster__bg--gradientTri {
   opacity: 0.45;
-  animation: posterTextureSpin 47s linear infinite reverse;
+  animation: posterTextureSpin 67s linear infinite reverse;
 }
 
 /* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
@@ -1666,17 +1668,19 @@
   mix-blend-mode: normal;
 }
 .poster--softTint .poster__bg--gradientAlt {
-  background:
-    radial-gradient(circle at 32% 31%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 90%, transparent) 0%, transparent 22%),
-    radial-gradient(circle at 67% 57%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 80%, transparent) 0%, transparent 19%),
-    radial-gradient(circle at 47% 73%, color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 70%, transparent) 0%, transparent 16%);
+  background: linear-gradient(128deg,
+    transparent 4%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 45%, transparent) 38%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 62%, transparent) 54%,
+    transparent 92%);
 }
-/* `--poster-comp3` : 2e couleur de taches quand elle diffère de comp2
+/* `--poster-comp3` : 2e couleur de voile quand elle diffère de comp2
    (Bundesliga : blanc + un peu de rouge) — voir LiveMatchPage.css. */
 .poster--softTint .poster__bg--gradientTri {
-  background:
-    radial-gradient(circle at 61% 33%, color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 85%, transparent) 0%, transparent 20%),
-    radial-gradient(circle at 36% 61%, color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 75%, transparent) 0%, transparent 17%);
+  background: linear-gradient(214deg,
+    transparent 8%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 58%, transparent) 46%,
+    transparent 88%);
 }
 .poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.5;  }
 .poster--softTint.poster--tinted .poster__bg--gradientTri { opacity: 0.45; }
