@@ -283,7 +283,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           prefers-reduced-motion, l'animation s'arrête pour qui a désactivé les
           animations dans son système. */}
       <div
-        className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}${comp?.tintLight ? ' lmp__hero--lightTint' : ''}${comp?.tint ? ' lmp__hero--tinted' : ''}${comp?.tint3 ? ' lmp__hero--triColor' : ''}`}
+        className={`mp__hero lmp__hero${isTermine ? '' : ' sf-liveBorder'}${comp?.tintLight ? ' lmp__hero--lightTint' : ''}${comp?.tint ? ' lmp__hero--tinted' : ''}`}
         style={{
           // Teinte du championnat (voir `tint`, competitions.js). Absente pour
           // une compétition sans couleur identifiable : le CSS retombe alors
@@ -295,23 +295,23 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           // championnat au lieu de la compléter. `getMatchTeamColors` et les
           // spans .lmp__heroGlowL/R ont été retirés avec (voir git log si
           // besoin de les retrouver).
-          // ⚠️ tint2/tint3 AJOUTÉS (05/09, même jour, demande explicite :
-          // "animer les couleurs... en embellissant la couleur", Bundesliga/
-          // LaLiga en plusieurs couleurs) — alimentent .lmp__heroTintB/C
-          // (LiveMatchPage.css), les calques qui font crossfader la teinte en
-          // boucle. Absents pour la plupart des compétitions : le CSS retombe
-          // alors sur une variante éclaircie auto-calculée de `--lmp-comp`.
+          // ⚠️ tint2 AJOUTÉ (05/09, même jour, demande explicite : "un
+          // mélange de blanc et rouge... des taches blanche" + reflet façon
+          // verre/eau, PAS un simple fondu de couleur plate — voir le
+          // commentaire détaillé dans LiveMatchPage.css) — alimente
+          // .lmp__heroTintB/.lmp__heroSheen. Absent pour la plupart des
+          // compétitions : le CSS retombe sur une variante éclaircie
+          // auto-calculée de `--lmp-comp`.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
-          ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
         }}
       >
       {/* ⚠️ Calques d'animation de la teinte (05/09) — voir le commentaire
-          détaillé dans LiveMatchPage.css (.lmp__heroTintB/C). Purement
-          décoratifs (aria-hidden), n'affectent jamais la mise en page : le
-          contenu réel garde son z-index au-dessus. */}
+          détaillé dans LiveMatchPage.css (.lmp__heroTintB/.lmp__heroSheen).
+          Purement décoratifs (aria-hidden), n'affectent jamais la mise en
+          page : le contenu réel garde son z-index au-dessus. */}
       <span className="lmp__heroTintB" aria-hidden="true" />
-      <span className="lmp__heroTintC" aria-hidden="true" />
+      <span className="lmp__heroSheen" aria-hidden="true" />
 
       {/* Bandeau : championnat à gauche, bien lisible */}
       <div className="mp__hero__top lmp__heroTop">

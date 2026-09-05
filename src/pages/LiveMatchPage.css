@@ -887,75 +887,80 @@
   clip-path: inset(0 round 20px);
 }
 
-/* ⚠️ ANIMATION DE LA TEINTE (05/09, demande utilisateur : "faudrait animer
-   les couleurs dans ces pages comme avant dans les cards de accueil avec les
-   couleurs des équipes... mais avec les couleurs du championnat, en
-   embellissant la couleur"). Même principe que l'ancien crossfade équipe de
-   l'Accueil (poster__bg--gradient/gradientAlt, accueil.css) : 2 calques
-   (spans JSX, voir LiveMatchPage.jsx/MatchPage.jsx) superposés au fond
-   statique ci-dessus, dont l'opacité respire en boucle. Durées volontairement
-   non multiples l'une de l'autre (6.5s / 8.5s + décalage négatif) pour que
-   les 2 pics ne retombent jamais en phase — un vrai mouvement organique,
-   jamais un cycle qui se répète à l'identique toutes les X secondes.
-   N'anime QUE `opacity` (GPU, aucun repaint) — même contrainte déjà en place
-   partout ailleurs dans l'app pour ce type de fond animé.
-   - lmp__heroTintB : 2e couleur. Par défaut (`--lmp-comp2` non fourni par
-     competitions.js) une variante EXPLICITEMENT ÉCLAIRCIE de la couleur de
-     base (color-mix avec du blanc) — un embellissement automatique valable
-     pour TOUTE compétition teintée, sans configuration par championnat.
-     Bundesliga (blanc) et LaLiga (rose) ont une vraie 2e couleur dédiée
-     (voir competitions.js, tint2).
-   - lmp__heroTintC : 3e couleur, LaLiga uniquement pour l'instant (jaune,
-     tint3) — le calque existe toujours (évite un rendu JSX conditionnel de
-     plus) mais reste invisible (opacity jamais animée) tant que
-     `.lmp__hero--triColor` n'est pas posé par le JSX.
+/* ⚠️ ANIMATION DE LA TEINTE — TACHES + REFLET VERRE/EAU (05/09, 2e passe,
+   demande utilisateur). 1ère version (fondu uniforme entre 2 couleurs
+   plates) explicitement rejetée : "c pas un changement de couleur que je
+   voulais c vraiment un melange de blanc et rouge couleur dominante rouge
+   avec des taches blanche et la texture en mode glasses vitré eau".
+   Remplacée par 2 calques bien distincts, tous les deux UNIQUEMENT animés en
+   `transform` (GPU, aucun repaint — même contrainte déjà en place partout
+   ailleurs dans l'app pour ce type de fond animé) :
+   - lmp__heroTintB : plusieurs radial-gradient (2e couleur, `--lmp-comp2` —
+     blanc pour Bundesliga, jaune pour LaLiga, sinon une variante éclaircie
+     auto-calculée) posés à des positions/tailles différentes → des TACHES
+     organiques plutôt qu'un fondu plat. `mix-blend-mode: overlay` les fait
+     fusionner dans le rouge au lieu de flotter dessus en aplat, et une
+     opacité de calque <1 garde le rouge dominant (demande explicite). Le
+     calque entier dérive lentement (translate+scale) pour un mouvement
+     organique — jamais un décor figé.
+   - lmp__heroSheen : bande diagonale claire, façon reflet sur une surface de
+     verre/eau ("glasses vitré eau"), qui balaie lentement la carte
+     (translate) — `mix-blend-mode: screen` l'éclaircit sans jamais poser un
+     aplat opaque.
+   Le conteneur (`.lmp__hero`) porte déjà `overflow:hidden` + `clip-path` :
+   les 2 calques débordent volontairement (`inset: -20%`) pour que la dérive
+   ne révèle jamais un bord net.
    Actif uniquement sur les compétitions déjà teintées (`.lmp__hero--tinted`,
    posé quand `comp.tint` existe) — les championnats volontairement neutres
-   (Ligue des champions…) restent parfaitement statiques, comme avant : sans
-   ce garde-fou, la variante éclaircie par défaut ferait pulser un gris
-   parasite même sur un fond censé rester noir uni. */
+   (Ligue des champions…) restent parfaitement statiques, comme avant. */
 .lmp__hero {
   --lmp-comp2-auto: color-mix(in srgb, var(--lmp-comp, #2a2d38) 58%, white 42%);
 }
 .lmp__heroTintB,
-.lmp__heroTintC {
+.lmp__heroSheen {
   position: absolute;
-  inset: 0;
+  inset: -20%;
   z-index: 0;
   pointer-events: none;
   opacity: 0;
 }
 .lmp__heroTintB {
-  background: linear-gradient(158deg,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 85%, #0a0b10) 0%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 68%, #08090d) 62%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 48%, #07080b) 100%);
+  background:
+    radial-gradient(circle at 22% 26%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 42%),
+    radial-gradient(circle at 80% 62%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 38%),
+    radial-gradient(circle at 42% 90%, var(--lmp-comp2, var(--lmp-comp2-auto)) 0%, transparent 34%);
+  mix-blend-mode: overlay;
 }
-.lmp__heroTintC {
-  background: linear-gradient(158deg,
-    color-mix(in srgb, var(--lmp-comp3, transparent) 85%, #0a0b10) 0%,
-    color-mix(in srgb, var(--lmp-comp3, transparent) 68%, #08090d) 62%,
-    color-mix(in srgb, var(--lmp-comp3, transparent) 48%, #07080b) 100%);
+.lmp__heroSheen {
+  background: linear-gradient(115deg,
+    transparent 30%,
+    rgba(255,255,255,0.16) 46%,
+    rgba(255,255,255,0.28) 50%,
+    rgba(255,255,255,0.16) 54%,
+    transparent 70%);
+  mix-blend-mode: screen;
 }
 .lmp__hero--tinted .lmp__heroTintB {
-  animation: lmpHeroTintB 6.5s ease-in-out infinite;
-  will-change: opacity;
+  opacity: 0.65;
+  animation: lmpHeroBlobDrift 16s ease-in-out infinite;
+  will-change: transform;
 }
-.lmp__hero--triColor .lmp__heroTintC {
-  animation: lmpHeroTintC 8.5s ease-in-out infinite;
-  animation-delay: -3.2s;
-  will-change: opacity;
+.lmp__hero--tinted .lmp__heroSheen {
+  opacity: 1;
+  animation: lmpHeroSheenSweep 9s ease-in-out infinite;
+  will-change: transform;
 }
-@keyframes lmpHeroTintB {
-  0%, 100% { opacity: 0; }
-  50%      { opacity: 0.85; }
+@keyframes lmpHeroBlobDrift {
+  0%, 100% { transform: translate(0%, 0%)   scale(1);    }
+  33%      { transform: translate(-4%, 3%)  scale(1.06); }
+  66%      { transform: translate(3%, -3%)  scale(0.97); }
 }
-@keyframes lmpHeroTintC {
-  0%, 100% { opacity: 0; }
-  50%      { opacity: 0.8; }
+@keyframes lmpHeroSheenSweep {
+  0%, 100% { transform: translate(-30%, -12%); }
+  50%      { transform: translate(18%, 10%);   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
+  .lmp__heroTintB, .lmp__heroSheen { animation: none !important; opacity: 0; }
 }
 
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:

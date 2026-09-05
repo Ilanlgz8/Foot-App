@@ -290,24 +290,18 @@ export const COMPETITIONS = [
     // au noir) avait été essayé puis retiré (05/09, "pas fan", "mauvaise
     // teinte") — repris en rosé (rouge mélangé au BLANC plutôt qu'au noir,
     // demande explicite : "un mélange de rouge et blanc").
-    // ⚠️ ANIMÉ EN 3 COULEURS (05/09, même jour, demande explicite : "faudrait
-    // animé les couleurs... pour la liga en rouge rose et jaune") — tint reste
-    // le rouge (pôle "1"), tint2/tint3 sont les 2 couleurs supplémentaires que
-    // LiveMatchPage.css/accueil.css font crossfader en boucle par-dessus (voir
-    // .lmp__heroTintB/C, .poster__bg--gradientAlt/Tri). Rouge légèrement
-    // repincé vers le corail d'origine (#ff4b44) par rapport à l'ancien
-    // #d96c68 — nécessaire pour rester visuellement distinct du rose (tint2)
-    // une fois les 3 couleurs posées côte à côte, sinon les 2 se confondaient
-    // (vérifié par calcul color-mix aux 3 paliers du dégradé). Rose et jaune :
-    // choix stylistiques assumés (aucune couleur "officielle" LaLiga rose/or
-    // à extraire d'un logo ici, contrairement au rouge) — mêmes gamme de
-    // saturation/luminosité que le reste de la palette de l'app (désaturée,
-    // jamais un jaune/rose flashy) pour rester cohérent avec le style déjà en
-    // place. Vérifié : les 3 couleurs restent nettement distinctes aux 3
-    // paliers du dégradé (85/68/48%), aucune ne devient invisible.
+    // ⚠️ CORRIGÉ EN "TACHES" ROUGE+JAUNE (05/09, même jour) : 1ère version
+    // (rouge/rose/jaune en crossfade uniforme, 3 couleurs) explicitement
+    // rejetée ("c pas un changement de couleur que je voulais... vraiment un
+    // mélange... des taches... la texture en mode glasses vitré eau" —
+    // demande un effet de taches organiques + reflet façon verre/eau, pas un
+    // simple fondu de couleur plate). Repassé à 2 couleurs, même principe que
+    // Bundesliga ("comme bundesliga mais en rouge et jaune") : tint = rouge
+    // (dominant), tint2 = jaune vif façon "Bumblebee" (demande explicite),
+    // consommés par .lmp__heroTintB (taches, LiveMatchPage.css) et
+    // .poster__bg--gradientAlt (accueil.css). tint3 retiré (plus utilisé).
     tint: '#c8433f',
-    tint2: '#d9738f',
-    tint3: '#d1a94a',
+    tint2: '#f2b705',
     tintLight: true, // fond rosé, pas neutre sombre : la minute reste blanche
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
@@ -324,10 +318,13 @@ export const COMPETITIONS = [
     id: 'BL1',
     // brut #cc000c → rosé (même raison/même demande que PD ci-dessus, rouge
     // mélangé au blanc plutôt qu'au noir).
-    // ⚠️ ANIMÉ EN 2 COULEURS (05/09, demande explicite : "le rouge et blanc
-    // pour bundesliga") — tint (rouge) reste inchangé, tint2 (blanc) est la
-    // 2e couleur que LiveMatchPage.css/accueil.css font crossfader en boucle
-    // par-dessus (voir .lmp__heroTintB, .poster__bg--gradientAlt).
+    // ⚠️ "TACHES" ROUGE+BLANC ANIMÉES (05/09, demande explicite : "le rouge et
+    // blanc pour bundesliga", puis précisé le même jour : pas un fondu de
+    // couleur plate mais "un melange de blanc et rouge... des taches
+    // blanche" + reflet façon verre/eau) — tint (rouge) reste le fond
+    // dominant, tint2 (blanc) alimente les taches organiques + le reflet
+    // animés dans .lmp__heroTintB/.lmp__heroSheen (LiveMatchPage.css) et
+    // .poster__bg--gradientAlt/.poster__sheen (accueil.css).
     tint: '#d16168',
     tint2: '#ffffff',
     tintLight: true,

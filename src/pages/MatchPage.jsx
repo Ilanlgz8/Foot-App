@@ -210,7 +210,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
       <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
 
       <div
-        className={`mp__hero lmp__hero${comp?.tintLight ? ' lmp__hero--lightTint' : ''}${comp?.tint ? ' lmp__hero--tinted' : ''}${comp?.tint3 ? ' lmp__hero--triColor' : ''}`}
+        className={`mp__hero lmp__hero${comp?.tintLight ? ' lmp__hero--lightTint' : ''}${comp?.tint ? ' lmp__hero--tinted' : ''}`}
         style={{
           // Teinte du championnat (voir `tint`, competitions.js), déjà posée
           // sur LiveMatchPage.jsx — manquait ici (constat utilisateur 05/09 :
@@ -222,15 +222,15 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           // explicite : "enlève les couleurs du club dans livematchpage/
           // matchpage/résultat page pour bien garder la couleur [du
           // championnat]") — voir LiveMatchPage.jsx pour le détail.
-          // ⚠️ tint2/tint3 AJOUTÉS (05/09, même jour, animation de la teinte)
-          // — voir LiveMatchPage.jsx pour le détail, même mécanisme partagé.
+          // ⚠️ tint2 AJOUTÉ (05/09, même jour, animation de la teinte en
+          // taches + reflet façon verre/eau) — voir LiveMatchPage.jsx pour le
+          // détail, même mécanisme partagé.
           ...(comp?.tint ? { '--lmp-comp': comp.tint } : {}),
           ...(comp?.tint2 ? { '--lmp-comp2': comp.tint2 } : {}),
-          ...(comp?.tint3 ? { '--lmp-comp3': comp.tint3 } : {}),
         }}
       >
       <span className="lmp__heroTintB" aria-hidden="true" />
-      <span className="lmp__heroTintC" aria-hidden="true" />
+      <span className="lmp__heroSheen" aria-hidden="true" />
 
       {/* Bandeau : championnat à gauche, statut du match à droite */}
       <div className="mp__hero__top lmp__heroTop">

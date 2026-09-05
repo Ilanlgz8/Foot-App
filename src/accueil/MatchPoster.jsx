@@ -239,13 +239,13 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // endroits sans dupliquer la recherche dans COMPETITIONS.
   const posterComp = COMPETITIONS.find(c => c.id === match.competition?.code)
   const compTint    = posterComp?.tint ?? null
-  // ⚠️ AJOUTÉS (05/09, même jour, demande explicite : "animer les couleurs...
-  // en embellissant la couleur", Bundesliga/LaLiga en plusieurs couleurs) —
-  // voir LiveMatchPage.jsx pour le même mécanisme (`--lmp-comp2/3`). Ici
-  // alimentent `--poster-comp2/3`, lues par .poster__bg--gradientAlt/Tri
+  // ⚠️ AJOUTÉ (05/09, même jour, demande explicite : "un mélange de blanc et
+  // rouge... des taches blanche" + reflet façon verre/eau, PAS un fondu de
+  // couleur plate — voir le commentaire détaillé dans accueil.css) — voir
+  // LiveMatchPage.jsx pour le même mécanisme (`--lmp-comp2`). Ici alimente
+  // `--poster-comp2`, lu par .poster__bg--gradientAlt/.poster__sheen
   // (accueil.css).
   const compTint2   = posterComp?.tint2 ?? null
-  const compTint3   = posterComp?.tint3 ?? null
 
   const homeShort = translateTeam(match.homeTeam?.shortName || homeName)
   const awayShort = translateTeam(match.awayTeam?.shortName || awayName)
@@ -267,7 +267,6 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   const cls = 'poster'
     + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
     + (compTint ? ' poster--tinted' : '')
-    + (compTint3 ? ' poster--triColor' : '')
 
   // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
   // Même contenu/logique que le hero de LiveMatchPage et que la version
@@ -359,7 +358,6 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
       style={compTint ? {
         '--poster-comp': compTint,
         ...(compTint2 ? { '--poster-comp2': compTint2 } : {}),
-        ...(compTint3 ? { '--poster-comp3': compTint3 } : {}),
       } : undefined}
     >
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
@@ -369,20 +367,18 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
           (`.lmp__hero`, LiveMatchPage.css) : la couleur (`--poster-comp`) est
           posée une seule fois ci-dessus, tout le dégradé (color-mix) vit dans
           accueil.css, pas ici.
-          ⚠️ RÉANIMÉ EN COULEUR (05/09, demande explicite : "faudrait animer
-          les couleurs... comme avant dans les cards de accueil avec les
-          couleurs des équipes... mais avec les couleurs du championnat, en
-          embellissant la couleur") — gradientAlt ne fait plus un crossfade
-          inutile vers la MÊME couleur (comme juste après le passage aux
-          teintes championnat) : il porte maintenant `--poster-comp2` (2e
-          couleur, éclaircie auto par défaut, dédiée pour Bundesliga/LaLiga) et
-          son opacité respire réellement. gradientTri (3e couche, LaLiga
-          uniquement) fait de même avec `--poster-comp3`. Seules `transform`/
-          `opacity` sont animées (GPU, aucun repaint) — même contrainte que le
-          reste de l'app pour ce type de fond animé. */}
+          ⚠️ TACHES + REFLET VERRE/EAU (05/09, 2e passe, demande explicite :
+          "c pas un changement de couleur que je voulais... vraiment un
+          mélange... des taches... la texture en mode glasses vitré eau") —
+          une 1ère version en simple fondu de couleur plate a été rejetée.
+          gradientAlt porte maintenant plusieurs radial-gradient (taches
+          organiques, `--poster-comp2`) plutôt qu'un dégradé plein, et
+          poster__sheen ajoute un reflet diagonal qui balaie la carte. Seul
+          `transform`/`opacity` sont animés (GPU, aucun repaint) — même
+          contrainte que le reste de l'app pour ce type de fond animé. */}
       <div className="poster__bg poster__bg--gradient" />
       <div className="poster__bg poster__bg--gradientAlt" />
-      <div className="poster__bg poster__bg--gradientTri" />
+      <div className="poster__sheen" />
       <div className="poster__overlay" />
 
       {/* ── Badge compét (gauche, logo + nom FR) + statut période en live (droite) ── */}
