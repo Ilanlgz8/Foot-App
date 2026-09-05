@@ -1610,49 +1610,58 @@
   will-change: transform;
   animation: posterDrift 18s ease-in-out infinite;
 }
-/* ⚠️ DÉGRADÉ QUI PIVOTE LENTEMENT (05/09, 4e et dernière passe). Trois
-   versions précédentes rejetées par l'utilisateur — fondu d'opacité entre 2
-   couleurs plates, puis taches + reflet diagonale qui balaie la carte, puis
-   taches tournant en continu ("les truc qui bouge ça fait pas pro"). Voir le
-   commentaire détaillé dans LiveMatchPage.css (.lmp__heroTintB/C) : même
-   mécanisme exactement, gardé identique des deux côtés pour que l'Accueil et
-   les pages match ne divergent pas au prochain ajustement.
-   En résumé : 2 calques de dégradé PLEINE SURFACE (donc aucune forme
-   identifiable qui puisse "bouger") qui pivotent très lentement, en sens
-   inverse et à des vitesses non multiples (44s/67s) → on perçoit que le fond
-   vit, sans jamais voir un objet se déplacer. La couleur de base reste
-   dominante (opacité <1 + `mix-blend-mode: overlay`).
+/* ⚠️ RETOUR À L'ANIMATION D'ORIGINE (05/09, 5e passe) — c'est ce que
+   l'utilisateur demandait depuis le début : "comme AVANT dans les cards de
+   l'accueil avec les couleurs des équipes... bah là pareil mais avec les
+   couleurs du championnat". Les 4 versions intermédiaires (fondu de couleurs
+   plates, taches + reflet verre/eau, taches en rotation continue, dégradé
+   pivotant lentement) étaient des inventions, toutes rejetées.
+   Cette animation-ci N'EST PAS nouvelle : c'est exactement celle qui tournait
+   ici avant le passage aux couleurs de championnat (commit 073a0a5),
+   récupérée telle quelle dans git — mêmes keyframes, mêmes durées, mêmes
+   courbes. Seules les COULEURS changent (championnat au lieu des 2 équipes).
+   Voir le commentaire détaillé dans LiveMatchPage.css (.lmp__heroTintB/C) :
+   le même mécanisme y est répliqué à l'identique pour que l'Accueil et les
+   pages match ne divergent pas au prochain ajustement.
    Actif uniquement sur `.poster--tinted` (comp.tint présent) : sans ce
    garde-fou, la variante éclaircie par défaut ferait apparaître des taches
    grises parasites même sur les compétitions volontairement neutres (Ligue
    des champions…). */
 .poster__bg--gradientAlt,
 .poster__bg--gradientTri {
-  inset: -55%;
+  inset: 0;
+  transform-origin: center;
   mix-blend-mode: overlay;
-  will-change: transform;
   opacity: 0;
 }
 .poster__bg--gradientAlt {
-  background: linear-gradient(128deg,
-    transparent 6%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 60%, transparent) 40%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 75%, transparent) 54%,
-    transparent 90%);
+  background: linear-gradient(135deg,
+    var(--poster-comp2, var(--poster-comp2-auto)) 0%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 78%,
+    var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 100%);
 }
 .poster__bg--gradientTri {
-  background: linear-gradient(214deg,
-    transparent 10%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 46%,
-    transparent 86%);
+  background: linear-gradient(135deg,
+    var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 0%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 78%,
+    var(--poster-comp2, var(--poster-comp2-auto)) 100%);
 }
 .poster--tinted .poster__bg--gradientAlt {
   opacity: 0.6;
-  animation: posterTextureSpin 44s linear infinite;
+  will-change: transform;
+  animation: posterDrift 18s ease-in-out infinite;
 }
 .poster--tinted .poster__bg--gradientTri {
-  opacity: 0.45;
-  animation: posterTextureSpin 67s linear infinite reverse;
+  will-change: transform, opacity;
+  animation:
+    posterDrift 18s ease-in-out infinite reverse,
+    posterMorph  9s ease-in-out infinite;
 }
 
 /* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
@@ -1667,27 +1676,33 @@
 .poster--softTint .poster__bg--gradientTri {
   mix-blend-mode: normal;
 }
-.poster--softTint .poster__bg--gradientAlt {
-  background: linear-gradient(128deg,
-    transparent 4%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 45%, transparent) 38%,
-    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 62%, transparent) 54%,
-    transparent 92%);
-}
-/* `--poster-comp3` : 2e couleur de voile quand elle diffère de comp2
+/* `--poster-comp3` : 2e couleur d'accent quand elle diffère de comp2
    (Bundesliga : blanc + un peu de rouge) — voir LiveMatchPage.css. */
-.poster--softTint .poster__bg--gradientTri {
-  background: linear-gradient(214deg,
-    transparent 8%,
-    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 58%, transparent) 46%,
-    transparent 88%);
+.poster--softTint .poster__bg--gradientAlt {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 55%, transparent) 0%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 26%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 30%, transparent) 78%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 60%, transparent) 100%);
 }
-.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.5;  }
-.poster--softTint.poster--tinted .poster__bg--gradientTri { opacity: 0.45; }
+.poster--softTint .poster__bg--gradientTri {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 55%, transparent) 0%,
+    color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 26%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 30%, transparent) 78%,
+    color-mix(in srgb, var(--poster-comp2, var(--poster-comp2-auto)) 60%, transparent) 100%);
+}
+.poster--softTint.poster--tinted .poster__bg--gradientAlt { opacity: 0.55; }
 
-@keyframes posterTextureSpin {
-  from { transform: rotate(0deg);   }
-  to   { transform: rotate(360deg); }
+/* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
+   Repris à l'identique de l'animation d'origine (couleurs des équipes). */
+@keyframes posterMorph {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.9; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -887,36 +887,33 @@
   clip-path: inset(0 round 20px);
 }
 
-/* ⚠️ DÉGRADÉ QUI PIVOTE LENTEMENT (05/09, 4e et dernière passe).
-   Historique des 3 versions rejetées, pour ne pas les refaire :
-     1. Fondu d'opacité entre 2 couleurs plates → "c pas un changement de
-        couleur que je voulais".
-     2. Taches + bande de reflet diagonale qui balaie la carte → "nn pa cette
-        effet animé là".
-     3. Taches (radial-gradient) tournant en continu → "les truc qui bouge ça
-        fait pas pro". Diagnostic partagé avec l'utilisateur et retenu : des
-        FORMES identifiables qui se déplacent sur une carte se lisent comme
-        de la décoration ; les apps foot de référence n'animent pas leurs
-        fonds de carte.
-   Retenu (choix explicite de l'utilisateur parmi 3 propositions, les 2 autres
-   étant "aucune animation" et "lueur qui respire en direct uniquement") : un
-   dégradé PLEINE SURFACE qui pivote très lentement. Aucune forme
-   identifiable ne peut donc bouger — c'est le champ de couleur entier qui se
-   déplace, on perçoit que ça vit sans jamais voir un objet se déplacer.
-   Points clés :
-   - `linear-gradient` très diffus (bandes larges, extrémités transparentes)
-     au lieu de `radial-gradient` : pas de contour, donc pas de "tache".
-   - `rotate` sur un calque surdimensionné (`inset: -55%`) : rotation
-     parfaitement continue, sans point de rebond. Le conteneur porte déjà
-     `overflow:hidden` + `clip-path`, le débordement garantit qu'aucun coin
-     ne se découvre pendant la rotation.
-   - `linear` (et non ease-in-out) : aucune décélération, donc jamais de
-     temps mort où l'animation semble s'arrêter et repartir.
-   - 2 vitesses lentes, non multiples et de sens opposés (44s / 67s) : le
-     rendu ne se répète visuellement qu'au bout de très longtemps (PPCM des
-     2 périodes), sans jamais donner de rythme perceptible.
-   N'anime QUE `transform` (GPU, aucun repaint) — même contrainte que partout
-   ailleurs dans l'app pour ce type de fond.
+/* ⚠️ REPRISE DE L'ANIMATION D'ORIGINE DES CARDS ACCUEIL (05/09, 5e passe).
+   C'est la demande initiale de l'utilisateur, mal comprise pendant 4
+   itérations : "faudrait animer les couleurs dans ces pages COMME AVANT dans
+   les cards de l'accueil avec les couleurs des équipes, tu sais c'était
+   animé — bah là pareil mais avec les couleurs du championnat".
+   Autrement dit : ne rien inventer, reprendre TEL QUEL l'effet qui existait
+   déjà sur les posters de l'Accueil (et qui lui plaisait), en remplaçant
+   simplement les couleurs des 2 équipes par celles du championnat.
+   Les 4 tentatives rejetées entre-temps (fondu de couleurs plates, taches +
+   reflet verre/eau, taches en rotation continue, dégradé pivotant lentement)
+   étaient toutes des inventions de ma part, d'où les rejets successifs
+   ("c pas ce que je t'ai demandé").
+   Mécanique d'origine, reprise à l'identique depuis git (voir
+   .poster__bg--gradient/--gradientAlt dans accueil.css, commit 073a0a5) :
+   - 2 calques portant chacun un `linear-gradient(135deg, …)` multi-arrêts,
+     peints UNE SEULE FOIS (la couleur ne change jamais dans le temps).
+   - Calque 1 : toujours visible, léger zoom/pan (`lmpHeroDrift`, 18s).
+   - Calque 2 : mêmes couleurs mais rôles inversés, apparaît/disparaît en
+     fondu par-dessus (`lmpHeroMorph`, 9s) avec le même mouvement en sens
+     inverse.
+   - Seules `transform` et `opacity` sont animées : les 2 seules propriétés
+     qu'un navigateur compose sur le GPU sans jamais redéclencher de repaint
+     (contrairement à `background-position` ou à une couleur de dégradé qui
+     change dans le temps, qui repaint à chaque frame).
+   - `scale(1.12)` de base : le zoom couvre le débordement, d'où `inset: 0`
+     (pas besoin d'agrandir le calque comme le faisaient mes versions à
+     rotation).
    Actif uniquement sur les compétitions déjà teintées (`.lmp__hero--tinted`,
    posé quand `comp.tint` existe) — les championnats volontairement neutres
    (Ligue des champions…) restent parfaitement statiques, comme avant. */
@@ -926,34 +923,41 @@
 .lmp__heroTintB,
 .lmp__heroTintC {
   position: absolute;
-  inset: -55%;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
+  transform-origin: center;
   mix-blend-mode: overlay;
   opacity: 0;
 }
 .lmp__heroTintB {
-  background: linear-gradient(128deg,
-    transparent 6%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 60%, transparent) 40%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 75%, transparent) 54%,
-    transparent 90%);
+  background: linear-gradient(135deg,
+    var(--lmp-comp2, var(--lmp-comp2-auto)) 0%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 78%,
+    var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 100%);
 }
 .lmp__heroTintC {
-  background: linear-gradient(214deg,
-    transparent 10%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 46%,
-    transparent 86%);
+  background: linear-gradient(135deg,
+    var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 0%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 78%,
+    var(--lmp-comp2, var(--lmp-comp2-auto)) 100%);
 }
 .lmp__hero--tinted .lmp__heroTintB {
   opacity: 0.6;
-  animation: lmpTextureSpin 44s linear infinite;
   will-change: transform;
+  animation: lmpHeroDrift 18s ease-in-out infinite;
 }
 .lmp__hero--tinted .lmp__heroTintC {
-  opacity: 0.45;
-  animation: lmpTextureSpin 67s linear infinite reverse;
-  will-change: transform;
+  will-change: transform, opacity;
+  animation:
+    lmpHeroDrift 18s ease-in-out infinite reverse,
+    lmpHeroMorph  9s ease-in-out infinite;
 }
 /* ⚠️ VARIANTE "DOUCE" (05/09, `tintSoft` dans competitions.js — LaLiga
    uniquement pour l'instant). Sur une base quasi noire, `mix-blend-mode:
@@ -968,29 +972,44 @@
 .lmp__hero--softTint .lmp__heroTintC {
   mix-blend-mode: normal;
 }
-.lmp__hero--softTint .lmp__heroTintB {
-  background: linear-gradient(128deg,
-    transparent 4%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 45%, transparent) 38%,
-    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 62%, transparent) 54%,
-    transparent 92%);
-}
-/* `--lmp-comp3` (optionnel, `tint3` dans competitions.js) : permet au 2e
-   calque de porter une couleur DIFFÉRENTE du 1er — Bundesliga = voile blanc
-   (comp2) + un peu de rouge (comp3). Sans lui, les 2 calques partagent la
-   même couleur (cas LaLiga), comportement d'origine inchangé. */
+/* `--lmp-comp3` (optionnel, `tint3` dans competitions.js) : 2e couleur
+   d'accent — Bundesliga = blanc (comp2) + un peu de rouge (comp3). Sans lui,
+   les 2 extrémités du dégradé partagent la même couleur (cas LaLiga). */
+.lmp__hero--softTint .lmp__heroTintB,
 .lmp__hero--softTint .lmp__heroTintC {
-  background: linear-gradient(214deg,
-    transparent 8%,
-    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 58%, transparent) 46%,
-    transparent 88%);
+  mix-blend-mode: normal;
 }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.5;  }
-.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintC { opacity: 0.45; }
+.lmp__hero--softTint .lmp__heroTintB {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 55%, transparent) 0%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 26%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 30%, transparent) 78%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 60%, transparent) 100%);
+}
+.lmp__hero--softTint .lmp__heroTintC {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 55%, transparent) 0%,
+    color-mix(in srgb, var(--lmp-comp3, var(--lmp-comp2, var(--lmp-comp2-auto))) 26%, transparent) 24%,
+    transparent 46%,
+    transparent 58%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 30%, transparent) 78%,
+    color-mix(in srgb, var(--lmp-comp2, var(--lmp-comp2-auto)) 60%, transparent) 100%);
+}
+.lmp__hero--softTint.lmp__hero--tinted .lmp__heroTintB { opacity: 0.55; }
 
-@keyframes lmpTextureSpin {
-  from { transform: rotate(0deg);   }
-  to   { transform: rotate(360deg); }
+/* Mouvement et fondu repris À L'IDENTIQUE de l'animation d'origine des
+   posters Accueil (posterDrift / posterMorph, accueil.css) — même durées,
+   même courbes, mêmes valeurs. C'est précisément ce que l'utilisateur
+   demandait depuis le début ("comme avant dans les cards de l'accueil"). */
+@keyframes lmpHeroDrift {
+  0%, 100% { transform: scale(1.12) translate(0%, 0%); }
+  50%      { transform: scale(1.18) translate(-2%, 2%); }
+}
+@keyframes lmpHeroMorph {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.9; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
