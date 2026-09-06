@@ -317,10 +317,14 @@ export const COMPETITIONS = [
     // blancs très larges à faible opacité, répartis sur toute la carte).
     // `tint3` n'est donc plus qu'un violet un peu plus clair : il donne du
     // relief au dégradé sans créer de zone claire identifiable.
+    // Voile nacré et fin de dégradé redescendus pour laisser le violet
+    // dominer — même demande et même dosage que Ligue 1 ("faut diminuer le
+    // blanc", 06/09).
     tint2: '#9d1fa8',
-    tint3: '#b57fd0',
+    tint3: '#a86ac4',
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
+    tintPearl: 0.5,
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier
     // League ne l'avait pas, son violet étant moins clair qu'un bleu — il est
@@ -478,10 +482,13 @@ export const COMPETITIONS = [
     tintLight: true, // voir le commentaire sur FL1 (même raison)
     // `tint3` volontairement pas trop clair — même raison que Ligue 1 : la
     // brillance vient du calque nacré, pas de la fin du dégradé.
-    tint2: '#10a3b8',
-    tint3: '#4fc6d8',
+    // Voile nacré et fin de dégradé redescendus — même demande et même dosage
+    // que Ligue 1 et Premier League ("faut diminuer le blanc", 06/09).
+    tint2: '#0d97ab',
+    tint3: '#3bb3c7',
     tintSoft: true,
     tintStops: { base: '22%', c2: '52%', c3: '82%' },
+    tintPearl: 0.5,
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
