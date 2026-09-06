@@ -448,12 +448,19 @@ export const COMPETITIONS = [
     id: 'SA',
     // brut #0084cc (bleu dominant du logo, 2 571 px) → corrigé, puis affiné
     // (05/09, 2e passe) même raison que Ligue 1
-    tint: '#1a8fd6',
+    // ⚠️ DÉPLACÉ VERS LE TURQUOISE (06/09, constat utilisateur : "pour la Serie
+    // A le bleu ressemble à celui de la Ligue 1, on peut pas modifier un peu
+    // pour différencier"). Les deux championnats étaient effectivement dans le
+    // même registre (#1a8fd6 contre #1c5ce0) : deux bleus qui ne se
+    // distinguaient que par la clarté. Deux pistes ont été montrées en rendu
+    // réel — un marine plus profond (différence de CLARTÉ) et ce bleu-cyan
+    // (différence de TEINTE) ; le turquoise a été retenu parce qu'on ne peut
+    // plus confondre les deux d'un coup d'œil. Ça reste fidèle au logo Serie
+    // A, dont le bleu dominant (#0084cc) tire déjà vers le cyan.
+    tint: '#0a5f7a',
     tintLight: true, // voir le commentaire sur FL1 (même raison)
-    // Même reprise de texture que Ligue 1 (voir son commentaire) : bleu de
-    // marque en base, bleu plus clair au centre, blanc en fin de dégradé.
-    tint2: '#3fb0ee',
-    tint3: '#ffffff',
+    tint2: '#10a3b8',
+    tint3: '#7fdfe8',
     tintSoft: true,
     tintStops: { base: '22%', c2: '52%', c3: '82%' },
     name: 'Serie A Enilive',
