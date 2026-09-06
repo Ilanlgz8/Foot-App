@@ -996,13 +996,10 @@
    glisse sur le noir. C'est aussi ce qui règle le problème d'orange constaté
    sur l'ancienne version rouge+jaune de LaLiga : sans `overlay`, deux
    couleurs ne se fondent plus l'une dans l'autre. */
-.lmp__hero--softTint .lmp__heroTintB,
-.lmp__hero--softTint .lmp__heroTintC {
-  mix-blend-mode: normal;
-}
 /* `--lmp-comp3` (optionnel, `tint3` dans competitions.js) : 2e couleur
-   d'accent — Bundesliga = blanc (comp2) + un peu de rouge (comp3). Sans lui,
-   les 2 extrémités du dégradé partagent la même couleur (cas LaLiga). */
+   d'accent — Bundesliga = rouge (comp2) puis blanc (comp3). Sans lui, les 2
+   extrémités du dégradé partagent la même couleur (cas LaLiga avant l'ajout
+   de son jaune). */
 .lmp__hero--softTint .lmp__heroTintB,
 .lmp__hero--softTint .lmp__heroTintC {
   mix-blend-mode: normal;
@@ -1013,9 +1010,10 @@
    gardant toujours le noir le blanc et le rouge bien distincts — couleur
    primaire noir puis rouge puis blanc".
    Conséquences, par rapport à toutes les versions précédentes :
-   - Le 2e calque (`lmp__heroTintC`) est DÉSACTIVÉ : c'était lui qui, en
-     apparaissant/disparaissant en fondu (`lmpHeroMorph`), faisait changer les
-     couleurs au fil du temps. Sans lui, la carte garde exactement la même
+   - Le 2e calque (`lmp__heroTintC`) ne fait plus de fondu : c'était lui qui,
+     en apparaissant/disparaissant (`lmpHeroMorph`), faisait changer les
+     couleurs au fil du temps. Il est depuis réaffecté à l'éclat diffus,
+     statique (06/09, voir plus bas) — la carte garde donc exactement la même
      couleur en permanence.
    - Il ne reste qu'UN dégradé fixe, parcouru dans l'ordre demandé : le fond
      reste nu (donc noir, la couleur primaire) sur toute la première moitié,
@@ -1049,11 +1047,21 @@
   opacity: 0.9;
   animation: lmpHeroDriftLeger 20s ease-in-out infinite;
 }
-/* Calque 2 neutralisé (voir ci-dessus) — conservé dans le DOM pour ne pas
-   toucher au JSX partagé avec les compétitions non `tintSoft`. */
-.lmp__hero--softTint .lmp__heroTintC {
-  opacity: 0;
+/* ⚠️ CALQUE D'ÉCLAT DIFFUS (06/09) — voir le commentaire détaillé dans
+   accueil.css (.poster--tinted .poster__bg--gradientTri) : même recette,
+   gardée identique des deux côtés. Le calque 2, jusqu'ici neutralisé depuis
+   qu'on avait figé les couleurs, sert maintenant de voile brillant réparti
+   sur toute la carte (halos blancs larges et très peu opaques, statiques). */
+.lmp__hero--tinted .lmp__heroTintC {
+  opacity: 1;
   animation: none;
+  mix-blend-mode: normal;
+  inset: 0;
+  background:
+    radial-gradient(120% 85% at 18% 10%, rgba(var(--white-rgb),0.15) 0%, transparent 60%),
+    radial-gradient(105% 75% at 84% 28%, rgba(var(--white-rgb),0.11) 0%, transparent 62%),
+    radial-gradient(115% 80% at 42% 92%, rgba(var(--white-rgb),0.10) 0%, transparent 58%),
+    radial-gradient(90%  60% at 65% 62%, rgba(var(--white-rgb),0.07) 0%, transparent 55%);
 }
 
 /* Mouvement et fondu repris À L'IDENTIQUE de l'animation d'origine des

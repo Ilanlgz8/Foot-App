@@ -286,18 +286,24 @@ export const COMPETITIONS = [
     tint: '#680c6e',
     // Même reprise de texture que Ligue 1 (voir son commentaire) : violet de
     // marque en base, violet plus vif au centre.
-    // ⚠️ VERT RETIRÉ (06/09, demande : "enlève le vert stp mais garde ce côté
-    // blanc pour la Premier League un peu partout mais léger, pour pas que ce
-    // soit que violet"). Le vert-menthe #00d9a3 (2e couleur officielle PL)
-    // tranchait trop. Remplacé par un blanc très légèrement lavande — assez
-    // proche du violet pour ne pas faire tache, assez clair pour casser le
-    // "tout violet". Son arrêt démarre plus tôt (68% au lieu de 84%) pour
-    // qu'il se diffuse sur tout le dernier tiers plutôt que de se concentrer
-    // dans l'angle : c'est ce qui donne le "un peu partout mais léger".
+    // ⚠️ VERT RETIRÉ (06/09, demande : "enlève le vert mais garde ce côté blanc
+    // pour la Premier League un peu partout mais léger, pour pas que ce soit
+    // que violet"). Le vert-menthe #00d9a3 (2e couleur officielle PL)
+    // tranchait trop.
+    // ⚠️ 2e CORRECTION le même jour ("là le blanc est en bas à droite, faudrait
+    // qu'il se disperse mais qu'il soit super léger un peu partout, comme si
+    // il rajoutait un effet brillant") : un dégradé LINÉAIRE range forcément
+    // sa dernière couleur dans un coin — mettre du blanc ici ne pouvait donc
+    // jamais donner un éclat diffus. Le blanc a été sorti de ce dégradé et
+    // confié à un calque dédié, commun à toutes les compétitions teintées
+    // (voir .poster__bg--gradientTri / .lmp__heroTintC : plusieurs halos
+    // blancs très larges à faible opacité, répartis sur toute la carte).
+    // `tint3` n'est donc plus qu'un violet un peu plus clair : il donne du
+    // relief au dégradé sans créer de zone claire identifiable.
     tint2: '#9d1fa8',
-    tint3: '#efe6f5',
+    tint3: '#b57fd0',
     tintSoft: true,
-    tintStops: { base: '20%', c2: '46%', c3: '68%' },
+    tintStops: { base: '20%', c2: '50%', c3: '84%' },
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,

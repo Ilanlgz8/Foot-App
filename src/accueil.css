@@ -1695,9 +1695,30 @@
   opacity: 0.9;
   animation: posterDriftLeger 20s ease-in-out infinite;
 }
-.poster--softTint .poster__bg--gradientTri {
-  opacity: 0;
+/* ⚠️ CALQUE D'ÉCLAT DIFFUS (06/09, demande : "faudrait que le blanc se
+   disperse mais qu'il soit super léger un peu partout, comme si il rajoutait
+   un effet brillant"). Un dégradé LINÉAIRE pousse forcément sa dernière
+   couleur dans un coin : c'est structurel, aucun réglage d'arrêt ne pouvait
+   donner un blanc "partout". D'où ce calque séparé — plusieurs halos blancs
+   très larges et très peu opaques (7 à 15%), posés à des endroits différents,
+   qui se recouvrent et donnent un voile brillant réparti sur toute la carte.
+   STATIQUE volontairement (aucune animation) : le mouvement léger est déjà
+   porté par le calque de couleur en dessous, et une brillance qui se déplace
+   redeviendrait l'"effet" rejeté plus tôt. Le calque était jusqu'ici
+   neutralisé (opacity 0) depuis qu'on avait figé les couleurs ; il est
+   réutilisé ici plutôt que d'en ajouter un 3e au DOM.
+   Appliqué à TOUTES les compétitions teintées, pas seulement à celles en
+   `tintSoft` : l'éclat bénéficie autant aux fonds bleus/violets. */
+.poster--tinted .poster__bg--gradientTri {
+  opacity: 1;
   animation: none;
+  mix-blend-mode: normal;
+  inset: 0;
+  background:
+    radial-gradient(120% 85% at 18% 10%, rgba(var(--white-rgb),0.15) 0%, transparent 60%),
+    radial-gradient(105% 75% at 84% 28%, rgba(var(--white-rgb),0.11) 0%, transparent 62%),
+    radial-gradient(115% 80% at 42% 92%, rgba(var(--white-rgb),0.10) 0%, transparent 58%),
+    radial-gradient(90%  60% at 65% 62%, rgba(var(--white-rgb),0.07) 0%, transparent 55%);
 }
 
 /* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
