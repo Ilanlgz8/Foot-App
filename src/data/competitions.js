@@ -244,7 +244,14 @@ export const COMPETITIONS = [
     // brut #0054fc (bleu dominant du logo, 20 526 px) → corrigé, puis affiné
     // (05/09, 2e passe) pour rester lisible comme bleu même dilué en bas du
     // dégradé — voir le commentaire au-dessus de COMPETITIONS
-    tint: '#1a5cd6',
+    // ⚠️ BLEU REPRIS (06/09, demande : "pour la Ligue 1 faudrait un bleu qui
+    // brille, genre vraiment beau, pas trop clair pas trop foncé, le truc
+    // parfait qui fait vraiment foot"). #1a5cd6 était un bleu correct mais un
+    // peu éteint. Remonté en bleu royal saturé, avec un bleu franchement
+    // lumineux en couleur 2 — c'est le passage de l'un à l'autre qui donne
+    // l'effet "qui brille", pas la clarté de la base (un bleu clair uniforme
+    // délave la carte, un bleu sombre l'éteint).
+    tint: '#1c5ce0',
     // ⚠️ AJOUT (05/09, demande utilisateur : "fond bleu clair comme Serie A ou
     // Ligue 1, la minute doit être en blanc pas en rouge"). Le rouge de la
     // minute (voir .lmp__heroMinute, LiveMatchPage.css) se lit mal sur un
@@ -262,10 +269,10 @@ export const COMPETITIONS = [
     // validée : zones de couleur distinctes (base → couleur 2 → couleur 3),
     // aucune fusion, voile allégé. Bleu Ligue 1 en base, bleu plus vif au
     // centre, blanc en fin de dégradé (couleurs de marque du championnat).
-    tint2: '#2f7ff5',
+    tint2: '#2b82ff',
     tint3: '#ffffff',
     tintSoft: true,
-    tintStops: { base: '22%', c2: '52%', c3: '82%' },
+    tintStops: { base: '20%', c2: '50%', c3: '84%' },
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -278,12 +285,19 @@ export const COMPETITIONS = [
     // brut #39003d (violet du logo d'origine, avant détourage) → corrigé
     tint: '#680c6e',
     // Même reprise de texture que Ligue 1 (voir son commentaire) : violet de
-    // marque en base, violet plus vif au centre, puis le vert-menthe qui est
-    // la 2e couleur officielle de la Premier League en fin de dégradé.
+    // marque en base, violet plus vif au centre.
+    // ⚠️ VERT RETIRÉ (06/09, demande : "enlève le vert stp mais garde ce côté
+    // blanc pour la Premier League un peu partout mais léger, pour pas que ce
+    // soit que violet"). Le vert-menthe #00d9a3 (2e couleur officielle PL)
+    // tranchait trop. Remplacé par un blanc très légèrement lavande — assez
+    // proche du violet pour ne pas faire tache, assez clair pour casser le
+    // "tout violet". Son arrêt démarre plus tôt (68% au lieu de 84%) pour
+    // qu'il se diffuse sur tout le dernier tiers plutôt que de se concentrer
+    // dans l'angle : c'est ce qui donne le "un peu partout mais léger".
     tint2: '#9d1fa8',
-    tint3: '#00d9a3',
+    tint3: '#efe6f5',
     tintSoft: true,
-    tintStops: { base: '22%', c2: '52%', c3: '84%' },
+    tintStops: { base: '20%', c2: '46%', c3: '68%' },
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
