@@ -332,6 +332,17 @@
   color: #fff;
   text-shadow: 0 1px 6px rgba(var(--black-rgb),0.55), 0 0 10px rgba(var(--black-rgb),0.35);
 }
+/* ⚠️ "Terminé" EN BLANC AUSSI (06/09, demande : "pour la Ligue 1 dans
+   Résultat/MatchPage mets Terminé en blanc, pareil pour Premier League et
+   Serie A"). Même raison que la minute juste au-dessus : le rouge se noie sur
+   ces fonds saturés (bleu, violet). Les 2 informations sont désormais
+   traitées ensemble sous `tintLight` — voir competitions.js pour la liste des
+   championnats concernés. LaLiga et Bundesliga ne sont PAS ici : elles ont
+   leur propre traitement en blanc argenté (`tintSilverText`, plus bas). */
+.lmp__hero--lightTint .lmp__heroWhenLabel--ft {
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(var(--black-rgb),0.6), 0 0 10px rgba(var(--black-rgb),0.35);
+}
 .lmp__heroMinute--ft {
   font-size: 1rem;
   font-weight: 700;

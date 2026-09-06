@@ -304,6 +304,13 @@ export const COMPETITIONS = [
     tint3: '#b57fd0',
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
+    // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
+    // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier
+    // League ne l'avait pas, son violet étant moins clair qu'un bleu — il est
+    // pourtant assez saturé pour que le rouge du chrono s'y noie de la même
+    // façon. Effet de bord assumé et cohérent : la minute d'un match en direct
+    // passe elle aussi en blanc sur cette compétition (même règle CSS).
+    tintLight: true,
     name: 'Premier League',
     shortName: 'Premier L.',
     emblem: premierLeagueLogo,
