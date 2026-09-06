@@ -1720,6 +1720,25 @@
     radial-gradient(115% 80% at 42% 92%, rgba(var(--white-rgb),0.10) 0%, transparent 58%),
     radial-gradient(90%  60% at 65% 62%, rgba(var(--white-rgb),0.07) 0%, transparent 55%);
 }
+/* ⚠️ VOILE NACRÉ APPUYÉ (06/09, demande : "j'aimerais que le blanc soit un peu
+   partout, qu'il rajoute vraiment du brillant, en mode perle anodisée") —
+   réservé aux fonds CLAIRS (`tintLight` : Ligue 1, Premier League, Serie A).
+   Cinq halos au lieu de quatre, plus larges, en `screen`, et surtout
+   légèrement IRISÉS : chacun tire vers un blanc différent (neutre, bleuté,
+   chaud, lavande). C'est cette variation de température, et non l'opacité,
+   qui donne l'aspect nacré/anodisé plutôt qu'un simple voile blanc.
+   NE PAS étendre aux fonds sombres (LaLiga, Bundesliga) : vérifié en rendu
+   réel, `screen` à ces opacités y délave complètement le noir, qui vire au
+   gris-brun. Elles gardent la version douce ci-dessus. */
+.poster--tinted.poster--lightTint .poster__bg--gradientTri {
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(140% 90% at 15% 8%,  rgba(255,255,255,0.30) 0%, transparent 55%),
+    radial-gradient(120% 80% at 88% 22%, rgba(226,240,255,0.24) 0%, transparent 58%),
+    radial-gradient(130% 85% at 35% 95%, rgba(255,250,240,0.20) 0%, transparent 55%),
+    radial-gradient(110% 70% at 72% 70%, rgba(240,235,255,0.18) 0%, transparent 52%),
+    radial-gradient(90%  60% at 50% 40%, rgba(255,255,255,0.12) 0%, transparent 60%);
+}
 
 /* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
    Repris à l'identique de l'animation d'origine (couleurs des équipes). */

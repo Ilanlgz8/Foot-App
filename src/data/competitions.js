@@ -269,8 +269,16 @@ export const COMPETITIONS = [
     // validée : zones de couleur distinctes (base → couleur 2 → couleur 3),
     // aucune fusion, voile allégé. Bleu Ligue 1 en base, bleu plus vif au
     // centre, blanc en fin de dégradé (couleurs de marque du championnat).
+    // ⚠️ `tint3` N'EST PLUS BLANC (06/09, constat utilisateur : "le blanc est
+    // en bas à droite seulement, j'aimerais qu'il soit un peu partout").
+    // Même cause et même correctif que pour la Premier League : un dégradé
+    // linéaire range forcément sa dernière couleur dans un coin, y mettre du
+    // blanc ne pouvait donc pas donner un éclat réparti. Le blanc est
+    // entièrement porté par le calque nacré (voir .poster--lightTint
+    // .poster__bg--gradientTri) ; `tint3` n'est plus qu'un bleu plus clair,
+    // qui donne du relief au dégradé sans créer de zone blanche.
     tint2: '#2b82ff',
-    tint3: '#ffffff',
+    tint3: '#6aa8ff',
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
     name: "Ligue 1 McDonald's",
@@ -459,8 +467,10 @@ export const COMPETITIONS = [
     // A, dont le bleu dominant (#0084cc) tire déjà vers le cyan.
     tint: '#0a5f7a',
     tintLight: true, // voir le commentaire sur FL1 (même raison)
+    // `tint3` volontairement pas trop clair — même raison que Ligue 1 : la
+    // brillance vient du calque nacré, pas de la fin du dégradé.
     tint2: '#10a3b8',
-    tint3: '#7fdfe8',
+    tint3: '#4fc6d8',
     tintSoft: true,
     tintStops: { base: '22%', c2: '52%', c3: '82%' },
     name: 'Serie A Enilive',

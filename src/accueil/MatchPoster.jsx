@@ -277,6 +277,11 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
     + (isLive ? ' poster--live' : isFinished ? ' poster--ft' : '')
     + (compTint ? ' poster--tinted' : '')
     + (compTintSoft ? ' poster--softTint' : '')
+    // `tintLight` : fond clair/saturé (Ligue 1, Premier League, Serie A) par
+    // opposition aux fonds quasi noirs (LaLiga, Bundesliga). Sert ici à
+    // réserver le voile nacré appuyé aux premiers — sur un fond noir il le
+    // délaverait entièrement (vérifié en rendu réel). Voir accueil.css.
+    + (posterComp?.tintLight ? ' poster--lightTint' : '')
 
   // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
   // Même contenu/logique que le hero de LiveMatchPage et que la version
