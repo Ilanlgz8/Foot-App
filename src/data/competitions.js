@@ -300,7 +300,14 @@ export const COMPETITIONS = [
   {
     id: 'PL',
     // brut #39003d (violet du logo d'origine, avant détourage) → corrigé
-    tint: '#680c6e',
+    // ⚠️ VIOLET ÉCLAIRCI (06/09, demande : "pour la Premier League faudrait un
+    // violet moins foncé"). Contrairement à la Ligue 1, impossible de relever
+    // la couleur sur le fichier : `premier-league-2026.png` est un lion BLANC
+    // détouré sur fond transparent (vérifié — 7,9% de blanc, aucun violet).
+    // Le violet vient donc de l'identité de marque, dont la référence
+    // officielle (#37003C) est très sombre — d'où les valeurs successivement
+    // éclaircies : #39003d brut, puis #680c6e, puis celle-ci.
+    tint: '#8a1d92',
     // Même reprise de texture que Ligue 1 (voir son commentaire) : violet de
     // marque en base, violet plus vif au centre.
     // ⚠️ VERT RETIRÉ (06/09, demande : "enlève le vert mais garde ce côté blanc
@@ -320,8 +327,8 @@ export const COMPETITIONS = [
     // Voile nacré et fin de dégradé redescendus pour laisser le violet
     // dominer — même demande et même dosage que Ligue 1 ("faut diminuer le
     // blanc", 06/09).
-    tint2: '#9d1fa8',
-    tint3: '#a86ac4',
+    tint2: '#b330c0',
+    tint3: '#c983dc',
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
     tintPearl: 0.5,
