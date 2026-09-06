@@ -318,6 +318,8 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
             '--lmp-stop-c2':   comp.tintStops.c2,
             '--lmp-stop-c3':   comp.tintStops.c3,
           } : {}),
+          // `tintPearl` (optionnel) : dose du voile nacré, 1 par défaut.
+          ...(comp?.tintPearl != null ? { '--lmp-pearl': comp.tintPearl } : {}),
         }}
       >
       {/* ⚠️ Calques de la texture animée (05/09) — voir le commentaire

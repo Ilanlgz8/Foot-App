@@ -280,8 +280,14 @@ export const COMPETITIONS = [
     // entièrement porté par le calque nacré (voir .poster--lightTint
     // .poster__bg--gradientTri) ; `tint3` n'est plus qu'un bleu plus clair,
     // qui donne du relief au dégradé sans créer de zone blanche.
-    tint2: '#3d82ff',
-    tint3: '#7aa9ff',
+    // ⚠️ VOILE NACRÉ ATTÉNUÉ + FIN DE DÉGRADÉ PLUS BLEUE (06/09, constat
+    // utilisateur : "diminue un peu le blanc, le bleu est pas assez
+    // prononcé"). Le blanc venait de deux sources cumulées : le voile nacré
+    // (calque commun) et `tint3` trop clair. Les deux sont redescendus, ce qui
+    // laisse le bleu de marque dominer sans supprimer la brillance.
+    tint2: '#2f78ff',
+    tint3: '#5b93ff',
+    tintPearl: 0.5,
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
     name: "Ligue 1 McDonald's",

@@ -379,6 +379,8 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
           '--poster-stop-c2':   compStops.c2,
           '--poster-stop-c3':   compStops.c3,
         } : {}),
+        // `tintPearl` (optionnel) : dose du voile nacré, 1 par défaut.
+        ...(posterComp?.tintPearl != null ? { '--poster-pearl': posterComp.tintPearl } : {}),
       } : undefined}
     >
     <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>

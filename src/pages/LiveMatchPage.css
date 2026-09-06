@@ -1078,6 +1078,8 @@
    dans accueil.css (.poster--lightTint .poster__bg--gradientTri). */
 .lmp__hero--tinted.lmp__hero--lightTint .lmp__heroTintC {
   mix-blend-mode: screen;
+  /* `--lmp-pearl` : dose du voile nacré par compétition — voir accueil.css. */
+  opacity: var(--lmp-pearl, 1);
   background:
     radial-gradient(140% 90% at 15% 8%,  rgba(255,255,255,0.30) 0%, transparent 55%),
     radial-gradient(120% 80% at 88% 22%, rgba(226,240,255,0.24) 0%, transparent 58%),

@@ -235,6 +235,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
             '--lmp-stop-c2':   comp.tintStops.c2,
             '--lmp-stop-c3':   comp.tintStops.c3,
           } : {}),
+          ...(comp?.tintPearl != null ? { '--lmp-pearl': comp.tintPearl } : {}),
         }}
       >
       <span className="lmp__heroTintB" aria-hidden="true" />
