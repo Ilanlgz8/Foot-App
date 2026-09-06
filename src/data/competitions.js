@@ -244,14 +244,17 @@ export const COMPETITIONS = [
     // brut #0054fc (bleu dominant du logo, 20 526 px) → corrigé, puis affiné
     // (05/09, 2e passe) pour rester lisible comme bleu même dilué en bas du
     // dégradé — voir le commentaire au-dessus de COMPETITIONS
-    // ⚠️ BLEU REPRIS (06/09, demande : "pour la Ligue 1 faudrait un bleu qui
-    // brille, genre vraiment beau, pas trop clair pas trop foncé, le truc
-    // parfait qui fait vraiment foot"). #1a5cd6 était un bleu correct mais un
-    // peu éteint. Remonté en bleu royal saturé, avec un bleu franchement
-    // lumineux en couleur 2 — c'est le passage de l'un à l'autre qui donne
-    // l'effet "qui brille", pas la clarté de la base (un bleu clair uniforme
-    // délave la carte, un bleu sombre l'éteint).
-    tint: '#1c5ce0',
+    // ⚠️ BLEU DU LOGO (06/09, demande finale : "mets le même bleu que le logo
+    // de la Ligue 1"). Relevé directement sur le fichier plutôt que repris du
+    // commentaire historique : `ligue1-2026.png` est à 76,2% de #085dfe (2e
+    // couleur : blanc, 8,8%). C'est donc la couleur de marque exacte.
+    // Historique utile : la teinte brute avait été écartée au tout début
+    // parce qu'elle rendait mal une fois diluée dans l'ancienne recette de
+    // dégradé — d'où les valeurs intermédiaires #1a5cd6 puis #1c5ce0. Cette
+    // recette a changé depuis (zones distinctes + voile nacré), la couleur de
+    // marque tient maintenant très bien : vérifié en rendu réel, elle reste
+    // franchement bleue et distincte du turquoise de la Serie A.
+    tint: '#085dfe',
     // ⚠️ AJOUT (05/09, demande utilisateur : "fond bleu clair comme Serie A ou
     // Ligue 1, la minute doit être en blanc pas en rouge"). Le rouge de la
     // minute (voir .lmp__heroMinute, LiveMatchPage.css) se lit mal sur un
@@ -277,8 +280,8 @@ export const COMPETITIONS = [
     // entièrement porté par le calque nacré (voir .poster--lightTint
     // .poster__bg--gradientTri) ; `tint3` n'est plus qu'un bleu plus clair,
     // qui donne du relief au dégradé sans créer de zone blanche.
-    tint2: '#2b82ff',
-    tint3: '#6aa8ff',
+    tint2: '#3d82ff',
+    tint3: '#7aa9ff',
     tintSoft: true,
     tintStops: { base: '20%', c2: '50%', c3: '84%' },
     name: "Ligue 1 McDonald's",
