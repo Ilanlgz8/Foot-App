@@ -1112,38 +1112,41 @@
   .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
 }
 
-/* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09) — même habillage que sur les cards
-   de l'Accueil, voir le commentaire détaillé dans accueil.css
+/* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09, révisé 09/09) — même habillage que
+   sur les cards de l'Accueil, voir le commentaire détaillé dans accueil.css
    (`.poster--theme-ucl`) et competitions.js (`tintTheme`). Gardé identique des
    deux côtés pour que les deux surfaces ne divergent pas.
+   Historique complet dans accueil.css : starball abandonné (halos +
+   silhouette vectorisée jugés soit trop envahissants soit pas fidèles au
+   visuel officiel), remplacé par un bleu marine profond + voile nacré (même
+   recette que Ligue 1/PL/Serie A, `.poster--tinted.poster--lightTint`).
+   Couleurs (#010056 base, #0232FF touche) : voir note complète dans
+   accueil.css — trouvées via recherche web, NON vérifiées à la source
+   officielle UEFA, validées à l'œil sur la card avec l'utilisateur.
    ⚠️ Le sélecteur porte `#root` : la règle de fond de base est écrite
    `#root .lmp__hero` (voir plus haut), donc avec un ID — une simple classe ne
    pourrait pas la surcharger, quel que soit son ordre dans le fichier. */
 #root .lmp__hero--theme-ucl {
   background:
-    radial-gradient(70% 100% at 10% 18%, #1a3aa4 0%, transparent 60%),
-    radial-gradient(70% 100% at 96% 88%, #8f2ec0 0%, transparent 58%),
-    radial-gradient(55% 80% at 70%  8%, #2b7fd6 0%, transparent 55%),
-    linear-gradient(155deg, #0a1352 0%, #0a1140 55%, #0c0e2e 100%);
+    radial-gradient(50% 70% at 70% 30%, #0232FF 0%, transparent 42%),
+    radial-gradient(45% 65% at 15% 85%, #010056 0%, transparent 60%),
+    linear-gradient(160deg, #040a2e 0%, #05103f 45%, #010056 100%);
 }
 .lmp__hero--theme-ucl .lmp__heroTintB {
   inset: 0;
-  opacity: 0.45;
-  mix-blend-mode: screen;
-  animation: lmpHeroDriftLeger 22s ease-in-out infinite;
-  background:
-    radial-gradient(45% 65% at 74% 26%, rgba(70,190,235,0.40) 0%, transparent 62%),
-    radial-gradient(42% 62% at 26% 82%, rgba(150,50,195,0.36) 0%, transparent 60%);
+  opacity: 0;
 }
 .lmp__hero--theme-ucl .lmp__heroTintC {
   inset: 0;
-  opacity: 0.18;
+  opacity: 0.55;
   animation: none;
-  mix-blend-mode: normal;
-  background-image: url('../assets/leagues/ldc-starball.png');
-  background-size: auto 125%;
-  background-position: 84% 42%;
-  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  background-image:
+    radial-gradient(140% 90% at 15% 8%,  rgba(255,255,255,0.30) 0%, transparent 55%),
+    radial-gradient(120% 80% at 88% 22%, rgba(226,240,255,0.24) 0%, transparent 58%),
+    radial-gradient(130% 85% at 35% 95%, rgba(255,250,240,0.20) 0%, transparent 55%),
+    radial-gradient(110% 70% at 72% 70%, rgba(240,235,255,0.18) 0%, transparent 52%),
+    radial-gradient(90%  60% at 50% 40%, rgba(255,255,255,0.12) 0%, transparent 60%);
 }
 
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:

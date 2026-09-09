@@ -1766,44 +1766,47 @@
   .poster__bg--gradientTri { opacity: 0; }
 }
 
-/* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09) — voir competitions.js (`tintTheme`).
-   Seule compétition à ne pas suivre la recette commune : son identité tient à
-   des HALOS de couleur (marine → bleu → magenta, d'après le visuel officiel
-   fourni par l'utilisateur) et au starball en filigrane, pas à un dégradé
-   linéaire à 3 zones.
-   Ces règles ne dépendent PAS de `.poster--tinted` : la Ligue des Champions
-   n'a volontairement pas de champ `tint`, elle ne reçoit donc jamais cette
-   classe. C'est ce bloc seul qui rend ses calques visibles.
-   ⚠️ Le starball est un PNG de 65x65 px extrait de `ldc.png` (seul fichier
-   disponible dans le projet), agrandi à 300 px avec les contours durcis à la
-   génération. Il reste donc légèrement doux — c'est inhérent à la source, pas
-   un réglage. Si un logo haute résolution est ajouté un jour, il suffit de
-   remplacer `ldc-starball.png`, aucune règle à toucher. */
+/* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09, révisé 09/09) — voir competitions.js
+   (`tintTheme`). Seule compétition à ne pas suivre la recette commune (pas de
+   dégradé linéaire à 3 zones, pas de `tint`/`tintStops`).
+   Historique : d'abord halos marine/bleu/magenta + starball en filigrane
+   (extrait de `ldc.png`, seul fichier dispo, 65x65 px agrandi — resté flou,
+   inhérent à la source). Plusieurs tentatives pour un starball net (SVG
+   vectorisé via vtracer, effet "liquid glass") toutes jugées soit trop
+   envahissantes soit pas fidèles au visuel officiel UEFA. Demande finale
+   utilisateur (09/09, avec capture UEFA à l'appui) : abandonner le starball
+   entièrement, garder un bleu marine profond et brillant façon "perle
+   anodisée" — même mécanisme de voile nacré que Ligue 1/Premier League/Serie A
+   (voir plus haut `.poster--tinted.poster--lightTint`), réutilisé ici sans
+   dépendre de `.poster--tinted` (CL n'a pas de `tint`, donc jamais cette
+   classe — ce bloc seul rend ses calques visibles). Opacité du voile réduite
+   (0.55 au lieu de 1) : `screen` sur un fond aussi sombre sature vite.
+   Couleurs (#010056 base, #0232FF touche) trouvées via recherche web comme
+   étant la charte UEFA Champions League 2024-2027 — mais NON vérifiées à la
+   source officielle (page fan-made + PDF non authentifié, voir échange du
+   09/09). Choisies pour leur cohérence visuelle avec les visuels UEFA vus par
+   l'utilisateur, validées à l'œil sur la card, pas garanties "officielles". */
 .poster--theme-ucl .poster__bg--gradient {
   background:
-    radial-gradient(70% 100% at 10% 18%, #1a3aa4 0%, transparent 60%),
-    radial-gradient(70% 100% at 96% 88%, #8f2ec0 0%, transparent 58%),
-    radial-gradient(55% 80% at 70%  8%, #2b7fd6 0%, transparent 55%),
-    linear-gradient(155deg, #0a1352 0%, #0a1140 55%, #0c0e2e 100%);
+    radial-gradient(50% 70% at 70% 30%, #0232FF 0%, transparent 42%),
+    radial-gradient(45% 65% at 15% 85%, #010056 0%, transparent 60%),
+    linear-gradient(160deg, #040a2e 0%, #05103f 45%, #010056 100%);
 }
 .poster--theme-ucl .poster__bg--gradientAlt {
   inset: 0;
-  opacity: 0.45;
-  mix-blend-mode: screen;
-  animation: posterDriftLeger 22s ease-in-out infinite;
-  background:
-    radial-gradient(45% 65% at 74% 26%, rgba(70,190,235,0.40) 0%, transparent 62%),
-    radial-gradient(42% 62% at 26% 82%, rgba(150,50,195,0.36) 0%, transparent 60%);
+  opacity: 0;
 }
 .poster--theme-ucl .poster__bg--gradientTri {
   inset: 0;
-  opacity: 0.18;
+  opacity: 0.55;
   animation: none;
-  mix-blend-mode: normal;
-  background-image: url('./assets/leagues/ldc-starball.png');
-  background-size: auto 125%;
-  background-position: 84% 42%;
-  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  background-image:
+    radial-gradient(140% 90% at 15% 8%,  rgba(255,255,255,0.30) 0%, transparent 55%),
+    radial-gradient(120% 80% at 88% 22%, rgba(226,240,255,0.24) 0%, transparent 58%),
+    radial-gradient(130% 85% at 35% 95%, rgba(255,250,240,0.20) 0%, transparent 55%),
+    radial-gradient(110% 70% at 72% 70%, rgba(240,235,255,0.18) 0%, transparent 52%),
+    radial-gradient(90%  60% at 50% 40%, rgba(255,255,255,0.12) 0%, transparent 60%);
 }
 .poster--theme-ucl .poster__overlay {
   background: linear-gradient(to bottom,
