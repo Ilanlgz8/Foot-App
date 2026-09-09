@@ -1129,6 +1129,7 @@
 #root .lmp__hero--theme-ucl {
   background:
     radial-gradient(50% 70% at 70% 30%, #0232FF 0%, transparent 42%),
+    radial-gradient(45% 60% at 92% 92%, #6a1fb0 0%, transparent 55%),
     radial-gradient(45% 65% at 15% 85%, #010056 0%, transparent 60%),
     linear-gradient(160deg, #040a2e 0%, #05103f 45%, #010056 100%);
 }
