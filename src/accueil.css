@@ -1882,6 +1882,19 @@
   opacity: 0.85;
   flex-shrink: 0;
 }
+/* ⚠️ Logo LDC complet (ballon + texte "UEFA CHAMPIONS LEAGUE") : demande
+   utilisateur (09/09, comparaison faite en direct sur l'app avec 2 cards
+   côte à côte, ballon seul vs logo complet) — a explicitement préféré le
+   logo complet malgré l'avertissement que le texte serait petit. Agrandi
+   par rapport aux 15x15px communs à toutes les compétitions (sinon le texte
+   est totalement illisible) : hauteur fixée, largeur en auto pour garder
+   les proportions du logo (pas carré, contrairement aux logos ronds/écusson
+   des autres compétitions). */
+.poster--theme-ucl .poster__topbarCompLogo {
+  width: auto;
+  height: 26px;
+  opacity: 1;
+}
 .poster__comp-name {
   font-size: 0.58rem;
   font-weight: 700;
