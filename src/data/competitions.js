@@ -505,9 +505,29 @@ export const COMPETITIONS = [
   },
   {
     id: 'CL',
+    // ⚠️ HABILLAGE DÉDIÉ (06/09, demande utilisateur, visuel officiel UEFA à
+    // l'appui : "il faudrait que ce soit le bleu de la Ligue des Champions
+    // avec des étoiles", puis "mets le logo de la Ligue des Champions").
+    // Cette compétition était volontairement NEUTRE (aucune teinte, fond noir)
+    // depuis l'origine — c'est donc un changement de parti pris assumé.
+    // Elle ne suit pas la recette commune aux autres championnats (dégradé
+    // linéaire à 3 zones) : son identité repose sur des HALOS de couleur
+    // (marine → bleu → magenta) et sur le starball en filigrane. D'où
+    // `tintTheme`, qui bascule sur un bloc CSS dédié (voir `.poster--theme-ucl`
+    // dans accueil.css et `.lmp__hero--theme-ucl` dans LiveMatchPage.css).
+    // Les autres champs de teinte ne sont donc PAS lus pour cette compétition.
+    tintTheme: 'ucl',
+    tintLight: true, // fond bleu saturé : minute et "Terminé" en blanc
     name: 'Ligue des Champions',
     shortName: 'C. League',
     emblem: championsLeagueLogo,
+    // ⚠️ `ldc.png` a été DÉTOURÉ (06/09, demande : "supprime le fond noir du
+    // logo de la LDC") : le fichier était un logo blanc sur fond NOIR PLEIN,
+    // d'où un carré noir visible derrière le starball dans la pastille. Il est
+    // désormais blanc sur transparent (alpha = luminance). `emblemOpaque`
+    // supprime en plus la pastille blanche commune, qui rendrait un logo blanc
+    // totalement invisible — le starball se pose directement sur la carte.
+    emblemOpaque: true,
   },
   {
     id: 'UEL',

@@ -282,6 +282,9 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
     // réserver le voile nacré appuyé aux premiers — sur un fond noir il le
     // délaverait entièrement (vérifié en rendu réel). Voir accueil.css.
     + (posterComp?.tintLight ? ' poster--lightTint' : '')
+    // `tintTheme` : habillage entièrement dédié à une compétition (Ligue des
+    // Champions), qui ne suit pas la recette commune — voir competitions.js.
+    + (posterComp?.tintTheme ? ` poster--theme-${posterComp.tintTheme}` : '')
 
   // ── Bandeau compétition (gauche, logo + nom FR) + statut période (droite) ──
   // Même contenu/logique que le hero de LiveMatchPage et que la version

@@ -1112,6 +1112,40 @@
   .lmp__heroTintB, .lmp__heroTintC { animation: none !important; opacity: 0; }
 }
 
+/* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09) — même habillage que sur les cards
+   de l'Accueil, voir le commentaire détaillé dans accueil.css
+   (`.poster--theme-ucl`) et competitions.js (`tintTheme`). Gardé identique des
+   deux côtés pour que les deux surfaces ne divergent pas.
+   ⚠️ Le sélecteur porte `#root` : la règle de fond de base est écrite
+   `#root .lmp__hero` (voir plus haut), donc avec un ID — une simple classe ne
+   pourrait pas la surcharger, quel que soit son ordre dans le fichier. */
+#root .lmp__hero--theme-ucl {
+  background:
+    radial-gradient(70% 100% at 10% 18%, #1a3aa4 0%, transparent 60%),
+    radial-gradient(70% 100% at 96% 88%, #8f2ec0 0%, transparent 58%),
+    radial-gradient(55% 80% at 70%  8%, #2b7fd6 0%, transparent 55%),
+    linear-gradient(155deg, #0a1352 0%, #0a1140 55%, #0c0e2e 100%);
+}
+.lmp__hero--theme-ucl .lmp__heroTintB {
+  inset: 0;
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  animation: lmpHeroDriftLeger 22s ease-in-out infinite;
+  background:
+    radial-gradient(45% 65% at 74% 26%, rgba(70,190,235,0.40) 0%, transparent 62%),
+    radial-gradient(42% 62% at 26% 82%, rgba(150,50,195,0.36) 0%, transparent 60%);
+}
+.lmp__hero--theme-ucl .lmp__heroTintC {
+  inset: 0;
+  opacity: 0.18;
+  animation: none;
+  mix-blend-mode: normal;
+  background-image: url('../assets/leagues/ldc-starball.png');
+  background-size: auto 125%;
+  background-position: 84% 42%;
+  background-repeat: no-repeat;
+}
+
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
    -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
    `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé
