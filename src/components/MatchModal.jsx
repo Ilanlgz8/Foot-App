@@ -16,6 +16,7 @@ import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavor
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
+import { groupScorers } from '../utils/groupScorers'
 import './../matchModal.css'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
@@ -33,31 +34,34 @@ export function getEspnData(matchId) {
 export function ESPNScorers({ scorers = [] }) {
   if (scorers.length === 0) return null
 
-  const homeGoals = scorers.filter(s => s.team === 'home')
-  const awayGoals = scorers.filter(s => s.team === 'away')
+  const homeGoals = groupScorers(scorers.filter(s => s.team === 'home'))
+  const awayGoals = groupScorers(scorers.filter(s => s.team === 'away'))
   if (homeGoals.length === 0 && awayGoals.length === 0) return null
 
   const fmtMin  = (m) => { const base = (m ?? '').split(':')[0]; return base ? `${base}'` : '' }
   const fmtType = (s) => s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+  // Doublé/triplé : une seule ligne, minutes séparées par une virgule
+  // (demande utilisateur 09/09) — au lieu de répéter le nom du buteur.
+  const fmtMinutes = g => g.entries.map(s => `${fmtMin(s.minute)}${fmtType(s)}`).join(', ')
 
   return (
     <div className="modal__stats">
       <div className="modal__statsCol modal__statsCol--home">
-        {homeGoals.map((s, i) => (
+        {homeGoals.map((g, i) => (
           <div key={i} className="modal__goalRow">
-            <span className="modal__goalName">{s.name}{fmtType(s)}</span>
-            <span className="modal__goalMeta">{fmtMin(s.minute)}</span>
+            <span className="modal__goalName">{g.name}</span>
+            <span className="modal__goalMeta">{fmtMinutes(g)}</span>
             <span className="modal__goalIcon" aria-hidden="true">⚽</span>
           </div>
         ))}
       </div>
       <div className="modal__statsDivider" />
       <div className="modal__statsCol modal__statsCol--away">
-        {awayGoals.map((s, i) => (
+        {awayGoals.map((g, i) => (
           <div key={i} className="modal__goalRow modal__goalRow--away">
             <span className="modal__goalIcon" aria-hidden="true">⚽</span>
-            <span className="modal__goalMeta">{fmtMin(s.minute)}</span>
-            <span className="modal__goalName">{s.name}{fmtType(s)}</span>
+            <span className="modal__goalMeta">{fmtMinutes(g)}</span>
+            <span className="modal__goalName">{g.name}</span>
           </div>
         ))}
       </div>
@@ -278,42 +282,44 @@ function H2HSkeleton() {
 export function GoalTimeline({ goals = [], homeId }) {
   if (goals.length === 0) return null
 
-  const homeGoals = goals.filter(g => g.team?.id === homeId)
-  const awayGoals = goals.filter(g => g.team?.id !== homeId)
+  // ⚠️ Regroupement par buteur : `groupScorers` regroupe sur `s.name`, donc
+  // on projette d'abord chaque but FD.org vers ce même champ (avant de
+  // regrouper) plutôt que d'appeler goalLabel APRÈS le groupement.
+  const toEntry = g => ({
+    name: g.scorer?.shortName ?? g.scorer?.name ?? '?',
+    minute: g.minute ? `${g.minute}'` : '',
+    ownGoal: g.type === 'OWN_GOAL',
+    penaltyKick: g.type === 'PENALTY',
+  })
+  const homeGoals = groupScorers(goals.filter(g => g.team?.id === homeId).map(toEntry))
+  const awayGoals = groupScorers(goals.filter(g => g.team?.id !== homeId).map(toEntry))
   if (Math.max(homeGoals.length, awayGoals.length) === 0) return null
 
-  const goalLabel = (g) => ({
-    name: g.scorer?.shortName ?? g.scorer?.name ?? '?',
-    min:  g.minute ? `${g.minute}'` : '',
-    type: g.type === 'OWN_GOAL' ? ' (csc)' : g.type === 'PENALTY' ? ' (pen)' : '',
-  })
+  const suffix = s => s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+  // Doublé/triplé : une seule ligne, minutes séparées par une virgule
+  // (demande utilisateur 09/09) — au lieu de répéter le nom du buteur.
+  const minutesLabel = g => g.entries.map(s => `${s.minute}${suffix(s)}`).join(', ')
 
   return (
     <div className="modal__stats">
       <div className="modal__statsCol modal__statsCol--home">
-        {homeGoals.map((g, i) => {
-          const { name, min, type } = goalLabel(g)
-          return (
-            <div key={i} className="modal__goalRow">
-              <span className="modal__goalName">{name}{type}</span>
-              <span className="modal__goalMeta">{min}</span>
-              <span className="modal__goalIcon" aria-hidden="true">⚽</span>
-            </div>
-          )
-        })}
+        {homeGoals.map((g, i) => (
+          <div key={i} className="modal__goalRow">
+            <span className="modal__goalName">{g.name}</span>
+            <span className="modal__goalMeta">{minutesLabel(g)}</span>
+            <span className="modal__goalIcon" aria-hidden="true">⚽</span>
+          </div>
+        ))}
       </div>
       <div className="modal__statsDivider" />
       <div className="modal__statsCol modal__statsCol--away">
-        {awayGoals.map((g, i) => {
-          const { name, min, type } = goalLabel(g)
-          return (
-            <div key={i} className="modal__goalRow modal__goalRow--away">
-              <span className="modal__goalIcon" aria-hidden="true">⚽</span>
-              <span className="modal__goalMeta">{min}</span>
-              <span className="modal__goalName">{name}{type}</span>
-            </div>
-          )
-        })}
+        {awayGoals.map((g, i) => (
+          <div key={i} className="modal__goalRow modal__goalRow--away">
+            <span className="modal__goalIcon" aria-hidden="true">⚽</span>
+            <span className="modal__goalMeta">{minutesLabel(g)}</span>
+            <span className="modal__goalName">{g.name}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -351,23 +357,34 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
   const events = { home: [], away: [] }
   let k = 0
 
+  // Doublé/triplé : un seul évènement ⚽ par buteur, minutes séparées par
+  // une virgule (demande utilisateur 09/09) — sa position dans le fil est
+  // celle de son PREMIER but (les cartons/remplacements intercalés gardent
+  // leur propre évènement, seuls les buts d'un même joueur sont fusionnés).
+  const pushGroupedGoals = (list, side) => {
+    groupScorers(list).forEach(g => {
+      const suffix = s => s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+      const minuteLabel = g.entries.map(s => `${s._label}${suffix(s)}`).join(', ')
+      const sort = Math.min(...g.entries.map(s => s._sort))
+      events[side].push({ key: `e${k++}`, sort, minute: minuteLabel, icon: '⚽', name: g.name })
+    })
+  }
+
   if (espnScorers.length > 0) {
-    espnScorers.forEach(s => {
-      const suffix = s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
-      events[s.team === 'home' ? 'home' : 'away'].push({
-        key: `e${k++}`, sort: minuteSort(s.minute), minute: espnMinuteLabel(s.minute),
-        icon: '⚽', name: `${s.name}${suffix}`,
-      })
-    })
+    const withMeta = espnScorers.map(s => ({ ...s, _sort: minuteSort(s.minute), _label: espnMinuteLabel(s.minute) }))
+    pushGroupedGoals(withMeta.filter(s => s.team === 'home'), 'home')
+    pushGroupedGoals(withMeta.filter(s => s.team !== 'home'), 'away')
   } else {
-    fdGoals.forEach(g => {
-      const isHome = g.team?.id === homeId
-      const suffix = g.type === 'OWN_GOAL' ? ' (csc)' : g.type === 'PENALTY' ? ' (pen)' : ''
-      events[isHome ? 'home' : 'away'].push({
-        key: `e${k++}`, sort: minuteSort(g.minute), minute: g.minute ? `${g.minute}'` : '',
-        icon: '⚽', name: `${g.scorer?.shortName ?? g.scorer?.name ?? '?'}${suffix}`,
-      })
-    })
+    const withMeta = fdGoals.map(g => ({
+      name: g.scorer?.shortName ?? g.scorer?.name ?? '?',
+      ownGoal: g.type === 'OWN_GOAL',
+      penaltyKick: g.type === 'PENALTY',
+      isHome: g.team?.id === homeId,
+      _sort: minuteSort(g.minute),
+      _label: g.minute ? `${g.minute}'` : '',
+    }))
+    pushGroupedGoals(withMeta.filter(g => g.isHome), 'home')
+    pushGroupedGoals(withMeta.filter(g => !g.isHome), 'away')
   }
 
   if (espnCards.length > 0) {

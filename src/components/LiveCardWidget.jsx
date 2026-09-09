@@ -19,6 +19,7 @@ import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
 import { TEAM_SHORT } from '../data/teamShortNames'
+import { groupScorers } from '../utils/groupScorers'
 import '../live.css'
 
 function shortenName(name) {
@@ -61,26 +62,29 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
 }
 
 function ScorerColumns({ scorers = [] }) {
-  const homeGoals = scorers.filter(s => s.team === 'home')
-  const awayGoals = scorers.filter(s => s.team === 'away')
+  const homeGoals = groupScorers(scorers.filter(s => s.team === 'home'))
+  const awayGoals = groupScorers(scorers.filter(s => s.team === 'away'))
   if (!homeGoals.length && !awayGoals.length) return null
   const suffix = s => s.ownGoal ? ' (csc)' : s.penaltyKick ? ' (pen)' : ''
+  // Doublé/triplé : "K. Mbappé 23', 34'" au lieu de répéter le nom (demande
+  // utilisateur 09/09) — chaque minute garde son propre suffixe (csc/pen).
+  const minutesLabel = g => g.entries.map(s => `${s.minute ?? ''}${suffix(s)}`).join(', ')
   return (
     <div className="live__scorers">
       <div className="live__scorersHome">
-        {homeGoals.map((s, i) => (
+        {homeGoals.map((g, i) => (
           <div key={i} className="live__scorerItem">
-            <span className="live__scorerName">{s.name}{suffix(s)}</span>
-            {s.minute && <span className="live__scorerMin">{s.minute}</span>}
+            <span className="live__scorerName">{g.name}</span>
+            <span className="live__scorerMin">{minutesLabel(g)}</span>
           </div>
         ))}
       </div>
       <div className="live__scorersGap" />
       <div className="live__scorersAway">
-        {awayGoals.map((s, i) => (
+        {awayGoals.map((g, i) => (
           <div key={i} className="live__scorerItem">
-            <span className="live__scorerName">{s.name}{suffix(s)}</span>
-            {s.minute && <span className="live__scorerMin">{s.minute}</span>}
+            <span className="live__scorerName">{g.name}</span>
+            <span className="live__scorerMin">{minutesLabel(g)}</span>
           </div>
         ))}
       </div>
