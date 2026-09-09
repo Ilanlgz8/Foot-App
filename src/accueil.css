@@ -1887,7 +1887,10 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--white-rgb),0.5);
+  /* ⚠️ Couleur remontée de rgba(white,0.5) à ce blanc argenté quasi-opaque
+     (09/09, demande utilisateur : "trop grisé") — le nom de la compétition
+     était à peine lisible en haut à gauche des cards. */
+  color: #f2f5fa;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
