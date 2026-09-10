@@ -1198,35 +1198,52 @@
     #0a1020;
 }
 
-/* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même recette que
-   `.lmp__hero--theme-nl` juste au-dessus, palette Coupe du Monde. Voir le
-   commentaire détaillé dans accueil.css (`.poster--theme-wc`) pour tout
-   l'historique (or/bronze seul → or + bleu FIFA → palette finale demandée
-   vert/bleu/rouge/or/blanc/noir, ni l'un ni l'autre des deux premiers essais
-   validés). Gardé identique des deux côtés. */
+/* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même famille que
+   `.lmp__hero--theme-nl` juste au-dessus (calque dédié flouté), composition
+   finale bien différente : voir le commentaire complet dans accueil.css
+   (`.poster--theme-wc`) pour tout l'historique (or/bronze seul → or + bleu
+   FIFA → palette arc-en-ciel façon LDN, tous rejetés → or très dominant +
+   touches de vert asymétriques + pointe de marron quasi invisible, fond
+   brun-doré sans noir). `.lmp__heroTintC` porte le mélange flouté (mirroir
+   de `.poster__bg--gradient`) ; `.lmp__heroTintB`, inutilisé pour les autres
+   thèmes dédiés, porte ici le voile brillant crème (mirroir de
+   `.poster__bg--gradientTri`) plutôt que de rester à opacité 0. Gardé
+   identique des deux côtés. */
 #root .lmp__hero--theme-wc {
-  background: #0a0a0c;
+  background: #4a2f08;
 }
 .lmp__hero--theme-wc .lmp__heroTintB {
   inset: 0;
-  opacity: 0;
+  opacity: 0.55;
+  animation: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(55% 60% at 50% 30%, rgba(255,236,190,0.6) 0%, transparent 65%);
 }
 .lmp__hero--theme-wc .lmp__heroTintC {
   inset: -20px;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  filter: blur(22px) saturate(1.4);
+  filter: blur(20px) saturate(1.3);
   background:
-    radial-gradient(45% 70% at 10% 30%, #0f7a3d 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #123a70 0%, transparent 60%),
-    radial-gradient(42% 68% at 55% 20%, #d8000c 0%, transparent 60%),
-    radial-gradient(38% 62% at 75% 65%, #d9a52c 0%, transparent 60%),
-    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
-    radial-gradient(40% 65% at 90% 30%, #0f7a3d 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #123a70 0%, transparent 60%),
-    radial-gradient(35% 55% at 15% 85%, #d8000c 0%, transparent 60%),
-    #0a0a0c;
+    radial-gradient(60% 35% at 38% 28%, #d9a52c 0%, transparent 60%),
+    radial-gradient(32% 65% at 52% 42%, #d9a52c 0%, transparent 62%),
+    radial-gradient(48% 50% at 24% 58%, #d9a52c 0%, transparent 58%),
+    radial-gradient(28% 48% at 40% 68%, #d9a52c 0%, transparent 55%),
+    radial-gradient(55% 28% at 75% 68%, #a86000 0%, transparent 58%),
+    radial-gradient(24% 42% at 68% 80%, #a86000 0%, transparent 55%),
+    radial-gradient(38% 14% at 88% 6%, #2d5a27 0%, transparent 55%),
+    radial-gradient(14% 34% at 96% 16%, #2d5a27 0%, transparent 55%),
+    radial-gradient(22% 10% at 78% 18%, #1f4a1a 0%, transparent 50%),
+    radial-gradient(10% 26% at 94% 26%, #3a6b2f 0%, transparent 50%),
+    radial-gradient(24% 9% at 8% 6%, #2d5a27 0%, transparent 50%),
+    radial-gradient(9% 22% at 14% 16%, #1f4a1a 0%, transparent 48%),
+    radial-gradient(36% 12% at 4% 88%, #2d5a27 0%, transparent 58%),
+    radial-gradient(12% 30% at 2% 98%, #2d5a27 0%, transparent 55%),
+    radial-gradient(20% 9% at 20% 94%, #3a6b2f 0%, transparent 50%),
+    radial-gradient(9% 24% at 10% 82%, #1f4a1a 0%, transparent 48%),
+    radial-gradient(9% 11% at 98% 97%, rgba(107,31,31,0.55) 0%, transparent 60%),
+    #4a2f08;
 }
 
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:

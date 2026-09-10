@@ -592,12 +592,13 @@ export const COMPETITIONS = [
     emblem: worldCupLogo,
     // ⚠️ "MODE PEINTURE" (10/09) — remplace la teinte or/bronze 2 tons
     // ci-dessus (constat utilisateur : "ça fait pas trop coupe du monde"),
-    // puis un essai or + bleu FIFA (toujours pas validé). Demande finale :
-    // vert/bleu/rouge/jaune-doré/blanc/noir — voir le commentaire complet
-    // dans accueil.css (`.poster--theme-wc`) pour le détail des couleurs et
-    // leur origine (or et bleu déjà choisis avant, vert/rouge génériques,
-    // aucune couleur "monde" unique n'existant pour une compétition qui
-    // change de pays hôte à chaque édition). `tintTheme: 'wc'` bascule sur
+    // puis un essai or + bleu FIFA, puis une palette arc-en-ciel façon Ligue
+    // des Nations ("ça fait comme la ligue des nation") — aucun des trois
+    // validé. Composition finale, affinée par itérations successives : or
+    // très dominant (couleur du trophée), touches de vert asymétriques,
+    // pointe de marron quasi invisible, fond brun-doré SANS noir. Voir le
+    // commentaire complet dans accueil.css (`.poster--theme-wc`) pour le
+    // détail des couleurs et leur origine. `tintTheme: 'wc'` bascule sur
     // un bloc CSS dédié (comme `tintTheme: 'ucl'`/`'nl'`) — les champs
     // tint/tint2/tintStops/tintLight/tintSoft ne servent plus.
     tintTheme: 'wc',
