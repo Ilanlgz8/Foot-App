@@ -51,7 +51,18 @@ const FIFA_TIMEOUT  = 7_000
 // repique directement le résultat au lieu de tout refaire. Plus il y a de
 // spectateurs simultanés sur les mêmes matchs, plus ce fast-path est efficace —
 // l'inverse du problème actuel où chaque utilisateur ajoute du coût.
-const FRESH_TTL     = 12
+// ⚠️ RELEVÉ 12 → 18s (10/09, constat utilisateur : "244K commandes Upstash en
+// 10 jours", plafond gratuit 500K/MOIS — vérifié sur upstash.com/pricing).
+// Chaque poll qui rate le fast-path (fenêtre expirée) déclenche le pipeline
+// complet (~15-20 commandes Redis : cache ESPN/FIFA par match, écritures
+// fm:match/fm:fresh...) contre ~5 commandes pour un hit du fast-path
+// (rate-limit, mget storedMatches, get freshbatch, tentative de verrou) — une
+// fenêtre plus large fait retomber plus de polls sur le chemin bon marché.
+// 18s reste largement sous le rythme perçu par l'utilisateur (le poll client
+// lui-même tourne à 30-45s, voir espnTimerWorker.js, et Ably réveille de
+// toute façon un client dès qu'un AUTRE utilisateur détecte un vrai
+// changement) — aucune perte de fraîcheur perceptible attendue.
+const FRESH_TTL     = 18
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

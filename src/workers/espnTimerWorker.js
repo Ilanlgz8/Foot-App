@@ -18,4 +18,16 @@
 // client dès qu'un AUTRE utilisateur détecte un changement — la fraîcheur
 // perçue reste correcte sur les matchs suivis par plusieurs personnes
 // malgré ce tick plus lent.
-setInterval(() => postMessage('tick'), 30_000)
+//
+// ⚠️ RELEVÉ UNE 3e FOIS, 30s → 45s (10/09, constat utilisateur : "244K
+// commandes Upstash en 10 jours", plafond gratuit 500K/MOIS — vérifié sur
+// upstash.com/pricing, trajectoire ~730K/mois au rythme observé). Ce tick
+// déclenche un appel /api/fifa-live PAR CLIENT connecté à /live, qui coûte
+// au moins quelques commandes Redis (voir FRESH_TTL, fifa-live.js) même sur
+// le chemin le moins cher — le poste le plus proportionnel au nombre de
+// spectateurs simultanés de toute l'app. Même logique et même garde-fou que
+// les 2 réductions précédentes (10s→20s→30s, Fluid Active CPU) : Ably
+// compense toujours la fraîcheur perçue sur les matchs suivis par plusieurs
+// personnes, donc pas de perte perceptible attendue pour un gain direct sur
+// le volume de commandes Redis.
+setInterval(() => postMessage('tick'), 45_000)
