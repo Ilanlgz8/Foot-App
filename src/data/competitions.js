@@ -574,33 +574,119 @@ export const COMPETITIONS = [
     emblem: null,
   },
   {
+    // ⚠️ TEINTE AJOUTÉE (10/09, demande utilisateur : "regarder les couleurs
+    // pour la ligue des nations... etc" → confirmé via AskUserQuestion :
+    // teinte simple façon championnat club, sur TOUTES les compétitions
+    // internationales jusque-là neutres). Même méthode que les championnats
+    // club (voir le commentaire en tête de fichier) : couleur dominante
+    // extraite des pixels réels de `coupe-du-monde.png` (bucket 12, pixels
+    // sombres/gris/blancs ignorés) — un bronze-or franc (`#a86000`, cluster le
+    // plus fourni après les reflets clairs/crème qui ne sont que la brillance
+    // du trophée, pas sa couleur propre), avec une pointe plus claire en
+    // `tint2`. Pas de logo "Coupe du Monde" intemporel officiel (chaque
+    // édition a le sien) — ce fichier est déjà un générique, voir le
+    // commentaire plus haut sur le recadrage de sa marge.
     id: 'WC',
     name: 'Coupe du Monde',
     shortName: 'Coupe du monde',
     emblem: worldCupLogo,
+    tint: '#a86000',
+    tint2: '#d9a52c',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
   },
   {
+    // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC juste au-dessus pour le
+    // contexte de la demande. `euro-generic.png` est un arc-en-ciel de
+    // drapeaux (voir son commentaire d'import plus haut) : aucune couleur
+    // n'y domine vraiment (rouge, jaune, bleu, vert mesurés à quasi égalité,
+    // 5-8% chacun) — bleu retenu en base (couleur la plus proche de
+    // l'identité UEFA) et rouge en 2e couleur (2e plus fort cluster mesuré),
+    // plutôt qu'inventer une couleur hors de ce qui est réellement dans le
+    // logo.
     id: 'EC',
     name: 'Euro',
     shortName: 'Euro',
     emblem: euroLogo,
+    tint: '#00489c',
+    tint2: '#d8000c',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
   },
   {
+    // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC pour le contexte. Le
+    // logo (`nations-league-real.png`) est un fanion multicolore (mosaïque de
+    // petits drapeaux) : la famille bleu/indigo (plusieurs clusters mesurés
+    // ensemble) arrive en tête d'un cheveu devant le rouge, le vert restant
+    // 3e — bleu-indigo retenu en base, un bleu plus clair en 2e couleur.
+    // Volontairement plus foncé/désaturé que le bleu Ligue 1 (#085dfe, très
+    // vif) pour ne pas donner la même couleur à deux compétitions
+    // différentes alors que les deux logos sont réellement bleus mais pas de
+    // la même nuance.
     id: 'NL',
     name: 'Ligue des Nations',
     shortName: 'Ligue des nations',
     emblem: nationsLeagueLogo,
+    tint: '#2a3873',
+    tint2: '#3f66ad',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
+    // ⚠️ FOND BLANC RETIRÉ (10/09, demande utilisateur : "pour le logo ligue
+    // des nation c possible de retirer le fond blanc du logo ?"). Le fichier
+    // n'a PAS de fond blanc cuit dans les pixels (transparence vérifiée aux
+    // 4 coins, alpha=0) — ce que l'utilisateur voyait est la pastille
+    // blanche commune posée automatiquement derrière tout logo sans
+    // `emblemOpaque` (`.lmp__heroCompIcon`/`.accueil__mdjLeagueIcon`, fond
+    // blanc à 94%). Le texte "UEFA NATIONS LEAGUE" du fichier est en BLANC
+    // PUR (vérifié pixel par pixel, exactement comme l'ancien `ldc.png` avant
+    // son détourage) : sur la pastille blanche il devenait donc invisible
+    // (blanc sur blanc). `emblemOpaque: true` retire cette pastille — le
+    // fanion coloré + texte blanc se posent directement sur la carte sombre,
+    // où le texte redevient lisible.
+    emblemOpaque: true,
   },
   {
+    // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC pour le contexte. Vert
+    // très largement dominant dans `caf-can.png` (~38% des pixels colorés
+    // mesurés, loin devant tout le reste) — couleurs CAF/panafricaines,
+    // cohérent avec l'identité de la confédération. Or en 2e couleur (2e
+    // famille la plus mesurée, ~10%).
     id: 'CAN',
     name: 'Coupe d’Afrique des Nations',
     shortName: 'CAN',
     emblem: canLogo,
+    tint: '#00903c',
+    tint2: '#d8b400',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
   },
   {
+    // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC pour le contexte. Bleu
+    // largement dominant dans `copa-america-real.png` (~43% des pixels
+    // colorés mesurés), rouge en 2e couleur (~24%) — les deux couleurs du
+    // drapeau américain stylisé du logo.
     id: 'COPA',
     name: 'Copa America',
     shortName: 'Copa America',
     emblem: copaAmericaLogo,
+    tint: '#0060e4',
+    tint2: '#f00000',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
+    // ⚠️ Trophée à corps BLANC/argent (vérifié visuellement) : même risque
+    // d'invisibilité sur la pastille blanche que la Ligue des Nations
+    // ci-dessus, mais PAS confirmé texte blanc pur comme NL — laissé sur la
+    // pastille par défaut pour l'instant (pas demandé explicitement),
+    // signalé à l'utilisateur séparément.
   },
 ]
