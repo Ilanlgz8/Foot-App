@@ -52,7 +52,25 @@ self.addEventListener('push', event => {
     tag      = `statfootix-goal-${matchId ?? Date.now()}`,
     silent   = false,
     renotify = true,
+    // `ts` : horodatage posé côté serveur (api/cron-goals.js, sendPushToMatch)
+    // à l'instant réel de l'envoi — voir commentaire ci-dessous.
+    ts       = null,
   } = data
+
+  // ⚠️ AJOUT (10/09, retour utilisateur : notifs reçues "bien après le match"
+  // et, en rouvrant le navigateur après une absence, "toutes les notifs de la
+  // veille d'un coup"). Le service de push (FCM/Mozilla/Apple) peut garder un
+  // message en attente pour un appareil injoignable (navigateur fermé,
+  // ordinateur éteint...) et le délivrer d'un coup à la reconnexion — TTL côté
+  // serveur réduit à 20min (voir sendPushToMatch), mais ce garde-fou CLIENT
+  // est la protection réelle : si la notif arrive quand même après un délai
+  // trop long (retard réseau, TTL pas honoré à l'identique par tous les
+  // services de push...), elle n'est JAMAIS affichée plutôt que montrée en
+  // retard hors contexte. Payload sans `ts` (ancienne version encore en cache
+  // le temps du déploiement, ou notif de test) → jamais bloqué, comportement
+  // inchangé.
+  const MAX_AGE_MS = 20 * 60 * 1000 // 20min — aligné sur le TTL serveur
+  if (ts != null && Date.now() - ts > MAX_AGE_MS) return
 
   // waitUntil garantit que le SW reste actif jusqu'à la fin de l'affichage
   event.waitUntil(

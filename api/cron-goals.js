@@ -292,7 +292,20 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   const subs = subsCache ?? await loadSubscriptions(log)
   if (!subs.length) return 0
 
-  const payloadStr = JSON.stringify(payload)
+  // ⚠️ AJOUT (10/09, retour utilisateur : "y'a desfois je reçois les notifs
+  // bien après le match" + "si j'ai pas ouvert le navigateur, faut pas que je
+  // reçoive toutes les notifs de la veille d'un coup en le rouvrant") : `ts`
+  // (horodatage réel de CET envoi, posé ici — le seul endroit qui appelle
+  // vraiment webpush.sendNotification, voir mode='notify' plus bas dans ce
+  // fichier) est lu par le service worker (sw-push.js) pour ignorer une
+  // notif trop vieille au moment où elle arrive VRAIMENT sur l'appareil.
+  // Ne remplace pas TTL (qui gouverne si le service de push la garde en
+  // attente ou la jette pendant que l'appareil est injoignable) : les DEUX
+  // sont nécessaires — TTL raccourci ci-dessous pour que le service de push
+  // arrête de la garder après 20min, `ts` pour rattraper le cas où elle est
+  // quand même délivrée juste avant expiration alors qu'entre-temps le match
+  // (ou la nuit) est bien fini.
+  const payloadStr = JSON.stringify({ ...payload, ts: payload.ts ?? Date.now() })
   const stale = []
   let sent = 0
   let failed = 0
@@ -307,8 +320,12 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
       // livraison en arrière-plan/économie d'énergie, ce qui correspond
       // exactement au symptôme observé (notifs de but rares et imprévisibles,
       // alors qu'il n'y en a que ~0-10 par match — pas un problème de volume).
+      // TTL raccourci 3600 → 1200 (20min, voir commentaire `ts` ci-dessus) :
+      // au-delà, le service de push (FCM/Mozilla/Apple) jette la notif au
+      // lieu de la garder en attente pour un appareil injoignable — aucun
+      // effet sur une livraison normale (toujours quasi instantanée).
       await webpush.sendNotification(sub, payloadStr, {
-        TTL: options.ttl ?? 3600,
+        TTL: options.ttl ?? 1200,
         urgency: options.urgency ?? 'normal',
       })
       sent++

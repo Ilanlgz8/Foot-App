@@ -731,10 +731,13 @@ async function runOnePass(env) {
   // (finalDoneKey déjà posé, voir plus bas) pendant ~48h après chaque journée
   // de championnat. AVANT ce fix, CHAQUE match déjà clos payait quand même le
   // pipeline complet (5-7 commandes Redis) à CHAQUE passe où il traînait
-  // encore ici, avant de découvrir (via pick(5), plus bas) qu'il n'y avait
-  // plus rien à faire — un coût jugé "inévitable" à l'origine (voir
-  // commentaire historique sur finalDoneKey/pick(5)) parce qu'on ne
-  // connaissait alreadyDone qu'APRÈS avoir exécuté le pipeline. Avec plusieurs
+  // encore ici, avant de découvrir (via `alreadyDone`, plus bas) qu'il n'y
+  // avait plus rien à faire — un coût jugé "inévitable" à l'origine (voir
+  // commentaire historique sur finalDoneKey) parce qu'on ne connaissait
+  // alreadyDone qu'APRÈS avoir exécuté le pipeline (depuis le 10/09, les
+  // lectures sont séparées des écritures — voir plus bas — donc ce n'est
+  // même plus vrai pour le pipeline par-match non plus, ce pré-filtre reste
+  // néanmoins utile pour éviter même le coût du mget par-match). Avec plusieurs
   // championnats qui reprennent la même semaine (donc souvent 10-20+ matchs
   // clos qui traînent en même temps dans la fenêtre 48h), ce coût devient vite
   // significatif — y compris la nuit, quand aucun nouveau match ne justifie
@@ -748,8 +751,8 @@ async function runOnePass(env) {
   // match encore actif, au risque de re-cogner la limite de 50/exécution que
   // le passage en pipeline, voir plus bas, avait justement réglée). Les
   // matchs déjà clos sautent alors la boucle avant de payer le moindre coût
-  // du pipeline par-match. Purement ADDITIF : le pipeline par-match et son
-  // propre .get(finalDoneKey) (voir pick(5) plus bas) restent INCHANGÉS —
+  // du pipeline par-match. Purement ADDITIF : le mget par-match et sa propre
+  // lecture de finalDoneKey (voir `alreadyDone` plus bas) restent INCHANGÉS —
   // ce pré-filtre ne fait que sauter les matchs qu'on sait DÉJÀ clos depuis
   // AVANT cette passe ; un match qui vient tout juste d'être confirmé clos
   // PENDANT cette passe (1ère fois) n'est pas concerné, traité normalement
@@ -944,60 +947,77 @@ async function runOnePass(env) {
     // en push à tous les abonnés en plein temps additionnel.
     const finalConfirmKey = `finalConfirm:${eventId}`
 
-    // ⚠️ Les indices [5]/[6] ci-dessous sont OPTIONNELS (ajoutés seulement
-    // sous condition) — finalDoneKey [5] doit donc rester le DERNIER ajout
-    // INCONDITIONNEL avant eux (position fixe, toujours [5]), sinon sa
-    // position réelle dans pipeResults se décale selon isLive/isFinalNow et
-    // pick(5) lirait le mauvais résultat (bug trouvé et corrigé pendant la
-    // relecture de ce fix, avant tout déploiement).
-    let pipe = kv.pipeline()
-      .get(stateKey)                                          // [0] prevState
-      .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [1] (résultat inutilisé)
-      .get(trackKey)                                           // [2] rawTrack
-      .get(cardTrackKey)                                       // [3] rawCardTrack
-      .set(lockKey, '1', { px: 5_000, nx: true })              // [4] lockAcquired
-      .get(finalDoneKey)                                       // [5] alreadyDone — voir commentaire plus haut, garde-fou bug notifs répétées
-    // [6] optionnel : dédup coup d'envoi (si live) OU lecture recap (si
-    // terminé) — isLive et isFinalNow sont mutuellement exclusifs (aucun
-    // statut n'appartient aux 2 ensembles à la fois), jamais les deux en
-    // même temps dans le même pipeline.
-    if (isLive) pipe = pipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
-    else if (isFinalNow) pipe = pipe.get(recapKey)
-    // [7] optionnel : 1ère acquisition de finalConfirmKey (voir commentaire
-    // ci-dessus) — uniquement pertinent quand isFinalNow.
-    if (isFinalNow) pipe = pipe.set(finalConfirmKey, '1', { ex: 300, nx: true })
-
-    let pipeResults = []
+    // ⚠️ OPTIMISÉ (10/09, réduction commandes Upstash — voir CLAUDE.md) :
+    // LECTURES et ÉCRITURES séparées en 2 groupes au lieu d'un seul pipeline
+    // mélangeant les deux. Upstash facture CHAQUE commande d'un pipeline
+    // individuellement (déjà documenté plus haut) — mais un MGET portant sur
+    // plusieurs clés est facturé comme UNE SEULE commande, quel que soit le
+    // nombre de clés (même principe déjà exploité ailleurs dans ce fichier
+    // pour emptyDayKey/nextCheckKey/cron:anyLive/cron:liveSlugs et les flags
+    // noMatch — voir plus haut). Les 5 lectures (stateKey/trackKey/
+    // cardTrackKey/finalDoneKey/recapKey, cette dernière toujours incluse
+    // même hors match terminé — un mget ne coûte pas plus cher avec une clé
+    // de plus) passent ainsi de 4-5 commandes à 1 seule.
+    // Les ÉCRITURES (stateKey, verrou but `goalLock` NX, dédup KO NX, 1ère
+    // confirmation FT NX) restent un pipeline séparé, INCHANGÉES commande
+    // par commande : ce sont des SET...NX dont la garantie d'atomicité (une
+    // seule exécution concurrente peut "gagner" — voir lockAcquired plus
+    // bas) dépend de rester des commandes Redis individuelles distinctes ;
+    // les fusionner dans un objet JSON unique aurait cassé cette garantie
+    // (lecture+comparaison+écriture n'est PAS atomique sans script Lua) —
+    // délibérément non fait, pour ne pas risquer de réintroduire le genre de
+    // bug de notifs dupliquées/manquées déjà rencontré sur ce fichier par le
+    // passé (voir historique finalConfirmKey/lockKey ci-dessus).
+    let reads = [null, null, null, null, null]
     try {
-      pipeResults = await pipe.exec({ keepErrors: true })
+      reads = await kv.mget(stateKey, trackKey, cardTrackKey, finalDoneKey, recapKey)
+    } catch (e) {
+      log.push(`[espn:${slug}:${eventId}] mget error=${e.message}`)
+    }
+    const prevState    = reads[0] ?? null
+    const rawTrack      = reads[1] ?? null
+    const rawCardTrack  = reads[2] ?? null
+    const alreadyDone   = reads[3] ?? null
+    const recapRaw      = reads[4] ?? null
+
+    // Match déjà confirmé clos pour de bon lors d'une passe précédente (voir
+    // finalDoneKey plus haut) → on s'arrête ICI, avant tout le reste (buts,
+    // cartons, mi-temps, reprise, FT, recheck).
+    // ⚠️ AMÉLIORÉ par rapport à avant : comme les lectures sont maintenant
+    // séparées des écritures, on connaît `alreadyDone` AVANT de payer le
+    // coût du pipeline d'écriture ci-dessous — un match déjà clos pour de
+    // bon ne coûte donc plus que CETTE seule commande (le mget), au lieu
+    // d'écrire quand même stateKey/lockKey/etc. pour rien (ancienne
+    // limitation du pipeline combiné lecture+écriture d'origine, qui ne
+    // connaissait alreadyDone qu'APRÈS avoir déjà tout exécuté).
+    if (alreadyDone) continue
+
+    let writePipe = kv.pipeline()
+      .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [0] (résultat inutilisé)
+      .set(lockKey, '1', { px: 5_000, nx: true })               // [1] lockAcquired
+    // [2] optionnel : dédup coup d'envoi (si live) OU 1ère acquisition de
+    // finalConfirmKey (si terminé) — isLive et isFinalNow sont mutuellement
+    // exclusifs (aucun statut n'appartient aux 2 ensembles à la fois),
+    // jamais les deux en même temps dans le même pipeline.
+    if (isLive) writePipe = writePipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
+    else if (isFinalNow) writePipe = writePipe.set(finalConfirmKey, '1', { ex: 300, nx: true })
+
+    let writeResults = []
+    try {
+      writeResults = await writePipe.exec({ keepErrors: true })
     } catch (e) {
       log.push(`[espn:${slug}:${eventId}] pipeline error=${e.message}`)
     }
-    // keepErrors:true → chaque entrée est { result, error? } — une commande
-    // en erreur individuelle (ou un échec réseau total, pipeResults=[])
-    // retombe sur null, exactement comme l'ancien "un .catch() par appel"
-    // séparé pour chaque commande.
-    const pick = (i) => (pipeResults[i] && !pipeResults[i].error) ? pipeResults[i].result : null
+    const pickWrite = (i) => (writeResults[i] && !writeResults[i].error) ? writeResults[i].result : null
 
-    const prevState    = pick(0)
-    const rawTrack      = pick(2)
-    const rawCardTrack  = pick(3)
-    const lockAcquired  = pick(4)
-    // Match déjà confirmé clos pour de bon lors d'une passe précédente (voir
-    // finalDoneKey plus haut, position FIXE [5]) → on s'arrête ICI, avant
-    // tout le reste (buts, cartons, mi-temps, reprise, FT, recheck). Le
-    // stateKey/trackKey/etc. ont déjà été écrits ci-dessus par le pipeline
-    // (coût déjà payé, inévitable vu qu'on ne connaît alreadyDone qu'APRÈS
-    // avoir exécuté le pipeline), mais aucune notif ne peut plus jamais
-    // repartir pour cet évènement à partir d'ici.
-    if (pick(5)) continue
-    const koAcquired    = isLive ? pick(6) : false
-    const recapAlready  = (!isLive && isFinalNow) ? pick(6) : null
+    const lockAcquired   = pickWrite(1)
+    const koAcquired     = isLive ? pickWrite(2) : false
+    const recapAlready   = (!isLive && isFinalNow) ? recapRaw : null
     // true = c'est la 1ère fois qu'on voit ce match FINAL (clé tout juste
     // créée) → PAS encore confirmé. false/null = la clé existait déjà → au
     // moins une passe FINAL précédente → confirmation possible (sous réserve
     // du score inchangé, voir isFinalConfirmed plus bas).
-    const finalFirstSeen = isFinalNow ? pick(7) : null
+    const finalFirstSeen = isFinalNow ? pickWrite(2) : null
 
     const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
     // Confirmé seulement à la 2e passe FINAL consécutive (ou plus), avec un
@@ -1195,7 +1215,7 @@ async function runOnePass(env) {
       // tête de fichier) : finalDoneKey était posé AVANT même de savoir si
       // l'envoi allait réussir — un échec (timeout/429/5xx) laissait quand
       // même le match "clos pour de bon" (plus aucun traitement possible,
-      // voir `if (pick(5)) continue` en tête de boucle), la notif "Fin de
+      // voir `if (alreadyDone) continue` en tête de boucle), la notif "Fin de
       // match" perdue pour toujours. Posé désormais SEULEMENT si l'envoi est
       // confirmé.
       const ftSent = await notifyVercel(env, `push:espn:ft:${eventId}`,

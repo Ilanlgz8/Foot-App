@@ -240,6 +240,38 @@ cf-worker/
   au moment de l'implémentation (28/08) — tant qu'elles sont absentes, `handleAsk` renvoie une
   500 "pas encore configuré côté serveur" (dégradation propre, pas de crash). Voir Env vars
   Vercel ci-dessus pour la procédure de création du token.
+- ✅ Commandes Upstash trop proches du plafond gratuit (500K/mois, constat utilisateur "244K en
+  10 jours", 10/09) : 3 correctifs cumulés, du moins au plus risqué. (1) `FRESH_TTL` (cache
+  partagé fifa-live.js) 12→18s, poll client `espnTimerWorker.js` 30→45s (3e réduction, voir son
+  commentaire) — coût par spectateur simultané de `/live`. (2) Poste le plus lourd identifié :
+  le pipeline Redis par match du cron (`cf-worker/src/index.js`), 6-8 commandes/match/minute
+  MÊME pipelinées (Upstash facture chaque commande d'un pipeline individuellement, pas le
+  pipeline comme un tout). Séparé en lectures (`cron:espn`/`goalTrack`/`cardTrack`/`finalDone`/
+  `recap` regroupées en 1 seul MGET — facturé comme 1 SEULE commande quel que soit le nombre de
+  clés, même principe déjà en place ailleurs dans ce fichier pour `cron:anyLive`/`cron:liveSlugs`/
+  les flags `noMatch`) et écritures (`SET...NX` sur le verrou but/dédup KO/1ère confirmation FT —
+  laissées INCHANGÉES, commande par commande : leur garantie d'atomicité ne survivrait pas à une
+  fusion en un seul objet JSON sans script Lua, risque jugé disproportionné sur le fichier le
+  plus sensible de l'app). Gain : ~6-8 → ~3-4 commandes/match/minute (match en cours), 1 seule
+  pour un match déjà clos qui traîne encore dans le scoreboard ESPN (avant : le pipeline complet
+  était quand même payé). Tests/lint/build vérifiés inchangés ; pas de test dédié sur le câblage
+  Redis du Worker lui-même (aucune infra de test dans `cf-worker/`, seule la logique pure de
+  détection est testée via `liveDetection.test.js`) — à surveiller sur le dashboard Upstash dans
+  les jours suivant le déploiement plutôt que garanti à 100% a priori.
+- ✅ Notifs reçues "bien après le match", ou toutes d'un coup en rouvrant le navigateur après une
+  absence (constat utilisateur, 10/09) : cause la plus probable — un service de push (FCM/Mozilla/
+  Apple) garde un message en attente pour un appareil injoignable (navigateur fermé) et le délivre
+  d'un coup à la reconnexion. TTL d'envoi (`webpush.sendNotification`, `api/cron-goals.js`)
+  raccourci 3600→1200s (20min) pour qu'un service de push abandonne plus vite. Garde-fou
+  complémentaire côté CLIENT (le vrai filet de sécurité, indépendant de la cause exacte) : chaque
+  payload embarque désormais `ts` (horodatage réel de l'envoi, posé dans `sendPushToMatch`, seul
+  endroit qui appelle vraiment `webpush.sendNotification`) ; `public/sw-push.js` ignore
+  silencieusement toute notif reçue plus de 20min après son `ts` au lieu de l'afficher hors
+  contexte. Honnêteté : pas d'accès aux logs de production (`CRON_SECRET` non disponible dans cet
+  environnement) pour confirmer que c'est EXACTEMENT ce mécanisme qui explique l'incident "hier en
+  Ligue des Champions" mentionné par l'utilisateur — le garde-fou `ts` protège contre ce symptôme
+  précis quelle qu'en soit la cause exacte, mais un futur diagnostic plus précis nécessitera
+  `/api/debug-push?secret=...&match=...` (logs des dernières 24h, déjà en place).
 
 ## Conventions
 - Noms français partout dans l'UI
