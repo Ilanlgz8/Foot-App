@@ -137,26 +137,7 @@ function App() {
   // verrouillé, on le libère de force. Un modal réellement encore ouvert à
   // ce moment perdrait son verrou de scroll (désagrément mineur, rare) —
   // largement préférable à une barre du bas décrochée durablement.
-  // ⚠️ COMPLÉTÉ (10/09, le correctif ci-dessus seul n'a pas suffi — retour
-  // utilisateur identique après déploiement) : cause probablement différente
-  // de ce qui a été corrigé au-dessus, un bug WebKit/iOS documenté où un
-  // `position: fixed` qui n'a pas sa PROPRE couche de composition GPU peut se
-  // "décoller" du viewport après un cycle arrière-plan→premier plan, surtout
-  // au moment où le scroll redéclenche le masquage/affichage de la barre
-  // d'adresse Safari. Voir `.sfTabbar` (navbar.css) pour le correctif CSS
-  // (`transform: translateZ(0)`, isole la barre sur sa propre couche) — ce
-  // "nudge" JS force WebKit à RECALCULER cette couche dès le retour au
-  // premier plan, avant que l'utilisateur ne scrolle (au lieu d'attendre une
-  // repaint qui peut ne jamais arriver toute seule) : on touche `transform`
-  // une frame puis on le relâche, ce qui suffit à forcer le recalcul sans
-  // effet visuel perceptible.
   useEffect(() => {
-    const nudgeTabbar = () => {
-      const el = document.querySelector('.sfTabbar')
-      if (!el) return
-      el.style.transform = 'translateZ(0.01px)'
-      requestAnimationFrame(() => { el.style.transform = '' })
-    }
     const unstickBody = () => {
       if (document.visibilityState !== 'visible') return
       if (document.body.style.position === 'fixed') {
@@ -166,13 +147,66 @@ function App() {
         document.body.style.left = ''
         document.body.style.right = ''
       }
-      nudgeTabbar()
     }
     document.addEventListener('visibilitychange', unstickBody)
     window.addEventListener('pageshow', unstickBody)
     return () => {
       document.removeEventListener('visibilitychange', unstickBody)
       window.removeEventListener('pageshow', unstickBody)
+    }
+  }, [])
+
+  // ⚠️ 3e TENTATIVE (10/09, "ça le fait encore" — signalé À NOUVEAU après le
+  // passage de `.sfTabbar` en portail React direct dans `<body>`, voir
+  // navbar.jsx). Ce dernier changement écarte pourtant avec certitude toute
+  // cause liée à un ANCÊTRE transformé/filtré (vérifié en production : le
+  // parent DOM réel de `.sfTabbar` est bien `<body>`, sans aucun intermédiaire
+  // possible) — 2 hypothèses ciblées de suite (verrou body figé, puis couche
+  // GPU dédiée + nudge sur un événement précis) n'ont donc pas identifié la
+  // vraie cause avec certitude. Plutôt que deviner un 3e déclencheur précis,
+  // changement d'approche : un watchdog qui vérifie l'état RÉEL et OBSERVABLE
+  // de la barre en continu (toutes les secondes + à chaque scroll/retour au
+  // premier plan) au lieu d'anticiper QUAND ça casse — même logique que le
+  // filet de sécurité déjà utilisé ailleurs dans l'app pour la fraîcheur ESPN
+  // (voir `useLiveMinute.js`, le setInterval qui détecte une suspension JS
+  // par l'écart RÉEL entre deux tops, indépendant de tout event navigateur).
+  // Un `position: fixed` correctement rendu colle TOUJOURS son bord bas
+  // exactement au bord bas du viewport VISUEL courant (`rect.bottom ===
+  // window.innerHeight`) — vrai quel que soit l'état de la barre d'adresse
+  // (masquée/affichée), donc un test fiable indépendamment des fluctuations
+  // normales de `window.innerHeight` sur mobile. Un écart détecté force un
+  // recalcul en retirant puis réappliquant `position` elle-même (le levier le
+  // plus direct sur la propriété en cause — pas un simple `transform`, déjà
+  // tenté sans succès durable) : corrige le symptôme quelle que soit sa cause
+  // exacte, generalement en moins d'1s, sans dépendre d'avoir deviné le bon
+  // déclencheur.
+  useEffect(() => {
+    let rafId = null
+    const check = () => {
+      const el = document.querySelector('.sfTabbar')
+      if (!el) return
+      if (getComputedStyle(el).display === 'none') return   // desktop : masquée exprès
+      const rect  = el.getBoundingClientRect()
+      const drift = Math.abs(rect.bottom - window.innerHeight)
+      if (drift > 2) {
+        el.style.position = 'static'
+        void el.offsetHeight   // force un reflow synchrone avant de réappliquer
+        el.style.position = ''
+      }
+    }
+    const scheduleCheck = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => { rafId = null; check() })
+    }
+    const intervalId = setInterval(check, 1000)
+    window.addEventListener('scroll', scheduleCheck, { passive: true })
+    document.addEventListener('visibilitychange', scheduleCheck)
+    window.addEventListener('pageshow', scheduleCheck)
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener('scroll', scheduleCheck)
+      document.removeEventListener('visibilitychange', scheduleCheck)
+      window.removeEventListener('pageshow', scheduleCheck)
     }
   }, [])
 

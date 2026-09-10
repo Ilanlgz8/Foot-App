@@ -360,6 +360,27 @@ cf-worker/
   accès à un vrai appareil mobile/PWA) — cette 3e tentative répare la classe de bug la plus
   probable identifiée par audit de code et par précédent réel dans ce même projet, pas une
   reproduction confirmée en direct ; à valider par l'utilisateur sur son téléphone.
+- ✅ Barre du bas TOUJOURS détachée malgré le passage en portail (constat utilisateur, 10/09,
+  "ça le fait encore" juste après le déploiement du fix précédent) — vérifié en production
+  (DevTools/JS distant) que le portail est bien actif : `.sfTabbar` est bien un enfant direct
+  RÉEL de `<body>`, `position: fixed` bien appliqué. Écarte donc avec certitude toute cause liée
+  à un ancêtre transformé (déjà la cible des 2 tentatives précédentes) — 3 tentatives ciblées de
+  suite (verrou body, couche GPU+nudge, portail) n'ont pas trouvé la vraie cause. Changement
+  d'approche : au lieu de deviner un 4e déclencheur précis, watchdog (`App.jsx`) qui vérifie
+  l'état RÉEL et OBSERVABLE de la barre en continu (toutes les secondes + à chaque scroll/retour
+  au premier plan) — un `position: fixed` correctement rendu colle TOUJOURS son bord bas
+  exactement au bord bas du viewport visuel courant (`rect.bottom === window.innerHeight`, fiable
+  quel que soit l'état de la barre d'adresse mobile) ; un écart détecté force un recalcul en
+  retirant puis réappliquant `position` elle-même. Vérifié RÉELLEMENT en direct sur la prod
+  (`statfootix.vercel.app`, pas juste en local) : décrochage simulé par script (position forcée à
+  `static`, la barre partait bien à 1005px alors que le viewport ne fait que 837px, reproduisant
+  fidèlement le symptôme signalé) → le watchdog détecte et répare en un seul cycle, la barre
+  revient exactement à `bottom: 837px = window.innerHeight`. Corrige le symptôme observable quelle
+  que soit sa cause exacte (jamais identifiée avec certitude malgré 3 audits), au lieu de parier
+  sur un nouveau déclencheur. 356 tests + lint + build inchangés. Honnêteté : le test ci-dessus
+  vérifie que le MÉCANISME DE RÉPARATION fonctionne (simulation fidèle du symptôme rapporté), pas
+  qu'il se déclenchera au bon moment sur un vrai décrochage spontané en conditions réelles — à
+  confirmer par l'utilisateur sur son téléphone.
 
 ## Conventions
 - Noms français partout dans l'UI
