@@ -598,12 +598,12 @@ export const COMPETITIONS = [
     // Cup 26 (trophée + anneau vert malachite à sa base) : couleurs
     // RÉELLEMENT mesurées sur ses pixels (or `#f0c000` dominant, vert
     // `#009040` dominant — nettement plus vifs que le premier extrait, fait
-    // sur un logo générique de moins bonne qualité). Composition finale :
-    // contraste lumière/ombre métallique (hautes lumières → or moyen →
-    // ombres, un aplat plat ne "faisait pas gold" aux yeux de l'utilisateur),
-    // touches de vert asymétriques concentrées en haut à gauche, fond or
-    // foncé SANS noir. Voir le commentaire complet dans accueil.css
-    // (`.poster--theme-wc`) pour le
+    // sur un logo générique de moins bonne qualité). Composition finale : or
+    // dominant (contraste lumière/ombre métallique, un aplat plat ne
+    // "faisait pas gold" aux yeux de l'utilisateur), PLUS rouge et jaune vif
+    // ajoutés en plus du vert (demande explicite finale), zones les plus
+    // sombres retirées ("jaune foncé"), fond or moyen SANS noir. Voir le
+    // commentaire complet dans accueil.css (`.poster--theme-wc`) pour le
     // détail des couleurs et leur origine. `tintTheme: 'wc'` bascule sur
     // un bloc CSS dédié (comme `tintTheme: 'ucl'`/`'nl'`) — les champs
     // tint/tint2/tintStops/tintLight/tintSoft ne servent plus.
@@ -730,12 +730,13 @@ export const COMPETITIONS = [
 // par les autres cards qui utilisent déjà le bloc CSS dédié en entier.
 // Couleurs reprises des dégradés déjà validés par l'utilisateur pour chaque
 // thème : bleu vif/bleu marine profond pour la LDC (mêmes valeurs que
-// `.poster--theme-ucl`), bleu/rouge du "mode peinture" LDN, or clair/or
-// foncé du "mode peinture" Coupe du Monde.
+// `.poster--theme-ucl`), bleu/rouge du "mode peinture" LDN, jaune vif/rouge
+// du "mode peinture" Coupe du Monde (composition finale : or dominant + vert
+// + rouge/jaune vif).
 const TINT_THEME_CAMP_COLORS = {
   ucl: ['#0232FF', '#010056'],
   nl:  ['#0c3c90', '#d8000c'],
-  wc:  ['#f7dc3c', '#6b5000'],
+  wc:  ['#ffe135', '#c1121f'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

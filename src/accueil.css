@@ -1882,33 +1882,37 @@
    5) Couleurs RÉELLEMENT mesurées sur les pixels de ce logo (script Python,
       bucket 16, pixels noirs/blancs exclus) : or `#f0c000`/dominant, vert
       `#009040`/dominant — nettement plus vifs que le premier extrait (logo
-      générique de moins bonne qualité). Composition finale : contraste
-      lumière/ombre métallique (hautes lumières `#f7dc3c` puis or moyen
-      `#c09000`/`#a87e00` puis ombres `#8a6800`/`#6b5000` — un aplat plat,
-      clair ou foncé, ne "faisait pas gold" aux yeux de l'utilisateur, il
-      fallait ce contraste comme sur le vrai trophée), touches de vert
-      asymétriques élargies en haut à gauche (anneau du trophée), fond
-      `#6b5000` (or foncé, jamais noir/marron). Le voile brillant
-      (`.poster__bg--gradientTri`) essayé puis retiré : il recréait un rond
-      "jaune clair" au centre non désiré. */
+      générique de moins bonne qualité). Contraste lumière/ombre métallique
+      d'abord essayé (un aplat plat, clair ou foncé, ne "faisait pas gold"
+      aux yeux de l'utilisateur), PUIS demande finale : ajouter aussi du
+      rouge et du jaune vif (`#c1121f`/`#e01a2b` et `#ffe135`, en plus du vert
+      `#007040`/`#005c30`/`#009040`) et retirer les zones les plus sombres
+      (`#8a6800`/`#6b5000`, jugées "jaune foncé") — rouge concentré en haut à
+      gauche et bas à droite, jaune vif au centre-haut à la place de l'or
+      moyen, vert gardé en haut à droite et bas à gauche (anneau du trophée).
+      Fond `#a87e00` (or moyen, jamais noir/marron/trop sombre). Le voile
+      brillant (`.poster__bg--gradientTri`) essayé puis retiré : il recréait
+      un rond "jaune clair" au centre non désiré. */
 .poster--theme-wc .poster__bg--gradient {
   inset: -20px;
   background:
     radial-gradient(45% 32% at 34% 24%, #f7dc3c 0%, transparent 60%),
-    radial-gradient(42% 65% at 48% 40%, #c09000 0%, transparent 64%),
+    radial-gradient(42% 65% at 48% 40%, #ffe135 0%, transparent 64%),
     radial-gradient(50% 55% at 22% 55%, #a87e00 0%, transparent 60%),
-    radial-gradient(38% 56% at 42% 66%, #8a6800 0%, transparent 60%),
-    radial-gradient(50% 30% at 80% 62%, #a87e00 0%, transparent 60%),
-    radial-gradient(30% 46% at 68% 82%, #6b5000 0%, transparent 58%),
-    radial-gradient(16% 10% at 55% 18%, #f7dc3c 0%, transparent 52%),
+    radial-gradient(38% 56% at 42% 66%, #a87e00 0%, transparent 60%),
+    radial-gradient(38% 22% at 74% 58%, #a87e00 0%, transparent 56%),
     radial-gradient(44% 22% at 88% 6%, #007040 0%, transparent 58%),
     radial-gradient(22% 46% at 96% 16%, #005c30 0%, transparent 55%),
-    radial-gradient(52% 24% at 8% 4%, #009040 0%, transparent 55%),
-    radial-gradient(26% 44% at 4% 18%, #007040 0%, transparent 52%),
+    radial-gradient(52% 24% at 8% 4%, #c1121f 0%, transparent 55%),
+    radial-gradient(26% 44% at 4% 18%, #e01a2b 0%, transparent 52%),
     radial-gradient(42% 18% at 4% 88%, #005c30 0%, transparent 58%),
     radial-gradient(22% 42% at 2% 98%, #007040 0%, transparent 55%),
     radial-gradient(30% 15% at 20% 94%, #009040 0%, transparent 52%),
-    #6b5000;
+    radial-gradient(48% 30% at 92% 90%, #c1121f 0%, transparent 60%),
+    radial-gradient(30% 55% at 100% 72%, #c1121f 0%, transparent 58%),
+    radial-gradient(20% 34% at 78% 100%, #e01a2b 0%, transparent 55%),
+    radial-gradient(30% 16% at 62% 96%, #ffe135 0%, transparent 55%),
+    #a87e00;
   filter: blur(20px) saturate(1.3);
   animation: none;
 }
