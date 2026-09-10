@@ -732,16 +732,16 @@ export const COMPETITIONS = [
     // mesurés, loin devant tout le reste) — couleurs CAF/panafricaines,
     // cohérent avec l'identité de la confédération. Or en 2e couleur (2e
     // famille la plus mesurée, ~10%).
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (10/09, demande : "fait pareil pour... la
+    // CAN... avec les couleurs qu'il y'a deja") : même mécanisme que CL/NL/
+    // WC/UEL/UECL (`tintTheme`, voir `.poster--theme-can` dans accueil.css) —
+    // plusieurs taches irrégulières mélangées, floutées, PAS de nouvelle
+    // couleur inventée, reprend exactement le vert/or déjà mesurés ci-dessus.
     id: 'CAN',
     name: 'Coupe d’Afrique des Nations',
     shortName: 'CAN',
     emblem: canLogo,
-    tint: '#00903c',
-    tint2: '#d8b400',
-    tintStops: { base: '22%', c2: '55%', c3: '85%' },
-    tintLight: true,
-    tintPearl: 0.45,
-    tintSoft: true,
+    tintTheme: 'can',
   },
   {
     // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC pour le contexte. Bleu
@@ -784,6 +784,7 @@ const TINT_THEME_CAMP_COLORS = {
   wc:   ['#ffe135', '#c1121f'],
   uel:  ['#c8551a', '#000000'],
   uecl: ['#2f8a3e', '#000000'],
+  can:  ['#d8b400', '#00903c'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

@@ -1304,6 +1304,37 @@
     #141414;
 }
 
+/* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`
+   (accueil.css, voir son commentaire détaillé). */
+#root .lmp__hero--theme-can {
+  background: #0d0d10;
+}
+.lmp__hero--theme-can .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-can .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(20px) saturate(1.3);
+  background:
+    radial-gradient(42% 34% at 60% 30%, #00903c 0%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #1fb050 0%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #006428 0%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #00903c 0%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #14a344 0%, transparent 56%),
+    radial-gradient(38% 30% at 15% 15%, #d8b400 0%, transparent 60%),
+    radial-gradient(30% 42% at 8% 48%, #f0cc20 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #d8b400 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #a88800 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #d8b400 0%, transparent 55%),
+    radial-gradient(22% 34% at 90% 32%, #f0cc20 0%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #00903c 0%, transparent 55%),
+    #0d0d10;
+}
+
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
    -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
    `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé

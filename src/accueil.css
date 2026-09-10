@@ -1999,6 +1999,39 @@
     rgba(var(--black-rgb),0.65) 100%);
 }
 
+/* ⚠️ HABILLAGE CAN (10/09) — voir competitions.js (`tintTheme`). Même
+   recette "mode peinture" que UEL/UECL ci-dessus, couleurs déjà mesurées
+   sur le vrai logo (`caf-can.png`) : vert #00903c dominant, or #d8b400 en
+   2e couleur — pas de composante noire ici (contrairement à UEL/UECL,
+   l'identité CAN/CAF n'en a pas), base neutre très sombre à la place. */
+.poster--theme-can .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(42% 34% at 60% 30%, #00903c 0%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #1fb050 0%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #006428 0%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #00903c 0%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #14a344 0%, transparent 56%),
+    radial-gradient(38% 30% at 15% 15%, #d8b400 0%, transparent 60%),
+    radial-gradient(30% 42% at 8% 48%, #f0cc20 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #d8b400 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #a88800 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #d8b400 0%, transparent 55%),
+    radial-gradient(22% 34% at 90% 32%, #f0cc20 0%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #00903c 0%, transparent 55%),
+    #0d0d10;
+  filter: blur(20px) saturate(1.3);
+  animation: none;
+}
+.poster--theme-can .poster__bg--gradientAlt { inset: 0; opacity: 0; }
+.poster--theme-can .poster__bg--gradientTri { inset: 0; opacity: 0; }
+.poster--theme-can .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.65) 100%);
+}
+
 /* Overlay sombre + dégradé directional */
 .poster__overlay {
   position: absolute;
