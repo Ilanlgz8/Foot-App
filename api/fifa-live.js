@@ -743,134 +743,160 @@ export default async function handler(req, res) {
     : []
 
   // Matcher chaque match FD.org avec un event ESPN
-  const usedEspnIds = new Set()
-  // ⚠️ PERF (question utilisateur sur la tenue en charge avec beaucoup de
-  // matchs simultanés) : les fetchEspnSummaryStats() nécessaires plus bas
-  // dans cette boucle ne sont PLUS attendus (`await`) un par un — ça
-  // sérialisait un aller-retour réseau PAR MATCH (ex: 20 matchs en direct
-  // sans stats scoreboard × ~300-500ms chacun = jusqu'à 10s rien que pour
-  // cette étape, risquant de dépasser le timeout par défaut d'une fonction
-  // Vercel Hobby et de faire échouer TOUTE la réponse). Le fetch est lancé
-  // immédiatement (la requête réseau part tout de suite) mais collecté ici
-  // pour être résolu APRÈS la boucle, en parallèle pour tous les matchs qui
-  // en ont besoin — le temps total ne dépend plus du nombre de matchs mais
-  // du plus lent des appels ESPN.
-  const pendingStatsFetches = []
+  // ⚠️ BUG CORRIGÉ (10/09, signalement utilisateur : 4 matchs Ligue des
+  // Champions démarrant à la même minute restés bloqués sur "Débute" même
+  // après avoir fermé/rouvert l'app plusieurs fois — débloqué tout seul bien
+  // plus tard). Cause : la résolution se faisait un match FD.org à la fois,
+  // DANS L'ORDRE du tableau `matches` — un match qui échouait son match
+  // strict (2 côtés, par noms d'équipe) retombait sur un repli plus faible
+  // (1 seul côté + horaire ESPN à ±10min, voir passe 3 plus bas) qui pouvait
+  // revendiquer (usedEspnIds) l'event ESPN d'un AUTRE match plus loin dans le
+  // tableau — un match qui, lui, aurait matché PARFAITEMENT en strict. Ce
+  // dernier se retrouvait alors sans aucun event disponible, bloqué
+  // indéfiniment (bug déterministe : mêmes données en entrée à chaque poll →
+  // même collision, jamais résolue toute seule — contrairement à un simple
+  // glitch réseau ; le déblocage observé n'est arrivé qu'une fois qu'un
+  // facteur externe, ex. un des matchs ayant changé d'état, a changé l'ordre/
+  // le contenu des candidats ESPN). Risque maximal justement quand PLUSIEURS
+  // matchs partagent exactement le même horaire (le repli ±10min devient
+  // alors peu discriminant entre eux) — le cas typique d'une journée de poule
+  // où tous les matchs d'un même groupe démarrent à la même heure (Ligue des
+  // Champions/Europa/Conference notamment).
+  // Fix : résoudre TOUS les matchs FD.org en 3 passes de confiance
+  // DÉCROISSANTE (id exact → fuzzy strict 2 côtés → repli 1 côté+horaire) —
+  // une passe ne peut revendiquer un event que parmi ceux encore libres
+  // APRÈS la passe précédente, donc un match plus fiable ne peut plus jamais
+  // se faire voler son event par un match moins fiable traité avant lui dans
+  // le tableau, quel que soit l'ordre.
+  const usedEspnIds   = new Set()
+  const matchedByFdId = {}   // fdMatch.id → { slug, evt } | undefined
+
+  // ── Passe 1 : ids EXACTS (natifs ou réutilisés d'un poll précédent) ──────
+  // Comparaison d'id, pas de nom → aucune ambiguïté possible, safe à
+  // résoudre dans n'importe quel ordre.
+  const unresolvedAfter1 = []
   for (const fdMatch of matches) {
     // ⚠️ AJOUT (demande utilisateur : "mets les coupes/NL/CAN/COPA sur le
     // système rapide aussi, sans rien casser") : ces matchs sont DÉJÀ
     // sourcés depuis ESPN (voir espnAdapter.js) — leur event ESPN exact est
     // connu d'avance (id embarqué dans fdMatch.id, ex: `espn-FL1-cup-
     // 401693213` → dernier segment), pas besoin de deviner par nom d'équipe
-    // comme pour un match football-data.org ci-dessous. Branche à part,
-    // AVANT tout le reste (qui reste 100% inchangé) : moins de risque de
-    // régression sur le matching FD.org existant, déjà fragile par ailleurs.
+    // comme pour un match football-data.org ci-dessous.
     const nativeSlug = espnNativeSlug(fdMatch)
     const slug = nativeSlug ?? COMP_ESPN[fdMatch.competition?.id]
     if (!slug) continue
 
-    let found
+    const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
+    const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
 
+    let found
     // ⚠️ BUG CORRIGÉ (15/08, signalement utilisateur : "j'ai même plus de
-    // match en live" — régression apparue juste après l'ajout du raccourci
-    // id-exact ci-dessous pour les 6 grands championnats club) : ce
-    // raccourci (fiable à 100% normalement — l'event ESPN exact est déjà
-    // connu, embarqué dans fdMatch.id) faisait `continue` IMMÉDIATEMENT s'il
-    // échouait, SANS repli sur le fuzzy-match par nom plus bas — pire qu'AVANT
-    // l'ajout du raccourci, où ces mêmes matchs (avant le fix espnNativeSlug
-    // du même soir) passaient déjà par le fuzzy-match et ses 3 filets de
-    // sécurité. Un seul cas suffit à le faire échouer (l'event est déjà
-    // marqué usedEspnIds par une AUTRE entrée qui le revendique en premier —
-    // ex: une entrée liveTracker orpheline en doublon, laissée par un ancien
-    // bug déjà corrigé ce soir — voir isEspnWorking) : le match disparaissait
-    // alors ENTIÈREMENT du suivi live, plutôt que de simplement rater le
-    // raccourci rapide. Le raccourci id-exact reste tenté EN PREMIER (le cas
-    // normal, sans collision, reste aussi rapide/fiable qu'avant) — mais s'il
-    // échoue, on retombe maintenant sur EXACTEMENT le même fuzzy-match que
-    // pour un match football-data.org classique, au lieu d'abandonner.
+    // match en live") : ce raccourci id-exact (fiable à 100% normalement)
+    // faisait `continue` IMMÉDIATEMENT s'il échouait, SANS repli sur le
+    // fuzzy-match par nom — le match disparaissait alors ENTIÈREMENT du
+    // suivi live. Tenté EN PREMIER (le cas normal, sans collision, reste
+    // aussi rapide/fiable qu'avant) — mais s'il échoue, repli sur les passes
+    // 2/3 plus bas comme pour un match football-data.org classique.
     if (nativeSlug) {
       const nativeEventId = String(fdMatch.id).split('-').pop()
       found = espnEvents.find(({ slug: s, evt }) =>
         s === nativeSlug && String(evt.id) === nativeEventId && !usedEspnIds.has(evt.id))
     }
 
-    const fdHome = fdMatch.homeTeam?.name ?? fdMatch.homeTeam?.shortName ?? ''
-    const fdAway = fdMatch.awayTeam?.name ?? fdMatch.awayTeam?.shortName ?? ''
-
+    // ── Raccourci : ré-utiliser l'ID ESPN déjà résolu lors d'un poll précédent ──
+    // Root cause d'une bonne partie des bugs "intermittents" déjà corrigés
+    // (matchs simultanés, noms légèrement différents...) : le fuzzy-match par
+    // NOM était re-exécuté à chaque poll, y compris pour des matchs déjà
+    // identifiés avec certitude auparavant — ré-tenter un pari probabiliste en
+    // boucle indéfiniment, c'est mathématiquement garanti de finir par tomber
+    // sur le mauvais tirage tôt ou tard. On ne devrait avoir à "deviner"
+    // qu'UNE SEULE FOIS par match, puis se souvenir du bon ID ESPN.
+    // (espnRealEventId ≠ le champ espnEventId du résultat final, qui contient
+    // l'ID FIFA pour la CM — deux systèmes d'ID différents, à ne pas confondre.)
     if (!found && fdHome && fdAway) {
-      // ── Raccourci : ré-utiliser l'ID ESPN déjà résolu lors d'un poll précédent ──
-      // Root cause d'une bonne partie des bugs "intermittents" déjà corrigés cette
-      // session (matchs simultanés, noms légèrement différents...) : le fuzzy-match
-      // par NOM était re-exécuté à chaque poll (~toutes les 15-20s), pour CHAQUE
-      // match, y compris ceux déjà identifiés avec certitude auparavant. Ré-tenter
-      // un pari probabiliste en boucle indéfiniment, c'est mathématiquement
-      // garanti de finir par tomber sur le mauvais tirage tôt ou tard. On ne
-      // devrait avoir à "deviner" qu'UNE SEULE FOIS par match (à son apparition),
-      // puis se souvenir du bon ID ESPN et le réutiliser directement tant qu'il
-      // reste valide — beaucoup plus fiable ET moins de travail à chaque poll.
-      // (espnRealEventId ≠ le champ espnEventId du résultat final, qui contient
-      // l'ID FIFA pour la CM — deux systèmes d'ID différents, à ne pas confondre.)
       const prevRealId = storedData[fdMatch.id]?.espnRealEventId ?? null
       found = prevRealId != null
         ? espnEvents.find(({ slug: s, evt }) =>
             s === slug && evt.id === prevRealId && !usedEspnIds.has(evt.id))
         : null
-
-      // Si l'ID connu n'est plus dans le scoreboard actuel (rare — event retiré,
-      // changement de jour...), on retombe sur le fuzzy-match par nom comme avant.
-      if (!found) {
-        found = espnEvents.find(({ slug: s, evt }) => {
-          if (s !== slug) return false
-          if (usedEspnIds.has(evt.id)) return false
-          const comp  = evt.competitions?.[0]
-          const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-          const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-          const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
-          const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
-          return fuzzyTeam(fdHome, eHome) && fuzzyTeam(fdAway, eAway)
-        })
-      }
-
-      // Repli : le fuzzy-match strict (2 côtés) peut échouer sur un des deux
-      // matchs quand plusieurs commencent à la même minute — situation garantie
-      // pour les derniers matchs de poule (kickoff simultané obligatoire), pas
-      // juste un hasard. Dans ce cas un match restait bloqué sur "Débute" sans
-      // jamais se raccrocher à son event ESPN. Repli : n'exiger qu'UN des deux
-      // côtés + un coup d'envoi ESPN à ±10min du nôtre (assez précis pour ne pas
-      // accrocher un mauvais match, assez large pour couvrir les petits écarts
-      // de synchro d'horloge entre FD.org et ESPN).
-      if (!found) {
-        const fdKickoff = new Date(fdMatch.utcDate).getTime()
-        found = espnEvents.find(({ slug: s, evt }) => {
-          if (s !== slug) return false
-          if (usedEspnIds.has(evt.id)) return false
-          const comp  = evt.competitions?.[0]
-          const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-          const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-          const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
-          const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
-          if (!fuzzyTeam(fdHome, eHome) && !fuzzyTeam(fdAway, eAway)) return false
-          const rawKickoff = evt.date ?? comp?.date
-          if (!rawKickoff) return false
-          const evtKickoff = new Date(rawKickoff).getTime()
-          return Math.abs(evtKickoff - fdKickoff) <= 10 * 60_000
-        })
-      }
     }
 
-    // ⚠️ AJOUT diagnostic (signalement utilisateur : match resté bloqué sur
-    // "Débute" ~20min après le vrai coup d'envoi, buts/score très en retard
-    // — même famille de symptôme que le fix ±10min juste au-dessus, mais
-    // visiblement pas toujours suffisant). Aucune certitude sur la cause
-    // exacte sans logs réels (pas d'accès Vercel/production depuis cet
-    // environnement) — ce log capture les faits utiles la PROCHAINE fois
-    // que ça se reproduit (candidats disponibles pour ce slug, déjà pris
-    // par un autre match ou vraiment absents du scoreboard ESPN) au lieu
-    // de deviner. Uniquement pour un match déjà censé être en cours
-    // (>=0min après utcDate) : avant le coup d'envoi, ne pas trouver
-    // l'event est normal, pas la peine de logguer. Lecture seule, aucun
-    // changement de comportement.
-    if (!found) {
+    if (found) {
+      usedEspnIds.add(found.evt.id)
+      matchedByFdId[fdMatch.id] = found
+    } else {
+      unresolvedAfter1.push({ fdMatch, slug, fdHome, fdAway })
+    }
+  }
+
+  // ── Passe 2 : fuzzy STRICT (les 2 côtés doivent matcher) ─────────────────
+  const unresolvedAfter2 = []
+  for (const entry of unresolvedAfter1) {
+    const { fdMatch, slug, fdHome, fdAway } = entry
+    let found = null
+    if (fdHome && fdAway) {
+      found = espnEvents.find(({ slug: s, evt }) => {
+        if (s !== slug) return false
+        if (usedEspnIds.has(evt.id)) return false
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
+        const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
+        return fuzzyTeam(fdHome, eHome) && fuzzyTeam(fdAway, eAway)
+      })
+    }
+    if (found) {
+      usedEspnIds.add(found.evt.id)
+      matchedByFdId[fdMatch.id] = found
+    } else {
+      unresolvedAfter2.push(entry)
+    }
+  }
+
+  // ── Passe 3 (repli le plus faible) : 1 SEUL côté + horaire ESPN à ±10min ──
+  // Le fuzzy-match strict (2 côtés) peut échouer sur un des deux matchs quand
+  // plusieurs commencent à la même minute — situation garantie pour les
+  // derniers matchs de poule (kickoff simultané obligatoire), pas juste un
+  // hasard. N'exige qu'UN des deux côtés + un coup d'envoi ESPN à ±10min du
+  // nôtre (assez précis pour ne pas accrocher un mauvais match, assez large
+  // pour couvrir les petits écarts de synchro d'horloge entre FD.org et
+  // ESPN). Ne tourne qu'APRÈS les passes 1 et 2 pour TOUS les matchs — ne
+  // peut donc plus jamais voler l'event d'un match qui aurait matché en
+  // strict, quel que soit l'ordre du tableau `matches`.
+  // ⚠️ AJOUT diagnostic (signalement utilisateur : match resté bloqué sur
+  // "Débute" longtemps après le vrai coup d'envoi, buts/score très en
+  // retard). Aucune certitude sur la cause exacte sans logs réels (pas
+  // d'accès Vercel/production depuis cet environnement) — ce log capture les
+  // faits utiles la PROCHAINE fois que ça se reproduit (candidats disponibles
+  // pour ce slug, déjà pris par un autre match ou vraiment absents du
+  // scoreboard ESPN) au lieu de deviner. Uniquement pour un match déjà censé
+  // être en cours (>=0min après utcDate) : avant le coup d'envoi, ne pas
+  // trouver l'event est normal, pas la peine de logguer.
+  for (const entry of unresolvedAfter2) {
+    const { fdMatch, slug, fdHome, fdAway } = entry
+    let found = null
+    if (fdHome && fdAway) {
+      const fdKickoff = new Date(fdMatch.utcDate).getTime()
+      found = espnEvents.find(({ slug: s, evt }) => {
+        if (s !== slug) return false
+        if (usedEspnIds.has(evt.id)) return false
+        const comp  = evt.competitions?.[0]
+        const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+        const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+        const eHome = homeC?.team?.displayName ?? homeC?.team?.name ?? ''
+        const eAway = awayC?.team?.displayName ?? awayC?.team?.name ?? ''
+        if (!fuzzyTeam(fdHome, eHome) && !fuzzyTeam(fdAway, eAway)) return false
+        const rawKickoff = evt.date ?? comp?.date
+        if (!rawKickoff) return false
+        const evtKickoff = new Date(rawKickoff).getTime()
+        return Math.abs(evtKickoff - fdKickoff) <= 10 * 60_000
+      })
+    }
+    if (found) {
+      usedEspnIds.add(found.evt.id)
+      matchedByFdId[fdMatch.id] = found
+    } else {
       const minsSinceKO = Math.round((Date.now() - new Date(fdMatch.utcDate).getTime()) / 60_000)
       if (minsSinceKO >= 0) {
         const slugEvents = espnEvents.filter(({ slug: s }) => s === slug)
@@ -886,10 +912,25 @@ export default async function handler(req, res) {
           }))}`
         )
       }
-      continue
     }
+  }
 
-    usedEspnIds.add(found.evt.id)
+  // ⚠️ PERF (question utilisateur sur la tenue en charge avec beaucoup de
+  // matchs simultanés) : les fetchEspnSummaryStats() nécessaires plus bas
+  // dans cette boucle ne sont PLUS attendus (`await`) un par un — ça
+  // sérialisait un aller-retour réseau PAR MATCH (ex: 20 matchs en direct
+  // sans stats scoreboard × ~300-500ms chacun = jusqu'à 10s rien que pour
+  // cette étape, risquant de dépasser le timeout par défaut d'une fonction
+  // Vercel Hobby et de faire échouer TOUTE la réponse). Le fetch est lancé
+  // immédiatement (la requête réseau part tout de suite) mais collecté ici
+  // pour être résolu APRÈS la boucle, en parallèle pour tous les matchs qui
+  // en ont besoin — le temps total ne dépend plus du nombre de matchs mais
+  // du plus lent des appels ESPN.
+  const pendingStatsFetches = []
+  for (const fdMatch of matches) {
+    const found = matchedByFdId[fdMatch.id]
+    if (!found) continue
+
     const comp     = found.evt.competitions[0]
     const st       = comp.status
     const espnStatus = normalizeEspnStatus(st)

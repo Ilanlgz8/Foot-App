@@ -303,6 +303,38 @@ cf-worker/
   n'existe à ce jour pour `calcLiveProno`, même limite déjà documentée pour `LIVE_LAMBDA_SHRINK`
   plus bas dans le fichier) — à ajuster si le retour utilisateur indique encore trop/pas assez de
   mouvement.
+- ✅ 4 matchs Ligue des Champions démarrant à la même minute restés bloqués sur "Débute" (constat
+  utilisateur, 10/09, persistant après 3 fermetures/réouvertures complètes de la PWA — donc pas un
+  simple glitch réseau, un vrai bug déterministe) : root cause trouvée dans `api/fifa-live.js` —
+  le matching FD.org↔ESPN (par nom d'équipe, aucun id commun entre les deux sources) se faisait un
+  match à la fois, DANS L'ORDRE du tableau `matches`. Un match dont le fuzzy-match strict (les 2
+  côtés) échouait (variante de nom) retombait sur un repli plus faible (1 seul côté + horaire ESPN
+  à ±10min, déjà ajouté lors d'un incident précédent) — et pouvait revendiquer l'event ESPN d'un
+  AUTRE match plus loin dans le tableau qui, lui, aurait matché PARFAITEMENT en strict. Ce dernier
+  se retrouvait alors sans event disponible, bloqué indéfiniment (déterministe : mêmes données en
+  entrée à chaque poll → même collision, ne se corrige jamais toute seule — le déblocage constaté
+  n'est arrivé qu'une fois qu'un facteur externe, ex. un des matchs changeant d'état, a changé les
+  candidats ESPN disponibles). Risque maximal quand PLUSIEURS matchs partagent exactement le même
+  horaire (le repli ±10min devient alors peu discriminant) — le cas typique d'une journée de poule
+  où tous les matchs d'un groupe démarrent à la même heure (LDC/Europa/Conference). Corrigé :
+  résolution en 3 passes de confiance décroissante sur TOUS les matchs à la fois (id exact → fuzzy
+  strict 2 côtés → repli 1 côté+horaire), chaque passe ne pouvant revendiquer un event que parmi
+  ceux encore libres après la précédente — un match plus fiable ne peut plus se faire voler son
+  event par un match moins fiable traité avant lui, quel que soit l'ordre du tableau. Vérifié
+  numériquement (scénario reproduit avec 2 matchs fictifs partageant un mot dans leur nom : l'ancien
+  algo laissait bien un match sans event tout en donnant à l'autre les mauvaises données, le nouvel
+  algo résout les deux correctement) + suite de tests complète (356 tests) et build toujours verts.
+  Honnêteté : aucun test dédié n'existe pour `api/fifa-live.js` (fichier serverless, jamais couvert
+  par vitest jusqu'ici) — la vérification s'est faite par une simulation ad-hoc de l'algorithme
+  exact, pas par un test permanent ajouté au dépôt.
+- ✅ Logo Ligue des Champions qui met un moment à s'afficher en PWA mobile (constat utilisateur,
+  10/09, "ça vient de s'afficher mais c'est quand même un bug") : `ldc.png` (`src/assets/leagues/`)
+  pesait 396KB pour 900×843px — de très loin le plus gros fichier du dossier (le 2e plus gros,
+  coupe-du-monde.png, fait 233KB ; la plupart des logos de championnats font 5-70KB) alors qu'il
+  est affiché en petit badge partout dans l'app, jamais en grand. Sur une connexion mobile plus
+  lente, ce poids explique un vrai délai visible avant que le logo apparaisse. Redimensionné à
+  360×337px (largement suffisant même en Retina/3x pour tout affichage réel de l'app) → 101KB
+  (-74%), qualité visuelle inchangée à l'œil (vérifié par comparaison visuelle avant/après).
 
 ## Conventions
 - Noms français partout dans l'UI
