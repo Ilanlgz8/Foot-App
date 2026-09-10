@@ -539,15 +539,20 @@ export const COMPETITIONS = [
     // (linéaire à zones, même mécanisme que les championnats club), PAS le
     // "mode peinture" flou utilisé pour CL/NL/WC. Orange mesuré sur les vrais
     // pixels de `europa-league.png` (bucket-count Python/PIL, ~2 400 px
-    // orange sur fond noir) : #ec722c — contrairement à la note plus haut sur
-    // ce fichier ("même style que l'ancien ldc.png"), le PNG contient bien un
-    // vrai orange distinct (7% des pixels), pas juste noir/blanc. Base quasi
-    // noire (comme Bundesliga) plutôt que noir pur, pour garder un peu de
-    // profondeur au lieu d'un aplat.
-    tint: '#0a0a0a',
-    tint2: '#ec722c',
+    // orange sur fond noir, pic de saturation #ff7b2d) — contrairement à la
+    // note plus haut sur ce fichier ("même style que l'ancien ldc.png"), le
+    // PNG contient bien un vrai orange distinct (7% des pixels), pas juste
+    // noir/blanc.
+    // ⚠️ RETOUCHÉ (10/09, live-preview : "c pas assez noir et les couleurs
+    // sont trop transparentes" puis "c trop clair") : noir remonté à `#000000`
+    // pur (était quasi-noir), orange assombri #ff7b2d → #8a3c14 (brûlé, moins
+    // pastel), arrêts du dégradé repoussés (22/52/82 → 30/62/88) pour que le
+    // noir domine largement plus de la carte et que la couleur n'arrive qu'en
+    // touche finale — validé à l'œil en direct sur le site ("voila").
+    tint: '#000000',
+    tint2: '#8a3c14',
     tintSoft: true,
-    tintStops: { base: '22%', c2: '52%', c3: '82%' },
+    tintStops: { base: '30%', c2: '62%', c3: '88%' },
     tintSilverText: true, // fond noir : chrono en blanc argenté, comme Bundesliga/LaLiga
     name: 'Ligue Europa',
     shortName: 'Europa L.',
@@ -557,11 +562,13 @@ export const COMPETITIONS = [
     id: 'UECL',
     // ⚠️ AJOUTÉ (10/09, demande : "noir et vert"). Même recette que UEL
     // ci-dessus. Vert mesuré sur les vrais pixels de `conference-league.png`
-    // (même méthode) : #3bad46 (~900 px verts sur fond noir, 1.7%).
-    tint: '#0a0a0a',
-    tint2: '#3bad46',
+    // (même méthode, pic de saturation #3ec149).
+    // ⚠️ RETOUCHÉ (10/09, même feedback que UEL) : noir pur, vert assombri
+    // #3cb846 → #1f5c2a (sapin), mêmes arrêts repoussés.
+    tint: '#000000',
+    tint2: '#1f5c2a',
     tintSoft: true,
-    tintStops: { base: '22%', c2: '52%', c3: '82%' },
+    tintStops: { base: '30%', c2: '62%', c3: '88%' },
     tintSilverText: true,
     name: 'Ligue Europa Conférence',
     shortName: 'Conférence L.',
