@@ -549,10 +549,19 @@ export const COMPETITIONS = [
     // pastel), arrêts du dégradé repoussés (22/52/82 → 30/62/88) pour que le
     // noir domine largement plus de la carte et que la couleur n'arrive qu'en
     // touche finale — validé à l'œil en direct sur le site ("voila").
+    // ⚠️ RETOUCHÉ ENCORE (10/09, même jour, live-preview : "les couleurs sont
+    // pas assez prononcé" — le #8a3c14 trop assombri se fondait dans le noir
+    // au lieu de ressortir) : orange remonté vers un franc #c8551a (plus
+    // saturé/vif que le brûlé précédent, toujours nettement en dessous du
+    // #ff7b2d d'origine jugé "trop clair"). Puis "met plus de noir et que
+    // orange et vert stp" : arrêts repoussés une 2e fois (30/62/88 → 36/66/88)
+    // pour laisser encore plus de noir en haut de carte, tout en gardant la
+    // couleur franche (pas de zone de transition qui la ternirait) une fois
+    // qu'elle apparaît — validé en direct sur le site.
     tint: '#000000',
-    tint2: '#8a3c14',
+    tint2: '#c8551a',
     tintSoft: true,
-    tintStops: { base: '30%', c2: '62%', c3: '88%' },
+    tintStops: { base: '36%', c2: '66%', c3: '88%' },
     tintSilverText: true, // fond noir : chrono en blanc argenté, comme Bundesliga/LaLiga
     name: 'Ligue Europa',
     shortName: 'Europa L.',
@@ -562,13 +571,15 @@ export const COMPETITIONS = [
     id: 'UECL',
     // ⚠️ AJOUTÉ (10/09, demande : "noir et vert"). Même recette que UEL
     // ci-dessus. Vert mesuré sur les vrais pixels de `conference-league.png`
-    // (même méthode, pic de saturation #3ec149).
+    // (même méthode, pic de saturation #3ec149). Même 2 retouches que UEL —
+    // voir ses commentaires : vert remonté #1f5c2a → #2f8a3e (plus prononcé),
+    // arrêts repoussés 30/62/88 → 36/66/88 (plus de noir).
     // ⚠️ RETOUCHÉ (10/09, même feedback que UEL) : noir pur, vert assombri
     // #3cb846 → #1f5c2a (sapin), mêmes arrêts repoussés.
     tint: '#000000',
-    tint2: '#1f5c2a',
+    tint2: '#2f8a3e',
     tintSoft: true,
-    tintStops: { base: '30%', c2: '62%', c3: '88%' },
+    tintStops: { base: '36%', c2: '66%', c3: '88%' },
     tintSilverText: true,
     name: 'Ligue Europa Conférence',
     shortName: 'Conférence L.',

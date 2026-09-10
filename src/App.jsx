@@ -119,6 +119,43 @@ function App() {
     }
   }, [])
 
+  // ⚠️ AJOUT (10/09, retour utilisateur : "quand je quitte et reviens
+  // d'arrière-plan et que je scroll vers le bas, la barre du bas se
+  // détache"). Plusieurs endroits de l'app (Match.jsx, Footer.jsx,
+  // GroupModal.jsx, Resultat.jsx, Classement.jsx) verrouillent le scroll
+  // d'un modal/dropdown en posant `body.style.position = 'fixed'` +
+  // `overflow = 'hidden'` pendant qu'il est ouvert, et le retirent au
+  // nettoyage React (fermeture/démontage — un `useEffect` classique).
+  // Si l'app est mise en arrière-plan PENDANT que l'un de ces verrous est
+  // actif, iOS peut geler l'exécution JS à tout moment sans prévenir : le
+  // nettoyage ne s'exécute alors jamais au bon moment, le body reste
+  // bloqué en `position: fixed` — ce qui casse l'ancrage au viewport des
+  // autres éléments fixes (dont `.sfTabbar`, la barre du bas) au prochain
+  // scroll. Même classe de bug que celle déjà documentée dans index.css
+  // (overflow-x/swipe), cause différente (overflow-y/background). Filet de
+  // sécurité : à chaque retour au premier plan, si le body est resté
+  // verrouillé, on le libère de force. Un modal réellement encore ouvert à
+  // ce moment perdrait son verrou de scroll (désagrément mineur, rare) —
+  // largement préférable à une barre du bas décrochée durablement.
+  useEffect(() => {
+    const unstickBody = () => {
+      if (document.visibilityState !== 'visible') return
+      if (document.body.style.position === 'fixed') {
+        document.body.style.position = ''
+        document.body.style.overflow = ''
+        document.body.style.top = ''
+        document.body.style.left = ''
+        document.body.style.right = ''
+      }
+    }
+    document.addEventListener('visibilitychange', unstickBody)
+    window.addEventListener('pageshow', unstickBody)
+    return () => {
+      document.removeEventListener('visibilitychange', unstickBody)
+      window.removeEventListener('pageshow', unstickBody)
+    }
+  }, [])
+
   return (
     // LiveProvider monté ici → hooks live survivent aux changements de route
     // + Web Worker ESPN continue de tourner même si l'utilisateur est sur Classement etc.
