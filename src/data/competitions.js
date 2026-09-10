@@ -590,12 +590,17 @@ export const COMPETITIONS = [
     name: 'Coupe du Monde',
     shortName: 'Coupe du monde',
     emblem: worldCupLogo,
-    tint: '#a86000',
-    tint2: '#d9a52c',
-    tintStops: { base: '22%', c2: '55%', c3: '85%' },
-    tintLight: true,
-    tintPearl: 0.45,
-    tintSoft: true,
+    // ⚠️ "MODE PEINTURE" (10/09) — remplace la teinte or/bronze 2 tons
+    // ci-dessus (constat utilisateur : "ça fait pas trop coupe du monde"),
+    // puis un essai or + bleu FIFA (toujours pas validé). Demande finale :
+    // vert/bleu/rouge/jaune-doré/blanc/noir — voir le commentaire complet
+    // dans accueil.css (`.poster--theme-wc`) pour le détail des couleurs et
+    // leur origine (or et bleu déjà choisis avant, vert/rouge génériques,
+    // aucune couleur "monde" unique n'existant pour une compétition qui
+    // change de pays hôte à chaque édition). `tintTheme: 'wc'` bascule sur
+    // un bloc CSS dédié (comme `tintTheme: 'ucl'`/`'nl'`) — les champs
+    // tint/tint2/tintStops/tintLight/tintSoft ne servent plus.
+    tintTheme: 'wc',
   },
   {
     // ⚠️ TEINTE AJOUTÉE (10/09) — voir commentaire WC juste au-dessus pour le

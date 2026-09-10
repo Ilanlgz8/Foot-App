@@ -1198,6 +1198,37 @@
     #0a1020;
 }
 
+/* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même recette que
+   `.lmp__hero--theme-nl` juste au-dessus, palette Coupe du Monde. Voir le
+   commentaire détaillé dans accueil.css (`.poster--theme-wc`) pour tout
+   l'historique (or/bronze seul → or + bleu FIFA → palette finale demandée
+   vert/bleu/rouge/or/blanc/noir, ni l'un ni l'autre des deux premiers essais
+   validés). Gardé identique des deux côtés. */
+#root .lmp__hero--theme-wc {
+  background: #0a0a0c;
+}
+.lmp__hero--theme-wc .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-wc .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(22px) saturate(1.4);
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0f7a3d 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #123a70 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #d8000c 0%, transparent 60%),
+    radial-gradient(38% 62% at 75% 65%, #d9a52c 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
+    radial-gradient(40% 65% at 90% 30%, #0f7a3d 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #123a70 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #d8000c 0%, transparent 60%),
+    #0a0a0c;
+}
+
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
    -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
    `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé

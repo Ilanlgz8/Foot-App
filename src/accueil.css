@@ -1866,6 +1866,52 @@
     rgba(var(--black-rgb),0.65) 100%);
 }
 
+/* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même recette que
+   `.poster--theme-nl` juste au-dessus (voir son commentaire détaillé), avec
+   la palette de la Coupe du Monde plutôt que celle de la Ligue des Nations.
+   Historique : d'abord un dégradé or/bronze à 2 tons extrait des pixels réels
+   du trophée (`coupe-du-monde.png`) — jugé "pas assez Coupe du Monde"
+   (constat utilisateur : l'or seul ne dit rien sans une couleur associée).
+   Essai suivant : or (trophée, réel) + bleu FIFA (choix assumé, PAS extrait
+   d'un pixel — le fichier est un trophée recadré serré, sans aucun vert/bleu
+   dedans, vérifié pixel par pixel). Toujours pas validé, demande finale :
+   vert/bleu/rouge/jaune-doré/blanc/noir. Seul le doré (`#d9a52c`) et le bleu
+   (`#123a70`) viennent d'un choix déjà fait plus haut dans la conversation ;
+   vert (`#0f7a3d`) et rouge (`#d8000c`) sont des couleurs franches génériques
+   (aucune couleur "monde/nations" unique n'existe pour une compétition qui
+   change de pays hôte à chaque édition) — le noir sert de base (`#0a0a0c`)
+   plutôt que le bleu marine de la LDN, pour respecter la liste exacte de
+   couleurs demandée. */
+.poster--theme-wc .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0f7a3d 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #123a70 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #d8000c 0%, transparent 60%),
+    radial-gradient(38% 62% at 75% 65%, #d9a52c 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
+    radial-gradient(40% 65% at 90% 30%, #0f7a3d 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #123a70 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #d8000c 0%, transparent 60%),
+    #0a0a0c;
+  filter: blur(22px) saturate(1.4);
+  animation: none;
+}
+.poster--theme-wc .poster__bg--gradientAlt {
+  inset: 0;
+  opacity: 0;
+}
+.poster--theme-wc .poster__bg--gradientTri {
+  inset: 0;
+  opacity: 0;
+}
+.poster--theme-wc .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.65) 100%);
+}
+
 /* Overlay sombre + dégradé directional */
 .poster__overlay {
   position: absolute;
