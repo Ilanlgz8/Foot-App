@@ -137,7 +137,26 @@ function App() {
   // verrouillé, on le libère de force. Un modal réellement encore ouvert à
   // ce moment perdrait son verrou de scroll (désagrément mineur, rare) —
   // largement préférable à une barre du bas décrochée durablement.
+  // ⚠️ COMPLÉTÉ (10/09, le correctif ci-dessus seul n'a pas suffi — retour
+  // utilisateur identique après déploiement) : cause probablement différente
+  // de ce qui a été corrigé au-dessus, un bug WebKit/iOS documenté où un
+  // `position: fixed` qui n'a pas sa PROPRE couche de composition GPU peut se
+  // "décoller" du viewport après un cycle arrière-plan→premier plan, surtout
+  // au moment où le scroll redéclenche le masquage/affichage de la barre
+  // d'adresse Safari. Voir `.sfTabbar` (navbar.css) pour le correctif CSS
+  // (`transform: translateZ(0)`, isole la barre sur sa propre couche) — ce
+  // "nudge" JS force WebKit à RECALCULER cette couche dès le retour au
+  // premier plan, avant que l'utilisateur ne scrolle (au lieu d'attendre une
+  // repaint qui peut ne jamais arriver toute seule) : on touche `transform`
+  // une frame puis on le relâche, ce qui suffit à forcer le recalcul sans
+  // effet visuel perceptible.
   useEffect(() => {
+    const nudgeTabbar = () => {
+      const el = document.querySelector('.sfTabbar')
+      if (!el) return
+      el.style.transform = 'translateZ(0.01px)'
+      requestAnimationFrame(() => { el.style.transform = '' })
+    }
     const unstickBody = () => {
       if (document.visibilityState !== 'visible') return
       if (document.body.style.position === 'fixed') {
@@ -147,6 +166,7 @@ function App() {
         document.body.style.left = ''
         document.body.style.right = ''
       }
+      nudgeTabbar()
     }
     document.addEventListener('visibilitychange', unstickBody)
     window.addEventListener('pageshow', unstickBody)

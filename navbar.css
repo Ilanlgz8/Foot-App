@@ -99,12 +99,27 @@
 .sfLiveBtn { display: none; }
 
 /* ───────────────────── BOTTOM TAB BAR (mobile) ───────────────── */
+/* ⚠️ RETOUCHÉ (10/09, retour utilisateur persistant malgré un 1er correctif
+   — voir le filet `unstickBody` dans App.jsx, insuffisant seul) : "des fois
+   quand je quitte et reviens d'arrière-plan et que je scroll vers le bas la
+   barre du bas se détache". Bug WebKit/iOS documenté, distinct de celui déjà
+   corrigé ailleurs (overflow-x/swipe, voir index.css) : un `position: fixed`
+   qui n'a pas sa PROPRE couche de composition GPU peut, sur iOS, se
+   "décoller" du viewport après un cycle arrière-plan→premier plan, surtout
+   au moment où le scroll redéclenche le masquage/affichage de la barre
+   d'adresse. `transform: translateZ(0)` (+ `will-change: transform`) force
+   Safari à isoler cet élément sur sa propre couche, indépendante du reste de
+   la page — le correctif standard documenté pour ce type de décrochage.
+   Combiné à un "nudge" JS au retour au premier plan (App.jsx) qui force
+   WebKit à recalculer cette couche avant que l'utilisateur ne scrolle. */
 .sfTabbar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 60;
+  transform: translateZ(0);
+  will-change: transform;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
