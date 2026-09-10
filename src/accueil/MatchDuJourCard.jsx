@@ -22,7 +22,7 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, getCompetitionCampColors } from '../data/competitions'
 
 function shortenName(name) {
   if (!name) return name
@@ -221,14 +221,18 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // terne (essai d'avant) : format haut type affiche de match, camp de chaque
   // équipe teinté de SA couleur, gros blasons face à face, "VS" central.
   //
-  // Couleurs : `--hc` / `--ac` sont les couleurs principales curées des deux
-  // équipes (getMatchTeamColors, dico teamPhotos). Quand les deux équipes ont
-  // une couleur de la même famille, c'est l'équipe à l'EXTÉRIEUR qui bascule
-  // sur sa secondaire — règle appliquée directement dans getMatchTeamColors
-  // (voir son commentaire : demande explicite + convention du foot réel, le
-  // club qui reçoit garde son maillot principal).
-  const homeColor = teamColors.home.main
-  const awayColor = teamColors.away.main
+  // ⚠️ CHANGÉ (10/09, demande utilisateur : "met le couleur du championnat
+  // aussi au lieu de la couleur des equipe je pense que c mieux") : `--hc` /
+  // `--ac` portaient jusque-là les couleurs des 2 ÉQUIPES (teamColors,
+  // getMatchTeamColors). Elles reprennent maintenant la couleur de la
+  // COMPÉTITION (getCompetitionCampColors, voir competitions.js) — cohérent
+  // avec le reste de l'Accueil, où chaque card de la liste est déjà teintée
+  // par championnat plutôt que par équipe. Repli sur les couleurs d'équipe
+  // uniquement pour les compétitions encore neutres (UEL/UECL/USC/TDC/CS,
+  // pas de tint défini) — mieux qu'un rouge de marque plat par défaut.
+  const compCampColors = getCompetitionCampColors(mdjComp)
+  const homeColor = compCampColors?.[0] ?? teamColors.home.main
+  const awayColor = compCampColors?.[1] ?? teamColors.away.main
 
   // Journée de championnat — affichée en sous-titre du bandeau compétition.
   // `matchday` vient de football-data.org (vérifié sur les données réelles de

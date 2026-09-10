@@ -720,3 +720,41 @@ export const COMPETITIONS = [
     // signalé à l'utilisateur séparément.
   },
 ]
+
+// ⚠️ COULEURS "CAMP" DÉDIÉES (10/09) — les 3 compétitions à `tintTheme`
+// (dégradés peints à la main dans accueil.css/LiveMatchPage.css, voir plus
+// haut) n'ont PAS de champs `tint`/`tint2` : impossible d'en dériver une
+// paire de couleurs directement. Utilisée UNIQUEMENT par
+// `getCompetitionCampColors` ci-dessous pour la carte "Match du jour"
+// (2 couleurs nécessaires par construction — camp domicile/extérieur), pas
+// par les autres cards qui utilisent déjà le bloc CSS dédié en entier.
+// Couleurs reprises des dégradés déjà validés par l'utilisateur pour chaque
+// thème : bleu vif/bleu marine profond pour la LDC (mêmes valeurs que
+// `.poster--theme-ucl`), bleu/rouge du "mode peinture" LDN, or clair/or
+// foncé du "mode peinture" Coupe du Monde.
+const TINT_THEME_CAMP_COLORS = {
+  ucl: ['#0232FF', '#010056'],
+  nl:  ['#0c3c90', '#d8000c'],
+  wc:  ['#f7dc3c', '#6b5000'],
+}
+
+// Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —
+// demande utilisateur (10/09) : "met le couleur du championnat aussi au lieu
+// de la couleur des equipe je pense que c mieux". Priorité :
+//   1) `tintTheme` (LDC/LDN/Coupe du Monde) → paire dédiée ci-dessus ;
+//   2) `tint`/`tint2` (tous les championnats club + WC/EC/NL/CAN/COPA
+//      pré-mode-peinture, laissé en repli si jamais retiré) → tint comme
+//      camp domicile, tint2 (ou tint si absent) comme camp extérieur ;
+//   3) `null` → MatchDuJourCard garde alors les couleurs d'équipe (compét.
+//      encore neutre : UEL/UECL/USC/TDC/CS, pas dans le scope de cette
+//      demande).
+export function getCompetitionCampColors(comp) {
+  if (!comp) return null
+  if (comp.tintTheme && TINT_THEME_CAMP_COLORS[comp.tintTheme]) {
+    return TINT_THEME_CAMP_COLORS[comp.tintTheme]
+  }
+  if (comp.tint) {
+    return [comp.tint, comp.tint2 || comp.tint]
+  }
+  return null
+}
