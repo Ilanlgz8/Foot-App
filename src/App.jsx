@@ -156,57 +156,76 @@ function App() {
     }
   }, [])
 
-  // ⚠️ 3e TENTATIVE (10/09, "ça le fait encore" — signalé À NOUVEAU après le
-  // passage de `.sfTabbar` en portail React direct dans `<body>`, voir
-  // navbar.jsx). Ce dernier changement écarte pourtant avec certitude toute
-  // cause liée à un ANCÊTRE transformé/filtré (vérifié en production : le
-  // parent DOM réel de `.sfTabbar` est bien `<body>`, sans aucun intermédiaire
-  // possible) — 2 hypothèses ciblées de suite (verrou body figé, puis couche
-  // GPU dédiée + nudge sur un événement précis) n'ont donc pas identifié la
-  // vraie cause avec certitude. Plutôt que deviner un 3e déclencheur précis,
-  // changement d'approche : un watchdog qui vérifie l'état RÉEL et OBSERVABLE
-  // de la barre en continu (toutes les secondes + à chaque scroll/retour au
-  // premier plan) au lieu d'anticiper QUAND ça casse — même logique que le
-  // filet de sécurité déjà utilisé ailleurs dans l'app pour la fraîcheur ESPN
-  // (voir `useLiveMinute.js`, le setInterval qui détecte une suspension JS
-  // par l'écart RÉEL entre deux tops, indépendant de tout event navigateur).
-  // Un `position: fixed` correctement rendu colle TOUJOURS son bord bas
-  // exactement au bord bas du viewport VISUEL courant (`rect.bottom ===
-  // window.innerHeight`) — vrai quel que soit l'état de la barre d'adresse
-  // (masquée/affichée), donc un test fiable indépendamment des fluctuations
-  // normales de `window.innerHeight` sur mobile. Un écart détecté force un
-  // recalcul en retirant puis réappliquant `position` elle-même (le levier le
-  // plus direct sur la propriété en cause — pas un simple `transform`, déjà
-  // tenté sans succès durable) : corrige le symptôme quelle que soit sa cause
-  // exacte, generalement en moins d'1s, sans dépendre d'avoir deviné le bon
-  // déclencheur.
+  // ⚠️ 4e TENTATIVE (10/09, "nn toujours pas bg .." puis confirmé "iphone pwa
+  // et c comme avant les symptome" — DONC symptôme identique confirmé sur un
+  // vrai iPhone en PWA après le watchdog ci-dessous, pas juste "pas encore
+  // reproduit"). En reprenant le watchdog de la 3e tentative avec cette
+  // nouvelle donnée, un vrai trou logique apparaît : le check tournait sur
+  // CHAQUE événement `scroll` (via rAF, donc quasiment à chaque frame pendant
+  // un geste de scroll), et comparait `rect.bottom` à `window.innerHeight` —
+  // or sur iOS Safari, `window.innerHeight` (viewport de LAYOUT) change en
+  // continu PENDANT l'animation native de la barre d'adresse qui se
+  // masque/affiche au scroll, un comportement 100% normal et déjà géré
+  // nativement par WebKit pour les éléments `position:fixed`. Un simple écart
+  // transitoire pendant cette animation (mesuré au mauvais frame) suffisait à
+  // déclencher la "réparation" — qui elle-même force un reflow synchrone en
+  // retirant puis réappliquant `position` sur la barre. Répétée à chaque
+  // frame de CHAQUE scroll, cette réparation est probablement devenue la
+  // cause du symptôme observé plutôt que son remède : le watchdog lui-même
+  // provoquait le flash/décrochage visible qu'il était censé corriger.
+  // Autrement dit, la 3e tentative n'a probablement rien réparé de réel — elle
+  // a ajouté un déclencheur supplémentaire du même symptôme.
+  // Corrigé : plus AUCUNE réparation pendant le scroll (retiré entièrement,
+  // c'est la source la plus probable du bruit). Le filet de sécurité ne reste
+  // actif que sur les transitions arrière-plan → premier plan
+  // (`visibilitychange`/`pageshow`, seul moment où le bug ORIGINAL — perte de
+  // couche GPU après mise en arrière-plan — a un sens réel) et un intervalle
+  // lent (3s, au lieu d'1s) qui exige DEUX mesures consécutives en dérive
+  // avant d'agir (évite qu'une seule mesure prise pile pendant une animation
+  // de barre d'adresse déclenche une réparation inutile). Utilise
+  // `window.visualViewport` quand disponible : c'est l'API conçue
+  // spécifiquement pour refléter le viewport RÉELLEMENT visible sur mobile
+  // (indépendant de l'animation de la barre d'adresse ou d'un zoom), plus
+  // fiable que `window.innerHeight` pour ce cas précis.
   useEffect(() => {
-    let rafId = null
+    let driftStreak = 0
+    const viewportH = () => window.visualViewport?.height ?? window.innerHeight
     const check = () => {
+      if (document.visibilityState !== 'visible') { driftStreak = 0; return }
       const el = document.querySelector('.sfTabbar')
-      if (!el) return
-      if (getComputedStyle(el).display === 'none') return   // desktop : masquée exprès
+      if (!el) { driftStreak = 0; return }
+      if (getComputedStyle(el).display === 'none') { driftStreak = 0; return }   // desktop : masquée exprès
       const rect  = el.getBoundingClientRect()
-      const drift = Math.abs(rect.bottom - window.innerHeight)
-      if (drift > 2) {
+      const drift = Math.abs(rect.bottom - viewportH())
+      if (drift > 4) {
+        driftStreak += 1
+      } else {
+        driftStreak = 0
+      }
+      // 2 mesures consécutives en dérive (≥3s d'écart réel) avant de réparer —
+      // une dérive isolée est presque toujours une simple animation de barre
+      // d'adresse en cours, pas un vrai décrochage.
+      if (driftStreak >= 2) {
+        driftStreak = 0
         el.style.position = 'static'
         void el.offsetHeight   // force un reflow synchrone avant de réappliquer
         el.style.position = ''
       }
     }
-    const scheduleCheck = () => {
-      if (rafId) return
-      rafId = requestAnimationFrame(() => { rafId = null; check() })
+    const intervalId = setInterval(check, 3000)
+    // Un retour au premier plan est le seul déclencheur qui avait un sens
+    // réel pour le bug ORIGINAL (couche GPU perdue en arrière-plan) — check
+    // immédiat, pas d'attente de 2 mesures pour ce cas précis.
+    const onResume = () => {
+      driftStreak = 2
+      check()
     }
-    const intervalId = setInterval(check, 1000)
-    window.addEventListener('scroll', scheduleCheck, { passive: true })
-    document.addEventListener('visibilitychange', scheduleCheck)
-    window.addEventListener('pageshow', scheduleCheck)
+    document.addEventListener('visibilitychange', onResume)
+    window.addEventListener('pageshow', onResume)
     return () => {
       clearInterval(intervalId)
-      window.removeEventListener('scroll', scheduleCheck)
-      document.removeEventListener('visibilitychange', scheduleCheck)
-      window.removeEventListener('pageshow', scheduleCheck)
+      document.removeEventListener('visibilitychange', onResume)
+      window.removeEventListener('pageshow', onResume)
     }
   }, [])
 

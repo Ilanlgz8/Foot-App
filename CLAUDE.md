@@ -381,6 +381,33 @@ cf-worker/
   vérifie que le MÉCANISME DE RÉPARATION fonctionne (simulation fidèle du symptôme rapporté), pas
   qu'il se déclenchera au bon moment sur un vrai décrochage spontané en conditions réelles — à
   confirmer par l'utilisateur sur son téléphone.
+- ✅ Barre du bas ENCORE détachée malgré le watchdog, confirmé identique sur "iphone pwa" (constat
+  utilisateur, 10/09, "nn toujours pas bg .." puis confirmation explicite "iphone pwa et c comme
+  avant les symptome" — donc bien le même symptôme, pas un nouveau, sur un vrai appareil réel).
+  Cette confirmation a permis de trouver un vrai trou logique dans le watchdog de la tentative
+  précédente plutôt que de deviner une 5e cause : il réparait sur CHAQUE `scroll` (via
+  `requestAnimationFrame`, donc quasiment à chaque frame pendant un geste de scroll), en comparant
+  `rect.bottom` à `window.innerHeight` — or sur iOS Safari, `window.innerHeight` change en continu
+  PENDANT l'animation native de la barre d'adresse qui se masque/affiche au scroll (comportement
+  normal, déjà géré nativement par WebKit pour `position: fixed`). Une mesure prise au mauvais
+  instant de cette animation suffisait à déclencher la "réparation" du watchdog — qui force
+  elle-même un reflow synchrone (retire puis réapplique `position` sur la barre). Répétée à
+  quasiment chaque frame de CHAQUE scroll sur mobile, cette réparation est la cause la plus
+  probable du symptôme observé : le watchdog de la tentative précédente provoquait probablement
+  lui-même le flash qu'il était censé corriger, plutôt que de réparer un vrai bug résiduel.
+  Corrigé (`App.jsx`) : plus aucune réparation déclenchée par le scroll (retiré entièrement). Le
+  filet de sécurité ne reste actif que sur les transitions arrière-plan → premier plan
+  (`visibilitychange`/`pageshow`, seul moment où le bug ORIGINAL — perte de couche GPU après mise
+  en arrière-plan — a un sens réel, réparation immédiate) et un intervalle lent (3s au lieu d'1s)
+  qui exige DEUX mesures consécutives en dérive avant d'agir (une dérive isolée est presque
+  toujours une animation de barre d'adresse en cours, pas un vrai décrochage). Utilise
+  `window.visualViewport?.height` quand disponible plutôt que `window.innerHeight` : c'est l'API
+  conçue spécifiquement pour refléter le viewport réellement visible sur mobile, indépendante de
+  l'animation de la barre d'adresse. Lint + build vérifiés propres. Honnêteté : je n'ai toujours
+  aucun accès à un vrai iPhone depuis cet environnement — cette fois la théorie n'est pas une
+  nouvelle cause devinée au hasard mais un vrai trou de logique trouvé dans le code du fix
+  précédent une fois la confirmation "même symptôme, vrai iPhone PWA" obtenue ; reste à confirmer
+  par l'utilisateur que ça règle vraiment le problème cette fois.
 
 ## Conventions
 - Noms français partout dans l'UI
