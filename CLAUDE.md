@@ -335,6 +335,31 @@ cf-worker/
   lente, ce poids explique un vrai délai visible avant que le logo apparaisse. Redimensionné à
   360×337px (largement suffisant même en Retina/3x pour tout affichage réel de l'app) → 101KB
   (-74%), qualité visuelle inchangée à l'œil (vérifié par comparaison visuelle avant/après).
+- ✅ Barre du bas (`.sfTabbar`) toujours détachée du viewport après un cycle arrière-plan→scroll
+  (constat utilisateur, 10/09, 3e signalement — capture d'écran à l'appui montrant la barre
+  affichée EN PLEIN MILIEU de la page, entre deux cartes de match, comme un bloc normal du flux au
+  lieu d'une barre fixe) — les 2 correctifs précédents (filet `unstickBody`, `App.jsx` ; couche GPU
+  dédiée + nudge, `navbar.css`) n'ont pas suffi durablement. Audit complet de la chaîne de parents
+  DOM de `.sfTabbar` (Navbar → LiveProvider → 2× ErrorBoundary → #root) : aucun transform/filter/
+  will-change/contain permanent trouvé dans l'état actuel du code — mais ce projet a DÉJÀ eu
+  exactement cette classe de bug une fois ailleurs (voir `App.css`, `.page-transition`, fix du
+  05/09) : un `animation-fill-mode: both` laissait un `transform` résiduel EN PERMANENCE sur un
+  conteneur, ce qui en fait le bloc conteneur de TOUS ses descendants en `position: fixed` (ils
+  s'ancrent alors sur ce conteneur au lieu du viewport — exactement le symptôme "barre au milieu
+  de la page"). Plutôt que traquer un transform précis une 3e fois (les 2 tentatives précédentes
+  n'ont pas identifié la vraie cause avec certitude), fix structurel : la barre du bas est
+  désormais rendue via un **portail React directement dans `<body>`** (`createPortal`, voir
+  `src/components/navbar.jsx`) au lieu d'être un descendant de `#root` — son parent DOM réel n'est
+  plus jamais affecté par un transform/filter ajouté N'IMPORTE OÙ dans l'arbre de l'app (aujourd'hui
+  ou dans une future fonctionnalité), l'immunise structurellement contre toute cette classe de bug
+  au lieu de patcher un cas précis. Le contexte React (routing, données live) reste inchangé — un
+  portail ne déplace que l'emplacement DOM, pas la position dans l'arbre React. `z-index` inchangé
+  (60) : ni `#root` ni `body` n'établissent de contexte d'empilement propre, donc la comparaison
+  reste globale, aucune régression de superposition attendue. 356 tests + lint + build vérifiés
+  inchangés. Honnêteté : je n'ai pas pu reproduire le bug moi-même dans cet environnement (aucun
+  accès à un vrai appareil mobile/PWA) — cette 3e tentative répare la classe de bug la plus
+  probable identifiée par audit de code et par précédent réel dans ce même projet, pas une
+  reproduction confirmée en direct ; à valider par l'utilisateur sur son téléphone.
 
 ## Conventions
 - Noms français partout dans l'UI
