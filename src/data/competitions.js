@@ -558,11 +558,17 @@ export const COMPETITIONS = [
     // pour laisser encore plus de noir en haut de carte, tout en gardant la
     // couleur franche (pas de zone de transition qui la ternirait) une fois
     // qu'elle apparaît — validé en direct sur le site.
-    tint: '#000000',
-    tint2: '#c8551a',
-    tintSoft: true,
-    tintStops: { base: '36%', c2: '66%', c3: '88%' },
-    tintSilverText: true, // fond noir : chrono en blanc argenté, comme Bundesliga/LaLiga
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (10/09, encore le même jour, demande :
+    // "plusieurs petites parties difformes de noir et de orange mélangées")
+    // : la recette standard tint/tint2 (dégradé à 2 zones nettes, diagonale)
+    // ne peut structurellement PAS donner ce résultat — remplacée par le même
+    // mécanisme dédié que CL/NL/WC (`tintTheme`, voir `.poster--theme-uel`
+    // dans accueil.css) : plusieurs taches irrégulières qui se recouvrent,
+    // floutées, mélangeant noir et les mêmes teintes d'orange que ci-dessus
+    // (validées "prononcées" juste avant). Champs tint/tint2/tintStops/
+    // tintSilverText retirés : ce mécanisme n'en a plus besoin (voir
+    // TINT_THEME_CAMP_COLORS plus bas pour la couleur du "Match du jour").
+    tintTheme: 'uel',
     name: 'Ligue Europa',
     shortName: 'Europa L.',
     emblem: europaLeagueLogo,
@@ -576,11 +582,9 @@ export const COMPETITIONS = [
     // arrêts repoussés 30/62/88 → 36/66/88 (plus de noir).
     // ⚠️ RETOUCHÉ (10/09, même feedback que UEL) : noir pur, vert assombri
     // #3cb846 → #1f5c2a (sapin), mêmes arrêts repoussés.
-    tint: '#000000',
-    tint2: '#2f8a3e',
-    tintSoft: true,
-    tintStops: { base: '36%', c2: '66%', c3: '88%' },
-    tintSilverText: true,
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (10/09, même demande que UEL) : voir
+    // `.poster--theme-uecl` dans accueil.css.
+    tintTheme: 'uecl',
     name: 'Ligue Europa Conférence',
     shortName: 'Conférence L.',
     emblem: conferenceLeagueLogo,
@@ -775,9 +779,11 @@ export const COMPETITIONS = [
 // du "mode peinture" Coupe du Monde (composition finale : or dominant + vert
 // + rouge/jaune vif).
 const TINT_THEME_CAMP_COLORS = {
-  ucl: ['#0232FF', '#010056'],
-  nl:  ['#0c3c90', '#d8000c'],
-  wc:  ['#ffe135', '#c1121f'],
+  ucl:  ['#0232FF', '#010056'],
+  nl:   ['#0c3c90', '#d8000c'],
+  wc:   ['#ffe135', '#c1121f'],
+  uel:  ['#c8551a', '#000000'],
+  uecl: ['#2f8a3e', '#000000'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —
