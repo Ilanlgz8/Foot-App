@@ -623,20 +623,38 @@ export const COMPETITIONS = [
     // petits drapeaux) : la famille bleu/indigo (plusieurs clusters mesurés
     // ensemble) arrive en tête d'un cheveu devant le rouge, le vert restant
     // 3e — bleu-indigo retenu en base, un bleu plus clair en 2e couleur.
-    // Volontairement plus foncé/désaturé que le bleu Ligue 1 (#085dfe, très
-    // vif) pour ne pas donner la même couleur à deux compétitions
-    // différentes alors que les deux logos sont réellement bleus mais pas de
-    // la même nuance.
+    // ⚠️ CORRIGÉ (10/09, retour utilisateur : "c'est pas ça les couleurs de
+    // la ligue des nations... c multicouleur un peu" — capture de référence
+    // à l'appui, logo officiel avec texte gris-ardoise plutôt que blanc). Le
+    // 1er essai (2 tons bleu/indigo mesurés sur `nations-league-real.png`,
+    // l'asset RÉELLEMENT utilisé par l'app) était too en 2 couleurs alors que
+    // le vrai fanion est une mosaïque à 4 familles de couleurs. Re-mesuré sur
+    // l'image de référence envoyée (même logo, rendu plus net) avec un
+    // classement par famille de teinte plutôt qu'un simple bucket brut :
+    // bleu 32%, rouge 24%, or 14%, vert 12% des pixels colorés du fanion.
+    // Passé à une recette à 3 couleurs (comme Bundesliga/LaLiga) plutôt que
+    // 2, pour rendre ce côté "multicolore" : bleu en base (toujours la
+    // famille la plus mesurée), rouge en 2e, or en pointe finale — le vert
+    // (4e, le plus faible des 4) est laissé de côté, 3 couleurs étant déjà la
+    // recette la plus chargée dispo dans le mécanisme commun.
     id: 'NL',
     name: 'Ligue des Nations',
     shortName: 'Ligue des nations',
     emblem: nationsLeagueLogo,
-    tint: '#2a3873',
-    tint2: '#3f66ad',
-    tintStops: { base: '22%', c2: '55%', c3: '85%' },
-    tintLight: true,
-    tintPearl: 0.45,
-    tintSoft: true,
+    // ⚠️ "MODE PEINTURE" (10/09) — remplace la teinte 3 tons ci-dessus
+    // (bleu/rouge/or en dégradé linéaire), elle-même déjà une révision d'une
+    // teinte 2 tons initiale. Aucune des deux n'a satisfait l'utilisateur
+    // ("c pas ça les couleurs", "nn fait vraiment mieux" sur une mosaïque
+    // géométrique essayée entre-temps). Demande finale : "fais en mode
+    // peinture pas de forme juste un melange de pleins de couleur" — approuvé
+    // en aperçu live sur la card Accueil ("vas y"). `tintTheme: 'nl'` bascule
+    // sur un habillage dédié (comme `tintTheme: 'ucl'`), voir
+    // `.poster--theme-nl` dans accueil.css et `.lmp__hero--theme-nl` dans
+    // LiveMatchPage.css — mélange flouté de bleu/rouge/vert/or/blanc, sans
+    // forme géométrique. Les champs tint/tint2/tint3/tintStops/tintSilverText
+    // ne servent plus : la mécanique de teinte partagée n'est pas utilisée
+    // par ce thème dédié.
+    tintTheme: 'nl',
     // ⚠️ FOND BLANC RETIRÉ (10/09, demande utilisateur : "pour le logo ligue
     // des nation c possible de retirer le fond blanc du logo ?"). Le fichier
     // n'a PAS de fond blanc cuit dans les pixels (transparence vérifiée aux

@@ -1150,6 +1150,54 @@
     radial-gradient(90%  60% at 50% 40%, rgba(255,255,255,0.12) 0%, transparent 60%);
 }
 
+/* ⚠️ HABILLAGE LIGUE DES NATIONS "MODE PEINTURE" (10/09, demande utilisateur :
+   "fais en mode peinture pas de forme juste un melange de pleins de couleur",
+   approuvé en aperçu live sur la card Accueil : "vas y"). Même recette que
+   accueil.css (`.poster--theme-nl`), reprise à l'identique ici — voir le
+   commentaire complet là-bas pour tout l'historique (teinte 2 tons → 3 tons →
+   mosaïque géométrique, toutes rejetées avant cette version).
+   ⚠️ Le flou (`filter: blur()`) est posé sur `.lmp__heroTintC`, PAS sur
+   `#root .lmp__hero--theme-nl` : ce dernier est l'élément qui porte aussi le
+   contenu (score, blasons, minute...) — un flou posé dessus flouterait tout,
+   pas seulement le fond. `.lmp__heroTintC` est un calque dédié, vide,
+   `aria-hidden`, absolument positionné derrière le contenu — exactement le
+   rôle de `.poster__bg--gradient` côté Accueil, d'où le choix de ce calque
+   plutôt que l'élément racine.
+   `inset: -20px` fait déborder le calque flouté au-delà de la carte : sans ça
+   le flou assombrit artificiellement les bords (il "voit" du vide juste après
+   son propre bord). Le `clip-path` déjà posé sur `#root .lmp__hero` (voir plus
+   haut, bug du 02/09 — nécessaire précisément pour ce cas : `overflow:hidden`
+   seul ne rogne pas fiablement un enfant flouté) rogne proprement ce
+   débordement, flou compris.
+   `#root .lmp__hero--theme-nl` garde un fond marine plein (non flouté) : pur
+   filet de sécurité si jamais `.lmp__heroTintC` ne couvrait pas 100% de la
+   zone (angles du clip-path), aucune couleur ne le remplace jamais vraiment
+   vu que le calque flouté couvre toute la carte. */
+#root .lmp__hero--theme-nl {
+  background: #0a1020;
+}
+.lmp__hero--theme-nl .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-nl .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(22px) saturate(1.4);
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0c3c90 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #d8000c 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #009c48 0%, transparent 60%),
+    radial-gradient(38% 62% at 75% 65%, #fcc000 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
+    radial-gradient(40% 65% at 90% 30%, #0c3c90 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #d8000c 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #009c48 0%, transparent 60%),
+    #0a1020;
+}
+
 /* Le contour animé du direct (.sf-liveBorder, index.css) est posé en `inset:
    -1px`, soit 1px À L'EXTÉRIEUR de la card — or ce panneau porte un
    `clip-path` qui rogne exactement au bord, l'anneau s'y serait donc retrouvé

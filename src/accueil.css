@@ -1816,6 +1816,56 @@
     rgba(var(--black-rgb),0.48) 100%);
 }
 
+/* ⚠️ HABILLAGE LIGUE DES NATIONS (10/09) — voir competitions.js (`tintTheme`).
+   Historique rapide sur CETTE carte : d'abord une teinte simple à 2 tons
+   (bleu-indigo mesuré sur `nations-league-real.png`, même méthode que les
+   championnats club) — jugée "pas les bonnes couleurs" (le logo réel est une
+   mosaïque à 4 familles de couleurs, pas juste bleu). Passée à 3 tons
+   (bleu/rouge/or, mécanisme `tint`/`tint2`/`tint3` commun) — jugée encore
+   trop "dégradé plat", pas assez fidèle au fanion multicolore. Un essai en
+   mosaïque géométrique (triangles nets, même esprit que le logo) a été
+   montré et jugé correct, mais la demande finale ("fais en mode peinture pas
+   de forme juste un melange de pleins de couleur") voulait explicitement
+   l'inverse : PAS de formes nettes, un mélange organique flou. D'où ce bloc
+   dédié (comme la LDC) plutôt que le mécanisme `tint` commun, qui ne sait
+   produire QUE des dégradés linéaires/radiaux nets à 2-3 tons.
+   Recette : 8 taches radiales (bleu/rouge/vert/or/blanc mesurés sur l'image
+   de référence UEFA envoyée par l'utilisateur, mêmes familles que le calcul
+   du 1er essai : bleu 32%, rouge 24%, or 14%, vert 12%), fortement floutées
+   (`blur(22px)`) et légèrement sursaturées pour un effet "peinture/aquarelle"
+   qui se mélange plutôt que des zones séparées. `inset: -20px` (déborde du
+   cadre) : le flou assombrirait sinon les bords de la card (halo visible),
+   `.poster` a son propre `overflow:hidden` qui coupe proprement le débord. */
+.poster--theme-nl .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0c3c90 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #d8000c 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #009c48 0%, transparent 60%),
+    radial-gradient(38% 62% at 75% 65%, #fcc000 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
+    radial-gradient(40% 65% at 90% 30%, #0c3c90 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #d8000c 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #009c48 0%, transparent 60%),
+    #0a1020;
+  filter: blur(22px) saturate(1.4);
+  animation: none;
+}
+.poster--theme-nl .poster__bg--gradientAlt {
+  inset: 0;
+  opacity: 0;
+}
+.poster--theme-nl .poster__bg--gradientTri {
+  inset: 0;
+  opacity: 0;
+}
+.poster--theme-nl .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.65) 100%);
+}
+
 /* Overlay sombre + dégradé directional */
 .poster__overlay {
   position: absolute;
