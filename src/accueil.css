@@ -1868,46 +1868,47 @@
 
 /* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même famille que
    `.poster--theme-nl` juste au-dessus (calque dédié flouté), mais composition
-   très différente après plusieurs rejets successifs de l'utilisateur :
-   1) or/bronze 2 tons extrait des pixels réels du trophée → "pas assez coupe
-      du monde" (l'or seul ne dit rien sans couleur associée).
+   très retravaillée après de nombreux allers-retours utilisateur :
+   1) or/bronze 2 tons extrait des pixels réels du trophée générique
+      (`coupe-du-monde.png`) → "pas assez coupe du monde" (l'or seul ne dit
+      rien sans couleur associée).
    2) or + bleu FIFA (choix assumé, pas de pixel) → jamais validé.
    3) palette arc-en-ciel façon LDN (vert/bleu/rouge/or/blanc/noir) → "ça fait
       comme la ligue des nations", pas assez distinctif.
-   4) demande finale, validée : rester sur de l'OR dominant (c'est la couleur
-      du trophée) avec du blanc en reflets, puis sans noir dans le fond, puis
-      encore plus d'or, puis un peu de vert et de marron en petites touches,
-      puis le blanc remplacé par du vert, puis des formes moins rondes/plus
-      irrégulières ("difforme") — surtout sur le vert — et enfin moins de
-      marron. Résultat : un or très dominant (trophée), des touches de vert
-      étalées et asymétriques (plusieurs nuances #1f4a1a/#2d5a27/#3a6b2f pour
-      casser la forme ronde d'un dégradé radial isolé), une pointe de marron
-      quasi invisible dans un coin, fond brun-doré foncé (`#4a2f08`, PAS noir).
-   Le voile brillant (`.poster__bg--gradientTri`, technique reprise de
-   `tintPearl`/pearl sheen des championnats club) est réactivé ici en teinte
-   chaude crème plutôt que blanc pur : lueur façon métal poli, cohérente avec
-   le thème "trophée". */
+   4) or dominant + blanc, sans noir, encore plus d'or, un peu de vert et de
+      marron, blanc remplacé par du vert, formes plus irrégulières, moins de
+      marron → l'utilisateur a alors envoyé le VRAI logo officiel FIFA World
+      Cup 26 (trophée + anneau vert malachite à sa base, sur fond noir).
+   5) Couleurs RÉELLEMENT mesurées sur les pixels de ce logo (script Python,
+      bucket 16, pixels noirs/blancs exclus) : or `#f0c000`/dominant, vert
+      `#009040`/dominant — nettement plus vifs que le premier extrait (logo
+      générique de moins bonne qualité). Composition finale : contraste
+      lumière/ombre métallique (hautes lumières `#f7dc3c` puis or moyen
+      `#c09000`/`#a87e00` puis ombres `#8a6800`/`#6b5000` — un aplat plat,
+      clair ou foncé, ne "faisait pas gold" aux yeux de l'utilisateur, il
+      fallait ce contraste comme sur le vrai trophée), touches de vert
+      asymétriques élargies en haut à gauche (anneau du trophée), fond
+      `#6b5000` (or foncé, jamais noir/marron). Le voile brillant
+      (`.poster__bg--gradientTri`) essayé puis retiré : il recréait un rond
+      "jaune clair" au centre non désiré. */
 .poster--theme-wc .poster__bg--gradient {
   inset: -20px;
   background:
-    radial-gradient(60% 35% at 38% 28%, #d9a52c 0%, transparent 60%),
-    radial-gradient(32% 65% at 52% 42%, #d9a52c 0%, transparent 62%),
-    radial-gradient(48% 50% at 24% 58%, #d9a52c 0%, transparent 58%),
-    radial-gradient(28% 48% at 40% 68%, #d9a52c 0%, transparent 55%),
-    radial-gradient(55% 28% at 75% 68%, #a86000 0%, transparent 58%),
-    radial-gradient(24% 42% at 68% 80%, #a86000 0%, transparent 55%),
-    radial-gradient(38% 14% at 88% 6%, #2d5a27 0%, transparent 55%),
-    radial-gradient(14% 34% at 96% 16%, #2d5a27 0%, transparent 55%),
-    radial-gradient(22% 10% at 78% 18%, #1f4a1a 0%, transparent 50%),
-    radial-gradient(10% 26% at 94% 26%, #3a6b2f 0%, transparent 50%),
-    radial-gradient(24% 9% at 8% 6%, #2d5a27 0%, transparent 50%),
-    radial-gradient(9% 22% at 14% 16%, #1f4a1a 0%, transparent 48%),
-    radial-gradient(36% 12% at 4% 88%, #2d5a27 0%, transparent 58%),
-    radial-gradient(12% 30% at 2% 98%, #2d5a27 0%, transparent 55%),
-    radial-gradient(20% 9% at 20% 94%, #3a6b2f 0%, transparent 50%),
-    radial-gradient(9% 24% at 10% 82%, #1f4a1a 0%, transparent 48%),
-    radial-gradient(9% 11% at 98% 97%, rgba(107,31,31,0.55) 0%, transparent 60%),
-    #4a2f08;
+    radial-gradient(45% 32% at 34% 24%, #f7dc3c 0%, transparent 60%),
+    radial-gradient(42% 65% at 48% 40%, #c09000 0%, transparent 64%),
+    radial-gradient(50% 55% at 22% 55%, #a87e00 0%, transparent 60%),
+    radial-gradient(38% 56% at 42% 66%, #8a6800 0%, transparent 60%),
+    radial-gradient(50% 30% at 80% 62%, #a87e00 0%, transparent 60%),
+    radial-gradient(30% 46% at 68% 82%, #6b5000 0%, transparent 58%),
+    radial-gradient(16% 10% at 55% 18%, #f7dc3c 0%, transparent 52%),
+    radial-gradient(44% 22% at 88% 6%, #007040 0%, transparent 58%),
+    radial-gradient(22% 46% at 96% 16%, #005c30 0%, transparent 55%),
+    radial-gradient(52% 24% at 8% 4%, #009040 0%, transparent 55%),
+    radial-gradient(26% 44% at 4% 18%, #007040 0%, transparent 52%),
+    radial-gradient(42% 18% at 4% 88%, #005c30 0%, transparent 58%),
+    radial-gradient(22% 42% at 2% 98%, #007040 0%, transparent 55%),
+    radial-gradient(30% 15% at 20% 94%, #009040 0%, transparent 52%),
+    #6b5000;
   filter: blur(20px) saturate(1.3);
   animation: none;
 }
@@ -1917,10 +1918,7 @@
 }
 .poster--theme-wc .poster__bg--gradientTri {
   inset: 0;
-  opacity: 0.55;
-  animation: none;
-  mix-blend-mode: screen;
-  background: radial-gradient(55% 60% at 50% 30%, rgba(255,236,190,0.6) 0%, transparent 65%);
+  opacity: 0;
 }
 .poster--theme-wc .poster__overlay {
   background: linear-gradient(to bottom,

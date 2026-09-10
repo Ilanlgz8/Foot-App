@@ -594,10 +594,16 @@ export const COMPETITIONS = [
     // ci-dessus (constat utilisateur : "ça fait pas trop coupe du monde"),
     // puis un essai or + bleu FIFA, puis une palette arc-en-ciel façon Ligue
     // des Nations ("ça fait comme la ligue des nation") — aucun des trois
-    // validé. Composition finale, affinée par itérations successives : or
-    // très dominant (couleur du trophée), touches de vert asymétriques,
-    // pointe de marron quasi invisible, fond brun-doré SANS noir. Voir le
-    // commentaire complet dans accueil.css (`.poster--theme-wc`) pour le
+    // validé. L'utilisateur a ensuite envoyé le vrai logo officiel FIFA World
+    // Cup 26 (trophée + anneau vert malachite à sa base) : couleurs
+    // RÉELLEMENT mesurées sur ses pixels (or `#f0c000` dominant, vert
+    // `#009040` dominant — nettement plus vifs que le premier extrait, fait
+    // sur un logo générique de moins bonne qualité). Composition finale :
+    // contraste lumière/ombre métallique (hautes lumières → or moyen →
+    // ombres, un aplat plat ne "faisait pas gold" aux yeux de l'utilisateur),
+    // touches de vert asymétriques concentrées en haut à gauche, fond or
+    // foncé SANS noir. Voir le commentaire complet dans accueil.css
+    // (`.poster--theme-wc`) pour le
     // détail des couleurs et leur origine. `tintTheme: 'wc'` bascule sur
     // un bloc CSS dédié (comme `tintTheme: 'ucl'`/`'nl'`) — les champs
     // tint/tint2/tintStops/tintLight/tintSoft ne servent plus.
