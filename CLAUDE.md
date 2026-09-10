@@ -272,6 +272,37 @@ cf-worker/
   Ligue des Champions" mentionné par l'utilisateur — le garde-fou `ts` protège contre ce symptôme
   précis quelle qu'en soit la cause exacte, mais un futur diagnostic plus précis nécessitera
   `/api/debug-push?secret=...&match=...` (logs des dernières 24h, déjà en place).
+- ✅ Côtes live "trop méchantes" en fin de match à égalité (constat utilisateur, 10/09 : "les
+  côtes montent trop vite" en approchant de la fin, exemple donné non littéral "~0,20/min à
+  partir de la 75e, 2 à 5/min à partir de la 90e") : vérifié numériquement sur `calcLiveProno`
+  (`src/utils/calcProno.js`) — un match fictif 0-0 (favori pré-match 57%) tombait à 24% dès la
+  75e et à 2% dès la 89e, l'essentiel de la chute concentré dans le dernier quart d'heure. Cause
+  racine : `remaining` (fraction de temps restant) décroît linéairement avec la minute, mais son
+  effet sur la probabilité Poisson "plus aucun but d'ici la fin" est exponentiel — la vitesse de
+  variation du pronostic est donc structurellement plus forte en fin de match, même à rythme de
+  jeu constant. Deux correctifs cumulés, tous deux dans `calcLiveProno` : (1) `remainingEased =
+  remaining^0.6` (exposant < 1, uniquement pour la mise à l'échelle des λ dans la projection
+  Poisson) — étale la bascule sur une plus grande partie de la 2e mi-temps, tout en préservant la
+  convergence exacte vers 0 en toute fin de match (aucun changement au résultat final, seulement
+  au chemin pour y arriver). (2) Bug annexe trouvé au passage : `parseMinuteValue` ne retenait
+  que la base de "90+X'"/"120+X'" (le "+X" temps additionnel était ignoré) — `remaining` tombait
+  donc à 0 (traité comme la fin du match) dès l'affichage de "90'", et restait FIGÉ tout le reste
+  du vrai temps additionnel jusqu'au coup de sifflet, un saut brutal plutôt qu'une continuité.
+  Corrigé via `endOfMatchStoppage()` + `STOPPAGE_BUFFER` (8min, choisi par raisonnement — le vrai
+  total de temps additionnel n'est jamais connu à l'avance côté données dispo ici) : `remaining`
+  est maintenant une fonction réellement continue de la minute affichée, du coup d'envoi jusqu'au
+  vrai coup de sifflet final, sans palier au moment où l'affichage bascule sur le temps
+  additionnel. Re-vérifié après les 2 correctifs combinés : même match fictif, favori à 41%
+  (75e), 29% (90e pile), puis 2% seulement une fois le temps additionnel réellement écoulé
+  (90+7/8) — la bascule brutale existe toujours en toute fin (statistiquement fondée), mais
+  repoussée à la fin du temps additionnel plutôt qu'anticipée dès la 75e. 78 tests existants de
+  `calcProno.test.js` (dont les invariants stricts sur le nul qui écrase en fin de match à
+  égalité, le garde-fou anti-victoire-plus-probable-que-nul, etc.) toujours verts sans
+  modification — aucune régression sur les scénarios déjà audités. Honnêteté : `0.6` et `8min`
+  sont des choix raisonnés, pas backtestés sur de vrais matchs en direct (aucun backtest live
+  n'existe à ce jour pour `calcLiveProno`, même limite déjà documentée pour `LIVE_LAMBDA_SHRINK`
+  plus bas dans le fichier) — à ajuster si le retour utilisateur indique encore trop/pas assez de
+  mouvement.
 
 ## Conventions
 - Noms français partout dans l'UI

@@ -768,6 +768,34 @@ function parseMinuteValue(minute) {
   return m ? parseInt(m[1], 10) : 45     // fallback neutre si format inconnu
 }
 
+// ── Temps additionnel en fin de match ("90+X'"/"120+X'") ───────────────────
+// Retour utilisateur (10/09, "à partir de la 90..." — sous-entend que la 90e
+// minute ne devrait pas déjà être un point d'arrêt) : parseMinuteValue()
+// ci-dessus ne retient QUE la base ("90") de "90+3'" (regex générique) — le
+// "+X" est ignoré. Résultat mesuré (voir calcLiveProno, `remaining`) :
+// `remaining` tombe à 0 (traité comme la fin du match) dès que l'affichage
+// passe à "90'", et reste FIGÉ tout le reste du vrai temps additionnel (3 à
+// 8min en pratique) jusqu'au coup de sifflet — un saut brutal plutôt qu'une
+// continuité. Cas symétrique en fin de prolongations ("120+X'"). Volontairement
+// PAS "105+X'" (fin de la 1ère mi-temps de prolongation, simple pause avant la
+// 2e — pas une fin de match, `min > 90` bascule déjà correctement sur
+// totalDuration=120 dans ce cas, remaining reste légitimement non nul).
+// STOPPAGE_BUFFER : le vrai total de temps additionnel n'est jamais connu à
+// l'avance côté données dispo ici — valeur choisie par raisonnement (moyenne
+// courante observée ces dernières saisons, hors cas extrêmes rallongés par
+// VAR/blessures), pas mesurée : sert uniquement à étaler la fin de la
+// projection sur une fenêtre réaliste au lieu de la figer instantanément.
+// ⚠️ "90'" pile (sans "+X" encore affiché, un tout petit instant de
+// transition) est traité comme "90+0" — pas seulement "90+X'" — sinon la
+// bascule producsait un aller-retour absurde (remaining tombe à 0 pile à
+// "90'", PUIS remonte franchement à "90+1'" dès que le buffer s'applique de
+// nouveau juste après) au lieu d'une vraie continuité.
+const STOPPAGE_BUFFER = 8
+function endOfMatchStoppage(minute) {
+  const m = typeof minute === 'string' ? /^(90|120)(?:\+(\d+))?(?:'|$)/.exec(minute) : null
+  return m ? { base: parseInt(m[1], 10), extra: m[2] ? parseInt(m[2], 10) : 0 } : null
+}
+
 // ── Projection Poisson en direct ────────────────────────────────────────
 // Retour utilisateur (bug réel : France favorite pré-match, menée 0-3 par
 // l'Angleterre — cote nul 6,74 MAIS cote victoire France 3,37, la victoire
@@ -952,9 +980,16 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     : calcProno(homeForm, awayForm, { neutralVenue }))
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 
-  const min           = parseMinuteValue(minute)
-  const totalDuration = min > 90 ? 120 : 90
-  const remaining     = Math.min(1, Math.max(0, (totalDuration - min) / totalDuration))
+  // STOPPAGE_BUFFER ajouté à totalDuration EN PERMANENCE (pas seulement une
+  // fois en "90+X'") : remaining reste une fonction continue de la minute,
+  // sans palier au moment précis où l'affichage bascule sur le temps
+  // additionnel (un palier réintroduirait exactement le type de saut brutal
+  // que ce correctif vise à éliminer — voir endOfMatchStoppage()).
+  const stoppage       = endOfMatchStoppage(minute)
+  const min            = stoppage ? stoppage.base + Math.min(stoppage.extra, STOPPAGE_BUFFER) : parseMinuteValue(minute)
+  const isExtraTime    = stoppage ? stoppage.base === 120 : min > 90
+  const totalDuration  = (isExtraTime ? 120 : 90) + STOPPAGE_BUFFER
+  const remaining      = Math.min(1, Math.max(0, (totalDuration - min) / totalDuration))
 
   // Coup d'envoi exact (0-0, minute 0) : rien à projeter, le direct EST le
   // pré-match — évite aussi toute imprécision numérique de la projection
@@ -1061,7 +1096,42 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   const lambdaHome = baseLambdaHome * paceFactor
   const lambdaAway = baseLambdaAway * paceFactor
 
-  const proj = poissonOutcomesFromDiff(lambdaHome * remaining, lambdaAway * remaining, diff)
+  // ── Lissage de la bascule en fin de match (retour utilisateur, 10/09 :
+  // "on est souvent trop méchant quand ça approche de la fin du match, à
+  // égalité... les côtes montent trop vite" — exemple donné, pas une valeur
+  // à appliquer littéralement : "0,20/min à partir de la 75e, 2 à 5/min à
+  // partir de la 90e") ── Vérifié numériquement (match fictif 0-0, favori
+  // pré-match à 57%) : SANS ce correctif, le favori tombait de 57% à 24% dès
+  // la 75e puis à 2% dès la 89e — l'essentiel de la chute concentré dans le
+  // dernier quart d'heure. Cause racine : `remaining` décroît LINÉAIREMENT
+  // avec la minute, mais son effet sur la probabilité Poisson "plus aucun but
+  // d'ici la fin" (~e^-λ·remaining, voir poissonOutcomesFromDiff) est
+  // EXPONENTIEL — la vitesse de variation du pronostic est donc
+  // structurellement bien plus forte en fin de match qu'en début, même à
+  // rythme de jeu constant (mathématiquement fondé dans l'absolu : moins de
+  // temps restant = plus de certitude légitime, mais le RYTHME de cette
+  // hausse est ce qui choquait, pas sa direction). Racine carrée-like
+  // (exposant < 1) : ralentit la décroissance de `remaining` sur la majeure
+  // partie du match tout en préservant sa convergence exacte vers 0 en toute
+  // fin (remaining=0 reste eased=0), donc aucun changement au résultat final
+  // — seulement au CHEMIN pour y arriver. Combiné à STOPPAGE_BUFFER
+  // ci-dessus (qui repousse aussi le moment où `remaining` atteint
+  // effectivement 0, du 90e pile jusqu'au vrai temps additionnel), la chute
+  // se répartit désormais sur toute la 2e mi-temps au lieu de se concentrer
+  // sur le dernier quart d'heure : re-vérifié, favori à 41% (75e), 29% (90e),
+  // puis 2% seulement une fois le temps additionnel écoulé (90+7/8) — la
+  // bascule brutale existe toujours (statistiquement fondée à l'approche du
+  // coup de sifflet), mais elle est désormais repoussée à la toute fin du
+  // temps additionnel plutôt qu'anticipée dès la 75e.
+  // ⚠️ LIVE_REMAINING_EASE_EXP choisi par raisonnement (assez proche de 0.5
+  // — une racine carrée classique pour amortir une courbe trop convexe —
+  // sans non plus aplatir complètement la 2e mi-temps), PAS backtesté sur de
+  // vrais matchs en direct (aucun backtest live n'existe à ce jour pour
+  // calcLiveProno, voir LIVE_LAMBDA_SHRINK plus haut) — à ajuster si le
+  // retour utilisateur indique encore trop/pas assez de mouvement.
+  const LIVE_REMAINING_EASE_EXP = 0.6
+  const remainingEased = Math.pow(remaining, LIVE_REMAINING_EASE_EXP)
+  const proj = poissonOutcomesFromDiff(lambdaHome * remainingEased, lambdaAway * remainingEased, diff)
   let home = proj.home * 100
   let draw = proj.draw * 100
   let away = proj.away * 100
