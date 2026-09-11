@@ -516,6 +516,9 @@ cf-worker/
   build vérifiés. Même limite de déploiement que les points notifs ci-dessus : la partie
   `cf-worker/` nécessite `npm run deploy` manuel ; la partie `api/cron-goals.js` (fallback
   historique, pas le chemin actif) se déploie automatiquement avec le reste de l'app via Vercel.
+- ✅ Titre "Coup d'envoi" encadré de 2 points rouges (demande utilisateur, 11/09) : `"🔴 Coup
+  d'envoi !"` → `"🔴 Coup d'envoi 🔴"` (le "!" retiré au profit de la symétrie visuelle des 2
+  emoji, choix assumé) dans `api/cron-goals.js` ET `cf-worker/src/index.js`.
 
 ## Conventions
 - Noms français partout dans l'UI
