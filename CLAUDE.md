@@ -408,6 +408,31 @@ cf-worker/
   nouvelle cause devinée au hasard mais un vrai trou de logique trouvé dans le code du fix
   précédent une fois la confirmation "même symptôme, vrai iPhone PWA" obtenue ; reste à confirmer
   par l'utilisateur que ça règle vraiment le problème cette fois.
+- ✅ Notifs "Fin de match" reçues pour les matchs DE LA VEILLE, en pleine soirée (constat
+  utilisateur, 11/09 : "hier soir j'ai reçu les notifs de fin de match des matchs de la veille")
+  — root cause trouvée dans `cf-worker/src/index.js` : `FINAL_DONE_TTL` (verrou `finalDone:
+  {eventId}`, seul garde-fou empêchant de retraiter un match déjà clos) était fixé à 26h,
+  supposé couvrir "le reste de la journée + marge". Sous-estimé : `slugDatePairs` (voir
+  `runOnePass`) fetch CHAQUE passe le scoreboard ESPN "today" ET "yesterday" pour chaque
+  compétition — un match fini tôt le Jour 1 reste donc visible dans le fetch "today" tout le
+  reste du Jour 1 (~24h), PUIS dans "yesterday" tout le Jour 2 suivant (~24h de plus), soit
+  jusqu'à ~48h au pire, pas "le reste de la journée". Une fois `finalDoneKey` expiré (et le
+  cache d'état par-match, 12h, expiré lui aussi) pendant que ce match traîne encore dans un
+  fetch, le Worker le voit comme "FINAL pour la 1ère fois" : contrairement à l'ancien schéma
+  Vercel (`api/cron-goals.js`, fallback manuel désormais inactif) qui exige une vraie transition
+  LIVE→FINAL entre 2 passes et ne peut donc jamais redémarrer tout seul, ce Worker confirme un FT
+  sur 2 passes "FINAL" consécutives au même score (`isFinalConfirmed`) — un match qui réapparaît
+  juste comme "FINAL" y suffit très bien, sans avoir eu besoin de le voir LIVE d'abord. Il envoie
+  alors une VRAIE notif neuve (`ts` à l'instant présent), qui échappe totalement au garde-fou
+  côté client déjà en place (`sw-push.js`, ignore les notifs de plus de 20min par rapport à LEUR
+  PROPRE `ts` — inutile ici puisque ce `ts` est frais, ce n'est pas une notif ancienne délivrée en
+  retard, mais une notif neuve pour un événement ancien). 26h expirant typiquement en soirée le
+  lendemain d'un match du soir colle exactement au symptôme rapporté. Corrigé : `FINAL_DONE_TTL`
+  26h → 54h (marge confortable au-delà du pire cas ~48h). Honnêteté : ce correctif est dans
+  `cf-worker/`, un Worker Cloudflare déployé SÉPARÉMENT de Vercel (`npm run deploy` depuis ce
+  dossier, voir `cf-worker/README.md`) — je n'ai pas d'accès authentifié à `wrangler`/Cloudflare
+  depuis cet environnement pour déployer moi-même ; le code est poussé sur le repo mais reste
+  inactif en production tant que l'utilisateur ne lance pas le déploiement manuellement.
 
 ## Conventions
 - Noms français partout dans l'UI

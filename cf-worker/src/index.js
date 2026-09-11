@@ -207,7 +207,32 @@ const FINAL_RECHECK_DELAY_MS = 18_000
 // Durée de vie de finalDoneKey (voir runOnePass, garde-fou en tête de boucle) —
 // doit largement dépasser combien de temps ESPN peut continuer à lister un
 // match FINAL dans son scoreboard (le reste de la journée + marge).
-const FINAL_DONE_TTL = 26 * 3600
+// ⚠️ CORRIGÉ 26h → 54h (constat utilisateur, 11/09 : "hier soir j'ai reçu les
+// notifs de fin de match des matchs de la veille") — 26h sous-estimait la
+// vraie fenêtre : `slugDatePairs` (voir runOnePass) fetch CHAQUE passe le
+// scoreboard ESPN "today" ET "yesterday" pour chaque compétition, donc un
+// match qui a fini tôt le matin du Jour 1 reste visible dans le fetch
+// "today" tout le reste du Jour 1 (~24h), PUIS dans le fetch "yesterday"
+// tout le Jour 2 suivant (~24h de plus) — soit jusqu'à ~48h au pire, pas
+// "le reste de la journée" comme supposé à l'origine. `alreadyDone` (`if
+// (alreadyDone) continue`, seul garde-fou contre un re-traitement, voir plus
+// bas) est le SEUL verrou : contrairement à l'ancien schéma Vercel
+// (api/cron-goals.js, fallback manuel désormais inactif), qui exige une
+// vraie transition LIVE→FINAL entre 2 passes (`LIVE_ESPN.has(prevStatus) &&
+// FINAL_ESPN.has(status)`) et redémarre donc jamais tout seul, ce Worker
+// confirme un FT sur 2 passes "FINAL" consécutives au même score
+// (isFinalConfirmed) — si finalDoneKey a déjà expiré ET que le cache d'état
+// par-match (stateKey, 12h) a AUSSI expiré au moment où ESPN reliste encore
+// ce match (fenêtre ~48h ci-dessus), le Worker le voit comme "FINAL pour la
+// 1ère fois", le confirme sur les 2 passes suivantes comme n'importe quel
+// vrai match qui vient de finir, et envoie une VRAIE notif "Fin de match"
+// toute neuve (`ts` à l'instant présent) — qui échappe totalement au
+// garde-fou côté client (`sw-push.js`, filtre les notifs de plus de 20min
+// par rapport à LEUR PROPRE `ts`, inutile ici puisque ce `ts` est frais).
+// 26h expirait typiquement en fin de soirée le lendemain d'un match du soir
+// — collant exactement avec le symptôme rapporté. 54h laisse une marge large
+// au-delà du pire cas (~48h), sans day-off supplémentaire nécessaire.
+const FINAL_DONE_TTL = 54 * 3600
 
 async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, scoreStr, log) {
   await new Promise(resolve => setTimeout(resolve, FINAL_RECHECK_DELAY_MS))
