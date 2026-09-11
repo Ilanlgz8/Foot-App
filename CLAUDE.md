@@ -504,6 +504,17 @@ cf-worker/
   dans le fichier depuis le début, `BIG_TEAMS`/`NOTABLE_TEAMS` restent des listes CURÉES (aucune
   donnée de popularité/enjeu réelle disponible sans appel API supplémentaire), donc un jugement
   assumé, pas un score objectif — à réajuster au prochain cas qui semble à côté de la plaque.
+- ✅ Emojis KO/mi-temps/reprise des notifs push "pas ouf" (constat utilisateur, 11/09 : "c des
+  emoji de telephone quoi") : 🔴 (coup d'envoi), ⏸ (mi-temps) et ▶️ (reprise) sont littéralement
+  les icônes de contrôle média (enregistrer/pause/lecture) du Control Center iPhone — pas des
+  symboles foot, d'où l'impression "téléphone" plutôt que sport. Remplacés dans `api/cron-goals.js`
+  ET `cf-worker/src/index.js` (les 2 implémentations, gardées identiques) : 🟢 (feu vert — le match
+  démarre), ⏳ (sablier — pause dans le temps) et 🏃 (joueur qui repart — reprise). But/carton
+  rouge/fin de match (⚽/🟥/🏁) n'avaient pas ce problème (déjà des symboles clairement sportifs),
+  inchangés. Lint + 357 tests + build vérifiés. Même limite de déploiement que les points notifs
+  ci-dessus : la partie `cf-worker/` nécessite `npm run deploy` manuel ; la partie
+  `api/cron-goals.js` (fallback historique, pas le chemin actif) se déploie automatiquement avec
+  le reste de l'app via Vercel.
 
 ## Conventions
 - Noms français partout dans l'UI

@@ -1104,11 +1104,16 @@ async function runOnePass(env) {
       log.push(`[cron:liveIds:${eventId}] error=${e.message}`)
     }
 
-    // 🔴 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
+    // 🟢 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
     // que si on vient vraiment de l'acquérir, comportement identique à avant.
+    // ⚠️ Emoji changé 🔴→🟢 le 11/09 (voir le commentaire détaillé dans
+    // api/cron-goals.js, même changement appliqué ici pour rester identique
+    // aux 2 implémentations — constat utilisateur : les anciens émojis
+    // KO/mi-temps/reprise ressemblaient à des boutons de contrôle média
+    // (enregistrer/pause/lecture) plutôt qu'à des symboles foot).
     if (isLive && notPostponed && koAcquired) {
       const koSent = await sendToVercel(env,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: "🟢 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
       if (koSent) {
         log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
       } else {
@@ -1308,18 +1313,18 @@ async function runOnePass(env) {
       }
     }
 
-    // ⏸ Mi-temps
+    // ⏳ Mi-temps
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       await notifyVercel(env, `push:espn:ht:${eventId}`,
-        { title: '⏸ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: '⏳ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
-    // ▶️ Reprise 2ème MT
+    // 🏃 Reprise 2ème MT
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       await notifyVercel(env, `push:espn:2h:${eventId}`,
-        { title: '▶️ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: '🏃 Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
     // 🏁 Fin de match — seulement une fois CONFIRMÉ (2e passe FINAL
