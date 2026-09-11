@@ -234,6 +234,20 @@ const FINAL_RECHECK_DELAY_MS = 18_000
 // au-delà du pire cas (~48h), sans day-off supplémentaire nécessaire.
 const FINAL_DONE_TTL = 54 * 3600
 
+// ⚠️ AJOUT (demande utilisateur, 11/09, voir son usage dans runOnePass pour
+// le contexte complet) : garde-fou basé sur l'âge réel du match (coup
+// d'envoi, `evt.date` ESPN) plutôt que sur des verrous Redis à durée de vie
+// fixe — un match commencé il y a plus de ça ne peut plus être un événement
+// légitime à notifier, quel que soit l'état des clés Redis. 6h : le plus
+// long match possible (90min + prolongations 30min + tirs au but + mi-temps
+// + un gros retard) tient largement dans cette marge, tout en étant très en
+// dessous de la fenêtre de ~48h où ESPN peut encore lister un match dans
+// son scoreboard (voir FINAL_DONE_TTL ci-dessus) — ce garde-fou empêche donc
+// par construction toute notif pour un match visiblement trop ancien, même
+// dans un scénario totalement différent de celui déjà corrigé par
+// FINAL_DONE_TTL.
+const STALE_MATCH_MS = 6 * 3600 * 1000
+
 async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, scoreStr, log) {
   await new Promise(resolve => setTimeout(resolve, FINAL_RECHECK_DELAY_MS))
   try {
@@ -840,6 +854,29 @@ async function runOnePass(env) {
     const rawHomeTeam = homeC.team?.shortDisplayName ?? homeC.team?.displayName ?? ''
     const rawAwayTeam = awayC.team?.shortDisplayName ?? awayC.team?.displayName ?? ''
     const eventId  = evt.id
+
+    // ⚠️ AJOUT (demande utilisateur, 11/09 : "ça sert à rien de recevoir la
+    // notif si le match est déjà terminé" — après le fix `FINAL_DONE_TTL`
+    // 26h→54h ci-dessus, qui referme la fenêtre de course avec le verrou
+    // Redis mais reste une histoire de TIMING de verrou). Garde-fou
+    // INDÉPENDANT, plus direct : peu importe l'état des verrous Redis, un
+    // match dont le coup d'envoi (`evt.date`, fourni par ESPN) remonte à plus
+    // de `STALE_MATCH_MS` ne peut plus, par construction, être un événement
+    // qui vient RÉELLEMENT de se produire — même le plus long match possible
+    // (prolongations + tirs au but + gros retard) est terminé bien avant ce
+    // délai. Zéro coût Redis (juste une comparaison de date), donc peut
+    // tourner à CHAQUE passe sans se soucier du budget de commandes/
+    // sous-requêtes déjà serré ailleurs dans ce fichier. Complète le fix
+    // TTL au lieu de le remplacer : celui-ci reste utile pour éviter de
+    // retraiter inutilement les matchs récents déjà clos (routine normale,
+    // voir alreadyDoneIds plus haut) — celui-ci n'intervient QUE dans le cas
+    // extrême où, malgré tout, un match visiblement trop vieux se
+    // présenterait encore comme "à notifier".
+    const kickoffMs = Date.parse(evt.date)
+    if (Number.isFinite(kickoffMs) && (now.getTime() - kickoffMs) > STALE_MATCH_MS) {
+      log.push(`[espn:${slug}:${eventId}] match trop vieux (coup d'envoi il y a >${STALE_MATCH_MS / 3_600_000}h) — notif sautée par sécurité`)
+      continue
+    }
 
     // ⚠️ BUG CRITIQUE CORRIGÉ (retour utilisateur : notif "🏁 Fin de match"
     // reçue 3 fois à plusieurs heures d'intervalle sur un match terminé

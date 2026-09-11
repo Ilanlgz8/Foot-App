@@ -450,6 +450,23 @@ cf-worker/
   étroite (il fallait 2 échecs consécutifs d'envoi Vercel dans les ~2 dernières minutes d'un
   match précis) mais réelle. 356 tests + lint inchangés. Même limite de déploiement que le point
   ci-dessus : ce fix vit dans `cf-worker/`, à déployer manuellement (`npm run deploy`).
+- ✅ Garde-fou supplémentaire ajouté suite à une remarque utilisateur pertinente (11/09 : "c juste
+  pour les notifs qu'il faut enlever le fait d'envoyer les notifs [...] quand le match est déjà
+  terminé, ça sert à rien") — après les 2 fixes ci-dessus (TTL 54h + retry élargi), tous deux basés
+  sur des verrous Redis à durée de vie fixe, l'utilisateur a raison de vouloir quelque chose de plus
+  direct. Ajout dans `cf-worker/src/index.js` : `STALE_MATCH_MS` (6h) — avant tout traitement d'un
+  match, compare `evt.date` (coup d'envoi, fourni par ESPN) à maintenant ; si l'écart dépasse 6h,
+  le match est sauté purement et simplement (`continue`), SANS AUCUN accès Redis (juste une
+  comparaison de date, donc gratuit en performance, peut tourner à chaque passe sans souci de
+  budget). 6h couvre très largement le plus long match possible (90min + prolongations + tirs au
+  but + un gros retard), tout en étant bien en dessous de la fenêtre ~48h où un match peut
+  réapparaître dans les fetchs ESPN. Ne remplace PAS `FINAL_DONE_TTL`/`alreadyDoneIds` (toujours
+  utiles pour éviter de retraiter inutilement les matchs récents déjà clos, le cas normal) — s'ajoute
+  comme dernier rempart indépendant de tout état Redis : même si un futur bug de verrou/TTL
+  réapparaissait pour une raison différente de celle déjà corrigée, un match visiblement trop vieux
+  ne pourra plus jamais générer de notif. Vérifié par un test numérique ad-hoc (2h → pas sauté,
+  30h → sauté) + 356 tests + lint inchangés. Même limite de déploiement que les 2 points
+  ci-dessus : à déployer manuellement (`npm run deploy` depuis `cf-worker/`).
 
 ## Conventions
 - Noms français partout dans l'UI
