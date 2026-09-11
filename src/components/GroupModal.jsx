@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { lockBodyScroll } from '../utils/scrollLock'
 
 // Modal générique "détail d'un groupe" — partagée par Match.jsx (matchs à
 // venir) et Resultat.jsx (résultats), qui avaient chacun leur propre copie
@@ -11,20 +12,13 @@ export function GroupModal({ title, matches, renderMatch, emptyMessage, onClose 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
-    const scrollY = window.scrollY
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.left = '0'
-    document.body.style.right = '0'
+    // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le
+    // pattern position:fixed direct sur body, qui décalait .sfTabbar depuis
+    // son passage en portail direct dans body).
+    const unlock = lockBodyScroll()
     return () => {
       window.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.left = ''
-      document.body.style.right = ''
-      window.scrollTo(0, scrollY)
+      unlock()
     }
     // `onClose` est une arrow function recréée à chaque render du parent →
     // la mettre en dépendance démonte/remonte cet effect à chaque re-render

@@ -2,25 +2,19 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import '../footer.css'
+import { lockBodyScroll } from '../utils/scrollLock'
 
 function AProposModal({ onClose }) {
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
-    const scrollY = window.scrollY
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.left = '0'
-    document.body.style.right = '0'
+    // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le
+    // pattern position:fixed direct sur body, qui décalait .sfTabbar depuis
+    // son passage en portail direct dans body).
+    const unlock = lockBodyScroll()
     return () => {
       window.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.left = ''
-      document.body.style.right = ''
-      window.scrollTo(0, scrollY)
+      unlock()
     }
   }, [onClose])
 

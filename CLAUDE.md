@@ -530,6 +530,43 @@ cf-worker/
   final à `⏳ Mi-temps` dans `api/cron-goals.js` ET `cf-worker/src/index.js` (annule le point
   jaune du commit précédent). 357 tests + lint vérifiés à chaque étape.
 
+- ✅ Barre du bas ENCORE décollée, 6e signalement (constat utilisateur, 11/09, capture d'écran à
+  l'appui : la barre apparaît EN PLEIN MILIEU de la page — entre les cartes de résultats Ligue des
+  Champions et le bloc "Dernières actualités" — malgré les 5 tentatives précédentes : filet body,
+  couche GPU, portail React, watchdog avec réparation, watchdog affiné sans trigger scroll). Audit
+  complet refait de zéro plutôt que de deviner une 6e cause (2 agents de recherche dédiés, lecture
+  intégrale de `navbar.jsx`, `navbar.css`, du watchdog `App.jsx`, et grep exhaustif de tout ce qui
+  touche à `.sfTabbar`/`body`) : root cause la plus probable trouvée, jamais auditée jusqu'ici —
+  6 endroits du code (`Match.jsx`, `Resultat.jsx`, `Classement.jsx` ×2, `Footer.jsx`,
+  `GroupModal.jsx`) posent le pattern classique de scroll-lock iOS sur un dropdown/modal ouvert :
+  `document.body.style.position = 'fixed'; top = -scrollY px`. Ce pattern existait déjà AVANT le
+  passage de `.sfTabbar` en portail direct dans `<body>` (10/09) — mais depuis ce portail,
+  `.sfTabbar` est un ENFANT DIRECT de `<body>`, et Safari iOS a un comportement non conforme à la
+  spec CSS documenté sur ce cas précis : quand `<body>` lui-même passe en `position:fixed` avec un
+  `top` négatif dynamique, certains rendus WebKit répercutent ce décalage sur les descendants
+  `position:fixed` de `<body>` au lieu de les laisser ancrés au viewport (la spec dit que seuls
+  transform/filter/perspective/will-change/contain sur un ancêtre doivent casser `position:fixed`
+  — pas un simple `position:fixed` — mais c'est une régression connue de Safari). Résultat :
+  ouvrir n'importe lequel des 6 dropdowns/modals après avoir scrollé décale visuellement
+  `.sfTabbar` de `-scrollY` px — collant exactement au symptôme rapporté, et contrairement aux 5
+  tentatives précédentes, **reproductible à la demande** (pas besoin d'un cycle arrière-plan/
+  premier-plan). Corrigé : nouveau fichier `src/utils/scrollLock.js` (`lockBodyScroll()`,
+  factorise les 6 copies quasi identiques) qui pose `position:fixed`/`top` sur `#root` (le
+  conteneur de tout le contenu applicatif React) au lieu de `<body>` — `#root` est un FRÈRE de
+  `.sfTabbar` dans le DOM (portail direct dans body), jamais un ancêtre, donc structurellement
+  insensible à ce que `#root` fait. `<body>` garde seulement `overflow:hidden` (inoffensif pour
+  `position:fixed`, bloque juste le scroll de fond). Vérifié qu'aucune règle CSS statique du
+  projet ne pose déjà `transform`/`filter`/`contain` sur `#root` (grep exhaustif, `theme-v2.css`/
+  `index.css`/`LiveMatchPage.css` n'utilisent `#root` que comme préfixe de spécificité sur des
+  descendants) — donc rien qui casserait à son tour `position:fixed` posé dynamiquement dessus.
+  357 tests + lint + build vérifiés (1 erreur lint pré-existante dans `Classement.jsx` ligne 212,
+  confirmée sans lien avec ce fix via `git stash`, non touchée). Honnêteté : toujours aucun accès
+  à un vrai iPhone/PWA depuis cet environnement pour reproduire le bug moi-même — mais c'est la
+  première piste concrète, reproductible à la demande (pas seulement en théorie), qui explique le
+  symptôme EXACT de la capture d'écran (position figée à `-scrollY`, pas un décrochage aléatoire) ;
+  à confirmer par l'utilisateur sur son téléphone après déploiement Vercel (automatique, contrairement
+  aux fixes `cf-worker/` — pas de `npm run deploy` manuel nécessaire pour celui-ci).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

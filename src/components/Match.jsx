@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
 import { COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
 // Resultat.jsx) : le sélecteur de championnat n'affiche pas les
@@ -780,26 +781,12 @@ function Matchs() {
   // body en dessous de scroller en même temps — un geste de scroll qui
   // atteint le haut/bas de la liste du dropdown (fin de son propre scroll
   // interne) "traverse" et continue de scroller la page derrière. Fix :
-  // même technique de verrou de scroll déjà utilisée pour GroupModal.jsx
-  // (position:fixed sur body + restauration de la position exacte à la
-  // fermeture, pour ne pas sauter ailleurs sur la page une fois le dropdown
-  // refermé).
+  // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le pattern
+  // position:fixed direct sur body, qui décalait .sfTabbar depuis son passage
+  // en portail direct dans body).
   useEffect(() => {
     if (!compOpen) return
-    const scrollY = window.scrollY
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.left = '0'
-    document.body.style.right = '0'
-    return () => {
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.left = ''
-      document.body.style.right = ''
-      window.scrollTo(0, scrollY)
-    }
+    return lockBodyScroll()
   }, [compOpen])
   // Conteneur du bracket — mesuré par BracketSvgView pour calculer le zoom
   // "fit-to-screen" (voir commentaire dans BracketSvgView).

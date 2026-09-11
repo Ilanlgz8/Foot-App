@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
 import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/competitions'
+import { lockBodyScroll } from '../utils/scrollLock'
 
 // NL/CAN/COPA sont sourcées via ESPN (voir espnAdapter.js) : pas de
 // classement/buteurs pour l'instant (ESPN n'expose pas proprement les
@@ -93,25 +94,12 @@ function Classement() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [compOpen])
 
-  // ⚠️ AJOUT (retour utilisateur, même bug que Programme/Résultats — voir
-  // Match.jsx pour l'explication détaillée) : verrou de scroll body pendant
-  // que ce dropdown flottant est ouvert, même technique que GroupModal.jsx.
+  // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le pattern
+  // position:fixed direct sur body, qui décalait .sfTabbar depuis son passage
+  // en portail direct dans body).
   useEffect(() => {
     if (!compOpen) return
-    const scrollY = window.scrollY
-    document.body.style.overflow = 'hidden'
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.left = '0'
-    document.body.style.right = '0'
-    return () => {
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.left = ''
-      document.body.style.right = ''
-      window.scrollTo(0, scrollY)
-    }
+    return lockBodyScroll()
   }, [compOpen])
 
   // Pré-chargé ici (avant useStandings) pour calculer hasMatchToday — voir
@@ -348,20 +336,13 @@ function Classement() {
     useEffect(() => {
       const handler = e => { if (e.key === 'Escape') onClose() }
       window.addEventListener('keydown', handler)
-      const scrollY = window.scrollY
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.left = '0'
-      document.body.style.right = '0'
+      // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le
+      // pattern position:fixed direct sur body, qui décalait .sfTabbar depuis
+      // son passage en portail direct dans body).
+      const unlock = lockBodyScroll()
       return () => {
         window.removeEventListener('keydown', handler)
-        document.body.style.overflow = ''
-        document.body.style.position = ''
-        document.body.style.top = ''
-        document.body.style.left = ''
-        document.body.style.right = ''
-        window.scrollTo(0, scrollY)
+        unlock()
       }
     }, [onClose])
 
