@@ -433,6 +433,23 @@ cf-worker/
   dossier, voir `cf-worker/README.md`) — je n'ai pas d'accès authentifié à `wrangler`/Cloudflare
   depuis cet environnement pour déployer moi-même ; le code est poussé sur le repo mais reste
   inactif en production tant que l'utilisateur ne lance pas le déploiement manuellement.
+- ✅ Risque annexe trouvé en répondant à une question utilisateur (11/09 : "si une notif part pas
+  pendant un match, si le match est fini je recevrai pas de notif de ce match ?") — bonne
+  intuition, un vrai trou existait dans `cf-worker/src/index.js` : les blocs de retry "but" et
+  "carton rouge" (`track[side]`/`cardTrack[side]` n'avancent QUE si l'envoi réussit, déjà corrigé
+  pour un bug antérieur — voir historique) n'étaient retentés que tant que `LIVE_ESPN.has(prevStatus)
+  || isLive` était vrai — c'est-à-dire pendant le direct, PLUS une seule passe supplémentaire (le
+  temps que `prevStatus` rattrape le passage à FINAL). Au-delà (dès que `prevStatus` lui-même
+  devient FINAL, ce qui arrive pile à la passe qui confirme le FT et pose `finalDoneKey`), un but
+  ou carton resté non envoyé après 2 échecs consécutifs (~2min de panne Vercel/réseau) n'était
+  plus jamais retenté — perdu silencieusement, sans erreur visible, alors que la notif "Fin de
+  match" elle-même partait normalement (chemin séparé). Corrigé : condition élargie à `||
+  isFinalNow` sur les deux blocs — sans risque, `alreadyDone` (vérifié en tête de boucle) protège
+  déjà totalement contre tout retraitement d'un match réellement clos, cet ajout ne fait que
+  retarder le moment où on arrête de retenter, jamais le dépasser. Fenêtre de risque avant ce fix :
+  étroite (il fallait 2 échecs consécutifs d'envoi Vercel dans les ~2 dernières minutes d'un
+  match précis) mais réelle. 356 tests + lint inchangés. Même limite de déploiement que le point
+  ci-dessus : ce fix vit dans `cf-worker/`, à déployer manuellement (`npm run deploy`).
 
 ## Conventions
 - Noms français partout dans l'UI

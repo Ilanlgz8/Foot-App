@@ -1097,7 +1097,28 @@ async function runOnePass(env) {
     const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
 
     // ⚽ But (+ ❌ but annulé) — même state machine que api/cron-goals.js
-    if (LIVE_ESPN.has(prevStatus) || isLive) {
+    // ⚠️ ÉLARGI (question utilisateur, 11/09 : "si une notif part pas pendant
+    // un match, si le match est fini je recevrai pas de notif de ce match ?")
+    // — bonne pioche : condition trouvée trop stricte. `track[side]` n'avance
+    // QUE si l'envoi réussit (voir goalSent plus bas, déjà corrigé pour un
+    // bug antérieur) — donc un but jamais notifié DEVRAIT être retenté à
+    // chaque passe tant que le match n'est pas définitivement clos
+    // (`alreadyDone`, déjà vérifié en tête de boucle, seul vrai garde-fou
+    // nécessaire). Mais cette condition-ci ne laissait REtenter que pendant
+    // que `prevStatus` était encore "live" (donc seulement 1 passe après la
+    // fin réelle du direct, le temps que prevStatus rattrape le nouveau
+    // statut FINAL) — au-delà (une fois `prevStatus` lui-même passé à FINAL,
+    // ce qui arrive dès la 2e passe FINAL, celle-là même qui confirme le FT
+    // et pose `finalDoneKey`), un but resté non envoyé après 2 échecs
+    // consécutifs (~2min de panne Vercel/réseau) n'était plus JAMAIS retenté
+    // — perdu silencieusement, sans erreur visible, alors même que la notif
+    // "Fin de match" partait normalement. Ajout de `isFinalNow` : couvre
+    // aussi les passes où le match est déjà FINAL (avant et après
+    // confirmation) — sans risque, `alreadyDone` (ligne ~1018) protège déjà
+    // totalement contre tout retraitement d'un match réellement clos pour de
+    // bon, cette condition-ci ne fait que retarder le moment où on arrête
+    // d'essayer, jamais le dépasser.
+    if (LIVE_ESPN.has(prevStatus) || isLive || isFinalNow) {
       if (!lockAcquired) {
         log.push(`[espn:${slug}:${eventId}] verrou but déjà pris — passe suivante`)
       } else {
@@ -1180,8 +1201,11 @@ async function runOnePass(env) {
       }
     }
 
-    // 🟥 Carton rouge
-    if (isLive || LIVE_ESPN.has(prevStatus)) {
+    // 🟥 Carton rouge — même élargissement que le bloc but juste au-dessus
+    // (voir son commentaire, 11/09) : sans `isFinalNow`, un carton rouge non
+    // envoyé après la fin du direct pouvait cesser d'être retenté avant
+    // d'avoir réussi, silencieusement.
+    if (isLive || LIVE_ESPN.has(prevStatus) || isFinalNow) {
       const reds = extractEspnCards(comp, homeC.team?.id).filter(c => c.red)
         .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
       const redsBySide = { home: reds.filter(c => c.team === 'home'), away: reds.filter(c => c.team === 'away') }
