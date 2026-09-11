@@ -187,14 +187,58 @@ function App() {
   // spécifiquement pour refléter le viewport RÉELLEMENT visible sur mobile
   // (indépendant de l'animation de la barre d'adresse ou d'un zoom), plus
   // fiable que `window.innerHeight` pour ce cas précis.
+  // ⚠️ RETOUCHÉ (11/09, 7e signalement malgré les 6 tentatives précédentes —
+  // portail body, couche GPU dédiée, watchdog géométrique, scroll-lock #root)
+  // : nouvelle théorie + vrai bug de logique trouvé dans CE watchdog, pas
+  // juste une nouvelle cause devinée au hasard.
+  //
+  // Théorie : si le décrochage est un désync de PEINTURE (la couche compositée
+  // à l'écran reste figée après un cycle arrière-plan→premier plan) plutôt
+  // qu'un désync de LAYOUT, `getBoundingClientRect()` continue de renvoyer la
+  // position CORRECTE (le calcul de layout n'a jamais été faux) alors que
+  // l'écran affiche autre chose — ce qui expliquerait que ce watchdog
+  // géométrique n'ait JAMAIS rien détecté d'anormal dans aucune tentative
+  // précédente : il mesure une géométrie qui a toujours été juste, le problème
+  // est invisible à cette mesure. Voir navbar.css : la couche GPU dédiée
+  // (transform/will-change, ajoutée le 10/09) a été retirée en conséquence —
+  // c'est précisément le mécanisme qui expose ce type de bug de compositing
+  // sur iOS Safari.
+  //
+  // Bug de logique trouvé (indépendant de la théorie ci-dessus, et solide à
+  // 100% celui-là) : `onResume` mettait `driftStreak = 2` puis appelait
+  // `check()` — mais `check()` RECALCULE la dérive à cet instant précis et
+  // écrase `driftStreak` à 0 si cette mesure est ≤4px, AVANT même de regarder
+  // la valeur "2" qu'onResume venait de poser. Résultat : la réparation
+  // immédiate au retour au premier plan — tout l'intérêt d'`onResume` — ne se
+  // déclenchait en pratique QUE si la dérive était déjà mesurable au moment de
+  // l'appel. Dans le scénario "désync de peinture" (layout correct, donc
+  // drift mesuré ≈0), ce filet ne réparait jamais rien : du code mort pour
+  // exactement le cas qu'il était censé traiter.
+  //
+  // Corrigé : `onResume` force désormais une réparation INCONDITIONNELLE
+  // (reflow forcé, indépendant de toute mesure) à chaque retour au premier
+  // plan — le moment à risque identifié depuis la théorie initiale (perte de
+  // couche GPU/paint après mise en arrière-plan). Le watchdog périodique (3s,
+  // 2 mesures consécutives en dérive) reste actif en complément pour un vrai
+  // décrochage de LAYOUT qui surviendrait sans cycle arrière-plan/premier
+  // plan (ex. après le scroll-lock #root, voir scrollLock.js).
   useEffect(() => {
     let driftStreak = 0
     const viewportH = () => window.visualViewport?.height ?? window.innerHeight
+    const getBar = () => {
+      const el = document.querySelector('.sfTabbar')
+      if (!el || getComputedStyle(el).display === 'none') return null   // desktop : masquée exprès
+      return el
+    }
+    const repair = el => {
+      el.style.position = 'static'
+      void el.offsetHeight   // force un reflow + repaint synchrones avant de réappliquer
+      el.style.position = ''
+    }
     const check = () => {
       if (document.visibilityState !== 'visible') { driftStreak = 0; return }
-      const el = document.querySelector('.sfTabbar')
+      const el = getBar()
       if (!el) { driftStreak = 0; return }
-      if (getComputedStyle(el).display === 'none') { driftStreak = 0; return }   // desktop : masquée exprès
       const rect  = el.getBoundingClientRect()
       const drift = Math.abs(rect.bottom - viewportH())
       if (drift > 4) {
@@ -207,18 +251,18 @@ function App() {
       // d'adresse en cours, pas un vrai décrochage.
       if (driftStreak >= 2) {
         driftStreak = 0
-        el.style.position = 'static'
-        void el.offsetHeight   // force un reflow synchrone avant de réappliquer
-        el.style.position = ''
+        repair(el)
       }
     }
     const intervalId = setInterval(check, 3000)
-    // Un retour au premier plan est le seul déclencheur qui avait un sens
-    // réel pour le bug ORIGINAL (couche GPU perdue en arrière-plan) — check
-    // immédiat, pas d'attente de 2 mesures pour ce cas précis.
+    // Réparation INCONDITIONNELLE au retour au premier plan (voir commentaire
+    // au-dessus) — ne dépend d'aucune mesure de dérive, cible directement le
+    // scénario "désync de peinture" que `check()` seul ne peut pas détecter.
     const onResume = () => {
-      driftStreak = 2
-      check()
+      driftStreak = 0
+      if (document.visibilityState !== 'visible') return
+      const el = getBar()
+      if (el) repair(el)
     }
     document.addEventListener('visibilitychange', onResume)
     window.addEventListener('pageshow', onResume)

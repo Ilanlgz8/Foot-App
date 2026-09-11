@@ -99,27 +99,31 @@
 .sfLiveBtn { display: none; }
 
 /* ───────────────────── BOTTOM TAB BAR (mobile) ───────────────── */
-/* ⚠️ RETOUCHÉ (10/09, retour utilisateur persistant malgré un 1er correctif
-   — voir le filet `unstickBody` dans App.jsx, insuffisant seul) : "des fois
-   quand je quitte et reviens d'arrière-plan et que je scroll vers le bas la
-   barre du bas se détache". Bug WebKit/iOS documenté, distinct de celui déjà
-   corrigé ailleurs (overflow-x/swipe, voir index.css) : un `position: fixed`
-   qui n'a pas sa PROPRE couche de composition GPU peut, sur iOS, se
-   "décoller" du viewport après un cycle arrière-plan→premier plan, surtout
-   au moment où le scroll redéclenche le masquage/affichage de la barre
-   d'adresse. `transform: translateZ(0)` (+ `will-change: transform`) force
-   Safari à isoler cet élément sur sa propre couche, indépendante du reste de
-   la page — le correctif standard documenté pour ce type de décrochage.
-   Combiné à un "nudge" JS au retour au premier plan (App.jsx) qui force
-   WebKit à recalculer cette couche avant que l'utilisateur ne scrolle. */
+/* ⚠️ RETIRÉ (11/09, 7e signalement du même bug malgré 6 tentatives
+   précédentes — portail body, watchdog géométrique, scroll-lock #root...) :
+   `transform: translateZ(0)` + `will-change: transform`, posés le 10/09 pour
+   forcer une couche GPU dédiée (le "correctif standard" documenté pour ce
+   type de décrochage). Nouvelle théorie, jamais testée jusqu'ici : c'est
+   PEUT-ÊTRE cette couche dédiée elle-même qui cause le bug plutôt que le
+   réparer. iOS Safari a un bug de COMPOSITING documenté sur les éléments
+   position:fixed promus sur leur propre couche : après un cycle arrière-plan
+   → premier plan, le LAYOUT de l'élément reste correct (getBoundingClientRect
+   renvoie bien bottom=viewport) mais la couche compositée à l'écran reste
+   figée à son ancienne position tant qu'un vrai repaint n'est pas forcé — un
+   décalage PEINTURE, pas LAYOUT. C'est cohérent avec le fait que le watchdog
+   géométrique (App.jsx, mesure rect.bottom vs viewport) n'a jamais rien
+   détecté d'anormal dans aucune des tentatives précédentes : il mesure une
+   géométrie qui a toujours été correcte, le problème est dans le rendu
+   affiché, invisible à getBoundingClientRect(). Retiré : sans couche GPU
+   dédiée, l'élément reste composité avec le reste de la page (pas de couche
+   séparée pouvant se désynchroniser). Voir App.jsx pour le 2e volet de ce
+   correctif (un vrai bug de logique trouvé dans le watchdog lui-même). */
 .sfTabbar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 60;
-  transform: translateZ(0);
-  will-change: transform;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;

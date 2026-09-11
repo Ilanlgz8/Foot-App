@@ -567,6 +567,37 @@ cf-worker/
   à confirmer par l'utilisateur sur son téléphone après déploiement Vercel (automatique, contrairement
   aux fixes `cf-worker/` — pas de `npm run deploy` manuel nécessaire pour celui-ci).
 
+- ✅ Barre du bas ENCORE décollée, 7e signalement (constat utilisateur, 11/09, juste après le
+  déploiement confirmé du fix scroll-lock #root — "s'est encore décollé", bundle live vérifié en
+  direct via le navigateur intégré : `index-DpnRwcE_.js` bien identique au build local du commit
+  précédent, donc le fix scroll-lock ÉTAIT réellement en prod, la piste "déploiement pas encore
+  actif" est écartée avec certitude cette fois). Nouvelle théorie, jamais testée jusqu'ici, ET un
+  vrai bug de logique trouvé au passage dans le watchdog lui-même — pas juste une 7e cause devinée
+  au hasard. Théorie : si le décrochage est un désync de PEINTURE (la couche compositée à l'écran
+  reste visuellement figée après un cycle arrière-plan→premier plan) plutôt qu'un désync de LAYOUT,
+  `getBoundingClientRect()` (utilisé par TOUS les watchdogs géométriques des tentatives 4/5/6)
+  continue de renvoyer la position CORRECTE — le layout n'a jamais été faux, seul l'écran affiche
+  autre chose. Ça expliquerait pourquoi aucun watchdog géométrique n'a jamais rien détecté
+  d'anormal en 3 tentatives. Suspect direct : `transform: translateZ(0)` + `will-change:
+  transform` posés le 10/09 sur `.sfTabbar` (`navbar.css`) pour forcer une couche GPU dédiée — le
+  "correctif standard" documenté pour ce type de décrochage, mais aussi précisément le mécanisme
+  qui expose ce genre de bug de compositing sur iOS Safari (un élément promu sur sa propre couche
+  peut se désynchroniser de cette couche après un cycle arrière-plan/premier-plan). Retiré. En
+  parallèle, vrai bug de logique trouvé dans le watchdog (`App.jsx`, indépendant de la théorie
+  ci-dessus, solide à 100%) : `onResume` posait `driftStreak = 2` puis appelait `check()` — mais
+  `check()` RECALCULE la dérive à cet instant et écrase `driftStreak` à 0 si cette mesure est
+  ≤4px, AVANT même de regarder la valeur "2" qu'onResume venait de poser. Dans le scénario "désync
+  de peinture" (layout correct, donc drift mesuré ≈0), ce filet ne réparait JAMAIS rien — du code
+  mort pour exactement le cas qu'il était censé traiter en priorité (le retour au premier plan).
+  Corrigé (`App.jsx`) : `onResume` force désormais une réparation INCONDITIONNELLE (reflow/repaint
+  forcé via toggle `position`), indépendante de toute mesure de dérive, à chaque retour au premier
+  plan. Le watchdog périodique (3s, 2 mesures consécutives) reste actif en complément pour un vrai
+  décrochage de LAYOUT sans cycle arrière-plan/premier-plan. 357 tests + lint + build vérifiés.
+  Honnêteté : toujours aucun accès à un vrai iPhone/PWA pour reproduire — mais cette fois la
+  correction adresse un TROU DE LOGIQUE concret et démontrable dans le code existant (pas une
+  hypothèse externe non vérifiable), ce qui est plus solide que les tentatives purement théoriques ;
+  à confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
