@@ -1322,11 +1322,11 @@ async function runOnePass(env) {
         { title: '⏳ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
-    // 🏃 Reprise 2ème MT
+    // ⚡ Reprise 2ème MT (11/09, choisi parmi 4 options proposées à l'utilisateur)
     if (prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_IN_PROGRESS') {
       log.push(`[espn:${slug}:${eventId}] reprise`)
       await notifyVercel(env, `push:espn:2h:${eventId}`,
-        { title: '🏃 Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: '⚡ Reprise !', body: `2ème MT · ${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
     // 🏁 Fin de match — seulement une fois CONFIRMÉ (2e passe FINAL

@@ -519,6 +519,9 @@ cf-worker/
 - ✅ Titre "Coup d'envoi" encadré de 2 points rouges (demande utilisateur, 11/09) : `"🔴 Coup
   d'envoi !"` → `"🔴 Coup d'envoi 🔴"` (le "!" retiré au profit de la symétrie visuelle des 2
   emoji, choix assumé) dans `api/cron-goals.js` ET `cf-worker/src/index.js`.
+- ✅ Emoji "Reprise" revu ensemble avec l'utilisateur (11/09) : 4 options proposées (🏃 le choix
+  précédent, 🔄, ⏱️, ⚡) — ⚡ choisi. `"🏃 Reprise !"` → `"⚡ Reprise !"` dans les 2 fichiers.
+  Lint + 357 tests + build vérifiés à chaque étape.
 
 ## Conventions
 - Noms français partout dans l'UI
