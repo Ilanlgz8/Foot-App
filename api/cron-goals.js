@@ -5,17 +5,18 @@
 //
 // Détecte et notifie :
 //   ⚽ But         — score change pendant un match en cours
-//   🟢 Coup d'envoi — match démarre
+//   🔴 Coup d'envoi — match démarre
 //   ⏳ Mi-temps    — pause mi-temps
 //   🏃 Reprise     — reprise 2ème MT
 //   🏁 Fin de match — match terminé
-// ⚠️ Emojis KO/mi-temps/reprise changés le 11/09 (constat utilisateur : "c des
-// emoji de telephone quoi c pas ouf") — 🔴/⏸/▶️ sont littéralement les icônes
-// de contrôle média (enregistrer/pause/lecture) du Control Center iPhone,
-// pas des symboles foot. Remplacés par 🟢 (feu vert = ça démarre), ⏳ (pause
-// dans le temps) et 🏃 (les joueurs repartent) — plus thématique, sans
-// ambiguïté avec des boutons d'interface. But/carton/fin de match (⚽/🟥/🏁)
-// n'avaient pas ce problème, inchangés.
+// ⚠️ Emojis mi-temps/reprise changés le 11/09 (constat utilisateur : "c des
+// emoji de telephone quoi c pas ouf") — ⏸/▶️ sont littéralement les icônes
+// de contrôle média (pause/lecture) du Control Center iPhone, pas des
+// symboles foot. Remplacés par ⏳ (pause dans le temps) et 🏃 (les joueurs
+// repartent). 🔴 pour le coup d'envoi gardé tel quel (demande explicite
+// utilisateur : "laisse en rouge") malgré le même changement testé un temps
+// vers 🟢 — revert. But/carton/fin de match (⚽/🟥/🏁) n'avaient pas ce
+// problème, inchangés.
 //
 // ⚠️ FIX retard notif WC (~10min) : ESPN a un lag connu sur le slug 'fifa.world'
 // (le statut scoreboard ESPN met du temps à passer SCHEDULED → IN_PROGRESS).
@@ -769,7 +770,7 @@ export default async function handler(req, res) {
       try { await kv.srem('cron:liveIds', String(eventId)) } catch {}
     }
 
-    // 🟢 Coup d'envoi — basé sur la confirmation RÉELLE (statut LIVE_ESPN, déjà
+    // 🔴 Coup d'envoi — basé sur la confirmation RÉELLE (statut LIVE_ESPN, déjà
     // corrigé par le fifa-override ci-dessus pour compenser le lag ESPN connu
     // sur le Mondial), plutôt que sur l'heure programmée (evt.date).
     // ⚠️ Avant : notifiait dès l'heure prévue dépassée, même si le coup
@@ -785,7 +786,7 @@ export default async function handler(req, res) {
       // TTL de dédup à 6h : marge de sécurité pour un match prolongation+tab
       // (peut dépasser 3h depuis le coup d'envoi).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: "🟢 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
+        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`) }
     }
 

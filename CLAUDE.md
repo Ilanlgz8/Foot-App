@@ -508,13 +508,14 @@ cf-worker/
   emoji de telephone quoi") : 🔴 (coup d'envoi), ⏸ (mi-temps) et ▶️ (reprise) sont littéralement
   les icônes de contrôle média (enregistrer/pause/lecture) du Control Center iPhone — pas des
   symboles foot, d'où l'impression "téléphone" plutôt que sport. Remplacés dans `api/cron-goals.js`
-  ET `cf-worker/src/index.js` (les 2 implémentations, gardées identiques) : 🟢 (feu vert — le match
-  démarre), ⏳ (sablier — pause dans le temps) et 🏃 (joueur qui repart — reprise). But/carton
-  rouge/fin de match (⚽/🟥/🏁) n'avaient pas ce problème (déjà des symboles clairement sportifs),
-  inchangés. Lint + 357 tests + build vérifiés. Même limite de déploiement que les points notifs
-  ci-dessus : la partie `cf-worker/` nécessite `npm run deploy` manuel ; la partie
-  `api/cron-goals.js` (fallback historique, pas le chemin actif) se déploie automatiquement avec
-  le reste de l'app via Vercel.
+  ET `cf-worker/src/index.js` (les 2 implémentations, gardées identiques) : ⏳ (sablier — pause
+  dans le temps) pour la mi-temps, 🏃 (joueur qui repart) pour la reprise. 🔴 pour le coup d'envoi
+  gardé tel quel (demande explicite utilisateur juste après : "laisse en rouge") — un essai vers
+  🟢 (feu vert) a été fait puis reverté dans la foulée. But/carton rouge/fin de match (⚽/🟥/🏁)
+  n'avaient pas ce problème (déjà des symboles clairement sportifs), inchangés. Lint + 357 tests +
+  build vérifiés. Même limite de déploiement que les points notifs ci-dessus : la partie
+  `cf-worker/` nécessite `npm run deploy` manuel ; la partie `api/cron-goals.js` (fallback
+  historique, pas le chemin actif) se déploie automatiquement avec le reste de l'app via Vercel.
 
 ## Conventions
 - Noms français partout dans l'UI
