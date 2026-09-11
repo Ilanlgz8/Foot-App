@@ -523,12 +523,12 @@ cf-worker/
   précédent, 🔄, ⏱️, ⚡) — ⚡ choisi. `"🏃 Reprise !"` → `"⚡ Reprise !"` dans les 2 fichiers.
   Lint + 357 tests + build vérifiés à chaque étape.
 - ✅ Emoji "Mi-temps" revu ensemble avec l'utilisateur (11/09, plusieurs allers-retours : 3 lots
-  d'options proposées, les 2 premiers jugés "trop loin"/"on s'éloigne trop" par l'utilisateur avant
-  de converger sur un choix sobre) : `⏳ Mi-temps` → `🟡 Mi-temps` (point jaune) dans
-  `api/cron-goals.js` ET `cf-worker/src/index.js`. Logique retenue : cohérence avec les 2 autres
-  emoji du même trio — 🔴 coup d'envoi (arrêt/lancement), 🟡 mi-temps (pause), ⚡ reprise (ça
-  repart) — plutôt que le sablier ⏳, correct mais isolé stylistiquement des deux autres. 357
-  tests + lint vérifiés.
+  d'options proposées, les 2 premiers jugés "trop loin"/"on s'éloigne trop" par l'utilisateur,
+  puis passage à `🟡 Mi-temps` (point jaune, cohérent avec 🔴 KO / ⚡ Reprise) — mais l'utilisateur
+  est revenu dessus juste après ("j'aime pas... j'hésite entre les deux [sablier/horloge]"),
+  confirmé explicitement vouloir le sablier une fois la question reposée directement) : retour
+  final à `⏳ Mi-temps` dans `api/cron-goals.js` ET `cf-worker/src/index.js` (annule le point
+  jaune du commit précédent). 357 tests + lint vérifiés à chaque étape.
 
 ## Conventions
 - Noms français partout dans l'UI
