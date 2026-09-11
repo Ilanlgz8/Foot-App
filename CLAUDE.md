@@ -606,6 +606,29 @@ cf-worker/
   être faussement à 0 en cas de désync de peinture). Reste à confirmer si ce fix (déployé) suffit
   maintenant que le scénario déclencheur est identifié avec certitude — première fois dans cette
   série de tentatives qu'on a une confirmation du "quand", pas seulement du "quoi".
+- ✅ Détail décisif obtenu (11/09, question posée directement — "à quoi ça ressemble visuellement
+  quand ça se décolle ?" — réponse utilisateur : "y'a une épaisseur noire en dessous [de la barre]
+  quand elle se décolle"). Premier détail visuel PRÉCIS obtenu en 8 signalements — jusqu'ici on
+  savait "la barre est mal placée", jamais exactement COMMENT. Un bandeau noir qui apparaît SOUS
+  la barre au moment du décrochage est la signature d'un mécanisme précis et bien documenté,
+  différent de toutes les théories précédentes (compositing/peinture, ancêtre transformé,
+  scroll-lock) : le viewport de LAYOUT (`window.innerHeight`, sur lequel `position:fixed;
+  bottom:0` s'ancre nativement) et le viewport VISUEL réel (`visualViewport.height`) divergent
+  quand la barre d'outils Safari se masque/affiche — en PWA standalone particulièrement, ce
+  réajustement n'est pas toujours instantané/fiable. Le résultat : un espace entre le bas de la
+  barre et le vrai bas de l'écran, qui apparaît noir (fond de page nu, sans le dégradé de la barre
+  par-dessus) — exactement la description de l'utilisateur. Aucune des 7 tentatives précédentes ne
+  corrigeait CET écart précis : les watchdogs géométriques (tentatives 4/5/7) ne réparaient
+  qu'APRÈS COUP (toutes les 3s, ou au retour d'arrière-plan), jamais PENDANT que l'écart existe.
+  Fix (`App.jsx`, nouvel effect séparé, complémentaire aux watchdogs existants — ne les remplace
+  pas) : synchronisation active via l'API `window.visualViewport` (conçue précisément pour ce cas),
+  qui décale la barre d'un `translateY` égal à l'écart mesuré (`window.innerHeight - (vv.height +
+  vv.offsetTop)`), recalculé à CHAQUE évènement `resize`/`scroll` de `visualViewport` — déclenchés
+  EN TEMPS RÉEL pendant l'animation de la barre d'adresse, contrairement aux watchdogs précédents
+  qui ne vérifiaient qu'à intervalle fixe. 357 tests + lint + build vérifiés. Honnêteté : toujours
+  aucun accès à un vrai iPhone/PWA — mais c'est la 1re fois dans cette série qu'un détail visuel
+  PRÉCIS du symptôme (pas juste "ça se décolle") pointe vers un mécanisme documenté et spécifique,
+  plutôt qu'une hypothèse générique parmi plusieurs possibles ; à confirmer par l'utilisateur.
 
 ## Conventions
 - Noms français partout dans l'UI

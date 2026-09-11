@@ -273,6 +273,53 @@ function App() {
     }
   }, [])
 
+  // ⚠️ 8e TENTATIVE (11/09, description précise de l'utilisateur enfin obtenue
+  // — "y'a une épaisseur noire en dessous [de la barre] quand elle se
+  // décolle" — un détail visuel qu'aucune tentative précédente n'avait, et
+  // qui pointe vers un mécanisme complètement différent des 7 précédentes
+  // (compositing/peinture, ancêtre transformé, scroll-lock...).
+  //
+  // Un bandeau NOIR qui apparaît SOUS la barre, precisément quand elle se
+  // décolle, correspond au symptôme classique et documenté de
+  // `position:fixed; bottom:0` sur iOS Safari/PWA quand la barre d'outils du
+  // navigateur se masque : le viewport RÉELLEMENT visible (`visualViewport`)
+  // grandit (la barre d'adresse disparaît, l'écran devient "plus grand"),
+  // mais l'élément fixé reste ancré au bas de l'ancien viewport de LAYOUT
+  // (`window.innerHeight`, qui ne se met pas forcément à jour aussi vite/de
+  // la même façon en mode PWA standalone) — ça laisse un espace entre le bas
+  // de la barre et le vrai bas de l'écran, qui apparaît noir (fond de la
+  // page, sans le dégradé de la barre par-dessus). Aucune des 7 tentatives
+  // précédentes ne corrigeait spécifiquement CET écart précis — les
+  // watchdogs géométriques mesuraient `rect.bottom` vs le viewport, mais ne
+  // recalculaient/réparaient qu'après coup (3s + 2 mesures, ou au retour
+  // d'arrière-plan), jamais EN CONTINU pendant que l'écart existe.
+  //
+  // Fix : synchronisation active et continue via l'API `visualViewport`
+  // (conçue précisément pour ce cas), indépendante du reste des filets déjà
+  // en place. Décale la barre d'un `translateY` égal à l'écart mesuré entre
+  // le viewport de layout et le viewport visuel réel, recalculé à CHAQUE
+  // évènement `resize`/`scroll` de `visualViewport` (déclenchés en temps réel
+  // pendant l'animation de la barre d'adresse, pas seulement après coup) —
+  // la barre suit donc le bord réellement visible de l'écran au lieu de
+  // dépendre entièrement du calcul natif de `position:fixed` par WebKit.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const sync = () => {
+      const el = document.querySelector('.sfTabbar')
+      if (!el || getComputedStyle(el).display === 'none') { return }
+      const gap = window.innerHeight - (vv.height + vv.offsetTop)
+      el.style.transform = gap > 0.5 ? `translateY(-${gap}px)` : ''
+    }
+    vv.addEventListener('resize', sync)
+    vv.addEventListener('scroll', sync)
+    sync()
+    return () => {
+      vv.removeEventListener('resize', sync)
+      vv.removeEventListener('scroll', sync)
+    }
+  }, [])
+
   return (
     // LiveProvider monté ici → hooks live survivent aux changements de route
     // + Web Worker ESPN continue de tourner même si l'utilisateur est sur Classement etc.
