@@ -467,6 +467,25 @@ cf-worker/
   ne pourra plus jamais générer de notif. Vérifié par un test numérique ad-hoc (2h → pas sauté,
   30h → sauté) + 356 tests + lint inchangés. Même limite de déploiement que les 2 points
   ci-dessus : à déployer manuellement (`npm run deploy` depuis `cf-worker/`).
+- ✅ Choix produit adopté suite à une proposition utilisateur (11/09 : "quand l'app reçoit que le
+  match est terminé [...] on n'autorise pas les notifs qui étaient bloquées de ce match, on les
+  jette") — remplace, pour les notifs but/carton rouge, l'approche "retenter plus longtemps"
+  ajoutée juste avant (élargissement `isFinalNow`) par une approche plus simple demandée par
+  l'utilisateur : ABANDONNER plutôt que retenter, dès que le match vient d'être confirmé terminé.
+  Dans `cf-worker/src/index.js`, les 2 blocs de retry (but + carton rouge) vérifient maintenant
+  `isFinalConfirmed` (déjà calculé plus haut, vrai seulement à la passe qui confirme le FT) au
+  moment d'un échec d'envoi : si vrai, `track[side]`/`cardTrack[side]` avance quand même (comme si
+  envoyé) au lieu de rester bloqué à retenter — le but/carton concerné n'est alors jamais notifié
+  individuellement. Différent de `STALE_MATCH_MS` (protège contre un match vieux de PLUSIEURS
+  HEURES) : ici c'est la fin du match, la même minute — choix produit assumé de préférer NE RIEN
+  envoyer plutôt qu'un but notifié après-coup une fois le score déjà scellé. L'essentiel (score
+  final exact via la notif "Fin de match" elle-même) reste correct dans tous les cas ; seul le
+  détail "but de X à la Ye minute" de ce but précis serait perdu, sciemment, dans le scénario rare
+  où son envoi échoue PILE à la passe de confirmation du FT. La notif "Fin de match" elle-même
+  N'EST PAS concernée par ce changement — elle continue d'être retentée (bornée par
+  `STALE_MATCH_MS`, 6h) plutôt qu'abandonnée : contrairement à un but individuel, c'est la seule
+  notif qui informe vraiment du résultat, la perdre serait un vrai recul, pas juste un détail en
+  moins. 356 tests + lint inchangés. Même limite de déploiement que les points ci-dessus.
 
 ## Conventions
 - Noms français partout dans l'UI

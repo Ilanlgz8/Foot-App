@@ -1218,6 +1218,29 @@ async function runOnePass(env) {
             const goalSent = await notifyVercel(env, `push:espn:goal:${eventId}:${side}:${goalIndex + 1}`,
               { title: goalTitle, body: goalBody, url: '/live', matchId: eventId, tag: `goal-${eventId}-${side}-${goalIndex + 1}` }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
             if (!goalSent) {
+              // ⚠️ AJOUT (demande utilisateur, 11/09 : "si le match est
+              // terminé sur l'app, on jette les notifs bloquées plutôt que de
+              // continuer à les retenter" — proposition plus simple que la
+              // fenêtre de retry élargie ajoutée juste avant, adoptée ici) :
+              // si le match vient JUSTEMENT d'être confirmé terminé
+              // (`isFinalConfirmed`, calculé plus haut) PENDANT cette passe
+              // précise, on ne retente plus ce but — on l'abandonne
+              // sciemment (`track[side]` avance quand même, comme si envoyé)
+              // au lieu de le laisser traîner indéfiniment. Différent de
+              // `STALE_MATCH_MS` (qui protège contre un match vieux de PLUSIEURS
+              // HEURES) : ici c'est la même minute que la fin du match, mais le
+              // choix produit fait qu'on préfère ne RIEN envoyer plutôt qu'un
+              // but notifié après-coup une fois le score final déjà connu —
+              // l'essentiel (le score final juste, via la notif "Fin de
+              // match") reste correct, seul le détail "but marqué par X à la
+              // Ye minute" de CE but précis est perdu, sciemment, plutôt que
+              // retenté sans fin.
+              if (isFinalConfirmed) {
+                log.push(`[espn:${slug}:${eventId}] échec envoi but ${side} ${goalIndex + 1}, match déjà terminé — abandonné (pas retenté)`)
+                track[side] = targetCount
+                trackChanged = true
+                break
+              }
               // Échec confirmé — voir commentaire sendToVercel/notifyVercel en
               // tête de fichier : on N'AVANCE PAS track[side], sinon ce but
               // précis ne serait plus jamais redétecté (le prochain passage
@@ -1261,6 +1284,15 @@ async function runOnePass(env) {
           const redSent = await notifyVercel(env, `push:espn:red:${eventId}:${side}:${cardTrack[side] + 1}`,
             { title: '🟥 Carton rouge', body: `${card.name} (${teamName})${minuteText ? ` — ${minuteText}` : ''}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
           if (!redSent) {
+            // Même choix produit que le but ci-dessus (voir son commentaire,
+            // 11/09) : match déjà confirmé terminé cette passe → abandonné,
+            // pas retenté indéfiniment.
+            if (isFinalConfirmed) {
+              log.push(`[espn:${slug}:${eventId}] échec envoi carton rouge ${side}, match déjà terminé — abandonné (pas retenté)`)
+              cardTrack[side] = list.length
+              cardTrackChanged = true
+              break
+            }
             // Même fix que le but ci-dessus : ne pas avancer cardTrack[side]
             // tant que l'envoi n'est pas confirmé, sinon ce carton précis ne
             // serait plus jamais redétecté.
