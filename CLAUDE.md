@@ -522,6 +522,13 @@ cf-worker/
 - ✅ Emoji "Reprise" revu ensemble avec l'utilisateur (11/09) : 4 options proposées (🏃 le choix
   précédent, 🔄, ⏱️, ⚡) — ⚡ choisi. `"🏃 Reprise !"` → `"⚡ Reprise !"` dans les 2 fichiers.
   Lint + 357 tests + build vérifiés à chaque étape.
+- ✅ Emoji "Mi-temps" revu ensemble avec l'utilisateur (11/09, plusieurs allers-retours : 3 lots
+  d'options proposées, les 2 premiers jugés "trop loin"/"on s'éloigne trop" par l'utilisateur avant
+  de converger sur un choix sobre) : `⏳ Mi-temps` → `🟡 Mi-temps` (point jaune) dans
+  `api/cron-goals.js` ET `cf-worker/src/index.js`. Logique retenue : cohérence avec les 2 autres
+  emoji du même trio — 🔴 coup d'envoi (arrêt/lancement), 🟡 mi-temps (pause), ⚡ reprise (ça
+  repart) — plutôt que le sablier ⏳, correct mais isolé stylistiquement des deux autres. 357
+  tests + lint vérifiés.
 
 ## Conventions
 - Noms français partout dans l'UI

@@ -6,15 +6,18 @@
 // Détecte et notifie :
 //   ⚽ But          — score change pendant un match en cours
 //   🔴 Coup d'envoi 🔴 — match démarre
-//   ⏳ Mi-temps     — pause mi-temps
+//   🟡 Mi-temps     — pause mi-temps
 //   ⚡ Reprise      — reprise 2ème MT
 //   🏁 Fin de match  — match terminé
 // ⚠️ Emojis mi-temps/reprise changés le 11/09 (constat utilisateur : "c des
 // emoji de telephone quoi c pas ouf") — ⏸/▶️ sont littéralement les icônes
 // de contrôle média (pause/lecture) du Control Center iPhone, pas des
-// symboles foot. Remplacés par ⏳ (pause dans le temps) puis ⚡ pour la
-// reprise (choisi par l'utilisateur parmi 4 options proposées — 🏃 essayé
-// d'abord, remplacé le même jour). 🔴 pour le coup d'envoi gardé tel quel
+// symboles foot. Remplacés par ⏳ (pause dans le temps), puis 🟡 (point
+// jaune — cohérent avec 🔴 KO / ⚡ Reprise : rouge=arrêt, jaune=pause,
+// éclair=ça repart, choix final le même jour après plusieurs allers-retours
+// avec l'utilisateur). Reprise : ⚡ choisi par l'utilisateur parmi 4 options
+// proposées — 🏃 essayé d'abord, remplacé le même jour. 🔴 pour le coup
+// d'envoi gardé tel quel
 // (demande explicite : "laisse en rouge") malgré un essai vers 🟢 — revert —
 // puis encadré des 2 côtés ("🔴 Coup d'envoi 🔴", "!" retiré pour la symétrie,
 // demande explicite). But/carton/fin de match (⚽/🟥/🏁) n'avaient pas ce
@@ -1047,11 +1050,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // ⏳ Mi-temps
+    // 🟡 Mi-temps (11/09, choisi avec l'utilisateur — cohérent avec 🔴 KO / ⚡ Reprise :
+    // rouge = arrêt, jaune = pause, éclair = ça repart)
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} mi-temps`)
       const sent = await sendDeduped(`push:espn:ht:${eventId}`,
-        { title: '⏳ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
+        { title: '🟡 Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, log, undefined, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) notifsSent++
     }
 

@@ -1315,11 +1315,12 @@ async function runOnePass(env) {
       }
     }
 
-    // ⏳ Mi-temps
+    // 🟡 Mi-temps (11/09, choisi avec l'utilisateur — cohérent avec 🔴 KO / ⚡ Reprise :
+    // rouge = arrêt, jaune = pause, éclair = ça repart)
     if (LIVE_ESPN.has(prevStatus) && prevStatus !== 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME') {
       log.push(`[espn:${slug}:${eventId}] mi-temps`)
       await notifyVercel(env, `push:espn:ht:${eventId}`,
-        { title: '⏳ Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: '🟡 Mi-temps', body: `${homeTeam} ${scoreStr} ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
     }
 
     // ⚡ Reprise 2ème MT (11/09, choisi parmi 4 options proposées à l'utilisateur)
