@@ -1110,10 +1110,12 @@ async function runOnePass(env) {
     // dans api/cron-goals.js, même changement appliqué ici pour rester
     // identique aux 2 implémentations) — 🔴 gardé tel quel pour le coup
     // d'envoi (demande explicite utilisateur), malgré un essai vers 🟢 entre
-    // les deux, reverté.
+    // les deux, reverté. Puis "encadré" des deux côtés (même jour, demande
+    // explicite) — le "!" retiré au profit de la symétrie visuelle des 2
+    // points rouges (choix assumé, à ajuster si préféré avec le "!" gardé).
     if (isLive && notPostponed && koAcquired) {
       const koSent = await sendToVercel(env,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
+        { title: "🔴 Coup d'envoi 🔴", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam }, log)
       if (koSent) {
         log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`)
       } else {

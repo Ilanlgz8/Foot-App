@@ -785,8 +785,11 @@ export default async function handler(req, res) {
     if (LIVE_ESPN.has(status) && notPostponed) {
       // TTL de dédup à 6h : marge de sécurité pour un match prolongation+tab
       // (peut dépasser 3h depuis le coup d'envoi).
+      // ⚠️ "Encadré" de 2 points rouges (11/09, demande explicite utilisateur) —
+      // "!" retiré au profit de la symétrie visuelle (voir même commentaire
+      // dans cf-worker/src/index.js).
       const sent = await sendDeduped(`push:espn:ko:${eventId}`,
-        { title: "🔴 Coup d'envoi !", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
+        { title: "🔴 Coup d'envoi 🔴", body: `${homeTeam} – ${awayTeam}`, url: '/live' }, slug, log, 6 * 3600, subsCache, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam })
       if (sent > 0) { notifsSent++; log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} KO (confirmé ESPN)`) }
     }
 
