@@ -597,6 +597,15 @@ cf-worker/
   correction adresse un TROU DE LOGIQUE concret et démontrable dans le code existant (pas une
   hypothèse externe non vérifiable), ce qui est plus solide que les tentatives purement théoriques ;
   à confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via Vercel).
+- 🔍 Premier vrai diagnostic confirmé par l'utilisateur (11/09, question posée directement — "tu
+  fais quoi juste avant que ça arrive ?" — réponse : "je revenais d'arrière-plan") : le
+  déclencheur est bien un retour d'arrière-plan, PAS un scroll isolé ni l'ouverture d'un
+  dropdown/modal. Ça valide directement la cible du fix de la 7e tentative (`onResume` dans
+  `App.jsx`, déclenché sur `visibilitychange`/`pageshow`) — c'est exactement le chemin de code
+  déjà corrigé (réparation inconditionnelle, plus de dépendance à une mesure de dérive qui pouvait
+  être faussement à 0 en cas de désync de peinture). Reste à confirmer si ce fix (déployé) suffit
+  maintenant que le scénario déclencheur est identifié avec certitude — première fois dans cette
+  série de tentatives qu'on a une confirmation du "quand", pas seulement du "quoi".
 
 ## Conventions
 - Noms français partout dans l'UI
