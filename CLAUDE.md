@@ -486,6 +486,24 @@ cf-worker/
   `STALE_MATCH_MS`, 6h) plutôt qu'abandonnée : contrairement à un but individuel, c'est la seule
   notif qui informe vraiment du résultat, la perdre serait un vrai recul, pas juste un détail en
   moins. 356 tests + lint inchangés. Même limite de déploiement que les points ci-dessus.
+- ✅ "Match du jour" affichait Valence-Séville alors que Rennes-Marseille était objectivement plus
+  attendu (constat utilisateur, 11/09) : root cause dans `src/utils/matchDuJour.js` — Séville
+  était dans `BIG_TEAMS` (2 points) au même titre que Marseille, et Rennes/Valence étaient tous
+  deux dans `NOTABLE_TEAMS` (1 point) → Rennes-Marseille (1+2=3) et Valence-Séville (1+2=3)
+  tombaient EXACTEMENT à égalité, départagés uniquement par le coup d'envoi le plus tardif
+  (`electBest`), un critère purement horaire sans lien avec "quel match est le plus attendu".
+  L'ajout initial de Séville dans BIG_TEAMS (02/09) reposait sur un palmarès réel (7 Ligues
+  Europa) mais plus étroit que celui des autres clubs de ce tier (champions nationaux/finalistes
+  C1) — objectivement un cran en dessous en termes d'affiche générale auprès du grand public.
+  Déplacé vers `NOTABLE_TEAMS` (1 point, au lieu d'un retrait pur et simple — le palmarès reste
+  réel, juste pas au niveau du 1er tier). Avec ce changement, Rennes-Marseille (1+2=3) devance
+  désormais clairement Valence-Séville (1+1=2), quelle que soit l'heure de coup d'envoi. Test
+  dédié ajouté (`matchDuJour.test.js`) reproduisant exactement ce cas ; 1 test existant ajusté
+  (utilisait Séville comme exemple générique de "gros club à 2 points", remplacé par Atlético
+  Madrid qui reste à ce tier) — 357 tests + lint + build vérifiés. Honnêteté : comme documenté
+  dans le fichier depuis le début, `BIG_TEAMS`/`NOTABLE_TEAMS` restent des listes CURÉES (aucune
+  donnée de popularité/enjeu réelle disponible sans appel API supplémentaire), donc un jugement
+  assumé, pas un score objectif — à réajuster au prochain cas qui semble à côté de la plaque.
 
 ## Conventions
 - Noms français partout dans l'UI

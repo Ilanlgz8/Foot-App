@@ -120,9 +120,23 @@ describe('pickMatchDuJour', () => {
   })
 
   it('une élite + un gros club devance deux gros clubs', () => {
-    const mixte = makeMatch('PD', 'Real Madrid', 'Séville', 13)
+    // ⚠️ Séville → Atlético Madrid (11/09) : Séville a été déplacé de
+    // BIG_TEAMS vers NOTABLE_TEAMS (voir son commentaire dans matchDuJour.js,
+    // constat utilisateur "Rennes-Marseille > Valence-Séville") — l'exemple
+    // avait besoin d'un club toujours à 2 points pour rester valide.
+    const mixte = makeMatch('PD', 'Real Madrid', 'Atlético Madrid', 13)
     const gros  = makeMatch('SA', 'Juventus', 'Milan', 20)
     expect(pickMatchDuJour([mixte, gros])).toBe(mixte)
+  })
+
+  it('Rennes-Marseille devance Valence-Séville, même avec un coup d\'envoi plus tôt (constat utilisateur 11/09)', () => {
+    // Avant le déplacement de Séville vers NOTABLE_TEAMS, ce cas produisait
+    // exactement une égalité (Marseille 2 + Rennes 1 = Séville 2 + Valence 1
+    // = 3), départagée uniquement par le coup d'envoi le plus tardif — sans
+    // lien avec quel match est réellement le plus intéressant.
+    const rennesOm    = makeMatch('FL1', 'Rennes', 'Marseille', 15)
+    const valenceSeville = makeMatch('PD', 'Valence', 'Séville', 21)
+    expect(pickMatchDuJour([rennesOm, valenceSeville])).toBe(rennesOm)
   })
 
   it('garde le match du jour ÉPINGLÉ une fois lancé, au lieu de sauter au suivant', () => {

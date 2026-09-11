@@ -83,15 +83,26 @@ const COMP_PRIORITY = {
 // champion consécutifs 2002-2008, habitué des soirées européennes) et Monaco
 // (finaliste C1 2004, champion 2017) pour la Ligue 1 ; RB Leipzig (habitué
 // de la phase à élimination directe de C1, finaliste de coupe d'Allemagne) et
-// Leverkusen (champion d'Allemagne invaincu 2023-24) pour la Bundesliga ;
-// Séville (club le plus titré en Ligue Europa, 7 trophées) pour la Liga.
+// Leverkusen (champion d'Allemagne invaincu 2023-24) pour la Bundesliga.
+// ⚠️ Séville RETIRÉ d'ici, déplacé dans NOTABLE_TEAMS (constat utilisateur,
+// 11/09 : "aujourd'hui c'est Valence-Séville alors qu'il y a un meilleur
+// match qui est Rennes-Marseille") — root cause : Séville (2 pts, BIG_TEAMS)
+// + Valence (1 pt, NOTABLE_TEAMS) = 3, EXACTEMENT à égalité avec Marseille
+// (2 pts) + Rennes (1 pt) = 3 — le départage tombait alors sur le coup
+// d'envoi le plus tardif (voir electBest), purement horaire, sans lien avec
+// le "meilleur match". Son ajout initial ci-dessus reposait sur un palmarès
+// européen réel (7 Ligues Europa) mais plus étroit que celui des autres clubs
+// de ce tier (champions nationaux/finalistes C1) — objectivement un cran
+// en dessous en termes d'affiche générale, d'où son déplacement au tier du
+// dessous plutôt qu'un retrait pur et simple. Avec ce changement, Rennes-
+// Marseille (1+2=3) devance désormais clairement Valence-Séville (1+1=2).
 const BIG_TEAMS = new Set([
   // Ligue 1
   'Paris SG', 'Marseille', 'Lyon', 'Monaco',
   // Premier League
   'Man. City', 'Man. United', 'Liverpool', 'Arsenal', 'Chelsea', 'Tottenham',
   // La Liga
-  'Real Madrid', 'Barcelone', 'Atlético Madrid', 'Séville',
+  'Real Madrid', 'Barcelone', 'Atlético Madrid',
   // Bundesliga
   'Bayern Munich', 'Dortmund', 'RB Leipzig', 'Leverkusen',
   // Serie A
@@ -139,7 +150,7 @@ const NOTABLE_TEAMS = new Set([
   // Premier League
   'Newcastle', 'Aston Villa', 'West Ham', 'Everton',
   // La Liga
-  'Villarreal', 'Betis', 'Athletic Bilbao', 'Valence',
+  'Villarreal', 'Betis', 'Athletic Bilbao', 'Valence', 'Séville',
   // Bundesliga
   'Francfort', 'Stuttgart', "M'gladbach", 'Wolfsburg',
   // Serie A
