@@ -472,6 +472,10 @@ export function useTeamFormMulti(compCodes) {
   const fdCodes   = codes.filter(c => !ESPN_SOURCED_FORM_COMPS.has(c))
   const espnCodes = codes.filter(c => ESPN_SOURCED_FORM_COMPS.has(c))
   for (const c of fdCodes) Object.assign(formMap, resultByCode[c]?.data?.formMap ?? {})
+  // Capturé par code (voir `formMapByComp` plus bas) — même formMap résolu
+  // que celui fusionné dans `formMap` juste en dessous, juste gardé SÉPARÉ
+  // par compétition plutôt qu'aplati dans un seul objet partagé.
+  const espnFormMapByCode = {}
   if (espnCodes.length) {
     const fdTeamPool = fdCodes.flatMap(c => resultByCode[c]?.data?.matches ?? [])
     for (const c of espnCodes) {
@@ -490,6 +494,7 @@ export function useTeamFormMulti(compCodes) {
         })
         .filter(Boolean)
       const espnFormMap = buildFormMap(resolvedMatches)
+      espnFormMapByCode[c] = espnFormMap
       for (const [id, form] of Object.entries(espnFormMap)) {
         if (!(id in formMap)) formMap[id] = form
       }
@@ -504,5 +509,49 @@ export function useTeamFormMulti(compCodes) {
   const matchesByComp = {}
   codes.forEach((code, i) => { matchesByComp[code] = results[i]?.data?.matches ?? [] })
 
-  return { formMap, matchesByComp, isLoading: results.some(r => r.isLoading) }
+  // ⚠️ AJOUT `formMapByComp` (constat utilisateur, 12/09 : "real madrid a
+  // joué quatre match déjà et la sur la card dans accueil ya que un losange
+  // vert [...] alors que lorsque l'on va dans livematchpage [...] y'a bien
+  // quatre losange [...] ça le fait pas à toutes les équipes") : bug réel
+  // trouvé dans `formMap` (fusionné) ci-dessus — `Object.assign(formMap,
+  // resultByCode[c]?.data?.formMap ?? {})` ÉCRASE purement et simplement
+  // l'entrée d'une équipe déjà présente dès qu'un CODE SUIVANT dans `codes`
+  // contient aussi cette équipe. Réel Madrid joue à la fois en Liga (PD) et
+  // en Ligue des Champions (CL) : si l'Accueil affiche des matchs des deux
+  // compétitions le même jour, `codes` contient ['PD', ..., 'CL'] — le
+  // formMap de 'CL' (peu de matchs joués en tout début de phase de ligue)
+  // écrase alors intégralement celui de 'PD' (Liga + Copa del Rey fusionnées,
+  // voir fetchTeamForm plus haut) pour l'id partagé de Real Madrid, même si
+  // la card affichée est un match DE LIGA. Vérifié en direct sur la prod
+  // (navigateur intégré, lecture des props réelles via fiber React) :
+  // `accueilFormMapForHome` valait `['W']` (1 seul résultat, cohérent avec un
+  // tout début de campagne C1) alors que `matchesByComp.PD` contenait bien 45
+  // matchs — la carte Real Madrid-Rayo (Liga) affichait donc la forme
+  // Champions League de Real Madrid, pas sa forme Liga. N'affecte QUE les
+  // équipes jouant simultanément dans ≥2 compétitions affichées le même jour
+  // sur l'Accueil (explique "ça le fait pas à toutes les équipes") — une
+  // équipe dans une seule compétition n'a jamais de collision d'id à
+  // résoudre, `formMap` fusionné et `formMapByComp[soncode]` sont alors
+  // strictement identiques pour elle.
+  //
+  // Plutôt que de fusionner "intelligemment" les tableaux (mélanger la forme
+  // Liga et la forme C1 d'un même club n'aurait pas de sens sportif clair, et
+  // risquerait de réintroduire le bug Deportivo du 16/08 sur le repli saison
+  // précédente — voir le commentaire détaillé dans fetchTeamForm plus haut),
+  // ce nouveau champ expose le formMap DE CHAQUE compétition séparément,
+  // jamais fusionné entre elles — exactement ce que `useTeamForm(compCode)`
+  // (MatchPage.jsx/LiveMatchPage.jsx, appelé UNE compétition à la fois)
+  // retourne déjà pour cette compétition précise. Les appelants (Accueil.jsx/
+  // MatchCard.jsx/Pronos.jsx) piochent maintenant `formMapByComp[match.
+  // competition.code]` au lieu du `formMap` fusionné pour choisir/afficher la
+  // forme d'un match précis — la carte Accueil affiche alors EXACTEMENT la
+  // même donnée que MatchPage/LiveMatchPage pour ce même match, par
+  // construction (même fonction fetchTeamForm, même queryKey React Query).
+  // `formMap` (fusionné) est conservé tel quel ci-dessus pour compat/tests
+  // existants, mais n'est plus utilisé par aucun appelant depuis ce fix.
+  const formMapByComp = {}
+  for (const c of fdCodes) formMapByComp[c] = resultByCode[c]?.data?.formMap ?? {}
+  for (const c of espnCodes) formMapByComp[c] = espnFormMapByCode[c] ?? {}
+
+  return { formMap, formMapByComp, matchesByComp, isLoading: results.some(r => r.isLoading) }
 }

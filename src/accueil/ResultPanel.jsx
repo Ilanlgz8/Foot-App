@@ -43,11 +43,12 @@ function formatDayLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-// matchesByComp n'est plus utilisé ici : ResultCard résout les blasons
-// directement depuis match.homeTeam/awayTeam (pas besoin de cross-matching
-// FD.org comme ResultHeroCard avant). Accueil.jsx continue de le passer
-// (encore utilisé par MatchPanel pour les matchs à venir) — prop simplement
-// ignorée ici, rien à casser côté appelant.
+// formMap/matchesByComp n'ont jamais été utilisés ici : ResultCard résout les
+// blasons directement depuis match.homeTeam/awayTeam (pas besoin de
+// cross-matching FD.org comme ResultHeroCard avant). Accueil.jsx ne les passe
+// d'ailleurs plus du tout depuis le 12/09 (voir useTeamForm.js/
+// useTeamFormMulti — `formMap` fusionné remplacé par `formMapByComp`,
+// jamais consommé ici de toute façon).
 export function ResultPanel({ results, loading, view = 'chrono' }) {
   const grouped  = groupByDay(results)
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué jusqu'à un

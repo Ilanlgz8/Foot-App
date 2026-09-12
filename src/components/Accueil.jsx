@@ -354,7 +354,14 @@ function Accueil() {
   // contournaient complètement. Fix : formMap ET matchesByComp descendent
   // maintenant en props jusqu'à MatchPoster (voir MatchCard.jsx/
   // MatchPoster.jsx), qui n'a plus besoin de refetch pour rien.
-  const { formMap, matchesByComp } = useTeamFormMulti(formCompCodes)
+  // ⚠️ `formMap` (fusionné toutes compétitions) remplacé par `formMapByComp`
+  // dans les props transmises plus bas (constat utilisateur, 12/09 : Real
+  // Madrid — Liga + Ligue des Champions le même jour sur l'Accueil — voyait
+  // sa forme Liga écrasée par sa forme C1, voir le commentaire détaillé dans
+  // useTeamForm.js/useTeamFormMulti) — chaque card pioche maintenant la
+  // forme de SA PROPRE compétition, jamais celle d'une autre compétition du
+  // même club affichée ailleurs sur la page.
+  const { formMapByComp, matchesByComp } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
@@ -892,7 +899,7 @@ function Accueil() {
               espnScores={espnScores}
               onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
               onLiveClick={m => navigate(`/live/${m.id}`)}
-              formMap={formMap}
+              formMapByComp={formMapByComp}
               matchesByComp={matchesByComp}
             />
           </div>
@@ -916,7 +923,7 @@ function Accueil() {
                 </div>
               </div>
               <div className="accueil__dashPanelDivider" />
-              <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} formMap={formMap} matchesByComp={matchesByComp} />
+              <ResultPanel results={resultPanel} loading={resultsLoading} view={resultView} />
             </div>
           )}
 

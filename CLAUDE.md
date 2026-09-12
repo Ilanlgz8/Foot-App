@@ -966,6 +966,53 @@ cf-worker/
   comportement inchangé sinon. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé)
   + build vérifiés.
 
+- ✅ "Forme récente" fausse pour un club jouant dans ≥2 compétitions le même
+  jour sur l'Accueil (constat utilisateur, 12/09 : "le real madrid a joué
+  quatre match déjà et la sur la card dans accueil ya que un losange vert
+  [...] alors que lorsque l'on va dans livematchpage [...] y'a bien quatre
+  losange [...] ça le fait pas à toutes les équipes") — bug DIFFÉRENT du bug
+  Aston Villa (celui-là était un résidu de cache figé, voir plus haut) : root
+  cause confirmée EN DIRECT sur la prod (navigateur intégré, lecture des
+  props réelles via fiber React sur la carte Real Madrid-Rayo, Liga) dans
+  `useTeamFormMulti` (`useTeamForm.js`) — le `formMap` fusionné toutes
+  compétitions confondues faisait `Object.assign(formMap, ...)` PAR CODE DE
+  COMPÉTITION, dans l'ordre de `codes` : pour un club jouant dans 2
+  compétitions affichées le même jour sur l'Accueil (Real Madrid : Liga `PD`
+  ET Ligue des Champions `CL`), le formMap de la compétition traitée EN
+  DERNIER (ici `CL`, tout début de phase de ligue, 1 seul résultat) ÉCRASAIT
+  intégralement celui de la compétition traitée avant (`PD`, Liga+Copa del
+  Rey fusionnées, 4 résultats) — quelle que soit la compétition du match
+  réellement affiché sur la carte. Vérifié : `accueilFormMapForHome` valait
+  `['W']` alors que `matchesByComp.PD` contenait bien 45 matchs Liga. N'af-
+  fecte QUE les clubs dans ≥2 compétitions affichées simultanément (explique
+  "ça le fait pas à toutes les équipes" — un club dans une seule compétition
+  n'a jamais de collision d'id, donc jamais d'écrasement). MatchPage/
+  LiveMatchPage n'ont jamais ce bug : ils appellent `useTeamForm(compCode)`
+  pour UNE SEULE compétition à la fois (jamais de fusion). Corrigé
+  (`useTeamForm.js`) : nouveau champ `formMapByComp` retourné par
+  `useTeamFormMulti` — le formMap de CHAQUE compétition exposé séparément,
+  jamais fusionné entre elles (au lieu de tenter une fusion "intelligente"
+  des tableaux, qui n'aurait pas de sens sportif clair entre forme Liga et
+  forme C1 d'un même club, et risquerait de réintroduire le bug Deportivo du
+  16/08 sur le repli saison précédente). `Accueil.jsx`/`MatchCard.jsx`/
+  `Pronos.jsx` piochent désormais `formMapByComp[match.competition.code]`
+  pour choisir la forme d'un match précis — demande explicite de
+  l'utilisateur ("faut lié les deux [...] que dans accueil les card herite
+  des donnee [...] de matchpage ou livematchpage") : la carte Accueil affiche
+  maintenant EXACTEMENT la même donnée que MatchPage/LiveMatchPage pour ce
+  même match, par construction (même fonction `fetchTeamForm`, même queryKey
+  React Query, même cache). Ce bug touchait aussi `Pronos.jsx` (même
+  `matchProno()` utilisait le formMap fusionné) — donc potentiellement le %
+  de pronostic affiché, pas seulement l'affichage visuel des losanges,
+  corrigé au même endroit. `formMap` (fusionné) reste exporté par
+  `useTeamFormMulti` pour compat mais n'est plus consommé par aucun
+  appelant. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés. Honnêteté : pas de test automatisé dédié
+  ajouté pour ce fix précis (la collision nécessite un vrai mock React Query
+  multi-compétitions, jugé disproportionné vs. la vérification déjà faite en
+  direct sur la prod avec de vraies données) — à reconfirmer par
+  l'utilisateur sur la carte Real Madrid après déploiement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

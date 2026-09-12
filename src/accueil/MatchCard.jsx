@@ -450,7 +450,13 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
 // ⚠️ RETIRÉ onOddPick (02/09) : passthrough vers MatchPoster qui n'existait
 // que pour la page "Mes Paris" (cotes cliquables), fonctionnalité entièrement
 // supprimée de l'app. Aucun appelant ne le passait en dehors d'elle.
-export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMap = null, matchesByComp = null }) {
+// ⚠️ `formMap` (fusionné toutes compétitions) remplacé par `formMapByComp`
+// (12/09, voir useTeamForm.js/useTeamFormMulti pour le bug corrigé : un club
+// jouant simultanément dans 2 compétitions affichées le même jour sur
+// l'Accueil, ex. Real Madrid Liga+C1, voyait la forme de l'une écraser
+// celle de l'autre) — chaque card pioche `formMapByComp[match.competition.
+// code]` ci-dessous, jamais un objet fusionné entre compétitions.
+export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMatchClick, onLiveClick, formMapByComp = null, matchesByComp = null }) {
   // Si des matchs sont en cours ou à venir → les afficher en priorité
   // Sinon (tous terminés) → afficher quand même les résultats du jour
   const active    = allMatches.filter(m => m.status !== 'FINISHED')
@@ -484,7 +490,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                   match={match}
                   espnScore={espnScores[match.id] ?? null}
                   onClick={clickHandler}
-                  formMap={formMap}
+                  formMap={formMapByComp?.[match.competition?.code] ?? null}
                   compMatches={matchesByComp?.[match.competition?.code] ?? null}
                 />
               )
@@ -508,7 +514,7 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
                     espnScore={espnScores[match.id] ?? null}
                     noAnimation
                     noGradient
-                    formMap={formMap}
+                    formMap={formMapByComp?.[match.competition?.code] ?? null}
                     compMatches={matchesByComp?.[match.competition?.code] ?? null}
                   />
                 </div>

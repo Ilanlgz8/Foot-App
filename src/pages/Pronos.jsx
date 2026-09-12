@@ -167,8 +167,15 @@ function outcomeOf(h, a) {
 // ⚠️ BUG CORRIGÉ (même fix que MatchPoster.jsx/MatchDuJourCard.jsx) : id ESPN
 // vs id FD.org pour les 6 grands championnats — sans résolution, calcPronoAdvanced
 // ne retrouve jamais la vraie donnée saison de l'équipe.
-function matchProno(match, formMap, matchesByComp, lowerDivByComp) {
+// ⚠️ `formMap` (fusionné toutes compétitions) remplacé par `formMapByComp`
+// (12/09, voir useTeamForm.js/useTeamFormMulti : un club jouant dans ≥2
+// compétitions affichées le même jour, ex. Real Madrid Liga+C1, voyait sa
+// forme d'une compétition écraser celle de l'autre — même bug que sur
+// l'Accueil, ce calcul de prono partage la même source de données). On
+// pioche maintenant le formMap DE LA COMPÉTITION du match, jamais fusionné.
+function matchProno(match, formMapByComp, matchesByComp, lowerDivByComp) {
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
+  const formMap = formMapByComp?.[match?.competition?.code] ?? {}
   // ⚠️ BUG CORRIGÉ (16/08, même fix que MatchCard.jsx/MatchPoster.jsx : id
   // ESPN coïncidant par hasard avec l'id FD.org d'un club différent, forme/
   // stats saison d'une AUTRE équipe utilisées dans le calcul de prono) :
@@ -311,7 +318,7 @@ function JoinCreateScreen({ onCreate, onJoin }) {
 // Domicile (match SUIVANT dans la liste affichée). `registerInputRef`/
 // `focusInput`/`nextMatchId` viennent de Pronos() (une seule Map de refs
 // pour toute la liste, pas un état local par ligne).
-function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
+function MatchPredictRow({ match, myPred, onSave, formMapByComp, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -350,7 +357,7 @@ function MatchPredictRow({ match, myPred, onSave, formMap, matchesByComp, lowerD
   const h = parseInt(home, 10)
   const a = parseInt(away, 10)
   const hasValidPred = Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20
-  const prono = useMemo(() => matchProno(match, formMap, matchesByComp, lowerDivByComp), [match, formMap, matchesByComp, lowerDivByComp])
+  const prono = useMemo(() => matchProno(match, formMapByComp, matchesByComp, lowerDivByComp), [match, formMapByComp, matchesByComp, lowerDivByComp])
   const potentialPoints = hasValidPred ? pronoPointsForProb(prono[outcomeOf(h, a)]) : null
 
   return (
@@ -598,7 +605,7 @@ function Pronos() {
     for (const m of liveMatches) if (m.competition?.code) codes.add(m.competition.code)
     return [...codes]
   }, [upcoming, finished, liveMatches])
-  const { formMap, matchesByComp } = useTeamFormMulti(formCompCodes)
+  const { formMapByComp, matchesByComp } = useTeamFormMulti(formCompCodes)
   // Repli "club promu" (03/08, cohérence demandée avec Accueil) — voir
   // useLowerDivisionStatsMulti (useMatchs.js) et son commentaire détaillé.
   const lowerDivByComp = useLowerDivisionStatsMulti(formCompCodes, matchesByComp)
@@ -760,9 +767,9 @@ function Pronos() {
   // que celui affiché avant le match (voir computePoints).
   const pronoByMatchId = useMemo(() => {
     const map = {}
-    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMap, matchesByComp, lowerDivByComp) })
+    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMapByComp, matchesByComp, lowerDivByComp) })
     return map
-  }, [finishedAll, formMap, matchesByComp, lowerDivByComp])
+  }, [finishedAll, formMapByComp, matchesByComp, lowerDivByComp])
 
   const leaderboard = useMemo(() => {
     return Object.entries(players)
@@ -877,7 +884,7 @@ function Pronos() {
                         match={m}
                         myPred={predictions[String(m.id)]?.[deviceId]}
                         onSave={handlePredict}
-                        formMap={formMap}
+                        formMapByComp={formMapByComp}
                         matchesByComp={matchesByComp}
                         lowerDivByComp={lowerDivByComp}
                         nextMatchId={nextIdByMatchId[m.id] ?? null}
