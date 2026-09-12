@@ -34,9 +34,32 @@ function readNavDebugFlag() {
   return localStorage.getItem('navDebug') === '1'
 }
 
+// ⚠️ AJOUT (12/09, retour utilisateur : "faudrait que je teste sur mon tel
+// mais [...] tout les appareils ne font pas la même taille") — le lien
+// `?navdebug=1` marche bien pour tester au clavier/desktop, mais une PWA
+// installée sur iPhone ("ajouter à l'écran d'accueil") n'a PAS de barre
+// d'adresse : impossible d'y taper une URL avec paramètre une fois lancée
+// depuis l'icône. Et rien ne garantit que le `localStorage` posé depuis
+// Safari soit bien partagé avec l'app installée (comportement iOS pas
+// toujours fiable sur ce point). Ajout d'un déclencheur qui marche DEPUIS
+// L'APP ELLE-MÊME, sans URL : 5 taps rapides sur le logo "StatFootix" du
+// header (voir `navbar.jsx`, `handleBrandTap`) basculent l'encart on/off via
+// un évènement `navdebug:toggle` — fonctionne à l'identique dans la PWA
+// installée, Safari, ou n'importe quel navigateur. Honnêteté sur "toutes les
+// tailles d'écran" : ce n'est pas un problème pour cet outil — les chiffres
+// affichés sont des VALEURS RELATIVES (l'écart `gap`, la position du bas de
+// la barre PAR RAPPORT au bas du viewport), pas des seuils absolus supposant
+// une taille d'écran précise ; ils se lisent de la même façon quel que soit
+// le modèle d'iPhone.
 export function NavDebugHUD() {
-  const [on] = useState(readNavDebugFlag)
+  const [on, setOn] = useState(readNavDebugFlag)
   const [stats, setStats] = useState(null)
+
+  useEffect(() => {
+    const onToggle = e => setOn(!!e.detail)
+    window.addEventListener('navdebug:toggle', onToggle)
+    return () => window.removeEventListener('navdebug:toggle', onToggle)
+  }, [])
 
   useEffect(() => {
     if (!on) return
