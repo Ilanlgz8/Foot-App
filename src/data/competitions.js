@@ -932,7 +932,7 @@ const TINT_THEME_CAMP_COLORS = {
   // documenté dans ce fichier avant le passage en mode peinture du 12/09
   // (ancien `tint2`) — réutilisation d'une couleur déjà établie plutôt
   // qu'une nouvelle teinte inventée.
-  pl:   ['#37003c', '#ffffff'],
+  pl:   ['#8a1d92', '#ffffff'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

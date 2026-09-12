@@ -1396,22 +1396,22 @@
 /* ⚠️ HABILLAGE PREMIER LEAGUE "MODE PEINTURE" (12/09) — mirroir exact de
    `.poster--theme-pl` (accueil.css, voir son commentaire détaillé). */
 #root .lmp__hero--theme-pl {
-  background: #37003c;
+  background: #8a1d92;
 }
 .lmp__hero--theme-pl .lmp__heroTintB {
   inset: 0;
   opacity: 0;
 }
-/* ⚠️ RETRAVAILLÉ (13/09) — mirroir exact de `.poster--theme-pl` (accueil.css,
-   voir son commentaire détaillé) : dégradé radial inversé, violet foncé
-   dominant au centre, blanc repoussé vers les bords/coins. */
+/* ⚠️ ÉCLAIRCI (13/09) — mirroir exact de `.poster--theme-pl` (accueil.css,
+   voir son commentaire détaillé) : `#37003c` → `#8a1d92`, violet un peu
+   moins foncé. */
 .lmp__hero--theme-pl .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background: radial-gradient(145% 145% at 50% 50%,
-    #37003c 0%, #37003c 68%,
+    #8a1d92 0%, #8a1d92 68%,
     #b565c4 86%,
     #ffffff 100%);
 }

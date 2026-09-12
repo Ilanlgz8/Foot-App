@@ -1368,6 +1368,19 @@ cf-worker/
   uniquement). Honnêteté : rendu jamais vu en direct avant ce déploiement (juste lecture du CSS)
   — à confirmer par l'utilisateur que la coupure a bien disparu.
 
+- ✅ Violet Premier League éclairci, même jour (13/09, demande explicite : "pour la premiere leagu
+  le violet un peu moins foncé stp") — `#37003c` (violet très sombre, quasi noir, dominant du
+  dégradé radial juste mis en place) remplacé par `#8a1d92` dans `.poster--theme-pl .poster__bg--
+  gradient` (`accueil.css`) et `.lmp__hero--theme-pl .lmp__heroTintC` (`LiveMatchPage.css`, gardé
+  identique) — même position dans le dégradé (plateau 0-68%), même pont `#b565c4` (86%) et même
+  blanc (100%) aux bords, seule la teinte dominante change. Réutilisation d'une couleur déjà
+  établie plutôt qu'une invention : `#8a1d92` est l'ancien `tint` de Premier League (violet de
+  marque plus vif que `#37003c`, qui était son `tint2`), documenté dans ce même fichier avant le
+  passage en mode peinture du 12/09. Fond de repli `#root .lmp__hero--theme-pl` et
+  `TINT_THEME_CAMP_COLORS.pl` (`competitions.js`) mis à jour en cohérence (`#37003c` → `#8a1d92`).
+  357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés
+  (CSS + `competitions.js`, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

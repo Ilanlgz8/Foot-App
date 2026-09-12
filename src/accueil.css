@@ -1910,10 +1910,16 @@
    "violet clair intermédiaire") avant le blanc, pour éviter de réintroduire
    la même coupure nette qu'avant — juste appliqué en anneau vers l'extérieur
    plutôt qu'en diagonale. */
+/* ⚠️ ÉCLAIRCI (13/09, demande explicite : "pour la premiere leagu le violet
+   un peu moins foncé stp") — `#37003c` (violet très sombre, quasi noir)
+   remplacé par `#8a1d92`, un violet de marque plus vif déjà établi et
+   documenté dans ce même fichier (c'était l'ancien `tint` de PL avant le
+   passage en mode peinture du 12/09, associé à `#37003c` comme `tint2`) —
+   réutilisation d'une teinte déjà connue plutôt qu'une nouvelle invention. */
 .poster--theme-pl .poster__bg--gradient {
   inset: 0;
   background: radial-gradient(145% 145% at 50% 50%,
-    #37003c 0%, #37003c 68%,
+    #8a1d92 0%, #8a1d92 68%,
     #b565c4 86%,
     #ffffff 100%);
   animation: none;
