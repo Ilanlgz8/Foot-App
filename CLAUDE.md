@@ -772,6 +772,19 @@ cf-worker/
   ressemble encore trop à un rond après vérification visuelle. 357 tests + lint + build vérifiés
   inchangés (changement CSS + commentaire uniquement).
 
+- ✅ Blanc réduit en petites touches sur Premier League ET Ligue 1, même jour (12/09, retour
+  utilisateur : "enlève le blanc en fait pour la premiere league ca va pas ou met des toute
+  petite touche de blanc mais petit pareil pour la ligue 1") — le découpage en 2 ellipses par
+  tache (tentative précédente, pour casser l'effet "point") n'a pas suffi. Choix fait : garder du
+  blanc mais en réduisant fortement la taille plutôt que continuer à retoucher la forme. PL
+  (`.poster--theme-pl` + `.lmp__hero--theme-pl`) : retour à 1 seule ellipse par emplacement (plus
+  simple que le découpage précédent), taille ~14-16%/22-24% (contre 34-42% avant), fondu resserré
+  à 36-38%. Ligue 1 (`.poster--theme-fl1` + `.lmp__hero--theme-fl1`) : même traitement sur ses 2
+  taches blanches existantes (38%/62% et 38%/60%, la même taille que les taches de couleur
+  principales jusqu'ici) → réduites à ~15-16%/23-24%, mêmes positions inchangées. `accueil.css`
+  et `LiveMatchPage.css` gardés identiques comme toujours pour les 2 compétitions. 357 tests +
+  lint + build vérifiés inchangés (changement CSS + commentaires uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

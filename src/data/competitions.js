@@ -309,6 +309,12 @@ export const COMPETITIONS = [
     // sur l'ordre). Vérifié en direct (`className` du hero contenait bien
     // `lmp__hero--tinted` en trop). `tint` supprimé, `tintLight` conservé
     // (toujours utile pour le texte blanc, indépendant de ce bug).
+    // ⚠️ TACHES BLANCHES RÉDUITES LE MÊME JOUR (demande utilisateur suite au
+    // retour sur Premier League : "petit pareil pour la ligue 1") — les 2
+    // taches blanches de `.poster--theme-fl1` (38%/62% et 38%/60%, la même
+    // taille que les taches de couleur principales) rétrécies à ~15-16%/23-
+    // 24% pour rester de VRAIES petites touches plutôt qu'une zone étendue,
+    // mêmes positions (20% 80%, 45% 12%).
     tintTheme: 'fl1',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
@@ -387,6 +393,16 @@ export const COMPETITIONS = [
     // seul — ceci est une approximation par superposition d'ellipses, pas une
     // vraie forme "sans sens" comme une tache de peinture réelle ; à ajuster
     // si le rendu ressemble encore trop à un rond.
+    // ⚠️ BLANC SIMPLIFIÉ ET RÉDUIT LE MÊME JOUR (retour utilisateur : "enlève
+    // le blanc en fait pour la premiere league ca va pas ou met des toute
+    // petite touche de blanc mais petit") — le découpage en 2 ellipses par
+    // tache (point ci-dessus) n'a pas suffi à corriger le ressenti. Choix
+    // fait : garder du blanc mais en VRAIES petites touches plutôt que
+    // continuer à retravailler la forme — retour à 1 seule ellipse par
+    // emplacement (plus simple), taille réduite à ~14-16%/22-24% (contre
+    // 34-42% avant), fondu resserré (36-38% au lieu de 42-48%). Même
+    // principe de réduction appliqué à la Ligue 1 juste en dessous, sur
+    // demande explicite ("petit pareil pour la ligue 1").
     tintTheme: 'pl',
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier
