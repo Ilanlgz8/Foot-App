@@ -372,6 +372,21 @@ export const COMPETITIONS = [
     // en `#b330c0` (déjà présent ailleurs dans ce même dégradé) pour ne pas
     // laisser de rose isolé. Revient donc de facto à la palette "violet +
     // blanc" qui était l'option "Recommandé" proposée à l'origine.
+    // ⚠️ FORME DES TACHES BLANCHES RETRAVAILLÉE LE MÊME JOUR (retour
+    // utilisateur juste après : "ça fait un point blanc [...] tu peux pas
+    // faire pluto des chose diformes [...] sans forme apparente") — un seul
+    // `radial-gradient` produit toujours un rond/une ellipse bien définie, ce
+    // qui se lit comme un point net une fois sur l'écran. Chacune des 2
+    // taches blanches a été éclatée en 2 petites ellipses de tailles et
+    // ratios différents, centrées à quelques % d'écart l'une de l'autre
+    // (53%/51% + 61%/61% pour l'ex-tache centrale, 89%/43% + 95%/51% pour
+    // l'ex-tache droite) — une fois combinées et floutées (`blur(22px)`),
+    // elles fusionnent en une seule tache asymétrique sans contour circulaire
+    // net, plutôt qu'un point propre. Honnêteté : CSS ne permet pas de
+    // dessiner une forme réellement libre/organique avec `radial-gradient`
+    // seul — ceci est une approximation par superposition d'ellipses, pas une
+    // vraie forme "sans sens" comme une tache de peinture réelle ; à ajuster
+    // si le rendu ressemble encore trop à un rond.
     tintTheme: 'pl',
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier

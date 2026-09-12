@@ -759,6 +759,19 @@ cf-worker/
   (`#8a1d92`/`#37003c`) est inchangé. 357 tests + lint + build vérifiés inchangés (changement CSS +
   commentaires uniquement, aucune logique touchée).
 
+- ✅ Forme des taches blanches PL retravaillée, même jour (12/09, retour utilisateur juste après :
+  "ça fait un point blanc [...] tu peux pas faire pluto des chose diformes [...] sans forme
+  apparente") : un seul `radial-gradient` produit toujours un rond/une ellipse bien définie, d'où
+  l'effet "point" plutôt qu'une tache de peinture. Dans `.poster--theme-pl` (`accueil.css`) et
+  `.lmp__hero--theme-pl` (`LiveMatchPage.css`, gardé identique) : chacune des 2 taches blanches
+  éclatée en 2 petites ellipses de tailles/ratios différents, centres décalés de quelques % l'un
+  de l'autre — une fois combinées et floutées (`blur(22px)` déjà en place), elles fusionnent en
+  une forme asymétrique sans contour circulaire net. Honnêteté : `radial-gradient` seul ne permet
+  pas de dessiner une forme réellement libre/organique — approximation par superposition
+  d'ellipses, pas une vraie tache "sans forme" comme de la vraie peinture ; à ajuster si le rendu
+  ressemble encore trop à un rond après vérification visuelle. 357 tests + lint + build vérifiés
+  inchangés (changement CSS + commentaire uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
