@@ -1144,6 +1144,59 @@ cf-worker/
   confirmer séparément plutôt que supposé. 357 tests + lint (33 erreurs pré-existantes,
   Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
 
+- ✅ Refonte complète de LaLiga/Ligue 1/Premier League/Bundesliga, abandon du "mode peinture"
+  pour ces 4 compétitions (13/09, demande explicite et sans ambiguïté : "on va reprendre de zéro
+  [...] pour la liga tu met jaune rouge en dégradé proprement et couleur bien vive bien présente
+  pareil pour la ligue 1 que du bleu avec une légère touche de blanc qui vient apporter un effet
+  brillant et premiere league violet clair et blanc pareil et la bundesliga rouge avec du blanc
+  en dégradé avec plus de rouge que de blanc") — après plusieurs allers-retours ratés sur le
+  "mode peinture" (taches radiales floutées : flou jugé désagréable, points blancs "une horreur",
+  noir donnant un aspect trouble sur LaLiga, voir les 3 points juste au-dessus), demande de
+  repartir sur un principe entièrement différent : un DÉGRADÉ LINÉAIRE propre à 2 couleurs par
+  compétition plutôt qu'un empilement de taches radiales. Remplacé entièrement (`accueil.css` ET
+  `LiveMatchPage.css`, mêmes 2 fichiers gardés identiques comme toujours) :
+  - LaLiga (`.poster--theme-pd`) : `linear-gradient(135deg, #e0b040 0-32%, #b3242b 52-100%)` —
+    or et rouge de marque, chacun en PALIER (zone à 100% de la couleur, pas juste un point de
+    départ) avant une transition courte (32-52%) plutôt qu'un dégradé étalé sur toute la carte —
+    c'est ce qui rend les 2 couleurs "bien vives, bien présentes" plutôt que diluées.
+  - Ligue 1 (`.poster--theme-fl1`) : `linear-gradient(135deg, #4d94ff 0%, #085dfe 45%, #04225c
+    100%)` — bleu SEUL (3 nuances de la même couleur pour le relief, aucune 2e couleur de marque)
+    + un calque séparé, discret, `radial-gradient(rgba(255,255,255,0.24)...)` posé en HAUT à
+    gauche pour la "légère touche de blanc qui apporte un effet brillant" demandée — un reflet
+    léger, pas une zone blanche pleine comme avant.
+  - Premier League (`.poster--theme-pl`) : `linear-gradient(135deg, #ffffff 0-18%, #b565c4 42%,
+    #8a1d92 68-100%)` — blanc en palier au coin (donnant le "clair" demandé) qui bascule vers un
+    violet clair intermédiaire (`#b565c4`, nouvelle nuance, pas dans la palette validée jusqu'ici
+    — choisie pour la transition, pas mesurée sur un logo officiel) puis le violet de marque
+    `#8a1d92` en palier. Honnêteté : "violet clair" a été interprété comme la présence de blanc +
+    une nuance de violet plus claire que le violet de marque sombre déjà utilisé, pas un violet
+    de marque alternatif vérifié.
+  - Bundesliga (`.poster--theme-bl1`) : `linear-gradient(135deg, #8a0410 0%, #e30613 38-76%,
+    #ffffff 100%)` — rouge (sombre puis vif) en palier sur 76% du dégradé, blanc seulement sur
+    les derniers 24% ("plus de rouge que de blanc" demandé). Point d'honnêteté important, déjà
+    documenté une fois dans ce fichier (voir plus haut, "rosé délavé") : un dégradé LINÉAIRE
+    continu rouge→blanc traverse nécessairement une zone rose/saumon dans sa transition — c'est
+    justement le mécanisme qui avait donné un résultat jugé raté sur cette même compétition il y
+    a plusieurs semaines. Le risque n'est PAS éliminé ici (contrairement aux taches radiales
+    discrètes qui l'avaient contourné), seulement réduit en resserrant la transition à une plage
+    courte (38-76% pleinement rouge, transition uniquement sur les 24% final) plutôt qu'un dégradé
+    continu sur 100% de la carte — la zone rose existe toujours mais occupe une portion plus
+    réduite et plus proche du bord. Demande explicite de l'utilisateur malgré cet historique connu
+    (le risque lui avait été signalé dans une réponse précédente) — à vérifier à l'usage, pas de
+    garantie que ce soit suffisant.
+  `filter: saturate(...)` retiré des 4 (n'avait plus de sens sur un dégradé linéaire aux couleurs
+  déjà pleines, contrairement aux taches radiales qui en avaient besoin après le flou). `inset:
+  -20px` (marge anti-bord-sombre du flou) repassé à `inset: 0` pour les 4 (plus besoin sans flou,
+  et un dégradé à 135deg calé sur la vraie boîte de l'élément est plus prévisible qu'un dégradé
+  calé sur une boîte élargie de 20px). Fond de repli `#root .lmp__hero--theme-pd/-bl1/-fl1/-pl`
+  (utilisé si le calque `.lmp__heroTintC` ne couvre pas 100% de la zone, filet de sécurité déjà en
+  place) mis à jour vers une couleur de la nouvelle palette de chaque thème (au lieu de l'ancien
+  quasi-noir `#141414`/`#050b22`/`#1a0016`, qui aurait juré avec le nouveau rendu). `TINT_THEME_
+  CAMP_COLORS` (carte "Match du jour") non touché : toutes les couleurs de marque utilisées restent
+  les mêmes hex, seule leur composition change. UEL/UECL/SA/NL/WC/CAN/UCL non touchés (pas
+  mentionnés dans la demande, gardent leur mode peinture à taches radiales). 357 tests + lint
+  (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
