@@ -395,17 +395,17 @@ export const COMPETITIONS = [
     // à 26% (au lieu des 48% par défaut), le rouge est un peu plus clair et
     // occupe une large plage centrale, et le jaune démarre à 88% pour rester
     // une pointe sans devenir dominant.
-    tint: '#140f11',
-    tint2: '#b3242b',
-    tint3: '#e0b040',
-    tintSoft: true,
-    tintStops: { base: '26%', c2: '60%', c3: '88%' },
-    // Chrono ("Terminé", minute) en blanc argenté plutôt qu'en rouge — le
-    // rouge se confondrait avec le rouge du fond. Voir LiveMatchPage.css.
-    tintSilverText: true,
-    // Pas de `tintLight` ici : le fond est redevenu sombre, la minute reprend
-    // donc le rouge standard de l'app (le blanc n'était nécessaire que sur
-    // les fonds clairs/rosés des versions précédentes).
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (12/09, demande explicite : "tu pourrais
+    // faire pareil [que Europa League/Conference League] pour les cards de
+    // LaLiga et Bundesliga ?") — remplace la recette dégradé-3-zones ci-dessus
+    // (tint/tint2/tint3/tintSoft/tintStops/tintSilverText, gardée en
+    // commentaire au-dessus pour l'historique des réglages déjà validés) par
+    // le même mécanisme que UEL/UECL/CAN (`tintTheme`, voir `.poster--theme-pd`
+    // dans accueil.css) : taches irrégulières floutées, noir dominant (5
+    // taches, gabarit identique à UEL/UECL) + rouge/or en accent — reprend
+    // EXACTEMENT les couleurs déjà validées ci-dessus (#b3242b rouge, #e0b040
+    // or), juste appliquées en taches plutôt qu'en dégradé linéaire à zones.
+    tintTheme: 'pd',
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
@@ -450,15 +450,17 @@ export const COMPETITIONS = [
     // blanc démarre à 76% au lieu de 82% et occupe donc tout le dernier quart.
     // L'atténuation venait aussi du voile noir du poster, corrigé séparément
     // (voir .poster--softTint .poster__overlay dans accueil.css).
-    tint: '#131217',
-    tint2: '#e30613',
-    tint3: '#ffffff',
-    tintSoft: true,
-    tintStops: { base: '20%', c2: '48%', c3: '76%' },
-    // Voir LaLiga : chrono en blanc argenté, même raison (fond noir + rouge).
-    tintSilverText: true,
-    // Pas de `tintLight` : fond redevenu sombre, la minute reprend le rouge
-    // standard de l'app (même raison que LaLiga ci-dessus).
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (12/09, même demande que LaLiga — voir son
+    // commentaire juste au-dessus) : `tintTheme: 'bl1'`, voir
+    // `.poster--theme-bl1` dans accueil.css. Reprend le rouge de marque déjà
+    // validé (#e30613) en plusieurs nuances, sur fond noir dominant (même
+    // gabarit de 5 taches noires que UEL/UECL/PD). Honnêteté : le "un peu de
+    // blanc" demandé le 05/09 pour la recette précédente n'a PAS été repris
+    // ici — un blob blanc flouté en mode peinture reproduirait l'échec déjà
+    // rencontré sur cette même compétition ("rosé délavé, le blanc se
+    // diluant dans le rouge", voir l'historique juste au-dessus) — écarté
+    // par prudence plutôt que retesté à l'identique.
+    tintTheme: 'bl1',
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,
@@ -785,6 +787,11 @@ const TINT_THEME_CAMP_COLORS = {
   uel:  ['#c8551a', '#000000'],
   uecl: ['#2f8a3e', '#000000'],
   can:  ['#d8b400', '#00903c'],
+  // Ajoutés le 12/09 avec le passage de LaLiga/Bundesliga en mode peinture
+  // (voir leurs entrées ci-dessus) — mêmes couleurs que les taches dominantes
+  // de chaque thème.
+  pd:   ['#b3242b', '#e0b040'],
+  bl1:  ['#e30613', '#000000'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

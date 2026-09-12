@@ -1304,6 +1304,68 @@
     #141414;
 }
 
+/* ⚠️ HABILLAGE LALIGA / BUNDESLIGA (12/09) — mirroir exact de
+   `.poster--theme-pd`/`.poster--theme-bl1` (accueil.css, voir son
+   commentaire détaillé pour l'historique complet et pourquoi le blanc a été
+   écarté pour Bundesliga). */
+#root .lmp__hero--theme-pd {
+  background: #141414;
+}
+.lmp__hero--theme-pd .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-pd .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(20px) saturate(1.3);
+  background:
+    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
+    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
+    radial-gradient(42% 34% at 60% 30%, #b3242b 0%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #e0b040 0%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #7a1a1f 0%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #b3242b 0%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #f0c766 0%, transparent 56%),
+    radial-gradient(22% 34% at 90% 32%, #c22d34 0%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #c9932e 0%, transparent 55%),
+    #141414;
+}
+
+#root .lmp__hero--theme-bl1 {
+  background: #141414;
+}
+.lmp__hero--theme-bl1 .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-bl1 .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(20px) saturate(1.3);
+  background:
+    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
+    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
+    radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #f0374f 0%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #8a0410 0%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #e30613 0%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #c41230 0%, transparent 56%),
+    radial-gradient(22% 34% at 90% 32%, #5c0209 0%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
+    #141414;
+}
+
 /* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`
    (accueil.css, voir son commentaire détaillé). */
 #root .lmp__hero--theme-can {

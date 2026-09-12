@@ -630,6 +630,24 @@ cf-worker/
   PRÉCIS du symptôme (pas juste "ça se décolle") pointe vers un mécanisme documenté et spécifique,
   plutôt qu'une hypothèse générique parmi plusieurs possibles ; à confirmer par l'utilisateur.
 
+- ✅ LaLiga et Bundesliga passées en "mode peinture" comme UEL/UECL (demande explicite, 12/09 :
+  "tu pourrais faire pareil pour les cards de bundesliga et laliga aussi ?") : `tint`/`tint2`/
+  `tint3`/`tintSoft`/`tintStops`/`tintSilverText` (dégradé linéaire à zones, plusieurs fois affiné
+  par le passé — historique gardé en commentaire) remplacés par `tintTheme: 'pd'`/`'bl1'` dans
+  `src/data/competitions.js`, avec les blocs CSS dédiés `.poster--theme-pd`/`-bl1` (`accueil.css`)
+  et `.lmp__hero--theme-pd`/`-bl1` (`LiveMatchPage.css`), sur le modèle exact de `.poster--theme-
+  uel`/`-uecl` (5 taches noires au même gabarit + taches de couleur floutées). Couleurs reprises
+  TELLES QUELLES de l'ancienne recette, pas inventées : LaLiga rouge `#b3242b` + or `#e0b040`,
+  Bundesliga rouge de marque `#e30613`. `TINT_THEME_CAMP_COLORS` (carte "Match du jour") mis à
+  jour avec ces 2 nouvelles entrées. Honnêteté / écart assumé : le "un peu de blanc" demandé le
+  05/09 pour Bundesliga n'a PAS été repris dans cette version peinture — un ancien essai de blob
+  blanc flouté sur cette même compétition avait donné un rendu "rosé délavé" (le blanc se diluant
+  dans le rouge, voir l'historique dans `competitions.js`) ; par prudence, gardé noir+rouge
+  uniquement plutôt que retester à l'identique un échec déjà documenté. 357 tests + lint + build
+  vérifiés (fonctionnement automatique : ces champs ne sont lus qu'en présence, leur suppression
+  désactive proprement l'ancienne recette sans toucher au JS, même mécanisme que UCL/UEL/UECL/WC/
+  NL/CAN déjà en mode peinture).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
