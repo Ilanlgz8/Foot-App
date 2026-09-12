@@ -454,12 +454,17 @@ export const COMPETITIONS = [
     // commentaire juste au-dessus) : `tintTheme: 'bl1'`, voir
     // `.poster--theme-bl1` dans accueil.css. Reprend le rouge de marque déjà
     // validé (#e30613) en plusieurs nuances, sur fond noir dominant (même
-    // gabarit de 5 taches noires que UEL/UECL/PD). Honnêteté : le "un peu de
-    // blanc" demandé le 05/09 pour la recette précédente n'a PAS été repris
-    // ici — un blob blanc flouté en mode peinture reproduirait l'échec déjà
-    // rencontré sur cette même compétition ("rosé délavé, le blanc se
-    // diluant dans le rouge", voir l'historique juste au-dessus) — écarté
-    // par prudence plutôt que retesté à l'identique.
+    // gabarit de 5 taches noires que UEL/UECL/PD). Le "un peu de blanc" du
+    // 05/09 avait d'abord été volontairement écarté ici par prudence (l'ancien
+    // essai en dégradé linéaire avait donné un "rosé délavé", voir l'historique
+    // juste au-dessus) — puis rajouté quand même le même jour suite à une
+    // demande explicite ("rajoute un peu de blanc") : une des taches rouges
+    // sombres est remplacée par une tache blanche petite et resserrée dans
+    // `.poster--theme-bl1`. Honnêteté : le mécanisme est différent de l'ancien
+    // dégradé linéaire (taches radiales discrètes floutées vs. fondu continu),
+    // donc le risque de "rosé délavé" ne s'applique pas forcément à l'identique
+    // — mais ce n'est pas non plus garanti à 100%, jamais testé sous cette
+    // forme précise avant ce changement.
     tintTheme: 'bl1',
     name: 'Bundesliga',
     shortName: 'Bundesliga',

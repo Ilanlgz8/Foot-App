@@ -2035,11 +2035,22 @@
 
 /* ⚠️ HABILLAGE BUNDESLIGA (12/09, même demande que LaLiga ci-dessus) — même
    recette, rouge de marque déjà validé (`#e30613`, voir competitions.js) en
-   plusieurs nuances sur fond noir dominant. Honnêteté : le "un peu de blanc"
-   de l'ancienne recette n'a pas été repris ici — un blob blanc flouté en
-   mode peinture reproduirait l'échec déjà rencontré sur cette compétition
-   ("rosé délavé", voir l'historique dans competitions.js) — écarté par
-   prudence. */
+   plusieurs nuances sur fond noir dominant. Un peu de blanc rajouté juste
+   après (12/09, demande explicite : "juste pour la bundesliga rajoute un peu
+   de blanc") : la tache la plus sombre/la moins utile visuellement
+   (`#5c0209`, 90% 32%) est remplacée par une tache BLANCHE, mais volontairement
+   petite et resserrée (stop transparent à 42% au lieu de 52%, blanc qui
+   s'estompe donc plus vite) pour rester un "peu" de blanc et non une masse.
+   Honnêteté / différence avec l'échec déjà documenté (`competitions.js`,
+   "rosé délavé") : cet échec concernait l'ANCIENNE recette en dégradé
+   LINÉAIRE continu, où le blanc se mélangeait progressivement au rouge sur
+   toute une zone → un rosé délavé. Ici la structure est différente : des
+   taches radiales DISCRÈTES et floutées (`blur(20px)`), chacune avec son
+   propre point de fondu vers transparent — un mécanisme déjà éprouvé sans
+   problème sur NL/WC (blanc + autres couleurs, jamais associé au rouge côte
+   à côte comme avant). Pas de garantie à 100% que le rendu plaira davantage
+   qu'avant (jamais testé sous cette forme précise), mais la demande explicite
+   de l'utilisateur prime sur la prudence initiale. */
 .poster--theme-bl1 .poster__bg--gradient {
   inset: -20px;
   background:
@@ -2053,7 +2064,7 @@
     radial-gradient(30% 32% at 76% 72%, #8a0410 0%, transparent 58%),
     radial-gradient(26% 40% at 50% 14%, #e30613 0%, transparent 55%),
     radial-gradient(34% 28% at 14% 82%, #c41230 0%, transparent 56%),
-    radial-gradient(22% 34% at 90% 32%, #5c0209 0%, transparent 52%),
+    radial-gradient(22% 34% at 90% 32%, #ffffff 0%, transparent 42%),
     radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
     #141414;
   filter: blur(20px) saturate(1.3);

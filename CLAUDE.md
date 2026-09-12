@@ -663,6 +663,21 @@ cf-worker/
   vérifiés, vérifié aussi en direct sur la prod (navigateur intégré, cartes LaLiga/Bundesliga du
   point précédent confirmées visuellement identiques au rendu attendu).
 
+- ✅ Un peu de blanc rajouté au mode peinture Bundesliga (12/09, demande explicite juste après le
+  point précédent : "juste pour la bundesliga rajoute un peu de blanc") — reversal assumé d'un
+  choix de prudence que j'avais moi-même proposé de reconsidérer. La tache rouge la plus sombre
+  et la moins visible du gabarit (`#5c0209`, 90% 32%) est remplacée par une tache BLANCHE dans
+  `.poster--theme-bl1` (`accueil.css` + `.lmp__hero--theme-bl1` dans `LiveMatchPage.css`, gardés
+  identiques comme toujours), volontairement petite et resserrée (fondu vers transparent à 42%
+  au lieu de 52%) pour rester un "peu" de blanc, pas une masse. Honnêteté : l'échec documenté
+  "rosé délavé" (voir l'historique du 05/09 dans `competitions.js`) concernait l'ANCIENNE recette
+  en dégradé LINÉAIRE continu, où le blanc se mélange progressivement au rouge sur toute une
+  zone — ici la structure est des taches radiales DISCRÈTES et floutées, chacune avec son propre
+  point de fondu, un mécanisme déjà éprouvé sans souci sur NL/WC (mais jamais testé aux côtés du
+  rouge avant ce changement précis) — pas de garantie à 100% que le rendu final plaira davantage,
+  mais la demande explicite de l'utilisateur prime sur la prudence initiale. 357 tests + lint +
+  build vérifiés inchangés (changement CSS + commentaire uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
