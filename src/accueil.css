@@ -1843,7 +1843,6 @@
     radial-gradient(40% 65% at 30% 75%, #d8000c 0%, transparent 60%),
     radial-gradient(42% 68% at 55% 20%, #009c48 0%, transparent 60%),
     radial-gradient(38% 62% at 75% 65%, #fcc000 0%, transparent 60%),
-    radial-gradient(35% 60% at 40% 45%, #ffffff 0%, transparent 55%),
     radial-gradient(40% 65% at 90% 30%, #0c3c90 0%, transparent 60%),
     radial-gradient(38% 60% at 60% 90%, #d8000c 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #009c48 0%, transparent 60%),
@@ -1882,10 +1881,8 @@
     radial-gradient(45% 70% at 12% 25%, #085dfe 0%, transparent 60%),
     radial-gradient(40% 65% at 85% 15%, #04225c 0%, transparent 60%),
     radial-gradient(42% 68% at 55% 55%, #4d94ff 0%, transparent 58%),
-    radial-gradient(16% 24% at 20% 80%, #ffffff 0%, transparent 36%),
     radial-gradient(35% 60% at 75% 75%, #085dfe 0%, transparent 60%),
     radial-gradient(40% 65% at 90% 45%, #0a1f5c 0%, transparent 58%),
-    radial-gradient(15% 23% at 45% 12%, #ffffff 0%, transparent 36%),
     radial-gradient(35% 55% at 60% 92%, #4d94ff 0%, transparent 58%),
     #050b22;
   filter: saturate(1.35);
@@ -1913,10 +1910,8 @@
   background:
     radial-gradient(45% 70% at 12% 25%, #8a1d92 0%, transparent 60%),
     radial-gradient(40% 65% at 85% 15%, #37003c 0%, transparent 60%),
-    radial-gradient(16% 24% at 55% 54%, #ffffff 0%, transparent 38%),
     radial-gradient(38% 62% at 20% 80%, #b330c0 0%, transparent 58%),
     radial-gradient(35% 60% at 75% 75%, #8a1d92 0%, transparent 60%),
-    radial-gradient(14% 22% at 90% 44%, #ffffff 0%, transparent 36%),
     radial-gradient(38% 60% at 45% 12%, #37003c 0%, transparent 58%),
     radial-gradient(35% 55% at 60% 92%, #b330c0 0%, transparent 58%),
     #1a0016;
@@ -2150,11 +2145,6 @@
     radial-gradient(26% 38% at 92% 58%, #c41230 0%, transparent 56%),
     radial-gradient(30% 24% at 42% 92%, #e30613 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
-    radial-gradient(16% 22% at 30% 55%, rgba(255,255,255,0.55) 0%, transparent 55%),
-    radial-gradient(14% 20% at 76% 72%, rgba(255,255,255,0.5) 0%, transparent 54%),
-    radial-gradient(15% 22% at 50% 14%, rgba(255,255,255,0.5) 0%, transparent 55%),
-    radial-gradient(16% 20% at 14% 82%, rgba(255,255,255,0.5) 0%, transparent 54%),
-    radial-gradient(14% 20% at 90% 32%, rgba(255,255,255,0.5) 0%, transparent 55%),
     radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
     #141414;
   filter: saturate(1.3);
@@ -2180,7 +2170,6 @@
   background:
     radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
     radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
-    radial-gradient(42% 68% at 55% 20%, #ffffff 0%, transparent 55%),
     radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
     radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
     radial-gradient(40% 65% at 90% 30%, #073b4c 0%, transparent 60%),

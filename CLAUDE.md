@@ -1092,6 +1092,34 @@ cf-worker/
   un vrai appareil avant ce déploiement (juste la lecture du CSS résultant) — à confirmer par
   l'utilisateur que le rendu "net" lui plaît davantage que l'ancien flou, pas juste différent.
 
+- ✅ Points blancs retirés des cards "mode peinture" NL/FL1/PL/BL1/SA (constat utilisateur, 12/09,
+  juste après le retrait du flou ci-dessus : "y'a toujours le flou mais bon et enlève moi tout
+  ces points blancs la c une horreur"). Sur le flou résiduel : honnêteté d'abord, le retrait du
+  `filter: blur()` (point précédent) enlève le flou ajouté PAR-DESSUS le calque, mais chaque
+  `radial-gradient` a lui-même un fondu progressif intégré vers `transparent` (`0% couleur → 55-
+  60% transparent`) — cette dégradation propre au gradient donne encore un aspect doux/vaporeux
+  aux bords, distinct du `blur()` déjà retiré. Pas retouché ici (l'utilisateur a dit "mais bon",
+  pas demandé de correction) — si le rendu doit vraiment devenir dur/net, il faudrait resserrer
+  ces stops (ex. ajouter un palier de couleur pleine avant le fondu) en plus, à faire si demandé.
+  Sur les points blancs (la demande ferme cette fois) : retiré tous les `radial-gradient` blancs
+  (`#ffffff` / `rgba(255,255,255,...)`) des 5 thèmes qui en avaient — NL (1), FL1 (2), PL (2),
+  BL1 (5), SA (1) — dans `accueil.css` ET `LiveMatchPage.css` (mêmes lignes, mêmes thèmes, les 2
+  fichiers gardés identiques comme toujours). WC/UEL/UECL/PD/CAN n'en avaient aucun (inchangés).
+  Le mécanisme de "voile nacré" séparé de la Ligue des Champions (`.poster--theme-ucl
+  .poster__bg--gradientTri`, halos blancs très larges et peu opaques en `mix-blend-mode: screen`,
+  PAS des points, un ancien mécanisme différent de la recette mode-peinture) volontairement laissé
+  intact — jamais mentionné dans les retours de l'utilisateur sur ce sujet, mécanisme visuel
+  différent (sheen ambiant vs points solides), pas touché pour ne rien casser sans demande.
+  Bilan par thème après retrait : NL et SA restent multicolores (bleu/rouge/vert/or pour NL,
+  bleu/vert/teal pour SA) — aucun risque de rendu fade. FL1 et PL passent à 6 taches de couleur
+  chacun (plus de blanc du tout, conforme à la demande). Point d'honnêteté à surveiller : BL1
+  n'avait plus que du rouge en dehors de ses 5 taches blanches (voir historique du jour) — les
+  retirer laisse Bundesliga avec 7 taches, toutes rouges (une seule couleur), le même symptôme
+  "y'a qu'une couleur c'est fade" qui avait initialement motivé le passage en mode peinture de
+  Ligue 1/Premier League — pas corrigé ici puisque non demandé, mais probable prochain retour si
+  le rendu Bundesliga semble monochrome à l'usage. 357 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
