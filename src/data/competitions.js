@@ -254,7 +254,6 @@ export const COMPETITIONS = [
     // recette a changé depuis (zones distinctes + voile nacré), la couleur de
     // marque tient maintenant très bien : vérifié en rendu réel, elle reste
     // franchement bleue et distincte du turquoise de la Serie A.
-    tint: '#085dfe',
     // ⚠️ AJOUT (05/09, demande utilisateur : "fond bleu clair comme Serie A ou
     // Ligue 1, la minute doit être en blanc pas en rouge"). Le rouge de la
     // minute (voir .lmp__heroMinute, LiveMatchPage.css) se lit mal sur un
@@ -296,6 +295,20 @@ export const COMPETITIONS = [
     // marque exact repris tel quel (`#085dfe`, déjà validé ci-dessus) +
     // une nuance marine plus sombre + une nuance plus claire pour le relief,
     // + du blanc (déjà présent dans le logo).
+    // ⚠️ BUG CORRIGÉ LE MÊME JOUR (constat utilisateur : "pourquoi c pas la
+    // même couleur dans livematchpage et matchpage [...] plus foncé") : le
+    // champ `tint: '#085dfe'` ci-dessus avait été OUBLIÉ lors du passage en
+    // mode peinture (contrairement à PD/BL1/SA où il avait bien été retiré) —
+    // `comp?.tint` restant truthy, `MatchPage.jsx`/`LiveMatchPage.jsx`
+    // ajoutaient encore la classe `lmp__hero--tinted`, dont la règle CSS
+    // `.lmp__hero--tinted.lmp__hero--lightTint .lmp__heroTintC` (3 classes)
+    // est plus spécifique que `.lmp__hero--theme-fl1 .lmp__heroTintC` (2
+    // classes) — elle reprenait donc la main et affichait l'ancien voile
+    // nacré blanc générique à la place du bleu/blanc voulu, PEU IMPORTE
+    // l'ordre des règles dans le fichier CSS (la spécificité prime toujours
+    // sur l'ordre). Vérifié en direct (`className` du hero contenait bien
+    // `lmp__hero--tinted` en trop). `tint` supprimé, `tintLight` conservé
+    // (toujours utile pour le texte blanc, indépendant de ce bug).
     tintTheme: 'fl1',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
@@ -314,7 +327,6 @@ export const COMPETITIONS = [
     // Le violet vient donc de l'identité de marque, dont la référence
     // officielle (#37003C) est très sombre — d'où les valeurs successivement
     // éclaircies : #39003d brut, puis #680c6e, puis celle-ci.
-    tint: '#8a1d92',
     // Même reprise de texture que Ligue 1 (voir son commentaire) : violet de
     // marque en base, violet plus vif au centre.
     // ⚠️ VERT RETIRÉ (06/09, demande : "enlève le vert mais garde ce côté blanc
@@ -345,6 +357,13 @@ export const COMPETITIONS = [
     // officielle vérifiée à la source — choisi comme accent cohérent avec le
     // violet, sur le même principe assumé que d'autres accents de ce fichier
     // (ex. le vert Serie A) plutôt que mesuré sur un pixel de logo.
+    // ⚠️ BUG CORRIGÉ LE MÊME JOUR (constat utilisateur : "pourquoi c pas la
+    // même couleur dans livematchpage et matchpage [...] plus foncé") — même
+    // cause exacte que Ligue 1 (voir son commentaire) : le champ
+    // `tint: '#8a1d92'` avait aussi été oublié ici lors du passage en mode
+    // peinture, réactivant `.lmp__hero--tinted` (plus spécifique en CSS que
+    // `.lmp__hero--theme-pl`) sur MatchPage/LiveMatchPage. Supprimé,
+    // `tintLight` conservé.
     tintTheme: 'pl',
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier

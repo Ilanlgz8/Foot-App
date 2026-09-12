@@ -726,6 +726,27 @@ cf-worker/
   (fonctionnement automatique : suppression propre de l'ancienne recette, même mécanisme que les
   autres passages en mode peinture).
 
+- ✅ Bug trouvé et corrigé le même jour (12/09, constat utilisateur : "pourquoi c pas la même
+  couleur dans livematchpage et matchpage et resultatpage la ? j'ai l'impression que c plus
+  foncé" — précisé ensuite : concernait uniquement Ligue 1 et Premier League) : lors du passage en
+  mode peinture ci-dessus, le champ `tint` d'origine (`'#085dfe'` pour FL1, `'#8a1d92'` pour PL)
+  avait été OUBLIÉ dans `competitions.js` — contrairement à PD/BL1/SA où il avait bien été
+  entièrement retiré. `comp?.tint` restant truthy, `MatchPage.jsx`/`LiveMatchPage.jsx` ajoutaient
+  encore la classe `lmp__hero--tinted` en plus de `lmp__hero--theme-fl1`/`-pl` — or la règle CSS
+  de l'ANCIEN mécanisme, `.lmp__hero--tinted.lmp__hero--lightTint .lmp__heroTintC` (3 classes),
+  est plus SPÉCIFIQUE que celle du nouveau mode peinture, `.lmp__hero--theme-fl1 .lmp__heroTintC`
+  (2 classes) — elle reprenait donc la main sur ces 2 pages précises et affichait l'ancien voile
+  nacré blanc générique à la place du bleu/blanc ou violet/magenta voulu, quel que soit l'ordre
+  des règles dans le fichier (la spécificité CSS prime toujours sur l'ordre). Les cartes de
+  l'Accueil/Résultats (`MatchPoster.jsx`) n'étaient PAS touchées par ce bug précis : leur mode
+  peinture vit sur une classe différente (`.poster__bg--gradient`) que celle utilisée par
+  l'ancien mécanisme lightTint (`.poster__bg--gradientTri`), pas de collision de spécificité sur
+  ce layer-là. Vérifié en direct sur la prod (navigateur intégré) : `className` du hero contenait
+  bien `lmp__hero--tinted` en trop sur `/match/espn-FL1-...`, confirmé par lecture du
+  `backgroundImage` calculé (c'était bien le motif nacré générique, pas notre dégradé bleu/blanc).
+  Corrigé : `tint` supprimé pour les 2 compétitions, `tintLight` conservé (toujours utile pour le
+  texte blanc, indépendant de ce bug). 357 tests + lint + build vérifiés inchangés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
