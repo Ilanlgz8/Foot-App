@@ -1866,6 +1866,72 @@
     rgba(var(--black-rgb),0.65) 100%);
 }
 
+/* ⚠️ HABILLAGE LIGUE 1 "MODE PEINTURE" (12/09, constat utilisateur : "y'a que
+   une couleur c fade" — l'ancienne recette `tint`/`tint2`/`tint3` en dégradé
+   linéaire, même retravaillée plusieurs fois, restait un aplat à une seule
+   teinte). Même famille que `.poster--theme-nl` juste au-dessus (grands
+   calques flous, pas de gabarit à taches noires — aucun noir demandé cette
+   fois). Palette choisie avec l'utilisateur : bleu + blanc uniquement, pas de
+   2e couleur de marque à ajouter. Bleu de marque exact repris tel quel
+   (`#085dfe`, déjà validé dans competitions.js) + une nuance marine plus
+   sombre + une nuance plus claire pour le relief, + du blanc (déjà présent
+   dans le logo Ligue 1). */
+.poster--theme-fl1 .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(45% 70% at 12% 25%, #085dfe 0%, transparent 60%),
+    radial-gradient(40% 65% at 85% 15%, #04225c 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 55%, #4d94ff 0%, transparent 58%),
+    radial-gradient(38% 62% at 20% 80%, #ffffff 0%, transparent 42%),
+    radial-gradient(35% 60% at 75% 75%, #085dfe 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 45%, #0a1f5c 0%, transparent 58%),
+    radial-gradient(38% 60% at 45% 12%, #ffffff 0%, transparent 40%),
+    radial-gradient(35% 55% at 60% 92%, #4d94ff 0%, transparent 58%),
+    #050b22;
+  filter: blur(22px) saturate(1.35);
+  animation: none;
+}
+.poster--theme-fl1 .poster__bg--gradientAlt { inset: 0; opacity: 0; }
+.poster--theme-fl1 .poster__bg--gradientTri { inset: 0; opacity: 0; }
+.poster--theme-fl1 .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.60) 100%);
+}
+
+/* ⚠️ HABILLAGE PREMIER LEAGUE "MODE PEINTURE" (12/09, même constat que Ligue
+   1 ci-dessus). Même famille (grands calques flous, pas de noir). Palette
+   choisie avec l'utilisateur : violet + rose/magenta (pas de blanc cette
+   fois, choix explicite). Violet de marque repris tel quel (`#8a1d92`/
+   `#37003c`, déjà validés dans competitions.js). Honnêteté : le rose/magenta
+   (`#d6006d`/`#ff2e9e`) n'est pas une couleur de marque PL vérifiée à la
+   source — accent choisi par cohérence avec le violet, pas mesuré sur un
+   pixel de logo (même principe assumé que le vert Serie A). */
+.poster--theme-pl .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(45% 70% at 12% 25%, #8a1d92 0%, transparent 60%),
+    radial-gradient(40% 65% at 85% 15%, #37003c 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 55%, #d6006d 0%, transparent 58%),
+    radial-gradient(38% 62% at 20% 80%, #b330c0 0%, transparent 58%),
+    radial-gradient(35% 60% at 75% 75%, #8a1d92 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 45%, #ff2e9e 0%, transparent 56%),
+    radial-gradient(38% 60% at 45% 12%, #37003c 0%, transparent 58%),
+    radial-gradient(35% 55% at 60% 92%, #d6006d 0%, transparent 58%),
+    #1a0016;
+  filter: blur(22px) saturate(1.35);
+  animation: none;
+}
+.poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
+.poster--theme-pl .poster__bg--gradientTri { inset: 0; opacity: 0; }
+.poster--theme-pl .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.60) 100%);
+}
+
 /* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même famille que
    `.poster--theme-nl` juste au-dessus (calque dédié flouté), mais composition
    très retravaillée après de nombreux allers-retours utilisateur :

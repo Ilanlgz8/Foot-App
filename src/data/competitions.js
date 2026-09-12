@@ -285,11 +285,18 @@ export const COMPETITIONS = [
     // prononcé"). Le blanc venait de deux sources cumulées : le voile nacré
     // (calque commun) et `tint3` trop clair. Les deux sont redescendus, ce qui
     // laisse le bleu de marque dominer sans supprimer la brillance.
-    tint2: '#2f78ff',
-    tint3: '#5b93ff',
-    tintPearl: 0.5,
-    tintSoft: true,
-    tintStops: { base: '20%', c2: '50%', c3: '84%' },
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (12/09, constat utilisateur : "y'a que une
+    // couleur c fade" — le dégradé linéaire ci-dessus, même retravaillé
+    // plusieurs fois, reste un aplat à une seule teinte). Remplacé par
+    // `tintTheme: 'fl1'`, voir `.poster--theme-fl1` dans accueil.css — même
+    // famille que Ligue des Nations/Coupe du Monde (grands calques flous,
+    // pas de gabarit à taches noires puisqu'aucun noir demandé). Palette
+    // choisie avec l'utilisateur : bleu uniquement (+ blanc), pas de 2e
+    // couleur de marque distincte à ajouter pour ce championnat. Bleu de
+    // marque exact repris tel quel (`#085dfe`, déjà validé ci-dessus) +
+    // une nuance marine plus sombre + une nuance plus claire pour le relief,
+    // + du blanc (déjà présent dans le logo).
+    tintTheme: 'fl1',
     name: "Ligue 1 McDonald's",
     shortName: 'Ligue 1',
     emblem: ligue1Logo,
@@ -327,11 +334,18 @@ export const COMPETITIONS = [
     // Voile nacré et fin de dégradé redescendus pour laisser le violet
     // dominer — même demande et même dosage que Ligue 1 ("faut diminuer le
     // blanc", 06/09).
-    tint2: '#b330c0',
-    tint3: '#c983dc',
-    tintSoft: true,
-    tintStops: { base: '20%', c2: '50%', c3: '84%' },
-    tintPearl: 0.5,
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (12/09, même constat que Ligue 1 ci-dessus :
+    // "y'a que une couleur c fade"). Remplacé par `tintTheme: 'pl'`, voir
+    // `.poster--theme-pl` dans accueil.css — même famille que Ligue des
+    // Nations/Coupe du Monde/Ligue 1 (grands calques flous, pas de gabarit à
+    // taches noires). Palette choisie avec l'utilisateur : violet + rose/
+    // magenta (pas de blanc cette fois, choix explicite). Violet de marque
+    // repris tel quel (`#8a1d92`/`#37003c`, déjà validés ci-dessus). Honnêteté :
+    // le rose/magenta (`#d6006d`/`#ff2e9e`) n'est PAS une couleur de marque PL
+    // officielle vérifiée à la source — choisi comme accent cohérent avec le
+    // violet, sur le même principe assumé que d'autres accents de ce fichier
+    // (ex. le vert Serie A) plutôt que mesuré sur un pixel de logo.
+    tintTheme: 'pl',
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier
     // League ne l'avait pas, son violet étant moins clair qu'un bleu — il est
@@ -811,6 +825,10 @@ const TINT_THEME_CAMP_COLORS = {
   pd:   ['#b3242b', '#e0b040'],
   bl1:  ['#e30613', '#000000'],
   sa:   ['#0d97ab', '#16a34a'],
+  // Ajoutés le 12/09 avec le passage de Ligue 1/Premier League en mode
+  // peinture (constat utilisateur : "y'a que une couleur c fade").
+  fl1:  ['#085dfe', '#04225c'],
+  pl:   ['#8a1d92', '#d6006d'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

@@ -708,6 +708,24 @@ cf-worker/
   coin haut-gauche (15% 15%) reste noire, demandée explicitement à garder à 2 reprises maintenant.
   Bilan final : 1 noire / 6 rouges / 5 blanches. 357 tests + lint + build vérifiés inchangés.
 
+- ✅ Ligue 1 et Premier League passées en "mode peinture", même jour (12/09, constat utilisateur :
+  "pour la ligue 1 et la premiere league [...] y'a que une couleur c fade") — ces 2 compétitions
+  étaient encore sur l'ANCIENNE recette (dégradé linéaire à zones `tint`/`tint2`/`tint3`, plusieurs
+  fois retravaillée par le passé), contrairement à UEL/UECL/LaLiga/Bundesliga/Serie A/UCL/NL/WC/CAN
+  déjà en mode peinture (taches radiales floutées) — d'où l'impression de "fade" en comparaison.
+  Palette choisie avec l'utilisateur via question directe (2 options par compétition) : Ligue 1 en
+  bleu + blanc uniquement (`tintTheme: 'fl1'`), Premier League en violet + rose/magenta
+  (`tintTheme: 'pl'`, l'utilisateur a choisi cette option plutôt que "violet + blanc"). Structure
+  reprise de `.poster--theme-nl`/`-sa` (8 grands calques flous, pas de gabarit à taches noires —
+  aucun noir demandé pour l'une ou l'autre). Couleurs de marque déjà validées reprises telles
+  quelles : bleu Ligue 1 `#085dfe`, violet PL `#8a1d92`/`#37003c`. Honnêteté : le rose/magenta PL
+  (`#d6006d`/`#ff2e9e`) n'est PAS une couleur de marque officielle vérifiée à la source — accent
+  choisi par cohérence avec le violet, même principe assumé que le vert Serie A. `tintLight: true`
+  conservé sur les 2 (texte "Terminé"/minute en blanc, toujours pertinent sur ces fonds saturés).
+  `TINT_THEME_CAMP_COLORS` mis à jour (`fl1`, `pl`). 357 tests + lint + build vérifiés
+  (fonctionnement automatique : suppression propre de l'ancienne recette, même mécanisme que les
+  autres passages en mode peinture).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
