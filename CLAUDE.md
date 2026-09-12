@@ -648,6 +648,21 @@ cf-worker/
   désactive proprement l'ancienne recette sans toucher au JS, même mécanisme que UCL/UEL/UECL/WC/
   NL/CAN déjà en mode peinture).
 
+- ✅ Serie A passée en "mode peinture" avec bleu/vert/blanc (demande explicite, 12/09 : "fait
+  aussi pour la serie a avec un bleu vert et blanc") : `tint`/`tintLight`/`tint2`/`tint3`/
+  `tintSoft`/`tintStops`/`tintPearl` remplacés par `tintTheme: 'sa'` dans `competitions.js`, blocs
+  CSS `.poster--theme-sa` (`accueil.css`) et `.lmp__hero--theme-sa` (`LiveMatchPage.css`). Structure
+  reprise de `.poster--theme-nl` (grands calques flous, base sombre) plutôt que du gabarit UEL/
+  UECL/PD/BL1 (5 taches noires) : aucune demande de noir cette fois, et NL avait déjà prouvé que
+  le blanc se mélange bien en mode peinture tant qu'il n'est pas associé au rouge (contrairement à
+  l'échec documenté sur Bundesliga, rouge+blanc = rosé délavé). Bleus repris de l'ancienne recette
+  Serie A déjà validée (`#0a5f7a`/`#0d97ab`/`#3bb3c7`) ; vert `#16a34a` choisi par cohérence
+  esthétique, honnêteté : aucun vert n'existait dans l'identité Serie A sur ce site avant cette
+  demande, pas un pixel repris d'un logo officiel comme pour d'autres thèmes (UEL/UECL/CAN/WC).
+  `TINT_THEME_CAMP_COLORS` mis à jour (`sa: ['#0d97ab', '#16a34a']`). 357 tests + lint + build
+  vérifiés, vérifié aussi en direct sur la prod (navigateur intégré, cartes LaLiga/Bundesliga du
+  point précédent confirmées visuellement identiques au rendu attendu).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

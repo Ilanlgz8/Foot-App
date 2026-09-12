@@ -1366,6 +1366,34 @@
     #141414;
 }
 
+/* ⚠️ HABILLAGE SERIE A (12/09) — mirroir exact de `.poster--theme-sa`
+   (accueil.css, voir son commentaire détaillé). Structure reprise de
+   `.lmp__hero--theme-nl` (grands calques flous, pas de noir). */
+#root .lmp__hero--theme-sa {
+  background: #071620;
+}
+.lmp__hero--theme-sa .lmp__heroTintB {
+  inset: 0;
+  opacity: 0;
+}
+.lmp__hero--theme-sa .lmp__heroTintC {
+  inset: -20px;
+  opacity: 1;
+  animation: none;
+  mix-blend-mode: normal;
+  filter: blur(22px) saturate(1.4);
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #ffffff 0%, transparent 55%),
+    radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 30%, #073b4c 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
+    #071620;
+}
+
 /* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`
    (accueil.css, voir son commentaire détaillé). */
 #root .lmp__hero--theme-can {

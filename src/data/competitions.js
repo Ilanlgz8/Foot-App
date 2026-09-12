@@ -487,17 +487,21 @@ export const COMPETITIONS = [
     // (différence de TEINTE) ; le turquoise a été retenu parce qu'on ne peut
     // plus confondre les deux d'un coup d'œil. Ça reste fidèle au logo Serie
     // A, dont le bleu dominant (#0084cc) tire déjà vers le cyan.
-    tint: '#0a5f7a',
-    tintLight: true, // voir le commentaire sur FL1 (même raison)
-    // `tint3` volontairement pas trop clair — même raison que Ligue 1 : la
-    // brillance vient du calque nacré, pas de la fin du dégradé.
-    // Voile nacré et fin de dégradé redescendus — même demande et même dosage
-    // que Ligue 1 et Premier League ("faut diminuer le blanc", 06/09).
-    tint2: '#0d97ab',
-    tint3: '#3bb3c7',
-    tintSoft: true,
-    tintStops: { base: '22%', c2: '52%', c3: '82%' },
-    tintPearl: 0.5,
+    // ⚠️ PASSÉ EN "MODE PEINTURE" (12/09, demande explicite : "fait aussi pour
+    // la serie a avec un bleu vert et blanc") — remplace la recette dégradé-3-
+    // zones ci-dessus (tint/tint2/tint3/tintSoft/tintStops/tintPearl, gardée
+    // en commentaire pour l'historique) par le même mécanisme que UEL/UECL/PD/
+    // BL1 (`tintTheme`, voir `.poster--theme-sa` dans accueil.css). Structure
+    // reprise de `.poster--theme-nl` plutôt que UEL/UECL : pas de composante
+    // noire demandée ici (contrairement à UEL/UECL/PD/BL1), et NL a déjà
+    // prouvé que le blanc se mélange bien en mode peinture quand il n'est pas
+    // associé au rouge (voir l'échec documenté sur Bundesliga ci-dessus,
+    // rouge+blanc = rosé délavé — bleu/vert+blanc n'a pas ce problème). Bleus
+    // repris de l'ancienne recette (#0a5f7a/#0d97ab/#3bb3c7, déjà validés,
+    // choisis à l'époque pour se distancier du bleu Ligue 1), vert choisi par
+    // cohérence esthétique (aucun vert n'existait avant dans l'identité Serie
+    // A sur ce site, pas de pixel officiel à reprendre).
+    tintTheme: 'sa',
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
@@ -792,6 +796,7 @@ const TINT_THEME_CAMP_COLORS = {
   // de chaque thème.
   pd:   ['#b3242b', '#e0b040'],
   bl1:  ['#e30613', '#000000'],
+  sa:   ['#0d97ab', '#16a34a'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

@@ -2068,6 +2068,36 @@
     rgba(var(--black-rgb),0.65) 100%);
 }
 
+/* ⚠️ HABILLAGE SERIE A (12/09, demande explicite : "fait aussi pour la serie
+   a avec un bleu vert et blanc") — même famille que `.poster--theme-nl`
+   (grands calques flous, pas de composante noire, voir son commentaire) plutôt
+   que le gabarit UEL/UECL/PD/BL1 (5 taches noires) : aucune demande de noir
+   ici. Bleus repris de l'ancienne recette Serie A (déjà validés) ; vert choisi
+   par cohérence (aucun vert dans l'identité Serie A sur ce site avant). */
+.poster--theme-sa .poster__bg--gradient {
+  inset: -20px;
+  background:
+    radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
+    radial-gradient(42% 68% at 55% 20%, #ffffff 0%, transparent 55%),
+    radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
+    radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 30%, #073b4c 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
+    radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
+    #071620;
+  filter: blur(22px) saturate(1.4);
+  animation: none;
+}
+.poster--theme-sa .poster__bg--gradientAlt { inset: 0; opacity: 0; }
+.poster--theme-sa .poster__bg--gradientTri { inset: 0; opacity: 0; }
+.poster--theme-sa .poster__overlay {
+  background: linear-gradient(to bottom,
+    rgba(var(--black-rgb),0.10) 0%,
+    rgba(var(--black-rgb),0.10) 55%,
+    rgba(var(--black-rgb),0.65) 100%);
+}
+
 /* ⚠️ HABILLAGE CAN (10/09) — voir competitions.js (`tintTheme`). Même
    recette "mode peinture" que UEL/UECL ci-dessus, couleurs déjà mesurées
    sur le vrai logo (`caf-can.png`) : vert #00903c dominant, or #d8b400 en
