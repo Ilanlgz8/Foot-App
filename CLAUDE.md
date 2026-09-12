@@ -954,6 +954,18 @@ cf-worker/
   l'utilisateur que la barre ne bouge plus du tout, y compris sur un cycle arrière-plan/premier-
   plan.
 
+- ✅ Outil de diagnostic `NavDebugHUD` retiré (12/09, demande explicite : "enleve le truc
+  maintenant en haut a gauche la pour le debug d la navbar") — sa mission est terminée : il a
+  servi à obtenir la preuve réelle (`gap:335`/`innerH:509`) qui a permis de trouver puis
+  d'éliminer entièrement la cause du décrochage (voir les 2 points ci-dessus). Retiré : le
+  composant `src/components/NavDebugHUD.jsx` (fichier supprimé), son montage dans `App.jsx`
+  (`<NavDebugHUD />` + import), et le geste de 5 taps sur le logo dans `navbar.jsx`
+  (`handleBrandTap`/`brandTapCount`/`brandTapTimer`, plus aucun listener n'écoutant l'événement
+  `navdebug:toggle` qu'il émettait) — nettoyage complet plutôt qu'un simple masquage, pour ne pas
+  laisser du code mort. Le tap sur le logo redevient un lien de navigation simple vers l'Accueil,
+  comportement inchangé sinon. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé)
+  + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

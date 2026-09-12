@@ -10,7 +10,6 @@
  * en desktop quand rien n'est en cours) : badge + pulsation/rouge
  * uniquement quand des matchs sont en cours.
  */
-import { useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
@@ -99,28 +98,6 @@ function Navbar() {
   // (LiveProvider), exactement comme la card Accueil.
   const liveCount = liveMatches.filter(isCardLive).length
 
-  // ⚠️ AJOUT (12/09, voir NavDebugHUD.jsx pour le contexte complet) : bascule
-  // l'encart de debug (barre du bas décollée) via 5 taps rapides sur le logo
-  // "StatFootix" — seul déclencheur qui marche DEPUIS l'app installée en PWA
-  // sur iPhone (pas de barre d'adresse là-bas pour taper ?navdebug=1).
-  // N'empêche pas le tap de naviguer normalement vers l'Accueil (comportement
-  // du lien inchangé) — juste un compteur qui se réinitialise après 1,5s
-  // d'inactivité.
-  const brandTapCount = useRef(0)
-  const brandTapTimer = useRef(null)
-  const handleBrandTap = () => {
-    brandTapCount.current += 1
-    if (brandTapTimer.current) clearTimeout(brandTapTimer.current)
-    brandTapTimer.current = setTimeout(() => { brandTapCount.current = 0 }, 1500)
-    if (brandTapCount.current >= 5) {
-      brandTapCount.current = 0
-      const turningOn = localStorage.getItem('navDebug') !== '1'
-      if (turningOn) localStorage.setItem('navDebug', '1')
-      else localStorage.removeItem('navDebug')
-      window.dispatchEvent(new CustomEvent('navdebug:toggle', { detail: turningOn }))
-    }
-  }
-
   return (
     <>
       {/* ── Header ── */}
@@ -150,7 +127,7 @@ function Navbar() {
             </NavLink>
           </div>
 
-          <NavLink to="/" className="sfHeader__brand" onClick={handleBrandTap}>
+          <NavLink to="/" className="sfHeader__brand">
             <span>Stat</span>Footix
           </NavLink>
 
