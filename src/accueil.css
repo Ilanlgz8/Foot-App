@@ -1848,7 +1848,7 @@
     radial-gradient(38% 60% at 60% 90%, #d8000c 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #009c48 0%, transparent 60%),
     #0a1020;
-  filter: blur(22px) saturate(1.4);
+  filter: saturate(1.4);
   animation: none;
 }
 .poster--theme-nl .poster__bg--gradientAlt {
@@ -1888,7 +1888,7 @@
     radial-gradient(15% 23% at 45% 12%, #ffffff 0%, transparent 36%),
     radial-gradient(35% 55% at 60% 92%, #4d94ff 0%, transparent 58%),
     #050b22;
-  filter: blur(22px) saturate(1.35);
+  filter: saturate(1.35);
   animation: none;
 }
 .poster--theme-fl1 .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -1920,7 +1920,7 @@
     radial-gradient(38% 60% at 45% 12%, #37003c 0%, transparent 58%),
     radial-gradient(35% 55% at 60% 92%, #b330c0 0%, transparent 58%),
     #1a0016;
-  filter: blur(22px) saturate(1.35);
+  filter: saturate(1.35);
   animation: none;
 }
 .poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -1979,7 +1979,7 @@
     radial-gradient(20% 34% at 78% 100%, #e01a2b 0%, transparent 55%),
     radial-gradient(30% 16% at 62% 96%, #ffe135 0%, transparent 55%),
     #a87e00;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-wc .poster__bg--gradientAlt {
@@ -2025,7 +2025,7 @@
     radial-gradient(22% 34% at 90% 32%, #8a3c14 0%, transparent 52%),
     radial-gradient(28% 22% at 65% 96%, #c8551a 0%, transparent 55%),
     #141414;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-uel .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2053,7 +2053,7 @@
     radial-gradient(22% 34% at 90% 32%, #1f5c2a 0%, transparent 52%),
     radial-gradient(28% 22% at 65% 96%, #2f8a3e 0%, transparent 55%),
     #141414;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-uecl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2087,7 +2087,7 @@
     radial-gradient(22% 34% at 90% 32%, #c22d34 0%, transparent 52%),
     radial-gradient(28% 22% at 65% 96%, #c9932e 0%, transparent 55%),
     #141414;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2157,7 +2157,7 @@
     radial-gradient(14% 20% at 90% 32%, rgba(255,255,255,0.5) 0%, transparent 55%),
     radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
     #141414;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-bl1 .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2187,7 +2187,7 @@
     radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
     #071620;
-  filter: blur(22px) saturate(1.4);
+  filter: saturate(1.4);
   animation: none;
 }
 .poster--theme-sa .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2220,7 +2220,7 @@
     radial-gradient(22% 34% at 90% 32%, #f0cc20 0%, transparent 52%),
     radial-gradient(28% 22% at 65% 96%, #00903c 0%, transparent 55%),
     #0d0d10;
-  filter: blur(20px) saturate(1.3);
+  filter: saturate(1.3);
   animation: none;
 }
 .poster--theme-can .poster__bg--gradientAlt { inset: 0; opacity: 0; }

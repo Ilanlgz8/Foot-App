@@ -1066,6 +1066,32 @@ cf-worker/
   l'axe horizontal — jamais vérifié pour un équivalent vertical). À confirmer par l'utilisateur
   sur son téléphone après déploiement.
 
+- ✅ Effet flou retiré de TOUTES les cards "mode peinture" (constat utilisateur, 12/09 : "ce qui
+  me deplai c l'effet flou [...] entre le sombre et le blanc la c flou j'aime pas" — précisé via
+  question directe : concerne bien TOUTES les compétitions en mode peinture, pas une en
+  particulier, et la direction demandée est "zones nettes, pas de flou du tout" plutôt qu'un
+  flou réduit ou un retrait du blanc). Chaque thème (`ucl`/`nl`/`fl1`/`pl`/`wc`/`uel`/`uecl`/
+  `pd`/`bl1`/`sa`/`can`) empile plusieurs `radial-gradient` (taches de couleur, chacune avec son
+  propre fondu `transparent` intégré au gradient) puis applique un `filter: blur(20-22px)
+  saturate(1.3-1.4)` PAR-DESSUS tout le calque — c'est ce filtre qui donnait l'aspect "laiteux"/
+  flou aux transitions entre zones sombres et blanches que l'utilisateur n'aimait pas. Retiré
+  (`blur(Npx)` seul, `saturate` conservé pour la vivacité des couleurs) dans `accueil.css` (cards
+  Accueil/Résultats, 10 règles `.poster--theme-*`) ET `LiveMatchPage.css` (hero MatchPage +
+  LiveMatchPage, partagé par les 2 pages — voir `MatchPage.jsx` qui importe ce fichier et réutilise
+  les mêmes classes `.lmp__hero--theme-*`, 10 règles). Chaque `radial-gradient` a déjà son propre
+  fondu vers `transparent` dans ses stops (`0% couleur → 55-60% transparent`) : sans le filtre
+  `blur()` par-dessus, les zones restent des taches à bords nets mais pas des cercles durs
+  agressifs — exactement la demande "zones nettes, pas de flou". Vérifié que `filter: blur(60px)`
+  sur `.accueil__backdrop` (halo décoratif de fond de page, sans lien avec les cards) et les 2
+  `backdrop-filter: blur(6px)` (verre dépoli d'un autre composant) n'ont pas été touchés — seuls
+  les 20 `filter: blur(Npx) saturate(...)` des règles `--theme-*` l'ont été. `inset: -20px` sur
+  les calques (posé à l'origine pour éviter qu'un bord flouté "voie" du vide et s'assombrisse)
+  laissé inchangé : inoffensif sans blur, aucun artefact de bord introduit par sa présence.
+  357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés
+  (changement CSS uniquement, aucune logique touchée). Honnêteté : rendu jamais vu en direct sur
+  un vrai appareil avant ce déploiement (juste la lecture du CSS résultant) — à confirmer par
+  l'utilisateur que le rendu "net" lui plaît davantage que l'ancien flou, pas juste différent.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
