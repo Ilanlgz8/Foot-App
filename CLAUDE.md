@@ -1315,6 +1315,42 @@ cf-worker/
   avant ce déploiement (juste lecture du CSS) — à confirmer par l'utilisateur que la coupure a
   bien disparu, pas seulement déplacée.
 
+- ✅ Dégradé Premier League restructuré en radial (violet dominant, blanc aux
+  bords), même jour (13/09, demande explicite, en alternative au dégradé
+  linéaire diagonal qui venait d'être lissé : "au pire met que du violet
+  foncé et genre vers les bord autour tu met du blanc genre pour pas que ce
+  soit que du violet") — changement structurel, pas juste une couleur :
+  `.poster--theme-pl .poster__bg--gradient` (`accueil.css`) et
+  `.lmp__hero--theme-pl .lmp__heroTintC` (`LiveMatchPage.css`, gardé
+  identique comme toujours) passent d'un `linear-gradient(135deg, ...)`
+  diagonal à un `radial-gradient(145% 145% at 50% 50%, ...)` centré : violet
+  de marque `#37003c` en plateau plein sur 0-68% (donc sur l'essentiel du
+  centre/de la surface de la carte, "que du violet foncé" comme demandé),
+  pont `#b565c4` (déjà utilisé et documenté juste avant comme "violet clair
+  intermédiaire", pas une nouvelle teinte) à 86%, blanc uniquement dans le
+  dernier anneau 86-100% — donc repoussé vers les bords/coins extrêmes
+  ("vers les bord autour") plutôt que dans un coin diagonal comme avant. Le
+  pont violet-clair est conservé exprès pour ne pas réintroduire la même
+  "coupure" nette violet foncé→blanc que l'utilisateur venait de signaler sur
+  la version linéaire — juste appliqué en anneau vers l'extérieur plutôt
+  qu'en diagonale. `145% 145%` (rayon plus grand que la boîte) garantit que
+  même les coins (les points les plus excentrés d'un radial centré) restent
+  bien couverts par le dégradé jusqu'au blanc, pas seulement les bords
+  horizontaux/verticaux. Fond de repli `#root .lmp__hero--theme-pl` et
+  `TINT_THEME_CAMP_COLORS.pl` (`competitions.js`) non touchés : toujours
+  `#37003c`/`['#37003c', '#ffffff']`, les 2 couleurs dominantes du thème ne
+  changent pas, seule leur disposition spatiale change (radial inversé au
+  lieu de diagonale). 357 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+  Honnêteté : rendu jamais vu en direct sur un vrai appareil avant ce
+  déploiement (juste lecture du CSS résultant) — un radial centré à 50% 50%
+  donne un effet proche d'un halo/vignette inversée (violet au milieu, blanc
+  aux 4 coins ET aux 4 bords à parts à peu près égales), pas un simple
+  "liseré" fin uniquement sur le contour ; à confirmer que ce rendu correspond
+  bien à l'intention de "vers les bord autour", sinon une variante avec un
+  anneau blanc plus fin (transition resserrée, ex. 92-100% au lieu de
+  86-100%) serait le prochain ajustement naturel.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

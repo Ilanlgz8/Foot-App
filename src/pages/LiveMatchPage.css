@@ -1399,15 +1399,18 @@
   inset: 0;
   opacity: 0;
 }
+/* ⚠️ RETRAVAILLÉ (13/09) — mirroir exact de `.poster--theme-pl` (accueil.css,
+   voir son commentaire détaillé) : dégradé radial inversé, violet foncé
+   dominant au centre, blanc repoussé vers les bords/coins. */
 .lmp__hero--theme-pl .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background: linear-gradient(135deg,
-    #37003c 0%, #37003c 42%,
-    #b565c4 66%,
-    #ffffff 90%, #ffffff 100%);
+  background: radial-gradient(145% 145% at 50% 50%,
+    #37003c 0%, #37003c 68%,
+    #b565c4 86%,
+    #ffffff 100%);
 }
 
 /* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`

@@ -1899,12 +1899,23 @@
    (`#d6006d`/`#ff2e9e`) n'est pas une couleur de marque PL vérifiée à la
    source — accent choisi par cohérence avec le violet, pas mesuré sur un
    pixel de logo (même principe assumé que le vert Serie A). */
+/* ⚠️ RETRAVAILLÉ (13/09, demande explicite : "au pire met que du violet
+   foncé et genre vers les bord autour tu met du blanc genre pour pas que ce
+   soit que du violet") — remplace le dégradé linéaire diagonal précédent
+   (qui donnait une "coupure" violet→blanc jugée moche) par un dégradé
+   RADIAL inversé : violet foncé de marque (`#37003c`) dominant sur tout le
+   centre/la majorité de la carte, blanc repoussé uniquement vers les bords/
+   coins extrêmes ("vers les bord autour"). Toujours un pont de transition
+   (`#b565c4`, déjà utilisé et documenté plus haut dans ce fichier comme
+   "violet clair intermédiaire") avant le blanc, pour éviter de réintroduire
+   la même coupure nette qu'avant — juste appliqué en anneau vers l'extérieur
+   plutôt qu'en diagonale. */
 .poster--theme-pl .poster__bg--gradient {
   inset: 0;
-  background: linear-gradient(135deg,
-    #37003c 0%, #37003c 42%,
-    #b565c4 66%,
-    #ffffff 90%, #ffffff 100%);
+  background: radial-gradient(145% 145% at 50% 50%,
+    #37003c 0%, #37003c 68%,
+    #b565c4 86%,
+    #ffffff 100%);
   animation: none;
 }
 .poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
