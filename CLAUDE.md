@@ -1279,6 +1279,21 @@ cf-worker/
   lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS +
   `competitions.js`, aucune logique touchée).
 
+- ✅ Violet Premier League re-assombri vers la couleur de marque, même jour (13/09, demande
+  explicite juste après le point précédent : "encore + foncé comme la couleur du logo officielle
+  tu vois") — `#9932cc` (darkorchid, couleur nommée CSS générique choisie au point précédent pour
+  "un violet + foncé") remplacé par `#37003c` dans `.poster--theme-pl` (`accueil.css`) et
+  `.lmp__hero--theme-pl .lmp__heroTintC` (`LiveMatchPage.css`, gardé identique) — même position
+  dans le dégradé (0-58%), même blanc (84-100%). Honnêteté sur le choix : `#37003c` n'est pas
+  une nouvelle mesure de pixel sur le logo officiel actuel (pas d'accès à une image du logo dans
+  cet environnement pour ce faire), mais réutilise le violet de marque déjà établi et documenté
+  dans ce même fichier AVANT le passage en mode peinture du 12/09 (ancien champ `tint2` de PL,
+  qualifié à l'époque de "violet foncé de marque") — plus fiable qu'inventer une nouvelle teinte,
+  cohérent avec la demande de coller à la vraie couleur du logo plutôt qu'un violet générique.
+  Fond de repli `#root .lmp__hero--theme-pl` et `TINT_THEME_CAMP_COLORS.pl` (`competitions.js`)
+  mis à jour en cohérence. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build vérifiés inchangés (CSS + `competitions.js`, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

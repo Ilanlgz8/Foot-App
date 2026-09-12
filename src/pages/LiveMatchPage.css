@@ -1393,7 +1393,7 @@
 /* ⚠️ HABILLAGE PREMIER LEAGUE "MODE PEINTURE" (12/09) — mirroir exact de
    `.poster--theme-pl` (accueil.css, voir son commentaire détaillé). */
 #root .lmp__hero--theme-pl {
-  background: #9932cc;
+  background: #37003c;
 }
 .lmp__hero--theme-pl .lmp__heroTintB {
   inset: 0;
@@ -1405,7 +1405,7 @@
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #9932cc 0%, #9932cc 58%,
+    #37003c 0%, #37003c 58%,
     #ffffff 84%, #ffffff 100%);
 }
 

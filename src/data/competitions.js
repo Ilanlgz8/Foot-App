@@ -925,7 +925,14 @@ const TINT_THEME_CAMP_COLORS = {
   // ⚠️ ASSOMBRI (13/09, demande explicite : "pour la premiere league met un
   // violet + foncé") — `#da70d6` (orchidée claire) → `#9932cc` (orchidée
   // foncée / "darkorchid"), même position dans le dégradé, blanc inchangé.
-  pl:   ['#9932cc', '#ffffff'],
+  // ⚠️ RE-ASSOMBRI (13/09, demande explicite juste après : "encore + foncé
+  // comme la couleur du logo officielle") — `#9932cc` était un choix
+  // générique (nom CSS standard), pas une couleur de marque vérifiée.
+  // Remplacé par `#37003c`, le violet foncé de marque PL déjà utilisé et
+  // documenté dans ce fichier avant le passage en mode peinture du 12/09
+  // (ancien `tint2`) — réutilisation d'une couleur déjà établie plutôt
+  // qu'une nouvelle teinte inventée.
+  pl:   ['#37003c', '#ffffff'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —
