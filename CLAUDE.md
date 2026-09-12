@@ -1351,6 +1351,23 @@ cf-worker/
   anneau blanc plus fin (transition resserrée, ex. 92-100% au lieu de
   86-100%) serait le prochain ajustement naturel.
 
+- ✅ Transition noir→rouge LaLiga lissée, même jour (13/09, demande explicite : "pour la liga le
+  degradé est pas terribl entre le noir et le rouge") — même famille de problème que la "coupure"
+  déjà documentée et corrigée sur Premier League (voir point juste au-dessus) : le dégradé LaLiga
+  passait directement d'un plateau noir plein (0-20%) à un plateau rouge plein (40-72%) sur une
+  seule zone de transition, sans étape intermédiaire — traverse une teinte brune/rougeâtre trouble
+  plutôt qu'un fondu propre. Corrigé (`.poster--theme-pd` dans `accueil.css` + `.lmp__hero--theme-
+  pd .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique) : ajout d'un pont `#7a1a1f`
+  (rouge très sombre déjà présent dans l'historique de palette LaLiga de ce fichier, réutilisé
+  plutôt qu'inventé) à 30%, entre la fin du plateau noir (18%, légèrement raccourci) et le début
+  du plateau rouge vif (42%, légèrement repoussé) — le dégradé passe maintenant en 2 étapes
+  (noir → rouge sombre → rouge vif) au lieu d'un seul saut direct. Le palier or final (72-100%)
+  non touché. `TINT_THEME_CAMP_COLORS`/fond de repli non touchés (couleurs dominantes inchangées,
+  seule la transition entre elles est adoucie, même principe que le fix PL juste avant). 357 tests
+  + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS
+  uniquement). Honnêteté : rendu jamais vu en direct avant ce déploiement (juste lecture du CSS)
+  — à confirmer par l'utilisateur que la coupure a bien disparu.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -2066,11 +2066,20 @@
    identique), couleurs reprises EXACTEMENT de l'ancienne recette dégradé
    linéaire de LaLiga (`#b3242b` rouge, `#e0b040` or, voir competitions.js) au
    lieu d'en inventer de nouvelles. */
+/* ⚠️ LISSÉ (13/09, demande explicite : "pour la liga le degradé est pas
+   terribl entre le noir et le rouge") — même famille de problème que la
+   "coupure" déjà documentée et corrigée sur Premier League (transition
+   directe foncé→couleur vive sans étape intermédiaire, qui traverse une
+   zone trouble/brune-sombre). Pont ajouté : `#7a1a1f`, rouge très sombre
+   déjà présent dans l'historique de palette LaLiga de ce fichier (utilisé
+   comme une des taches de l'ancien mode peinture), pas une nouvelle teinte
+   inventée — sert d'étape entre le noir plein et le rouge vif de marque. */
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
   background: linear-gradient(135deg,
-    #000000 0%, #000000 20%,
-    #b3242b 40%, #b3242b 72%,
+    #000000 0%, #000000 18%,
+    #7a1a1f 30%,
+    #b3242b 42%, #b3242b 72%,
     #c9932e 100%);
   animation: none;
 }

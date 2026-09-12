@@ -1314,14 +1314,17 @@
   inset: 0;
   opacity: 0;
 }
+/* ⚠️ LISSÉ (13/09) — mirroir exact de `.poster--theme-pd` (accueil.css, voir
+   son commentaire détaillé) : pont `#7a1a1f` entre le noir et le rouge. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #000000 0%, #000000 20%,
-    #b3242b 40%, #b3242b 72%,
+    #000000 0%, #000000 18%,
+    #7a1a1f 30%,
+    #b3242b 42%, #b3242b 72%,
     #c9932e 100%);
 }
 
