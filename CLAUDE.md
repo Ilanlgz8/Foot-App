@@ -1033,6 +1033,39 @@ cf-worker/
   357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
   vérifiés inchangés (changement de données + commentaire uniquement).
 
+- 🔍 Barre du bas ENCORE décollée, 12e signalement (constat utilisateur, 12/09, juste après le
+  retrait complet de la compensation `transform` du 11e round : "j'ai encore eu le bug de la
+  navbar du bas décollé"). Question posée directement pour la première fois sur CE point précis
+  ("à quoi ça ressemble visuellement cette fois ?") — réponse : "c comme si elle se décolle e
+  après quand je scroll vers le bas elle monte et inversement" — c'est-à-dire que la barre SUIT
+  le sens du scroll (monte quand on scroll vers le bas, descend quand on scroll vers le haut),
+  exactement comme le ferait un élément normal du flux de page (le contenu remonte à l'écran
+  quand on scroll vers le bas). Description DIFFÉRENTE de tous les signalements précédents
+  ("barre au milieu de la page", "bandeau noir sous la barre") — c'est la signature du bug
+  WebKit/iOS Safari le plus ancien et le mieux documenté sur les éléments `position: fixed` :
+  sans couche de compositing dédiée, un élément fixed peut visiblement "glisser" avec le contenu
+  pendant le geste de scroll (le navigateur n'arrive pas à le repeindre indépendamment du reste
+  de la page assez vite), avant de se re-caler une fois le scroll arrêté. Le correctif standard
+  pour CE bug précis (promotion sur une couche GPU dédiée, `transform`/`will-change`) est
+  justement ce qui avait été retiré le 11/09 (7e tentative) sur la base d'une AUTRE théorie
+  jamais confirmée (désync de peinture après retour d'arrière-plan) — cette théorie n'ayant
+  jamais eu de preuve directe, il est plausible que son retrait ait réintroduit ce bug plus
+  ancien et mieux documenté. Corrigé (`navbar.css`) : `will-change: transform` remis sur
+  `.sfTabbar`, SEUL — sans `transform: translateZ(0)` littéral comme avant le 11/09 — pour
+  demander à WebKit une couche de compositing dédiée sans jamais poser de valeur de transform
+  réelle qui pourrait rester "figée" (l'hypothèse du 11/09). Le filet de sécurité retour
+  arrière-plan (`App.jsx`, `repair()` via toggle `display:none`) reste actif en complément,
+  indépendant de cette couche. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé)
+  + build vérifiés inchangés. Honnêteté : toujours aucun accès à un vrai iPhone/PWA depuis cet
+  environnement pour reproduire ou confirmer — mais c'est la première fois en 12 signalements
+  qu'une description visuelle précise ("suit le sens du scroll") pointe sans ambiguïté vers un
+  mécanisme WebKit spécifique et documenté plutôt qu'une hypothèse générique parmi plusieurs
+  possibles ; si le symptôme persiste malgré ce remous en arrière, ce sera un signal fort que ce
+  n'est PAS (ou plus) un problème de couche de compositing, et qu'il faudra chercher ailleurs
+  (ex. un vrai conteneur de scroll créé quelque part, cf. le fix `overflow-x: clip` du 05/09 pour
+  l'axe horizontal — jamais vérifié pour un équivalent vertical). À confirmer par l'utilisateur
+  sur son téléphone après déploiement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

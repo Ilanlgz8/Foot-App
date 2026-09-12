@@ -103,21 +103,32 @@
    précédentes — portail body, watchdog géométrique, scroll-lock #root...) :
    `transform: translateZ(0)` + `will-change: transform`, posés le 10/09 pour
    forcer une couche GPU dédiée (le "correctif standard" documenté pour ce
-   type de décrochage). Nouvelle théorie, jamais testée jusqu'ici : c'est
-   PEUT-ÊTRE cette couche dédiée elle-même qui cause le bug plutôt que le
-   réparer. iOS Safari a un bug de COMPOSITING documenté sur les éléments
-   position:fixed promus sur leur propre couche : après un cycle arrière-plan
-   → premier plan, le LAYOUT de l'élément reste correct (getBoundingClientRect
-   renvoie bien bottom=viewport) mais la couche compositée à l'écran reste
-   figée à son ancienne position tant qu'un vrai repaint n'est pas forcé — un
-   décalage PEINTURE, pas LAYOUT. C'est cohérent avec le fait que le watchdog
-   géométrique (App.jsx, mesure rect.bottom vs viewport) n'a jamais rien
-   détecté d'anormal dans aucune des tentatives précédentes : il mesure une
-   géométrie qui a toujours été correcte, le problème est dans le rendu
-   affiché, invisible à getBoundingClientRect(). Retiré : sans couche GPU
-   dédiée, l'élément reste composité avec le reste de la page (pas de couche
-   séparée pouvant se désynchroniser). Voir App.jsx pour le 2e volet de ce
-   correctif (un vrai bug de logique trouvé dans le watchdog lui-même). */
+   type de décrochage). Théorie de l'époque : c'est PEUT-ÊTRE cette couche
+   dédiée elle-même qui cause le bug plutôt que le réparer (bug de COMPOSITING
+   documenté sur iOS Safari pour les éléments position:fixed promus sur leur
+   propre couche). Retiré sur cette base.
+   ⚠️ REMIS, PARTIELLEMENT (12/09, 12e signalement — nouvelle description
+   PRÉCISE du symptôme, jamais obtenue jusqu'ici : "elle se décolle et après
+   quand je scroll vers le bas elle monte et inversement" — c'est-à-dire que
+   la barre SUIT le sens du scroll, exactement comme un élément normal du
+   flux de la page (scroller vers le bas fait remonter le contenu à l'écran,
+   scroller vers le haut le fait redescendre). Ce n'est PAS la même
+   description que les signalements précédents ("barre au milieu de la
+   page", "bandeau noir sous la barre") — c'est la signature du bug
+   WebKit/iOS Safari le plus ancien et le mieux documenté sur les éléments
+   `position: fixed` : sans couche de compositing DÉDIÉE, un élément fixed
+   peut visiblement "glisser" avec le contenu pendant le geste de scroll
+   (le navigateur ne peut pas repeindre la barre indépendamment du reste de
+   la page assez vite) puis se re-caler brutalement une fois le scroll
+   arrêté — le correctif standard pour CE bug précis est justement la
+   promotion sur une couche GPU séparée, celle retirée le 11/09 ci-dessus.
+   Compromis pour ne pas revenir en arrière à l'identique : `will-change:
+   transform` SEUL (sans `transform: translateZ(0)` littéral) — ça suffit à
+   demander à WebKit une couche de compositing dédiée pour cet élément, sans
+   jamais poser de VALEUR de transform réelle qui pourrait rester "figée" en
+   cas de désync peinture (l'hypothèse du 11/09) : il n'y a rien à figer.
+   Le filet de sécurité retour arrière-plan (App.jsx, `repair()` via toggle
+   `display: none`) reste actif en complément, indépendant de cette couche. */
 .sfTabbar {
   position: fixed;
   left: 0;
@@ -135,6 +146,7 @@
     #000000 70%
   );
   pointer-events: none;               /* le fond dégradé ne capte pas les taps */
+  will-change: transform;             /* couche de compositing dédiée — voir historique ci-dessus */
 }
 .sfTabbar > * { pointer-events: auto; }
 
