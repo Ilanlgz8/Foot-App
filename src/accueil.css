@@ -1902,8 +1902,8 @@
 .poster--theme-pl .poster__bg--gradient {
   inset: 0;
   background: linear-gradient(135deg,
-    #da70d6 0%, #da70d6 32%,
-    #ffffff 62%, #ffffff 100%);
+    #da70d6 0%, #da70d6 58%,
+    #ffffff 84%, #ffffff 100%);
   animation: none;
 }
 .poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2116,9 +2116,9 @@
 .poster--theme-bl1 .poster__bg--gradient {
   inset: 0;
   background:
-    radial-gradient(45% 40% at 15% 15%, rgba(255,255,255,0.22) 0%, transparent 60%),
+    radial-gradient(58% 52% at 15% 15%, rgba(255,255,255,0.36) 0%, transparent 62%),
     linear-gradient(135deg,
-      #8a0410 0%, #e30613 38%, #e30613 76%,
+      #8a0410 0%, #e30613 38%, #e30613 64%,
       #ffffff 100%);
   animation: none;
 }

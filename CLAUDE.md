@@ -1253,6 +1253,22 @@ cf-worker/
     build vérifiés inchangés pour les 3 changements (CSS + `competitions.js`, aucune logique
     touchée).
 
+- ✅ Rééquilibrage blanc Bundesliga/Premier League, même jour (13/09, demande explicite : "met +
+  de blanc dans bundesliga et moins de blanc dans premiere league stp") — ajustement direct des 2
+  thèmes juste retouchés au point précédent :
+  - Bundesliga (`.poster--theme-bl1` / `.lmp__hero--theme-bl1 .lmp__heroTintC`) : la touche de
+    blanc haut-gauche ajoutée juste avant est agrandie et renforcée (`45% 40%` → `58% 52%`,
+    opacité `0.22` → `0.36`, fondu repoussé `60%` → `62%`) ET le palier rouge du dégradé principal
+    raccourci (`#e30613` tenait jusqu'à 76% → maintenant 64%), laissant la transition vers le
+    blanc du coin bas-droite commencer plus tôt — plus de surface blanche au total sans faire
+    disparaître le rouge, qui reste dominant sur l'essentiel de la carte (0-64%).
+  - Premier League (`.poster--theme-pl` / `.lmp__hero--theme-pl .lmp__heroTintC`) : effet inverse
+    — le palier violet clair rosé (`#da70d6`) est allongé (32% → 58%) et le blanc repoussé plus
+    loin dans le dégradé (`62-100%` → `84-100%`), réduisant sa zone de ~38% à ~16% du dégradé.
+    `TINT_THEME_CAMP_COLORS`/fonds de repli non touchés (mêmes couleurs, seules leurs PROPORTIONS
+    dans le dégradé changent) — aucune modification nécessaire. 357 tests + lint (33 erreurs
+    pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
