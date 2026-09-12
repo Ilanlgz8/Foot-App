@@ -932,6 +932,28 @@ cf-worker/
   après la 9e tentative : "faudrait savoir en fait"). À confirmer par l'utilisateur sur un
   nouveau cycle arrière-plan/premier-plan après ce déploiement.
 
+- ✅ Compensation `translateY` retirée ENTIÈREMENT, 11e round, même bug (12/09, retour utilisateur
+  immédiat après le clamp `MAX_PLAUSIBLE_GAP` ci-dessus : "ok mais faut pas qui bouge d'un pixel
+  tu vois faut vraiment qu'il soit fixe quoi") — exigence explicite et sans ambiguïté : AUCUN
+  mouvement, même petit et "plausible" (le clamp limitait les dégâts à 60px max, mais tout gap
+  mesuré entre 0.5 et 60px continuait de déplacer réellement la barre). Décision : l'effet de
+  synchronisation `visualViewport` de la 8e tentative (`App.jsx`, celui qui a directement causé
+  le bug du point précédent) est retiré en entier, pas juste re-clampé plus fort — tant que ce
+  code existe, une compensation par transform reste possible et donc un mouvement reste possible.
+  La barre repose maintenant entièrement sur `position: fixed; bottom: 0` NATIF (aucun JS
+  n'applique plus jamais de `transform` dessus) + le filet de réparation existant pour le vrai
+  déclencheur connu (retour d'arrière-plan, watchdog `onResume`, 7e/9e tentatives) — ce filet ne
+  pose lui non plus aucun transform permanent, il force un reflow (toggle `display`/`position`,
+  toujours remis à l'état d'origine) puis laisse WebKit recalculer nativement. 357 tests + lint
+  (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : le "bandeau noir
+  sous la barre" qui avait motivé la 8e tentative (11/09) n'a jamais été confirmé par une mesure
+  réelle (contrairement au bug qu'elle a ensuite elle-même causé, lui bien confirmé) — si ce
+  symptôme précis revient, il faudra un mécanisme borné dans le temps (actif seulement pendant
+  l'animation de la barre d'adresse) plutôt qu'un transform permanent comme celui qu'on vient de
+  retirer. Toujours aucun accès à un vrai iPhone/PWA depuis cet environnement — à confirmer par
+  l'utilisateur que la barre ne bouge plus du tout, y compris sur un cycle arrière-plan/premier-
+  plan.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

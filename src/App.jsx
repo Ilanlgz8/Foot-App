@@ -319,77 +319,44 @@ function App() {
     }
   }, [])
 
-  // ⚠️ 8e TENTATIVE (11/09, description précise de l'utilisateur enfin obtenue
-  // — "y'a une épaisseur noire en dessous [de la barre] quand elle se
-  // décolle" — un détail visuel qu'aucune tentative précédente n'avait, et
-  // qui pointe vers un mécanisme complètement différent des 7 précédentes
-  // (compositing/peinture, ancêtre transformé, scroll-lock...).
+  // ⚠️ 8e TENTATIVE (11/09) PUIS 10e (12/09, clamp `MAX_PLAUSIBLE_GAP`) —
+  // EFFET RETIRÉ ENTIÈREMENT (12/09, 11e round, demande explicite et sans
+  // ambiguïté de l'utilisateur juste après le clamp : "faut pas qui bouge
+  // d'un pixel tu vois faut vraiment qu'il soit fixe quoi"). Historique
+  // complet gardé ici pour ne pas perdre le raisonnement déjà fait :
   //
-  // Un bandeau NOIR qui apparaît SOUS la barre, precisément quand elle se
-  // décolle, correspond au symptôme classique et documenté de
-  // `position:fixed; bottom:0` sur iOS Safari/PWA quand la barre d'outils du
-  // navigateur se masque : le viewport RÉELLEMENT visible (`visualViewport`)
-  // grandit (la barre d'adresse disparaît, l'écran devient "plus grand"),
-  // mais l'élément fixé reste ancré au bas de l'ancien viewport de LAYOUT
-  // (`window.innerHeight`, qui ne se met pas forcément à jour aussi vite/de
-  // la même façon en mode PWA standalone) — ça laisse un espace entre le bas
-  // de la barre et le vrai bas de l'écran, qui apparaît noir (fond de la
-  // page, sans le dégradé de la barre par-dessus). Aucune des 7 tentatives
-  // précédentes ne corrigeait spécifiquement CET écart précis — les
-  // watchdogs géométriques mesuraient `rect.bottom` vs le viewport, mais ne
-  // recalculaient/réparaient qu'après coup (3s + 2 mesures, ou au retour
-  // d'arrière-plan), jamais EN CONTINU pendant que l'écart existe.
+  // Cet effet appliquait un `transform: translateY(-gap px)` sur la barre
+  // pour compenser l'écart entre le viewport de LAYOUT (`window.innerHeight`)
+  // et le viewport VISUEL réel (`visualViewport`), écart réel sur iOS Safari
+  // quand la barre d'adresse s'anime. Ça a d'abord semblé correct (11/09),
+  // puis une VRAIE capture d'écran (`NavDebugHUD.jsx`) a prouvé que ce même
+  // mécanisme pouvait lire une mesure aberrante (`gap:335`, `innerH:509`,
+  // valeurs prises pendant une fenêtre où le navigateur n'avait manifestement
+  // pas encore les vraies dimensions, juste après un retour d'arrière-plan)
+  // et appliquer un `translateY(-335px)` littéral — LA cause du symptôme le
+  // plus visible et le plus rapporté de toute cette série ("barre en plein
+  // milieu de la page"). Un clamp (`MAX_PLAUSIBLE_GAP = 60`) avait ensuite
+  // limité les dégâts, mais tant que l'effet existe, TOUT `gap` mesuré entre
+  // 0.5px et 60px déplace encore la barre de ce nombre de pixels — un
+  // mouvement réel, juste plus petit. L'utilisateur a été clair : aucun
+  // mouvement n'est acceptable, même petit et "plausible".
   //
-  // Fix : synchronisation active et continue via l'API `visualViewport`
-  // (conçue précisément pour ce cas), indépendante du reste des filets déjà
-  // en place. Décale la barre d'un `translateY` égal à l'écart mesuré entre
-  // le viewport de layout et le viewport visuel réel, recalculé à CHAQUE
-  // évènement `resize`/`scroll` de `visualViewport` (déclenchés en temps réel
-  // pendant l'animation de la barre d'adresse, pas seulement après coup) —
-  // la barre suit donc le bord réellement visible de l'écran au lieu de
-  // dépendre entièrement du calcul natif de `position:fixed` par WebKit.
-  // ⚠️ 10e SIGNALEMENT (12/09) — cette fois avec une VRAIE preuve capturée
-  // (grâce à `NavDebugHUD.jsx`, voir plus haut) au moment exact du
-  // décrochage, pas une théorie : `gap:335`, `innerH:509` — une hauteur de
-  // layout ~509px est bien trop petite pour un écran de téléphone plein
-  // écran (donc `vv.height` calculé à ce moment était lui aussi faussé,
-  // ~174px). Cette mesure a été prise pendant une fenêtre où `window.
-  // innerHeight`/`visualViewport.height` n'avaient manifestement pas encore
-  // les vraies valeurs (transition juste après un retour d'arrière-plan,
-  // probablement) — et le code CI-DESSOUS (8e tentative, 11/09) a pris ce
-  // chiffre au pied de la lettre : `transform: translateY(-335px)` a
-  // littéralement arraché la barre de 335px vers le haut, en plein milieu de
-  // la liste de matchs — EXACTEMENT le symptôme "barre en plein milieu de la
-  // page" déjà signalé plusieurs fois par le passé (6e signalement, entre
-  // autres). Autrement dit : cette 8e tentative, censée corriger un petit
-  // écart de quelques pixels (le "bandeau noir"), n'avait AUCUN garde-fou
-  // contre une mesure aberrante — et en a provoqué un bien pire elle-même.
-  // Première fois dans cette série qu'une cause est confirmée par une
-  // mesure réelle plutôt que déduite par audit de code ou théorie.
-  // Corrigé : la correction n'est appliquée que si l'écart mesuré est
-  // PLAUSIBLE pour une vraie barre d'outils mobile (quelques dizaines de px,
-  // `MAX_PLAUSIBLE_GAP` = 60px, marge large) — une valeur aberrante (comme
-  // 335px) est ignorée et le `transform` est explicitement nettoyé plutôt
-  // que laissé tel quel, pour ne jamais rester bloqué sur une correction
-  // erronée déjà appliquée.
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const MAX_PLAUSIBLE_GAP = 60
-    const sync = () => {
-      const el = document.querySelector('.sfTabbar')
-      if (!el || getComputedStyle(el).display === 'none') { return }
-      const gap = window.innerHeight - (vv.height + vv.offsetTop)
-      el.style.transform = (gap > 0.5 && gap <= MAX_PLAUSIBLE_GAP) ? `translateY(-${gap}px)` : ''
-    }
-    vv.addEventListener('resize', sync)
-    vv.addEventListener('scroll', sync)
-    sync()
-    return () => {
-      vv.removeEventListener('resize', sync)
-      vv.removeEventListener('scroll', sync)
-    }
-  }, [])
+  // Décision : abandonner la compensation manuelle par transform, faire
+  // confiance à `position: fixed; bottom: 0` NATIF (WebKit gère lui-même le
+  // viewport visuel pour un élément fixed sans qu'aucun JS n'ait besoin d'y
+  // toucher — le "bandeau noir" initial qui a motivé cette 8e tentative
+  // était une hypothèse plausible mais jamais confirmée par une mesure
+  // réelle, contrairement au bug que cette même tentative a ensuite
+  // elle-même causé et qui LUI a été confirmé). Le filet de sécurité pour le
+  // vrai bug de décrochage (retour d'arrière-plan, cf. watchdog `onResume`
+  // ci-dessus, 7e/9e tentatives) reste actif et ne pose lui non plus aucun
+  // transform permanent : il force un reflow (toggle display/position) puis
+  // laisse WebKit recalculer nativement, sans jamais appliquer de valeur
+  // numérique devinée. Honnêteté : si un vrai "bandeau noir sous la barre"
+  // réapparaît (symptôme originel du 11/09), il faudra un mécanisme qui ne
+  // déplace la barre QUE dans une fenêtre de temps très courte et bornée
+  // (ex. seulement pendant l'animation de la barre d'adresse, jamais à
+  // l'état stable) plutôt que revenir à un transform permanent comme celui-ci.
 
   return (
     // LiveProvider monté ici → hooks live survivent aux changements de route
