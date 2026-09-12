@@ -1357,23 +1357,19 @@
   inset: 0;
   opacity: 0;
 }
-/* ⚠️ MOINS DE VERT (13/09) — mirroir exact de `.poster--theme-sa`
-   (accueil.css, voir son commentaire détaillé). */
+/* ⚠️ REFONTE (13/09) — mirroir exact de `.poster--theme-sa` (accueil.css,
+   voir son commentaire détaillé) : fond bleu nuit + dégradé bleu Serie A,
+   accents cyan à faible opacité, touche de blanc, fin du mode peinture. */
 .lmp__hero--theme-sa .lmp__heroTintC {
-  inset: -20px;
+  inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  filter: saturate(1.4);
   background:
-    radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
-    radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
-    radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
-    #0b3a4d;
+    radial-gradient(45% 40% at 14% 14%, rgba(255,255,255,0.16) 0%, transparent 60%),
+    radial-gradient(55% 50% at 85% 22%, rgba(59,179,199,0.28) 0%, transparent 65%),
+    radial-gradient(50% 45% at 75% 82%, rgba(59,179,199,0.18) 0%, transparent 65%),
+    linear-gradient(135deg, #041c2c 0%, #0b3a4d 50%, #0d5a73 100%);
 }
 
 /* ⚠️ HABILLAGE LIGUE 1 "MODE PEINTURE" (12/09) — mirroir exact de

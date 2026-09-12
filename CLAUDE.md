@@ -1394,6 +1394,35 @@ cf-worker/
   retirée). 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
   inchangés (CSS + `competitions.js`, aucune logique touchée).
 
+- ✅ Refonte complète de Serie A, abandon du "mode peinture" pour cette compétition, même jour
+  (13/09, demande explicite : "fond bleu nuit avec degradé bleu serie a et quelque accent cyan a
+  faible opacité et un peu de blanc pour la card de la serie a stp essaie ça") — Serie A était le
+  dernier des thèmes redessinés encore sur l'ancien mécanisme "mode peinture" (7 taches radiales
+  + `filter: saturate()`), après que LaLiga/Ligue 1/Premier League/Bundesliga soient déjà passées
+  au dégradé linéaire propre plus tôt dans la journée (voir "Refonte complète..." plus haut).
+  Remplacé entièrement (`.poster--theme-sa` dans `accueil.css` + `.lmp__hero--theme-sa
+  .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme toujours) par :
+  `linear-gradient(135deg, #041c2c 0%, #0b3a4d 50%, #0d5a73 100%)` comme fond principal (bleu
+  nuit → bleu Serie A, demande "fond bleu nuit avec degradé bleu serie a"), plus 2 calques
+  discrets par-dessus : 2 taches `radial-gradient` cyan à faible opacité
+  (`rgba(59,179,199,0.28)`/`rgba(59,179,199,0.18)`, coin haut-droite et bas-droite — "quelque
+  accent cyan a faible opacité") et 1 touche de blanc semi-transparent au coin haut-gauche
+  (`rgba(255,255,255,0.16)` — "un peu de blanc"), même mécanisme déjà utilisé pour la "légère
+  touche de blanc" de Ligue 1. Toutes les couleurs réutilisées de la palette Serie A déjà établie
+  dans ce fichier (aucune invention) : `#041c2c`/`#0b3a4d` déjà le fond de repli, `#0d5a73`/
+  `#0a5f7a` déjà dans l'ancien dégradé, `#3bb3c7` (converti en `rgba` pour l'opacité) déjà la
+  tache cyan la plus claire de l'ancienne recette. `filter: saturate(1.4)` retiré (n'a plus de
+  sens sur un dégradé linéaire aux couleurs déjà pleines, même raisonnement que pour les 4 autres
+  refontes du jour) ; `inset: -20px` → `inset: 0` (plus besoin de marge anti-bord-flou sans blur).
+  Plus aucun vert dans ce thème (cohérent avec la demande, qui ne mentionne plus que bleu/cyan/
+  blanc). `TINT_THEME_CAMP_COLORS.sa` (`competitions.js`) mis à jour (`['#0d97ab', '#4ade80']` →
+  `['#0b3a4d', '#3bb3c7']`, pour refléter les 2 couleurs réellement dominantes du nouveau thème).
+  Fond de repli `#root .lmp__hero--theme-sa` inchangé (`#0b3a4d`, coïncide déjà avec la couleur
+  médiane du nouveau dégradé, aucune mise à jour nécessaire). 357 tests + lint (33 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS + `competitions.js`,
+  aucune logique touchée). Honnêteté : rendu jamais vu en direct sur un vrai appareil avant ce
+  déploiement (juste lecture du CSS résultant) — à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

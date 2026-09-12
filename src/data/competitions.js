@@ -910,7 +910,7 @@ const TINT_THEME_CAMP_COLORS = {
   // repassée à `#c41230` (rouge sombre déjà présent dans le dégradé), plus
   // de `#000000` référencé.
   bl1:  ['#e30613', '#c41230'],
-  sa:   ['#0d97ab', '#4ade80'],
+  sa:   ['#0b3a4d', '#3bb3c7'],
   // Ajoutés le 12/09 avec le passage de Ligue 1/Premier League en mode
   // peinture (constat utilisateur : "y'a que une couleur c fade").
   fl1:  ['#085dfe', '#04225c'],

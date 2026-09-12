@@ -2164,25 +2164,28 @@
    que le gabarit UEL/UECL/PD/BL1 (5 taches noires) : aucune demande de noir
    ici. Bleus repris de l'ancienne recette Serie A (déjà validés) ; vert choisi
    par cohérence (aucun vert dans l'identité Serie A sur ce site avant). */
-/* ⚠️ MOINS DE VERT (13/09, demande explicite : "pour la seriea met moins de
-   vert stp") — 2 des 3 taches vertes (`#16a34a` à 30% 75%, `#0f7a37` à
-   60% 90%) converties vers des bleus déjà présents dans ce même dégradé
-   (`#0d5a73`/`#0a5f7a`, réutilisés plutôt qu'inventés) — ne reste plus
-   qu'une seule tache verte (`#4ade80`, 40% 45%) sur 7, contre 3 avant.
-   Palette "bleu vert et blanc" toujours respectée, juste rééquilibrée vers
-   le bleu. */
+/* ⚠️ REFONTE (13/09, demande explicite : "fond bleu nuit avec degradé bleu
+   serie a et quelque accent cyan a faible opacité et un peu de blanc") —
+   abandon du "mode peinture" (7 taches radiales + blur) pour ce thème, même
+   principe que la refonte LaLiga/Ligue1/PL/Bundesliga du même jour (voir
+   plus haut) : un dégradé LINÉAIRE bleu nuit → bleu Serie A en fond, avec
+   2 calques discrets par-dessus plutôt qu'un empilement de taches. Couleurs
+   toutes réutilisées de la palette Serie A déjà établie dans ce fichier,
+   aucune invention : bleu nuit `#041c2c`/`#0b3a4d` (déjà le fond de repli),
+   bleu Serie A `#0d5a73`/`#0a5f7a` pour le dégradé principal, cyan `#3bb3c7`
+   (déjà présent) en accent à faible opacité (`rgba(...,0.22-0.28)`) plutôt
+   qu'en tache pleine, et une touche de blanc semi-transparent au coin
+   haut-gauche (`rgba(255,255,255,0.16)`, même mécanisme que le "reflet"
+   déjà utilisé sur Ligue 1). Plus de vert du tout (le vert n'était de toute
+   façon plus demandé, uniquement le résultat "moins de vert" du point
+   précédent). */
 .poster--theme-sa .poster__bg--gradient {
-  inset: -20px;
+  inset: 0;
   background:
-    radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
-    radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
-    radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
-    #0b3a4d;
-  filter: saturate(1.4);
+    radial-gradient(45% 40% at 14% 14%, rgba(255,255,255,0.16) 0%, transparent 60%),
+    radial-gradient(55% 50% at 85% 22%, rgba(59,179,199,0.28) 0%, transparent 65%),
+    radial-gradient(50% 45% at 75% 82%, rgba(59,179,199,0.18) 0%, transparent 65%),
+    linear-gradient(135deg, #041c2c 0%, #0b3a4d 50%, #0d5a73 100%);
   animation: none;
 }
 .poster--theme-sa .poster__bg--gradientAlt { inset: 0; opacity: 0; }
