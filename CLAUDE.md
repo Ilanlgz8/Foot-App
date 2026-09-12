@@ -1197,6 +1197,23 @@ cf-worker/
   mentionnés dans la demande, gardent leur mode peinture à taches radiales). 357 tests + lint
   (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
 
+- ✅ Ajustement du dégradé LaLiga juste redessiné (13/09, demande explicite : "pour la liga
+  rajoute du noir stp en haut a gauche et le jaune t'en met seulement en bas a droite et du jaune
+  un peu plus fonc") — itération sur `.poster--theme-pd` (`accueil.css`) et
+  `.lmp__hero--theme-pd .lmp__heroTintC` (`LiveMatchPage.css`, gardé identique comme toujours),
+  qui venait tout juste d'être réécrit en dégradé linéaire à 2 couleurs (or→rouge, voir le point
+  juste au-dessus). Reversal assumé du retrait du noir demandé plus tôt dans la journée sur ce
+  même thème (voir "Noir retiré du mode peinture LaLiga" plus haut) — l'utilisateur redemande
+  explicitement du noir, cette fois positionné, pas en taches réparties. Le dégradé passe de 2 à
+  3 couleurs en paliers : `linear-gradient(135deg, #000000 0-20%, #b3242b 40-72%, #c9932e 100%)`
+  — noir en palier plein dans le coin haut-gauche (0-20%, direction 135deg part bien du coin
+  haut-gauche), rouge de marque au milieu (40-72%, toujours bien présent), or SEULEMENT dans le
+  dernier palier proche du coin bas-droite (100%, transition 72-100% uniquement) — plus aucune
+  zone or en dehors de ce coin, conforme à "seulement en bas à droite". Jaune assombri : `#e0b040`
+  → `#c9932e` (déjà présent dans l'historique de palette LaLiga de ce fichier, un ton plus foncé/
+  cuivré que l'or clair précédent) plutôt qu'une nouvelle teinte inventée. 357 tests + lint
+  (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -2058,8 +2058,9 @@
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
   background: linear-gradient(135deg,
-    #e0b040 0%, #e0b040 32%,
-    #b3242b 52%, #b3242b 100%);
+    #000000 0%, #000000 20%,
+    #b3242b 40%, #b3242b 72%,
+    #c9932e 100%);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }

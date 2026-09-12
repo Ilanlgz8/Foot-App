@@ -1320,8 +1320,9 @@
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #e0b040 0%, #e0b040 32%,
-    #b3242b 52%, #b3242b 100%);
+    #000000 0%, #000000 20%,
+    #b3242b 40%, #b3242b 72%,
+    #c9932e 100%);
 }
 
 #root .lmp__hero--theme-bl1 {
