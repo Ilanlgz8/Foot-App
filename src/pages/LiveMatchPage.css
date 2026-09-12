@@ -1337,16 +1337,18 @@
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background: linear-gradient(135deg,
-    #8a0410 0%, #e30613 38%, #e30613 76%,
-    #ffffff 100%);
+  background:
+    radial-gradient(45% 40% at 15% 15%, rgba(255,255,255,0.22) 0%, transparent 60%),
+    linear-gradient(135deg,
+      #8a0410 0%, #e30613 38%, #e30613 76%,
+      #ffffff 100%);
 }
 
 /* ⚠️ HABILLAGE SERIE A (12/09) — mirroir exact de `.poster--theme-sa`
    (accueil.css, voir son commentaire détaillé). Structure reprise de
    `.lmp__hero--theme-nl` (grands calques flous, pas de noir). */
 #root .lmp__hero--theme-sa {
-  background: #071620;
+  background: #0b3a4d;
 }
 .lmp__hero--theme-sa .lmp__heroTintB {
   inset: 0;
@@ -1363,10 +1365,10 @@
     radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
     radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
     radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
-    radial-gradient(40% 65% at 90% 30%, #073b4c 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
     radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
-    #071620;
+    #0b3a4d;
 }
 
 /* ⚠️ HABILLAGE LIGUE 1 "MODE PEINTURE" (12/09) — mirroir exact de
@@ -1391,7 +1393,7 @@
 /* ⚠️ HABILLAGE PREMIER LEAGUE "MODE PEINTURE" (12/09) — mirroir exact de
    `.poster--theme-pl` (accueil.css, voir son commentaire détaillé). */
 #root .lmp__hero--theme-pl {
-  background: #8a1d92;
+  background: #da70d6;
 }
 .lmp__hero--theme-pl .lmp__heroTintB {
   inset: 0;
@@ -1403,9 +1405,8 @@
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #ffffff 0%, #ffffff 18%,
-    #b565c4 42%,
-    #8a1d92 68%, #8a1d92 100%);
+    #da70d6 0%, #da70d6 32%,
+    #ffffff 62%, #ffffff 100%);
 }
 
 /* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`

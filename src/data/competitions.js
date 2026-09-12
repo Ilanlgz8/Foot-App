@@ -917,7 +917,12 @@ const TINT_THEME_CAMP_COLORS = {
   // ⚠️ pl : rose/magenta retiré le 12/09 (reconsidération utilisateur, voir
   // commentaire détaillé sur l'entrée PL ci-dessus) — 2e couleur repassée à
   // `#37003c` (violet foncé de marque, déjà présent dans le dégradé).
-  pl:   ['#8a1d92', '#37003c'],
+  // ⚠️ RETOUCHÉ (13/09, demande explicite : "inverse les couleurs et le
+  // violet met que du violet clair rosé") — le violet marque foncé
+  // (`#8a1d92`/`#37003c`) est entièrement retiré du dégradé PL, remplacé par
+  // un violet clair rosé unique (`#da70d6`, orchidée) associé au blanc,
+  // ordre inversé (violet au coin haut-gauche, blanc au coin bas-droite).
+  pl:   ['#da70d6', '#ffffff'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

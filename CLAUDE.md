@@ -1214,6 +1214,45 @@ cf-worker/
   cuivré que l'or clair précédent) plutôt qu'une nouvelle teinte inventée. 357 tests + lint
   (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
 
+- ✅ 3 ajustements groupés le même jour (13/09, demande explicite unique : "pour la premiere
+  league inverse les couleur et le violet met que du violet clair rosé stp et la bundesliga
+  rajoute du blanc en haut a gauche aussi et la serie a enlève le noir") :
+  - Premier League (`.poster--theme-pl` / `.lmp__hero--theme-pl .lmp__heroTintC`) : le violet de
+    marque foncé (`#8a1d92`/`#37003c`, présent depuis le passage en mode peinture du 12/09) est
+    entièrement retiré du dégradé — remplacé par une seule teinte de violet clair rosé
+    (`#da70d6`, orchidée) demandée explicitement ("que du violet clair rosé"), plus aucune nuance
+    sombre. Ordre inversé comme demandé : `linear-gradient(135deg, #da70d6 0-32%, #ffffff
+    62-100%)` — le violet est maintenant au coin haut-gauche (135deg part de ce coin), le blanc
+    au coin bas-droite (c'était l'inverse juste avant, voir "Refonte complète..." plus haut).
+    `TINT_THEME_CAMP_COLORS.pl` (`competitions.js`) mis à jour (`['#da70d6', '#ffffff']`, ancien
+    violet foncé retiré, plus aucune référence à une couleur absente du dégradé). Fond de repli
+    `#root .lmp__hero--theme-pl` passé de `#8a1d92` à `#da70d6`, cohérent avec la nouvelle
+    palette. Honnêteté : `#da70d6` (orchidée) est un choix de teinte "clair rosé" cohérent avec la
+    demande, pas une couleur de marque Premier League officielle vérifiée à la source (aucune ne
+    l'est dans cette teinte précise).
+  - Bundesliga (`.poster--theme-bl1` / `.lmp__hero--theme-bl1 .lmp__heroTintC`) : ajout d'un
+    calque `radial-gradient` discret de blanc semi-transparent (`rgba(255,255,255,0.22)`) au coin
+    haut-gauche (15% 15%, fondu à 60%), PAR-DESSUS le dégradé linéaire rouge→blanc déjà existant
+    (inchangé) — "aussi" dans la demande interprété comme additif : le blanc du dégradé principal
+    (coin bas-droite, "plus de rouge que de blanc") reste en place, ce nouveau calque ajoute
+    seulement une touche de blanc en plus au coin opposé, même mécanisme déjà utilisé pour la
+    "légère touche de blanc qui apporte un effet brillant" de Ligue 1 (voir "Refonte complète..."
+    plus haut) — cohérence de méthode entre les 2 thèmes.
+  - Serie A (`.poster--theme-sa` / `.lmp__hero--theme-sa .lmp__heroTintC`) : Serie A n'avait en
+    réalité JAMAIS de `#000000` littéral (contrairement à PD/BL1/UEL/UECL) — son fond de repli
+    (`#071620`) et une de ses 7 taches radiales (`#073b4c`, coin haut-droite) sont des bleu-marine
+    TRÈS sombres, visuellement quasi indiscernables du noir à l'œil, la cause la plus probable de
+    la perception "il y a du noir" de l'utilisateur. Éclaircis vers un bleu-marine clairement
+    identifiable comme bleu : fond de repli `#071620` → `#0b3a4d`, tache `#073b4c` → `#0d5a73` —
+    les 6 autres couleurs (bleus/verts/teal déjà validés) inchangées, palette "bleu vert et blanc"
+    toujours respectée. Honnêteté : pas de certitude à 100% que c'était CES 2 couleurs précises
+    qui donnaient l'impression de noir (aucune vraie valeur `#000000`/quasi-noir `#0a0a0a` n'existe
+    dans ce thème, contrairement aux autres où retirer "le noir" visait une couleur littéralement
+    noire) — c'est l'interprétation la plus probable vu qu'aucun autre candidat plus sombre
+    n'existe dans ce thème. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
+    build vérifiés inchangés pour les 3 changements (CSS + `competitions.js`, aucune logique
+    touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

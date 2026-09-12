@@ -1902,9 +1902,8 @@
 .poster--theme-pl .poster__bg--gradient {
   inset: 0;
   background: linear-gradient(135deg,
-    #ffffff 0%, #ffffff 18%,
-    #b565c4 42%,
-    #8a1d92 68%, #8a1d92 100%);
+    #da70d6 0%, #da70d6 32%,
+    #ffffff 62%, #ffffff 100%);
   animation: none;
 }
 .poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2116,9 +2115,11 @@
    rouges, 5 blanches. */
 .poster--theme-bl1 .poster__bg--gradient {
   inset: 0;
-  background: linear-gradient(135deg,
-    #8a0410 0%, #e30613 38%, #e30613 76%,
-    #ffffff 100%);
+  background:
+    radial-gradient(45% 40% at 15% 15%, rgba(255,255,255,0.22) 0%, transparent 60%),
+    linear-gradient(135deg,
+      #8a0410 0%, #e30613 38%, #e30613 76%,
+      #ffffff 100%);
   animation: none;
 }
 .poster--theme-bl1 .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2143,10 +2144,10 @@
     radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
     radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
     radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
-    radial-gradient(40% 65% at 90% 30%, #073b4c 0%, transparent 60%),
+    radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
     radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
-    #071620;
+    #0b3a4d;
   filter: saturate(1.4);
   animation: none;
 }
