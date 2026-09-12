@@ -2144,17 +2144,17 @@
 .poster--theme-bl1 .poster__bg--gradient {
   inset: -20px;
   background:
-    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
+    radial-gradient(38% 30% at 15% 15%, #e30613 0%, transparent 60%),
     radial-gradient(30% 42% at 8% 48%, #e30613 0%, transparent 58%),
     radial-gradient(34% 26% at 82% 10%, #e30613 0%, transparent 55%),
     radial-gradient(26% 38% at 92% 58%, #c41230 0%, transparent 56%),
     radial-gradient(30% 24% at 42% 92%, #e30613 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #ffffff 0%, transparent 42%),
-    radial-gradient(30% 32% at 76% 72%, #ffffff 0%, transparent 40%),
-    radial-gradient(26% 40% at 50% 14%, #ffffff 0%, transparent 42%),
-    radial-gradient(34% 28% at 14% 82%, #ffffff 0%, transparent 40%),
-    radial-gradient(22% 34% at 90% 32%, #ffffff 0%, transparent 42%),
+    radial-gradient(16% 22% at 30% 55%, rgba(255,255,255,0.55) 0%, transparent 55%),
+    radial-gradient(14% 20% at 76% 72%, rgba(255,255,255,0.5) 0%, transparent 54%),
+    radial-gradient(15% 22% at 50% 14%, rgba(255,255,255,0.5) 0%, transparent 55%),
+    radial-gradient(16% 20% at 14% 82%, rgba(255,255,255,0.5) 0%, transparent 54%),
+    radial-gradient(14% 20% at 90% 32%, rgba(255,255,255,0.5) 0%, transparent 55%),
     radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
     #141414;
   filter: blur(20px) saturate(1.3);

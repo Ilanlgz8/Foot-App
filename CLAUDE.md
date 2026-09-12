@@ -785,6 +785,21 @@ cf-worker/
   et `LiveMatchPage.css` gardés identiques comme toujours pour les 2 compétitions. 357 tests +
   lint + build vérifiés inchangés (changement CSS + commentaires uniquement).
 
+- ✅ Noir entièrement retiré du mode peinture Bundesliga, même jour (12/09, demande explicite :
+  "met que rouge et blanc pas de noir et beaucoup de rouge et du blanc [...] très doux tres
+  fins") — revient sur le "garder le noir en haut à gauche" demandé 2 fois plus tôt dans la
+  journée (voir les 2 points ci-dessus). La dernière tache noire (15% 15%) passe au rouge de
+  marque `#e30613` dans `.poster--theme-bl1` (`accueil.css`) et `.lmp__hero--theme-bl1`
+  (`LiveMatchPage.css`, gardé identique) : 7 taches rouges au total, 0 noire. Les 5 taches
+  blanches réduites ET adoucies pour rester "très doux très fins" plutôt que des blocs nets :
+  taille divisée par ~2 (14-16%/20-22% contre 22-46% avant, même principe de réduction que PL/
+  Ligue 1 ci-dessus) ET couleur passée de `#ffffff` opaque à `rgba(255,255,255,0.5-0.55)`
+  (semi-transparent) — la baisse d'opacité en plus de la taille est ce qui donne le rendu "doux"
+  spécifiquement demandé ici (différent de PL/Ligue 1, restés en blanc opaque). `TINT_THEME_
+  CAMP_COLORS.bl1` mis à jour (`#000000` → `#c41230`, rouge déjà présent dans le dégradé) pour ne
+  plus référencer le noir retiré. 357 tests + lint + build vérifiés inchangés (changement CSS +
+  commentaires uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

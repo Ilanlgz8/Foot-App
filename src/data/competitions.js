@@ -546,6 +546,21 @@ export const COMPETITIONS = [
     // passent au rouge de marque, et la tache "bas milieu" déjà rouge est
     // éclaircie vers ce même rouge primaire — ne reste noir QUE le coin
     // haut-gauche (15% 15%), demandé explicitement à garder à 2 reprises.
+    // ⚠️ NOIR ENTIÈREMENT RETIRÉ LE MÊME JOUR (demande explicite : "met que
+    // rouge et blanc pas de noir et beaucoup de rouge et du blanc [...] très
+    // doux tres fins") — revient sur le "garder le noir en haut à gauche"
+    // demandé 2 fois plus tôt dans la journée. La dernière tache noire (15%
+    // 15%) passe au rouge de marque `#e30613` : 7 taches rouges au total
+    // désormais, 0 noire. Les 5 taches blanches sont réduites ET adoucies
+    // pour rester discrètes ("très doux très fins") plutôt que des blocs
+    // blancs nets : taille divisée par ~2 (14-16%/20-22% contre 22-46%
+    // avant) ET couleur passée de `#ffffff` opaque à `rgba(255,255,255,
+    // 0.5-0.55)` (semi-transparent, donc plus "doux") — même principe de
+    // réduction que ce qui vient d'être fait sur Premier League/Ligue 1,
+    // mais avec en plus la baisse d'opacité (pas seulement la taille) pour
+    // le rendu "doux" spécifiquement demandé ici. `TINT_THEME_CAMP_COLORS.
+    // bl1` mis à jour (`#000000` → `#c41230`, rouge déjà présent dans le
+    // dégradé) pour ne plus référencer le noir retiré.
     tintTheme: 'bl1',
     name: 'Bundesliga',
     shortName: 'Bundesliga',
@@ -881,7 +896,11 @@ const TINT_THEME_CAMP_COLORS = {
   // (voir leurs entrées ci-dessus) — mêmes couleurs que les taches dominantes
   // de chaque thème.
   pd:   ['#b3242b', '#e0b040'],
-  bl1:  ['#e30613', '#000000'],
+  // ⚠️ bl1 : noir retiré le 12/09 (voir commentaire détaillé sur l'entrée
+  // Bundesliga ci-dessus, "que rouge et blanc pas de noir") — 2e couleur
+  // repassée à `#c41230` (rouge sombre déjà présent dans le dégradé), plus
+  // de `#000000` référencé.
+  bl1:  ['#e30613', '#c41230'],
   sa:   ['#0d97ab', '#16a34a'],
   // Ajoutés le 12/09 avec le passage de Ligue 1/Premier League en mode
   // peinture (constat utilisateur : "y'a que une couleur c fade").
