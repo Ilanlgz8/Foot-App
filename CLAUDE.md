@@ -800,6 +800,41 @@ cf-worker/
   plus référencer le noir retiré. 357 tests + lint + build vérifiés inchangés (changement CSS +
   commentaires uniquement).
 
+- ✅ "Forme récente" fausse sur certaines cards Accueil (constat utilisateur, 12/09 : "certaines
+  équipe n'avait pas la bonne forme récente exemple aston villa il y'a que un losange vert alors
+  que normalement elle a joué trois match") : investigation en direct via le navigateur intégré
+  (React DevTools, lecture des props RÉELLEMENT reçues par `MatchPoster` sur la carte en question)
+  — preuve formelle que la carte recevait `compMatches` CORRECT (les 3 vrais matchs de Villa
+  cette saison : Brighton 4-0 Villa, Villa 0-1 Arsenal, Hull 0-0 Villa → L/L/D) mais un
+  `formMap['58']` (id football-data.org d'Aston Villa) FAUX (`['W']`, un seul résultat qui ne
+  correspond même pas au début de la vraie séquence) — alors que les deux viennent pourtant du
+  MÊME objet `{formMap, matches}` renvoyé par une seule requête `fetchTeamForm('PL')`
+  (`useTeamForm.js`, `formMap = buildFormMap(matches)`), donc censés être TOUJOURS cohérents
+  entre eux. Vérifications qui ont permis d'écarter les pistes les plus évidentes : un test
+  isolé (vitest) rejouant `resolveFdTeamId`+`buildFormMap` sur les vraies données extraites du
+  cache donne le bon résultat (`['L','L','D']`) — donc pas un bug de logique encore actif
+  aujourd'hui. `queryClient.getQueryData(['teamForm2','PL','cur'])` ET le blob persisté
+  (`REACT_QUERY_OFFLINE_CACHE`, voir `PersistQueryClientProvider` dans `main.jsx`) contenaient
+  eux DÉJÀ la bonne valeur au moment du test, y compris après un rechargement complet de la page
+  — la donnée s'était donc autocorrigée entre-temps (un refetch en arrière-plan a fini par
+  écraser la mauvaise valeur), mais la carte déjà affichée à l'écran, elle, ne s'est jamais mise
+  à jour avec cette correction. Honnêteté : cause précise de l'écriture initiale de `['W']` non
+  confirmée à 100% (aucun accès aux logs d'un fetch passé pour savoir QUAND/POURQUOI ça s'est
+  produit) — l'hypothèse la plus crédible est la même famille de bug déjà documentée le 16/08
+  (Deportivo) : un match de coupe (Community Shield en tout début de saison, sourcé ESPN) mal
+  résolu vers le mauvais id FD.org via `resolveFdTeamId` contre un `leagueMatches` encore quasi
+  vide, une valeur fausse restée ensuite figée dans le cache PERSISTÉ (`gcTime` 24h) plus
+  longtemps qu'un simple cycle de `FORM_STALE` (2min) n'aurait dû le permettre. Remède appliqué
+  (`src/main.jsx`), cohérent avec le mécanisme déjà en place dans ce fichier pour exactement ce
+  type de symptôme (voir l'historique `CACHE_BUSTER` v11/v12/v13) : bump du buster
+  (`v13-...` → `v14-2026-09-12-fix-forme-recente-cache-fige`) pour purger IMMÉDIATEMENT toute
+  entrée `teamForm2` déjà persistée chez les utilisateurs actuels, plutôt que de compter sur un
+  refetch futur dont le délai n'est pas garanti. Si le même symptôme réapparaît sur une AUTRE
+  équipe après ce déploiement, ce sera le signe qu'un vrai bug de logique est encore actif (pas
+  juste un résidu de cache) et qu'il faudra creuser `resolveFdTeamId`/`cupMatches` plus
+  profondément (`useTeamForm.js`). 357 tests + lint + build vérifiés inchangés (bump de constante
+  uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

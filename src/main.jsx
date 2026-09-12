@@ -191,7 +191,46 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // fait déjà useStandings.js. Corrigé (`throw err` en dernier recours, aligné
 // sur useStandings.js). Bump pour vider tout faux [] déjà écrit sous ce
 // mécanisme avant le fix.
-const CACHE_BUSTER = 'v13-2026-08-28-fix-scorers-429-swallowed'
+// v14 : "forme récente" (losanges Accueil) fausse pour certaines équipes
+// (constat utilisateur, 12/09 : Aston Villa n'affichait qu'1 seul losange
+// vert alors qu'elle avait joué 3 matchs de Premier League cette saison) —
+// investigation en direct (React DevTools via le navigateur intégré,
+// inspection des props RÉELLEMENT reçues par MatchPoster) : preuve formelle
+// que la carte affichée recevait `compMatches` CORRECT (les 3 vrais matchs,
+// L/L/D) mais un `formMap['58']` FAUX (`['W']`, un seul résultat qui ne
+// correspond même pas au début de la vraie séquence) — les deux venant
+// pourtant du MÊME objet `{formMap, matches}` renvoyé par une seule requête
+// `fetchTeamForm('PL')` (`useTeamForm.js`), donc censés être TOUJOURS
+// cohérents entre eux. `queryClient.getQueryData(['teamForm2','PL','cur'])`
+// et le blob persisté (`REACT_QUERY_OFFLINE_CACHE`) contenaient eux DÉJÀ la
+// bonne valeur au moment du test — la donnée en cache s'était donc
+// autocorrigée entre-temps (un refetch en arrière-plan a fini par écraser la
+// mauvaise valeur), mais la carte déjà affichée à l'écran, elle, ne s'est
+// jamais mise à jour avec cette correction. Cause précise non confirmée à
+// 100% (aucun accès aux logs d'un fetch passé pour savoir QUAND/POURQUOI
+// `formMap['58']` a valu `['W']` la première fois) — l'hypothèse la plus
+// crédible reste la même famille de bug déjà documentée le 16/08 (Deportivo) :
+// un match de coupe (Community Shield en août, sourcé ESPN) mal résolu vers
+// le mauvais id FD.org via `resolveFdTeamId` contre un `leagueMatches` encore
+// quasi vide en tout début de saison — mais cette fois la valeur fausse
+// semble être restée figée dans le cache PERSISTÉ (`PersistQueryClientProvider`,
+// gcTime 24h) plus longtemps qu'un simple cycle de `FORM_STALE` (2min)
+// n'aurait dû le permettre, plutôt que d'être un bug de logique encore actif
+// aujourd'hui (le calcul refait à l'identique avec les données actuelles,
+// testé indépendamment via vitest, donne bien le bon résultat). Remède
+// appliqué, cohérent avec le mécanisme déjà en place dans ce fichier pour
+// exactement ce type de symptôme (voir v11/v12/v13 ci-dessus) : bump du
+// buster pour purger IMMÉDIATEMENT toute entrée `teamForm2` déjà persistée
+// chez les utilisateurs actuels, quelle que soit son ancienneté exacte,
+// plutôt que de compter sur un futur refetch dont le délai n'est pas
+// garanti. Honnêteté : ceci corrige le symptôme observé avec certitude (plus
+// aucune vieille valeur ne peut survivre à ce déploiement) mais je n'ai pas
+// pu remonter jusqu'au commit/appel exact qui a écrit `['W']` la toute
+// première fois — si le même symptôme réapparaît sur une AUTRE équipe après
+// ce bump, ce sera le signe qu'un vrai bug de logique est encore actif
+// (pas juste un résidu de cache) et qu'il faudra creuser resolveFdTeamId/
+// cupMatches plus profondément.
+const CACHE_BUSTER = 'v14-2026-09-12-fix-forme-recente-cache-fige'
 
 // ══════════════════════════════════════════════════════════════════════
 // FILET ANTI-ÉCRAN BLANC (02/09, constat utilisateur : "pourquoi j'ai un
