@@ -1269,6 +1269,16 @@ cf-worker/
     dans le dégradé changent) — aucune modification nécessaire. 357 tests + lint (33 erreurs
     pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
 
+- ✅ Violet Premier League assombri, même jour (13/09, demande explicite : "pour la premiere
+  league met un violet + foncé") — `.poster--theme-pl` (`accueil.css`) et `.lmp__hero--theme-pl
+  .lmp__heroTintC` (`LiveMatchPage.css`, gardé identique) : la teinte `#da70d6` (orchidée claire,
+  choisie au point précédent pour "violet clair rosé") remplacée par `#9932cc` (orchidée foncée,
+  couleur nommée CSS standard "darkorchid") — même position dans le dégradé (0-58%), même blanc
+  (84-100%), seule la teinte change. Fond de repli `#root .lmp__hero--theme-pl` et `TINT_THEME_
+  CAMP_COLORS.pl` (`competitions.js`) mis à jour en cohérence (`#da70d6` → `#9932cc`). 357 tests +
+  lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (CSS +
+  `competitions.js`, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

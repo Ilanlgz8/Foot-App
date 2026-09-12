@@ -922,7 +922,10 @@ const TINT_THEME_CAMP_COLORS = {
   // (`#8a1d92`/`#37003c`) est entièrement retiré du dégradé PL, remplacé par
   // un violet clair rosé unique (`#da70d6`, orchidée) associé au blanc,
   // ordre inversé (violet au coin haut-gauche, blanc au coin bas-droite).
-  pl:   ['#da70d6', '#ffffff'],
+  // ⚠️ ASSOMBRI (13/09, demande explicite : "pour la premiere league met un
+  // violet + foncé") — `#da70d6` (orchidée claire) → `#9932cc` (orchidée
+  // foncée / "darkorchid"), même position dans le dégradé, blanc inchangé.
+  pl:   ['#9932cc', '#ffffff'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —
