@@ -1405,8 +1405,9 @@
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #37003c 0%, #37003c 58%,
-    #ffffff 84%, #ffffff 100%);
+    #37003c 0%, #37003c 42%,
+    #b565c4 66%,
+    #ffffff 90%, #ffffff 100%);
 }
 
 /* ⚠️ HABILLAGE CAN (10/09) — mirroir exact de `.poster--theme-can`

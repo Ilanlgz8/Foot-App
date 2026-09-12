@@ -1902,8 +1902,9 @@
 .poster--theme-pl .poster__bg--gradient {
   inset: 0;
   background: linear-gradient(135deg,
-    #37003c 0%, #37003c 58%,
-    #ffffff 84%, #ffffff 100%);
+    #37003c 0%, #37003c 42%,
+    #b565c4 66%,
+    #ffffff 90%, #ffffff 100%);
   animation: none;
 }
 .poster--theme-pl .poster__bg--gradientAlt { inset: 0; opacity: 0; }

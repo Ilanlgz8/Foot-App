@@ -1294,6 +1294,27 @@ cf-worker/
   mis à jour en cohérence. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
   build vérifiés inchangés (CSS + `competitions.js`, aucune logique touchée).
 
+- ✅ Transition violet→blanc PL lissée, même jour (13/09, retour utilisateur juste après le
+  passage à `#37003c` : "le problème c que le dégradé est moche la car on passe d'un violet
+  foncé au blanc ça fait une vrai coupure") — root cause : `#37003c` est un violet TRÈS sombre
+  (proche du noir), passer directement de ce ton à blanc pur sur une seule zone de transition
+  (58-84%) traverse un gris-mauve terne perçu comme une coupure nette plutôt qu'un fondu, le même
+  type de problème déjà rencontré et documenté sur cette page pour d'autres combinaisons foncé↔
+  clair (voir "rosé délavé" Bundesliga, "effet trouble" noir+or LaLiga). Corrigé
+  (`.poster--theme-pl` dans `accueil.css` + `.lmp__hero--theme-pl .lmp__heroTintC` dans
+  `LiveMatchPage.css`, gardé identique) : ajout d'une teinte violette intermédiaire, `#b565c4`
+  (déjà utilisée et documentée comme "violet clair intermédiaire" dans une version précédente de
+  ce thème, voir "Refonte complète..." plus haut — réutilisation d'une teinte déjà établie plutôt
+  qu'une nouvelle invention) — le dégradé passe maintenant en 2 étapes progressives : `#37003c`
+  (plateau 0-42%) → `#b565c4` (pont à 66%) → `#ffffff` (plateau 90-100%), au lieu d'un seul saut
+  direct foncé→blanc. Chaque étape reste dans une gamme de violet cohérente (foncé → clair →
+  blanc) plutôt qu'un aplat sombre suivi d'un blanc immédiat. `TINT_THEME_CAMP_COLORS.pl` non
+  touché (toujours `['#37003c', '#ffffff']`, les 2 couleurs dominantes restent identiques, seule
+  la transition entre elles est adoucie). 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés inchangés (CSS uniquement). Honnêteté : rendu jamais vu en direct
+  avant ce déploiement (juste lecture du CSS) — à confirmer par l'utilisateur que la coupure a
+  bien disparu, pas seulement déplacée.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
