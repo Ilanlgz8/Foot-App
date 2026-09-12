@@ -1013,6 +1013,26 @@ cf-worker/
   direct sur la prod avec de vraies données) — à reconfirmer par
   l'utilisateur sur la carte Real Madrid après déploiement.
 
+- ✅ Minute du match en rouge sur Serie A (LiveMatchPage), demandée en blanc
+  (12/09, demande explicite : "pour la serie a dans livematchpage met la
+  minute du match ne blanc plutot que rouge") — en fait une RÉGRESSION du
+  passage en mode peinture de Serie A le même jour (voir plus haut) : Serie A
+  avait déjà `tintLight: true` avant ce passage (demande du 06/09, "Terminé"
+  en blanc pour Ligue 1/Premier League/Serie A) mais le switch vers
+  `tintTheme: 'sa'` a remplacé TOUS les anciens champs (`tint`/`tintLight`/
+  `tint2`/`tint3`/`tintSoft`/`tintStops`/`tintPearl`) sans reprendre
+  `tintLight` — contrairement à Premier League, passée en mode peinture le
+  même jour mais où `tintLight: true` avait bien été explicitement ajouté à
+  côté de `tintTheme: 'pl'`. Remis (`competitions.js`, `SA.tintLight = true`)
+  — `tintTheme` et `tintLight` sont deux classes CSS indépendantes appliquées
+  ensemble sur le hero (`LiveMatchPage.jsx`/`MatchPage.jsx`/`MatchPoster.jsx`),
+  aucun conflit entre les deux. Effet de bord assumé et cohérent, comme pour
+  Premier League à l'époque : le "Terminé" repasse aussi en blanc, et l'effet
+  s'applique aussi à MatchPage et aux cards Accueil (même flag partagé), pas
+  seulement LiveMatchPage — cohérent avec la demande initiale du 06/09.
+  357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  vérifiés inchangés (changement de données + commentaire uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

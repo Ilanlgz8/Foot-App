@@ -603,6 +603,15 @@ export const COMPETITIONS = [
     // cohérence esthétique (aucun vert n'existait avant dans l'identité Serie
     // A sur ce site, pas de pixel officiel à reprendre).
     tintTheme: 'sa',
+    // ⚠️ AJOUT (12/09, demande explicite : "pour la serie a dans livematchpage
+    // met la minute du match en blanc plutot que rouge") — même mécanisme déjà
+    // en place pour FL1/PL (voir `.lmp__hero--lightTint .lmp__heroMinute`,
+    // LiveMatchPage.css) : le rouge du chrono se noie sur un fond mode-peinture
+    // déjà saturé (ici bleu/vert). `tintTheme` et `tintLight` sont deux
+    // classes indépendantes appliquées ensemble sur le hero (voir LiveMatchPage.
+    // jsx) — aucun conflit, PD/BL1/UEL/UECL restent volontairement SANS
+    // `tintLight` (jamais demandé pour elles).
+    tintLight: true,
     name: 'Serie A Enilive',
     shortName: 'Serie A',
     emblem: serieALogo,
