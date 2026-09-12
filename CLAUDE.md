@@ -856,6 +856,26 @@ cf-worker/
   de deviner une 10e cause théorique mais d'obtenir une preuve visuelle directe (capture d'écran/
   vidéo de l'instant où ça se décolle) — demandé à l'utilisateur.
 
+- 🔍 Changement de stratégie sur la barre du bas décollée (12/09, retour utilisateur après la 9e
+  tentative : "bah oui mais faudrait savoir en fait parce que la ça fait jsp combien de fois qu'on
+  essaie de réparer ça") — remarque juste : 9 tentatives basées sur des théories (compositing,
+  ancêtre transformé, scroll-lock, écart viewport visuel...) sans jamais avoir pu observer le bug
+  moi-même sur un vrai appareil depuis cet environnement. Plutôt qu'une 10e théorie devinée à
+  l'aveugle, ajout d'un petit outil de MESURE réelle : `src/components/NavDebugHUD.jsx`, monté en
+  permanence dans `App.jsx` mais invisible par défaut — activé une fois via `.../?navdebug=1`
+  (persiste en localStorage, `.../?navdebug=0` pour désactiver). Affiche en direct (3x/seconde,
+  encart discret en haut à gauche, `pointer-events: none`) : viewport de layout (`innerH`) vs
+  viewport visuel réel (`vvH`/`vvTop`), l'écart entre les deux (`gap`, ce que la 8e tentative
+  essaie de combler), la position réelle du bas de la barre (`barBottom`), le `transform`/
+  `position` CSS réellement appliqués à `.sfTabbar`, et `scrollY`. Objectif : au prochain
+  décrochage, une capture d'écran de cet encart donne les VRAIES valeurs au moment exact du bug —
+  permet de savoir laquelle des 9 théories déjà tentées était juste (ou pas) au lieu de continuer
+  à empiler des correctifs sur des hypothèses non vérifiées. 357 tests + lint + build vérifiés
+  (1 erreur lint introduite puis corrigée : `setState` dans un `useEffect` plutôt qu'un
+  initialiseur `useState` paresseux, même pattern déjà utilisé ailleurs dans l'app). Honnêteté :
+  cet ajout ne corrige rien en soi, c'est un outil de diagnostic — la vraie correction dépendra de
+  ce que montrera la prochaine capture d'écran de l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

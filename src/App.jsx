@@ -13,6 +13,7 @@ import { useWeakNetwork } from './hooks/useNetworkQuality'
 import { WeakNetworkBanner } from './components/WeakNetworkBanner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { SplashScreen } from './components/SplashScreen'
+import { NavDebugHUD } from './components/NavDebugHUD'
 
 const MatchAVenir = lazy(() => import('./components/Match.jsx'))
 const Resultat = lazy(() => import('./components/Resultat.jsx'))
@@ -381,6 +382,7 @@ function App() {
           SplashScreen.jsx pour le détail du déclencheur (lancement à froid
           uniquement) et de la durée (variable, liée aux requêtes en cours). */}
       <SplashScreen />
+      <NavDebugHUD />
       <LiveProvider>
         <Navbar />
         {!online && <OfflineBanner />}
