@@ -4,6 +4,13 @@ import './index.css'
 import App from './App.jsx'
 import { checkAppVersion } from './utils/appUpdate'
 
+// Efface le garde-fou anti-boucle posé par le script inline d'index.html
+// (voir son commentaire) : si CE module s'exécute, c'est que le script
+// d'entrée a bien chargé — le filet peut redevenir actif pour un futur
+// échec de chargement, plutôt que rester bloqué "déjà tenté" pour toujours
+// à cause d'un incident réseau ponctuel résolu depuis.
+try { sessionStorage.removeItem('sfModuleRetry') } catch { /* stockage inaccessible */ }
+
 // Auto-reload quand le SW prend le contrôle (skipWaiting + clientsClaim)
 // → plus besoin de vider le cache Safari après chaque déploiement
 if ('serviceWorker' in navigator) {

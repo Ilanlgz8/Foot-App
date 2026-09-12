@@ -24,6 +24,56 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- ⚠️ FILET ULTIME anti-écran-blanc (12/09, cause réelle trouvée en
+         reproduisant en direct le "écran blanc, rien dessus" signalé par
+         l'utilisateur sur Opera desktop) : le filet existant dans main.jsx
+         (window.addEventListener 'error'/'unhandledrejection', voir
+         showBootError) ne peut RIEN faire dans ce cas précis — il vit DANS
+         le module d'entrée lui-même (src/main.jsx). Si CE module échoue à
+         charger (ex. le service worker sert un vieux index.html en cache
+         qui pointe vers un bundle JS dont le hash a été purgé après un
+         nouveau déploiement — cleanupOutdatedCaches, voir vite.config.js —
+         le fichier n'existe simplement plus sur le serveur), aucun JS de
+         l'app ne tourne JAMAIS pour afficher la moindre erreur : écran
+         blanc silencieux, exactement le symptôme rapporté. Reproduit en
+         direct (navigateur intégré) : "Failed to load module script...MIME
+         type text/html" après plusieurs déploiements rapprochés — le réseau
+         qui échoue à temps sur la requête HTML (NetworkFirst, 3s de délai,
+         voir vite.config.js) fait retomber sur un vieux HTML en cache
+         référençant un bundle déjà purgé entre-temps.
+         Seul du JS EN DEHORS du système de modules (ce script classique,
+         toujours exécuté même si le <script type="module"> plus bas échoue)
+         peut intercepter ça : erreur de chargement de script capturée en
+         phase de capture sur `window` (les erreurs de ressource ne
+         remontent pas en bulles, mais SONT dispatchées en capture) — purge
+         le service worker + les caches (même geste que le bouton "Vider les
+         données" de main.jsx) et recharge une seule fois (garde
+         sessionStorage anti-boucle si le vrai problème est ailleurs, ex.
+         panne réseau totale — voir main.jsx qui efface ce garde-fou dès que
+         l'app démarre vraiment). -->
+    <script>
+      window.addEventListener('error', function (e) {
+        var t = e.target
+        if (!t || t.tagName !== 'SCRIPT') return
+        if (sessionStorage.getItem('sfModuleRetry')) return
+        sessionStorage.setItem('sfModuleRetry', '1')
+        Promise.resolve()
+          .then(function () {
+            if (!('serviceWorker' in navigator)) return
+            return navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister() }))
+            })
+          })
+          .then(function () {
+            if (!('caches' in window)) return
+            return caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k) }))
+            })
+          })
+          .catch(function () {})
+          .then(function () { location.reload() })
+      }, true)
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -876,6 +876,38 @@ cf-worker/
   cet ajout ne corrige rien en soi, c'est un outil de diagnostic — la vraie correction dépendra de
   ce que montrera la prochaine capture d'écran de l'utilisateur.
 
+- ✅ Écran blanc "rien dessus" signalé par l'utilisateur (12/09, Opera desktop, juste après avoir
+  ouvert le lien `?navdebug=1`) — reproduit EN DIRECT dans le navigateur intégré en testant ce
+  même lien juste après plusieurs déploiements rapprochés : console montrant "Failed to load
+  module script... MIME type text/html" — le bundle JS d'entrée référencé par le `index.html` en
+  cache n'existait plus sur le serveur (purgé par un déploiement plus récent), et la réponse
+  reçue à la place était l'`index.html` lui-même (repli SPA de Vercel sur un chemin inconnu),
+  d'où le mauvais type MIME. Confirmé root cause : après avoir vidé le service worker + les
+  caches Workbox (`html-navigations` notamment) à la main, la page se remettait à charger
+  normalement. Contexte : `vite.config.js` a DÉJÀ une protection dédiée à cette classe de bug
+  (NetworkFirst 3s sur les navigations + `cleanupOutdatedCaches`, voir son historique 04/09) —
+  mais elle suppose que la requête réseau du HTML aboutit OU échoue franchement (vraiment hors
+  ligne). Trou non couvert jusqu'ici : le réseau qui échoue À TEMPS (3s dépassées, ex. VPN/
+  bloqueur intégré d'Opera ajoutant de la latence) fait retomber sur le HTML encore en cache —
+  qui peut référencer un bundle déjà purgé entre-temps par `cleanupOutdatedCaches` (justement
+  censé éviter ce genre de résidu). Plus grave : le filet anti-écran-blanc déjà en place
+  (`main.jsx`, `showBootError`) ne peut RIEN faire ici — il vit DANS le module d'entrée
+  (`src/main.jsx`) lui-même ; si CE module échoue à charger, aucun JS de l'app ne tourne jamais
+  pour afficher quoi que ce soit, y compris ce filet. Corrigé (`index.html`) : ajout d'un script
+  classique (PAS un module — donc toujours exécuté même si le `<script type="module">` suivant
+  échoue) qui écoute les erreurs de chargement de ressource en phase de CAPTURE sur `window`
+  (les erreurs de ressource ne remontent pas en bulles) ; sur une erreur de script, purge le
+  service worker + tous les caches puis recharge une seule fois (garde `sessionStorage` anti-
+  boucle, effacé dès que `main.jsx` s'exécute avec succès — voir son tout début — pour ne pas
+  rester bloqué "déjà tenté" après un incident réseau ponctuel résolu). Complémentaire à la
+  protection NetworkFirst existante, pas un remplacement : celle-ci réduit la fréquence du
+  problème, celle-là est le vrai filet de dernier recours quand il se produit quand même. 357
+  tests + lint + build vérifiés inchangés (fichier HTML + petit ajout `main.jsx`, aucune logique
+  React touchée). Honnêteté : je n'ai pas pu confirmer que c'est EXACTEMENT ce qui s'est passé
+  sur l'Opera de l'utilisateur (pas de logs de sa session) — mais j'ai reproduit un vrai
+  mécanisme identique en conditions réelles (pas une hypothèse théorique), avec le même symptôme
+  exact ("écran blanc, rien dessus") et la même erreur console précise.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
