@@ -908,6 +908,30 @@ cf-worker/
   mécanisme identique en conditions réelles (pas une hypothèse théorique), avec le même symptôme
   exact ("écran blanc, rien dessus") et la même erreur console précise.
 
+- ✅ ROOT CAUSE TROUVÉE ET CONFIRMÉE pour la barre du bas décollée (12/09, 10e signalement — mais
+  cette fois avec une VRAIE capture d'écran de `NavDebugHUD.jsx` au moment exact du décrochage,
+  pas une théorie) : `gap:335`, `innerH:509` sur la capture — une hauteur de layout ~509px est
+  bien trop petite pour un écran de téléphone plein écran (donc `visualViewport.height` calculé
+  au même instant était lui aussi faussé, ~174px déduit). Cette mesure a clairement été prise
+  pendant une fenêtre où le navigateur n'avait pas encore les vraies dimensions (juste après un
+  retour d'arrière-plan). Le vrai coupable : la 8e tentative elle-même (`App.jsx`, sync
+  `visualViewport`, 11/09) — censée corriger un petit "bandeau noir" de quelques pixels sous la
+  barre, elle n'avait AUCUN garde-fou contre une mesure aberrante, et a donc appliqué
+  `transform: translateY(-335px)` au pied de la lettre — arrachant littéralement la barre de
+  335px vers le haut, en plein milieu de la liste de matchs. C'est EXACTEMENT le symptôme "barre
+  en plein milieu de la page" déjà rapporté plusieurs fois (dont le 6e signalement) : la 8e
+  tentative, une correction censée AIDER, était en réalité elle-même la cause du symptôme le
+  plus visible et le plus rapporté de toute cette série. Corrigé (`App.jsx`) : la correction
+  `translateY` n'est appliquée que si l'écart mesuré est PLAUSIBLE pour une vraie barre d'outils
+  mobile (`MAX_PLAUSIBLE_GAP = 60px`, marge large) — une valeur aberrante comme 335px est ignorée
+  et le `transform` est explicitement nettoyé (`''`) plutôt que laissé tel quel, pour ne jamais
+  rester bloqué sur une correction déjà appliquée à tort. 357 tests + lint + build vérifiés
+  inchangés. C'est la première fois dans cette série de 10 tentatives qu'une cause est confirmée
+  par une MESURE RÉELLE capturée au bon moment plutôt que déduite par audit de code ou théorie —
+  directement rendu possible par l'outil de diagnostic ajouté juste avant (constat utilisateur
+  après la 9e tentative : "faudrait savoir en fait"). À confirmer par l'utilisateur sur un
+  nouveau cycle arrière-plan/premier-plan après ce déploiement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

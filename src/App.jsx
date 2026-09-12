@@ -348,14 +348,39 @@ function App() {
   // pendant l'animation de la barre d'adresse, pas seulement après coup) —
   // la barre suit donc le bord réellement visible de l'écran au lieu de
   // dépendre entièrement du calcul natif de `position:fixed` par WebKit.
+  // ⚠️ 10e SIGNALEMENT (12/09) — cette fois avec une VRAIE preuve capturée
+  // (grâce à `NavDebugHUD.jsx`, voir plus haut) au moment exact du
+  // décrochage, pas une théorie : `gap:335`, `innerH:509` — une hauteur de
+  // layout ~509px est bien trop petite pour un écran de téléphone plein
+  // écran (donc `vv.height` calculé à ce moment était lui aussi faussé,
+  // ~174px). Cette mesure a été prise pendant une fenêtre où `window.
+  // innerHeight`/`visualViewport.height` n'avaient manifestement pas encore
+  // les vraies valeurs (transition juste après un retour d'arrière-plan,
+  // probablement) — et le code CI-DESSOUS (8e tentative, 11/09) a pris ce
+  // chiffre au pied de la lettre : `transform: translateY(-335px)` a
+  // littéralement arraché la barre de 335px vers le haut, en plein milieu de
+  // la liste de matchs — EXACTEMENT le symptôme "barre en plein milieu de la
+  // page" déjà signalé plusieurs fois par le passé (6e signalement, entre
+  // autres). Autrement dit : cette 8e tentative, censée corriger un petit
+  // écart de quelques pixels (le "bandeau noir"), n'avait AUCUN garde-fou
+  // contre une mesure aberrante — et en a provoqué un bien pire elle-même.
+  // Première fois dans cette série qu'une cause est confirmée par une
+  // mesure réelle plutôt que déduite par audit de code ou théorie.
+  // Corrigé : la correction n'est appliquée que si l'écart mesuré est
+  // PLAUSIBLE pour une vraie barre d'outils mobile (quelques dizaines de px,
+  // `MAX_PLAUSIBLE_GAP` = 60px, marge large) — une valeur aberrante (comme
+  // 335px) est ignorée et le `transform` est explicitement nettoyé plutôt
+  // que laissé tel quel, pour ne jamais rester bloqué sur une correction
+  // erronée déjà appliquée.
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    const MAX_PLAUSIBLE_GAP = 60
     const sync = () => {
       const el = document.querySelector('.sfTabbar')
       if (!el || getComputedStyle(el).display === 'none') { return }
       const gap = window.innerHeight - (vv.height + vv.offsetTop)
-      el.style.transform = gap > 0.5 ? `translateY(-${gap}px)` : ''
+      el.style.transform = (gap > 0.5 && gap <= MAX_PLAUSIBLE_GAP) ? `translateY(-${gap}px)` : ''
     }
     vv.addEventListener('resize', sync)
     vv.addEventListener('scroll', sync)
