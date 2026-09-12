@@ -364,6 +364,14 @@ export const COMPETITIONS = [
     // peinture, réactivant `.lmp__hero--tinted` (plus spécifique en CSS que
     // `.lmp__hero--theme-pl`) sur MatchPage/LiveMatchPage. Supprimé,
     // `tintLight` conservé.
+    // ⚠️ ROSE/MAGENTA RETIRÉ LE MÊME JOUR (reconsidération utilisateur : "c
+    // mieux si c du blanc pluto que le rose bizarre la nn ?") — les 2 taches
+    // `#d6006d`/`#ff2e9e` remplacées par du blanc dans `.poster--theme-pl`
+    // (accueil.css) et `.lmp__hero--theme-pl` (LiveMatchPage.css, gardé
+    // identique comme toujours) ; la 3e tache magenta (60% 92%) reconvertie
+    // en `#b330c0` (déjà présent ailleurs dans ce même dégradé) pour ne pas
+    // laisser de rose isolé. Revient donc de facto à la palette "violet +
+    // blanc" qui était l'option "Recommandé" proposée à l'origine.
     tintTheme: 'pl',
     // ⚠️ AJOUTÉ (06/09, demande : "Terminé" en blanc pour Ligue 1, Premier
     // League et Serie A). Les 2 autres avaient déjà `tintLight` ; la Premier
@@ -847,7 +855,10 @@ const TINT_THEME_CAMP_COLORS = {
   // Ajoutés le 12/09 avec le passage de Ligue 1/Premier League en mode
   // peinture (constat utilisateur : "y'a que une couleur c fade").
   fl1:  ['#085dfe', '#04225c'],
-  pl:   ['#8a1d92', '#d6006d'],
+  // ⚠️ pl : rose/magenta retiré le 12/09 (reconsidération utilisateur, voir
+  // commentaire détaillé sur l'entrée PL ci-dessus) — 2e couleur repassée à
+  // `#37003c` (violet foncé de marque, déjà présent dans le dégradé).
+  pl:   ['#8a1d92', '#37003c'],
 }
 
 // Couleurs "camp" (domicile/extérieur) pour la carte "Match du jour" —

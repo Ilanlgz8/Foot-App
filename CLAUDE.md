@@ -747,6 +747,18 @@ cf-worker/
   Corrigé : `tint` supprimé pour les 2 compétitions, `tintLight` conservé (toujours utile pour le
   texte blanc, indépendant de ce bug). 357 tests + lint + build vérifiés inchangés.
 
+- ✅ Rose/magenta retiré du mode peinture Premier League, même jour (12/09, reconsidération
+  utilisateur juste après le fix ci-dessus : "pour la premiere league c mieux si c du blanc pluto
+  que le rose bizarre la nn ?") — revient sur le choix explicite fait plus tôt via question directe
+  ("violet + rose/magenta" plutôt que l'option "Recommandé" violet + blanc). Dans
+  `.poster--theme-pl` (`accueil.css`) et `.lmp__hero--theme-pl` (`LiveMatchPage.css`, gardé
+  identique comme toujours) : les 2 taches `#d6006d`/`#ff2e9e` remplacées par du blanc `#ffffff`,
+  la 3e tache magenta (60% 92%) reconvertie en `#b330c0` (déjà présent dans le même dégradé) pour
+  ne laisser aucun rose isolé. `TINT_THEME_CAMP_COLORS.pl` mis à jour (`['#8a1d92', '#37003c']` au
+  lieu de `['#8a1d92', '#d6006d']`) pour ne plus référencer le magenta retiré. Le violet de marque
+  (`#8a1d92`/`#37003c`) est inchangé. 357 tests + lint + build vérifiés inchangés (changement CSS +
+  commentaires uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
