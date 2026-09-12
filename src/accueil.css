@@ -2056,18 +2056,23 @@
    supplémentaires (30% 55%, 76% 72%, 50% 14%, 14% 82% — dispersées aux 4
    coins de la carte plutôt que groupées) converties en blanc, chacune gardée
    petite/resserrée (fondu à 40-42% comme la 1ère) pour rester "un peu" de
-   blanc réparti plutôt qu'une zone blanche continue. 2 taches rouges
-   conservées (60% 30% et 65% 96%) pour ne pas perdre l'identité rouge de la
-   compétition — 5 taches blanches au total désormais, contre 5 noires et 2
-   rouges. */
+   blanc réparti plutôt qu'une zone blanche continue.
+   Rééquilibré noir/rouge le même jour (demande explicite : "met + de rouge a
+   la place du noir en bas a droite [...] garde le noir en haut a gauche") :
+   les 2 taches noires du gabarit qui tombaient en bas/bas-droite (92% 58% et
+   42% 92%) passent en rouge (`#c41230`/`#8a0410`, nuances déjà utilisées
+   ailleurs dans cette recette) — la tache noire du coin haut-gauche (15% 15%)
+   et les 2 autres taches noires (8% 48%, 82% 10%, ni bas ni droite) restent
+   inchangées comme demandé. Bilan final : 3 taches noires (dont le coin
+   haut-gauche demandé), 4 rouges, 5 blanches. */
 .poster--theme-bl1 .poster__bg--gradient {
   inset: -20px;
   background:
     radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
     radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
     radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
-    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
-    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #c41230 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #8a0410 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
     radial-gradient(36% 46% at 30% 55%, #ffffff 0%, transparent 42%),
     radial-gradient(30% 32% at 76% 72%, #ffffff 0%, transparent 40%),

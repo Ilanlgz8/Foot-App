@@ -688,6 +688,15 @@ cf-worker/
   2 taches rouges conservées (60% 30%, 65% 96%) pour ne pas perdre l'identité rouge de marque —
   bilan : 5 blanches / 5 noires / 2 rouges. 357 tests + lint + build vérifiés inchangés.
 
+- ✅ Rééquilibrage noir/rouge du mode peinture Bundesliga, même jour (12/09, demande explicite :
+  "met + de rouge a la place du noir en bas a droite [...] garde le noir en haut a gauche") : les
+  2 taches noires du gabarit qui tombaient en bas/bas-droite de la carte (92% 58% et 42% 92%)
+  converties en rouge (`#c41230`/`#8a0410`) dans `.poster--theme-bl1` (`accueil.css` +
+  `.lmp__hero--theme-bl1` dans `LiveMatchPage.css`) — la tache noire du coin haut-gauche (15% 15%,
+  explicitement demandée à garder) et les 2 autres taches noires restantes (8% 48%, 82% 10% — ni
+  en bas ni à droite) inchangées. Bilan final : 3 noires / 4 rouges / 5 blanches. 357 tests + lint
+  + build vérifiés inchangés (changement CSS + commentaire uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
