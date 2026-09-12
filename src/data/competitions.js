@@ -468,6 +468,12 @@ export const COMPETITIONS = [
     // "au moins 4 autres [taches blanches], un peu dispersé") : 4 taches
     // rouges de plus converties en blanc, réparties aux 4 coins de la carte
     // (2 taches rouges seulement conservées) — voir `.poster--theme-bl1`.
+    // Rouge encore renforcé le même jour (demande : "en bas au milieu et en
+    // haut a droite et au milieu aussi rajoute du rouge c la couleur primaire
+    // du championnat") : les 2 dernières taches noires hors coin haut-gauche
+    // passent au rouge de marque, et la tache "bas milieu" déjà rouge est
+    // éclaircie vers ce même rouge primaire — ne reste noir QUE le coin
+    // haut-gauche (15% 15%), demandé explicitement à garder à 2 reprises.
     tintTheme: 'bl1',
     name: 'Bundesliga',
     shortName: 'Bundesliga',

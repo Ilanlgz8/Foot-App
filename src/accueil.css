@@ -2063,16 +2063,26 @@
    42% 92%) passent en rouge (`#c41230`/`#8a0410`, nuances déjà utilisées
    ailleurs dans cette recette) — la tache noire du coin haut-gauche (15% 15%)
    et les 2 autres taches noires (8% 48%, 82% 10%, ni bas ni droite) restent
-   inchangées comme demandé. Bilan final : 3 taches noires (dont le coin
-   haut-gauche demandé), 4 rouges, 5 blanches. */
+   inchangées comme demandé.
+   Encore plus de rouge, même jour (demande explicite : "en bas au milieu et
+   en haut a droite et au milieu aussi rajoute du rouge c la couleur primaire
+   du championnat") : les 2 dernières taches noires autres que le coin
+   haut-gauche (8% 48% — au milieu verticalement de la carte — et 82% 10% —
+   haut-droite) passent au rouge de marque `#e30613`. La tache "bas milieu"
+   (42% 92%, déjà rouge depuis le point précédent) est éclaircie de `#8a0410`
+   (rouge très sombre) vers ce même `#e30613` pour que ce soit bien LE rouge
+   primaire du championnat qui domine, pas une nuance sombre annexe. Seule la
+   tache noire du coin haut-gauche (15% 15%) reste noire, comme demandé
+   explicitement à 2 reprises maintenant. Bilan final : 1 tache noire, 6
+   rouges, 5 blanches. */
 .poster--theme-bl1 .poster__bg--gradient {
   inset: -20px;
   background:
     radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
-    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
-    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
+    radial-gradient(30% 42% at 8% 48%, #e30613 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #e30613 0%, transparent 55%),
     radial-gradient(26% 38% at 92% 58%, #c41230 0%, transparent 56%),
-    radial-gradient(30% 24% at 42% 92%, #8a0410 0%, transparent 55%),
+    radial-gradient(30% 24% at 42% 92%, #e30613 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
     radial-gradient(36% 46% at 30% 55%, #ffffff 0%, transparent 42%),
     radial-gradient(30% 32% at 76% 72%, #ffffff 0%, transparent 40%),

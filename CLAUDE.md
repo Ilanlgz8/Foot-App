@@ -697,6 +697,17 @@ cf-worker/
   en bas ni à droite) inchangées. Bilan final : 3 noires / 4 rouges / 5 blanches. 357 tests + lint
   + build vérifiés inchangés (changement CSS + commentaire uniquement).
 
+- ✅ Rouge encore renforcé au mode peinture Bundesliga, même jour (12/09, demande explicite :
+  "en bas au milieu et en haut a droite et au milieu aussi rajoute du rouge c la couleur primaire
+  du championnat") : les 2 dernières taches noires du gabarit autres que le coin haut-gauche (8%
+  48% — au milieu verticalement de la carte — et 82% 10% — haut-droite) converties vers le rouge
+  de marque `#e30613` dans `.poster--theme-bl1` (`accueil.css` + `.lmp__hero--theme-bl1` dans
+  `LiveMatchPage.css`). La tache "bas milieu" (42% 92%, déjà rouge depuis le point précédent)
+  éclaircie de `#8a0410` (rouge très sombre) vers ce même `#e30613`, pour que ce soit bien LE
+  rouge primaire de la Bundesliga qui domine plutôt qu'une nuance sombre annexe. Seule la tache du
+  coin haut-gauche (15% 15%) reste noire, demandée explicitement à garder à 2 reprises maintenant.
+  Bilan final : 1 noire / 6 rouges / 5 blanches. 357 tests + lint + build vérifiés inchangés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
