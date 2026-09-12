@@ -2164,15 +2164,22 @@
    que le gabarit UEL/UECL/PD/BL1 (5 taches noires) : aucune demande de noir
    ici. Bleus repris de l'ancienne recette Serie A (déjà validés) ; vert choisi
    par cohérence (aucun vert dans l'identité Serie A sur ce site avant). */
+/* ⚠️ MOINS DE VERT (13/09, demande explicite : "pour la seriea met moins de
+   vert stp") — 2 des 3 taches vertes (`#16a34a` à 30% 75%, `#0f7a37` à
+   60% 90%) converties vers des bleus déjà présents dans ce même dégradé
+   (`#0d5a73`/`#0a5f7a`, réutilisés plutôt qu'inventés) — ne reste plus
+   qu'une seule tache verte (`#4ade80`, 40% 45%) sur 7, contre 3 avant.
+   Palette "bleu vert et blanc" toujours respectée, juste rééquilibrée vers
+   le bleu. */
 .poster--theme-sa .poster__bg--gradient {
   inset: -20px;
   background:
     radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #0d5a73 0%, transparent 60%),
     radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
     radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
     radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #0a5f7a 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
     #0b3a4d;
   filter: saturate(1.4);

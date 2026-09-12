@@ -1357,6 +1357,8 @@
   inset: 0;
   opacity: 0;
 }
+/* ⚠️ MOINS DE VERT (13/09) — mirroir exact de `.poster--theme-sa`
+   (accueil.css, voir son commentaire détaillé). */
 .lmp__hero--theme-sa .lmp__heroTintC {
   inset: -20px;
   opacity: 1;
@@ -1365,11 +1367,11 @@
   filter: saturate(1.4);
   background:
     radial-gradient(45% 70% at 10% 30%, #0a5f7a 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #16a34a 0%, transparent 60%),
+    radial-gradient(40% 65% at 30% 75%, #0d5a73 0%, transparent 60%),
     radial-gradient(38% 62% at 75% 65%, #0d97ab 0%, transparent 60%),
     radial-gradient(35% 60% at 40% 45%, #4ade80 0%, transparent 60%),
     radial-gradient(40% 65% at 90% 30%, #0d5a73 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #0f7a37 0%, transparent 60%),
+    radial-gradient(38% 60% at 60% 90%, #0a5f7a 0%, transparent 60%),
     radial-gradient(35% 55% at 15% 85%, #3bb3c7 0%, transparent 60%),
     #0b3a4d;
 }

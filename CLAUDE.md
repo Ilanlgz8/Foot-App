@@ -1381,6 +1381,19 @@ cf-worker/
   357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés
   (CSS + `competitions.js`, aucune logique touchée).
 
+- ✅ Vert réduit sur Serie A, même jour (13/09, demande explicite : "pour la seriea met moins de
+  vert stp") — le dégradé Serie A (mode peinture, 7 taches radiales) comptait 3 taches vertes
+  (`#16a34a` à 30% 75%, `#4ade80` à 40% 45%, `#0f7a37` à 60% 90%) sur 7. Corrigé
+  (`.poster--theme-sa` dans `accueil.css` + `.lmp__hero--theme-sa .lmp__heroTintC` dans
+  `LiveMatchPage.css`, gardé identique) : 2 des 3 taches vertes (`#16a34a` et `#0f7a37`)
+  converties vers des bleus déjà présents dans ce même dégradé (`#0d5a73`/`#0a5f7a`, réutilisés
+  plutôt qu'inventés) — ne reste plus qu'une seule tache verte (`#4ade80`) sur 7, contre 3 avant.
+  Palette "bleu vert et blanc" (demande d'origine du 12/09) toujours respectée, juste rééquilibrée
+  vers le bleu. `TINT_THEME_CAMP_COLORS.sa` (`competitions.js`) mis à jour (`#16a34a` → `#4ade80`,
+  pour continuer à référencer une couleur encore présente dans le dégradé plutôt qu'une couleur
+  retirée). 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
+  inchangés (CSS + `competitions.js`, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
