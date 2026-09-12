@@ -2050,7 +2050,16 @@
    problème sur NL/WC (blanc + autres couleurs, jamais associé au rouge côte
    à côte comme avant). Pas de garantie à 100% que le rendu plaira davantage
    qu'avant (jamais testé sous cette forme précise), mais la demande explicite
-   de l'utilisateur prime sur la prudence initiale. */
+   de l'utilisateur prime sur la prudence initiale.
+   Densifié le même jour (demande explicite : "rajoute un peu plus de tache
+   blanche [...] au moins 4 autres, un peu dispersé") : 4 taches rouges
+   supplémentaires (30% 55%, 76% 72%, 50% 14%, 14% 82% — dispersées aux 4
+   coins de la carte plutôt que groupées) converties en blanc, chacune gardée
+   petite/resserrée (fondu à 40-42% comme la 1ère) pour rester "un peu" de
+   blanc réparti plutôt qu'une zone blanche continue. 2 taches rouges
+   conservées (60% 30% et 65% 96%) pour ne pas perdre l'identité rouge de la
+   compétition — 5 taches blanches au total désormais, contre 5 noires et 2
+   rouges. */
 .poster--theme-bl1 .poster__bg--gradient {
   inset: -20px;
   background:
@@ -2060,10 +2069,10 @@
     radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
     radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #e30613 0%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #f0374f 0%, transparent 62%),
-    radial-gradient(30% 32% at 76% 72%, #8a0410 0%, transparent 58%),
-    radial-gradient(26% 40% at 50% 14%, #e30613 0%, transparent 55%),
-    radial-gradient(34% 28% at 14% 82%, #c41230 0%, transparent 56%),
+    radial-gradient(36% 46% at 30% 55%, #ffffff 0%, transparent 42%),
+    radial-gradient(30% 32% at 76% 72%, #ffffff 0%, transparent 40%),
+    radial-gradient(26% 40% at 50% 14%, #ffffff 0%, transparent 42%),
+    radial-gradient(34% 28% at 14% 82%, #ffffff 0%, transparent 40%),
     radial-gradient(22% 34% at 90% 32%, #ffffff 0%, transparent 42%),
     radial-gradient(28% 22% at 65% 96%, #e30613 0%, transparent 55%),
     #141414;

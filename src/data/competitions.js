@@ -464,7 +464,10 @@ export const COMPETITIONS = [
     // dégradé linéaire (taches radiales discrètes floutées vs. fondu continu),
     // donc le risque de "rosé délavé" ne s'applique pas forcément à l'identique
     // — mais ce n'est pas non plus garanti à 100%, jamais testé sous cette
-    // forme précise avant ce changement.
+    // forme précise avant ce changement. Densifié le même jour (demande :
+    // "au moins 4 autres [taches blanches], un peu dispersé") : 4 taches
+    // rouges de plus converties en blanc, réparties aux 4 coins de la carte
+    // (2 taches rouges seulement conservées) — voir `.poster--theme-bl1`.
     tintTheme: 'bl1',
     name: 'Bundesliga',
     shortName: 'Bundesliga',

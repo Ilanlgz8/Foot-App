@@ -678,6 +678,16 @@ cf-worker/
   mais la demande explicite de l'utilisateur prime sur la prudence initiale. 357 tests + lint +
   build vérifiés inchangés (changement CSS + commentaire uniquement, aucune logique touchée).
 
+- ✅ Blanc du mode peinture Bundesliga densifié, même jour (12/09, demande explicite juste après
+  le point précédent : "rajoute un peu plus de tache blanche [...] au moins 4 autre je pense un
+  peu dispercé") : 4 taches rouges supplémentaires converties en blanc dans `.poster--theme-bl1`
+  (`accueil.css` + `.lmp__hero--theme-bl1` dans `LiveMatchPage.css`) — positions choisies pour
+  être DISPERSÉES aux 4 coins de la carte (30% 55%, 76% 72%, 50% 14%, 14% 82%) plutôt que
+  regroupées, chacune gardée petite/resserrée (fondu à 40-42%, même logique que la 1ère tache
+  blanche du point précédent) pour rester "un peu" de blanc réparti et non une masse continue.
+  2 taches rouges conservées (60% 30%, 65% 96%) pour ne pas perdre l'identité rouge de marque —
+  bilan : 5 blanches / 5 noires / 2 rouges. 357 tests + lint + build vérifiés inchangés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
