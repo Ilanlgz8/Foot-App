@@ -1120,6 +1120,30 @@ cf-worker/
   le rendu Bundesliga semble monochrome à l'usage. 357 tests + lint (33 erreurs pré-existantes,
   Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
 
+- ✅ Noir retiré du mode peinture LaLiga (13/09, question utilisateur : "regarde le jaune et le
+  rouge et tout paraissent flou c le noir qui fait ça ? sinon on enlève le noir hein") — LaLiga
+  (`tintTheme: 'pd'`) est le seul thème correspondant exactement à "le jaune et le rouge" (rouge
+  `#b3242b`/`#c22d34`/`#7a1a1f` + or `#e0b040`/`#f0c766`/`#c9932e`, palette de marque) ET au
+  gabarit à 5 taches noires partagé avec UEL/UECL. Réponse à la question posée : oui, plausible —
+  chaque tache a son propre fondu vers `transparent` sur une bonne partie de son rayon (`0% →
+  55-60% transparent`) ; là où une tache NOIRE et une tache rouge/or se chevauchent dans leur
+  zone de fondu, le mélange traverse des teintes grises/brunes intermédiaires avant d'atteindre
+  la couleur pleine — un effet de transition trouble différent du `filter: blur()` déjà retiré
+  (points précédents), mais qui peut se lire visuellement comme "flou" du même œil. Pas une
+  certitude absolue (pas de mesure de contraste faite, juste un raisonnement sur le mécanisme des
+  dégradés) mais une explication technique cohérente avec ce qui est observé. Corrigé comme
+  demandé ("sinon on enlève le noir") : les 5 taches `#000000` de `.poster--theme-pd`
+  (`accueil.css`) et `.lmp__hero--theme-pd` (`LiveMatchPage.css`, gardé identique comme toujours)
+  remplacées par des nuances déjà présentes dans la palette LaLiga (or/rouge alternés :
+  `#e0b040`/`#b3242b`/`#c9932e`/`#7a1a1f`/`#f0c766`) plutôt que par de nouvelles couleurs —
+  répartition équilibrée après ce changement : 6 taches rouge / 6 taches or, aucune noire. Même
+  principe déjà appliqué à la Bundesliga plus tôt (retrait du noir, voir plus haut). UEL/UECL
+  (même gabarit à 5 taches noires, mais couleurs orange/vert — pas "jaune et rouge") volontairement
+  NON touchés : la question portait précisément sur cette combinaison de couleurs, pas sur le
+  gabarit en général — si le même effet de flou perçu se retrouve sur UEL/UECL, ce sera à
+  confirmer séparément plutôt que supposé. 357 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés inchangés (CSS uniquement).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -1321,11 +1321,11 @@
   mix-blend-mode: normal;
   filter: saturate(1.3);
   background:
-    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
-    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
-    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
-    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
-    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
+    radial-gradient(38% 30% at 15% 15%, #e0b040 0%, transparent 60%),
+    radial-gradient(30% 42% at 8% 48%, #b3242b 0%, transparent 58%),
+    radial-gradient(34% 26% at 82% 10%, #c9932e 0%, transparent 55%),
+    radial-gradient(26% 38% at 92% 58%, #7a1a1f 0%, transparent 56%),
+    radial-gradient(30% 24% at 42% 92%, #f0c766 0%, transparent 55%),
     radial-gradient(42% 34% at 60% 30%, #b3242b 0%, transparent 60%),
     radial-gradient(36% 46% at 30% 55%, #e0b040 0%, transparent 62%),
     radial-gradient(30% 32% at 76% 72%, #7a1a1f 0%, transparent 58%),
