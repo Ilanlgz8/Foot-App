@@ -222,6 +222,34 @@ function App() {
   // 2 mesures consécutives en dérive) reste actif en complément pour un vrai
   // décrochage de LAYOUT qui surviendrait sans cycle arrière-plan/premier
   // plan (ex. après le scroll-lock #root, voir scrollLock.js).
+  // ⚠️ 9e TENTATIVE (12/09, retour utilisateur : "j'ai encore le bug de la
+  // navbar en bas la elle se decollent frr quand je reviens d'arriere plan" —
+  // 9e signalement du MÊME symptôme au MÊME déclencheur (retour d'arrière-
+  // plan) malgré la réparation "inconditionnelle" de la 7e tentative
+  // ci-dessus, censée cibler exactement ce cas). Honnêteté d'abord : je n'ai
+  // toujours aucun accès à un vrai iPhone/PWA depuis cet environnement, donc
+  // je ne peux pas observer le bug moi-même ni confirmer qu'UNE théorie
+  // précise est la bonne — seulement rendre la réparation existante plus
+  // difficile à contourner par WebKit, et le dire clairement plutôt que de
+  // prétendre à une certitude que je n'ai pas.
+  //
+  // Piste concrète cette fois : `repair()` ci-dessus ne fait que retirer/
+  // remettre `position` (`fixed` → `static` → `fixed`). Ça force un reflow,
+  // mais PAS forcément un vrai repaint de la couche de compositing sur iOS
+  // Safari — sur certaines versions, un élément qui a perdu sa couche
+  // compositée pendant la mise en arrière-plan peut traverser un cycle
+  // reflow complet sans jamais être repeint tant que sa couche de
+  // compositing n'est pas totalement détruite puis recréée. `display: none`
+  // → reflow → `display` d'origine est un cran au-dessus : ça retire
+  // complètement l'élément du rendu (destruction de sa couche) avant de le
+  // reconstruire de zéro, plutôt qu'un simple recalcul de position sur une
+  // couche potentiellement déjà corrompue. Combiné à un micro-scroll (1px
+  // aller-retour, technique déjà connue pour forcer WebKit à resynchroniser
+  // `position: fixed` avec le viewport visuel après un cycle arrière-plan/
+  // premier-plan) et à une 2e passe différée (100ms) au cas où la 1re passe
+  // arrive AVANT que iOS ait fini son propre travail de resynchronisation
+  // interne au retour au premier plan (raison la plus probable pour laquelle
+  // une réparation immédiate seule a pu échouer silencieusement jusqu'ici).
   useEffect(() => {
     let driftStreak = 0
     const viewportH = () => window.visualViewport?.height ?? window.innerHeight
@@ -231,9 +259,19 @@ function App() {
       return el
     }
     const repair = el => {
+      const prevDisplay = el.style.display
+      el.style.display = 'none'
+      void el.offsetHeight   // force la destruction complète de la couche avant de la reconstruire
+      el.style.display = prevDisplay
       el.style.position = 'static'
-      void el.offsetHeight   // force un reflow + repaint synchrones avant de réappliquer
+      void el.offsetHeight
       el.style.position = ''
+      // Micro-scroll aller-retour : force WebKit à resynchroniser les
+      // éléments `position: fixed` avec le viewport visuel réel (technique
+      // documentée pour ce cas précis sur iOS Safari/PWA standalone).
+      const y = window.scrollY
+      window.scrollTo(window.scrollX, y + 1)
+      window.scrollTo(window.scrollX, y)
     }
     const check = () => {
       if (document.visibilityState !== 'visible') { driftStreak = 0; return }
@@ -255,14 +293,21 @@ function App() {
       }
     }
     const intervalId = setInterval(check, 3000)
-    // Réparation INCONDITIONNELLE au retour au premier plan (voir commentaire
-    // au-dessus) — ne dépend d'aucune mesure de dérive, cible directement le
-    // scénario "désync de peinture" que `check()` seul ne peut pas détecter.
+    // Réparation au retour au premier plan — INCONDITIONNELLE (ne dépend
+    // d'aucune mesure de dérive, voir 7e tentative) et en 2 PASSES (nouveau,
+    // 9e tentative) : immédiate puis re-déclenchée 100ms plus tard, au cas où
+    // le cycle interne de resynchronisation d'iOS au retour au premier plan
+    // ne serait pas encore terminé au moment du tout premier événement reçu.
     const onResume = () => {
       driftStreak = 0
       if (document.visibilityState !== 'visible') return
       const el = getBar()
       if (el) repair(el)
+      setTimeout(() => {
+        if (document.visibilityState !== 'visible') return
+        const el2 = getBar()
+        if (el2) repair(el2)
+      }, 100)
     }
     document.addEventListener('visibilitychange', onResume)
     window.addEventListener('pageshow', onResume)

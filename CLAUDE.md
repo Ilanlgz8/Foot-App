@@ -835,6 +835,27 @@ cf-worker/
   profondément (`useTeamForm.js`). 357 tests + lint + build vérifiés inchangés (bump de constante
   uniquement, aucune logique touchée).
 
+- 🔍 Barre du bas ENCORE décollée, 9e signalement (constat utilisateur, 12/09 : "j'ai encore le
+  bug de la navbar en bas la elle se decollent frr quand je reviens d'arriere plan j'en peu
+  plus") — même symptôme, même déclencheur (retour d'arrière-plan) que la 7e tentative, qui
+  ciblait pourtant déjà exactement ce cas avec une réparation "inconditionnelle". Honnêteté
+  d'abord : toujours aucun accès à un vrai iPhone/PWA depuis cet environnement pour observer le
+  bug ni confirmer une cause précise — ce correctif rend la réparation existante plus difficile à
+  manquer pour WebKit, ce n'est pas une nouvelle certitude. Changements (`App.jsx`, watchdog
+  retour-arrière-plan) : (1) `repair()` passait par un simple toggle de `position` (fixed→static→
+  fixed), qui force un reflow mais pas forcément un vrai repaint de la couche de compositing ; un
+  toggle `display: none` → reflow → display d'origine AVANT le toggle de position détruit
+  complètement la couche de l'élément avant de la reconstruire, un cran au-dessus. (2) Ajout d'un
+  micro-scroll aller-retour (1px) après la réparation — technique documentée pour forcer WebKit à
+  resynchroniser les éléments `position: fixed` avec le viewport visuel après un cycle arrière-
+  plan/premier-plan. (3) `onResume` déclenche maintenant la réparation en 2 PASSES (immédiate +
+  100ms plus tard), au cas où la 1re passe arrive avant que le cycle interne de resynchronisation
+  d'iOS ne soit terminé — hypothèse pour expliquer pourquoi une réparation immédiate seule (7e
+  tentative) a pu échouer silencieusement. 357 tests + lint + build vérifiés inchangés. Si le
+  symptôme persiste malgré ces 3 renforts cumulés, la piste la plus utile pour la suite n'est plus
+  de deviner une 10e cause théorique mais d'obtenir une preuve visuelle directe (capture d'écran/
+  vidéo de l'instant où ça se décolle) — demandé à l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
