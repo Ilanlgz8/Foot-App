@@ -1443,6 +1443,46 @@ cf-worker/
   pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (changement de données +
   commentaire uniquement, aucune logique touchée).
 
+- 🔍 Barre du bas TOUJOURS décollée, 13e signalement (14/09, retour utilisateur : "toujours
+  problème avec la navbar du bas [...] faut qu'elle ne bouge en aucun cas") — après 12 tentatives
+  (portail body, couches GPU ajoutées/retirées/ré-ajoutées partiellement, scroll-lock #root,
+  watchdogs géométriques, sync visualViewport ajoutée PUIS retirée après avoir causé une vraie
+  régression mesurée), décision honnête : pas une 14e théorie nouvelle inventée au hasard, mais la
+  correction directe du dernier COMPROMIS non-éprouvé encore en place. Le 12e signalement avait
+  déjà donné la description la plus précise obtenue à ce jour ("elle se décolle et quand je scroll
+  vers le bas elle monte et inversement" = la barre glisse AVEC le scroll) — signature exacte et
+  bien documentée du bug WebKit "position:fixed sans couche de compositing dédiée". Le correctif
+  standard pour CE bug précis (`transform: translateZ(0)`) avait été posé le 10/09 puis retiré le
+  11/09 sur la base d'une AUTRE théorie ("désync de peinture après retour d'arrière-plan") qui n'a,
+  elle, jamais été confirmée par aucune preuve concrète — seulement `will-change: transform` SEUL
+  avait été remis en compromis, en pariant que ça suffirait sans le risque supposé de la théorie du
+  11/09. Le symptôme identique persistant malgré ce compromis est la preuve que `will-change` seul
+  ne garantit pas la promotion de couche sur toutes les versions de WebKit (le spec CSS ne
+  l'exige pas, contrairement à `transform` qui EST la promotion). Corrigé (`navbar.css`,
+  `.sfTabbar`) : `transform: translateZ(0)` restauré EN PLUS de `will-change: transform` (+
+  préfixes `-webkit-`, + `backface-visibility: hidden` pour renforcer la promotion de couche sur
+  WebKit). Différence assumée avec le `translateY(-gap)` de la 8e/10e tentative (celui qui AVAIT
+  causé une vraie régression) : ici la valeur est FIXE (`translateZ(0)`, jamais recalculée par du
+  JS), donc structurellement incapable de "sauter" à une valeur aberrante comme `-335px` — le
+  risque qui avait fait abandonner toute compensation par transform ne s'applique pas à une
+  valeur constante. Le watchdog retour-arrière-plan (`App.jsx`, `repair()`) reste actif en
+  complément, cible un déclencheur différent (retour d'arrière-plan, pas glissement pendant le
+  scroll). 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
+  inchangés (CSS uniquement). Honnêteté totale, comme à chaque tentative précédente : toujours
+  aucun accès à un vrai iPhone/PWA depuis cet environnement pour reproduire ou confirmer avant
+  déploiement — mais contrairement à plusieurs tentatives précédentes, celle-ci ne devine pas une
+  nouvelle cause : elle corrige un compromis dont on a maintenant la preuve qu'il était
+  insuffisant, en appliquant le correctif standard et documenté pour la signature EXACTE du bug
+  déjà décrite deux fois par l'utilisateur. Si le symptôme persiste malgré ça, ce sera un signal
+  fort que la cause n'est PAS (ou plus) un problème de couche de compositing — et il faudra alors
+  sérieusement envisager un changement structurel plus profond (ex. remplacer position:fixed par
+  une mise en page en colonne flex pleine hauteur avec un seul conteneur de scroll interne, qui
+  élimine la classe de bug entière plutôt que de la contourner) plutôt qu'un 14e ajustement CSS —
+  option volontairement pas prise cette fois car elle demanderait de retoucher le modèle de scroll
+  de toute l'app (restauration de position au retour arrière, `window.scrollTo`, tous les
+  scroll-locks de modals) et risquerait d'introduire de nouvelles régressions ailleurs, pour un
+  bug pas encore confirmé comme nécessitant ce niveau de changement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

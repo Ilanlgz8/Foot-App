@@ -122,13 +122,31 @@
    la page assez vite) puis se re-caler brutalement une fois le scroll
    arrêté — le correctif standard pour CE bug précis est justement la
    promotion sur une couche GPU séparée, celle retirée le 11/09 ci-dessus.
-   Compromis pour ne pas revenir en arrière à l'identique : `will-change:
-   transform` SEUL (sans `transform: translateZ(0)` littéral) — ça suffit à
-   demander à WebKit une couche de compositing dédiée pour cet élément, sans
-   jamais poser de VALEUR de transform réelle qui pourrait rester "figée" en
-   cas de désync peinture (l'hypothèse du 11/09) : il n'y a rien à figer.
-   Le filet de sécurité retour arrière-plan (App.jsx, `repair()` via toggle
-   `display: none`) reste actif en complément, indépendant de cette couche. */
+   Compromis fait à l'époque pour ne pas revenir en arrière à l'identique :
+   `will-change: transform` SEUL (sans `transform: translateZ(0)` littéral).
+   ⚠️ 13e SIGNALEMENT (14/09, retour utilisateur : "toujours problème avec la
+   navbar du bas [...] faut qu'elle ne bouge en aucun cas") — MÊME symptôme
+   encore après le compromis ci-dessus : preuve réelle (pas une théorie) que
+   `will-change: transform` SEUL ne suffit pas à obtenir une couche de
+   compositing fiable sur toutes les versions de WebKit — le spec autorise le
+   navigateur à optimiser `will-change` comme un simple indice, pas une
+   garantie de promotion immédiate/persistante, contrairement à `transform`
+   qui EST la promotion. Décision : restaurer `transform: translateZ(0)` EN
+   PLUS de `will-change: transform` — c'est le correctif standard, documenté,
+   pour exactement ce bug ("glisse avec le scroll"), confirmé par la
+   description précise de l'utilisateur, pas une hypothèse parmi d'autres.
+   La théorie qui avait justifié son retrait le 11/09 ("désync de peinture
+   après retour d'arrière-plan") n'a, elle, JAMAIS été confirmée par une
+   preuve concrète — contrairement à ce bug-ci, décrit deux fois avec la
+   même signature exacte. `translateZ(0)` est une valeur FIXE, jamais
+   recalculée par du JS (contrairement au `translateY(-gap)` du 8e/10e
+   tentative qui, lui, a réellement causé une régression mesurée) — aucun
+   risque de rester "figée" sur une mauvaise valeur : elle ne bouge jamais,
+   par construction. Le filet de sécurité retour arrière-plan (App.jsx,
+   `repair()` via toggle `display: none`) reste actif en complément,
+   indépendant de cette couche — les deux mécanismes ciblent des
+   déclencheurs différents et documentés séparément (retour d'arrière-plan
+   vs. glissement pendant le scroll), pas le même bug sous 2 formes. */
 .sfTabbar {
   position: fixed;
   left: 0;
@@ -146,7 +164,11 @@
     #000000 70%
   );
   pointer-events: none;               /* le fond dégradé ne capte pas les taps */
-  will-change: transform;             /* couche de compositing dédiée — voir historique ci-dessus */
+  transform: translateZ(0);           /* couche de compositing dédiée — valeur fixe, jamais recalculée */
+  -webkit-transform: translateZ(0);
+  will-change: transform;             /* renforce la promotion, voir historique ci-dessus */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 .sfTabbar > * { pointer-events: auto; }
 
