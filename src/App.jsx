@@ -1,7 +1,7 @@
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import './App.css'
 import './theme-v2.css'
-import Navbar from './components/navbar.jsx'
+import Navbar, { BottomTabBar } from './components/navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Accueil from './components/Accueil.jsx'
 import { LiveProvider } from './context/LiveProvider.jsx'
@@ -59,6 +59,14 @@ function App() {
   const location = useLocation()
   const navType  = useNavigationType() // 'PUSH' | 'POP' | 'REPLACE'
   const online   = useOnline()
+  // ⚠️ AJOUTÉ (14/09, refonte structurelle — voir le commentaire détaillé
+  // juste avant le JSX retourné, tout en bas de ce fichier) : depuis le
+  // passage à une mise en page en colonne flex pleine hauteur, TOUT l'app
+  // scrolle DANS ce conteneur (`.appScroll`) au lieu du document/`window` —
+  // toute la logique de scroll de ce fichier (sauvegarde/restauration de
+  // position, verrou de scroll des modals) doit donc viser cette référence
+  // plutôt que `window.scrollY`/`window.scrollTo`.
+  const appScrollRef = useRef(null)
   // Signal "réseau faible" (voir useNetworkQuality.js) — inutile de l'afficher
   // en plus de OfflineBanner quand on est carrément hors ligne, ce dernier
   // couvre déjà et plus clairement ce cas.
@@ -79,10 +87,16 @@ function App() {
   // la restaurer si on revient dessus via "retour arrière". Écoute en continu
   // (pas juste au démontage) : plus fiable, aucune dépendance à l'ordre exact
   // des effets React au moment du changement de route.
+  // ⚠️ CIBLE CHANGÉE (14/09, refonte structurelle) : `window.scrollY`/
+  // `window.scrollTo` → `appScrollRef.current.scrollTop` — c'est désormais
+  // `.appScroll` qui défile, plus jamais le document/`window` (voir le JSX
+  // retourné en bas de ce fichier).
   useEffect(() => {
-    const onScroll = () => scrollPositions.set(location.key, window.scrollY)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const el = appScrollRef.current
+    if (!el) return
+    const onScroll = () => scrollPositions.set(location.key, el.scrollTop)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
   }, [location.key])
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur : scroller dans "Résultats récents"
@@ -97,17 +111,19 @@ function App() {
   // la position sauvegardée pour cette page si on en a une ; sinon
   // (PUSH/REPLACE, nouvelle page) → comportement inchangé, on repart en haut.
   useEffect(() => {
+    const el = appScrollRef.current
+    if (!el) return
     if (navType === 'POP') {
       const saved = scrollPositions.get(location.key)
       if (saved != null) {
         // Double rAF : laisse le temps au contenu (souvent déjà en cache,
         // mais pas garanti) de se poser avant de scroller, sinon la page
         // n'est parfois pas encore assez haute pour atteindre `saved`.
-        requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, saved)))
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.scrollTop = saved }))
         return
       }
     }
-    window.scrollTo(0, 0)
+    el.scrollTop = 0
   }, [location.pathname, location.key, navType])
 
   // Demander la permission notifications au premier lancement (après 3s pour ne pas surprendre)
@@ -119,248 +135,65 @@ function App() {
     }
   }, [])
 
-  // ⚠️ AJOUT (10/09, retour utilisateur : "quand je quitte et reviens
-  // d'arrière-plan et que je scroll vers le bas, la barre du bas se
-  // détache"). Plusieurs endroits de l'app (Match.jsx, Footer.jsx,
-  // GroupModal.jsx, Resultat.jsx, Classement.jsx) verrouillent le scroll
-  // d'un modal/dropdown en posant `body.style.position = 'fixed'` +
-  // `overflow = 'hidden'` pendant qu'il est ouvert, et le retirent au
-  // nettoyage React (fermeture/démontage — un `useEffect` classique).
-  // Si l'app est mise en arrière-plan PENDANT que l'un de ces verrous est
-  // actif, iOS peut geler l'exécution JS à tout moment sans prévenir : le
-  // nettoyage ne s'exécute alors jamais au bon moment, le body reste
-  // bloqué en `position: fixed` — ce qui casse l'ancrage au viewport des
-  // autres éléments fixes (dont `.sfTabbar`, la barre du bas) au prochain
-  // scroll. Même classe de bug que celle déjà documentée dans index.css
-  // (overflow-x/swipe), cause différente (overflow-y/background). Filet de
-  // sécurité : à chaque retour au premier plan, si le body est resté
-  // verrouillé, on le libère de force. Un modal réellement encore ouvert à
-  // ce moment perdrait son verrou de scroll (désagrément mineur, rare) —
-  // largement préférable à une barre du bas décrochée durablement.
+  // ⚠️ REMPLACÉ (14/09, refonte structurelle — voir le commentaire complet
+  // au-dessus du JSX retourné, tout en bas de ce fichier) : ce fichier
+  // portait auparavant ~220 lignes cumulées sur 9 tentatives successives
+  // (portail body, couches GPU ajoutées/retirées, watchdogs géométriques à
+  // intervalle, réparation au retour d'arrière-plan en 1 puis 2 passes...)
+  // pour maintenir `.sfTabbar` (`position: fixed`) ancrée au viewport malgré
+  // divers comportements WebKit. Tout ce mécanisme est devenu OBSOLÈTE :
+  // `.sfTabbar` n'est plus `position: fixed` du tout (voir navbar.css) —
+  // c'est un simple élément de flux dans `.appShell`, structurellement
+  // incapable de se "décoller" puisqu'il n'y a plus rien à ancrer au
+  // viewport. Aucun de ces watchdogs ne peut plus s'appliquer, ils sont
+  // retirés en entier plutôt que laissés comme code mort.
+  //
+  // Reste un seul filet de sécurité, plus simple et sans risque WebKit,
+  // pour un problème DIFFÉRENT : `lockBodyScroll()` (scrollLock.js) bloque
+  // désormais le scroll en posant `overflow: hidden` sur `.appScroll`
+  // pendant qu'un modal/dropdown est ouvert (voir son propre historique) —
+  // si l'app est mise en arrière-plan PENDANT que ce verrou est actif, iOS
+  // peut geler l'exécution JS à tout moment, et le nettoyage React
+  // (`unlock()`) ne s'exécute alors jamais : `.appScroll` resterait bloqué
+  // en `overflow: hidden` pour de bon, l'app semblerait figée/impossible à
+  // scroller. À chaque retour au premier plan, si `.appScroll` est encore
+  // verrouillé, on le libère de force — même filet que l'ancien `unstickBody`
+  // (10/09), juste adapté à la nouvelle cible et à un mécanisme de verrou
+  // bien plus simple (`overflow`, pas de `position: fixed`/`top` à défaire).
   useEffect(() => {
-    const unstickBody = () => {
+    const unstickScroll = () => {
       if (document.visibilityState !== 'visible') return
-      if (document.body.style.position === 'fixed') {
-        document.body.style.position = ''
-        document.body.style.overflow = ''
-        document.body.style.top = ''
-        document.body.style.left = ''
-        document.body.style.right = ''
+      const el = appScrollRef.current
+      if (el && el.style.overflow === 'hidden') {
+        el.style.overflow = ''
       }
     }
-    document.addEventListener('visibilitychange', unstickBody)
-    window.addEventListener('pageshow', unstickBody)
+    document.addEventListener('visibilitychange', unstickScroll)
+    window.addEventListener('pageshow', unstickScroll)
     return () => {
-      document.removeEventListener('visibilitychange', unstickBody)
-      window.removeEventListener('pageshow', unstickBody)
+      document.removeEventListener('visibilitychange', unstickScroll)
+      window.removeEventListener('pageshow', unstickScroll)
     }
   }, [])
 
-  // ⚠️ 4e TENTATIVE (10/09, "nn toujours pas bg .." puis confirmé "iphone pwa
-  // et c comme avant les symptome" — DONC symptôme identique confirmé sur un
-  // vrai iPhone en PWA après le watchdog ci-dessous, pas juste "pas encore
-  // reproduit"). En reprenant le watchdog de la 3e tentative avec cette
-  // nouvelle donnée, un vrai trou logique apparaît : le check tournait sur
-  // CHAQUE événement `scroll` (via rAF, donc quasiment à chaque frame pendant
-  // un geste de scroll), et comparait `rect.bottom` à `window.innerHeight` —
-  // or sur iOS Safari, `window.innerHeight` (viewport de LAYOUT) change en
-  // continu PENDANT l'animation native de la barre d'adresse qui se
-  // masque/affiche au scroll, un comportement 100% normal et déjà géré
-  // nativement par WebKit pour les éléments `position:fixed`. Un simple écart
-  // transitoire pendant cette animation (mesuré au mauvais frame) suffisait à
-  // déclencher la "réparation" — qui elle-même force un reflow synchrone en
-  // retirant puis réappliquant `position` sur la barre. Répétée à chaque
-  // frame de CHAQUE scroll, cette réparation est probablement devenue la
-  // cause du symptôme observé plutôt que son remède : le watchdog lui-même
-  // provoquait le flash/décrochage visible qu'il était censé corriger.
-  // Autrement dit, la 3e tentative n'a probablement rien réparé de réel — elle
-  // a ajouté un déclencheur supplémentaire du même symptôme.
-  // Corrigé : plus AUCUNE réparation pendant le scroll (retiré entièrement,
-  // c'est la source la plus probable du bruit). Le filet de sécurité ne reste
-  // actif que sur les transitions arrière-plan → premier plan
-  // (`visibilitychange`/`pageshow`, seul moment où le bug ORIGINAL — perte de
-  // couche GPU après mise en arrière-plan — a un sens réel) et un intervalle
-  // lent (3s, au lieu d'1s) qui exige DEUX mesures consécutives en dérive
-  // avant d'agir (évite qu'une seule mesure prise pile pendant une animation
-  // de barre d'adresse déclenche une réparation inutile). Utilise
-  // `window.visualViewport` quand disponible : c'est l'API conçue
-  // spécifiquement pour refléter le viewport RÉELLEMENT visible sur mobile
-  // (indépendant de l'animation de la barre d'adresse ou d'un zoom), plus
-  // fiable que `window.innerHeight` pour ce cas précis.
-  // ⚠️ RETOUCHÉ (11/09, 7e signalement malgré les 6 tentatives précédentes —
-  // portail body, couche GPU dédiée, watchdog géométrique, scroll-lock #root)
-  // : nouvelle théorie + vrai bug de logique trouvé dans CE watchdog, pas
-  // juste une nouvelle cause devinée au hasard.
-  //
-  // Théorie : si le décrochage est un désync de PEINTURE (la couche compositée
-  // à l'écran reste figée après un cycle arrière-plan→premier plan) plutôt
-  // qu'un désync de LAYOUT, `getBoundingClientRect()` continue de renvoyer la
-  // position CORRECTE (le calcul de layout n'a jamais été faux) alors que
-  // l'écran affiche autre chose — ce qui expliquerait que ce watchdog
-  // géométrique n'ait JAMAIS rien détecté d'anormal dans aucune tentative
-  // précédente : il mesure une géométrie qui a toujours été juste, le problème
-  // est invisible à cette mesure. Voir navbar.css : la couche GPU dédiée
-  // (transform/will-change, ajoutée le 10/09) a été retirée en conséquence —
-  // c'est précisément le mécanisme qui expose ce type de bug de compositing
-  // sur iOS Safari.
-  //
-  // Bug de logique trouvé (indépendant de la théorie ci-dessus, et solide à
-  // 100% celui-là) : `onResume` mettait `driftStreak = 2` puis appelait
-  // `check()` — mais `check()` RECALCULE la dérive à cet instant précis et
-  // écrase `driftStreak` à 0 si cette mesure est ≤4px, AVANT même de regarder
-  // la valeur "2" qu'onResume venait de poser. Résultat : la réparation
-  // immédiate au retour au premier plan — tout l'intérêt d'`onResume` — ne se
-  // déclenchait en pratique QUE si la dérive était déjà mesurable au moment de
-  // l'appel. Dans le scénario "désync de peinture" (layout correct, donc
-  // drift mesuré ≈0), ce filet ne réparait jamais rien : du code mort pour
-  // exactement le cas qu'il était censé traiter.
-  //
-  // Corrigé : `onResume` force désormais une réparation INCONDITIONNELLE
-  // (reflow forcé, indépendant de toute mesure) à chaque retour au premier
-  // plan — le moment à risque identifié depuis la théorie initiale (perte de
-  // couche GPU/paint après mise en arrière-plan). Le watchdog périodique (3s,
-  // 2 mesures consécutives en dérive) reste actif en complément pour un vrai
-  // décrochage de LAYOUT qui surviendrait sans cycle arrière-plan/premier
-  // plan (ex. après le scroll-lock #root, voir scrollLock.js).
-  // ⚠️ 9e TENTATIVE (12/09, retour utilisateur : "j'ai encore le bug de la
-  // navbar en bas la elle se decollent frr quand je reviens d'arriere plan" —
-  // 9e signalement du MÊME symptôme au MÊME déclencheur (retour d'arrière-
-  // plan) malgré la réparation "inconditionnelle" de la 7e tentative
-  // ci-dessus, censée cibler exactement ce cas). Honnêteté d'abord : je n'ai
-  // toujours aucun accès à un vrai iPhone/PWA depuis cet environnement, donc
-  // je ne peux pas observer le bug moi-même ni confirmer qu'UNE théorie
-  // précise est la bonne — seulement rendre la réparation existante plus
-  // difficile à contourner par WebKit, et le dire clairement plutôt que de
-  // prétendre à une certitude que je n'ai pas.
-  //
-  // Piste concrète cette fois : `repair()` ci-dessus ne fait que retirer/
-  // remettre `position` (`fixed` → `static` → `fixed`). Ça force un reflow,
-  // mais PAS forcément un vrai repaint de la couche de compositing sur iOS
-  // Safari — sur certaines versions, un élément qui a perdu sa couche
-  // compositée pendant la mise en arrière-plan peut traverser un cycle
-  // reflow complet sans jamais être repeint tant que sa couche de
-  // compositing n'est pas totalement détruite puis recréée. `display: none`
-  // → reflow → `display` d'origine est un cran au-dessus : ça retire
-  // complètement l'élément du rendu (destruction de sa couche) avant de le
-  // reconstruire de zéro, plutôt qu'un simple recalcul de position sur une
-  // couche potentiellement déjà corrompue. Combiné à un micro-scroll (1px
-  // aller-retour, technique déjà connue pour forcer WebKit à resynchroniser
-  // `position: fixed` avec le viewport visuel après un cycle arrière-plan/
-  // premier-plan) et à une 2e passe différée (100ms) au cas où la 1re passe
-  // arrive AVANT que iOS ait fini son propre travail de resynchronisation
-  // interne au retour au premier plan (raison la plus probable pour laquelle
-  // une réparation immédiate seule a pu échouer silencieusement jusqu'ici).
-  useEffect(() => {
-    let driftStreak = 0
-    const viewportH = () => window.visualViewport?.height ?? window.innerHeight
-    const getBar = () => {
-      const el = document.querySelector('.sfTabbar')
-      if (!el || getComputedStyle(el).display === 'none') return null   // desktop : masquée exprès
-      return el
-    }
-    const repair = el => {
-      const prevDisplay = el.style.display
-      el.style.display = 'none'
-      void el.offsetHeight   // force la destruction complète de la couche avant de la reconstruire
-      el.style.display = prevDisplay
-      el.style.position = 'static'
-      void el.offsetHeight
-      el.style.position = ''
-      // Micro-scroll aller-retour : force WebKit à resynchroniser les
-      // éléments `position: fixed` avec le viewport visuel réel (technique
-      // documentée pour ce cas précis sur iOS Safari/PWA standalone).
-      const y = window.scrollY
-      window.scrollTo(window.scrollX, y + 1)
-      window.scrollTo(window.scrollX, y)
-    }
-    const check = () => {
-      if (document.visibilityState !== 'visible') { driftStreak = 0; return }
-      const el = getBar()
-      if (!el) { driftStreak = 0; return }
-      const rect  = el.getBoundingClientRect()
-      const drift = Math.abs(rect.bottom - viewportH())
-      if (drift > 4) {
-        driftStreak += 1
-      } else {
-        driftStreak = 0
-      }
-      // 2 mesures consécutives en dérive (≥3s d'écart réel) avant de réparer —
-      // une dérive isolée est presque toujours une simple animation de barre
-      // d'adresse en cours, pas un vrai décrochage.
-      if (driftStreak >= 2) {
-        driftStreak = 0
-        repair(el)
-      }
-    }
-    const intervalId = setInterval(check, 3000)
-    // Réparation au retour au premier plan — INCONDITIONNELLE (ne dépend
-    // d'aucune mesure de dérive, voir 7e tentative) et en 2 PASSES (nouveau,
-    // 9e tentative) : immédiate puis re-déclenchée 100ms plus tard, au cas où
-    // le cycle interne de resynchronisation d'iOS au retour au premier plan
-    // ne serait pas encore terminé au moment du tout premier événement reçu.
-    const onResume = () => {
-      driftStreak = 0
-      if (document.visibilityState !== 'visible') return
-      const el = getBar()
-      if (el) repair(el)
-      setTimeout(() => {
-        if (document.visibilityState !== 'visible') return
-        const el2 = getBar()
-        if (el2) repair(el2)
-      }, 100)
-    }
-    document.addEventListener('visibilitychange', onResume)
-    window.addEventListener('pageshow', onResume)
-    return () => {
-      clearInterval(intervalId)
-      document.removeEventListener('visibilitychange', onResume)
-      window.removeEventListener('pageshow', onResume)
-    }
-  }, [])
-
-  // ⚠️ 8e TENTATIVE (11/09) PUIS 10e (12/09, clamp `MAX_PLAUSIBLE_GAP`) —
-  // EFFET RETIRÉ ENTIÈREMENT (12/09, 11e round, demande explicite et sans
-  // ambiguïté de l'utilisateur juste après le clamp : "faut pas qui bouge
-  // d'un pixel tu vois faut vraiment qu'il soit fixe quoi"). Historique
-  // complet gardé ici pour ne pas perdre le raisonnement déjà fait :
-  //
-  // Cet effet appliquait un `transform: translateY(-gap px)` sur la barre
-  // pour compenser l'écart entre le viewport de LAYOUT (`window.innerHeight`)
-  // et le viewport VISUEL réel (`visualViewport`), écart réel sur iOS Safari
-  // quand la barre d'adresse s'anime. Ça a d'abord semblé correct (11/09),
-  // puis une VRAIE capture d'écran (`NavDebugHUD.jsx`) a prouvé que ce même
-  // mécanisme pouvait lire une mesure aberrante (`gap:335`, `innerH:509`,
-  // valeurs prises pendant une fenêtre où le navigateur n'avait manifestement
-  // pas encore les vraies dimensions, juste après un retour d'arrière-plan)
-  // et appliquer un `translateY(-335px)` littéral — LA cause du symptôme le
-  // plus visible et le plus rapporté de toute cette série ("barre en plein
-  // milieu de la page"). Un clamp (`MAX_PLAUSIBLE_GAP = 60`) avait ensuite
-  // limité les dégâts, mais tant que l'effet existe, TOUT `gap` mesuré entre
-  // 0.5px et 60px déplace encore la barre de ce nombre de pixels — un
-  // mouvement réel, juste plus petit. L'utilisateur a été clair : aucun
-  // mouvement n'est acceptable, même petit et "plausible".
-  //
-  // Décision : abandonner la compensation manuelle par transform, faire
-  // confiance à `position: fixed; bottom: 0` NATIF (WebKit gère lui-même le
-  // viewport visuel pour un élément fixed sans qu'aucun JS n'ait besoin d'y
-  // toucher — le "bandeau noir" initial qui a motivé cette 8e tentative
-  // était une hypothèse plausible mais jamais confirmée par une mesure
-  // réelle, contrairement au bug que cette même tentative a ensuite
-  // elle-même causé et qui LUI a été confirmé). Le filet de sécurité pour le
-  // vrai bug de décrochage (retour d'arrière-plan, cf. watchdog `onResume`
-  // ci-dessus, 7e/9e tentatives) reste actif et ne pose lui non plus aucun
-  // transform permanent : il force un reflow (toggle display/position) puis
-  // laisse WebKit recalculer nativement, sans jamais appliquer de valeur
-  // numérique devinée. Honnêteté : si un vrai "bandeau noir sous la barre"
-  // réapparaît (symptôme originel du 11/09), il faudra un mécanisme qui ne
-  // déplace la barre QUE dans une fenêtre de temps très courte et bornée
-  // (ex. seulement pendant l'animation de la barre d'adresse, jamais à
-  // l'état stable) plutôt que revenir à un transform permanent comme celui-ci.
-
+  // ⚠️ REFONTE STRUCTURELLE (14/09, 14e signalement de la barre du bas
+  // décollée — voir CLAUDE.md pour l'historique complet des 13 tentatives
+  // précédentes, toutes centrées sur `.sfTabbar` en `position: fixed`). La
+  // dernière tentative (restaurer `transform: translateZ(0)`) a été vérifiée
+  // déployée en production ET confirmée insuffisante par l'utilisateur (test
+  // refait après fermeture complète de l'app — pas un souci de cache). Plutôt
+  // qu'une 15e théorie CSS sur `.sfTabbar` elle-même, changement structurel :
+  // `.appShell` (voir App.css) est une colonne flex de hauteur EXACTEMENT
+  // égale au viewport (`100dvh`) — header (`Navbar`) et barre du bas
+  // (`BottomTabBar`) sont 2 éléments de flux `flex: 0 0 auto` aux 2
+  // extrémités de cette colonne, JAMAIS `position: fixed`. Entre les deux,
+  // `.appScroll` (`flex: 1 1 auto; overflow-y: auto`) est le SEUL conteneur
+  // qui défile — tout le reste de l'app (bannières, routes, footer) vit
+  // dedans. La barre du bas ne peut structurellement plus "se décoller" :
+  // elle n'est plus positionnée par-dessus quoi que ce soit qu'un navigateur
+  // pourrait désynchroniser, sa position découle uniquement du layout flex,
+  // recalculé nativement comme n'importe quel autre élément de page.
   return (
-    // LiveProvider monté ici → hooks live survivent aux changements de route
-    // + Web Worker ESPN continue de tourner même si l'utilisateur est sur Classement etc.
-    //
     // 2 niveaux d'ErrorBoundary (voir ErrorBoundary.jsx pour le contexte
     // complet) : l'extérieur protège tout le shell (Navbar/Footer compris —
     // filet de dernier recours si l'un d'eux plante) ; celui autour des
@@ -374,29 +207,44 @@ function App() {
           uniquement) et de la durée (variable, liée aux requêtes en cours). */}
       <SplashScreen />
       <LiveProvider>
-        <Navbar />
-        {!online && <OfflineBanner />}
-        {online && weakNetwork && <WeakNetworkBanner />}
-        <div key={location.pathname} className="page-transition">
-          <ErrorBoundary key={location.pathname}>
-            <Suspense fallback={<div className="routeFallback" />}>
-              <Routes location={location}>
-                <Route path="/" element={<Accueil />} />
-                <Route path="/matchs" element={<MatchAVenir />} />
-                <Route path="/resultats" element={<Resultat />} />
-                <Route path="/classement" element={<Classement />} />
-                <Route path="/live" element={<Live />} />
-                <Route path="/live/:matchId" element={<LiveMatchPage />} />
-                <Route path="/match/:matchId" element={<MatchPage />} />
-                <Route path="/favoris" element={<FavoritesPage />} />
-                <Route path="/pronos" element={<Pronos />} />
-                <Route path="/mentions-legales" element={<MentionsLegales />} />
-                {/* <Route path="/debug-espn" element={<DebugEspn />} /> — voir commentaire import ci-dessus */}
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
+        <div className="appShell">
+          {/* Header — hors de la zone qui défile, toujours visible, jamais
+              positionné par-dessus le contenu (simple élément de flux). */}
+          <Navbar />
+          {!online && <OfflineBanner />}
+          {online && weakNetwork && <WeakNetworkBanner />}
+
+          {/* Seul conteneur qui défile dans toute l'app (voir le commentaire
+              juste au-dessus du `return`) — la sauvegarde/restauration de
+              position de scroll et le verrou de scroll des modals
+              (scrollLock.js) ciblent tous les deux cette réf. */}
+          <div className="appScroll" ref={appScrollRef}>
+            <div key={location.pathname} className="page-transition">
+              <ErrorBoundary key={location.pathname}>
+                <Suspense fallback={<div className="routeFallback" />}>
+                  <Routes location={location}>
+                    <Route path="/" element={<Accueil />} />
+                    <Route path="/matchs" element={<MatchAVenir />} />
+                    <Route path="/resultats" element={<Resultat />} />
+                    <Route path="/classement" element={<Classement />} />
+                    <Route path="/live" element={<Live />} />
+                    <Route path="/live/:matchId" element={<LiveMatchPage />} />
+                    <Route path="/match/:matchId" element={<MatchPage />} />
+                    <Route path="/favoris" element={<FavoritesPage />} />
+                    <Route path="/pronos" element={<Pronos />} />
+                    <Route path="/mentions-legales" element={<MentionsLegales />} />
+                    {/* <Route path="/debug-espn" element={<DebugEspn />} /> — voir commentaire import ci-dessus */}
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+            <Footer />
+          </div>
+
+          {/* Barre du bas — hors de la zone qui défile elle aussi, mais tout
+              en bas de la colonne flex (mobile uniquement, voir navbar.css). */}
+          <BottomTabBar />
         </div>
-        <Footer />
       </LiveProvider>
     </ErrorBoundary>
   )

@@ -9,6 +9,12 @@
 
 /* ─────────────────────────── HEADER ─────────────────────────── */
 .sfHeader {
+  /* Élément de flux dans .appShell (voir App.css/App.jsx, 14/09) : ne
+     grandit/rétrécit jamais, toujours sa hauteur naturelle — `.appScroll`
+     seul absorbe l'espace restant. `position: sticky` gardé (inoffensif,
+     sans effet visible : le header n'est plus jamais surplombé par du
+     contenu qui défile, `.appScroll` étant hors de son propre flux). */
+  flex: 0 0 auto;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -99,63 +105,42 @@
 .sfLiveBtn { display: none; }
 
 /* ───────────────────── BOTTOM TAB BAR (mobile) ───────────────── */
-/* ⚠️ RETIRÉ (11/09, 7e signalement du même bug malgré 6 tentatives
-   précédentes — portail body, watchdog géométrique, scroll-lock #root...) :
-   `transform: translateZ(0)` + `will-change: transform`, posés le 10/09 pour
-   forcer une couche GPU dédiée (le "correctif standard" documenté pour ce
-   type de décrochage). Théorie de l'époque : c'est PEUT-ÊTRE cette couche
-   dédiée elle-même qui cause le bug plutôt que le réparer (bug de COMPOSITING
-   documenté sur iOS Safari pour les éléments position:fixed promus sur leur
-   propre couche). Retiré sur cette base.
-   ⚠️ REMIS, PARTIELLEMENT (12/09, 12e signalement — nouvelle description
-   PRÉCISE du symptôme, jamais obtenue jusqu'ici : "elle se décolle et après
-   quand je scroll vers le bas elle monte et inversement" — c'est-à-dire que
-   la barre SUIT le sens du scroll, exactement comme un élément normal du
-   flux de la page (scroller vers le bas fait remonter le contenu à l'écran,
-   scroller vers le haut le fait redescendre). Ce n'est PAS la même
-   description que les signalements précédents ("barre au milieu de la
-   page", "bandeau noir sous la barre") — c'est la signature du bug
-   WebKit/iOS Safari le plus ancien et le mieux documenté sur les éléments
-   `position: fixed` : sans couche de compositing DÉDIÉE, un élément fixed
-   peut visiblement "glisser" avec le contenu pendant le geste de scroll
-   (le navigateur ne peut pas repeindre la barre indépendamment du reste de
-   la page assez vite) puis se re-caler brutalement une fois le scroll
-   arrêté — le correctif standard pour CE bug précis est justement la
-   promotion sur une couche GPU séparée, celle retirée le 11/09 ci-dessus.
-   Compromis fait à l'époque pour ne pas revenir en arrière à l'identique :
-   `will-change: transform` SEUL (sans `transform: translateZ(0)` littéral).
-   ⚠️ 13e SIGNALEMENT (14/09, retour utilisateur : "toujours problème avec la
-   navbar du bas [...] faut qu'elle ne bouge en aucun cas") — MÊME symptôme
-   encore après le compromis ci-dessus : preuve réelle (pas une théorie) que
-   `will-change: transform` SEUL ne suffit pas à obtenir une couche de
-   compositing fiable sur toutes les versions de WebKit — le spec autorise le
-   navigateur à optimiser `will-change` comme un simple indice, pas une
-   garantie de promotion immédiate/persistante, contrairement à `transform`
-   qui EST la promotion. Décision : restaurer `transform: translateZ(0)` EN
-   PLUS de `will-change: transform` — c'est le correctif standard, documenté,
-   pour exactement ce bug ("glisse avec le scroll"), confirmé par la
-   description précise de l'utilisateur, pas une hypothèse parmi d'autres.
-   La théorie qui avait justifié son retrait le 11/09 ("désync de peinture
-   après retour d'arrière-plan") n'a, elle, JAMAIS été confirmée par une
-   preuve concrète — contrairement à ce bug-ci, décrit deux fois avec la
-   même signature exacte. `translateZ(0)` est une valeur FIXE, jamais
-   recalculée par du JS (contrairement au `translateY(-gap)` du 8e/10e
-   tentative qui, lui, a réellement causé une régression mesurée) — aucun
-   risque de rester "figée" sur une mauvaise valeur : elle ne bouge jamais,
-   par construction. Le filet de sécurité retour arrière-plan (App.jsx,
-   `repair()` via toggle `display: none`) reste actif en complément,
-   indépendant de cette couche — les deux mécanismes ciblent des
-   déclencheurs différents et documentés séparément (retour d'arrière-plan
-   vs. glissement pendant le scroll), pas le même bug sous 2 formes. */
+/* ⚠️ `position: fixed` ABANDONNÉ ENTIÈREMENT (14/09, 14e signalement de la
+   barre du bas décollée — historique complet des 13 tentatives précédentes
+   sur ce même mécanisme gardé ci-dessous pour mémoire, mais plus aucune ne
+   s'applique à l'implémentation actuelle). La dernière tentative (restaurer
+   `transform: translateZ(0)` + `will-change: transform`) a été vérifiée
+   déployée en production ET confirmée insuffisante par l'utilisateur (test
+   refait après fermeture complète de l'app, pas un souci de cache). Plutôt
+   qu'une 15e théorie sur les propriétés CSS de `.sfTabbar` elle-même,
+   changement structurel (voir `App.jsx`/`App.css`, `.appShell`/`.appScroll`)
+   : toute l'app tient désormais dans une colonne flex de hauteur exactement
+   égale au viewport (`100dvh`), avec UN SEUL conteneur qui défile
+   (`.appScroll`) entre le header et cette barre. `.sfTabbar` n'est plus
+   "par-dessus" le contenu (`position: fixed`) mais un simple élément de
+   flux, en dehors de la zone qui défile — elle est donc TOUJOURS exactement
+   au bas de l'écran par construction géométrique, plus par un mécanisme de
+   positionnement que WebKit pourrait désynchroniser. Ça élimine toute la
+   CLASSE de bugs `position: fixed` sur iOS (compositing, glissement pendant
+   le scroll, écart viewport visuel/layout, ancêtre transformé...) d'un coup,
+   plutôt que d'en corriger les symptômes un par un comme les 13 tentatives
+   précédentes ont tenté de le faire. `position: relative` gardé (voir plus
+   bas) uniquement pour que `::before` (la pilule de fond) continue de
+   s'ancrer sur `.sfTabbar` elle-même. Plus besoin de `z-index` (elle ne
+   superpose plus rien), ni de `transform`/`will-change`/`backface-
+   visibility` (aucune promotion de couche à demander à un élément qui n'est
+   plus jamais repeint indépendamment du reste de la page).
+   Historique des 13 tentatives précédentes sur le mécanisme `position:fixed`
+   (portail body, couches GPU ajoutées/retirées/ré-ajoutées, watchdogs
+   géométriques, scroll-lock #root, sync visualViewport...) : voir CLAUDE.md,
+   section "Problèmes connus / résolus" — gardé là plutôt que dupliqué ici
+   pour ne pas alourdir ce fichier davantage. */
 .sfTabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 60;
+  position: relative;                 /* ancre ::before (pilule de fond), rien d'autre */
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
+  flex: 0 0 auto;                     /* élément de flux dans .appShell, jamais fixed */
   padding: 10px 8px calc(12px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(
     180deg,
@@ -163,12 +148,6 @@
     rgba(0, 0, 0, 0.92) 32%,
     #000000 70%
   );
-  pointer-events: none;               /* le fond dégradé ne capte pas les taps */
-  transform: translateZ(0);           /* couche de compositing dédiée — valeur fixe, jamais recalculée */
-  -webkit-transform: translateZ(0);
-  will-change: transform;             /* renforce la promotion, voir historique ci-dessus */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 .sfTabbar > * { pointer-events: auto; }
 

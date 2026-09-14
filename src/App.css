@@ -1,3 +1,37 @@
+/* ── Coquille pleine hauteur (14/09, refonte structurelle de la navbar) ──
+   Voir le commentaire détaillé dans App.jsx (juste au-dessus du `return`) et
+   dans navbar.css (`.sfTabbar`) pour le contexte complet : après 14
+   signalements de la barre du bas qui se décolle malgré 13 tentatives de
+   patcher `.sfTabbar` en `position: fixed`, toute l'app tient désormais dans
+   une colonne flex de la hauteur EXACTE du viewport — header et barre du bas
+   sont des éléments de flux à ses 2 extrémités, `.appScroll` est le SEUL
+   conteneur qui défile entre les deux. Plus rien n'est `position: fixed`
+   par-dessus le contenu, donc plus aucune classe de bug WebKit liée à ce
+   mécanisme (compositing, glissement au scroll, écart viewport visuel/
+   layout...) ne peut plus affecter la barre du bas. */
+.appShell {
+  height: 100vh;    /* repli navigateurs anciens */
+  height: 100dvh;   /* hauteur de viewport dynamique — tient compte de la
+                        barre d'adresse mobile qui se masque/affiche, contrairement
+                        à 100vh qui reste figée sur sa valeur la plus grande */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.appScroll {
+  flex: 1 1 auto;
+  /* ⚠️ CRITIQUE : sans ce `min-height: 0`, un enfant flex garde par défaut
+     `min-height: auto` — il refuse de rétrécir sous la hauteur intrinsèque de
+     son contenu, ce qui empêcherait `overflow-y: auto` de jamais déclencher
+     un vrai défilement interne (le conteneur grandirait plutôt que de
+     scroller). Piège flexbox classique, documenté ici pour ne pas le
+     réintroduire par erreur lors d'une future retouche de ce fichier. */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Transition de page ── */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(10px); }

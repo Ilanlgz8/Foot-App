@@ -1483,6 +1483,69 @@ cf-worker/
   scroll-locks de modals) et risquerait d'introduire de nouvelles régressions ailleurs, pour un
   bug pas encore confirmé comme nécessitant ce niveau de changement.
 
+- ✅ Barre du bas décollée, 14e signalement, REFONTE STRUCTURELLE (14/09, retour utilisateur
+  immédiat après la 13e tentative confirmée déployée : "la navbar s'est encore decoller" — puis,
+  à la question directe "as-tu complètement fermé l'app et rouverte depuis ce déploiement ?",
+  confirmation explicite "Oui, complètement fermée et rouverte") : cette confirmation écarte avec
+  certitude la piste "cache PWA obsolète" (la 13e tentative — `transform: translateZ(0)` +
+  `will-change: transform` — a été revérifiée en direct sur la prod, bien déployée) ET la piste
+  "couche de compositing manquante" elle-même, désormais réfutée par une preuve réelle plutôt
+  qu'une hypothèse non testée. Décision assumée : après 13 tentatives successives (portail body,
+  couches GPU ajoutées/retirées/ré-ajoutées, watchdogs géométriques à intervalle, réparation au
+  retour d'arrière-plan en 1 puis 2 passes, sync visualViewport ajoutée puis retirée après avoir
+  elle-même causé une régression mesurée, scroll-lock déplacé de `<body>` à `#root`...) toutes
+  centrées sur le maintien de `.sfTabbar` en `position: fixed` ancrée au viewport, il ne s'agit
+  plus de deviner une 15e cause précise mais d'éliminer la classe de bug entière. Recherche
+  préalable (avant tout code) : grep exhaustif de tout l'usage de `window.scrollY`/
+  `window.scrollTo`/`IntersectionObserver`/`position: sticky` dans `src/` pour évaluer le risque
+  d'un changement structurel du modèle de scroll — usage bien plus limité que redouté (seuls
+  `App.jsx` et `scrollLock.js` en dépendaient réellement ; le `window.scrollTo` trouvé dans
+  `Match.jsx` n'était qu'un commentaire historique, pas du code actif ; aucun `IntersectionObserver`
+  réel dans le code applicatif ; les `position: sticky` existants — sidebars Programme/Résultats/
+  Classement, en-têtes de tableau — restent valides à l'identique car ils redeviennent relatifs à
+  `.appScroll`, leur nouvel ancêtre défilant, exactement comme ils l'étaient avant vis-à-vis du
+  document).
+  Changement (`src/components/navbar.jsx`, `navbar.css`, `src/App.jsx`, `src/App.css`,
+  `src/utils/scrollLock.js`) : toute l'app tient désormais dans `.appShell`, une colonne flex de
+  hauteur EXACTEMENT égale au viewport (`100dvh`, repli `100vh`) — header (`Navbar`, désormais
+  export par défaut réduit au seul `<header>`) et barre du bas (`BottomTabBar`, nouvel export
+  nommé du même fichier) sont 2 éléments de flux `flex: 0 0 auto` à ses 2 extrémités, plus jamais
+  `position: fixed` pour la barre du bas ni portail dans `<body>` (retiré, n'a plus lieu d'être).
+  Entre les deux, `.appScroll` (`flex: 1 1 auto; min-height: 0; overflow-y: auto`) est le SEUL
+  conteneur qui défile dans toute l'app — bannières, routes, footer vivent dedans. `.sfTabbar` ne
+  peut structurellement plus "se décoller" : sa position découle uniquement du layout flex natif,
+  recalculé par le navigateur comme n'importe quel autre élément de page, sans aucun mécanisme de
+  positionnement `position: fixed` que WebKit pourrait désynchroniser (compositing, glissement au
+  scroll, écart viewport visuel/layout, ancêtre transformé — toute cette classe de bugs devient
+  sans objet). `App.jsx` : la sauvegarde/restauration de position de scroll (retour arrière) vise
+  désormais `appScrollRef.current.scrollTop` au lieu de `window.scrollY`/`window.scrollTo`. Les
+  ~220 lignes cumulées des 9 tentatives de watchdog `.sfTabbar` (portail, couches GPU, réparation
+  au retour d'arrière-plan) sont retirées en entier (code devenu obsolète, pas juste inutile) —
+  remplacées par un seul filet de sécurité, plus simple et sans risque WebKit : si `.appScroll`
+  reste verrouillé (`overflow: hidden`, posé par `scrollLock.js` pendant un modal/dropdown ouvert)
+  après un retour d'arrière-plan où iOS aurait gelé le nettoyage React avant qu'il ne s'exécute, il
+  est libéré de force. `scrollLock.js` réécrit entièrement : posait auparavant `position: fixed` +
+  `top: -scrollY` sur `#root` (fix du 11/09, lui-même une protection contre une régression Safari
+  n'ayant plus lieu d'être puisque `.sfTabbar` n'est plus `position: fixed`) — remplacé par un
+  simple `overflow: hidden` sur `.appScroll`, sans aucune restauration manuelle de position au
+  déverrouillage (`scrollTop` reste intact nativement tant qu'on ne le touche pas). Les 6 appelants
+  (`Match.jsx`, `Resultat.jsx`, `Classement.jsx` ×2, `Footer.jsx`, `GroupModal.jsx`) n'ont nécessité
+  AUCUNE modification : ils appellent déjà tous `lockBodyScroll()` via l'API partagée existante,
+  jamais de logique dupliquée localement — vérifié par grep avant de considérer le refactor sûr.
+  Effet de bord positif non demandé, découvert en auditant le CSS existant : aucune règle du
+  projet ne réservait d'espace (`padding-bottom`) pour compenser l'ancienne barre flottante — le
+  bas de chaque page (Footer compris) était donc potentiellement partiellement masqué derrière
+  `.sfTabbar` jusqu'ici (jamais signalé par l'utilisateur, probablement peu visible en pratique) ;
+  avec la barre en flux normal, ce chevauchement disparaît structurellement, sans rien avoir eu à
+  ajouter exprès. 357 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  vérifiés inchangés. Honnêteté : toujours aucun accès à un vrai iPhone/PWA depuis cet
+  environnement pour reproduire ou confirmer avant déploiement — mais contrairement aux 13
+  tentatives précédentes (qui corrigeaient toutes un symptôme précis d'un mécanisme conservé), ce
+  changement retire le mécanisme problématique lui-même (`position: fixed` pour la barre du bas) :
+  la classe de bug ne peut plus se produire par construction, ce qui est une garantie plus forte
+  qu'un correctif ciblé, même si le rendu visuel final (déjà revu par lecture du CSS résultant,
+  jamais vu en direct) reste à confirmer par l'utilisateur après ce déploiement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

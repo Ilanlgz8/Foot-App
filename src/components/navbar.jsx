@@ -10,7 +10,6 @@
  * en desktop quand rien n'est en cours) : badge + pulsation/rouge
  * uniquement quand des matchs sont en cours.
  */
-import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
 import { isCardLive } from '../utils/matchUtils'
@@ -79,6 +78,29 @@ const BallIcon = () => (
   <span className="sfTabLive__ball" aria-hidden="true">⚽</span>
 )
 
+// ⚠️ SÉPARÉ EN 2 COMPOSANTS (14/09, 14e signalement de la barre du bas
+// décollée — voir l'historique complet dans navbar.css/App.jsx) : après 13
+// tentatives de patcher `.sfTabbar` en `position: fixed` (portail body,
+// couches GPU, watchdogs, scroll-lock #root...), la dernière (restaurer
+// `transform: translateZ(0)`) a été confirmée déployée en production ET
+// confirmée insuffisante par l'utilisateur (test refait après fermeture
+// complète de l'app). Plutôt qu'une 15e théorie sur `.sfTabbar` elle-même,
+// changement structurel : `position: fixed` est abandonné entièrement pour
+// la barre du bas, au profit d'une mise en page en colonne flex pleine
+// hauteur (voir `.appShell`/`.appScroll` dans `App.css` et leur usage dans
+// `App.jsx`) où la barre est un simple élément de flux, toujours exactement
+// au bas de l'écran par construction — plus aucune classe de bug WebKit liée
+// à `position: fixed` (compositing, glissement au scroll, écart viewport
+// visuel, ancêtre transformé...) ne peut plus l'affecter, puisqu'elle n'est
+// plus jamais positionnée "par-dessus" quoi que ce soit. `Navbar` (header,
+// toujours visible en haut, hors de la zone qui défile) et `BottomTabBar`
+// (barre du bas, hors de la zone qui défile elle aussi, mais tout en bas de
+// la colonne) sont désormais 2 exports distincts pour être placés aux 2
+// extrémités de `.appShell` dans `App.jsx`, avec `.appScroll` (contenu
+// routé + footer) seul à défiler entre les deux. Le portail direct dans
+// `<body>` (10/09) est retiré : il n'a plus lieu d'être, la barre n'a plus
+// besoin d'être immunisée contre un ancêtre transformé puisqu'elle n'est
+// plus `position: fixed` du tout.
 function Navbar() {
   const { liveMatches } = useLiveData()
   // ⚠️ REVU EN PROFONDEUR (constat utilisateur, 20/08 — voir le commentaire
@@ -99,9 +121,7 @@ function Navbar() {
   const liveCount = liveMatches.filter(isCardLive).length
 
   return (
-    <>
-      {/* ── Header ── */}
-      <header className="sfHeader">
+    <header className="sfHeader">
         <div className="sfHeader__inner">
           {/* Pronos — mobile uniquement, à la place de la date (voir
               sfHeader__pronosBtn). Le wrapper flex date de l'époque où
@@ -169,87 +189,65 @@ function Navbar() {
           </div>
         </div>
       </header>
+  )
+}
 
-      {/* ── Bottom tab bar — mobile uniquement ── */}
-      {/* ⚠️ RENDUE VIA UN PORTAIL DIRECTEMENT DANS <body> (10/09, retour
-          utilisateur persistant malgré 2 correctifs précédents — voir
-          navbar.css/App.jsx pour leur historique, tous les deux insuffisants
-          seuls). Root cause probable trouvée en auditant TOUTE la chaîne de
-          parents DOM de .sfTabbar (Navbar → LiveProvider → ErrorBoundary ×2 →
-          #root) : aucun transform/filter/will-change/contain permanent trouvé
-          sur aucun d'eux dans l'état actuel du code — MAIS ce projet a déjà
-          eu EXACTEMENT ce bug une fois ailleurs (voir App.css, `.page-transition`,
-          05/09 : un `animation-fill-mode: both` laissait un `transform`
-          résiduel en permanence sur un conteneur, ce qui le transforme en
-          bloc conteneur pour tous ses descendants en `position: fixed` —
-          ceux-ci s'ancrent alors sur CE conteneur au lieu du viewport). Une
-          telle régression est probable pour N'IMPORTE QUEL élément fixed
-          rendu quelque part dans l'arbre React à chaque nouvelle animation/
-          transform ajoutée n'importe où dans l'app (habillages de cartes,
-          transitions, filtres CSS...) — et ce fichier concentre justement
-          beaucoup de nouveaux `filter`/`transform` cette session (mode
-          peinture LDC/LDN/CDM/LDE/LDC-C/CAN). Plutôt que traquer un
-          transform précis (déjà fait 2 fois sans succès durable), rendre la
-          barre du bas dans un PORTAIL React directement enfant de <body> (au
-          lieu d'un enfant de #root) la rend structurellement immunisée : son
-          parent DOM réel n'est plus jamais dans l'arbre affecté par CSS
-          ajouté à l'intérieur de l'app, quel que soit ce qui y est ajouté à
-          l'avenir — plus besoin de ré-auditer cette classe de bug à chaque
-          nouvelle fonctionnalité. Le contexte React (useLiveData, routing
-          react-router pour NavLink) reste disponible normalement : un portail
-          ne change que l'emplacement DOM, pas la position dans l'arbre React
-          (contexte/événements inchangés). */}
-      {createPortal(
-        <nav className="sfTabbar" aria-label="Navigation">
-          {NAV.slice(0, 2).map(item => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              end={item.href === '/'}
-              className={({ isActive }) =>
-                isActive ? 'sfTab sfTab--active' : 'sfTab'
-              }
-            >
-              {ICONS[item.href]}
-              <span className="sfTab__label">{item.name}</span>
-            </NavLink>
-          ))}
+// ── Barre du bas — mobile uniquement ──
+// Composant séparé (voir commentaire au-dessus de Navbar) : plus de portail,
+// plus de position:fixed — rendue normalement dans `.appShell` (App.jsx),
+// en flux, toujours au bas de l'écran par construction.
+export function BottomTabBar() {
+  const { liveMatches } = useLiveData()
+  const liveCount = liveMatches.filter(isCardLive).length
 
-          {/* Orb Live central — toujours présent, pulse seulement si live */}
-          <NavLink
-            to="/live"
-            className={({ isActive }) =>
-              [
-                'sfTabLive',
-                liveCount > 0 ? 'sfTabLive--hasLive' : '',
-                isActive ? 'sfTabLive--active' : '',
-              ].filter(Boolean).join(' ')
-            }
-          >
-            <span className="sfTabLive__orb">
-              <BallIcon />
-              {liveCount > 0 && <span className="sfTabLive__count">{liveCount}</span>}
-            </span>
-            <span className="sfTab__label">Live</span>
-          </NavLink>
+  return (
+    <nav className="sfTabbar" aria-label="Navigation">
+      {NAV.slice(0, 2).map(item => (
+        <NavLink
+          key={item.href}
+          to={item.href}
+          end={item.href === '/'}
+          className={({ isActive }) =>
+            isActive ? 'sfTab sfTab--active' : 'sfTab'
+          }
+        >
+          {ICONS[item.href]}
+          <span className="sfTab__label">{item.name}</span>
+        </NavLink>
+      ))}
 
-          {NAV.slice(2).map(item => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              end={item.href === '/'}
-              className={({ isActive }) =>
-                isActive ? 'sfTab sfTab--active' : 'sfTab'
-              }
-            >
-              {ICONS[item.href]}
-              <span className="sfTab__label">{item.name}</span>
-            </NavLink>
-          ))}
-        </nav>,
-        document.body
-      )}
-    </>
+      {/* Orb Live central — toujours présent, pulse seulement si live */}
+      <NavLink
+        to="/live"
+        className={({ isActive }) =>
+          [
+            'sfTabLive',
+            liveCount > 0 ? 'sfTabLive--hasLive' : '',
+            isActive ? 'sfTabLive--active' : '',
+          ].filter(Boolean).join(' ')
+        }
+      >
+        <span className="sfTabLive__orb">
+          <BallIcon />
+          {liveCount > 0 && <span className="sfTabLive__count">{liveCount}</span>}
+        </span>
+        <span className="sfTab__label">Live</span>
+      </NavLink>
+
+      {NAV.slice(2).map(item => (
+        <NavLink
+          key={item.href}
+          to={item.href}
+          end={item.href === '/'}
+          className={({ isActive }) =>
+            isActive ? 'sfTab sfTab--active' : 'sfTab'
+          }
+        >
+          {ICONS[item.href]}
+          <span className="sfTab__label">{item.name}</span>
+        </NavLink>
+      ))}
+    </nav>
   )
 }
 
