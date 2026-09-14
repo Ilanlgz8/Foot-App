@@ -561,7 +561,15 @@ export const COMPETITIONS = [
     // le rendu "doux" spécifiquement demandé ici. `TINT_THEME_CAMP_COLORS.
     // bl1` mis à jour (`#000000` → `#c41230`, rouge déjà présent dans le
     // dégradé) pour ne plus référencer le noir retiré.
+    // ⚠️ AJOUTÉ (14/09, demande explicite : "pour la bundeliga met les
+    // minutes la en blanc stp dans livematchpage et resultat match et tout
+    // la") — `tintLight: true`, même mécanisme déjà utilisé pour PL/SA
+    // (texte minute/"Terminé" en blanc plutôt que rouge par défaut sur fond
+    // saturé), indépendant de `tintTheme` — s'applique automatiquement à
+    // LiveMatchPage, MatchPage ET aux cards Accueil/Résultats (même flag
+    // partagé par les 3, voir historique du 06/09 pour PL/FL1/SA).
     tintTheme: 'bl1',
+    tintLight: true,
     name: 'Bundesliga',
     shortName: 'Bundesliga',
     emblem: bundesligaLogo,

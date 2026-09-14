@@ -1423,6 +1423,26 @@ cf-worker/
   aucune logique touchée). Honnêteté : rendu jamais vu en direct sur un vrai appareil avant ce
   déploiement (juste lecture du CSS résultant) — à confirmer par l'utilisateur.
 
+- ✅ Minute/"Terminé" Bundesliga passée en blanc (14/09, demande explicite : "pour la bundeliga
+  met les minutes la en blanc stp dans livematchpage et resultat match et tout la") — ajout de
+  `tintLight: true` dans `competitions.js` à côté de `tintTheme: 'bl1'` (déjà présent), même
+  mécanisme que PL/Serie A (voir historique du 06/09) : `comp?.tintLight` ajoute la classe
+  `lmp__hero--lightTint` (`LiveMatchPage.jsx`/`MatchPage.jsx`) qui met le texte de la minute
+  live et "Terminé" en blanc (`.lmp__hero--lightTint .lmp__heroMinute`/`.lmp__hero--lightTint
+  .lmp__heroWhenLabel--ft`, `LiveMatchPage.css`) — s'applique automatiquement à LiveMatchPage ET
+  MatchPage (même composant/classes partagés). Vérifié avant d'appliquer (via agent dédié) que ça
+  ne réintroduit PAS le bug du 12/09 (collision de spécificité CSS causée par un champ `tint`
+  résiduel qui ajoutait `lmp__hero--tinted` en plus) : Bundesliga n'a AUCUN champ `tint` (que
+  `tintTheme`/`tintLight`), donc cette classe n'est jamais ajoutée — même situation saine que PL/
+  SA, qui utilisent déjà exactement cette combinaison sans souci. Sur les cards Accueil/Résultats,
+  aucun changement nécessaire : `.poster__min-label` (minute live) est déjà en blanc opaque
+  inconditionnellement pour TOUTES les compétitions (décision du 04/09, indépendante de
+  `tintLight`), et `.poster__env-label` ("Terminé") est déjà en blanc quasi-plein par défaut —
+  seul le voile nacré décoratif (non concerné par cette demande) dépend de `tintLight` sur les
+  cards, et nécessite en plus `tint` (absent ici) pour s'activer. 357 tests + lint (33 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés (changement de données +
+  commentaire uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
