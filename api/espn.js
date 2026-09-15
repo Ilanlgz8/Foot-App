@@ -191,15 +191,28 @@ function scoreboardChunkTtl(chunkDates) {
 // Récupère UNE tranche (déjà ≤7j) — cache Redis si `scoreboardChunkTtl` en
 // autorise un, sinon fetch direct à chaque fois (zone "live"). AbortController
 // dédié par tranche (indépendant de celui de la requête simple plus bas) :
-// plusieurs tranches sont interrogées EN PARALLÈLE (Promise.all), chacune
-// doit pouvoir s'annuler sans affecter les autres.
+// plusieurs tranches sont interrogées en petits groupes (voir
+// fetchScoreboardChunksStaggered plus bas), chacune doit pouvoir s'annuler
+// sans affecter les autres.
+// ⚠️ Retourne `{ ok, events }` et NON directement `{ events }` (15/09,
+// corrigé avant même le 1er déploiement de ce mécanisme) : si une tranche
+// échoue réellement (ESPN en panne/bloque, timeout), la confondre avec "0
+// match sur cette période" aurait fait perdre le filet de sécurité déjà en
+// place côté client (`fetchEspnCompMatches`, espnAdapter.js) — qui ne retombe
+// sur le cache local périmé QUE si `res.ok` est faux. Un merge qui renvoyait
+// toujours 200 avec `events:[]` en cas d'échec aurait donc fait écraser un
+// cache client valide par une liste vide à la moindre panne ESPN, PIRE que
+// le comportement d'avant ce correctif.
 async function fetchScoreboardChunk(slug, chunkDates) {
   const ttl = scoreboardChunkTtl(chunkDates)
   const cacheKey = `espn:sb:${slug}:${chunkDates}`
   if (ttl != null) {
     try {
       const cached = await kv.get(cacheKey)
-      if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached
+      if (cached) {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached
+        return { ok: true, events: parsed.events ?? [] }
+      }
     } catch { /* Redis indisponible → on retente un fetch direct ci-dessous */ }
   }
 
@@ -211,34 +224,65 @@ async function fetchScoreboardChunk(slug, chunkDates) {
       headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
       signal: controller.signal,
     })
-    if (!response.ok) return { events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
+    if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
     const json = await response.json()
     if (ttl != null) {
       kv.set(cacheKey, JSON.stringify(json), { ex: ttl }).catch(() => {})
     }
-    return json
+    return { ok: true, events: json.events ?? [] }
   } catch {
-    return { events: [] }
+    return { ok: false, events: [] }
   } finally {
     clearTimeout(timeoutId)
   }
 }
 
-// Fusionne les `events` de toutes les tranches, dédupliqués par id (les
+// ⚠️ AJOUT (15/09, incident constaté PENDANT le tout premier test de ce
+// mécanisme) : envoyer TOUTES les tranches d'un coup en Promise.all (jusqu'à
+// ~31 pour la fenêtre complète 60j/150j) a fait répondre ESPN en 403 sur les
+// requêtes suivantes, y compris des requêtes simples déjà validées quelques
+// minutes plus tôt — un vrai blocage anti-rafale côté ESPN, déclenché par ce
+// nombre de requêtes simultanées depuis la même IP serveur (celle de Vercel).
+// Même principe déjà appliqué côté client pour la même raison
+// (ESPN_CALL_STAGGER_MS, useTodayMatches.js/useMatchs.js) : petits groupes de
+// GROUP_SIZE tranches à la fois, avec une pause entre chaque groupe, plutôt
+// qu'une rafale totale. Les tranches déjà en cache Redis (le cas normal une
+// fois la fenêtre "chauffée" une 1ère fois) ne comptent pas dans la rafale —
+// seuls les VRAIS appels ESPN sont espacés (le cache répond immédiatement).
+const CHUNK_GROUP_SIZE   = 5
+const CHUNK_GROUP_DELAY_MS = 200
+
+async function fetchScoreboardChunksStaggered(slug, chunkList) {
+  const results = []
+  for (let i = 0; i < chunkList.length; i += CHUNK_GROUP_SIZE) {
+    const group = chunkList.slice(i, i + CHUNK_GROUP_SIZE)
+    results.push(...await Promise.all(group.map(c => fetchScoreboardChunk(slug, c))))
+    if (i + CHUNK_GROUP_SIZE < chunkList.length) {
+      await new Promise(r => setTimeout(r, CHUNK_GROUP_DELAY_MS))
+    }
+  }
+  return results
+}
+
+// Fusionne les tranches : `ok:false` si TOUTES ont échoué (préserve le filet
+// de sécurité client, voir commentaire de fetchScoreboardChunk), sinon
+// combine les `events` de celles qui ont réussi — dédupliqués par id (les
 // tranches sont construites contiguës/non chevauchantes, mais un événement à
 // cheval sur minuit UTC pourrait apparaître dans 2 tranches adjacentes selon
 // la version de l'API ESPN — sécurité peu coûteuse).
-function mergeScoreboardChunks(jsons) {
+function mergeScoreboardChunks(results) {
+  const anyOk = results.some(r => r.ok)
+  if (!anyOk) return { ok: false, events: [] }
   const seen = new Set()
   const events = []
-  for (const j of jsons) {
-    for (const e of j?.events ?? []) {
+  for (const r of results) {
+    for (const e of r.events) {
       if (!e?.id || seen.has(e.id)) continue
       seen.add(e.id)
       events.push(e)
     }
   }
-  return { events }
+  return { ok: true, events }
 }
 
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
@@ -567,14 +611,20 @@ export default async function handler(req, res) {
     // le découpage.
     const chunks = dates ? splitScoreboardRange(dates) : [null]
     if (chunks.length > 1) {
-      const jsons = await Promise.all(chunks.map(c => fetchScoreboardChunk(slug, c)))
+      const results = await fetchScoreboardChunksStaggered(slug, chunks)
       clearTimeout(timeoutId)
+      const merged = mergeScoreboardChunks(results)
+      // Toutes les tranches ont échoué (ESPN en panne/bloque) : un vrai
+      // statut d'erreur, PAS un 200 avec `events:[]` — voir le commentaire de
+      // fetchScoreboardChunk, ça préserve le repli sur cache local périmé
+      // déjà en place côté client (fetchEspnCompMatches, espnAdapter.js).
+      if (!merged.ok) return res.status(502).json({ error: 'ESPN indisponible sur toutes les tranches' })
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
         .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
         .setHeader('Pragma', 'no-cache')
         .setHeader('Surrogate-Control', 'no-store')
-        .json(mergeScoreboardChunks(jsons))
+        .json({ events: merged.events })
     }
 
     // ⚠️ &limit=100 indispensable pour les matchs à élimination directe : sans
