@@ -287,7 +287,28 @@ export function pickMatchDuJour(matches) {
   // page. Compté sur TOUS les matchs du jour (et non plus les seuls "à venir")
   // — sinon la carte disparaissait dès qu'il ne restait qu'un match à jouer,
   // alors que la journée en comptait plusieurs.
-  if (all.length < 2) return null
+  //
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 15/09 : "quand il reste plus que
+  // [le match en cours] et que les autres sont terminé il redevient comme
+  // les autres cards basique" — PAS après la fin du match du jour lui-même,
+  // pendant qu'il est encore en direct). Reproduit en isolant `pickMatchDuJour`
+  // (2 matchs FINISHED + 1 IN_PLAY → élit bien le match en cours ; le MÊME
+  // match seul dans le tableau → `null`, alors que rien n'a changé pour LUI).
+  // Root cause : `all` reflète le tableau `matches` REÇU en argument (au final
+  // `todayMatchesForResults`, Accueil.jsx) — si les 2 autres matchs finis
+  // disparaissent de CE tableau au fil de la journée (rafraîchissement réseau,
+  // repli `upcomingAllComps` qui ne garde que SCHEDULED/TIMED, etc. — un
+  // problème de FLUX DE DONNÉES, pas de cette fonction), `all.length` tombe
+  // à 1 pour le SEUL match qui compte encore : celui déjà épinglé, en cours
+  // ou terminé. Le garde-fou "carte redondante" n'a jamais eu de sens pour ce
+  // cas : une fois qu'un match a débuté, l'affiche n'affiche plus jamais un
+  // simple doublon (minute live/score/"Terminé", absents de la card normale
+  // pour CE match précis — voir le filet anti-doublon dans Accueil.jsx) —
+  // elle mérite donc sa place même si elle se retrouve seule dans le tableau.
+  // Ne s'applique donc plus qu'au cas où AUCUN candidat n'a encore débuté
+  // (vrai cas pré-match visé à l'origine par ce garde-fou).
+  const hasStarted = all.some(m => !UPCOMING_STATUSES.has(m.status))
+  if (!hasStarted && all.length < 2) return null
 
   return electBest(all)
 }

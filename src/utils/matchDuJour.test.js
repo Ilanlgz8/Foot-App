@@ -196,4 +196,26 @@ describe('pickMatchDuJour', () => {
     const can = makeMatch('CAN', 'Comores', 'Eswatini', 20)
     expect(pickMatchDuJour([uel, can])).toBe(uel)
   })
+
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 15/09 : "quand il reste plus que
+  // [le match en cours] et que les autres sont terminé il redevient comme
+  // les autres cards basique") : le garde-fou "moins de 2 matchs" comptait
+  // TOUT le tableau reçu — si les autres matchs finis disparaissent du flux
+  // de données au fil de la journée (Accueil.jsx/useTodayMatches.js, hors
+  // de cette fonction) et qu'il ne reste plus QUE le match déjà épinglé
+  // (en cours ou terminé), `all.length` tombait à 1 et la carte disparaissait
+  // — alors que rien n'avait changé pour ce match précis.
+  it('reste élu même SEUL dans le tableau, s\'il a déjà débuté (en cours)', () => {
+    const enCours = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'IN_PLAY' }
+    expect(pickMatchDuJour([enCours])).toBe(enCours)
+  })
+
+  it('reste élu même SEUL dans le tableau, s\'il a déjà débuté (terminé)', () => {
+    const termine = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'FINISHED' }
+    expect(pickMatchDuJour([termine])).toBe(termine)
+  })
+
+  it('un seul match JAMAIS débuté reste refusé (comportement pré-match inchangé)', () => {
+    expect(pickMatchDuJour([makeMatch('PD', 'Real Madrid', 'Barcelona', 13)])).toBeNull()
+  })
 })

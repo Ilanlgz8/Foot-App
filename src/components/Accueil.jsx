@@ -321,9 +321,10 @@ function Accueil() {
   // Match du jour : toujours basé sur aujourd'hui (absolu), indépendant de
   // dayOffset — comme le panneau résultats juste au-dessus, pour ne pas
   // changer quand l'utilisateur navigue vers un autre jour dans "Matchs".
-  // Le garde-fou "un seul match = pas de carte" est dans pickMatchDuJour lui-
-  // même, basé sur le nombre de matchs À VENIR (pas le total de la journée,
-  // qui inclurait des matchs déjà terminés/live et fausserait le décompte).
+  // Le garde-fou "un seul match = pas de carte" est dans pickMatchDuJour
+  // lui-même (voir son commentaire) : ne s'applique qu'AVANT que le match élu
+  // n'ait débuté — une fois en direct/terminé, il reste épinglé même s'il se
+  // retrouve seul dans `todayMatchesForResults` (15/09, correctif dédié).
   const matchDuJour = useMemo(() => pickMatchDuJour(todayMatchesForResults), [todayMatchesForResults])
 
   const results = useMemo(
