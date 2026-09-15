@@ -477,7 +477,20 @@ export const COMPETITIONS = [
     // taches, gabarit identique à UEL/UECL) + rouge/or en accent — reprend
     // EXACTEMENT les couleurs déjà validées ci-dessus (#b3242b rouge, #e0b040
     // or), juste appliquées en taches plutôt qu'en dégradé linéaire à zones.
+    // ⚠️ AJOUTÉ (15/09, demande explicite : "pour la minute du match dans
+    // livematchpage pour laliga met le en blanc") : `tintLight: true`, même
+    // mécanisme déjà en place pour BL1/PL/SA/UCL (voir leurs commentaires
+    // respectifs) — ajoute `lmp__hero--lightTint` sur le hero
+    // (LiveMatchPage.jsx/MatchPage.jsx), qui met le texte de la minute live
+    // et "Terminé" en blanc au lieu de rouge par défaut. LaLiga n'a AUCUN
+    // champ `tint` résiduel (vérifié : que `tintTheme`/`name`/`shortName`/
+    // `emblem` sur ce bloc) — donc pas de risque de réintroduire le bug du
+    // 12/09 (collision de spécificité CSS `lmp__hero--tinted` vs `--theme-*`,
+    // voir son historique). S'applique aussi à MatchPage et aux cards
+    // Accueil (même flag partagé), cohérent avec le comportement des autres
+    // compétitions déjà en `tintLight`.
     tintTheme: 'pd',
+    tintLight: true,
     name: 'LALIGA EA SPORTS',
     shortName: 'LaLiga',
     emblem: laligaLogo,
