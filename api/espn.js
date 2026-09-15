@@ -104,6 +104,143 @@ const LIVE_SUMMARY_CACHE_TTL = 15
 // entre-temps publiée par ESPN.
 const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pas encore publiée par ESPN
 
+// ⚠️ AJOUT (15/09, constat utilisateur : "match du jour" disparaît alors que
+// le match en question est bien en cours — investigation a révélé un bug
+// beaucoup plus large que la carte elle-même) : ESPN a commencé à rejeter
+// (400) toute requête scoreboard dont la plage `dates=DEBUT-FIN` dépasse 7
+// jours calendaires — confirmé par test direct sur plusieurs slugs (esp.1,
+// eng.1, uefa.champions), avec une recherche par dichotomie qui isole le
+// seuil exact : 7 jours passe, 8 jours échoue systématiquement. Avant ce
+// changement (pas de notre fait — jamais documenté comme limite auparavant,
+// voir l'historique de `windowRange()` dans espnAdapter.js qui utilisait
+// cette plage EXACTE sans souci le 05/09), CE PROXY renvoyait la plage large
+// (60j avant / 150j après, voir DAYS_BACK/DAYS_FORWARD côté client) en UN
+// SEUL appel ESPN. Cassé net : `fetchEspnWindowJson` (espnAdapter.js),
+// utilisé par TOUTE compétition sourcée ESPN (6 grands championnats + CL/
+// UEL/UECL/NL/CAN/COPA/USC/TDC/CS + coupes nationales) échouait
+// silencieusement (repli sur cache local périmé, voir son commentaire) —
+// pas seulement le "match du jour", mais une bonne partie des données
+// Accueil/team-form pour ces compétitions.
+// Plutôt que de réduire la fenêtre (perdrait la couverture qui existait déjà
+// — ex. trouver le "prochain jour avec un match" jusqu'à 30j en avance pour
+// une compétition sporadique comme la Ligue des Nations, cf. l'historique de
+// ce bug le 28/07 dans CLAUDE.md) ou de faire chunker le CLIENT (multiplierait
+// par ~30 le nombre de requêtes comptées contre SON PROPRE plafond
+// ratelimit:espn:{ip}, 100/60s — le ferait exploser dès le 1er chargement),
+// le découpage se fait ICI, côté serveur : le client envoie TOUJOURS une
+// seule requête (contrat inchangé, `{ events: [...] }`), et CE proxy la
+// découpe en tranches ≤7j, chacune interrogée UNE FOIS puis mise en cache
+// Redis PARTAGÉ entre tous les visiteurs (comme le reste de ce fichier) — le
+// vrai coût réseau vers ESPN ne dépend donc que du nombre de tranches
+// distinctes (slug × semaine), pas du nombre de visiteurs ni du nombre de
+// requêtes client.
+const ESPN_SCOREBOARD_MAX_RANGE_DAYS = 7 // limite ESPN confirmée par test direct (15/09)
+// Passé (dernier jour de la tranche < aujourd'hui) : matchs FINISHED,
+// immuables — cache long. Futur lointain (1er jour de la tranche > 2j après
+// aujourd'hui) : matchs SCHEDULED, changent rarement (report/replanification
+// possible mais rare) — cache moyen. Une tranche qui touche aujourd'hui ±2j
+// n'est JAMAIS mise en cache : c'est la seule zone qui doit rester "live",
+// même contrat que le mode scoreboard non-chunké (voir plus bas, toujours
+// `no-store` pour une requête simple).
+const SCOREBOARD_PAST_CHUNK_TTL   = 24 * 60 * 60 // 24h
+const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
+
+function ymd(d) {
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
+}
+function parseYmd(s) {
+  return new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T00:00:00Z`)
+}
+
+// Découpe `DEBUT-FIN` (ou une date simple, retournée telle quelle) en
+// tranches consécutives d'au plus ESPN_SCOREBOARD_MAX_RANGE_DAYS jours
+// calendaires (limite ESPN, pas la nôtre).
+function splitScoreboardRange(dates) {
+  if (!dates.includes('-')) return [dates]
+  const [startStr, endStr] = dates.split('-')
+  const start = parseYmd(startStr)
+  const end   = parseYmd(endStr)
+  if (!(start <= end)) return [dates] // plage invalide — laisser ESPN renvoyer son erreur telle quelle
+  const totalDays = Math.round((end - start) / 86_400_000)
+  if (totalDays < ESPN_SCOREBOARD_MAX_RANGE_DAYS) return [dates]
+
+  const chunks = []
+  let chunkStart = start
+  while (chunkStart <= end) {
+    const chunkEnd = new Date(Math.min(
+      chunkStart.getTime() + (ESPN_SCOREBOARD_MAX_RANGE_DAYS - 1) * 86_400_000,
+      end.getTime(),
+    ))
+    chunks.push(`${ymd(chunkStart)}-${ymd(chunkEnd)}`)
+    chunkStart = new Date(chunkEnd.getTime() + 86_400_000)
+  }
+  return chunks
+}
+
+// TTL Redis (secondes) pour une tranche donnée, ou `null` si elle doit rester
+// live (jamais mise en cache) — voir le commentaire au-dessus.
+function scoreboardChunkTtl(chunkDates) {
+  const [startStr, endStr] = chunkDates.includes('-') ? chunkDates.split('-') : [chunkDates, chunkDates]
+  const today      = new Date(); today.setUTCHours(0, 0, 0, 0)
+  const todayPlus2 = new Date(today.getTime() + 2 * 86_400_000)
+  if (parseYmd(endStr) < today) return SCOREBOARD_PAST_CHUNK_TTL
+  if (parseYmd(startStr) > todayPlus2) return SCOREBOARD_FUTURE_CHUNK_TTL
+  return null
+}
+
+// Récupère UNE tranche (déjà ≤7j) — cache Redis si `scoreboardChunkTtl` en
+// autorise un, sinon fetch direct à chaque fois (zone "live"). AbortController
+// dédié par tranche (indépendant de celui de la requête simple plus bas) :
+// plusieurs tranches sont interrogées EN PARALLÈLE (Promise.all), chacune
+// doit pouvoir s'annuler sans affecter les autres.
+async function fetchScoreboardChunk(slug, chunkDates) {
+  const ttl = scoreboardChunkTtl(chunkDates)
+  const cacheKey = `espn:sb:${slug}:${chunkDates}`
+  if (ttl != null) {
+    try {
+      const cached = await kv.get(cacheKey)
+      if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached
+    } catch { /* Redis indisponible → on retente un fetch direct ci-dessous */ }
+  }
+
+  const controller = new AbortController()
+  const timeoutId  = setTimeout(() => controller.abort(), 8_000)
+  try {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${chunkDates}&limit=100`
+    const response = await fetch(url, {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      signal: controller.signal,
+    })
+    if (!response.ok) return { events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
+    const json = await response.json()
+    if (ttl != null) {
+      kv.set(cacheKey, JSON.stringify(json), { ex: ttl }).catch(() => {})
+    }
+    return json
+  } catch {
+    return { events: [] }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// Fusionne les `events` de toutes les tranches, dédupliqués par id (les
+// tranches sont construites contiguës/non chevauchantes, mais un événement à
+// cheval sur minuit UTC pourrait apparaître dans 2 tranches adjacentes selon
+// la version de l'API ESPN — sécurité peu coûteuse).
+function mergeScoreboardChunks(jsons) {
+  const seen = new Set()
+  const events = []
+  for (const j of jsons) {
+    for (const e of j?.events ?? []) {
+      if (!e?.id || seen.has(e.id)) continue
+      seen.add(e.id)
+      events.push(e)
+    }
+  }
+  return { events }
+}
+
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
 // manquants ou incomplets — "des fois ça marche, des fois pas") : jusqu'ici,
 // pour afficher les stats d'un match terminé, CHAQUE appareil de CHAQUE
@@ -414,11 +551,32 @@ export default async function handler(req, res) {
         .json(compact)
     }
 
-    // ── Mode scoreboard (pas de cache — données live, doivent rester fraîches) ──
+    // ── Mode scoreboard (pas de cache pour une plage "live" — voir plus bas
+    //    pour les tranches passées/futures lointaines, qui SONT mises en
+    //    cache, voir fetchScoreboardChunk/scoreboardChunkTtl) ──
     // Format simple (YYYYMMDD) OU plage (YYYYMMDD-YYYYMMDD) — la plage est
     // nécessaire pour les tournois ponctuels (NL/CAN/Copa America) où l'on
     // interroge une fenêtre large plutôt qu'un jour précis.
     if (dates && !/^\d{8}(-\d{8})?$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD ou YYYYMMDD-YYYYMMDD attendu)' })
+
+    // ⚠️ AJOUT (15/09) : ESPN rejette désormais (400) toute plage >7j calendaires
+    // — voir le commentaire détaillé de splitScoreboardRange/fetchScoreboardChunk
+    // plus haut. Une plage qui tient déjà dans cette limite (ou une date simple,
+    // ou aucune date) suit le chemin EXISTANT ci-dessous, inchangé — seul le cas
+    // qui casserait sinon (plage large, ex. windowRange() côté client) passe par
+    // le découpage.
+    const chunks = dates ? splitScoreboardRange(dates) : [null]
+    if (chunks.length > 1) {
+      const jsons = await Promise.all(chunks.map(c => fetchScoreboardChunk(slug, c)))
+      clearTimeout(timeoutId)
+      return res.status(200)
+        .setHeader('Content-Type', 'application/json')
+        .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
+        .setHeader('Pragma', 'no-cache')
+        .setHeader('Surrogate-Control', 'no-store')
+        .json(mergeScoreboardChunks(jsons))
+    }
+
     // ⚠️ &limit=100 indispensable pour les matchs à élimination directe : sans
     // lui, ESPN renvoie des noms d'équipe placeholder de bracket ("Round of 32
     // 5 Winner") et un statut/score figés SCHEDULED/0-0 même après le vrai
