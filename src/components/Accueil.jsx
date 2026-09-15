@@ -655,6 +655,21 @@ function Accueil() {
   // carte du match du jour, elle, n'en avait aucune et restait affichée
   // indéfiniment. Extraite ici pour que les DEUX s'appuient exactement sur la
   // même décision — sinon elles redivergeront au prochain ajustement.
+  // ⚠️ REVIREMENT (15/09, constat utilisateur : "pourquoi la card match du
+  // jour disparait quand il reste plus que lui et que les autres sont
+  // terminé [...] faut qu'il reste") — demande explicitement L'INVERSE du
+  // 02/09 ci-dessus : `stillVisibleToday` masque la card SEULEMENT
+  // `TERMINE_GRACE_MS` (8s, voir matchStateTracker.js) après le coup de
+  // sifflet, exactement comme prévu à l'époque. Mais l'objectif même de
+  // "match du jour" (voir matchDuJour.js, épinglage du 02/09 : "le match du
+  // jour reste affiché et bascule naturellement en mode live puis 'Terminé',
+  // au lieu d'être remplacé") est de rester LA vitrine du match toute la
+  // journée — la faire disparaître 8s après le coup de sifflet la ramène au
+  // rang d'une card normale (déjà présente en parallèle dans "Résultats
+  // récents", qui n'exclut jamais son id — seule matchPanelMatches, la liste
+  // à venir/live juste ci-dessus, l'exclut). Ce filtre reste utilisé POUR
+  // CETTE liste (stillVisibleToday(m) juste en dessous, comportement 02/09
+  // inchangé) — seule la carte elle-même n'y est plus soumise.
   // `isRecentlyFinished` laisse une courte fenêtre après le coup de sifflet
   // final (TERMINE_GRACE_MS) pour qu'on ait le temps de voir le score final
   // avant que la card ne s'efface — comportement déjà en place pour la liste,
@@ -792,7 +807,7 @@ function Accueil() {
             fonction partagée de matchUtils.js) — pas une condition
             réinventée ici, sinon les deux comportements divergeraient au
             prochain ajustement. */}
-        {matchDuJour && stillVisibleToday(matchDuJour) && (
+        {matchDuJour && (
           <MatchDuJourCard
             match={matchDuJour}
             espnScore={espnScores[matchDuJour.id]}
