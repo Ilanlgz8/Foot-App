@@ -1294,8 +1294,13 @@
    `.poster--theme-pd`/`.poster--theme-bl1` (accueil.css, voir son
    commentaire détaillé pour l'historique complet et pourquoi le blanc a été
    écarté pour Bundesliga). */
+/* ⚠️ Fond de repli mis à jour le 16/09 (passage au mélange de taches
+   noir/rouge/or, voir .lmp__heroTintC plus bas) : #b3242b (ancien rouge
+   jamais retouché depuis l'ère "mode peinture") remplacé par le neutre
+   sombre déjà utilisé comme fond de la pastille du logo LaLiga
+   (`emblemBg`, competitions.js) plutôt qu'une des 3 couleurs du mélange. */
 #root .lmp__hero--theme-pd {
-  background: #b3242b;
+  background: #0b0b0e;
 }
 .lmp__hero--theme-pd .lmp__heroTintB {
   inset: 0;
@@ -1313,17 +1318,28 @@
    or #e0b040 en vrai plateau 84-100% au lieu d'un simple point final.
    ⚠️ RETOUCHÉ (16/09, "ca fait + plage genre mdr" → "Plus de noir présent")
    — mirroir exact : noir 18% -> 32%, arrêts suivants repoussés en
-   conséquence (42/50/64/86), mêmes tailles relatives rouge/or. */
+   conséquence (42/50/64/86), mêmes tailles relatives rouge/or.
+   ⚠️ REFONTE (16/09, "fait un melange de noir, rouge et jaune partout sur
+   la card") — mirroir exact du changement accueil.css : abandon du dégradé
+   linéaire diagonal, 9 taches radial-gradient (3 noires/3 rouges #ff4b44/
+   3 or #e0b040) dispersées sur toute la carte, chacune avec un palier de
+   couleur pleine avant de fondre vers transparent (pas de blur). */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background: linear-gradient(135deg,
-    #000000 0%, #000000 32%,
-    #8c2925 42%,
-    #ff4b44 50%, #ff4b44 64%,
-    #e0b040 86%, #e0b040 100%);
+  background:
+    radial-gradient(45% 45% at 12% 15%, #000000 0%, #000000 28%, transparent 58%),
+    radial-gradient(42% 42% at 82% 10%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
+    radial-gradient(40% 40% at 50% 6%, #e0b040 0%, #e0b040 26%, transparent 56%),
+    radial-gradient(44% 44% at 14% 55%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
+    radial-gradient(46% 46% at 86% 52%, #e0b040 0%, #e0b040 28%, transparent 58%),
+    radial-gradient(48% 48% at 50% 48%, #000000 0%, #000000 26%, transparent 56%),
+    radial-gradient(42% 42% at 12% 90%, #e0b040 0%, #e0b040 26%, transparent 56%),
+    radial-gradient(44% 44% at 50% 92%, #ff4b44 0%, #ff4b44 26%, transparent 56%),
+    radial-gradient(40% 40% at 88% 88%, #000000 0%, #000000 26%, transparent 56%),
+    linear-gradient(#0b0b0e, #0b0b0e);
 }
 
 #root .lmp__hero--theme-bl1 {

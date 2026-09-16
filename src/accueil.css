@@ -2119,12 +2119,35 @@
      suivants repoussés en conséquence (bridge 30→42%, rouge 42/58→50/64%,
      or 84→86%) pour garder les mêmes tailles relatives de rouge/or, juste
      précédées d'un vrai bloc noir plus présent qui casse l'effet "tout
-     chaud". */
-  background: linear-gradient(135deg,
-    #000000 0%, #000000 32%,
-    #8c2925 42%,
-    #ff4b44 50%, #ff4b44 64%,
-    #e0b040 86%, #e0b040 100%);
+     chaud".
+     ⚠️ REFONTE (16/09, demande explicite : "fait un melange de noir, rouge
+     et jaune partout sur la card je pense que le resultat rendra mieux") —
+     abandon du dégradé linéaire diagonal (même après le renfort de noir
+     ci-dessus, l'utilisateur restait mitigé, "ca fait + plage genre mdr")
+     au profit d'un mélange de taches réparties sur toute la carte, plutôt
+     qu'un dégradé continu dans une seule direction. Retour partiel au
+     principe déjà utilisé pour UEL/UECL avant leur propre refonte linéaire
+     (voir leur historique) : 9 taches `radial-gradient` (3 noires / 3
+     rouges `#ff4b44` / 3 or `#e0b040`, mêmes couleurs déjà validées),
+     dispersées aux 4 coins + bords + centre. Chaque tache a un vrai palier
+     de couleur pleine avant de fondre vers transparent (leçon retenue du
+     fix "taches nettes UEL/UECL" du 16/09 : évite l'aspect flou/vaporeux
+     sans utiliser `filter: blur()`, qui avait aussi été retiré partout
+     pour la même raison). Fond de base sombre neutre (`#0b0b0e`, déjà la
+     couleur du fond de la pastille du logo LaLiga sur ce même fichier)
+     plutôt qu'une des 3 couleurs, pour ne favoriser aucune des 3 à parts
+     égales. */
+  background:
+    radial-gradient(45% 45% at 12% 15%, #000000 0%, #000000 28%, transparent 58%),
+    radial-gradient(42% 42% at 82% 10%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
+    radial-gradient(40% 40% at 50% 6%, #e0b040 0%, #e0b040 26%, transparent 56%),
+    radial-gradient(44% 44% at 14% 55%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
+    radial-gradient(46% 46% at 86% 52%, #e0b040 0%, #e0b040 28%, transparent 58%),
+    radial-gradient(48% 48% at 50% 48%, #000000 0%, #000000 26%, transparent 56%),
+    radial-gradient(42% 42% at 12% 90%, #e0b040 0%, #e0b040 26%, transparent 56%),
+    radial-gradient(44% 44% at 50% 92%, #ff4b44 0%, #ff4b44 26%, transparent 56%),
+    radial-gradient(40% 40% at 88% 88%, #000000 0%, #000000 26%, transparent 56%),
+    linear-gradient(#0b0b0e, #0b0b0e);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
