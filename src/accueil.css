@@ -2010,38 +2010,38 @@
    taches quasi-noires (`#000000` sur une base `#141414`, pas `#0a0a0a`
    comme les autres — nécessaire pour que des taches NOIRES restent visibles
    comme taches distinctes plutôt que de disparaître dans un fond déjà noir). */
-/* ⚠️ NETTETÉ DES TACHES ORANGE/VERTE (16/09, demande explicite : "faudrait
-   que les taches orange et verte ne soit pas flou [...] faudrait que ce
-   soit net") — le `filter: blur()` global avait déjà été retiré de TOUS les
-   thèmes mode-peinture le 12/09, mais chaque `radial-gradient` fond direc-
-   tement de sa couleur pleine (0%) vers `transparent` sur un large rayon —
-   ce fondu progressif intégré au gradient donne lui-même un aspect doux/
-   vaporeux aux bords, indépendant du `blur()` déjà retiré (déjà noté au
-   12/09 mais pas corrigé à l'époque faute de demande précise). Un palier de
-   couleur PLEINE ajouté avant le fondu (~50% du rayon total, ex. `transparent
-   60%` devient `COULEUR 30%, transparent 60%`) sur les 7 taches ORANGE (UEL)
-   / VERTE (UECL) uniquement — les 5 taches noires partagées avec les autres
-   thèmes du même gabarit (LaLiga/Bundesliga) ne sont pas concernées, la
-   demande visait spécifiquement les couleurs distinctives de ces 2 ligues.
-   Résultat : bords de tache nets plutôt qu'un dégradé continu depuis le
-   centre, sans changer position/taille/couleur des taches. */
+/* ⚠️ ABANDON DU "MODE PEINTURE" POUR UEL/UECL (16/09, demande explicite,
+   juste après la tentative de nettoyer les bords des taches ci-dessus
+   [voir plus bas dans l'historique de ce fichier] : "la c moche enlève les
+   tache orange et verte et fait un degradé entre le noir et orange et noir
+   et vert stp comme les autre et a la fin en bas a droite remet un peu de
+   noir") — même mouvement que LaLiga/Ligue 1/Premier League/Bundesliga le
+   13/09 ("Refonte complète..." plus bas) : les taches radiales multiples
+   remplacées par un DÉGRADÉ LINÉAIRE propre noir→couleur→noir, "comme les
+   autres" citées par l'utilisateur. Couleurs reprises telles quelles de
+   l'ancienne palette de taches (aucune invention) : orange `#c8551a`/
+   `#e6742a`/`#8a3c14` pour UEL, vert `#2f8a3e`/`#3fae52`/`#1c4a26` pour
+   UECL — mêmes teintes utilisées comme ponts de transition (déjà présentes
+   dans le dégradé, pas de nouvelle couleur), même principe que les ponts
+   noir→rouge de LaLiga (`#7a1a1f`) pour éviter la "coupure" nette déjà
+   documentée sur d'autres thèmes. Structure : noir en plateau au coin
+   haut-gauche (0-16%, 135deg part de ce coin), la couleur de marque domine
+   l'essentiel de la carte (30-80%), puis un petit retour de noir au coin
+   bas-droite (92-100%, "un peu de noir vite fait" comme demandé) — un
+   3e stop plutôt qu'un simple aller-retour à 2 couleurs, pour respecter
+   précisément les 2 parties de la demande (dégradé noir↔couleur ET un peu
+   de noir en bas à droite à la fin). `filter: saturate(...)` retiré (plus
+   de sens sur un dégradé linéaire aux couleurs déjà pleines, même
+   raisonnement que les 4 autres refontes du 13/09) ; `inset: -20px` →
+   `inset: 0` (plus de marge anti-bord-flou nécessaire, aucun flou ici). */
 .poster--theme-uel .poster__bg--gradient {
-  inset: -20px;
-  background:
-    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
-    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
-    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
-    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
-    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
-    radial-gradient(42% 34% at 60% 30%, #c8551a 0%, #c8551a 30%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #e6742a 0%, #e6742a 32%, transparent 62%),
-    radial-gradient(30% 32% at 76% 72%, #a8460f 0%, #a8460f 29%, transparent 58%),
-    radial-gradient(26% 40% at 50% 14%, #c8551a 0%, #c8551a 27%, transparent 55%),
-    radial-gradient(34% 28% at 14% 82%, #d9631f 0%, #d9631f 28%, transparent 56%),
-    radial-gradient(22% 34% at 90% 32%, #8a3c14 0%, #8a3c14 26%, transparent 52%),
-    radial-gradient(28% 22% at 65% 96%, #c8551a 0%, #c8551a 27%, transparent 55%),
-    #141414;
-  filter: saturate(1.3);
+  inset: 0;
+  background: linear-gradient(135deg,
+    #000000 0%, #000000 16%,
+    #8a3c14 30%,
+    #e6742a 46%, #c8551a 80%,
+    #8a3c14 92%,
+    #000000 97%, #000000 100%);
   animation: none;
 }
 .poster--theme-uel .poster__bg--gradientAlt { inset: 0; opacity: 0; }
@@ -2054,22 +2054,13 @@
 }
 
 .poster--theme-uecl .poster__bg--gradient {
-  inset: -20px;
-  background:
-    radial-gradient(38% 30% at 15% 15%, #000000 0%, transparent 60%),
-    radial-gradient(30% 42% at 8% 48%, #000000 0%, transparent 58%),
-    radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
-    radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
-    radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
-    radial-gradient(42% 34% at 60% 30%, #2f8a3e 0%, #2f8a3e 30%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #3fae52 0%, #3fae52 32%, transparent 62%),
-    radial-gradient(30% 32% at 76% 72%, #1c4a26 0%, #1c4a26 29%, transparent 58%),
-    radial-gradient(26% 40% at 50% 14%, #2f8a3e 0%, #2f8a3e 27%, transparent 55%),
-    radial-gradient(34% 28% at 14% 82%, #379645 0%, #379645 28%, transparent 56%),
-    radial-gradient(22% 34% at 90% 32%, #1f5c2a 0%, #1f5c2a 26%, transparent 52%),
-    radial-gradient(28% 22% at 65% 96%, #2f8a3e 0%, #2f8a3e 27%, transparent 55%),
-    #141414;
-  filter: saturate(1.3);
+  inset: 0;
+  background: linear-gradient(135deg,
+    #000000 0%, #000000 16%,
+    #1c4a26 30%,
+    #3fae52 46%, #2f8a3e 80%,
+    #1c4a26 92%,
+    #000000 97%, #000000 100%);
   animation: none;
 }
 .poster--theme-uecl .poster__bg--gradientAlt { inset: 0; opacity: 0; }
