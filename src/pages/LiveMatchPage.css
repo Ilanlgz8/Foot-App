@@ -1330,23 +1330,23 @@
    ⚠️ DISPERSÉ (16/09, mirroir exact accueil.css) — les positions suivaient
    encore toutes la même diagonale que l'ancien dégradé, repositionné pour
    que chaque couleur apparaisse à des coins/côtés opposés, aucune
-   diagonale commune. */
+   diagonale commune.
+   ⚠️ REFAIT (16/09, mirroir exact accueil.css — "c pas du tout ca [...] un
+   melange des trois couleur pas [...] un fond noir avec des boules") —
+   2 conic-gradient superposés (calque du dessus semi-transparent) pour un
+   vrai mélange multi-directionnel des 3 couleurs, sans fond noir dominant
+   ni formes isolées. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background:
-    radial-gradient(23% 23% at 22% 78%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(24% 24% at 10% 30%, #ff4b44 0%, #ff4b44 13%, transparent 27%),
-    radial-gradient(22% 22% at 35% 55%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    radial-gradient(23% 23% at 65% 15%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(22% 22% at 78% 25%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(21% 21% at 90% 12%, #e0b040 0%, #e0b040 12%, transparent 25%),
-    radial-gradient(24% 24% at 85% 60%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(23% 23% at 50% 88%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(22% 22% at 15% 92%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    linear-gradient(#0b0b0e, #0b0b0e);
+    conic-gradient(from 30deg at 30% 30%,
+      rgba(0,0,0,0.75) 0%, rgba(255,75,68,0.75) 22%, rgba(224,176,64,0.75) 44%,
+      rgba(0,0,0,0.75) 66%, rgba(255,75,68,0.75) 88%, rgba(0,0,0,0.75) 100%),
+    conic-gradient(from 200deg at 75% 70%,
+      #e0b040 0%, #000000 25%, #ff4b44 50%, #e0b040 75%, #000000 100%);
 }
 
 #root .lmp__hero--theme-bl1 {

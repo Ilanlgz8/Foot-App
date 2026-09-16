@@ -2149,18 +2149,29 @@
      dégradé), donc même resserrées, elles recomposaient visuellement le
      même axe rouge→or. Repositionné pour casser cet axe : chaque couleur
      apparaît maintenant à des coins/côtés OPPOSÉS les uns des autres,
-     aucune diagonale commune. */
+     aucune diagonale commune.
+     ⚠️ REFAIT (16/09, retour utilisateur ferme : "c pas du tout ca que je
+     t'ai demané [...] je t'ai dis de faire un melange des trois couleur
+     pas de mettre un fond noir avec des boules") — les taches ci-dessus
+     étaient justement le problème : des formes ISOLÉES sur un fond noir
+     dominant, pas un mélange. Précisé via question directe : "dégradé
+     multi-directionnel", les 3 couleurs fondues en continu dans plusieurs
+     sens (pas un seul axe diagonal), aucune ne dominant comme fond.
+     Remplacé par 2 `conic-gradient` superposés (contrairement à
+     `linear`/`radial`, un `conic-gradient` change de couleur tout autour
+     d'un point central → intrinsèquement "multi-directionnel", pas un axe
+     unique) : le calque du dessus est semi-transparent (alpha 0.75) pour
+     laisser transparaître celui du dessous, les 2 centrés à des endroits
+     et des angles de départ différents — les 3 couleurs se mélangent donc
+     RÉELLEMENT (pas juste juxtaposées) sur toute la surface, sans fond
+     noir dominant (chaque couleur occupe un tiers du cercle dans les 2
+     calques). */
   background:
-    radial-gradient(23% 23% at 22% 78%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(24% 24% at 10% 30%, #ff4b44 0%, #ff4b44 13%, transparent 27%),
-    radial-gradient(22% 22% at 35% 55%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    radial-gradient(23% 23% at 65% 15%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(22% 22% at 78% 25%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(21% 21% at 90% 12%, #e0b040 0%, #e0b040 12%, transparent 25%),
-    radial-gradient(24% 24% at 85% 60%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(23% 23% at 50% 88%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(22% 22% at 15% 92%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    linear-gradient(#0b0b0e, #0b0b0e);
+    conic-gradient(from 30deg at 30% 30%,
+      rgba(0,0,0,0.75) 0%, rgba(255,75,68,0.75) 22%, rgba(224,176,64,0.75) 44%,
+      rgba(0,0,0,0.75) 66%, rgba(255,75,68,0.75) 88%, rgba(0,0,0,0.75) 100%),
+    conic-gradient(from 200deg at 75% 70%,
+      #e0b040 0%, #000000 25%, #ff4b44 50%, #e0b040 75%, #000000 100%);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
