@@ -18,7 +18,10 @@ import { clubNameMatch, normalize } from './espnSummaryParse'
 import { translateTeam } from '../data/teamNames'
 import { readCacheStale, writeCache } from '../hooks/localCache'
 
-const HT_DURATION = 15 * 60_000  // durée estimée de la mi-temps
+// ⚠️ HT_DURATION (15min fixe) retiré (16/09) — servait à deviner une minute
+// chiffrée pendant la mi-temps sans ancre réelle, root cause d'un bug de
+// surestimation (voir le commentaire détaillé sur son ancien point d'usage,
+// plus bas dans "MI-TEMPS & 2ème MT").
 // Pas de cap sur l'interpolation : STATUS_HALFTIME/FINAL sont gérés avant cet appel,
 // donc interpoler sans limite évite les minutes gelées après un long arrière-plan iOS.
 
@@ -462,12 +465,25 @@ export function calcMinute(match) {
     // Match encore en PAUSED → ne jamais avancer au-delà de MT
     // (half2Start sera positionné dès que ESPN/api-football détecte la reprise)
     if (match.status === 'PAUSED') return 'MT'
-    const sinceP = now - state.pausedAt
-    if (sinceP < HT_DURATION) return 'MT'
-    // half2Start absent et statut PAUSED déjà écarté → estimation
-    const min2 = Math.floor((sinceP - HT_DURATION) / 60_000) + 1
-    if (min2 <= 45) return `${45 + min2}'`
-    return `90+${min2 - 45}'`
+    // ⚠️ BUG CORRIGÉ (16/09, constat utilisateur : "je reviens d'arrière-plan
+    // [...] au lieu de mettre reprise dans X minutes ça met mi-temps, et
+    // quand ça reprend, ça reprend pas la 46e, ça reprend la 50e") — cette
+    // branche n'est atteinte QUE quand ESPN est absent/non fiable ET qu'aucun
+    // ancrage précis (half2Start) n'existe encore pour ce match : le seul cas
+    // réaliste où ça arrive est un rechargement à froid de l'app (retour
+    // d'arrière-plan iOS qui relance le JS) pendant/juste après une mi-temps,
+    // avant que le 1er rendu n'ait eu la moindre donnée fraîche. L'ancien code
+    // supposait ICI que la 2e MT avait démarré pile à `pausedAt + 15min` et
+    // affichait aussitôt une minute chiffrée qui avance — or une vraie
+    // mi-temps dépasse fréquemment 15min (VAR, retard, championnats
+    // internationaux) : dès que la vraie pause dépasse cette hypothèse figée,
+    // la minute affichée était SURESTIMÉE d'exactement cet écart (pause réelle
+    // de 19min → "50'" affiché au lieu de "46'", pile le symptôme rapporté).
+    // Corrigé : on ne devine plus une minute précise sans ancre réelle — on
+    // continue d'afficher "MT" (jamais faux, juste moins précis) le temps que
+    // l'ancrage précoce de half2Start (useLiveMinute.js, quelques secondes
+    // après le montage) prenne le relais avec une vraie référence temporelle.
+    return 'MT'
   }
 
   if (match.status === 'PAUSED') return 'MT'
