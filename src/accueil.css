@@ -2092,10 +2092,15 @@
    inventée — sert d'étape entre le noir plein et le rouge vif de marque. */
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
+  /* ⚠️ RETOUCHÉ (16/09, demande explicite : "pour la liga remplace le rouge
+     actuel par du rouge orangé un peu stp") — pont #7a1a1f → #7a2712 et
+     plateau #b3242b → #c2391a, même position/paliers inchangés, juste la
+     teinte décalée vers l'orange (hue ~355° → ~14°) tout en gardant le noir
+     du coin et l'or final identiques. */
   background: linear-gradient(135deg,
     #000000 0%, #000000 18%,
-    #7a1a1f 30%,
-    #b3242b 42%, #b3242b 72%,
+    #7a2712 30%,
+    #c2391a 42%, #c2391a 72%,
     #c9932e 100%);
   animation: none;
 }
