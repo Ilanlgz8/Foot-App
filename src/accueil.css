@@ -2096,11 +2096,16 @@
      actuel par du rouge orangé un peu stp") — pont #7a1a1f → #7a2712 et
      plateau #b3242b → #c2391a, même position/paliers inchangés, juste la
      teinte décalée vers l'orange (hue ~355° → ~14°) tout en gardant le noir
-     du coin et l'or final identiques. */
+     du coin et l'or final identiques.
+     ⚠️ RETOUCHÉ (16/09, retour immédiat : "nn fait + rouge un beau rouge
+     stp") — le ton orangé ci-dessus est revenu vers un vrai rouge vif :
+     pont #7a2712 → #7a1414, plateau #c2391a → #d61f26 (hue ~14° → ~358°,
+     quasi le rouge d'origine mais plus vif/saturé). Mêmes positions/paliers,
+     noir et or inchangés. */
   background: linear-gradient(135deg,
     #000000 0%, #000000 18%,
-    #7a2712 30%,
-    #c2391a 42%, #c2391a 72%,
+    #7a1414 30%,
+    #d61f26 42%, #d61f26 72%,
     #c9932e 100%);
   animation: none;
 }

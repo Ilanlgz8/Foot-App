@@ -927,7 +927,9 @@ const TINT_THEME_CAMP_COLORS = {
   // de chaque thème.
   // ⚠️ pd : rouge décalé vers l'orangé le 16/09 (demande explicite, voir
   // accueil.css/LiveMatchPage.css) — #b3242b → #c2391a, même or `#e0b040`.
-  pd:   ['#c2391a', '#e0b040'],
+  // ⚠️ RETOUCHÉ (16/09, "nn fait + rouge un beau rouge stp") — #c2391a →
+  // #d61f26 (rouge vif, retour arrière sur le ton orangé).
+  pd:   ['#d61f26', '#e0b040'],
   // ⚠️ bl1 : noir retiré le 12/09 (voir commentaire détaillé sur l'entrée
   // Bundesliga ci-dessus, "que rouge et blanc pas de noir") — 2e couleur
   // repassée à `#c41230` (rouge sombre déjà présent dans le dégradé), plus
