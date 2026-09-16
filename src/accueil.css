@@ -2136,17 +2136,23 @@
      pour la même raison). Fond de base sombre neutre (`#0b0b0e`, déjà la
      couleur du fond de la pastille du logo LaLiga sur ce même fichier)
      plutôt qu'une des 3 couleurs, pour ne favoriser aucune des 3 à parts
-     égales. */
+     égales.
+     ⚠️ RESSERRÉ (16/09, même changement, vérifié en direct sur la prod) —
+     les 9 taches à 40-48% de rayon se chevauchaient tellement qu'elles se
+     refondaient en un lissage quasi identique au dégradé diagonal qu'elles
+     devaient remplacer (constaté par capture d'écran, pas supposé). Rayon
+     réduit à 20-24% : les taches restent bien distinctes/identifiables
+     comme des taches séparées plutôt qu'un unique wash continu. */
   background:
-    radial-gradient(45% 45% at 12% 15%, #000000 0%, #000000 28%, transparent 58%),
-    radial-gradient(42% 42% at 82% 10%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
-    radial-gradient(40% 40% at 50% 6%, #e0b040 0%, #e0b040 26%, transparent 56%),
-    radial-gradient(44% 44% at 14% 55%, #ff4b44 0%, #ff4b44 28%, transparent 58%),
-    radial-gradient(46% 46% at 86% 52%, #e0b040 0%, #e0b040 28%, transparent 58%),
-    radial-gradient(48% 48% at 50% 48%, #000000 0%, #000000 26%, transparent 56%),
-    radial-gradient(42% 42% at 12% 90%, #e0b040 0%, #e0b040 26%, transparent 56%),
-    radial-gradient(44% 44% at 50% 92%, #ff4b44 0%, #ff4b44 26%, transparent 56%),
-    radial-gradient(40% 40% at 88% 88%, #000000 0%, #000000 26%, transparent 56%),
+    radial-gradient(24% 24% at 12% 15%, #000000 0%, #000000 13%, transparent 26%),
+    radial-gradient(22% 22% at 82% 10%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
+    radial-gradient(20% 20% at 50% 6%, #e0b040 0%, #e0b040 12%, transparent 24%),
+    radial-gradient(23% 23% at 14% 55%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
+    radial-gradient(24% 24% at 86% 52%, #e0b040 0%, #e0b040 13%, transparent 26%),
+    radial-gradient(25% 25% at 50% 48%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(22% 22% at 12% 90%, #e0b040 0%, #e0b040 12%, transparent 26%),
+    radial-gradient(23% 23% at 50% 92%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
+    radial-gradient(21% 21% at 88% 88%, #000000 0%, #000000 12%, transparent 26%),
     linear-gradient(#0b0b0e, #0b0b0e);
   animation: none;
 }
