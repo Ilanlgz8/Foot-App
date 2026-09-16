@@ -1621,6 +1621,19 @@ cf-worker/
   Pronos.jsx, inchangé) + build vérifiés. Honnêteté : rendu jamais vu en direct sur un vrai
   appareil avant ce déploiement (juste lecture du CSS résultant) — à confirmer par l'utilisateur.
 
+- ✅ UEL : rééquilibrage noir/orange du dégradé linéaire tout juste posé (16/09, retour utilisateur
+  immédiat : "y'a pas assez de noir et trop de orange bg") — `.poster--theme-uel .poster__bg--
+  gradient` (`accueil.css`) et `.lmp__hero--theme-uel .lmp__heroTintC` (`LiveMatchPage.css`, gardé
+  identique comme toujours) : plateau noir élargi (0-16% → 0-30%), plateau orange plein resserré
+  (46-80% → 52-68%, plus étroit qu'avant) et plateau noir final élargi (97-100% → 92-100%) — noir
+  passe d'environ 19% à environ 38% du dégradé, orange plein réduit d'environ 34% à environ 16%.
+  Ponts de transition `#8a3c14` (orange sombre, déjà utilisé) conservés aux mêmes rôles pour éviter
+  de réintroduire une coupure nette noir→orange déjà documentée sur d'autres thèmes (LaLiga,
+  Premier League). Portée : uniquement UEL — la demande ne mentionnait que "orange", pas "vert"
+  (UECL), donc UECL n'a volontairement pas été touché malgré la structure identique ; si le même
+  déséquilibre est constaté sur UECL, ce sera à traiter séparément plutôt que supposé. 360 tests +
+  lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
