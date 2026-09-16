@@ -1749,6 +1749,32 @@ cf-worker/
   corrigé sur UEL juste avant, évité ici dès le départ). Honnêteté : rendu jamais vu en direct
   avant déploiement (juste lecture du CSS) — à confirmer par l'utilisateur.
 
+- ✅ Logo UECL remplacé par la version transparente officielle + contour blanc retiré
+  (16/09, demande explicite avec image jointe : "remplace ce logo stp par lui la et aussi
+  et dasn matchpage et tout la y'a du contour blanc enlève ça stp") : l'ancien
+  `src/assets/leagues/conference-league.png` (204×192) était le lockup complet UEFA
+  Europa Conference League sur un carré NOIR plein (fond opaque baké dans le fichier) —
+  l'image fournie par l'utilisateur est la version officielle TRANSPARENTE du même logo
+  (trophée + texte en blanc, arcs en vert `#22c55e`-like, fond réellement transparent,
+  RGBA vérifié). Remplacé le fichier (redimensionné 2138×2160 → 360×364, ratio conservé,
+  alpha préservé) sous le MÊME nom de fichier — aucun changement de code nécessaire
+  (`competitions.js` importe déjà `conference-league.png`, un seul import, un seul
+  usage). En parallèle, retiré le fond blanc (`background: rgba(var(--white-rgb),0.94)`)
+  et l'ombre (`box-shadow`) de `.lmp__heroCompIcon` (`LiveMatchPage.css`, pastille du
+  logo de compétition en haut à gauche du hero — partagée par MatchPage ET
+  LiveMatchPage, qui importe ce même fichier CSS) : la nouvelle image, transparente et
+  déjà lisible en blanc/vert, n'avait plus besoin d'une plaque blanche derrière (qui
+  donnait justement l'effet de "contour blanc" signalé, un carré blanc visible autour du
+  logo). Honnêteté : ce fond blanc existait aussi pour garder lisibles d'AUTRES logos de
+  compétition dont le tracé est sombre sur fond transparent (voir le commentaire
+  équivalent dans `accueil.css` pour `.accueil__mdjLeagueIcon`, la même pastille sur la
+  carte "Match du jour" de l'Accueil — celle-ci N'A PAS été touchée, la demande ne
+  nommait que MatchPage/LiveMatchPage) — son retrait sur le hero MatchPage/LiveMatchPage
+  est une demande explicite, pas une garantie que chaque logo de compétition y reste
+  aussi lisible qu'avant ; à signaler si un logo précis devient difficile à voir sur ce
+  panneau. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  vérifiés (fichier image + CSS uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

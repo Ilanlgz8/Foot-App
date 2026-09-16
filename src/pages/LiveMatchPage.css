@@ -1458,17 +1458,22 @@
 /* Pastille collée au logo — même raison et même recette que
    .accueil__mdjLeagueIcon (voir son commentaire détaillé dans accueil.css). */
 .lmp__heroCompIcon {
+  /* ⚠️ Contour/pastille blanche RETIRÉE (16/09, demande explicite : "y'a du
+     contour blanc enlève ça" — juste après le remplacement du logo UECL par
+     sa version transparente officielle, voir competitions.js). Le logo
+     flotte désormais directement sur le fond sombre du panneau, sans boîte
+     blanche derrière. Honnêteté : ce fond blanc existait aussi pour garder
+     lisibles les logos dont le tracé est sombre sur fond transparent — son
+     retrait est une demande explicite de l'utilisateur, pas une garantie
+     que CHAQUE logo de compétition reste aussi lisible qu'avant sur ce
+     panneau ; à signaler si un logo précis devient difficile à voir ici. */
   height: 20px;
   width: max-content;
   max-width: 62px;
-  padding: 2px;
-  border-radius: 5px;
   flex-shrink: 0;
-  background: rgba(var(--white-rgb),0.94);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 12px rgba(var(--black-rgb),0.6);
 }
 .lmp__heroCompIcon img {
   height: 100%;
