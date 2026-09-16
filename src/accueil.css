@@ -2010,6 +2010,21 @@
    taches quasi-noires (`#000000` sur une base `#141414`, pas `#0a0a0a`
    comme les autres — nécessaire pour que des taches NOIRES restent visibles
    comme taches distinctes plutôt que de disparaître dans un fond déjà noir). */
+/* ⚠️ NETTETÉ DES TACHES ORANGE/VERTE (16/09, demande explicite : "faudrait
+   que les taches orange et verte ne soit pas flou [...] faudrait que ce
+   soit net") — le `filter: blur()` global avait déjà été retiré de TOUS les
+   thèmes mode-peinture le 12/09, mais chaque `radial-gradient` fond direc-
+   tement de sa couleur pleine (0%) vers `transparent` sur un large rayon —
+   ce fondu progressif intégré au gradient donne lui-même un aspect doux/
+   vaporeux aux bords, indépendant du `blur()` déjà retiré (déjà noté au
+   12/09 mais pas corrigé à l'époque faute de demande précise). Un palier de
+   couleur PLEINE ajouté avant le fondu (~50% du rayon total, ex. `transparent
+   60%` devient `COULEUR 30%, transparent 60%`) sur les 7 taches ORANGE (UEL)
+   / VERTE (UECL) uniquement — les 5 taches noires partagées avec les autres
+   thèmes du même gabarit (LaLiga/Bundesliga) ne sont pas concernées, la
+   demande visait spécifiquement les couleurs distinctives de ces 2 ligues.
+   Résultat : bords de tache nets plutôt qu'un dégradé continu depuis le
+   centre, sans changer position/taille/couleur des taches. */
 .poster--theme-uel .poster__bg--gradient {
   inset: -20px;
   background:
@@ -2018,13 +2033,13 @@
     radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
     radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
     radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
-    radial-gradient(42% 34% at 60% 30%, #c8551a 0%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #e6742a 0%, transparent 62%),
-    radial-gradient(30% 32% at 76% 72%, #a8460f 0%, transparent 58%),
-    radial-gradient(26% 40% at 50% 14%, #c8551a 0%, transparent 55%),
-    radial-gradient(34% 28% at 14% 82%, #d9631f 0%, transparent 56%),
-    radial-gradient(22% 34% at 90% 32%, #8a3c14 0%, transparent 52%),
-    radial-gradient(28% 22% at 65% 96%, #c8551a 0%, transparent 55%),
+    radial-gradient(42% 34% at 60% 30%, #c8551a 0%, #c8551a 30%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #e6742a 0%, #e6742a 32%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #a8460f 0%, #a8460f 29%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #c8551a 0%, #c8551a 27%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #d9631f 0%, #d9631f 28%, transparent 56%),
+    radial-gradient(22% 34% at 90% 32%, #8a3c14 0%, #8a3c14 26%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #c8551a 0%, #c8551a 27%, transparent 55%),
     #141414;
   filter: saturate(1.3);
   animation: none;
@@ -2046,13 +2061,13 @@
     radial-gradient(34% 26% at 82% 10%, #000000 0%, transparent 55%),
     radial-gradient(26% 38% at 92% 58%, #000000 0%, transparent 56%),
     radial-gradient(30% 24% at 42% 92%, #000000 0%, transparent 55%),
-    radial-gradient(42% 34% at 60% 30%, #2f8a3e 0%, transparent 60%),
-    radial-gradient(36% 46% at 30% 55%, #3fae52 0%, transparent 62%),
-    radial-gradient(30% 32% at 76% 72%, #1c4a26 0%, transparent 58%),
-    radial-gradient(26% 40% at 50% 14%, #2f8a3e 0%, transparent 55%),
-    radial-gradient(34% 28% at 14% 82%, #379645 0%, transparent 56%),
-    radial-gradient(22% 34% at 90% 32%, #1f5c2a 0%, transparent 52%),
-    radial-gradient(28% 22% at 65% 96%, #2f8a3e 0%, transparent 55%),
+    radial-gradient(42% 34% at 60% 30%, #2f8a3e 0%, #2f8a3e 30%, transparent 60%),
+    radial-gradient(36% 46% at 30% 55%, #3fae52 0%, #3fae52 32%, transparent 62%),
+    radial-gradient(30% 32% at 76% 72%, #1c4a26 0%, #1c4a26 29%, transparent 58%),
+    radial-gradient(26% 40% at 50% 14%, #2f8a3e 0%, #2f8a3e 27%, transparent 55%),
+    radial-gradient(34% 28% at 14% 82%, #379645 0%, #379645 28%, transparent 56%),
+    radial-gradient(22% 34% at 90% 32%, #1f5c2a 0%, #1f5c2a 26%, transparent 52%),
+    radial-gradient(28% 22% at 65% 96%, #2f8a3e 0%, #2f8a3e 27%, transparent 55%),
     #141414;
   filter: saturate(1.3);
   animation: none;
