@@ -1306,7 +1306,11 @@
    ⚠️ RETOUCHÉ (16/09, "rouge orangé un peu") — mirroir exact du changement
    fait dans accueil.css : #7a1a1f → #7a2712, #b3242b → #c2391a.
    ⚠️ RETOUCHÉ (16/09, "nn fait + rouge un beau rouge stp") — mirroir exact :
-   #7a2712 → #7a1414, #c2391a → #d61f26. */
+   #7a2712 → #7a1414, #c2391a → #d61f26.
+   ⚠️ RETOUCHÉ (16/09, "fait un rouge comme la couleur du logo un peu etle
+   jaune fait le + prononcé stp") — mirroir exact du changement accueil.css :
+   #7a1414 -> #8c2925, #d61f26 -> #ff4b44 (couleur réelle du SVG du logo),
+   or #e0b040 en vrai plateau 84-100% au lieu d'un simple point final. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
@@ -1314,9 +1318,9 @@
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
     #000000 0%, #000000 18%,
-    #7a1414 30%,
-    #d61f26 42%, #d61f26 72%,
-    #c9932e 100%);
+    #8c2925 30%,
+    #ff4b44 42%, #ff4b44 58%,
+    #e0b040 84%, #e0b040 100%);
 }
 
 #root .lmp__hero--theme-bl1 {

@@ -2101,12 +2101,22 @@
      stp") — le ton orangé ci-dessus est revenu vers un vrai rouge vif :
      pont #7a2712 → #7a1414, plateau #c2391a → #d61f26 (hue ~14° → ~358°,
      quasi le rouge d'origine mais plus vif/saturé). Mêmes positions/paliers,
-     noir et or inchangés. */
+     noir et or inchangés.
+     ⚠️ RETOUCHÉ (16/09, demande explicite : "fait un rouge comme la couleur
+     du logo un peu etle jaune fait le + prononcé stp on le voit pas trop
+     trop la") — plateau #d61f26 -> #ff4b44 : couleur REELLE du logo LaLiga
+     (laliga-ea-sports.svg, tracé monochrome .cls-1{fill:#ff4b44}, vérifié en
+     lisant le SVG, pas une estimation) ; pont #7a1414 -> #8c2925, assombri
+     dans la même proportion pour rester cohérent. Or rendu plus visible :
+     le rouge plein est raccourci (72% -> 58%) et l'or #e0b040 (déjà présent
+     dans la palette LaLiga établie, plus clair/vif que l'ancien #c9932e)
+     tient maintenant un vrai plateau 84-100% au lieu d'un simple point
+     d'arrivée qui ne se voyait quasiment jamais. */
   background: linear-gradient(135deg,
     #000000 0%, #000000 18%,
-    #7a1414 30%,
-    #d61f26 42%, #d61f26 72%,
-    #c9932e 100%);
+    #8c2925 30%,
+    #ff4b44 42%, #ff4b44 58%,
+    #e0b040 84%, #e0b040 100%);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }

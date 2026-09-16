@@ -929,7 +929,11 @@ const TINT_THEME_CAMP_COLORS = {
   // accueil.css/LiveMatchPage.css) — #b3242b → #c2391a, même or `#e0b040`.
   // ⚠️ RETOUCHÉ (16/09, "nn fait + rouge un beau rouge stp") — #c2391a →
   // #d61f26 (rouge vif, retour arrière sur le ton orangé).
-  pd:   ['#d61f26', '#e0b040'],
+  // ⚠️ RETOUCHÉ (16/09, "fait un rouge comme la couleur du logo un peu") —
+  // #d61f26 → #ff4b44, couleur réelle du SVG du logo LaLiga (vérifiée en
+  // lisant laliga-ea-sports.svg, .cls-1{fill:#ff4b44}). Or #e0b040 déjà
+  // référencé ici, inchangé (juste rendu plus visible dans le dégradé CSS).
+  pd:   ['#ff4b44', '#e0b040'],
   // ⚠️ bl1 : noir retiré le 12/09 (voir commentaire détaillé sur l'entrée
   // Bundesliga ci-dessus, "que rouge et blanc pas de noir") — 2e couleur
   // repassée à `#c41230` (rouge sombre déjà présent dans le dégradé), plus
