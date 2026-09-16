@@ -134,7 +134,24 @@ const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pa
 // vrai coût réseau vers ESPN ne dépend donc que du nombre de tranches
 // distinctes (slug × semaine), pas du nombre de visiteurs ni du nombre de
 // requêtes client.
-const ESPN_SCOREBOARD_MAX_RANGE_DAYS = 7 // limite ESPN confirmée par test direct (15/09)
+// ⚠️ MIS À JOUR (16/09, constat utilisateur : "j'ai plus rien dans accueil"
+// juste après le déploiement du découpage par tranches de 7j ci-dessous) :
+// re-testé en direct sur la prod — même une plage de SEULEMENT 2 jours
+// (`dates=20260916-20260917`) était désormais rejetée en 400, alors qu'un
+// test répété quelques heures plus tôt le même jour avait mesuré un seuil
+// à 7j. Conclusion la plus probable : ESPN ne rejette pas "au-delà de 7j"
+// de façon stable — le comportement est instable/en train de se durcir
+// (possiblement lié à mes propres tests en rafale du jour, voir l'incident
+// 403 documenté plus bas ; possiblement un changement côté ESPN indépendant
+// de nous). Seul format encore confirmé fiable au moment de ce correctif :
+// une DATE UNIQUE, sans aucun tiret (`dates=20260916` → 200 OK, vérifié en
+// direct). Plutôt que de continuer à deviner un nouveau seuil de plage,
+// chaque tranche envoyée à ESPN est désormais une SEULE date, sans tiret, le
+// seul format qui n'a jamais échoué (voir splitScoreboardRange plus bas, qui
+// découpe systématiquement en dates individuelles). Pour rester dans un
+// temps d'exécution raisonnable (limite Vercel, voir vercel.json) malgré ce
+// découpage bien plus fin, la fenêtre demandée par le client est réduite en
+// parallèle (voir DAYS_BACK/DAYS_FORWARD dans espnAdapter.js, 60/150 → 30/45).
 // Passé (dernier jour de la tranche < aujourd'hui) : matchs FINISHED,
 // immuables — cache long. Futur lointain (1er jour de la tranche > 2j après
 // aujourd'hui) : matchs SCHEDULED, changent rarement (report/replanification
@@ -153,26 +170,20 @@ function parseYmd(s) {
 }
 
 // Découpe `DEBUT-FIN` (ou une date simple, retournée telle quelle) en
-// tranches consécutives d'au plus ESPN_SCOREBOARD_MAX_RANGE_DAYS jours
-// calendaires (limite ESPN, pas la nôtre).
+// dates individuelles SANS tiret (voir commentaire ci-dessus, 16/09) — chaque
+// tranche envoyée à ESPN est maintenant au format exact confirmé fiable.
 function splitScoreboardRange(dates) {
   if (!dates.includes('-')) return [dates]
   const [startStr, endStr] = dates.split('-')
   const start = parseYmd(startStr)
   const end   = parseYmd(endStr)
   if (!(start <= end)) return [dates] // plage invalide — laisser ESPN renvoyer son erreur telle quelle
-  const totalDays = Math.round((end - start) / 86_400_000)
-  if (totalDays < ESPN_SCOREBOARD_MAX_RANGE_DAYS) return [dates]
 
   const chunks = []
-  let chunkStart = start
-  while (chunkStart <= end) {
-    const chunkEnd = new Date(Math.min(
-      chunkStart.getTime() + (ESPN_SCOREBOARD_MAX_RANGE_DAYS - 1) * 86_400_000,
-      end.getTime(),
-    ))
-    chunks.push(`${ymd(chunkStart)}-${ymd(chunkEnd)}`)
-    chunkStart = new Date(chunkEnd.getTime() + 86_400_000)
+  let d = start
+  while (d <= end) {
+    chunks.push(ymd(d)) // date simple, sans tiret
+    d = new Date(d.getTime() + 86_400_000)
   }
   return chunks
 }
@@ -249,8 +260,17 @@ async function fetchScoreboardChunk(slug, chunkDates) {
 // qu'une rafale totale. Les tranches déjà en cache Redis (le cas normal une
 // fois la fenêtre "chauffée" une 1ère fois) ne comptent pas dans la rafale —
 // seuls les VRAIS appels ESPN sont espacés (le cache répond immédiatement).
-const CHUNK_GROUP_SIZE   = 5
-const CHUNK_GROUP_DELAY_MS = 200
+// ⚠️ AJUSTÉ (16/09, en même temps que le passage à des tranches d'1 jour) :
+// beaucoup plus de tranches par fenêtre désormais (jusqu'à ~75 au lieu de
+// ~31) — groupes légèrement plus larges (6 au lieu de 5) avec un espacement
+// un peu réduit (150ms au lieu de 200ms) pour rester sous la limite
+// d'exécution Vercel (maxDuration, voir vercel.json) sur un cache totalement
+// froid, tout en gardant un vrai espacement anti-rafale (l'incident 403 du
+// 15/09 avait été déclenché par une rafale de ~31 requêtes SIMULTANÉES sans
+// aucun espacement — un groupe de 6 espacé de 150ms reste loin de ce
+// scénario).
+const CHUNK_GROUP_SIZE   = 6
+const CHUNK_GROUP_DELAY_MS = 150
 
 async function fetchScoreboardChunksStaggered(slug, chunkList) {
   const results = []
@@ -603,12 +623,12 @@ export default async function handler(req, res) {
     // interroge une fenêtre large plutôt qu'un jour précis.
     if (dates && !/^\d{8}(-\d{8})?$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD ou YYYYMMDD-YYYYMMDD attendu)' })
 
-    // ⚠️ AJOUT (15/09) : ESPN rejette désormais (400) toute plage >7j calendaires
-    // — voir le commentaire détaillé de splitScoreboardRange/fetchScoreboardChunk
-    // plus haut. Une plage qui tient déjà dans cette limite (ou une date simple,
-    // ou aucune date) suit le chemin EXISTANT ci-dessous, inchangé — seul le cas
-    // qui casserait sinon (plage large, ex. windowRange() côté client) passe par
-    // le découpage.
+    // ⚠️ AJOUT (15/09, durci le 16/09) : ESPN rejette désormais (400) TOUTE
+    // plage avec un tiret, même 2 jours — voir le commentaire détaillé de
+    // splitScoreboardRange/fetchScoreboardChunk plus haut. Une date simple
+    // (sans tiret, ou aucune date) suit le chemin EXISTANT ci-dessous,
+    // inchangé — toute plage (ex. windowRange() côté client) passe désormais
+    // par le découpage, en dates individuelles.
     const chunks = dates ? splitScoreboardRange(dates) : [null]
     if (chunks.length > 1) {
       const results = await fetchScoreboardChunksStaggered(slug, chunks)

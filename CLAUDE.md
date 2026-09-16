@@ -1546,6 +1546,40 @@ cf-worker/
   qu'un correctif ciblé, même si le rendu visuel final (déjà revu par lecture du CSS résultant,
   jamais vu en direct) reste à confirmer par l'utilisateur après ce déploiement.
 
+- ✅ Accueil complètement vide ("j'ai plus rien [...] les match resultat de hier et les match a
+  venir") juste après le déploiement du découpage serveur ESPN en tranches ≤7j (15/09, voir plus
+  haut) : root cause — le seuil de 7j mesuré ce jour-là n'était pas stable. Re-testé en direct sur
+  la prod (16/09) : ESPN rejetait désormais (400) même une plage de 2 jours
+  (`dates=20260916-20260917`), alors qu'une date UNIQUE sans tiret (`dates=20260916`) réussissait
+  toujours (200 OK, vraies données). Le découpage par tranches de 7j de la veille produisait donc
+  encore des tranches qui échouaient TOUTES — `mergeScoreboardChunks` renvoyait `ok:false` sur
+  tous les grands championnats (CL/PL/esp.1/ger.1/ita.1/UEL confirmés en 502 via Network), d'où
+  l'écran vide constaté. Honnêteté : pas de certitude sur la cause exacte de ce durcissement
+  (nouvelle règle ESPN, ou séquelle de mes propres tests en rafale du 15/09 déjà documentés comme
+  ayant déclenché un 403 — impossible à distinguer depuis cet environnement) — mais peu importe la
+  cause, le format qui reste fiable est clair et vérifié. Corrigé (`api/espn.js`,
+  `splitScoreboardRange`) : le découpage se fait maintenant en DATES INDIVIDUELLES sans tiret
+  (`ESPN_SCOREBOARD_MAX_RANGE_DAYS` retiré, remplacé par un découpage jour par jour systématique
+  dès qu'un tiret est présent), le seul format qui n'a jamais échoué lors des tests du jour. Pour
+  compenser le nombre de tranches bien plus élevé (jusqu'à ~76 au lieu de ~31 pour la même
+  fenêtre) sans dépasser le temps d'exécution Vercel : `CHUNK_GROUP_SIZE` 5→6 et
+  `CHUNK_GROUP_DELAY_MS` 200→150 (`fetchScoreboardChunksStaggered`), `maxDuration` 20→30
+  (`vercel.json`), et surtout la fenêtre demandée par le client réduite (`espnAdapter.js`,
+  `DAYS_BACK`/`DAYS_FORWARD` : 60/150 → 30/45, soit 210j → 75j au total) — garde une marge x4-5 sur
+  les 2 vrais besoins connus de l'app (7j pour les résultats récents, 30j pour "prochain jour avec
+  un match" dans Accueil), compromis assumé sur la profondeur de forme récente d'une équipe très
+  peu active et la portée de recherche pour un tournoi sporadique (NL/CAN/COPA), pour restaurer une
+  app qui fonctionne plutôt que garder une couverture plus large mais cassée. Le mécanisme de repli
+  déjà en place (502 si toutes les tranches échouent, jamais un faux 200 vide — voir le fix du
+  15/09) reste inchangé, il a d'ailleurs fonctionné comme prévu pendant cet incident (aucune donnée
+  fausse affichée, juste vide, le filet client de repli sur cache périmé n'a pas pu s'activer faute
+  de cache jamais chauffé sur une fenêtre aussi large). 360 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés. Honnêteté finale : toujours pas de garantie à 100% que
+  ESPN ne durcira pas encore sa position sur les dates simples elles-mêmes à l'avenir — c'est
+  cependant le format historiquement le plus basique et le plus utilisé de son API, donc le pari
+  le plus sûr disponible ; à surveiller si un nouveau signalement d'Accueil vide survient malgré ce
+  correctif.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

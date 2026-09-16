@@ -143,9 +143,26 @@ function fmtDate(d) { return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(
 // Fenêtre glissante large plutôt que des dates de tournoi exactes (non
 // vérifiables/invariables pour NL/CAN/COPA, contrairement au Mondial dont on
 // connaît l'édition 2026 à l'avance) — filtrage par statut fait côté client
-// après coup. ESPN supporte les plages de dates (confirmé par test direct).
-const DAYS_BACK    = 60
-const DAYS_FORWARD = 150
+// après coup.
+// ⚠️ RÉDUIT 60/150 → 30/45 (16/09, même incident que le découpage par date
+// simple dans api/espn.js — voir son commentaire détaillé) : ESPN rejette
+// maintenant TOUTE plage avec un tiret, donc ce proxy découpe cette fenêtre
+// en autant de dates individuelles qu'il y a de jours dedans (voir
+// splitScoreboardRange). Avec l'ancienne fenêtre (210j), ça fait jusqu'à 210
+// vrais appels ESPN par compétition sur un cache Redis froid — bien trop
+// lent pour tenir sous le temps d'exécution Vercel (voir maxDuration,
+// vercel.json) au 1er chargement après une purge de cache. Réduit à 75j au
+// total : reste largement au-dessus des 2 vrais besoins connus de l'app
+// (RESULTS_DAYS_BACK=7 pour les résultats de la semaine, fenêtre 30j pour
+// "prochain jour avec un match" dans Accueil.jsx) — marge de x4-5 gardée sur
+// chacun plutôt que de coller au plus juste. Compromis assumé : moins de
+// profondeur pour la forme récente d'une équipe qui joue très rarement
+// (trêve internationale longue) et moins de portée pour trouver le prochain
+// match d'un tournoi très sporadique (NL/CAN/COPA) — accepté pour restaurer
+// une app qui fonctionne maintenant plutôt qu'une couverture plus large mais
+// cassée.
+const DAYS_BACK    = 30
+const DAYS_FORWARD = 45
 
 function windowRange() {
   const now   = new Date()
