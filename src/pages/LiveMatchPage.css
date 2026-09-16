@@ -1280,12 +1280,14 @@
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background: linear-gradient(135deg,
-    #000000 0%, #000000 16%,
-    #1c4a26 30%,
-    #3fae52 46%, #2f8a3e 80%,
-    #1c4a26 92%,
-    #000000 97%, #000000 100%);
+  background:
+    linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.22)),
+    linear-gradient(135deg,
+      #000000 0%, #000000 14%,
+      #1c4a26 36%,
+      #2f8a3e 54%,
+      #1c4a26 72%,
+      #000000 86%, #000000 100%);
 }
 
 /* ⚠️ HABILLAGE LALIGA / BUNDESLIGA (12/09) — mirroir exact de

@@ -1725,6 +1725,30 @@ cf-worker/
   environnement) — à confirmer par l'utilisateur. Portée : UEL uniquement (UECL non mentionné,
   comme toutes les itérations précédentes de ce dégradé).
 
+- ✅ UECL alignée sur la structure finale de UEL (16/09, constat utilisateur : "la ligue conference
+  league y'a pas assez de noir et t'as pas fait exactement comme l'europa league") — vérification
+  du constat : exacte, UECL n'avait reçu QUE le tout premier passage "mode peinture → dégradé
+  linéaire" du 16/09 (noir 0-16% / vert 30-92% en 2 nuances / noir 97-100%), mais n'avait PAS suivi
+  les 5 itérations suivantes faites sur UEL le même jour (rééquilibrage noir/couleur, refonte en
+  pente continue à 5 points sans palier, réintroduction de 2 courts paliers noirs aux coins, voile
+  noir centré, puis voile noir étendu à toute la carte) — chaque fois documenté explicitement
+  "Portée : UEL uniquement (UECL non mentionné)", donc UECL était restée figée sur une version
+  largement antérieure et moins riche en noir que celle de UEL. Corrigé (`.poster--theme-uecl
+  .poster__bg--gradient` dans `accueil.css` + `.lmp__hero--theme-uecl .lmp__heroTintC` dans
+  `LiveMatchPage.css`, gardé identique comme toujours) : structure copiée À L'IDENTIQUE de la
+  version UEL actuelle (2 calques — voile noir uniforme `linear-gradient(rgba(0,0,0,0.22),
+  rgba(0,0,0,0.22))` sur toute la carte + dégradé linéaire à 2 paliers noirs des coins (0-14% et
+  86-100%) reliés par une seule pente continue sans palier intermédiaire), mêmes % exacts — seules
+  les couleurs changent : `#1c4a26` (vert sombre) et `#2f8a3e` (vert vif) à la place de `#8a3c14`/
+  `#c8551a`, toutes deux déjà présentes dans l'ancienne palette UECL de ce fichier (aucune couleur
+  inventée). `TINT_THEME_CAMP_COLORS.uecl` (`competitions.js`) déjà `['#2f8a3e', '#000000']` —
+  aucune modification nécessaire, cohérent avec les 2 couleurs du nouveau dégradé. 360 tests +
+  lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés, y compris le CSS
+  minifié inspecté avant déploiement pour confirmer que le voile noir (calque non-final) reste
+  bien un `linear-gradient` valide et non une couleur plate invalide (même bug que celui trouvé et
+  corrigé sur UEL juste avant, évité ici dès le départ). Honnêteté : rendu jamais vu en direct
+  avant déploiement (juste lecture du CSS) — à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
