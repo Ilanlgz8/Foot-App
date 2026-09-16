@@ -1698,6 +1698,25 @@ cf-worker/
   rendu jamais vu en direct avant ce déploiement (juste lecture du CSS) — à confirmer par
   l'utilisateur. Portée : UEL uniquement (UECL non mentionné).
 
+- ✅ UEL : voile noir étendu à TOUTE la carte, même jour (16/09, retour utilisateur immédiat après
+  le point précédent : "met en partout ps juste au milieu tu vois") — le `radial-gradient` centré
+  du point précédent concentrait le voile noir sur le centre de la carte, avec un fondu vers
+  transparent dès 60% du rayon (donc quasiment aucun effet sur les bords/coins). Corrigé
+  (`.poster--theme-uel .poster__bg--gradient` dans `accueil.css` + `.lmp__hero--theme-uel
+  .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme toujours) : remplacement du
+  `radial-gradient` par une couleur plate `rgba(0,0,0,0.22)` en 1er calque — une couleur unie
+  (sans direction ni fondu) posée comme calque `background` couvre uniformément TOUTE la surface
+  de la carte, contrairement à un `radial-gradient` qui est structurellement concentré autour de
+  son centre. Opacité légèrement réduite (32%→22%) par rapport au voile centré précédent : un
+  assombrissement uniforme sur 100% de la carte à la même opacité qu'un voile concentré sur ~20%
+  du centre aurait rendu l'ensemble trop sombre, y compris les 2 paliers noirs des coins déjà
+  bien noirs — 22% reste un voile "léger" perceptible partout sans écraser le fondu déjà validé.
+  Le dégradé linéaire principal (2e calque, noir→orange sombre→orange vif→orange sombre→noir)
+  reste inchangé. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  vérifiés. Honnêteté : rendu jamais vu en direct avant ce déploiement (juste lecture du CSS) — à
+  confirmer par l'utilisateur. Portée : UEL uniquement (UECL non mentionné, comme toutes les
+  itérations précédentes de ce dégradé).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

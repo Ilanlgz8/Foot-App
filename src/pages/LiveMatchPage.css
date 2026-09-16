@@ -1259,7 +1259,7 @@
   animation: none;
   mix-blend-mode: normal;
   background:
-    radial-gradient(60% 55% at 50% 50%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.32) 18%, transparent 60%),
+    rgba(0,0,0,0.22),
     linear-gradient(135deg,
       #000000 0%, #000000 14%,
       #8a3c14 36%,
