@@ -1335,18 +1335,24 @@
    melange des trois couleur pas [...] un fond noir avec des boules") —
    2 conic-gradient superposés (calque du dessus semi-transparent) pour un
    vrai mélange multi-directionnel des 3 couleurs, sans fond noir dominant
-   ni formes isolées. */
+   ni formes isolées.
+   ⚠️ REFAIT #2 (16/09, mirroir exact accueil.css) — conic-gradient
+   ABANDONNÉ : "un truc bizarre [...] un point qui relier toutes les
+   differente couleur" (le point central inhérent à tout conic-gradient),
+   "principalement du rouge". Remplacé par 3 grands radial-gradient
+   semi-transparents (120% de rayon chacun, jamais entièrement visibles
+   dans la carte → pas de point de convergence), centrés à 3 endroits
+   différents, qui se chevauchent et se mélangent par transparence. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background:
-    conic-gradient(from 30deg at 30% 30%,
-      rgba(0,0,0,0.75) 0%, rgba(255,75,68,0.75) 22%, rgba(224,176,64,0.75) 44%,
-      rgba(0,0,0,0.75) 66%, rgba(255,75,68,0.75) 88%, rgba(0,0,0,0.75) 100%),
-    conic-gradient(from 200deg at 75% 70%,
-      #e0b040 0%, #000000 25%, #ff4b44 50%, #e0b040 75%, #000000 100%);
+    radial-gradient(120% 120% at 18% 18%, rgba(0,0,0,0.6) 0%, transparent 75%),
+    radial-gradient(120% 120% at 85% 22%, rgba(255,75,68,0.6) 0%, transparent 75%),
+    radial-gradient(120% 120% at 50% 92%, rgba(224,176,64,0.6) 0%, transparent 75%),
+    linear-gradient(#15100b, #15100b);
 }
 
 #root .lmp__hero--theme-bl1 {
