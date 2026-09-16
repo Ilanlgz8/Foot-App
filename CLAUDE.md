@@ -1596,6 +1596,31 @@ cf-worker/
   (juste lecture du CSS résultant) — si le rendu reste perçu comme pas assez net, l'étape suivante
   serait de resserrer encore le palier (ex. 60-65% du rayon au lieu de 50%).
 
+- ✅ UEL/UECL : abandon du "mode peinture", dégradé linéaire noir→couleur→noir (16/09, retour
+  utilisateur immédiat après le point précédent : "la c moche enlève les tache orange et verte et
+  fait un degradé entre le noir et orange et noir et vert stp comme les autre et a la fin en bas a
+  droite remet un peu de noir vite fait") — reversal du resserrement des bords fait juste avant :
+  le problème n'était pas la netteté des taches mais le principe même des taches radiales pour ces
+  2 thèmes. Même mouvement que LaLiga/Ligue 1/Premier League/Bundesliga le 13/09 ("Refonte
+  complète...", voir plus haut) : les 12 `radial-gradient` (5 noires + 7 colorées) remplacés par
+  UN SEUL `linear-gradient(135deg, ...)` à 3 zones dans `accueil.css` et `LiveMatchPage.css`
+  (gardés identiques comme toujours) — noir en plateau au coin haut-gauche (0-16%), la couleur de
+  marque domine l'essentiel de la carte (orange `#e6742a`/`#c8551a` pour UEL, vert `#3fae52`/
+  `#2f8a3e` pour UECL, 30-80%), puis un petit retour de noir au coin bas-droite (92-100%, "un peu
+  de noir vite fait" comme demandé) — 3 zones plutôt que 2 pour respecter précisément les 2 volets
+  de la demande. Ponts de transition (`#8a3c14` orange sombre, `#1c4a26` vert sombre) réutilisés
+  de l'ancienne palette de taches (aucune couleur inventée), même principe que les ponts noir→
+  rouge de LaLiga (`#7a1a1f`) pour éviter la "coupure" nette déjà documentée par le passé sur
+  d'autres thèmes. `filter: saturate(...)` retiré et `inset: -20px` → `inset: 0` (même
+  raisonnement que les 4 autres refontes linéaires du 13/09 : plus de sens sans flou/taches).
+  Fond de repli `#root .lmp__hero--theme-uel`/`-uecl` mis à jour de l'ancien quasi-noir `#141414`
+  vers la couleur dominante de chaque thème (`#c8551a`/`#2f8a3e`), même convention que PD/BL1.
+  `TINT_THEME_CAMP_COLORS.uel`/`.uecl` (`competitions.js`) déjà corrects (`['#c8551a', '#000000']`/
+  `['#2f8a3e', '#000000']`) — aucune modification nécessaire, les 2 couleurs dominantes du nouveau
+  dégradé (couleur + noir) y figuraient déjà. 360 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés. Honnêteté : rendu jamais vu en direct sur un vrai
+  appareil avant ce déploiement (juste lecture du CSS résultant) — à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
