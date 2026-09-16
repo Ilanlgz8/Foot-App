@@ -925,15 +925,11 @@ const TINT_THEME_CAMP_COLORS = {
   // Ajoutés le 12/09 avec le passage de LaLiga/Bundesliga en mode peinture
   // (voir leurs entrées ci-dessus) — mêmes couleurs que les taches dominantes
   // de chaque thème.
-  // ⚠️ pd : rouge décalé vers l'orangé le 16/09 (demande explicite, voir
-  // accueil.css/LiveMatchPage.css) — #b3242b → #c2391a, même or `#e0b040`.
-  // ⚠️ RETOUCHÉ (16/09, "nn fait + rouge un beau rouge stp") — #c2391a →
-  // #d61f26 (rouge vif, retour arrière sur le ton orangé).
-  // ⚠️ RETOUCHÉ (16/09, "fait un rouge comme la couleur du logo un peu") —
-  // #d61f26 → #ff4b44, couleur réelle du SVG du logo LaLiga (vérifiée en
-  // lisant laliga-ea-sports.svg, .cls-1{fill:#ff4b44}). Or #e0b040 déjà
-  // référencé ici, inchangé (juste rendu plus visible dans le dégradé CSS).
-  pd:   ['#ff4b44', '#e0b040'],
+  // ⚠️ REVERT COMPLET (16/09) — plusieurs essais successifs le même jour
+  // (rouge orangé, rouge vif, rouge=couleur du logo #ff4b44, tentatives de
+  // "vrai mélange" noir/rouge/or) tous rejetés, retour à la valeur d'avant
+  // la première retouche : voir le commentaire détaillé dans accueil.css.
+  pd:   ['#b3242b', '#e0b040'],
   // ⚠️ bl1 : noir retiré le 12/09 (voir commentaire détaillé sur l'entrée
   // Bundesliga ci-dessus, "que rouge et blanc pas de noir") — 2e couleur
   // repassée à `#c41230` (rouge sombre déjà présent dans le dégradé), plus

@@ -1294,46 +1294,26 @@
    `.poster--theme-pd`/`.poster--theme-bl1` (accueil.css, voir son
    commentaire détaillé pour l'historique complet et pourquoi le blanc a été
    écarté pour Bundesliga). */
-/* ⚠️ Fond de repli mis à jour le 16/09 (voir .lmp__heroTintC plus bas pour
-   l'historique complet) : passé par un neutre sombre pendant les essais de
-   mélange à 3 couleurs, repassé à un rouge (couleur du logo, #ff4b44) une
-   fois l'approche finale "noir par-dessus rouge visible" adoptée — cohérent
-   avec le fait que le rouge est maintenant la base dominante de la carte. */
 #root .lmp__hero--theme-pd {
-  background: #ff4b44;
+  background: #b3242b;
 }
 .lmp__hero--theme-pd .lmp__heroTintB {
   inset: 0;
   opacity: 0;
 }
-/* ⚠️ HISTORIQUE CONDENSÉ (16/09, mirroir exact accueil.css — voir son
-   commentaire détaillé pour la liste complète des tentatives) : rouge
-   orangé puis retour au rouge vif puis rouge = couleur réelle du logo
-   (#ff4b44) + or plus visible + ajout de noir, puis abandon du dégradé
-   linéaire pour un "vrai mélange" demandé explicitement — 4 tentatives
-   CSS (taches resserrées, taches dispersées, conic-gradient abandonné
-   pour son point de convergence visible, 3 radial-gradient superposés)
-   et une texture image générée (`laliga-mix.jpg`), toutes jugées encore
-   trop "chaudes"/pas assez mélangées à l'usage.
-   ⚠️ APPROCHE FINALE (16/09, "tu vas mettre du noir par dessus du rouge en
-   laissant du rouge qu'on voit [...] un effet melanger un peu avec un peu
-   de jaune") — mirroir exact accueil.css : base rouge pleine (#ff4b44),
-   taches noires semi-transparentes par-dessus (rouge visible entre/autour),
-   2 petites touches d'or en accent. `laliga-mix.jpg` plus référencé (voir
-   accueil.css, fichier supprimé du dépôt). */
+/* ⚠️ REVERT COMPLET (16/09) — voir le commentaire détaillé dans accueil.css
+   (`.poster--theme-pd .poster__bg--gradient`) pour le contexte complet de
+   cet abandon et retour à l'état d'avant la première retouche du jour. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background:
-    radial-gradient(16% 16% at 72% 16%, rgba(224,176,64,0.55) 0%, rgba(224,176,64,0.55) 38%, transparent 72%),
-    radial-gradient(14% 14% at 18% 86%, rgba(224,176,64,0.5) 0%, rgba(224,176,64,0.5) 38%, transparent 72%),
-    radial-gradient(36% 36% at 14% 20%, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.72) 42%, transparent 78%),
-    radial-gradient(32% 32% at 82% 32%, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.68) 42%, transparent 78%),
-    radial-gradient(34% 34% at 42% 82%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.7) 42%, transparent 78%),
-    radial-gradient(28% 28% at 88% 88%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.65) 42%, transparent 78%),
-    linear-gradient(#ff4b44, #ff4b44);
+  background: linear-gradient(135deg,
+    #000000 0%, #000000 18%,
+    #7a1a1f 30%,
+    #b3242b 42%, #b3242b 72%,
+    #c9932e 100%);
 }
 
 #root .lmp__hero--theme-bl1 {

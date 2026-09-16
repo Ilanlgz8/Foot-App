@@ -2092,37 +2092,22 @@
    inventée — sert d'étape entre le noir plein et le rouge vif de marque. */
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
-  /* ⚠️ HISTORIQUE CONDENSÉ (16/09) — de nombreux essais successifs ce jour :
-     rouge orangé, retour au rouge vif, rouge = couleur réelle du logo
-     (#ff4b44, vérifié dans laliga-ea-sports.svg) + or plus visible, ajout
-     de noir ("ca fait + plage genre mdr"), puis abandon complet du
-     dégradé linéaire pour un "vrai mélange" demandé explicitement — 4
-     tentatives en pur CSS (taches radiales resserrées, taches dispersées,
-     conic-gradient — abandonné : point de convergence visible lu comme un
-     artefact "bizarre" — puis 3 grands radial-gradient superposés) toutes
-     retombées sur un rendu à dominante rouge, avant de tenter une image
-     texture générée (`laliga-mix.jpg`, bruit organique via script Python)
-     — abandonnée à son tour, jugée encore trop "chaude" à l'usage malgré
-     un vrai mélange mesuré. Détail complet de chaque étape dans l'historique
-     git de ce fichier plutôt que gardé ici (devenait illisible).
-     ⚠️ APPROCHE FINALE (16/09, demande explicite : "tu vas mettre du noir
-     par dessus du rouge en laissant du rouge qu'on voit [...] que ça fasse
-     un effet melanger un peu avec un peu de jaune") — principe différent de
-     tout ce qui précède : plus une tentative de "mélange à 3 couleurs à
-     parts égales", mais une base ROUGE pleine (#ff4b44, couleur du logo)
-     avec des taches NOIRES semi-transparentes PAR-DESSUS (laissant le rouge
-     nettement visible entre/autour, pas une couverture totale) + 2 petites
-     touches d'or en accent discret. Retire `laliga-mix.jpg` (plus utilisé,
-     supprimé du dépôt) et tout le mécanisme radial/conic-gradient à 3
-     couleurs égales des tentatives précédentes. */
-  background:
-    radial-gradient(16% 16% at 72% 16%, rgba(224,176,64,0.55) 0%, rgba(224,176,64,0.55) 38%, transparent 72%),
-    radial-gradient(14% 14% at 18% 86%, rgba(224,176,64,0.5) 0%, rgba(224,176,64,0.5) 38%, transparent 72%),
-    radial-gradient(36% 36% at 14% 20%, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.72) 42%, transparent 78%),
-    radial-gradient(32% 32% at 82% 32%, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.68) 42%, transparent 78%),
-    radial-gradient(34% 34% at 42% 82%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.7) 42%, transparent 78%),
-    radial-gradient(28% 28% at 88% 88%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.65) 42%, transparent 78%),
-    linear-gradient(#ff4b44, #ff4b44);
+  /* ⚠️ REVERT COMPLET (16/09, demande explicite et sans ambiguïté : "c
+     horrible [...] c atroce [...] met comme avant qu'on modifie la laisse
+     tombé") — après une dizaine de tentatives le même jour (rouge orangé,
+     rouge vif, rouge=couleur du logo, ajout de noir, mélanges à taches/
+     conic-gradient/texture image, puis noir par-dessus rouge) toutes
+     jugées insatisfaisantes, retour EXACT à l'état d'avant la toute
+     première retouche de la journée (`git show 4fd4c01:src/accueil.css`,
+     le commit juste avant ce fil de modifications) : noir → pont rouge
+     très sombre `#7a1a1f` → rouge de marque `#b3242b` → or `#c9932e`. Plus
+     aucune demande de retouche sur ce thème tant qu'elle n'est pas
+     explicitement reformulée. */
+  background: linear-gradient(135deg,
+    #000000 0%, #000000 18%,
+    #7a1a1f 30%,
+    #b3242b 42%, #b3242b 72%,
+    #c9932e 100%);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
