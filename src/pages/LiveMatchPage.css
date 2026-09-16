@@ -1294,67 +1294,46 @@
    `.poster--theme-pd`/`.poster--theme-bl1` (accueil.css, voir son
    commentaire détaillé pour l'historique complet et pourquoi le blanc a été
    écarté pour Bundesliga). */
-/* ⚠️ Fond de repli mis à jour le 16/09 (passage au mélange de taches
-   noir/rouge/or, voir .lmp__heroTintC plus bas) : #b3242b (ancien rouge
-   jamais retouché depuis l'ère "mode peinture") remplacé par le neutre
-   sombre déjà utilisé comme fond de la pastille du logo LaLiga
-   (`emblemBg`, competitions.js) plutôt qu'une des 3 couleurs du mélange. */
+/* ⚠️ Fond de repli mis à jour le 16/09 (voir .lmp__heroTintC plus bas pour
+   l'historique complet) : passé par un neutre sombre pendant les essais de
+   mélange à 3 couleurs, repassé à un rouge (couleur du logo, #ff4b44) une
+   fois l'approche finale "noir par-dessus rouge visible" adoptée — cohérent
+   avec le fait que le rouge est maintenant la base dominante de la carte. */
 #root .lmp__hero--theme-pd {
-  background: #0b0b0e;
+  background: #ff4b44;
 }
 .lmp__hero--theme-pd .lmp__heroTintB {
   inset: 0;
   opacity: 0;
 }
-/* ⚠️ LISSÉ (13/09) — mirroir exact de `.poster--theme-pd` (accueil.css, voir
-   son commentaire détaillé) : pont `#7a1a1f` entre le noir et le rouge.
-   ⚠️ RETOUCHÉ (16/09, "rouge orangé un peu") — mirroir exact du changement
-   fait dans accueil.css : #7a1a1f → #7a2712, #b3242b → #c2391a.
-   ⚠️ RETOUCHÉ (16/09, "nn fait + rouge un beau rouge stp") — mirroir exact :
-   #7a2712 → #7a1414, #c2391a → #d61f26.
-   ⚠️ RETOUCHÉ (16/09, "fait un rouge comme la couleur du logo un peu etle
-   jaune fait le + prononcé stp") — mirroir exact du changement accueil.css :
-   #7a1414 -> #8c2925, #d61f26 -> #ff4b44 (couleur réelle du SVG du logo),
-   or #e0b040 en vrai plateau 84-100% au lieu d'un simple point final.
-   ⚠️ RETOUCHÉ (16/09, "ca fait + plage genre mdr" → "Plus de noir présent")
-   — mirroir exact : noir 18% -> 32%, arrêts suivants repoussés en
-   conséquence (42/50/64/86), mêmes tailles relatives rouge/or.
-   ⚠️ REFONTE (16/09, "fait un melange de noir, rouge et jaune partout sur
-   la card") — mirroir exact du changement accueil.css : abandon du dégradé
-   linéaire diagonal, 9 taches radial-gradient (3 noires/3 rouges #ff4b44/
-   3 or #e0b040) dispersées sur toute la carte, chacune avec un palier de
-   couleur pleine avant de fondre vers transparent (pas de blur).
-   ⚠️ RESSERRÉ (16/09, mirroir exact accueil.css) — rayon 40-48% → 20-24%,
-   les taches se refondaient en un wash quasi identique au dégradé
-   diagonal remplacé (constaté en direct sur la prod).
-   ⚠️ DISPERSÉ (16/09, mirroir exact accueil.css) — les positions suivaient
-   encore toutes la même diagonale que l'ancien dégradé, repositionné pour
-   que chaque couleur apparaisse à des coins/côtés opposés, aucune
-   diagonale commune.
-   ⚠️ REFAIT (16/09, mirroir exact accueil.css — "c pas du tout ca [...] un
-   melange des trois couleur pas [...] un fond noir avec des boules") —
-   2 conic-gradient superposés (calque du dessus semi-transparent) pour un
-   vrai mélange multi-directionnel des 3 couleurs, sans fond noir dominant
-   ni formes isolées.
-   ⚠️ REFAIT #2 (16/09, mirroir exact accueil.css) — conic-gradient
-   ABANDONNÉ : "un truc bizarre [...] un point qui relier toutes les
-   differente couleur" (le point central inhérent à tout conic-gradient),
-   "principalement du rouge". Tenté avec 3 grands radial-gradient
-   semi-transparents superposés, toujours pas concluant (un dégradé CSS
-   reste une structure mathématique à axe/centre).
-   ⚠️ REFAIT #3 (16/09, mirroir exact accueil.css — "texture bruitée
-   générée", demandé explicitement) — abandon du CSS pur, remplacé par
-   `laliga-mix.jpg` (`src/assets/themes/`, généré par script Python :
-   3 champs de bruit lissé + domain warping + blend softmax, voir le
-   commentaire détaillé dans accueil.css pour la méthode complète). */
+/* ⚠️ HISTORIQUE CONDENSÉ (16/09, mirroir exact accueil.css — voir son
+   commentaire détaillé pour la liste complète des tentatives) : rouge
+   orangé puis retour au rouge vif puis rouge = couleur réelle du logo
+   (#ff4b44) + or plus visible + ajout de noir, puis abandon du dégradé
+   linéaire pour un "vrai mélange" demandé explicitement — 4 tentatives
+   CSS (taches resserrées, taches dispersées, conic-gradient abandonné
+   pour son point de convergence visible, 3 radial-gradient superposés)
+   et une texture image générée (`laliga-mix.jpg`), toutes jugées encore
+   trop "chaudes"/pas assez mélangées à l'usage.
+   ⚠️ APPROCHE FINALE (16/09, "tu vas mettre du noir par dessus du rouge en
+   laissant du rouge qu'on voit [...] un effet melanger un peu avec un peu
+   de jaune") — mirroir exact accueil.css : base rouge pleine (#ff4b44),
+   taches noires semi-transparentes par-dessus (rouge visible entre/autour),
+   2 petites touches d'or en accent. `laliga-mix.jpg` plus référencé (voir
+   accueil.css, fichier supprimé du dépôt). */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background-image: url('../assets/themes/laliga-mix.jpg');
-  background-size: cover;
-  background-position: center;
+  background:
+    radial-gradient(16% 16% at 72% 16%, rgba(224,176,64,0.55) 0%, rgba(224,176,64,0.55) 38%, transparent 72%),
+    radial-gradient(14% 14% at 18% 86%, rgba(224,176,64,0.5) 0%, rgba(224,176,64,0.5) 38%, transparent 72%),
+    radial-gradient(36% 36% at 14% 20%, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.72) 42%, transparent 78%),
+    radial-gradient(32% 32% at 82% 32%, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.68) 42%, transparent 78%),
+    radial-gradient(34% 34% at 42% 82%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.7) 42%, transparent 78%),
+    radial-gradient(28% 28% at 88% 88%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.65) 42%, transparent 78%),
+    linear-gradient(#ff4b44, #ff4b44);
 }
 
 #root .lmp__hero--theme-bl1 {

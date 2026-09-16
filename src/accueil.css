@@ -2092,102 +2092,37 @@
    inventée — sert d'étape entre le noir plein et le rouge vif de marque. */
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
-  /* ⚠️ RETOUCHÉ (16/09, demande explicite : "pour la liga remplace le rouge
-     actuel par du rouge orangé un peu stp") — pont #7a1a1f → #7a2712 et
-     plateau #b3242b → #c2391a, même position/paliers inchangés, juste la
-     teinte décalée vers l'orange (hue ~355° → ~14°) tout en gardant le noir
-     du coin et l'or final identiques.
-     ⚠️ RETOUCHÉ (16/09, retour immédiat : "nn fait + rouge un beau rouge
-     stp") — le ton orangé ci-dessus est revenu vers un vrai rouge vif :
-     pont #7a2712 → #7a1414, plateau #c2391a → #d61f26 (hue ~14° → ~358°,
-     quasi le rouge d'origine mais plus vif/saturé). Mêmes positions/paliers,
-     noir et or inchangés.
-     ⚠️ RETOUCHÉ (16/09, demande explicite : "fait un rouge comme la couleur
-     du logo un peu etle jaune fait le + prononcé stp on le voit pas trop
-     trop la") — plateau #d61f26 -> #ff4b44 : couleur REELLE du logo LaLiga
-     (laliga-ea-sports.svg, tracé monochrome .cls-1{fill:#ff4b44}, vérifié en
-     lisant le SVG, pas une estimation) ; pont #7a1414 -> #8c2925, assombri
-     dans la même proportion pour rester cohérent. Or rendu plus visible :
-     le rouge plein est raccourci (72% -> 58%) et l'or #e0b040 (déjà présent
-     dans la palette LaLiga établie, plus clair/vif que l'ancien #c9932e)
-     tient maintenant un vrai plateau 84-100% au lieu d'un simple point
-     d'arrivée qui ne se voyait quasiment jamais.
-     ⚠️ RETOUCHÉ (16/09, retour utilisateur : "ca fait + plage genre mdr" —
-     précisé via question directe : "Plus de noir présent") — le fondu chaud
-     rouge→or sans ancrage sombre suffisant rappelait un dégradé de coucher
-     de soleil. Noir élargi 18% → 32% (quasiment doublé), tous les arrêts
-     suivants repoussés en conséquence (bridge 30→42%, rouge 42/58→50/64%,
-     or 84→86%) pour garder les mêmes tailles relatives de rouge/or, juste
-     précédées d'un vrai bloc noir plus présent qui casse l'effet "tout
-     chaud".
-     ⚠️ REFONTE (16/09, demande explicite : "fait un melange de noir, rouge
-     et jaune partout sur la card je pense que le resultat rendra mieux") —
-     abandon du dégradé linéaire diagonal (même après le renfort de noir
-     ci-dessus, l'utilisateur restait mitigé, "ca fait + plage genre mdr")
-     au profit d'un mélange de taches réparties sur toute la carte, plutôt
-     qu'un dégradé continu dans une seule direction. Retour partiel au
-     principe déjà utilisé pour UEL/UECL avant leur propre refonte linéaire
-     (voir leur historique) : 9 taches `radial-gradient` (3 noires / 3
-     rouges `#ff4b44` / 3 or `#e0b040`, mêmes couleurs déjà validées),
-     dispersées aux 4 coins + bords + centre. Chaque tache a un vrai palier
-     de couleur pleine avant de fondre vers transparent (leçon retenue du
-     fix "taches nettes UEL/UECL" du 16/09 : évite l'aspect flou/vaporeux
-     sans utiliser `filter: blur()`, qui avait aussi été retiré partout
-     pour la même raison). Fond de base sombre neutre (`#0b0b0e`, déjà la
-     couleur du fond de la pastille du logo LaLiga sur ce même fichier)
-     plutôt qu'une des 3 couleurs, pour ne favoriser aucune des 3 à parts
-     égales.
-     ⚠️ RESSERRÉ (16/09, même changement, vérifié en direct sur la prod) —
-     les 9 taches à 40-48% de rayon se chevauchaient tellement qu'elles se
-     refondaient en un lissage quasi identique au dégradé diagonal qu'elles
-     devaient remplacer (constaté par capture d'écran, pas supposé). Rayon
-     réduit à 20-24%.
-     ⚠️ DISPERSÉ (16/09, même changement, re-vérifié en direct : ENCORE trop
-     proche du dégradé diagonal d'origine) — cause trouvée : les 9 positions
-     choisies suivaient TOUTES la même diagonale haut-gauche → bas-droite
-     (noir/rouge/or qui s'enchaînaient dans le même sens que l'ancien
-     dégradé), donc même resserrées, elles recomposaient visuellement le
-     même axe rouge→or. Repositionné pour casser cet axe : chaque couleur
-     apparaît maintenant à des coins/côtés OPPOSÉS les uns des autres,
-     aucune diagonale commune.
-     ⚠️ REFAIT (16/09, retour utilisateur ferme : "c pas du tout ca que je
-     t'ai demané [...] je t'ai dis de faire un melange des trois couleur
-     pas de mettre un fond noir avec des boules") — les taches ci-dessus
-     étaient justement le problème : des formes ISOLÉES sur un fond noir
-     dominant, pas un mélange. Précisé via question directe : "dégradé
-     multi-directionnel", les 3 couleurs fondues en continu dans plusieurs
-     sens (pas un seul axe diagonal), aucune ne dominant comme fond.
-     Tentative 1 (conic-gradient) — ABANDONNÉE : retour utilisateur "pas
-     assez melanger [...] y'a un truc bizarre [...] comme si y'avait un
-     point qui relier toutes les differente couleur [...] principalement
-     du rouge". Root cause : un `conic-gradient` a TOUJOURS un point
-     central unique où tous les arrêts de couleur se rejoignent (structure
-     de roue/éventail) — lu comme un artefact géométrique ("le truc
-     bizarre"), pas comme un mélange organique.
-     ⚠️ REFAIT #2 (16/09) — abandon complet des structures à point/axe
-     unique (conic ET les positions radiales dispersées d'avant), tenté
-     avec 3 GRANDS `radial-gradient` semi-transparents superposés. Toujours
-     pas concluant en vérifiant moi-même en direct sur la prod : un
-     dégradé CSS reste une structure MATHÉMATIQUE (axe, centre, direction),
-     ça ne "mélange" jamais vraiment comme de la peinture — d'où le retour
-     systématique vers un résultat à dominante rouge malgré 4 tentatives.
-     ⚠️ REFAIT #3 (16/09, question posée directement à l'utilisateur —
-     "texture bruitée générée") — abandon du CSS pur : `laliga-mix.jpg`
-     (`src/assets/themes/`), une image générée par script Python (PIL/
-     NumPy/SciPy, pas trouvée/téléchargée) — 3 champs de bruit lissé
-     (un par couleur), déformés ensemble par un champ de bruit
-     supplémentaire ("domain warping", technique classique pour un effet
-     marbré organique) puis combinés par un softmax (chaque pixel = la
-     couleur dont le champ de bruit local est le plus fort à cet endroit,
-     transition douce entre zones) — génère de vraies formes irrégulières
-     sans axe ni centre, contrairement à n'importe quel dégradé CSS. Biais
-     ajustés pour un partage à peu près égal des 3 couleurs (~35%/31%/33%
-     de la surface, vérifié par calcul sur l'image générée, pas à l'œil).
-     Remplace tout le mécanisme `radial-gradient`/`conic-gradient` par une
-     simple image de fond. */
-  background-image: url('./assets/themes/laliga-mix.jpg');
-  background-size: cover;
-  background-position: center;
+  /* ⚠️ HISTORIQUE CONDENSÉ (16/09) — de nombreux essais successifs ce jour :
+     rouge orangé, retour au rouge vif, rouge = couleur réelle du logo
+     (#ff4b44, vérifié dans laliga-ea-sports.svg) + or plus visible, ajout
+     de noir ("ca fait + plage genre mdr"), puis abandon complet du
+     dégradé linéaire pour un "vrai mélange" demandé explicitement — 4
+     tentatives en pur CSS (taches radiales resserrées, taches dispersées,
+     conic-gradient — abandonné : point de convergence visible lu comme un
+     artefact "bizarre" — puis 3 grands radial-gradient superposés) toutes
+     retombées sur un rendu à dominante rouge, avant de tenter une image
+     texture générée (`laliga-mix.jpg`, bruit organique via script Python)
+     — abandonnée à son tour, jugée encore trop "chaude" à l'usage malgré
+     un vrai mélange mesuré. Détail complet de chaque étape dans l'historique
+     git de ce fichier plutôt que gardé ici (devenait illisible).
+     ⚠️ APPROCHE FINALE (16/09, demande explicite : "tu vas mettre du noir
+     par dessus du rouge en laissant du rouge qu'on voit [...] que ça fasse
+     un effet melanger un peu avec un peu de jaune") — principe différent de
+     tout ce qui précède : plus une tentative de "mélange à 3 couleurs à
+     parts égales", mais une base ROUGE pleine (#ff4b44, couleur du logo)
+     avec des taches NOIRES semi-transparentes PAR-DESSUS (laissant le rouge
+     nettement visible entre/autour, pas une couverture totale) + 2 petites
+     touches d'or en accent discret. Retire `laliga-mix.jpg` (plus utilisé,
+     supprimé du dépôt) et tout le mécanisme radial/conic-gradient à 3
+     couleurs égales des tentatives précédentes. */
+  background:
+    radial-gradient(16% 16% at 72% 16%, rgba(224,176,64,0.55) 0%, rgba(224,176,64,0.55) 38%, transparent 72%),
+    radial-gradient(14% 14% at 18% 86%, rgba(224,176,64,0.5) 0%, rgba(224,176,64,0.5) 38%, transparent 72%),
+    radial-gradient(36% 36% at 14% 20%, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.72) 42%, transparent 78%),
+    radial-gradient(32% 32% at 82% 32%, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.68) 42%, transparent 78%),
+    radial-gradient(34% 34% at 42% 82%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.7) 42%, transparent 78%),
+    radial-gradient(28% 28% at 88% 88%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.65) 42%, transparent 78%),
+    linear-gradient(#ff4b44, #ff4b44);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
