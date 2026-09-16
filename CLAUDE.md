@@ -1580,6 +1580,22 @@ cf-worker/
   le plus sûr disponible ; à surveiller si un nouveau signalement d'Accueil vide survient malgré ce
   correctif.
 
+- ✅ Taches orange (UEL) / verte (UECL) rendues nettes (16/09, demande explicite : "faudrait que
+  les taches orange et verte ne soit pas flou [...] faudrait que ce soit net") : le `filter:
+  blur()` global avait déjà été retiré de tous les thèmes mode-peinture le 12/09, mais chaque
+  `radial-gradient` fond directement de sa couleur pleine (0%) vers `transparent` sur un large
+  rayon — ce fondu intégré au gradient lui-même donne un aspect doux/vaporeux, indépendant du
+  `blur()` déjà retiré (déjà noté dans l'entrée du 12/09, non corrigé à l'époque faute de demande
+  précise). Corrigé (`accueil.css` + `LiveMatchPage.css`, gardés identiques comme toujours) :
+  ajout d'un palier de couleur pleine avant le fondu (~50% du rayon d'origine) sur les 7 taches
+  ORANGE (UEL) / VERTE (UECL) uniquement — les 5 taches noires partagées avec le même gabarit
+  (LaLiga/Bundesliga) non touchées, la demande visait spécifiquement les couleurs distinctives de
+  ces 2 ligues. Position/taille/couleur de chaque tache inchangées, seule la courbe de fondu
+  interne est resserrée. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build vérifiés. Honnêteté : rendu jamais vu en direct sur un vrai appareil avant ce déploiement
+  (juste lecture du CSS résultant) — si le rendu reste perçu comme pas assez net, l'étape suivante
+  serait de resserrer encore le palier (ex. 60-65% du rayon au lieu de 50%).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
