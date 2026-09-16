@@ -1310,17 +1310,20 @@
    ⚠️ RETOUCHÉ (16/09, "fait un rouge comme la couleur du logo un peu etle
    jaune fait le + prononcé stp") — mirroir exact du changement accueil.css :
    #7a1414 -> #8c2925, #d61f26 -> #ff4b44 (couleur réelle du SVG du logo),
-   or #e0b040 en vrai plateau 84-100% au lieu d'un simple point final. */
+   or #e0b040 en vrai plateau 84-100% au lieu d'un simple point final.
+   ⚠️ RETOUCHÉ (16/09, "ca fait + plage genre mdr" → "Plus de noir présent")
+   — mirroir exact : noir 18% -> 32%, arrêts suivants repoussés en
+   conséquence (42/50/64/86), mêmes tailles relatives rouge/or. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #000000 0%, #000000 18%,
-    #8c2925 30%,
-    #ff4b44 42%, #ff4b44 58%,
-    #e0b040 84%, #e0b040 100%);
+    #000000 0%, #000000 32%,
+    #8c2925 42%,
+    #ff4b44 50%, #ff4b44 64%,
+    #e0b040 86%, #e0b040 100%);
 }
 
 #root .lmp__hero--theme-bl1 {

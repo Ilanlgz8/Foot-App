@@ -2111,12 +2111,20 @@
      le rouge plein est raccourci (72% -> 58%) et l'or #e0b040 (déjà présent
      dans la palette LaLiga établie, plus clair/vif que l'ancien #c9932e)
      tient maintenant un vrai plateau 84-100% au lieu d'un simple point
-     d'arrivée qui ne se voyait quasiment jamais. */
+     d'arrivée qui ne se voyait quasiment jamais.
+     ⚠️ RETOUCHÉ (16/09, retour utilisateur : "ca fait + plage genre mdr" —
+     précisé via question directe : "Plus de noir présent") — le fondu chaud
+     rouge→or sans ancrage sombre suffisant rappelait un dégradé de coucher
+     de soleil. Noir élargi 18% → 32% (quasiment doublé), tous les arrêts
+     suivants repoussés en conséquence (bridge 30→42%, rouge 42/58→50/64%,
+     or 84→86%) pour garder les mêmes tailles relatives de rouge/or, juste
+     précédées d'un vrai bloc noir plus présent qui casse l'effet "tout
+     chaud". */
   background: linear-gradient(135deg,
-    #000000 0%, #000000 18%,
-    #8c2925 30%,
-    #ff4b44 42%, #ff4b44 58%,
-    #e0b040 84%, #e0b040 100%);
+    #000000 0%, #000000 32%,
+    #8c2925 42%,
+    #ff4b44 50%, #ff4b44 64%,
+    #e0b040 86%, #e0b040 100%);
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
