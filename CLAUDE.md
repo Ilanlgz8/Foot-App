@@ -1798,6 +1798,35 @@ cf-worker/
   reconnaissable, contrairement à avant). 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
   inchangé) + build vérifiés (fichier image uniquement, aucune logique touchée).
 
+- ✅ Logo UEL recadré sur le ballon seul, même fix que UECL (16/09, demande explicite juste après :
+  "pareil pour l'europa league") : `europa-league.png` (181×148) avait exactement le même défaut
+  que l'ancien fichier UECL — tout le lockup (ballon UEFA + wordmark complet "UEFA EUROPA LEAGUE"
+  sur 3 lignes) empilé verticalement, MAIS avec une différence par rapport à UECL : ce fichier n'a
+  jamais eu de version transparente fournie par l'utilisateur, c'est un PNG opaque avec un fond
+  NOIR PLEIN baké dans l'image (pas de canal alpha) — donc la détection de contenu ne pouvait pas
+  se faire par transparence (comme pour UECL) mais par luminosité (pixels non-noirs = ballon/
+  texte). Analyse (PIL/NumPy, somme RGB par ligne) : le ballon occupe les lignes 5-72 sur 148
+  (~46% de la hauteur), suivi d'un espace vide (73-79) puis "UEFA" (80-101) puis un espace
+  (102-104) puis "EUROPA LEAGUE" (105-122) puis encore du texte (126-138) — dans le badge 20px,
+  le ballon réel occupait donc moins de la moitié de l'espace disponible, le reste perdu sur du
+  texte devenu illisible à cette taille. Corrigé : recadré sur le ballon seul (boîte cols 58-126 /
+  lignes 5-72, marge de 6px, détection automatique du contenu non-noir), redimensionné à 304×300
+  (LANCZOS) — fond noir plein CONSERVÉ (contrairement à UECL, ce fichier n'avait pas de version
+  transparente disponible pour repartir dessus ; le badge flotte donc comme un carré noir avec le
+  ballon dedans, cohérent avec le style déjà en place pour ce logo précis avant ce fix). Honnêteté
+  sur la résolution : le fichier source ne mesurait que 181×148 au départ (le ballon natif ~68×68
+  px) — pas de version haute résolution disponible dans le dépôt ni fournie par l'utilisateur pour
+  ce logo (contrairement à UECL où l'utilisateur avait uploadé un 2138×2160) ; le résultat reste
+  net à la taille d'affichage réelle du badge (20px, jusqu'à ~60px en Retina 3x, bien en dessous
+  des 68px natifs du crop), mais serait visiblement pixelisé si jamais affiché plus grand un jour.
+  Même fichier/import, aucun changement de code nécessaire (import unique dans `competitions.js`,
+  propagé automatiquement à MatchPage/LiveMatchPage/carte "Match du jour"/switcher de compétition).
+  Vérifié en direct sur la prod après déploiement (taille du fichier déployé 304×300/56KB
+  confirmée identique au fichier local, capture d'écran sur la bannière de sélection de
+  compétition Ligue Europa — ballon orange/noir clairement visible et reconnaissable, contrairement
+  à avant). 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
+  (fichier image uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
