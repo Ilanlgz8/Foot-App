@@ -1703,19 +1703,27 @@ cf-worker/
   du point précédent concentrait le voile noir sur le centre de la carte, avec un fondu vers
   transparent dès 60% du rayon (donc quasiment aucun effet sur les bords/coins). Corrigé
   (`.poster--theme-uel .poster__bg--gradient` dans `accueil.css` + `.lmp__hero--theme-uel
-  .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme toujours) : remplacement du
-  `radial-gradient` par une couleur plate `rgba(0,0,0,0.22)` en 1er calque — une couleur unie
-  (sans direction ni fondu) posée comme calque `background` couvre uniformément TOUTE la surface
-  de la carte, contrairement à un `radial-gradient` qui est structurellement concentré autour de
-  son centre. Opacité légèrement réduite (32%→22%) par rapport au voile centré précédent : un
-  assombrissement uniforme sur 100% de la carte à la même opacité qu'un voile concentré sur ~20%
-  du centre aurait rendu l'ensemble trop sombre, y compris les 2 paliers noirs des coins déjà
-  bien noirs — 22% reste un voile "léger" perceptible partout sans écraser le fondu déjà validé.
-  Le dégradé linéaire principal (2e calque, noir→orange sombre→orange vif→orange sombre→noir)
-  reste inchangé. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
-  vérifiés. Honnêteté : rendu jamais vu en direct avant ce déploiement (juste lecture du CSS) — à
-  confirmer par l'utilisateur. Portée : UEL uniquement (UECL non mentionné, comme toutes les
-  itérations précédentes de ce dégradé).
+  .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme toujours), en 2 temps : (1)
+  1re tentative — remplacement du `radial-gradient` par une couleur plate `rgba(0,0,0,0.22)` en
+  1er calque du `background`. Bug trouvé juste après build (`dist/assets/*.css` inspecté avant
+  déploiement) : une couleur unie n'est PAS une valeur valide pour un calque non-final du
+  raccourci `background` (la spec CSS impose qu'un `background-color` seul n'apparaisse que dans
+  le DERNIER calque) — le minifier CSS de Vite transformait silencieusement `rgba(0,0,0,.22)` en
+  `0 0` (une position invalide comme image), annulant complètement l'effet, sans erreur de build
+  visible. (2) Corrigé avant tout déploiement : `linear-gradient(rgba(0,0,0,0.22),
+  rgba(0,0,0,0.22))` à la place — un dégradé de la même couleur vers elle-même EST une image
+  valide, minifie proprement (`linear-gradient(#00000038,#00000038)`, vérifié dans le CSS buildé)
+  et couvre uniformément toute la surface de la carte, contrairement au `radial-gradient`
+  structurellement concentré sur son centre. Opacité 22% (contre 32% pour le voile centré
+  précédent) : un assombrissement uniforme sur 100% de la carte à la même opacité que le voile
+  concentré sur ~20% du centre aurait rendu l'ensemble trop sombre, y compris les 2 paliers noirs
+  des coins déjà bien noirs. Le dégradé linéaire principal (2e calque, noir→orange sombre→orange
+  vif→orange sombre→noir) reste inchangé. 360 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés (le 2e build confirmant le calque correctement présent
+  dans le CSS minifié, contrairement au 1er). Honnêteté : rendu jamais vu en direct sur un vrai
+  appareil avant déploiement (seule la lecture du CSS résultant a été possible depuis cet
+  environnement) — à confirmer par l'utilisateur. Portée : UEL uniquement (UECL non mentionné,
+  comme toutes les itérations précédentes de ce dégradé).
 
 ## Conventions
 - Noms français partout dans l'UI

@@ -2037,7 +2037,7 @@
 .poster--theme-uel .poster__bg--gradient {
   inset: 0;
   background:
-    rgba(0,0,0,0.22),
+    linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.22)),
     linear-gradient(135deg,
       #000000 0%, #000000 14%,
       #8a3c14 36%,
