@@ -237,7 +237,22 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // ce bump, ce sera le signe qu'un vrai bug de logique est encore actif
 // (pas juste un résidu de cache) et qu'il faudra creuser resolveFdTeamId/
 // cupMatches plus profondément.
-const CACHE_BUSTER = 'v14-2026-09-12-fix-forme-recente-cache-fige'
+//
+// v15 (16/09, même incident que le découpage ESPN par date simple — voir
+// CLAUDE.md) : pendant la fenêtre où ESPN rejetait les plages de dates
+// (400/502 en cascade sur `api/espn.js`), chaque requête `todayMatchesEspn`/
+// `todayMatchesWcEc` par jour est retombée sur `[] ` (repli "pas de copie
+// stale disponible" côté client) — React Query a mis ce tableau VIDE en
+// cache avec `status:'success'` (aucune erreur remontée, juste un résultat
+// vide), donc persisté normalement comme n'importe quel résultat valide.
+// Conséquence pour l'utilisateur : même après le déploiement du vrai fix
+// serveur, "Résultats récents" sur l'Accueil restait vide — les entrées déjà
+// en cache (`success`, vide) ne sont pas considérées périmées avant leur
+// vrai staleTime, donc pas re-fetchées automatiquement à l'ouverture. Bump
+// du buster pour purger IMMÉDIATEMENT ces résultats vides déjà persistés
+// chez les utilisateurs actuels (même mécanisme que v14 ci-dessus) plutôt
+// que d'attendre une expiration naturelle.
+const CACHE_BUSTER = 'v15-2026-09-16-fix-espn-dates-cache-vide'
 
 // ══════════════════════════════════════════════════════════════════════
 // FILET ANTI-ÉCRAN BLANC (02/09, constat utilisateur : "pourquoi j'ai un
