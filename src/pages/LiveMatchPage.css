@@ -428,6 +428,16 @@
      assombrissaient le fond autour du texte. */
   text-shadow: 0 1px 5px rgba(var(--black-rgb),0.55);
 }
+/* ⚠️ AJOUT (16/09, demande explicite : "pour europa league [...] le statut
+   du match en haut a droite la met le en blanc aussi") — le badge de
+   période (ex. "1ère mi-temps") restait en argent/gris (#c8ccd4, voir
+   commentaire ci-dessus) même une fois la minute passée en blanc via
+   tintLight. Scopé à UEL uniquement (pas le mécanisme général tintLight,
+   qui toucherait aussi PL/SA/BL1 sans que ça ait été demandé pour eux) :
+   2 classes, plus spécifique que la règle grise ci-dessus, l'emporte. */
+.lmp__hero--theme-uel .lmp__heroPeriodBadge--live {
+  color: rgba(var(--white-rgb),0.75);
+}
 
 /* 5 pastilles tab par équipe : gris = pas encore tiré, vert = marqué */
 .lmp__soDots {
