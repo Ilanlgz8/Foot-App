@@ -2036,12 +2036,14 @@
    `inset: 0` (plus de marge anti-bord-flou nécessaire, aucun flou ici). */
 .poster--theme-uel .poster__bg--gradient {
   inset: 0;
-  background: linear-gradient(135deg,
-    #000000 0%, #000000 14%,
-    #8a3c14 36%,
-    #c8551a 54%,
-    #8a3c14 72%,
-    #000000 86%, #000000 100%);
+  background:
+    radial-gradient(60% 55% at 50% 50%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.32) 18%, transparent 60%),
+    linear-gradient(135deg,
+      #000000 0%, #000000 14%,
+      #8a3c14 36%,
+      #c8551a 54%,
+      #8a3c14 72%,
+      #000000 86%, #000000 100%);
   animation: none;
 }
 .poster--theme-uel .poster__bg--gradientAlt { inset: 0; opacity: 0; }

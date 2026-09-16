@@ -1677,6 +1677,27 @@ cf-worker/
   avant ce déploiement (juste lecture du CSS) — à confirmer par l'utilisateur que l'équilibre
   noir/fondu convient cette fois. Portée : UEL uniquement (UECL non mentionné).
 
+- ✅ UEL : touche de noir léger ajoutée AU MILIEU du dégradé, même jour (16/09, demande explicite :
+  "essaie de mettre un peu de noir mais leger au milieu pour que le orange soit vrm foncé") —
+  contrairement aux itérations précédentes qui modifiaient les POINTS du dégradé linéaire lui-même
+  (paliers noirs aux coins), cette demande vise le CENTRE de la carte, où le dégradé linéaire
+  culmine sur l'orange le plus vif (`#c8551a` à 54%) — y ajouter un point noir directement dans la
+  liste de stops aurait cassé la pente continue déjà validée juste avant ("ouais mais la c bien").
+  Solution reprise d'un mécanisme déjà utilisé ailleurs dans ce fichier pour ce type de "petite
+  touche" (voir Bundesliga/Ligue 1/Serie A, `radial-gradient` en calque additionnel plutôt que
+  modification du dégradé principal) : un second calque `radial-gradient(60% 55% at 50% 50%,
+  rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.32) 18%, transparent 60%)` empilé PAR-DESSUS le dégradé linéaire
+  existant (inchangé, `.poster--theme-uel .poster__bg--gradient` dans `accueil.css` +
+  `.lmp__hero--theme-uel .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme toujours)
+  — un voile noir semi-transparent (32%, donc "léger", pas un noir plein) centré sur la carte,
+  fondant en douceur vers transparent (aucune coupure nette, cohérent avec le fondu déjà en place).
+  Effet : assombrit l'orange au centre sans retoucher les 2 paliers noirs des coins ni la continuité
+  de la pente déjà validée — répond précisément à "que le orange soit vrm foncé" en assombrissant
+  la zone la plus vive plutôt qu'en ajoutant un nouveau point de couleur dans le dégradé principal.
+  360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté :
+  rendu jamais vu en direct avant ce déploiement (juste lecture du CSS) — à confirmer par
+  l'utilisateur. Portée : UEL uniquement (UECL non mentionné).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
