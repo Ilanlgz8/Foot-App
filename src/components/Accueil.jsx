@@ -13,7 +13,7 @@ import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
-import { pickMatchDuJour } from '../utils/matchDuJour'
+import { pickMatchDuJour, MDJ_STATUSES } from '../utils/matchDuJour'
 import { MatchPanel } from '../accueil/MatchCard'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
@@ -432,7 +432,20 @@ function Accueil() {
 
   useEffect(() => {
     if (matchesLoading) return
-    const hasUpcoming = matches.some(m => m.status !== 'FINISHED')
+    // ⚠️ BUG CORRIGÉ (17/09, constat utilisateur : "des fois j'ai l'impression
+    // que ça le fait qu'à partir de minuit" — le saut auto ci-dessous semblait
+    // ne JAMAIS se déclencher certains jours, seul le reset de minuit
+    // (checkDateChange plus haut) faisait finalement avancer la vue). Root
+    // cause : `!== 'FINISHED'` traitait un match POSTPONED/CANCELLED/SUSPENDU
+    // comme "encore à venir" pour toujours (son statut ne devient jamais
+    // 'FINISHED') — un seul match reporté/annulé qui traîne dans les données
+    // du jour bloquait donc le saut indéfiniment, jusqu'à ce que minuit
+    // change la date "aujourd'hui" de force. Repris de MDJ_STATUSES.
+    // DEAD_STATUSES (matchDuJour.js, déjà la référence pour "ce statut ne
+    // compte pour rien") plutôt que dupliquer la liste ici.
+    const hasUpcoming = matches.some(m =>
+      m.status !== 'FINISHED' && !MDJ_STATUSES.DEAD_STATUSES.has(m.status)
+    )
     if (hasUpcoming) return
 
     const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
