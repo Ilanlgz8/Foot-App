@@ -1634,6 +1634,27 @@ cf-worker/
   déséquilibre est constaté sur UECL, ce sera à traiter séparément plutôt que supposé. 360 tests +
   lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
 
+- ✅ UEL : orange plus foncé + dégradé vraiment fondu (16/09, retour utilisateur juste après le
+  point précédent : "orange + foncé et fait un meilleur degradé que ça stp que ce soit fondu la c
+  moche et pas beau") — root cause du "pas fondu" : le dégradé précédent empilait 2 PLATEAUX de
+  couleur pleine (noir 0-30%, orange plein 52-68%) reliés par de COURTES zones de transition
+  (30-42%, 68-82%) — un mélange de paliers plats et de pentes raides, pas un fondu continu.
+  Refait de zéro (`.poster--theme-uel .poster__bg--gradient` dans `accueil.css` +
+  `.lmp__hero--theme-uel .lmp__heroTintC` dans `LiveMatchPage.css`, gardé identique comme
+  toujours) en un dégradé à 5 points SEULS, sans aucun plateau (chaque stop est un point unique,
+  pas une plage) : `linear-gradient(135deg, #000000 0%, #8a3c14 38%, #c8551a 56%, #8a3c14 74%,
+  #000000 100%)` — noir aux 2 extrémités, monte en continu vers l'orange sombre `#8a3c14` puis le
+  pic orange à 56%, puis redescend symétriquement vers le noir — une seule pente ininterrompue
+  d'un bout à l'autre, plus aucune rupture plat→pente. Orange assombri comme demandé : le pic
+  utilise désormais `#c8551a` (déjà dans la palette UEL, plus sombre que l'ancien pic `#e6742a`
+  qui a été entièrement retiré du dégradé) — plus aucune trace du orange vif d'origine. Aucune
+  couleur inventée : les 3 teintes (`#000000`/`#8a3c14`/`#c8551a`) étaient déjà toutes les 3 dans
+  la palette UEL établie. `TINT_THEME_CAMP_COLORS.uel` (déjà `['#c8551a', '#000000']`) reste
+  cohérent sans modification. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build vérifiés, ET vérifié en direct sur la prod (navigateur intégré, lecture du CSS déployé
+  après déploiement Vercel) que le nouveau dégradé était bien servi. Portée : UEL uniquement, même
+  raisonnement que le point précédent (UECL non mentionné, non touché).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
