@@ -1775,6 +1775,29 @@ cf-worker/
   panneau. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
   vérifiés (fichier image + CSS uniquement, aucune logique touchée).
 
+- ✅ Logo UECL recadré sur l'icône seule, trop petit dans le badge (16/09, retour utilisateur
+  juste après le remplacement du logo officiel transparent : "le logo est peit on le voit pas
+  comment on pourrait faire ?") : root cause trouvée par analyse du canal alpha (PIL/NumPy) de
+  l'image source fournie par l'utilisateur (2138×2160) — le fichier remplacé le matin même
+  contenait tout le lockup officiel (icône trophée+arcs ET le texte "UEFA Europa Conference
+  League" en dessous), avec l'icône n'occupant qu'environ 38% de la hauteur totale de l'image
+  (lignes 279-1108 sur 2160, le reste étant le texte). Dans le badge `.lmp__heroCompIcon`
+  (hauteur fixe 20px, `object-fit: contain`), c'est la hauteur TOTALE de l'image qui est
+  contrainte à 20px — l'icône réelle se retrouvait donc réduite à ~7-8px de haut, quasi
+  invisible, alors que l'espace texte transparent en dessous ne servait à rien dans ce contexte
+  d'affichage en petit badge. Corrigé : recadrage de l'image source sur le bloc icône uniquement
+  (trophée blanc + 2 arcs verts, boîte `647,239 → 1492,1148` avec marge, calculée par détection
+  automatique du contenu opaque), redimensionné à 390×420 (alpha/transparence préservée),
+  sauvegardé sous le même nom de fichier `src/assets/leagues/conference-league.png` — aucun
+  changement de code nécessaire (import unique dans `competitions.js`, propagé automatiquement à
+  MatchPage/LiveMatchPage/carte "Match du jour"/switcher de compétition). Vérifié visuellement
+  avant déploiement (composite sur fond sombre : icône bien nette, trophée blanc + arcs verts,
+  fond transparent intact) ET en direct sur la prod après déploiement (navigateur intégré, taille
+  du fichier déployé 390×420/35KB confirmée identique au fichier local, capture d'écran sur la
+  bannière de sélection de compétition Ligue Europa Conférence — logo clairement visible et
+  reconnaissable, contrairement à avant). 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés (fichier image uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
