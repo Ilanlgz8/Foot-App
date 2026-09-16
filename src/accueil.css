@@ -2141,18 +2141,25 @@
      les 9 taches à 40-48% de rayon se chevauchaient tellement qu'elles se
      refondaient en un lissage quasi identique au dégradé diagonal qu'elles
      devaient remplacer (constaté par capture d'écran, pas supposé). Rayon
-     réduit à 20-24% : les taches restent bien distinctes/identifiables
-     comme des taches séparées plutôt qu'un unique wash continu. */
+     réduit à 20-24%.
+     ⚠️ DISPERSÉ (16/09, même changement, re-vérifié en direct : ENCORE trop
+     proche du dégradé diagonal d'origine) — cause trouvée : les 9 positions
+     choisies suivaient TOUTES la même diagonale haut-gauche → bas-droite
+     (noir/rouge/or qui s'enchaînaient dans le même sens que l'ancien
+     dégradé), donc même resserrées, elles recomposaient visuellement le
+     même axe rouge→or. Repositionné pour casser cet axe : chaque couleur
+     apparaît maintenant à des coins/côtés OPPOSÉS les uns des autres,
+     aucune diagonale commune. */
   background:
-    radial-gradient(24% 24% at 12% 15%, #000000 0%, #000000 13%, transparent 26%),
-    radial-gradient(22% 22% at 82% 10%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
-    radial-gradient(20% 20% at 50% 6%, #e0b040 0%, #e0b040 12%, transparent 24%),
-    radial-gradient(23% 23% at 14% 55%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
-    radial-gradient(24% 24% at 86% 52%, #e0b040 0%, #e0b040 13%, transparent 26%),
-    radial-gradient(25% 25% at 50% 48%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(22% 22% at 12% 90%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    radial-gradient(23% 23% at 50% 92%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(21% 21% at 88% 88%, #000000 0%, #000000 12%, transparent 26%),
+    radial-gradient(23% 23% at 22% 78%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(24% 24% at 10% 30%, #ff4b44 0%, #ff4b44 13%, transparent 27%),
+    radial-gradient(22% 22% at 35% 55%, #e0b040 0%, #e0b040 12%, transparent 26%),
+    radial-gradient(23% 23% at 65% 15%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(22% 22% at 78% 25%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
+    radial-gradient(21% 21% at 90% 12%, #e0b040 0%, #e0b040 12%, transparent 25%),
+    radial-gradient(24% 24% at 85% 60%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(23% 23% at 50% 88%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
+    radial-gradient(22% 22% at 15% 92%, #e0b040 0%, #e0b040 12%, transparent 26%),
     linear-gradient(#0b0b0e, #0b0b0e);
   animation: none;
 }

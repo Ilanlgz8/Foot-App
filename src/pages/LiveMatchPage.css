@@ -1326,22 +1326,26 @@
    couleur pleine avant de fondre vers transparent (pas de blur).
    ⚠️ RESSERRÉ (16/09, mirroir exact accueil.css) — rayon 40-48% → 20-24%,
    les taches se refondaient en un wash quasi identique au dégradé
-   diagonal remplacé (constaté en direct sur la prod). */
+   diagonal remplacé (constaté en direct sur la prod).
+   ⚠️ DISPERSÉ (16/09, mirroir exact accueil.css) — les positions suivaient
+   encore toutes la même diagonale que l'ancien dégradé, repositionné pour
+   que chaque couleur apparaisse à des coins/côtés opposés, aucune
+   diagonale commune. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background:
-    radial-gradient(24% 24% at 12% 15%, #000000 0%, #000000 13%, transparent 26%),
-    radial-gradient(22% 22% at 82% 10%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
-    radial-gradient(20% 20% at 50% 6%, #e0b040 0%, #e0b040 12%, transparent 24%),
-    radial-gradient(23% 23% at 14% 55%, #ff4b44 0%, #ff4b44 13%, transparent 26%),
-    radial-gradient(24% 24% at 86% 52%, #e0b040 0%, #e0b040 13%, transparent 26%),
-    radial-gradient(25% 25% at 50% 48%, #000000 0%, #000000 13%, transparent 27%),
-    radial-gradient(22% 22% at 12% 90%, #e0b040 0%, #e0b040 12%, transparent 26%),
-    radial-gradient(23% 23% at 50% 92%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
-    radial-gradient(21% 21% at 88% 88%, #000000 0%, #000000 12%, transparent 26%),
+    radial-gradient(23% 23% at 22% 78%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(24% 24% at 10% 30%, #ff4b44 0%, #ff4b44 13%, transparent 27%),
+    radial-gradient(22% 22% at 35% 55%, #e0b040 0%, #e0b040 12%, transparent 26%),
+    radial-gradient(23% 23% at 65% 15%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(22% 22% at 78% 25%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
+    radial-gradient(21% 21% at 90% 12%, #e0b040 0%, #e0b040 12%, transparent 25%),
+    radial-gradient(24% 24% at 85% 60%, #000000 0%, #000000 13%, transparent 27%),
+    radial-gradient(23% 23% at 50% 88%, #ff4b44 0%, #ff4b44 12%, transparent 26%),
+    radial-gradient(22% 22% at 15% 92%, #e0b040 0%, #e0b040 12%, transparent 26%),
     linear-gradient(#0b0b0e, #0b0b0e);
 }
 
