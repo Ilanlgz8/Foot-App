@@ -705,7 +705,12 @@ export const COMPETITIONS = [
     // (validées "prononcées" juste avant). Champs tint/tint2/tintStops/
     // tintSilverText retirés : ce mécanisme n'en a plus besoin (voir
     // TINT_THEME_CAMP_COLORS plus bas pour la couleur du "Match du jour").
+    // ⚠️ tintLight ajouté (16/09, demande explicite : "pour europa league
+    // met les minute en blanc") — même mécanisme que PL/SA/BL1, voir leurs
+    // entrées : passe la minute live et "Terminé" en blanc sur MatchPage/
+    // LiveMatchPage/cards (`.lmp__hero--lightTint`).
     tintTheme: 'uel',
+    tintLight: true,
     name: 'Ligue Europa',
     shortName: 'Europa L.',
     emblem: europaLeagueLogo,
