@@ -1827,6 +1827,29 @@ cf-worker/
   à avant). 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
   (fichier image uniquement, aucune logique touchée).
 
+- ✅ Logo UEL remplacé par la version officielle transparente fournie par l'utilisateur (16/09,
+  image jointe juste après le fix précédent) : le fichier fourni (447×447) montrait visuellement
+  un fond "transparent" (damier gris caractéristique) — mais l'analyse PIL/NumPy a révélé que ce
+  damier était en réalité BAKÉ dans les pixels (canal alpha uniforme à 255 partout, aucune vraie
+  transparence) — probablement une capture/export d'un aperçu de transparence plutôt que le
+  fichier PNG réellement transparent. Corrigé par chroma-key avant tout recadrage : tout pixel
+  gris neutre (R≈G≈B, tolérance ±6) et sombre (<60) reconverti en alpha=0 — le damier utilise
+  exactement 2 nuances de gris (23-40), vérifié sans aucun chevauchement avec le blanc du trophée
+  (255) ni l'orange des arcs avant application (0 pixel de recouvrement mesuré). Recadré ensuite
+  sur le bloc trophée+arcs uniquement (lignes 39-232 sur 447, avant le texte "UEFA EUROPA LEAGUE"
+  qui suit, même principe que tous les recadrages précédents de ce fichier), marge 14px,
+  redimensionné à 380×420 (LANCZOS). Résultat nettement plus net que la version juste posée
+  quelques minutes avant (source native 447×447 contre 181×148 pour l'ancien fichier basse
+  résolution) — le point d'honnêteté noté dans l'entrée précédente ("pas de version haute
+  résolution disponible") ne s'applique donc plus. Fond réellement transparent cette fois (pas de
+  carré noir comme avant), cohérent avec le style déjà appliqué à UECL le matin même. Vérifié
+  visuellement avant déploiement (composite sur fond sombre : trophée blanc + arcs orange nets,
+  aucun résidu de damier) ET en direct sur la prod après déploiement (taille du fichier déployé
+  380×420/76KB confirmée identique au fichier local, capture d'écran sur la carte Accueil "Ligue
+  Europa" — logo bien net, fond transparent, aucun carré/damier visible). Même fichier/import,
+  aucun changement de code nécessaire. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés (fichier image uniquement, aucune logique touchée).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
