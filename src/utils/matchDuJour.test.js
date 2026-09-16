@@ -148,39 +148,51 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([enCours, aVenir1, aVenir2])).toBe(enCours)
   })
 
-  it('reste sur le match terminé plutôt que de vider la carte, tant que rien n\'est en cours', () => {
+  // ⚠️ RETOURNÉ (16/09, demande explicite : "quand le match est terminé faut
+  // bien qu'elle disparaisse comme toutes les autres") — ce test vérifiait
+  // l'ANCIEN comportement (rester affiché avec le score final). Inversé :
+  // une fois FINISHED, la carte disparaît (null), même s'il reste un match
+  // à venir ce jour-là (pas de bascule vers un autre match, voir le
+  // commentaire détaillé dans matchDuJour.js).
+  it('disparaît (null) une fois le match élu terminé, même s\'il reste un match à venir', () => {
     const termine = { ...makeMatch('PL', 'Arsenal', 'Chelsea', 15), status: 'FINISHED' }
     const aVenir  = makeMatch('SA', 'Fiorentina', 'Torino', 20)
-    expect(pickMatchDuJour([termine, aVenir])).toBe(termine)
+    expect(pickMatchDuJour([termine, aVenir])).toBeNull()
   })
 
-  // ⚠️ Ce test remplace un ancien ("un match EN COURS passe devant un match
-  // déjà terminé") devenu FAUX volontairement : le statut ne doit plus
-  // influencer l'élection, sinon le match du jour change en cours de journée
-  // (constat utilisateur, 02/09). C'est bien l'affiche qui gagne, pas l'état.
-  it('le statut n\'influence PAS le choix : la meilleure affiche gagne, même terminée', () => {
-    const termine = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'FINISHED' }
-    const enCours = { ...makeMatch('FL1', 'Toulouse', 'Lille', 20), status: 'IN_PLAY' }
-    expect(pickMatchDuJour([termine, enCours])).toBe(termine)
+  // L'élection elle-même reste invariante au statut (le même match reste "le
+  // meilleur du jour" tout du long, voir electBest) — seul l'AFFICHAGE change
+  // une fois FINISHED (masqué). Ici l'élu (meilleure affiche) est toujours en
+  // cours, donc bien affiché normalement.
+  it('le statut n\'influence PAS l\'élection : la meilleure affiche gagne, qu\'elle soit à venir ou en cours', () => {
+    const enCours = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'IN_PLAY' }
+    const aVenir  = makeMatch('FL1', 'Toulouse', 'Lille', 20)
+    expect(pickMatchDuJour([enCours, aVenir])).toBe(enCours)
   })
 
-  it('LE MÊME match reste élu toute la journée, quels que soient les changements de statut', () => {
-    // Cas réel signalé : le match du jour se termine et un AUTRE match, encore
-    // en cours, prend sa place sur l'Accueil. La journée est rejouée ici étape
-    // par étape — l'élu ne doit jamais changer.
+  it('LE MÊME match reste élu toute la journée tant qu\'il n\'est pas terminé, puis la carte disparaît', () => {
+    // Cas réel signalé le 02/09 : le match du jour se termine et un AUTRE
+    // match, encore en cours, prend sa place sur l'Accueil — corrigé en
+    // rendant l'élection invariante au statut. Le 16/09, demande explicite
+    // inverse le comportement APRÈS la fin : au lieu de rester affiché avec
+    // le score final, la carte disparaît désormais purement et simplement.
     const faire = (statutChoc, statutAutre) => ([
       { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: statutChoc },
       { ...makeMatch('FL1', 'Toulouse', 'Lille', 20), status: statutAutre },
     ])
     const etapes = [
-      faire('SCHEDULED', 'SCHEDULED'),  // matin
-      faire('IN_PLAY',   'SCHEDULED'),  // le choc démarre
-      faire('FINISHED',  'IN_PLAY'),    // le choc se termine, l'autre joue
-      faire('FINISHED',  'FINISHED'),   // fin de journée
+      { jour: faire('SCHEDULED', 'SCHEDULED'), attendu: 'Real Madrid' },  // matin
+      { jour: faire('IN_PLAY',   'SCHEDULED'), attendu: 'Real Madrid' },  // le choc démarre
+      { jour: faire('FINISHED',  'IN_PLAY'),   attendu: null },           // le choc se termine → disparaît
+      { jour: faire('FINISHED',  'FINISHED'),  attendu: null },           // fin de journée
     ]
-    for (const jour of etapes) {
+    for (const { jour, attendu } of etapes) {
       const elu = pickMatchDuJour(jour)
-      expect(elu.homeTeam.name).toBe('Real Madrid')
+      if (attendu === null) {
+        expect(elu).toBeNull()
+      } else {
+        expect(elu.homeTeam.name).toBe(attendu)
+      }
     }
   })
 
@@ -210,9 +222,12 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([enCours])).toBe(enCours)
   })
 
-  it('reste élu même SEUL dans le tableau, s\'il a déjà débuté (terminé)', () => {
+  // ⚠️ RETOURNÉ (16/09) : avant, restait épinglé même seul et terminé — voir
+  // le commentaire détaillé dans matchDuJour.js. Désormais, terminé = masqué,
+  // qu'il soit seul dans le tableau ou non.
+  it('disparaît (null) une fois terminé, même seul dans le tableau', () => {
     const termine = { ...makeMatch('PD', 'Real Madrid', 'Barcelona', 13), status: 'FINISHED' }
-    expect(pickMatchDuJour([termine])).toBe(termine)
+    expect(pickMatchDuJour([termine])).toBeNull()
   })
 
   it('un seul match JAMAIS débuté reste refusé (comportement pré-match inchangé)', () => {

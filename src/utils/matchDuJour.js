@@ -310,7 +310,23 @@ export function pickMatchDuJour(matches) {
   const hasStarted = all.some(m => !UPCOMING_STATUSES.has(m.status))
   if (!hasStarted && all.length < 2) return null
 
-  return electBest(all)
+  const elected = electBest(all)
+
+  // ⚠️ RETOUR ARRIÈRE (16/09, demande explicite : "quand le match est
+  // terminé faut bien qu'elle disparaisse comme toutes les autres frerot")
+  // — annule le comportement ajouté le 02/09 (voir tout l'historique
+  // ci-dessus) : une fois TERMINÉ, le match élu ne reste plus affiché avec
+  // son score final jusqu'au lendemain, la carte disparaît comme n'importe
+  // quelle autre card une fois le match fini. L'algorithme d'élection
+  // lui-même est inchangé (le même match reste "le meilleur du jour" tout
+  // du long, invariant au statut — voir electBest) : ça évite de retomber
+  // dans le bug du 02/09 où un AUTRE match prenait la place une fois le
+  // 1er terminé. Ici, une fois l'élu terminé, on masque simplement la
+  // carte plutôt que d'élire un remplaçant — jamais de bascule vers un
+  // 2e match, juste une disparition.
+  if (elected?.status === 'FINISHED') return null
+
+  return elected
 }
 
 // Statuts exportés pour les tests (et pour éviter qu'un appelant réinvente
