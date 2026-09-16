@@ -1301,18 +1301,18 @@
   inset: 0;
   opacity: 0;
 }
-/* ⚠️ REVERT COMPLET (16/09) — voir le commentaire détaillé dans accueil.css
-   (`.poster--theme-pd .poster__bg--gradient`) pour le contexte complet de
-   cet abandon et retour à l'état d'avant la première retouche du jour. */
+/* ⚠️ REVERT + transition noir→rouge élargie (16/09) — voir le commentaire
+   détaillé dans accueil.css (`.poster--theme-pd .poster__bg--gradient`),
+   mirroir exact comme toujours. */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #000000 0%, #000000 18%,
-    #7a1a1f 30%,
-    #b3242b 42%, #b3242b 72%,
+    #000000 0%, #000000 10%,
+    #7a1a1f 28%,
+    #b3242b 46%, #b3242b 70%,
     #c9932e 100%);
 }
 

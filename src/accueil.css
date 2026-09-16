@@ -2092,21 +2092,19 @@
    inventée — sert d'étape entre le noir plein et le rouge vif de marque. */
 .poster--theme-pd .poster__bg--gradient {
   inset: 0;
-  /* ⚠️ REVERT COMPLET (16/09, demande explicite et sans ambiguïté : "c
-     horrible [...] c atroce [...] met comme avant qu'on modifie la laisse
-     tombé") — après une dizaine de tentatives le même jour (rouge orangé,
-     rouge vif, rouge=couleur du logo, ajout de noir, mélanges à taches/
-     conic-gradient/texture image, puis noir par-dessus rouge) toutes
-     jugées insatisfaisantes, retour EXACT à l'état d'avant la toute
-     première retouche de la journée (`git show 4fd4c01:src/accueil.css`,
-     le commit juste avant ce fil de modifications) : noir → pont rouge
-     très sombre `#7a1a1f` → rouge de marque `#b3242b` → or `#c9932e`. Plus
-     aucune demande de retouche sur ce thème tant qu'elle n'est pas
-     explicitement reformulée. */
+  /* ⚠️ REVERT (16/09, "met comme avant qu'on modifie la laisse tombé") puis
+     TRANSITION NOIR→ROUGE ÉLARGIE le même jour (demande explicite : "entre
+     le noir et le rouge y'a rien de degradé la") — même 4 couleurs que
+     l'original (noir / pont rouge très sombre #7a1a1f / rouge de marque
+     #b3242b / or #c9932e), mais les paliers pleins de noir et de rouge sont
+     raccourcis et les zones de transition entre eux nettement allongées
+     (10%→28% puis 28%→46%, contre 18%→30%→42% avant) pour qu'on voie
+     vraiment le dégradé passer d'une couleur à l'autre au lieu d'un
+     changement perçu comme net. Palier or final inchangé. */
   background: linear-gradient(135deg,
-    #000000 0%, #000000 18%,
-    #7a1a1f 30%,
-    #b3242b 42%, #b3242b 72%,
+    #000000 0%, #000000 10%,
+    #7a1a1f 28%,
+    #b3242b 46%, #b3242b 70%,
     #c9932e 100%);
   animation: none;
 }
