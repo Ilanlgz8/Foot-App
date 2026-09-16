@@ -1339,20 +1339,22 @@
    ⚠️ REFAIT #2 (16/09, mirroir exact accueil.css) — conic-gradient
    ABANDONNÉ : "un truc bizarre [...] un point qui relier toutes les
    differente couleur" (le point central inhérent à tout conic-gradient),
-   "principalement du rouge". Remplacé par 3 grands radial-gradient
-   semi-transparents (120% de rayon chacun, jamais entièrement visibles
-   dans la carte → pas de point de convergence), centrés à 3 endroits
-   différents, qui se chevauchent et se mélangent par transparence. */
+   "principalement du rouge". Tenté avec 3 grands radial-gradient
+   semi-transparents superposés, toujours pas concluant (un dégradé CSS
+   reste une structure mathématique à axe/centre).
+   ⚠️ REFAIT #3 (16/09, mirroir exact accueil.css — "texture bruitée
+   générée", demandé explicitement) — abandon du CSS pur, remplacé par
+   `laliga-mix.jpg` (`src/assets/themes/`, généré par script Python :
+   3 champs de bruit lissé + domain warping + blend softmax, voir le
+   commentaire détaillé dans accueil.css pour la méthode complète). */
 .lmp__hero--theme-pd .lmp__heroTintC {
   inset: 0;
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background:
-    radial-gradient(120% 120% at 18% 18%, rgba(0,0,0,0.6) 0%, transparent 75%),
-    radial-gradient(120% 120% at 85% 22%, rgba(255,75,68,0.6) 0%, transparent 75%),
-    radial-gradient(120% 120% at 50% 92%, rgba(224,176,64,0.6) 0%, transparent 75%),
-    linear-gradient(#15100b, #15100b);
+  background-image: url('../assets/themes/laliga-mix.jpg');
+  background-size: cover;
+  background-position: center;
 }
 
 #root .lmp__hero--theme-bl1 {

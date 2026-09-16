@@ -2165,22 +2165,29 @@
      de roue/éventail) — lu comme un artefact géométrique ("le truc
      bizarre"), pas comme un mélange organique.
      ⚠️ REFAIT #2 (16/09) — abandon complet des structures à point/axe
-     unique (conic ET les positions radiales dispersées d'avant). Remplacé
-     par 3 GRANDS `radial-gradient` semi-transparents (noir/rouge/or),
-     chacun bien plus grand que la carte (120% de rayon) et centré à un
-     endroit différent (coin haut-gauche / coin haut-droite / bas-centre),
-     avec un fondu continu simple (pas de palier plat, pas de bord net) —
-     aucun n'a de "centre visible" puisqu'aucun n'est jamais entièrement
-     contenu dans la carte. Les 3 se chevauchent sur la quasi-totalité de
-     la surface et se combinent par transparence (alpha 0.6 chacun) :
-     zones où 2-3 calques se recouvrent = vraies couleurs mélangées
-     (bordeaux, bronze, ocre...), pas de point de convergence, pas de
-     couleur qui domine visuellement (3 tailles/opacités identiques). */
-  background:
-    radial-gradient(120% 120% at 18% 18%, rgba(0,0,0,0.6) 0%, transparent 75%),
-    radial-gradient(120% 120% at 85% 22%, rgba(255,75,68,0.6) 0%, transparent 75%),
-    radial-gradient(120% 120% at 50% 92%, rgba(224,176,64,0.6) 0%, transparent 75%),
-    linear-gradient(#15100b, #15100b);
+     unique (conic ET les positions radiales dispersées d'avant), tenté
+     avec 3 GRANDS `radial-gradient` semi-transparents superposés. Toujours
+     pas concluant en vérifiant moi-même en direct sur la prod : un
+     dégradé CSS reste une structure MATHÉMATIQUE (axe, centre, direction),
+     ça ne "mélange" jamais vraiment comme de la peinture — d'où le retour
+     systématique vers un résultat à dominante rouge malgré 4 tentatives.
+     ⚠️ REFAIT #3 (16/09, question posée directement à l'utilisateur —
+     "texture bruitée générée") — abandon du CSS pur : `laliga-mix.jpg`
+     (`src/assets/themes/`), une image générée par script Python (PIL/
+     NumPy/SciPy, pas trouvée/téléchargée) — 3 champs de bruit lissé
+     (un par couleur), déformés ensemble par un champ de bruit
+     supplémentaire ("domain warping", technique classique pour un effet
+     marbré organique) puis combinés par un softmax (chaque pixel = la
+     couleur dont le champ de bruit local est le plus fort à cet endroit,
+     transition douce entre zones) — génère de vraies formes irrégulières
+     sans axe ni centre, contrairement à n'importe quel dégradé CSS. Biais
+     ajustés pour un partage à peu près égal des 3 couleurs (~35%/31%/33%
+     de la surface, vérifié par calcul sur l'image générée, pas à l'œil).
+     Remplace tout le mécanisme `radial-gradient`/`conic-gradient` par une
+     simple image de fond. */
+  background-image: url('./assets/themes/laliga-mix.jpg');
+  background-size: cover;
+  background-position: center;
   animation: none;
 }
 .poster--theme-pd .poster__bg--gradientAlt { inset: 0; opacity: 0; }
