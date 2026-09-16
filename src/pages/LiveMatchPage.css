@@ -1259,11 +1259,11 @@
   animation: none;
   mix-blend-mode: normal;
   background: linear-gradient(135deg,
-    #000000 0%,
-    #8a3c14 38%,
-    #c8551a 56%,
-    #8a3c14 74%,
-    #000000 100%);
+    #000000 0%, #000000 14%,
+    #8a3c14 36%,
+    #c8551a 54%,
+    #8a3c14 72%,
+    #000000 86%, #000000 100%);
 }
 
 #root .lmp__hero--theme-uecl {

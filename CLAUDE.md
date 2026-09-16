@@ -1655,6 +1655,28 @@ cf-worker/
   après déploiement Vercel) que le nouveau dégradé était bien servi. Portée : UEL uniquement, même
   raisonnement que le point précédent (UECL non mentionné, non touché).
 
+- ✅ UEL : noir remis en quantité visible tout en gardant le fondu, même jour (16/09, retour
+  utilisateur juste après le point précédent : "ouais mais la y'a pratiquement pas de noir enft")
+  — root cause : le dégradé à 5 points uniques (aucun palier, chaque stop un simple point) rendait
+  bien un fondu continu comme demandé, mais sans AUCUNE zone plate en noir pur, le noir n'occupait
+  quasiment aucune surface réelle de la carte — dès les premiers % après 0%, la couleur remontait
+  déjà vers l'orange sombre. Corrigé (`.poster--theme-uel .poster__bg--gradient` dans
+  `accueil.css` + `.lmp__hero--theme-uel .lmp__heroTintC` dans `LiveMatchPage.css`, gardé
+  identique comme toujours) : réintroduction de 2 COURTS paliers noirs, uniquement dans les 2
+  coins extrêmes (0-14% et 86-100%, ~14% chacun) — juste assez pour que le noir soit clairement
+  visible dans les coins — puis une seule pente continue ininterrompue entre les deux (14% → 36%
+  → 54% pic → 72% → 86%, aucun autre palier, aucune couleur plate au milieu) : `linear-
+  gradient(135deg, #000000 0%, #000000 14%, #8a3c14 36%, #c8551a 54%, #8a3c14 72%, #000000 86%,
+  #000000 100%)`. Différence assumée avec la version jugée "moche" un peu plus tôt : celle-là avait
+  3 paliers plats (noir 30%, orange plein 16%, noir 8%) reliés par des rampes courtes et abruptes —
+  ici il n'y a QUE 2 petits paliers, confinés aux coins, et le milieu entier (14-86%, 72% de la
+  carte) reste une seule pente continue sans aucune couleur plate — le compromis vise à donner assez
+  de noir visible sans recréer l'effet trapèze/coupures signalé juste avant. Mêmes 3 teintes déjà
+  établies (`#000000`/`#8a3c14`/`#c8551a`), aucune couleur inventée. 360 tests + lint (33 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : rendu jamais vu en direct
+  avant ce déploiement (juste lecture du CSS) — à confirmer par l'utilisateur que l'équilibre
+  noir/fondu convient cette fois. Portée : UEL uniquement (UECL non mentionné).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
