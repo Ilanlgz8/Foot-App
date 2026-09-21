@@ -25,25 +25,23 @@ const NAV = [
 
 /* Icônes tab bar — variante outline (inactif) + variante pleine (actif).
    Les deux sont rendues, le CSS affiche la bonne selon l'état. */
-/* ⚠️ ICÔNES REVUES (21/09, demande explicite : "propose moi de meilleur
-   icones [...] plus pro") — l'utilisateur a comparé plusieurs styles via un
-   aperçu visuel (Tabler icons : home / calendar-event / clipboard-check pour
-   Accueil/Programme/Résultats, chart-bar pour Classement) et a choisi ces 4
-   formes précises. Pas de dépendance à une webfont externe ajoutée (pas
-   cohérent avec le reste de l'app, 100 % offline-first PWA, voir CLAUDE.md) :
-   redessinées à la main en SVG, même gabarit que les icônes existantes
-   (viewBox 24x24, stroke 1.8 arrondi pour la variante ligne, fill plein pour
-   la variante active) pour rester visuellement cohérentes avec le reste du
-   fichier plutôt que d'importer les tracés Tabler tels quels. */
+/* ⚠️ ICÔNES REVUES PUIS PARTIELLEMENT REVERTÉES (21/09) — demande initiale
+   ambiguë ("pour programme met le 1er [...] sinon le reste c bon [...] pour
+   accueil et resultat") interprétée à tort comme "applique aussi la 1re
+   option à Accueil/Résultats" ; l'utilisateur a clarifié juste après que
+   "le reste c bon" voulait dire NE PAS LES TOUCHER. Accueil et Résultats
+   remis à l'identique de leurs tracés d'origine (avant ce round). Seuls
+   Programme (calendar-event) et Classement (chart-bar) restent changés —
+   ce sont les seuls explicitement demandés/validés dans l'aperçu. */
 const ICONS = {
   '/': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M4 11.5L12 4l8 7.5" />
-        <path d="M6 10.5V19a1.5 1.5 0 001.5 1.5H10v-5h4v5h2.5A1.5 1.5 0 0018 19v-8.5" />
+        <path d="M3 10.5L12 3l9 7.5" />
+        <path d="M5 9.5V20a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V9.5" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 2.8l9 7.9a1 1 0 01-.66 1.75H19V19a2 2 0 01-2 2h-2.5v-6h-5v6H7a2 2 0 01-2-2v-6.55H3.66A1 1 0 013 10.7l9-7.9z" />
+        <path d="M12 2.5l9.5 7.9a1 1 0 01-.64 1.77H20V20a2 2 0 01-2 2h-3.5v-6.5h-5V22H6a2 2 0 01-2-2v-7.83H3.14a1 1 0 01-.64-1.77L12 2.5z" />
       </svg>
     </>
   ),
@@ -62,12 +60,11 @@ const ICONS = {
   '/resultats': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="5" y="4.5" width="14" height="17" rx="2.5" />
-        <rect x="9" y="2.5" width="6" height="3.5" rx="1.2" />
-        <path d="M8.5 13.2l2.4 2.4 4.4-4.9" />
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8.5 12.2l2.4 2.4 4.8-5" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M9 2a1 1 0 00-1 1v.5H6.5A2.5 2.5 0 004 6v13a2.5 2.5 0 002.5 2.5h11A2.5 2.5 0 0020 19V6a2.5 2.5 0 00-2.5-2.5H16V3a1 1 0 00-1-1H9zm-.7 10.4a1 1 0 011.4.08l1.75 1.95 3.65-4.05a1 1 0 111.48 1.34l-4.4 4.9a1 1 0 01-1.47.02l-2.5-2.77a1 1 0 01.09-1.47z" />
+        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.5 7.3l-5.2 5.5a1 1 0 01-1.44.02L7.5 12.4a1 1 0 111.42-1.4l1.63 1.65 4.5-4.76a1 1 0 111.45 1.38z" />
       </svg>
     </>
   ),
