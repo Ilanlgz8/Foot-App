@@ -102,13 +102,29 @@ export function usePushNotifications() {
     setStatus('loading')
 
     try {
-      // 1. Récupérer la clé VAPID publique depuis le serveur
-      const keyRes = await fetch('/api/vapid-key')
-      if (!keyRes.ok) throw new Error(`vapid-key: ${keyRes.status}`)
-      const { publicKey } = await keyRes.json()
-      if (!publicKey) throw new Error('Clé VAPID manquante')
-
-      // 2. Demander la permission à l'utilisateur
+      // ⚠️ BUG CORRIGÉ (21/09, constat utilisateur : "j'appuie sur activer ça
+      // change rien" — la cloche n'est pourtant pas bloquée/refusée) — root
+      // cause : l'ordre des étapes 1/2 (VAPID d'abord, permission ensuite)
+      // avait TOUJOURS été comme ça depuis la toute première implémentation
+      // (voir git blame, aucun changement récent sur ce fichier), mais casse
+      // silencieusement sur WebKit (Safari desktop ET Safari/PWA iOS 16.4+) :
+      // ces navigateurs exigent que `Notification.requestPermission()` soit
+      // appelé de façon SYNCHRONE dans la pile d'appel du geste utilisateur
+      // (le clic) — un `await fetch(...)` intercalé AVANT rompt cette chaîne
+      // aux yeux de WebKit, qui ne considère alors plus l'appel comme
+      // "déclenché par l'utilisateur". Résultat : la popup de permission
+      // n'apparaît jamais, `requestPermission()` se résout silencieusement
+      // sans jamais passer par 'granted' — le code tombait alors dans la
+      // branche `permission !== 'granted'` (ligne plus bas) et repassait en
+      // 'idle' SANS AUCUN message d'erreur visible : exactement le symptôme
+      // "j'appuie sur activer ça change rien". Sur Chrome/Firefox (moins
+      // stricts sur ce point), la même séquence fonctionnait — d'où le fait
+      // que ce bug n'avait jamais été signalé jusqu'ici malgré son ancienneté.
+      // Corrigé : la demande de permission est maintenant le TOUT PREMIER
+      // appel asynchrone de subscribe() (rien avant, dans la continuité
+      // directe du clic) — le fetch de la clé VAPID passe après, une fois la
+      // permission déjà accordée.
+      // 1. Demander la permission à l'utilisateur — EN PREMIER (voir ci-dessus)
       const permission = await Notification.requestPermission()
       if (permission === 'denied') {
         setStatus('denied')
@@ -119,6 +135,12 @@ export function usePushNotifications() {
         setStatus('idle')
         return
       }
+
+      // 2. Récupérer la clé VAPID publique depuis le serveur
+      const keyRes = await fetch('/api/vapid-key')
+      if (!keyRes.ok) throw new Error(`vapid-key: ${keyRes.status}`)
+      const { publicKey } = await keyRes.json()
+      if (!publicKey) throw new Error('Clé VAPID manquante')
 
       // 3. Créer la subscription via le PushManager du navigateur
       const reg = await navigator.serviceWorker.ready
