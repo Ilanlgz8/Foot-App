@@ -1836,18 +1836,28 @@
    qui se mélange plutôt que des zones séparées. `inset: -20px` (déborde du
    cadre) : le flou assombrirait sinon les bords de la card (halo visible),
    `.poster` a son propre `overflow:hidden` qui coupe proprement le débord. */
+/* ⚠️ REFONTE (21/09, demande explicite : "un degradé de differente couleur et
+   que ce soit pas flou comme actuellement") — abandon du "mode peinture" (7
+   taches radiales, chacune avec un large fondu vers transparent qui donnait
+   cet aspect flou/laiteux même sans filter:blur(), déjà retiré le 12/09 sans
+   régler ce souci précis ici) pour ce thème, même principe que la refonte
+   LaLiga/Ligue1/PL/Bundesliga/Serie A/UEL/UECL déjà faite : un seul dégradé
+   LINÉAIRE, zones de couleur pleine (paliers) reliées par des transitions
+   courtes, zéro flou. 4 couleurs déjà établies de l'identité Ligue des
+   Nations (rouge/or/vert/bleu, reprises telles quelles) enchaînées dans
+   l'ordre du spectre (rouge→or→vert→bleu) plutôt qu'un ordre arbitraire :
+   évite de coller 2 teintes éloignées sur le cercle chromatique l'une à côté
+   de l'autre, qui donnerait une zone de transition trouble/brunâtre (même
+   piège déjà rencontré sur noir→rouge LaLiga ou violet→blanc PL, réglé à
+   chaque fois par un pont de couleur intermédiaire — ici l'ordre spectre
+   sert directement le même but). */
 .poster--theme-nl .poster__bg--gradient {
-  inset: -20px;
-  background:
-    radial-gradient(45% 70% at 10% 30%, #0c3c90 0%, transparent 60%),
-    radial-gradient(40% 65% at 30% 75%, #d8000c 0%, transparent 60%),
-    radial-gradient(42% 68% at 55% 20%, #009c48 0%, transparent 60%),
-    radial-gradient(38% 62% at 75% 65%, #fcc000 0%, transparent 60%),
-    radial-gradient(40% 65% at 90% 30%, #0c3c90 0%, transparent 60%),
-    radial-gradient(38% 60% at 60% 90%, #d8000c 0%, transparent 60%),
-    radial-gradient(35% 55% at 15% 85%, #009c48 0%, transparent 60%),
-    #0a1020;
-  filter: saturate(1.4);
+  inset: 0;
+  background: linear-gradient(135deg,
+    #d8000c 0%, #d8000c 10%,
+    #fcc000 28%, #fcc000 38%,
+    #009c48 56%, #009c48 66%,
+    #0c3c90 84%, #0c3c90 100%);
   animation: none;
 }
 .poster--theme-nl .poster__bg--gradientAlt {
