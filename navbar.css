@@ -208,16 +208,12 @@
    sous n'importe quelle marge raisonnable ici) : l'ombre reste visible et
    donne toujours l'effet "flotte au-dessus de la page", mais a toujours la
    place de s'estomper avant le bord réel, quelle que soit la marge choisie.
-   ⚠️ HAUTEUR DE LA BARRE ELLE-MÊME RÉDUITE EN PLUS (21/09, 2e round — la marge
-   seule ne suffisait pas à couvrir les 25px demandés : 14px→2px ne libère que
-   12px, le reste ("aucune amélioration" visible) ne pouvait venir que de la
-   barre elle-même, pas juste de son écart au bord). `padding` 5px 6px 8px →
-   3px 6px 4px (top -2px, bottom -4px) : la barre est maintenant physiquement
-   plus courte, donc son bord haut (où sont les icônes) descend d'autant, en
-   plus des 12px déjà gagnés sur la marge — combiné avec la réduction du
-   padding des onglets ci-dessous (`.sfTab`), le déplacement total vers le bas
-   se rapproche des ~25px demandés. `border-radius` inchangé (26px reste
-   cohérent visuellement même sur une barre plus basse). */
+   ⚠️ TENTATIVE DE RÉDUIRE AUSSI LA HAUTEUR DE LA BARRE (21/09) FAITE PUIS
+   REVERTÉE le jour même (demande explicite : "remet comme avant") — le
+   padding avait été resserré (5px 6px 8px → 3px 6px 4px) pour aller plus loin
+   que la marge seule, mais l'utilisateur a préféré revenir à l'état d'avant
+   ce changement précis plutôt que de le garder. Padding remis à sa valeur
+   d'origine. */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -228,7 +224,7 @@
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px));
-  padding: 3px 6px 4px;
+  padding: 5px 6px 8px;
   border-radius: 26px;
   background: rgba(15, 15, 16, 0.88);
   backdrop-filter: blur(20px);
@@ -246,11 +242,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  /* Padding resserré en même temps que `.sfTabbar` (voir son commentaire,
-     21/09) : c'est la combinaison des deux qui fait vraiment descendre la
-     barre visuellement, pas la marge basse seule. 8px 0 12px → 5px 0 6px
-     (top -3px, bottom -6px). */
-  padding: 5px 0 6px;
+  padding: 8px 0 12px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 10px;
   font-weight: 600;
@@ -287,12 +279,7 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  /* -16px → -11px (21/09, même round que `.sfTabbar`/`.sfTab`) : l'orb LIVE
-     est délibérément surélevé par rapport aux autres onglets (effet central
-     proéminent) — en réduisant leur padding, il faut réduire ce décalage
-     d'autant, sinon l'orb "remonterait" relativement aux autres icônes et
-     casserait l'alignement visuel du bas de la barre. */
-  transform: translateY(-11px);
+  transform: translateY(-16px);
   color: var(--sf-muted);
   font-size: 10px;
   font-weight: 700;
