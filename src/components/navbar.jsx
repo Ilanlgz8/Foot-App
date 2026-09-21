@@ -73,8 +73,16 @@ const ICONS = {
   ),
   '/classement': (
     <>
+      {/* ⚠️ CORRIGÉ (21/09, retour utilisateur : "c pas le même que tu m'avais
+          montré") — la 1re version (3 traits + une ligne de base) ne
+          correspondait pas au vrai chart-bar Tabler validé dans l'aperçu :
+          3 BARRES pleines (rectangles arrondis), sans trait de base qui les
+          relie. Remplacé par 3 rects, mêmes positions que la variante active
+          juste en dessous (pour rester cohérent entre l'état inactif/actif). */}
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M4.5 20V11M12 20V4.5M19.5 20v-7.5M3.5 20h17" />
+        <rect x="3.5" y="11" width="4" height="9" rx="1.3" />
+        <rect x="10.5" y="3.7" width="4" height="16.3" rx="1.3" />
+        <rect x="17.3" y="12.2" width="4" height="7.8" rx="1.3" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M3.5 11a1.3 1.3 0 011.3-1.3h1.4A1.3 1.3 0 017.5 11v9h-4v-9zm7.2-7.3a1.3 1.3 0 011.3-1.2h1.3a1.3 1.3 0 011.3 1.3V20h-4V3.7zm7.2 8.5a1.3 1.3 0 011.3-1.3h1.3a1.3 1.3 0 011.3 1.3V20h-4v-7.8z" />
