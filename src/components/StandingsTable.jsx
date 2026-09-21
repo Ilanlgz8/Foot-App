@@ -2,6 +2,7 @@
 import { useEffect, useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
+import { resolveFdTeamId } from '../utils/matchUtils'
 // Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
 // pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
 // visitée au moins une fois (chunk lazy pas encore chargé), l'onglet Classement de
@@ -102,7 +103,7 @@ function Forme({ results }) {
  * @param {string}   compCode         — code compétition transmis à onToggleFavorite (contexte du favori)
  */
 export function StandingsTable({
-  rows, compact = false, formMap = {}, qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false,
+  rows, compact = false, formMap = {}, compMatches = [], qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false,
   favoritable = false, isFavorite = null, onToggleFavorite = null, favLimitReached = false, compCode = null,
 }) {
   const getZone = (position) =>
@@ -131,7 +132,34 @@ export function StandingsTable({
           {rows.map((team) => {
             const topRank = team.position <= 3
             const zone    = getZone(team.position)
-            const forme   = formMap[team.team.id]
+            // ⚠️ BUG CORRIGÉ (21/09, constat utilisateur : colonne "Forme" vide
+            // pour TOUTES les équipes de Ligue 1, alors que le classement
+            // lui-même s'affichait bien) — root cause différente du fix du
+            // 21/09 sur useTeamForm.js (readCache→readCacheStale, qui réglait
+            // un cas de cache expiré mais ne suffisait pas ici) : `rows` peut
+            // venir soit de football-data.org (ids FD.org, cas normal) soit
+            // d'ESPN (ids ESPN, repli déjà existant dans useStandings.js —
+            // voir son commentaire "ESPN n'est qu'un repli sur échec" —
+            // déclenché ici par un FD.org rate-limité au moment du test,
+            // confirmé via `team.team.crest` pointant vers a.espncdn.com et
+            // `team.team.id==="174"` alors que `formMap` — TOUJOURS construit
+            // depuis FD.org pour les 5 grands championnats domestiques, voir
+            // ESPN_SOURCED_FORM_COMPS dans useTeamForm.js — est keyé par des
+            // ids FD.org (ex. "511"). Le lookup direct `formMap[team.team.id]`
+            // échoue alors pour TOUTE la ligue, pas juste une équipe (id d'un
+            // référentiel totalement différent). `resolveFdTeamId` (déjà
+            // utilisé ailleurs dans l'app pour exactement ce genre de
+            // réconciliation ESPN↔FD.org par nom, voir matchUtils.js) résout
+            // l'id FD.org réel à partir du nom de l'équipe et de `compMatches`
+            // (renvoyé par useTeamForm à côté de `formMap`, déjà chargé —
+            // aucun appel réseau supplémentaire). Chemin normal (rows déjà en
+            // ids FD.org, cas de loin le plus fréquent) inchangé : le lookup
+            // direct réussit et ce fallback n'est jamais atteint.
+            let forme = formMap[team.team.id]
+            if (forme === undefined && compMatches?.length) {
+              const fdId = resolveFdTeamId(team.team, compMatches, { loose: true })
+              if (fdId != null) forme = formMap[fdId]
+            }
             const formeSlice = compact && forme ? forme.slice(-3) : forme
             const prevPos = prevSnapshot[team.team.id]
             const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0

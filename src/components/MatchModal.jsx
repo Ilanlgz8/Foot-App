@@ -1256,7 +1256,7 @@ export function ClassementTab({ match, compId }) {
   // fdSpacingTracker.js) — attente adaptative (0ms si useStandings n'a rien
   // tapé de réel), pas un délai fixe à chaque visite.
   const { standings, groups, loading } = useStandings(compId)
-  const { formMap } = useTeamForm(compId, 6_000)
+  const { formMap, compMatches: formCompMatches } = useTeamForm(compId, 6_000)
 
   // ⚠️ AJOUT (04/09, demande utilisateur : appliquer ici la même correction que
   // sur la page Classement). football-data.org intègre le match en cours au
@@ -1319,7 +1319,7 @@ export function ClassementTab({ match, compId }) {
                 {g.name.replace('GROUP_', 'Groupe ')}
               </p>
             )}
-            <StandingsTable rows={g.table} compact={false} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
+            <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} />
           </div>
         ))}
       </div>
@@ -1333,7 +1333,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} qualificationRules={rules} isCountry={compId === 'WC'} />
+      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} />
     </div>
   )
 }

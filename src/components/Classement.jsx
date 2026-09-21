@@ -146,7 +146,7 @@ function Classement() {
   // chaque visite, même quand inutile, était effectivement une mauvaise
   // expérience — corrigé ici sans réintroduire la collision.
   const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday)
-  const { formMap } = useTeamForm(selectedComp, 6_000)
+  const { formMap, compMatches: formCompMatches } = useTeamForm(selectedComp, 6_000)
   const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
@@ -460,6 +460,7 @@ function Classement() {
                 rows={group.table}
                 compact={false}
                 formMap={formMap}
+                compMatches={formCompMatches}
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
@@ -517,6 +518,7 @@ function Classement() {
                 rows={group.table}
                 compact
                 formMap={formMap}
+                compMatches={formCompMatches}
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
@@ -838,6 +840,7 @@ function Classement() {
               ? <StandingsTable
                   rows={filteredStandings}
                   formMap={formMap}
+                  compMatches={formCompMatches}
                   qualificationRules={qualificationRules}
                   snapshotKey={`standings_prev_${selectedComp}`}
                   snapshotRows={standingsLive}
