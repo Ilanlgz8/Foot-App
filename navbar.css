@@ -193,8 +193,7 @@
    l'écran (`100dvh`, `overflow: hidden` — voir App.css) : la marge basse ne
    peut donc pas descendre sous ~0px sans que la barre touche le vrai bord de
    l'écran. 14px → 2px : le minimum qui garde encore un tout petit espace
-   "flottant" (pas totalement flush) plutôt que 0px pile — maximum atteignable
-   SANS réduire la hauteur de la barre elle-même (confirmé avec l'utilisateur).
+   "flottant" (pas totalement flush) plutôt que 0px pile.
    `env(safe-area-inset-bottom)` INCHANGÉ : reste indispensable sur iPhone
    avec indicateur d'accueil (sinon la barre passerait sous ce dernier).
    ⚠️ OMBRE RESSERRÉE EN MÊME TEMPS — bug trouvé au 1er essai (14px→6px) :
@@ -208,7 +207,17 @@
    avait changé. Décalage/flou réduits à une portée d'environ 14px (largement
    sous n'importe quelle marge raisonnable ici) : l'ombre reste visible et
    donne toujours l'effet "flotte au-dessus de la page", mais a toujours la
-   place de s'estomper avant le bord réel, quelle que soit la marge choisie. */
+   place de s'estomper avant le bord réel, quelle que soit la marge choisie.
+   ⚠️ HAUTEUR DE LA BARRE ELLE-MÊME RÉDUITE EN PLUS (21/09, 2e round — la marge
+   seule ne suffisait pas à couvrir les 25px demandés : 14px→2px ne libère que
+   12px, le reste ("aucune amélioration" visible) ne pouvait venir que de la
+   barre elle-même, pas juste de son écart au bord). `padding` 5px 6px 8px →
+   3px 6px 4px (top -2px, bottom -4px) : la barre est maintenant physiquement
+   plus courte, donc son bord haut (où sont les icônes) descend d'autant, en
+   plus des 12px déjà gagnés sur la marge — combiné avec la réduction du
+   padding des onglets ci-dessous (`.sfTab`), le déplacement total vers le bas
+   se rapproche des ~25px demandés. `border-radius` inchangé (26px reste
+   cohérent visuellement même sur une barre plus basse). */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -219,7 +228,7 @@
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px));
-  padding: 5px 6px 8px;
+  padding: 3px 6px 4px;
   border-radius: 26px;
   background: rgba(15, 15, 16, 0.88);
   backdrop-filter: blur(20px);
@@ -237,7 +246,11 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 0 12px;
+  /* Padding resserré en même temps que `.sfTabbar` (voir son commentaire,
+     21/09) : c'est la combinaison des deux qui fait vraiment descendre la
+     barre visuellement, pas la marge basse seule. 8px 0 12px → 5px 0 6px
+     (top -3px, bottom -6px). */
+  padding: 5px 0 6px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 10px;
   font-weight: 600;
@@ -274,7 +287,12 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  transform: translateY(-16px);
+  /* -16px → -11px (21/09, même round que `.sfTabbar`/`.sfTab`) : l'orb LIVE
+     est délibérément surélevé par rapport aux autres onglets (effet central
+     proéminent) — en réduisant leur padding, il faut réduire ce décalage
+     d'autant, sinon l'orb "remonterait" relativement aux autres icônes et
+     casserait l'alignement visuel du bas de la barre. */
+  transform: translateY(-11px);
   color: var(--sf-muted);
   font-size: 10px;
   font-weight: 700;
