@@ -199,10 +199,62 @@ function scoreboardChunkTtl(chunkDates) {
   return null
 }
 
-// Récupère UNE tranche (déjà ≤7j) — cache Redis si `scoreboardChunkTtl` en
-// autorise un, sinon fetch direct à chaque fois (zone "live"). AbortController
-// dédié par tranche (indépendant de celui de la requête simple plus bas) :
-// plusieurs tranches sont interrogées en petits groupes (voir
+// ⚠️ AJOUT (21/09, demande explicite utilisateur — commandes Upstash/CPU actif
+// Vercel en forte hausse) : jusqu'ici, `fetchScoreboardChunk` faisait un
+// `kv.get` INDIVIDUEL par tranche pour vérifier le cache — avec des fenêtres
+// désormais découpées en dates individuelles (16/09, voir plus haut, jusqu'à
+// ~75 tranches par compétition) et ~17 compétitions ESPN suivies au total
+// (ESPN_SOURCED_COMPS + coupes nationales, voir useTodayMatches.js), un seul
+// chargement de page pouvait déclencher plus de 1000 commandes Redis rien
+// que pour VÉRIFIER le cache. Même principe déjà en place ailleurs dans ce
+// projet pour exactement ce problème (voir api/fifa-live.js, `kv.mget` sur
+// `espn:sum:*`/`espn:fb:*`, et cf-worker/src/index.js, MGET sur les clés de
+// suivi par match, 10/09) : Upstash facture un MGET de N clés comme UNE
+// SEULE commande, peu importe N. Toutes les clés de cache des tranches
+// CACHEABLES (celles qui ont un TTL défini — passé/futur lointain, voir
+// `scoreboardChunkTtl` ; la zone "live" ±2j autour d'aujourd'hui n'est
+// JAMAIS mise en cache, inchangé) sont donc lues en un seul aller-retour
+// AVANT de lancer le moindre fetch ESPN — voir `readCachedChunks` plus bas,
+// appelée une fois dans le handler avant `fetchScoreboardChunksStaggered`.
+// Seules les tranches réellement absentes du cache (vrai cache miss) ou
+// "live" déclenchent encore un vrai fetch ESPN, TOUJOURS par petits groupes
+// espacés (voir `fetchScoreboardChunksStaggered` plus bas, INCHANGÉE — c'est
+// ce qui protège contre le blocage anti-rafale ESPN, incident 403 du 15/09,
+// voir plus haut) : ce changement ne touche QUE la lecture du cache, jamais
+// la façon dont ESPN lui-même est interrogé.
+function safeJsonChunk(val) {
+  if (!val) return null
+  if (typeof val === 'string') { try { return JSON.parse(val) } catch { return null } }
+  return val
+}
+
+// Lit d'un coup (1 seule commande Redis, voir commentaire ci-dessus) l'état
+// de cache de toutes les tranches CACHEABLES d'une liste — retourne une Map
+// chunkDates → résultat déjà prêt (`{ ok: true, events }`) pour les seules
+// tranches trouvées en cache. Les tranches absentes de cette Map (cache
+// miss OU zone "live" jamais cachée) doivent encore être fetchées pour de
+// vrai (voir `fetchScoreboardChunksStaggered`).
+async function readCachedChunks(slug, chunkList) {
+  const cacheable = chunkList
+    .map(chunk => ({ chunk, ttl: scoreboardChunkTtl(chunk) }))
+    .filter(x => x.ttl != null)
+  const hits = new Map()
+  if (cacheable.length === 0) return hits
+  try {
+    const values = await kv.mget(...cacheable.map(x => `espn:sb:${slug}:${x.chunk}`))
+    cacheable.forEach((x, i) => {
+      const parsed = safeJsonChunk(values[i])
+      if (parsed) hits.set(x.chunk, { ok: true, events: parsed.events ?? [] })
+    })
+  } catch { /* Redis indisponible → toutes les tranches retombent en fetch direct */ }
+  return hits
+}
+
+// Fetch RÉEL d'une tranche auprès d'ESPN (le cache a déjà été vérifié en
+// amont par `readCachedChunks` — cette fonction n'est plus appelée QUE pour
+// un vrai cache miss ou une tranche "live"). AbortController dédié par
+// tranche (indépendant de celui de la requête simple plus bas) : plusieurs
+// tranches sont interrogées en petits groupes (voir
 // fetchScoreboardChunksStaggered plus bas), chacune doit pouvoir s'annuler
 // sans affecter les autres.
 // ⚠️ Retourne `{ ok, events }` et NON directement `{ events }` (15/09,
@@ -216,17 +268,6 @@ function scoreboardChunkTtl(chunkDates) {
 // le comportement d'avant ce correctif.
 async function fetchScoreboardChunk(slug, chunkDates) {
   const ttl = scoreboardChunkTtl(chunkDates)
-  const cacheKey = `espn:sb:${slug}:${chunkDates}`
-  if (ttl != null) {
-    try {
-      const cached = await kv.get(cacheKey)
-      if (cached) {
-        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached
-        return { ok: true, events: parsed.events ?? [] }
-      }
-    } catch { /* Redis indisponible → on retente un fetch direct ci-dessous */ }
-  }
-
   const controller = new AbortController()
   const timeoutId  = setTimeout(() => controller.abort(), 8_000)
   try {
@@ -238,7 +279,7 @@ async function fetchScoreboardChunk(slug, chunkDates) {
     if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
     const json = await response.json()
     if (ttl != null) {
-      kv.set(cacheKey, JSON.stringify(json), { ex: ttl }).catch(() => {})
+      kv.set(`espn:sb:${slug}:${chunkDates}`, JSON.stringify(json), { ex: ttl }).catch(() => {})
     }
     return { ok: true, events: json.events ?? [] }
   } catch {
@@ -631,7 +672,14 @@ export default async function handler(req, res) {
     // par le découpage, en dates individuelles.
     const chunks = dates ? splitScoreboardRange(dates) : [null]
     if (chunks.length > 1) {
-      const results = await fetchScoreboardChunksStaggered(slug, chunks)
+      // ⚠️ 1 seul kv.mget pour vérifier TOUTES les tranches cacheables d'un
+      // coup (voir readCachedChunks plus haut) — seules celles non trouvées
+      // (vrai cache miss ou zone "live") sont réellement fetchées auprès
+      // d'ESPN, toujours par petits groupes espacés (anti-rafale, inchangé).
+      const cachedByChunk = await readCachedChunks(slug, chunks)
+      const toFetch = chunks.filter(c => !cachedByChunk.has(c))
+      const fetched = await fetchScoreboardChunksStaggered(slug, toFetch)
+      const results = [...cachedByChunk.values(), ...fetched]
       clearTimeout(timeoutId)
       const merged = mergeScoreboardChunks(results)
       // Toutes les tranches ont échoué (ESPN en panne/bloque) : un vrai
