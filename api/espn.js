@@ -656,12 +656,19 @@ export default async function handler(req, res) {
         .json(compact)
     }
 
-    // ── Mode scoreboard (pas de cache pour une plage "live" — voir plus bas
-    //    pour les tranches passées/futures lointaines, qui SONT mises en
-    //    cache, voir fetchScoreboardChunk/scoreboardChunkTtl) ──
+    // ── Mode scoreboard ──────────────────────────────────────────────────
     // Format simple (YYYYMMDD) OU plage (YYYYMMDD-YYYYMMDD) — la plage est
     // nécessaire pour les tournois ponctuels (NL/CAN/Copa America) où l'on
     // interroge une fenêtre large plutôt qu'un jour précis.
+    // ⚠️ Date simple (chunks.length === 1 plus bas) : jamais mise en cache
+    // (`no-store`) — utilisée pour retrouver un event précis dans le
+    // scoreboard du jour (useMatchDetail.js/useEspnMatchDetail.js), doit
+    // rester fraîche. Plage multi-jours (chunks.length > 1) : les tranches
+    // passées/futures lointaines SONT mises en cache individuellement (voir
+    // fetchScoreboardChunk/scoreboardChunkTtl), et depuis le 21/09 la
+    // réponse fusionnée elle-même l'est aussi, brièvement (voir plus bas,
+    // Cache-Control public/s-maxage) — ce mode ne sert jamais le direct,
+    // voir le commentaire détaillé à cet endroit.
     if (dates && !/^\d{8}(-\d{8})?$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD ou YYYYMMDD-YYYYMMDD attendu)' })
 
     // ⚠️ AJOUT (15/09, durci le 16/09) : ESPN rejette désormais (400) TOUTE
@@ -687,11 +694,39 @@ export default async function handler(req, res) {
       // fetchScoreboardChunk, ça préserve le repli sur cache local périmé
       // déjà en place côté client (fetchEspnCompMatches, espnAdapter.js).
       if (!merged.ok) return res.status(502).json({ error: 'ESPN indisponible sur toutes les tranches' })
+      // ⚠️ AJOUT (21/09, demande explicite utilisateur — "si une seule
+      // personne consulte l'app ça utilise trop de commandes Upstash") : le
+      // kv.mget (voir readCachedChunks) réduit le coût PAR VISITEUR, mais ne
+      // change rien si N visiteurs chargent l'Accueil dans la même minute —
+      // chacun refait le même calcul (même optimisé). Ce mode (plage
+      // multi-jours, windowRange() côté client, voir espnAdapter.js) est le
+      // SEUL appelant de ce format `dates=DEBUT-FIN` — tous les autres
+      // appelants (useMatchDetail.js/useEspnMatchDetail.js/DebugEspn.jsx)
+      // passent une DATE UNIQUE, qui suit le chemin `chunks.length === 1`
+      // plus bas, jamais touché ici. Et le direct (score en temps réel
+      // pendant un match) ne passe JAMAIS par ce endpoint — useLiveMinute.js/
+      // LiveProvider.jsx s'appuient sur un mécanisme de polling séparé (voir
+      // leurs propres fichiers), pas sur fetchEspnCompMatches. Cette réponse
+      // sert uniquement à établir la LISTE des matchs (calendrier), jamais
+      // leur score en direct — un court cache PARTAGÉ ici (Vercel Edge,
+      // même mécanisme déjà en place sans souci pour le mode "standings" de
+      // ce fichier, voir plus haut) ne dégrade donc aucune fraîcheur
+      // perçue : le client lui-même tolère déjà jusqu'à 60s de péremption
+      // sur ces données (`staleTime` de useTodayMatches.js). 90s : dans le
+      // même ordre de grandeur que cette tolérance déjà acceptée côté
+      // client, tout en donnant à ce cache Edge une vraie chance d'absorber
+      // une salve de visiteurs. `stale-while-revalidate` sert une copie
+      // encore un peu périmée pendant qu'un revalidate se fait en tâche de
+      // fond, plutôt qu'un visiteur "malchanceux" qui tombe pile à
+      // l'expiration ne déclenche un aller-retour complet à découvert.
+      // Effet concret : au lieu d'un calcul (même réduit à 1 mget) PAR
+      // VISITEUR, un seul calcul PARTAGÉ toutes les ~90s, peu importe le
+      // nombre de visiteurs simultanés — un visiteur qui tombe sur un cache
+      // Edge HIT ne déclenche même plus l'exécution de cette fonction,
+      // donc zéro commande Redis ET zéro CPU Vercel pour lui.
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-        .setHeader('Pragma', 'no-cache')
-        .setHeader('Surrogate-Control', 'no-store')
+        .setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=300')
         .json({ events: merged.events })
     }
 
