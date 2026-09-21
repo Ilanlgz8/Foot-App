@@ -218,11 +218,20 @@
    (déjà quasi minimale). Le seul levier qui reste un effet visible réel est
    donc la hauteur propre de la barre : padding 5px 6px 8px → 2px 6px 3px
    (top -3px, bottom -5px, un cran plus loin que le 1er essai reverté).
-   ⚠️ TRANSPARENCE AUGMENTÉE EN MÊME TEMPS (demande explicite : "met plus de
-   transparence [...] y'en a pas assez") : fond 0.88 → 0.62 d'opacité, flou
-   20px → 24px (légèrement renforcé pour garder les icônes lisibles malgré la
-   baisse d'opacité — sans ce flou plus fort, un fond plus transparent
-   laisserait trop transparaître le contenu qui défile derrière). */
+   ⚠️ TRANSPARENCE AUGMENTÉE PUIS RÉDUITE (4e round, même jour) — 0.88 → 0.62
+   jugé "trop transparente", demande explicite de revenir vers plus foncé :
+   0.62 → 0.82 (entre les deux, plus proche de l'original que du dernier
+   essai). Flou gardé à 24px (toujours utile même avec un fond plus opaque).
+   ⚠️ MARGE BASSE ENCORE RÉDUITE (4e round) — retour utilisateur : "y'a encore
+   un espace" malgré le padding déjà resserré au round précédent. Le seul
+   espace qui restait était `env(safe-area-inset-bottom)` (~34px, jusqu'ici
+   jamais touché, gardé intact "par sécurité" contre l'indicateur d'accueil
+   iOS). Demande explicite de baisser quand même : sa contribution est
+   réduite à 55 % de sa valeur réelle (`* 0.55`) plutôt que supprimée
+   entièrement — un compromis assumé, pas 0 % : ça laisse un tout petit
+   espace de sécurité résiduel plutôt que de coller la barre pile sur la zone
+   de swipe de l'indicateur d'accueil, ce qui la rendrait plus difficile à
+   utiliser sur les iPhone à encoche/Dynamic Island. */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -232,10 +241,10 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
-  margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px));
+  margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px) * 0.55);
   padding: 2px 6px 3px;
   border-radius: 26px;
-  background: rgba(15, 15, 16, 0.62);
+  background: rgba(15, 15, 16, 0.82);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.12);
