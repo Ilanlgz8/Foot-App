@@ -187,6 +187,12 @@
    comme demandé, grâce au fond semi-transparent + `backdrop-filter` déjà en
    place. `z-index` ajouté (la barre doit rester au-dessus du contenu qui
    défile maintenant sous elle, plus jamais garanti par l'ordre du flux). */
+/* ⚠️ MARGE BASSE RÉDUITE (21/09, demande explicite mobile : "la navbar est
+   trop haute [...] baisse un peu qu'elle soit plus bas") — 14px → 6px,
+   rapproche la barre du bord bas de l'écran (toujours pas flush à 0, garde
+   un léger espace "flottant" comme demandé initialement le même jour).
+   `env(safe-area-inset-bottom)` INCHANGÉ : reste indispensable sur iPhone
+   avec indicateur d'accueil (sinon la barre passerait sous ce dernier). */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -196,7 +202,7 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
-  margin: 0 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  margin: 0 14px calc(6px + env(safe-area-inset-bottom, 0px));
   padding: 5px 6px 8px;
   border-radius: 26px;
   background: rgba(15, 15, 16, 0.88);
