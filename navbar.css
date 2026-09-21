@@ -151,36 +151,37 @@
    réintroduire les 13 anciens bugs de décrochage. `::before` (l'ancienne
    pilule séparée) n'a plus lieu d'être : supprimée, son rôle est repris par
    le fond de `.sfTabbar` elle-même.
-   ⚠️ AJUSTÉ (21/09, retour utilisateur juste après : "supprime le fond noir
-   derriere la navbar [...] et baisse la hauteur [...] comme ça y'a que le
-   ballon qui depasse") — la marge basse (14px + safe-area) laissait
-   apparaître le fond de page (`--bg-deep`, quasi noir) en un grand
-   rectangle plein largeur SOUS la pilule, bien plus visible/moche qu'un
-   simple espace de respiration : lu comme "un fond noir séparé", pas comme
-   un flottement. Corrigé en retirant la marge basse (la barre retrouve le
-   bas de l'écran, plus aucun rectangle exposé) tout en GARDANT les marges
-   gauche/droite (toujours détachée sur les côtés, toujours flottante) —
-   coins arrondis seulement en haut (les coins bas seraient de toute façon
-   masqués par le bord de l'écran). Hauteur réduite (padding resserré) pour
-   que l'orb Live central (`transform: translateY(-16px)`, inchangé) dépasse
-   proportionnellement plus du haut de la barre. */
+   ⚠️ AJUSTÉ PUIS RÉTABLI (21/09) — un 1er retour ("supprime le fond noir
+   derriere [...] baisse la hauteur") avait fait retirer la marge basse : la
+   vraie cause du "fond noir" n'était pas la marge elle-même mais une règle
+   CSS MORTE ailleurs (`body { padding-bottom: 92px }`, reliquat de l'ancienne
+   barre `position: fixed`, voir plus bas dans ce fichier — SUPPRIMÉE) qui
+   rendait `body` plus haut que l'écran et donc scrollable, révélant ce
+   padding vide en scrollant. Une fois cette vraie cause corrigée (+ garde-fou
+   `overflow-y: hidden` sur `html`/`body`, voir index.css), `body` ne peut
+   plus jamais scroller — la marge basse peut donc être remise SANS RISQUE de
+   réexposer un "fond noir" scrollable : demande explicite de l'utilisateur
+   ("met un espace aussi en bas [...] accroché a rien [...] pas l'impression
+   que c'est coupé"), cohérente avec la toute 1ère demande du jour (flotter
+   sur les 4 côtés). Coins arrondis rétablis sur les 4 côtés (plus seulement
+   en haut, puisque le bas n'est plus flush avec l'écran). Hauteur/padding
+   restent resserrés (demande du round précédent, toujours valable). */
 .sfTabbar {
   position: relative;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   flex: 0 0 auto;                     /* élément de flux dans .appShell, jamais fixed */
-  margin: 0 14px 0;
-  padding: 5px 6px calc(6px + env(safe-area-inset-bottom, 0px));
-  border-radius: 26px 26px 0 0;
+  margin: 0 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 5px 6px 8px;
+  border-radius: 26px;
   background: rgba(15, 15, 16, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-bottom: none;
   box-shadow:
-    0 -10px 28px rgba(0, 0, 0, 0.45),
-    0 2px 10px rgba(0, 0, 0, 0.3);
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 .sfTabbar > * { pointer-events: auto; }
 
