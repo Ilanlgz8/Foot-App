@@ -332,12 +332,22 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* ── Espace en bas des pages pour ne pas passer sous la tab bar ── */
-@media (max-width: 639px) {
-  body {
-    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
-  }
-}
+/* ⚠️ SUPPRIMÉ (21/09, retour utilisateur : "je peux scroll vers le bas [...]
+   la navbar [...] se baisse [...] en dessous y'a rien on peut pas scroll") —
+   cette règle réservait de l'espace en bas de `body` pour que le contenu ne
+   passe pas sous la barre du bas quand elle était encore `position: fixed`
+   (avant le 14/09, voir le commentaire complet sur `.sfTabbar` plus haut).
+   Depuis le passage en colonne flex (`.appShell`/`.appScroll`), `body` n'est
+   plus jamais le conteneur qui défile — seul `.appScroll` défile, en interne,
+   avec sa propre hauteur déjà calculée pour laisser la place exacte à la
+   barre (élément de flux normal, plus besoin de réserver quoi que ce soit).
+   Cette règle était devenue du code mort NUISIBLE plutôt que juste inutile :
+   elle ajoutait ~92px de padding en bas de `body`, rendant `body` plus haut
+   que le viewport (`.appShell` fait déjà exactement 100dvh) — `body`
+   devenait donc lui-même scrollable, ce qui n'aurait jamais dû être
+   possible. Ce padding vide (fond `--bg-deep`, quasi noir) est très
+   probablement aussi le "bloc noir" déjà signalé par l'utilisateur : visible
+   en scrollant `body` au lieu de `.appScroll`, sous la barre. Supprimée. */
 
 /* ─────────────────────────── DESKTOP ─────────────────────────── */
 @media (min-width: 640px) {

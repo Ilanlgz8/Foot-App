@@ -67,6 +67,22 @@ html { scroll-behavior: smooth; }
    défaut (débordement possible), jamais sur quelque chose de cassé. */
 html, body { overflow-x: clip; max-width: 100vw; }
 
+/* ⚠️ AJOUT (21/09, retour utilisateur : "je peux scroll vers le bas [...] en
+   dessous y'a rien on peut pas scroll [...] sinon c pas pro") — depuis le
+   passage en colonne flex (`.appShell`/`.appScroll`, 14/09), SEUL
+   `.appScroll` est censé défiler ; `body`/`html` ne devraient plus jamais
+   pouvoir scroller verticalement. Mais rien ne l'empêchait explicitement —
+   une règle obsolète (`body { padding-bottom: 92px }`, navbar.css, reliquat
+   de l'ancienne barre `position: fixed`) rendait `body` plus haut que le
+   viewport et donc réellement scrollable, ce qui laissait voir du vide sous
+   la barre du bas en scrollant. Cette règle est supprimée (voir navbar.css),
+   et ce garde-fou explicite est ajouté en plus pour que ce type de bug —
+   `body` qui redevient scrollable à cause d'un futur ajout de padding/marge
+   quelque part — ne puisse plus jamais se reproduire, quelle qu'en soit la
+   cause. `overflow-x` reste en `clip` (pas touché, voir commentaire
+   au-dessus) ; seul l'axe vertical est concerné ici. */
+html, body { overflow-y: hidden; }
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
