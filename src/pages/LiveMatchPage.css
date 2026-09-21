@@ -1185,8 +1185,9 @@
    vu que le calque flouté couvre toute la carte. */
 /* ⚠️ REFONTE (21/09) — voir le commentaire complet dans accueil.css
    (`.poster--theme-nl .poster__bg--gradient`), reprise à l'identique ici :
-   abandon du "mode peinture" (taches radiales floutées) pour un dégradé
-   linéaire à 4 couleurs (rouge→or→vert→bleu, ordre spectre). */
+   dégradé linéaire 2 couleurs dominantes (bleu/rouge) + 2 petites touches
+   d'accent en coin (or/vert), après rejet d'une 1ère version à 4 bandes
+   égales ("ça fait trop drapeau LGBT"). */
 #root .lmp__hero--theme-nl {
   background: #0c3c90;
 }
@@ -1199,11 +1200,10 @@
   opacity: 1;
   animation: none;
   mix-blend-mode: normal;
-  background: linear-gradient(135deg,
-    #d8000c 0%, #d8000c 10%,
-    #fcc000 28%, #fcc000 38%,
-    #009c48 56%, #009c48 66%,
-    #0c3c90 84%, #0c3c90 100%);
+  background:
+    radial-gradient(30% 30% at 88% 12%, #fcc000 0%, #fcc000 30%, transparent 65%),
+    radial-gradient(28% 28% at 10% 90%, #009c48 0%, #009c48 30%, transparent 65%),
+    linear-gradient(135deg, #0c3c90 0%, #0c3c90 45%, #d8000c 100%);
 }
 
 /* ⚠️ HABILLAGE COUPE DU MONDE "MODE PEINTURE" (10/09) — même famille que
