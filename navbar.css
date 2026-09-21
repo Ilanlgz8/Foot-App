@@ -265,8 +265,27 @@
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.4),
     0 1px 4px rgba(0, 0, 0, 0.3);
+  /* ⚠️ AJOUT (21/09, demande explicite : "que la navbar disparaisse au scroll
+     et réapparaisse à l'arrêt") — piloté par la prop `hidden` (App.jsx,
+     `navHidden`), un simple toggle de classe. Volontairement un `transform`
+     (pas de changement de `display`/`position`) : `.sfTabbar` reste ancrée en
+     `position: absolute` sur `.appShell` exactement comme avant, ce
+     `transform` est purement visuel et n'a aucune interaction avec les 15
+     variantes déjà documentées du bug de barre décollée (toutes liées à
+     `position: fixed` sur le viewport, abandonné le 14/09 — voir plus haut).
+     `transition` uniquement sur transform/opacity (pas sur `background`/
+     `backdrop-filter`, jamais retouchés ici). */
+  transition: transform 0.22s ease, opacity 0.22s ease;
 }
 .sfTabbar > * { pointer-events: auto; }
+
+.sfTabbar--hidden {
+  /* 130% plutôt que 100% : couvre aussi la marge basse + l'ombre portée, qui
+     resteraient sinon visibles en dépassement une fois la barre "sortie". */
+  transform: translateY(130%);
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* ── Onglet standard — icônes blanches au repos, rouge vif quand actif ── */
 .sfTab {

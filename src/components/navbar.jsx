@@ -227,12 +227,15 @@ function Navbar() {
 // Composant séparé (voir commentaire au-dessus de Navbar) : plus de portail,
 // plus de position:fixed — rendue normalement dans `.appShell` (App.jsx),
 // en flux, toujours au bas de l'écran par construction.
-export function BottomTabBar() {
+export function BottomTabBar({ hidden = false }) {
   const { liveMatches } = useLiveData()
   const liveCount = liveMatches.filter(isCardLive).length
 
   return (
-    <nav className="sfTabbar" aria-label="Navigation">
+    <nav
+      className={`sfTabbar${hidden ? ' sfTabbar--hidden' : ''}`}
+      aria-label="Navigation"
+    >
       {NAV.slice(0, 2).map(item => (
         <NavLink
           key={item.href}

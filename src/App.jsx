@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import './App.css'
 import './theme-v2.css'
 import Navbar, { BottomTabBar } from './components/navbar.jsx'
@@ -71,6 +71,51 @@ function App() {
   // en plus de OfflineBanner quand on est carrément hors ligne, ce dernier
   // couvre déjà et plus clairement ce cas.
   const weakNetwork = useWeakNetwork()
+
+  // ⚠️ AJOUT (21/09, demande explicite : "quand on scroll vers le bas ou le
+  // haut la navbar disparait et reapparait quand on arrete de scroll") —
+  // `navHidden` pilote une simple classe CSS (`.sfTabbar--hidden`, voir
+  // navbar.css) qui applique un `transform: translateY(...)` + `opacity` à
+  // `.sfTabbar`. Volontairement PAS de nouveau mécanisme de positionnement :
+  // `.sfTabbar` reste exactement ce qu'elle est depuis le 21/09 (`position:
+  // absolute` ancrée sur `.appShell`, voir navbar.css/App.css) — un
+  // `transform` purement visuel appliqué par-dessus ne change rien à cet
+  // ancrage, donc aucun risque de réintroduire une des 15 variantes du bug de
+  // barre décollée déjà documentées dans CLAUDE.md.
+  const [navHidden, setNavHidden] = useState(false)
+
+  useEffect(() => {
+    const el = appScrollRef.current
+    if (!el) return
+    let hideTimer = null
+    const IDLE_DELAY = 200 // ms sans scroll avant réapparition
+
+    const onScroll = () => {
+      // Toujours visible tout en haut de la page (évite un flicker sur le
+      // léger rebond élastique iOS au sommet) — pas demandé explicitement,
+      // mais un défaut sûr et courant sur ce genre de comportement.
+      if (el.scrollTop <= 8) {
+        setNavHidden(false)
+      } else {
+        setNavHidden(true)
+      }
+      if (hideTimer) clearTimeout(hideTimer)
+      hideTimer = setTimeout(() => setNavHidden(false), IDLE_DELAY)
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (hideTimer) clearTimeout(hideTimer)
+    }
+  }, [])
+  // ⚠️ Pas besoin d'un effet séparé pour réinitialiser `navHidden` au
+  // changement de page : `el.scrollTop = 0` (PUSH/REPLACE) ou `= saved`
+  // (POP, voir l'effet juste en dessous) déclenchent tous les deux un vrai
+  // événement `scroll` natif — le handler `onScroll` ci-dessus s'en charge
+  // déjà lui-même (scrollTop ≤ 8 → visible). Un effet dédié aurait en plus
+  // appelé `setState` de façon synchrone dans un effet (règle react-hooks/
+  // set-state-in-effect, lint) sans rien apporter de plus.
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -252,8 +297,9 @@ function App() {
           {/* Barre du bas — `position: absolute` ancrée sur `.appShell`
               (voir navbar.css/App.css), flotte par-dessus `.appScroll` plutôt
               que de réserver sa propre place dans le flux (mobile uniquement,
-              voir navbar.css). */}
-          <BottomTabBar />
+              voir navbar.css). `hidden` : se cache pendant le scroll,
+              réapparaît à l'arrêt (voir le useEffect `navHidden` plus haut). */}
+          <BottomTabBar hidden={navHidden} />
         </div>
       </LiveProvider>
     </ErrorBoundary>
