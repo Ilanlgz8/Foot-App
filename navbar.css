@@ -208,12 +208,21 @@
    sous n'importe quelle marge raisonnable ici) : l'ombre reste visible et
    donne toujours l'effet "flotte au-dessus de la page", mais a toujours la
    place de s'estomper avant le bord réel, quelle que soit la marge choisie.
-   ⚠️ TENTATIVE DE RÉDUIRE AUSSI LA HAUTEUR DE LA BARRE (21/09) FAITE PUIS
-   REVERTÉE le jour même (demande explicite : "remet comme avant") — le
-   padding avait été resserré (5px 6px 8px → 3px 6px 4px) pour aller plus loin
-   que la marge seule, mais l'utilisateur a préféré revenir à l'état d'avant
-   ce changement précis plutôt que de le garder. Padding remis à sa valeur
-   d'origine. */
+   ⚠️ RÉDUCTION DE HAUTEUR REFAITE, EN PLUS AGRESSIVE (21/09, 3e round) — un
+   1er essai (5px 6px 8px → 3px 6px 4px) avait été fait PUIS reverté le jour
+   même sur demande, mais l'utilisateur est revenu dessus juste après en
+   demandant explicitement d'aller ENCORE plus loin ("baisse encore même si
+   y'a une sécurité"), confirmé par une capture d'écran qui a permis de
+   comprendre que l'essentiel de l'espace visible venait de
+   `env(safe-area-inset-bottom)` (~34px, fixe, pas touché) et non de la marge
+   (déjà quasi minimale). Le seul levier qui reste un effet visible réel est
+   donc la hauteur propre de la barre : padding 5px 6px 8px → 2px 6px 3px
+   (top -3px, bottom -5px, un cran plus loin que le 1er essai reverté).
+   ⚠️ TRANSPARENCE AUGMENTÉE EN MÊME TEMPS (demande explicite : "met plus de
+   transparence [...] y'en a pas assez") : fond 0.88 → 0.62 d'opacité, flou
+   20px → 24px (légèrement renforcé pour garder les icônes lisibles malgré la
+   baisse d'opacité — sans ce flou plus fort, un fond plus transparent
+   laisserait trop transparaître le contenu qui défile derrière). */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -224,11 +233,11 @@
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px));
-  padding: 5px 6px 8px;
+  padding: 2px 6px 3px;
   border-radius: 26px;
-  background: rgba(15, 15, 16, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(15, 15, 16, 0.62);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.4),
@@ -242,7 +251,9 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 0 12px;
+  /* Resserré en même temps que `.sfTabbar` (voir son commentaire, 21/09, 3e
+     round) : 8px 0 12px → 4px 0 5px (top -4px, bottom -7px). */
+  padding: 4px 0 5px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 10px;
   font-weight: 600;
@@ -279,7 +290,9 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  transform: translateY(-16px);
+  /* -16px → -9px (21/09, 3e round, même raison que `.sfTab` : garder l'orb
+     LIVE aligné avec les autres onglets une fois leur padding resserré). */
+  transform: translateY(-9px);
   color: var(--sf-muted);
   font-size: 10px;
   font-weight: 700;
