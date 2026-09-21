@@ -32,7 +32,7 @@ function formatGroupName(raw = '') {
 
 export default function FavoritesPage() {
   const navigate = useNavigate()
-  const { status, subscribe, unsubscribe } = usePushNotifications()
+  const { status, subscribe, unsubscribe, errorMessage } = usePushNotifications()
   const { favorites: favComps, toggle: toggleComp } = useFavoriteTeams()
   const { favorites: favClubs, isFavorite: isFavClub, toggle: toggleFavClub, atLimit } = useFavoriteClubs()
   // ⚠️ Défaut changé de 'WC' à 'FL1' (Ligue 1) — demande utilisateur : la CM
@@ -83,6 +83,14 @@ export default function FavoritesPage() {
           <button className="favPage__btn favPage__btn--accent" onClick={subscribe} disabled={isLoading} type="button">
             {isLoading ? 'Activation…' : 'Activer les notifications'}
           </button>
+        )}
+        {/* ⚠️ AJOUT (21/09, diagnostic "cloche qui ne s'active pas [...] rien
+            du tout") — affiche la vraie erreur de subscribe() à l'écran
+            plutôt que seulement en console (inaccessible depuis un vrai
+            téléphone sans DevTools branchés). Retiré uniquement au prochain
+            clic sur Activer ou à un succès (voir usePushNotifications.js). */}
+        {errorMessage && (
+          <p className="favPage__hint favPage__hint--warn">Erreur : {errorMessage}</p>
         )}
       </section>
 

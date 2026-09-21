@@ -51,6 +51,15 @@ function urlBase64ToUint8Array(base64String) {
 
 export function usePushNotifications() {
   const [status, setStatus] = useState('checking')
+  // ⚠️ AJOUT (21/09, constat utilisateur : "j'ai reessayer ca a pas marché"
+  // + confirmation "rien du tout" au clic, même en PWA installée sur l'écran
+  // d'accueil — donc pas le cas iOS "onglet Safari nu" déjà géré ailleurs) —
+  // jusqu'ici l'erreur réelle de subscribe() ne partait que dans
+  // console.error, invisible depuis cet environnement (aucun accès aux
+  // DevTools d'un vrai iPhone). Exposée dans le state pour être affichée
+  // directement dans FavoritesPage — seul moyen d'obtenir la vraie cause
+  // plutôt que de deviner une énième hypothèse.
+  const [errorMessage, setErrorMessage] = useState(null)
 
   // ── Vérification au montage ───────────────────────────────────────────────
   useEffect(() => {
@@ -100,6 +109,7 @@ export function usePushNotifications() {
   const subscribe = useCallback(async () => {
     if (status === 'loading' || status === 'subscribed') return
     setStatus('loading')
+    setErrorMessage(null)
 
     try {
       // ⚠️ BUG CORRIGÉ (21/09, constat utilisateur : "j'appuie sur activer ça
@@ -131,7 +141,9 @@ export function usePushNotifications() {
         return
       }
       if (permission !== 'granted') {
-        // Dismissed (l'utilisateur a fermé sans choisir)
+        // Dismissed (l'utilisateur a fermé sans choisir) — message affiché
+        // pour distinguer ce cas de "rien ne s'est passé du tout" (21/09).
+        setErrorMessage(`Autorisation non accordée (valeur reçue : "${permission}")`)
         setStatus('idle')
         return
       }
@@ -165,6 +177,12 @@ export function usePushNotifications() {
       setStatus('subscribed')
     } catch (err) {
       console.error('[usePushNotifications] subscribe error:', err)
+      // Message conservé à l'écran même après le retour à 'idle' ci-dessous
+      // (21/09) — jusqu'ici invisible en dehors de la console, inutilisable
+      // pour diagnostiquer un échec signalé depuis un vrai téléphone sans
+      // accès aux DevTools. Effacé seulement au prochain clic sur "Activer"
+      // (voir le setErrorMessage(null) en tête de fonction) ou à un succès.
+      setErrorMessage(err?.message || String(err))
       setStatus('error')
       // Revenir à idle après 3s pour permettre une nouvelle tentative
       setTimeout(() => setStatus('idle'), 3_000)
@@ -203,7 +221,7 @@ export function usePushNotifications() {
     return () => clearTimeout(t)
   }, [status, subscribe])
 
-  return { status, subscribe, unsubscribe }
+  return { status, subscribe, unsubscribe, errorMessage }
 }
 
 /**
