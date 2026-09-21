@@ -135,38 +135,40 @@
    géométriques, scroll-lock #root, sync visualViewport...) : voir CLAUDE.md,
    section "Problèmes connus / résolus" — gardé là plutôt que dupliqué ici
    pour ne pas alourdir ce fichier davantage. */
+/* ⚠️ REDESIGN "flottante" (21/09, demande explicite : "arrondi sur les côté
+   [...] que ça survole la page [...] rattaché a rien que ça flotte dans le
+   vide mais que ça reste fix en bas") — jusqu'ici la barre elle-même était un
+   rectangle plein largeur, collé aux 3 bords (gauche/droite/bas), avec une
+   pilule arrondie posée EN PLUS derrière les icônes (`::before`, séparée).
+   Le rendu réel était donc "bandeau plein + pilule dedans", pas "un seul
+   objet flottant". Changement : c'est maintenant `.sfTabbar` elle-même qui
+   est la pilule — marge de chaque côté (elle ne touche plus les bords ni le
+   bas de l'écran, un vrai espace de page tout autour) + coins arrondis sur
+   les 4 côtés + ombre portée (l'effet "survole la page"). Reste un élément
+   de flux normal dans `.appShell` (voir commentaire plus haut, `position:
+   fixed` abandonné le 14/09) — la marge/le rayon ne changent que
+   l'apparence, jamais le mécanisme de positionnement, donc aucun risque de
+   réintroduire les 13 anciens bugs de décrochage. `::before` (l'ancienne
+   pilule séparée) n'a plus lieu d'être : supprimée, son rôle est repris par
+   le fond de `.sfTabbar` elle-même. */
 .sfTabbar {
-  position: relative;                 /* ancre ::before (pilule de fond), rien d'autre */
+  position: relative;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   flex: 0 0 auto;                     /* élément de flux dans .appShell, jamais fixed */
-  padding: 10px 8px calc(12px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.92) 32%,
-    #000000 70%
-  );
+  margin: 0 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 6px 10px;
+  border-radius: 26px;
+  background: rgba(15, 15, 16, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    0 2px 10px rgba(0, 0, 0, 0.35);
 }
 .sfTabbar > * { pointer-events: auto; }
-
-/* Pilule flottante en arrière-plan des onglets — noir neutre (pas de teinte
-   bleu marine, retour utilisateur) */
-.sfTabbar::before {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  height: 62px;
-  background: rgba(15, 15, 16, 0.85);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 22px;
-  z-index: -1;
-}
 
 /* ── Onglet standard — icônes blanches au repos, rouge vif quand actif ── */
 .sfTab {
