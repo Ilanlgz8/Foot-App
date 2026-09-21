@@ -47,13 +47,23 @@ const ICONS = {
   ),
   '/matchs': (
     <>
+      {/* ⚠️ CORRIGÉ (21/09, retour utilisateur : "les icones sont pas les
+          memes que tu m'as montrer [...] des contrefacon de temu") — la
+          1re version était une approximation dessinée à la main, pas le vrai
+          tracé Tabler affiché dans l'aperçu. Remplacé par le VRAI path SVG
+          `calendar-event` récupéré directement depuis le package
+          @tabler/icons (mêmes coordonnées, viewBox 24x24 identique) —
+          uniquement l'épaisseur de trait passe de 2 (défaut Tabler) à 1.8
+          pour rester cohérente avec les 3 autres icônes de cette barre. */}
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
-        <path d="M3.5 9.5h17M8 3v4M16 3v4" />
-        <circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none" />
+        <rect x="4" y="5" width="16" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M4 11h16" />
+        <rect x="8" y="15" width="2" height="2" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M7 2.5a1 1 0 012 0V4h6V2.5a1 1 0 012 0V4h1a3 3 0 013 3v1.5H3V7a3 3 0 013-3h1V2.5zM3 10.5h18V19a3 3 0 01-3 3H6a3 3 0 01-3-3v-8.5zm9 3a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4z" />
+        <rect x="4" y="5" width="16" height="16" rx="2.5" />
+        <rect x="6.8" y="2.2" width="2.4" height="4.6" rx="1.2" />
+        <rect x="14.8" y="2.2" width="2.4" height="4.6" rx="1.2" />
       </svg>
     </>
   ),
@@ -70,19 +80,24 @@ const ICONS = {
   ),
   '/classement': (
     <>
-      {/* ⚠️ CORRIGÉ (21/09, retour utilisateur : "c pas le même que tu m'avais
-          montré") — la 1re version (3 traits + une ligne de base) ne
-          correspondait pas au vrai chart-bar Tabler validé dans l'aperçu :
-          3 BARRES pleines (rectangles arrondis), sans trait de base qui les
-          relie. Remplacé par 3 rects, mêmes positions que la variante active
-          juste en dessous (pour rester cohérent entre l'état inactif/actif). */}
+      {/* ⚠️ CORRIGÉ UNE 2E FOIS (21/09, retour utilisateur : "les icones sont
+          pas les memes que tu m'as montrer [...] des contrefacon de temu") —
+          l'essai précédent (3 rects à la main) était une approximation, pas
+          le vrai tracé. Remplacé par la VRAIE géométrie du path Tabler
+          `chart-bar` récupéré depuis @tabler/icons (rects décodés depuis le
+          path source : x/y/largeur/hauteur/rayon exacts) + la ligne de base
+          que la vraie icône a réellement (contrairement à ce qui était
+          supposé au 1er correctif). */}
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3.5" y="11" width="4" height="9" rx="1.3" />
-        <rect x="10.5" y="3.7" width="4" height="16.3" rx="1.3" />
-        <rect x="17.3" y="12.2" width="4" height="7.8" rx="1.3" />
+        <rect x="3" y="12" width="6" height="8" rx="1.3" />
+        <rect x="9" y="8" width="6" height="12" rx="1.3" />
+        <rect x="15" y="4" width="6" height="16" rx="1.3" />
+        <path d="M4 20h14" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M3.5 11a1.3 1.3 0 011.3-1.3h1.4A1.3 1.3 0 017.5 11v9h-4v-9zm7.2-7.3a1.3 1.3 0 011.3-1.2h1.3a1.3 1.3 0 011.3 1.3V20h-4V3.7zm7.2 8.5a1.3 1.3 0 011.3-1.3h1.3a1.3 1.3 0 011.3 1.3V20h-4v-7.8z" />
+        <rect x="3" y="12" width="6" height="8" rx="1.3" />
+        <rect x="9" y="8" width="6" height="12" rx="1.3" />
+        <rect x="15" y="4" width="6" height="16" rx="1.3" />
       </svg>
     </>
   ),
