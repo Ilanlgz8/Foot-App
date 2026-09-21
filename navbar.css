@@ -231,7 +231,21 @@
    entièrement — un compromis assumé, pas 0 % : ça laisse un tout petit
    espace de sécurité résiduel plutôt que de coller la barre pile sur la zone
    de swipe de l'indicateur d'accueil, ce qui la rendrait plus difficile à
-   utiliser sur les iPhone à encoche/Dynamic Island. */
+   utiliser sur les iPhone à encoche/Dynamic Island.
+   ⚠️ ENCORE BAISSÉE (5e round, demande explicite "baisse encore un peu") :
+   facteur du safe-area 0.55 → 0.35, dans la continuité du round précédent —
+   toujours pas 0 (même raisonnement : garder un minimum de marge de sécurité
+   contre la zone de swipe de l'indicateur d'accueil).
+   ⚠️ `align-items: end` → `center` (5e round, demande explicite : "met les
+   icones au milieu [...] ça fait un vide sur le dessus des icones") — la
+   rangée de la grille se calait sur la hauteur du plus grand élément (l'orb
+   LIVE central, ~74px avec son cercle+libellé), et les onglets classiques
+   (~45px de haut) étaient collés à son bas (`end`) : tout l'espace en trop
+   se retrouvait donc au-dessus d'eux uniquement. `center` répartit cet excès
+   également au-dessus ET en dessous de chaque onglet — n'élimine pas
+   totalement le vide (la rangée reste dictée par l'orb, plus haut par
+   nature) mais le réduit de moitié et le rend symétrique plutôt que
+   concentré en haut, ce qui est le vrai problème visuel signalé. */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -240,8 +254,8 @@
   z-index: 40;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  align-items: end;
-  margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px) * 0.55);
+  align-items: center;
+  margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px) * 0.35);
   padding: 2px 6px 3px;
   border-radius: 26px;
   background: rgba(15, 15, 16, 0.82);
