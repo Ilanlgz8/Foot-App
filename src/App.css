@@ -17,6 +17,26 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* ⚠️ AJOUT (21/09, demande explicite : "en haut de l'app [...] derriere la
+     navbar [...] devrait voir les cards [...] pas un rectangle noir") — sert
+     désormais d'ancre `position: absolute` pour `.sfTabbar` (voir plus bas et
+     navbar.css) : la barre flottante doit survoler le contenu (pour qu'on
+     voie les cards à travers/autour d'elle, comme demandé), pas repousser le
+     contenu au-dessus d'elle (ce que faisait `flex: 0 0 auto`, laissant un
+     bandeau de fond de page vide et jugé "noir" dans l'espace de la marge).
+     Important : `position: absolute` ancré sur `.appShell` (qui ne scrolle
+     JAMAIS lui-même, `overflow: hidden`, hauteur 100dvh stable) N'EST PAS le
+     même mécanisme que le `position: fixed` abandonné le 14/09 après 13
+     tentatives ratées — celui-là s'ancrait directement au VIEWPORT du
+     navigateur, une ancre que WebKit désynchronise dans plusieurs scénarios
+     documentés (compositing, glissement au scroll, écart viewport visuel/
+     layout, cycle arrière-plan/premier-plan...). Ici, l'ancre est un élément
+     DOM normal, en flux, qui ne bouge et ne scroll jamais — un enfant
+     `position: absolute` d'un tel parent n'a aucune des raisons connues de se
+     désynchroniser : il suit mécaniquement les dimensions de `.appShell`
+     (elles-mêmes déjà fiables via `100dvh`, voir plus haut), pas une notion
+     de viewport séparée que WebKit pourrait perdre de vue. */
+  position: relative;
 }
 .appScroll {
   flex: 1 1 auto;
@@ -30,6 +50,22 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+}
+/* ⚠️ AJOUT (21/09, même changement que ci-dessus) : `.sfTabbar` n'est plus un
+   élément de flux qui réserve sa propre place (elle est maintenant
+   `position: absolute`, voir navbar.css) — `.appScroll` s'étend donc
+   désormais sur TOUTE la hauteur disponible sous le header, jusqu'au bas de
+   l'écran. Sans ce padding, les dernières cards d'une page se retrouveraient
+   cachées sous la barre flottante en fin de scroll. Valeur alignée sur la
+   hauteur réelle de la barre + sa marge (voir navbar.css, `.sfTabbar`) +
+   marge de sécurité, même principe que l'ancien `body { padding-bottom }`
+   (reliquat de l'ère `position: fixed`, supprimé le même jour — celui-là
+   visait `body`, qui n'est plus jamais le bon conteneur ; celui-ci vise
+   `.appScroll`, le SEUL qui compte désormais). */
+@media (max-width: 639px) {
+  .appScroll {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* ── Transition de page ── */

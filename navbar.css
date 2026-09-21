@@ -166,12 +166,36 @@
    sur les 4 côtés). Coins arrondis rétablis sur les 4 côtés (plus seulement
    en haut, puisque le bas n'est plus flush avec l'écran). Hauteur/padding
    restent resserrés (demande du round précédent, toujours valable). */
+/* ⚠️ REVENU EN "OVERLAY" — mais via `position: absolute`, PAS `position:
+   fixed` (21/09, dernière clarification utilisateur : "en haut de l'app [...]
+   derriere la navbar les cards des matchs [...] pas un rectangle noir") — la
+   barre en élément de flux (juste au-dessus) réservait sa propre place dans
+   `.appShell` : `.appScroll` s'arrêtait donc réellement avant elle, et
+   l'espace de sa marge ne montrait jamais que le fond de page nu, jamais le
+   contenu défilant — pas ce que l'utilisateur attendait ("je devrais voir
+   [...] les cards des matchs" DERRIÈRE la barre). Corrigé en ancrant
+   `.sfTabbar` en `position: absolute` sur `.appShell` (qui a désormais
+   `position: relative`, voir App.css) plutôt qu'en `position: fixed` sur le
+   viewport — voir le commentaire détaillé dans App.css pour la distinction :
+   `.appShell` ne scrolle jamais lui-même (`overflow: hidden`, hauteur fixe
+   `100dvh`), donc un enfant absolute ancré dessus n'a aucune des raisons
+   connues (documentées dans les 14 signalements précédents, tous liés à
+   `position: fixed` relatif au VIEWPORT du navigateur) de se désynchroniser.
+   `.appScroll` remplit maintenant toute la hauteur de `.appShell` (plus de
+   `flex: 0 0 auto` à réserver pour la barre) et défile SOUS la barre
+   flottante — les cards sont donc bien visibles derrière/autour d'elle,
+   comme demandé, grâce au fond semi-transparent + `backdrop-filter` déjà en
+   place. `z-index` ajouté (la barre doit rester au-dessus du contenu qui
+   défile maintenant sous elle, plus jamais garanti par l'ordre du flux). */
 .sfTabbar {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
-  flex: 0 0 auto;                     /* élément de flux dans .appShell, jamais fixed */
   margin: 0 14px calc(14px + env(safe-area-inset-bottom, 0px));
   padding: 5px 6px 8px;
   border-radius: 26px;

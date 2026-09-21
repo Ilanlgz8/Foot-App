@@ -142,11 +142,13 @@ function App() {
   // intervalle, réparation au retour d'arrière-plan en 1 puis 2 passes...)
   // pour maintenir `.sfTabbar` (`position: fixed`) ancrée au viewport malgré
   // divers comportements WebKit. Tout ce mécanisme est devenu OBSOLÈTE :
-  // `.sfTabbar` n'est plus `position: fixed` du tout (voir navbar.css) —
-  // c'est un simple élément de flux dans `.appShell`, structurellement
-  // incapable de se "décoller" puisqu'il n'y a plus rien à ancrer au
-  // viewport. Aucun de ces watchdogs ne peut plus s'appliquer, ils sont
-  // retirés en entier plutôt que laissés comme code mort.
+  // `.sfTabbar` n'est plus `position: fixed` sur le VIEWPORT (voir
+  // navbar.css) — elle est `position: absolute` ancrée sur `.appShell`, un
+  // conteneur DOM stable qui ne scrolle jamais lui-même, structurellement
+  // incapable de se "décoller" puisqu'il n'y a plus de notion de viewport
+  // séparée à désynchroniser. Aucun de ces watchdogs ne peut plus
+  // s'appliquer, ils sont retirés en entier plutôt que laissés comme code
+  // mort.
   //
   // Reste un seul filet de sécurité, plus simple et sans risque WebKit,
   // pour un problème DIFFÉRENT : `lockBodyScroll()` (scrollLock.js) bloque
@@ -184,15 +186,21 @@ function App() {
   // refait après fermeture complète de l'app — pas un souci de cache). Plutôt
   // qu'une 15e théorie CSS sur `.sfTabbar` elle-même, changement structurel :
   // `.appShell` (voir App.css) est une colonne flex de hauteur EXACTEMENT
-  // égale au viewport (`100dvh`) — header (`Navbar`) et barre du bas
-  // (`BottomTabBar`) sont 2 éléments de flux `flex: 0 0 auto` aux 2
-  // extrémités de cette colonne, JAMAIS `position: fixed`. Entre les deux,
+  // égale au viewport (`100dvh`) — header (`Navbar`) est un élément de flux
+  // `flex: 0 0 auto` en haut de cette colonne, JAMAIS `position: fixed`.
   // `.appScroll` (`flex: 1 1 auto; overflow-y: auto`) est le SEUL conteneur
   // qui défile — tout le reste de l'app (bannières, routes, footer) vit
-  // dedans. La barre du bas ne peut structurellement plus "se décoller" :
-  // elle n'est plus positionnée par-dessus quoi que ce soit qu'un navigateur
-  // pourrait désynchroniser, sa position découle uniquement du layout flex,
-  // recalculé nativement comme n'importe quel autre élément de page.
+  // dedans, et remplit désormais TOUTE la hauteur restante sous le header.
+  // ⚠️ MàJ (21/09, demande explicite : "je devrais voir derriere la navbar
+  // les cards des matchs [...] pas un rectangle noir") — `BottomTabBar` n'est
+  // plus un 3e élément de flux qui réserve sa propre place : elle est
+  // `position: absolute` (voir navbar.css, `.sfTabbar`), ANCRÉE SUR
+  // `.appShell` (qui a `position: relative`) et non sur le viewport — donc
+  // toujours immunisée contre les 14 bugs `position: fixed` documentés dans
+  // CLAUDE.md (compositing, glissement au scroll, écart viewport visuel/
+  // layout, ancêtre transformé...), tout en flottant PAR-DESSUS `.appScroll`
+  // (via son fond semi-transparent + `backdrop-filter`) pour que le contenu
+  // qui défile reste visible derrière/autour d'elle, comme demandé.
   return (
     // 2 niveaux d'ErrorBoundary (voir ErrorBoundary.jsx pour le contexte
     // complet) : l'extérieur protège tout le shell (Navbar/Footer compris —
@@ -241,8 +249,10 @@ function App() {
             <Footer />
           </div>
 
-          {/* Barre du bas — hors de la zone qui défile elle aussi, mais tout
-              en bas de la colonne flex (mobile uniquement, voir navbar.css). */}
+          {/* Barre du bas — `position: absolute` ancrée sur `.appShell`
+              (voir navbar.css/App.css), flotte par-dessus `.appScroll` plutôt
+              que de réserver sa propre place dans le flux (mobile uniquement,
+              voir navbar.css). */}
           <BottomTabBar />
         </div>
       </LiveProvider>
