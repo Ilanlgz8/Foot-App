@@ -1840,23 +1840,16 @@
    que ce soit pas flou comme actuellement") — abandon du "mode peinture" (7
    taches radiales, large fondu vers transparent, aspect flou/laiteux). Un
    1er essai (rouge→or→vert→bleu en 4 bandes égales dans l'ordre du spectre)
-   a été rejeté le jour même : "ça fait trop drapeau LGBT" — 4 couleurs à
-   largeur quasi égale, en bandes parallèles nettes, lisent effectivement
-   comme un drapeau à rayures plutôt qu'un dégradé de marque. Corrigé en
-   changeant la STRUCTURE, pas juste les couleurs : dégradé linéaire à 2
-   couleurs DOMINANTES seulement (bleu/rouge, la paire déjà utilisée pour la
-   carte "Match du jour", `TINT_THEME_CAMP_COLORS.nl`) sur toute la carte —
-   plus aucune bande de largeur comparable — et l'or/le vert ramenés à de
-   petites touches d'accent en coin (repères ronds, pas des bandes), même
-   mécanisme déjà utilisé pour le "reflet" de Ligue 1/Bundesliga/Serie A.
-   Toujours net (pas de flou), toujours plusieurs couleurs de l'identité LDN
-   présentes, mais plus aucune lecture "drapeau à rayures". */
+   a été rejeté : "ça fait trop drapeau LGBT". Un 2e essai (bleu/rouge
+   dominant + 2 petites touches rondes or/vert en coin) a lui aussi été
+   retiré juste après : "enlève les cercle jaune et vert stp" — même en
+   petit, des ronds de couleur isolés restent perçus comme des pastilles
+   plutôt qu'un dégradé. Version finale, la plus simple : dégradé linéaire à
+   2 couleurs SEULEMENT (bleu/rouge, la paire déjà utilisée pour la carte
+   "Match du jour", `TINT_THEME_CAMP_COLORS.nl`), aucun autre calque. */
 .poster--theme-nl .poster__bg--gradient {
   inset: 0;
-  background:
-    radial-gradient(30% 30% at 88% 12%, #fcc000 0%, #fcc000 30%, transparent 65%),
-    radial-gradient(28% 28% at 10% 90%, #009c48 0%, #009c48 30%, transparent 65%),
-    linear-gradient(135deg, #0c3c90 0%, #0c3c90 45%, #d8000c 100%);
+  background: linear-gradient(135deg, #0c3c90 0%, #0c3c90 45%, #d8000c 100%);
   animation: none;
 }
 .poster--theme-nl .poster__bg--gradientAlt {
