@@ -372,6 +372,48 @@ function isMatchFinished(json) {
   return completed === true || statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL'
 }
 
+// ⚠️ AJOUT (21/09, demande explicite utilisateur — commandes Upstash
+// toujours trop élevées même après le batching mget + cache Edge du mode
+// scoreboard) : même principe étendu au mode "summary" — un match TERMINÉ
+// avec compo publiée est une donnée IMMUABLE, déjà en cache Redis PERMANENT
+// (voir isMatchFinished/hasLineups ci-dessous), mais la RÉPONSE HTTP restait
+// marquée `no-store` dans tous les cas — donc CHAQUE consultation (n'importe
+// qui parcourant "Résultats" et cliquant sur un vieux match pour voir ses
+// stats/compo) réinvoquait quand même la fonction + au moins 1 commande
+// Redis, pour une donnée qui ne change plus jamais. `_cacheHint` (embarqué
+// UNIQUEMENT dans la valeur stockée en Redis via JSON.stringify, JAMAIS
+// renvoyé tel quel au client — voir strip plus bas) mémorise à quel "cycle
+// de vie" appartient l'entrée au moment de l'écriture, pour choisir le bon
+// Cache-Control SANS commande Redis supplémentaire (pas de kv.ttl() par
+// requête, qui aurait juste déplacé le problème) :
+//   - 'permanent' (terminé + compo) : cache Edge long (24h) — la donnée ne
+//     changera plus jamais, autant la servir directement depuis le réseau
+//     Vercel pour toute consultation future de ce match précis.
+//   - 'pending'   (terminé, compo pas encore publiée par ESPN, TTL Redis
+//     24h) : cache Edge modéré (5min) — laisse une vraie chance à une
+//     consultation ultérieure de retomber sur une compo entre-temps publiée,
+//     sans resservir un cache HTTP vieux de plusieurs heures.
+//   - 'live' (ou absent — entrée "legacy" écrite avant ce déploiement, sans
+//     le hint) : cache Edge TRÈS court (10s), aligné sur LIVE_SUMMARY_
+//     CACHE_TTL déjà en place — ne rend RIEN de plus périmé que ce que Redis
+//     autorisait déjà (le TTL Redis reste le vrai garde-fou de fraîcheur),
+//     seulement PARTAGÉ entre tous les spectateurs simultanés du même match
+//     au lieu d'un aller-retour Redis par spectateur — le scénario qui
+//     compte le plus (plusieurs personnes regardant le même match populaire
+//     en même temps).
+// Honnêteté : les entrées PERMANENTES déjà en Redis avant ce déploiement
+// (des centaines de matchs déjà terminés) n'ont pas ce hint — elles restent
+// sur le seuil "live" (10s) par défaut, un vrai mieux par rapport à avant
+// (no-store) mais pas le gain maximal, tant qu'elles ne sont pas réécrites
+// naturellement (ce qui n'arrive plus jamais pour une entrée permanente déjà
+// correcte) — seuls les matchs qui se termineront APRÈS ce déploiement
+// profitent du cache 24h dès le départ.
+function summaryCacheControlFor(hint) {
+  if (hint === 'permanent') return 'public, s-maxage=86400, stale-while-revalidate=604800'
+  if (hint === 'pending')   return 'public, s-maxage=300, stale-while-revalidate=900'
+  return 'public, s-maxage=10, stale-while-revalidate=30'
+}
+
 // Un résultat compacté "utile" contient au moins des stats ou une compo —
 // évite de mettre en cache une réponse vide/quasi-vide qui bloquerait un
 // refetch utile plus tard (le cache serait alors permanent pour RIEN).
@@ -602,10 +644,13 @@ export default async function handler(req, res) {
             if (!isLegacyPermanentEmpty) {
               clearTimeout(timeoutId)
               await mapWrite
+              // Strip _cacheHint avant l'envoi client (voir summaryCacheControlFor
+              // plus haut — champ interne, jamais destiné au client).
+              const { _cacheHint, ...clientObj } = cachedObj
               return res.status(200)
                 .setHeader('Content-Type', 'application/json')
-                .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-                .json(cachedObj)
+                .setHeader('Cache-Control', summaryCacheControlFor(_cacheHint))
+                .json(clientObj)
             }
             // Sinon : entrée legacy figée sans compo → traitée comme une
             // absence de cache, on retombe sur le fetch frais ci-dessous, qui
@@ -627,6 +672,7 @@ export default async function handler(req, res) {
 
       const rawBody = await response.text()
       let compact = { scorers: [], cards: [], stats: null, lineups: null }
+      let cacheHint = 'live' // défaut : pas de donnée utile mise en cache → traité comme "live" (cache Edge court)
       try {
         const parsed = JSON.parse(rawBody)
         compact = compactEspnSummary(parsed)
@@ -637,22 +683,26 @@ export default async function handler(req, res) {
           // ci-dessus pour le cas "pas encore" et pourquoi ce n'était PAS déjà
           // le cas avant).
           if (isMatchFinished(parsed) && hasLineups) {
-            await kv.set(cacheKey, JSON.stringify(compact))
+            cacheHint = 'permanent'
+            await kv.set(cacheKey, JSON.stringify({ ...compact, _cacheHint: cacheHint }))
           } else if (isMatchFinished(parsed)) {
-            await kv.set(cacheKey, JSON.stringify(compact), { ex: LINEUPS_PENDING_TTL })
+            cacheHint = 'pending'
+            await kv.set(cacheKey, JSON.stringify({ ...compact, _cacheHint: cacheHint }), { ex: LINEUPS_PENDING_TTL })
           } else {
             // Match en cours : TTL court (LIVE_SUMMARY_CACHE_TTL), les stats évoluent.
-            await kv.set(cacheKey, JSON.stringify(compact), { ex: LIVE_SUMMARY_CACHE_TTL })
+            cacheHint = 'live'
+            await kv.set(cacheKey, JSON.stringify({ ...compact, _cacheHint: cacheHint }), { ex: LIVE_SUMMARY_CACHE_TTL })
           }
         }
       } catch { /* JSON invalide ESPN ou KV en erreur → on renvoie quand même le résultat compacté (vide si le parse a échoué), pas bloquant */ }
       await mapWrite
 
+      // Voir summaryCacheControlFor plus haut — cache Edge choisi selon le
+      // cycle de vie réel de la donnée (permanent/pending/live), jamais
+      // moins frais que ce que le TTL Redis autorisait déjà.
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-        .setHeader('Pragma', 'no-cache')
-        .setHeader('Surrogate-Control', 'no-store')
+        .setHeader('Cache-Control', summaryCacheControlFor(cacheHint))
         .json(compact)
     }
 
