@@ -170,7 +170,11 @@ export function usePushNotifications() {
       if (!storeRes.ok) {
         // Subscription créée côté navigateur mais pas stockée → annuler
         await sub.unsubscribe()
-        throw new Error(`subscribe: ${storeRes.status}`)
+        // ⚠️ `detail` lu depuis la réponse (21/09, diagnostic) — voir le
+        // commentaire correspondant dans api/subscribe.js.
+        let detail = ''
+        try { detail = (await storeRes.json())?.detail || '' } catch { /* body non-JSON */ }
+        throw new Error(`subscribe: ${storeRes.status}${detail ? ` — ${detail}` : ''}`)
       }
 
       localStorage.setItem(LS_KEY, '1')

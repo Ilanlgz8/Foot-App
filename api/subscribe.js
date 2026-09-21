@@ -153,7 +153,15 @@ export default async function handler(req, res) {
     await kv.hset(SUBS_KEY, { [body.endpoint]: cleanStr })
   } catch (kvErr) {
     console.error('[subscribe] KV store error:', kvErr.message)
-    return res.status(503).json({ error: 'Stockage temporairement indisponible' })
+    // ⚠️ `detail` AJOUTÉ TEMPORAIREMENT (21/09, diagnostic "erreur subscribe
+    // 503" signalée par l'utilisateur) — la seule façon d'obtenir le vrai
+    // message Upstash depuis cet environnement (pas d'accès aux logs Vercel
+    // ni au dashboard Upstash ici, CRON_SECRET absent pour /debug-push). Le
+    // message d'erreur Upstash lui-même ne contient normalement aucune
+    // donnée sensible (juste une raison technique : auth, quota, timeout) —
+    // exposition ponctuelle acceptée pour ce diagnostic, à retirer une fois
+    // la cause confirmée.
+    return res.status(503).json({ error: 'Stockage temporairement indisponible', detail: kvErr.message })
   }
 
   return res.status(201).json({ ok: true })
