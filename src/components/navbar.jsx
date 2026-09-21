@@ -25,48 +25,59 @@ const NAV = [
 
 /* Icônes tab bar — variante outline (inactif) + variante pleine (actif).
    Les deux sont rendues, le CSS affiche la bonne selon l'état. */
+/* ⚠️ ICÔNES REVUES (21/09, demande explicite : "propose moi de meilleur
+   icones [...] plus pro") — l'utilisateur a comparé plusieurs styles via un
+   aperçu visuel (Tabler icons : home / calendar-event / clipboard-check pour
+   Accueil/Programme/Résultats, chart-bar pour Classement) et a choisi ces 4
+   formes précises. Pas de dépendance à une webfont externe ajoutée (pas
+   cohérent avec le reste de l'app, 100 % offline-first PWA, voir CLAUDE.md) :
+   redessinées à la main en SVG, même gabarit que les icônes existantes
+   (viewBox 24x24, stroke 1.8 arrondi pour la variante ligne, fill plein pour
+   la variante active) pour rester visuellement cohérentes avec le reste du
+   fichier plutôt que d'importer les tracés Tabler tels quels. */
 const ICONS = {
   '/': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M3 10.5L12 3l9 7.5" />
-        <path d="M5 9.5V20a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V9.5" />
+        <path d="M4 11.5L12 4l8 7.5" />
+        <path d="M6 10.5V19a1.5 1.5 0 001.5 1.5H10v-5h4v5h2.5A1.5 1.5 0 0018 19v-8.5" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 2.5l9.5 7.9a1 1 0 01-.64 1.77H20V20a2 2 0 01-2 2h-3.5v-6.5h-5V22H6a2 2 0 01-2-2v-7.83H3.14a1 1 0 01-.64-1.77L12 2.5z" />
+        <path d="M12 2.8l9 7.9a1 1 0 01-.66 1.75H19V19a2 2 0 01-2 2h-2.5v-6h-5v6H7a2 2 0 01-2-2v-6.55H3.66A1 1 0 013 10.7l9-7.9z" />
       </svg>
     </>
   ),
   '/matchs': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="4.5" width="18" height="17" rx="3" />
-        <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+        <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+        <circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M7 2.5a1 1 0 012 0V4h6V2.5a1 1 0 012 0V4h1a3 3 0 013 3v1.5H3V7a3 3 0 013-3h1V2.5zM3 10.5h18V19a3 3 0 01-3 3H6a3 3 0 01-3-3v-8.5zm5 3.5a1.2 1.2 0 100 2.4A1.2 1.2 0 008 14zm4 0a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4zm4 0a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z" />
+        <path d="M7 2.5a1 1 0 012 0V4h6V2.5a1 1 0 012 0V4h1a3 3 0 013 3v1.5H3V7a3 3 0 013-3h1V2.5zM3 10.5h18V19a3 3 0 01-3 3H6a3 3 0 01-3-3v-8.5zm9 3a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4z" />
       </svg>
     </>
   ),
   '/resultats': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M8.5 12.2l2.4 2.4 4.8-5" />
+        <rect x="5" y="4.5" width="14" height="17" rx="2.5" />
+        <rect x="9" y="2.5" width="6" height="3.5" rx="1.2" />
+        <path d="M8.5 13.2l2.4 2.4 4.4-4.9" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.5 7.3l-5.2 5.5a1 1 0 01-1.44.02L7.5 12.4a1 1 0 111.42-1.4l1.63 1.65 4.5-4.76a1 1 0 111.45 1.38z" />
+        <path d="M9 2a1 1 0 00-1 1v.5H6.5A2.5 2.5 0 004 6v13a2.5 2.5 0 002.5 2.5h11A2.5 2.5 0 0020 19V6a2.5 2.5 0 00-2.5-2.5H16V3a1 1 0 00-1-1H9zm-.7 10.4a1 1 0 011.4.08l1.75 1.95 3.65-4.05a1 1 0 111.48 1.34l-4.4 4.9a1 1 0 01-1.47.02l-2.5-2.77a1 1 0 01.09-1.47z" />
       </svg>
     </>
   ),
   '/classement': (
     <>
       <svg className="sfTab__icLine" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 01-10 0V4z" />
-        <path d="M7 6H4.5a1 1 0 00-1 1c0 2.2 1.6 4 3.7 4.4M17 6h2.5a1 1 0 011 1c0 2.2-1.6 4-3.7 4.4" />
+        <path d="M4.5 20V11M12 20V4.5M19.5 20v-7.5M3.5 20h17" />
       </svg>
       <svg className="sfTab__icFill" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M7 3h10a1 1 0 011 1v1h2a1 1 0 011 1c0 2.9-2 5.4-4.8 6.1A6 6 0 0114.5 15v2.5H17a1 1 0 011 1V21H6v-2.5a1 1 0 011-1h2.5V15a6 6 0 01-2.7-2.9C4 11.4 2 8.9 2 6a1 1 0 011-1h3V4a1 1 0 011-1zm-1 4H4.1c.3 1.5 1.3 2.7 2.6 3.3A6 6 0 016 8V7zm14 0h-2v1c0 .8-.2 1.6-.6 2.3 1.4-.6 2.3-1.8 2.6-3.3z" />
+        <path d="M3.5 11a1.3 1.3 0 011.3-1.3h1.4A1.3 1.3 0 017.5 11v9h-4v-9zm7.2-7.3a1.3 1.3 0 011.3-1.2h1.3a1.3 1.3 0 011.3 1.3V20h-4V3.7zm7.2 8.5a1.3 1.3 0 011.3-1.3h1.3a1.3 1.3 0 011.3 1.3V20h-4v-7.8z" />
       </svg>
     </>
   ),
