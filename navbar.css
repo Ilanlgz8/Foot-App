@@ -188,11 +188,27 @@
    place. `z-index` ajouté (la barre doit rester au-dessus du contenu qui
    défile maintenant sous elle, plus jamais garanti par l'ordre du flux). */
 /* ⚠️ MARGE BASSE RÉDUITE (21/09, demande explicite mobile : "la navbar est
-   trop haute [...] baisse un peu qu'elle soit plus bas") — 14px → 6px,
-   rapproche la barre du bord bas de l'écran (toujours pas flush à 0, garde
-   un léger espace "flottant" comme demandé initialement le même jour).
+   trop haute [...] baisse-la, genre de 25px") — la barre est ancrée en
+   `bottom: 0` d'un conteneur (`.appShell`) calé EXACTEMENT sur la hauteur de
+   l'écran (`100dvh`, `overflow: hidden` — voir App.css) : la marge basse ne
+   peut donc pas descendre sous ~0px sans que la barre touche le vrai bord de
+   l'écran. 14px → 2px : le minimum qui garde encore un tout petit espace
+   "flottant" (pas totalement flush) plutôt que 0px pile — maximum atteignable
+   SANS réduire la hauteur de la barre elle-même (confirmé avec l'utilisateur).
    `env(safe-area-inset-bottom)` INCHANGÉ : reste indispensable sur iPhone
-   avec indicateur d'accueil (sinon la barre passerait sous ce dernier). */
+   avec indicateur d'accueil (sinon la barre passerait sous ce dernier).
+   ⚠️ OMBRE RESSERRÉE EN MÊME TEMPS — bug trouvé au 1er essai (14px→6px) :
+   l'ancienne ombre (décalage 12px + flou 32px, soit ~44px de portée réelle)
+   avait besoin d'une bonne marge pour s'estomper en douceur avant le bord de
+   l'écran. Avec une marge de seulement 6px (a fortiori 2px maintenant), cette
+   portée dépassait largement l'espace disponible : l'ombre se faisait couper
+   NET par le bord de l'écran au lieu de se fondre — vu et décrit par
+   l'utilisateur comme "un bloc noir" et "moins transparent" en bas de
+   l'écran, alors qu'aucun nouvel élément n'avait été ajouté, seule la marge
+   avait changé. Décalage/flou réduits à une portée d'environ 14px (largement
+   sous n'importe quelle marge raisonnable ici) : l'ombre reste visible et
+   donne toujours l'effet "flotte au-dessus de la page", mais a toujours la
+   place de s'estomper avant le bord réel, quelle que soit la marge choisie. */
 .sfTabbar {
   position: absolute;
   left: 0;
@@ -202,7 +218,7 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
-  margin: 0 14px calc(6px + env(safe-area-inset-bottom, 0px));
+  margin: 0 14px calc(2px + env(safe-area-inset-bottom, 0px));
   padding: 5px 6px 8px;
   border-radius: 26px;
   background: rgba(15, 15, 16, 0.88);
@@ -210,8 +226,8 @@
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.5),
-    0 2px 10px rgba(0, 0, 0, 0.35);
+    0 4px 10px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.3);
 }
 .sfTabbar > * { pointer-events: auto; }
 
