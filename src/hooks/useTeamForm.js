@@ -1,6 +1,6 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
-import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { outcomeForTeam, resolveFdTeamId } from '../utils/matchUtils'
 import { fetchClubMatchesRaw } from './useMatchs'
 import { MIN_LEAGUE_GAMES } from '../utils/calcProno'
@@ -347,7 +347,21 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
       return result
     },
     enabled:              !!selectedComp && enabled,
-    initialData:          readCache(cacheKey) ?? undefined,
+    // ⚠️ BUG CORRIGÉ (21/09, constat utilisateur : colonne "Forme" vide pour
+    // certaines compétitions dans Classement — Ligue 1 à zéro entièrement,
+    // alors que le classement lui-même s'affichait bien) : `readCache` (strict,
+    // renvoie null passé le TTL de 2min, voir localCache.js) faisait que
+    // `initialData` valait `undefined` dès qu'on revisitait la page après
+    // 2min — si le tout premier fetch de ce montage tombait ensuite sur un
+    // 429 FD.org (budget partagé, voir historique CLAUDE.md), `data` restait
+    // `undefined` jusqu'au prochain retry réussi, formMap valait `{}` pour
+    // TOUTE la table (vérifié en direct : le localStorage contenait pourtant
+    // un formMap complet et correct, juste "trop vieux" pour `readCache`).
+    // `readCacheStale` (ignore le TTL) laisse afficher IMMÉDIATEMENT ce
+    // dernier résultat connu — `initialDataUpdatedAt` (déjà en place)
+    // continue de le marquer périmé et de déclencher un refetch en arrière-
+    // plan normalement, la donnée affichée se met à jour dès qu'il réussit.
+    initialData:          readCacheStale(cacheKey) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(cacheKey),
     staleTime:            FORM_STALE,
     retry:                2,
@@ -437,7 +451,10 @@ export function useTeamFormMulti(compCodes) {
           writeCache(cacheKey, result, FORM_STALE)
           return result
         },
-        initialData:          readCache(cacheKey) ?? undefined,
+        // Voir le commentaire détaillé dans useTeamForm ci-dessus (même fix,
+        // même symptôme possible sur l'Accueil : readCache strict → formMap
+        // vide dès qu'un 429 FD.org tombe pile sur le tout premier fetch).
+        initialData:          readCacheStale(cacheKey) ?? undefined,
         initialDataUpdatedAt: getCacheSavedAt(cacheKey),
         staleTime:            FORM_STALE,
         retry:                2,
