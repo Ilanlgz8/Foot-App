@@ -152,16 +152,15 @@ export default async function handler(req, res) {
   try {
     await kv.hset(SUBS_KEY, { [body.endpoint]: cleanStr })
   } catch (kvErr) {
+    // ⚠️ CAUSE CONFIRMÉE (21/09, diagnostic "erreur subscribe 503") : quota
+    // Upstash gratuit épuisé (500 000/500 000 commandes du mois) — message
+    // exact obtenu via un `detail` exposé temporairement dans la réponse,
+    // retiré maintenant que la cause est connue (pas de raison de continuer
+    // à exposer le message d'erreur brut d'Upstash en prod). Se résout tout
+    // seul au reset mensuel du quota, ou en passant sur le plan payant
+    // Upstash (facturation au-delà de 500K, pas de coupure).
     console.error('[subscribe] KV store error:', kvErr.message)
-    // ⚠️ `detail` AJOUTÉ TEMPORAIREMENT (21/09, diagnostic "erreur subscribe
-    // 503" signalée par l'utilisateur) — la seule façon d'obtenir le vrai
-    // message Upstash depuis cet environnement (pas d'accès aux logs Vercel
-    // ni au dashboard Upstash ici, CRON_SECRET absent pour /debug-push). Le
-    // message d'erreur Upstash lui-même ne contient normalement aucune
-    // donnée sensible (juste une raison technique : auth, quota, timeout) —
-    // exposition ponctuelle acceptée pour ce diagnostic, à retirer une fois
-    // la cause confirmée.
-    return res.status(503).json({ error: 'Stockage temporairement indisponible', detail: kvErr.message })
+    return res.status(503).json({ error: 'Stockage temporairement indisponible' })
   }
 
   return res.status(201).json({ ok: true })
