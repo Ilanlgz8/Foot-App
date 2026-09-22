@@ -1573,6 +1573,33 @@ export function useLiveMinute(matches) {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - lastRunAt < 1_000) return
       lastRunAt = Date.now()
+
+      // ⚠️ BUG CORRIGÉ (22/09, constat utilisateur : un match live affiché
+      // "Terminé" à tort en revenant d'arrière-plan alors qu'il reste du
+      // temps de jeu — correct après un redémarrage complet de l'app) —
+      // root cause : `lastSeenInEspn` (Safeguard 4 de _runFtSafeguards,
+      // "match disparu du scoreboard ESPN depuis > 5min") est une Map EN
+      // MÉMOIRE, jamais mise à jour pendant que l'app est en arrière-plan
+      // (aucun poll ne tourne). Revenir d'arrière-plan après ne serait-ce que
+      // 5min+ de mise en veille (verrouillage d'écran ordinaire, rien
+      // d'exceptionnel) fait mécaniquement dépasser le seuil de 5min de CE
+      // garde-fou — non pas parce que le match a réellement disparu d'ESPN,
+      // mais simplement parce que NOUS n'avons rien sondé pendant ce temps.
+      // Combiné à `ageMin >= 90` (courant dès la 2e mi-temps), ce garde-fou
+      // pouvait confirmer un FAUX FT dès la toute 1ère passe de sécurité
+      // suivant la reprise, potentiellement avant même que le poll ESPN
+      // déclenché juste en dessous n'ait eu le temps de rafraîchir cette
+      // valeur. Fix : on retrempe `lastSeenInEspn` à l'instant présent pour
+      // tous les matchs actuellement suivis comme live, AVANT de déclencher
+      // quoi que ce soit d'autre — le compteur de 5min repart d'ici, jamais
+      // du temps passé en arrière-plan. Un match VRAIMENT disparu d'ESPN sera
+      // toujours détecté normalement 5min plus tard si le poll qui suit ne le
+      // revoit jamais — cette remise à zéro ne fait que retirer le temps mort
+      // de mise en veille du calcul, elle ne bloque aucune détection réelle.
+      for (const lm of getLiveMatches()) {
+        lastSeenInEspn[lm.id] = Date.now()
+      }
+
       // Marquer les données ESPN comme périmées : empêche l'interpolation stale
       window.__espnNeedsRefresh = Date.now()
       // Stats live (possession/tirs/corners) — même fix que le score : ne pas
@@ -1653,6 +1680,16 @@ export function useLiveMinute(matches) {
       const gap = now - lastAlive
       lastAlive = now
       if (gap > GAP_THRESHOLD_MS) {
+        // ⚠️ Même correctif que `onVisible` plus haut (22/09, "match live
+        // affiché Terminé à tort au retour d'arrière-plan") — ce filet capte
+        // justement les reprises où `visibilitychange` ne s'est pas déclenché
+        // (voir commentaire au-dessus), donc `onVisible` n'a PAS pu faire ce
+        // reset lui-même : sans lui ici aussi, Safeguard 4 (lastSeenInEspn,
+        // useLiveMinute.js) resterait exposé au même faux FT exactement dans
+        // le cas que ce filet est censé couvrir.
+        for (const lm of getLiveMatches()) {
+          lastSeenInEspn[lm.id] = now
+        }
         window.__espnNeedsRefresh = now
         // Même contournement du cache Redis stats que dans onVisible ci-dessus
         // (ce filet se déclenche justement quand visibilitychange n'a pas fired).
