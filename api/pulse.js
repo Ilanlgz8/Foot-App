@@ -122,7 +122,19 @@ export default async function handler(req, res) {
           }
           predictions[matchId] = parsed
         }
-        return res.status(200).json({ ok: true, players, predictions })
+        // ⚠️ AJOUT (24/09, audit CPU/Redis suite au dépassement de quota
+        // Fluid Active CPU Vercel) : jusqu'ici zéro cache sur ces lectures —
+        // chaque consultation du classement d'un groupe (potentiellement
+        // pollée en boucle par Pronos.jsx pendant qu'un match se joue)
+        // retapait Redis à chaque fois (1 hgetall + 1 smembers + 1 hgetall
+        // PAR match du groupe). Cache PARTAGÉ court (8s) : assez court pour
+        // qu'un nouveau prono apparaisse quasi immédiatement pour les autres
+        // joueurs du groupe, assez long pour qu'un visiteur qui rafraîchit
+        // plusieurs fois de suite (ou plusieurs joueurs du même groupe au
+        // même moment) ne déclenche qu'1 seul vrai calcul au lieu de N.
+        return res.status(200)
+          .setHeader('Cache-Control', 'public, s-maxage=8, stale-while-revalidate=30')
+          .json({ ok: true, players, predictions })
       } catch (e) {
         console.error('[pulse] group read error:', e.message)
         return res.status(503).json({ error: 'Lecture temporairement indisponible' })
@@ -134,7 +146,14 @@ export default async function handler(req, res) {
     try {
       if (resource === 'curve') {
         const samples = await readCurve(matchId)
-        return res.status(200).json({ ok: true, samples })
+        // Même raisonnement que 'group' juste au-dessus : la courbe ne
+        // change qu'une fois par minute de match au mieux (voir le
+        // commentaire sur le rate limit POST plus bas, "~1x/minute de match
+        // suivi") — un cache de 8s ne peut donc jamais la faire paraître en
+        // retard, et absorbe les visiteurs simultanés du même match.
+        return res.status(200)
+          .setHeader('Cache-Control', 'public, s-maxage=8, stale-while-revalidate=30')
+          .json({ ok: true, samples })
       }
       return res.status(400).json({ error: 'resource invalide' })
     } catch (e) {
