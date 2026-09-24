@@ -796,11 +796,29 @@ export default async function handler(req, res) {
     if (!response.ok) return res.status(response.status).json({ error: `ESPN a répondu ${response.status}` })
 
     const body = await response.text()
+    // ⚠️ AJOUT (24/09, quota Fluid Active CPU Vercel dépassé — confirmé via
+    // dashboard Observability : /api/espn = 14K invocations / 2min de CPU en
+    // 12h, très largement devant les autres routes) — ce mode "date simple"
+    // était jusqu'ici `no-store` inconditionnel : chaque appelant (surtout
+    // useMatchDetail.js/useEspnMatchDetail.js, déclenché à CHAQUE ouverture
+    // d'un détail de match par N'IMPORTE QUEL visiteur) retapait ESPN pour de
+    // vrai, sans aucune mutualisation entre visiteurs — profil qui colle bien
+    // mieux au volume observé (rythme constant toute la journée, coût CPU par
+    // appel très bas) que le mode plage juste au-dessus (déjà mis en cache
+    // 90s le 21/09). Vérifié avant ce changement — AUCUN lien avec le direct :
+    // le vrai suivi live (score qui bouge minute par minute) passe par
+    // /api/fifa-live, qui interroge ESPN directement, jamais via cette route
+    // (grep confirmé sur useLiveMinute.js/fifa-live.js). Cette route ne sert
+    // qu'à LOCALISER un match une fois (eventId + snapshot initial) au
+    // moment où un visiteur ouvre son détail — jamais à suivre son évolution.
+    // 15s de cache PARTAGÉ (tous visiteurs confondus, pas par visiteur) :
+    // assez court pour rester imperceptible même sur un match qui vient de
+    // commencer, largement suffisant pour absorber plusieurs visiteurs qui
+    // ouvrent le même match dans la même fenêtre au lieu de retaper ESPN
+    // chacun de leur côté.
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, s-maxage=0, proxy-revalidate')
-       .setHeader('Pragma', 'no-cache')
-       .setHeader('Surrogate-Control', 'no-store')
+       .setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=120')
        .send(body)
   } catch (err) {
     clearTimeout(timeoutId)
