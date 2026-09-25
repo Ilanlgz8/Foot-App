@@ -811,14 +811,31 @@ export default async function handler(req, res) {
     // (grep confirmé sur useLiveMinute.js/fifa-live.js). Cette route ne sert
     // qu'à LOCALISER un match une fois (eventId + snapshot initial) au
     // moment où un visiteur ouvre son détail — jamais à suivre son évolution.
-    // 15s de cache PARTAGÉ (tous visiteurs confondus, pas par visiteur) :
-    // assez court pour rester imperceptible même sur un match qui vient de
-    // commencer, largement suffisant pour absorber plusieurs visiteurs qui
-    // ouvrent le même match dans la même fenêtre au lieu de retaper ESPN
-    // chacun de leur côté.
+    //
+    // ⚠️ CORRIGÉ (25/09, toujours 13K invocations / 3min CPU sur 12h même
+    // APRÈS ce cache 15s — soirée Ligue des Nations, plusieurs matchs
+    // simultanés) : le vrai trou trouvé en auditant les appelants
+    // (useMatchDetail.js) — `EMPTY_RETRY_INTERVAL_MS = 30_000` (useLineups/
+    // useEspnMatchStats/résolution d'event, 4 points d'appel, retryWhileEmpty)
+    // et `refetchInterval: 60_000` (useEspnSummaryStats, MatchModal.jsx:479)
+    // repollent CETTE MÊME requête (même slug+date) tant que la compo/stat
+    // n'est pas encore publiée par ESPN — situation plus fréquente/longue un
+    // soir de sélections nationales (compos publiées souvent plus tard/moins
+    // fiablement que pour un match de club). Avec 15s < 30s < 60s, le cache
+    // Edge expirait TOUJOURS avant le repoll suivant — même le retry d'UN
+    // SEUL visiteur sur UN SEUL match ne pouvait jamais taper le cache, qui
+    // ne servait donc qu'aux rafales de plusieurs visiteurs sur le même match
+    // dans la même seconde. 40s (> 60s/60=1 poll manqué max, largement au-
+    // dessus du plus court cycle 30s) : un visiteur qui repoll toutes les 30s
+    // tape désormais le cache un repoll sur deux au minimum, et tous les
+    // visiteurs qui suivent le même match pendant sa fenêtre de résolution la
+    // partagent. Toujours sans lien avec le direct (raisonnement inchangé
+    // ci-dessus) — seule la fraîcheur de "ce match est-il déjà localisable"
+    // passe de 15s à 40s de tolérance max, imperceptible pour un snapshot de
+    // pré-match/résolution d'event.
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=120')
+       .setHeader('Cache-Control', 'public, s-maxage=40, stale-while-revalidate=180')
        .send(body)
   } catch (err) {
     clearTimeout(timeoutId)
