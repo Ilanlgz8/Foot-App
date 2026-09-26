@@ -2557,18 +2557,13 @@
   /* Zoom léger : compense la marge interne intégrée à certaines images crest/drapeau */
   transform: scale(1.18);
 }
-.poster__crest-empty {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(200,210,225,0.18);
-  background: rgba(var(--white-rgb),0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: rgba(230,235,245,0.55);
+/* ⚠️ REMPLACÉ `.poster__crest-empty` (26/09, demande explicite utilisateur —
+   voir le commentaire détaillé dans MatchPoster.jsx) : l'ancien cercle avec
+   l'initiale du club est retiré au profit d'un simple espaceur, hauteur
+   mesurée en direct sur la prod pour faire atterrir le centre du nom juste
+   en dessous au niveau visuel de l'heure centrale (`.poster__time`). */
+.poster__crest-spacer {
+  height: 32px;
 }
 .poster__name {
   font-size: 0.72rem;
@@ -3067,6 +3062,14 @@
   font-size: 1.3rem;
   font-weight: 800;
   color: rgba(235,240,250,0.7);
+}
+/* ⚠️ AJOUT (26/09, voir le commentaire détaillé dans MatchDuJourCard.jsx) :
+   remplace le cercle (84px) quand aucun blason n'est disponible — hauteur
+   mesurée en direct sur la prod pour que le nom de l'équipe (juste en
+   dessous, même colonne flex) atterrisse au niveau visuel du "VS" central
+   au lieu de remonter tout en haut de la card. */
+.accueil__mdjCrestSpacer {
+  height: 25px;
 }
 .accueil__mdjTeamName {
   font-size: 0.95rem;

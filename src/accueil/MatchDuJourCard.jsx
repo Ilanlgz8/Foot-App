@@ -258,18 +258,24 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // des clubs amateurs de Copa del Rey, voir DOMESTIC_CUPS) affichait quand
   // même le cercle vide avec son code à 3 lettres dedans (`accueil__mdjCrestFb`,
   // ex. "PIN"), redondant avec le nom complet juste en dessous. Ce cercle
-  // (avec ou sans code) n'est plus rendu du tout dans ce cas — `.accueil__
-  // mdjSide` étant une colonne flex (voir accueil.css), le nom de l'équipe
-  // remonte alors naturellement à la place qu'occupait le cercle, sans code
-  // en trop au-dessus. `code` (toujours utile pour les pilules de cote,
-  // homeCode/awayCode plus bas) n'est donc plus transmis à renderSide.
+  // (avec ou sans code) n'est plus rendu du tout dans ce cas.
+  // ⚠️ AJUSTÉ (même jour, retour utilisateur après 1er essai : le nom
+  // remontait TROP haut, au-dessus du "VS") : `.accueil__mdjCrestSpacer`
+  // remplace le cercle par un espace réduit plutôt que rien du tout — hauteur
+  // (25px) mesurée en direct sur la prod (DevTools) pour faire atterrir le
+  // CENTRE du nom de l'équipe pile sur le centre visuel du "VS" (211px sur
+  // l'exemple mesuré), au lieu de coller le nom au tout début de la colonne.
+  // `code` (toujours utile pour les pilules de cote, homeCode/awayCode plus
+  // bas) n'est donc plus transmis à renderSide.
   const renderSide = (name, crest, rawName, form) => (
     <div className="accueil__mdjSide">
-      {crest && (
-        <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
-          <img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} />
-        </div>
-      )}
+      {crest
+        ? (
+          <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
+            <img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} />
+          </div>
+        )
+        : <div className="accueil__mdjCrestSpacer" aria-hidden="true" />}
       <span className="accueil__mdjTeamName">{name}</span>
       <FormDiamonds form={form} />
     </div>

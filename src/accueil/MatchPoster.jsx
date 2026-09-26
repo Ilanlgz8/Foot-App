@@ -450,11 +450,19 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
               — voir CSS), donc centrés les uns par rapport aux autres quelle
               que soit la longueur du nom, tandis que le groupe entier reste
               plaqué au bord extérieur via l'align-items hérité de team-col. */}
+          {/* ⚠️ MODIFIÉ (26/09, demande explicite utilisateur, même traitement
+              que MatchDuJourCard.jsx — voir son commentaire détaillé) : le
+              cercle avec l'initiale du club (`.poster__crest-empty`) est
+              remplacé par un espaceur réduit (`.poster__crest-spacer`,
+              32px — hauteur mesurée en direct sur la prod) quand aucun
+              blason n'est disponible, pour que le nom remonte au niveau
+              visuel de l'heure centrale au lieu de rester collé sous un
+              cercle vide OU de remonter tout en haut de la card. */}
           <div className="poster__nameGroup">
             {homeCrest && !homeCrestError
               ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={homeCrest} alt="" data-team={homeName}
                   onError={() => setHomeCrestError(true)} /></div>
-              : <div className="poster__crest-empty">{homeShort?.[0] ?? ''}</div>
+              : <div className="poster__crest-spacer" aria-hidden="true" />
             }
             <span className="poster__name poster__name--home">{homeShort}</span>
             <FormDiamonds form={hForm} />
@@ -512,7 +520,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
             {awayCrest && !awayCrestError
               ? <div className="poster__crestWrap" data-crest={isWC ? 'country' : 'club'}><img className="poster__crest" src={awayCrest} alt="" data-team={awayName}
                   onError={() => setAwayCrestError(true)} /></div>
-              : <div className="poster__crest-empty">{awayShort?.[0] ?? ''}</div>
+              : <div className="poster__crest-spacer" aria-hidden="true" />
             }
             <span className="poster__name poster__name--away">{awayShort}</span>
             <FormDiamonds form={aForm} />
