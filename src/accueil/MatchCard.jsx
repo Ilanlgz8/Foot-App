@@ -346,7 +346,12 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   // n'est pas (encore) dans COMPETITIONS.
   const liveComp = COMPETITIONS.find(c => c.id === match.competition?.code)
   const liveCompEmblem = liveComp?.emblem ?? match.competition?.emblem
-  const liveCompName   = liveComp?.name ?? match.competition?.name ?? ''
+  // ⚠️ AJOUT `match.isCup` (26/09, voir le commentaire détaillé dans
+  // MatchPoster.jsx) : un match de coupe domestique garde le `code` du
+  // championnat parent côté données, `liveComp` retombait donc toujours sur
+  // le nom du championnat (ex. "LaLiga EA Sports" pour un match de Copa del
+  // Rey) au lieu du vrai nom de la coupe (`match.competition?.name`).
+  const liveCompName   = match.isCup ? (match.competition?.name ?? liveComp?.name ?? '') : (liveComp?.name ?? match.competition?.name ?? '')
   const rawPeriod = getMatchPeriod(match)
   const livePeriodLabel = rawPeriod === '1ère MT'       ? '1ère mi-temps'
     : rawPeriod === '2ème MT'       ? '2ème mi-temps'

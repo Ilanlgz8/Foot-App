@@ -697,9 +697,26 @@ function looseTeamNameMatch(a, b) {
 // est ENTIÈREMENT égal à l'un de ces mots — un nom court à plusieurs mots
 // ("Manchester City", "Toulouse FC"...) n'est jamais concerné, aucune
 // régression possible sur les cas déjà couverts par les tests existants.
+// ⚠️ AJOUT 'atleti' (26/09, constat utilisateur : un match de Copa del Rey
+// entre 2 clubs amateurs, "Atlético Melilla" vs "Atlético Pinatarense",
+// affichait le VRAI logo de l'Atlético Madrid pour les DEUX clubs) — root
+// cause vérifiée en direct sur les vraies données ESPN/FD.org : le shortName
+// football-data.org d'Atlético Madrid est "Atleti" (pas "Atlético"), un mot
+// tout aussi générique et préfixe valide de N'IMPORTE QUEL "Atlético X" —
+// mais absent de ce Set, qui ne contenait que 'atletico'. `clubNameMatch`
+// acceptait donc "Atleti" comme préfixe de "Atlético Melilla"/"Atlético
+// Pinatarense", et resolveFdTeamId (appelé sans compMatches par MatchPoster/
+// MatchCard/MatchDuJourCard, donc en mode refus systématique voulu) ne
+// bloquait jamais cette collision précise faute de la connaître. Sans risque
+// pour la résolution légitime d'Atlético Madrid lui-même : TEAM_NAMES_FR
+// (teamNames.js) a déjà une entrée 'Atleti' → 'Atlético Madrid', donc
+// `looseTeamNameMatch` (jamais concerné par ce garde-fou, voir plus bas)
+// continue de le résoudre correctement par égalité canonique — seul le
+// chemin risqué (préfixe nu) est fermé, même compromis déjà accepté pour
+// 'real'/'deportivo'/etc.
 const AMBIGUOUS_BARE_PREFIXES = new Set([
-  'deportivo', 'real', 'racing', 'sporting', 'union', 'atletico', 'dynamo',
-  'dinamo', 'inter', 'club',
+  'deportivo', 'real', 'racing', 'sporting', 'union', 'atletico', 'atleti',
+  'dynamo', 'dinamo', 'inter', 'club',
 ])
 
 // ⚠️ AJOUT paramètre `compMatches` (constat utilisateur, 19/08 : "du jour au

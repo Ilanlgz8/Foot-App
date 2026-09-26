@@ -295,7 +295,17 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // MatchCard.jsx/LiveMatchPage.jsx/MatchPage.jsx.
   // (posterComp lui-même est calculé plus haut, voir compTint.)
   const posterCompEmblem = posterComp?.emblem ?? match.competition?.emblem
-  const posterCompName   = posterComp?.name ?? match.competition?.name ?? ''
+  // ⚠️ AJOUT `match.isCup` (26/09, constat utilisateur : un match de Copa del
+  // Rey — tour préliminaire, clubs amateurs — affichait le badge "LaLiga EA
+  // Sports" au lieu de "Copa del Rey") : les matchs de coupe domestique
+  // (DOMESTIC_CUPS, competitions.js) gardent volontairement `competition.code`
+  // = le code du championnat parent ('PD' pour Copa del Rey) côté données
+  // (voir fetchEspnCupMatches, espnAdapter.js) — mais portent aussi
+  // `competition.name` = le VRAI nom de la coupe et `isCup: true`. Sans ce
+  // garde-fou, `posterComp` (trouvé par code, donc toujours l'entrée LaLiga)
+  // écrasait ce nom via `??`. Même correctif déjà en place sur
+  // ResultCard.jsx (Résultats), jamais porté sur les 3 cards de l'Accueil.
+  const posterCompName   = match.isCup ? (match.competition?.name ?? posterComp?.name ?? '') : (posterComp?.name ?? match.competition?.name ?? '')
   const rawPosterPeriod = getMatchPeriod(match)
   // "Mi-temps" → "MT" ici uniquement (retour utilisateur, spécifique à ce
   // badge en haut à droite de la card Accueil — getMatchPeriod() lui-même

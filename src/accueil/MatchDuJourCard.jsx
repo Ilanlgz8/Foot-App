@@ -139,7 +139,11 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
 
   const mdjComp = COMPETITIONS.find(c => c.id === match.competition?.code)
   const mdjCompEmblem = mdjComp?.emblem ?? match.competition?.emblem
-  const mdjCompName   = mdjComp?.name ?? match.competition?.name ?? ''
+  // ⚠️ AJOUT `match.isCup` (26/09, voir le commentaire détaillé dans
+  // MatchPoster.jsx) : un match de coupe domestique garde le `code` du
+  // championnat parent côté données — sans ce garde-fou, "Match du jour"
+  // afficherait le nom du championnat au lieu du vrai nom de la coupe.
+  const mdjCompName   = match.isCup ? (match.competition?.name ?? mdjComp?.name ?? '') : (mdjComp?.name ?? match.competition?.name ?? '')
 
   // ── Pronostic — même modèle que MatchPoster.jsx (cote de marché ESPN en
   // priorité pré-match, sinon calcProno/calcLiveProno). ──
