@@ -251,13 +251,25 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
 
   // (plus de modificateur --home/--away : depuis que les couleurs de camp sont
   // portées par les calques de fond, aucun style ne dépend plus du côté.)
-  const renderSide = (name, crest, rawName, form, code) => (
+  // ⚠️ MODIFIÉ (26/09, demande explicite utilisateur : "pour les equipes sans
+  // logo... enlève le truc au dessus ou y'a le nom de l'equipe en abreger...
+  // remonte le nom de l'equipe la ou y'a le nom en abreger") : avant, un club
+  // sans blason (aucune image dispo ni côté ESPN ni côté FD.org — cas réel
+  // des clubs amateurs de Copa del Rey, voir DOMESTIC_CUPS) affichait quand
+  // même le cercle vide avec son code à 3 lettres dedans (`accueil__mdjCrestFb`,
+  // ex. "PIN"), redondant avec le nom complet juste en dessous. Ce cercle
+  // (avec ou sans code) n'est plus rendu du tout dans ce cas — `.accueil__
+  // mdjSide` étant une colonne flex (voir accueil.css), le nom de l'équipe
+  // remonte alors naturellement à la place qu'occupait le cercle, sans code
+  // en trop au-dessus. `code` (toujours utile pour les pilules de cote,
+  // homeCode/awayCode plus bas) n'est donc plus transmis à renderSide.
+  const renderSide = (name, crest, rawName, form) => (
     <div className="accueil__mdjSide">
-      <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
-        {crest
-          ? <img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} />
-          : <span className="accueil__mdjCrestFb">{code}</span>}
-      </div>
+      {crest && (
+        <div className="accueil__mdjCrestWrap" data-crest={isWC ? 'country' : 'club'}>
+          <img src={crest} alt="" className="accueil__mdjCrest" data-team={rawName} />
+        </div>
+      )}
       <span className="accueil__mdjTeamName">{name}</span>
       <FormDiamonds form={form} />
     </div>
@@ -340,7 +352,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         </div>
 
         <div className="accueil__mdjDuel">
-          {renderSide(homeName, homeCrest, match.homeTeam?.name, homeForm, homeCode)}
+          {renderSide(homeName, homeCrest, match.homeTeam?.name, homeForm)}
           {/* VS en CONTOUR lumineux : 2 calques superposés (noyau translucide
               + contour tracé via -webkit-text-stroke) + halo rond derrière.
               aria-hidden : purement décoratif, l'affrontement est déjà porté
@@ -350,7 +362,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             <span className="accueil__mdjVsCore">VS</span>
             <span className="accueil__mdjVsOutline">VS</span>
           </span>
-          {renderSide(awayName, awayCrest, match.awayTeam?.name, awayForm, awayCode)}
+          {renderSide(awayName, awayCrest, match.awayTeam?.name, awayForm)}
         </div>
 
         {/* Minute de jeu à la place du libellé, juste au-dessus du score
