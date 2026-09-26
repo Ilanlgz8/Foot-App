@@ -47,6 +47,31 @@ const COMP_PRIORITY = {
   NL: 5, UECL: 5, TDC: 5, CS: 5,
 }
 
+// ⚠️ AJOUT (26/09, constat utilisateur : "c clairement espagne angleterre
+// la c quoi ça" — le match du jour élu était Pinatarense-Melilla, un tour
+// préliminaire de Copa del Rey entre 2 clubs amateurs espagnols, DEVANT
+// Espagne-Angleterre en Ligue des Nations) : root cause — un match de coupe
+// domestique garde volontairement le `competition.code` du championnat
+// PARENT ('PD' pour Copa del Rey, voir DOMESTIC_CUPS/fetchEspnCupMatches,
+// espnAdapter.js) — `COMP_PRIORITY['PD']` valait donc 3 (le MÊME tier qu'un
+// vrai Real Madrid-Barcelone), très largement devant NL (tier 5), sans
+// aucun rapport avec l'intérêt réel du match. Un tour préliminaire de coupe
+// entre clubs amateurs n'a évidemment pas le même enjeu qu'un vrai match de
+// championnat — ce tier dédié, le plus bas de tous (6, sous NL/UECL/TDC/CS),
+// s'applique à TOUT match de coupe domestique quel que soit le tier de son
+// championnat parent. Honnêteté : comme le reste de ce fichier, un jugement
+// assumé, pas une science exacte — une finale de coupe entre 2 grands clubs
+// mériterait sans doute mieux qu'un tier 6, mais rien dans les données
+// dispo ici ne distingue un tour préliminaire d'une finale de façon fiable
+// (voir mapEspnStage, espnAdapter.js) ; à ajuster si un vrai cas de finale
+// se présente et semble mal classé.
+const DOMESTIC_CUP_PRIORITY = 6
+
+function compPriority(match) {
+  if (match.isCup) return DOMESTIC_CUP_PRIORITY
+  return COMP_PRIORITY[match.competition?.code]
+}
+
 // ⚠️ AJOUT (constat utilisateur, 28/08 : "le but du match du jour c'est de
 // montrer... la rencontre la plus solide, la plus attendue... par rapport à
 // l'influence des deux équipes" — avant ce fix, à compétition égale, seul le
@@ -217,7 +242,7 @@ function electBest(candidates) {
   let bestPriority = Infinity
   let bestBigScore = -1
   for (const m of candidates) {
-    const priority = COMP_PRIORITY[m.competition?.code]
+    const priority = compPriority(m)
     if (priority == null) continue
     const bigScore = bigTeamScore(m)
     if (priority < bestPriority) {

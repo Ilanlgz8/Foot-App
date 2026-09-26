@@ -65,6 +65,12 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([wc, clasico])).toBe(wc)
   })
 
+  it('un match de coupe domestique (tour préliminaire, code = championnat parent) ne devance jamais un vrai match de championnat/tournoi (constat utilisateur : Pinatarense-Melilla/Copa del Rey élu devant Espagne-Angleterre/NL)', () => {
+    const cupPrelim = { ...makeMatch('PD', 'Atlético Pinatarense', 'Atlético Melilla', 20), isCup: true, competition: { code: 'PD', name: 'Copa del Rey' } }
+    const nl = makeMatch('NL', 'Espagne', 'Angleterre', 13)
+    expect(pickMatchDuJour([cupPrelim, nl])).toBe(nl)
+  })
+
   it('un club "notable" (2e niveau) bat un match sans aucune équipe listée (constat utilisateur : Toulouse-Lille > R. Sociedad-Celta)', () => {
     // Cas réel constaté le 02/09 sur l'Accueil : aucune des 4 équipes n'était
     // listée, donc score 0 partout, et seul le coup d'envoi le plus tardif
