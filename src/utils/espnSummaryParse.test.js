@@ -8,7 +8,7 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam, clubNameMatch } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, compactEspnScorers, normalize, fuzzyTeam, clubNameMatch } from './espnSummaryParse'
 
 // Payloads de test simplifiés mais avec les VRAIS noms de champs ESPN,
 // vérifiés par appel réel à site.api.espn.com/apis/v2/sports/soccer/{slug}/
@@ -100,6 +100,88 @@ describe('compactEspnStandings', () => {
   it('gère un entries manquant/malformé sans planter', () => {
     expect(compactEspnStandings({ children: [{ name: 'X' }] })).toEqual({ table: [], groups: [] })
     expect(compactEspnStandings({ children: [{ name: 'X', standings: {} }] })).toEqual({ table: [], groups: [] })
+  })
+})
+
+// ⚠️ Payloads simplifiés mais avec les VRAIS noms de champs ESPN, vérifiés
+// par appel réel à site.api.espn.com/apis/site/v2/sports/soccer/{slug}/
+// statistics (uefa.nations, 26/09, voir le commentaire de compactEspnScorers
+// pour le détail complet de cette découverte).
+function espnLeader(athleteId, name, teamId, teamName, { goals, assists }) {
+  return {
+    value: goals,
+    athlete: {
+      id: String(athleteId),
+      displayName: name,
+      shortName: name,
+      team: {
+        id: String(teamId),
+        name: teamName,
+        displayName: teamName,
+        abbreviation: teamName.slice(0, 3).toUpperCase(),
+        logos: [{ href: `https://example.com/${teamId}.png` }],
+      },
+      statistics: [
+        { name: 'appearances', value: 2 },
+        { name: 'totalGoals', value: goals },
+        { name: 'goalAssists', value: assists },
+      ],
+    },
+  }
+}
+
+describe('compactEspnScorers', () => {
+  it('renvoie [] si stats est absent, vide, ou sans catégorie goalsLeaders', () => {
+    expect(compactEspnScorers({})).toEqual([])
+    expect(compactEspnScorers({ stats: {} })).toEqual([])
+    expect(compactEspnScorers({ stats: { 0: { name: 'assistsLeaders', leaders: [] } } })).toEqual([])
+  })
+
+  it('convertit un vrai payload goalsLeaders en tableau {player, team, goals, assists}', () => {
+    const raw = {
+      stats: {
+        0: {
+          name: 'goalsLeaders',
+          leaders: [
+            espnLeader(1, 'Erling Haaland', 464, 'Norway', { goals: 4, assists: 0 }),
+            espnLeader(2, 'Christos Tzolis', 455, 'Greece', { goals: 3, assists: 1 }),
+          ],
+        },
+        1: { name: 'assistsLeaders', leaders: [] },
+      },
+    }
+    const result = compactEspnScorers(raw)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({
+      player: { id: '1', name: 'Erling Haaland' },
+      team: { id: '464', name: 'Norway', shortName: 'Norway', crest: 'https://example.com/464.png' },
+      goals: 4,
+      assists: 0,
+    })
+    expect(result[1].player.name).toBe('Christos Tzolis')
+  })
+
+  it('trie par buts décroissants (ESPN censé déjà trier, mais pas garanti)', () => {
+    const raw = {
+      stats: {
+        0: {
+          name: 'goalsLeaders',
+          leaders: [
+            espnLeader(1, 'Joueur B', 10, 'Équipe B', { goals: 2, assists: 0 }),
+            espnLeader(2, 'Joueur A', 20, 'Équipe A', { goals: 5, assists: 0 }),
+          ],
+        },
+      },
+    }
+    const result = compactEspnScorers(raw)
+    expect(result.map(s => s.player.name)).toEqual(['Joueur A', 'Joueur B'])
+  })
+
+  it('gère un athlete/team/statistics manquant sans planter', () => {
+    const raw = { stats: { 0: { name: 'goalsLeaders', leaders: [{}, { athlete: {} }] } } }
+    const result = compactEspnScorers(raw)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ player: { id: '', name: '' }, team: { id: '', name: '', shortName: '', crest: null }, goals: 0, assists: 0 })
   })
 })
 

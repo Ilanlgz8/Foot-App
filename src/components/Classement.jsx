@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
+import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ RÉDUIT (26/09, voir le commentaire détaillé sur NO_STANDINGS_COMPS dans
@@ -147,22 +147,16 @@ function Classement() {
   // expérience — corrigé ici sans réintroduire la collision.
   const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday)
   const { formMap, compMatches: formCompMatches } = useTeamForm(selectedComp, 6_000)
-  // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09, voir
-  // NO_STANDINGS_COMPS/NO_SCORERS_COMPS dans competitions.js) mais n'ont
-  // aucune source de buteurs — `enabled: false` évite un fetch voué à
-  // échouer à chaque visite (voir le commentaire dans useScorers.js).
-  const scorersSupported = !NO_SCORERS_COMPS.has(selectedComp)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000, scorersSupported)
+  // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09) : useScorers sait
+  // désormais aller chercher ces 5 via ESPN plutôt que FD.org, qui ne les
+  // couvre pas (voir ESPN_SOURCED_SCORERS_COMPS, competitions.js, et le
+  // commentaire détaillé dans useScorers.js) — aucun garde-fou nécessaire ici,
+  // même mécanisme que pour Classement/Forme.
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
   // Sélections nationales (crest rond, pas d'écusson club) — WC/EC déjà là,
   // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
   const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
     || selectedComp === 'NL' || selectedComp === 'CAN' || selectedComp === 'COPA'
-  // Si l'utilisateur était sur l'onglet Buteurs et change vers une compétition
-  // qui ne le supporte pas, on revient sur Classement plutôt que de laisser
-  // un onglet vide/masqué sélectionné.
-  useEffect(() => {
-    if (!scorersSupported && view === 'buteurs') setView('classement')
-  }, [scorersSupported, view, setView])
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement
@@ -669,18 +663,12 @@ function Classement() {
             >
               Classement
             </button>
-            {/* ⚠️ Masqué pour NL/CAN/COPA/UEL/UECL (26/09) : aucune source de
-                buteurs pour ces 5 (voir NO_SCORERS_COMPS, competitions.js) —
-                mieux vaut ne pas proposer un onglet qui échouerait à coup sûr
-                que d'afficher "Données non disponibles" à chaque fois. */}
-            {scorersSupported && (
-              <button
-                className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
-                onClick={() => setView('buteurs')}
-              >
-                Buteurs
-              </button>
-            )}
+            <button
+              className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
+              onClick={() => setView('buteurs')}
+            >
+              Buteurs
+            </button>
             {/* Onglet "Tendances" mis de côté pour être retravaillé plus tard —
                 voir TendancesView.jsx / tendances.css (conservés, pas supprimés). */}
           </div>

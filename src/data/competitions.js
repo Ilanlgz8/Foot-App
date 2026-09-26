@@ -171,16 +171,24 @@ export const DOMESTIC_CUPS = {
 // principe que SINGLE_MATCH_COMPS ci-dessus, pour Programme/Résultats).
 export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 
-// ⚠️ AJOUT (26/09, même constat que ci-dessus) : contrairement au classement,
-// les BUTEURS n'ont AUCUNE source pour NL/CAN/COPA/UEL/UECL — football-data.org
-// ne couvre pas ces compétitions et ESPN n'a jamais eu d'endpoint scorers
-// fonctionnel non plus (voir CLAUDE.md, gap déjà documenté pour useScorers.js).
-// Séparé de NO_STANDINGS_COMPS : le classement, lui, fonctionne bien pour ces
-// 5 (voir ci-dessus) — seul l'onglet Buteurs doit rester masqué pour elles,
-// plutôt que de tenter un fetch voué à échouer à chaque visite (3 tentatives
-// FD.org avec retry avant d'abandonner, voir useScorers.js — un gaspillage
-// pur puisque le résultat est connu d'avance).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+// ⚠️ AJOUT PUIS CORRIGÉ LE MÊME JOUR (26/09) : d'abord introduit comme
+// `NO_SCORERS_COMPS` en partant du gap documenté de longue date dans ce
+// projet ("aucune alternative gratuite connue ne couvre les BUTEURS", voir
+// CLAUDE.md — testé à l'époque : TheSportsDB `lookuptopscorers.php` vide,
+// ESPN `/leaders` vide) — mais quelques minutes plus tard, demande explicite
+// utilisateur ("y'a pas... le classement des meilleurs buteurs dans ligue des
+// nations et les autres competition aussi") a motivé une VRAIE revérification
+// plutôt que de simplement répéter le constat précédent. Trouvé et vérifié en
+// direct : `/apis/site/v2/sports/soccer/{slug}/statistics` (endpoint DIFFÉRENT
+// de `/leaders`, jamais essayé jusqu'ici) renvoie bien un classement buteurs
+// réel pour 4 des 5 — voir compactEspnScorers, espnSummaryParse.js, pour le
+// détail complet et le comptage exact par compétition. useScorers.js source
+// donc désormais ces 5 comps via ESPN plutôt que FD.org (qui ne les couvre
+// toujours pas). UECL exceptée en pratique (mais laissée dans ce Set : la
+// source existe, l'ESPN n'a simplement pas encore de données à y mettre pour
+// l'instant, voir le commentaire détaillé dans compactEspnScorers) — `[]` en
+// sortie, déjà géré proprement par Classement.jsx ("Aucun buteur disponible").
+export const ESPN_SOURCED_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -857,7 +865,11 @@ export const COMPETITIONS = [
     // (4e, le plus faible des 4) est laissé de côté, 3 couleurs étant déjà la
     // recette la plus chargée dispo dans le mécanisme commun.
     id: 'NL',
-    name: 'Ligue des Nations',
+    // Renommée (26/09, demande explicite utilisateur : "ligues des nation tu
+    // peux renommer en 'UEFA Nation League'") — nom officiel complet plutôt
+    // que la traduction française FD.org/ESPN générique, orthographe
+    // corrigée ("Nations", pluriel, comme sur le logo/le site officiel UEFA).
+    name: 'UEFA Nations League',
     shortName: 'Ligue des nations',
     emblem: nationsLeagueLogo,
     // ⚠️ "MODE PEINTURE" (10/09) — remplace la teinte 3 tons ci-dessus

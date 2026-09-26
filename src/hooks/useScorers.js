@@ -3,6 +3,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
+import { ESPN_SOURCED_SCORERS_COMPS, COMPETITION_ESPN_SLUG } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -29,16 +30,18 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // MatchPoster.jsx, LiveMatchPage.jsx... qui n'appellent jamais useStandings
 // en parallèle) — seuls Classement.jsx et ClassementTab (MatchModal.jsx, même
 // collision : standings+form ensemble) passent un délai explicite.
-// ⚠️ `enabled` AJOUTÉ (26/09, constat utilisateur : "y'a pas toutes les
-// competition dans le dropdown" classement — NL/CAN/COPA/UEL/UECL rejoignent
-// le sélecteur, voir NO_SCORERS_COMPS dans competitions.js) : ces 5
-// compétitions n'ont aucune source de buteurs (ni FD.org, ni ESPN, gap déjà
-// documenté dans CLAUDE.md) — sans ce garde-fou, Classement.jsx déclencherait
-// pour elles un fetch voué à échouer à CHAQUE visite (3 tentatives FD.org
-// avec retry, voir plus bas), pur gaspillage de budget FD.org pour un
-// résultat déjà connu d'avance. Défaut à `true` : comportement inchangé pour
-// tout appelant qui ne précise rien.
-export function useScorers(compId, hasMatchToday = true, delayMs = 0, enabled = true) {
+// ⚠️ Source ESPN AJOUTÉE (26/09, constat utilisateur : "y'a pas... le
+// classement des meilleurs buteurs dans ligue des nations et les autres
+// competition aussi", juste après l'ouverture de NL/CAN/COPA/UEL/UECL dans
+// le sélecteur de Classement.jsx) : ces 5 compétitions n'ont AUCUNE
+// couverture football-data.org — jusqu'ici un gap documenté sans repli connu
+// (voir CLAUDE.md, un ancien essai sur `/leaders` ESPN puis TheSportsDB
+// s'étaient tous les deux révélés vides). Revérifié en direct ce jour-là :
+// `/apis/site/v2/sports/soccer/{slug}/statistics`, un endpoint ESPN DIFFÉRENT
+// et jamais essayé jusqu'ici, renvoie un vrai classement buteurs pour 4 des 5
+// (voir compactEspnScorers, espnSummaryParse.js, pour le détail complet et
+// l'honnêteté sur la 5e, Ligue Europa Conférence, vide pour l'instant).
+export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
   // (tryFetch) a pu déjà écrire un [] en cache localStorage AVANT ce
@@ -59,6 +62,29 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0, enabled = 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
     queryFn: async () => {
+      // ⚠️ Branche ESPN (26/09, voir le commentaire au-dessus de la fonction)
+      // : chemin séparé et plus simple que celui FD.org ci-dessous — pas de
+      // verrou d'espacement à respecter (ESPN n'a pas cette contrainte sur ce
+      // projet, voir useStandings.js/useTeamForm.js qui font déjà de même
+      // pour ces 5 comps). `readCacheStale` reste le filet de secours en cas
+      // d'échec réseau, même mécanisme que la branche FD.org plus bas.
+      if (ESPN_SOURCED_SCORERS_COMPS.has(compId)) {
+        const slug = COMPETITION_ESPN_SLUG[compId]
+        if (!slug) { writeCache(key, [], STALE_MS); return [] }
+        try {
+          const r = await fetch(`/espn?slug=${slug}&scorers=1`)
+          if (!r.ok) throw new Error(String(r.status))
+          const j = await r.json()
+          const scorersEspn = j.scorers ?? []
+          writeCache(key, scorersEspn, STALE_MS)
+          return scorersEspn
+        } catch (err) {
+          const stale = readCacheStale(key)
+          if (stale) return stale
+          throw err
+        }
+      }
+
       // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
       // délai fixe — 0ms si aucun hook voisin (useStandings/useTeamForm,
       // même page) n'a vraiment tapé FD.org juste avant.
@@ -196,7 +222,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0, enabled = 
     // sans rien tenter de réel.
     retry: 2,
     retryDelay: attempt => 8_000 * (attempt + 1),
-    enabled: !!compId && enabled,
+    enabled: !!compId,
   })
 
   return {

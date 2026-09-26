@@ -96,6 +96,68 @@ export function compactEspnStandings(json) {
   }
 }
 
+// compactEspnScorers — convertit une réponse `/apis/site/v2/sports/soccer/
+// {slug}/statistics` ESPN brute en un tableau STRICTEMENT compatible avec ce
+// que football-data.org renvoie déjà pour /scorers (voir useScorers.js) :
+// [{ player: {id, name}, team: {id, name, shortName, crest}, goals, assists }].
+// Permet à Classement.jsx de consommer indifféremment l'une ou l'autre source
+// sans aucune modification du composant d'affichage (même contrat que
+// compactEspnStandings ci-dessus pour le classement).
+//
+// ⚠️ AJOUT (26/09, demande utilisateur : "y'a pas... le classement des
+// meilleurs buteurs dans ligue des nations et les autres competition aussi")
+// — un gap documenté de longue date dans ce projet ("aucune alternative
+// gratuite connue ne couvre les BUTEURS", voir CLAUDE.md, l'endpoint
+// `lookuptopscorers.php` de TheSportsDB avait été testé vide). Ce constat
+// visait `/leaders` (testé vide) et l'ancien scoreboard ESPN — jamais ce
+// endpoint STATISTICS précis, découvert et vérifié en direct ce jour-là :
+// contrairement à /standings, la réponse n'a pas de top-level `children` mais
+// un objet `stats` (indexé "0","1"...) où chaque entrée est une catégorie
+// ({name:'goalsLeaders', leaders:[...]}, {name:'assistsLeaders', leaders:[...]}).
+// Seule 'goalsLeaders' est utilisée ici : chaque `leader` y porte déjà À LA
+// FOIS les buts (`value`, dupliqué dans `athlete.statistics[name=totalGoals]`)
+// ET les passes déterminantes (`athlete.statistics[name=goalAssists]`) — pas
+// besoin de croiser avec la catégorie 'assistsLeaders' séparée.
+// Structure ESPN observée (vérifiée par 5 appels réels, pas documentée
+// officiellement) : { stats: { "0": { name, leaders: [ { value, athlete: {
+// id, displayName, shortName, team: {id, name, displayName, abbreviation,
+// logos:[{href}]}, statistics: [{name:'totalGoals'|'goalAssists'|..., value}]
+// } } ] }, "1": {...} } }.
+// Vérifié en direct pour les 5 compétitions concernées (26/09) : 50 buteurs
+// renvoyés pour Ligue des Nations/Ligue Europa/CAN/Copa America — Ligue
+// Europa Conférence renvoie 0 leader pour l'instant (phase de ligue trop
+// récente, ESPN n'a pas encore publié de classement buteurs pour elle cette
+// saison) ; pas un défaut du parseur, `[]` en sortie, déjà géré proprement
+// par Classement.jsx ("Aucun buteur disponible").
+export function compactEspnScorers(json) {
+  const categories = json?.stats ? Object.values(json.stats) : []
+  const goalsCategory = categories.find(c => c?.name === 'goalsLeaders')
+  const leaders = Array.isArray(goalsCategory?.leaders) ? goalsCategory.leaders : []
+
+  const rows = leaders.map(l => {
+    const athlete = l?.athlete ?? {}
+    const stat = {}
+    for (const s of (athlete.statistics ?? [])) stat[s.name] = s.value
+    const team = athlete.team ?? {}
+    return {
+      player: {
+        id:   athlete.id != null ? String(athlete.id) : '',
+        name: athlete.displayName ?? athlete.shortName ?? '',
+      },
+      team: {
+        id:        team.id != null ? String(team.id) : '',
+        name:      team.displayName ?? team.name ?? '',
+        shortName: team.name ?? team.displayName ?? team.abbreviation ?? '',
+        crest:     team.logos?.[0]?.href ?? null,
+      },
+      goals:   stat.totalGoals ?? l.value ?? 0,
+      assists: stat.goalAssists ?? 0,
+    }
+  })
+
+  return rows.sort((a, b) => (b.goals - a.goals) || (b.assists - a.assists))
+}
+
 // ⚠️ compactSportsDbStandings (TheSportsDB) ajoutée puis RETIRÉE le même jour
 // (23/07) : la clé publique gratuite de TheSportsDB plafonne lookuptable.php
 // à 5 lignes seulement, quelle que soit la ligue (confirmé par 2 appels
