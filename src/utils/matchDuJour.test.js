@@ -41,10 +41,21 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([avecGrandClub, sansGrandClub])).toBe(avecGrandClub)
   })
 
-  it('la Ligue des Champions garde priorité sur un match de grands clubs en championnat', () => {
-    const cl = makeMatch('CL', 'Monaco', 'Auxerre', 13)
-    const clasico = makeMatch('PD', 'Real Madrid', 'Barcelona', 20)
-    expect(pickMatchDuJour([cl, clasico])).toBe(cl)
+  // ⚠️ INVERSÉ (26/09, voir l'en-tête de matchDuJour.js) : la Ligue des
+  // Champions ne "garde" plus la priorité automatiquement — désormais
+  // seulement à score d'affiche ÉGAL (test ci-dessous). À score d'affiche
+  // différent, la meilleure affiche gagne (2e test), même dans une
+  // compétition moins bien classée.
+  it('à score d\'affiche égal, la compétition la plus prestigieuse départage', () => {
+    const cl = makeMatch('CL', 'Ajax', 'Auxerre', 13)       // Ajax (BIG=2) + Auxerre (0) = 2
+    const pd = makeMatch('PD', 'Betis', 'Villarreal', 20)   // Betis (NOTABLE=1) + Villarreal (NOTABLE=1) = 2
+    expect(pickMatchDuJour([cl, pd])).toBe(cl)
+  })
+
+  it('une meilleure affiche devance désormais une compétition mieux classée (demande explicite utilisateur, 26/09)', () => {
+    const cl = makeMatch('CL', 'Monaco', 'Auxerre', 13)         // 2
+    const clasico = makeMatch('PD', 'Real Madrid', 'Barcelona', 20) // 6
+    expect(pickMatchDuJour([cl, clasico])).toBe(clasico)
   })
 
   it('à prestige égal, garde le départage par coup d\'envoi le plus tardif', () => {
@@ -59,10 +70,18 @@ describe('pickMatchDuJour', () => {
     expect(pickMatchDuJour([nl, autreNl])).toBe(nl)
   })
 
-  it('la Coupe du monde garde la priorité sur l\'Euro et la Ligue des Champions', () => {
-    const wc = makeMatch('WC', 'Panama', 'Curaçao', 13)
-    const clasico = makeMatch('CL', 'Real Madrid', 'Barcelona', 20)
-    expect(pickMatchDuJour([wc, clasico])).toBe(wc)
+  // ⚠️ INVERSÉ (26/09, voir l'en-tête de matchDuJour.js) : même chose pour la
+  // Coupe du monde — priorité conservée uniquement à score d'affiche égal.
+  it('à score d\'affiche égal, la Coupe du monde départage sur l\'Euro/la Ligue des Champions', () => {
+    const wc = makeMatch('WC', 'Maroc', 'Sénégal', 13)  // Maroc + Sénégal (BIG=2 chacun) = 4
+    const cl = makeMatch('CL', 'Ajax', 'Benfica', 20)   // Ajax + Benfica (BIG=2 chacun) = 4
+    expect(pickMatchDuJour([wc, cl])).toBe(wc)
+  })
+
+  it('une meilleure affiche devance désormais la Coupe du monde (demande explicite utilisateur, 26/09)', () => {
+    const wc = makeMatch('WC', 'Panama', 'Curaçao', 13)              // 0
+    const clasico = makeMatch('CL', 'Real Madrid', 'Barcelona', 20)  // 6
+    expect(pickMatchDuJour([wc, clasico])).toBe(clasico)
   })
 
   it('un match de coupe domestique (tour préliminaire, code = championnat parent) ne devance jamais un vrai match de championnat/tournoi (constat utilisateur : Pinatarense-Melilla/Copa del Rey élu devant Espagne-Angleterre/NL)', () => {

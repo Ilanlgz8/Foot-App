@@ -2,10 +2,23 @@ import { translateTeam } from '../data/teamNames'
 
 // Sélection du "match du jour" — la carte mise en avant en haut de l'Accueil.
 //
-// Heuristique en 3 niveaux : priorité à la compétition la plus prestigieuse,
-// puis — à égalité de compétition — à l'affiche la plus attendue entre les
-// deux équipes, puis — à égalité totale — au coup d'envoi le plus tardif de
-// la journée (créneau prime-time).
+// ⚠️ INVERSÉ (26/09, demande explicite utilisateur, posée directement pour
+// trancher un cas ambigu : "si un jour il y a un match de Coupe du Monde
+// entre 2 petites nations ET un PSG-Marseille le même jour, tu veux quoi ?"
+// → réponse "la meilleure affiche gagne, peu importe la compétition") :
+// avant, la compétition (COMP_PRIORITY) décidait EN PREMIER, le score
+// d'affiche (bigTeamScore) ne départageant QUE dans un même tier — un match
+// de Coupe du Monde entre 2 petites nations passait donc TOUJOURS devant un
+// Clasico en Ligue des Champions, uniquement parce que WC < CL dans
+// COMP_PRIORITY, sans aucun rapport avec l'intérêt réel des 2 matchs.
+//
+// Heuristique en 3 niveaux, dans l'ordre : le score d'affiche (2 équipes
+// fortes/intéressantes) décide EN PREMIER, la compétition ne sert plus que
+// de départage à score d'affiche ÉGAL, et le coup d'envoi le plus tardif
+// reste le tout dernier recours à égalité totale. Une affiche exceptionnelle
+// (2 clubs élite) peut donc désormais dépasser une compétition mieux classée
+// si l'écart d'intérêt est net — mais à intérêt équivalent, la compétition la
+// plus prestigieuse (tiers ci-dessous) l'emporte toujours.
 //
 // ⚠️ ÉTENDU (constat utilisateur, 28/08 : "fait ça pour tous les
 // championnats qu'il y'a dans l'app") : COMP_PRIORITY ne couvrait avant que
@@ -214,9 +227,14 @@ const ELITE_TEAMS = new Set([
 
 // Score d'affiche : 3 points par club "élite", 2 par club du 1er niveau,
 // 1 par club du 2e. Deux élites (6) devancent une élite + un gros (5), qui
-// devance deux gros (4), etc. — la hiérarchie reste lisible sans jamais
-// inverser l'ordre des tiers de COMP_PRIORITY (ce score ne sert qu'à
-// départager DANS un même tier).
+// devance deux gros (4), etc. — la somme des 2 équipes (pas une seule) fait
+// qu'un club énorme contre un amateur (ex. Real Madrid en coupe contre un
+// club de division régionale) ne score jamais aussi haut qu'un vrai choc où
+// LES DEUX équipes sont fortes, cohérent avec "la rencontre de deux fortes
+// équipes" plutôt qu'une seule.
+// ⚠️ DEVENU LE CRITÈRE PRINCIPAL (26/09, voir l'en-tête du fichier) : décide
+// maintenant EN PREMIER, COMP_PRIORITY ne sert plus qu'à départager une
+// égalité de score d'affiche.
 function bigTeamScore(match) {
   const rank = (team) =>
     teamMatchesSet(team, ELITE_TEAMS) ? 3
@@ -233,27 +251,31 @@ const ONGOING_STATUSES  = new Set(['IN_PLAY', 'PAUSED', 'SUSPENDED'])
 const DEAD_STATUSES = new Set(['POSTPONED', 'CANCELLED', 'SUSPENDED_INDEFINITELY'])
 
 // Élit le meilleur match d'une liste selon les 3 critères, dans l'ordre :
-// prestige de la compétition, puis score d'affiche, puis coup d'envoi le plus
-// tardif. Les 2 premiers portent tout le sens ; le 3e n'est qu'un dernier
-// recours (voir ELITE_TEAMS : c'est justement pour éviter d'y arriver trop
-// souvent que le 3e niveau a été ajouté).
+// score d'affiche (2 équipes fortes/intéressantes), puis prestige de la
+// compétition (départage uniquement), puis coup d'envoi le plus tardif (tout
+// dernier recours — voir ELITE_TEAMS : c'est justement pour éviter d'y
+// arriver trop souvent que le 3e niveau de score a été ajouté).
+// ⚠️ ORDRE INVERSÉ (26/09, voir l'en-tête du fichier) : avant, la compétition
+// décidait en premier et le score d'affiche ne départageait QUE dans un même
+// tier — désormais l'inverse, demande explicite utilisateur ("la meilleure
+// affiche gagne, peu importe la compétition").
 function electBest(candidates) {
   let best = null
-  let bestPriority = Infinity
   let bestBigScore = -1
+  let bestPriority = Infinity
   for (const m of candidates) {
     const priority = compPriority(m)
     if (priority == null) continue
     const bigScore = bigTeamScore(m)
-    if (priority < bestPriority) {
-      bestPriority = priority
+    if (bigScore > bestBigScore) {
       bestBigScore = bigScore
+      bestPriority = priority
       best = m
-    } else if (priority === bestPriority && best) {
-      if (bigScore > bestBigScore) {
-        bestBigScore = bigScore
+    } else if (bigScore === bestBigScore && best) {
+      if (priority < bestPriority) {
+        bestPriority = priority
         best = m
-      } else if (bigScore === bestBigScore && new Date(m.utcDate) > new Date(best.utcDate)) {
+      } else if (priority === bestPriority && new Date(m.utcDate) > new Date(best.utcDate)) {
         best = m
       }
     }
