@@ -1957,6 +1957,48 @@ cf-worker/
   cette vérification post-reset. 374 tests + lint (33 erreurs pré-existantes, inchangé) + build
   vérifiés à chaque étape de ce chantier.
 
+- ✅ Match Copa del Rey affiché à 18h jamais passé "en direct" ni "terminé" (constat utilisateur,
+  26/09 : "il est 20h15 c toujours pas lancer en mode live [...] soit on les enlève soit on les
+  met mais un truc qui fonctionne") : root cause confirmée en DIRECT sur l'API ESPN au moment même
+  du signalement (`/api/espn?slug=esp.copa_del_rey&dates=20260926`) — les 5 matchs du jour,
+  y compris un dont le coup d'envoi théorique (18:00Z) était déjà passé de 15+ minutes au moment
+  du test, affichaient TOUS encore `STATUS_SCHEDULED` côté ESPN LUI-MÊME. Écarté avec certitude un
+  bug de cache/polling côté app : la fenêtre "aujourd'hui" n'est jamais mise en cache serveur
+  (`scoreboardChunkTtl` renvoie `null` pour les dates dans la fenêtre live, voir `api/espn.js`),
+  donc ce test a bien tapé ESPN en direct, pas une copie périmée. Tous les matchs concernés
+  partagent `event.season.slug === 'qualifying-round'` — le tour de qualification amateur/régional
+  (clubs de divisions très inférieures, ex. "CD Tedeón", "Anaitasuna", "Atlético Calatayud") qui
+  précède l'entrée des clubs professionnels en Round 1 (6 octobre pour cette édition). Conclusion :
+  ESPN ne fournit tout simplement AUCUN suivi live/fin de match fiable pour ce tour précis — déjà
+  pressenti dans un commentaire existant d'`espnAdapter.js` ("tours antérieurs... qualifs
+  amateurs"), mais jusqu'ici seulement documenté pour l'absence de TABLEAU à élimination directe
+  (`mapEspnStage` renvoie `null`), jamais identifié comme cassant aussi le statut live lui-même.
+  Aucune alternative gratuite connue ne couvre mieux ces qualifs amateurs (même limite déjà
+  documentée pour d'autres gaps ESPN dans ce fichier) — pas de "vrai fix" de statut possible côté
+  source. Choix fait entre les 2 options posées par l'utilisateur : RETRAIT plutôt que garder un
+  affichage cassé, cohérent avec toutes les décisions précédentes de ce projet face à un vrai gap
+  de données (TheSportsDB, buteurs ESPN NL/CAN/COPA/UEL/UECL). Corrigé (`src/utils/espnAdapter.js`,
+  `fetchEspnCupMatches`) : nouveau filtre `isUntrackedCupQualifyingRound()` sur
+  `event.season?.slug` (regex `qualif|preliminary`, insensible à la casse pour couvrir d'éventuelles
+  variantes de nommage ESPN) — exclut ces matchs À LA SOURCE, avant `normalizeEvent`, donc
+  invisibles partout où `fetchEspnCupMatches` est consommé (Accueil, Programme, Résultats). Portée
+  volontairement élargie aux 3 coupes nationales (FL1/PD/PL, voir `DOMESTIC_CUPS`) et pas seulement
+  Copa del Rey : Coupe de France et FA Cup ont très probablement le même trou de couverture sur
+  leurs propres tours de qualification amateurs (même pyramide à rounds préliminaires régionaux
+  avant l'entrée des clubs pros), pas vérifié en direct pour ces 2-là faute de match en cours au
+  moment du test, mais le mécanisme ESPN en cause n'a aucune raison de différer par compétition.
+  Effet : Copa del Rey n'affichera plus AUCUN match tant que le tournoi reste au stade qualificatif
+  (jusqu'au 6 octobre pour cette édition) — attendu et voulu, pas une régression : il n'y avait de
+  toute façon rien d'exploitable à montrer. Les matchs réapparaîtront normalement dès l'entrée en
+  lice des clubs pros (Round 1), où ESPN suit le direct sans problème comme pour n'importe quel
+  autre match pro déjà couvert par ce fichier. 374 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés. Honnêteté : pas de test automatisé dédié ajouté (aucune
+  infra de test n'existe pour `espnAdapter.js` à ce jour, contrairement à `liveDetection.js`/
+  `calcProno.js`) — la vérification s'est faite par un appel réel à l'API ESPN en production au
+  moment exact de l'incident, pas par une simulation ad-hoc ; à confirmer par l'utilisateur que la
+  compétition reste cohérente (rien affiché) jusqu'au 6 octobre, puis qu'un vrai match Round 1
+  passe bien en direct normalement le moment venu.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
