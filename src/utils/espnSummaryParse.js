@@ -96,6 +96,47 @@ export function compactEspnStandings(json) {
   }
 }
 
+// extractGoalsFromSummary — "buteurs fait maison" (26/09, suite au retrait de
+// compactEspnScorers ci-dessous : l'utilisateur a demandé si on pouvait
+// calculer nous-mêmes les buts par joueur à partir des vrais matchs plutôt
+// que de faire confiance à un endpoint agrégé ESPN buggé). Contrairement à
+// `/statistics` (cumul historique non fiable, voir plus bas), le détail
+// but-par-but d'UN match précis (`/apis/site/v2/sports/soccer/{slug}/
+// summary?event={id}`, champ `header.competitions[0].details`) est fiable :
+// vérifié en direct sur Norvège 3-2 Danemark (24/09) — les 5 buts extraits
+// (Bobb 14', Haaland 18', Damsgaard 25', Højlund 60', Haaland 74') collent
+// exactement au score réel et aux vrais événements du match. En sommant ce
+// détail sur TOUS les matchs déjà joués d'une compétition (une passe côté
+// serveur, voir `api/espn.js` mode `computedScorers=1`), on obtient un
+// classement buteurs qui ne peut PAS diverger du score réel des matchs,
+// contrairement à l'endpoint `/statistics` retiré au-dessus.
+// Chaque entrée de `details` a `scoringPlay: true` pour un but ; le premier
+// `participants[]` est le buteur, le second (s'il existe) est le passeur.
+// Les autogoals (`ownGoal: true`) sont exclus du décompte joueur — ils
+// comptent dans le score du match mais ne sont crédités à aucun joueur dans
+// un classement buteurs classique (même convention que football-data.org).
+export function extractGoalsFromSummary(json) {
+  const details = json?.header?.competitions?.[0]?.details
+  if (!Array.isArray(details)) return []
+
+  const goals = []
+  for (const d of details) {
+    if (!d?.scoringPlay || d.ownGoal) continue
+    const scorer = d.participants?.[0]?.athlete
+    if (!scorer?.id) continue
+    const assister = d.participants?.[1]?.athlete
+    goals.push({
+      athleteId:       String(scorer.id),
+      athleteName:     scorer.displayName ?? scorer.shortName ?? '',
+      teamId:          d.team?.id != null ? String(d.team.id) : '',
+      teamName:        d.team?.displayName ?? d.team?.name ?? '',
+      assistAthleteId: assister?.id != null ? String(assister.id) : null,
+      penaltyKick:     d.penaltyKick ?? false,
+    })
+  }
+  return goals
+}
+
 // ⚠️ compactEspnScorers ajoutée PUIS RETIRÉE le même jour (26/09) : convertissait
 // `/apis/site/v2/sports/soccer/{slug}/statistics` (goalsLeaders) en buteurs
 // pour NL/CAN/COPA/UEL/UECL (aucune couverture football-data.org). Semblait

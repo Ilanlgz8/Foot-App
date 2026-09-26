@@ -8,7 +8,7 @@
 // ⚠️ BUG CORRIGÉ dans espnSummaryParse.js pour le détail des bugs réels que
 // ces tests figent.
 import { describe, it, expect } from 'vitest'
-import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, normalize, fuzzyTeam, clubNameMatch } from './espnSummaryParse'
+import { extractMatchDetails, parseEspnRoster, compactEspnSummary, compactEspnStandings, extractGoalsFromSummary, normalize, fuzzyTeam, clubNameMatch } from './espnSummaryParse'
 
 // Payloads de test simplifiés mais avec les VRAIS noms de champs ESPN,
 // vérifiés par appel réel à site.api.espn.com/apis/v2/sports/soccer/{slug}/
@@ -109,6 +109,78 @@ describe('compactEspnStandings', () => {
 // `/statistics` se sont révélées mathématiquement incompatibles avec les
 // vrais totaux d'équipe une fois recoupées (ex. Portugal 1 but marqué au
 // total cette saison vs João Félix seul affiché à 2 buts).
+
+// ⚠️ Payload simplifié mais avec les VRAIS noms de champs ESPN, vérifié par
+// appel réel au vrai match Norvège 3-2 Danemark (eventId=401861046, 24/09) —
+// voir le commentaire d'extractGoalsFromSummary pour le contexte complet.
+function scoringDetail(minute, teamId, teamName, scorer, assister, extra = {}) {
+  return {
+    clock: { displayValue: `${minute}'` },
+    scoringPlay: true,
+    team: { id: teamId, displayName: teamName },
+    participants: [
+      { athlete: { id: String(scorer.id), displayName: scorer.name } },
+      ...(assister ? [{ athlete: { id: String(assister.id), displayName: assister.name } }] : []),
+    ],
+    ownGoal: false,
+    penaltyKick: false,
+    ...extra,
+  }
+}
+
+describe('extractGoalsFromSummary', () => {
+  it('renvoie [] si details est absent ou vide', () => {
+    expect(extractGoalsFromSummary({})).toEqual([])
+    expect(extractGoalsFromSummary({ header: { competitions: [{}] } })).toEqual([])
+    expect(extractGoalsFromSummary({ header: { competitions: [{ details: [] }] } })).toEqual([])
+  })
+
+  it('extrait les vrais buts du match Norvège 3-2 Danemark (24/09)', () => {
+    const json = {
+      header: { competitions: [{ details: [
+        scoringDetail(14, '464', 'Norway', { id: 307111, name: 'Oscar Bobb' }, { id: 203669, name: 'Martin Ødegaard' }),
+        scoringDetail(18, '464', 'Norway', { id: 253989, name: 'Erling Haaland' }, { id: 319368, name: 'Antonio Nusa' }),
+        scoringDetail(25, '479', 'Denmark', { id: 308932, name: 'Mikkel Damsgaard' }, null),
+        scoringDetail(60, '479', 'Denmark', { id: 309273, name: 'Rasmus Højlund' }, null),
+        scoringDetail(74, '464', 'Norway', { id: 253989, name: 'Erling Haaland' }, { id: 203669, name: 'Martin Ødegaard' }),
+      ] }] },
+    }
+    const goals = extractGoalsFromSummary(json)
+    expect(goals).toHaveLength(5)
+    // Haaland apparaît 2 fois (2 buts réels), pas 4 comme l'ancien endpoint /statistics buggé.
+    expect(goals.filter(g => g.athleteId === '253989')).toHaveLength(2)
+    expect(goals.filter(g => g.athleteId === '307111')).toHaveLength(1) // Bobb : 1 but réel, pas 2
+    expect(goals[0]).toEqual({
+      athleteId: '307111',
+      athleteName: 'Oscar Bobb',
+      teamId: '464',
+      teamName: 'Norway',
+      assistAthleteId: '203669',
+      penaltyKick: false,
+    })
+  })
+
+  it('exclut les entrées scoringPlay:false et les autogoals', () => {
+    const json = {
+      header: { competitions: [{ details: [
+        scoringDetail(10, '1', 'A', { id: 1, name: 'X' }),
+        { ...scoringDetail(20, '1', 'A', { id: 2, name: 'Y' }), scoringPlay: false },
+        { ...scoringDetail(30, '1', 'A', { id: 3, name: 'Z' }), ownGoal: true },
+      ] }] },
+    }
+    const goals = extractGoalsFromSummary(json)
+    expect(goals).toHaveLength(1)
+    expect(goals[0].athleteId).toBe('1')
+  })
+
+  it('gère un participant/athlete manquant sans planter', () => {
+    const json = { header: { competitions: [{ details: [
+      { scoringPlay: true, team: {}, participants: [] },
+      { scoringPlay: true, team: {}, participants: [{}] },
+    ] }] } }
+    expect(extractGoalsFromSummary(json)).toEqual([])
+  })
+})
 
 // ⚠️ Tests ajoutés (audit période creuse) pour figer le comportement de
 // normalize()/fuzzyTeam() — cette paire existait en 3 copies dont une avait

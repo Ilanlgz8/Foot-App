@@ -195,7 +195,23 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // PAS à confirmer qu'une donnée est correcte, il faut la recouper contre une
 // autre source (ici, les propres standings d'ESPN) avant de la considérer
 // fiable. NL/CAN/COPA/UEL/UECL restent donc dans NO_SCORERS_COMPS ci-dessous.
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+//
+// ⚠️ NL RETIRÉE de NO_SCORERS_COMPS (même jour, 26/09) : plutôt que de faire
+// confiance à un endpoint ESPN agrégé, `useScorers.js` calcule désormais lui-
+// même les buts par joueur en additionnant le détail but-par-but de chaque
+// vrai match joué (`api/espn.js` mode `computedScorers=1`, voir
+// extractGoalsFromSummary dans espnSummaryParse.js) — vérifié en direct sur
+// Norvège 3-2 Danemark (24/09) : les 5 buts extraits collent exactement au
+// score réel. Piloté sur NL seule pour l'instant (voir HOMEMADE_SCORERS_COMPS
+// ci-dessous) : CAN/COPA/UEL/UECL restent dans NO_SCORERS_COMPS, à basculer
+// séparément une fois le mécanisme validé sur NL (UEL/UECL ont beaucoup plus
+// de matchs par journée, risque budget Vercel/Redis plus élevé à valider).
+export const NO_SCORERS_COMPS = new Set(['CAN', 'COPA', 'UEL', 'UECL'])
+
+// Compétitions dont les buteurs sont calculés "maison" (voir commentaire
+// ci-dessus) plutôt que lus depuis football-data.org ou un endpoint agrégé
+// ESPN — useScorers.js route ces compIds vers `api/espn.js?computedScorers=1`.
+export const HOMEMADE_SCORERS_COMPS = new Set(['NL'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les

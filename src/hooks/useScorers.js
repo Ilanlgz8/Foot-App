@@ -3,7 +3,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
-import { NO_SCORERS_COMPS } from '../data/competitions'
+import { NO_SCORERS_COMPS, HOMEMADE_SCORERS_COMPS, COMPETITION_ESPN_SLUG } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -46,11 +46,19 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // un cumul historique/all-time de la compétition (toutes éditions confondues)
 // plutôt qu'un classement de la saison affichée, aucun paramètre de
 // filtrage par saison/édition trouvé sur cet endpoint pour le corriger.
-// NL/CAN/COPA/UEL/UECL restent donc dans `NO_SCORERS_COMPS` (bouton "Buteurs"
-// caché pour ces 5, voir Classement.jsx) — gap honnêtement documenté plutôt
-// qu'une donnée fausse affichée. `compactEspnScorers`/le mode `scorers=1` de
+// CAN/COPA/UEL/UECL restent dans `NO_SCORERS_COMPS` (bouton "Buteurs" caché
+// pour ces 4, voir Classement.jsx) — gap honnêtement documenté plutôt qu'une
+// donnée fausse affichée. `compactEspnScorers`/le mode `scorers=1` de
 // `api/espn.js` ont été retirés avec ce revert (code mort, plus aucun
 // appelant) — voir CLAUDE.md pour l'historique complet de cette tentative.
+//
+// ⚠️ NL relancée le même jour via un calcul MAISON (voir HOMEMADE_SCORERS_
+// COMPS, competitions.js) : plutôt que de faire confiance à un endpoint
+// agrégé ESPN, `api/espn.js` (mode `computedScorers=1`) additionne lui-même
+// le détail but-par-but de chaque vrai match joué — vérifié en direct sur
+// Norvège 3-2 Danemark (24/09), les 5 buts extraits collent exactement au
+// score réel. Piloté sur NL seule pour l'instant, à étendre séparément aux 4
+// autres une fois validé (UEL/UECL ont beaucoup plus de matchs/journée).
 export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
@@ -79,6 +87,29 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
       // laisser tomber dans la branche FD.org, qui échouerait (compId pas un
       // vrai code FD.org) sans jamais rien avoir de mieux à proposer.
       if (NO_SCORERS_COMPS.has(compId)) { writeCache(key, [], STALE_MS); return [] }
+
+      // ⚠️ Branche "buteurs fait maison" (voir commentaire au-dessus de la
+      // fonction) : chemin séparé et plus simple que celui FD.org ci-dessous
+      // — pas de verrou d'espacement à respecter (le calcul/l'agrégation se
+      // fait côté serveur, api/espn.js, ce hook ne fait qu'un seul GET).
+      // `readCacheStale` reste le filet de secours en cas d'échec réseau,
+      // même mécanisme que la branche FD.org plus bas.
+      if (HOMEMADE_SCORERS_COMPS.has(compId)) {
+        const slug = COMPETITION_ESPN_SLUG[compId]
+        if (!slug) { writeCache(key, [], STALE_MS); return [] }
+        try {
+          const r = await fetch(`/espn?slug=${slug}&computedScorers=1`)
+          if (!r.ok) throw new Error(String(r.status))
+          const j = await r.json()
+          const scorersHomemade = j.scorers ?? []
+          writeCache(key, scorersHomemade, STALE_MS)
+          return scorersHomemade
+        } catch (err) {
+          const stale = readCacheStale(key)
+          if (stale) return stale
+          throw err
+        }
+      }
 
       // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
       // délai fixe — 0ms si aucun hook voisin (useStandings/useTeamForm,
