@@ -407,10 +407,11 @@ async function fetchEventSummaryGoals(slug, eventId, debugInfo) {
     // sans await laissait le mget partir avant que l'ecriture Redis soit reellement posee, d'ou
     // des events "status:ok" avec de vrais buts calcules mais relus vides (`goalListsNonEmpty:0`
     // confirme en direct via ?debug=1) — bug reel trouve et corrige, pas une hypothese.
+    let writeError = null
     try {
       await kv.set(eventCacheKey, JSON.stringify(goals)) // pas de `ex` : permanent, comme documenté ci-dessus
-    } catch { /* Redis indisponible pour l'ecriture : les buts restent quand meme dispos en memoire pour ce cycle via le return ci-dessous, juste pas mis en cache */ }
-    debugInfo?.push({ eventId, status: 'ok', goals: goals.length })
+    } catch (e) { writeError = String(e) /* Redis indisponible pour l'ecriture : les buts restent quand meme dispos en memoire pour ce cycle via le return ci-dessous, juste pas mis en cache */ }
+    debugInfo?.push({ eventId, status: 'ok', goals: goals.length, writeError })
     return goals
   } catch (err) {
     debugInfo?.push({ eventId, status: 'exception', message: String(err) })
