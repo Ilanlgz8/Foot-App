@@ -1901,6 +1901,62 @@ cf-worker/
   vérifiés. Classement de groupe (`NO_STANDINGS_COMPS`, point ci-dessus) et renommage NL restent
   en place, non concernés par ce retrait — seuls les buteurs de ces 5 comps sont affectés.
 
+- 🔍 Buteurs "fait maison" pour la Ligue des Nations, EN PAUSE — bloqué par le quota Upstash
+  épuisé, pas un bug de code (26/09) : suite au retrait des buteurs ESPN ci-dessus (données
+  fausses confirmées), demande explicite utilisateur de calculer les buteurs nous-mêmes en
+  agrégeant les vrais événements de but match par match plutôt que de faire confiance à un
+  endpoint agrégé d'ESPN. Faisabilité validée en direct : `header.competitions[0].details` de
+  `/apis/site/v2/sports/soccer/{slug}/summary?event={id}` (endpoint PAR MATCH, différent de
+  `/statistics`) donne le détail but par but (buteur, passeur, minute, csc) — vérifié à 100%
+  exact sur Norvège 3-2 Danemark (401861046) : buts extraits (Bobb 14', Haaland 18', Damsgaard
+  25', Højlund 60', Haaland 74') correspondent exactement au vrai score et aux vrais événements.
+  Nouvelle fonction `extractGoalsFromSummary()` (`src/utils/espnSummaryParse.js`, 4 tests dédiés)
+  + nouveau mode `computedScorers=1` dans `api/espn.js` : scanne le scoreboard ESPN jour par jour
+  (réutilise `readCachedChunks`/`fetchScoreboardChunksStaggered`/`mergeScoreboardChunks` déjà en
+  place, aucune duplication), détecte les matchs nouvellement terminés, fetch leur summary,
+  agrège buts/passes par joueur (`aggregateGoals`), cache le résultat par match de façon
+  permanente dans Redis (`espn:ownscorers:event:*`) + un pointeur `meta` (`scannedThrough`,
+  `doneEventIds`) pour ne rescanner que l'incrément à chaque appel — même philosophie de cache
+  incrémental que le reste du fichier. Nouveau champ `HOMEMADE_SCORERS_COMPS` (`competitions.js`,
+  NL uniquement pour l'instant — CAN/COPA/UEL/UECL restent dans `NO_SCORERS_COMPS`, extension
+  explicitement pas encore demandée par l'utilisateur, qui a choisi ce périmètre pilote via
+  question directe). 2 vrais bugs trouvés et corrigés AVANT toute confirmation live définitive :
+  (1) `group.forEach(id => doneIds.add(id))` marquait TOUS les ids d'un groupe comme "traités"
+  même quand `fetchEventSummaryGoals` échouait (null) — un simple raté réseau/timeout excluait
+  alors ce match DÉFINITIVEMENT du calcul (`doneEventIds` persiste en Redis, jamais rescanné) ;
+  corrigé pour ne marquer "done" que les ids dont le fetch a réellement réussi. (2) le
+  `kv.mget` d'agrégation finale lisait un format de clé différent de celui utilisé à l'écriture
+  après un bump de version — corrigé. Testé en direct via `?debug=1` (instrumentation temporaire,
+  toujours en place à ce stade car le diagnostic n'est pas encore terminé) : les 2 bugs ci-dessus
+  étaient bien réels, mais une fois corrigés, `goalListsNonEmpty` restait à 0 alors que CHAQUE
+  match scanné affichait "status:ok" avec de vrais buts calculés (ex. 7 buts sur un match) — piste
+  suivante : `kv.set` était en fire-and-forget (`.catch(()=>{})` sans `await`), donc le `kv.mget`
+  de la même requête pouvait partir avant que l'écriture soit réellement posée ; corrigé (`await`
+  ajouté) + bump de version (v2→v3) pour forcer un rescan propre des matchs déjà "pollués" par le
+  bug précédent (déjà marqués done avec un cache vide, jamais rescannés sinon). Toujours 0 après
+  ce fix : le `catch` autour de `kv.set` avalait l'erreur SANS la logger, donc le "status:ok" du
+  debug ne prouvait que le succès du fetch ESPN, pas de l'écriture Redis — ajout d'un champ
+  `writeError` pour voir le message d'exception réel, bump v3→v4 pour forcer un nouveau rescan.
+  **Root cause réelle enfin confirmée, en toutes lettres dans `writeError` sur les 21 événements
+  scannés** : `UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000,
+  Usage: 500000` — le quota MENSUEL Redis Upstash gratuit (500 000 commandes) est intégralement
+  épuisé au moment de ce test. Aucun rapport avec le code de cette fonctionnalité : les 2 bugs
+  trouvés et corrigés ci-dessus étaient réels et corrects, mais avec ce quota à 500000/500000,
+  TOUTE commande Redis échoue actuellement pour TOUTE l'app (pas seulement cette fonctionnalité) —
+  déjà pressenti comme un risque le 10/09 ("Commandes Upstash trop proches du plafond gratuit"),
+  désormais confirmé effectivement atteint. Implication large, pas juste ce ticket : tant que ce
+  quota reste épuisé, tout ce qui dépend de Redis dans l'app tourne en mode dégradé silencieux
+  (chaque fonction a déjà un `catch` de repli, donc pas de crash visible, mais probablement plus
+  de cache du tout — fast-path live, budget/circuit-breaker football-data.org, subscriptions push,
+  etc. — jusqu'au reset mensuel du quota Upstash ou une mise à niveau de plan, aucune des deux
+  actions n'étant faisable depuis cet environnement). Le code de cette fonctionnalité (bugs 1+2
+  corrigés, `await` ajouté, clés en `v4`) est considéré CORRECT et prêt — la vérification finale
+  (confirmer un vrai classement buteurs non-vide, ex. Haaland à 2 buts) ne pourra se faire qu'une
+  fois le quota Upstash disponible à nouveau. Instrumentation debug (`?debug=1`, `writeError`)
+  volontairement laissée en place pour l'instant plutôt que retirée immédiatement, le temps de
+  cette vérification post-reset. 374 tests + lint (33 erreurs pré-existantes, inchangé) + build
+  vérifiés à chaque étape de ce chantier.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
