@@ -378,7 +378,7 @@ function isEventFinished(evt) {
 // live des buts (cron-goals.js/cf-worker) qu'il ne faut jamais reduppliquer
 // ni fragiliser pour cette fonctionnalité annexe).
 async function fetchEventSummaryGoals(slug, eventId, debugInfo) {
-  const eventCacheKey = `espn:ownscorers:event:v2:${slug}:${eventId}`
+  const eventCacheKey = `espn:ownscorers:event:v3:${slug}:${eventId}`
   try {
     const cached = await kv.get(eventCacheKey)
     if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached
@@ -666,7 +666,7 @@ export default async function handler(req, res) {
       // inconditionnel corrigé juste avant, voir plus bas) — sans ce bump, cet
       // état déjà écrit resterait "frais" (HOMEMADE_SCORERS_FRESH_MS) et
       // bloquerait tout nouveau scan pendant 10min après le déploiement du fix.
-      const metaKey = `espn:ownscorers:meta:v2:${slug}`
+      const metaKey = `espn:ownscorers:meta:v3:${slug}`
       let meta = null
       try {
         const raw = await kv.get(metaKey)
@@ -746,7 +746,7 @@ export default async function handler(req, res) {
         try {
           // 1 seul kv.mget quel que soit le nombre de matchs déjà connus
           // (même optimisation Upstash qu'ailleurs dans ce fichier).
-          const values = await kv.mget(...eventIds.map(id => `espn:ownscorers:event:v2:${slug}:${id}`))
+          const values = await kv.mget(...eventIds.map(id => `espn:ownscorers:event:v3:${slug}:${id}`))
           goalLists = values.map(v => {
             if (!v) return []
             try { return typeof v === 'string' ? JSON.parse(v) : v } catch { return [] }
