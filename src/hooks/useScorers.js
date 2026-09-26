@@ -3,7 +3,7 @@ import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
-import { ESPN_SOURCED_SCORERS_COMPS, COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { NO_SCORERS_COMPS } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
@@ -30,17 +30,27 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // MatchPoster.jsx, LiveMatchPage.jsx... qui n'appellent jamais useStandings
 // en parallèle) — seuls Classement.jsx et ClassementTab (MatchModal.jsx, même
 // collision : standings+form ensemble) passent un délai explicite.
-// ⚠️ Source ESPN AJOUTÉE (26/09, constat utilisateur : "y'a pas... le
-// classement des meilleurs buteurs dans ligue des nations et les autres
-// competition aussi", juste après l'ouverture de NL/CAN/COPA/UEL/UECL dans
-// le sélecteur de Classement.jsx) : ces 5 compétitions n'ont AUCUNE
-// couverture football-data.org — jusqu'ici un gap documenté sans repli connu
-// (voir CLAUDE.md, un ancien essai sur `/leaders` ESPN puis TheSportsDB
-// s'étaient tous les deux révélés vides). Revérifié en direct ce jour-là :
-// `/apis/site/v2/sports/soccer/{slug}/statistics`, un endpoint ESPN DIFFÉRENT
-// et jamais essayé jusqu'ici, renvoie un vrai classement buteurs pour 4 des 5
-// (voir compactEspnScorers, espnSummaryParse.js, pour le détail complet et
-// l'honnêteté sur la 5e, Ligue Europa Conférence, vide pour l'instant).
+// ⚠️ Source ESPN AJOUTÉE PUIS RETIRÉE LE MÊME JOUR (26/09) : après le constat
+// utilisateur "y'a pas... le classement des meilleurs buteurs dans ligue des
+// nations", `/apis/site/v2/sports/soccer/{slug}/statistics` avait d'abord été
+// branché ici (endpoint jamais essayé jusque-là, voir historique CLAUDE.md
+// pour /leaders et TheSportsDB, tous deux vides). Retiré quelques minutes
+// après déploiement : constat utilisateur PRÉCIS et vérifiable ("impossible
+// que haaland il est 4 buts et joao felix 2 vu que y'avait meme pas 4 buts et
+// 1 but au portugal seulement") — recroisé en direct avec les VRAIS totaux
+// d'équipe de ce même ESPN (`/apis/v2/sports/soccer/uefa.nations/standings`) :
+// Portugal n'a marqué QUE 1 but au total (1 match joué) alors que João Félix
+// seul apparaissait à 2 ; la Norvège n'a marqué QUE 3 buts au total alors que
+// Haaland (4) + Bobb (2) totalisaient 6 à eux deux. Mathématiquement
+// impossible si l'endpoint reflétait la saison en cours — very probablement
+// un cumul historique/all-time de la compétition (toutes éditions confondues)
+// plutôt qu'un classement de la saison affichée, aucun paramètre de
+// filtrage par saison/édition trouvé sur cet endpoint pour le corriger.
+// NL/CAN/COPA/UEL/UECL restent donc dans `NO_SCORERS_COMPS` (bouton "Buteurs"
+// caché pour ces 5, voir Classement.jsx) — gap honnêtement documenté plutôt
+// qu'une donnée fausse affichée. `compactEspnScorers`/le mode `scorers=1` de
+// `api/espn.js` ont été retirés avec ce revert (code mort, plus aucun
+// appelant) — voir CLAUDE.md pour l'historique complet de cette tentative.
 export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
@@ -62,28 +72,13 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
     queryFn: async () => {
-      // ⚠️ Branche ESPN (26/09, voir le commentaire au-dessus de la fonction)
-      // : chemin séparé et plus simple que celui FD.org ci-dessous — pas de
-      // verrou d'espacement à respecter (ESPN n'a pas cette contrainte sur ce
-      // projet, voir useStandings.js/useTeamForm.js qui font déjà de même
-      // pour ces 5 comps). `readCacheStale` reste le filet de secours en cas
-      // d'échec réseau, même mécanisme que la branche FD.org plus bas.
-      if (ESPN_SOURCED_SCORERS_COMPS.has(compId)) {
-        const slug = COMPETITION_ESPN_SLUG[compId]
-        if (!slug) { writeCache(key, [], STALE_MS); return [] }
-        try {
-          const r = await fetch(`/espn?slug=${slug}&scorers=1`)
-          if (!r.ok) throw new Error(String(r.status))
-          const j = await r.json()
-          const scorersEspn = j.scorers ?? []
-          writeCache(key, scorersEspn, STALE_MS)
-          return scorersEspn
-        } catch (err) {
-          const stale = readCacheStale(key)
-          if (stale) return stale
-          throw err
-        }
-      }
+      // ⚠️ NO_SCORERS_COMPS (voir commentaire au-dessus de la fonction) :
+      // aucune source fiable pour ces 5 comps — Classement.jsx cache le
+      // bouton "Buteurs" avant même d'appeler ce hook pour elles, mais on
+      // garde un filet ici aussi (défense en profondeur) plutôt que de
+      // laisser tomber dans la branche FD.org, qui échouerait (compId pas un
+      // vrai code FD.org) sans jamais rien avoir de mieux à proposer.
+      if (NO_SCORERS_COMPS.has(compId)) { writeCache(key, [], STALE_MS); return [] }
 
       // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
       // délai fixe — 0ms si aucun hook voisin (useStandings/useTeamForm,

@@ -25,7 +25,7 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
-import { compactEspnSummary, compactEspnStandings, compactEspnScorers } from '../src/utils/espnSummaryParse.js'
+import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -479,7 +479,7 @@ export default async function handler(req, res) {
     if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings, scorers } = req.query
+  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
@@ -539,51 +539,16 @@ export default async function handler(req, res) {
         .json(compact)
     }
 
-    // ── Mode scorers : meilleurs buteurs ESPN — seule source possible pour
-    // Ligue des Nations/CAN/Copa America/Ligue Europa/Ligue Europa Conférence
-    // (football-data.org ne couvre aucune d'elles, voir
-    // ESPN_SOURCED_SCORERS_COMPS dans data/competitions.js). Découvert et
-    // vérifié en direct le 26/09 (demande utilisateur) — un endpoint DIFFÉRENT
-    // du scoreboard/summary ci-dessus, jamais essayé jusqu'ici (voir
-    // compactEspnScorers, espnSummaryParse.js, pour le détail complet).
-    // ⚠️ /apis/site/v2/ (PAS /apis/v2/, utilisé pour standings ci-dessus) —
-    // c'est l'inverse de standings : /apis/v2/.../statistics n'existe pas,
-    // seul /apis/site/v2/.../statistics renvoie les leaders.
-    if (scorers === '1') {
-      const cacheKey = `espn:scorers:${slug}`
-      try {
-        const cached = await kv.get(cacheKey)
-        if (cached) {
-          clearTimeout(timeoutId)
-          const cachedArr = typeof cached === 'string' ? JSON.parse(cached) : cached
-          return res.status(200)
-            .setHeader('Content-Type', 'application/json')
-            .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-            .json({ scorers: cachedArr })
-        }
-      } catch { /* Redis indisponible → on continue vers le fetch direct */ }
-
-      const statsUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/statistics`
-      const response = await fetch(statsUrl, {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-
-      if (!response.ok) return res.status(response.status).json({ error: `ESPN a répondu ${response.status}` })
-
-      const rawBody = await response.text()
-      let compact = []
-      try {
-        compact = compactEspnScorers(JSON.parse(rawBody))
-        await kv.set(cacheKey, JSON.stringify(compact), { ex: 300 })
-      } catch { /* JSON invalide ESPN ou KV en erreur → on renvoie quand même le résultat compacté (vide si le parse a échoué) */ }
-
-      return res.status(200)
-        .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-        .json({ scorers: compact })
-    }
+    // ── Mode scorers : AJOUTÉ PUIS RETIRÉ LE MÊME JOUR (26/09) — voir le
+    // commentaire détaillé dans data/competitions.js (NO_SCORERS_COMPS) et
+    // useScorers.js. L'endpoint `/apis/site/v2/sports/soccer/{slug}/
+    // statistics` renvoyait bien des noms/buts plausibles à première vue,
+    // mais recoupé avec les propres standings ESPN, les totaux se sont avérés
+    // mathématiquement impossibles pour la saison en cours (ex. Portugal 1
+    // but marqué au total vs João Félix seul à 2) — vraisemblablement un
+    // cumul historique/all-time de la compétition, pas la saison affichée.
+    // Mode entièrement retiré plutôt que laissé mort : `scorers` n'est plus
+    // lu dans req.query, `compactEspnScorers` n'est plus importé.
 
     // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
     // Voir le commentaire sur espnMap plus haut pour le contexte. Écrit

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/competitions'
+import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ RÉDUIT (26/09, voir le commentaire détaillé sur NO_STANDINGS_COMPS dans
@@ -157,6 +157,15 @@ function Classement() {
   // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
   const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
     || selectedComp === 'NL' || selectedComp === 'CAN' || selectedComp === 'COPA'
+  // ⚠️ AJOUT (26/09, filet pour NO_SCORERS_COMPS ci-dessus) : le bouton
+  // "Buteurs" est caché pour ces comps, mais `view` est persisté
+  // (usePersistedState) — un utilisateur déjà sur la vue "buteurs" avant de
+  // changer de championnat vers NL/CAN/COPA/UEL/UECL resterait sinon bloqué
+  // sur un panneau vide sans bouton pour en sortir. Repli automatique.
+  useEffect(() => {
+    if (view === 'buteurs' && NO_SCORERS_COMPS.has(selectedComp)) setView('classement')
+  }, [selectedComp, view, setView])
+
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement
@@ -663,12 +672,19 @@ function Classement() {
             >
               Classement
             </button>
-            <button
-              className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
-              onClick={() => setView('buteurs')}
-            >
-              Buteurs
-            </button>
+            {/* ⚠️ Caché pour NO_SCORERS_COMPS (voir competitions.js) — aucune
+                source fiable pour ces comps (dernier essai ESPN /statistics
+                retiré le 26/09, données prouvées fausses par recoupement avec
+                les standings). Mieux vaut ne rien afficher qu'un classement
+                trompeur. */}
+            {!NO_SCORERS_COMPS.has(selectedComp) && (
+              <button
+                className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
+                onClick={() => setView('buteurs')}
+              >
+                Buteurs
+              </button>
+            )}
             {/* Onglet "Tendances" mis de côté pour être retravaillé plus tard —
                 voir TendancesView.jsx / tendances.css (conservés, pas supprimés). */}
           </div>

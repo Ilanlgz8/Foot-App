@@ -1850,6 +1850,57 @@ cf-worker/
   aucun changement de code nécessaire. 360 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
   inchangé) + build vérifiés (fichier image uniquement, aucune logique touchée).
 
+- ✅ Dropdown Classement complété (26/09, constat utilisateur : "dans la page classement y'a pas
+  toutes les competition dans le dropdown") : `NO_STANDINGS_COMPS` excluait NL/CAN/COPA/UEL/UECL
+  par prudence depuis l'origine, en confondant avec une limite réelle mais différente (le
+  scoreboard ESPN, utilisé pour Programme/Résultats, n'expose pas proprement la structure de
+  groupe) — jamais vérifié en direct pour l'endpoint DÉDIÉ aux classements
+  (`/apis/v2/sports/soccer/{slug}/standings`, `compactEspnStandings`). Testé en direct pour les 5 :
+  toutes renvoient un vrai classement structuré. Retirées de `NO_STANDINGS_COMPS` (ne reste que
+  USC/TDC/CS, un seul match par an). Complété au même moment `BIG_TEAMS`/`NOTABLE_TEAMS`
+  (`matchDuJour.js`) pour ces compétitions et d'autres championnats domestiques déjà présents
+  (Porto/Feyenoord, Brest, Brighton, Real Sociedad/Girona, Union Berlin, Bologne, Uruguay/
+  Colombie/Chili/Équateur/Paraguay/Pérou pour la Copa America) — demande explicite utilisateur
+  ("faut mettre les meilleures equipe a chaque fois"). NL renommée "UEFA Nations League" (nom
+  officiel complet, orthographe corrigée en "Nations" pluriel). 374 tests (+15) + lint + build
+  vérifiés à chaque étape.
+
+- ❌ Buteurs ESPN pour NL/CAN/COPA/UEL/UECL, AJOUTÉS PUIS RETIRÉS LE MÊME JOUR (26/09) : suite au
+  dropdown Classement ci-dessus, demande utilisateur explicite ("y'a pas... le classement des
+  meilleurs buteur dans ligue des nations et les autres competition aussi") — ces 5 compétitions
+  n'ont aucune couverture football-data.org pour les buteurs, gap documenté de longue
+  date (`/leaders` ESPN et TheSportsDB `lookuptopscorers.php` déjà testés vides par le passé).
+  Plutôt que de répéter ce constat, revérifié en direct : un endpoint DIFFÉRENT jamais essayé,
+  `/apis/site/v2/sports/soccer/{slug}/statistics` (`goalsLeaders`), renvoyait bien des noms/buts
+  plausibles pour 4 des 5 (UECL vide) — câblé de bout en bout (`compactEspnScorers`,
+  `espnSummaryParse.js`, mode `scorers=1` dans `api/espn.js`, branche ESPN dans `useScorers.js`,
+  bouton "Buteurs" affiché pour ces 5 dans `Classement.jsx`) et déployé, avec vérification live
+  positive (Haaland 4 buts affiché sur UEFA Nations League). Quelques minutes plus tard, retour
+  utilisateur PRÉCIS et vérifiable : "c impossible que halland il est 4 buts et joao felix 2 vu
+  que y'avait meme pas 4 buts et 1 but au portugal seulement". Recroisé en direct avec les VRAIS
+  totaux d'ÉQUIPE du même ESPN (`/apis/v2/sports/soccer/uefa.nations/standings`) : Portugal
+  gamesPlayed=1, pointsFor=1 (1 seul but marqué au total cette saison) alors que João Félix SEUL
+  était affiché à 2 buts — impossible. Même schéma pour la Norvège (3 buts d'équipe au total vs
+  Haaland 4 + Oscar Bobb 2 = 6 à eux deux) et pour l'Allemagne/le Danemark/la Serbie/le Kosovo
+  (mêmes écarts, un joueur affiché à plus de buts que toute son équipe n'en a marqué). Cause la
+  plus probable (`seasonType: 14105`, un identifiant ESPN interne inhabituel, ni 1/2/3 comme un
+  vrai type de phase de saison) : cet endpoint `/statistics` renvoie vraisemblablement un cumul
+  HISTORIQUE/ALL-TIME de la compétition (toutes éditions de la Ligue des Nations confondues, par
+  exemple), pas un classement de la saison/édition affichée — aucun paramètre de filtrage par
+  saison/édition trouvé pour le corriger sur cet endpoint. Entièrement retiré plutôt que corrigé
+  (pas de fix fiable trouvé) : `compactEspnScorers` + ses tests supprimés (`espnSummaryParse.js`/
+  `.test.js`), mode `scorers=1` supprimé (`api/espn.js`), branche ESPN supprimée
+  (`useScorers.js`, retour à `NO_SCORERS_COMPS` — renommé depuis `ESPN_SOURCED_SCORERS_COMPS`),
+  bouton "Buteurs" recaché pour ces 5 comps (`Classement.jsx`) avec un filet qui repasse
+  automatiquement en vue "Classement" si l'utilisateur y était resté (persisté en
+  sessionStorage). Leçon retenue et documentée dans le code : une vérification "ça renvoie des
+  noms et des chiffres plausibles" ne suffit PAS à confirmer qu'une donnée est correcte — il faut
+  la recouper contre une autre source (ici, les propres standings d'ESPN) avant de la considérer
+  fiable, pas seulement constater qu'elle a l'air de fonctionner. 370 tests (-4, les tests
+  compactEspnScorers retirés) + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  vérifiés. Classement de groupe (`NO_STANDINGS_COMPS`, point ci-dessus) et renommage NL restent
+  en place, non concernés par ce retrait — seuls les buteurs de ces 5 comps sont affectés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

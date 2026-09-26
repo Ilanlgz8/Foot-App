@@ -171,24 +171,31 @@ export const DOMESTIC_CUPS = {
 // principe que SINGLE_MATCH_COMPS ci-dessus, pour Programme/Résultats).
 export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 
-// ⚠️ AJOUT PUIS CORRIGÉ LE MÊME JOUR (26/09) : d'abord introduit comme
-// `NO_SCORERS_COMPS` en partant du gap documenté de longue date dans ce
-// projet ("aucune alternative gratuite connue ne couvre les BUTEURS", voir
-// CLAUDE.md — testé à l'époque : TheSportsDB `lookuptopscorers.php` vide,
-// ESPN `/leaders` vide) — mais quelques minutes plus tard, demande explicite
-// utilisateur ("y'a pas... le classement des meilleurs buteurs dans ligue des
-// nations et les autres competition aussi") a motivé une VRAIE revérification
-// plutôt que de simplement répéter le constat précédent. Trouvé et vérifié en
-// direct : `/apis/site/v2/sports/soccer/{slug}/statistics` (endpoint DIFFÉRENT
-// de `/leaders`, jamais essayé jusqu'ici) renvoie bien un classement buteurs
-// réel pour 4 des 5 — voir compactEspnScorers, espnSummaryParse.js, pour le
-// détail complet et le comptage exact par compétition. useScorers.js source
-// donc désormais ces 5 comps via ESPN plutôt que FD.org (qui ne les couvre
-// toujours pas). UECL exceptée en pratique (mais laissée dans ce Set : la
-// source existe, l'ESPN n'a simplement pas encore de données à y mettre pour
-// l'instant, voir le commentaire détaillé dans compactEspnScorers) — `[]` en
-// sortie, déjà géré proprement par Classement.jsx ("Aucun buteur disponible").
-export const ESPN_SOURCED_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+// ⚠️ AJOUT, "CORRIGÉ" PAR ERREUR, PUIS RE-RÉTABLI LE MÊME JOUR (26/09) :
+// d'abord introduit en partant du gap documenté de longue date ("aucune
+// alternative gratuite connue ne couvre les BUTEURS", voir CLAUDE.md — testé
+// à l'époque : TheSportsDB `lookuptopscorers.php` vide, ESPN `/leaders` vide).
+// Suite à la demande utilisateur d'ajouter les buteurs pour ces 5 comps, un
+// nouvel endpoint JAMAIS essayé (`/apis/site/v2/sports/soccer/{slug}/
+// statistics`) a semblé fonctionner (renvoyait bien des noms/buts plausibles,
+// vérifié en direct) — brièvement câblé (`ESPN_SOURCED_SCORERS_COMPS`,
+// `compactEspnScorers`). Retiré quelques minutes après déploiement : constat
+// utilisateur PRÉCIS et vérifiable ("impossible que haaland il est 4 buts et
+// joao felix 2 vu que y'avait meme pas 4 buts et 1 but au portugal
+// seulement") — recroisé en direct avec les VRAIS totaux d'équipe du même
+// ESPN (`/apis/v2/sports/soccer/uefa.nations/standings`) : Portugal n'a
+// marqué QUE 1 but au total (1 match joué) alors que João Félix seul
+// apparaissait à 2 buts ; Norvège n'a marqué QUE 3 buts au total alors que
+// Haaland (4) + Bobb (2) totalisaient 6 à eux deux — mathématiquement
+// impossible pour la saison en cours. Cet endpoint `/statistics` semble donc
+// renvoyer un cumul historique/all-time de la compétition (toutes éditions
+// confondues), pas un classement de l'édition/saison affichée — aucun
+// paramètre de saison/édition trouvé pour le corriger. Leçon retenue : une
+// vérification "ça renvoie des noms et des chiffres plausibles" ne suffit
+// PAS à confirmer qu'une donnée est correcte, il faut la recouper contre une
+// autre source (ici, les propres standings d'ESPN) avant de la considérer
+// fiable. NL/CAN/COPA/UEL/UECL restent donc dans NO_SCORERS_COMPS ci-dessous.
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
