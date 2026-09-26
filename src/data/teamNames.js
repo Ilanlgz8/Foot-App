@@ -157,6 +157,18 @@ export const TEAM_NAMES_FR = {
   'Sporting CP': 'Sporting CP',
   'FK Kairat': 'Kairat',
   'Galatasaray': 'Galatasaray',
+  // ⚠️ AJOUT (26/09, demande utilisateur : "pour tous les championnats
+  // différents faut qu'on mette les meilleures équipes à chaque fois") : Porto
+  // et Feyenoord n'avaient encore JAMAIS été rencontrés par cette table
+  // (aucun match réel observé avec ces clubs jusqu'ici, contrairement au reste
+  // du fichier "vérifié un par un" sur de vraies données ESPN/FD.org — voir
+  // matchDuJour.js pour l'honnêteté complète sur ce point). Auto-mappés par
+  // cohérence avec le nom déjà utilisé partout ailleurs dans l'app pour ces 2
+  // clubs, 2 variantes pour Porto (nom court ESPN probable + nom complet
+  // FD.org probable), à corriger si un vrai match révèle une autre forme.
+  'Porto': 'Porto',
+  'FC Porto': 'Porto',
+  'Feyenoord': 'Feyenoord',
 
   // Euro / Nations
   'Germany': 'Allemagne',

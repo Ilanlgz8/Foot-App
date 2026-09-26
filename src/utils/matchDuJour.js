@@ -145,14 +145,32 @@ const BIG_TEAMS = new Set([
   'Bayern Munich', 'Dortmund', 'RB Leipzig', 'Leverkusen',
   // Serie A
   'Juventus', 'Inter Milan', 'Milan AC', 'Naples',
-  // Autres clubs européens historiques (Ligue Europa/Ligue des Champions)
-  'Ajax', 'Benfica',
+  // Autres clubs européens historiques (Ligue Europa/Ligue des Champions) —
+  // plusieurs Coupes d'Europe/Ligues des Champions chacun, palmarès objectif.
+  // Porto/PSV Eindhoven/Feyenoord ajoutés le 26/09 (demande utilisateur :
+  // "pour tous les championnats différents faut qu'on mette les meilleures
+  // équipes à chaque fois") — Ajax/Benfica seuls ne couvraient qu'une
+  // fraction de la Ligue Europa/Conférence hors 5 grands championnats. Même
+  // critère objectif (palmarès européen réel) : Porto (2 Coupes des clubs
+  // champions/C1 1987+2004, 2 Coupes UEFA 2003+2011), PSV Eindhoven (1 Coupe
+  // des clubs champions 1988), Feyenoord (1 Coupe des clubs champions 1970,
+  // 2 Coupes UEFA 1974+2002). Honnêteté : contrairement au reste de cette
+  // liste (noms vérifiés un par un sur de vrais matchs ESPN/FD.org), ces 3
+  // clubs n'ont jamais encore été rencontrés par l'app — libellé choisi par
+  // cohérence avec teamNames.js, à corriger si un vrai match révèle une autre
+  // forme de nom.
+  'Ajax', 'Benfica', 'Porto', 'PSV Eindhoven', 'Feyenoord',
   // Coupe du monde / Euro / Ligue des Nations — vainqueurs et finalistes
   // récents, plus historiquement dominants
   'France', 'Brésil', 'Argentine', 'Angleterre', 'Espagne', 'Allemagne',
   'Portugal', 'Italie', 'Pays-Bas', 'Belgique', 'Croatie',
-  // Copa America — grandes nations CONMEBOL
-  'Uruguay', 'Colombie', 'Chili', 'Équateur',
+  // Copa America — grandes nations CONMEBOL. Paraguay/Pérou ajoutés le 26/09
+  // (même demande que ci-dessus) : sur les 10 membres CONMEBOL, seuls 4
+  // étaient listés (hors Brésil/Argentine déjà dans le groupe Mondial/Euro
+  // au-dessus). Pérou (vainqueur 1975, finaliste 2011) et Paraguay (finaliste
+  // à 6 reprises dont 2011) ont un palmarès continental comparable à
+  // Chili/Équateur déjà présents.
+  'Uruguay', 'Colombie', 'Chili', 'Équateur', 'Paraguay', 'Pérou',
   // CAN — vainqueurs/finalistes récents, meilleures nations africaines
   'Maroc', 'Sénégal', 'Nigeria', 'Égypte', 'Algérie', 'Côte d\'Ivoire',
   'Cameroun', 'Ghana', 'Tunisie', 'Afrique du Sud',
@@ -182,17 +200,30 @@ const BIG_TEAMS = new Set([
 // table de traduction raccourcissant ce nom-là). Voir aussi teamMatchesSet()
 // juste en dessous : selon la source, `shortName` peut être absent ou déjà
 // être le nom long, donc les deux champs sont testés.
+// ⚠️ COMPLÉTÉ (26/09, demande utilisateur : "pour tous les championnats
+// différents faut qu'on mette les meilleures équipes à chaque fois") : audit
+// des 5 grands championnats — chacun avait un club récent, qualifié en Ligue
+// des Champions ou en forte progression, absent de cette liste (score 0 alors
+// qu'il pèse réellement plus qu'un club anonyme). Même critère déjà établi
+// (habitué du haut de tableau ou de la coupe d'Europe) : Brest (qualifié C1
+// 2024-25, 1re campagne européenne à ce niveau de son histoire), Brighton
+// (qualifié en coupe d'Europe chaque saison depuis 2022-23), Real Sociedad
+// (habituée de la C1/Ligue Europa), Girona (vice-champion d'Espagne 2023-24,
+// 1re participation C1 de son histoire), Union Berlin (qualifié C1 2023-24,
+// 1re campagne européenne majeure de son histoire), Bologne (qualifié C1
+// 2024-25, 1re campagne européenne depuis des décennies).
 const NOTABLE_TEAMS = new Set([
   // Ligue 1
-  'Lille', 'Lens', 'Nice', 'Rennes', 'Toulouse', 'Strasbourg',
+  'Lille', 'Lens', 'Nice', 'Rennes', 'Toulouse', 'Strasbourg', 'Brest',
   // Premier League
-  'Newcastle', 'Aston Villa', 'West Ham', 'Everton',
+  'Newcastle', 'Aston Villa', 'West Ham', 'Everton', 'Brighton',
   // La Liga
   'Villarreal', 'Betis', 'Athletic Bilbao', 'Valence', 'Séville',
+  'Real Sociedad', 'Girona',
   // Bundesliga
-  'Francfort', 'Stuttgart', "M'gladbach", 'Wolfsburg',
+  'Francfort', 'Stuttgart', "M'gladbach", 'Wolfsburg', 'Union Berlin',
   // Serie A
-  'Rome', 'Lazio', 'Atalanta', 'Fiorentina',
+  'Rome', 'Lazio', 'Atalanta', 'Fiorentina', 'Bologne',
 ])
 
 // ⚠️ Teste `shortName` ET `name` (bug évité de justesse en vérifiant sur les

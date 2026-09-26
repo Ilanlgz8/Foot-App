@@ -59,7 +59,12 @@ describe('pickMatchDuJour', () => {
   })
 
   it('à prestige égal, garde le départage par coup d\'envoi le plus tardif', () => {
-    const tot = makeMatch('FL1', 'Lens', 'Brest', 13)
+    // ⚠️ 'Brest' remplacé par 'Angers' (26/09) : Brest est désormais dans
+    // NOTABLE_TEAMS (voir matchDuJour.js), ce qui aurait cassé ce test (Lens+
+    // Brest passerait à 2, plus à égalité avec Toulouse+Nantes=1) — Angers
+    // reste non-listé, le test garde son intention d'origine (égalité de
+    // score, départage par l'heure).
+    const tot = makeMatch('FL1', 'Lens', 'Angers', 13)
     const tard = makeMatch('FL1', 'Toulouse', 'Nantes', 20)
     expect(pickMatchDuJour([tot, tard])).toBe(tard)
   })
@@ -257,5 +262,26 @@ describe('pickMatchDuJour', () => {
 
   it('un seul match JAMAIS débuté reste refusé (comportement pré-match inchangé)', () => {
     expect(pickMatchDuJour([makeMatch('PD', 'Real Madrid', 'Barcelona', 13)])).toBeNull()
+  })
+
+  // ⚠️ AJOUTS (26/09, demande utilisateur : "pour tous les championnats
+  // différents faut qu'on mette les meilleures équipes à chaque fois") — voir
+  // le commentaire détaillé dans matchDuJour.js pour le raisonnement complet.
+  it('les clubs européens complétés (Porto/Feyenoord, même critère qu\'Ajax/Benfica) sont bien reconnus', () => {
+    const uel = makeMatch('UEL', 'Porto', 'Feyenoord', 13)              // 2+2=4
+    const anonyme = makeMatch('UEL', 'Slavia Praha', 'Bodø/Glimt', 20)  // 0
+    expect(pickMatchDuJour([uel, anonyme])).toBe(uel)
+  })
+
+  it('les clubs "notable" complétés (Brighton, habitué de la coupe d\'Europe) sont bien reconnus', () => {
+    const brighton = makeMatch('PL', 'Brighton', 'Fulham', 13)   // 1+0=1
+    const anonyme  = makeMatch('PL', 'Burnley', 'Bournemouth', 20)  // 0
+    expect(pickMatchDuJour([brighton, anonyme])).toBe(brighton)
+  })
+
+  it('Paraguay/Pérou complétés en Copa America (même critère que Uruguay/Chili/Équateur)', () => {
+    const copa    = makeMatch('COPA', 'Paraguay', 'Pérou', 13)      // 2+2=4
+    const anonyme = makeMatch('COPA', 'Bolivie', 'Venezuela', 20)   // 0
+    expect(pickMatchDuJour([copa, anonyme])).toBe(copa)
   })
 })
