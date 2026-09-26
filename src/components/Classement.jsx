@@ -4,13 +4,13 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS } from '../data/competitions'
+import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
-// NL/CAN/COPA sont sourcées via ESPN (voir espnAdapter.js) : pas de
-// classement/buteurs pour l'instant (ESPN n'expose pas proprement les
-// groupes sur son scoreboard) — donc pas sélectionnables ici tant que ce
-// n'est pas construit.
+// ⚠️ RÉDUIT (26/09, voir le commentaire détaillé sur NO_STANDINGS_COMPS dans
+// competitions.js) : NL/CAN/COPA/UEL/UECL ont un vrai classement ESPN,
+// vérifié en direct — ne restent exclues du sélecteur que USC/TDC/CS (un seul
+// match par an, pas de classement possible par nature).
 const competitions = allCompetitions.filter(c => !NO_STANDINGS_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
@@ -147,7 +147,22 @@ function Classement() {
   // expérience — corrigé ici sans réintroduire la collision.
   const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday)
   const { formMap, compMatches: formCompMatches } = useTeamForm(selectedComp, 6_000)
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
+  // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09, voir
+  // NO_STANDINGS_COMPS/NO_SCORERS_COMPS dans competitions.js) mais n'ont
+  // aucune source de buteurs — `enabled: false` évite un fetch voué à
+  // échouer à chaque visite (voir le commentaire dans useScorers.js).
+  const scorersSupported = !NO_SCORERS_COMPS.has(selectedComp)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000, scorersSupported)
+  // Sélections nationales (crest rond, pas d'écusson club) — WC/EC déjà là,
+  // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
+  const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
+    || selectedComp === 'NL' || selectedComp === 'CAN' || selectedComp === 'COPA'
+  // Si l'utilisateur était sur l'onglet Buteurs et change vers une compétition
+  // qui ne le supporte pas, on revient sur Classement plutôt que de laisser
+  // un onglet vide/masqué sélectionné.
+  useEffect(() => {
+    if (!scorersSupported && view === 'buteurs') setView('classement')
+  }, [scorersSupported, view, setView])
   // Classement des passes décisives retiré : aucune source fiable trouvée
   // (api-football → plan gratuit ne couvre pas la saison en cours ; scraping
   // ESPN tenté ensuite → ne fonctionnait pas non plus). On garde uniquement
@@ -268,6 +283,23 @@ function Classement() {
       { label: 'Qualifié (2 premières)', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
       { label: 'Éliminé',                start: 3, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
     ],
+    // ⚠️ AJOUT (26/09, voir NO_STANDINGS_COMPS/competitions.js) : NL/CAN/COPA/
+    // UEL/UECL rejoignent le sélecteur avec un vrai classement ESPN — sans
+    // entrée dédiée ici, elles seraient tombées sur `default` (zones Ligue des
+    // Champions/Europa/Conférence), qui n'a AUCUN sens pour une poule de
+    // Ligue des Nations/CAN/Copa America à 4 équipes ni pour la "phase de
+    // ligue" UEL/UECL. Légende VIDE plutôt qu'inventée : CAN/Copa America
+    // qualifient un nombre de "meilleurs troisièmes" qui varie d'une édition
+    // à l'autre (aucune donnée fiable ici pour le reproduire sans risquer de
+    // l'afficher faux), NL a une logique de promotion/relégation par division
+    // trop différente d'un simple intervalle de positions, et UEL/UECL
+    // qualifient pour la phase à élimination directe selon un barème propre
+    // à chacune. Pas de zone plutôt qu'une zone fausse.
+    // ⚠️ Bug annexe corrigé au passage : EC (Euro) tombait DÉJÀ sur `default`
+    // depuis toujours, pour exactement la même raison (poule Euro à 4, aucun
+    // rapport avec CL/UEL/UECL) — jamais remarqué car EC était déjà dans le
+    // sélecteur avant ce fix. Vidée ici aussi, même principe.
+    NL: [], CAN: [], COPA: [], UEL: [], UECL: [], EC: [],
     default: [
       { label: 'Ligue des champions', start: 1, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
       { label: 'Europa League',       start: 6, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
@@ -463,7 +495,7 @@ function Classement() {
                 compMatches={formCompMatches}
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
-                isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
+                isCountry={isCountryComp}
               />
             )}
 
@@ -522,7 +554,7 @@ function Classement() {
                 qualificationRules={qualificationRules}
                 snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
                 snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
-                isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
+                isCountry={isCountryComp}
               />
             </div>
           ))}
@@ -637,12 +669,18 @@ function Classement() {
             >
               Classement
             </button>
-            <button
-              className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
-              onClick={() => setView('buteurs')}
-            >
-              Buteurs
-            </button>
+            {/* ⚠️ Masqué pour NL/CAN/COPA/UEL/UECL (26/09) : aucune source de
+                buteurs pour ces 5 (voir NO_SCORERS_COMPS, competitions.js) —
+                mieux vaut ne pas proposer un onglet qui échouerait à coup sûr
+                que d'afficher "Données non disponibles" à chaque fois. */}
+            {scorersSupported && (
+              <button
+                className={`classement__viewBtn ${view === 'buteurs' ? 'classement__viewBtn--active' : ''}`}
+                onClick={() => setView('buteurs')}
+              >
+                Buteurs
+              </button>
+            )}
             {/* Onglet "Tendances" mis de côté pour être retravaillé plus tard —
                 voir TendancesView.jsx / tendances.css (conservés, pas supprimés). */}
           </div>
@@ -664,8 +702,9 @@ function Classement() {
           )}
         </div>
 
-        {/* Légende zones */}
-        {view === 'classement' && (
+        {/* Légende zones — masquée si vide (NL/CAN/COPA/UEL/UECL/EC, voir
+            competitionRules plus haut : pas de zone plutôt qu'une zone fausse). */}
+        {view === 'classement' && qualificationRules.length > 0 && (
           <div className="classement__zoneStrip">
             {qualificationRules.map(rule => (
               <div key={rule.label} className={`classement__zoneCard ${rule.cardClassName}`}>
@@ -739,7 +778,7 @@ function Classement() {
                         <span className="classement__scorerName">{playerName}</span>
                         <div className="classement__scorerTeamRow">
                           {s.team?.crest && (
-                            <div className="classement__scorerCrestWrap" data-crest={(selectedComp === 'WC' || selectedComp === 'EC') ? 'country' : 'club'}><img src={s.team.crest} alt="" className="classement__scorerCrest" data-team={s.team?.name}
+                            <div className="classement__scorerCrestWrap" data-crest={isCountryComp ? 'country' : 'club'}><img src={s.team.crest} alt="" className="classement__scorerCrest" data-team={s.team?.name}
                               onError={e => e.currentTarget.style.display = 'none'} /></div>
                           )}
                           <span className="classement__scorerTeam">
@@ -844,7 +883,7 @@ function Classement() {
                   qualificationRules={qualificationRules}
                   snapshotKey={`standings_prev_${selectedComp}`}
                   snapshotRows={standingsLive}
-                  isCountry={(selectedComp === 'WC' || selectedComp === 'EC')}
+                  isCountry={isCountryComp}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>
         )}

@@ -29,7 +29,16 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // MatchPoster.jsx, LiveMatchPage.jsx... qui n'appellent jamais useStandings
 // en parallèle) — seuls Classement.jsx et ClassementTab (MatchModal.jsx, même
 // collision : standings+form ensemble) passent un délai explicite.
-export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
+// ⚠️ `enabled` AJOUTÉ (26/09, constat utilisateur : "y'a pas toutes les
+// competition dans le dropdown" classement — NL/CAN/COPA/UEL/UECL rejoignent
+// le sélecteur, voir NO_SCORERS_COMPS dans competitions.js) : ces 5
+// compétitions n'ont aucune source de buteurs (ni FD.org, ni ESPN, gap déjà
+// documenté dans CLAUDE.md) — sans ce garde-fou, Classement.jsx déclencherait
+// pour elles un fetch voué à échouer à CHAQUE visite (3 tentatives FD.org
+// avec retry, voir plus bas), pur gaspillage de budget FD.org pour un
+// résultat déjà connu d'avance. Défaut à `true` : comportement inchangé pour
+// tout appelant qui ne précise rien.
+export function useScorers(compId, hasMatchToday = true, delayMs = 0, enabled = true) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
   // (tryFetch) a pu déjà écrire un [] en cache localStorage AVANT ce
@@ -187,7 +196,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     // sans rien tenter de réel.
     retry: 2,
     retryDelay: attempt => 8_000 * (attempt + 1),
-    enabled: !!compId,
+    enabled: !!compId && enabled,
   })
 
   return {

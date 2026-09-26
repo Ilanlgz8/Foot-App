@@ -147,20 +147,40 @@ export const DOMESTIC_CUPS = {
   PL:  { slug: 'eng.fa',              name: 'FA Cup' },
 }
 
-// Compétitions sourcées via ESPN (pas football-data.org, voir espnAdapter.js)
-// : pas de classement/buteurs pour l'instant (ESPN n'expose pas proprement la
-// structure de groupe sur son scoreboard) — utilisé par Classement.jsx pour
-// ne pas proposer un classement qui n'existe pas.
-// UEL/UECL ajoutées par prudence (même raison, jamais vérifié en direct pour
-// leur format "phase de ligue" — si ESPN s'avère exposer un classement
-// propre pour elles, à retirer d'ici).
+// ⚠️ RÉDUIT (26/09, constat utilisateur : "dans la page classement y'a pas
+// toutes les competition dans le dropdown") : NL/CAN/COPA/UEL/UECL étaient
+// exclues ici par PRUDENCE depuis l'origine ("jamais vérifié en direct pour
+// leur format 'phase de ligue'", voir l'historique git) — en confondant avec
+// une limite RÉELLE mais différente (le SCOREBOARD ESPN, utilisé pour
+// Programme/Résultats, n'expose effectivement pas proprement la structure de
+// groupe). Le endpoint dédié `/apis/v2/sports/soccer/{slug}/standings` (voir
+// compactEspnStandings, espnSummaryParse.js) est un endpoint SÉPARÉ, conçu et
+// documenté depuis le début spécifiquement pour ce cas — jamais vérifié en
+// direct jusqu'ici. Testé en direct (appel réel à cet endpoint, 26/09) pour
+// les 5 : NL renvoie bien plusieurs vrais groupes ("Group A1" Italie/Belgique
+// …), CAN pareil ("Group A" Mali…), Copa America pareil ("Group A"
+// Argentine…), UEL/UECL renvoient une table plate "League Phase" (Lyon/Aston
+// Villa…/Strasbourg…, ~32 lignes) — exactement le contrat `{table, groups}`
+// que Classement.jsx sait déjà consommer pour WC/EC. Retirées d'ici.
 // ⚠️ N'est PLUS utilisé par FavoritesPage.jsx pour filtrer les favoris de
 // NOTIFS (voir son commentaire dédié) — l'absence de classement n'a aucun
 // rapport avec l'éligibilité aux notifs push, seulement avec l'onglet
 // Classement.
-// USC (Supercoupe UEFA) ajoutée pour la même raison — un seul match par an,
-// aucun classement n'a jamais de sens ici.
-export const NO_STANDINGS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC', 'TDC', 'CS'])
+// USC/TDC/CS restent exclues pour une raison différente et toujours valide :
+// un seul match par an, aucun classement n'a jamais de sens ici (même
+// principe que SINGLE_MATCH_COMPS ci-dessus, pour Programme/Résultats).
+export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
+
+// ⚠️ AJOUT (26/09, même constat que ci-dessus) : contrairement au classement,
+// les BUTEURS n'ont AUCUNE source pour NL/CAN/COPA/UEL/UECL — football-data.org
+// ne couvre pas ces compétitions et ESPN n'a jamais eu d'endpoint scorers
+// fonctionnel non plus (voir CLAUDE.md, gap déjà documenté pour useScorers.js).
+// Séparé de NO_STANDINGS_COMPS : le classement, lui, fonctionne bien pour ces
+// 5 (voir ci-dessus) — seul l'onglet Buteurs doit rester masqué pour elles,
+// plutôt que de tenter un fetch voué à échouer à chaque visite (3 tentatives
+// FD.org avec retry avant d'abandonner, voir useScorers.js — un gaspillage
+// pur puisque le résultat est connu d'avance).
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
