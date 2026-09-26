@@ -113,7 +113,38 @@ export function groupRounds(matches, order = 'asc') {
     matches: [...dayMap[dayKey]].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate)),
   }))
 
-  const chrono   = [...mdEntries, ...koEntries, ...dayEntries]
+  // ⚠️ CORRIGÉ (26/09, constat utilisateur : "dans programme on a pas le
+  // programme des matchs" — les matchs de coupe domestique en tour
+  // préliminaire, ex. Copa del Rey, atterrissent dans `dayEntries` faute de
+  // stage reconnu par mapEspnStage/KNOCKOUT_ORDER, voir plus haut) : cette
+  // ligne empilait TOUJOURS dayEntries après TOUTES les journées de
+  // championnat (mdEntries), quelle que soit leur vraie date — en Programme
+  // (asc), il fallait parcourir toutes les journées restantes (parfois 20-30)
+  // avant de tomber dessus, quasi invisible en pratique ; en Résultats (desc,
+  // tout le tableau inversé plus bas), l'effet était inversé (dayEntries se
+  // retrouvaient tout devant). Un match de tour préliminaire de coupe se joue
+  // pourtant à une date précise, souvent AU MILIEU de la saison de
+  // championnat — il doit apparaître à sa vraie place chronologique, pas
+  // en bloc à une extrémité.
+  // Fix ciblé : mdEntries+koEntries gardent EXACTEMENT leur ordre actuel
+  // entre eux (journée 1, 2, 3… puis les tours à élimination reconnus,
+  // inchangé) — seuls les dayEntries (jamais présents en dehors des
+  // compétitions à coupe fusionnée, voir DOMESTIC_CUPS) sont insérés un par
+  // un à la position chronologique correcte parmi eux, par comparaison de
+  // date entre groupes. Sans dayEntries (le cas de toutes les autres
+  // compétitions), la boucle ne s'exécute jamais et le résultat est
+  // RIGOUREUSEMENT identique à avant — aucune régression possible sur
+  // l'ordre déjà en place.
+  const groupDate = (g) => Math.min(...g.matches.map(m => new Date(m.utcDate).getTime()))
+  let chrono = [...mdEntries, ...koEntries]
+  for (const day of dayEntries) {
+    const dayDate = groupDate(day)
+    let insertAt = chrono.length
+    for (let i = 0; i < chrono.length; i++) {
+      if (groupDate(chrono[i]) > dayDate) { insertAt = i; break }
+    }
+    chrono = [...chrono.slice(0, insertAt), day, ...chrono.slice(insertAt)]
+  }
   const ordered  = order === 'desc' ? [...chrono].reverse() : chrono
   return ordered.map(g => ({
     ...g,
