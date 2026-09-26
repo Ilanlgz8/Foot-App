@@ -324,6 +324,39 @@ export async function fetchEspnCompMatches(compCode, slug, overrides = {}) {
   }
 }
 
+// ⚠️ AJOUT (26/09, constat utilisateur : un match Copa del Rey affiché à 18h
+// dans Accueil toujours pas "en direct" à 20h15, ni terminé) — vérifié en
+// DIRECT sur l'API ESPN (`/espn?slug=esp.copa_del_rey&dates=...`) au moment
+// exact du signalement : les 5 matchs du jour, y compris un dont le coup
+// d'envoi théorique (18:00Z) était déjà passé de 15+ minutes au moment du
+// test, affichaient TOUS encore `STATUS_SCHEDULED` côté ESPN lui-même — pas
+// un souci de cache ou de polling côté app (la fenêtre "aujourd'hui" n'est
+// jamais mise en cache serveur, voir scoreboardChunkTtl dans api/espn.js,
+// donc ce test a bien tapé ESPN en direct). Tous ces matchs partagent
+// `event.season.slug === 'qualifying-round'` — le tour de qualification
+// amateur/régional (clubs de divisions très inférieures, ex. "CD Tedeón",
+// "Anaitasuna") qui précède l'entrée des clubs professionnels en Round 1
+// (6 octobre pour cette édition). Conclusion : ESPN ne fournit tout
+// simplement AUCUN suivi live/fin de match fiable pour ce tour précis (déjà
+// pressenti dans le commentaire plus haut sur `mapEspnStage` — "tours
+// antérieurs... qualifs amateurs" — mais jusqu'ici seulement pour le
+// TABLEAU à élimination directe, pas pour le statut live lui-même). Un match
+// qui reste bloqué indéfiniment sur "à venir" des heures après son coup
+// d'envoi est pire que ne pas l'afficher du tout. Plutôt que de deviner un
+// correctif de statut qui n'existe pas côté source (aucune alternative
+// gratuite connue ne couvre mieux ces qualifs amateurs, même limite déjà
+// documentée pour d'autres gaps ESPN dans ce fichier), ces matchs sont
+// exclus à la source : ils réapparaîtront normalement dès l'entrée en lice
+// des clubs pros (Round 1), où ESPN suit le direct sans problème comme pour
+// n'importe quel autre match pro de ce fichier. Portée : les 3 coupes
+// nationales (FL1/PD/PL) partagent probablement le même trou de couverture
+// sur leurs propres tours de qualification amateurs — filtré ici pour les
+// 3 à la fois plutôt que seulement Copa del Rey, par cohérence.
+function isUntrackedCupQualifyingRound(event) {
+  const slug = event?.season?.slug ?? ''
+  return /qualif|preliminary/i.test(slug)
+}
+
 // Coupe nationale d'un championnat parent (Coupe de France pour FL1, Copa del
 // Rey pour PD, FA Cup pour PL — voir DOMESTIC_CUPS dans competitions.js).
 // Les matchs renvoyés gardent competition.code = parentCode (pour rester
@@ -338,6 +371,7 @@ export async function fetchEspnCupMatches(parentCode) {
     const json = await fetchEspnWindowJson(cup.slug)
     if (!json) return readCacheStale(cacheKey) ?? []
     const matches = (json.events ?? [])
+      .filter(e => !isUntrackedCupQualifyingRound(e))
       .map(e => normalizeEvent(e, parentCode, {
         idPrefix: `${parentCode}-cup`,
         isCup: true,
