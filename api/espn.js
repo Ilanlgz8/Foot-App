@@ -402,7 +402,14 @@ async function fetchEventSummaryGoals(slug, eventId, debugInfo) {
       if (c.team?.id) teamCrests[String(c.team.id)] = c.team.logos?.[0]?.href ?? null
     }
     const goals = extractGoalsFromSummary(json).map(g => ({ ...g, teamCrest: teamCrests[g.teamId] ?? null }))
-    kv.set(eventCacheKey, JSON.stringify(goals)).catch(() => {}) // pas de `ex` : permanent, comme documenté ci-dessus
+    // IMPORTANT : awaited (pas fire-and-forget) — la lecture finale (kv.mget, plus bas dans le
+    // meme handler) peut arriver dans la MEME requete juste apres ce calcul ; un `.catch(()=>{})`
+    // sans await laissait le mget partir avant que l'ecriture Redis soit reellement posee, d'ou
+    // des events "status:ok" avec de vrais buts calcules mais relus vides (`goalListsNonEmpty:0`
+    // confirme en direct via ?debug=1) — bug reel trouve et corrige, pas une hypothese.
+    try {
+      await kv.set(eventCacheKey, JSON.stringify(goals)) // pas de `ex` : permanent, comme documenté ci-dessus
+    } catch { /* Redis indisponible pour l'ecriture : les buts restent quand meme dispos en memoire pour ce cycle via le return ci-dessous, juste pas mis en cache */ }
     debugInfo?.push({ eventId, status: 'ok', goals: goals.length })
     return goals
   } catch (err) {
