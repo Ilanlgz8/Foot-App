@@ -377,8 +377,8 @@ function isEventFinished(evt) {
 // une agrégation par joueur, et c'est un chemin partagé avec la détection
 // live des buts (cron-goals.js/cf-worker) qu'il ne faut jamais reduppliquer
 // ni fragiliser pour cette fonctionnalité annexe).
-async function fetchEventSummaryGoals(slug, eventId) {
-  const eventCacheKey = `espn:ownscorers:event:${slug}:${eventId}`
+async function fetchEventSummaryGoals(slug, eventId, debugInfo) {
+  const eventCacheKey = `espn:ownscorers:event:v2:${slug}:${eventId}`
   try {
     const cached = await kv.get(eventCacheKey)
     if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached
@@ -392,7 +392,10 @@ async function fetchEventSummaryGoals(slug, eventId) {
       headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
       signal: controller.signal,
     })
-    if (!response.ok) return null // échec réel (pas "0 but") — jamais mis en cache, retenté au prochain scan
+    if (!response.ok) {
+      debugInfo?.push({ eventId, status: response.status })
+      return null // échec réel (pas "0 but") — jamais mis en cache, retenté au prochain scan
+    }
     const json = await response.json()
     const teamCrests = {}
     for (const c of (json?.header?.competitions?.[0]?.competitors ?? [])) {
@@ -400,8 +403,10 @@ async function fetchEventSummaryGoals(slug, eventId) {
     }
     const goals = extractGoalsFromSummary(json).map(g => ({ ...g, teamCrest: teamCrests[g.teamId] ?? null }))
     kv.set(eventCacheKey, JSON.stringify(goals)).catch(() => {}) // pas de `ex` : permanent, comme documenté ci-dessus
+    debugInfo?.push({ eventId, status: 'ok', goals: goals.length })
     return goals
-  } catch {
+  } catch (err) {
+    debugInfo?.push({ eventId, status: 'exception', message: String(err) })
     return null
   } finally {
     clearTimeout(timeoutId)
@@ -645,7 +650,16 @@ export default async function handler(req, res) {
     // Remplacé par le mode `computedScorers` ci-dessous — calcul MAISON à
     // partir des vrais matchs plutôt que de faire confiance à cet endpoint.
     if (computedScorers === '1') {
-      const metaKey = `espn:ownscorers:meta:${slug}`
+      const debugEnabled = req.query.debug === '1'
+      const debugInfo = debugEnabled ? [] : null
+      // v2 : bump délibéré (même clé meta ET clé event, voir fetchEventSummaryGoals)
+      // suite au tout 1er déploiement de cette fonctionnalité, qui avait écrit un
+      // état figé "scannedThrough=aujourd'hui, doneEventIds=[...]" SANS jamais
+      // avoir réussi à mettre en cache le moindre but (bug du group.forEach
+      // inconditionnel corrigé juste avant, voir plus bas) — sans ce bump, cet
+      // état déjà écrit resterait "frais" (HOMEMADE_SCORERS_FRESH_MS) et
+      // bloquerait tout nouveau scan pendant 10min après le déploiement du fix.
+      const metaKey = `espn:ownscorers:meta:v2:${slug}`
       let meta = null
       try {
         const raw = await kv.get(metaKey)
@@ -681,25 +695,40 @@ export default async function handler(req, res) {
             // Groupes espacés, même précaution anti-rafale ESPN que le
             // scoreboard (incident 403 du 15/09) — un 1er scan à froid
             // pourrait sinon déclencher ~25 fetches /summary d'un coup.
+            // ⚠️ Un id n'est ajouté à `doneIds` QUE si fetchEventSummaryGoals
+            // a réellement réussi (renvoie un tableau, jamais `null`) — sinon
+            // un simple raté réseau/timeout ESPN marquerait ce match comme
+            // "déjà traité" POUR TOUJOURS, sans jamais avoir mis ses buts en
+            // cache : ses buts disparaîtraient silencieusement du classement
+            // sans plus jamais être retentés (bug trouvé et corrigé avant tout
+            // déploiement, en vérifiant en direct pourquoi le tout 1er appel
+            // renvoyait `scorers:[]`).
             for (let i = 0; i < newFinishedIds.length; i += CHUNK_GROUP_SIZE) {
               const group = newFinishedIds.slice(i, i + CHUNK_GROUP_SIZE)
-              await Promise.all(group.map(id => fetchEventSummaryGoals(slug, id)))
-              group.forEach(id => doneIds.add(id))
+              const results = await Promise.all(group.map(id => fetchEventSummaryGoals(slug, id, debugInfo)))
+              group.forEach((id, idx) => { if (results[idx] != null) doneIds.add(id) })
               if (i + CHUNK_GROUP_SIZE < newFinishedIds.length) {
                 await new Promise(res => setTimeout(res, CHUNK_GROUP_DELAY_MS))
               }
             }
             nextScannedThrough = ymd(today)
+            if (debugInfo) debugInfo.push({ dayListLength: dayList.length, newFinishedIdsCount: newFinishedIds.length, mergedEventsCount: merged.events.length })
+          } else if (debugInfo) {
+            debugInfo.push({ mergedOk: false, dayListLength: dayList.length })
           }
           // merged.ok === false (ESPN indisponible sur toutes les tranches) :
           // on NE PERD PAS la progression déjà connue — scannedThrough/
           // doneEventIds restent inchangés, le prochain appel (une fois
           // HOMEMADE_SCORERS_FRESH_MS écoulé) retentera la même fenêtre.
+        } else if (debugInfo) {
+          debugInfo.push({ noScanNeeded: true })
         }
         // scanFrom > today : rien de nouveau à scanner, déjà à jour.
 
         meta = { scannedThrough: nextScannedThrough ?? ymd(today), doneEventIds: [...doneIds], updatedAt: now }
         kv.set(metaKey, JSON.stringify(meta)).catch(() => {})
+      } else if (debugInfo) {
+        debugInfo.push({ isFresh: true })
       }
 
       clearTimeout(timeoutId) // controller/timeoutId du haut de la fonction, jamais utilisé par ce mode
@@ -710,7 +739,7 @@ export default async function handler(req, res) {
         try {
           // 1 seul kv.mget quel que soit le nombre de matchs déjà connus
           // (même optimisation Upstash qu'ailleurs dans ce fichier).
-          const values = await kv.mget(...eventIds.map(id => `espn:ownscorers:event:${slug}:${id}`))
+          const values = await kv.mget(...eventIds.map(id => `espn:ownscorers:event:v2:${slug}:${id}`))
           goalLists = values.map(v => {
             if (!v) return []
             try { return typeof v === 'string' ? JSON.parse(v) : v } catch { return [] }
@@ -721,7 +750,10 @@ export default async function handler(req, res) {
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
         .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-        .json({ scorers: aggregateGoals(goalLists) })
+        .json({
+          scorers: aggregateGoals(goalLists),
+          ...(debugInfo ? { _debug: { meta, eventIdsCount: eventIds.length, goalListsNonEmpty: goalLists.filter(g => g.length > 0).length, steps: debugInfo } } : {}),
+        })
     }
 
     // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
