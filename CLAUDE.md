@@ -2105,6 +2105,43 @@ cf-worker/
      l'app mais manqué par cet audit — à signaler pour l'ajouter à la whitelist plutôt que
      retirer tout le header.
 
+- ✅ 3e passe de l'audit sécurité : dépendance `react-router-dom` vulnérable, suite à la question
+  directe de l'utilisateur (28/09 : "ok donc la toute l'app est sécurisé a 100% de ce qu'on
+  pourrait faire ?") — question honnête qui a motivé un dernier contrôle jamais fait jusqu'ici
+  dans cet audit : `npm audit` sur les dépendances elles-mêmes (les 2 passes précédentes
+  n'auditaient que le CODE écrit pour ce projet, pas les paquets tiers utilisés). Résultat réel :
+  `react-router-dom@7.16.0` (celui installé) tombait dans la plage vulnérable (6.0.0-7.18.1) de 5
+  CVE réelles et documentées (GHSA) — open redirect via backslash dans `<Link>`/`useNavigate`,
+  XSS par validation de protocole manquante (mode RSC), injection de constructeur arbitraire via
+  `deserializeErrors()` (hydratation SSR), déni de service via matching de route inefficace, et
+  contournement CSRF permettant d'exécuter une action avant la réponse 400 (mode RSC). Portée
+  réelle pour CE projet : StatFootix n'utilise ni le SSR ni le mode RSC de React Router (SPA Vite
+  classique, `createBrowserRouter`/`<Routes>` standard) — plusieurs de ces CVE ne s'appliquent
+  donc probablement pas en pratique ici, mais pas de certitude à 100% sans auditer le code
+  interne de la librairie elle-même (hors de portée raisonnable) ; le risque de déni de service
+  par route mal matchée, lui, s'applique à n'importe quel usage. Corrigé par simple mise à jour
+  (`package.json`) : `7.16.0` → `7.18.4` (dernière version publiée, contient tous les correctifs
+  — vérifié via `npm view react-router-dom@latest version`), `npm audit --omit=dev` confirme
+  `0 vulnérabilité` sur les dépendances de PRODUCTION après ce bump (celles qui finissent dans le
+  bundle envoyé au navigateur ou tournent dans les fonctions serverless Vercel). 374 tests + lint
+  (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés inchangés après la mise à
+  jour — aucune API cassée, seule la version bouge. Honnêteté complète sur ce qui RESTE, réponse
+  factuelle à la question "100%" : `npm audit` (sans `--omit=dev`) trouve encore 8 vulnérabilités
+  dans des dépendances de DÉVELOPPEMENT (vitest/postcss/browserslist/nanoid/fast-uri/brace-
+  expansion, utilisées uniquement par les outils de build/test sur cette machine) — vérifié
+  qu'aucune d'elles n'est une dépendance de production (`npm audit --omit=dev` les exclut
+  entièrement) : elles ne tournent jamais dans le navigateur de l'utilisateur ni dans les
+  fonctions Vercel déployées, donc sans risque réel pour l'app en production, seulement pour cet
+  environnement de build lui-même — pas corrigées à ce stade (aucune ne concerne du code exposé
+  publiquement), mais existent et seraient à mettre à jour un jour pour la propreté. Au-delà de
+  ce que le code peut garantir : la sécurité des COMPTES eux-mêmes (Vercel, GitHub, Upstash,
+  Cloudflare, football-data.org) — mots de passe, 2FA, qui a accès — n'est ni auditable ni
+  modifiable depuis cet environnement, c'est un point aveugle total de cet audit. Une clé API
+  qui a été vulnérable un temps (voir le fix SSRF plus haut) mériterait d'être régénérée par
+  précaution (aucune preuve qu'elle ait été exploitée, mais aucune preuve du contraire non plus
+  faute d'accès aux logs football-data.org) — décision et action laissées à l'utilisateur,
+  jamais faisable depuis ce sandbox.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -19,7 +19,7 @@
     "ably": "^2.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.16.0",
+    "react-router-dom": "^7.18.4",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
