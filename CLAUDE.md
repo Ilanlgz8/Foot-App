@@ -2061,6 +2061,50 @@ cf-worker/
   n'était donc pas une fuite de données utilisateur mais bien la clé API
   backend elle-même (rachat/abus du quota football-data.org par un tiers).
 
+- ✅ Les 2 constats mineurs de l'audit sécurité ci-dessus, corrigés le jour même sur demande
+  explicite de l'utilisateur ("vaut mieux faire les deux trucs que tu as dites") :
+  1. **Header Content-Security-Policy ajouté** (`vercel.json`) : n'existait pas du tout avant.
+     Whitelist construite en auditant TOUTES les sources externes réellement utilisées par le
+     front (grep exhaustif `src/`, config `runtimeCaching` du service worker dans
+     `vite.config.js`, contenu de `index.html`) plutôt que copiée d'un template générique :
+     `script-src 'self' 'sha256-...'` (le hash correspond EXACTEMENT au petit script classique
+     du filet anti-écran-blanc dans `index.html` — voir son commentaire — pas de `'unsafe-
+     inline'` sur script-src, la protection XSS la plus importante de CSP reste donc pleine ;
+     ⚠️ si ce script inline est un jour modifié, le hash doit être recalculé sinon CSP le
+     bloquera silencieusement — commande : `node -e "const c=require('fs').readFileSync
+     ('index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];console.log('sha256-'+
+     require('crypto').createHash('sha256').update(c).digest('base64'))"`), `style-src 'self'
+     'unsafe-inline' https://fonts.googleapis.com` (`'unsafe-inline'` gardé ici car
+     `showBootError` dans `main.jsx` — le MÊME filet anti-écran-blanc — injecte des attributs
+     `style=""` littéraux via `innerHTML` pour son UI de secours ; un style injecté est un
+     risque bien moindre qu'un script injecté, compromis assumé plutôt que casser ce filet
+     critique), `img-src`/`connect-src` limités aux domaines réellement appelés (blasons
+     `crests.football-data.org`, repli logos `a.espncdn.com`, drapeaux `flagcdn.com`, photos
+     joueurs `upload.wikimedia.org`, Ably `*.ably.io`/`*.ably-realtime.com` pour le temps quasi
+     réel), `object-src 'none'`, `frame-ancestors 'none'`, `base-uri`/`form-action 'self'`.
+     ESPN (`site.api.espn.com`) volontairement PAS dans `connect-src` : vérifié par grep que le
+     front n'appelle jamais ESPN en direct (uniquement via `/api/espn`, même origine) — la règle
+     `NetworkOnly` sur ce domaine dans `vite.config.js` est un filet de sécurité déjà en place
+     côté service worker, pas la preuve d'un vrai appel direct.
+  2. **Faille CSRF basique corrigée** (`api/subscribe.js`, `isAllowedOrigin`) : l'ancien `if
+     (!origin) return true` (pensé pour un hypothétique appel serveur-à-serveur) laissait passer
+     n'importe quel script/curl sans header Origin. Vérifié par grep qu'AUCUN appelant serveur
+     légitime n'existe pour cet endpoint (seul `usePushNotifications.js` côté client l'appelle) —
+     et qu'un vrai navigateur envoie TOUJOURS un Origin sur une requête POST, même same-origin
+     (comportement standard `fetch()`). Retiré le passthrough (`if (!origin) return false`) :
+     aucun usage réel cassé, seuls les scripts directs sans navigateur sont désormais bloqués à
+     la source plutôt que seulement freinés par le rate-limit (20/h/IP, toujours en place en
+     complément). 374 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build +
+     `vercel.json` validé comme JSON syntaxiquement correct — vérifiés pour les 2 correctifs.
+     Honnêteté : le rendu réel du site avec ce nouveau CSP n'a pas pu être vérifié en direct sur
+     un vrai navigateur depuis cet environnement (pas d'accès à Chrome/Safari réel) — la
+     whitelist a été construite par audit de code exhaustif, pas par observation d'erreurs
+     console CSP réelles ; si un élément de l'UI cesse de charger une image/police/connexion
+     après ce déploiement (console navigateur : "Refused to ... because it violates the following
+     Content Security Policy directive"), c'est très probablement un domaine externe utilisé par
+     l'app mais manqué par cet audit — à signaler pour l'ajouter à la whitelist plutôt que
+     retirer tout le header.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -25,7 +25,21 @@ const ALLOWED_ORIGINS = new Set([
 ])
 
 function isAllowedOrigin(origin) {
-  if (!origin) return true // pas d'origin = requête serveur (curl, cron)
+  // ⚠️ FIX SÉCURITÉ (audit demandé par l'utilisateur, 28/09) : l'ancien
+  // `if (!origin) return true` (pensé pour un hypothétique appel serveur-à-
+  // serveur, curl/cron) laissait en réalité passer N'IMPORTE QUEL script/
+  // curl direct sans header Origin — ce garde-fou ne protégeait alors QUE
+  // contre un vrai navigateur (seul cas où un Origin manquant est suspect
+  // ET où le check a un sens : un vrai navigateur envoie TOUJOURS un Origin
+  // sur une requête POST, même same-origin, c'est le comportement standard
+  // fetch()). Vérifié : ce endpoint n'a AUCUN appelant serveur légitime
+  // dans ce projet (seul `usePushNotifications.js`, côté client, l'appelle
+  // — grep confirmé, aucun cron/webhook interne ne poste ici). Retirer ce
+  // passthrough ne casse donc aucun usage réel, seulement les scripts
+  // scriptés directs (déjà limités par le rate-limit 20/h/IP ci-dessous et
+  // la validation stricte du payload, mais un vrai blocage à la source est
+  // plus solide qu'une simple limite de débit).
+  if (!origin) return false
   if (ALLOWED_ORIGINS.has(origin)) return true
   if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true
   // Previews Vercel du projet uniquement (préfixe foot-app-)
