@@ -141,10 +141,27 @@ export default defineConfig(({ mode }) => {
             // que TOUS les fichiers de ces 6 familles restent en cache pendant
             // toute la durée de `maxAgeSeconds` (1 an), sans jamais purger une
             // police encore utilisée activement par l'app.
+            // ⚠️ CORRECTIF COMPLÉMENTAIRE (même jour, retour utilisateur "tu vois
+            // bien que ça n'a rien changé" après déploiement du fix ci-dessus) :
+            // remonter `maxEntries` ne répare RIEN rétroactivement — l'ancien
+            // cache Workbox nommé `google-fonts`, déjà tronqué à 10 entrées chez
+            // les utilisateurs déjà affectés, restait actif tel quel (Workbox
+            // réutilise un cache existant par son nom, il ne le vide jamais tout
+            // seul juste parce que la config change) : les polices déjà éjectées
+            // AVANT ce déploiement restaient éjectées, un simple relèvement du
+            // plafond n'empêche que de FUTURES évictions, pas de restaurer les
+            // fichiers déjà perdus. Renommé `google-fonts` → `google-fonts-v2`
+            // pour forcer Workbox à traiter ça comme un cache TOUT NEUF : un
+            // premier accès à chaque police repart du réseau (comme au tout
+            // premier chargement de l'app), puis reste cette fois dans un cache
+            // à 60 entrées qui ne le purgera plus. L'ancien cache `google-fonts`
+            // (orphelin) est supprimé automatiquement par `cleanupOutdatedCaches`
+            // (déjà activé plus haut dans ce fichier) au prochain contrôle du
+            // service worker.
             {
               urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
               handler: 'CacheFirst',
-              options: { cacheName: 'google-fonts', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+              options: { cacheName: 'google-fonts-v2', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 } },
             },
             // ⚠️ AJOUT (constat utilisateur : "les crest se rechargent à chaque
             // fois qu'on change de page, ça met parfois plusieurs secondes à

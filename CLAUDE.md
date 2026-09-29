@@ -2290,6 +2290,31 @@ cf-worker/
   certitude, seul le chiffre exact ne l'est pas. Toujours aucun accès à un vrai iPhone/PWA pour
   confirmer que ce fix règle définitivement le symptôme — à confirmer par l'utilisateur.
 
+- ✅ Fix `maxEntries` ci-dessus jugé sans effet visible par l'utilisateur, même jour (29/09,
+  retour immédiat : "bah nn tu vois bien que ça n'a rien changer la") — remarque juste, root
+  cause d'un trou dans le raisonnement précédent : Workbox réutilise un cache existant PAR SON
+  NOM (`cacheName: 'google-fonts'`) — changer uniquement `maxEntries` dans la config ne vide
+  jamais le cache déjà présent sur l'appareil de l'utilisateur, il continue de tourner tel quel,
+  déjà tronqué à 10 entrées, avec les mêmes fichiers de police déjà évincés AVANT ce déploiement.
+  Remonter le plafond empêche seulement de FUTURES évictions une fois que le cache se
+  repeuplerait naturellement — un processus lent et non garanti, pas un correctif qui se voit
+  "immédiatement" comme je l'avais annoncé à tort. Corrigé (`vite.config.js`) : `cacheName`
+  renommé `'google-fonts'` → `'google-fonts-v2'` — Workbox traite ça comme un cache TOUT NEUF,
+  forçant un premier refetch réseau propre de chaque police au prochain besoin, qui se retrouve
+  ensuite dans un cache à 60 entrées ne purgeant plus rien. L'ancien cache orphelin `google-fonts`
+  est supprimé automatiquement par `cleanupOutdatedCaches` (déjà actif dans ce fichier, mécanisme
+  éprouvé — même principe que le `CACHE_BUSTER` de React Query documenté plus haut pour un
+  symptôme similaire, "cache figé qui ne se répare jamais tout seul"). Vérifié dans le build local
+  (`dist/sw.js`) avant déploiement : `"google-fonts-v2",plugins:[new s.ExpirationPlugin({maxEntries:
+  60,...})]` bien présent. 374 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build vérifiés. Honnêteté : comme pour le fix précédent, aucun accès à un vrai iPhone/PWA pour
+  confirmer en direct — mais cette fois le mécanisme corrige un vrai trou de raisonnement (renommer
+  le cache est ce qui rend le changement réellement observable, pas juste "correct en théorie")
+  plutôt que de re-proposer la même action sous une forme différente ; l'utilisateur devra fermer
+  complètement l'app puis la rouvrir pour que le nouveau service worker prenne la main
+  (`skipWaiting`/`clientsClaim` déjà actifs, mais une PWA déjà ouverte ne bascule pas seule sur un
+  nouveau SW tant qu'elle n'est pas rechargée) avant que les polices ne se rechargent proprement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
