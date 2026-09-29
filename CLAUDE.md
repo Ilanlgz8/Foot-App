@@ -2142,6 +2142,40 @@ cf-worker/
   faute d'accès aux logs football-data.org) — décision et action laissées à l'utilisateur,
   jamais faisable depuis ce sandbox.
 
+- ✅ Police du score/heure/cotes qui change au retour d'arrière-plan et ne revient jamais à la
+  normale (constat utilisateur, 29/09 : "je reviens d'arrière-plan [...] la police et tout ils
+  ont changé et ça s'est pas remis comme avant depuis" — sur iPhone PWA). Piste initiale écartée
+  après vérification en direct sur le site déployé (navigateur intégré, lecture des computed
+  styles réels) : PAS un vieux cache PWA périmé — le site sert bien la bonne version (Inter 900
+  pour score/heure depuis début septembre, choix déjà documenté ; Russo One pour les cotes,
+  inchangé), et le mécanisme dédié à ce type de problème (`checkAppVersion`, `src/utils/
+  appUpdate.js`, ajouté le 04/09) compare les bundles JS/CSS déployés à ceux réellement chargés —
+  mais ne peut RIEN détecter ici : le bundle n'a pas changé, seul l'état RUNTIME des polices déjà
+  chargées a changé après la mise en arrière-plan. Cause la plus probable, un bug WebKit
+  documenté (pas vérifiable à 100% sans accès à un vrai iPhone depuis cet environnement, mais
+  cohérent avec le déclencheur EXACT rapporté — au retour d'arrière-plan, jamais spontané) : iOS
+  évince de la mémoire les polices web déjà chargées (Chakra Petch/Archivo Black/Orbitron/Russo
+  One/Bebas Neue, chargées via Google Fonts dans `index.html`) pendant une mise en arrière-plan
+  prolongée (pression mémoire) — et comme cette app ne recharge jamais la page pour revenir au
+  premier plan (SPA), rien ne redemande ensuite ces polices : elles restent bloquées sur leur
+  repli (system-ui/sans-serif) indéfiniment, jusqu'à un vrai rechargement complet — expliquant à
+  la fois le déclencheur précis (retour d'arrière-plan) ET la persistance ("ça s'est pas remis
+  comme avant depuis", puisque rien dans l'app ne redemande spontanément ces polices en
+  fonctionnement normal). Corrigé (`src/App.jsx`, nouvel effect) : à chaque retour au premier
+  plan (`visibilitychange`/`pageshow`, mêmes événements déjà utilisés par le filet `unstickScroll`
+  juste au-dessus dans le même fichier), appel explicite de `document.fonts.load()` sur chaque
+  police/graisse réellement utilisée par l'app. Si la police est toujours en mémoire, l'appel est
+  résolu immédiatement sans coût réseau ; si elle a été évincée, ça force son rechargement — et
+  une fois chargée, le navigateur réaffiche automatiquement tout le texte concerné (comportement
+  standard de la Font Loading API), sans avoir besoin d'un rechargement de page complet (donc pas
+  de flash/clignotement comme un `window.location.reload()` en aurait causé). 374 tests + lint (33
+  erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : toujours aucun accès
+  à un vrai iPhone/PWA depuis cet environnement pour reproduire ou confirmer avant déploiement —
+  le diagnostic s'appuie sur une vérification réelle qui a écarté la piste cache (pas juste une
+  supposition) et sur un mécanisme WebKit connu qui correspond précisément au déclencheur décrit,
+  mais reste à confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via
+  Vercel, pas de `npm run deploy` manuel nécessaire pour celui-ci).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
