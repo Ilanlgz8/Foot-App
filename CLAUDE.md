@@ -2247,6 +2247,49 @@ cf-worker/
   signalement) plutôt que par un test permanent ajouté au dépôt ; à reconfirmer par l'utilisateur
   sur son prochain jour de Ligue des Nations après ce déploiement.
 
+- ✅ Cotes plus "en gras comme avant" + heure du "Match du jour" dans une police différente
+  (constat utilisateur, 29/09, plusieurs allers-retours : d'abord "la police et tout ils ont
+  changé", puis précisé "les chiffre des côtes ne sont plus en gras comme avant et l'heure du
+  match du jour etait d'une police differente") — root cause DIFFÉRENTE du fix "font-eviction au
+  retour d'arrière-plan" posé plus tôt le même jour (`App.jsx`, `document.fonts.load()`), qui
+  restait un correctif préventif raisonnable mais jamais confirmé comme LA cause exacte. Audit du
+  CSS en direct sur la prod (navigateur intégré, `getComputedStyle`) : les cotes (`.poster__prono-
+  pillVal`) demandent bien `font-family: "Russo One"` et l'heure du Match du jour
+  (`.accueil__mdjClock .accueil__mdjBigNum`, règle `index.css`) demande bien `Orbitron` — les deux
+  RENDUS CORRECTEMENT à l'instant du test, donc pas un bug permanent, mais Russo One n'a NATURELLEMENT
+  qu'une seule graisse (400) qui a déjà un tracé très épais par nature — si cette police échoue à
+  charger, le repli `sans-serif` à la même graisse 400 rend un texte visiblement bien plus fin :
+  exactement la plainte "plus en gras". Cause structurelle trouvée dans `vite.config.js`
+  (`runtimeCaching`, règle `google-fonts`) : `expiration: { maxEntries: 10 }` sur un `CacheFirst`
+  — largement insuffisant pour les 6 familles demandées en une seule requête CSS2 (Chakra Petch ×2
+  graisses, Archivo ×2, Archivo Black, Orbitron, Russo One, Bebas Neue = 8 combos famille+graisse),
+  chacun décliné par Google Fonts en PLUSIEURS blocs `@font-face` par sous-ensemble unicode (latin/
+  latin-ext/vietnamese/…) — entre ~25 et ~45 fichiers réels à mettre en cache, bien au-delà de 10.
+  Workbox (`ExpirationPlugin`) purge les entrées les plus anciennes dès que ce plafond est dépassé,
+  y compris des polices DÉJÀ activement utilisées (Orbitron, Russo One) simplement parce qu'un
+  sous-ensemble d'une AUTRE police est arrivé après elles dans le cache — contredisant directement
+  l'intention du commentaire d'origine ("cache long, jamais de fetch inutile"). Une fois évincée
+  du cache SW, un refetch réseau est retenté au prochain besoin ; s'il échoue ou traîne (reprise
+  d'arrière-plan, réseau capricieux au mauvais moment), le texte reste sur son repli système tant
+  qu'aucun retry ne réussit. Corrigé (`vite.config.js`) : `maxEntries` 10 → 60 (marge large,
+  couvre confortablement les ~25-45 fichiers réels + marge pour une future police). Le fix
+  `document.fonts.load()` du matin (`App.jsx`) reste en place en complément, sans risque — les 2
+  corrections sont indépendantes et cumulables (l'un couvre une éviction mémoire runtime côté
+  WebKit, l'autre une éviction du cache Workbox côté service worker). 374 tests + lint (33 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés, y compris `dist/sw.js` généré inspecté
+  pour confirmer `maxEntries:60` bien présent dans le service worker buildé. Honnêteté : je n'ai
+  pas pu compter avec certitude absolue le nombre EXACT de fichiers de police réellement servis
+  par Google Fonts pour ce jeu de familles précis (la tentative de récupérer la vraie feuille CSS2
+  avec un user-agent iPhone réel depuis cet environnement a échoué — `fetch` bloqué par la CSP de
+  l'app depuis le navigateur intégré, et l'outil `web_fetch` du sandbox ne relaie pas de vrai
+  user-agent, renvoyant un repli TrueType d'ancien navigateur avec un seul bloc plutôt que le vrai
+  découpage moderne par sous-ensemble) — l'estimation ~25-45 fichiers s'appuie sur le comportement
+  public bien documenté de l'API Google Fonts CSS2 pour des familles latines, pas sur une mesure
+  directe confirmée dans cet environnement ; mais que ce soit 25 ou 45, les deux dépassent
+  largement l'ancien plafond de 10, donc le mécanisme de purge excessive reste vérifié avec
+  certitude, seul le chiffre exact ne l'est pas. Toujours aucun accès à un vrai iPhone/PWA pour
+  confirmer que ce fix règle définitivement le symptôme — à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
