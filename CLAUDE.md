@@ -2176,6 +2176,43 @@ cf-worker/
   mais reste à confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via
   Vercel, pas de `npm run deploy` manuel nécessaire pour celui-ci).
 
+- ✅ Cote pré-match qui saute brutalement pile au coup d'envoi (constat utilisateur, 29/09 :
+  "pourquoi quand le match il commence tu changes la côte des que le match commence au lieu de
+  laisser la côte et après monter ou baisser [...] en fonction du score de cartons rouge ou de
+  minutes du match ?") — le garde-fou existait déjà en théorie (`calcLiveProno`, `if (diff === 0
+  && remaining === 1) return pre` — au coup d'envoi exact, le direct EST censé renvoyer
+  exactement la même valeur que le pré-match, voir son commentaire), mais un vrai trou l'annule
+  dans un cas précis. Root cause dans `useEspnPregameOdds` (`useMatchDetail.js`) : ce hook exclut
+  explicitement tout provider dont le nom matche `/live/i` (`ODDS_PROVIDER_SKIP`) — ESPN publie
+  souvent une ligne "*Live Odds*" séparée une fois le match commencé, remplaçant la ligne
+  pré-match dans `comp.odds[]`. Pile au moment où `isLive` bascule à `true`, si ESPN a déjà
+  relabellisé la ligne, `espnOdds` retombe à `null` — `marketPre` transmis à `calcLiveProno`
+  devient alors `null`, et `pre` (le point de départ du direct) se recalcule via le prior interne
+  `calcPronoAdvanced` au lieu de la vraie cote de marché affichée une seconde plus tôt : un vrai
+  saut de valeur, pas une variation légitime liée au jeu. Corrigé (`MatchPoster.jsx`,
+  `MatchDuJourCard.jsx`, les 2 endroits qui réinjectent déjà `marketPre`) : la dernière cote de
+  marché pré-match valide vue est désormais figée dans un state local, et c'est CETTE valeur figée
+  (pas `espnOdds` en direct, qui peut disparaître) qui sert de point de départ à `calcLiveProno` —
+  mise à jour PENDANT le rendu (pattern officiel React "Adjusting state when a prop changes",
+  comparaison de référence `espnOdds !== prevEspnOdds`) plutôt que dans un `useEffect`, pour éviter
+  la règle lint `react-hooks/set-state-in-effect` (repérée en cours de route : un premier essai via
+  `useRef` a aussi été écarté, la règle `react-hooks/refs` interdisant toute lecture/écriture de
+  `.current` pendant le rendu — les deux règles n'existaient pas encore la dernière fois qu'un
+  `useRef` similaire avait été ajouté ailleurs dans ce projet). Une fois figée, la cote ne peut
+  plus jamais sauter à la transition pré-match → live ; le direct continue ensuite de bouger
+  normalement selon le score/les cartons rouges/la minute, exactement le mécanisme Poisson déjà en
+  place dans `calcLiveProno` (inchangé). `MatchModal.jsx` (LiveStatsTab, page LiveMatchPage) laissé
+  tel quel : son `useEspnPregameOdds(match, isLive)` n'est activé QU'une fois le match en direct
+  (jamais pré-match), donc n'a pas la même fenêtre pour figer une valeur AVANT le coup d'envoi —
+  il dépend du cache localStorage partagé (`espnOdds_${match.id}`, déjà écrit par MatchPoster.jsx/
+  MatchDuJourCard.jsx si l'utilisateur a vu la card Accueil avant), un filet différent, pas corrigé
+  ici faute de demande précise sur ce point. 374 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés. Honnêteté : rendu jamais vu en direct sur un vrai
+  coup d'envoi avant ce déploiement (mécanisme ESPN de relabellisation "Live Odds" déjà documenté
+  dans le commentaire existant de `useEspnPregameOdds`, mais pas re-vérifié en direct au moment
+  exact d'un vrai coup d'envoi depuis cet environnement) — à confirmer par l'utilisateur sur son
+  prochain match suivi dès le coup d'envoi.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
