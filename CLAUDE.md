@@ -2315,6 +2315,38 @@ cf-worker/
   (`skipWaiting`/`clientsClaim` déjà actifs, mais une PWA déjà ouverte ne bascule pas seule sur un
   nouveau SW tant qu'elle n'est pas rechargée) avant que les polices ne se rechargent proprement.
 
+- ✅ Faux départ écarté puis vrai filet ajouté, même jour (29/09, suite du symptôme cotes/heure
+  Match du jour) : l'utilisateur a insisté ("c'était pas comme ça avant [...] tu le fais exprès")
+  et a fini par fournir 2 vraies captures d'écran de son iPhone à 5 jours d'écart (24/09 13:40 et
+  29/09 10:03) montrant une police visiblement différente sur les mêmes éléments. Vérifié par
+  `git log --since=2026-09-24 -- accueil.css index.css matchModal.css LiveMatchPage.css` : UN
+  SEUL commit CSS dans cette fenêtre (repositionnement de nom d'équipe, sans rapport) — aucune
+  règle `font-family`/`font-weight` de ces éléments n'a changé entre les 2 captures. Confirme que
+  ce n'est PAS une régression introduite par un déploiement précis (ni les 2 fixes du jour même,
+  déjà tentés avant ces captures) : un vrai problème RUNTIME, intermittent, propre à l'appareil.
+  Testé et écarté avec certitude aujourd'hui : blocage réseau/CSP/bloqueur de pub (l'utilisateur a
+  tapé l'URL Google Fonts directement dans Safari, le vrai CSS `@font-face` avec les bonnes URLs
+  woff2 est revenu) ; cache PWA/service worker (reproduit identique en Safari normal ET navigation
+  privée, où le SW ne joue pas le même rôle) ; police visible dans un navigateur de test frais
+  (vérifié en direct via le navigateur intégré : rendu correct, `document.fonts.check()` à `true`
+  pour les 3 polices). Le fix `document.fonts.load()` posé ce matin (visibilitychange/pageshow,
+  voir juste au-dessus) reste déployé et confirmé (bundle vérifié en direct) mais n'a pas suffi à
+  éliminer le symptôme constaté sur les captures — cause probable : ces 2 événements ne se
+  déclenchent pas de façon fiable en PWA standalone iOS (limite déjà documentée dans ce fichier
+  pour d'autres watchdogs, ex. la barre du bas). Renforcé (`App.jsx`) : `reloadFonts()` appelé
+  aussi une fois au montage (pas seulement sur les événements), + un `setInterval` de 2min tant
+  que l'app est au premier plan, filet indépendant de tout événement — même principe déjà éprouvé
+  dans `main.jsx` pour le check de mise à jour du SW (justifié par le même constat "iOS standalone
+  ne déclenche pas toujours `visibilitychange`"). 374 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés. Honnêteté totale : je ne peux toujours pas reproduire ce
+  bug moi-même (mon navigateur de test rend correctement dès le premier chargement) — cet ajout
+  est un filet raisonnable et de faible risque pour un mécanisme déjà plausible, PAS une nouvelle
+  certitude sur la cause exacte ; si le symptôme persiste malgré ce renfort, la piste la plus
+  fiable restante — jamais essayée faute d'accès à l'appareil — est un vrai reset du cache Safari
+  pour le domaine (Réglages > Safari > Avancé > Données de sites Web > statfootix.vercel.app >
+  Supprimer), pour éliminer tout état runtime WebKit persistant qu'aucun mécanisme côté app ne
+  peut atteindre depuis l'extérieur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

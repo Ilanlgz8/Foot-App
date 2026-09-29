@@ -244,6 +244,26 @@ function App() {
   // évincée, ça force son rechargement — et une fois chargée, le navigateur
   // réaffiche automatiquement tout le texte concerné (comportement standard
   // de `document.fonts.load`), sans avoir besoin d'un rechargement de page.
+  // ⚠️ RENFORCÉ (29/09, même jour — l'utilisateur a fourni 2 captures d'écran
+  // RÉELLES de son iPhone, à 5 jours d'écart, montrant une police différente
+  // sur les mêmes éléments (cotes + heure Match du jour) alors que `git log`
+  // confirme qu'AUCUN commit n'a touché `font-family`/`font-weight` de ces
+  // règles entre les deux dates — donc pas une régression de code introduite
+  // par un déploiement précis, un vrai problème RUNTIME sur son appareil.
+  // Écarté avec certitude aujourd'hui par un test direct depuis son Safari
+  // (URL Google Fonts tapée à la main) : la requête réseau aboutit et renvoie
+  // le vrai CSS @font-face avec les bonnes URLs woff2 — donc pas un blocage
+  // réseau/CSP/bloqueur. Le fix `document.fonts.load()` posé ce matin
+  // (visibilitychange/pageshow ci-dessous) n'a pas suffi à corriger le
+  // symptôme malgré un déploiement confirmé — probablement parce que ces 2
+  // événements ne se déclenchent pas de façon fiable en PWA standalone iOS
+  // (limite déjà documentée ailleurs dans ce fichier, `checkAppVersion`/
+  // watchdog barre du bas) : rien ne garantit qu'ils tirent au bon moment
+  // pour rattraper une police qui vient d'être évincée. Ajout d'un filet
+  // supplémentaire, même principe que le fallback déjà utilisé dans
+  // `main.jsx` pour un problème analogue (vérif de mise à jour du SW) :
+  // un intervalle régulier qui ne dépend d'aucun événement, tant que l'app
+  // est au premier plan.
   useEffect(() => {
     if (!('fonts' in document)) return
     const FACES = [
@@ -258,11 +278,14 @@ function App() {
       if (document.visibilityState !== 'visible') return
       FACES.forEach(f => { document.fonts.load(f).catch(() => {}) })
     }
+    reloadFonts()
     document.addEventListener('visibilitychange', reloadFonts)
     window.addEventListener('pageshow', reloadFonts)
+    const intervalId = setInterval(reloadFonts, 2 * 60 * 1000) // 2min, filet iOS standalone
     return () => {
       document.removeEventListener('visibilitychange', reloadFonts)
       window.removeEventListener('pageshow', reloadFonts)
+      clearInterval(intervalId)
     }
   }, [])
 
