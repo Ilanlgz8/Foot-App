@@ -492,27 +492,54 @@ export function useTeamFormMulti(compCodes) {
   // Capturé par code (voir `formMapByComp` plus bas) — même formMap résolu
   // que celui fusionné dans `formMap` juste en dessous, juste gardé SÉPARÉ
   // par compétition plutôt qu'aplati dans un seul objet partagé.
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 29/09 : "sur les matchs d'aujourd'hui
+  // on voit pas la forme récente... alors qu'ils ont tous joué des matchs" —
+  // repro sur un jour de trêve internationale, Ligue des Nations) : le
+  // `if (homeId == null && awayId == null) return null` ci-dessous (ajouté
+  // pour le bug Deportivo au-dessus) DROPAIT ENTIÈREMENT tout match dont
+  // AUCUN des 2 camps ne se résolvait contre `fdTeamPool` — correct pour
+  // UEL/UECL/TDC/CS/USC (compétitions de CLUBS, un vrai club a normalement
+  // une correspondance dans les championnats domestiques affichés le même
+  // jour), mais absurde pour NL/CAN/COPA (compétitions d'ÉQUIPES NATIONALES) :
+  // `fdTeamPool` ne contient QUE des matchs de club (fdCodes exclut déjà les
+  // comps ESPN-only) — l'Espagne ou la Croatie ne "matchent" JAMAIS un nom de
+  // club. Un jour de trêve internationale (aucun championnat club ne joue),
+  // fdTeamPool est même totalement VIDE : 100% des matchs NL échouaient donc
+  // la résolution des DEUX côtés, étaient filtrés, et `formMapByComp['NL']`
+  // (la table réellement consommée par Accueil/MatchPoster depuis le 12/09)
+  // restait vide en permanence pour cette compétition — pas de bug occasionnel,
+  // un vide garanti à chaque fois. Fix : `formMapByComp` (indexé PAR
+  // compétition, jamais partagé) garde désormais TOUJOURS le match, avec
+  // repli sur l'id ESPN natif de chaque équipe quand la résolution par nom
+  // échoue — sans risque de collision propre à cette table (elle n'est jamais
+  // fusionnée avec une autre compétition). Le `formMap` LEGACY fusionné
+  // (toujours exposé pour compat, plus consommé par aucun appelant réel)
+  // reste protégé à l'identique qu'avant : n'y entrent que les matchs où AU
+  // MOINS un des 2 camps a été identifié avec certitude par nom — pour ne
+  // jamais réintroduire le bug Deportivo sur cette table partagée.
   const espnFormMapByCode = {}
   if (espnCodes.length) {
     const fdTeamPool = fdCodes.flatMap(c => resultByCode[c]?.data?.matches ?? [])
     for (const c of espnCodes) {
       const espnMatches = resultByCode[c]?.data?.matches ?? []
-      const resolvedMatches = espnMatches
+      const resolved = espnMatches
         .filter(m => m.status === 'FINISHED')
         .map(m => {
           const homeId = resolveFdTeamId(m.homeTeam, fdTeamPool, { loose: true, strict: true })
           const awayId = resolveFdTeamId(m.awayTeam, fdTeamPool, { loose: true, strict: true })
-          if (homeId == null && awayId == null) return null
           return {
-            ...m,
-            homeTeam: { ...m.homeTeam, id: homeId ?? m.homeTeam.id },
-            awayTeam: { ...m.awayTeam, id: awayId ?? m.awayTeam.id },
+            bothUnresolved: homeId == null && awayId == null,
+            match: {
+              ...m,
+              homeTeam: { ...m.homeTeam, id: homeId ?? m.homeTeam.id },
+              awayTeam: { ...m.awayTeam, id: awayId ?? m.awayTeam.id },
+            },
           }
         })
-        .filter(Boolean)
-      const espnFormMap = buildFormMap(resolvedMatches)
+      const espnFormMap = buildFormMap(resolved.map(r => r.match))
       espnFormMapByCode[c] = espnFormMap
-      for (const [id, form] of Object.entries(espnFormMap)) {
+      const safeFormMap = buildFormMap(resolved.filter(r => !r.bothUnresolved).map(r => r.match))
+      for (const [id, form] of Object.entries(safeFormMap)) {
         if (!(id in formMap)) formMap[id] = form
       }
     }
