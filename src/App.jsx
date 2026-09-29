@@ -223,6 +223,49 @@ function App() {
     }
   }, [])
 
+  // ⚠️ AJOUT (29/09, constat utilisateur : "je reviens d'arrière-plan et la
+  // police [...] a changé [...] et ça s'est pas remis comme avant depuis").
+  // Ni un vieux cache PWA (vérifié en direct : le site sert bien la bonne
+  // version) ni un problème de code (`checkAppVersion`, main.jsx, ne détecte
+  // que des changements de BUNDLE — ici le bundle n'a pas changé, seul l'état
+  // RUNTIME des polices déjà chargées a changé, ce qui échappe entièrement à
+  // ce mécanisme). Cause la plus probable, un bug WebKit documenté : une
+  // police web déjà chargée (Chakra Petch/Archivo Black/Orbitron/Russo One/
+  // Bebas Neue, chargées via Google Fonts dans index.html) peut être évincée
+  // de la mémoire par iOS pendant une mise en arrière-plan prolongée (pression
+  // mémoire) — et comme cette app ne recharge jamais la page pour revenir au
+  // premier plan (SPA), rien ne redemande ces polices après coup : elles
+  // restent bloquées sur leur repli (system-ui/sans-serif) indéfiniment,
+  // jusqu'à un vrai rechargement complet — exactement le symptôme "persiste
+  // depuis hier soir".
+  // Fix : redemander explicitement chaque police/graisse utilisée via la Font
+  // Loading API à chaque retour au premier plan. Si la police est toujours en
+  // mémoire, l'appel est résolu immédiatement sans coût réseau ; si elle a été
+  // évincée, ça force son rechargement — et une fois chargée, le navigateur
+  // réaffiche automatiquement tout le texte concerné (comportement standard
+  // de `document.fonts.load`), sans avoir besoin d'un rechargement de page.
+  useEffect(() => {
+    if (!('fonts' in document)) return
+    const FACES = [
+      '600 16px "Chakra Petch"', '700 16px "Chakra Petch"',
+      '700 16px "Archivo"', '900 16px "Archivo"',
+      '400 16px "Archivo Black"',
+      '700 16px "Orbitron"',
+      '400 16px "Russo One"',
+      '400 16px "Bebas Neue"',
+    ]
+    const reloadFonts = () => {
+      if (document.visibilityState !== 'visible') return
+      FACES.forEach(f => { document.fonts.load(f).catch(() => {}) })
+    }
+    document.addEventListener('visibilitychange', reloadFonts)
+    window.addEventListener('pageshow', reloadFonts)
+    return () => {
+      document.removeEventListener('visibilitychange', reloadFonts)
+      window.removeEventListener('pageshow', reloadFonts)
+    }
+  }, [])
+
   // ⚠️ REFONTE STRUCTURELLE (14/09, 14e signalement de la barre du bas
   // décollée — voir CLAUDE.md pour l'historique complet des 13 tentatives
   // précédentes, toutes centrées sur `.sfTabbar` en `position: fixed`). La
