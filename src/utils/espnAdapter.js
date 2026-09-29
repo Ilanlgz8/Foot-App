@@ -164,10 +164,55 @@ function fmtDate(d) { return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(
 const DAYS_BACK    = 30
 const DAYS_FORWARD = 45
 
-function windowRange() {
+// ⚠️ AJOUT (29/09, constat utilisateur : "j'ai pas les stats saison des
+// matchs d'aujourd'hui ni la forme recente" — jour de la 2e journée du tout
+// nouveau cycle 2026-27 de Ligue des Nations, matchday 2, 27-29/09) : la
+// fenêtre 30j/45j ci-dessus (réduite le 16/09 pour un tout autre incident,
+// voir son commentaire) est bien trop courte pour les tournois de sélections
+// nationales — vérifié via le vrai calendrier UEFA (Wikipédia) : l'édition
+// précédente de la Ligue des Nations s'est terminée en juin 2025 (Finals),
+// la nouvelle ne reprend que le 24/09/2026 — un écart de ~15 MOIS entre 2
+// matchs de CETTE même compétition pour une équipe éliminée tôt du groupe
+// précédent, largement au-delà de n'importe quelle fenêtre raisonnable côté
+// serveur (voir le compromis perf ci-dessus). Fenêtre élargie à 400j
+// UNIQUEMENT pour les slugs dédiés à ces compétitions sporadiques (jamais
+// partagés avec les 5 grands championnats club ni la C1 — voir
+// COMPETITION_ESPN_SLUG, competitions.js — donc AUCUN risque de réintroduire
+// le problème de timeout Vercel du 16/09, qui concernait le découpage de
+// plage pour des slugs à fort trafic ; ici le 1er chargement à froid peut
+// être plus lent, mais dégrade proprement sur la copie cache existante
+// (readCacheStale, voir fetchEspnCompMatches) plutôt que de planter, et les
+// tranches passées sont mises en cache très longtemps une fois obtenues —
+// coût payé une seule fois). Honnêteté : 400j ne couvre PAS tous les cas —
+// une équipe reléguée en Ligue D ou éliminée très tôt peut avoir un écart de
+// PLUS de 400j entre 2 matchs de CETTE compétition précise ; la vraie limite
+// structurelle est ailleurs (voir fetchTeamForm, useTeamForm.js) : pour ces
+// compétitions ESPN-only, "forme récente" ne compte QUE les matchs de la
+// MÊME compétition (contrairement aux clubs, où Coupe de France compte déjà
+// dans la forme Ligue 1 depuis le 27/07) — jamais les amicaux/qualifs d'une
+// autre compétition de la même équipe nationale, qui seraient les vrais
+// "5 derniers matchs" dans la réalité. Élargir la fenêtre aide les cas où le
+// dernier match DE CETTE COMPÉTITION est encore dans les 400j (ex. dès la
+// 2e journée d'un nouveau cycle, comme aujourd'hui — chaque équipe a alors
+// déjà 1 résultat, la vraie journée 1, 3-5j plus tôt, largement dans la
+// fenêtre), mais ne peut pas faire apparaître un vrai historique "5 sur 5"
+// pour une compétition qui vient tout juste de commencer — pas un bug
+// restant, juste ce qu'il y a réellement à afficher.
+const SPARSE_INTL_SLUGS = new Set([
+  'uefa.nations', 'caf.nations', 'conmebol.america',
+  'uefa.europa', 'uefa.europa.conf',
+  'uefa.super_cup', 'fra.super_cup', 'eng.charity',
+])
+const DAYS_BACK_SPARSE    = 400
+const DAYS_FORWARD_SPARSE = 60
+
+function windowRange(slug) {
+  const sparse = slug && SPARSE_INTL_SLUGS.has(slug)
+  const back = sparse ? DAYS_BACK_SPARSE : DAYS_BACK
+  const fwd  = sparse ? DAYS_FORWARD_SPARSE : DAYS_FORWARD
   const now   = new Date()
-  const start = new Date(now); start.setDate(start.getDate() - DAYS_BACK)
-  const end   = new Date(now); end.setDate(end.getDate() + DAYS_FORWARD)
+  const start = new Date(now); start.setDate(start.getDate() - back)
+  const end   = new Date(now); end.setDate(end.getDate() + fwd)
   return `${fmtDate(start)}-${fmtDate(end)}`
 }
 
@@ -296,7 +341,7 @@ async function fetchEspnWindowJson(slug) {
   const cached = espnWindowCache.get(slug)
   if (cached && Date.now() - cached.ts < ESPN_WINDOW_CACHE_MS) return cached.json
   if (inFlightEspnWindowFetch.has(slug)) return inFlightEspnWindowFetch.get(slug)
-  const promise = fetch(`/espn?slug=${slug}&dates=${windowRange()}`)
+  const promise = fetch(`/espn?slug=${slug}&dates=${windowRange(slug)}`)
     .then(res => (res.ok ? res.json() : null))
     .catch(() => null)
     .then(json => {

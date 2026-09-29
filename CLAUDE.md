@@ -2347,6 +2347,46 @@ cf-worker/
   Supprimer), pour éliminer tout état runtime WebKit persistant qu'aucun mécanisme côté app ne
   peut atteindre depuis l'extérieur.
 
+- ✅ "Stats saison" ET "forme récente" absentes pour les matchs du jour, constat utilisateur le
+  jour même où la 2e journée du tout nouveau cycle 2026-27 de Ligue des Nations se jouait (29/09,
+  matchday 2, 27-29/09 — Espagne-Croatie, Finlande-Biélorussie...) : root cause confirmée via le
+  vrai calendrier UEFA (recherche web, Wikipédia) — l'édition précédente de la Ligue des Nations
+  s'est terminée en juin 2025 (Finals), la nouvelle n'a repris que le 24/09/2026 : un écart de
+  ~15 MOIS entre 2 matchs de CETTE compétition pour une équipe déjà éliminée du groupe précédent.
+  `fetchTeamForm` (`useTeamForm.js`) source NL/CAN/COPA/UEL/UECL/TDC/CS/USC via ESPN
+  (`fetchEspnCompMatches`, `espnAdapter.js`) avec une fenêtre glissante `DAYS_BACK`/`DAYS_FORWARD`
+  — réduite à 30j/45j le 16/09 pour un tout autre incident (timeout Vercel sur les 5 grands
+  championnats club) — bien trop courte pour capter le dernier match RÉEL de ces compétitions
+  sporadiques : "stats saison" (`MpSeasonStats`/`PreMatchSection`) et "forme récente"
+  (`formMapByComp`) dépendent tous les deux du MÊME `compMatches` vide → même symptôme, même
+  cause, pas 2 bugs séparés. Corrigé (`espnAdapter.js`) : fenêtre élargie à 400j EN ARRIÈRE
+  UNIQUEMENT pour les 8 slugs dédiés à ces compétitions sporadiques (`uefa.nations`,
+  `caf.nations`, `conmebol.america`, `uefa.europa`, `uefa.europa.conf`, `uefa.super_cup`,
+  `fra.super_cup`, `eng.charity`) — jamais partagés avec les 5 grands championnats club ni la C1
+  (`COMPETITION_ESPN_SLUG`, `competitions.js`), donc AUCUN risque de réintroduire le problème de
+  timeout du 16/09 (qui concernait le découpage de plage pour des slugs à fort trafic) : le 1er
+  chargement à froid de ces 8 slugs peut être plus lent, mais dégrade proprement sur la copie
+  cache existante (`readCacheStale`) plutôt que de planter, et les tranches passées sont mises en
+  cache très longtemps une fois obtenues (coût payé une seule fois). Honnêteté, 2 limites
+  assumées : (1) 400j ne couvre pas TOUS les cas — une équipe reléguée en Ligue D ou éliminée très
+  tôt peut avoir un écart de plus de 400j entre 2 matchs de cette compétition précise ; (2) limite
+  plus profonde, pas corrigée ici : pour ces compétitions ESPN-only, "forme récente" ne compte QUE
+  les matchs de la MÊME compétition (jamais les amicaux/qualifs d'une autre compétition de la même
+  équipe nationale, qui seraient les vrais "5 derniers matchs" dans la réalité) — contrairement aux
+  clubs, où la Coupe de France compte déjà dans la forme Ligue 1 depuis le 27/07. Élargir la
+  fenêtre aide surtout les cas où le dernier match DE CETTE COMPÉTITION est encore dans les 400j
+  (ex. dès la 2e journée d'un nouveau cycle NL, comme le jour du signalement — chaque équipe a
+  déjà 1 résultat, la vraie journée 1, 3-5j plus tôt) — un vrai historique "5 sur 5" pour une
+  compétition qui vient de commencer n'existe simplement pas encore, ce n'est pas un bug restant.
+  Fusionner plusieurs compétitions ESPN pour une même équipe nationale (comme pour les clubs)
+  serait le vrai fix complet, plus gros chantier, pas fait ici faute de demande explicite en ce
+  sens. 374 tests + lint + build vérifiés inchangés (changement isolé à `espnAdapter.js`, aucune
+  autre logique touchée). Honnêteté finale : pas d'accès à un vrai iPhone/PWA ni à l'API ESPN en
+  direct depuis cet environnement pour confirmer le rendu final après déploiement — le diagnostic
+  s'appuie sur le calendrier UEFA réel (vérifié via recherche web) et la lecture exhaustive du code
+  existant (dont plusieurs commentaires antérieurs documentant déjà ce compromis comme "accepté"),
+  pas sur une reproduction live ; à confirmer par l'utilisateur sur son prochain match international.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
