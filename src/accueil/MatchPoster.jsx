@@ -1,4 +1,4 @@
-import { useState, useEffect }        from 'react'
+import { useState, useEffect } from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
@@ -194,6 +194,41 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
   // "forme récente" seule — surtout en tout début de saison, quand peu de
   // matchs de la saison en cours existent encore pour affiner le modèle.
   const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
+  // ⚠️ AJOUT (constat utilisateur, 29/09 : "pourquoi tu changes la côte dès
+  // que le match commence au lieu de laisser la côte et après monter/
+  // baisser [...] en fonction du score/carton rouge/minute ?") — root cause
+  // trouvée dans `useEspnPregameOdds` (voir son commentaire, `useMatchDetail.js`) :
+  // ce hook exclut explicitement tout provider dont le nom contient "live"
+  // (`ODDS_PROVIDER_SKIP`), car ESPN publie une ligne "Live Odds" séparée une
+  // fois le match commencé. Au moment précis où `isLive` bascule à `true`,
+  // ESPN peut avoir déjà relabellisé la ligne pré-match en "*Live Odds*" —
+  // `espnOdds` retombe alors à `null` pile à cet instant, et `calcLiveProno`
+  // (qui, à 0-0/minute 0, est censé renvoyer EXACTEMENT `marketPre` sans
+  // aucun calcul, voir son early-return) se rabat sur son prior interne
+  // (`calcPronoAdvanced`) — une valeur différente de la vraie cote marché
+  // affichée une seconde plus tôt. D'où le saut visible pile au coup d'envoi,
+  // alors que rien ne s'est réellement passé sur le terrain à cet instant.
+  // Fix : on fige la DERNIÈRE cote de marché valide vue (forcément une cote
+  // pré-match, puisque c'est la seule sorte que ce hook renvoie jamais) dans
+  // un state, et on l'utilise comme point de départ du direct à la place de
+  // `espnOdds` en direct — qui peut disparaître, alors que la vraie valeur de
+  // référence, elle, ne change plus une fois le match commencé. Une fois
+  // figée, plus aucun saut n'est possible à la transition pré-match → live ;
+  // le direct continue ensuite de bouger normalement selon le score/les
+  // cartons/la minute (mécanisme Poisson de calcLiveProno, inchangé).
+  // `useState` (pas `useRef`) : lu directement dans le calcul ci-dessous, et
+  // la règle react-hooks/refs interdit d'accéder à `.current` pendant le
+  // rendu (lecture ou écriture) — seul un state est sûr à lire ici. Mis à
+  // jour PENDANT le rendu (pas dans un `useEffect`) selon le pattern officiel
+  // React "Adjusting state when a prop changes" — évite le rendu en plus
+  // qu'un `useEffect` provoquerait ici (et la règle react-hooks/set-state-in-
+  // effect, qui déconseille justement ce pattern).
+  const [lastPregameOdds, setLastPregameOdds] = useState(null)
+  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
+  if (espnOdds !== prevEspnOdds) {
+    setPrevEspnOdds(espnOdds)
+    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
+  }
 
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
@@ -208,7 +243,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
         homeCorners:       espnScore?.stats?.home?.corners,
         awayCorners:       espnScore?.stats?.away?.corners,
-        marketPre:         espnOdds?.pct ?? null,
+        marketPre:         lastPregameOdds?.pct ?? null,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H, lowerDivMatches,

@@ -11,6 +11,7 @@
 // card en live du match du jour"), plus une rangée de cotes prono (même
 // calcul que MatchPoster.jsx — cote de marché ESPN si disponible, sinon
 // calcProno/calcLiveProno).
+import { useState } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { FormDiamonds } from './FormDiamonds'
@@ -107,6 +108,22 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // d'envoi et jamais avant. Même hook, même cache, aucun appel réseau en
   // plus — juste jamais branché ici.
   const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
+  // ⚠️ AJOUT (même fix que MatchPoster.jsx — voir son commentaire détaillé,
+  // constat utilisateur 29/09 : saut de cote visible pile au coup d'envoi) :
+  // `espnOdds` peut devenir `null` dès que le match passe en direct (ESPN
+  // relabellise la ligne en "*Live Odds*", filtrée par `useEspnPregameOdds`)
+  // — on fige donc la dernière valeur pré-match valide vue, plutôt que de
+  // laisser `calcLiveProno` retomber sur son prior interne à cet instant.
+  // `useState` (pas `useRef`) : la règle react-hooks/refs interdit d'accéder
+  // à `.current` pendant le rendu (lecture ou écriture, voir MatchPoster.jsx).
+  // Mis à jour PENDANT le rendu (pattern officiel React "Adjusting state when
+  // a prop changes"), pas dans un `useEffect` (react-hooks/set-state-in-effect).
+  const [lastPregameOdds, setLastPregameOdds] = useState(null)
+  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
+  if (espnOdds !== prevEspnOdds) {
+    setPrevEspnOdds(espnOdds)
+    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
+  }
 
   if (!match) return null
 
@@ -186,7 +203,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         // dans MatchPoster.jsx et LiveStatsTab. Sans elle, cette carte partait
         // du prior interne (forme récente) et divergeait des deux autres pour
         // le même match — voir le commentaire de useEspnPregameOdds plus haut.
-        marketPre:         espnOdds?.pct ?? null,
+        marketPre:         lastPregameOdds?.pct ?? null,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H, lowerDivMatches,
