@@ -115,10 +115,36 @@ export default defineConfig(({ mode }) => {
               },
             },
             // Fonts Google → cache long, jamais de fetch inutile
+            // ⚠️ BUG CORRIGÉ (constat utilisateur, 29/09 : cotes plus "en gras
+            // comme avant" — Russo One tombé en repli sans-serif fin — et
+            // heure du "Match du jour" dans une police différente — Orbitron
+            // tombé en repli) : `maxEntries: 10` était BEAUCOUP trop bas pour
+            // ce que cette règle doit réellement mettre en cache. 6 familles
+            // (Chakra Petch 2 graisses, Archivo 2 graisses, Archivo Black,
+            // Orbitron, Russo One, Bebas Neue = 8 combos famille+graisse) sont
+            // demandées en UNE seule requête CSS2 — Google Fonts répond avec
+            // UN bloc @font-face PAR combo ET par sous-ensemble unicode (latin/
+            // latin-ext/vietnamese/…, généralement 3 à 6 par graisse) : entre
+            // ~25 et ~45 fichiers de police réels + la feuille CSS elle-même,
+            // largement plus que 10. Workbox (ExpirationPlugin) purge les
+            // entrées les plus anciennes dès que ce plafond est dépassé — donc
+            // des polices déjà utilisées (ex. Orbitron, Russo One) pouvaient
+            // se faire éjecter du cache par l'arrivée d'un sous-ensemble plus
+            // récent (ex. un caractère spécial déclenchant le fetch du
+            // sous-ensemble "vietnamese"), contredisant directement l'intention
+            // du commentaire d'origine ("cache long, jamais de fetch inutile").
+            // Une fois évincé, un refetch réseau est retenté au prochain besoin
+            // — s'il échoue ou traîne (reprise d'arrière-plan, réseau capricieux),
+            // le texte reste sur son repli système (sans-serif fin pour Russo
+            // One, très différent visuellement). Remonté à 60 (marge large et
+            // volontairement généreuse au-delà du besoin actuel measuré) pour
+            // que TOUS les fichiers de ces 6 familles restent en cache pendant
+            // toute la durée de `maxAgeSeconds` (1 an), sans jamais purger une
+            // police encore utilisée activement par l'app.
             {
               urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
               handler: 'CacheFirst',
-              options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+              options: { cacheName: 'google-fonts', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 } },
             },
             // ⚠️ AJOUT (constat utilisateur : "les crest se rechargent à chaque
             // fois qu'on change de page, ça met parfois plusieurs secondes à
