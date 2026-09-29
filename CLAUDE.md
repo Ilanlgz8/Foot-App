@@ -2213,6 +2213,40 @@ cf-worker/
   exact d'un vrai coup d'envoi depuis cet environnement) — à confirmer par l'utilisateur sur son
   prochain match suivi dès le coup d'envoi.
 
+- ✅ "Forme récente" (losanges) totalement absente sous les équipes pour les matchs d'aujourd'hui,
+  malgré des équipes ayant bien joué (constat utilisateur, 29/09 : "on voit pas la forme recente
+  sous les equipes la les losanges [...] surtout qu'ils ont tous joué des matchs") — reproduit en
+  direct sur la prod (navigateur intégré) : le jour du signalement était un jour de trêve
+  internationale (Ligue des Nations, Espagne-Croatie/Finlande-Biélorussie), aucune carte
+  "Aujourd'hui" n'affichait de losange. Root cause dans `useTeamFormMulti` (`useTeamForm.js`) :
+  la protection anti-collision ajoutée le 16/08 pour le bug Deportivo (voir plus haut) — résoudre
+  chaque équipe d'une compétition ESPN-only (NL/CAN/COPA/UEL/UECL/TDC/CS/USC) PAR NOM contre
+  `fdTeamPool` (les matchs de club FD.org affichés le même jour), et DROPPER ENTIÈREMENT le match
+  si AUCUN des 2 côtés ne se résout — a un sens pour UEL/UECL (compétitions de CLUBS, qui
+  recoupent normalement les championnats domestiques) mais aucun pour NL/CAN/COPA (compétitions
+  d'ÉQUIPES NATIONALES) : l'Espagne ou la Croatie ne "matchent" jamais un nom de club, et un jour
+  de trêve internationale, `fdTeamPool` est de toute façon VIDE (aucun championnat club ne joue).
+  Résultat : 100% des matchs de Ligue des Nations échouaient la résolution des DEUX côtés, étaient
+  filtrés hors de `resolvedMatches`, et `formMapByComp['NL']` (la table réellement consommée par
+  Accueil/MatchPoster/MatchDuJourCard depuis le fix du 12/09) restait vide en PERMANENCE pour
+  cette compétition — pas un bug occasionnel, un vide garanti à chaque journée internationale.
+  Corrigé (`useTeamForm.js`, `useTeamFormMulti`) : `formMapByComp` (indexée par compétition,
+  jamais fusionnée avec une autre) garde désormais TOUJOURS le match, avec repli sur l'id ESPN
+  natif de chaque équipe quand la résolution par nom échoue — sans risque de collision propre à
+  cette table précise, contrairement au `formMap` legacy fusionné (partagé entre compétitions).
+  Ce dernier (plus consommé par aucun appelant réel depuis le 12/09, gardé pour compat) reste
+  protégé À L'IDENTIQUE qu'avant : seuls les matchs où AU MOINS un des 2 camps a été identifié
+  avec certitude par nom y entrent encore, pour ne jamais réintroduire le bug Deportivo sur cette
+  table-là. 374 tests + lint (33 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
+  Honnêteté : aucun test automatisé dédié ajouté pour cette logique de résolution précise (même
+  choix que documenté dans `useTeamForm.test.js` — la résolution par nom réutilise
+  `resolveFdTeamId`, déjà testée séparément dans `matchUtils.test.js`, et `useTeamFormMulti`
+  lui-même nécessiterait de mocker react-query pour être testé unitairement, jugé disproportionné
+  ici) — vérifié par lecture exhaustive du code et par reproduction visuelle en direct sur la prod
+  (capture d'écran confirmant l'absence de losange sur la carte Finlande-Biélorussie au moment du
+  signalement) plutôt que par un test permanent ajouté au dépôt ; à reconfirmer par l'utilisateur
+  sur son prochain jour de Ligue des Nations après ce déploiement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
