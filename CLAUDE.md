@@ -2549,6 +2549,44 @@ cf-worker/
   silence) — vérifiable sur le dashboard Vercel (logs de `/cron-goals`) dans les prochaines
   minutes après déploiement plutôt que d'attendre un futur cycle de facturation.
 
+- ✅ 3e passe, côté Upstash cette fois (30/09, demande explicite de rester à 100% gratuit : "oui
+  mais en version gratuite moi je veux pas payer pour le moment") — recherche faite (agent dédié)
+  sur les vraies alternatives : Upstash Fixed 250MB/10$/mois = commandes ILLIMITÉES (la seule
+  solution qui règle le problème avec certitude), Vercel Hobby confirmé bloquant réellement les
+  fonctions 30 jours en cas de dépassement CPU (pas juste une facturation), Cloudflare KV écarté
+  comme remplaçant de Redis pour le dédup/verrous (1000 écritures/jour gratuit, largement en
+  dessous du rythme actuel, et pas d'atomicité `SET NX` équivalente). L'utilisateur ayant choisi de
+  rester gratuit, optimisation supplémentaire trouvée et appliquée dans `api/fifa-live.js` — le
+  fichier le PLUS sollicité de l'app (chaque spectateur d'un match en direct l'appelle toutes les
+  30-45s, voir `espnTimerWorker.js`) : son coût PLANCHER (payé à CHAQUE appel, même quand le
+  fast-path évite tout le reste) faisait 2 commandes Redis séparées — `kv.mget` sur les clés
+  `fm:match:*` PUIS, plus loin, `kv.get('fm:freshbatch')` pour vérifier le fast-path — alors
+  qu'Upstash facture un MGET comme 1 SEULE commande quel que soit le nombre de clés qu'il touche.
+  Fusionnées en un seul `kv.mget(...matchKeys, 'fm:freshbatch')` : 1 commande au lieu de 2, sur le
+  chemin le plus emprunté de toute l'app — un client qui suit un match 1h à 30s/poll passe de 120
+  à 60 commandes rien que sur ce plancher. 2e économie trouvée au même endroit : la persistance en
+  fin de pipeline refaisait un `kv.get('fm:freshbatch')` juste avant d'écrire (lecture-fusion pour
+  ne pas écraser les ids d'un autre match) — remplacé par la réutilisation de la valeur déjà lue en
+  DÉBUT de requête, 1 commande de moins à chaque fois que le pipeline complet s'exécute. Sûr dans
+  l'immense majorité des cas (le verrou `fm:computelock` garantit qu'un seul client à la fois
+  exécute cette section) ; seule exception rare et bénigne documentée dans le code : 2 appels
+  `forceFresh` concurrents (retour d'arrière-plan sur 2 matchs différents en même temps) pourraient
+  se marcher dessus sur ce marqueur de fraîcheur précis — jamais de donnée fausse affichée, juste
+  le fast-path indisponible quelques secondes de plus pour l'un des deux. 370 tests + lint (clean)
+  + build vérifiés. Honnêteté : ce fix réduit le coût structurel mais ne peut pas garantir à 100%
+  de ne plus jamais dépasser le quota gratuit si le trafic grossit encore (aucun code ne peut
+  compenser indéfiniment une croissance d'audience sur un plan à commandes limitées) — la seule
+  garantie absolue reste le forfait Upstash Fixed payant, refusé pour l'instant par choix de
+  l'utilisateur. Pistes plus lourdes identifiées mais PAS entreprises (gains plus importants,
+  changement structurel plus risqué, nécessitant un déploiement manuel `cf-worker/`) : déplacer
+  les clés de suivi interne du cron (`cron:liveIds`/`goalTrack`/`cardTrack`/`finalDone`/`recap`,
+  actuellement sur Upstash) vers le stockage propre de Cloudflare (Durable Objects, gratuit,
+  jamais compté dans le quota Upstash puisque le Worker tourne déjà sur Cloudflare) — retirerait de
+  l'addition Upstash le plus gros consommateur 24/7/365 (poll chaque minute, toute l'année) sans
+  rien changer pour Vercel ; non fait à ce stade faute de demande explicite et vu l'ampleur du
+  chantier (migration complète du câblage Redis du Worker, tests dédiés à écrire pour une infra qui
+  n'en a aucune aujourd'hui).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
