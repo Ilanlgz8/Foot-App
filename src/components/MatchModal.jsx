@@ -584,7 +584,35 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
   // (calcPronoAdvanced/forme récente), qui peut diverger du marché — d'où des
   // pourcentages différents pour EXACTEMENT le même match selon l'endroit
   // consulté. Même hook, même TTL, même repli — juste jamais branché ici.
-  const { data: espnOdds } = useEspnPregameOdds(match, isLive)
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 30/09 : "les côtes dans accueil
+  // etait pas les memes que dans livematch page") — root cause : cette
+  // requête était activée UNIQUEMENT quand `isLive` (donc jamais avant le
+  // coup d'envoi), et `marketPre` lisait `espnOdds?.pct` EN DIRECT, sans le
+  // figer — exactement les 2 défauts déjà corrigés dans MatchPoster.jsx/
+  // MatchDuJourCard.jsx le 29/09 pour le même symptôme ("la cote saute au
+  // coup d'envoi"), jamais reportés ici (déjà documenté comme non fait dans
+  // CLAUDE.md, faute de demande précise à l'époque). Résultat concret : (1)
+  // LiveMatchPage ne captait jamais la vraie cote de marché AVANT le coup
+  // d'envoi (seul un éventuel cache localStorage écrit par une visite
+  // préalable de la card Accueil pouvait la fournir), et (2) même quand une
+  // valeur existait, elle pouvait disparaître pile au coup d'envoi (ESPN
+  // relabellise la ligne en "*Live Odds*", filtrée par `useEspnPregameOdds`)
+  // sans jamais être figée — recalcul sur le prior interne, cote différente
+  // de celle affichée sur l'Accueil pour le MÊME match. Corrigé en reprenant
+  // EXACTEMENT le même mécanisme que MatchPoster.jsx : `enabled: !isFinished`
+  // (actif pré-match ET en live, pas seulement en live) + state figé sur la
+  // dernière valeur valide vue, mis à jour PENDANT le rendu (pattern React
+  // officiel, mêmes raisons déjà documentées côté MatchPoster.jsx : useState
+  // plutôt que useRef à cause de react-hooks/refs, pendant le rendu plutôt
+  // qu'un useEffect à cause de react-hooks/set-state-in-effect).
+  const isFinished = match.status === 'FINISHED'
+  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
+  const [lastPregameOdds, setLastPregameOdds] = useState(null)
+  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
+  if (espnOdds !== prevEspnOdds) {
+    setPrevEspnOdds(espnOdds)
+    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
+  }
   const liveProno   = (hForm != null || aForm != null) ? calcLiveProno(
     hForm, aForm, homeGoals, awayGoals, liveMinute,
     {
@@ -617,7 +645,7 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
       awayShotsOnTarget: pronoStats?.away?.shotsOnTarget,
       homeCorners:       pronoStats?.home?.corners,
       awayCorners:       pronoStats?.away?.corners,
-      marketPre:         espnOdds?.pct ?? null,
+      marketPre:         lastPregameOdds?.pct ?? null,
     }
   ) : null
 
