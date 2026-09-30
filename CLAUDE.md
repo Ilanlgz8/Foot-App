@@ -2487,6 +2487,68 @@ cf-worker/
   tout moment. À traiter si un futur pic CPU coïncide avec un jour de match ET une nouvelle
   coupure Redis.
 
+- ✅ 2e passe de l'audit CPU, suite à la demande explicite de l'utilisateur (30/09 : "regarde ce
+  qui consomme beaucoup le fluid activ cpu et comment on peut arranger ça en trouvant une
+  meilleure solution stp") — après le fix `MAX_FETCH_CHUNKS` (api/espn.js, voir juste au-dessus),
+  audit complet de TOUS les autres `api/*.js` pour d'autres risques du même type (travail non
+  borné qui s'aggrave quand Redis est en panne ou qui n'a jamais eu de plafond). Lu en entier
+  `api/fifa-live.js` (déjà audité) puis délégué un audit dédié des fichiers restants
+  (cron-goals.js, football.js, h2h.js, news.js, pulse.js, fifa-lineups.js, apifootball.js,
+  subscribe.js, debug-push.js, vapid-key.js). 2 vrais risques trouvés et corrigés :
+  1. **`api/cron-goals.js` — le plus concret des deux.** N'importe quel appel avec le bon
+     `CRON_SECRET` mais SANS `body.mode==='notify'` retombait AUTOMATIQUEMENT dans l'ancien mode
+     complet (polling de TOUS les slugs ESPN, potentiellement plusieurs passes) — exactement le
+     code qui avait fait dépasser le plafond CPU une 1ère fois le 08/07, avant la migration vers
+     le Worker Cloudflare. Rien ne distinguait "appelé par le Worker (mode notify, bon marché)"
+     de "appelé par un ancien schedule cron-job.org resté actif par erreur" — les deux n'ont
+     besoin que du même secret. Vérifié par lecture directe du code (`vercel.json` ne contient
+     aucun `crons` natif, confirmant que seul cron-job.org — config EXTERNE, invisible depuis ce
+     dépôt — a pu historiquement appeler cet endpoint en continu) ET par lecture complète de
+     `cf-worker/src/index.js` : le Worker n'appelle JAMAIS ce mode complet, uniquement
+     `mode:'notify'` (2 call-sites, `notifyVercel()`/`pushLiveTicker()`, tous les deux en POST
+     avec ce mode) — donc gater le mode complet ne casse rien du chemin actif actuel. Risque réel
+     et plausible, pas juste théorique : si l'ancien schedule cron-job.org n'a jamais été
+     désactivé côté cron-job.org au moment de la migration vers le Worker (aucun moyen de le
+     vérifier depuis cet environnement, c'est une config externe), il continuerait de taper cet
+     endpoint 1440×/jour avec le mode complet, coûteux, à l'insu de tout le monde. Corrigé
+     (`api/cron-goals.js`) : le mode complet exige désormais explicitement `?legacy=1` (ou
+     `body.legacy===true` en POST) EN PLUS du secret — sans ça, 400 clair au lieu de déclencher
+     le polling complet. Le fallback manuel documenté ("si le Worker Cloudflare est en panne")
+     reste entièrement possible, juste plus jamais accidentel.
+  2. **`api/news.js`** : seul proxy de toute l'app sans AUCUNE limite de débit par IP
+     (contrairement à espn.js/fifa-live.js/fifa-lineups.js/h2h.js, tous déjà à 30-60/min/IP) — sur
+     cache-miss OU panne Redis (`catch {}` silencieux autour de `redis.get`), CHAQUE appel refait
+     le fetch+parse réel des 4 flux RSS, sans aucun plafond de fréquence. Risque actif dès
+     maintenant, pas seulement théorique : le quota Upstash reste épuisé (confirmé le 26/09), donc
+     le cache Redis 5min de ce fichier est aujourd'hui cassé en pratique — un simple curl/bot en
+     boucle (ou même un usage normal un peu insistant) peut déclencher un nombre illimité de ces
+     cycles fetch+parse. Corrigé : même pattern `ratelimit:*` 30/min/IP déjà utilisé partout
+     ailleurs dans l'app (repris tel quel de `fifa-lineups.js`).
+  Risques audités et jugés SANS danger réel, pour référence (aucune modification nécessaire) :
+  `api/h2h.js` (CSV parsing borné à 6 saisons, déjà cache long + rate-limité 30/min/IP — un léger
+  défaut trouvé, `kv.get` non protégé par try/catch contrairement à son `kv.set`, fait échouer
+  proprement en 500 plutôt que de redéclencher un travail coûteux, donc pas un risque CPU) ;
+  `api/fifa-lineups.js` (~10 fetchs FIFA bornés par match, déjà rate-limité, IDs mis en cache
+  définitivement une fois résolus) ; `api/football.js`/`pulse.js`/`api/subscribe.js`/
+  `api/vapid-key.js` (tous bornés : 1 seul appel amont ou opérations Redis O(1), déjà
+  rate-limités ou protégés par CRON_SECRET) ; `api/apifootball.js` (mode GET mort en pratique,
+  `PERMANENTLY_DISABLED`, voir Stack) ; `api/debug-push.js` (lit un historique Redis en entier,
+  mais protégé par CRON_SECRET et appelé manuellement — négligeable). Le risque déjà identifié
+  mais volontairement pas corrigé dans la passe précédente (`fm:computelock` de `fifa-live.js`,
+  fail-open si Redis tombe PENDANT un match très suivi) reste dans le même état : pas confirmé
+  comme actif, à traiter si un futur pic CPU coïncide avec un jour de match ET une coupure Redis.
+  370 tests + lint (clean sur les 2 fichiers touchés) + build vérifiés. Honnêteté : je ne peux
+  toujours pas mesurer avec certitude la part exacte de CHAQUE mécanisme (cron-goals legacy vs.
+  news.js vs. le fix MAX_FETCH_CHUNKS déjà posé) dans le pic CPU observé par l'utilisateur — pas
+  d'accès aux logs de durée par fonction Vercel depuis cet environnement — mais les 2 corrections
+  de cette passe sont des vrais bugs structurels (un chemin de code coûteux atteignable sans
+  garde-fou explicite, dans les deux cas), pas des optimisations spéculatives, donc utiles
+  indépendamment de leur part exacte dans le total constaté. Si le CPU reste élevé après ce
+  déploiement ET qu'un ancien schedule cron-job.org existait bien, ce fix devrait le rendre
+  immédiatement visible (l'ancien schedule recevra désormais des 400 au lieu de tourner en
+  silence) — vérifiable sur le dashboard Vercel (logs de `/cron-goals`) dans les prochaines
+  minutes après déploiement plutôt que d'attendre un futur cycle de facturation.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
