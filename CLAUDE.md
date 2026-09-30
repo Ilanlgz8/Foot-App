@@ -2447,6 +2447,46 @@ cf-worker/
   le quota Upstash résolu (reset mensuel ou upgrade de plan) — pas faisable depuis cet
   environnement.
 
+- ✅ PLUS GROSSE CAUSE du pic "Fluid Active CPU" trouvée et corrigée, suite à l'insistance
+  justifiée de l'utilisateur (30/09 : "faut vrm que la conso baisse considerablement hein" juste
+  après le fix buteurs NL/retrait — bonne intuition, ce fix-là n'était PAS le principal coupable)
+  : `readCachedChunks` (`api/espn.js`) ne distingue pas "vrai cache miss" de "Redis indisponible"
+  — un simple `catch` silencieux qui, tant que le quota Upstash reste épuisé (confirmé le 26/09),
+  fait retomber TOUTES les tranches d'une fenêtre en fetch ESPN réel, pour chaque requête non
+  absorbée par le cache Edge 90s. Combiné à l'élargissement du 29/09 (400j+60j pour les 8 slugs
+  sporadiques NL/CAN/COPA/UEL/UECL/TDC/CS/USC, pour corriger "stats saison"/"forme récente"
+  absentes) : jusqu'à ~460 tranches à fetcher RÉELLEMENT sur ESPN à CHAQUE cycle de cache Edge
+  (~toutes les 90s tant qu'il y a du trafic Ligue des Nations, en pleine journée internationale
+  au moment du signalement) — plus de 6x le volume du défaut normal (~75 tranches, 30j+45j),
+  largement suffisant pour expliquer la majorité du pic CPU, bien plus que le bug buteurs déjà
+  corrigé juste avant (qui ne touchait qu'un onglet niche, celui-ci touche TOUTE consultation
+  Accueil/Programme/Résultats de ces 8 compétitions). Honnêteté : je n'ai pas de chiffre exact
+  Vercel pour confirmer la part précise de chaque cause (pas d'accès aux logs de durée par
+  fonction depuis cet environnement) — mais le mécanisme est confirmé par lecture directe du code
+  (le `catch {}` de `readCachedChunks` ne fait bien aucune distinction), et le calcul de volume
+  (6x) est vérifiable arithmétiquement. Corrigé (`api/espn.js`) : `MAX_FETCH_CHUNKS` (60) — plafond
+  DUR sur le nombre de tranches réellement envoyées à ESPN en une seule exécution, quelle que soit
+  la largeur de la fenêtre demandée et indépendamment de la cause (Redis en panne, fenêtre large,
+  ou les deux) — protège structurellement contre CE scénario ET contre toute combinaison future du
+  même genre, sans avoir besoin de deviner l'état de Redis à l'avance. Quand le nombre de tranches
+  à fetcher dépasse ce plafond, seules les plus PROCHES d'aujourd'hui sont gardées (triées par
+  distance absolue) — la partie la plus utile (forme récente/prochain match) est préservée, les
+  tranches lointaines sont sacrifiées en premier plutôt qu'un tronquage arbitraire. 60 couvre
+  confortablement le besoin normal (~75j pour les grands championnats, déjà servi en 1 seule fois
+  avant ce plafond) sans jamais dépasser une fraction du budget d'exécution (`maxDuration: 30`,
+  vercel.json) même à froid total. 370 tests + lint (clean) + build vérifiés. Risque annexe du
+  même type repéré mais PAS corrigé dans cette passe (périmètre différent, pas confirmé comme
+  actif au moment du signalement) : `api/fifa-live.js` a un verrou de calcul partagé
+  (`fm:computelock`) qui, si `kv.set` échoue (Redis en panne), traite la requête COMME SI elle
+  avait le verrou (`lockAcquired = true`) — pendant un vrai match live très suivi ET un Redis en
+  panne en même temps, chaque spectateur referait le pipeline complet au lieu d'un seul calcul
+  partagé, un retour au coût "1 par spectateur" que ce verrou existe justement pour éviter (voir
+  son historique du 10/09). Pas corrigé ici car conditionné à un match live en cours au moment où
+  Redis est indisponible — combinaison non confirmée comme active au moment de ce diagnostic,
+  contrairement au chunking ESPN qui touchait N'IMPORTE QUELLE consultation Accueil/Programme à
+  tout moment. À traiter si un futur pic CPU coïncide avec un jour de match ET une nouvelle
+  coupure Redis.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
