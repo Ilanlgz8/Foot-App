@@ -196,22 +196,23 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // autre source (ici, les propres standings d'ESPN) avant de la considérer
 // fiable. NL/CAN/COPA/UEL/UECL restent donc dans NO_SCORERS_COMPS ci-dessous.
 //
-// ⚠️ NL RETIRÉE de NO_SCORERS_COMPS (même jour, 26/09) : plutôt que de faire
-// confiance à un endpoint ESPN agrégé, `useScorers.js` calcule désormais lui-
-// même les buts par joueur en additionnant le détail but-par-but de chaque
-// vrai match joué (`api/espn.js` mode `computedScorers=1`, voir
-// extractGoalsFromSummary dans espnSummaryParse.js) — vérifié en direct sur
-// Norvège 3-2 Danemark (24/09) : les 5 buts extraits collent exactement au
-// score réel. Piloté sur NL seule pour l'instant (voir HOMEMADE_SCORERS_COMPS
-// ci-dessous) : CAN/COPA/UEL/UECL restent dans NO_SCORERS_COMPS, à basculer
-// séparément une fois le mécanisme validé sur NL (UEL/UECL ont beaucoup plus
-// de matchs par journée, risque budget Vercel/Redis plus élevé à valider).
-export const NO_SCORERS_COMPS = new Set(['CAN', 'COPA', 'UEL', 'UECL'])
-
-// Compétitions dont les buteurs sont calculés "maison" (voir commentaire
-// ci-dessus) plutôt que lus depuis football-data.org ou un endpoint agrégé
-// ESPN — useScorers.js route ces compIds vers `api/espn.js?computedScorers=1`.
-export const HOMEMADE_SCORERS_COMPS = new Set(['NL'])
+// ⚠️ NL RETIRÉE de NO_SCORERS_COMPS PUIS RE-AJOUTÉE (26/09 → 30/09) : un calcul
+// "maison" avait brièvement remplacé l'endpoint ESPN agrégé pour NL seule
+// (`api/espn.js` mode `computedScorers=1`, additionnant le détail but-par-but
+// de chaque vrai match joué — vérifié exact en direct sur Norvège 3-2
+// Danemark) : le mécanisme lui-même fonctionnait (un vrai bug de gaspillage
+// CPU y a même été trouvé et corrigé le 30/09, voir CLAUDE.md), mais restait
+// bloqué vide en pratique tant que le quota Upstash mensuel reste épuisé
+// (confirmé le 26/09) — Redis indisponible = aucun match ne peut jamais être
+// marqué "scanné", donc aucun but jamais agrégé. Demande explicite
+// utilisateur (30/09, "autant supp le classement buteur de la lique des
+// nation ça sert a rien y'a rien qui s'affiche") : retiré entièrement plutôt
+// que gardé pour un affichage vide — NL rejoint CAN/COPA/UEL/UECL, aucune des
+// 5 n'a de source de buteurs fiable actuellement. Voir CLAUDE.md pour
+// l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
+// maison) et git history si le calcul maison doit être repris un jour une
+// fois le quota Upstash résolu (code supprimé, pas juste désactivé).
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les

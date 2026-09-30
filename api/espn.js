@@ -25,7 +25,7 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
-import { compactEspnSummary, compactEspnStandings, extractGoalsFromSummary } from '../src/utils/espnSummaryParse.js'
+import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -346,113 +346,6 @@ function mergeScoreboardChunks(results) {
   return { ok: true, events }
 }
 
-// ── "Buteurs fait maison" (26/09) ───────────────────────────────────────
-// Voir extractGoalsFromSummary (src/utils/espnSummaryParse.js) pour le
-// contexte complet : remplace l'endpoint ESPN `/statistics` (retiré le même
-// jour — cumul historique buggé, pas la saison en cours) par un calcul MAISON
-// à partir des vrais matchs. Réutilise l'infra scoreboard déjà en place
-// ci-dessus (readCachedChunks/fetchScoreboardChunksStaggered/
-// mergeScoreboardChunks) pour découvrir les matchs joués jour par jour, sans
-// aucun coût réseau supplémentaire pour les jours déjà en cache pour une
-// autre raison (Programme/Résultats). Piloté sur NL uniquement pour l'instant
-// (voir HOMEMADE_SCORERS_COMPS, data/competitions.js) — UEL/UECL ont
-// beaucoup plus de matchs par journée, à valider séparément avant extension.
-const HOMEMADE_SCORERS_FRESH_MS = 10 * 60 * 1000 // 10min — au-delà, un nouveau scan incrémental est tenté
-// Marge large sur la 1ère journée de Ligue des Nations 2026-27, déjà jouée
-// au moment de l'ajout de cette fonctionnalité (24-26/09) — couvre un
-// éventuel 1er appel à froid (cache jamais chauffé) sans avoir à deviner la
-// date exacte de reprise de la compétition.
-const HOMEMADE_SCORERS_INITIAL_LOOKBACK_DAYS = 35
-
-function isEventFinished(evt) {
-  const t = evt?.status?.type
-  return t?.completed === true || t?.name === 'STATUS_FULL_TIME' || t?.name === 'STATUS_FINAL'
-}
-
-// Détail but-par-but d'UN match, mis en cache PERMANENT par eventId (un match
-// FINAL déjà confirmé ne rejoue jamais ses buts — même principe que le cache
-// permanent du mode summary plus haut, mais volontairement séparé de
-// `espn:summary:v2:*` : ce dernier ne garde QUE le format compact
-// {scorers,cards,stats,lineups} sans id joueur, inutilisable tel quel pour
-// une agrégation par joueur, et c'est un chemin partagé avec la détection
-// live des buts (cron-goals.js/cf-worker) qu'il ne faut jamais reduppliquer
-// ni fragiliser pour cette fonctionnalité annexe).
-async function fetchEventSummaryGoals(slug, eventId, debugInfo) {
-  const eventCacheKey = `espn:ownscorers:event:v4:${slug}:${eventId}`
-  try {
-    const cached = await kv.get(eventCacheKey)
-    if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached
-  } catch { /* Redis indisponible → on retente un fetch direct ci-dessous */ }
-
-  const controller = new AbortController()
-  const timeoutId  = setTimeout(() => controller.abort(), 8_000)
-  try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`
-    const response = await fetch(url, {
-      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      debugInfo?.push({ eventId, status: response.status })
-      return null // échec réel (pas "0 but") — jamais mis en cache, retenté au prochain scan
-    }
-    const json = await response.json()
-    const teamCrests = {}
-    for (const c of (json?.header?.competitions?.[0]?.competitors ?? [])) {
-      if (c.team?.id) teamCrests[String(c.team.id)] = c.team.logos?.[0]?.href ?? null
-    }
-    const goals = extractGoalsFromSummary(json).map(g => ({ ...g, teamCrest: teamCrests[g.teamId] ?? null }))
-    // IMPORTANT : awaited (pas fire-and-forget) — la lecture finale (kv.mget, plus bas dans le
-    // meme handler) peut arriver dans la MEME requete juste apres ce calcul ; un `.catch(()=>{})`
-    // sans await laissait le mget partir avant que l'ecriture Redis soit reellement posee, d'ou
-    // des events "status:ok" avec de vrais buts calcules mais relus vides (`goalListsNonEmpty:0`
-    // confirme en direct via ?debug=1) — bug reel trouve et corrige, pas une hypothese.
-    let writeError = null
-    try {
-      await kv.set(eventCacheKey, JSON.stringify(goals)) // pas de `ex` : permanent, comme documenté ci-dessus
-    } catch (e) { writeError = String(e) /* Redis indisponible pour l'ecriture : les buts restent quand meme dispos en memoire pour ce cycle via le return ci-dessous, juste pas mis en cache */ }
-    debugInfo?.push({ eventId, status: 'ok', goals: goals.length, writeError })
-    return goals
-  } catch (err) {
-    debugInfo?.push({ eventId, status: 'exception', message: String(err) })
-    return null
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-// Additionne les buts déjà connus (chaque `goals` = le détail permanent d'UN
-// match, voir fetchEventSummaryGoals) en un classement {player, team, goals,
-// assists} — même contrat que football-data.org, déjà consommé tel quel par
-// Classement.jsx. Passes décisives comptées en 2e passe, uniquement pour un
-// joueur déjà connu comme buteur au moins une fois (extractGoalsFromSummary
-// ne garde que l'id du passeur, pas son nom — un passeur qui n'a jamais
-// marqué n'a donc pas assez d'info pour une entrée `player` complète ; limite
-// assumée, sans impact réel puisque Classement.jsx n'affiche les passes qu'en
-// info secondaire, jamais comme critère de tri principal).
-function aggregateGoals(goalLists) {
-  const players = new Map()
-  for (const goals of goalLists) {
-    for (const g of goals) {
-      const cur = players.get(g.athleteId) ?? {
-        player: { id: g.athleteId, name: g.athleteName },
-        team:   { id: g.teamId, name: g.teamName, shortName: g.teamName, crest: g.teamCrest ?? null },
-        goals: 0, assists: 0,
-      }
-      cur.goals += 1
-      players.set(g.athleteId, cur)
-    }
-  }
-  for (const goals of goalLists) {
-    for (const g of goals) {
-      if (!g.assistAthleteId) continue
-      const cur = players.get(g.assistAthleteId)
-      if (cur) cur.assists += 1
-    }
-  }
-  return [...players.values()].sort((a, b) => (b.goals - a.goals) || (b.assists - a.assists))
-}
-
 // ⚠️ AJOUT (retour utilisateur : stats/déroulement d'un match terminé parfois
 // manquants ou incomplets — "des fois ça marche, des fois pas") : jusqu'ici,
 // pour afficher les stats d'un match terminé, CHAQUE appareil de CHAQUE
@@ -586,7 +479,7 @@ export default async function handler(req, res) {
     if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings, computedScorers } = req.query
+  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
@@ -655,135 +548,18 @@ export default async function handler(req, res) {
     // (ex. Portugal 1 but marqué au total vs João Félix seul à 2) —
     // vraisemblablement un cumul historique/all-time de la compétition, pas
     // la saison affichée. Mode entièrement retiré plutôt que laissé mort.
-    // Remplacé par le mode `computedScorers` ci-dessous — calcul MAISON à
-    // partir des vrais matchs plutôt que de faire confiance à cet endpoint.
-    if (computedScorers === '1') {
-      const debugEnabled = req.query.debug === '1'
-      const debugInfo = debugEnabled ? [] : null
-      // v2 : bump délibéré (même clé meta ET clé event, voir fetchEventSummaryGoals)
-      // suite au tout 1er déploiement de cette fonctionnalité, qui avait écrit un
-      // état figé "scannedThrough=aujourd'hui, doneEventIds=[...]" SANS jamais
-      // avoir réussi à mettre en cache le moindre but (bug du group.forEach
-      // inconditionnel corrigé juste avant, voir plus bas) — sans ce bump, cet
-      // état déjà écrit resterait "frais" (HOMEMADE_SCORERS_FRESH_MS) et
-      // bloquerait tout nouveau scan pendant 10min après le déploiement du fix.
-      // ⚠️ BUG DE CPU TROUVÉ ET CORRIGÉ (30/09, constat utilisateur : "Fluid
-      // Active CPU" en forte hausse sur le dashboard Vercel, "50min en
-      // quelques jours") : tant que le quota Upstash mensuel reste épuisé
-      // (voir l'incident du 26/09 ci-dessus, `writeError` confirmé en toutes
-      // lettres), CE `kv.get` échoue systématiquement — l'ancien code
-      // traitait alors `meta` comme `null` ("jamais scanné"), ce qui
-      // déclenchait un scan COMPLET des 35 derniers jours (scoreboard +
-      // fetch du résumé de CHAQUE match terminé) à CHAQUE appel, sans
-      // AUCUNE chance de mettre le résultat en cache ensuite (le `kv.set`
-      // plus bas échoue lui aussi, silencieusement, `.catch(()=>{})`) — un
-      // travail CPU intégralement gaspillé, refait de zéro toutes les 10min
-      // (HOMEMADE_SCORERS_FRESH_MS) PAR VISITEUR de l'onglet Buteurs NL,
-      // en pleine journée de Ligue des Nations. Corrigé : on distingue
-      // maintenant "Redis a répondu, pas de méta connue" (scan normal,
-      // comportement inchangé) de "Redis a levé une erreur" (`redisDown`) —
-      // dans ce 2e cas, on abandonne IMMÉDIATEMENT avant le moindre fetch
-      // ESPN plutôt que de refaire un travail qui ne pourra de toute façon
-      // jamais être persisté. Le classement buteurs reste vide dans ce cas
-      // (comme actuellement), mais sans plus jamais consommer de CPU pour y
-      // arriver.
-      const metaKey = `espn:ownscorers:meta:v4:${slug}`
-      let meta = null
-      let redisDown = false
-      try {
-        const raw = await kv.get(metaKey)
-        meta = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
-      } catch { redisDown = true }
-
-      const now = Date.now()
-      const isFresh = redisDown || (meta && (now - (meta.updatedAt ?? 0)) < HOMEMADE_SCORERS_FRESH_MS)
-
-      if (!isFresh) {
-        const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-        const scanFrom = meta?.scannedThrough
-          ? new Date(parseYmd(meta.scannedThrough).getTime() + 86_400_000)
-          : new Date(today.getTime() - HOMEMADE_SCORERS_INITIAL_LOOKBACK_DAYS * 86_400_000)
-
-        const doneIds = new Set(meta?.doneEventIds ?? [])
-        let nextScannedThrough = meta?.scannedThrough ?? null
-
-        if (scanFrom <= today) {
-          const dayList = []
-          for (let d = scanFrom; d <= today; d = new Date(d.getTime() + 86_400_000)) dayList.push(ymd(d))
-
-          const cachedByChunk = await readCachedChunks(slug, dayList)
-          const toFetch = dayList.filter(c => !cachedByChunk.has(c))
-          const fetched = await fetchScoreboardChunksStaggered(slug, toFetch)
-          const merged = mergeScoreboardChunks([...cachedByChunk.values(), ...fetched])
-
-          if (merged.ok) {
-            const newFinishedIds = merged.events
-              .filter(e => isEventFinished(e) && !doneIds.has(e.id))
-              .map(e => e.id)
-
-            // Groupes espacés, même précaution anti-rafale ESPN que le
-            // scoreboard (incident 403 du 15/09) — un 1er scan à froid
-            // pourrait sinon déclencher ~25 fetches /summary d'un coup.
-            // ⚠️ Un id n'est ajouté à `doneIds` QUE si fetchEventSummaryGoals
-            // a réellement réussi (renvoie un tableau, jamais `null`) — sinon
-            // un simple raté réseau/timeout ESPN marquerait ce match comme
-            // "déjà traité" POUR TOUJOURS, sans jamais avoir mis ses buts en
-            // cache : ses buts disparaîtraient silencieusement du classement
-            // sans plus jamais être retentés (bug trouvé et corrigé avant tout
-            // déploiement, en vérifiant en direct pourquoi le tout 1er appel
-            // renvoyait `scorers:[]`).
-            for (let i = 0; i < newFinishedIds.length; i += CHUNK_GROUP_SIZE) {
-              const group = newFinishedIds.slice(i, i + CHUNK_GROUP_SIZE)
-              const results = await Promise.all(group.map(id => fetchEventSummaryGoals(slug, id, debugInfo)))
-              group.forEach((id, idx) => { if (results[idx] != null) doneIds.add(id) })
-              if (i + CHUNK_GROUP_SIZE < newFinishedIds.length) {
-                await new Promise(res => setTimeout(res, CHUNK_GROUP_DELAY_MS))
-              }
-            }
-            nextScannedThrough = ymd(today)
-            if (debugInfo) debugInfo.push({ dayListLength: dayList.length, newFinishedIdsCount: newFinishedIds.length, mergedEventsCount: merged.events.length })
-          } else if (debugInfo) {
-            debugInfo.push({ mergedOk: false, dayListLength: dayList.length })
-          }
-          // merged.ok === false (ESPN indisponible sur toutes les tranches) :
-          // on NE PERD PAS la progression déjà connue — scannedThrough/
-          // doneEventIds restent inchangés, le prochain appel (une fois
-          // HOMEMADE_SCORERS_FRESH_MS écoulé) retentera la même fenêtre.
-        } else if (debugInfo) {
-          debugInfo.push({ noScanNeeded: true })
-        }
-        // scanFrom > today : rien de nouveau à scanner, déjà à jour.
-
-        meta = { scannedThrough: nextScannedThrough ?? ymd(today), doneEventIds: [...doneIds], updatedAt: now }
-        kv.set(metaKey, JSON.stringify(meta)).catch(() => {})
-      } else if (debugInfo) {
-        debugInfo.push({ isFresh: true })
-      }
-
-      clearTimeout(timeoutId) // controller/timeoutId du haut de la fonction, jamais utilisé par ce mode
-
-      const eventIds = meta?.doneEventIds ?? []
-      let goalLists = []
-      if (eventIds.length > 0) {
-        try {
-          // 1 seul kv.mget quel que soit le nombre de matchs déjà connus
-          // (même optimisation Upstash qu'ailleurs dans ce fichier).
-          const values = await kv.mget(...eventIds.map(id => `espn:ownscorers:event:v4:${slug}:${id}`))
-          goalLists = values.map(v => {
-            if (!v) return []
-            try { return typeof v === 'string' ? JSON.parse(v) : v } catch { return [] }
-          })
-        } catch { /* Redis indisponible → classement vide plutôt qu'une erreur, filet déjà géré côté client (useScorers.js) */ }
-      }
-
-      return res.status(200)
-        .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=150')
-        .json({
-          scorers: aggregateGoals(goalLists),
-          ...(debugInfo ? { _debug: { meta, eventIdsCount: eventIds.length, goalListsNonEmpty: goalLists.filter(g => g.length > 0).length, steps: debugInfo } } : {}),
-        })
-    }
+    // ⚠️ Tentative de remplacement "calcul MAISON" (`computedScorers=1`,
+    // pilotée sur NL, 26/09) elle-même retirée le 30/09 (demande explicite
+    // utilisateur : "autant supp le classement buteur de la lique des nation
+    // ça sert a rien y'a rien qui saffiche") — le mécanisme fonctionnait
+    // (un vrai bug de CPU y avait même été trouvé et corrigé le jour même,
+    // voir l'historique CLAUDE.md), mais restait bloqué vide en pratique par
+    // le quota Upstash mensuel épuisé (confirmé le 26/09) : un classement qui
+    // n'affiche jamais rien n'a aucune valeur, mieux vaut le retirer que le
+    // garder pour rien. Voir CLAUDE.md pour l'historique complet de cette
+    // tentative (extractGoalsFromSummary/aggregateGoals/fetchEventSummaryGoals
+    // supprimés avec ce retrait, voir git history si besoin de les reprendre
+    // un jour une fois le quota Upstash résolu).
 
     // ── Mode lookupMap : lecture seule du mapping fdMatchId → eventId ESPN ──
     // Voir le commentaire sur espnMap plus haut pour le contexte. Écrit
