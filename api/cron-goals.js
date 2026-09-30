@@ -509,6 +509,31 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, mode: 'notify', sent: sentCount })
   }
 
+  // ⚠️ AJOUT (30/09, audit "Fluid Active CPU" demandé par l'utilisateur) :
+  // avant ce garde-fou, N'IMPORTE QUEL appel avec le bon CRON_SECRET mais SANS
+  // `mode:'notify'` retombait automatiquement dans le mode complet ci-dessous
+  // (polling ESPN de TOUS les slugs + potentiellement plusieurs passes) — la
+  // seule protection contre un appel non voulu était de ne PAS appeler cet
+  // endpoint sans ce mode, jamais vérifié activement. Risque concret et
+  // plausible : si l'ancien schedule cron-job.org (remplacé par le Worker
+  // Cloudflare, voir plus haut) n'a jamais été désactivé côté cron-job.org
+  // (config externe, invisible depuis ce dépôt), il continuerait de taper
+  // CET endpoint 1440×/jour avec exactement le même secret — chaque appel
+  // déclenchant le mode complet, coûteux, celui-là même qui avait fait
+  // dépasser le plafond CPU une première fois le 08/07. Corrigé : le mode
+  // complet exige maintenant explicitement `?legacy=1` (ou `body.legacy===true`
+  // en POST) EN PLUS du secret — un simple ping avec le secret seul (ancien
+  // schedule stale, scan, etc.) reçoit désormais un 400 clair plutôt que de
+  // déclencher le polling complet. Le fallback manuel documenté plus haut
+  // ("si le Worker Cloudflare est en panne") reste entièrement possible, juste
+  // plus jamais accidentel — il suffit d'ajouter `&legacy=1` à l'URL utilisée.
+  const legacyOptIn = req.query.legacy === '1' || body?.legacy === true
+  if (!legacyOptIn) {
+    return res.status(400).json({
+      error: "Mode complet désactivé par défaut — ajoutez ?legacy=1 pour l'appeler explicitement (fallback manuel si le Worker Cloudflare est en panne), ou body.mode='notify' pour le mode normal.",
+    })
+  }
+
   // Marqueur "dernière exécution" — lu par /api/debug-push pour vérifier que
   // cron-job.org appelle bien cet endpoint chaque minute. Avant ce fix,
   // aucune trace de la dernière exécution réelle n'existait nulle part :

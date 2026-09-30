@@ -72,9 +72,27 @@ function fetchWithTimeout(url, options, ms = 6000) {
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id))
 }
 
-export default async function handler(_req, res) {
+export default async function handler(req, res) {
   const redis = getKv()
   try {
+    // ⚠️ AJOUT (30/09, audit "Fluid Active CPU" demandé par l'utilisateur) :
+    // ce endpoint était le SEUL proxy de l'app sans aucune limite de débit
+    // par IP (contrairement à espn.js/fifa-live.js/fifa-lineups.js/h2h.js,
+    // tous à 30-60/min/IP) — un cache-hit Redis rend un appel en boucle
+    // bon marché, mais tant que le quota Upstash reste épuisé (voir
+    // CLAUDE.md, incident du 26/09), CHAQUE appel retombe sur le fetch+parse
+    // réel des 4 flux RSS (`catch` silencieux sur `redis.get` ci-dessous) —
+    // sans plafond, un simple curl/bot en boucle pouvait générer un nombre
+    // illimité de ces cycles. Même pattern que les autres endpoints
+    // (30/min/IP, cohérent avec fifa-lineups.js).
+    const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
+    const rlKey = `ratelimit:news:${ip}`
+    try {
+      const count = await redis?.incr(rlKey)
+      if (count === 1) await redis.expire(rlKey, 60)
+      if (count > 30) return res.status(429).json({ error: 'Trop de requêtes' })
+    } catch {}
+
     if (redis) {
       try {
         const cached = await redis.get(NEWS_CACHE_KEY)
