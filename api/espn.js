@@ -313,6 +313,38 @@ async function fetchScoreboardChunk(slug, chunkDates) {
 const CHUNK_GROUP_SIZE   = 6
 const CHUNK_GROUP_DELAY_MS = 150
 
+// ⚠️ AJOUT (30/09, suite au constat utilisateur "Fluid Active CPU" toujours
+// trop élevé après le retrait des buteurs NL — root cause bien PLUS grosse
+// trouvée en creusant plus loin) : `readCachedChunks` (voir plus haut) ne
+// fait AUCUNE distinction entre "vrai cache miss" et "Redis indisponible" —
+// dans ce 2e cas (`catch` silencieux, quota Upstash épuisé confirmé le
+// 26/09), TOUTES les tranches d'une fenêtre retombent en fetch ESPN réel,
+// pour CHAQUE requête non absorbée par le cache Edge 90s ci-dessous. Combiné
+// à l'élargissement à 400j+60j pour les 8 slugs sporadiques (NL/CAN/COPA/
+// UEL/UECL/TDC/CS/USC, voir espnAdapter.js, fix du 29/09 pour "forme
+// récente"/"stats saison" absentes) — jusqu'à ~460 tranches/jour à fetcher
+// RÉELLEMENT sur ESPN à CHAQUE cycle de cache Edge (toutes les ~90s tant
+// qu'il y a du trafic), au lieu des ~75 tranches du défaut normal (30j+45j)
+// — plus de 6x le volume, largement suffisant pour expliquer la majorité du
+// pic CPU à lui seul, sans même compter le bug buteurs déjà corrigé. Plutôt
+// que de re-réduire la fenêtre (qui règle le confort actuel de NL en pleine
+// journée internationale, voir son propre commentaire), plafond DUR
+// indépendant de la cause : jamais plus de MAX_FETCH_CHUNKS tranches
+// réellement envoyées à ESPN en une seule exécution de cette fonction, quelle
+// que soit la largeur de la fenêtre demandée — protège structurellement
+// contre CE scénario (Redis en panne + fenêtre large) ET contre toute
+// combinaison future du même genre, sans dépendre de deviner correctement
+// l'état de Redis à l'avance. Quand le nombre de tranches à fetcher dépasse
+// ce plafond, on garde seulement les plus PROCHES d'aujourd'hui (triées par
+// distance absolue) — c'est la partie la plus utile (forme récente/prochain
+// match) qui est préservée, les tranches lointaines (passé ancien/futur
+// lointain) sont sacrifiées en premier plutôt qu'un tronquage arbitraire par
+// ordre chronologique. 60 : couvre confortablement le besoin normal (~75j
+// pour les grands championnats, déjà servi en 1 seule fois avant ce plafond)
+// sans jamais dépasser une fraction du budget d'exécution (`maxDuration: 30`,
+// vercel.json) même à froid total (aucune tranche déjà en cache).
+const MAX_FETCH_CHUNKS = 60
+
 async function fetchScoreboardChunksStaggered(slug, chunkList) {
   const results = []
   for (let i = 0; i < chunkList.length; i += CHUNK_GROUP_SIZE) {
@@ -756,7 +788,16 @@ export default async function handler(req, res) {
       // (vrai cache miss ou zone "live") sont réellement fetchées auprès
       // d'ESPN, toujours par petits groupes espacés (anti-rafale, inchangé).
       const cachedByChunk = await readCachedChunks(slug, chunks)
-      const toFetch = chunks.filter(c => !cachedByChunk.has(c))
+      let toFetch = chunks.filter(c => !cachedByChunk.has(c))
+      // Voir MAX_FETCH_CHUNKS plus haut : plafond dur, indépendant de la
+      // cause (Redis en panne, fenêtre large, ou les deux à la fois) — garde
+      // les tranches les plus proches d'aujourd'hui en priorité.
+      if (toFetch.length > MAX_FETCH_CHUNKS) {
+        const today = new Date(); today.setUTCHours(0, 0, 0, 0)
+        toFetch = [...toFetch]
+          .sort((a, b) => Math.abs(parseYmd(a) - today) - Math.abs(parseYmd(b) - today))
+          .slice(0, MAX_FETCH_CHUNKS)
+      }
       const fetched = await fetchScoreboardChunksStaggered(slug, toFetch)
       const results = [...cachedByChunk.values(), ...fetched]
       clearTimeout(timeoutId)
