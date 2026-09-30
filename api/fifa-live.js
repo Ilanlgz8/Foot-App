@@ -590,11 +590,30 @@ export default async function handler(req, res) {
   const today     = dateStr(now)
   const yesterday = dateStr(new Date(now - 86_400_000))
 
-  // Charger les données Redis last-known
+  // ⚠️ AJOUT (30/09, audit "Fluid Active CPU"/Upstash demandé par l'utilisateur,
+  // qui a explicitement choisi de rester sur le plan Redis gratuit plutôt que
+  // passer sur un forfait payant) : ce fichier est de loin le plus sollicité de
+  // toute l'app — CHAQUE client qui regarde un match en direct l'appelle toutes
+  // les 30-45s (voir espnTimerWorker.js), donc son coût PLANCHER (les commandes
+  // payées à CHAQUE appel, même quand le fast-path fait gagner tout le reste)
+  // domine la facture Upstash bien plus que n'importe quel pic ponctuel. Avant
+  // ce fix, ce plancher était de 2 lectures séparées : `kv.mget(...matchKeys)`
+  // (juste en dessous) PUIS, plus loin, `kv.get('fm:freshbatch')` pour le
+  // fast-path — 2 commandes facturées séparément par Upstash (qui facture
+  // chaque commande, pas la quantité de clés qu'elle touche : un MGET sur 1 clé
+  // ou sur 50 coûte pareil). Fusionnées en UN SEUL `kv.mget` (clés des matchs +
+  // 'fm:freshbatch' ensemble) : 1 seule commande au lieu de 2, sur LE chemin le
+  // plus emprunté de toute l'app — un client qui poll toutes les 30s pendant 1h
+  // de match passe de 120 à 60 commandes rien que sur ce plancher, avant même
+  // de compter le rate-limit. Aucun changement de comportement : mêmes données
+  // lues, juste regroupées en un aller-retour Redis au lieu de deux.
+  const matchKeys = matches.map(m => `fm:match:${m.id}`)
   let storedMatches = Array(matches.length).fill(null)
+  let freshBatchRaw = null
   try {
-    const keys = matches.map(m => `fm:match:${m.id}`)
-    storedMatches = await kv.mget(...keys)
+    const combined = await kv.mget(...matchKeys, 'fm:freshbatch')
+    storedMatches = combined.slice(0, matches.length)
+    freshBatchRaw = combined[matches.length]
   } catch {}
 
   const storedData = {}
@@ -613,22 +632,17 @@ export default async function handler(req, res) {
   // déjà éprouvé (buts, cartons, désync score/buteur, tirs au but…).
   // forceFresh (retour au premier plan) contourne toujours ce fast-path, comme il
   // contourne déjà le cache ESPN/FIFA plus bas — même intention.
+  // ⚠️ `freshBatchRaw` vient maintenant du mget combiné ci-dessus (voir son
+  // commentaire) — plus aucune commande Redis séparée ici, cette section ne
+  // fait plus que de la lecture en mémoire sur une valeur déjà en main.
   if (!forceFresh) {
-    try {
-      // ⚠️ AJOUT : lit maintenant la clé unique fm:freshbatch (voir commentaire
-      // détaillé sur freshIds plus bas, section persistance) au lieu d'un mget
-      // sur N clés fm:fresh:{id} — déjà 1 seule commande dans les deux cas
-      // (mget groupe déjà tout, peu importe le nombre de clés), donc aucun
-      // gain ici précisément, mais cohérent avec le nouveau format d'écriture.
-      const freshBatchRaw = await kv.get('fm:freshbatch')
-      const freshIdSet = new Set(safeJson(freshBatchRaw) ?? [])
-      const allFresh = matches.every(m => freshIdSet.has(String(m.id)) && storedData[m.id])
-      if (allFresh) {
-        const fast = {}
-        matches.forEach(m => { fast[m.id] = { ...storedData[m.id], fromCache: true } })
-        return res.json(fast)
-      }
-    } catch {}
+    const freshIdSet = new Set(safeJson(freshBatchRaw) ?? [])
+    const allFresh = matches.every(m => freshIdSet.has(String(m.id)) && storedData[m.id])
+    if (allFresh) {
+      const fast = {}
+      matches.forEach(m => { fast[m.id] = { ...storedData[m.id], fromCache: true } })
+      return res.json(fast)
+    }
   }
 
   // ── Verrou anti-doublon (constat utilisateur : "peu importe le nombre de
@@ -1361,12 +1375,28 @@ export default async function handler(req, res) {
   }
   if (writes.length > 0) await Promise.allSettled(writes)
   // Lu-fusionné avant d'écrire (voir commentaire détaillé plus haut sur
-  // freshIds) : 1 GET + 1 SET, TOUJOURS, quel que soit le nombre de matchs —
-  // remplace les N kv.set individuels d'avant.
+  // freshIds) : 1 SET, TOUJOURS, quel que soit le nombre de matchs — remplace
+  // les N kv.set individuels d'avant.
+  // ⚠️ AJOUT (30/09, même audit Upstash que le mget combiné plus haut) :
+  // réutilise `freshBatchRaw` déjà lu EN DÉBUT de requête au lieu de refaire un
+  // `kv.get('fm:freshbatch')` ici — 1 commande Redis économisée à chaque fois
+  // que le pipeline complet s'exécute (le chemin déjà le plus coûteux, donc
+  // celui où chaque commande évitée compte le plus). Sûr dans l'immense
+  // majorité des cas : le verrou `fm:computelock` garantit qu'UN SEUL client à
+  // la fois exécute cette section (tous les autres reçoivent le fallback
+  // beaucoup plus tôt, voir plus haut) — aucun autre écrivain ne peut modifier
+  // `fm:freshbatch` entre notre lecture du début et cette écriture. Seule
+  // exception, déjà tolérée ailleurs dans ce fichier : plusieurs appels
+  // `forceFresh` concurrents (retour au premier plan sur des matchs
+  // différents) contournent le verrou — dans ce cas rare, une valeur lue plus
+  // tôt qu'avant pourrait manquer les ids ajoutés par un AUTRE appel
+  // `forceFresh` entre-temps ; conséquence bénigne et auto-corrigée (le
+  // fast-path de CE match reste juste indisponible quelques secondes de plus,
+  // jamais une donnée fausse affichée), cohérente avec le niveau de tolérance
+  // déjà assumé pour ce mécanisme (voir le commentaire d'origine juste au-dessus).
   if (freshIds.length > 0) {
     try {
-      const existingRaw = await kv.get('fm:freshbatch')
-      const existingIds = safeJson(existingRaw) ?? []
+      const existingIds = safeJson(freshBatchRaw) ?? []
       const mergedIds = [...new Set([...existingIds, ...freshIds])]
       await kv.set('fm:freshbatch', JSON.stringify(mergedIds), { ex: FRESH_TTL })
     } catch {}
