@@ -2587,6 +2587,35 @@ cf-worker/
   chantier (migration complète du câblage Redis du Worker, tests dédiés à écrire pour une infra qui
   n'en a aucune aujourd'hui).
 
+- ✅ Cote pré-match qui saute au coup d'envoi : fix du 29/09 étendu à LiveMatchPage (constat
+  utilisateur, 30/09, confirmé après vérification directe : "les côtes dans accueil etait pas les
+  memes que dans livematch page") — le fix du 29/09 ("Cote pré-match qui saute brutalement pile au
+  coup d'envoi") n'avait été appliqué qu'aux cards Accueil (`MatchPoster.jsx`/`MatchDuJourCard.jsx`),
+  explicitement documenté comme non fait pour `LiveStatsTab` (`MatchModal.jsx`, partagé par
+  MatchPage/LiveMatchPage) faute de demande précise à l'époque — confirmé maintenant comme un vrai
+  écart visible, pas juste une limite théorique. 2 défauts cumulés trouvés dans `LiveStatsTab` :
+  (1) `useEspnPregameOdds(match, isLive)` n'était activé QUE pendant le direct (jamais avant le
+  coup d'envoi), donc ne pouvait jamais capter la vraie cote de marché AVANT que le match commence
+  — contrairement à l'Accueil (`!isFinished`, actif pré-match ET en live) ; (2) `marketPre:
+  espnOdds?.pct ?? null` lisait la valeur EN DIRECT sans la figer — dès qu'ESPN relabellise la
+  ligne en "*Live Odds*" (filtrée par `ODDS_PROVIDER_SKIP`), `espnOdds` retombe à `null` et le
+  calcul retombe sur le prior interne, une valeur différente de celle affichée sur l'Accueil pour
+  le même match, exactement le même symptôme que le fix du 29/09 visait déjà à éliminer. Corrigé
+  (`MatchModal.jsx`, `LiveStatsTab`) en reprenant EXACTEMENT le mécanisme déjà éprouvé de
+  `MatchPoster.jsx` : `enabled: !isFinished` (calculé via un nouveau `isFinished = match.status
+  === 'FINISHED'` local à ce composant) + state figé sur la dernière valeur valide vue
+  (`lastPregameOdds`/`prevEspnOdds`, mis à jour PENDANT le rendu via la comparaison `espnOdds !==
+  prevEspnOdds`, même pattern React officiel "Adjusting state when a prop changes" que l'Accueil,
+  mêmes raisons déjà documentées côté `MatchPoster.jsx` pour écarter `useEffect`/`useRef`) —
+  `marketPre` utilise maintenant `lastPregameOdds?.pct` au lieu de `espnOdds?.pct` en direct.
+  Comme `LiveStatsTab` est partagé par `MatchPage.jsx` ET `LiveMatchPage.jsx`, les deux bénéficient
+  du fix en un seul endroit. 370 tests + lint (5 erreurs pré-existantes `react-refresh/only-export-
+  components` sur ce fichier, sans lien avec ce changement, confirmées identiques via `git stash`
+  avant/après) + build vérifiés. Honnêteté : rendu jamais revu en direct sur un vrai coup d'envoi
+  après ce déploiement (même limite que le fix du 29/09 dont celui-ci est l'extension directe) — à
+  confirmer par l'utilisateur que les cotes Accueil et LiveMatchPage restent bien identiques pour
+  un même match, y compris pile au moment du coup d'envoi.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
