@@ -667,15 +667,36 @@ export default async function handler(req, res) {
       // inconditionnel corrigé juste avant, voir plus bas) — sans ce bump, cet
       // état déjà écrit resterait "frais" (HOMEMADE_SCORERS_FRESH_MS) et
       // bloquerait tout nouveau scan pendant 10min après le déploiement du fix.
+      // ⚠️ BUG DE CPU TROUVÉ ET CORRIGÉ (30/09, constat utilisateur : "Fluid
+      // Active CPU" en forte hausse sur le dashboard Vercel, "50min en
+      // quelques jours") : tant que le quota Upstash mensuel reste épuisé
+      // (voir l'incident du 26/09 ci-dessus, `writeError` confirmé en toutes
+      // lettres), CE `kv.get` échoue systématiquement — l'ancien code
+      // traitait alors `meta` comme `null` ("jamais scanné"), ce qui
+      // déclenchait un scan COMPLET des 35 derniers jours (scoreboard +
+      // fetch du résumé de CHAQUE match terminé) à CHAQUE appel, sans
+      // AUCUNE chance de mettre le résultat en cache ensuite (le `kv.set`
+      // plus bas échoue lui aussi, silencieusement, `.catch(()=>{})`) — un
+      // travail CPU intégralement gaspillé, refait de zéro toutes les 10min
+      // (HOMEMADE_SCORERS_FRESH_MS) PAR VISITEUR de l'onglet Buteurs NL,
+      // en pleine journée de Ligue des Nations. Corrigé : on distingue
+      // maintenant "Redis a répondu, pas de méta connue" (scan normal,
+      // comportement inchangé) de "Redis a levé une erreur" (`redisDown`) —
+      // dans ce 2e cas, on abandonne IMMÉDIATEMENT avant le moindre fetch
+      // ESPN plutôt que de refaire un travail qui ne pourra de toute façon
+      // jamais être persisté. Le classement buteurs reste vide dans ce cas
+      // (comme actuellement), mais sans plus jamais consommer de CPU pour y
+      // arriver.
       const metaKey = `espn:ownscorers:meta:v4:${slug}`
       let meta = null
+      let redisDown = false
       try {
         const raw = await kv.get(metaKey)
         meta = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
-      } catch { /* Redis indisponible → traité comme "jamais scanné", repart d'un scan initial */ }
+      } catch { redisDown = true }
 
       const now = Date.now()
-      const isFresh = meta && (now - (meta.updatedAt ?? 0)) < HOMEMADE_SCORERS_FRESH_MS
+      const isFresh = redisDown || (meta && (now - (meta.updatedAt ?? 0)) < HOMEMADE_SCORERS_FRESH_MS)
 
       if (!isFresh) {
         const today = new Date(); today.setUTCHours(0, 0, 0, 0)

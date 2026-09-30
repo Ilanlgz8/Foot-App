@@ -2387,6 +2387,35 @@ cf-worker/
   existant (dont plusieurs commentaires antérieurs documentant déjà ce compromis comme "accepté"),
   pas sur une reproduction live ; à confirmer par l'utilisateur sur son prochain match international.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : "Fluid Active CPU" Vercel en forte hausse anormale ces
+  derniers jours (constat utilisateur, 30/09, capture d'écran du dashboard Vercel Observability
+  à l'appui — question initiale "ça a un lien avec Upstash ?", réponse : pas directement, mais
+  en creusant la vraie cause s'est révélée liée à l'incident Upstash déjà documenté le 26/09).
+  Root cause : le mode `computedScorers=1` (`api/espn.js`, buteurs "faits maison" pour la Ligue
+  des Nations, voir l'entrée "EN PAUSE" du 26/09) gate son scan complet (35 jours d'historique +
+  fetch du résumé de chaque match terminé) derrière `isFresh` — `meta` lu via `kv.get`, censé
+  rester "frais" 10min (`HOMEMADE_SCORERS_FRESH_MS`) une fois un scan réussi. Mais tant que le
+  quota mensuel Upstash reste épuisé (confirmé le 26/09, `writeError` explicite dans les logs),
+  CE `kv.get` échoue systématiquement — l'ancien code traitait alors `meta` comme `null` ("jamais
+  scanné") au lieu de "Redis en panne", ce qui déclenchait un scan COMPLET à CHAQUE appel, sans
+  jamais pouvoir persister le résultat ensuite (le `kv.set` qui suit échoue lui aussi, avalé
+  silencieusement par son propre `.catch(()=>{})`) — un travail CPU intégralement gaspillé, REFAIT
+  DE ZÉRO toutes les 10min PAR VISITEUR de l'onglet Buteurs Ligue des Nations, en pleine période de
+  matchday (24-29/09). Corrigé (`api/espn.js`) : nouveau flag `redisDown`, distinct de `meta ===
+  null` — si le `kv.get` initial lève une exception (Redis indisponible/quota dépassé), le code
+  abandonne IMMÉDIATEMENT (`isFresh = true` forcé) avant le moindre fetch ESPN, plutôt que de
+  refaire un scan qui ne pourra de toute façon jamais être mis en cache. Le classement buteurs NL
+  reste vide dans ce cas (comme actuellement, aucune régression fonctionnelle — c'était déjà vide
+  avant ce fix, pour la même raison), mais sans plus consommer un seul cycle CPU inutile pour y
+  arriver. 374 tests + lint + build vérifiés inchangés (changement isolé à `api/espn.js`, 2 lignes
+  de logique + commentaire). Honnêteté : je ne peux pas confirmer avec certitude à 100% que c'est
+  CE mécanisme précis qui explique la totalité des "50min en quelques jours" constatés (pas
+  d'accès aux logs de durée par fonction Vercel depuis cet environnement pour le chiffrer
+  exactement) — mais c'est un vrai bug de boucle de travail gaspillé, confirmé par lecture directe
+  du code et cohérent dans le temps (actif depuis le 26/09, exactement la fenêtre "quelques jours"
+  mentionnée), corrigé indépendamment du chiffre exact. À surveiller sur le dashboard Vercel dans
+  les jours suivant ce déploiement — la baisse de CPU sera la confirmation la plus fiable.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
