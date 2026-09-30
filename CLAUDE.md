@@ -2416,6 +2416,37 @@ cf-worker/
   mentionnée), corrigé indépendamment du chiffre exact. À surveiller sur le dashboard Vercel dans
   les jours suivant ce déploiement — la baisse de CPU sera la confirmation la plus fiable.
 
+- ✅ Classement buteurs "fait maison" de la Ligue des Nations RETIRÉ ENTIÈREMENT (30/09, demande
+  explicite utilisateur juste après le fix CPU ci-dessus : "bah autant supp le classement buteur
+  de la lique des nation ça sert a rien y'a rien qui s'affiche") — décision juste et cohérente :
+  le mécanisme lui-même fonctionnait bien (vérifié exact sur Norvège 3-2 Danemark le 24/09, et le
+  bug de gaspillage CPU venait d'être trouvé et corrigé le jour même), mais tant que le quota
+  mensuel Upstash reste épuisé (confirmé le 26/09, `writeError` explicite dans les logs), le `kv.get`
+  initial de ce mode échoue systématiquement — `redisDown` fait alors abandonner IMMÉDIATEMENT
+  avant tout fetch ESPN (c'est justement le fix du jour), donc plus aucun match ne peut jamais être
+  marqué "scanné" et le classement reste vide indéfiniment, pour n'importe quel visiteur, tant que
+  ce quota n'est pas réinitialisé ou augmenté. Un classement qui n'affiche jamais rien n'a aucune
+  valeur : mieux vaut le retirer proprement que le garder pour rien, même corrigé côté CPU.
+  Retiré (pas juste désactivé, pour ne pas laisser de code mort) : `src/data/competitions.js`
+  (`NL` déplacée de `HOMEMADE_SCORERS_COMPS`, supprimée, vers `NO_SCORERS_COMPS` — rejoint
+  CAN/COPA/UEL/UECL, aucune des 5 n'a de source de buteurs fiable actuellement) ; `useScorers.js`
+  (branche `HOMEMADE_SCORERS_COMPS`/fetch `computedScorers=1` retirée, import nettoyé) ; `api/
+  espn.js` (le mode `computedScorers=1` entier supprimé — `fetchEventSummaryGoals`,
+  `aggregateGoals`, `isEventFinished`, les constantes `HOMEMADE_SCORERS_FRESH_MS`/
+  `HOMEMADE_SCORERS_INITIAL_LOOKBACK_DAYS`, et l'import `extractGoalsFromSummary` — `ymd`/
+  `parseYmd`/`CHUNK_GROUP_SIZE`/`CHUNK_GROUP_DELAY_MS` conservés, encore utilisés par le mode
+  scoreboard) ; `src/utils/espnSummaryParse.js` (`extractGoalsFromSummary` supprimée, plus aucun
+  appelant) + ses 4 tests dédiés (`espnSummaryParse.test.js`). `Classement.jsx` n'a nécessité
+  AUCUNE modification : son bouton "Buteurs" et son repli de vue (`view === 'buteurs' &&
+  NO_STANDINGS_COMPS...`) sont déjà entièrement pilotés par `NO_SCORERS_COMPS`, jamais par
+  `HOMEMADE_SCORERS_COMPS` directement — NL a donc automatiquement récupéré le comportement
+  "bouton caché" déjà en place pour CAN/COPA/UEL/UECL, sans rien à toucher là. 370 tests (-4, les
+  tests `extractGoalsFromSummary` retirés) + lint (clean sur tous les fichiers touchés) + build
+  vérifiés. Le code n'est pas perdu : disponible dans l'historique git (commit du 26/09 pour
+  l'ajout initial, du 30/09 pour le fix CPU) si le calcul maison doit être repris un jour, une fois
+  le quota Upstash résolu (reset mensuel ou upgrade de plan) — pas faisable depuis cet
+  environnement.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
