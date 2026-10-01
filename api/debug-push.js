@@ -101,10 +101,19 @@ export default async function handler(req, res) {
     info.cron = {
       reachable:   true,
       lastRunAgo:  ageSec != null ? `${ageSec}s` : 'jamais',
-      // Le cron est censé tourner toutes les 60s (cron-job.org) → si la
-      // dernière exécution connue date de plus de 3min, cron-job.org
-      // n'appelle probablement plus cet endpoint.
-      stale:       ageSec == null || ageSec > 180,
+      // ⚠️ SEUIL CORRIGÉ (01/10, faux "stale:true" constaté juste après la
+      // migration Turso du Worker alors que `wrangler tail` confirmait des
+      // passes "Ok" chaque minute) : le Worker Cloudflare (cf-worker/,
+      // handlePass → shouldWriteDebugBookkeeping) n'écrit RÉELLEMENT
+      // cron:goals:lastRun qu'1 minute sur 15 (getMinutes()%15===0, déjà en
+      // place AVANT la migration Turso — optimisation anti-quota Upstash),
+      // pas à chaque passe comme le commentaire d'origine le laissait
+      // penser (resté calé sur l'ancien schéma cron-job.org→Vercel 1x/min).
+      // Seuil remonté à 20min (1200s) — large marge au-delà des 15min
+      // d'espacement réel, pour ne déclencher une vraie alerte que si le
+      // Worker s'est effectivement arrêté, pas à cause de cet espacement
+      // volontaire.
+      stale:       ageSec == null || ageSec > 1200,
       lastResult:  parsedResult,
       source:      isTursoConfigured() ? 'turso (repli redis si absent)' : 'redis',
     }
