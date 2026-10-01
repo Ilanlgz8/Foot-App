@@ -3071,6 +3071,98 @@ cf-worker/
   à ajuster si une compétition active se retrouve à tort classée dormante
   (polling coupé trop tôt) ou l'inverse.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : notifs but/carton jamais envoyées après
+  le passage du Worker Cloudflare sur Turso, constat utilisateur le jour même
+  du déploiement (01/10 : "j'ai reçu que fin de match du premier match qui
+  s'est fini sinon les autres match qui sont en cours rien du tout meme pas
+  les buts ou quoi"). Diagnostic fait par lecture comparée des 2 chemins NX
+  du fichier plutôt que par test live (toujours aucun accès réseau depuis cet
+  environnement vers Turso/Cloudflare) : `acquireDedup` (dédup de CHAQUE
+  notif individuelle, y compris "Fin de match") appelle le `set()` STANDALONE
+  de `tursoKv.js` — 1 SEUL `client.execute()` isolé — et fonctionnait bien
+  (c'est lui qui a laissé passer la notif de fin de match constatée). Le
+  verrou anti-doublon but/carton (`lockKey`, `writePipe` dans `index.js`
+  ~ligne 1000), lui, était batché AVEC le SET normal de `stateKey` dans UN
+  SEUL `client.batch(stmts, 'write')` — un batch libSQL est UNE SEULE
+  transaction : si une des opérations lève une erreur (contention, latence,
+  erreur transitoire...), TOUT le batch échoue d'un coup, et l'ancien code de
+  `pipeline().exec()` renvoyait alors `{result:null, error}` pour TOUTES les
+  opérations du pipeline, y compris celles sans rapport avec l'échec —
+  contrairement à Redis, où `pipeline().exec({keepErrors:true})` isole
+  VRAIMENT chaque commande des autres (c'est précisément ce que ce code
+  prétendait émuler, sans le faire correctement). Toutes les notifs de
+  but/carton sont gardées par ce verrou (`if (!lockAcquired) { ... passe
+  suivante }`, `index.js` ligne ~1109) alors que "Fin de match" n'en dépend
+  pas du tout (`isFinalConfirmed`, indépendant) — un seul échec ponctuel sur
+  CETTE paire d'opérations suffisait donc à rendre `lockAcquired`
+  systématiquement faux pour TOUS les matchs en cours, pendant que "Fin de
+  match" continuait de passer normalement : exactement le symptôme rapporté.
+  Corrigé (`cf-worker/src/tursoKv.js`, `pipeline().exec()`) : chaque
+  opération du pipeline s'exécute désormais en SÉQUENCE, comme un
+  `client.execute()` INDÉPENDANT avec son propre try/catch — un échec sur une
+  opération ne peut plus jamais affecter le résultat d'une autre, même
+  garantie d'isolation que Redis. Coût assumé : N allers-retours HTTP au lieu
+  d'1 seul par pipeline — accepté sciemment, Turso facture par LIGNE (pas par
+  requête) et le temps d'attente réseau ne compte pas dans le budget CPU
+  Cloudflare Workers (seul le temps CPU réellement actif est limité), donc
+  un aller-retour de plus ne coûte quasiment rien ici. Fix complémentaire,
+  diagnostic pur (`cf-worker/src/index.js`) : `pickWrite()` traitait jusque-là
+  une erreur par-opération EXACTEMENT comme un refus de verrou normal (les
+  deux donnaient `null`), sans jamais logger le message d'erreur réel —
+  impossible de distinguer après coup "verrou légitimement déjà pris" d'une
+  vraie panne Turso. Chaque erreur de `writePipe` est désormais loggée
+  explicitement (visible via `npm run tail`), sans changer le comportement
+  (toujours traité comme "non acquis" par sécurité — on ne risque jamais un
+  doublon en traitant une erreur inconnue comme un succès). 370 tests + lint
+  (cf-worker/ inclus, clean) + `npx wrangler deploy --dry-run` (bundle généré
+  sans erreur, 403 KiB) vérifiés. Honnêteté : comme pour toute la partie
+  `cf-worker/`, aucun accès `wrangler`/réseau réel depuis cet environnement
+  pour confirmer ce fix contre la vraie base Turso en conditions de match —
+  le diagnostic s'appuie sur un raisonnement solide (le chemin NX à une seule
+  opération fonctionne, celui à plusieurs opérations batchées ne fonctionne
+  pas — la différence structurelle entre les deux est exactement ce point
+  précis) et corrige un vrai défaut de conception confirmé par lecture de
+  code (l'isolation par commande promise par `keepErrors` n'était pas
+  réellement assurée), mais reste à confirmer par l'utilisateur sur son
+  prochain match en direct après déploiement (`npm run deploy` manuel depuis
+  `cf-worker/`, comme toujours pour ce dossier — aucun déploiement
+  automatique). Si le symptôme persistait malgré ce fix, les nouveaux logs
+  `writePipe[i] error=...` seraient la prochaine piste à vérifier via
+  `npm run tail` pendant un match en direct, pour voir la vraie cause au lieu
+  de deviner à nouveau.
+
+- ✅ Images des articles "Dernières actualités" toutes noires/cassées (constat utilisateur,
+  01/10 : "j'ai les images des articles qui ne s'affiche pas genre c tout noir c normal ?") —
+  root cause directe : la Content-Security-Policy ajoutée le 28/09 (`vercel.json`, audit
+  sécurité) limitait `img-src` à une liste fermée de 4 domaines (`crests.football-data.org`/
+  `a.espncdn.com`/`flagcdn.com`/`upload.wikimedia.org`, tous liés aux blasons/logos/drapeaux) —
+  mais `api/news.js` agrège 4 flux RSS externes (L'Équipe, RMC Sport, Foot Mercato, Eurosport,
+  voir `RSS_FEEDS`) dont les images (`extractImage`, balises `enclosure`/`media:content`)
+  pointent vers les CDN propres de CHACUN de ces sites — aucun n'était dans la whitelist.
+  Le navigateur bloque alors silencieusement le chargement de ces images (violation CSP), d'où
+  le rendu "tout noir" — PAS un bug de chargement réseau ni un oubli côté `NewsCard`/composant
+  d'affichage. Non : ce n'était pas normal, c'est un vrai effet de bord de l'audit sécurité du
+  28/09, pas repéré à l'époque car les images RSS n'avaient pas été testées après ce changement.
+  Honnêteté : tentative d'identifier les domaines EXACTS utilisés par ces 4 flux pour les ajouter
+  un par un à la whitelist (même esprit que les 4 domaines déjà listés) — infructueuse, aucun
+  accès réseau sortant vers ces domaines depuis cet environnement (`curl`/`web_fetch` bloqués,
+  même limite déjà documentée pour Turso/npm le 01/10) pour inspecter les vraies URLs d'images
+  renvoyées. Plutôt que de deviner des noms de domaine au hasard (risque de rester silencieusement
+  cassé si le mauvais nom est choisi, ou de devoir recommencer à chaque fois qu'un de ces 4 sites
+  change de CDN), corrigé en élargissant `img-src` au SCHÉMA plutôt qu'à des hôtes précis :
+  `img-src 'self' data: https:` (accepte toute image chargée en HTTPS, quel que soit l'hôte) —
+  `api/news.js` (`safeUrl()`) exige déjà que CHAQUE URL d'image soit `https://` avant de l'exposer
+  (aucune image `http://` ne peut passer), donc ce n'est pas un retour à "aucune restriction" :
+  juste le fait qu'une balise `<img>` ne peut de toute façon pas exécuter de script ni faire
+  grand-chose de dangereux même depuis un hôte inconnu (contrairement à `script-src`/`connect-src`,
+  restés strictement inchangés, toujours la vraie protection XSS/exfiltration de cette CSP) — un
+  compromis standard et courant pour un agrégateur de contenu externe dont les sources changent de
+  CDN sans préavis. `vercel.json` validé comme JSON syntaxiquement correct + 370 tests + lint
+  inchangés (changement d'1 ligne de policy uniquement, aucune logique touchée). Honnêteté finale :
+  rendu jamais revu en direct après ce déploiement (toujours aucun accès à un vrai navigateur/
+  appareil depuis cet environnement) — à confirmer par l'utilisateur que les images des articles
+  s'affichent bien maintenant.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

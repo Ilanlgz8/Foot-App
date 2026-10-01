@@ -1013,6 +1013,18 @@ async function runOnePass(env) {
     } catch (e) {
       log.push(`[espn:${slug}:${eventId}] pipeline error=${e.message}`)
     }
+    // ⚠️ AJOUT (01/10, suite du bug "lockAcquired toujours faux" — voir
+    // tursoKv.js) : `pickWrite` traitait jusqu'ici une erreur par-opération
+    // exactement comme un refus de verrou normal (les deux donnent `null`),
+    // sans jamais logger le message d'erreur réel — impossible de distinguer
+    // après coup "verrou légitimement déjà pris" de "Turso/Redis a vraiment
+    // échoué sur cette commande". Chaque erreur est maintenant visible dans
+    // les logs (`npm run tail`), sans changer le comportement (toujours
+    // traité comme "non acquis" par sécurité — on ne veut jamais risquer un
+    // doublon en traitant une erreur inconnue comme un succès).
+    writeResults.forEach((r, i) => {
+      if (r?.error) log.push(`[espn:${slug}:${eventId}] writePipe[${i}] error=${r.error}`)
+    })
     const pickWrite = (i) => (writeResults[i] && !writeResults[i].error) ? writeResults[i].result : null
 
     const lockAcquired   = pickWrite(1)

@@ -251,11 +251,36 @@ export function createTursoKv({ url, authToken }) {
   }
 
   // Émule kv.pipeline().set(...).get(...).del(...).srem(...).exec({keepErrors})
-  // de @upstash/redis — 1 seul .batch() = 1 seul aller-retour HTTP vers Turso,
-  // même principe que le pipeline Redis (même si la facturation Turso par
-  // ligne rend ce regroupement moins critique côté coût que côté Upstash,
-  // réduire le nombre d'allers-retours reste bon pour la latence/le budget
-  // CPU Workers).
+  // de @upstash/redis.
+  //
+  // ⚠️ RÉÉCRIT (01/10, bug prod : notifs buts/cartons jamais envoyées une fois
+  // basculé sur Turso — "j'ai reçu que fin de match du premier match, sinon
+  // rien du tout même pas les buts", voir CLAUDE.md). Root cause la plus
+  // probable trouvée en comparant les 2 chemins NX du fichier : `acquireDedup`
+  // (index.js, dédup des notifs individuelles) appelle le `set()` STANDALONE
+  // ci-dessus — 1 seul `client.execute()` isolé — et fonctionne bien (c'est
+  // LUI qui a laissé passer la notif "Fin de match"). Le verrou anti-doublon
+  // but/carton (`lockKey`, `writePipe` dans index.js ~ligne 1000), lui, est
+  // batché avec le SET normal de `stateKey` dans UN SEUL `client.batch(stmts,
+  // 'write')` — un batch libSQL est UNE SEULE transaction : si une des
+  // opérations lève une erreur (contention, erreur transitoire...), TOUT le
+  // batch échoue d'un coup, et l'ancien code ci-dessous renvoyait alors
+  // `{result:null, error}` pour TOUTES les opérations du pipeline, y compris
+  // celles sans rapport avec l'échec — contrairement à Redis, où
+  // `pipeline().exec({keepErrors:true})` isole VRAIMENT chaque commande les
+  // unes des autres. Un seul échec ponctuel sur `stateKey` (ou l'inverse)
+  // suffisait donc à rendre `lockAcquired` systématiquement faux, bloquant
+  // TOUTE notif de but/carton — alors que la notif "Fin de match" elle-même,
+  // qui ne dépend pas de ce verrou, continuait de passer : exactement le
+  // symptôme observé.
+  // Corrigé : chaque opération du pipeline s'exécute maintenant en SÉQUENCE,
+  // comme un `client.execute()` INDÉPENDANT avec son propre try/catch — un
+  // échec sur une opération ne peut plus jamais affecter le résultat d'une
+  // autre, même garantie d'isolation que Redis. Coût : N allers-retours HTTP
+  // au lieu d'1 seul par pipeline — accepté ici : Turso facture par LIGNE
+  // (pas par requête), et le temps d'attente réseau ne compte pas dans le
+  // budget CPU Cloudflare Workers (seul le temps CPU réellement actif est
+  // limité) — un aller-retour HTTP de plus ne coûte donc quasiment rien ici.
   function pipeline() {
     const ops = []
     const builder = {
@@ -265,18 +290,20 @@ export function createTursoKv({ url, authToken }) {
       srem(setName, member) { ops.push({ type: 'srem', setName, member }); return builder },
       async exec(options = {}) {
         await ensureSchema()
-        const now = nowSec()
-        const stmts = ops.map(op => buildStatement(op, now))
-        try {
-          const resultsRaw = stmts.length ? await client.batch(stmts, 'write') : []
-          return ops.map((op, i) => {
-            const result = interpretResult(op, resultsRaw[i])
-            return options.keepErrors ? { result, error: null } : result
-          })
-        } catch (e) {
-          if (options.keepErrors) return ops.map(() => ({ result: null, error: e.message }))
-          throw e
+        const results = []
+        for (const op of ops) {
+          const now = nowSec()
+          const stmt = buildStatement(op, now)
+          try {
+            const rs = await client.execute(stmt)
+            const result = interpretResult(op, rs)
+            results.push(options.keepErrors ? { result, error: null } : result)
+          } catch (e) {
+            if (options.keepErrors) results.push({ result: null, error: e.message })
+            else throw e
+          }
         }
+        return results
       },
     }
     return builder

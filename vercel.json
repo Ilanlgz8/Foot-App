@@ -23,7 +23,7 @@
         { "key": "Permissions-Policy",     "value": "geolocation=(), camera=(), microphone=(), payment=(), usb=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-8HMm6A49rMwzNe0Wz0XJiSvq7/pZinnWuHS+Wgn5Rdo='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://crests.football-data.org https://a.espncdn.com https://flagcdn.com https://upload.wikimedia.org; connect-src 'self' https://crests.football-data.org https://a.espncdn.com https://flagcdn.com https://*.ably.io wss://*.ably.io https://*.ably-realtime.com wss://*.ably-realtime.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' 'sha256-8HMm6A49rMwzNe0Wz0XJiSvq7/pZinnWuHS+Wgn5Rdo='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://crests.football-data.org https://a.espncdn.com https://flagcdn.com https://*.ably.io wss://*.ably.io https://*.ably-realtime.com wss://*.ably-realtime.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         }
       ]
     },
