@@ -33,8 +33,13 @@ export default defineConfig([
   // is not defined (code parfaitement valide en prod, juste vérifié avec le
   // mauvais jeu de globals) faussaient le compte total d'un audit ESLint
   // complet du projet.
+  // src/utils/tursoCache.js (01/10, migration cache scoreboard ESPN vers
+  // Turso) : physiquement sous src/ comme le reste du code navigateur, mais
+  // n'est JAMAIS importé côté client — uniquement par api/espn.js (Node), où
+  // il lit process.env.TURSO_*. Même exception que les fichiers Node
+  // ci-dessus, juste scopée à ce seul fichier plutôt qu'à tout src/.
   {
-    files: ['api/**/*.js', 'cf-worker/**/*.js', 'scripts/**/*.mjs', 'vite.config.js'],
+    files: ['api/**/*.js', 'cf-worker/**/*.js', 'scripts/**/*.mjs', 'vite.config.js', 'src/utils/tursoCache.js'],
     languageOptions: {
       globals: globals.node,
     },

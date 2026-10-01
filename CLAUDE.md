@@ -7,6 +7,11 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - **APIs** : ESPN (primaire, live), football-data.org (matchs/classements). api-football (compos) **désactivé définitivement** (`PERMANENTLY_DISABLED` dans `api/apifootball.js` — compte suspendu à répétition, ESPN/FD.org couvrent déjà l'essentiel en fallback). xG retiré (`api/fifa-live.js`) : jamais présent en pratique dans le boxscore ESPN, aucune intégration FotMob n'a jamais existé malgré une ancienne mention ici
 - **Backend Vercel** : `/api/*` serverless functions (12/12 — limite dure Hobby, plus aucun slot libre : tout nouvel endpoint doit être fusionné dans un fichier existant)
 - **Push notifs** : Web Push VAPID via `web-push`, subscriptions dans Upstash Redis (KV)
+- **Cache scoreboard ESPN** (`api/espn.js`, clés `espn:sb:*`) : sur Turso (SQLite distribué,
+  `src/utils/tursoCache.js`) si `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` sont configurées côté
+  Vercel, sinon repli automatique sur Upstash Redis — voir l'entrée du 01/10 dans Problèmes
+  connus/résolus. Seul ce cache précis (résultats de matchs, très lu/très peu écrit) est concerné ;
+  rate-limit, live, notifs, H2H, news... restent sur Redis.
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
 - **Cron (polling ESPN + notifs)** : Worker Cloudflare (`cf-worker/`, gratuit, Cron Trigger `* * * * *`) — fait le fetch ESPN + la détection (but/carton/KO/mi-temps/fin) chaque minute, coût CPU quasi nul (le réseau ne compte pas dans le budget CPU Cloudflare). N'appelle `/api/cron-goals` (mode `notify`, voir plus bas) QUE quand un vrai événement est détecté — Vercel ne fait plus que l'envoi push (VAPID + chiffrement par abonné), quelques dizaines de fois/jour de match au lieu de 1440x/jour inconditionnellement. Ancien schéma (cron-job.org → tout sur Vercel 1x/min 24/7) conservé intact en fallback manuel dans le même fichier — voir `cf-worker/README.md` pour le contexte complet et la procédure de déploiement/rollback.
@@ -121,6 +126,21 @@ cf-worker/
 - `API_FOOTBALL_KEY` — api-football (clé toujours présente mais inutilisée, voir `PERMANENTLY_DISABLED`)
 - `ABLY_API_KEY` — pub/sub temps quasi réel (token borné généré via `/api/vapid-key?ably=1`)
 - `CF_ACCOUNT_ID`, `CF_AI_API_TOKEN` — Cloudflare Workers AI (Assistant IA, `api/apifootball.js` mode `ask`). Même compte Cloudflare que `cf-worker/` : ID de compte visible dans le dashboard Cloudflare (barre latérale droite) ; token créé dans dashboard Cloudflare → "Manage Account" → "Account API Tokens" → "Create Token" → template "Workers AI" (ou permission personnalisée "Account.Workers AI: Read/Edit")
+- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` — **PAS ENCORE AJOUTÉES côté Vercel
+  au moment de l'implémentation (01/10)**, voir l'entrée du 01/10 "Migration du
+  cache scoreboard ESPN vers Turso" dans Problèmes connus/résolus. Turso =
+  base SQLite distribuée (compte créé par l'utilisateur sur turso.tech, base
+  `statfootix`, région AWS EU West Ireland), utilisée UNIQUEMENT pour le cache
+  scoreboard ESPN (`espn:sb:*`, `api/espn.js`) — tout le reste (rate-limit,
+  live, notifs) reste sur Upstash Redis. Tant que ces 2 variables sont
+  absentes, `isTursoConfigured()` (`src/utils/tursoCache.js`) renvoie `false`
+  et le code retombe intégralement sur l'ancien chemin Redis, inchangé —
+  aucune régression si elles ne sont jamais ajoutées, juste pas de gain.
+  `TURSO_DATABASE_URL` : URL `libsql://...` visible dans le dashboard Turso,
+  page de la base → bouton "Connect". `TURSO_AUTH_TOKEN` : généré depuis ce
+  même panneau ("Create Token") — ⚠️ valeur secrète, à copier UNE SEULE FOIS
+  à la création (Turso ne la réaffiche jamais ensuite ; en créer une nouvelle
+  si perdue).
 
 ## Problèmes connus / résolus
 - ✅ Doublons notifs : suppression des appels client-side dans useLiveMinute
@@ -2668,6 +2688,96 @@ cf-worker/
   l'utilisateur peut l'observer sur les prochains jours ; 365j reste un choix de raisonnement
   (marge large sur le délai de correction disciplinaire le plus tardif connu), pas une valeur
   mesurée empiriquement sur un vrai cas de correction tardive survenu dans ce projet.
+
+- ✅ Migration du cache scoreboard ESPN vers Turso, nouveau composant d'infra
+  (01/10, suite à "j'ai pris 800 comands upstach en 1H30" alors qu'aucun
+  visiteur n'était sur l'app, puis demande explicite de l'utilisateur de
+  chercher "une meilleure solution [...] qui peut revolutionner cette logique
+  de cache" plutôt que d'empiler encore des rustines de TTL) : les 2 fixes du
+  même jour (TTL 90j→365j, `MAX_FETCH_CHUNKS`) réduisent la fréquence des
+  réécritures mais ne changent pas le fond du problème — ce cache reste
+  facturé par COMMANDE Redis (lecture ET écriture), avec un plafond gratuit
+  fixe (500K/mois) qui ne grandit jamais avec le trafic. Recherche faite
+  (comparaison Cloudflare D1 vs Turso, voir leurs limites gratuites
+  respectives) : **Turso** choisi — SQLite distribué, facturé par LIGNE
+  (500M lectures/mois + 10M écritures/mois gratuit, soft cap pay-as-you-go
+  plutôt qu'un blocage dur), directement accessible en HTTP depuis une
+  fonction serverless Vercel via `@libsql/client` (`npm install`, vérifié
+  0 nouvelle vulnérabilité de production via `npm audit --omit=dev`) — sans
+  avoir besoin d'un hop supplémentaire par un Worker Cloudflare comme
+  l'aurait exigé D1. Portée volontairement ÉTROITE, décidée après une 1re
+  tentative plus large (migrer aussi l'état Redis du Worker Cloudflare vers
+  Durable Objects) investiguée puis ABANDONNÉE le même jour en cours de
+  route : lecture de `cf-worker/src/index.js` a révélé une dépendance
+  profonde à des primitives propres à Redis (MGET multi-clés en 1 commande,
+  verrous atomiques `SET NX`, `SCARD`/`SREM`, TTL natif par clé) qui ne se
+  transposent pas proprement sur le modèle de stockage par objet des Durable
+  Objects — risque jugé disproportionné face au système de notifications
+  live déjà fragile et péniblement stabilisé (~30 itérations documentées
+  plus haut dans ce fichier), pour un gain devenu plus petit une fois les 2
+  fixes TTL/MAX_FETCH_CHUNKS déjà déployés. Décision network via
+  `AskUserQuestion`, confirmée par l'utilisateur ("ah donc en gros ça vaut
+  pas le coup de changer en mode ?" → "ok") : cf-worker/ reste intégralement
+  sur Redis, aucun changement. Seul le cache scoreboard ESPN (`espn:sb:*`,
+  `api/espn.js`) bascule — rate-limit, cache summary/standings ESPN, et tout
+  le reste de l'app (notifs, live, H2H, news...) restent sur Redis, ce profil
+  (écritures fréquentes/courte durée de vie, verrous atomiques) étant au
+  contraire le point fort de Redis, pas de Turso.
+  Implémentation (`src/utils/tursoCache.js`, nouveau fichier) : wrapper
+  générique `mget(keys)`/`set(key, value, ttlSeconds)` + `isTursoConfigured()`
+  au-dessus de `@libsql/client`, table unique `espn_cache (key TEXT PRIMARY
+  KEY, value TEXT NOT NULL, expires_at INTEGER NOT NULL)` créée à la volée
+  (`CREATE TABLE IF NOT EXISTS`, idempotent, appelé au 1er accès réel plutôt
+  qu'au chargement du module). TTL géré à la main (`expires_at` en secondes
+  epoch, filtré à la lecture) — SQLite n'a pas d'expiration native comme
+  Redis ; les lignes expirées non lues restent en base sans purge
+  périodique, poids négligeable (quelques Ko/ligne, quota 5 Go) sans impact
+  sur le quota de lectures/écritures qui est le seul vrai sujet ici. Bascule
+  **conditionnelle et sans risque** : `isTursoConfigured()` vérifie la
+  présence de `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` — tant qu'elles ne sont
+  pas ajoutées côté Vercel (pas encore fait au moment de l'implémentation,
+  voir Env vars Vercel plus haut), `readCachedChunks`/`fetchScoreboardChunk`
+  (`api/espn.js`) retombent intégralement sur l'ancien chemin `kv.mget`/
+  `kv.set` (Redis), strictement inchangé — déploiement possible sans aucune
+  régression même avant que l'utilisateur n'ajoute les 2 variables, bascule
+  automatique dès qu'elles le sont, sans redéploiement de code nécessaire.
+  Transition assumée : les clés déjà en cache côté Redis au moment de la
+  bascule ne sont PAS migrées vers Turso (pas de script de migration de
+  données) — un cache-miss ponctuel la première fois que Turso prend le
+  relais pour chaque tranche, re-remplie normalement au prochain vrai fetch
+  ESPN, sans donnée fausse ni incident, juste un léger réchauffement à froid.
+  Setup effectué par l'utilisateur (compte turso.tech, base `statfootix`,
+  région AWS EU West Ireland, option "concurrent writes/Rust rewrite"
+  laissée désactivée sur mon conseil — inutile pour un usage très majoritairement
+  en lecture) ; identifiants transmis en chat par l'utilisateur avec
+  l'instruction explicite "fait pas fuiter stp je compte sur toi" — jamais
+  écrits dans un fichier commité ni réaffichés, utilisés uniquement de façon
+  transitoire dans le sandbox pour un test (voir ci-dessous) puis à nouveau
+  nulle part : la vraie configuration se fait par variables d'environnement
+  Vercel, que seul l'utilisateur peut saisir.
+  Vérification : 370 tests + lint (33 erreurs pré-existantes, Pronos.jsx,
+  inchangé — `eslint.config.js` étendu pour inclure `src/utils/tursoCache.js`
+  dans le même jeu de globals Node que `api/**`, seul fichier sous `src/`
+  à avoir besoin de `process.env`, jamais importé côté client) + build
+  vérifiés (bundle client inchangé en taille — `@libsql/client` n'est importé
+  que par `api/espn.js`, une fonction serverless jamais bundlée par Vite).
+  **Honnêteté importante, limite réelle de cet environnement** : tentative de
+  tester les vraies requêtes SQL contre la base Turso réelle depuis ce
+  sandbox (contrairement à Durable Objects, c'était présenté comme un
+  avantage testable) — a échoué : AUCUN accès réseau sortant arbitraire
+  depuis ce sandbox, confirmé en reproduisant la même erreur (`EAI_AGAIN`,
+  échec DNS) aussi bien sur `turso.io` que sur `github.com`/le registre npm —
+  une restriction réseau globale du sandbox (visiblement un proxy allowlisté
+  à des domaines précis), pas un problème de code ni de Turso. Le code n'a
+  donc PAS pu être vérifié en conditions réelles avant déploiement — seulement
+  relu attentivement (SQL standard, API `@libsql/client` conforme à sa
+  documentation publique). La vraie vérification ne pourra se faire qu'une
+  fois déployé sur Vercel (qui a un accès réseau complet) ET les 2 variables
+  d'environnement ajoutées par l'utilisateur — à faire dans l'ordre : ajouter
+  `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` dans Vercel (Production + Preview),
+  redéployer, puis vérifier sur le dashboard Turso (onglet de la base,
+  compteur de lignes/requêtes) qu'un trafic réel apparaît après quelques
+  visites de l'app.
 
 ## Conventions
 - Noms français partout dans l'UI

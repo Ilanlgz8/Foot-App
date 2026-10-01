@@ -26,6 +26,7 @@
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
+import { mget as tursoMget, set as tursoSet, isTursoConfigured } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -274,7 +275,20 @@ function safeJsonChunk(val) {
   return val
 }
 
-// Lit d'un coup (1 seule commande Redis, voir commentaire ci-dessus) l'état
+// ⚠️ MIGRÉ vers Turso le 01/10 (src/utils/tursoCache.js) : ce cache précis
+// (résultats de matchs déjà terminés, TTL jusqu'à 365j pour le passé ancien)
+// est très majoritairement LU, très rarement ÉCRIT — exactement le profil où
+// la facturation par LIGNE de Turso (500M lectures/mois gratuit) est bien
+// plus généreuse que la facturation par COMMANDE d'Upstash (500K/mois,
+// déjà plusieurs fois proche de la limite début octobre, voir CLAUDE.md).
+// Bascule automatique et sans risque : isTursoConfigured() ne renvoie true
+// qu'une fois TURSO_DATABASE_URL/TURSO_AUTH_TOKEN ajoutées côté Vercel — tant
+// qu'elles ne le sont pas, ce code retombe intégralement sur l'ancien chemin
+// Redis, inchangé. Seul CE cache scoreboard bascule : rate-limit, cache
+// summary/standings, et tout le reste de ce fichier restent sur Redis (voir
+// l'en-tête de tursoCache.js pour le détail du pourquoi).
+//
+// Lit d'un coup (1 seul aller-retour, Turso OU Redis selon la config) l'état
 // de cache de toutes les tranches CACHEABLES d'une liste — retourne une Map
 // chunkDates → résultat déjà prêt (`{ ok: true, events }`) pour les seules
 // tranches trouvées en cache. Les tranches absentes de cette Map (cache
@@ -286,13 +300,14 @@ async function readCachedChunks(slug, chunkList) {
     .filter(x => x.ttl != null)
   const hits = new Map()
   if (cacheable.length === 0) return hits
+  const keys = cacheable.map(x => `espn:sb:${slug}:${x.chunk}`)
   try {
-    const values = await kv.mget(...cacheable.map(x => `espn:sb:${slug}:${x.chunk}`))
+    const values = isTursoConfigured() ? await tursoMget(keys) : await kv.mget(...keys)
     cacheable.forEach((x, i) => {
       const parsed = safeJsonChunk(values[i])
       if (parsed) hits.set(x.chunk, { ok: true, events: parsed.events ?? [] })
     })
-  } catch { /* Redis indisponible → toutes les tranches retombent en fetch direct */ }
+  } catch { /* Turso/Redis indisponible → toutes les tranches retombent en fetch direct */ }
   return hits
 }
 
@@ -325,7 +340,12 @@ async function fetchScoreboardChunk(slug, chunkDates) {
     if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
     const json = await response.json()
     if (ttl != null) {
-      kv.set(`espn:sb:${slug}:${chunkDates}`, JSON.stringify(json), { ex: ttl }).catch(() => {})
+      const cacheKey = `espn:sb:${slug}:${chunkDates}`
+      if (isTursoConfigured()) {
+        tursoSet(cacheKey, JSON.stringify(json), ttl).catch(() => {})
+      } else {
+        kv.set(cacheKey, JSON.stringify(json), { ex: ttl }).catch(() => {})
+      }
     }
     return { ok: true, events: json.events ?? [] }
   } catch {
