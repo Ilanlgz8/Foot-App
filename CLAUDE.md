@@ -2616,6 +2616,37 @@ cf-worker/
   confirmer par l'utilisateur que les cotes Accueil et LiveMatchPage restent bien identiques pour
   un même match, y compris pile au moment du coup d'envoi.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : "+1200 commandes Upstash en 10min alors qu'aucun match
+  n'est en cours" (constat utilisateur, 01/10, suivi en quasi temps réel sur le dashboard Upstash
+  — un vrai signal mesuré, pas une impression). Root cause trouvée par lecture directe du code
+  (`api/espn.js`), pas une hypothèse : `SCOREBOARD_PAST_CHUNK_TTL` (24h) s'appliquait À TOUT le
+  passé, y compris les tranches les plus anciennes — alors qu'un résultat de match FINISHED d'il y
+  a plusieurs mois ne changera plus jamais. Combiné à l'élargissement du 29/09 à 400 jours en
+  arrière pour 8 compétitions sporadiques (NL/CAN/COPA/UEL/UECL/TDC/CS/USC, fix "forme récente"/
+  "stats saison" absentes), ça voulait dire que TOUT ce passé lointain (jusqu'à 60 tranches par
+  requête, `MAX_FETCH_CHUNKS`) expirait et devait être intégralement RÉÉCRIT chaque jour, pour
+  toujours — un coût qui ne se stabilise jamais, grandit avec le temps, contrairement à l'esprit
+  d'un "cache long" pour du passé immuable. Écriture faite tranche par tranche en fire-and-forget
+  (`fetchScoreboardChunk`, `kv.set` individuel) : jusqu'à 60 commandes d'écriture RÉELLES à chaque
+  cache-miss — et Upstash facture chaque SET individuellement, même groupé en pipeline (pas de
+  gain possible en les regroupant, leçon déjà apprise le 10/09 sur ce même fichier pour les
+  verrous but/carton du Worker) donc la seule vraie économie possible était de réduire le nombre
+  de fois où cette réécriture se déclenche, pas sa forme. Corrigé (`api/espn.js`,
+  `scoreboardChunkTtl`) : au-delà de 10 jours dans le passé, le TTL passe à 90 jours au lieu de
+  24h (`SCOREBOARD_OLD_PAST_CHUNK_TTL`) — un résultat vieux de plusieurs mois n'a structurellement
+  aucune raison d'être revérifié tous les jours. Le passé RÉCENT (≤10j, le plus consulté en
+  pratique — "résultats récents"/"forme récente" classique) garde son cache 24h inchangé, aucun
+  risque de servir une donnée trop datée pour ce qui est réellement regardé souvent. 370 tests +
+  lint + build vérifiés, déployé immédiatement vu l'urgence du signal. Honnêteté : je n'ai aucun
+  accès au dashboard Upstash depuis cet environnement pour confirmer après coup que le rythme de
+  commandes a bien chuté (seule l'utilisateur peut le voir) — mais la mécanique du bug est
+  confirmée par lecture directe du code (pas une supposition) et le calcul d'impact (jusqu'à 60
+  écritures/requête pour du passé qui ne change jamais, répété chaque jour sur une fenêtre de 400j
+  × 8 compétitions) est cohérent avec l'ampleur du signal rapporté (+1200 en 10min). 90 jours
+  choisi par raisonnement (largement au-delà du moindre délai de correction disciplinaire tardive
+  connu) plutôt que mesuré empiriquement — à ajuster si un besoin de récupérer une correction très
+  ancienne se présentait un jour (cas extrêmement rare).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
