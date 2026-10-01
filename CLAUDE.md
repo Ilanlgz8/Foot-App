@@ -2779,6 +2779,57 @@ cf-worker/
   compteur de lignes/requêtes) qu'un trafic réel apparaît après quelques
   visites de l'app.
 
+- ✅ Écriture morte `espn:summary:{slug}:{eventId}` supprimée (`cacheEspnSummary`,
+  `cf-worker/src/index.js` + `api/cron-goals.js`), trouvée en lisant tout
+  `cf-worker/src/index.js` pour évaluer la faisabilité d'une migration Turso
+  du Worker (01/10, demande explicite utilisateur : "d'accord bah en vrai ce
+  serait bien qu'on le fasse alors [...] pour baisser le commands upstach") —
+  avant même d'entamer cette migration plus large/risquée, un vrai gaspillage
+  trouvé en cours de route : `cacheEspnSummary()` écrivait depuis toujours
+  dans `espn:summary:{slug}:{eventId}` (SANS `v2`), mais `api/espn.js` a
+  basculé son chemin de lecture vers `espn:summary:v2:{slug}:{eventId}` le
+  05/09 (bump de version pour invalider un bug d'attribution but/carton,
+  voir son commentaire) — SANS jamais mettre à jour le côté écriture. Confirmé
+  par grep exhaustif sur tout le dépôt : la clé sans `v2` n'est lue NULLE
+  PART. Résultat concret : ce Worker (tourne 1x/minute, 24/7/365, toute
+  l'année) ET le mode legacy d'`api/cron-goals.js` faisaient un vrai fetch
+  ESPN + un vrai SET Redis, pour CHAQUE match en direct à CHAQUE passe,
+  strictement pour rien depuis le 05/09 — un pur gaspillage de commandes
+  Upstash (et de sous-requêtes Workers, round robin déjà sous contrainte
+  stricte à 50/exécution) qui a duré 3 semaines sans que personne ne s'en
+  aperçoive, la donnée écrite n'étant simplement jamais consultée. Supprimé
+  intégralement dans les 2 fichiers (fonction, ses 2 call-sites par fichier,
+  le mécanisme `pendingSummaryFetches`/`Promise.allSettled` qui les
+  parallélisait, et — uniquement côté `cf-worker/` où elles n'avaient plus
+  d'autre usage — `shouldRefreshSummary()`, `hasUsefulSummaryData` (import),
+  `ESPN_BASE`/`ESPN_FETCH_HEADERS`) — `queueFdPriorityRefresh()` (partage le
+  même bloc `if (underFinalSafeLimit)` qu'un des appels supprimés) et
+  `isSummaryFinished()`/`ESPN_BASE` côté `api/cron-goals.js` (encore utilisés
+  ailleurs dans ce fichier) explicitement préservés, vérifiés un par un avant
+  suppression. Aucune régression possible : la vraie fraîcheur du summary
+  pour un visiteur reste assurée par `api/espn.js` lui-même (refetch à la
+  demande avec son propre TTL, totalement indépendant de ce pré-chauffage
+  mort) — ce mécanisme n'a jamais eu d'autre rôle que ce pré-chauffage de
+  secours, jamais consulté. 370 tests + lint (`cf-worker/src/index.js` ET
+  `api/cron-goals.js`, clean sur les 2 — 2 variables devenues réellement
+  inutilisées, `ESPN_BASE`/`ESPN_FETCH_HEADERS`, détectées et supprimées via
+  ESLint après coup) + build vérifiés. Décision explicite prise à ce stade,
+  en accord avec le pattern déjà établi dans ce fichier de signaler une
+  trouvaille avant de poursuivre un chantier plus large : la migration Turso
+  du reste de l'état Redis du Worker (Phase A : bookkeeping/caches simples
+  `cron:goals:lastRun`/`fifa:live`/`fd:warmPriority` ; Phase B : le vrai gain
+  de volume, le mécanisme skip-fast-path `cron:liveIds`/`cron:anyLive`/
+  `cron:liveSlugs`/`noMatch`) reste À FAIRE, pas entamée dans cette passe —
+  cette suppression de code mort était un gain indépendant, sûr à 100% et
+  déployable immédiatement, qui ne dispense pas de la migration plus large si
+  l'objectif réel (baisser les commandes Upstash du plancher 24/7 du Worker)
+  est toujours visé. Honnêteté : comme toujours pour `cf-worker/`, aucun accès
+  `wrangler`/déploiement direct depuis cet environnement — le code est poussé
+  sur le repo mais reste inactif en production tant que l'utilisateur ne lance
+  pas `npm run deploy` manuellement depuis `cf-worker/` ; la partie
+  `api/cron-goals.js` se déploie automatiquement avec le reste de l'app via
+  Vercel.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

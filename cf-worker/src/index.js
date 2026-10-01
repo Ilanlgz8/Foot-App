@@ -49,7 +49,7 @@ import {
   LIVE_ESPN, FINAL_ESPN, normalizeEspnStatus,
   fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
-  minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
+  minuteLabel, dateStr, parseMin,
 } from '../../src/utils/liveDetection.js'
 
 // EXTRA_NOTIFY_SLUGS (coupes nationales + NL/CAN/COPA, voir espnSlugs.js) :
@@ -58,52 +58,25 @@ import {
 // numérique, pas ce dont ce Worker a besoin — voir commentaire dans
 // espnSlugs.js).
 const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA_NOTIFY_SLUGS])]
-const ESPN_BASE  = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 // ⚠️ SOLUTION AU BLOCAGE 403 (constat confirmé, 22/08 : ESPN bloque 100% des
 // requêtes venant de Cloudflare Workers — testé en direct, la MÊME requête
-// depuis Vercel réussit sans problème, header par header identiques via
-// ESPN_FETCH_HEADERS ci-dessous, qui n'avait donc rien changé). C'est un
-// blocage réseau (IP/plage Cloudflare), pas un problème d'en-têtes — aucun
-// en-tête ne peut le contourner depuis ce Worker. api/espn.js (Vercel) sait
-// déjà atteindre ESPN sans souci (utilisé par toute l'app côté client) — son
-// mode "scoreboard" renvoie le JSON ESPN BRUT, tel quel, SANS transformation
-// (voir api/espn.js, mode scoreboard : `res.send(body)`, pas de compaction —
-// contrairement au mode "summary" qui compacte pour le client) : donc
-// compatible tel quel avec fetchEspnEvents ci-dessous, aucun changement de
-// parsing nécessaire. Le calcul/la décision (comparaison scores, détection
-// buts/cartons/FT) restent intégralement ici, dans le Worker — seul le SAUT
-// RÉSEAU vers ESPN passe désormais par Vercel plutôt que direct, un simple
-// relais sans le coût CPU qui avait motivé le passage à Cloudflare (voir
-// CLAUDE.md "Fluid Active CPU dépassé") : api/espn.js est un pass-through
-// léger (fetch + forward), pas la logique complète de l'ancien cron.
+// depuis Vercel réussit sans problème, header par header identiques, qui
+// n'avait donc rien changé). C'est un blocage réseau (IP/plage Cloudflare),
+// pas un problème d'en-têtes — aucun en-tête ne peut le contourner depuis ce
+// Worker. api/espn.js (Vercel) sait déjà atteindre ESPN sans souci (utilisé
+// par toute l'app côté client) — son mode "scoreboard" renvoie le JSON ESPN
+// BRUT, tel quel, SANS transformation (voir api/espn.js, mode scoreboard :
+// `res.send(body)`, pas de compaction — contrairement au mode "summary" qui
+// compacte pour le client) : donc compatible tel quel avec fetchEspnEvents
+// ci-dessous, aucun changement de parsing nécessaire. Le calcul/la décision
+// (comparaison scores, détection buts/cartons/FT) restent intégralement ici,
+// dans le Worker — seul le SAUT RÉSEAU vers ESPN passe désormais par Vercel
+// plutôt que direct, un simple relais sans le coût CPU qui avait motivé le
+// passage à Cloudflare (voir CLAUDE.md "Fluid Active CPU dépassé") :
+// api/espn.js est un pass-through léger (fetch + forward), pas la logique
+// complète de l'ancien cron.
 const VERCEL_ESPN_PROXY = 'https://statfootix.vercel.app/api/espn'
-
-// ⚠️ AJOUT (retour utilisateur, log réel : 403 systématique d'ESPN sur TOUS
-// les slugs, à chaque vraie passe, depuis plusieurs heures) : ce Worker
-// fetchait ESPN sans le moindre en-tête "navigateur" (juste Cache-Control),
-// contrairement à api/espn.js et api/fifa-live.js (côté Vercel) qui
-// atteignent le MÊME endpoint ESPN sans souci apparent — seule vraie
-// différence observée entre les deux : l'origine réseau (IPs partagées
-// Cloudflare Workers vs IPs Vercel). Piste la plus probable : ESPN applique
-// un filtrage anti-bot qui cible soit l'absence d'en-têtes "navigateur"
-// standards, soit les plages IP Cloudflare connues comme largement
-// utilisées par des scrapers — la 1ère est corrigeable ici, la 2e ne l'est
-// pas par du code. User-Agent + Accept + Accept-Language "réalistes" : sans
-// risque (aucun effet si la cause est un blocage IP pur), et directement
-// utile si c'est bien l'absence d'en-têtes qui déclenche le filtrage.
-// Honnêteté : pas de certitude sur la cause exacte, pas d'accès aux logs
-// ESPN — à vérifier après déploiement (le prochain [espn:...] dans le log
-// cf-worker doit repasser à un vrai statut 200, sinon la cause est bien un
-// blocage IP et il faudra une autre approche, ex. router ce fetch via
-// api/espn.js/Vercel au lieu d'ESPN directement).
-const ESPN_FETCH_HEADERS = {
-  'Cache-Control': 'no-cache',
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Referer': 'https://www.espn.com/',
-}
 
 function t(name) { return TEAM_NAMES_FR[name] ?? name }
 
@@ -172,13 +145,6 @@ async function fetchFifaLiveMatches(kv, log) {
   }
 }
 
-// ── Capture proactive du summary ESPN (compos + stats + événements) ──────────
-// Identique à cacheEspnSummary() dans api/cron-goals.js — pur fetch + Redis,
-// aucune dépendance crypto, portable telle quelle. hasUsefulSummaryData :
-// importée de src/utils/liveDetection.js (voir en tête de fichier) —
-// anciennement dupliquée ici et dans api/cron-goals.js.
-const SUMMARY_CACHE_TTL = 7 * 24 * 3600
-
 // ── Confirmation FT accélérée (retour utilisateur : le tick Cron normal met
 // jusqu'à 60s à confirmer un FT, trop lent pour la notif "Fin de match") ──
 //
@@ -194,9 +160,9 @@ const SUMMARY_CACHE_TTL = 7 * 24 * 3600
 //
 // Réutilise EXACTEMENT la même source de données que le tick normal
 // (fetchEspnEvents → scoreboard, PAS le endpoint /summary qui a un
-// problème connu de header.competitions parfois absent, voir
-// cacheEspnSummary/hasUsefulSummaryData) — comportement identique à un
-// "tick anticipé", aucune nouvelle logique de détection introduite.
+// problème connu de header.competitions parfois absent) — comportement
+// identique à un "tick anticipé", aucune nouvelle logique de détection
+// introduite.
 //
 // Sûr par construction même en cas de double confirmation (ce recheck ET
 // le tick normal suivant confirment tous les deux, ex. si ce recheck rate
@@ -319,7 +285,6 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
     } catch (e) {
       log.push(`[final-recheck:${slug}:${eventId}] pipeline error=${e.message}`)
     }
-    await cacheEspnSummary(kv, slug, eventId, log)
     try {
       if (!recapAlready) {
         const scorers = extractEspnScorers(comp, homeC.team?.id)
@@ -335,23 +300,6 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
     }
   } catch (e) {
     log.push(`[final-recheck:${slug}:${eventId}] error=${e.message}`)
-  }
-}
-
-async function cacheEspnSummary(kv, slug, eventId, log) {
-  try {
-    const url = `${ESPN_BASE}/${slug}/summary?event=${eventId}`
-    const res = await fetch(url, {
-      headers: ESPN_FETCH_HEADERS,
-      signal:  AbortSignal.timeout(8_000),
-    })
-    if (!res.ok) return
-    const body = await res.text()
-    const parsed = JSON.parse(body)
-    if (!hasUsefulSummaryData(parsed)) return
-    await kv.set(`espn:summary:${slug}:${eventId}`, body, { ex: SUMMARY_CACHE_TTL })
-  } catch (e) {
-    log.push(`[espn-summary-cache:${slug}:${eventId}] error=${e.message}`)
   }
 }
 
@@ -476,14 +424,13 @@ async function pushLiveTicker(env, payload, slug, log, homeTeam, awayTeam, rawHo
 // base fixe incompressible par passe = 34 (17 compétitions suivies × 2 fetchs
 // ESPN today+yesterday) + 1 (mget finalDone) = 35. Il reste ~15 de marge.
 // Le pipeline Redis par match (détection but/carton/mi-temps/fin — l'essentiel,
-// JAMAIS coupé) coûte 1 sous-requête/match live. Le résumé ESPN
-// (cacheEspnSummary) et le ticker score discret (pushLiveTicker) coûtent
-// chacun 1 sous-requête EN PLUS, mais seulement les minutes paires — jusqu'à
-// 2 de plus par match live sur ces minutes-là. Au-delà de ce seuil de matchs
-// live traités dans la MÊME passe, on coupe ces 2 postes secondaires pour les
-// matchs suivants (ils sont juste rattrapés à la minute paire suivante, rien
-// de perdu) — garde toujours de la marge pour que le pipeline principal ne
-// soit lui jamais impacté, quel que soit le nombre de matchs.
+// JAMAIS coupé) coûte 1 sous-requête/match live. Le ticker score discret
+// (pushLiveTicker) coûte 1 sous-requête EN PLUS, mais seulement les minutes
+// paires. Au-delà de ce seuil de matchs live traités dans la MÊME passe, on
+// coupe ce poste secondaire pour les matchs suivants (il est juste rattrapé à
+// la minute paire suivante, rien de perdu) — garde toujours de la marge pour
+// que le pipeline principal ne soit lui jamais impacté, quel que soit le
+// nombre de matchs.
 // ⚠️ ABAISSÉ 6 → 3 (28/08, incident réel : silence notifs + rattrapage très
 // en retard sur un pic de 5-8 matchs simultanés) : un recalcul complet du
 // budget (voir FINAL_SAFE_LIVE_THRESHOLD juste en dessous) a montré qu'avec
@@ -755,7 +702,6 @@ async function runOnePass(env) {
   const hasWc = allEvents.some(({ slug }) => slug === 'fifa.world')
   const fifaLiveMatches = hasWc ? await fetchFifaLiveMatches(kv, log) : []
 
-  const pendingSummaryFetches = []
   // Tâches de fond "recheck FT accéléré" (voir recheckFinalMatch) — collectées
   // ici et attendues tout à la fin de runOnePass, APRÈS le reste de la passe
   // (armement cron:emptyDay/cron:nextCheck inclus) pour ne rien changer à
@@ -946,10 +892,6 @@ async function runOnePass(env) {
     // la notif "Fin de match" elle-même (toujours envoyée, voir plus bas).
     if (isFinalNow) finalEventsSeenThisPass++
     const underFinalSafeLimit = finalEventsSeenThisPass <= FINAL_SAFE_THRESHOLD
-
-    if (isLive && underSubrequestSafeLimit && shouldRefreshSummary()) {
-      pendingSummaryFetches.push(cacheEspnSummary(kv, slug, eventId, log))
-    }
 
     if (status === 'STATUS_SCHEDULED' && notPostponed) continue
 
@@ -1354,7 +1296,6 @@ async function runOnePass(env) {
         // Au-delà du seuil, simplement pas fait pour CE match cette passe —
         // aucune notif perdue, juste le résumé/classement un peu moins vite à jour.
         if (underFinalSafeLimit) {
-          await cacheEspnSummary(kv, slug, eventId, log)
           // Voir FD_SLUG_TO_WARM_COMP/queueFdPriorityRefresh plus bas dans ce
           // fichier — priorise le rafraîchissement FD.org (calendrier+classement)
           // de cette compétition au lieu d'attendre la rotation aveugle.
@@ -1406,8 +1347,8 @@ async function runOnePass(env) {
     // même garde-fou isFinalConfirmed — un résumé généré sur un faux FT
     // (temps additionnel toujours en cours) risquerait d'omettre un
     // but/carton arrivé juste après. Gaté aussi par underFinalSafeLimit (voir
-    // FINAL_SAFE_THRESHOLD) — bonus non-essentiel, rattrapé par le résumé
-    // ESPN classique (cacheEspnSummary) une fois sous le seuil.
+    // FINAL_SAFE_THRESHOLD) — bonus non-essentiel, simplement pas fait pour
+    // CE match cette passe au-delà du seuil.
     if (isFinalConfirmed && underFinalSafeLimit) {
       try {
         if (!recapAlready) {
@@ -1457,10 +1398,6 @@ async function runOnePass(env) {
       : pipe.del('cron:liveSlugs')
     await pipe.exec()
   } catch {}
-
-  if (pendingSummaryFetches.length > 0) {
-    await Promise.allSettled(pendingSummaryFetches)
-  }
 
   // ── Armement des optimisations "on peut sauter le prochain fetch" ──────────
   // ⚠️ BUG CORRIGÉ (constat utilisateur : notifs but/mi-temps/fin reçues
@@ -1559,36 +1496,15 @@ function shouldWriteDebugBookkeeping() {
   return new Date().getMinutes() % 15 === 0
 }
 
-// ⚠️ AJOUT (03/08, demande utilisateur : réduire les commandes Upstash SANS
-// toucher à la latence du direct) : cacheEspnSummary (voir plus haut) écrit
-// espn:summary:{slug}:{eventId} dans Redis à CHAQUE passe (1min) pour CHAQUE
-// match en direct — mais ce n'est qu'un pré-chauffage de secours. La vraie
-// fraîcheur pour un spectateur actif vient d'ailleurs : api/espn.js relit
-// CETTE MÊME clé avec son propre TTL de 15s pour un match en cours
-// (LIVE_SUMMARY_CACHE_TTL) et refait un fetch ESPN dès qu'elle expire, à
-// chaque requête client (poll 10-30s, voir CLAUDE.md) — indépendamment de ce
-// Worker. cacheEspnSummary ne sert donc qu'à garder une copie "pas trop
-// vieille" pour le tout premier visiteur d'un match sans spectateur récent —
-// aucun rapport avec la détection buts/cartons/score (le pipeline juste
-// au-dessus, states/trackKey/cardTrackKey, reste à 1min, jamais touché ici)
-// ni avec les notifs push. Espacer à 1 passe sur 2 (paire uniquement) coupe
-// ce poste en 2 pendant les jours de match, avec un pré-chauffage encore
-// largement assez frais (≤2min) pour ce rôle de secours — gate purement
-// local sur l'horloge (même pattern que shouldWriteDebugBookkeeping
-// ci-dessus), zéro lecture Redis supplémentaire pour décider.
-function shouldRefreshSummary() {
-  return new Date().getMinutes() % 2 === 0
-}
-
 // ⚠️ AJOUT (question utilisateur : "225K/500K commandes Upstash alors qu'il y
 // a eu des matchs en continu depuis début août, faut optimiser") : contrairement
-// à cacheEspnSummary/warmFdCache/shouldWriteDebugBookkeeping ci-dessus (déjà
-// espacés), pushLiveTicker (score en direct silencieux, filtré par club
-// favori — voir plus bas dans la boucle) tournait encore à CHAQUE passe (1min),
-// pour CHAQUE match en direct, sans aucun espacement — 1 appel Vercel + au
+// à warmFdCache/shouldWriteDebugBookkeeping ci-dessus (déjà espacés),
+// pushLiveTicker (score en direct silencieux, filtré par club favori — voir
+// plus bas dans la boucle) tournait encore à CHAQUE passe (1min), pour
+// CHAQUE match en direct, sans aucun espacement — 1 appel Vercel + au
 // moins 1 lecture Redis (smembers push:subscriptions) par match live et par
 // minute, même si personne ne suit ce match en favori. Espacé à 1 passe sur 2,
-// même pattern que shouldRefreshSummary : coupe ce poste en 2 les jours de
+// même pattern que shouldWriteDebugBookkeeping : coupe ce poste en 2 les jours de
 // match chargés (plusieurs matchs simultanés). Contrepartie honnête, à
 // distinguer du reste : CETTE fonctionnalité EST directement visible par
 // l'utilisateur (le badge de notif "score en direct" silencieux, tray
