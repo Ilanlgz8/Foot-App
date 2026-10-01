@@ -117,3 +117,44 @@ export async function set(key, value, ttlSeconds) {
 export function isTursoConfigured() {
   return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN)
 }
+
+// ── Lecture de l'état du Worker Cloudflare (01/10) ──────────────────────────
+// cf-worker/src/tursoKv.js (migration du cron Cloudflare vers Turso, voir son
+// commentaire d'en-tête) écrit dans worker_kv/worker_queue — MÊME base Turso
+// que espn_cache ci-dessus (si TURSO_DATABASE_URL/TOKEN sont configurées sur
+// le Worker ET sur Vercel avec les mêmes valeurs), tables DIFFÉRENTES. Les 2
+// fonctions ci-dessous servent UNIQUEMENT à api/debug-push.js, pour continuer
+// à afficher cron:goals:lastRun/lastResult/logHistory même une fois que le
+// Worker a basculé sur Turso (sinon ces 3 clés disparaîtraient de Redis sans
+// que ce diagnostic ne les retrouve nulle part). Ne CRÉENT jamais les tables
+// (c'est le Worker qui les crée à sa 1ère écriture, voir ensureSchema dans
+// tursoKv.js) — si elles n'existent pas encore (Worker jamais exécuté avec
+// Turso configuré), retournent simplement "rien" plutôt qu'une erreur.
+export async function getWorkerKv(key) {
+  const c = client()
+  if (!c) return null
+  try {
+    const res = await c.execute({
+      sql: `SELECT value FROM worker_kv WHERE key=? AND expires_at>?`,
+      args: [key, Math.floor(Date.now() / 1000)],
+    })
+    return res.rows[0]?.value ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function getWorkerQueueAll(queueName) {
+  const c = client()
+  if (!c) return []
+  try {
+    const now = Math.floor(Date.now() / 1000)
+    const res = await c.execute({
+      sql: `SELECT value FROM worker_queue WHERE queue_name=? AND (expires_at IS NULL OR expires_at>?) ORDER BY id ASC`,
+      args: [queueName, now],
+    })
+    return res.rows.map(r => r.value)
+  } catch {
+    return []
+  }
+}

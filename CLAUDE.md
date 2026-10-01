@@ -10,8 +10,15 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - **Cache scoreboard ESPN** (`api/espn.js`, clés `espn:sb:*`) : sur Turso (SQLite distribué,
   `src/utils/tursoCache.js`) si `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` sont configurées côté
   Vercel, sinon repli automatique sur Upstash Redis — voir l'entrée du 01/10 dans Problèmes
-  connus/résolus. Seul ce cache précis (résultats de matchs, très lu/très peu écrit) est concerné ;
-  rate-limit, live, notifs, H2H, news... restent sur Redis.
+  connus/résolus. Rate-limit, H2H, news... restent sur Redis côté Vercel.
+- **État du Worker Cloudflare** (`cf-worker/src/index.js`, polling+notifs — voir plus bas) : sur
+  Turso aussi (`cf-worker/src/tursoKv.js`, MÊME base Turso `statfootix` que ci-dessus, tables
+  différentes) si `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` sont configurées comme SECRETS
+  Cloudflare (`wrangler secret put`, voir `cf-worker/wrangler.toml`), sinon repli intégral sur
+  Redis — voir l'entrée du 01/10 "Migration de l'état du Worker Cloudflare vers Turso". Couvre
+  TOUT l'état de ce fichier, y compris les verrous anti-doublon but/carton/KO/FT (émulation SQL
+  de l'atomicité SET NX de Redis, choix assumé par l'utilisateur après mise en garde explicite
+  sur le risque — voir cette même entrée pour le détail).
 - **Temps quasi réel** : Ably (pub/sub) — `api/fifa-live.js` publie sur `live-{matchId}` quand un poll détecte un vrai changement ; `useLiveMinute.js` s'abonne et relance son propre poll en réveil (complément du poll, ne le remplace pas)
 - **Fast-path cache partagé** (`api/fifa-live.js`) : marqueur `fm:fresh:{id}` (TTL 12s) posé à chaque calcul réel (fetch ESPN/FIFA + matching). Si TOUS les matchs demandés par un client ont ce marqueur encore valide (posé par un AUTRE utilisateur entre-temps), le calcul complet est sauté et le dernier résultat Redis renvoyé directement — le coût CPU par utilisateur baisse quand il y a plus de spectateurs simultanés sur les mêmes matchs, au lieu d'augmenter
 - **Cron (polling ESPN + notifs)** : Worker Cloudflare (`cf-worker/`, gratuit, Cron Trigger `* * * * *`) — fait le fetch ESPN + la détection (but/carton/KO/mi-temps/fin) chaque minute, coût CPU quasi nul (le réseau ne compte pas dans le budget CPU Cloudflare). N'appelle `/api/cron-goals` (mode `notify`, voir plus bas) QUE quand un vrai événement est détecté — Vercel ne fait plus que l'envoi push (VAPID + chiffrement par abonné), quelques dizaines de fois/jour de match au lieu de 1440x/jour inconditionnellement. Ancien schéma (cron-job.org → tout sur Vercel 1x/min 24/7) conservé intact en fallback manuel dans le même fichier — voir `cf-worker/README.md` pour le contexte complet et la procédure de déploiement/rollback.
@@ -114,7 +121,12 @@ public/
 cf-worker/
   src/index.js    — Worker Cloudflare : polling ESPN + détection, appelle /api/cron-goals
                     (mode notify) uniquement quand il y a vraiment un événement à notifier
-  wrangler.toml   — Cron Trigger toutes les minutes
+  src/tursoKv.js  — adaptateur Turso (01/10) réimplémentant le sous-ensemble @upstash/redis
+                    utilisé par index.js (get/set/mget/del/sadd/srem/scard/rpush/lpop/ltrim/
+                    pipeline, y compris l'émulation SET NX pour les verrous anti-doublon) —
+                    utilisé si TURSO_DATABASE_URL/TURSO_AUTH_TOKEN sont configurées comme
+                    secrets Cloudflare, sinon repli intégral sur Redis (voir wrangler.toml)
+  wrangler.toml   — Cron Trigger toutes les minutes + liste des secrets (dont Turso, optionnel)
   README.md       — procédure de déploiement/vérification/rollback
 ```
 
@@ -130,10 +142,14 @@ cf-worker/
   au moment de l'implémentation (01/10)**, voir l'entrée du 01/10 "Migration du
   cache scoreboard ESPN vers Turso" dans Problèmes connus/résolus. Turso =
   base SQLite distribuée (compte créé par l'utilisateur sur turso.tech, base
-  `statfootix`, région AWS EU West Ireland), utilisée UNIQUEMENT pour le cache
-  scoreboard ESPN (`espn:sb:*`, `api/espn.js`) — tout le reste (rate-limit,
-  live, notifs) reste sur Upstash Redis. Tant que ces 2 variables sont
-  absentes, `isTursoConfigured()` (`src/utils/tursoCache.js`) renvoie `false`
+  `statfootix`, région AWS EU West Ireland), utilisée pour le cache scoreboard
+  ESPN (`espn:sb:*`, `api/espn.js`) ET, si les MÊMES 2 valeurs sont en plus
+  configurées comme secrets CLOUDFLARE (`wrangler secret put`, voir
+  `cf-worker/wrangler.toml`), pour l'état du Worker Cloudflare (`cf-worker/
+  src/tursoKv.js` — voir l'entrée du 01/10 "Migration de l'état du Worker
+  Cloudflare vers Turso") — tout le reste (rate-limit, H2H, news côté Vercel)
+  reste sur Upstash Redis. Tant que ces 2 variables sont
+  absentes côté Vercel, `isTursoConfigured()` (`src/utils/tursoCache.js`) renvoie `false`
   et le code retombe intégralement sur l'ancien chemin Redis, inchangé —
   aucune régression si elles ne sont jamais ajoutées, juste pas de gain.
   `TURSO_DATABASE_URL` : URL `libsql://...` visible dans le dashboard Turso,
@@ -2829,6 +2845,112 @@ cf-worker/
   pas `npm run deploy` manuellement depuis `cf-worker/` ; la partie
   `api/cron-goals.js` se déploie automatiquement avec le reste de l'app via
   Vercel.
+
+- ✅ Migration de l'ÉTAT DU WORKER CLOUDFLARE vers Turso (01/10, suite directe
+  du point ci-dessus — demande explicite utilisateur après le fix du code
+  mort : "on peut continuer en vrai si on peut mettre un max de truc sur
+  turso pour alleger upstach [...] ce serait bien tu vois") : ce Worker tourne
+  1x/minute, 24h/24, 365j/an — de très loin le plus gros poste FIXE de
+  commandes Upstash de toute l'app (documenté plusieurs fois : incidents de
+  quota du 10/09, 26/09, 30/09, 01/10), indépendant du trafic des visiteurs.
+  Nouveau fichier `cf-worker/src/tursoKv.js` : réimplémente le SOUS-ENSEMBLE
+  EXACT de l'API `@upstash/redis` réellement utilisé dans `cf-worker/src/
+  index.js` (vérifié par grep exhaustif avant d'écrire le code — get/set/
+  mget/del/expire/sadd/srem/scard/rpush/lpop/ltrim/pipeline, aucune autre
+  méthode appelée nulle part dans ce fichier) au-dessus de `@libsql/client/
+  web` (variante edge-safe sans dépendance Node — Cloudflare Workers n'a pas
+  `net`/`tls`). Bascule conditionnelle dans `handlePass()` (nouvelle fonction
+  `createKv(env)`) : si `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` sont
+  configurées comme secrets Cloudflare (`wrangler secret put`, voir
+  `wrangler.toml`), tout `env._kv` passe par Turso ; sinon repli intégral et
+  silencieux sur Redis, strictement inchangé — même pattern déjà éprouvé côté
+  Vercel pour le cache scoreboard ESPN (`src/utils/tursoCache.js`, voir
+  l'entrée du 01/10 juste avant celle-ci). Même base Turso `statfootix` que
+  le cache scoreboard (le user peut réutiliser EXACTEMENT les mêmes 2
+  valeurs déjà saisies côté Vercel, juste comme secrets Cloudflare cette
+  fois) — 3 tables dédiées (`worker_kv`/`worker_set`/`worker_queue`), aucune
+  collision avec `espn_cache`.
+  Portée VOLONTAIREMENT MAXIMALE, question posée explicitement à l'utilisateur
+  avant d'implémenter (`AskUserQuestion`, le point le plus engageant de cette
+  migration) : fallait-il laisser les verrous anti-doublon but/carton/KO/FT
+  sur Redis (recommandation initiale, ce mécanisme ayant déjà ~30 itérations
+  de bugs documentées dans ce fichier — le plus fragile de toute l'app) ou
+  tout migrer y compris eux ? Réponse explicite de l'utilisateur : "Tout
+  migrer, y compris les verrous" — fait tel quel, risque assumé par
+  l'utilisateur en connaissance de cause. Émulation de l'atomicité SET NX de
+  Redis via SQL standard : `INSERT INTO worker_kv ... ON CONFLICT(key) DO
+  UPDATE ... WHERE worker_kv.expires_at <= ?` — si la clé n'existe pas OU est
+  expirée, l'UPDATE s'exécute (`rowsAffected=1` → `"OK"`, verrou acquis) ;
+  si une entrée encore valide existe, la clause `WHERE` bloque l'UPDATE
+  (`rowsAffected=0` → `null`, verrou refusé, même valeur falsy que le `null`
+  renvoyé par Redis sur un SET NX raté) — comportement documenté de SQLite
+  (upsert-clause), et une base libSQL/Turso sérialise les écritures sur UNE
+  MÊME ligne côté serveur (pas de fenêtre de course entre 2 requêtes HTTP
+  concurrentes sur la même clé) : cette émulation est atomique dans les
+  faits, pas seulement en apparence — mais JAMAIS vérifiée contre une vraie
+  base Turso (voir honnêteté plus bas).
+  Détail technique notable : le pipeline Redis (`kv.pipeline().set(...).
+  get(...).srem(...).exec({keepErrors:true})`, utilisé pour grouper plusieurs
+  écritures/lecture en 1 seul aller-retour) est émulé via `client.batch([...],
+  'write')` de `@libsql/client` — même principe (1 aller-retour HTTP au lieu
+  de N), les résultats sont réinterprétés dans le même format `{result,
+  error}` qu'Upstash pour que TOUT LE RESTE de `index.js` fonctionne SANS
+  AUCUNE MODIFICATION (un seul point de bascule, `createKv(env)`, plutôt que
+  de retoucher individuellement chacun des ~30 call-sites `kv.xxx(...)` du
+  fichier — minimise drastiquement le risque d'introduire un bug de
+  réécriture manuelle sur un fichier aussi sensible). `ltrim`/`expire` ne
+  supportent QUE les motifs réellement utilisés dans `index.js` (vérifié par
+  grep : `ltrim` toujours en `(-N, -1)` "garder les N derniers", `expire`
+  toujours sur une file jamais une clé simple) — pas de généralité Redis
+  complète prétendue à tort, juste ce qui est vraiment appelé.
+  Effet de bord positif découvert en cours de route : `api/debug-push.js`
+  (diagnostic protégé par `CRON_SECRET`) lisait directement `cron:goals:
+  lastRun`/`lastResult`/`logHistory` depuis Redis — ces 3 clés auraient
+  disparu silencieusement de Redis une fois le Worker basculé sur Turso,
+  rendant ce diagnostic inutilisable sans que rien ne le signale. Corrigé :
+  `src/utils/tursoCache.js` étendu avec `getWorkerKv()`/`getWorkerQueueAll()`
+  (lecture seule des tables `worker_kv`/`worker_queue` du Worker, MÊME base
+  Turso, ne les crée jamais — c'est le Worker qui le fait) ; `api/debug-
+  push.js` lit désormais Turso EN PRIORITÉ puis Redis en repli (jamais les
+  deux à la fois, pas de double-comptage) pour ces 3 clés précises, avec un
+  champ `source` explicite dans la réponse JSON pour savoir laquelle a
+  effectivement répondu.
+  Vérification AVANT déploiement, plus poussée que d'habitude pour ce fichier
+  vu l'enjeu (notifications push en production) : 370 tests + lint (4
+  fichiers touchés, clean) + build inchangés — ET, nouveau pour `cf-worker/`,
+  `npx wrangler deploy --dry-run --outdir=...` exécuté avec succès (confirme
+  que `@libsql/client/web` se résout et se bundle correctement dans ce
+  projet, qu'aucune erreur de syntaxe n'existe dans l'un des ~30 points de
+  réécriture, et — vérifié explicitement par grep du bundle généré — qu'AUCUN
+  module Node-only (`node:net`/`fs`/`tls`, qui planteraient au runtime sur
+  Cloudflare Workers même si le build réussit) ne s'est glissé dans le
+  bundle final malgré l'import `/web`). C'est la vérification la plus poussée
+  possible depuis cet environnement, mais ce n'est PAS un test d'exécution
+  réelle.
+  Honnêteté, sans détour : ce fichier (le câblage le plus sensible de toute
+  l'app — notifications push en direct) n'a PU ÊTRE TESTÉ CONTRE AUCUNE VRAIE
+  BASE TURSO ni exécuté ne serait-ce qu'une fois sur le vrai runtime
+  Cloudflare Workers depuis cet environnement (aucun accès réseau sortant
+  arbitraire dans ce sandbox, aucun accès `wrangler`/déploiement — mêmes
+  limites déjà documentées pour `tursoCache.js` le 01/10). Le dry-run
+  ci-dessus est un vrai filet (il aurait attrapé une erreur d'import/syntaxe/
+  module Node-only) mais ne prouve PAS que la logique SQL (notamment
+  l'émulation NX) se comporte exactement comme prévu une fois exécutée pour
+  de vrai contre une base Turso distante, ni que les performances/latences
+  restent compatibles avec le budget CPU Workers (10ms/exécution, déjà source
+  d'incidents passés — voir `FINAL_SAFE_THRESHOLD`/`SUBREQUEST_SAFE_LIVE_
+  THRESHOLD` plus haut dans ce fichier). Recommandation forte à l'utilisateur
+  avant de considérer ce chantier "fini" : (1) ajouter `TURSO_DATABASE_URL`/
+  `TURSO_AUTH_TOKEN` comme secrets Cloudflare (`wrangler secret put`, mêmes
+  valeurs que côté Vercel) PUIS `npm run deploy` depuis `cf-worker/` ; (2)
+  surveiller `npm run tail` et/ou `/api/debug-push?secret=...` sur les
+  premières minutes/heures, en particulier pendant un vrai match en direct
+  (le seul moment où les verrous but/carton/KO/FT sont réellement exercés) ;
+  (3) si un doublon ou une absence de notif est constaté, le retrait immédiat
+  des 2 secrets Cloudflare (`wrangler secret delete TURSO_DATABASE_URL` /
+  `TURSO_AUTH_TOKEN`) fait retomber ce Worker sur Redis au redéploiement
+  suivant, sans toucher au code — un vrai filet de secours existe, pas besoin
+  de revert Git dans l'urgence.
 
 ## Conventions
 - Noms français partout dans l'UI

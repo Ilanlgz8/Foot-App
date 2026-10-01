@@ -11,6 +11,7 @@
 import { Redis }  from '@upstash/redis'
 import webpush    from 'web-push'
 import crypto     from 'crypto'
+import { isTursoConfigured, getWorkerKv, getWorkerQueueAll } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -85,9 +86,14 @@ export default async function handler(req, res) {
   // expiré...) — cause plausible de "je ne reçois plus aucune notif de but"
   // qu'aucun log applicatif ne peut révéler puisque le cron externe
   // n'atteint alors même pas ce serveur.
+  // ⚠️ Turso (01/10, voir cf-worker/src/tursoKv.js) : si le Worker Cloudflare
+  // a basculé son état sur Turso, cron:goals:lastRun/lastResult n'existent
+  // plus dans Redis — lu en PRIORITÉ depuis Turso (worker_kv, même base,
+  // table différente — voir getWorkerKv), repli sur Redis pour ne rien casser
+  // pendant la transition (ou si le Worker reste sur Redis, cas par défaut).
   try {
-    const lastRun    = await kv.get('cron:goals:lastRun')
-    const lastResult = await kv.get('cron:goals:lastResult')
+    const lastRun    = (await getWorkerKv('cron:goals:lastRun'))    ?? (await kv.get('cron:goals:lastRun'))
+    const lastResult = (await getWorkerKv('cron:goals:lastResult')) ?? (await kv.get('cron:goals:lastResult'))
     const parsedResult = lastResult
       ? (typeof lastResult === 'string' ? JSON.parse(lastResult) : lastResult)
       : null
@@ -100,6 +106,7 @@ export default async function handler(req, res) {
       // n'appelle probablement plus cet endpoint.
       stale:       ageSec == null || ageSec > 180,
       lastResult:  parsedResult,
+      source:      isTursoConfigured() ? 'turso (repli redis si absent)' : 'redis',
     }
   } catch (e) {
     info.cron = { reachable: false, error: e.message }
@@ -112,7 +119,8 @@ export default async function handler(req, res) {
   // pour ne pas avoir à lire des milliers de lignes toutes compétitions
   // confondues.
   try {
-    const raw = (await kv.lrange('cron:goals:logHistory', 0, -1)) ?? []
+    const tursoRaw = await getWorkerQueueAll('cron:goals:logHistory')
+    const raw = tursoRaw.length > 0 ? tursoRaw : ((await kv.lrange('cron:goals:logHistory', 0, -1)) ?? [])
     // ⚠️ BUG CORRIGÉ : filtre sensible à la casse (l.includes(filter)) — les
     // noms d'équipe dans les logs viennent d'ESPN, toujours avec majuscule
     // ("France", "Paraguay"...), donc chercher "france" en minuscule ne

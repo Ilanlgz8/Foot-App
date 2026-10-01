@@ -21,3 +21,11 @@ crons = ["* * * * *"]
 #   KV_REST_API_TOKEN   — idem
 #   CRON_SECRET         — même valeur que la variable Vercel CRON_SECRET
 #   VERCEL_NOTIFY_URL    — ex: https://statfootix.vercel.app/api/cron-goals
+#   TURSO_DATABASE_URL  — optionnel (01/10) : MÊMES valeurs que les variables
+#   TURSO_AUTH_TOKEN      Vercel du même nom (même base Turso `statfootix`,
+#                         tables différentes — voir src/tursoKv.js). Si
+#                         présentes, TOUT l'état Redis de ce Worker (y
+#                         compris les verrous anti-doublon but/carton/KO/FT)
+#                         bascule sur Turso. Si absentes, repli intégral et
+#                         silencieux sur Redis (KV_REST_API_URL/TOKEN
+#                         ci-dessus) — comportement strictement inchangé.

@@ -38,6 +38,7 @@
 // Vercel (KV_REST_API_URL / KV_REST_API_TOKEN) : c'est LE MÊME Redis, partagé.
 
 import { Redis } from '@upstash/redis'
+import { createTursoKv } from './tursoKv.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
 import { ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS } from '../../src/data/espnSlugs.js'
 // ⚠️ Toutes ces fonctions étaient dupliquées ici ET dans api/cron-goals.js —
@@ -1539,8 +1540,28 @@ function shouldSendLiveTicker() {
 // tant qu'aucune réduction fiable du coût par match n'est trouvée d'abord
 // (ex: grouper les écritures but/carton restantes en pipeline, comme déjà
 // fait pour les lectures).
+// ⚠️ MIGRATION TURSO (01/10, demande explicite utilisateur : "un max de truc
+// sur turso pour alleger upstach") : ce Worker tourne 1x/minute 24h/24 —
+// c'est le plus gros poste FIXE de commandes Upstash de toute l'app. Bascule
+// conditionnelle, même principe que src/utils/tursoCache.js côté Vercel : si
+// TURSO_DATABASE_URL/TURSO_AUTH_TOKEN sont configurées comme secrets
+// Cloudflare (`wrangler secret put`, voir wrangler.toml), TOUT l'état de ce
+// fichier (y compris les verrous anti-doublon but/carton/KO/FT) passe par
+// tursoKv.js au lieu de Redis — sinon repli intégral et silencieux sur Redis,
+// comportement strictement inchangé. Les 2 bases Turso (scoreboard ESPN côté
+// Vercel, état de ce Worker) peuvent être LA MÊME base `statfootix` — tables
+// différentes (`worker_kv`/`worker_set`/`worker_queue` ici vs `espn_cache`
+// côté Vercel), aucune collision.
+function createKv(env) {
+  if (env.TURSO_DATABASE_URL && env.TURSO_AUTH_TOKEN) {
+    const tursoKv = createTursoKv({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN })
+    if (tursoKv) return tursoKv
+  }
+  return new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN })
+}
+
 async function handlePass(env) {
-  const kv = new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN })
+  const kv = createKv(env)
   env._kv = kv
   const writeBookkeeping = shouldWriteDebugBookkeeping()
   if (writeBookkeeping) {
