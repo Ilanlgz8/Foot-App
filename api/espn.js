@@ -183,8 +183,25 @@ const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pa
 // consulté — "résultats récents"/"forme récente" classique) garde son
 // cache 24h inchangé, pas de risque de servir une donnée räisonnablement
 // datée pour ce qui est réellement consulté souvent.
-const SCOREBOARD_PAST_CHUNK_TTL      = 24 * 60 * 60      // 24h — passé récent (≤10j)
-const SCOREBOARD_OLD_PAST_CHUNK_TTL  = 90 * 24 * 60 * 60 // 90j — passé ancien, totalement figé
+//
+// ⚠️ ENCORE RALLONGÉ (constat utilisateur, 01/10, juste après le fix 24h→90j
+// ci-dessus — "pourquoi on garde pas en cache les données des match terminé
+// longtemps vu que ça bougera pas, à part quand l'équipe rejoue ça s'ajoute")
+// : remarque juste — même 90 jours restait arbitrairement court pour une
+// donnée qui ne change structurellement JAMAIS (chaque jour est une clé de
+// cache séparée, `espn:sb:{comp}:{YYYYMMDD}` — un nouveau match ne touche
+// jamais les anciennes clés, c'est déjà 100% additif par construction, pas de
+// "recalcul en bloc"). La seule vraie raison de ne pas le garder indéfiniment
+// est le cas rare d'une correction tardive (décision disciplinaire, forfait
+// requalifié après coup, review VAR a posteriori) — un risque minime comparé
+// au coût de tout réécrire en boucle tous les 90 jours pour rien. Remonté à
+// 365 jours (quasi permanent en pratique) : un match vieux de plus de 10
+// jours ne sera revérifié qu'une fois par an au pire, au lieu de tous les 3
+// mois — élimine la quasi-totalité du coût de réécriture résiduel identifié
+// le 01/10, tout en gardant un filet (pas un cache littéralement infini qui
+// ne purgerait jamais une compétition retirée un jour de ALLOWED_SLUGS).
+const SCOREBOARD_PAST_CHUNK_TTL      = 24 * 60 * 60       // 24h — passé récent (≤10j)
+const SCOREBOARD_OLD_PAST_CHUNK_TTL  = 365 * 24 * 60 * 60 // 365j — passé ancien, quasi permanent
 const SCOREBOARD_PAST_RECENT_DAYS    = 10
 const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
 
