@@ -11,16 +11,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="StatFootix" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Bebas Neue (02/09) : police d'affiche du "Match du jour" — utilisée
-         pour le VS ET le score/heure de la carte hero uniquement. Un seul
-         chargement pour les deux, choisi pour ça : c'est la référence des
-         affiches de match (condensée display), elle monte plus haut donc le
-         score paraît plus imposant à taille de carte égale, et elle reste
-         élancée là où une grasse type Anton devient massive sur un score à
-         deux chiffres. Un seul graisse dispo, donc coût réseau minimal. -->
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Archivo:wght@700;900&family=Archivo+Black&family=Orbitron:wght@700&family=Russo+One&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <!-- ⚠️ RETIRÉ (01/10, dépendance Google Fonts externe) : ce <link> a été
+         remplacé par src/fonts.js (polices auto-hébergées via les packages
+         npm @fontsource/*, voir son commentaire d'en-tête pour le détail) —
+         constat utilisateur que le problème de police qui bascule sur le
+         repli système (cotes/heure Match du jour) persistait malgré 2
+         correctifs précédents (29/09) qui dépendaient encore d'un aller-
+         retour réseau vers fonts.googleapis.com/fonts.gstatic.com au moment
+         de la réparation. Les polices font maintenant partie du build Vite
+         lui-même, précachées par vite-plugin-pwa dans le même précache que
+         le reste de l'app (JS/CSS) — plus aucune dépendance réseau externe
+         à l'exécution. Bebas Neue (02/09, voir l'historique) : police
+         d'affiche du "Match du jour", utilisée pour le VS ET le score/heure
+         de la carte hero — toujours chargée via @fontsource/bebas-neue
+         désormais. -->
   </head>
   <body>
     <div id="root"></div>

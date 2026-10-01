@@ -2952,6 +2952,53 @@ cf-worker/
   suivant, sans toucher au code — un vrai filet de secours existe, pas besoin
   de revert Git dans l'urgence.
 
+- ✅ Polices (cotes/heure Match du jour en repli système) : ROOT FIX structurel,
+  abandon de Google Fonts au profit de polices auto-hébergées (01/10, constat
+  utilisateur "j'ai encore le problème" malgré 2 correctifs le 29/09 —
+  `document.fonts.load()` sur visibilitychange/pageshow/montage/intervalle
+  2min, puis renommage du cache Workbox `google-fonts`→`google-fonts-v2`).
+  Les 2 fixes précédents réduisaient le risque mais dépendaient encore d'un
+  aller-retour réseau vers `fonts.googleapis.com`/`fonts.gstatic.com` au
+  moment précis de la réparation — si cette ressource externe traîne/échoue
+  à cet instant (reprise d'arrière-plan, réseau capricieux), la réparation
+  elle-même peut échouer, ce qui correspond exactement à la persistance du
+  symptôme malgré ces 2 fixes. Plutôt qu'une 3e théorie sur CE mécanisme,
+  retrait de la dépendance externe elle-même : les 6 familles (Chakra Petch,
+  Archivo, Archivo Black, Orbitron, Russo One, Bebas Neue) sont désormais
+  chargées via les packages npm `@fontsource/*` (nouveau fichier
+  `src/fonts.js`, importé en tout premier dans `main.jsx`) au lieu du
+  `<link>` Google Fonts retiré d'`index.html` — mêmes polices, mêmes
+  graisses, juste distribuées en WOFF2 par npm/Vite au lieu du CDN Google.
+  Conséquence structurelle : les fichiers de police deviennent des assets du
+  build Vite comme n'importe quel autre (JS/CSS/images), précachés
+  automatiquement par vite-plugin-pwa dans LE MÊME précache que le reste du
+  shell applicatif — garanti disponible offline avec la même fiabilité que
+  le code de l'app, plus aucune dépendance réseau externe à l'exécution.
+  Résultat : la règle de cache Workbox dédiée (`google-fonts-v2`,
+  `vite.config.js`) devenue inutile est retirée ; `document.fonts.load()`
+  (`App.jsx`, toujours en place, filet contre une éventuelle éviction
+  mémoire WebKit après mise en arrière-plan) ne peut plus jamais échouer par
+  lenteur/indisponibilité réseau externe, la police est toujours déjà
+  présente localement. Optimisation complémentaire : sous-ensembles unicode
+  limités à `latin`+`latin-ext` par import (au lieu du fichier combiné qui
+  inclut aussi cyrillique/vietnamien/thaï) — couvre tous les noms d'équipes/
+  joueurs européens et sud-américains de l'app sans charger ~100 Ko de
+  polices pour des écritures jamais affichées ici (précache réduit de
+  516 Ko à 412 Ko rien que pour les polices, vérifié par mesure réelle des
+  fichiers générés avant/après). 370 tests + lint (33 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés (fichiers de police confirmés
+  présents dans `dist/assets/` et dans le précache PWA généré). Honnêteté :
+  je n'ai toujours aucun accès à un vrai iPhone/PWA depuis cet environnement
+  pour confirmer que ça règle définitivement le symptôme — mais contrairement
+  aux 2 tentatives précédentes (qui corrigeaient un mécanisme de réparation
+  tout en gardant la dépendance externe qui pouvait le faire échouer), ce
+  changement retire structurellement cette dépendance : la classe de bug
+  "réparation échoue car le réseau externe est indisponible/lent au mauvais
+  moment" ne peut plus se produire par construction, ce qui est une garantie
+  plus forte qu'un correctif supplémentaire sur le mécanisme de réparation
+  lui-même — à confirmer par l'utilisateur sur son téléphone après ce
+  déploiement (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

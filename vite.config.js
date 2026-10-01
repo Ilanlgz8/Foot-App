@@ -114,55 +114,17 @@ export default defineConfig(({ mode }) => {
                 cacheableResponse: { statuses: [0, 200] },
               },
             },
-            // Fonts Google → cache long, jamais de fetch inutile
-            // ⚠️ BUG CORRIGÉ (constat utilisateur, 29/09 : cotes plus "en gras
-            // comme avant" — Russo One tombé en repli sans-serif fin — et
-            // heure du "Match du jour" dans une police différente — Orbitron
-            // tombé en repli) : `maxEntries: 10` était BEAUCOUP trop bas pour
-            // ce que cette règle doit réellement mettre en cache. 6 familles
-            // (Chakra Petch 2 graisses, Archivo 2 graisses, Archivo Black,
-            // Orbitron, Russo One, Bebas Neue = 8 combos famille+graisse) sont
-            // demandées en UNE seule requête CSS2 — Google Fonts répond avec
-            // UN bloc @font-face PAR combo ET par sous-ensemble unicode (latin/
-            // latin-ext/vietnamese/…, généralement 3 à 6 par graisse) : entre
-            // ~25 et ~45 fichiers de police réels + la feuille CSS elle-même,
-            // largement plus que 10. Workbox (ExpirationPlugin) purge les
-            // entrées les plus anciennes dès que ce plafond est dépassé — donc
-            // des polices déjà utilisées (ex. Orbitron, Russo One) pouvaient
-            // se faire éjecter du cache par l'arrivée d'un sous-ensemble plus
-            // récent (ex. un caractère spécial déclenchant le fetch du
-            // sous-ensemble "vietnamese"), contredisant directement l'intention
-            // du commentaire d'origine ("cache long, jamais de fetch inutile").
-            // Une fois évincé, un refetch réseau est retenté au prochain besoin
-            // — s'il échoue ou traîne (reprise d'arrière-plan, réseau capricieux),
-            // le texte reste sur son repli système (sans-serif fin pour Russo
-            // One, très différent visuellement). Remonté à 60 (marge large et
-            // volontairement généreuse au-delà du besoin actuel measuré) pour
-            // que TOUS les fichiers de ces 6 familles restent en cache pendant
-            // toute la durée de `maxAgeSeconds` (1 an), sans jamais purger une
-            // police encore utilisée activement par l'app.
-            // ⚠️ CORRECTIF COMPLÉMENTAIRE (même jour, retour utilisateur "tu vois
-            // bien que ça n'a rien changé" après déploiement du fix ci-dessus) :
-            // remonter `maxEntries` ne répare RIEN rétroactivement — l'ancien
-            // cache Workbox nommé `google-fonts`, déjà tronqué à 10 entrées chez
-            // les utilisateurs déjà affectés, restait actif tel quel (Workbox
-            // réutilise un cache existant par son nom, il ne le vide jamais tout
-            // seul juste parce que la config change) : les polices déjà éjectées
-            // AVANT ce déploiement restaient éjectées, un simple relèvement du
-            // plafond n'empêche que de FUTURES évictions, pas de restaurer les
-            // fichiers déjà perdus. Renommé `google-fonts` → `google-fonts-v2`
-            // pour forcer Workbox à traiter ça comme un cache TOUT NEUF : un
-            // premier accès à chaque police repart du réseau (comme au tout
-            // premier chargement de l'app), puis reste cette fois dans un cache
-            // à 60 entrées qui ne le purgera plus. L'ancien cache `google-fonts`
-            // (orphelin) est supprimé automatiquement par `cleanupOutdatedCaches`
-            // (déjà activé plus haut dans ce fichier) au prochain contrôle du
-            // service worker.
-            {
-              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: { cacheName: 'google-fonts-v2', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-            },
+            // ⚠️ RÈGLE RETIRÉE (01/10) : les polices Google Fonts ne sont plus
+            // chargées depuis fonts.googleapis.com/fonts.gstatic.com (voir
+            // l'historique complet de ce problème dans CLAUDE.md, 29/09 — 2
+            // correctifs sur ce cache Workbox n'ont pas suffi, le symptôme
+            // persistait côté utilisateur). Remplacées par des polices
+            // auto-hébergées via les packages npm @fontsource/* (voir
+            // src/fonts.js) — elles font maintenant partie du build Vite
+            // lui-même, précachées automatiquement par vite-plugin-pwa dans
+            // le précache principal de l'app (même garantie de fiabilité que
+            // le JS/CSS), plus aucune dépendance réseau externe à
+            // l'exécution ni de cache Workbox séparé à gérer pour elles.
             // ⚠️ AJOUT (constat utilisateur : "les crest se rechargent à chaque
             // fois qu'on change de page, ça met parfois plusieurs secondes à
             // réapparaître") : blasons de clubs (crests.football-data.org),
