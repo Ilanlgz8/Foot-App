@@ -3041,6 +3041,36 @@ cf-worker/
   0ms ; à confirmer par l'utilisateur sur son prochain cache à froid (ex.
   après un futur déploiement, ou en pleine trêve internationale).
 
+- ✅ Polling forme récente ESPN gaté par activité réelle, même jour (01/10,
+  retour utilisateur immédiat après le fix ci-dessus : "faudrait juste
+  regarder les championnats actifs d'abord en premier et ensuite ce qui sont
+  pas joué [...] comme ça on gaspille pas de requêtes débiles pour rien") —
+  remarque juste : le polling borné (15s × 8 cycles) ajouté juste avant
+  s'appliquait UNIFORMÉMENT aux 8 comps ESPN-only, y compris CAN/COPA
+  (tournois biennaux, inactifs la quasi-totalité du temps) et TDC/CS/USC (1
+  seul match/an) — sonder ESPN 8 fois de suite pour une compétition qui n'a
+  structurellement rien de nouveau à offrir est exactement le gaspillage
+  visé. Corrigé (`useTeamForm.js`, `formRefetchIntervalFor`) : la fonction
+  react-query inspecte désormais `query.state.data.matches` à chaque cycle
+  (déjà disponible, aucun fetch supplémentaire) — si AUCUN match ne tombe
+  dans une fenêtre de ±20j autour d'aujourd'hui (`ESPN_FORM_ACTIVE_WINDOW_MS`,
+  large marge au-delà d'un cycle de trêve internationale classique), la
+  compétition est jugée dormante et le polling s'arrête dès ce 1er cycle au
+  lieu d'aller jusqu'à 8 — repose sur le fait que `MAX_FETCH_CHUNKS`
+  (`api/espn.js`) trie déjà les tranches les plus proches d'aujourd'hui en
+  priorité, donc un match récent/imminent apparaît toujours dès la 1re
+  réponse si la compétition est réellement active. `staleTime` (15s) reste
+  inchangé pour les 8 comps dans tous les cas — seul le SONDAGE AUTOMATIQUE
+  en tâche de fond s'arrête pour les dormantes, qui retombent sur un simple
+  refetch au remount/re-render (comportement normal). 370 tests + lint
+  (clean) + build vérifiés. Honnêteté : la fenêtre ±20j est un choix de
+  raisonnement (pas mesurée empiriquement sur tous les calendriers UEFA/CAF/
+  CONMEBOL réels) — un cycle de trêve internationale fait généralement
+  ~1 mois, 20j de marge de chaque côté couvre confortablement ce rythme sans
+  non plus laisser polluer indéfiniment une compétition vraiment dormante ;
+  à ajuster si une compétition active se retrouve à tort classée dormante
+  (polling coupé trop tôt) ou l'inverse.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

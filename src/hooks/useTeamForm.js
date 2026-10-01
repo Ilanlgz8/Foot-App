@@ -73,17 +73,54 @@ const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'TD
 const ESPN_FORM_STALE = 1000 * 15  // 15s (comps ESPN-only, jamais FD.org — aucun risque de suspension)
 const ESPN_FORM_POLL_MAX_ATTEMPTS = 8  // couvre le pire cas ~460j / 60 tranches par cycle (MAX_FETCH_CHUNKS, api/espn.js)
 
+// ⚠️ AJOUT (01/10, même jour, retour utilisateur juste après le fix ci-dessus
+// : "faudrait juste regarder les championnats actifs d'abord en premier et
+// ensuite ce qui sont pas joué [...] comme ça on gaspille pas de requêtes
+// débiles pour rien") : le polling borné ci-dessus (15s × 8 cycles) a un sens
+// pour une compétition qui VIENT de jouer ou va bientôt rejouer (ex. Ligue
+// des Nations en pleine trêve internationale, là où la convergence rapide a
+// une vraie utilité) — mais CAN/COPA (tournois biennaux, pas en cours la
+// plupart du temps) ou TDC/CS/USC (1 seul match/an, joué puis plus rien
+// pendant ~11 mois) sont "dormantes" l'essentiel du temps : continuer à
+// sonder ESPN toutes les 15s pendant 8 cycles pour une compétition qui n'a
+// RIEN de nouveau à offrir est exactement le gaspillage que l'utilisateur
+// pointe. Détection "active" sans fetch supplémentaire — basée sur la toute
+// première réponse déjà reçue (le plafond MAX_FETCH_CHUNKS d'api/espn.js
+// trie déjà les tranches les plus PROCHES d'aujourd'hui en priorité, voir son
+// commentaire — donc si un match récent/imminent existe, il apparaît dès le
+// 1er cycle) : si aucun match de `compMatches` ne tombe dans une fenêtre de
+// ±20j autour d'aujourd'hui (large marge au-delà d'un cycle de trêve
+// internationale classique, ~1 mois entre 2 journées), la compétition est
+// considérée dormante et le polling s'arrête dès ce 1er cycle au lieu
+// d'aller jusqu'à 8 — elle retombe sur le comportement normal (refetch au
+// remount/re-render, staleTime 15s toujours appliqué, juste sans sondage
+// automatique en tâche de fond).
+const ESPN_FORM_ACTIVE_WINDOW_MS = 20 * 24 * 3600 * 1000  // ±20j
+
 function formStaleFor(comp) {
   return ESPN_SOURCED_FORM_COMPS.has(comp) ? ESPN_FORM_STALE : FORM_STALE
 }
 
 // `false` pour les comps FD.org (aucun polling, comportement inchangé) ; pour
 // les 8 comps ESPN-only, une fonction (API react-query v5) qui s'auto-arrête
-// après ESPN_FORM_POLL_MAX_ATTEMPTS mises à jour réussies — jamais un
-// polling permanent.
+// après ESPN_FORM_POLL_MAX_ATTEMPTS mises à jour réussies OU dès qu'un cycle
+// ne montre aucune activité récente/imminente (compétition dormante) — jamais
+// un polling permanent ni un sondage "pour rien" sur une compétition hors
+// saison.
 function formRefetchIntervalFor(comp) {
   if (!ESPN_SOURCED_FORM_COMPS.has(comp)) return false
-  return query => (query.state.dataUpdateCount >= ESPN_FORM_POLL_MAX_ATTEMPTS ? false : ESPN_FORM_STALE)
+  return query => {
+    if (query.state.dataUpdateCount >= ESPN_FORM_POLL_MAX_ATTEMPTS) return false
+    const matches = query.state.data?.matches
+    // Pas encore de donnée (tout 1er cycle) : on sonde, on ne peut pas encore
+    // savoir si c'est actif ou dormant.
+    if (!matches) return ESPN_FORM_STALE
+    const hasRecentOrUpcoming = matches.some(m => {
+      const t = Date.parse(m.utcDate)
+      return Number.isFinite(t) && Math.abs(Date.now() - t) <= ESPN_FORM_ACTIVE_WINDOW_MS
+    })
+    return hasRecentOrUpcoming ? ESPN_FORM_STALE : false
+  }
 }
 
 // Un seul fetch "saison" FD.org (season explicite optionnel) → matchs FINISHED
