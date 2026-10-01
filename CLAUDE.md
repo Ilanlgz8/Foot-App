@@ -2647,6 +2647,28 @@ cf-worker/
   connu) plutôt que mesuré empiriquement — à ajuster si un besoin de récupérer une correction très
   ancienne se présentait un jour (cas extrêmement rare).
 
+- ✅ TTL passé ancien encore rallongé 90j→365j, même sujet, le jour même (01/10, remarque juste de
+  l'utilisateur juste après le fix ci-dessus : "pourquoi on garde pas en cache les données des
+  match terminé pour la forme recente etc en cache longtemps vu que ça bougera pas a part des que
+  l'equipe rejoue un match la ça va s'ajouter au donnée en cache tu vois ce que je veux dire") —
+  remarque techniquement juste, qui a mis le doigt sur le fait que même 90 jours restait arbitraire
+  pour une donnée structurellement IMMUABLE : chaque jour est une clé de cache séparée
+  (`espn:sb:{competition}:{YYYYMMDD}`) — un nouveau match d'une équipe ne touche JAMAIS les
+  anciennes clés, c'est déjà 100% additif par construction (confirmé en lisant `splitScoreboardRange`/
+  `fetchScoreboardChunk`), pas un "recalcul en bloc" qui justifierait une réécriture périodique.
+  Seule vraie raison de ne pas garder indéfiniment : le cas rare d'une correction tardive (décision
+  disciplinaire, forfait requalifié après coup, review a posteriori) — risque minime comparé au
+  coût de tout réécrire en boucle tous les 90 jours pour rien. Remonté (`api/espn.js`,
+  `SCOREBOARD_OLD_PAST_CHUNK_TTL`) à 365 jours (quasi permanent en pratique, pas littéralement
+  infini — garde un filet pour qu'une compétition un jour retirée de `ALLOWED_SLUGS` ne laisse pas
+  une clé orpheline en Redis pour toujours). Le passé RÉCENT (≤10j) garde son cache 24h inchangé,
+  seul le passé déjà vieux de plus de 10 jours est concerné. 370 tests + lint + build vérifiés.
+  Honnêteté : même limite que le fix précédent — aucun accès au dashboard Upstash depuis cet
+  environnement pour confirmer après coup la baisse réelle du rythme de commandes, seule
+  l'utilisateur peut l'observer sur les prochains jours ; 365j reste un choix de raisonnement
+  (marge large sur le délai de correction disciplinaire le plus tardif connu), pas une valeur
+  mesurée empiriquement sur un vrai cas de correction tardive survenu dans ce projet.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
