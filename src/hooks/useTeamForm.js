@@ -47,6 +47,45 @@ const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 // 16/08 — seule cette liste n'avait pas été mise à jour en même temps.
 const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'TDC', 'CS', 'USC'])
 
+// ⚠️ AJOUT (01/10, demande explicite utilisateur après un push Vercel qui a
+// réinitialisé le cache ESPN sporadique — "nn 5 a 10min c beaucoup trop
+// normalement ça devrait etre instantané enft") : FORM_STALE (2min) protège
+// football-data.org d'un risque de suspension bien réel et documenté (voir
+// l'historique de ce fichier/CLAUDE.md) — mais les 8 compétitions ci-dessus
+// ne tapent JAMAIS FD.org (voir fetchTeamForm plus bas, branche ESPN), ce
+// risque ne les concerne donc pas. Leur lenteur de convergence après un
+// cache à froid vient d'ailleurs : la fenêtre glissante élargie à 400j/60j
+// (espnAdapter.js, fix du 29/09) + le plafond MAX_FETCH_CHUNKS=60
+// tranches/requête (api/espn.js, fix du 30/09, anti-pic CPU) imposent
+// jusqu'à ~8 cycles de requête pour couvrir toute la fenêtre à froid — avec
+// l'ancien staleTime de 2min partagé, ça pouvait prendre jusqu'à ~16min
+// dans le pire cas, et seulement SI l'utilisateur redéclenche une requête
+// entre-temps (pas de polling auto, juste refetch au remount/re-render une
+// fois la donnée périmée). Pour CES 8 comps spécifiquement : staleTime bien
+// plus court (15s, ne coûte jamais FD.org, juste des requêtes /api/espn déjà
+// cache-first côté serveur — la quasi-totalité des cycles retombent sur du
+// cache déjà chaud, coût réel minime) + un vrai polling borné
+// (refetchInterval 15s, STOP après ESPN_FORM_POLL_MAX_ATTEMPTS cycles) pour
+// que la convergence se fasse automatiquement, sans dépendre d'une
+// navigation de l'utilisateur — plus proche de "instantané" (quelques
+// dizaines de secondes à ~2min dans le pire cas) tout en restant borné dans
+// le temps (pas de polling infini une fois les données déjà synchronisées).
+const ESPN_FORM_STALE = 1000 * 15  // 15s (comps ESPN-only, jamais FD.org — aucun risque de suspension)
+const ESPN_FORM_POLL_MAX_ATTEMPTS = 8  // couvre le pire cas ~460j / 60 tranches par cycle (MAX_FETCH_CHUNKS, api/espn.js)
+
+function formStaleFor(comp) {
+  return ESPN_SOURCED_FORM_COMPS.has(comp) ? ESPN_FORM_STALE : FORM_STALE
+}
+
+// `false` pour les comps FD.org (aucun polling, comportement inchangé) ; pour
+// les 8 comps ESPN-only, une fonction (API react-query v5) qui s'auto-arrête
+// après ESPN_FORM_POLL_MAX_ATTEMPTS mises à jour réussies — jamais un
+// polling permanent.
+function formRefetchIntervalFor(comp) {
+  if (!ESPN_SOURCED_FORM_COMPS.has(comp)) return false
+  return query => (query.state.dataUpdateCount >= ESPN_FORM_POLL_MAX_ATTEMPTS ? false : ESPN_FORM_STALE)
+}
+
 // Un seul fetch "saison" FD.org (season explicite optionnel) → matchs FINISHED
 // côté client (status=FINISHED non supporté par le free tier sur certains
 // endpoints). Factorisé pour être réutilisé par la saison en cours ET le
@@ -363,7 +402,11 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
     // plan normalement, la donnée affichée se met à jour dès qu'il réussit.
     initialData:          readCacheStale(cacheKey) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(cacheKey),
-    staleTime:            FORM_STALE,
+    staleTime:            formStaleFor(selectedComp),
+    // Voir le commentaire de ESPN_FORM_STALE/formRefetchIntervalFor plus haut
+    // — polling borné UNIQUEMENT pour les 8 comps ESPN-only, `false` (aucun
+    // changement de comportement) pour toutes les autres.
+    refetchInterval:      formRefetchIntervalFor(selectedComp),
     retry:                2,
     retryDelay:           attempt => Math.min(1000 * 2 ** attempt, 15_000)
   })
@@ -413,7 +456,7 @@ export function prefetchTeamForm(queryClient, selectedComp) {
       writeCache(cacheKey, result, FORM_STALE)
       return result
     },
-    staleTime: FORM_STALE,
+    staleTime: formStaleFor(selectedComp),
   })
 }
 
@@ -456,7 +499,11 @@ export function useTeamFormMulti(compCodes) {
         // vide dès qu'un 429 FD.org tombe pile sur le tout premier fetch).
         initialData:          readCacheStale(cacheKey) ?? undefined,
         initialDataUpdatedAt: getCacheSavedAt(cacheKey),
-        staleTime:            FORM_STALE,
+        staleTime:            formStaleFor(code),
+        // Voir le commentaire de ESPN_FORM_STALE/formRefetchIntervalFor plus
+        // haut dans ce fichier — polling borné uniquement pour les 8 comps
+        // ESPN-only (NL/CAN/COPA/UEL/UECL/TDC/CS/USC).
+        refetchInterval:      formRefetchIntervalFor(code),
         retry:                2,
         retryDelay:           attempt => Math.min(1000 * 2 ** attempt, 15_000),
       }

@@ -2999,6 +2999,48 @@ cf-worker/
   lui-même — à confirmer par l'utilisateur sur son téléphone après ce
   déploiement (automatique via Vercel).
 
+- ✅ "Forme récente"/"stats saison" encore lentes à converger après un cache à
+  froid pour les 8 comps ESPN-only (retour utilisateur ferme, 01/10, après un
+  premier essai de réchauffage manuel : "nn 5 a 10min c beaucoup trop
+  normalement ça devrait etre instantané enft") : root cause déjà identifiée
+  dans une entrée précédente de ce fichier (même jour) — la fenêtre glissante
+  élargie à 400j/60j pour NL/CAN/COPA/UEL/UECL/TDC/CS/USC (`espnAdapter.js`,
+  fix du 29/09) + le plafond `MAX_FETCH_CHUNKS=60` tranches/requête
+  (`api/espn.js`, fix du 30/09, anti-pic CPU) imposent jusqu'à ~8 cycles de
+  requête pour couvrir toute la fenêtre à froid — mais `FORM_STALE` (2min,
+  `useTeamForm.js`) était partagé avec les compétitions football-data.org,
+  où cette valeur protège contre un risque de suspension bien réel et
+  documenté (voir l'historique très fourni de ce fichier sur FD.org) — donc
+  pas question de la raccourcir globalement. Avec 2min partagé ET aucun
+  polling automatique (juste un refetch au remount/re-render une fois la
+  donnée périmée), le pire cas pouvait atteindre ~16min, et seulement SI
+  l'utilisateur redéclenchait une requête entre-temps (navigation, retour sur
+  la page) — cohérent avec le "5 à 10min" rapporté. Corrigé (`useTeamForm.js`)
+  : nouvelles constantes `ESPN_FORM_STALE` (15s) et
+  `ESPN_FORM_POLL_MAX_ATTEMPTS` (8), appliquées UNIQUEMENT aux 8 comps
+  ESPN-only (`ESPN_SOURCED_FORM_COMPS`, jamais FD.org — ce risque de
+  suspension ne les concerne pas) via 2 nouveaux helpers, `formStaleFor(comp)`
+  (staleTime 15s au lieu de 2min pour ces 8 comps, inchangé pour les autres)
+  et `formRefetchIntervalFor(comp)` (polling actif 15s pour ces 8 comps
+  SEULEMENT, `false`/aucun changement pour les autres — fonction react-query
+  v5 qui s'auto-arrête après `ESPN_FORM_POLL_MAX_ATTEMPTS` mises à jour
+  réussies via `query.state.dataUpdateCount`, jamais un polling permanent une
+  fois les données synchronisées). Appliqué aux 3 call-sites qui utilisaient
+  `FORM_STALE` en dur : `useTeamForm` (fiche match), `prefetchTeamForm`
+  (préchargement au clic, staleTime seulement — pas de composant monté donc
+  pas de polling possible) et `useTeamFormMulti` (Accueil, par compétition).
+  Le coût réel de ce polling reste minime : la quasi-totalité des cycles
+  retombent sur du cache déjà chaud côté serveur (`api/espn.js`, cache-first),
+  seuls les tout premiers cycles après un vrai cache-miss déclenchent un
+  travail réel — et seulement pour ces 8 compétitions à trafic sporadique, pas
+  pour les grands championnats. 370 tests + lint (clean) + build vérifiés.
+  Honnêteté : "instantané" reste relatif — un cache totalement à froid
+  nécessite toujours de vrais allers-retours ESPN (bornés par
+  `MAX_FETCH_CHUNKS`), ce fix compresse la convergence du pire cas ~16min à
+  quelques dizaines de secondes/~2min (8 cycles × 15s), pas une garantie de
+  0ms ; à confirmer par l'utilisateur sur son prochain cache à froid (ex.
+  après un futur déploiement, ou en pleine trêve internationale).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
