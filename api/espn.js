@@ -159,7 +159,33 @@ const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pa
 // n'est JAMAIS mise en cache : c'est la seule zone qui doit rester "live",
 // même contrat que le mode scoreboard non-chunké (voir plus bas, toujours
 // `no-store` pour une requête simple).
-const SCOREBOARD_PAST_CHUNK_TTL   = 24 * 60 * 60 // 24h
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 01/10 : "+1200 commandes Upstash en
+// 10min alors qu'aucun match n'est en cours") : `SCOREBOARD_PAST_CHUNK_TTL`
+// à 24h s'appliquait à TOUTES les tranches passées, y compris les plus
+// anciennes — dont le résultat ne changera jamais, ESPN les a déjà listées
+// comme FINISHED depuis longtemps. Avec l'élargissement à 400j en arrière
+// pour 8 compétitions sporadiques (NL/CAN/COPA/UEL/UECL/TDC/CS/USC, fix du
+// 29/09 pour "forme récente"/"stats saison" absentes), ça veut dire que
+// TOUT ce passé lointain (jusqu'à 400 jours, jusqu'à MAX_FETCH_CHUNKS=60
+// tranches par requête) expirait et devait être réécrit EN ENTIER CHAQUE
+// JOUR, pour toujours — un coût qui grandit avec le temps, sans jamais se
+// stabiliser, contrairement à l'intention d'un "cache long" pour du passé
+// immuable. Écriture (`kv.set`, voir `fetchScoreboardChunk` plus bas) faite
+// tranche par tranche, en fire-and-forget : jusqu'à 60 commandes d'écriture
+// RÉELLES à chaque cache-miss (Upstash facture chaque SET individuellement,
+// même groupé en pipeline — pas de gain possible en les regroupant, voir
+// l'historique Upstash du 10/09). Corrigé : au-delà de 10 jours dans le
+// passé (le seul délai où un score FINISHED pourrait encore être corrigé,
+// ex. décision disciplinaire tardive), le TTL passe à 90 jours au lieu de
+// 24h — un résultat vieux de plusieurs mois n'a structurellement aucune
+// raison d'être revérifié tous les jours. Le passé RÉCENT (≤10j, le plus
+// consulté — "résultats récents"/"forme récente" classique) garde son
+// cache 24h inchangé, pas de risque de servir une donnée räisonnablement
+// datée pour ce qui est réellement consulté souvent.
+const SCOREBOARD_PAST_CHUNK_TTL      = 24 * 60 * 60      // 24h — passé récent (≤10j)
+const SCOREBOARD_OLD_PAST_CHUNK_TTL  = 90 * 24 * 60 * 60 // 90j — passé ancien, totalement figé
+const SCOREBOARD_PAST_RECENT_DAYS    = 10
 const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
 
 function ymd(d) {
@@ -192,9 +218,12 @@ function splitScoreboardRange(dates) {
 // live (jamais mise en cache) — voir le commentaire au-dessus.
 function scoreboardChunkTtl(chunkDates) {
   const [startStr, endStr] = chunkDates.includes('-') ? chunkDates.split('-') : [chunkDates, chunkDates]
-  const today      = new Date(); today.setUTCHours(0, 0, 0, 0)
-  const todayPlus2 = new Date(today.getTime() + 2 * 86_400_000)
-  if (parseYmd(endStr) < today) return SCOREBOARD_PAST_CHUNK_TTL
+  const today        = new Date(); today.setUTCHours(0, 0, 0, 0)
+  const todayPlus2    = new Date(today.getTime() + 2 * 86_400_000)
+  const recentPastCutoff = new Date(today.getTime() - SCOREBOARD_PAST_RECENT_DAYS * 86_400_000)
+  if (parseYmd(endStr) < today) {
+    return parseYmd(endStr) < recentPastCutoff ? SCOREBOARD_OLD_PAST_CHUNK_TTL : SCOREBOARD_PAST_CHUNK_TTL
+  }
   if (parseYmd(startStr) > todayPlus2) return SCOREBOARD_FUTURE_CHUNK_TTL
   return null
 }
