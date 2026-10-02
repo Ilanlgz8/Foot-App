@@ -134,9 +134,20 @@ function safeJsonParse(raw, fallback) {
 // JSON en retour (`{events:[...]}`) sont identiques à un appel ESPN direct
 // (mode scoreboard d'api/espn.js = passthrough brut, aucune transformation)
 // — aucun changement de parsing nécessaire ici.
+// ⚠️ `&forceFresh=1` AJOUTÉ (02/10, bug prod : plusieurs matchs de Ligue des
+// Nations jamais détectés alors qu'ESPN les listait bien — voir le
+// commentaire détaillé dans api/espn.js, mode scoreboard date simple) : ce
+// endpoint renvoyait `Cache-Control: public, s-maxage=40, stale-while-
+// revalidate=180` par défaut (ajouté le 24-25/09 pour réduire le coût CPU des
+// visiteurs sur useMatchDetail.js, jamais pensé pour CE fichier à l'époque —
+// fichier séparé, hors de l'audit grep fait alors) — observé figé plus de 5h
+// d'affilée en Edge cache, empêchant ce Worker de voir le moindre nouveau
+// match/transition pendant tout ce temps. `forceFresh=1` fait désormais
+// répondre `no-store` côté Vercel pour CES appels précis, sans toucher au
+// cache dont profitent toujours les visiteurs normaux.
 async function fetchEspnEvents(slug, date, log) {
   try {
-    const r = await fetch(`${VERCEL_ESPN_PROXY}?slug=${slug}&dates=${date}`, {
+    const r = await fetch(`${VERCEL_ESPN_PROXY}?slug=${slug}&dates=${date}&forceFresh=1`, {
       headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(8_000),
     })

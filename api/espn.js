@@ -962,9 +962,31 @@ export default async function handler(req, res) {
     // ci-dessus) — seule la fraîcheur de "ce match est-il déjà localisable"
     // passe de 15s à 40s de tolérance max, imperceptible pour un snapshot de
     // pré-match/résolution d'event.
+    // ⚠️ BUG CORRIGÉ (02/10, constat utilisateur : plusieurs matchs de Ligue
+    // des Nations jamais détectés par le Worker Cloudflare alors qu'ESPN les
+    // listait bien — logs `cron:goals:logHistory` qui s'arrêtent net dès
+    // qu'un match se termine, plus aucune ligne pendant des heures malgré
+    // d'autres matchs qui démarrent/se terminent dans le même créneau) :
+    // le cache `public, s-maxage=40, stale-while-revalidate=180` ajouté le
+    // 24-25/09 pour CE mode (date simple) visait explicitement à réduire le
+    // coût CPU des visiteurs qui ouvrent un détail de match (useMatchDetail.js)
+    // — audité à l'époque comme "sans lien avec le direct" en grep-ant
+    // useLiveMinute.js/fifa-live.js. Mais `cf-worker/src/index.js`
+    // (fetchEspnEvents) utilise CE MÊME endpoint, avec le MÊME format
+    // (slug+date simple), pour son polling minute par minute — jamais
+    // considéré dans cet audit (fichier séparé, hors de src/). Résultat :
+    // les appels du Worker tombaient sur une réponse Edge mise en cache,
+    // parfois figée bien au-delà de la fenêtre de 40-220s annoncée (observé :
+    // plus de 5h sans qu'un seul nouveau match n'apparaisse dans la réponse,
+    // alors qu'ESPN en listait 10 au moment des faits) — le Worker ne voyait
+    // alors plus jamais les nouveaux matchs/transitions de la journée.
+    // `forceFresh=1` (déjà utilisé par le mode summary plus haut, voir
+    // `skipCache`) permet désormais au Worker de demander explicitement une
+    // réponse `no-store`, sans toucher au cache 40s qui profite toujours aux
+    // visiteurs normaux (jamais envoyé avec ce paramètre).
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', 'public, s-maxage=40, stale-while-revalidate=180')
+       .setHeader('Cache-Control', skipCache ? 'no-store' : 'public, s-maxage=40, stale-while-revalidate=180')
        .send(body)
   } catch (err) {
     clearTimeout(timeoutId)
