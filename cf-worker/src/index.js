@@ -40,7 +40,10 @@
 import { Redis } from '@upstash/redis'
 import { createTursoKv } from './tursoKv.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
-import { ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS } from '../../src/data/espnSlugs.js'
+import {
+  ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS,
+  NATIONAL_COMP_SLUGS, EUROPEAN_CUP_SLUGS, NATIONAL_SUPER_CUP_SLUGS,
+} from '../../src/data/espnSlugs.js'
 // ⚠️ Toutes ces fonctions étaient dupliquées ici ET dans api/cron-goals.js —
 // risque de divergence si un futur bug est corrigé d'un seul côté. Extraites
 // dans src/utils/liveDetection.js (fonctions pures, sans dépendance
@@ -59,6 +62,30 @@ import {
 // numérique, pas ce dont ce Worker a besoin — voir commentaire dans
 // espnSlugs.js).
 const ESPN_SLUGS = [...new Set([...Object.values(ESPN_SLUG_BY_COMP_ID), ...EXTRA_NOTIFY_SLUGS])]
+
+// ⚠️ AJOUT (02/10, constat utilisateur : Moldavie-Kazakhstan, Ligue des
+// Nations, jamais détecté par le Worker alors qu'en direct depuis 25min,
+// confirmé par un appel direct à ESPN qui listait bien le match — voir
+// NO_MATCH_TTL plus bas) : les compétitions internationales sporadiques
+// (NL/CAN/COPA/UEL/UECL/supercoupes) ont des coups d'envoi répartis sur TOUTE
+// la journée (14h, 16h, 18h45, 20h45 UTC selon les groupes/fuseaux), contrairement
+// aux 6 grands championnats club dont les horaires sont connus et groupés sur
+// quelques créneaux fixes. Si ESPN met quelques minutes à publier le
+// calendrier du jour pour une de ces compétitions (constaté : scoreboard
+// réellement vide tôt dans la journée alors que 10 matchs y figurent
+// quelques heures plus tard), le garde-fou double-confirmation (voir
+// NO_MATCH_TTL) peut légitimement enregistrer 2 vrais "0 match" consécutifs
+// et armer un skip de 20h — bien avant que les matchs du jour n'apparaissent,
+// coupant alors TOUTE détection (KO/buts/cartons/fin) pour cette compétition
+// le reste de la journée. Risque inexistant pour les 6 grands championnats
+// (calendrier quasi toujours déjà publié la veille). Set dédié pour leur
+// appliquer un TTL de skip beaucoup plus court (voir NO_MATCH_TTL_SPARSE) —
+// un faux-positif s'auto-corrige alors en 2h au lieu de 20h.
+const SPARSE_INTL_SLUGS = new Set([
+  ...Object.values(NATIONAL_COMP_SLUGS),
+  ...Object.values(EUROPEAN_CUP_SLUGS),
+  ...Object.values(NATIONAL_SUPER_CUP_SLUGS),
+])
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 // ⚠️ SOLUTION AU BLOCAGE 403 (constat confirmé, 22/08 : ESPN bloque 100% des
 // requêtes venant de Cloudflare Workers — testé en direct, la MÊME requête
@@ -599,6 +626,10 @@ async function runOnePass(env) {
   // Écriture : 1 seul pipeline groupé en fin de fetch. Gain concret un jour
   // normal : ~34 fetchs ESPN/minute → ~4-8 (après la 2e minute de la journée).
   const NO_MATCH_TTL      = 20 * 3600
+  // Voir SPARSE_INTL_SLUGS plus haut : les compétitions internationales
+  // sporadiques peuvent publier leur calendrier du jour en retard — un
+  // faux-positif "aucun match" n'y bloque la détection que 2h au lieu de 20h.
+  const NO_MATCH_TTL_SPARSE = 2 * 3600
   const NO_MATCH_PENDING_TTL = 3 * 60
   const slugDatePairs = ESPN_SLUGS.flatMap(slug => [
     { slug, date: today,     key: `noMatch:${slug}:${today}`,     pendingKey: `noMatchPending:${slug}:${today}` },
@@ -650,13 +681,13 @@ async function runOnePass(env) {
   )
 
   const allEvents = []
-  const newlyEmptyKeys   = [] // 2e confirmation consécutive → skip réel (20h)
+  const newlyEmptyKeys   = [] // 2e confirmation consécutive → skip réel (20h, ou 2h si sporadique)
   const newlyPendingKeys = [] // 1ère confirmation seulement → juste marquer, pas encore skip
   for (const r of allResults) {
     if (r.status !== 'fulfilled') continue
     const { pair, res } = r.value
     if (res.ok && res.events.length === 0) {
-      if (noMatchPending.has(pair.pendingKey)) newlyEmptyKeys.push(pair.key)
+      if (noMatchPending.has(pair.pendingKey)) newlyEmptyKeys.push({ key: pair.key, sparse: SPARSE_INTL_SLUGS.has(pair.slug) })
       else newlyPendingKeys.push(pair.pendingKey)
     } else {
       for (const evt of res.events) allEvents.push({ slug: pair.slug, evt })
@@ -687,7 +718,8 @@ async function runOnePass(env) {
   if (newlyEmptyKeys.length > 0 || newlyPendingKeys.length > 0) {
     try {
       let flagPipe = kv.pipeline()
-      for (const k of newlyEmptyKeys)   flagPipe = flagPipe.set(k, '1', { ex: NO_MATCH_TTL })
+      for (const { key, sparse } of newlyEmptyKeys)
+        flagPipe = flagPipe.set(key, '1', { ex: sparse ? NO_MATCH_TTL_SPARSE : NO_MATCH_TTL })
       for (const k of newlyPendingKeys) flagPipe = flagPipe.set(k, '1', { ex: NO_MATCH_PENDING_TTL })
       await flagPipe.exec()
     } catch {}
