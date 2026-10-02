@@ -11,13 +11,13 @@
 // card en live du match du jour"), plus une rangée de cotes prono (même
 // calcul que MatchPoster.jsx — cote de marché ESPN si disponible, sinon
 // calcProno/calcLiveProno).
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { FormDiamonds } from './FormDiamonds'
 import { TEAM_SHORT } from '../data/teamShortNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
-import { getMatchState } from '../utils/matchStateTracker'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
+import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
@@ -92,6 +92,44 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
     liveMinute !== null
   )
   const isUpcoming = !!match && !isFinished && !isLive
+
+  // Countdown mi-temps "Reprise dans X min" → "Reprise imminente" (demande
+  // explicite, 02/10 : "dans la card du match du jour [...] quand c la mi
+  // temps y'a pas genre 'reprise dans x min'") — cette card ne l'avait
+  // jamais eu, contrairement à MatchPoster.jsx (cards Accueil/Résultats) et
+  // LiveMatchPage/MatchPage, qui l'ont déjà. Logique copiée À L'IDENTIQUE de
+  // MatchPoster.jsx (même commentaire détaillé là-bas pour le raisonnement
+  // complet) : basée sur matchStateTracker/pausedAt-half2Start, jamais sur
+  // liveMinute en écriture — n'affecte donc jamais l'affichage de la minute
+  // réelle une fois la 2ème mi-temps commencée.
+  const [htLabel, setHtLabel] = useState(null)
+  useEffect(() => {
+    if (liveMinute !== 'MT') { setHtLabel(null); return }
+    const compute = () => {
+      let state = getMatchState(match.id)
+      // Filet de sécurité (même cas que MatchPoster.jsx) : si aucun autre
+      // hook n'a encore posé pausedAt pour ce match, on l'estime nous-mêmes
+      // à partir de l'horloge ESPN gelée plutôt que de rester bloqué sur
+      // "Mi-temps" statique.
+      if (!state.pausedAt && !state.half2Start) {
+        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
+        const parsedClock  = parseEspnClock(state.espnClock)
+        const realHalfMins = parsedClock ? parsedClock.base + (parsedClock.extra ?? 0) : null
+        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
+        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
+        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
+        state = getMatchState(match.id)
+      }
+      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
+      const elapsed = Date.now() - state.pausedAt
+      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
+      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
+    }
+    compute()
+    const id = setInterval(compute, 60_000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveMinute, match.id])
 
   // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "c'est pas les mêmes cotes
   // dans les cards des matchs en live que sur la page live/:matchId") :
@@ -399,10 +437,23 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
                  dans l'ancienne pastille de statut (supprimée, voir bandeau
                  haut) : c'est le signal "ça bouge en ce moment", il a plus de
                  sens collé au chrono que perdu dans un coin. */
-              <span className="accueil__mdjMinute">
-                <span className="accueil__mdjLiveDot" aria-hidden="true" />
-                {liveMinute ?? 'En cours'}
-              </span>
+              liveMinute === 'MT' ? (
+                // Même traitement que MatchPoster.jsx (voir htLabel plus haut) :
+                // "MT" en évidence + countdown "Reprise dans X min" juste en
+                // dessous, au lieu de remplacer la minute par le countdown.
+                <div className="poster__min-labelCol">
+                  <span className="accueil__mdjMinute">
+                    <span className="accueil__mdjLiveDot" aria-hidden="true" />
+                    MT
+                  </span>
+                  <div className="poster__reprise-label">{htLabel ?? 'Mi-temps'}</div>
+                </div>
+              ) : (
+                <span className="accueil__mdjMinute">
+                  <span className="accueil__mdjLiveDot" aria-hidden="true" />
+                  {liveMinute ?? 'En cours'}
+                </span>
+              )
             )
             : <span className="accueil__mdjWhenLabel">{isFinished ? 'Terminé' : "Aujourd'hui"}</span>}
           {(isLive || isFinished) ? (

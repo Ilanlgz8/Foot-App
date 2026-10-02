@@ -3210,6 +3210,25 @@ cf-worker/
   `api/espn.js` se déploie automatiquement avec le reste de l'app via Vercel,
   mais n'a d'effet réel qu'une fois le Worker aussi redéployé pour l'utiliser).
 
+- ✅ Countdown "Reprise dans X min" ajouté sur la card "Match du jour" (02/10, demande explicite :
+  "dans la card du match du jour dans accueil quand c la mi temps y'a pas genre 'reprise dans x
+  min' [...] au dessu du score come dans les autres card de accueil") — `MatchDuJourCard.jsx`
+  affichait déjà "MT" pendant la mi-temps (comme les autres cards Accueil) mais jamais le
+  countdown "Reprise dans X min"/"Reprise imminente" que `MatchPoster.jsx` (cards Accueil/
+  Résultats) et LiveMatchPage/MatchPage ont déjà. Logique copiée À L'IDENTIQUE de
+  `MatchPoster.jsx` (même mécanisme déjà éprouvé, voir son historique détaillé) : basée sur
+  `matchStateTracker`/`pausedAt`-`half2Start` (jamais sur `liveMinute` en écriture — n'affecte
+  donc jamais l'affichage de la minute réelle une fois la 2ème mi-temps commencée), avec le même
+  filet de sécurité qui estime `pausedAt` à partir de l'horloge ESPN gelée si aucun autre hook ne
+  l'a encore posé. Rendu : "MT" + countdown juste en dessous, dans `.poster__min-labelCol`/
+  `.poster__reprise-label` (classes déjà génériques et stylées, réutilisées telles quelles plutôt
+  que dupliquées en CSS). 370 tests + build vérifiés. Honnêteté lint : ce copier-coller introduit
+  1 nouvelle occurrence (34e, contre 33 pré-existantes) de la même erreur `react-hooks/set-state-
+  in-effect` déjà présente dans `MatchPoster.jsx` pour exactement ce mécanisme (timer externe +
+  `setState`) — pas une régression nouvelle, le même compromis déjà accepté dans le fichier
+  source copié, pas retouché ici pour rester cohérent avec lui plutôt que diverger. Rendu jamais
+  vu en direct sur un vrai match en mi-temps avant ce déploiement — à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
