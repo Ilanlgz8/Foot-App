@@ -215,7 +215,27 @@ async function fetchTeamForm(selectedComp) {
   if (ESPN_SOURCED_FORM_COMPS.has(selectedComp)) {
     const slug = COMPETITION_ESPN_SLUG[selectedComp]
     const all = await fetchEspnCompMatches(selectedComp, slug)
-    const matches = all.filter(m => m.status === 'FINISHED')
+    // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/10 : Lettonie affichait 4 matchs
+    // en "forme récente" — 2 barrages de mars (ÉDITION PRÉCÉDENTE de la Ligue
+    // des Nations, season.year 2024) + les 2 vrais matchs de l'édition en
+    // cours (septembre, season.year 2026) — "alors qu'à l'heure actuelle en
+    // Ligue des Nations elle a joué que deux matchs". Le tri par date (fix
+    // précédent, même jour) a corrigé l'ORDRE mais pas le MÉLANGE : rien ne
+    // filtrait par édition, contrairement aux compétitions club (FD.org, voir
+    // plus bas dans ce fichier, 25/07) qui excluent déjà explicitement la
+    // saison précédente de "forme récente"/"stats saison". Même principe
+    // appliqué ici via `seasonYear` (espnAdapter.js, ESPN fournit nativement
+    // l'année d'édition) : ne garder que les matchs de l'édition la plus
+    // récente PRÉSENTE dans la fenêtre (y compris les matchs à venir, qui
+    // confirment déjà l'édition en cours même avant le 1er match joué) —
+    // jamais mélanger 2 éditions, même constat qu'un club dont le mercato a
+    // pu tout changer entre 2 saisons (raison d'origine du fix du 25/07).
+    const seasonYears = all.map(m => m.seasonYear).filter(y => y != null)
+    const latestSeasonYear = seasonYears.length ? Math.max(...seasonYears) : null
+    const currentEdition = latestSeasonYear != null
+      ? all.filter(m => m.seasonYear === latestSeasonYear)
+      : all
+    const matches = currentEdition.filter(m => m.status === 'FINISHED')
     return { formMap: buildFormMap(matches), matches, isLastSeason: false }
   }
 

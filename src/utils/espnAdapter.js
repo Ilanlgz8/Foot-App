@@ -262,6 +262,18 @@ function normalizeEvent(event, compCode, overrides = {}) {
     utcDate: event.date,
     status,
     matchday: null,
+    // ⚠️ AJOUT (02/10, constat utilisateur : Lettonie montrait 4 matchs en
+    // "forme récente" — 2 de mars (barrages de maintien/montée de l'ÉDITION
+    // PRÉCÉDENTE, season.year 2024) + 2 de septembre (phase de ligue de
+    // l'édition EN COURS, season.year 2026) — alors qu'elle n'a joué QUE 2
+    // matchs dans l'édition actuelle. Même principe déjà appliqué aux
+    // compétitions club (FD.org) : "forme récente" ne doit pas mélanger 2
+    // saisons/éditions différentes (voir fetchTeamForm, useTeamForm.js,
+    // 25/07). Exposé ici pour permettre ce filtrage côté fetchTeamForm —
+    // ESPN fournit cette distinction nativement (season.year), contrairement
+    // à season.slug (déjà capté via `stage`, mais qui décrit la PHASE, pas
+    // l'ÉDITION).
+    seasonYear: event.season?.year ?? null,
     stage: mapEspnStage(event.season?.slug),
     group: null,
     winnerTeamId,
