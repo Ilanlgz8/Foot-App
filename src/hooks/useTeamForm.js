@@ -161,9 +161,30 @@ async function fetchFinishedSeasonMatches(selectedComp, seasonParam) {
 // lieu d'apparaître. outcomeForTeam() (matchUtils.js) résout ça en
 // préférant score.winner (champ catégorique, disponible plus tôt) et ne
 // retombe sur le score numérique qu'en dernier recours.
+//
+// ⚠️ BUG CORRIGÉ (constat utilisateur, 02/10 : "forme récente" de la Lettonie
+// affichait un match contre Gibraltar datant de mars — alors que l'équipe a
+// bien rejoué en Ligue des Nations fin septembre, matchs FINISHED confirmés
+// en direct côté ESPN) : `.slice(-5)` ci-dessous suppose `matches` trié par
+// date ASCENDANTE (le plus récent en dernier) — hypothèse fausse pour les 8
+// compétitions ESPN-only (NL/CAN/COPA/UEL/UECL/TDC/CS/USC, voir
+// ESPN_SOURCED_FORM_COMPS). Leur fenêtre glissante fait jusqu'à 460 jours
+// (voir espnAdapter.js), bien au-delà de MAX_FETCH_CHUNKS=60 (api/espn.js) —
+// les tranches à fetcher sont alors triées par PROXIMITÉ avec aujourd'hui
+// (pas par ordre chronologique) avant d'être fusionnées à la suite des
+// tranches déjà en cache (elles, chronologiques) — le tableau final mélange
+// donc un segment ancien trié ET un segment récent non-trié, sans qu'aucun
+// vrai tri par date n'ait jamais lieu. Un match de mars pouvait ainsi se
+// retrouver positionné APRÈS un match de septembre dans le tableau, et
+// `.slice(-5)` le gardait à tort comme "plus récent". Corrigé en triant
+// explicitement par date avant de construire la forme — ne coûte rien
+// (quelques dizaines de matchs tout au plus) et rend la fonction correcte
+// quel que soit l'ordre réel reçu, sans dépendre d'une hypothèse fragile sur
+// l'ordre amont.
 export function buildFormMap(matches) {
   const formMap = {}
-  matches.forEach(match => {
+  const sorted = [...matches].sort((a, b) => Date.parse(a.utcDate) - Date.parse(b.utcDate))
+  sorted.forEach(match => {
     const homeId = match.homeTeam.id
     const awayId = match.awayTeam.id
     const homeResult = outcomeForTeam(match, homeId)

@@ -1412,9 +1412,20 @@ export function TeamFormTable({ teamId, compMatches }) {
   // un match dont le résultat n'est pas encore déterminable (score pas
   // encore renseigné par FD.org) est maintenant exclu de la liste plutôt que
   // silencieusement affiché comme un match nul "-:-" trompeur.
+  // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/10 : Lettonie affichait un match
+  // de mars au lieu de ses vrais derniers matchs de Ligue des Nations, fin
+  // septembre) : le commentaire ci-dessus ("trié du plus ancien au plus
+  // récent") n'est vrai que pour les compétitions sourcées FD.org — pour les
+  // 8 compétitions ESPN-only (NL/CAN/COPA/UEL/UECL/TDC/CS/USC), compMatches
+  // vient d'une fenêtre glissante jusqu'à 460j fusionnée par chunks triés par
+  // PROXIMITÉ avec aujourd'hui (voir api/espn.js, MAX_FETCH_CHUNKS) et non par
+  // date — l'ordre réel n'est pas garanti. Même fix que buildFormMap
+  // (useTeamForm.js, même jour) : tri explicite par date avant de prendre les
+  // 5 derniers, au lieu de faire confiance à l'ordre reçu.
   const matches = (compMatches ?? [])
     .filter(m => m.status === 'FINISHED' && (m.homeTeam?.id === teamId || m.awayTeam?.id === teamId))
     .filter(m => outcomeForTeam(m, teamId) != null)
+    .sort((a, b) => Date.parse(a.utcDate) - Date.parse(b.utcDate))
     .slice(-5)
     .reverse()
 
