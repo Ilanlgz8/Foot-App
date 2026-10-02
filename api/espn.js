@@ -577,12 +577,72 @@ export default async function handler(req, res) {
     if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
   } catch {}
 
-  const { slug, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
+  const { slug, slugs, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle
   // chaîne comme clé Redis.
   const safeFdMatchId = fdMatchId && /^\d+$/.test(String(fdMatchId)) ? String(fdMatchId) : null
+
+  // ── Mode `slugs` (pluriel) : batching multi-compétitions en UN SEUL appel ──
+  // (02/10, demande explicite utilisateur : réduire le "Fluid Active CPU"
+  // Vercel sans casser les notifs). AVANT ce mode, `cf-worker/src/index.js`
+  // faisait un appel Vercel SÉPARÉ par compétition active à CHAQUE passe
+  // (`fetchEspnEvents`, jusqu'à ~15-17 invocations/minute un jour chargé) —
+  // chaque appel facturé indépendamment (démarrage de fonction, routing...)
+  // même si le travail réel (1 fetch ESPN) est minime. Ce mode regroupe
+  // plusieurs slugs PARTAGEANT LA MÊME DATE en un seul appel HTTP : le Worker
+  // passe de N appels/minute à 2 au plus (today + yesterday), sans aucun
+  // changement de fraîcheur (toujours `forceFresh=1`/`no-store`, chaque slug
+  // fait toujours son propre vrai fetch ESPN, juste dans la MÊME invocation
+  // Vercel plutôt que N invocations séparées).
+  // ⚠️ Lecture seule, AUCUNE écriture/transaction partagée entre slugs : un
+  // slug qui échoue (timeout/403/JSON invalide) est isolé dans sa propre
+  // entrée `{ok:false, error}` sans jamais affecter les autres — contrairement
+  // au bug `client.batch()` de Turso (voir CLAUDE.md, 01-02/10) qui, LUI,
+  // groupait plusieurs ÉCRITURES dans une seule transaction atomique (un échec
+  // en annulait d'autres). Ce n'est pas la même classe de risque : ici chaque
+  // slug est un `fetch()` indépendant, `Promise.allSettled` garantit qu'aucun
+  // ne peut faire échouer les autres.
+  if (slugs) {
+    const slugList = String(slugs).split(',').map(s => s.trim()).filter(Boolean)
+    if (slugList.length === 0) return res.status(400).json({ error: 'Paramètre slugs vide' })
+    if (slugList.length > 25) return res.status(400).json({ error: 'Trop de slugs (max 25)' })
+    for (const s of slugList) {
+      if (!ALLOWED_SLUGS.has(s)) return res.status(400).json({ error: `Slug non autorisé : ${s}` })
+    }
+    // Une seule date, simple (YYYYMMDD) — ce mode ne sert que le Worker
+    // (slugDatePairs, toujours une date unique par appel), jamais le client.
+    if (!dates || !/^\d{8}$/.test(dates)) return res.status(400).json({ error: 'Paramètre dates invalide (YYYYMMDD attendu)' })
+
+    const results = await Promise.allSettled(slugList.map(async (s) => {
+      const ctrl = new AbortController()
+      const tid  = setTimeout(() => ctrl.abort(), 8_000)
+      try {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${s}/scoreboard?dates=${dates}&limit=100`
+        const r = await fetch(url, {
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+          signal: ctrl.signal,
+        })
+        clearTimeout(tid)
+        if (!r.ok) return { slug: s, ok: false, error: `ESPN a répondu ${r.status}` }
+        const j = await r.json()
+        return { slug: s, ok: true, events: j.events ?? [] }
+      } catch (e) {
+        clearTimeout(tid)
+        return { slug: s, ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message }
+      }
+    }))
+
+    const bySlug = {}
+    results.forEach((r, i) => {
+      bySlug[slugList[i]] = r.status === 'fulfilled' ? r.value : { slug: slugList[i], ok: false, error: 'unknown' }
+    })
+    return res.status(200)
+       .setHeader('Content-Type', 'application/json')
+       .setHeader('Cache-Control', 'no-store')
+       .json({ bySlug })
+  }
 
   if (!slug)                    return res.status(400).json({ error: 'Paramètre slug manquant' })
   if (!ALLOWED_SLUGS.has(slug)) return res.status(400).json({ error: 'Slug non autorisé' })

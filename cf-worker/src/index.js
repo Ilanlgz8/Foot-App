@@ -160,6 +160,65 @@ async function fetchEspnEvents(slug, date, log) {
   }
 }
 
+// ⚠️ AJOUT (02/10, demande explicite utilisateur — "comment on pourrait faire
+// fonctionner les notifs sans problème tout en baissant le quota Fluid Active
+// CPU de Vercel ?") : avant ça, `pairsToFetch` (voir runOnePass) déclenchait
+// un appel `fetchEspnEvents` SÉPARÉ par slug — jusqu'à ~15-17 invocations
+// Vercel/minute un jour de match chargé, chacune facturée indépendamment
+// (démarrage de fonction compris) même si le travail réel est minime (1 seul
+// fetch ESPN). Regroupe tous les slugs PARTAGEANT LA MÊME DATE (today ou
+// yesterday — jamais plus de 2 groupes/passe par construction, voir
+// slugDatePairs) en un seul appel `/api/espn?slugs=a,b,c&dates=...` (voir son
+// commentaire dédié dans api/espn.js) : le Worker passe d'un nombre
+// d'invocations proportionnel au nombre de slugs actifs à AU PLUS 2/minute,
+// sans aucune perte de fraîcheur (toujours `forceFresh=1`/`no-store`, chaque
+// slug fait toujours son propre vrai fetch ESPN côté Vercel). Bénéfice
+// secondaire pour le budget de 50 sous-requêtes/exécution de ce Worker (voir
+// SUBREQUEST_SAFE_LIVE_THRESHOLD plus bas) : la phase de récupération ESPN
+// consomme désormais au plus 2 sous-requêtes au lieu d'autant que de slugs
+// actifs, libérant de la marge pour les notifs push de la même passe.
+// Isolation des pannes : un échec sur l'appel groupé d'UNE date (timeout
+// réseau/Vercel en panne) ne renvoie `{ok:false}` QUE pour les slugs de CE
+// groupe précis — l'autre date (today/yesterday) garde son propre résultat
+// indépendant. Une panne PAR SLUG à l'intérieur d'un groupe (ex. ESPN 403
+// pour un seul championnat) est déjà isolée côté Vercel (voir api/espn.js,
+// `Promise.allSettled` par slug) — jamais propagée aux autres slugs du même
+// groupe. Ce n'est PAS le même mécanisme que le bug `client.batch()` Turso
+// (voir CLAUDE.md, 01-02/10) qui, lui, groupait plusieurs ÉCRITURES dans une
+// seule transaction atomique (un échec en annulait d'autres) — ici, lecture
+// seule, chaque slug est un `fetch()` ESPN indépendant côté Vercel.
+async function fetchEspnEventsBatch(pairs, log) {
+  const byDate = new Map()
+  for (const p of pairs) {
+    if (!byDate.has(p.date)) byDate.set(p.date, [])
+    byDate.get(p.date).push(p)
+  }
+  const out = []
+  await Promise.all([...byDate.entries()].map(async ([date, group]) => {
+    const slugsParam = group.map(p => p.slug).join(',')
+    try {
+      const r = await fetch(`${VERCEL_ESPN_PROXY}?slugs=${encodeURIComponent(slugsParam)}&dates=${date}&forceFresh=1`, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8_000),
+      })
+      if (!r.ok) {
+        log.push(`[espn:batch:${date}] status=${r.status}`)
+        for (const p of group) out.push({ pair: p, res: { ok: false, events: [] } })
+        return
+      }
+      const j = await r.json()
+      for (const p of group) {
+        const entry = j.bySlug?.[p.slug]
+        out.push({ pair: p, res: entry?.ok ? { ok: true, events: entry.events ?? [] } : { ok: false, events: [] } })
+      }
+    } catch (e) {
+      log.push(`[espn:batch:${date}] error=${e.message}`)
+      for (const p of group) out.push({ pair: p, res: { ok: false, events: [] } })
+    }
+  }))
+  return out
+}
+
 async function fetchFifaLiveMatches(kv, log) {
   try {
     const cached = await kv.get('fifa:live')
@@ -687,9 +746,12 @@ async function runOnePass(env) {
     if (hotSlugs.has(p.slug)) return true
     return isColdSlugActiveThisMinute(p.slug)
   })
-  const allResults = await Promise.allSettled(
-    pairsToFetch.map(p => fetchEspnEvents(p.slug, p.date, log).then(res => ({ pair: p, res })))
-  )
+  // Voir fetchEspnEventsBatch (plus haut) : regroupe tous les pairsToFetch
+  // par date (today/yesterday, au plus 2 groupes) en au plus 2 appels Vercel
+  // au lieu d'un par slug — `.map(v => ({status:'fulfilled', value:v}))`
+  // pour garder EXACTEMENT la même forme que l'ancien Promise.allSettled,
+  // aucun changement nécessaire dans la boucle de traitement ci-dessous.
+  const allResults = (await fetchEspnEventsBatch(pairsToFetch, log)).map(v => ({ status: 'fulfilled', value: v }))
 
   const allEvents = []
   const newlyEmptyKeys   = [] // 2e confirmation consécutive → skip réel (20h, ou 2h si sporadique)

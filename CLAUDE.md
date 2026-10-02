@@ -3163,6 +3163,53 @@ cf-worker/
   appareil depuis cet environnement) — à confirmer par l'utilisateur que les images des articles
   s'affichent bien maintenant.
 
+- ✅ Batching multi-slug Worker→Vercel pour baisser le Fluid Active CPU SANS
+  perdre en fiabilité des notifs (02/10, demande explicite utilisateur : "ok
+  alors comment on pourrait faire fonctionner les notifs sans problème tout
+  en baissant le quota fluid activ cpu de vercel" — suite directe du fix
+  `forceFresh=1` du même jour, qui avait justement AUGMENTÉ le coût CPU des
+  appels Worker en supprimant leur cache Edge). Avant ce changement,
+  `cf-worker/src/index.js` (`pairsToFetch`, `runOnePass`) faisait un appel
+  Vercel SÉPARÉ par compétition active à CHAQUE passe (`fetchEspnEvents`,
+  jusqu'à ~15-17 invocations/minute un jour chargé) — chaque appel facturé
+  indépendamment (démarrage de fonction compris) même si le travail réel (1
+  fetch ESPN) est minime. Nouveau mode `slugs` (pluriel) dans `api/espn.js` :
+  accepte une liste de slugs + UNE SEULE date (`/api/espn?slugs=a,b,c&dates=
+  YYYYMMDD&forceFresh=1`), fait tous les fetchs ESPN en parallèle
+  (`Promise.allSettled`, chaque slug isolé — un échec sur l'un n'affecte
+  jamais les autres) en UNE SEULE invocation, renvoie `{bySlug:{a:{ok,events},
+  ...}}`. Côté Worker, nouvelle fonction `fetchEspnEventsBatch()` regroupe
+  `pairsToFetch` par date (today/yesterday, au plus 2 groupes par construction)
+  et ne fait plus qu'AU PLUS 2 appels Vercel/minute au lieu d'un par slug —
+  sans aucune perte de fraîcheur (`forceFresh=1`/`no-store` inchangé, chaque
+  slug fait toujours son propre vrai fetch ESPN). Bénéfice secondaire pour le
+  budget de 50 sous-requêtes/exécution du Worker (déjà un sujet sensible, voir
+  `SUBREQUEST_SAFE_LIVE_THRESHOLD`) : la phase de récupération ESPN consomme
+  désormais au plus 2 sous-requêtes au lieu d'autant que de slugs actifs,
+  libérant de la marge pour les notifs push de la même passe. Mode `slugs`
+  conçu en lecture seule, aucune écriture/transaction partagée entre slugs —
+  l'utilisateur avait justement demandé de vérifier que ce n'était pas le
+  même type de "batch" que celui qui avait cassé les notifs par le passé
+  (`client.batch()` Turso, voir l'entrée du 01-02/10 : plusieurs ÉCRITURES
+  groupées dans une seule transaction atomique, un échec en annulait
+  d'autres) — vérifié par relecture de l'historique git (aucune trace d'un
+  précédent essai de batching multi-slug ESPN) : ce n'est pas la même classe
+  de risque, chaque slug est un `fetch()` ESPN indépendant côté Vercel,
+  jamais de transaction partagée. `fetchEspnEvents` (single-slug) reste
+  utilisée telle quelle pour `recheckFinalMatch` (recheck FT à 18s, 1 seul
+  match/slug à la fois, volume négligeable — pas concerné par ce changement).
+  370 tests + lint (clean, cf-worker/ inclus) + build + `npx wrangler deploy
+  --dry-run` (bundle généré sans erreur, taille quasi inchangée) vérifiés.
+  Honnêteté : comme pour tout `cf-worker/`, aucun accès réseau réel depuis cet
+  environnement pour confirmer ce gain CPU contre la vraie prod (ni côté
+  Vercel Observability, ni en conditions de match) — le raisonnement
+  (invocations Vercel proportionnelles au nb de slugs actifs → au plus 2/
+  minute) est solide et vérifiable arithmétiquement, mais à confirmer par
+  l'utilisateur sur le dashboard Vercel après déploiement (`npm run deploy`
+  manuel depuis `cf-worker/`, comme toujours pour ce dossier — la partie
+  `api/espn.js` se déploie automatiquement avec le reste de l'app via Vercel,
+  mais n'a d'effet réel qu'une fois le Worker aussi redéployé pour l'utiliser).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
