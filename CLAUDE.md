@@ -3410,6 +3410,94 @@ cf-worker/
   l'incident plutôt qu'une 4e théorie, le debug-push différé ne suffisant
   visiblement plus à trancher seul.
 
+- ✅ 4e BUG CRITIQUE TROUVÉ ET CORRIGÉ, MÊME INCIDENT — CELUI-LÀ EXPLIQUE LE
+  PLUS DIRECTEMENT LE SYMPTÔME EXACT (05/10, constat utilisateur le soir même
+  des 3 fixes précédents : "j'ai eu que 3 notifs reçues sur 7 matchs [...] et
+  les notifs qui sont envoyées dix minutes après le coup d'envoi" — un soir où
+  7 matchs de Ligue des Nations démarraient tous à la même minute, 20h45).
+  Les 3 fixes précédents de cet incident corrigeaient des blocages qui
+  empêchaient le Worker de FETCHER/DÉCOUVRIR un match — mais ici, avec 7
+  matchs sous le MÊME slug `uefa.nations`, le fetch ESPN lui-même n'était pas
+  le problème (un seul appel groupé ramène les 7 événements d'un coup, voir
+  `fetchEspnEventsBatch`). Root cause trouvée en relisant `tursoKv.js` à la
+  lumière de ce nombre précis (7) : le fix du 01-02/10 (isolation des erreurs
+  Redis/Turso, voir son historique) avait transformé `pipeline().exec()` en N
+  allers-retours HTTP SÉQUENTIELS au lieu d'1 seul pipeliné — jugé "sans
+  risque" à l'époque parce que l'attente réseau ne compte pas dans le budget
+  CPU Cloudflare (10ms/exécution). Mais Cloudflare Workers plafonne aussi le
+  NOMBRE de sous-requêtes sortantes à 50/exécution (voir
+  SUBREQUEST_SAFE_LIVE_THRESHOLD, déjà documenté dans index.js) — un plafond
+  sur le NOMBRE, pas sur le TEMPS, que ce fix n'avait pas reconsidéré sous cet
+  angle. Le `writePipe` par match (stateKey + lockKey + koKey/finalConfirmKey)
+  coûtait donc 2-3 sous-requêtes Turso à lui seul, PAR MATCH, EN PLUS du
+  mget(1) et du sadd/srem cron:liveIds(1) — environ 5-6 sous-requêtes par
+  match live. Avec 7 matchs passant LIVE à la même minute (+ les ~5-6
+  sous-requêtes fixes de début de passe : fetch ESPN groupé, mget emptyDay/
+  nextCheck/anyLive/liveSlugs, mget noMatch flags, mget alreadyDoneIds), le
+  budget de 50 a très probablement été dépassé EN PLEIN MILIEU de la boucle
+  `for (const {slug, evt} of allEvents)` — Cloudflare tue alors l'exécution
+  d'un coup (aucune erreur JS récupérable, l'environnement d'exécution est
+  simplement arrêté), abandonnant TOUS les matchs pas encore atteints dans
+  cette passe précise, y compris leur notif "coup d'envoi" jamais envoyée.
+  Collant exactement au symptôme : les matchs traités AVANT la coupure
+  reçoivent leur notif, ceux traités APRÈS n'ont RIEN — et la rotation
+  déterministe de l'ordre de traitement (`allEvents.push(...allEvents.
+  splice(0, offset))`, basée sur l'horloge) change l'ordre à chaque passe,
+  donc un match "après la coupure" une minute peut se retrouver "avant" une
+  passe suivante — expliquant le délai de ~10min observé pour les 3 qui ont
+  fini par recevoir leur notif (il a fallu plusieurs passes pour que la
+  rotation les place assez tôt dans l'ordre de traitement), et potentiellement
+  bien plus pour les 4 qui n'ont RIEN reçu dans la fenêtre observée par
+  l'utilisateur.
+  Corrigé (`tursoKv.js`, `pipeline().exec()`) SANS rouvrir le bug du 01-02/10
+  (celui-ci visait à isoler les échecs PAR OPÉRATION — objectif toujours
+  respecté ici, voir plus bas) : quand TOUTES les opérations d'un pipeline
+  sont des `set()` (le cas exact et le plus chaud du writePipe par match),
+  elles sont désormais fusionnées en UN SEUL `INSERT INTO worker_kv (...)
+  VALUES (...), (...), (...) ON CONFLICT(key) DO UPDATE ... WHERE ...
+  RETURNING key` — UNE SEULE sous-requête au lieu de 2-3, mais chaque ligne de
+  l'upsert multi-row reste résolue INDÉPENDAMMENT par SQLite/libSQL
+  (comportement documenté du multi-row upsert — PAS une transaction
+  multi-statements comme `client.batch()`, le vrai mécanisme fautif du
+  01-02/10) : le refus d'une clé nx (verrou déjà pris par un autre passage)
+  n'affecte jamais le résultat d'une autre clé dans le même appel, même
+  garantie d'isolation qu'avant, pour 1 seule sous-requête. Les clés SANS nx
+  (stateKey, toujours écrite) sont forcées via `excluded.key IN (...)` dans le
+  WHERE — l'une ou l'autre condition (nx normalement expiré OU clé forcée)
+  suffit à déclencher l'update pour CETTE ligne précise, sans jamais dépendre
+  du résultat des autres lignes du même appel. `execSetBatch()` (nouvelle
+  fonction dédiée) renvoie les résultats PAR CLÉ dans l'ordre d'origine ('OK'
+  ou `null` pour un nx refusé), même contrat qu'avant — AUCUN changement
+  nécessaire côté `index.js` (`writePipe` garde exactement le même code, la
+  bascule est interne à `tursoKv.js`). Si un pipeline mélange d'autres types
+  d'opérations (get/del/srem — seul `recheckFinalMatch`, appelé une fois par
+  match qui se termine, jamais à ce rythme multiplié par le nombre de matchs
+  live) : repli INCHANGÉ sur l'exécution séquentielle déjà en place, pas
+  optimisé ici (coût bien moindre, pas le point chaud identifié).
+  Vérification plus poussée que d'habitude pour ce fichier (toujours aucun
+  accès réseau réel vers Turso depuis cet environnement, voir l'historique du
+  01/10) : la vraie logique SQL (upsert multi-row + RETURNING + mix nx/forcé)
+  a été testée contre une VRAIE base SQLite en mémoire (`node:sqlite`, moteur
+  de la même famille que libSQL/Turso — fork direct de SQLite), avec 4 cas
+  (toutes clés neuves, verrou déjà pris + state qui doit quand même passer,
+  verrou expiré qui se réacquiert, 1 seule opération) — les 4 résultats
+  correspondent exactement à l'attendu. C'est la première fois dans ce chantier
+  Turso qu'une vraie logique d'upsert est vérifiée par exécution réelle plutôt
+  que par seule lecture attentive du SQL. 370 tests + lint + build +
+  `npx wrangler deploy --dry-run` (406 KiB) vérifiés en plus. Honnêteté : le
+  calcul "budget de 50 dépassé" reste un raisonnement arithmétique cohérent
+  avec le symptôme exact (pas une certitude à 100%, aucun accès aux logs
+  `npm run tail` de ce soir précis depuis cet environnement) — mais c'est,
+  cette fois, la seule des 4 causes de cet incident qui explique SPÉCIFIQUEMENT
+  pourquoi le nombre de matchs simultanés (7) fait la différence entre "ça
+  marche" et "rien ne part", ce qu'aucun des 3 fixes précédents n'expliquait
+  (eux concernaient la DÉCOUVERTE du slug, pas le TRAITEMENT une fois
+  découvert). À déployer manuellement (`npm run deploy` depuis `cf-worker/`,
+  comme toujours pour ce dossier — idéalement avant la fin des matchs de ce
+  soir, puisque les buts/cartons restants dépendent du MÊME writePipe) ; à
+  confirmer par l'utilisateur sur son prochain soir à plusieurs matchs
+  simultanés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

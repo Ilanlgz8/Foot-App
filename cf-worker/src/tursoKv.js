@@ -273,14 +273,49 @@ export function createTursoKv({ url, authToken }) {
   // TOUTE notif de but/carton — alors que la notif "Fin de match" elle-même,
   // qui ne dépend pas de ce verrou, continuait de passer : exactement le
   // symptôme observé.
-  // Corrigé : chaque opération du pipeline s'exécute maintenant en SÉQUENCE,
-  // comme un `client.execute()` INDÉPENDANT avec son propre try/catch — un
-  // échec sur une opération ne peut plus jamais affecter le résultat d'une
-  // autre, même garantie d'isolation que Redis. Coût : N allers-retours HTTP
-  // au lieu d'1 seul par pipeline — accepté ici : Turso facture par LIGNE
-  // (pas par requête), et le temps d'attente réseau ne compte pas dans le
-  // budget CPU Cloudflare Workers (seul le temps CPU réellement actif est
-  // limité) — un aller-retour HTTP de plus ne coûte donc quasiment rien ici.
+  // Corrigé une 1ère fois (01-02/10) : chaque opération du pipeline
+  // s'exécutait en SÉQUENCE, comme un `client.execute()` INDÉPENDANT avec son
+  // propre try/catch — un échec sur une opération ne peut plus jamais
+  // affecter le résultat d'une autre. Coût accepté à l'époque : N allers-
+  // retours HTTP au lieu d'1 seul par pipeline.
+  //
+  // ⚠️ BUG CRITIQUE TROUVÉ ET CORRIGÉ (05/10, constat utilisateur : "3 notifs
+  // reçues sur 7 matchs, et 10min après le coup d'envoi" — un soir où 7
+  // matchs de Ligue des Nations démarraient EXACTEMENT à la même minute) :
+  // le coût ci-dessus ("N allers-retours au lieu d'1") avait été jugé
+  // négligeable en pensant au TEMPS (l'attente réseau ne compte pas dans le
+  // budget CPU Cloudflare) — mais c'est le NOMBRE de sous-requêtes qui est
+  // plafonné (50/exécution, voir SUBREQUEST_SAFE_LIVE_THRESHOLD dans
+  // index.js), pas leur durée. Le writePipe par-match dans index.js
+  // (stateKey + lockKey + koKey/finalConfirmKey) coûtait donc 2-3 allers-
+  // retours Turso à LUI SEUL, par match, à CHAQUE passe — avec 7 matchs qui
+  // passent LIVE à la même minute (+ mget(1) + sadd/srem(1) par match, déjà
+  // ~5-6 sous-requêtes/match), le budget de 50 sous-requêtes/exécution a très
+  // probablement été dépassé en plein milieu de la boucle — Cloudflare tue
+  // alors l'exécution d'un coup, sans erreur récupérable, abandonnant TOUS
+  // les matchs pas encore atteints dans cette passe (aucune notif, même pas
+  // un KO). Collant exactement au symptôme : certains matchs (traités avant
+  // la coupure) reçoivent leur notif, d'autres (après la coupure) rien du
+  // tout — et la rotation déterministe de l'ordre de traitement (voir
+  // `allEvents.push(...allEvents.splice(0, offset))` dans index.js) explique
+  // le délai de ~10min pour les matchs qui finissent par être traités assez
+  // tôt dans une passe suivante pour s'en sortir.
+  // Corrigé SANS rouvrir le bug du 01-02/10 : quand TOUTES les opérations
+  // d'un pipeline sont des `set()` (le cas chaud exact de ce writePipe), elles
+  // sont fusionnées en UN SEUL `INSERT ... VALUES (...), (...), (...)
+  // ON CONFLICT DO UPDATE ... WHERE ... RETURNING key` — UNE SEULE requête
+  // SQL, mais chaque ligne de l'upsert reste résolue INDÉPENDAMMENT par
+  // SQLite (comportement documenté du multi-row upsert, pas une transaction
+  // multi-statements comme `client.batch()`) : le refus d'une clé nx (verrou
+  // déjà pris) n'affecte jamais le résultat d'une autre clé dans le même
+  // appel, même garantie d'isolation que la version séquentielle, pour 1
+  // seule sous-requête au lieu de 2-3. Les entrées sans `nx` (stateKey) sont
+  // forcées via `excluded.key IN (...)` dans le WHERE — toujours écrites,
+  // comme un set() normal. Si le pipeline mélange d'autres types d'opérations
+  // (get/del/srem — seul `recheckFinalMatch` dans index.js, appelé une fois
+  // par match qui se termine, jamais à ce rythme) : repli INCHANGÉ sur
+  // l'exécution séquentielle déjà en place, pas optimisé ici (coût bien
+  // moindre, pas le point chaud).
   function pipeline() {
     const ops = []
     const builder = {
@@ -290,6 +325,16 @@ export function createTursoKv({ url, authToken }) {
       srem(setName, member) { ops.push({ type: 'srem', setName, member }); return builder },
       async exec(options = {}) {
         await ensureSchema()
+        const allSets = ops.length > 0 && ops.every(op => op.type === 'set')
+        if (allSets) {
+          try {
+            const results = await execSetBatch(ops)
+            return options.keepErrors ? results.map(r => ({ result: r, error: null })) : results
+          } catch (e) {
+            if (options.keepErrors) return ops.map(() => ({ result: null, error: e.message }))
+            throw e
+          }
+        }
         const results = []
         for (const op of ops) {
           const now = nowSec()
@@ -307,6 +352,44 @@ export function createTursoKv({ url, authToken }) {
       },
     }
     return builder
+  }
+
+  // Fusionne N opérations `set()` en UN SEUL aller-retour HTTP — voir le
+  // commentaire de pipeline() ci-dessus pour le bug qu'évite cette fonction.
+  // Renvoie un tableau de résultats DANS L'ORDRE des `ops` reçues ('OK' ou
+  // null pour un nx refusé) — même contrat que l'exécution séquentielle.
+  async function execSetBatch(ops) {
+    await ensureSchema()
+    const now = nowSec()
+    const valuesSql = ops.map(() => '(?,?,?)').join(',')
+    const args = []
+    for (const op of ops) {
+      const val = typeof op.value === 'string' ? op.value : String(op.value)
+      args.push(op.key, val, now + ttlSecFromOpts(op.opts))
+    }
+    // Clés SANS nx : toujours écrites, quel que soit l'état existant — même
+    // sémantique qu'un set() normal. Encodées comme des clés "forcées" dans
+    // le WHERE du ON CONFLICT (`excluded.key IN (...)`), en PLUS de la
+    // condition nx normale (expires_at déjà expiré) — l'une OU l'autre suffit
+    // à déclencher l'update pour une ligne donnée, chaque ligne restant
+    // évaluée indépendamment par SQLite (upsert multi-row documenté, pas une
+    // transaction multi-statements).
+    const forceKeys = ops.filter(op => !op.opts?.nx).map(op => op.key)
+    args.push(now)
+    let whereClause = `worker_kv.expires_at <= ?`
+    if (forceKeys.length > 0) {
+      whereClause += ` OR excluded.key IN (${forceKeys.map(() => '?').join(',')})`
+      args.push(...forceKeys)
+    }
+    const res = await client.execute({
+      sql: `INSERT INTO worker_kv (key, value, expires_at) VALUES ${valuesSql}
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value, expires_at=excluded.expires_at
+            WHERE ${whereClause}
+            RETURNING key`,
+      args,
+    })
+    const written = new Set(res.rows.map(r => r.key))
+    return ops.map(op => written.has(op.key) ? 'OK' : null)
   }
 
   return { get, mget, set, del, expire, sadd, srem, scard, rpush, lpop, ltrim, pipeline }
