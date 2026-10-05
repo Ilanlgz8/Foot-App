@@ -919,6 +919,33 @@ async function runOnePass(env) {
   // championnats ont un match tracké live/final-pas-confirmé DANS CETTE
   // passe, pour que la prochaine passe sache lesquels ne jamais ralentir.
   const hotSlugsThisPass = new Set()
+  // ⚠️ 3e BUG CRITIQUE CORRIGÉ, MÊME INCIDENT (05/10, retour utilisateur
+  // après le 2e fix déployé : "il vient d'avoir un but sur un match en cours
+  // et j'ai rien reçu" — confirmé par `/api/debug-push` : les MÊMES ~6
+  // eventId "trop vieux" (voir STALE_MATCH_MS plus bas) reviennent en boucle
+  // depuis 3 jours, avec des écarts de ~25min et ~3h26 entre les passes —
+  // exactement NEXT_CHECK_MAX_MS et EMPTY_DAY_TTL). Root cause : le `continue`
+  // de STALE_MATCH_MS (voir plus bas) saute bien le traitement de l'event,
+  // mais ne le retire JAMAIS de `activeEvents` (seul `alreadyDoneIds`, basé
+  // sur `finalDone:{id}`, en retire — un match jamais confirmé FINAL, ex.
+  // POSTPONED ou coincé par un bug antérieur, n'a pas ce flag et reste donc
+  // DANS `activeEvents` POUR TOUJOURS). Résultat : ces quelques matchs
+  // zombies maintenaient `activeEvents.length > 0` à chaque passe SANS
+  // jamais être `anyLive` (ils sont trop vieux, jamais LIVE_ESPN) — ce qui
+  // réarmait `nextCheckKey` (jusqu'à 25min de blackout TOTAL, voir plus bas)
+  // en boucle INDÉFINIMENT, bien après mon fix `fullyCovered` (qui garantit
+  // seulement "chaque slug a une info non expirée", pas "l'info vient d'être
+  // vérifiée cette minute précise") — et ce blackout de 25min, plus long que
+  // le cycle de probe `NOMATCH_PROBE_EVERY_N_MIN` (10min) du 1er fix, avale
+  // des cycles de probe entiers, empêchant la découverte d'un NOUVEAU match
+  // (but compris) sur une TOUTE AUTRE compétition pendant toute sa durée.
+  // Corrigé : `staleIds` collecte CHAQUE event sauté par STALE_MATCH_MS
+  // (ajout juste avant son `continue`, zéro coût Redis, même logique) ;
+  // `activeEvents` (plus bas) exclut désormais ces ids EN PLUS de
+  // `alreadyDoneIds` — un match visiblement trop vieux ne peut plus jamais
+  // faire croire que "rien ne bouge aujourd'hui" et bloquer la découverte
+  // d'un match réellement en cours ailleurs.
+  const staleIds = new Set()
 
   for (const { slug, evt } of allEvents) {
    if (alreadyDoneIds.has(evt.id)) continue
@@ -961,6 +988,7 @@ async function runOnePass(env) {
     const kickoffMs = Date.parse(evt.date)
     if (Number.isFinite(kickoffMs) && (now.getTime() - kickoffMs) > STALE_MATCH_MS) {
       log.push(`[espn:${slug}:${eventId}] match trop vieux (coup d'envoi il y a >${STALE_MATCH_MS / 3_600_000}h) — notif sautée par sécurité`)
+      staleIds.add(eventId)
       continue
     }
 
@@ -1589,7 +1617,12 @@ async function runOnePass(env) {
   // ces matchs clos du calcul — "plus rien à faire aujourd'hui" est détecté
   // dès la confirmation FINAL de tous les matchs du jour, pas seulement quand
   // ESPN cesse de les lister des heures/jours plus tard.
-  const activeEvents = allEvents.filter(({ evt }) => !alreadyDoneIds.has(evt.id))
+  // `staleIds` (voir sa définition plus haut, 3e bug du 05/10) rejoint
+  // `alreadyDoneIds` ici : un match trop vieux (STALE_MATCH_MS) n'a RIEN de
+  // plus à offrir qu'un match finalDone pour cette décision précise — les
+  // deux doivent être exclus pour que "rien ne se passe aujourd'hui" ne soit
+  // jamais faussé par un zombie qui traîne.
+  const activeEvents = allEvents.filter(({ evt }) => !alreadyDoneIds.has(evt.id) && !staleIds.has(evt.id))
 
   // ⚠️ 2e BUG CRITIQUE CORRIGÉ, MÊME INCIDENT (05/10, le fix hotSlugs/
   // noMatchFlags ci-dessus NE SUFFISAIT PAS — constat utilisateur après

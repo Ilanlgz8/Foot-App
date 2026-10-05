@@ -3351,6 +3351,65 @@ cf-worker/
   jour où un match démarre pendant que peu de compétitions tournent déjà (le
   scénario où ce 2e gate avait le plus de chances d'être armé).
 
+- ✅ 3e BUG CRITIQUE TROUVÉ ET CORRIGÉ, MÊME INCIDENT — LA VRAIE CAUSE
+  PRINCIPALE (05/10, les 2 fixes précédents déployés et confirmés par
+  l'utilisateur, mais retour immédiat : "il vient d'avoir un but sur un match
+  en cours et j'ai rien reçu"). Diagnostic fait à partir d'un nouveau JSON
+  `/api/debug-push` : `logHistory` montrait les MÊMES ~6 eventId (`401918758`/
+  `752`/`510`/`753`/`757` sur `esp.copa_del_rey`, `401861119` sur
+  `uefa.nations`) marqués "trop vieux" EN BOUCLE depuis 3 jours, avec des
+  écarts entre passes de très précisément ~25min et ~3h26 — soit EXACTEMENT
+  `NEXT_CHECK_MAX_MS` et `EMPTY_DAY_TTL`, les 2 durées de blackout des fixes
+  d'hier. Root cause : le `continue` de `STALE_MATCH_MS` (match dont le coup
+  d'envoi remonte à plus de 6h, protection ajoutée le 11/09) saute bien le
+  traitement de l'événement, mais ne l'ajoute JAMAIS à `alreadyDoneIds` (qui
+  ne vient que de `finalDone:{id}`) — un match jamais confirmé FINAL (ex.
+  POSTPONED, comme `401918759`/Melilla-Pinatarens vu dans les logs, ou un
+  match resté coincé par un bug antérieur) reste donc DANS `activeEvents`
+  POUR TOUJOURS, à chaque passe, indéfiniment. Ces quelques zombies
+  maintenaient `activeEvents.length > 0` en permanence SANS jamais être
+  `anyLive` (trop vieux, jamais un statut ESPN "live") — ce qui réarmait
+  `nextCheckKey` (jusqu'à 25min de blackout TOTAL de la fonction, voir le
+  2e fix d'hier) EN BOUCLE, INDÉFINIMENT. Le fix `fullyCovered` d'hier
+  garantit seulement "chaque compétition a une info non expirée" (un flag
+  `noMatchFlags` vieux de plusieurs heures compte comme "couvert"), jamais
+  "l'info vient d'être vérifiée cette minute précise" — donc il n'empêchait
+  pas CE blackout de s'armer. Et ce blackout de 25min, plus long que le cycle
+  de probe `NOMATCH_PROBE_EVERY_N_MIN` (10min) du 1er fix d'hier, avale des
+  cycles de probe entiers sans même les laisser s'exécuter (le blackout est
+  un retour anticipé de TOUTE la fonction, avant même d'atteindre la logique
+  de probe) — expliquant pourquoi un but sur un match par ailleurs normal,
+  sur une AUTRE compétition, pouvait rester invisible pendant toute la durée
+  du blackout, répété sans fin à cause des mêmes zombies qui ne disparaissent
+  jamais. Corrigé (`runOnePass`) : nouveau `staleIds` (Set), alimenté juste
+  avant le `continue` de `STALE_MATCH_MS` dans la boucle principale (zéro
+  coût Redis/Turso, même logique que l'ajout à `alreadyDoneIds`) — repris
+  ensuite dans le calcul d'`activeEvents` (`!alreadyDoneIds.has(id) &&
+  !staleIds.has(id)`), EN PLUS d'`alreadyDoneIds`, pour la décision
+  emptyDay/nextCheck. Un match visiblement trop vieux ne peut donc plus
+  jamais faire croire "rien ne se passe aujourd'hui" et bloquer la découverte
+  d'un match réellement en cours ailleurs — contrairement à `alreadyDoneIds`
+  (qui exige une vraie confirmation FINAL), `staleIds` est basé uniquement
+  sur l'âge du coup d'envoi, donc couvre aussi les matchs qui ne seront
+  JAMAIS confirmés FINAL (annulés, reportés, coincés). 370 tests + lint +
+  build + `npx wrangler deploy --dry-run` (bundle généré sans erreur, 405
+  KiB) vérifiés. Honnêteté : comme pour les 2 fixes précédents de cet
+  incident, aucun accès réseau réel depuis cet environnement pour reproduire
+  ni confirmer contre la vraie prod — mais cette fois la preuve est directe
+  et quasi certaine : les écarts de temps observés dans `logHistory`
+  correspondent EXACTEMENT (à la seconde près pour le 25min) aux 2 constantes
+  de blackout déjà identifiées, et le mécanisme qui les réarme en boucle (ces
+  mêmes event ids jamais retirés) est confirmé par simple lecture du code, pas
+  une hypothèse. C'est très probablement LA cause principale des 3 jours de
+  notifs cassées (les 2 fixes précédents, bien réels, corrigeaient des trous
+  adjacents mais n'empêchaient pas CE blackout précis de se réarmer en boucle
+  à cause des zombies). À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier) ; à confirmer par
+  l'utilisateur sur son prochain but/carton — si le symptôme persiste malgré
+  ces 3 fixes cumulés, il faudra obtenir un `npm run tail` en direct pendant
+  l'incident plutôt qu'une 4e théorie, le debug-push différé ne suffisant
+  visiblement plus à trancher seul.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
