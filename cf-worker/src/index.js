@@ -741,9 +741,43 @@ async function runOnePass(env) {
   const coldMinuteParity = now.getMinutes() % 2
   const isColdSlugActiveThisMinute = (slug) => (ESPN_SLUGS.indexOf(slug) % 2) === coldMinuteParity
 
+  // ⚠️ BUG CRITIQUE CORRIGÉ (constat utilisateur, 05/10 : "aucune notif
+  // pendant les matchs, et 2h après je reçois seulement la notif de fin de
+  // match" — déclenché, selon l'utilisateur, un jour où 4 matchs tournaient
+  // en même temps) : l'ordre des 2 checks ci-dessous était inversé par
+  // rapport à l'intention. noMatchFlags.has(p.key) était vérifié EN PREMIER
+  // et bloquait le fetch à 100%, même si hotSlugs.has(p.slug) était vrai —
+  // alors que le commentaire plus haut dans ce fichier (EMPTY_DAY_TTL/
+  // skipUntil) énonce explicitement le principe inverse : "un match en cours
+  // qu'on connaît prime toujours sur une optimisation 'aucun match'
+  // potentiellement erronée". Pire : un VRAI deadlock. Si un slug+date se
+  // fait flagger noMatch (2 passes consécutives "0 event" — typiquement tôt
+  // le jour même, avant que ESPN publie les events du jour), et qu'un match
+  // démarre PLUS TARD ce même jour sur ce même slug, hotSlugs ne peut pas
+  // encore le savoir (hotSlugsThisPass n'est alimenté QUE par les matchs
+  // trouvés dans `allEvents`, qui lui-même ne contient QUE ce qui a été
+  // fetché — exactement ce que noMatchFlags empêchait). Le seul moyen de
+  // DÉCOUVRIR que ce slug a un match live était bloqué par le flag censé
+  // n'agir que sur un jour VRAIMENT vide — un match de championnat (plusieurs
+  // rencontres sous le même slug, ex. "uefa.champions" un soir de phase de
+  // ligue) resterait alors TOTALEMENT invisible (buts/cartons/fin — rien)
+  // jusqu'à expiration du TTL (20h, ou 2h pour une compétition sporadique) —
+  // collant exactement au symptôme "rien pendant le match, notif de fin
+  // reçue bien plus tard" une fois le TTL enfin écoulé et le match retrouvé
+  // déjà FINAL au 1er fetch suivant.
+  // Corrigé en 2 temps : (1) hotSlugs passe EN PREMIER — un slug déjà connu
+  // comme "a un match live/pas-confirmé-fini" ne peut plus JAMAIS être
+  // bloqué par noMatchFlags, quel que soit son état. (2) Pour casser le
+  // deadlock initial (avant que hotSlugs ait eu la moindre chance d'exister
+  // pour CE match précis) : noMatchFlags ne bloque plus le fetch à 100%,
+  // seulement 9 minutes sur 10 (NOMATCH_PROBE_EVERY_N_MIN) — perd une partie
+  // de l'économie CPU visée par ce flag sur un jour VRAIMENT vide, mais
+  // garantit qu'un nouveau match est redécouvert en au PLUS 10 minutes au
+  // lieu d'être invisible pour le reste du TTL.
+  const NOMATCH_PROBE_EVERY_N_MIN = 10
   const pairsToFetch = slugDatePairs.filter(p => {
-    if (noMatchFlags.has(p.key)) return false
     if (hotSlugs.has(p.slug)) return true
+    if (noMatchFlags.has(p.key)) return now.getMinutes() % NOMATCH_PROBE_EVERY_N_MIN === 0
     return isColdSlugActiveThisMinute(p.slug)
   })
   // Voir fetchEspnEventsBatch (plus haut) : regroupe tous les pairsToFetch

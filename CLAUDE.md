@@ -3229,6 +3229,66 @@ cf-worker/
   source copié, pas retouché ici pour rester cohérent avec lui plutôt que diverger. Rendu jamais
   vu en direct sur un vrai match en mi-temps avant ce déploiement — à confirmer par l'utilisateur.
 
+- ✅ BUG CRITIQUE TROUVÉ ET CORRIGÉ : notifs but/carton/mi-temps/fin totalement
+  absentes pendant les matchs, "fin de match" reçue ~2h en retard seulement
+  (constat utilisateur, 05/10 : "j'en reçois aucune pendant les matchs et
+  c'est 2h après... seulement les notifs de fin de match" — déclenché, selon
+  l'utilisateur, le jour où 4 matchs tournaient en même temps, resté cassé
+  depuis). Après avoir d'abord vérifié (question explicite posée) que le
+  Worker était bien déployé à jour ET les secrets Turso bien configurés côté
+  Cloudflare (les deux confirmés oui par l'utilisateur — écarte la théorie
+  "ancien code pas redéployé" du 01/10), root cause trouvée par relecture du
+  mécanisme `noMatchFlags`/`hotSlugs` (`pairsToFetch`, `cf-worker/src/
+  index.js`) : l'ordre des 2 checks était inversé par rapport à l'intention
+  déjà énoncée ailleurs dans ce même fichier pour un mécanisme similaire
+  (EMPTY_DAY_TTL/skipUntil : "un match en cours qu'on connaît prime toujours
+  sur une optimisation 'aucun match' potentiellement erronée"). `noMatchFlags.
+  has(p.key)` était vérifié EN PREMIER et bloquait le fetch à 100%, même si
+  `hotSlugs.has(p.slug)` était vrai — et pire, un vrai DEADLOCK : si un
+  slug+date se fait flagger noMatch (2 passes consécutives "0 event", typique
+  tôt le jour même avant que ESPN publie les events du jour) puis qu'un match
+  démarre PLUS TARD ce même jour sur ce même slug (ex. une soirée Ligue des
+  Champions, plusieurs rencontres sous le même slug `uefa.champions`),
+  `hotSlugs` ne peut pas encore le savoir — il n'est alimenté QUE par les
+  matchs trouvés dans `allEvents`, qui lui-même ne contient QUE ce qui a été
+  fetché, exactement ce que `noMatchFlags` empêchait. Le SEUL moyen de
+  découvrir que ce slug a un match live était bloqué par le flag censé
+  n'agir que sur un jour VRAIMENT vide — toutes les rencontres de ce slug
+  restaient alors invisibles (buts/cartons/mi-temps/fin — rien) jusqu'à
+  expiration du TTL (20h, ou 2h pour une compétition sporadique), collant
+  exactement au symptôme "rien pendant le match, notif de fin reçue bien plus
+  tard" une fois le TTL enfin écoulé et le match retrouvé déjà FINAL au 1er
+  fetch suivant. Honnêteté sur une fausse piste explorée avant de trouver
+  celle-ci : d'abord suspecté le propre fix du 01-02/10 (pipeline Turso
+  séquentiel, 1→3 sous-requêtes/match) comme cause d'un dépassement du
+  plafond Cloudflare (50 sous-requêtes/exécution) sous charge — calcul
+  arithmétique détaillé à l'appui, mais écarté une fois réalisé que le
+  batching multi-slug du même jour (02/10) avait au contraire libéré ÉNORMÉMENT
+  de marge sur ce budget (34 sous-requêtes ESPN fixes/passe → ~2), rendant
+  cette théorie peu plausible pour un incident survenu APRÈS les 2 fixes.
+  Corrigé (`cf-worker/src/index.js`, `pairsToFetch`) en 2 temps : (1)
+  `hotSlugs` vérifié EN PREMIER — un slug déjà connu comme "a un match live/
+  pas-confirmé-fini" ne peut plus JAMAIS être bloqué par `noMatchFlags`, quel
+  que soit son état. (2) Pour casser le deadlock initial (avant que hotSlugs
+  ait eu la moindre chance d'exister pour CE match précis) : `noMatchFlags`
+  ne bloque plus le fetch à 100%, seulement 9 minutes sur 10
+  (`NOMATCH_PROBE_EVERY_N_MIN=10`) — perd une petite partie de l'économie CPU
+  visée par ce flag sur un jour VRAIMENT vide, mais garantit qu'un nouveau
+  match est redécouvert en au PLUS 10 minutes au lieu d'être invisible pour
+  le reste du TTL (jusqu'à 20h). 370 tests + lint + build + `npx wrangler
+  deploy --dry-run` (bundle généré sans erreur, 405 KiB) vérifiés. Honnêteté :
+  comme toujours pour `cf-worker/`, aucun accès réseau réel depuis cet
+  environnement pour reproduire le deadlock en conditions réelles ni
+  confirmer ce fix contre la vraie prod — mais c'est, cette fois, un VRAI bug
+  de logique confirmé par simple lecture du code (ordre des checks inversé +
+  dépendance circulaire hotSlugs↔fetch), pas une théorie arithmétique non
+  vérifiée comme la fausse piste explorée d'abord. À déployer manuellement
+  (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce dossier —
+  aucun déploiement automatique) ; à confirmer par l'utilisateur sur son
+  prochain match, idéalement un jour avec plusieurs rencontres sous le même
+  slug (Ligue des Champions/Europa/Conférence) pour revérifier le scénario
+  exact qui a déclenché l'incident.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
