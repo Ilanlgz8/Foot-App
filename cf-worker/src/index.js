@@ -774,7 +774,36 @@ async function runOnePass(env) {
   // de l'économie CPU visée par ce flag sur un jour VRAIMENT vide, mais
   // garantit qu'un nouveau match est redécouvert en au PLUS 10 minutes au
   // lieu d'être invisible pour le reste du TTL.
-  const NOMATCH_PROBE_EVERY_N_MIN = 10
+  // ⚠️ RESSERRÉ 10 → 2 (05/10, suite du même incident — l'utilisateur précise
+  // après les 4 fixes précédents : "les autres notifs sont apparus après mais
+  // deja de base y'avait 10min de retard au moins", sur un soir à 7 matchs de
+  // Ligue des Nations démarrant tous à la même minute). Root cause de ce
+  // retard-ci, DIFFÉRENTE des 4 fixes précédents (qui corrigeaient des pertes/
+  // blocages, pas un simple délai systématique) : les 7 matchs partagent le
+  // MÊME slug ESPN (`uefa.nations`) — un seul fetch groupé ramène les 7
+  // d'un coup, donc aucune raison structurelle qu'ils arrivent étalés. Mais
+  // `uefa.nations:today` a très probablement été flaggé `noMatch` plus tôt
+  // dans la journée (scoreboard ESPN encore vide avant que les 7 matchs n'y
+  // apparaissent, heures avant le coup d'envoi) — une fois ce flag posé,
+  // CE mécanisme-ci (probe 1 minute sur N) est le SEUL point qui décide à
+  // quelle vitesse le Worker redécouvre que ce slug a maintenant des matchs :
+  // avec N=10, le pire cas est un délai de 10 minutes complètes avant la
+  // toute première détection (KO compris) — exactement le "10min de retard
+  // au moins" rapporté, pour TOUS les matchs de ce slug à la fois (pas un
+  // sous-ensemble). Resserré à 2 : pire cas ramené à 2min. Coût accepté :
+  // les slugs noMatch-flaggés (la quasi-totalité du temps pour les
+  // compétitions sporadiques, hors jour de match) passent de "fetché 1 minute
+  // sur 10" à "1 minute sur 2" — mais ce fetch supplémentaire ne coûte PAS de
+  // sous-requêtes Cloudflare en plus : il rejoint simplement le même appel
+  // Vercel déjà groupé par date (voir fetchEspnEventsBatch, au plus 2 appels/
+  // minute QUEL QUE SOIT le nombre de slugs dans le groupe) — seul le travail
+  // CÔTÉ VERCEL (1 fetch ESPN de plus par slug concerné, déjà parallélisé via
+  // Promise.allSettled dans api/espn.js) augmente légèrement, pas le budget
+  // de 50 sous-requêtes/exécution du Worker qui avait motivé le fix précédent
+  // (4e bug du jour). Combiné à ce fix (writePipe fusionné en 1 sous-requête/
+  // match au lieu de 2-3), ce resserrement ne risque pas de recréer le
+  // dépassement de budget qu'il visait justement à corriger.
+  const NOMATCH_PROBE_EVERY_N_MIN = 2
   const pairsToFetch = slugDatePairs.filter(p => {
     if (hotSlugs.has(p.slug)) return true
     if (noMatchFlags.has(p.key)) return now.getMinutes() % NOMATCH_PROBE_EVERY_N_MIN === 0

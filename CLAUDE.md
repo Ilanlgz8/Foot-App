@@ -3498,6 +3498,43 @@ cf-worker/
   confirmer par l'utilisateur sur son prochain soir à plusieurs matchs
   simultanés.
 
+- ✅ 5e CORRECTIF, MÊME INCIDENT — précision apportée par l'utilisateur après
+  le 4e fix (05/10 : "les autres notifs sont apparus après mais bno deja de
+  base y'avait 10min de retard au moins") : ne décrit plus 4/7 matchs
+  perdus, mais bien les 7 arrivées, avec un retard SYSTÉMATIQUE d'au moins
+  10 minutes dès le départ — un symptôme différent du 4e fix (dépassement
+  du budget 50 sous-requêtes, qui expliquerait une perte/un rattrapage
+  étalé sur PLUSIEURS passes, pas un délai uniforme identique pour tout le
+  monde). Root cause trouvée directement dans la constante déjà identifiée
+  le même jour : `NOMATCH_PROBE_EVERY_N_MIN = 10` (1er fix du jour,
+  `pairsToFetch`) — les 7 matchs partagent le MÊME slug ESPN
+  (`uefa.nations`), donc un seul fetch groupé les ramène tous d'un coup dès
+  que ce slug est inclus dans la passe ; mais si `uefa.nations:today` a été
+  flaggé `noMatch` plus tôt dans la journée (scoreboard ESPN probablement
+  vide pendant des heures avant que les 7 matchs n'y apparaissent), ce
+  slug+date n'est plus fetché QUE 1 minute sur 10 — le pire cas avant la
+  toute première détection (KO compris, pour les 7 d'un coup) est donc
+  précisément 10 minutes complètes, exactement le "10min de retard au
+  moins" rapporté. Corrigé (`cf-worker/src/index.js`) : `NOMATCH_PROBE_
+  EVERY_N_MIN` resserré 10 → 2 — pire cas ramené à 2 minutes. Coût
+  vérifié comme sûr : ce fetch plus fréquent des slugs noMatch-flaggés
+  REJOINT le même appel Vercel déjà groupé par date (`fetchEspnEventsBatch`,
+  fix du 02/10 — au plus 2 appels Vercel/minute quel que soit le nombre de
+  slugs dans le groupe), donc n'augmente PAS le nombre de sous-requêtes
+  Cloudflare du Worker (seul le travail côté Vercel grandit très légèrement,
+  déjà parallélisé par slug) — combiné au 4e fix du jour (writePipe fusionné
+  à 1 sous-requête/match au lieu de 2-3), ce resserrement ne risque pas de
+  recréer le dépassement de budget que ce 4e fix venait justement de
+  corriger. 370 tests + lint + build + `npx wrangler deploy --dry-run` (406
+  KiB) vérifiés. Honnêteté : comme pour tout `cf-worker/`, aucun accès
+  réseau réel depuis cet environnement pour confirmer ce nouveau délai (2min
+  au lieu de 10) en conditions réelles — mais la cause est confirmée par
+  simple lecture de la constante déjà identifiée le même jour, pas une
+  nouvelle hypothèse. À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`) ; si un délai significatif persiste malgré les 5 fixes
+  cumulés de cette journée, il faudra un `npm run tail` en direct pendant un
+  prochain coup d'envoi plutôt qu'une 6e théorie.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
