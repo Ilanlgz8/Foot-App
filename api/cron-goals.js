@@ -823,11 +823,20 @@ export default async function handler(req, res) {
     // manquant) est conservé : c'est lui qui gère les buts multiples entre
     // deux polls (ex: 0→2 d'un coup), pas la partie retirée ici.
     //
-    // Exclusion conservée : un changement de score alors qu'on était DÉJÀ en
-    // mi-temps au poll précédent ET qu'on y est toujours (vraie pause, aucun
-    // but possible) = correction tardive de données ESPN, pas un but réel →
-    // absorbé silencieusement dans le compteur, jamais notifié.
-    const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
+    // ⚠️ EXCLUSION RETIRÉE (05/10, bug confirmé — voir le commentaire détaillé
+    // dans cf-worker/src/index.js, même state machine, même fix appliqué ici
+    // pour rester identique aux 2 implémentations). Elle supposait qu'un
+    // changement de score pendant une "vraie pause" mi-temps→mi-temps était
+    // forcément une correction tardive ESPN, jamais un but réel — faux dans
+    // au moins 2 cas réels (VAR confirmée après le coup de sifflet de la
+    // mi-temps ; champs statut/score ESPN qui se synchronisent de façon
+    // asynchrone). Constat utilisateur exact : Italie-Turquie, 2 buts jamais
+    // notifiés, alors que KO/mi-temps/reprise de ce même match sont bien
+    // tous les 3 arrivés normalement — correspond exactement à cette fenêtre
+    // (mi-temps 19:32:26→19:48:25, 16min à l'arrêt). Un but marqué pendant
+    // la mi-temps est désormais traité comme n'importe quel autre but ; le
+    // risque inverse (faux pic de score qui redescend) reste couvert par
+    // `cancelledSides` juste au-dessus (envoie "❌ But annulé" si besoin).
     // Retour utilisateur : notif de carton rouge reçue des heures après un match
     // fini (3h du mat', notif reçue en pleine journée). Cause : ce bloc restait
     // vrai à CHAQUE poll tant que le match était FINAL (`|| FINAL_ESPN.has(status)`,
@@ -903,12 +912,6 @@ export default async function handler(req, res) {
 
       for (const side of sides) {
         const targetCount = side === 'home' ? home : away
-
-        if (steadyHalftime) {
-          track[side] = targetCount
-          trackChanged = true
-          continue
-        }
 
         const scoringTeam = side === 'home' ? homeTeam : awayTeam
         const goalScorers = extractEspnScorers(comp, homeC.team?.id, awayC.team?.id)

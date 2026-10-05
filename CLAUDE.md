@@ -3535,6 +3535,61 @@ cf-worker/
   cumulés de cette journée, il faudra un `npm run tail` en direct pendant un
   prochain coup d'envoi plutôt qu'une 6e théorie.
 
+- ✅ 6e BUG TROUVÉ ET CORRIGÉ, MÊME INCIDENT — enfin la bonne piste pour les buts
+  manqués spécifiquement (05/10, demande du log `/api/debug-push` pour arrêter
+  de deviner — constat utilisateur : "la tu vois ça marchait bien mais y'a
+  deux buts pour italie - turquie ou j'ai pas reçu la notif"). Le log fourni a
+  tranché immédiatement : `401861131` (Italie-Turquie) a bien 2 lignes
+  normales — "transition STATUS_IN_PROGRESS → STATUS_HALFTIME" à 19:32:26 puis
+  "transition STATUS_HALFTIME → STATUS_IN_PROGRESS" à 19:48:25 — mais AUCUNE
+  ligne "BUT" nulle part dans tout l'historique pour ce match, alors qu'un
+  AUTRE match du même soir (401861134, Ukraine-Hongrie) montre bien "BUT away
+  1/1" à 19:55:23. KO/mi-temps/reprise fonctionnent, les buts jamais. Root
+  cause trouvée par lecture directe du code (`cf-worker/src/index.js` ET
+  `api/cron-goals.js`, "même state machine", vérifié identique dans les 2) :
+  `steadyHalftime` (`prevStatus==='STATUS_HALFTIME' && status==='STATUS_
+  HALFTIME'`, vrai à CHAQUE poll pendant toute la pause, ici 19:32:26 à
+  19:48:25, 16min) absorbait silencieusement TOUTE hausse de score détectée
+  pendant cette fenêtre (`track[side] = targetCount; continue`, AUCUN
+  `notifyVercel`, AUCUNE ligne de log) — l'hypothèse d'origine (commentaire du
+  code) : "aucun but ne peut être marqué pendant un arrêt de jeu, donc une
+  hausse de score ici = correction tardive ESPN, jamais un but réel". Fausse
+  dans au moins 2 cas réels : (1) un but marqué dans les derniers instants du
+  1er acte peut être confirmé par la VAR APRÈS que l'arbitre ait sifflé la
+  mi-temps — le score n'arrive côté ESPN qu'une fois déjà à l'arrêt ; (2) les
+  champs "statut" et "score" d'ESPN se synchronisent de façon asynchrone — si
+  "statut" bascule sur HALFTIME un poll avant que "score" rattrape un but de
+  fin de 1ère mi-temps, les 2 polls concernés (celui qui capture enfin le bon
+  score, et celui d'avant) sont déjà HALFTIME→HALFTIME, pile le cas absorbé.
+  Italie-Turquie colle exactement à ce scénario (fenêtre de 16min à l'arrêt,
+  largement assez longue pour qu'un des 2 mécanismes se produise 2 fois).
+  Corrigé dans les 2 fichiers (suppression de la variable et du bloc
+  `if (steadyHalftime) {...continue}` dans la boucle de détection de but) :
+  un but marqué pendant la mi-temps est désormais traité EXACTEMENT comme un
+  but en pleine action, même chemin de notification. Le risque inverse que ce
+  code visait à éviter à l'origine (un faux pic de score qui redescend juste
+  après) reste couvert PAR AILLEURS, sans rien avoir à ajouter : si le score
+  redescend ensuite, le bloc `cancelledSides` (juste au-dessus dans les 2
+  fichiers, inchangé) envoie "❌ But annulé" — mieux vaut notifier puis
+  corriger au besoin que ne jamais notifier un vrai but. 370 tests + lint (33
+  erreurs pré-existantes, Pronos.jsx, inchangé) + build + `npx wrangler deploy
+  --dry-run` (406 KiB) vérifiés. Honnêteté : comme pour tout `cf-worker/`,
+  aucun accès réseau réel depuis cet environnement pour reproduire ce scénario
+  exact en conditions réelles — mais cette fois la preuve est directe et quasi
+  certaine : le log fourni par l'utilisateur montre precisement 0 ligne "BUT"
+  pour ce match sur toute sa durée alors que tout le reste (transitions de
+  statut) fonctionne, et le mécanisme qui explique ça sans aucune autre
+  hypothèse possible est confirmé par simple lecture du code (l'absorption
+  silencieuse sans aucun log, donc aucune trace, est exactement ce qui
+  expliquerait l'absence totale de ligne "BUT" dans le log). C'est
+  probablement le vrai fix pour ce symptôme précis, distinct des 5 fixes
+  précédents de cette même journée (qui concernaient la découverte/le délai,
+  pas l'absorption silencieuse pendant la pause). À déployer manuellement
+  (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce dossier — la
+  partie `api/cron-goals.js` se déploie automatiquement avec le reste de
+  l'app via Vercel) ; à confirmer par l'utilisateur sur son prochain match
+  avec un but marqué pile avant/pendant la mi-temps.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

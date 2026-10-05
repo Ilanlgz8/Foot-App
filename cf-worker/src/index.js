@@ -1289,7 +1289,33 @@ async function runOnePass(env) {
       log.push(`[espn:${slug}:${eventId}] ${homeTeam}-${awayTeam} transition ${prevStatus} → ${status}`)
     }
 
-    const steadyHalftime = prevStatus === 'STATUS_HALFTIME' && status === 'STATUS_HALFTIME'
+    // ⚠️ RETIRÉ (05/10, bug confirmé — constat utilisateur : "y'a deux buts
+    // pour italie - turquie ou j'ai pas reçu la notif", alors que KO/mi-temps/
+    // reprise de CE match sont bien tous les 3 dans les logs, aucune autre
+    // anomalie). Variable `steadyHalftime` (prevStatus===HALFTIME ET
+    // status===HALFTIME) utilisée plus bas pour absorber silencieusement
+    // TOUTE hausse de score pendant une "vraie pause" mi-temps→mi-temps,
+    // présumée être "une correction tardive de données ESPN, jamais un but
+    // réel" (hypothèse plausible en théorie — aucun but ne PEUT être marqué
+    // pendant un arrêt de jeu — mais fausse dans au moins 2 cas réels :
+    // (1) un but marqué dans les derniers instants du 1er acte peut être
+    // confirmé par la VAR APRÈS que l'arbitre ait sifflé la mi-temps, le
+    // score n'arrivant alors côté ESPN qu'une fois déjà à l'arrêt ;
+    // (2) le champ "statut" et le champ "score" d'ESPN se synchronisent de
+    // façon asynchrone — si "statut" bascule sur HALFTIME un poll avant que
+    // "score" rattrape un but de fin de 1ère mi-temps, ce poll ET le suivant
+    // sont tous les deux HALFTIME→HALFTIME, pile le cas absorbé ici).
+    // Italie-Turquie colle exactement à ce scénario : mi-temps détectée à
+    // 19:32:26, reprise à 19:48:25 (16min à l'arrêt) — toute hausse de score
+    // pendant cette fenêtre était donc silencieusement avalée dans track[side]
+    // (jamais notifiée) plutôt que traitée comme un vrai but. Le risque
+    // inverse que ce code visait à éviter (un faux pic de score qui
+    // redescend juste après) est déjà couvert PAR AILLEURS : si le score
+    // redescend ensuite, `cancelledSides` (juste au-dessus) envoie "❌ But
+    // annulé" — mieux vaut notifier puis corriger que ne jamais notifier un
+    // vrai but. Supprimé : un but marqué pendant la mi-temps (VAR tardive ou
+    // simple lag de synchro ESPN) est désormais traité EXACTEMENT comme un
+    // but en pleine action, même chemin de notification plus bas.
 
     // ⚽ But (+ ❌ but annulé) — même state machine que api/cron-goals.js
     // ⚠️ ÉLARGI (question utilisateur, 11/09 : "si une notif part pas pendant
@@ -1354,7 +1380,6 @@ async function runOnePass(env) {
 
         for (const side of sides) {
           const targetCount = side === 'home' ? home : away
-          if (steadyHalftime) { track[side] = targetCount; trackChanged = true; continue }
 
           const scoringTeam = side === 'home' ? homeTeam : awayTeam
           const goalScorers = extractEspnScorers(comp, homeC.team?.id)
