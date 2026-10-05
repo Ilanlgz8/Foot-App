@@ -3289,6 +3289,68 @@ cf-worker/
   slug (Ligue des Champions/Europa/Conférence) pour revérifier le scénario
   exact qui a déclenché l'incident.
 
+- ✅ 2e BUG CRITIQUE TROUVÉ, MÊME INCIDENT (05/10, le fix hotSlugs/noMatchFlags
+  ci-dessus NE SUFFISAIT PAS — constat utilisateur après déploiement confirmé
+  (code poussé + `npm run deploy` fait + secrets Turso bien présents côté
+  Cloudflare, vérifié via question directe) : "il y a un match qui vient de
+  commencer, j'ai reçu aucune notification [...] il a commencé il y a même
+  45 minutes"). Récupéré le JSON complet de `/api/debug-push?secret=...` pour
+  diagnostiquer sans accès réseau direct : `cron.lastRunAgo: "849s"` n'était
+  PAS un signal d'alarme (confirmé par lecture de `shouldWriteDebugBookkeeping()`
+  — `cron:goals:lastRun` n'est écrit que 1 minute sur 15, optimisation déjà
+  documentée, donc ~14min d'écart est parfaitement normal même si le Worker
+  tourne bien chaque minute) — mais `logHistory` montrait des trous très
+  suspects d'environ 3h26 entre les entrées, et AUCUNE trace d'un quelconque
+  nouveau match détecté ce jour-là malgré le match que l'utilisateur regardait
+  depuis 45min. Root cause trouvée par relecture de `runOnePass()` : UN
+  DEUXIÈME gate, plus haut et plus radical que celui déjà corrigé — `knownEmpty`
+  (`cron:emptyDay`, TTL 3h) / `skipUntil` (`cron:nextCheck`, jusqu'à 25min) —
+  fait un `return` TOTAL de la fonction (`{events:0, log:[], quiet:true}`)
+  AVANT MÊME d'atteindre `pairsToFetch`/`hotSlugs`/`noMatchFlags` (le
+  mécanisme du fix précédent) : aucun slug n'est fetché du tout pendant que ce
+  gate est armé. Le vrai bug : ces 2 clés s'armaient sur la base
+  d'`activeEvents`/`allEvents`, qui ne contiennent QUE ce qui a été RÉELLEMENT
+  fetché CETTE passe précise (`pairsToFetch`, un SOUS-ENSEMBLE — la parité
+  froide `isColdSlugActiveThisMinute` ou le probe 1/10 de `noMatchFlags`
+  sautent volontairement une partie des slugs chaque minute) — traité comme
+  si cette vue partielle représentait la journée ENTIÈRE. Si les quelques
+  slugs effectivement fetchés cette passe étaient vides (alors qu'un AUTRE
+  slug, pas encore vérifié cette minute précise, avait justement un match qui
+  venait de démarrer), `cron:emptyDay` s'armait pour 3H — un blackout GLOBAL
+  qui coupe le fetch de TOUS les slugs, y compris ceux jamais encore vérifiés,
+  pendant 3h d'affilée, sans que le fix précédent (hotSlugs/noMatchFlags) n'ait
+  la moindre prise là-dessus puisqu'il n'est même jamais atteint. Coïncide
+  exactement avec les écarts de ~3h26 observés dans `logHistory` (3h de
+  blackout + le temps d'1-2 passes pour re-confirmer). Corrigé (`runOnePass`,
+  juste après le calcul d'`activeEvents`) : nouvelle variable `fullyCovered`
+  — vrai seulement si CHAQUE couple slug+date de `slugDatePairs` est soit
+  réellement fetché cette passe (`pairsToFetch`), soit déjà confirmé
+  `noMatchFlags` par une passe précédente — jamais sur la base d'un
+  sous-ensemble partiel. `emptyDayKey`/`nextCheckKey` ne peuvent plus s'armer
+  tant que `fullyCovered` n'est pas vrai : sans couverture complète, on
+  s'abstient juste d'armer l'optimisation cette passe précise (tout le reste —
+  traitement des buts/cartons/mi-temps/fin déjà fetchés — continue
+  normalement, aucun autre effet) ; la couverture se complète naturellement en
+  1-2 passes (rotation de parité + confirmations noMatch), donc cette économie
+  continue de s'armer dès que l'état réel du jour est vraiment connu en
+  entier, jamais sur une vue partielle qui pourrait cacher un match en train
+  de démarrer. 370 tests + lint + build + `npx wrangler deploy --dry-run`
+  (bundle généré sans erreur, 405 KiB) vérifiés. Honnêteté : comme pour le fix
+  précédent, aucun accès réseau réel depuis cet environnement pour reproduire
+  ce 2e blackout en conditions réelles ni confirmer ce fix contre la vraie
+  prod — mais c'est de nouveau un vrai bug de logique confirmé par lecture
+  directe du code (le gate `knownEmpty`/`skipUntil` se base structurellement
+  sur une vue partielle de la journée, jamais la journée entière), cohérent
+  avec le motif exact observé dans `logHistory` (trous de ~3h26, zéro trace du
+  match du soir) — pas une nouvelle théorie devinée au hasard. Les 2 fixes de
+  cet incident (hotSlugs/noMatchFlags + fullyCovered) sont complémentaires et
+  indépendants : le 1er protège le fetch PAR SLUG une fois qu'on a dépassé le
+  2e gate, le 2e protège l'accès à TOUTE la fonction. À déployer manuellement
+  (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce dossier) ; à
+  confirmer par l'utilisateur sur son prochain match en direct, idéalement un
+  jour où un match démarre pendant que peu de compétitions tournent déjà (le
+  scénario où ce 2e gate avait le plus de chances d'être armé).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

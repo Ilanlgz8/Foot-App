@@ -1591,7 +1591,33 @@ async function runOnePass(env) {
   // ESPN cesse de les lister des heures/jours plus tard.
   const activeEvents = allEvents.filter(({ evt }) => !alreadyDoneIds.has(evt.id))
 
-  if (stillTrackingLive === 0) {
+  // ⚠️ 2e BUG CRITIQUE CORRIGÉ, MÊME INCIDENT (05/10, le fix hotSlugs/
+  // noMatchFlags ci-dessus NE SUFFISAIT PAS — constat utilisateur après
+  // déploiement : "45min après le début d'un match, toujours aucune notif").
+  // activeEvents/allEvents ci-dessus ne contiennent QUE ce qui a été
+  // RÉELLEMENT fetché cette passe (pairsToFetch) — jamais les slugs
+  // volontairement sautés cette minute (parité froide isColdSlugActiveThisMinute,
+  // ou probe 1/10 de noMatchFlags). Or emptyDayKey/nextCheckKey juste en
+  // dessous s'armaient sur la base de CE SEUL sous-ensemble partiel, comme
+  // s'il représentait la journée ENTIÈRE : si les quelques slugs fetchés
+  // cette passe précise sont vides, emptyDayKey s'arme pour 3h — un BLACKOUT
+  // GLOBAL qui coupe le fetch de TOUS les slugs (y compris ceux pas encore
+  // vérifiés, potentiellement en train de démarrer un match) pendant 3h
+  // d'affilée, sans que le fix hotSlugs/noMatchFlags ci-dessus n'ait la
+  // moindre prise là-dessus (ce blackout empêche même d'ATTEINDRE pairsToFetch
+  // la prochaine passe). Coïncide exactement avec les écarts de ~3h26 observés
+  // dans logHistory. Corrigé : n'arme emptyDayKey/nextCheckKey QUE si TOUS les
+  // couples slug+date sont couverts avec certitude — soit fetchés cette passe,
+  // soit déjà confirmés noMatch par une passe précédente — jamais sur la base
+  // d'un sous-ensemble partiel. Sans couverture complète, on s'abstient juste
+  // d'armer l'optimisation cette passe (aucun autre effet) ; la couverture se
+  // complète naturellement en 1-2 passes (rotation de parité + confirmations
+  // noMatch), donc cette économie continue de s'armer dès que l'état réel du
+  // jour est vraiment connu en entier — jamais sur une vue partielle.
+  const pairsToFetchKeySet = new Set(pairsToFetch.map(p => p.key))
+  const fullyCovered = slugDatePairs.every(p => noMatchFlags.has(p.key) || pairsToFetchKeySet.has(p.key))
+
+  if (stillTrackingLive === 0 && fullyCovered) {
     if (activeEvents.length === 0 && !espnFetchFailed) {
       try { await kv.set(emptyDayKey, '1', { ex: EMPTY_DAY_TTL }) } catch {}
     } else if (activeEvents.length > 0 && !espnFetchFailed) {
