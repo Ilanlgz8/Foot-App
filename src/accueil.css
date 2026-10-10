@@ -1553,6 +1553,42 @@
     color-mix(in srgb, var(--poster-comp, #171b22) 45%, #08090d) 100%);
   box-shadow: 0 4px 24px rgba(var(--black-rgb),0.5);
   width: 100%;
+  /* ⚠️ AJOUT (constat utilisateur, 10/10 : flash noir sur les cards pendant
+     un scroll rapide dans Accueil, "avant ça me le faisait pas") — root
+     cause la plus probable : chaque card tintée (`.poster--tinted`, 22
+     compétitions sur la liste à ce jour — voir competitions.js — contre
+     bien moins au moment où ce symptôme n'existait pas encore, la quasi-
+     totalité des compétitions étant passées en thème animé au fil des
+     semaines) empile 3 calques (`.poster__bg--gradient`/`gradientAlt`/
+     `gradientTri`) qui animent EN PERMANENCE (`posterDrift`/`posterMorph`,
+     18s/9s en boucle infinie) avec `will-change: transform`, donc promus
+     chacun sur leur propre couche GPU — et la liste de cards n'est PAS
+     virtualisée (`.map()` simple dans MatchCard.jsx/Accueil.jsx, toutes les
+     cards du jour montées à la fois). Un scroll rapide fait apparaître/
+     disparaître beaucoup de ces cards à 3 couches animées en même temps —
+     signature connue et documentée de la surcharge du compositeur GPU
+     d'iOS Safari sur une longue liste d'éléments animés : les nouvelles
+     tuiles entrant dans le viewport s'affichent provisoirement en noir, le
+     temps que le compositeur rattrape le travail accumulé (le délai "1 à 2
+     secondes" décrit correspond bien à ce rattrapage, pas à un vrai
+     chargement réseau/données — rien n'est en train de charger ici).
+     `content-visibility: auto` (supporté Safari/iOS 18+, ignoré sans effet
+     sur les versions plus anciennes — aucune régression possible) retire
+     entièrement du travail de rendu/peinture/compositing les cards loin du
+     viewport, exactement comme une virtualisation "gratuite" sans toucher
+     au JS de la liste : le nombre de couches GPU actives à un instant donné
+     redescend à celles réellement visibles (+ marge), au lieu de TOUTES les
+     cards du jour. `contain-intrinsic-size` donne une taille de repli
+     avant la 1ère mesure réelle (le mot-clé `auto` mémorise ensuite la
+     vraie hauteur mesurée de CETTE card précise, donc l'estimation
+     320px ne sert qu'au tout 1er rendu, pas à chaque scroll). Honnêteté :
+     jamais vérifié en direct sur un vrai iPhone/PWA depuis cet
+     environnement — c'est le correctif standard et documenté pour cette
+     classe de symptôme (liste longue de cards animées + flash noir au
+     scroll rapide sur iOS Safari), pas une reproduction confirmée ; à
+     valider par l'utilisateur après déploiement. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }
 
 .poster {

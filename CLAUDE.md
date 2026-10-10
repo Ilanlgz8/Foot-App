@@ -3674,6 +3674,45 @@ cf-worker/
   plusieurs matchs simultanés, idéalement en gardant un œil sur
   `/api/debug-push?secret=...` pendant le direct plutôt qu'après coup.
 
+- ✅ Flash noir sur les cards de l'Accueil pendant un scroll rapide (PWA mobile), constat
+  utilisateur (10/10 : "quand je scrolle un peu trop vite [...] ça affiche noir et après ça
+  s'affiche au bout d'une seconde ou deux [...] avant ça me le faisait pas") : root cause trouvée
+  par lecture du CSS des cards (`src/accueil.css`, `.poster__frame`/`.poster`) — chaque card
+  tintée (`.poster--tinted`, 22 compétitions au total à ce jour sur `src/data/competitions.js` :
+  4 `tint` + 18 `tintTheme`, contre nettement moins au moment où ce symptôme n'existait pas
+  encore, la quasi-totalité des compétitions étant passée en thème animé au fil des semaines de
+  retouches documentées plus haut dans ce fichier) empile 3 calques (`.poster__bg--gradient`/
+  `gradientAlt`/`gradientTri`) qui animent EN PERMANENCE (`posterDrift` 18s + `posterMorph` 9s,
+  boucle infinie) avec `will-change: transform` — donc chacun promu sur sa propre couche GPU. La
+  liste de cards n'est PAS virtualisée (simple `.map()` dans `MatchCard.jsx`/`Accueil.jsx`, toutes
+  les cards du jour montées à la fois, jamais démontées hors viewport). Un scroll rapide fait
+  apparaître/disparaître beaucoup de ces cards à 3 couches animées en même temps — signature
+  connue et documentée de la surcharge du compositeur GPU d'iOS Safari sur une longue liste
+  d'éléments animés : les nouvelles tuiles qui entrent dans le viewport s'affichent provisoirement
+  en noir, le temps que le compositeur rattrape le travail accumulé — le délai "1 à 2 secondes"
+  décrit correspond à ce rattrapage, pas à un vrai chargement réseau (rien ne charge à cet
+  instant, toutes les données sont déjà en mémoire). Corrigé (`src/accueil.css`, `.poster__frame`) :
+  `content-visibility: auto` + `contain-intrinsic-size: auto 320px` — retire entièrement le
+  travail de rendu/peinture/compositing des cards loin du viewport, l'équivalent d'une
+  virtualisation "gratuite" sans toucher au JS de la liste (ni `MatchCard.jsx` ni `MatchPoster.jsx`
+  modifiés) : le nombre de couches GPU actives à un instant donné redescend à celles réellement
+  visibles (+ marge), au lieu de TOUTES les cards du jour simultanément. Le mot-clé `auto` dans
+  `contain-intrinsic-size` mémorise ensuite la vraie hauteur mesurée de chaque card après son 1er
+  rendu réel — l'estimation 320px ne sert qu'au tout premier affichage d'une card jamais encore
+  vue, pas à chaque scroll. Support : Safari/iOS 18+ (sorti sept. 2024, donc largement répandu à
+  cette date) — ignoré sans AUCUN effet sur des versions plus anciennes (propriété CSS inconnue
+  simplement non appliquée), donc aucune régression possible même si l'appareil de l'utilisateur
+  était plus ancien. `MatchCard.jsx` (desktop, cards `.accueil__card` sans ces calques animés) non
+  concerné, symptôme spécifique aux posters mobile. 370 tests + lint (34 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build vérifiés (CSS buildé inspecté : `content-visibility:auto;contain-
+  intrinsic-size:auto 320px` bien présent sur `.poster__frame`). Honnêteté : jamais vérifié en
+  direct sur un vrai iPhone/PWA depuis cet environnement — c'est le correctif standard et
+  documenté pour cette classe de symptôme précise (liste longue de cards animées + flash noir au
+  scroll rapide sur iOS Safari, cause confirmée par lecture du CSS — 3 couches GPU animées par
+  card × toutes les cards montées en même temps — pas une supposition générique), mais pas une
+  reproduction confirmée en conditions réelles ; à valider par l'utilisateur sur son téléphone
+  après ce déploiement (automatique via Vercel, pas de `npm run deploy` manuel nécessaire).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
