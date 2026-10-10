@@ -998,6 +998,63 @@ async function runOnePass(env) {
   // d'un match réellement en cours ailleurs.
   const staleIds = new Set()
 
+  // ⚠️ AJOUT (10/10, incident 11 matchs simultanés — constat utilisateur :
+  // "j'ai reçu aucune notif sur les buts [...] je les reçois soit après le
+  // match, longtemps après" — KO reçus normalement, buts jamais pendant le
+  // direct). Sans accès réseau depuis cet environnement pour confirmer sur
+  // de vrais logs (demandé, mais l'utilisateur a déjà redéployé le fix
+  // précédent — cron:anyLive — avant cet incident, donc ce n'est a priori
+  // pas ce bug-là qui revient), la piste la plus solide trouvée par lecture
+  // du code : CHAQUE match faisait jusqu'ici son propre `mget` (5 clés —
+  // stateKey/trackKey/cardTrackKey/finalDoneKey/recapKey) EN SÉQUENCE DANS
+  // LA BOUCLE, avant même d'arriver à son writePipe/sadd puis ses éventuels
+  // envois de notif (chacun aussi séquentiel, avec jusqu'à 1,5s de retry en
+  // cas d'aléa). Avec 11 matchs live, ça fait potentiellement des dizaines
+  // d'allers-retours Turso + Vercel l'un après l'autre dans UNE SEULE
+  // exécution. Risque structurel : le Cron Trigger tourne 1x/minute — si la
+  // somme de ces allers-retours finit par dépasser 60s un soir chargé, la
+  // passe suivante démarre AVANT que celle-ci soit terminée : 2 exécutions
+  // concurrentes qui retraitent LES MÊMES matchs en parallèle, se marchant
+  // dessus sur `goalLock` (SET NX 5s, voir `lockAcquired` plus bas — un
+  // verrou "déjà pris" devient alors un vrai refus, pas un faux positif) ET
+  // doublant la charge Turso au même moment, ce qui ralentit encore plus
+  // les deux passes à la fois — un cercle vicieux cohérent avec le symptôme
+  // exact rapporté (rien pendant la congestion, rattrapé d'un coup une fois
+  // moins de matchs en direct en même temps, donc moins de risque de
+  // chevauchement). Ni confirmé ni infirmé par des logs réels à ce stade —
+  // une hypothèse de lecture de code, pas une certitude.
+  //
+  // Corrigé dans la mesure du raisonnable sans réécrire toute la boucle en
+  // parallèle (risque jugé disproportionné sur ce fichier déjà fragile,
+  // 7 bugs critiques corrigés ici en une semaine) : les 5 lectures de CHAQUE
+  // match sont désormais regroupées en UN SEUL mget pour TOUS les matchs de
+  // la passe, avant la boucle — même principe déjà éprouvé plus haut dans ce
+  // fichier (alreadyDoneIds/noMatchFlags/emptyDayKey) : Turso facture un
+  // mget multi-clés comme 1 SEULE commande/sous-requête, peu importe le
+  // nombre de clés. 11 allers-retours séquentiels (un par match) deviennent
+  // 1 seul — le gain grandit avec le nombre de matchs simultanés, pile le
+  // scénario qui a posé problème. Purement un changement de TRANSPORT : le
+  // contenu lu pour chaque match (reads[0..4] plus bas) reste rigoureusement
+  // identique, aucune logique de détection but/carton/mi-temps/fin touchée.
+  // Les écritures (writePipe) et les envois de notif restent séquentiels,
+  // par match — cette partie reste un vrai risque résiduel si le symptôme
+  // persiste malgré ce changement (à vérifier via un `npm run tail` en
+  // direct la prochaine fois, plutôt qu'une 9e théorie).
+  const perMatchReadKeys = allEvents.map(({ evt }) => [
+    `cron:espn:${evt.id}`, `goalTrack:${evt.id}`, `cardTrack:${evt.id}`, `finalDone:${evt.id}`, `recap:${evt.id}`,
+  ])
+  const batchedReads = new Map()
+  if (perMatchReadKeys.length > 0) {
+    try {
+      const flatResults = await kv.mget(...perMatchReadKeys.flat())
+      perMatchReadKeys.forEach((_, i) => {
+        batchedReads.set(allEvents[i].evt.id, flatResults.slice(i * 5, i * 5 + 5))
+      })
+    } catch (e) {
+      log.push(`[espn:batch] mget error=${e.message}`)
+    }
+  }
+
   for (const { slug, evt } of allEvents) {
    if (alreadyDoneIds.has(evt.id)) continue
    try {
@@ -1191,12 +1248,12 @@ async function runOnePass(env) {
     // délibérément non fait, pour ne pas risquer de réintroduire le genre de
     // bug de notifs dupliquées/manquées déjà rencontré sur ce fichier par le
     // passé (voir historique finalConfirmKey/lockKey ci-dessus).
-    let reads = [null, null, null, null, null]
-    try {
-      reads = await kv.mget(stateKey, trackKey, cardTrackKey, finalDoneKey, recapKey)
-    } catch (e) {
-      log.push(`[espn:${slug}:${eventId}] mget error=${e.message}`)
-    }
+    // ⚠️ MODIFIÉ (10/10, voir le commentaire détaillé sur `batchedReads` juste
+    // avant la boucle) : ce mget individuel par match est remplacé par une
+    // simple lecture dans le batch déjà fait pour TOUTE la passe — même 5
+    // valeurs dans le même ordre, 0 sous-requête supplémentaire ici (le
+    // mget global, lui, a déjà été payé 1 seule fois avant la boucle).
+    const reads = batchedReads.get(eventId) ?? [null, null, null, null, null]
     const prevState    = reads[0] ?? null
     const rawTrack      = reads[1] ?? null
     const rawCardTrack  = reads[2] ?? null

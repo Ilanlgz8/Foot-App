@@ -3713,6 +3713,71 @@ cf-worker/
   reproduction confirmée en conditions réelles ; à valider par l'utilisateur sur son téléphone
   après ce déploiement (automatique via Vercel, pas de `npm run deploy` manuel nécessaire).
 
+- ✅ 8e BUG PROBABLE TRAITÉ, NOUVEL INCIDENT (10/10, constat utilisateur avec
+  11 matchs simultanés : "j'ai reçu aucune notif sur les buts [...] je les
+  reçois soit après le match, longtemps après [...] il y a un bouchon dans
+  les notifs" — KO reçus normalement pour les 11, buts jamais pendant le
+  direct). Confirmé avec l'utilisateur AVANT toute théorie que le dernier
+  correctif poussé (`d6130d9`, retrait de `cron:anyLive`, le 7e bug de cet
+  incident) avait bien été déployé (`npm run deploy`) avant cette soirée —
+  donc pas une rechute de ce bug précis avec l'ancien code. L'utilisateur a
+  ensuite explicitement refusé de fournir un nouveau `/api/debug-push`
+  ("arrete de me demander") — contrairement à tous les bugs précédents de
+  cet incident, ce correctif est donc basé sur une LECTURE DE CODE
+  raisonnée, PAS sur des logs réels confirmant la cause exacte. À prendre
+  avec cette réserve explicite.
+  Root cause la plus plausible trouvée par lecture de `runOnePass()` : la
+  boucle principale (`for (const {slug, evt} of allEvents)`) traite les
+  matchs un par un, EN SÉQUENCE, avec plusieurs allers-retours réseau
+  attendus (`await`) PAR MATCH — un `mget` de 5 clés (stateKey/trackKey/
+  cardTrackKey/finalDoneKey/recapKey), un `writePipe` (fusionné en 1
+  sous-requête depuis le 4e bug du 05/10), un `sadd`/`srem` sur
+  `cron:liveIds`, et pour chaque but/carton/mi-temps/fin détecté, un
+  `notifyVercel` (lui-même 2-3 sous-requêtes, avec jusqu'à 1,5s de retry
+  intégré en cas d'aléa). Avec 11 matchs live en même temps, la durée totale
+  d'UNE SEULE passe peut raisonnablement s'allonger à plusieurs dizaines de
+  secondes — or le Cron Trigger tourne 1x/minute (plancher dur de la
+  plateforme, voir `wrangler.toml`) : si une passe dépasse 60s, la passe
+  suivante démarre AVANT que la précédente soit terminée. Deux exécutions
+  concurrentes qui retraitent alors LES MÊMES 11 matchs en parallèle se
+  marchent dessus sur `goalLock` (SET NX 5s — un verrou "déjà pris" devient
+  un vrai refus silencieux de notifier, voir `lockAcquired`) ET doublent la
+  charge Turso au même instant, ralentissant encore plus les deux passes à
+  la fois — un cercle vicieux cohérent avec le symptôme exact (silence
+  pendant la congestion, rattrapage d'un coup une fois moins de matchs en
+  direct donc moins de risque de chevauchement). C'est une hypothèse de
+  lecture de code, pas une certitude confirmée par des logs.
+  Corrigé dans la mesure du raisonnable, SANS réécrire toute la boucle en
+  parallèle (jugé disproportionné sur ce fichier déjà fragile — 7 bugs
+  critiques corrigés ici en une semaine, chacun avec son propre risque de
+  régression) : les 5 lectures par match (`mget`) sont désormais regroupées
+  en UN SEUL `mget` pour TOUS les matchs de la passe, juste avant la boucle
+  — même principe déjà éprouvé ailleurs dans ce fichier (`alreadyDoneIds`/
+  `noMatchFlags`/`emptyDayKey`) : Turso facture un `mget` multi-clés comme 1
+  SEULE commande/sous-requête, peu importe le nombre de clés (vérifié dans
+  `tursoKv.js` : une seule requête SQL `WHERE key IN (...)`). 11 allers-
+  retours séquentiels deviennent 1 seul — le gain grandit avec le nombre de
+  matchs simultanés, pile le scénario qui a posé problème. Changement
+  purement de TRANSPORT : le contenu lu pour chaque match (`reads[0..4]`)
+  reste identique, aucune logique de détection but/carton/mi-temps/fin
+  touchée, aucun risque de double-notif introduit. Risque résiduel assumé et
+  documenté dans le code (`index.js`) : les ÉCRITURES (`writePipe`) et les
+  ENVOIS de notif restent séquentiels, par match — si le symptôme persiste
+  malgré ce changement, c'est cette partie qu'il faudra revoir, idéalement
+  avec un vrai `npm run tail` pendant un match plutôt qu'une 9e théorie.
+  370 tests + lint (34 erreurs pré-existantes, Pronos.jsx, inchangé) + build
+  + `npx wrangler deploy --dry-run` (406 KiB, inchangé) vérifiés. Honnêteté
+  totale, plus que d'habitude sur ce point : contrairement aux 7 bugs
+  précédents de cet incident, celui-ci n'a PAS été confirmé par des logs
+  réels avant d'agir — c'est un changement bas-risque (il ne fait que
+  regrouper des lectures déjà faites, sans toucher au comportement) mais je
+  ne peux pas affirmer avec certitude qu'il règle le symptôme rapporté. À
+  déployer manuellement (`npm run deploy` depuis `cf-worker/`, comme
+  toujours pour ce dossier) ; si le problème persiste sur un prochain soir à
+  beaucoup de matchs simultanés, la prochaine étape incontournable sera un
+  `npm run tail` en direct pendant l'incident — le debug-push différé ne
+  suffit déjà plus à trancher entre plusieurs causes possibles à ce stade.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
