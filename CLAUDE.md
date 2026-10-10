@@ -3842,6 +3842,66 @@ cf-worker/
   a maintenant produit 2 corrections raisonnées sans preuve empirique
   directe, ce qui commence à être la limite de cette méthode sans logs.
 
+- ✅ Flash noir au scroll RAPIDE VERS LE HAUT dans Accueil, persistant malgré
+  le fix `content-visibility:auto` du même jour (10/10, constat utilisateur
+  précisé : "quand je defille de bas en haut bah ca bug un peu [...] c noir
+  quand on defile trop vite et après ça arrive les cards [...] c comme si ca
+  chargeait l'afffichage des cards alors que normalement ça devrait etre
+  garder en memoire"). Root cause la plus probable, affinée par rapport au
+  1er fix du jour : `content-visibility: auto` saute bien le travail de
+  rendu des cards loin du viewport, mais sa marge de "pertinence" est fixée
+  par un heuristique INTERNE au navigateur, pas réglable en CSS. Sur un
+  scroll rapide qui traverse beaucoup de distance (typiquement en remontant
+  après avoir défilé loin, plus de distance parcourue en une seule fois
+  qu'en descendant progressivement), plusieurs cards franchissent cette
+  marge au même instant et doivent toutes "revivre" (repaint + promotion GPU
+  de leurs 3 calques animés `posterDrift`/`posterMorph`) dans la même frame
+  — d'où le flash noir le temps que le compositeur rattrape.
+  Option envisagée puis écartée après réflexion : démonter réellement les
+  posters loin du viewport (vraie "virtualisation", choisie par l'utilisateur
+  via question directe) plutôt que de les laisser montés-mais-masqués par
+  CSS. Écartée en cours de route : `MatchPoster.jsx` a ses propres hooks
+  réseau internes (`useTeamForm`, H2H, cotes ESPN pré-match...) — un vrai
+  démontage/remontage React au fil du scroll aurait remis ces hooks à zéro à
+  chaque remontage, risquant de RAJOUTER du travail (refetch, re-render
+  complet) au moment précis où on cherche à en retirer, sans garantie que ce
+  soit plus léger que ce que content-visibility fait déjà (qui, lui, ne
+  démonte jamais rien côté React — seul le rendu visuel est sauté). Aucun
+  moyen de vérifier ça sur un vrai device depuis cet environnement, donc pas
+  de pari pris sur une mécanique plus risquée sans preuve qu'elle aide.
+  Corrigé à la place (`MatchPoster.jsx` + `accueil.css`) en élargissant la
+  marge de pré-rendu plutôt qu'en démontant quoi que ce soit : un nouvel
+  IntersectionObserver par poster (root = `.appScroll`, le conteneur de
+  scroll unique de toute l'app — voir App.jsx/scrollLock.js, même pattern
+  déjà utilisé ailleurs — repli sur le viewport si absent), `rootMargin`
+  généreux et CONTRÔLÉ (150% de la hauteur d'écran de chaque côté, au lieu
+  du choix opaque du navigateur) — dès qu'une card entre dans cette zone
+  élargie, elle reçoit la classe `poster__frame--warm`
+  (`content-visibility: visible` explicite, CSS ajouté juste après la règle
+  `auto` existante, même spécificité, gagne par l'ordre de déclaration) qui
+  force son rendu/sa promotion GPU À L'AVANCE, avant qu'elle ne soit
+  réellement visible — le "cold start" coûteux est donc déjà payé quand elle
+  entre vraiment dans le viewport pendant un scroll rapide. Une card toujours
+  hors de cette zone élargie retombe sur `auto` (comportement du 1er fix,
+  inchangé) : le vrai gain CPU/GPU pour les cards réellement loin (ex. en
+  lisant les actualités tout en bas) reste intact, seule la taille du
+  rattrapage au bord du viewport est réduite. Changement purement ADDITIF et
+  sans risque de régression au chargement initial : au tout premier rendu
+  (avant le 1er callback, asynchrone, de l'IntersectionObserver), une card
+  retombe simplement sur `auto` — exactement son comportement d'avant ce
+  changement, jamais un "pop depuis rien" nouveau introduit par ce fix (à
+  l'inverse d'une virtualisation par démontage, qui aurait pu en introduire
+  un à chaque montage initial de page). 370 tests + lint (34 erreurs
+  pré-existantes, confirmées IDENTIQUES avant/après via `git stash` — aucune
+  nouvelle régression) + build vérifiés. Honnêteté : jamais vérifié en
+  direct sur un vrai iPhone/PWA depuis cet environnement (comme pour le 1er
+  fix du jour) — raisonnement technique cohérent avec le détail précis donné
+  par l'utilisateur (pire en remontant vite, pas en descendant), mais pas
+  une reproduction confirmée ; si le symptôme persiste malgré cet
+  élargissement, la marge (150%) serait le 1er paramètre à resserrer/élargir
+  encore, avant d'envisager une vraie virtualisation par démontage (plus
+  risquée, voir ci-dessus) en dernier recours.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -1590,6 +1590,17 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 320px;
 }
+/* ⚠️ AJOUT (10/10, même symptôme encore signalé en remontant vite — voir le
+   commentaire détaillé dans MatchPoster.jsx, IntersectionObserver rootMargin
+   150%) : force le rendu/la promotion GPU à l'avance sur une marge bien plus
+   large que le heuristique interne du navigateur, pour qu'une card soit déjà
+   "chaude" quand elle entre réellement dans le viewport pendant un scroll
+   rapide. Même spécificité que `.poster__frame` (1 classe) juste au-dessus —
+   la cascade (ordre de déclaration, celle-ci après) suffit à la faire
+   gagner, aucun `!important` nécessaire. */
+.poster__frame--warm {
+  content-visibility: visible;
+}
 
 .poster {
   position: relative;

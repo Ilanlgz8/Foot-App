@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
@@ -415,9 +415,57 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMinute, match.id])
 
+  // ⚠️ AJOUT (10/10, retour utilisateur : flash noir persistant en scroll
+  // rapide dans Accueil — y compris en remontant — malgré content-
+  // visibility:auto déjà posé sur .poster__frame plus tôt le même jour) :
+  // la marge de "pertinence" de content-visibility:auto est fixée par le
+  // navigateur lui-même, pas réglable en CSS. Sur un scroll rapide qui
+  // traverse beaucoup de distance (typiquement en remontant après avoir
+  // défilé loin), plusieurs cards franchissent cette marge en même temps
+  // et doivent toutes "revivre" (repaint + promotion GPU de leurs 3 calques
+  // animés) dans la même frame — d'où le flash noir le temps que le
+  // compositeur rattrape.
+  // Plutôt que de retirer content-visibility (le vrai gain CPU/GPU pour les
+  // cards réellement loin, ex. en lisant les actualités tout en bas), on
+  // ÉLARGIT sa marge effective avec une marge propre et bien plus généreuse
+  // (IntersectionObserver, rootMargin ~1.5 hauteur d'écran de chaque côté,
+  // contrôlée ici plutôt que choisie par le navigateur) : une card dans
+  // cette zone plus large reçoit `content-visibility: visible` explicite
+  // (force le rendu/la promotion GPU à l'avance, AVANT qu'elle ne soit
+  // réellement visible) — le "cold start" coûteux est donc déjà payé quand
+  // elle entre vraiment dans le viewport pendant un scroll rapide. Une card
+  // toujours hors de cette zone élargie retombe sur `auto` (comportement
+  // actuel inchangé) — le vrai gain CPU des cards loin reste intact, seule
+  // la taille du rattrapage au bord du viewport est réduite.
+  // root: le conteneur de scroll unique de toute l'app (`.appScroll`, voir
+  // App.jsx/scrollLock.js — même pattern déjà utilisé ailleurs) ; repli sur
+  // le viewport (root: null) si absent. Purement additif et sans risque :
+  // au tout premier rendu (avant le 1er callback, asynchrone, de
+  // l'IntersectionObserver), la card retombe simplement sur `auto` —
+  // exactement son comportement d'avant ce changement, aucune régression
+  // possible au chargement initial.
+  // Honnêteté : jamais vérifié en direct sur un vrai iPhone/PWA depuis cet
+  // environnement — raisonnement technique (élargir la marge de pré-rendu
+  // réduit la taille du burst de revival au moment du scroll), pas une
+  // reproduction confirmée ; à valider par l'utilisateur après déploiement.
+  const frameRef = useRef(null)
+  const [isWarm, setIsWarm] = useState(false)
+  useEffect(() => {
+    const el = frameRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const root = document.querySelector('.appScroll') ?? null
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsWarm(entry.isIntersecting),
+      { root, rootMargin: '150% 0px 150% 0px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div
-      className="poster__frame"
+      ref={frameRef}
+      className={`poster__frame${isWarm ? ' poster__frame--warm' : ''}`}
       style={compTint ? {
         '--poster-comp': compTint,
         ...(compTint2 ? { '--poster-comp2': compTint2 } : {}),
