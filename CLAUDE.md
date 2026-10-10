@@ -3778,6 +3778,70 @@ cf-worker/
   `npm run tail` en direct pendant l'incident — le debug-push différé ne
   suffit déjà plus à trancher entre plusieurs causes possibles à ce stade.
 
+- ✅ 9e CORRECTIF, MÊME INCIDENT (10/10, même jour, retour immédiat de
+  l'utilisateur après le déploiement du 8e fix (batching mget) : "y'a eu un
+  but encore et pas de notifs encore [...] c chiant [...] tu peux me dire
+  pourquoi ça marche pas si c le fait que y'a 11 match en meme temps" —
+  l'utilisateur a refusé explicitement de fournir un nouveau debug-push
+  ("arrete de me demander"), donc ce correctif est basé sur une relecture de
+  code plus poussée, pas sur des logs). Réponse honnête donnée d'abord à la
+  question posée : le calcul en sous-requêtes Cloudflare ne soutient PAS
+  "c'est simplement parce qu'il y a 11 matchs" comme explication complète —
+  avec le batching déjà en place, un seul but isolé sur un match parmi 11 ne
+  devrait coûter que ~2 sous-requêtes de plus (loin du plafond de 50), donc
+  11 matchs ne suffit pas à lui seul à expliquer QU'UN SEUL but reste sans
+  notif. Root cause réellement trouvée en creusant plus loin : `goalLock`
+  (`lockKey`, SET NX 5s dans `writePipe`) — gate `if (!lockAcquired) { skip
+  toute détection de but }` — ne protégeait en réalité contre RIEN qui ne
+  soit pas déjà couvert ailleurs. Preuve directe dans le même fichier : le
+  bloc 🟥 carton rouge, juste en dessous du bloc ⚽ but, n'a JAMAIS eu ce
+  verrou — il s'appuie uniquement sur `notifyVercel`/`acquireDedup` (clé
+  `push:espn:red:{id}:{side}:{n}`, SET NX) pour empêcher un envoi double, et
+  ça fonctionne sans souci documenté depuis toujours. Même raisonnement pour
+  les buts, vérifié par lecture : si 2 passages liraient le même
+  `track[side]` avant que l'un des deux l'ait mis à jour, les deux
+  tenteraient `notifyVercel` avec EXACTEMENT le même dedupKey
+  (`push:espn:goal:{id}:{side}:{goalIndex+1}`) — un seul gagne la course sur
+  cette clé, l'autre reçoit `acquired=false` et s'arrête sans ré-envoyer, et
+  `trackKey` est réécrit en `SET` simple (pas NX) donc idempotent même en cas
+  de double écriture. `goalLock` était donc redondant avec cette protection
+  déjà existante — et pire, en échange de rien, il introduisait un vrai
+  risque : il échouait de façon IDENTIQUE sur une simple ERREUR D'ÉCRITURE
+  Turso (contention OU panne transitoire — les deux donnent `null` via
+  `pickWrite`, voir le fix du 01/10 qui avait déjà noté ce problème sans le
+  résoudre à la racine) ET sur un vrai verrou légitimement pris — bloquant
+  alors TOUTE détection de but pour ce match cette passe précise, retenté
+  seulement 60s plus tard. Avec 11 matchs à traiter dans la même passe, le
+  risque qu'AU MOINS un de ces verrous essuie un aléa transitoire grandit
+  mécaniquement avec le nombre de matchs — ce qui explique le lien avec "11
+  matchs en même temps" sans que ce soit directement un problème de budget
+  de sous-requêtes comme je l'avais théorisé dans le 8e fix.
+  Corrigé (`cf-worker/src/index.js`) : `goalLock`/`lockKey` retiré
+  ENTIÈREMENT — plus d'écriture dans `writePipe` (indices `pickWrite`
+  décalés de [1]/[2] à [0]/[1] en conséquence), plus de gate avant la boucle
+  de détection de but, qui tourne désormais à chaque passe exactement comme
+  le bloc carton rouge (sans verrou séparé, protégé uniquement par
+  `acquireDedup`). Risque résiduel honnêtement nul de ce côté précis (le
+  mécanisme de dédup réel n'est pas touché) — le seul changement de
+  comportement est qu'un but n'est plus jamais bloqué par un verrou qui ne
+  protégeait rien de plus que ce que `acquireDedup` protège déjà. 370 tests
+  + lint (clean) + build + `npx wrangler deploy --dry-run` (406 KiB, taille
+  légèrement réduite — cohérent avec le retrait de code) vérifiés. Honnêteté :
+  comme pour le 8e fix du même jour, aucun accès réseau réel depuis cet
+  environnement pour reproduire ce scénario exact ni confirmer ce fix contre
+  la vraie prod — mais cette fois le raisonnement est plus solide qu'avant,
+  appuyé sur une preuve directe dans le code lui-même (le bloc carton rouge,
+  qui fonctionne sans ce verrou depuis toujours, à côté du bloc but qui
+  l'avait) plutôt qu'un calcul arithmétique de budget qui ne collait pas
+  entièrement au symptôme rapporté (un seul but isolé, pas une rafale
+  d'événements). À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier) ; si le symptôme persiste
+  malgré ces 2 fixes cumulés du 10/10 (batching mget + retrait goalLock), il
+  faudra vraiment un `npm run tail` en direct pendant un prochain but pour
+  voir la cause réelle plutôt qu'une 10e théorie — la lecture de code seule
+  a maintenant produit 2 corrections raisonnées sans preuve empirique
+  directe, ce qui commence à être la limite de cette méthode sans logs.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

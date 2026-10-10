@@ -1040,6 +1040,15 @@ async function runOnePass(env) {
   // par match — cette partie reste un vrai risque résiduel si le symptôme
   // persiste malgré ce changement (à vérifier via un `npm run tail` en
   // direct la prochaine fois, plutôt qu'une 9e théorie).
+  // ⚠️ SUITE (10/10, même jour, même incident — ce batching seul n'a PAS
+  // suffi : but suivant toujours sans notif). `goalLock`/`lockAcquired`
+  // retiré entièrement (voir son commentaire détaillé juste avant la
+  // construction de `writePipe` plus bas) — ce verrou n'était pas
+  // nécessaire (la vraie protection anti-doublon, `acquireDedup`, existe
+  // déjà et suffit, exactement comme pour les cartons rouges qui n'ont
+  // jamais eu ce verrou) et pouvait faire échouer silencieusement TOUTE
+  // détection de but sur une simple erreur d'écriture Turso, un risque qui
+  // grandit avec le nombre de matchs traités dans la même passe.
   const perMatchReadKeys = allEvents.map(({ evt }) => [
     `cron:espn:${evt.id}`, `goalTrack:${evt.id}`, `cardTrack:${evt.id}`, `finalDone:${evt.id}`, `recap:${evt.id}`,
   ])
@@ -1202,7 +1211,6 @@ async function runOnePass(env) {
     const stateKey        = `cron:espn:${eventId}`
     const trackKey        = `goalTrack:${eventId}`
     const cardTrackKey    = `cardTrack:${eventId}`
-    const lockKey         = `goalLock:${eventId}`
     const koKey           = `push:espn:ko:${eventId}`
     const recapKey        = `recap:${eventId}`
     // ⚠️ AJOUT (retour utilisateur : "j'ai eu comme quoi le match est fini
@@ -1238,16 +1246,45 @@ async function runOnePass(env) {
     // cardTrackKey/finalDoneKey/recapKey, cette dernière toujours incluse
     // même hors match terminé — un mget ne coûte pas plus cher avec une clé
     // de plus) passent ainsi de 4-5 commandes à 1 seule.
-    // Les ÉCRITURES (stateKey, verrou but `goalLock` NX, dédup KO NX, 1ère
-    // confirmation FT NX) restent un pipeline séparé, INCHANGÉES commande
-    // par commande : ce sont des SET...NX dont la garantie d'atomicité (une
-    // seule exécution concurrente peut "gagner" — voir lockAcquired plus
-    // bas) dépend de rester des commandes Redis individuelles distinctes ;
-    // les fusionner dans un objet JSON unique aurait cassé cette garantie
-    // (lecture+comparaison+écriture n'est PAS atomique sans script Lua) —
-    // délibérément non fait, pour ne pas risquer de réintroduire le genre de
-    // bug de notifs dupliquées/manquées déjà rencontré sur ce fichier par le
-    // passé (voir historique finalConfirmKey/lockKey ci-dessus).
+    // Les ÉCRITURES (stateKey, dédup KO NX, 1ère confirmation FT NX) restent
+    // un pipeline séparé, INCHANGÉES commande par commande : ce sont des
+    // SET...NX dont la garantie d'atomicité (une seule exécution concurrente
+    // peut "gagner") dépend de rester des commandes Redis individuelles
+    // distinctes ; les fusionner dans un objet JSON unique aurait cassé
+    // cette garantie (lecture+comparaison+écriture n'est PAS atomique sans
+    // script Lua) — délibérément non fait, pour ne pas risquer de
+    // réintroduire le genre de bug de notifs dupliquées/manquées déjà
+    // rencontré sur ce fichier par le passé (voir historique finalConfirmKey
+    // ci-dessus).
+    // ⚠️ `goalLock`/`lockAcquired` RETIRÉS (10/10, 8e bug probable, même
+    // incident que le constat "11 matchs en même temps, but reçu aucune
+    // notif") : ce verrou SET NX 5s ne protégeait en réalité qu'un scénario
+    // déjà couvert PAR AILLEURS — une race entre 2 exécutions qui
+    // chevaucheraient le traitement du MÊME match (la seule vraie raison
+    // d'en avoir un, puisqu'une même exécution ne traite jamais 2 fois le
+    // même eventId dans sa propre boucle). Preuve directe que ce n'était pas
+    // nécessaire : le bloc carton rouge juste en dessous (🟥) n'a JAMAIS eu
+    // ce verrou — il s'appuie uniquement sur `notifyVercel`/`acquireDedup`
+    // (clé `push:espn:red:{id}:{side}:{n}`, SET NX) pour empêcher un envoi
+    // double, et ce mécanisme fonctionne sans souci documenté depuis le
+    // début. Même raisonnement pour les buts : si 2 exécutions lisaient le
+    // MÊME `track[side]` avant que l'une des deux l'ait mis à jour, elles
+    // tenteraient toutes les deux `notifyVercel` avec LE MÊME dedupKey
+    // (`push:espn:goal:{id}:{side}:{goalIndex+1}`) — une seule gagne la
+    // course sur cette clé, l'autre reçoit `acquired=false` et s'arrête sans
+    // renvoyer la notif, sans jamais écraser `track[side]` de façon
+    // incohérente (un `SET` simple, pas de NX, donc idempotent). Le vrai
+    // risque d'un but non notifié était donc ailleurs : `goalLock` échouait
+    // aussi sur une simple ERREUR D'ÉCRITURE Turso (traitée identiquement à
+    // "verrou déjà pris", voir `pickWrite`) — avec 11 matchs à traiter dans
+    // la même passe, le risque qu'AU MOINS un de ces verrous essuie un aléa
+    // transitoire grandit mécaniquement, et bloquait ALORS TOUTE détection
+    // de but pour ce match cette passe-ci (next retry 60s plus tard, mais
+    // rien ne garantit que l'aléa ne se reproduise pas). Retiré : la
+    // détection de but tourne désormais à chaque passe SANS dépendre d'un
+    // verrou séparé, exactement comme les cartons rouges — un verrou de moins
+    // qui peut échouer pour rien, la vraie protection anti-doublon
+    // (`acquireDedup`) restant pleinement en place.
     // ⚠️ MODIFIÉ (10/10, voir le commentaire détaillé sur `batchedReads` juste
     // avant la boucle) : ce mget individuel par match est remplacé par une
     // simple lecture dans le batch déjà fait pour TOUTE la passe — même 5
@@ -1267,15 +1304,14 @@ async function runOnePass(env) {
     // séparées des écritures, on connaît `alreadyDone` AVANT de payer le
     // coût du pipeline d'écriture ci-dessous — un match déjà clos pour de
     // bon ne coûte donc plus que CETTE seule commande (le mget), au lieu
-    // d'écrire quand même stateKey/lockKey/etc. pour rien (ancienne
+    // d'écrire quand même stateKey/koKey/etc. pour rien (ancienne
     // limitation du pipeline combiné lecture+écriture d'origine, qui ne
     // connaissait alreadyDone qu'APRÈS avoir déjà tout exécuté).
     if (alreadyDone) continue
 
     let writePipe = kv.pipeline()
       .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [0] (résultat inutilisé)
-      .set(lockKey, '1', { px: 5_000, nx: true })               // [1] lockAcquired
-    // [2] optionnel : dédup coup d'envoi (si live) OU 1ère acquisition de
+    // [1] optionnel : dédup coup d'envoi (si live) OU 1ère acquisition de
     // finalConfirmKey (si terminé) — isLive et isFinalNow sont mutuellement
     // exclusifs (aucun statut n'appartient aux 2 ensembles à la fois),
     // jamais les deux en même temps dans le même pipeline.
@@ -1302,14 +1338,16 @@ async function runOnePass(env) {
     })
     const pickWrite = (i) => (writeResults[i] && !writeResults[i].error) ? writeResults[i].result : null
 
-    const lockAcquired   = pickWrite(1)
-    const koAcquired     = isLive ? pickWrite(2) : false
+    // ⚠️ Index décalé de [2]→[1] (10/10) : `lockKey`/`goalLock` retiré du
+    // writePipe (voir le commentaire détaillé juste au-dessus de sa
+    // construction) — koKey/finalConfirmKey occupe maintenant la position [1].
+    const koAcquired     = isLive ? pickWrite(1) : false
     const recapAlready   = (!isLive && isFinalNow) ? recapRaw : null
     // true = c'est la 1ère fois qu'on voit ce match FINAL (clé tout juste
     // créée) → PAS encore confirmé. false/null = la clé existait déjà → au
     // moins une passe FINAL précédente → confirmation possible (sous réserve
     // du score inchangé, voir isFinalConfirmed plus bas).
-    const finalFirstSeen = isFinalNow ? pickWrite(2) : null
+    const finalFirstSeen = isFinalNow ? pickWrite(1) : null
 
     const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
     // Confirmé seulement à la 2e passe FINAL consécutive (ou plus), avec un
@@ -1418,9 +1456,6 @@ async function runOnePass(env) {
     // bon, cette condition-ci ne fait que retarder le moment où on arrête
     // d'essayer, jamais le dépasser.
     if (LIVE_ESPN.has(prevStatus) || isLive || isFinalNow) {
-      if (!lockAcquired) {
-        log.push(`[espn:${slug}:${eventId}] verrou but déjà pris — passe suivante`)
-      } else {
         let track = rawTrack
         track = track ? (typeof track === 'string' ? safeJsonParse(track, { home, away }) : track) : { home, away }
 
@@ -1519,7 +1554,6 @@ async function runOnePass(env) {
         if (trackChanged) {
           try { await kv.set(trackKey, JSON.stringify(track), { ex: 12 * 3600 }) } catch {}
         }
-      }
     }
 
     // 🟥 Carton rouge — même élargissement que le bloc but juste au-dessus
