@@ -3902,6 +3902,41 @@ cf-worker/
   encore, avant d'envisager une vraie virtualisation par démontage (plus
   risquée, voir ci-dessus) en dernier recours.
 
+- ✅ 1ère PREUVE RÉELLE (vrai `/api/debug-push`, pas une relecture de code) sur
+  l'incident `goalLock`, même jour (10/10, suite directe de "ok tsur de toi ?"
+  — l'utilisateur a fourni un vrai `logHistory` de l'après-midi, couvrant
+  Premier League/Bundesliga/Serie A/La Liga, sans commentaire explicite mais
+  en clair en réponse à cette question). Vérifié en premier, avant toute
+  conclusion : le code actuel du dépôt (`cf-worker/src/index.js`, lignes
+  ~1259+) n'a PLUS DU TOUT de `lockKey`/`goalLock` — retiré par le 9e fix du
+  jour. Or ce `logHistory` contient encore PLUSIEURS lignes "verrou but déjà
+  pris — passe suivante" dans l'après-midi (12:03:09, puis une vraie rafale
+  15:03:51/15:03:52, puis 15:06:31/15:06:32, sur une dizaine de matchs
+  ger.1/esp.1/eng.1 à la fois) — preuve certaine que CE log a été capturé
+  AVANT le `npm run deploy` du 9e fix (le code qui produit cette ligne
+  n'existe plus dans le dépôt). Conséquence honnête : ce log ne peut PAS
+  confirmer que le 9e fix règle le problème — il a été capturé avec l'ANCIEN
+  code. Ce qu'il confirme en revanche, pour la première fois avec de vraies
+  données plutôt qu'un raisonnement : (1) la contention `goalLock` était bien
+  RÉELLE et FRÉQUENTE en conditions de production (pas une hypothèse en
+  l'air) — plusieurs matchs bloqués "verrou déjà pris" EN MÊME TEMPS, à
+  plusieurs reprises dans la même après-midi ; (2) en suivant chaque match
+  bloqué jusqu'à sa prochaine ligne "BUT" dans ce même log, aucun but ne
+  semble DÉFINITIVEMENT perdu dans cette fenêtre précise — le verrou (TTL 5s)
+  retardait de quelques minutes (le temps qu'une passe suivante retente sans
+  retomber sur le même aléa), pas indéfiniment, dans les cas observés ici.
+  Donc : ce log valide que retirer `goalLock` (9e fix) attaquait un vrai
+  mécanisme actif, mais ne prouve pas encore que le symptôme le plus grave
+  rapporté par l'utilisateur ("11 matchs, aucune notif de but du tout") est
+  réglé — cette confirmation-là ne pourra venir que d'un prochain match réel
+  APRÈS le déploiement effectif du 9e fix. Rien de nouveau corrigé dans cette
+  entrée : c'est un point de confiance affiné (passé de "raisonnement de code
+  non vérifié" à "mécanisme confirmé par logs réels, effet résiduel non
+  catastrophique dans cet échantillon précis"), pas un 10e fix. Honnêteté : je
+  ne peux toujours pas savoir depuis cet environnement si `npm run deploy` a
+  été fait entre la capture de ce log et maintenant — si ce n'est pas encore
+  fait, c'est le prochain geste qui donnera un vrai test du 9e fix.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
