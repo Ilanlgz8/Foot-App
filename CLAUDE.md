@@ -4014,6 +4014,47 @@ cf-worker/
   symptôme aussi spécifique ; à confirmer par l'utilisateur sur son téléphone après ce déploiement
   (automatique via Vercel, pas de `npm run deploy` manuel nécessaire).
 
+- ✅ Flash noir au scroll, 5e et dernière tentative du jour : animations de fond des cards RETIRÉES
+  ENTIÈREMENT plutôt que contournées (10/10, retour utilisateur après le fix précédent : "j'ai
+  l'impression que c'est pire qu'avant [...] il n'y a pas un système, un truc, qui permet de ne
+  pas avoir ce problème sur iPhone ou même sur téléphone ?") — question légitime après 4 tentatives
+  dans la même journée qui corrigeaient toutes le MÉCANISME DE RENDU/SCROLL (content-visibility,
+  marge IntersectionObserver, promotion GPU du conteneur, retrait de content-visibility) sans
+  jamais toucher à la VRAIE charge : chaque card teintée fait tourner `posterDrift`/`posterMorph`/
+  `posterDriftLeger` en boucle infinie (18-20s), chacune promue sur sa propre couche GPU
+  (`will-change: transform`) — et la liste Accueil n'étant pas virtualisée, 20-40+ de ces couches
+  peuvent tourner simultanément sur un téléphone. Aucun réglage de cache de rendu ou de conteneur
+  de scroll ne peut garantir d'absorber cette charge GPU réelle en continu ; seule la retirer à la
+  source l'élimine par construction — c'est la réponse honnête à "y'a pas un système qui évite ce
+  problème" : oui, ne pas avoir d'animation GPU permanente sur des dizaines d'éléments à la fois.
+  Décision validée explicitement par l'utilisateur via question directe (figer les dégradés plutôt
+  que tenter une pause par IntersectionObserver — cette dernière option aurait pu souffrir du même
+  décalage de timing que les tentatives précédentes sur un scroll très rapide, donc pas une
+  garantie aussi forte). Retiré dans `src/accueil.css` : `animation: posterDrift ...` sur
+  `.poster__bg--gradient` (calque de base, actif sur TOUTES les cards) et `.poster--tinted
+  .poster__bg--gradientAlt` (calque de couleur secondaire), `animation: posterDriftLeger ...` sur
+  `.poster--softTint.poster--tinted .poster__bg--gradientAlt` (variante Euro/CAN) — `gradientTri`
+  n'avait déjà plus d'animation depuis le 06/09 (un calque "éclat diffus" plus récent dans la
+  cascade l'avait déjà figé, `animation: none`, vérifié par lecture avant de conclure qu'il n'y
+  avait rien à faire dessus). `@keyframes posterMorph`/`posterDriftLeger` supprimées (plus aucun
+  appelant) ; le bloc `@media (prefers-reduced-motion: reduce)` qui neutralisait ces animations +
+  masquait gradientAlt/gradientTri pour ces utilisateurs retiré aussi — devenu non seulement
+  inutile (rien à neutraliser) mais incohérent (aurait donné aux utilisateurs "reduced motion" un
+  fond MOINS coloré que tout le monde, alors que la version par défaut est désormais déjà
+  statique). Couleurs/dégradés inchangés, seul le mouvement disparaît. Portée volontairement
+  limitée à `accueil.css` (les cards de l'Accueil, where le bug se produit — une longue liste non
+  virtualisée) : `LiveMatchPage.css` (hero MatchPage/LiveMatchPage, un seul élément animé à la
+  fois, jamais des dizaines en même temps dans une liste qui scrolle) n'a pas le même problème
+  structurel et garde ses animations — écart assumé et documenté plutôt que silencieux, malgré la
+  convention historique de ce projet de garder les 2 fichiers alignés sur le mécanisme de thème
+  (celle-ci concernait les COULEURS, pas la décision performance prise ici). 370 tests + lint
+  (clean sur `accueil.css`) + build vérifiés. Honnêteté : toujours aucun accès à un vrai iPhone/
+  PWA depuis cet environnement pour confirmer — mais contrairement aux 4 tentatives précédentes de
+  la même journée (qui contournaient toutes un symptôme en gardant la cause), celle-ci élimine
+  structurellement le mécanisme responsable (des dizaines de couches GPU animées en continu),
+  ce qui est une garantie plus forte qu'un réglage de cache/scroll ; à confirmer par l'utilisateur
+  sur son téléphone après ce déploiement (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

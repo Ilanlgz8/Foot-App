@@ -1627,9 +1627,19 @@
     color-mix(in srgb, var(--poster-comp, #16171f) 85%, #0a0b10) 0%,
     color-mix(in srgb, var(--poster-comp, #0e0f14) 68%, #08090d) 62%,
     color-mix(in srgb, var(--poster-comp, #0b0c10) 48%, #07080b) 100%);
-  transform-origin: center;
-  will-change: transform;
-  animation: posterDrift 18s ease-in-out infinite;
+  /* ⚠️ `animation: posterDrift ...` RETIRÉE (10/10, demande explicite de
+     l'utilisateur après le 4e bug de scroll de la journée : "fige les
+     dégradés") — root cause réelle du flash noir/contenu en retard au
+     scroll rapide, confirmée par raisonnement structurel plutôt qu'une
+     nouvelle supposition : chaque card teintée fait tourner CETTE animation
+     EN PERMANENCE, promue sur sa propre couche GPU (`will-change: transform`),
+     et la liste Accueil n'est pas virtualisée — toutes les cards du jour
+     restent montées, donc potentiellement 20-40+ couches qui animent sans
+     arrêt sur un téléphone. Aucun réglage de scroll/cache de rendu (les 4
+     tentatives précédentes ce même jour) ne peut garantir d'absorber cette
+     charge GPU réelle — seule la retirer à la source l'élimine par
+     construction. Le dégradé reste coloré et identique, juste figé (aucun
+     transform appliqué, le `linear-gradient` couvre déjà toute la boîte). */
 }
 /* ⚠️ RETOUR À L'ANIMATION D'ORIGINE (05/09, 5e passe) — c'est ce que
    l'utilisateur demandait depuis le début : "comme AVANT dans les cards de
@@ -1674,22 +1684,14 @@
     var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 100%);
 }
 .poster--tinted .poster__bg--gradientAlt {
+  /* ⚠️ `animation: posterDrift ...` RETIRÉE (10/10) — même root cause/décision
+     que `.poster__bg--gradient` juste au-dessus, voir son commentaire. */
   opacity: 0.6;
-  will-change: transform;
-  animation: posterDrift 18s ease-in-out infinite;
 }
-.poster--tinted .poster__bg--gradientTri {
-  will-change: transform, opacity;
-  animation:
-    posterDrift 18s ease-in-out infinite reverse,
-    posterMorph  9s ease-in-out infinite;
-}
-
-/* Mouvement : léger zoom/pan, transform uniquement (GPU, aucun repaint) */
-@keyframes posterDrift {
-  0%, 100% { transform: scale(1.12) translate(0%, 0%); }
-  50%      { transform: scale(1.18) translate(-2%, 2%); }
-}
+/* ⚠️ `.poster--tinted .poster__bg--gradientTri` n'anime déjà plus depuis le
+   06/09 (CALQUE D'ÉCLAT DIFFUS plus bas dans ce fichier, même sélecteur,
+   `animation: none` — règle plus récente dans la cascade, donc gagnante) :
+   rien à retirer ici, ce calque est déjà statique. */
 /* Variante "douce" (`tintSoft`, LaLiga) — voir le commentaire détaillé dans
    LiveMatchPage.css (.lmp__hero--softTint) : même mécanisme, gardé identique
    des deux côtés. */
@@ -1713,8 +1715,9 @@
     color-mix(in srgb, var(--poster-comp3, var(--poster-comp2, var(--poster-comp2-auto))) 90%, transparent) 100%);
 }
 .poster--softTint.poster--tinted .poster__bg--gradientAlt {
+  /* ⚠️ `animation: posterDriftLeger ...` RETIRÉE (10/10) — même root cause/
+     décision que `.poster__bg--gradient` plus haut. */
   opacity: 0.9;
-  animation: posterDriftLeger 20s ease-in-out infinite;
 }
 /* ⚠️ CALQUE D'ÉCLAT DIFFUS (06/09, demande : "faudrait que le blanc se
    disperse mais qu'il soit super léger un peu partout, comme si il rajoutait
@@ -1766,26 +1769,16 @@
     radial-gradient(90%  60% at 50% 40%, rgba(255,255,255,0.12) 0%, transparent 60%);
 }
 
-/* Fondu : la 2e palette (accent) monte en puissance puis redescend, en boucle.
-   Repris à l'identique de l'animation d'origine (couleurs des équipes). */
-@keyframes posterMorph {
-  0%, 100% { opacity: 0; }
-  50%      { opacity: 0.9; }
-}
-/* Mouvement discret pour les fonds sombres (`tintSoft`) — voir
-   LiveMatchPage.css (lmpHeroDriftLeger), mêmes valeurs. */
-@keyframes posterDriftLeger {
-  0%, 100% { transform: scale(1.06) translate(0%, 0%); }
-  50%      { transform: scale(1.10) translate(-1.5%, 1.5%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .poster__bg--gradient,
-  .poster__bg--gradientAlt,
-  .poster__bg--gradientTri { animation: none; }
-  .poster__bg--gradientAlt,
-  .poster__bg--gradientTri { opacity: 0; }
-}
+/* ⚠️ `@keyframes posterMorph`/`posterDriftLeger` SUPPRIMÉES (10/10) : plus
+   aucun appelant depuis le retrait des animations ci-dessus (`posterDrift`
+   avait déjà été retiré du fichier avec sa propre définition). Le bloc
+   `@media (prefers-reduced-motion: reduce)` qui neutralisait ces animations
+   + masquait gradientAlt/gradientTri (`opacity: 0`) est retiré pour la même
+   raison : il n'y a plus de mouvement à neutraliser pour personne, et
+   garder `opacity: 0` uniquement pour les utilisateurs "reduced motion"
+   leur aurait donné un fond MOINS coloré que tout le monde — une différence
+   qui n'a plus de sens maintenant que la version par défaut est déjà
+   statique. */
 
 /* ⚠️ HABILLAGE LIGUE DES CHAMPIONS (06/09, révisé 09/09) — voir competitions.js
    (`tintTheme`). Seule compétition à ne pas suivre la recette commune (pas de
