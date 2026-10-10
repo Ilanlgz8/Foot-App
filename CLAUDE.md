@@ -3972,6 +3972,48 @@ cf-worker/
   3e théorie générique sur le même mécanisme que les 2 précédentes, qui elles n'ont pas suffi) ; à
   confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via Vercel).
 
+- ✅ Flash noir au scroll rapide dans Accueil, `content-visibility` RETIRÉ ENTIÈREMENT — vraie
+  cause enfin identifiée via une description bien plus précise du symptôme (10/10, 4e tentative
+  du jour sur ce même bug, après content-visibility:auto, l'élargissement IntersectionObserver, et
+  la promotion GPU de `.appScroll` — constat utilisateur, par message vocal : "des fois, quand je
+  scrolle vers le bas, vers le haut, et qu'après je rescrolle vers le bas, c'est là que ça déconne
+  [...] les cartes, ça affiche un peu le contour, mais le contenu à l'intérieur, genre l'heure, le
+  score, les logos, ou les couleurs, ils s'affichent pas directement [...] c'est comme si ça
+  chargeait le contenu, alors que normalement, il devrait déjà être chargé de base [...] c'est ça
+  que je veux, en fait") — cette description, bien plus précise que les 2 précédentes ("écran
+  noir", "ça revient après 1-2s"), décrit EXACTEMENT le comportement PRÉVU et DOCUMENTÉ de
+  `content-visibility: auto` : la BOÎTE de l'élément reste mesurée/affichée (via
+  `contain-intrinsic-size`, qui lui donne une taille de repli), mais le RENDU DE SES DESCENDANTS
+  (texte, logos, dégradés) est sciemment SAUTÉ par le navigateur tant qu'il juge l'élément "pas
+  pertinent" — pas un effet de bord à corriger, c'est la mécanique même de cette technique,
+  volontairement posée le matin même pour réduire le coût GPU des cards hors écran. L'élargissement
+  IntersectionObserver (`poster__frame--warm`, rootMargin 150%) posé en 2e tentative n'arrivait pas
+  à rattraper un scroll bas→haut→bas assez rapide : son callback est ASYNCHRONE (1 frame de retard
+  minimum après chaque changement de direction), et sur une inversion de sens répétée vite, le
+  navigateur peut reconsidérer une card "pas pertinente" avant que la classe `--warm` n'ait eu le
+  temps d'être posée/retirée par React — exactement la fenêtre où le contour (déjà peint une 1ère
+  fois) reste visible mais où `content-visibility:auto` reprend la main sur le contenu. Retiré
+  ENTIÈREMENT plutôt que retouché une 3e fois sur ce même mécanisme (`src/accueil.css`,
+  `.poster__frame` : `content-visibility`/`contain-intrinsic-size` supprimés ; règle
+  `.poster__frame--warm` supprimée) ; `src/accueil/MatchPoster.jsx` : le hook `frameRef`/`isWarm`/
+  `IntersectionObserver` entièrement retiré (plus utilisé nulle part), `useRef` retiré de l'import
+  React (devenu inutilisé). Le vrai remède pour le flash noir ORIGINAL (celui qui avait motivé
+  cette technique le matin même) reste la promotion GPU de `.appScroll` (3e tentative du jour,
+  `App.css`, toujours en place, non remise en cause ici) : elle donne à WebKit un cache de tuiles
+  plus généreux autour de la zone de scroll SANS JAMAIS sauter le rendu d'un descendant — elle ne
+  peut donc pas, par construction, reproduire le symptôme précis décrit ici ("contour oui, contenu
+  non"). Risque assumé en retirant content-visibility : le gain CPU/GPU des cards très loin dans la
+  liste (ex. en lisant les actualités tout en bas de l'Accueil) disparaît — accepté, puisqu'il
+  entrait directement en conflit avec la demande explicite de l'utilisateur ("il devrait déjà être
+  chargé de base"), qui prime. 370 tests + lint (34 erreurs pré-existantes, confirmées identiques
+  avant/après — aucune régression) + build vérifiés. Honnêteté : toujours aucun accès à un vrai
+  iPhone/PWA depuis cet environnement pour reproduire ou confirmer avant déploiement — mais cette
+  fois la correspondance entre la description précise de l'utilisateur et le comportement DOCUMENTÉ
+  (pas supposé) de `content-visibility:auto` est directe et sans ambiguïté, bien plus solide que les
+  3 tentatives précédentes qui visaient des mécanismes plausibles mais jamais confirmés par un
+  symptôme aussi spécifique ; à confirmer par l'utilisateur sur son téléphone après ce déploiement
+  (automatique via Vercel, pas de `npm run deploy` manuel nécessaire).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
