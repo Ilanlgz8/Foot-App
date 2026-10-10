@@ -37,6 +37,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Non autorisé' })
   }
 
+  // ⚠️ AJOUT (10/10, constat utilisateur : 2 appels à cette URL, à des
+  // moments différents, ont renvoyé EXACTEMENT le même JSON — y compris la
+  // dernière ligne de `logHistory`, horodatée bien avant le moment du 2e
+  // appel) : ce fichier n'avait jamais posé de `Cache-Control`, donc un
+  // navigateur peut légitimement servir une copie déjà en cache pour la
+  // même URL au lieu de revalider — exactement ce qui s'est produit, et qui
+  // a fait perdre du temps à tort sur une "preuve" qui n'en était pas une.
+  // `no-store` explicite : ce diagnostic doit TOUJOURS refléter l'instant
+  // présent, jamais une copie.
+  res.setHeader('Cache-Control', 'no-store')
+
   const info = {}
 
   // 1. VAPID
