@@ -50,6 +50,36 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* ⚠️ AJOUT (10/10, 2e signalement du même symptôme malgré les 2 fixes
+     content-visibility posés plus tôt le même jour sur `.poster__frame` —
+     ceux-là réduisaient le coût de rendu PAR CARD, mais le symptôme exact
+     décrit par l'utilisateur ("remonte vite, du noir, les cards reviennent
+     ~1s après") est la signature la plus documentée d'un problème différent
+     et bien connu de WebKit/iOS Safari : un conteneur `overflow-y: auto` +
+     `-webkit-overflow-scrolling: touch` qui n'est PAS lui-même promu sur sa
+     propre couche de compositing garde un cache de tuiles ("tile cache")
+     plus conservateur autour de sa zone visible que le défilement du
+     document principal — un scroll rapide/un fling peut dépasser ce cache,
+     laissant apparaître du contenu non encore peint (noir ici, la couleur de
+     fond sous les cards) jusqu'à ce que WebKit rattrape. `.appScroll` est
+     devenu LE conteneur de scroll de toute l'app depuis la refonte du 14/09
+     (avant, le document lui-même défilait) — changement structurel plus
+     ancien que ce signalement, cohérent avec "avant ça faisait pas ça" si le
+     symptôme est resté discret tant que peu de cards animées étaient
+     montées à la fois, et plus visible depuis que la quasi-totalité des
+     compétitions sont passées en thème animé (voir l'historique CSS de ce
+     fichier). Corrigé par le remède standard et documenté pour cette classe
+     de bug précise : forcer `.appScroll` LUI-MÊME (le conteneur, pas les
+     cards individuelles) sur sa propre couche GPU — donne à WebKit un cache
+     de tuiles nettement plus généreux autour de sa zone visible, réduisant
+     fortement la fenêtre où un scroll rapide peut dépasser ce qui est déjà
+     peint. Complémentaire aux 2 fixes `content-visibility` déjà en place
+     (ceux-là réduisent le TRAVAIL par card, celui-ci réduit la fenêtre où ce
+     travail doit être fait EN RETARD par rapport au scroll) — aucun des 2
+     n'annule l'autre. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
 }
 /* ⚠️ AJOUT (21/09, même changement que ci-dessus) : `.sfTabbar` n'est plus un
    élément de flux qui réserve sa propre place (elle est maintenant

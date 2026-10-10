@@ -3937,6 +3937,41 @@ cf-worker/
   été fait entre la capture de ce log et maintenant — si ce n'est pas encore
   fait, c'est le prochain geste qui donnera un vrai test du 9e fix.
 
+- ✅ Flash noir au scroll rapide dans Accueil, 2e signalement le même jour, EN VRAI sur un iPhone
+  PWA cette fois (10/10, précisions utilisateur : "quand je monte vers le haut [...] du noir au
+  lieu des cartes [...] une seconde après [...] avant ça faisait pas ça") — les 2 fixes posés
+  plus tôt le même jour sur `.poster__frame` (`content-visibility: auto`, puis l'élargissement
+  via IntersectionObserver à 150% du viewport) réduisaient le coût de rendu PAR CARD, mais le
+  symptôme décrit (remonte vite, du noir, les cards reviennent ~1s après) est la signature la
+  plus documentée d'un problème DIFFÉRENT, bien connu sur WebKit/iOS Safari : un conteneur
+  `overflow-y: auto` + `-webkit-overflow-scrolling: touch` qui n'est PAS lui-même promu sur sa
+  propre couche de compositing garde un "tile cache" plus conservateur autour de sa zone visible
+  que le défilement du document principal — un scroll rapide/fling peut dépasser ce cache,
+  laissant apparaître du contenu pas encore peint (noir = fond sous les cards) jusqu'à ce que
+  WebKit rattrape. `.appScroll` (`App.css`) est devenu LE seul conteneur de scroll de toute l'app
+  depuis la refonte structurelle du 14/09 (avant, c'était le document qui défilait nativement) —
+  cohérent avec "avant ça faisait pas ça" si le symptôme est resté discret tant que peu de cards
+  animées étaient montées en même temps, et plus visible maintenant que la quasi-totalité des
+  compétitions sont passées en thème animé (voir l'historique CSS de ce fichier, des dizaines
+  d'itérations UEL/UECL/PD/BL1/SA/FL1/PL/NL/WC/CAN/UCL). Corrigé (`App.css`, `.appScroll`) :
+  `transform: translateZ(0)` + `-webkit-transform: translateZ(0)` + `will-change: transform` sur
+  le CONTENEUR DE SCROLL LUI-MÊME (pas les cards individuelles, déjà traitées) — le remède
+  standard documenté pour cette classe de bug précise, donne à WebKit un cache de tuiles
+  nettement plus généreux autour de la zone visible de `.appScroll`. Vérifié AVANT d'appliquer que
+  ça ne risque pas de réintroduire le bug de la barre du bas (13 tentatives documentées plus haut,
+  dont une cause exacte — ancêtre transformé — déjà rencontrée) : `.sfTabbar`/`BottomTabBar` est un
+  FRÈRE de `.appScroll` dans le DOM (`App.jsx`, les deux montés côte à côte dans `.appShell`,
+  `.sfTabbar` ancrée en `position: absolute` sur `.appShell` lui-même, jamais sur `.appScroll`) —
+  donc structurellement insensible à ce transform, aucun risque de collision avec cette classe de
+  bug déjà bien documentée dans ce même fichier. Complémentaire aux 2 fixes `content-visibility`
+  déjà posés le même jour : ceux-là réduisent le TRAVAIL par card, celui-ci réduit la fenêtre où ce
+  travail peut arriver EN RETARD par rapport au scroll — aucun des deux n'annule l'autre. 370 tests
+  + build vérifiés (CSS non linté par ESLint, comme toujours). Honnêteté : toujours aucun accès à
+  un vrai iPhone/PWA depuis cet environnement pour reproduire ou confirmer avant déploiement — mais
+  c'est, cette fois, le correctif standard et documenté pour la signature EXACTE décrite (pas une
+  3e théorie générique sur le même mécanisme que les 2 précédentes, qui elles n'ont pas suffi) ; à
+  confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
