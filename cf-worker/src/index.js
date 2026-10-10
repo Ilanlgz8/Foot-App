@@ -628,20 +628,48 @@ async function runOnePass(env) {
   // changer la moindre décision : skip immédiat si emptyDayKey posé, sinon
   // skip jusqu'à nextCheckKey si encore valide — comportement identique.
   // ⚠️ AJOUT (question utilisateur : "86K commandes/mois rien que pour ce
-  // check, c'est beaucoup sur 500K") : ce check faisait encore 2 commandes
-  // séparées CHAQUE minute — scard('cron:liveIds') PUIS, si vide, le mget
-  // ci-dessus. MGET ne peut pas lire un Set (scard) directement, donc
-  // impossible de le fusionner tel quel — mais cron:liveIds n'est JAMAIS
-  // consulté nulle part ailleurs autrement que par sa cardinalité (aucun
-  // smembers/sismember dans tout le fichier, vérifié), donc sa VALEUR
-  // exacte (quels matchs précisément) n'a jamais d'importance ici, seulement
-  // "vide ou pas". cron:anyLive (voir anyStillLive, recalculé à CHAQUE passe
-  // complète, jamais sur ce chemin skip) est un simple flag string dérivé de
-  // cron:liveIds, qui LUI peut rejoindre emptyDayKey/nextCheckKey dans le
-  // MÊME mget — 1 seule commande au lieu de 2, dans le cas de très loin le
-  // plus fréquent. cron:liveIds (le vrai Set) reste intact et reste la seule
-  // source utilisée pour la décision plus sensible (armement d'emptyDayKey/
-  // nextCheckKey, scard direct conservé plus bas dans ce fichier).
+  // check, c'est beaucoup sur 500K") puis RETIRÉ LE MÊME JOUR (voir le bloc
+  // juste en dessous) : une 1ère version de cette optimisation fusionnait ce
+  // check avec le mget ci-dessus via un flag dérivé (`cron:anyLive`) — abandon-
+  // née, elle a causé un vrai bug de désync (blackout de plusieurs heures,
+  // voir l'historique détaillé dans CLAUDE.md du 10/10). `cron:liveIds` (le
+  // vrai Set) reste la SEULE source consultée pour ce check, via un
+  // `scard` direct — 1 commande de plus par passe, coût accepté pour ne
+  // plus jamais risquer cette classe de bug.
+  // ⚠️ BUG CRITIQUE CORRIGÉ (constat utilisateur, 10/10 : "coup d'envoi reçu
+  // normalement pour 3 matchs, mais plus rien pendant les buts, et tout
+  // arrive d'un coup quelques dizaines de minutes après la fin des matchs")
+  // — reproduit sur les vrais logs du 09/10 : Dortmund-Werder Brême ET
+  // Lens-Lyon montrent chacun un trou total de PILE ~2h (aucune ligne, pas
+  // même une transition mi-temps/reprise, qui se logue pourtant toujours
+  // sans condition) entre leur coup d'envoi et leur rattrapage d'un coup
+  // (4 buts + FT loggés à la MÊME milliseconde pour Dortmund). Root cause :
+  // ce garde-fou utilisait `cron:anyLive`, un simple FLAG dérivé écrit UNE
+  // SEULE FOIS en fin de passe complète (voir le pipeline plus bas) — alors
+  // que la vraie source de vérité, `cron:liveIds` (Set), est mise à jour en
+  // TEMPS RÉEL à chaque match via sadd/srem (voir stayTrackedAsLive plus
+  // bas), dans un appel séparé et déjà logué en cas d'erreur. Si l'écriture
+  // groupée de `cron:anyLive` en fin de passe échoue pour une raison
+  // quelconque (ex. un aléa Turso transitoire — ce fichier vient d'être
+  // migré le 01/10, ce chemin n'a jamais été vérifié contre une vraie base)
+  // — son `catch {}` est totalement SILENCIEUX, aucune trace dans les logs —
+  // `cron:anyLive` reste alors à sa valeur précédente (souvent "rien n'est
+  // en direct", si c'était le cas juste avant le coup d'envoi) MÊME SI
+  // `cron:liveIds` contient bien le match qui vient de démarrer. La passe
+  // suivante lit alors `trackingLiveAtStart === 0` à tort, et si
+  // `emptyDayKey`/`nextCheckKey` étaient déjà armés depuis avant (légitime,
+  // avant que le match ne démarre), le garde-fou renvoie un early-return
+  // TOTAL (`{events:0, log:[], quiet:true}`) — qui ne vérifie JAMAIS
+  // `cron:liveIds` lui-même (ce check n'existe que PLUS BAS dans la
+  // fonction, jamais atteint ici) — pour TOUTE la durée du TTL déjà armé
+  // (jusqu'à 3h), expliquant le trou total observé. Corrigé : `cron:anyLive`
+  // entièrement retiré (plus de 2e source de vérité pouvant désynchroniser)
+  // — ce garde-fou consulte désormais directement `scard('cron:liveIds')`,
+  // la même source déjà utilisée plus bas dans ce fichier pour la décision
+  // d'armement (stillTrackingLive) — un seul endroit, toujours à jour, ne
+  // peut plus jamais se désynchroniser de lui-même. Coût : 1 commande de
+  // plus par passe (scard séparé du mget restant) — négligeable face à un
+  // bug qui pouvait couper toute notif pendant des heures.
   let trackingLiveAtStart = 0
   let knownEmpty = false
   let skipUntil  = null
@@ -651,8 +679,10 @@ async function runOnePass(env) {
   // coût négligeable, évite un aller-retour Redis séparé plus bas.
   let rawLiveSlugs = null
   try {
-    const [rawAnyLive, rawEmpty, rawNextCheck, rawSlugs] = await kv.mget('cron:anyLive', emptyDayKey, nextCheckKey, 'cron:liveSlugs')
-    trackingLiveAtStart = rawAnyLive ? 1 : 0
+    trackingLiveAtStart = (await kv.scard('cron:liveIds')) > 0 ? 1 : 0
+  } catch {}
+  try {
+    const [rawEmpty, rawNextCheck, rawSlugs] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs')
     knownEmpty = !!rawEmpty
     skipUntil  = rawNextCheck
     rawLiveSlugs = rawSlugs
@@ -928,22 +958,14 @@ async function runOnePass(env) {
   // FINAL n'est pas "isLive").
   let finalEventsSeenThisPass = 0
 
-  // ⚠️ AJOUT (investigation "~10K commandes/jour sans match") : drapeau
-  // dénormalisé, recalculé à CHAQUE passe complète (jamais sur le
-  // skip-fast-path, voir plus bas) à partir de cron:liveIds — sert
-  // UNIQUEMENT à fusionner le `scard('cron:liveIds')` du skip-fast-path avec
-  // le `mget(emptyDayKey, nextCheckKey)` juste à côté en UNE seule commande
-  // Redis au lieu de 2 (MGET porte sur des clés string, pas sur un Set —
-  // scard ne peut pas y être inclus directement). cron:liveIds (le vrai Set,
-  // source de vérité) n'est PAS touché, reste utilisé tel quel pour
-  // l'armement d'emptyDayKey/nextCheckKey (voir stillTrackingLive plus bas,
-  // scard direct conservé à cet endroit précis — décision plus sensible,
-  // autant rester sur la source authentique). Auto-réparateur en pire cas :
-  // recalculé à chaque passe complète (pas seulement au moment où un match
-  // démarre/finit), donc un échec d'écriture isolé s'auto-corrige au plus
-  // tard à la passe suivante (60s), largement sous les marges de sécurité
-  // déjà en place ailleurs dans ce fichier (grâce 45s-5min).
-  let anyStillLive = false
+  // ⚠️ `anyStillLive`/`cron:anyLive` RETIRÉS (10/10, voir le commentaire
+  // détaillé sur `trackingLiveAtStart` plus haut) : ce drapeau dénormalisé,
+  // écrit UNE SEULE FOIS en fin de passe complète avec un `catch {}`
+  // silencieux, pouvait se désynchroniser de `cron:liveIds` (la vraie
+  // source, mise à jour en temps réel par match) si cette écriture finale
+  // échouait — causant un blackout total de plusieurs heures. `cron:liveIds`
+  // (scard) est maintenant la SEULE source consultée, au début ET à la fin
+  // de la passe, ne peut plus se désynchroniser de lui-même.
   // Voir hotSlugs/isColdSlugActiveThisMinute plus haut — mémorise quels
   // championnats ont un match tracké live/final-pas-confirmé DANS CETTE
   // passe, pour que la prochaine passe sache lesquels ne jamais ralentir.
@@ -1246,7 +1268,6 @@ async function runOnePass(env) {
     // en pleine confusion, empêchant toute correction rapide si c'était
     // effectivement un faux FINAL.
     const stayTrackedAsLive = isLive || (isFinalNow && !isFinalConfirmed)
-    if (stayTrackedAsLive) anyStillLive = true
     if (stayTrackedAsLive) hotSlugsThisPass.add(slug)
     try {
       if (stayTrackedAsLive) await kv.sadd('cron:liveIds', String(eventId))
@@ -1547,7 +1568,6 @@ async function runOnePass(env) {
         // fichier) avant de retenter — exactement le symptôme remonté par
         // l'utilisateur ("notifs reçues d'un coup ~10min plus tard").
         log.push(`[espn:${slug}:${eventId}] échec envoi FT — match gardé "en direct", retenté au prochain passage`)
-        anyStillLive = true
         try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
       }
     } else if (isFinalNow) {
@@ -1618,19 +1638,16 @@ async function runOnePass(env) {
    }
   }
 
-  // Voir anyStillLive plus haut — 1 seule commande, 1 seule fois par passe
-  // complète (jamais sur le skip-fast-path). ex 3h : purement défensif, se
-  // réarme de toute façon à chaque passe complète tant qu'un match est suivi.
-  // Regroupés en pipeline (voir hotSlugsThisPass/cron:liveSlugs plus haut,
-  // audit CPU "Exceeded CPU Limit") — 2 écritures indépendantes, 1 seul
-  // aller-retour au lieu de 2.
+  // `cron:anyLive` retiré (10/10, voir le commentaire détaillé sur
+  // `trackingLiveAtStart` en tout début de fonction) — cron:liveIds (déjà
+  // maintenu en temps réel par match, voir stayTrackedAsLive plus haut)
+  // reste l'unique source de vérité, plus aucune écriture redondante ici.
   try {
-    let pipe = kv.pipeline()
-    pipe = anyStillLive ? pipe.set('cron:anyLive', '1', { ex: 3 * 3600 }) : pipe.del('cron:anyLive')
-    pipe = hotSlugsThisPass.size > 0
-      ? pipe.set('cron:liveSlugs', JSON.stringify([...hotSlugsThisPass]), { ex: 3 * 3600 })
-      : pipe.del('cron:liveSlugs')
-    await pipe.exec()
+    if (hotSlugsThisPass.size > 0) {
+      await kv.set('cron:liveSlugs', JSON.stringify([...hotSlugsThisPass]), { ex: 3 * 3600 })
+    } else {
+      await kv.del('cron:liveSlugs')
+    }
   } catch {}
 
   // ── Armement des optimisations "on peut sauter le prochain fetch" ──────────

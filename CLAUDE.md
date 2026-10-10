@@ -3590,6 +3590,90 @@ cf-worker/
   l'app via Vercel) ; à confirmer par l'utilisateur sur son prochain match
   avec un but marqué pile avant/pendant la mi-temps.
 
+- ✅ 7e BUG CRITIQUE TROUVÉ ET CORRIGÉ, NOUVEL INCIDENT (10/10, constat
+  utilisateur le lendemain des 6 fixes du 05/10, cette fois 3 matchs
+  simultanés : "j'ai bien reçu les notifs du coup d'envoi des trois matchs.
+  Mais après, quand il y a eu des buts et tout, bah j'ai plus rien reçu. Et
+  dès que les matchs ils se sont finis, là j'ai tout reçu quelques dizaines
+  de minutes plus tard. C'est pas normal.") — symptôme DIFFÉRENT des 6 bugs
+  de la veille (KO qui fonctionne, buts pendant le match totalement absents,
+  tout rattrapé d'un coup après la fin). Après confirmation explicite de
+  l'utilisateur que `npm run deploy` avait bien été fait avant les matchs de
+  la veille (écarte la théorie "ancien code pas redéployé"), nouveau JSON
+  `/api/debug-push?secret=...` demandé plutôt que de deviner une 7e théorie
+  à l'aveugle — même discipline que toute la veille. Root cause trouvée dans
+  `logHistory` : Dortmund-Werder Brême (`ger.1:401884781`) ET Lens-Lyon
+  (`fra.1:401876447`) montrent chacun un trou total de PILE ~2h (18:32:30→
+  20:32:55 UTC, aucune ligne, pas même une transition mi-temps/reprise qui se
+  logue pourtant toujours sans condition) entre leur coup d'envoi et un
+  rattrapage d'un coup (4 buts + FT loggés à la MÊME milliseconde pour
+  Dortmund) — et la toute première détection de Lens-Lyon après ce trou
+  affichait déjà un score 2-1 : les buts marqués AVANT cette détection sont
+  entrés directement dans la baseline, jamais notifiés individuellement,
+  collant exactement à "rien pendant le match, tout d'un coup après".
+  Mécanisme trouvé par lecture directe du code (`cf-worker/src/index.js`) :
+  le garde-fou d'entrée de `runOnePass()` (`trackingLiveAtStart`) ne lisait
+  QUE `cron:anyLive` — un simple FLAG STRING dérivé, écrit UNE SEULE FOIS en
+  toute fin de passe complète, dans un pipeline enveloppé d'un `try{}catch{}`
+  totalement SILENCIEUX (aucun log en cas d'échec) — alors que la vraie
+  source de vérité, `cron:liveIds` (Set), est mise à jour en TEMPS RÉEL à
+  CHAQUE match via `sadd`/`srem` (voir `stayTrackedAsLive`), dans un appel
+  séparé et DÉJÀ logué en cas d'erreur. Si cette écriture groupée de fin de
+  passe échouait pour une raison quelconque (ex. un aléa Turso transitoire —
+  ce fichier n'a été migré sur Turso que le 01/10, ce chemin précis n'avait
+  jamais été vérifié contre une vraie base avant cet incident), `cron:anyLive`
+  restait bloqué sur sa valeur précédente ("rien n'est en direct", le cas
+  juste avant un coup d'envoi) MÊME SI `cron:liveIds` contenait bien le match
+  qui venait de démarrer — les 2 clés, écrites par 2 chemins de code
+  totalement différents, pouvaient désynchroniser sans jamais se corriger
+  seules. La passe suivante lisait alors `trackingLiveAtStart === 0` à tort,
+  et comme `emptyDayKey`/`nextCheckKey` étaient déjà légitimement armés avant
+  le coup d'envoi (aucun match en cours à ce moment-là), le garde-fou
+  renvoyait un early-return TOTAL (`{events:0, log:[], quiet:true}`) — qui ne
+  consulte JAMAIS `cron:liveIds` lui-même (ce vrai check n'existe que PLUS
+  BAS dans la fonction, pour la décision d'armement, jamais atteint ici) —
+  pour TOUTE la durée du TTL déjà armé (jusqu'à 3h, `EMPTY_DAY_TTL`),
+  expliquant exactement le trou de ~2h observé sur 2 slugs simultanément (un
+  seul flag `cron:anyLive` partagé par tout le Worker, donc un seul échec
+  d'écriture bloque TOUS les slugs à la fois, pas seulement celui du match
+  qui vient de démarrer). Différent des 2 gates déjà corrigés le 05/10
+  (`hotSlugs`/`noMatchFlags` ordering pour le fetch PAR SLUG une fois ce
+  gate dépassé, `fullyCovered` pour l'armement basé sur une vue partielle) :
+  celui-ci bloquait l'accès à TOUTE la fonction, un niveau au-dessus, à cause
+  d'une 2e source de vérité redondante et non fiable plutôt qu'une mauvaise
+  vue de l'état réel. Corrigé (`cf-worker/src/index.js`) : `cron:anyLive`/
+  `anyStillLive` retirés entièrement (plus aucune écriture, plus aucune
+  lecture) — le garde-fou consulte désormais directement `scard('cron:liveIds')`
+  à l'entrée de la fonction, exactement la même source déjà utilisée plus bas
+  pour la décision d'armement (`stillTrackingLive`) — un seul endroit, toujours
+  à jour en temps réel, ne peut structurellement plus se désynchroniser de
+  lui-même puisqu'il n'y a plus que lui. Coût assumé : 1 commande Turso de
+  plus par passe (`scard` séparé du `mget` restant sur emptyDayKey/
+  nextCheckKey/cron:liveSlugs) — négligeable face à un bug qui pouvait couper
+  toutes les notifs de plusieurs matchs en même temps pendant des heures. Le
+  bloc d'écriture de fin de passe (pipeline `cron:anyLive`+`cron:liveSlugs`)
+  simplifié en conséquence : ne persiste plus que `cron:liveSlugs`, plus
+  aucune référence à la variable `anyStillLive` supprimée (vérifié par grep
+  exhaustif du fichier avant déploiement — seules des mentions dans des
+  commentaires historiques/explicatifs subsistent, aucune en code actif).
+  370 tests + lint (34 erreurs pré-existantes, confirmées IDENTIQUES avant/
+  après via `git stash` — toutes dans des fichiers non touchés par ce fix,
+  aucune nouvelle régression) + build + `npx wrangler deploy --dry-run` (406
+  KiB) vérifiés. Honnêteté : comme pour chacun des 6 fixes de la veille,
+  aucun accès réseau réel depuis cet environnement vers Cloudflare/Turso pour
+  reproduire ce désync précis ni confirmer ce fix en conditions de production
+  — mais la preuve est directe et solide : les 2 trous de ~2h observés dans
+  `logHistory`, synchronisés sur 2 slugs différents au même moment, collent
+  exactement à la durée de `EMPTY_DAY_TTL` (3h, cohérent avec un armement en
+  cours de descente) et au mécanisme de désync confirmé par simple lecture du
+  code (2 sources de vérité pour la même information, écrites par 2 chemins
+  différents avec des garanties d'erreur différentes) — pas une nouvelle
+  théorie devinée au hasard. À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier — aucun déploiement
+  automatique) ; à confirmer par l'utilisateur sur son prochain soir à
+  plusieurs matchs simultanés, idéalement en gardant un œil sur
+  `/api/debug-push?secret=...` pendant le direct plutôt qu'après coup.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
