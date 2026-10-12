@@ -598,7 +598,34 @@ async function runOnePass(env) {
   // vérifications qu'avant — gros gain pendant les périodes creuses, aucun
   // effet sur la détection live elle-même (cron:liveIds, voir garde-fou
   // juste en dessous, prime de toute façon toujours sur cette optimisation).
-  const EMPTY_DAY_TTL = 3 * 60 * 60
+  // ⚠️ RACCOURCI 3h → 30min (13/10, constat utilisateur : notifs reçues "1h,
+  // 2h, 3h après le match", en 2 vagues, sur 3-4 matchs à la fois — diagnostic
+  // via /api/debug-push?match=<eventId ESPN> sur un cas précis, Atalanta-
+  // Venezia : baseline (1ère observation du Worker) DÉJÀ à STATUS_FULL_TIME
+  // 3-1, suivie 1min après d'un carton rouge + FT confirmé — coup d'envoi et
+  // les 4 buts jamais vus, donc jamais notifiés). Le raisonnement d'origine
+  // ci-dessus ("aucune compétition n'ajoute une rencontre le jour même") était
+  // juste pour le calendrier RÉEL, mais confondait "le match n'existe pas
+  // encore dans la réalité" avec "ESPN n'a pas encore exposé ce match déjà
+  // programmé via CET endpoint précis à CET instant" — un vrai décalage de
+  // publication côté API (constaté, pas supposé : impossible pour un match de
+  // Serie A d'être ajouté au calendrier le jour même dans la vraie vie, donc
+  // le scoreboard ESPN était simplement vide pour `ita.1` au moment où
+  // emptyDayKey s'est armé, avant qu'ESPN ne finisse de publier la journée).
+  // Une fois armé, ce blackout de 3h n'a AUCUN garde-fou pour se réveiller si
+  // ESPN publie un nouveau match EN COURS de blackout (contrairement à
+  // nextCheckKey, qui lui connaît déjà un coup d'envoi et se cale dessus) —
+  // un match programmé puis joué entièrement DANS cette fenêtre de 3h est
+  // invisible à 100% du coup d'envoi jusqu'à la réouverture, expliquant à la
+  // fois "rien pendant le match" ET "plusieurs matchs d'un coup" (un seul
+  // flag `cron:emptyDay`, partagé par TOUTES les compétitions, donc TOUTES
+  // également aveugles pendant la même fenêtre). Compromis assumé : 30min
+  // borne le pire cas à 6x moins qu'avant (au lieu de 3h), au prix de plus de
+  // vérifications pendant les VRAIES périodes creuses (nuit, entre journées de
+  // championnat) — un sujet déjà sensible sur ce projet (plusieurs incidents
+  // de quota Upstash/Turso documentés dans CLAUDE.md) mais la fiabilité des
+  // notifs prime, demande explicite de l'utilisateur après ce diagnostic.
+  const EMPTY_DAY_TTL = 30 * 60
 
   // Garde-fou (audit bug notifs groupées) : si on suit encore un match vu
   // live sans confirmation de fin (cron:liveIds non vide), on ignore les 2

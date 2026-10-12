@@ -4055,6 +4055,49 @@ cf-worker/
   ce qui est une garantie plus forte qu'un réglage de cache/scroll ; à confirmer par l'utilisateur
   sur son téléphone après ce déploiement (automatique via Vercel).
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : notifs reçues "1h, 2h, 3h après le match", en 2 vagues, sur
+  3-4 matchs à la fois (13/10, constat utilisateur : "je reçois rien pendant le match... et d'un
+  coup, 4-10 notifications d'un coup, 1h-5h après — c'est pas normal, c'est pas des notifs live").
+  Diagnostiqué via `/api/debug-push?match=<eventId ESPN>` (filtre sur l'ID plutôt que le nom
+  d'équipe — piège trouvé en cours de route : les lignes "match trop vieux" ne contiennent JAMAIS
+  le nom des équipes, juste l'ID entre crochets, donc un filtre par nom peut rater une partie de
+  l'historique d'un match) sur un cas précis donné par l'utilisateur (Atalanta-Venezia, 12/10) :
+  `logHistory` montrait EXACTEMENT 1 ligne "baseline STATUS_FULL_TIME|3-1" (19:24:18) — la toute
+  PREMIÈRE observation du Worker pour ce match était déjà match terminé 3-1 — suivie 1min après
+  (19:25:20) d'un carton rouge + "FT (confirmé)" + recap. Coup d'envoi et les 4 buts : jamais vus,
+  jamais notifiés. Root cause dans `runOnePass()` (`cf-worker/src/index.js`) : `emptyDayKey`
+  (`EMPTY_DAY_TTL`, 3h) met le Worker en veille TOTALE (aucun fetch ESPN, aucune exception) dès
+  que le scoreboard confirme zéro match programmé aujourd'hui pour TOUTES les compétitions
+  couvertes — mais ce zéro est vérifié à UN INSTANT T, et rien ne force une réouverture si ESPN
+  publie un nouveau match EN COURS de ces 3h (contrairement à `nextCheckKey`, qui lui connaît déjà
+  un coup d'envoi et se cale dessus pour se réveiller juste avant). Le raisonnement d'origine du
+  03/10 ("aucune compétition n'ajoute une rencontre le jour même sans préavis de plusieurs heures")
+  restait vrai pour le calendrier RÉEL, mais confondait "le match n'existe pas encore dans la
+  réalité" avec "ESPN n'a pas encore exposé ce match déjà programmé via CET endpoint précis à CET
+  instant" — un vrai décalage de publication côté API (confirmé par le cas Atalanta-Venezia, pas
+  supposé) : un match de Serie A ne s'ajoute jamais au calendrier le jour même dans la vraie vie,
+  donc le scoreboard `ita.1` était simplement encore vide au moment où `emptyDayKey` s'est armé,
+  avant qu'ESPN ne finisse de publier la journée. Une fois armé, un match programmé puis joué
+  ENTIÈREMENT dans cette fenêtre de 3h est invisible à 100% du coup d'envoi jusqu'à la réouverture
+  — expliquant à la fois "rien pendant le match" ET "plusieurs matchs d'un coup" (`cron:emptyDay`
+  est un flag UNIQUE, partagé par TOUTES les compétitions à la fois, donc toutes également aveugles
+  pendant la même fenêtre — cohérent avec "3-4 matchs en même temps" rapporté par l'utilisateur).
+  Corrigé (`cf-worker/src/index.js`) : `EMPTY_DAY_TTL` 3h → 30min — borne le pire cas à 6x moins
+  qu'avant. Compromis assumé et documenté dans le code : plus de vérifications pendant les VRAIES
+  périodes creuses (nuit, entre journées de championnat) = plus de commandes Turso/Upstash, un
+  sujet déjà sensible sur ce projet (plusieurs incidents de quota documentés plus haut) — mais la
+  fiabilité des notifs prime, l'utilisateur a validé explicitement after le diagnostic plutôt que
+  de garder 3h. `nextCheckKey`/`NEXT_CHECK_MAX_MS` (25min, kickoff-aware une fois un match publié)
+  non touchés — seul le cas "zéro match encore visible nulle part" est concerné. 370 tests + lint
+  (clean) + build + `npx wrangler deploy --dry-run` (406 KiB) vérifiés. Honnêteté : comme pour
+  tout `cf-worker/`, aucun accès réseau réel depuis cet environnement pour confirmer ce fix contre
+  la vraie prod — mais cette fois la preuve est directe et sans ambiguïté (une seule ligne
+  "baseline FULL_TIME" suivie d'un rattrapage immédiat 1min après, sur un match qu'on sait
+  programmé à l'avance dans la vraie vie) plutôt qu'une théorie non vérifiée. À déployer
+  manuellement (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce dossier — aucun
+  déploiement automatique) ; à confirmer par l'utilisateur sur son prochain jour avec un match
+  programmé pendant une période autrement creuse.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
