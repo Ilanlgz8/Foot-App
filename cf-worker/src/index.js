@@ -626,6 +626,39 @@ async function runOnePass(env) {
   // de quota Upstash/Turso documentés dans CLAUDE.md) mais la fiabilité des
   // notifs prime, demande explicite de l'utilisateur après ce diagnostic.
   const EMPTY_DAY_TTL = 30 * 60
+  // ⚠️ AJOUT (13/10, même diagnostic Atalanta-Venezia que le raccourci
+  // 3h→30min ci-dessus — remarque utilisateur, après coup, en voyant les
+  // cards Accueil déjà affichées 7-30 jours à l'avance : "comment le Worker
+  // peut-il voir zéro match si l'app elle-même le montre déjà d'avance ?").
+  // Réponse honnête trouvée en relisant ce fichier : ce n'est pas que le
+  // Worker regarde une fenêtre de dates différente de celle de l'app (les
+  // deux interrogent bien le même scoreboard ESPN pour LE MÊME jour) — c'est
+  // qu'une requête "aujourd'hui" en direct (jamais mise en cache, ni côté
+  // front ni côté Worker, voir scoreboardChunkTtl/api/espn.js) peut
+  // légitimement renvoyer 0 événement à un instant T précis (ex. juste après
+  // minuit, avant qu'ESPN n'ait fini de publier la journée) puis un résultat
+  // correct quelques minutes plus tard — un simple décalage de publication
+  // ponctuel, pas une vraie absence de match. L'app, elle, montre la bonne
+  // donnée dès qu'UN SEUL chargement (n'importe quand dans la journée, par
+  // n'importe quel visiteur) tombe après ce décalage — ce qui arrive presque
+  // toujours, vu le volume de visites, contrairement au Worker qui ne fait
+  // QU'UNE SEULE vérification par minute et peut donc, par malchance, tomber
+  // pile sur l'instant creux. Or `noMatchFlags` (le mécanisme PAR SLUG, plus
+  // bas) a déjà une protection exactement pour ce cas — double confirmation
+  // avant d'armer un vrai skip, suite à un incident similaire (Angleterre-
+  // Argentine, voir son historique) — mais `emptyDayKey` (le blackout GLOBAL,
+  // qui coupe TOUS les slugs à la fois) n'avait jamais reçu la même
+  // protection : il s'armait sur la base d'UNE SEULE passe à 0 événement,
+  // sans aucune 2e confirmation. Corrigé en appliquant le même principe :
+  // `emptyDayPendingKey` mémorise une 1ère passe vide (TTL court, 3min, même
+  // valeur que NO_MATCH_PENDING_TTL plus bas) sans armer le blackout — ce
+  // n'est QUE si la MÊME vérification globale retombe à 0 événement à la
+  // passe suivante (pending déjà posé, donc à au plus 1min d'écart) que le
+  // vrai blackout de 30min s'arme. Un décalage de publication isolé d'une
+  // seule minute (le cas visé ici) ne peut donc plus jamais déclencher de
+  // blackout à lui seul.
+  const emptyDayPendingKey = 'cron:emptyDayPending'
+  const EMPTY_DAY_PENDING_TTL = 3 * 60
 
   // Garde-fou (audit bug notifs groupées) : si on suit encore un match vu
   // live sans confirmation de fin (cron:liveIds non vide), on ignore les 2
@@ -700,6 +733,12 @@ async function runOnePass(env) {
   let trackingLiveAtStart = 0
   let knownEmpty = false
   let skipUntil  = null
+  // Lu ici, dans le même mget que le reste (voir emptyDayPendingKey plus
+  // haut) : la décision d'armer emptyDayKey (double confirmation) a besoin
+  // de savoir si une 1ère passe vide a déjà été vue, AVANT même de refaire le
+  // fetch de cette passe — 0 sous-requête en plus, même principe que le
+  // reste de ce mget groupé.
+  let emptyPendingAtStart = null
   // Voir "cron:liveSlugs" plus bas (audit CPU, "Exceeded CPU Limit" en prod
   // confirmé via npm run tail) — lu ici, dans le MÊME mget que le reste
   // (aucune sous-requête en plus), même si ce chemin fait un early-return :
@@ -709,9 +748,10 @@ async function runOnePass(env) {
     trackingLiveAtStart = (await kv.scard('cron:liveIds')) > 0 ? 1 : 0
   } catch {}
   try {
-    const [rawEmpty, rawNextCheck, rawSlugs] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs')
+    const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey)
     knownEmpty = !!rawEmpty
     skipUntil  = rawNextCheck
+    emptyPendingAtStart = rawEmptyPending
     rawLiveSlugs = rawSlugs
   } catch {}
 
@@ -1841,7 +1881,18 @@ async function runOnePass(env) {
 
   if (stillTrackingLive === 0 && fullyCovered) {
     if (activeEvents.length === 0 && !espnFetchFailed) {
-      try { await kv.set(emptyDayKey, '1', { ex: EMPTY_DAY_TTL }) } catch {}
+      // Double confirmation (voir emptyDayPendingKey plus haut) : une 1ère
+      // passe à 0 événement ne pose qu'un marqueur court (3min) — ce n'est
+      // QUE si la passe précédente avait déjà posé ce marqueur (donc 2
+      // vérifications globales consécutives à 0, à au plus 1min d'écart)
+      // que le vrai blackout de 30min s'arme. Un décalage de publication
+      // ESPN isolé d'une seule minute ne peut plus jamais, à lui seul,
+      // couper le fetch de toutes les compétitions pendant 30min.
+      if (emptyPendingAtStart) {
+        try { await kv.set(emptyDayKey, '1', { ex: EMPTY_DAY_TTL }) } catch {}
+      } else {
+        try { await kv.set(emptyDayPendingKey, '1', { ex: EMPTY_DAY_PENDING_TTL }) } catch {}
+      }
     } else if (activeEvents.length > 0 && !espnFetchFailed) {
       const anyLive = activeEvents.some(({ evt }) =>
         LIVE_ESPN.has(normalizeEspnStatus(evt.competitions?.[0]?.status)))

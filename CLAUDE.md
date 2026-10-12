@@ -4098,6 +4098,45 @@ cf-worker/
   déploiement automatique) ; à confirmer par l'utilisateur sur son prochain jour avec un match
   programmé pendant une période autrement creuse.
 
+- ✅ `emptyDayKey` passé en DOUBLE CONFIRMATION, même incident (13/10, objection juste de
+  l'utilisateur après le fix ci-dessus : "comment un match... le worker il s'active, il repère des
+  matchs, il voit rien. C'est pas possible, c'est pas ça peut pas être ça le problème parce que sur
+  l'application, j'ai... sur 30 jours les matchs, je peux voir tout sur 30 jours" — objection
+  techniquement fondée, pas réfutée mais RÉCONCILIÉE après relecture). Clarification honnête
+  d'abord : le Worker et l'app interrogent bien LE MÊME scoreboard ESPN pour LE MÊME jour (pas 2
+  fenêtres de dates différentes comme on aurait pu le supposer) — la fenêtre 7-30 jours de l'Accueil
+  ne s'applique qu'à l'AFFICHAGE à l'avance, jamais mise en cache une fois le jour J atteint
+  (`scoreboardChunkTtl` renvoie null pour "aujourd'hui", exactement comme côté Worker). La vraie
+  explication : une requête "aujourd'hui" EN DIRECT (non cachée, des 2 côtés) peut légitimement
+  renvoyer 0 événement à un instant T précis (ex. juste après minuit, avant qu'ESPN ait fini de
+  publier la journée) puis un résultat correct quelques minutes plus tard — un décalage de
+  publication ponctuel, pas une vraie absence de match. L'app ne le voit presque jamais : un visiteur
+  qui charge l'Accueil n'importe quand dans la journée (volume élevé) tombe presque toujours APRÈS
+  ce décalage. Le Worker, lui, ne fait qu'UNE SEULE vérification par minute — assez rare mais
+  possible de tomber pile sur l'instant creux. Vrai gap trouvé en relisant le fichier à la lumière de
+  cette objection : `noMatchFlags` (le mécanisme PAR SLUG, plus bas dans ce fichier) a déjà une
+  protection exactement pour ce cas — double confirmation avant d'armer un vrai skip, ajoutée après
+  un incident similaire (Angleterre-Argentine, voir son historique) — mais `emptyDayKey` (le
+  blackout GLOBAL, qui coupe TOUS les slugs à la fois, bien plus impactant qu'un skip par slug)
+  n'avait JAMAIS reçu la même protection : il s'armait sur la base d'UNE SEULE passe à 0 événement.
+  Corrigé (`cf-worker/src/index.js`) en appliquant le même principe déjà éprouvé : nouveau
+  `emptyDayPendingKey` (`cron:emptyDayPending`, TTL 3min, même valeur que `NO_MATCH_PENDING_TTL`)
+  mémorise une 1ère passe globale à 0 événement SANS armer de blackout — ce n'est QUE si la passe
+  suivante retombe ELLE AUSSI à 0 (pending déjà posé, donc à au plus 1min d'écart) que le vrai
+  `emptyDayKey` (30min, voir fix ci-dessus) s'arme. Lu dans le même mget groupé que le reste (aucune
+  sous-requête Turso/Redis supplémentaire). Un décalage de publication ESPN isolé d'une seule minute
+  ne peut donc plus jamais, à lui seul, couper le fetch de toutes les compétitions. `nextCheckKey`
+  (kickoff-aware, 25min max) non touché — lui ne peut structurellement pas bloquer plus de 5min avant
+  un coup d'envoi déjà connu (`min(nextKickoff - NEXT_CHECK_BUFFER_MS, ...)`), donc hors de cause
+  pour un trou qui dure jusqu'à la fin du match. 370 tests + lint (34 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build + `npx wrangler deploy --dry-run` (406 KiB) vérifiés. Honnêteté :
+  comme pour tout `cf-worker/`, aucun accès réseau réel depuis cet environnement pour confirmer ce
+  mécanisme de double confirmation contre la vraie prod — mais c'est un gap de conception réel et
+  concret (une protection déjà prouvée ailleurs dans ce même fichier, simplement jamais étendue au
+  cas global) plutôt qu'une nouvelle théorie non vérifiée. À déployer manuellement (`npm run deploy`
+  depuis `cf-worker/`, comme toujours pour ce dossier) ; à confirmer par l'utilisateur sur son
+  prochain jour avec un match en tout début de journée.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
