@@ -4322,6 +4322,56 @@ cf-worker/
   nouvelle ligne `[cron] ERREUR runOnePass (passe avortée) : ...`, qui
   donnera enfin la vraie cause au lieu d'un silence total.
 
+- ✅ 11e BUG TROUVÉ, MÊME SOIRÉE — trou de visibilité réel confirmé par log,
+  cette fois avec une cause concrète plutôt qu'une hypothèse (14/10, suite
+  directe du fix `runOnePass` plus haut : le même soir, un nouveau
+  `/api/debug-push` montre un trou de ~69min (17:24:05→18:33:10) sur
+  Linz-Liverpool/Feyenoord-Côme, SANS AUCUNE ligne `[cron] ERREUR
+  runOnePass` ni aucune autre erreur — contrairement au trou précédent, donc
+  pas (ou plus) un plantage non géré). `npm run tail` lancé par l'utilisateur
+  pendant les matchs de 21h montre "Ok" chaque minute (21:14-21:18) — le
+  Worker ne plante pas, mais `tail` ne peut de toute façon pas voir
+  `logHistory` (écrit dans Turso/Redis, jamais en `console.log`), donc ça ne
+  prouve rien sur les notifs elles-mêmes. Root cause trouvée par lecture
+  directe de `fetchEspnEventsBatch` (`cf-worker/src/index.js`) : quand le
+  fetch groupé vers Vercel réussit (HTTP 200), le code lit `j.bySlug[slug]` —
+  mais côté Vercel (`api/espn.js`, mode `slugs`), CHAQUE slug a son propre
+  timeout de 8s INDÉPENDANT (`Promise.allSettled`) ; si ESPN timeout/erreur
+  pour UN slug précis (ex. `uefa.champions`, un soir à 11 matchs simultanés,
+  trafic ESPN probablement sous tension), Vercel renvoie quand même un 200
+  global avec `{slug, ok:false, error:'timeout'}` dans `bySlug` pour ce slug
+  précis. Le code du Worker (`out.push({pair, res: entry?.ok ? {...} :
+  {ok:false, events:[]}})`) traite ça SANS JAMAIS LOGGUER — ni le
+  `if (!r.ok)` (la requête HTTP globale a bien réussi), ni le `catch` plus
+  bas (rien n'a levé d'exception) ne voient ce cas précis. Le match
+  concerné disparaît alors de `allEvents` CETTE passe, silencieusement,
+  pour un slug pourtant `hotSlugs` (déjà connu comme ayant un match en
+  cours) — qui continue de forcer le refetch CHAQUE minute (donc ça se
+  rattrape automatiquement dès qu'ESPN redevient réactif pour ce slug, sans
+  jamais rester bloqué pour de bon) mais sans la moindre trace tant que ça
+  dure. Explique exactement le profil observé : silence total pendant
+  plusieurs dizaines de minutes, aucun crash, aucune erreur loggée, puis un
+  rattrapage d'un coup une fois ESPN redevenu réactif pour ce slug. Corrigé
+  (`fetchEspnEventsBatch`) : ajout d'une ligne de log
+  `[espn:batch:${date}:${slug}] ok=false error=${entry?.error ?? 'absent du
+  bySlug'}` quand `entry?.ok` est faux — ne CORRIGE pas la cause (ESPN lent/
+  indisponible pour ce slug précis, hors de notre contrôle depuis cet
+  environnement), la rend enfin VISIBLE la prochaine fois que ça arrive,
+  même philosophie que le fix `runOnePass` du même jour. 370 tests + lint
+  (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build + `npx wrangler
+  deploy --dry-run` (407 KiB) vérifiés. Honnêteté : comme pour tout
+  `cf-worker/`, aucun accès réseau réel depuis cet environnement pour
+  confirmer que c'est EXACTEMENT ce qui s'est passé ce soir précis (pas
+  d'accès aux vrais logs ESPN ni à un `npm run tail` qui aurait couvert LA
+  fenêtre 17:24-18:33) — mais c'est un vrai trou de visibilité confirmé par
+  lecture directe du code (un cas 100% silencieux, ni erreur ni crash,
+  existe réellement dans ce chemin précis), pas une nouvelle théorie non
+  vérifiable. À déployer manuellement (`npm run deploy` depuis `cf-worker/`,
+  comme toujours pour ce dossier) ; si un nouveau trou de silence se
+  reproduit, la prochaine ligne `[espn:batch:...:SLUG] ok=false error=...`
+  dans un futur `/api/debug-push` donnera enfin la vraie cause ESPN précise
+  au lieu d'un silence sans explication.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -209,6 +209,25 @@ async function fetchEspnEventsBatch(pairs, log) {
       const j = await r.json()
       for (const p of group) {
         const entry = j.bySlug?.[p.slug]
+        // ⚠️ AJOUT (14/10, trou de visibilité trouvé en diagnostiquant un
+        // silence de 69min sans crash ni erreur loggée pendant un soir à 11
+        // matchs de Ligue des Champions simultanés) : avant ce log, un échec
+        // PAR SLUG à l'intérieur d'une réponse HTTP 200 globale (ESPN qui
+        // timeout/erreur pour CE slug précis côté api/espn.js, voir son mode
+        // `slugs`, chaque slug a son propre timeout de 8s indépendant) était
+        // 100% SILENCIEUX — ni le `if (!r.ok)` ni le `catch` plus bas ne le
+        // voient, puisque la requête vers Vercel elle-même a bien réussi.
+        // Le `{ok:false, events:[]}` qui en résulte tombait alors dans la
+        // branche "rien à pousser" sans laisser la moindre trace, pour un
+        // slug pourtant HOT (match déjà en cours, voir hotSlugs plus bas) —
+        // explique un silence total qui ne crashe jamais (tail montre "Ok")
+        // et ne log jamais d'erreur, qui se résorbe seul dès qu'ESPN répond
+        // de nouveau (hotSlugs force le refetch chaque minute, sans jamais
+        // bloquer). Ce log ne CORRIGE pas la cause (ESPN lent/indisponible
+        // pour ce slug, hors de notre contrôle), il la rend enfin visible —
+        // même philosophie que le fix runOnePass du même jour : transformer
+        // un silence indiagnosticable en une ligne exploitable.
+        if (!entry?.ok) log.push(`[espn:batch:${date}:${p.slug}] ok=false error=${entry?.error ?? 'absent du bySlug'}`)
         out.push({ pair: p, res: entry?.ok ? { ok: true, events: entry.events ?? [] } : { ok: false, events: [] } })
       }
     } catch (e) {
