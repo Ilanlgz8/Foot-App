@@ -477,8 +477,35 @@ export default async function handler(req, res) {
     // désormais et le reporte dans SON PROPRE log persisté
     // (`cron:goals:logHistory`, visible via `/api/debug-push`), pour qu'un
     // futur sent=0/failed>0 soit enfin VISIBLE au lieu de disparaître.
+    // ⚠️ 14e BUG TROUVÉ ET CORRIGÉ (14/10, même soir, log `/api/debug-push`
+    // montrant pour la 1ère fois "[push] sent=5 failed=0 stale=0 total=5" —
+    // donc `webpush.sendNotification` RÉUSSIT bien côté serveur, mais
+    // l'utilisateur ne reçoit RIEN sur son téléphone malgré plusieurs buts
+    // consécutifs) — root cause trouvée en comparant ce chemin (seul réellement
+    // actif en prod, appelé par cf-worker) à `sendDeduped` juste au-dessus
+    // (mode complet legacy, plus appelé en prod) : `sendDeduped` force
+    // `urgency: 'high'` avec un commentaire explicite ("ces notifs — KO/but/
+    // mi-temps/reprise/fin — sont rares et importantes, priorité max") — mais
+    // ce commentaire décrit une intention jamais appliquée dans CE mode : ici,
+    // `options` vient directement du Worker Cloudflare (`notifyVercel`), qui ne
+    // définit jamais `urgency` dans aucun de ses 7 appels (but/carton/mi-temps/
+    // reprise/fin/but annulé) — `sendPushToMatch` retombe alors sur son défaut
+    // `options.urgency ?? 'normal'`. Une notif 'normal' est un signal que les
+    // services de push (Apple/APNs en particulier, qui gère les 3 abonnements
+    // web.push.apple.com sur les 5 actuels) peuvent légitimement différer ou
+    // ne jamais réveiller l'appareil en arrière-plan (économie de batterie,
+    // Low Power Mode) — contrairement à 'high', qui demande une livraison
+    // immédiate. `webpush.sendNotification` réussit quand même (c'est un appel
+    // serveur→service de push, pas serveur→téléphone) : exactement le
+    // "sent=5 failed=0" vu dans le log, sans rien expliquer de l'absence côté
+    // téléphone — cette urgence trop faible est l'explication la plus
+    // probable et la plus documentée de cet écart. Corrigé : `urgency: 'high'`
+    // forcé ICI, après le spread de `options` pour ne jamais pouvoir être
+    // silencieusement écrasé — ce mode n'est appelé QUE pour KO/but/carton/
+    // mi-temps/reprise/fin, jamais pour le ticker (qui force déjà 'high' de
+    // son côté, voir plus bas), donc aucun cas où 'normal' serait voulu ici.
     const log = []
-    const sentCount = await sendPushToMatch(payload, slug ?? null, options ?? {}, log)
+    const sentCount = await sendPushToMatch(payload, slug ?? null, { ...(options ?? {}), urgency: 'high' }, log)
     return res.status(200).json({ ok: true, mode: 'notify', sent: sentCount, logs: log })
   }
 

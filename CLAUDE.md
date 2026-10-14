@@ -4512,6 +4512,78 @@ cf-worker/
   tout s'envoie correctement (et qu'il faudrait alors chercher côté
   appareil/service de push de l'utilisateur plutôt que côté serveur).
 
+- ✅ 14e BUG TROUVÉ ET CORRIGÉ — PREMIÈRE PREUVE RÉELLE QUE L'ENVOI RÉUSSIT
+  CÔTÉ SERVEUR, MAIS L'URGENCE PUSH ÉTAIT MAL RÉGLÉE (14/10, même soir, suite
+  directe du 13e fix : "toujours rien hein j'ai rien en notif"). Nouveau
+  `/api/debug-push` demandé et fourni — PREMIÈRE FOIS depuis le début de cet
+  incident que `logHistory` contient les nouvelles lignes `[vercel→push]
+  [push] sent=5 failed=0 stale=0 total=5`, apparues 7 fois entre 20:22 et
+  20:36, chacune juste après un but détecté (Aston Villa-Fenerbahce,
+  Betis-Porto, Man. City-PSG, S Bratislava-Stuttgart...). Preuve directe et
+  non ambiguë : `webpush.sendNotification` RÉUSSIT, pour LES 5 abonnements
+  actifs (3 `web.push.apple.com` + 2 `fcm.googleapis.com`), à chaque fois,
+  SANS AUCUN échec ni endpoint stale — et pourtant l'utilisateur n'a rien
+  reçu sur son téléphone pour aucun de ces buts. Ça change la nature du
+  problème : pour la première fois en 14 bugs, ce n'est plus un problème de
+  DÉTECTION (déjà confirmée parfaite dans ce même log : KO, buts, cartons,
+  but annulé, mi-temps, reprise tous détectés et horodatés normalement) ni
+  d'ENVOI SERVEUR (confirmé réussi) — le problème se situe après que le
+  service de push (Apple/Google) ait accepté la requête.
+  Root cause trouvée en comparant 2 chemins du MÊME fichier
+  (`api/cron-goals.js`) : `sendDeduped()` (le mode complet "legacy", plus
+  appelé en prod depuis la migration vers le Worker Cloudflare) force
+  `urgency: 'high'` avec un commentaire explicite — "ces notifs (KO/but/
+  mi-temps/reprise/fin) sont rares et importantes, priorité max pour limiter
+  les retards/pertes en arrière-plan". Mais le handler `mode === 'notify'`
+  (le SEUL chemin réellement actif en prod, appelé par cf-worker à chaque
+  détection) ne reprend JAMAIS cette intention : il transmet `options`
+  directement tel que reçu du Worker — et vérifié par grep exhaustif des 7
+  appels `notifyVercel(...)` dans `cf-worker/src/index.js` (but/carton rouge/
+  mi-temps/reprise/fin/but annulé/FT recheck) : AUCUN ne définit `urgency`
+  dans son objet `options` (`{ homeTeam, awayTeam, rawHomeTeam,
+  rawAwayTeam }`, jamais plus). `sendPushToMatch` retombe donc sur son
+  défaut, `options.urgency ?? 'normal'` — une urgence 'normal' que les
+  services de push, Apple/APNs en tout premier lieu (qui gère la majorité
+  des abonnements actuels, 3 sur 5), peuvent légitimement différer ou ne
+  jamais livrer en arrière-plan pour économiser la batterie (Low Power Mode,
+  app pas au premier plan) — alors que 'high' est le signal documenté qui
+  demande une livraison immédiate, y compris en réveillant l'appareil.
+  `webpush.sendNotification` réussit quand même avec 'normal' (c'est un
+  appel serveur→service de push, pas serveur→téléphone — le service accepte
+  la requête puis décide lui-même quand/si la transmettre à l'appareil) :
+  exactement le "sent=5 failed=0" observé, qui ne prouve la livraison
+  jusqu'au téléphone, contrairement à ce qu'on aurait pu supposer avant
+  d'avoir cette preuve précise.
+  Corrigé (`api/cron-goals.js`, handler `mode === 'notify'`) :
+  `{ ...(options ?? {}), urgency: 'high' }` — forcé APRÈS le spread
+  d'`options` pour ne jamais pouvoir être silencieusement écrasé (ce mode
+  n'est appelé QUE pour KO/but/carton/mi-temps/reprise/fin/but annulé,
+  jamais pour le ticker en direct qui force déjà 'high' de son propre côté,
+  voir `pushLiveTicker` plus bas dans le même fichier — donc aucun cas
+  légitime où 'normal' serait voulu ici). Changement minimal et sûr : ne
+  touche à rien côté `cf-worker/` (se déploie automatiquement avec le reste
+  de l'app via Vercel, contrairement aux 13 bugs précédents de cet incident
+  qui nécessitaient tous un `npm run deploy` manuel) — c'était la seule pièce
+  manquante pour que l'intention déjà documentée dans `sendDeduped` (jamais
+  réellement appliquée au chemin de prod) s'applique enfin partout. 370
+  tests + lint (35/35, baseline confirmée identique) + build vérifiés.
+  Honnêteté : comme pour tout ce qui touche à la livraison push, aucun accès
+  à un vrai téléphone/service Apple-Google depuis cet environnement pour
+  confirmer que l'urgence 'normal' était VRAIMENT la cause exacte de la
+  non-livraison (plusieurs autres facteurs côté OS — Focus/Ne pas déranger,
+  Low Power Mode, permissions de notification révoquées pour la PWA — restent
+  possibles et hors de portée du code) — mais c'est un vrai défaut confirmé
+  par lecture directe (un mécanisme déjà écrit et commenté comme nécessaire
+  dans ce même fichier, jamais appliqué au seul chemin actif), avec un
+  mécanisme documenté et plausible qui explique précisément l'écart observé
+  entre "envoi serveur réussi" et "rien reçu sur l'appareil". À confirmer par
+  l'utilisateur sur son prochain but en direct — si le symptôme persiste
+  malgré ce fix (déployé automatiquement, aucune action manuelle requise
+  pour celui-ci), ce sera un signal fort que la cause est côté réglages de
+  l'appareil (Focus/Low Power Mode/permissions) plutôt que côté code,
+  puisque pour la première fois dans cet incident le serveur ET maintenant
+  l'urgence du push sont tous les deux confirmés corrects.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
