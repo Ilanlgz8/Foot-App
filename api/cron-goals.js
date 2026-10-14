@@ -453,8 +453,33 @@ export default async function handler(req, res) {
     // fait plus que le travail réellement coûteux : charger les abonnés,
     // filtrer, chiffrer et envoyer. sendPushToMatch() est la même fonction
     // inchangée que dans le mode complet ci-dessous (voir plus bas).
-    const sentCount = await sendPushToMatch(payload, slug ?? null, options ?? {})
-    return res.status(200).json({ ok: true, mode: 'notify', sent: sentCount })
+    // ⚠️ BUG CORRIGÉ (14/10, constat utilisateur : "je reçois toujours pas de
+    // notif" un soir à 11 matchs simultanés, log cf-worker montrant pourtant
+    // tout plein de buts/mi-temps/reprises DÉTECTÉS sans aucune ligne
+    // `[notify→vercel] error=...`/`status=...`) — root cause trouvée en
+    // relisant ce chemin précis : `sendPushToMatch` était appelée ici SANS le
+    // paramètre `log` (4e argument, laissé `undefined` → `null` par défaut
+    // dans sa signature) — donc TOUS les `log?.push(...)` internes à cette
+    // fonction (le résumé systématique "[push] sent=X failed=Y stale=Z
+    // total=W", ET chaque échec individuel "[push:fail] status=...") étaient
+    // silencieusement jetés dans LE SEUL mode réellement appelé en prod par
+    // cf-worker. Conséquence concrète : si `webpush.sendNotification` échoue
+    // pour TOUS les abonnés (clé VAPID cassée, tous les endpoints stale, ou
+    // tout autre aléa côté service de push), cette fonction répond quand même
+    // HTTP 200 OK (`res.status(200).json({...})`, rien à voir avec le succès
+    // RÉEL de l'envoi) — `sendToVercel` côté cf-worker ne vérifie QUE le
+    // statut HTTP, jamais le contenu réel de la réponse, donc traite ça comme
+    // un plein succès, sans la moindre trace nulle part. Un but détecté
+    // correctement mais jamais réellement livré à aucun appareil ressemblait
+    // donc EXACTEMENT, de l'extérieur, à "tout va bien" — pas de 2e chance,
+    // la clé de dédup restait posée. Corrigé : `log` capturé ici et renvoyé
+    // dans la réponse JSON (`logs`) — cf-worker (voir `sendToVercel`) le lit
+    // désormais et le reporte dans SON PROPRE log persisté
+    // (`cron:goals:logHistory`, visible via `/api/debug-push`), pour qu'un
+    // futur sent=0/failed>0 soit enfin VISIBLE au lieu de disparaître.
+    const log = []
+    const sentCount = await sendPushToMatch(payload, slug ?? null, options ?? {}, log)
+    return res.status(200).json({ ok: true, mode: 'notify', sent: sentCount, logs: log })
   }
 
   // ⚠️ AJOUT (30/09, audit "Fluid Active CPU" demandé par l'utilisateur) :

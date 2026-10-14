@@ -4445,6 +4445,73 @@ cf-worker/
   un futur `/api/debug-push` dira enfin si c'était bien cette cause précise
   ou s'il faut chercher encore ailleurs.
 
+- ✅ 13e BUG CRITIQUE TROUVÉ ET CORRIGÉ — LE VRAI TROU DE VISIBILITÉ SUR LA
+  LIVRAISON RÉELLE DES PUSH, NOUVEL INCIDENT (14/10, constat utilisateur :
+  "ok bah la je reçois toujours pas de notif", un soir à 11 matchs de Ligue
+  des Champions simultanés). Nouveau `/api/debug-push` demandé et fourni :
+  `logHistory` montrait une activité de détection PARFAITEMENT NORMALE ce
+  soir-là (KO confirmés 19:01-19:04 pour 7 matchs, buts détectés 19:14-19:42,
+  mi-temps 19:46-19:51, reprises 20:02-20:08, buts après reprise jusqu'à
+  20:11) — AUCUN trou de type "early-return"/"blackout" comme les 12 bugs
+  précédents de cette série. Root cause trouvée en remontant la chaîne
+  complète but détecté → notif réellement livrée, pas juste "but détecté" :
+  `api/cron-goals.js`, dans le handler `mode === 'notify'` (le SEUL chemin
+  réellement appelé en prod par cf-worker), `sendPushToMatch(payload, slug ??
+  null, options ?? {})` était appelée SANS le 4e paramètre `log` — laissé à
+  `null` par défaut dans sa signature. Or TOUTE la visibilité réelle sur ce
+  qui se passe lors d'un envoi webpush (le résumé systématique "[push]
+  sent=X failed=Y stale=Z total=W", ET chaque échec individuel "[push:fail]
+  status=...") passe par `log?.push(...)` à l'intérieur de cette fonction —
+  avec `log=null`, ces lignes s'évaluent toutes en no-op silencieux. Pire :
+  `sendToVercel` côté `cf-worker/src/index.js` ne vérifie QUE le statut HTTP
+  de la réponse (`res.ok`) pour décider si l'envoi a réussi — jamais le corps
+  JSON retourné (`{ok:true, mode:'notify', sent:sentCount}`, lui-même déjà
+  ignoré). Résultat : si `webpush.sendNotification` échoue pour TOUS les
+  abonnés d'un match précis (clé VAPID invalide pour ce provider, tous les
+  endpoints stale, throttling Apple/Google, ou tout autre aléa côté service
+  de push), `api/cron-goals.js` répond quand même HTTP 200 OK (son code ne
+  renvoie jamais autre chose qu'un 200 dans ce mode, que l'envoi réel ait
+  réussi ou pas) — cf-worker traite ça comme un plein succès, la clé de dédup
+  reste posée pour de bon, et RIEN n'apparaît nulle part dans `logHistory` :
+  ni une ligne d'erreur, ni même une trace que l'envoi a été tenté. Un but
+  parfaitement détecté (comme on le voit dans le log ce soir-là) pouvait donc
+  ne jamais atteindre un seul appareil, sans que ni le Worker ni
+  `/api/debug-push` n'aient la moindre façon de le savoir — exactement le
+  profil du symptôme rapporté ("plein d'activité dans les logs, zéro
+  notification reçue"), et un trou de visibilité DIFFÉRENT des 12 précédents
+  (qui empêchaient la DÉTECTION elle-même, jamais la LIVRAISON une fois
+  détecté). Corrigé aux 2 bouts de la chaîne : (1) `api/cron-goals.js`, mode
+  `notify` — un vrai tableau `log` est désormais passé à `sendPushToMatch`,
+  et renvoyé dans la réponse JSON (`logs: log`) ; (2) `cf-worker/src/
+  index.js`, `sendToVercel` — sur `res.ok`, le corps JSON est maintenant lu
+  (`res.json()`) et chaque ligne de `data.logs` est reportée dans le propre
+  log du Worker (préfixe `[vercel→push]`), qui est déjà persisté dans
+  `cron:goals:logHistory` par le mécanisme existant — donc visible dans un
+  futur `/api/debug-push` sans aucun autre changement d'infrastructure.
+  `pushLiveTicker` (le ticker score en direct, sans dédup, haute fréquence)
+  volontairement PAS modifié de la même façon : lui logue déjà ses propres
+  erreurs HTTP, et le brancher sur ce même mécanisme aurait noyé
+  `logHistory` sous des lignes "sent=0" très fréquentes et peu informatives
+  (ticker filtré `onlyFavorites`, sent=0 y est normal la plupart du temps) —
+  pas le chemin critique concerné par ce symptôme (but/carton/mi-temps/
+  reprise/fin, tous via `notifyVercel`, pas le ticker). 370 tests + lint
+  (35/35, baseline confirmée) + build + `npx wrangler deploy --dry-run`
+  (407.86 KiB) vérifiés. Honnêteté : comme pour tout `cf-worker/`, aucun
+  accès réseau réel depuis cet environnement pour confirmer que
+  `webpush.sendNotification` échouait RÉELLEMENT ce soir-là (le fix ne
+  prouve pas la cause exacte de la non-livraison, il répare seulement le
+  trou qui empêchait de la voir) — mais c'est, cette fois, un vrai défaut
+  d'architecture confirmé par simple lecture du code (un paramètre `log`
+  jamais passé, dans le seul mode actif en prod), pas une nouvelle théorie
+  non vérifiable. À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier — la partie `api/
+  cron-goals.js` se déploie automatiquement avec le reste de l'app via
+  Vercel) ; si le symptôme persiste malgré ce fix, le prochain
+  `/api/debug-push` montrera enfin, pour la première fois, si c'est un vrai
+  `sent=0 failed=N` (cause réelle de livraison, ex. VAPID/abonnements) ou si
+  tout s'envoie correctement (et qu'il faudrait alors chercher côté
+  appareil/service de push de l'utilisateur plutôt que côté serveur).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

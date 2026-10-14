@@ -480,7 +480,25 @@ async function sendToVercel(env, payload, slug, options = {}, log = null, attemp
       body: JSON.stringify({ mode: 'notify', payload, slug, options }),
       signal: AbortSignal.timeout(8_000),
     })
-    if (res.ok) return true
+    if (res.ok) {
+      // ⚠️ AJOUT (14/10, même incident que le fix côté api/cron-goals.js,
+      // mode notify) : un simple `res.ok` (HTTP 200) ne prouve RIEN sur le
+      // succès RÉEL de la livraison webpush — api/cron-goals.js répond
+      // toujours 200 même si `webpush.sendNotification` a échoué pour TOUS
+      // les abonnés. On lit maintenant le corps JSON (`logs`, le résumé
+      // "sent=X failed=Y stale=Z total=W" + chaque échec individuel, voir
+      // son propre commentaire) et on le reporte DANS NOTRE log — persisté
+      // par l'appelant dans `cron:goals:logHistory`, visible via
+      // `/api/debug-push`. Avant ce fix, un sent=0/failed>0 ne laissait
+      // AUCUNE trace nulle part, quel que soit le nombre de buts détectés.
+      try {
+        const data = await res.json()
+        if (Array.isArray(data?.logs)) {
+          for (const line of data.logs) log?.push(`[vercel→push] ${line}`)
+        }
+      } catch {}
+      return true
+    }
     const transient = res.status === 429 || res.status >= 500
     log?.push(`[notify→vercel] status=${res.status}${attempt === 1 && transient ? ' — retry dans 1.5s' : ''}`)
     if (attempt === 1 && transient) {
