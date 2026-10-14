@@ -4190,6 +4190,75 @@ cf-worker/
   pré-existantes, inchangé) + build vérifiés. À confirmer par l'utilisateur sur son prochain
   retour d'arrière-plan pile au moment d'un coup d'envoi (déploiement automatique via Vercel).
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE (preuve par log réel, pas une théorie) :
+  notifs but/carton/reprise reçues "d'un coup, pas au moment voulu" pendant
+  les matchs en live, sur plusieurs matchs à la fois, parfois à l'heure
+  parfois en retard de plusieurs minutes, sans motif visible (constat
+  utilisateur, 14/10 : "un but à la 63e, je reçois la notif alors que le
+  match est déjà à la 69e [...] comme un bouchon pendant les matchs en
+  live"). Diagnostiqué via un vrai `/api/debug-push?secret=...` (demandé
+  explicitement avant toute tentative, après l'historique récent de
+  correctifs à l'aveugle non concluants sur ce fichier) : `logHistory`
+  montrait les MÊMES transitions ("reprise", "BUT", "carton rouge") loggées
+  3 à 7 FOIS CHACUNE, à quelques centaines de ms d'écart (ex. 20:04:51.895 /
+  52.080 / 52.109 / 52.470Z pour les 4 mêmes matchs de Ligue des Champions,
+  moins de 600ms entre chaque répétition) — bien trop rapide pour être 2
+  vrais ticks du Cron Trigger Cloudflare (1x/minute, voir `wrangler.toml`,
+  un seul `crons = ["* * * * *"]`, aucune boucle interne). Root cause
+  trouvée par lecture exhaustive de `cf-worker/src/index.js` : AUCUN
+  garde-fou de concurrence n'existait nulle part dans ce fichier (vérifié
+  par grep — ni `isRunning`, ni verrou, ni rien d'équivalent) avant ce fix.
+  Si pour une raison quelconque 2 exécutions de `handlePass()` tournent en
+  même temps (retry automatique de Cloudflare sur un rejet non intercepté
+  ailleurs dans l'invocation, ou tout autre déclenchement concurrent des
+  handlers `scheduled`/`fetch`), les 2 lisent le MÊME état `stateKey`/
+  `trackKey` encore "ancien" — aucune des 2 n'a encore eu le temps d'écrire
+  sa mise à jour — et détectent chacune, INDÉPENDAMMENT, la même transition/
+  le même but : exactement la signature observée dans le log (mêmes
+  événements, répétés, à quelques centaines de ms d'écart). Pire : pendant
+  que ces exécutions concurrentes retraitent les MÊMES matchs déjà vus,
+  d'AUTRES matchs de la même minute (plus loin dans la boucle séquentielle
+  de `runOnePass`) prennent du retard — collant exactement au symptôme
+  "parfois à l'heure, parfois en retard, sur plusieurs matchs à la fois,
+  sans motif clair". Vérifié au passage que la boucle principale de
+  traitement (par événement) a bien un `try/catch` individuel qui absorbe
+  déjà toute erreur par match (`[espn:${slug}:${evt?.id}] ERREUR match
+  ignoré`, jamais un throw qui remonterait) — donc ce n'est pas UNE erreur
+  précise dans la boucle qui causait des retries, c'est l'ABSENCE totale de
+  protection contre une exécution concurrente, quelle qu'en soit la cause
+  exacte (jamais identifiée avec certitude depuis cet environnement, sans
+  accès à `npm run tail`/aux logs d'exécution bruts de Cloudflare — mais la
+  preuve indirecte, cette rafale de doublons à <600ms, est sans ambiguïté).
+  Corrigé (`cf-worker/src/index.js`, `handlePass`) par un verrou de
+  concurrence (`cron:passLock`, SET NX, TTL 55s — juste sous le tick de
+  60s) : la toute première chose que fait une exécution est d'essayer de le
+  poser ; si une autre exécution le détient déjà, on s'arrête IMMÉDIATEMENT
+  sans rien retraiter (aucun fetch ESPN, aucune notif) — la détection
+  reprend normalement au prochain tick/retry, une fois le verrou relâché.
+  Relâché explicitement en fin de passe RÉUSSIE (pour ne jamais retarder le
+  tick suivant, légitime, de 60s) ; volontairement PAS relâché si
+  `runOnePass()`/`warmFdCache()` lève une exception — l'expiration
+  naturelle (55s) agit alors comme un frein anti-retry-storm plutôt que de
+  laisser un retry Cloudflare immédiat retomber aussitôt sur le même
+  problème. Fail-open si le verrou lui-même ne peut pas être vérifié (Turso/
+  Redis en panne) — même principe que les autres garde-fous de ce fichier
+  (`noMatchFlags`, etc.) : on ne bloque jamais une vraie passe pour un
+  verrou qu'on n'a pas pu lire. 370 tests + lint (35 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build + `npx wrangler deploy --dry-run` (406 KiB)
+  vérifiés. Honnêteté : comme pour tout `cf-worker/`, aucun accès réseau
+  réel depuis cet environnement pour reproduire la concurrence elle-même ni
+  confirmer ce fix contre la vraie prod — mais cette fois le diagnostic
+  s'appuie sur une preuve DIRECTE dans un vrai log (pas une théorie
+  non vérifiée comme les 2 derniers correctifs à l'aveugle sur ce fichier) :
+  le même événement loggé plusieurs fois à quelques centaines de ms d'écart
+  ne peut raisonnablement s'expliquer que par une exécution concurrente, et
+  l'absence totale de verrou dans le code est confirmée par lecture directe,
+  pas supposée. À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier — aucun déploiement
+  automatique) ; à confirmer par l'utilisateur sur son prochain soir à
+  plusieurs matchs simultanés, idéalement en recoupant avec un nouveau
+  `/api/debug-push` si le symptôme persistait malgré ce fix.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
