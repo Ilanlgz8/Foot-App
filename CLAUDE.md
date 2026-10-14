@@ -4372,6 +4372,79 @@ cf-worker/
   dans un futur `/api/debug-push` donnera enfin la vraie cause ESPN précise
   au lieu d'un silence sans explication.
 
+- ✅ 12e BUG TROUVÉ ET CORRIGÉ, MÊME SOIRÉE — vraie asymétrie confirmée par
+  relecture ciblée du log fourni par l'utilisateur (14/10, après le 11e fix :
+  "toujours pas hein", puis un nouveau `/api/debug-push` fourni sur demande).
+  Analyse du log : `[espn:batch:...] error=...` (le format de LA 11e
+  correction) apparaît bien à 3 reprises CE JOUR-LÀ (21:10, 11:19, 15:14) —
+  preuve que le 11e fix est déployé et fonctionne — mais AUCUNE de ces 3
+  occurrences ne tombe dans le vrai trou signalé (17:24:05→18:33:10, LASK
+  Linz-Liverpool/Feyenoord-Côme). Pendant ce trou précis, logHistory ne
+  contient STRICTEMENT RIEN — pas même la ligne "mi-temps" (`[espn:${slug}:
+  ${eventId}] mi-temps`), qui se logue pourtant SANS AUCUNE CONDITION dès
+  que la transition est détectée (ligne dédiée, vue en relisant le code).
+  Or la reprise détectée à 18:33:10 prouve que la mi-temps A ÉTÉ atteinte
+  entre-temps (prevStatus lu = STATUS_HALFTIME) — donc une transition qui
+  DEVAIT se logger ne l'a jamais fait, pour ce match ET pour toute la durée
+  du trou. Une ligne qui se logue sans condition mais n'apparaît jamais ne
+  peut s'expliquer que si `runOnePass` n'a JAMAIS atteint cette ligne — donc
+  par un early-return total, pas par un fetch qui réussit mais ne trouve
+  rien à dire. Root cause trouvée en relisant le garde-fou d'entrée de
+  `runOnePass` (`trackingLiveAtStart`, lignes ~750+, déjà réécrit le 10/10
+  pour corriger le désync `cron:anyLive`/`cron:liveIds`) : `trackingLiveAtStart`
+  ET son jumeau `stillTrackingLive` (plus bas, décision d'armement) sont
+  TOUS LES DEUX initialisés à 0 puis mis à jour via `try { ... await kv.scard
+  ('cron:liveIds') ... } catch {}` — un `catch {}` 100% SILENCIEUX qui, en
+  cas d'exception Turso PONCTUELLE sur CETTE seule commande (appelée à
+  CHAQUE passe, donc statistiquement vouée à échouer tôt ou tard), laisse la
+  variable à sa valeur initiale 0 — c'est-à-dire "confirmé : aucun match en
+  cours" — EXACTEMENT la même famille de bug déjà corrigée une fois le même
+  jour pour `cron:anyLive` (désync entre 2 sources), sauf que cette fois
+  c'est la LECTURE de la source UNIQUE elle-même qui peut mentir en cas
+  d'erreur, pas une 2e source redondante. Si `emptyDayKey`/`nextCheckKey`
+  étaient déjà armés depuis juste avant le coup d'envoi (cas tout à fait
+  normal : rien n'était en direct avant 16:48), UNE SEULE exception Turso
+  sur ce `scard` suffit à déclencher l'early-return total
+  (`{events:0, log:[], quiet:true}`) qui ne revérifie JAMAIS `cron:liveIds`
+  lui-même plus loin dans la fonction — et comme cet early-return revient
+  avant même d'atteindre le code qui RÉ-ARME ces 2 clés, le blackout dure
+  jusqu'à l'expiration naturelle de LEUR PROPRE TTL (jusqu'à 30min pour
+  emptyDayKey, 25min pour nextCheckKey) — un enchaînement de plusieurs
+  expirations/ré-armements successifs explique un total de 69min observé.
+  Corrigé (`cf-worker/src/index.js`) aux 2 endroits (`trackingLiveAtStart`
+  ET `stillTrackingLive`) : sur exception, on ne traite plus JAMAIS ça comme
+  une confirmation "0/pas de match" — `trackingLiveAtStart` passe à 1
+  (bypass l'early-return, au prix d'un fetch ESPN de plus cette passe-ci,
+  rien de plus) et `stillTrackingLive` passe à 1 (empêche juste d'armer
+  l'optimisation cette passe précise, aucun autre effet) — dans les 2 cas,
+  l'erreur est désormais LOGGÉE (`[cron:liveIds:scard] error=...`, plus un
+  silence total) : si ça se reproduit, un futur `/api/debug-push` le dira
+  avec certitude au lieu de laisser deviner. Lint : l'initialisation à 0
+  de ces 2 variables est devenue inutile une fois les 2 branches du
+  try/catch réécrites pour TOUJOURS assigner une valeur (`no-useless-
+  assignment`, 2 nouvelles erreurs détectées par ESLint) — corrigé en
+  déclarant les variables sans valeur initiale (`let trackingLiveAtStart`/
+  `let stillTrackingLive`), retour exact à la baseline de 35 erreurs
+  pré-existantes (vérifié via `git stash`/`git stash pop` avant et après).
+  370 tests + lint (35/35, baseline confirmée) + build + `npx wrangler
+  deploy --dry-run` (407.64 KiB) vérifiés. Honnêteté : comme pour tout
+  `cf-worker/`, aucun accès réseau réel depuis cet environnement pour
+  reproduire une vraie exception Turso sur ce `scard` précis ni confirmer ce
+  fix contre la vraie prod — mais cette fois la preuve est directe et solide :
+  une ligne de log qui DOIT apparaître sans condition dès qu'un événement
+  précis se produit (la mi-temps) et qui n'apparaît jamais nulle part dans
+  toute la fenêtre du trou ne peut s'expliquer que par un early-return total,
+  et le seul mécanisme d'early-return de cette fonction repose entièrement
+  sur une lecture qui pouvait silencieusement mentir en cas d'erreur — pas
+  une nouvelle théorie non vérifiable, mais une asymétrie confirmée par
+  lecture directe du code, de la même famille qu'un bug déjà réellement
+  rencontré le même jour. À déployer manuellement (`npm run deploy` depuis
+  `cf-worker/`, comme toujours pour ce dossier — aucun déploiement
+  automatique) ; si un nouveau trou de silence se reproduit malgré ce fix,
+  la présence ou l'absence d'une ligne `[cron:liveIds:scard] error=...` dans
+  un futur `/api/debug-push` dira enfin si c'était bien cette cause précise
+  ou s'il faut chercher encore ailleurs.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -749,7 +749,7 @@ async function runOnePass(env) {
   // peut plus jamais se désynchroniser de lui-même. Coût : 1 commande de
   // plus par passe (scard séparé du mget restant) — négligeable face à un
   // bug qui pouvait couper toute notif pendant des heures.
-  let trackingLiveAtStart = 0
+  let trackingLiveAtStart
   let knownEmpty = false
   let skipUntil  = null
   // Lu ici, dans le même mget que le reste (voir emptyDayPendingKey plus
@@ -763,9 +763,37 @@ async function runOnePass(env) {
   // (aucune sous-requête en plus), même si ce chemin fait un early-return :
   // coût négligeable, évite un aller-retour Redis séparé plus bas.
   let rawLiveSlugs = null
+  // ⚠️ BUG CRITIQUE CORRIGÉ (14/10, même soirée que le fix hotSlugs/
+  // noMatchFlags/runOnePass try-catch ci-dessus/plus bas — nouveau trou de
+  // 69min, 17:24→18:33, confirmé par /api/debug-push : zéro ligne de log
+  // nulle part, pas même la transition "mi-temps" qui se logue pourtant
+  // SANS AUCUNE CONDITION dès qu'elle est détectée — donc `runOnePass`
+  // n'a jamais pu atteindre cette ligne pendant tout ce temps, ce qui ne
+  // peut arriver que via LE garde-fou ci-dessous). Avant ce fix, un
+  // `catch {}` totalement silencieux laissait `trackingLiveAtStart` à sa
+  // valeur initiale (0, "rien n'est en direct") si `kv.scard` levait une
+  // exception — EXACTEMENT la même famille de bug déjà corrigée une fois
+  // pour `cron:anyLive` (voir le commentaire détaillé juste au-dessus) :
+  // une erreur Turso PONCTUELLE sur CETTE seule commande (appelée à CHAQUE
+  // passe, donc statistiquement vouée à échouer tôt ou tard) se traduit en
+  // "aucun match en cours" plutôt qu'en "je ne sais pas" — si emptyDayKey/
+  // nextCheckKey étaient malheureusement déjà armés depuis avant le coup
+  // d'envoi (cas normal : rien n'était en direct juste avant), ça suffit à
+  // déclencher l'early-return total de la ligne juste en dessous, qui elle
+  // ne revérifie JAMAIS cron:liveIds directement. Corrigé : sur erreur, on
+  // ne sait PAS si un match est en cours — traiter ça comme "peut-être" (1,
+  // pas 0) plutôt que comme une confirmation "non" coûte au pire un fetch
+  // ESPN de plus cette passe, contre le risque d'un blackout de plusieurs
+  // dizaines de minutes à chaque fois que ça arrive. L'erreur est aussi
+  // maintenant loggée (plus un silence total) — si ça se reproduit, la
+  // prochaine ligne `[cron:liveIds:scard] error=...` dans un futur
+  // /api/debug-push confirmera (ou infirmera) cette cause précise.
   try {
     trackingLiveAtStart = (await kv.scard('cron:liveIds')) > 0 ? 1 : 0
-  } catch {}
+  } catch (e) {
+    trackingLiveAtStart = 1
+    log.push(`[cron:liveIds:scard] error=${e.message}`)
+  }
   try {
     const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey)
     knownEmpty = !!rawEmpty
@@ -1847,8 +1875,17 @@ async function runOnePass(env) {
   // minutes de fetch ESPN "pour rien" de plus après la vraie fin d'un match
   // (le temps que FINAL_ESPN soit confirmé) — largement acceptable face au
   // risque de rater des buts en direct.
-  let stillTrackingLive = 0
-  try { stillTrackingLive = await kv.scard('cron:liveIds') } catch {}
+  let stillTrackingLive
+  // ⚠️ Même correctif que `trackingLiveAtStart` plus haut (14/10, même
+  // incident) : sur erreur Turso ponctuelle, ne JAMAIS traiter ça comme une
+  // confirmation "plus aucun match en cours" (0) — ça armerait emptyDayKey/
+  // nextCheckKey sur la base d'une inconnue, pas d'un vrai constat. Défaut
+  // à 1 (non-zéro) sur erreur : empêche juste d'armer l'optimisation cette
+  // passe précise (aucun autre effet), au lieu de risquer un blackout.
+  try { stillTrackingLive = await kv.scard('cron:liveIds') } catch (e) {
+    stillTrackingLive = 1
+    log.push(`[cron:liveIds:scard] error=${e.message}`)
+  }
 
   // ⚠️ AJOUT (question utilisateur : "pourquoi revérifier toutes les 25min
   // alors qu'il n'y a plus de match jusqu'au lendemain ou plusieurs jours
