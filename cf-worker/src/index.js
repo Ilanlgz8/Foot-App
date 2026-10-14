@@ -2013,6 +2013,51 @@ function createKv(env) {
 async function handlePass(env) {
   const kv = createKv(env)
   env._kv = kv
+
+  // ⚠️ AJOUT (14/10, constat utilisateur : "un but à la 63e, je reçois la
+  // notif alors que le match est déjà à la 69e... comme un bouchon pendant
+  // les matchs en live", plusieurs matchs à la fois, tantôt à l'heure tantôt
+  // en retard de plusieurs minutes, sans motif visible) — diagnostiqué via
+  // un vrai /api/debug-push?secret=... (pas une théorie) : logHistory
+  // montrait les MÊMES transitions ("reprise", "BUT", "carton rouge")
+  // loggées 3 à 7 FOIS CHACUNE, à quelques centaines de ms d'écart (ex.
+  // 20:04:51.895 / 52.080 / 52.109 / 52.470Z, <600ms entre chaque répétition)
+  // — bien trop rapide pour être 2 vrais ticks du Cron Trigger (1x/minute,
+  // voir wrangler.toml). Aucun garde-fou de concurrence n'existait nulle
+  // part dans ce fichier (vérifié par lecture exhaustive) : si pour une
+  // raison quelconque 2 exécutions de handlePass() tournent en même temps
+  // (retry automatique de Cloudflare sur un rejet non intercepté ailleurs
+  // dans l'invocation, ou tout autre déclenchement concurrent des handlers
+  // `scheduled`/`fetch`), les 2 lisent le MÊME état stateKey/trackKey encore
+  // "ancien" — aucune des 2 n'a encore eu le temps d'écrire sa mise à jour —
+  // et détectent chacune, INDÉPENDAMMENT, la même transition/le même but.
+  // Pire : pendant que ces exécutions concurrentes retraitent les MÊMES
+  // matchs déjà vus, d'AUTRES matchs de la même minute (plus loin dans la
+  // boucle séquentielle de runOnePass) prennent du retard — collant
+  // exactement au symptôme "parfois à l'heure, parfois en retard, sur
+  // plusieurs matchs à la fois, sans motif clair".
+  // Corrigé par un verrou de concurrence (SET NX, TTL 55s — juste sous le
+  // tick de 60s) : la toute première chose que fait une exécution est
+  // d'essayer de le poser ; si une autre exécution le détient déjà, on
+  // s'arrête IMMÉDIATEMENT sans rien retraiter (aucun fetch ESPN, aucune
+  // notif) — la détection reprend normalement au prochain tick/retry, une
+  // fois le verrou relâché. Relâché explicitement en fin de passe RÉUSSIE
+  // (pour ne jamais retarder le tick suivant, légitime, de 60s) ;
+  // volontairement PAS relâché si runOnePass()/warmFdCache() lève une
+  // exception plus bas — l'expiration naturelle (55s) agit alors comme un
+  // frein anti-retry-storm plutôt que de laisser un retry Cloudflare
+  // immédiat retomber aussitôt sur le même problème. Fail-open si le verrou
+  // lui-même ne peut pas être vérifié (Turso/Redis en panne) — même
+  // principe que les autres garde-fous de ce fichier (noMatchFlags, etc.) :
+  // on ne bloque jamais une vraie passe pour un verrou qu'on n'a pas pu lire.
+  const passLockKey = 'cron:passLock'
+  let lockAcquired = false
+  try { lockAcquired = await kv.set(passLockKey, '1', { ex: 55, nx: true }) }
+  catch { lockAcquired = true }
+  if (!lockAcquired) {
+    return { events: 0, log: ['[cron] passe ignorée — une autre exécution est déjà en cours'], quiet: true }
+  }
+
   const writeBookkeeping = shouldWriteDebugBookkeeping()
   if (writeBookkeeping) {
     try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
@@ -2043,6 +2088,8 @@ async function handlePass(env) {
       await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     }
   } catch {}
+
+  try { await kv.del(passLockKey) } catch {}
 
   return result
 }
