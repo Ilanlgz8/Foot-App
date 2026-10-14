@@ -4259,6 +4259,69 @@ cf-worker/
   plusieurs matchs simultanés, idéalement en recoupant avec un nouveau
   `/api/debug-push` si le symptôme persistait malgré ce fix.
 
+- ✅ 10e BUG CRITIQUE TROUVÉ ET CORRIGÉ, NOUVEL INCIDENT LE SOIR MÊME DU FIX
+  DU VERROU DE CONCURRENCE (14/10, constat utilisateur : "ça se passait bien
+  niveau notif [...] et d'un coup, à partir de la 40-45e, j'ai pas eu de
+  notif pour la mi-temps, j'ai pas eu de notif pour la reprise, j'ai pas eu
+  de notif pour les buts après la reprise [...] Liverpool contre [...] la
+  Linz" — en fait LASK Linz-Liverpool, UCL). Diagnostiqué via un vrai
+  `/api/debug-push?secret=...` (demandé avant toute théorie, comme établi
+  sur ce fichier) : `logHistory` confirme KO (16:48:06) puis 3 buts Linz-
+  Liverpool jusqu'à 17:24:05 ("BUT away 3/3") — PUIS PLUS RIEN DU TOUT,
+  alors que la mi-temps de ce match (KO+40-45min) tombait juste après.
+  `cron.lastRunAgo: "2146s"` (35,8min) avec `stale:true` — anormal, le
+  bookkeeping `cron:goals:lastRun` s'écrit 1 minute sur 15, donc un vrai
+  Worker qui tourne ne devrait jamais afficher plus de ~15-16min. Root
+  cause trouvée par lecture directe du code (PAS une nouvelle théorie :
+  confirmé via `git show 4a7c7e1` que cette ligne n'a JAMAIS changé, avant
+  ni après le fix du verrou de concurrence posé quelques heures plus tôt le
+  même jour) : `const result = await runOnePass(env)` dans `handlePass()`
+  n'a jamais eu de try/catch. Si `runOnePass` lève une exception (cause
+  encore non confirmée avec certitude — aucun accès aux vrais logs
+  d'exécution Cloudflare depuis cet environnement, mais le timing colle
+  exactement à la transition mi-temps de ces 2 matchs, un moment qui a déjà
+  causé des bugs similaires par le passé sur ce fichier), TOUT s'arrête net
+  avant la moindre écriture : `result` n'existe jamais, donc ni
+  `warmFdCache`, ni le bookkeeping `cron:goals:lastResult`, ni surtout la
+  persistance du log (`cron:goals:logHistory`) ne s'exécutent — un silence
+  TOTAL, sans la moindre trace, contrairement à une erreur PAR MATCH dans la
+  boucle principale (déjà protégée individuellement, voir plus haut) qui
+  se logue normalement. Pire : si cette exception est déterministe (même
+  cause à chaque minute), le Worker reste bloqué dans cette boucle
+  INDÉFINIMENT — le verrou `cron:passLock` (posé le même jour, TTL 55s)
+  expire bien avant le tick suivant (60s), donc chaque minute RETENTE,
+  échoue pareil, sans jamais rien logger — un vrai trou noir plutôt qu'un
+  délai borné comme le verrou le suppose implicitement. Corrigé
+  (`cf-worker/src/index.js`, `handlePass`) : `runOnePass(env)` est
+  désormais dans son propre try/catch — en cas d'exception, le message
+  d'erreur (+ 400 premiers caractères de la stack) est écrit DIRECTEMENT
+  dans `cron:goals:logHistory` (impossible de passer par `result.log`,
+  qui n'existe pas dans ce cas précis), le verrou est relâché immédiatement
+  (pas d'attente artificielle de 55s une fois qu'on sait déjà que ça a
+  échoué — permet au tick suivant de retenter tout de suite), et la passe
+  retourne `{events:0, log:[], quiet:true}` proprement. Ce fix ne "répare"
+  pas la cause encore inconnue de l'exception elle-même — il transforme un
+  silence total et indiagnosticable en une ligne de log exploitable la
+  prochaine fois que ça arrive (message + stack réels), et évite que le
+  Worker reste bloqué indéfiniment dans la même boucle d'échec silencieux.
+  `warmFdCache` vérifié déjà sûr (son propre try/catch englobant existait
+  déjà, confirmé par lecture — pas concerné par ce bug). 370 tests + lint
+  (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build + `npx wrangler
+  deploy --dry-run` (407 KiB) vérifiés. Honnêteté totale : comme pour tout
+  `cf-worker/`, aucun accès réseau réel depuis cet environnement pour
+  reproduire l'exception elle-même ni confirmer ce fix contre la vraie
+  prod — la preuve du SILENCE TOTAL (logHistory vide pendant 35+ minutes,
+  lastRunAgo anormalement stale) est directe et sans ambiguïté, mais la
+  CAUSE RACINE de l'exception dans `runOnePass` reste inconnue à ce stade :
+  ce fix garantit qu'on aura enfin un message d'erreur concret la prochaine
+  fois, pas qu'il élimine le bug sous-jacent. À déployer manuellement
+  (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce dossier —
+  aucun déploiement automatique) ; si le symptôme (silence après la
+  mi-temps) se reproduit malgré ce fix, demander un nouveau
+  `/api/debug-push?secret=...` : la toute première chose à vérifier sera la
+  nouvelle ligne `[cron] ERREUR runOnePass (passe avortée) : ...`, qui
+  donnera enfin la vraie cause au lieu d'un silence total.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

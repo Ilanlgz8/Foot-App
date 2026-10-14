@@ -2063,7 +2063,46 @@ async function handlePass(env) {
     try { await kv.set('cron:goals:lastRun', Date.now(), { ex: 7 * 24 * 3600 }) } catch {}
   }
 
-  const result = await runOnePass(env)
+  // ⚠️ AJOUT (14/10, même soir que le verrou ci-dessus, NOUVEL incident :
+  // constat utilisateur "ça se passait bien, puis à partir de la 40-45e,
+  // plus rien — pas de mi-temps, pas de reprise, pas de buts après" sur
+  // LASK Linz-Liverpool/Feyenoord-Côme, confirmé par /api/debug-push : la
+  // dernière ligne de logHistory est le 3e but Linz à 17:24:05, puis RIEN
+  // pendant 35+ minutes (cron.lastRunAgo stale), alors que la mi-temps de
+  // ces 2 matchs tombait juste après (KO 16:48 + 40-45min). Root cause
+  // trouvée en relisant le code tel qu'il existait DÉJÀ avant le fix du
+  // verrou ce soir (vérifié via `git show`, cette ligne n'a jamais changé) :
+  // `runOnePass(env)` n'a JAMAIS eu de try/catch à cet endroit. Si elle lève
+  // une exception (pour une raison encore inconnue, peut-être spécifique à
+  // cette mi-temps précise — aucun accès aux vrais logs d'exécution
+  // Cloudflare depuis cet environnement pour la confirmer), TOUT s'arrête
+  // net : aucun log n'est jamais construit (result.log n'existe pas),
+  // aucun bookkeeping, et le verrou cron:passLock n'est jamais relâché
+  // explicitement — exactement le silence total observé. Si cette
+  // exception est déterministe (même cause à chaque minute), le Worker
+  // reste bloqué dans cette boucle INDÉFINIMENT : chaque tick retente après
+  // expiration du verrou (55s < 60s), échoue pareil, sans jamais rien
+  // logger — un vrai trou noir, pas juste un délai borné comme le verrou
+  // de concurrence le suppose. Corrigé : `runOnePass` est maintenant dans
+  // son propre try/catch, qui écrit l'erreur DIRECTEMENT dans
+  // cron:goals:logHistory (impossible de passer par result.log, qui
+  // n'existe pas dans ce cas) — la prochaine fois que ça arrive, on aura le
+  // message d'erreur réel au lieu d'un silence total, et le verrou est
+  // relâché immédiatement (pas d'attente artificielle de 55s une fois
+  // qu'on sait déjà que ça a échoué).
+  let result
+  try {
+    result = await runOnePass(env)
+  } catch (e) {
+    try {
+      const line = `${new Date().toISOString()} [cron] ERREUR runOnePass (passe avortée) : ${e?.message || e}${e?.stack ? ' | ' + String(e.stack).slice(0, 400) : ''}`
+      await kv.rpush('cron:goals:logHistory', line)
+      await kv.ltrim('cron:goals:logHistory', -30_000, -1)
+      await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
+    } catch {}
+    try { await kv.del(passLockKey) } catch {}
+    return { events: 0, log: [], quiet: true }
+  }
 
   // Préchauffage FD.org (voir warmFdCache) — volontairement INDÉPENDANT de la
   // logique ESPN ci-dessus (early-return "aucun match aujourd'hui" incluse) :
