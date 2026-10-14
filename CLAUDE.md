@@ -4137,6 +4137,39 @@ cf-worker/
   depuis `cf-worker/`, comme toujours pour ce dossier) ; à confirmer par l'utilisateur sur son
   prochain jour avec un match en tout début de journée.
 
+- ✅ UI figée sur un vieux statut (but/minute) plusieurs secondes après un retour d'arrière-plan,
+  constat utilisateur (14/10, message vocal : "quand l'appli est déjà ouverte, et qu'il y a des
+  matchs en cours qui se finissent et qu'il y a d'autres matchs qui commencent [...] ça reste sur
+  des buts alors que le statut débute [...] des fois faut laisser plusieurs secondes pour que les
+  minutes du match s'affichent [...] pour que ça fasse vraiment application, que ça bug pas trop")
+  — root cause trouvée dans `pollESPN()` (`src/hooks/useLiveMinute.js`), le mécanisme même censé
+  déjà corriger cette classe de bug : un garde-fou "verrou fantôme" (`STALE_LOCK_MS = 4000ms`)
+  existait déjà pour qu'un retour au premier plan (`forceFresh=true`) ne reste pas coincé derrière
+  un fetch ESPN gelé par la suspension réseau iOS pendant l'arrière-plan — mais il ne forçait le
+  bypass QUE si le verrou en cours avait déjà plus de 4s. Un poll (gelé OU simplement normal) qui
+  venait de démarrer il y a MOINS de 4s au moment du `forceFresh` retombait alors dans la file
+  d'attente, réveillé seulement une fois ce poll résolu ou expiré via son propre timeout
+  (`AbortSignal.timeout(10_000)`) — jusqu'à ~10s d'attente possible, pas "quelques secondes",
+  contredisant l'intention déjà écrite dans le commentaire du code lui-même ("on force le nouveau
+  poll immédiatement plutôt que de le mettre en file"). Confirmé par lecture directe (pas une
+  supposition) : le seuil 4000ms et le timeout 10000ms de l'unique fetch sous-jacent n'avaient
+  jamais été alignés. Corrigé (`useLiveMinute.js`) : le bypass sur `forceFresh` est désormais
+  INCONDITIONNEL — un retour au premier plan ne passe plus jamais par la file d'attente, qu'un
+  poll soit gelé ou juste normalement en cours. Le poll court-circuité n'est jamais annulé (aucun
+  `AbortController` partagé, changement volontairement minimal) : il continue en arrière-plan et
+  écrira son résultat normalement à sa résolution — au pire une écriture Redis/queryClient de
+  plus, sans incohérence possible (même donnée ESPN interrogée à quelques secondes d'écart,
+  "dernière écriture gagne" déjà le compromis implicitement accepté par ce mécanisme depuis son
+  origine). Nettoyage associé : `STALE_LOCK_MS` et `_pollQueuedForceFresh` retirés (devenus morts
+  — un poll mis en file ne peut structurellement plus jamais être un `forceFresh`, puisque ce cas
+  ne passe plus par la file). 370 tests + lint (34 erreurs pré-existantes, Pronos.jsx, confirmées
+  identiques avant/après via `git stash` — aucune régression) + build vérifiés. Honnêteté :
+  toujours aucun accès à un vrai iPhone/PWA depuis cet environnement pour reproduire ou confirmer
+  avant déploiement — mais c'est, cette fois, la correction directe d'une incohérence numérique
+  déjà présente dans le code (4000ms vs 10000ms), pas une nouvelle hypothèse ; à confirmer par
+  l'utilisateur sur son prochain retour d'arrière-plan pendant une transition de plusieurs matchs
+  (déploiement automatique via Vercel, aucune action manuelle nécessaire pour ce fichier).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

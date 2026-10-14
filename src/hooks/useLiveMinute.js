@@ -98,9 +98,25 @@ let _pollQueued     = false   // au plus un poll en attente
 // contentait alors de mettre ce poll en FILE D'ATTENTE derrière le fetch gelé
 // — lequel ne se débloque et ne timeout (AbortSignal 10s) qu'une fois relancé
 // par l'event loop, retardant d'autant le rafraîchissement "immédiat" censé
-// suivre le retour sur l'app. Voir STALE_LOCK_MS plus bas.
+// suivre le retour sur l'app.
+//
+// ⚠️ CORRIGÉ (14/10, constat utilisateur : "des fois faut laisser plusieurs
+// secondes pour que les minutes du match s'affichent et que ça enlève le
+// statut des buts [...] pour que ça fasse vraiment application, que ça bug
+// pas trop") — le 1er correctif (STALE_LOCK_MS=4000ms, voir historique CLAUDE.md)
+// ne forçait le bypass QUE si le verrou avait plus de 4s — mais le fetch
+// normal a son propre timeout à 10s (AbortSignal plus bas). Un retour
+// d'arrière-plan qui tombe alors qu'un poll (gelé OU encore légitimement en
+// cours) a démarré il y a MOINS de 4s retombait dans le else : mis en file,
+// puis réveillé seulement une fois ce poll résolu/timeout — jusqu'à ~10s
+// d'attente, pas les "quelques secondes" visés. Un forceFresh (retour au
+// premier plan) ne doit JAMAIS attendre un poll déjà en cours, qu'il soit
+// gelé ou simplement normal : les 2 écritures finales (espnScoresCache/
+// queryClient/localStorage) convergent de toute façon vers le même état
+// (ESPN interrogé à quelques secondes d'écart, "dernière écriture gagne"
+// déjà le compromis accepté par ce mécanisme depuis l'origine) — voir
+// pollESPN plus bas, le bypass est désormais inconditionnel sur forceFresh.
 let _pollStartedAt = 0
-const STALE_LOCK_MS = 4_000
 
 // ── Ably (temps quasi réel, complément du poll — ne le remplace pas) ──────────
 // Principe : le poll classique ci-dessus reste la SEULE source de données et
@@ -1272,25 +1288,30 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
 
 // ── Wrapper avec poll lock ─────────────────────────────────────────────────────
 // Empêche deux appels simultanés à _doPollESPN (race condition visibilitychange + Worker).
-// Si un poll est déjà en cours, on mémorise qu'un nouveau poll est souhaité (_pollQueued)
-// et on le lancera dès que le poll courant se termine.
-let _pollQueuedForceFresh = false
+// Si un poll NORMAL est déjà en cours, on mémorise qu'un nouveau poll est souhaité
+// (_pollQueued) et on le lancera dès que le poll courant se termine — un forceFresh
+// ne passe plus jamais par cette file (voir plus bas, bypass inconditionnel), donc
+// un poll mis en file est toujours un poll normal (jamais forceFresh).
 
 async function pollESPN(matches, queryClient, forceFresh = false) {
   if (_pollInProgress) {
-    // Verrou fantôme : un forceFresh (retour au premier plan) qui tombe sur un
-    // verrou posé il y a plus de STALE_LOCK_MS n'est presque sûrement pas un
-    // poll légitime encore en cours (10s max normalement) mais un fetch gelé
-    // par la suspension réseau iOS pendant que l'app était en arrière-plan. On
-    // ne veut pas attendre qu'il se débloque tout seul (jusqu'à 10s de plus,
-    // potentiellement davantage si les timers étaient eux aussi suspendus) —
-    // on force le nouveau poll immédiatement plutôt que de le mettre en file.
-    if (forceFresh && Date.now() - _pollStartedAt > STALE_LOCK_MS) {
-      console.warn('[useLiveMinute] verrou fantôme détecté (>', STALE_LOCK_MS, 'ms) → poll forcé sans attendre')
+    // Un forceFresh (retour au premier plan) ne doit JAMAIS attendre un poll
+    // déjà en cours — qu'il soit un fetch gelé par la suspension réseau iOS
+    // pendant l'arrière-plan, ou simplement un poll normal démarré il y a
+    // 1-2s : dans les 2 cas, le forceFresh veut la donnée la plus fraîche
+    // possible MAINTENANT, pas dans jusqu'à 10s (timeout du fetch en cours).
+    // Bypass désormais inconditionnel sur forceFresh (voir le commentaire de
+    // STALE_LOCK_MS plus haut, 14/10 — l'ancien seuil à 4000ms laissait une
+    // fenêtre de 0-4s où ce bypass ne se déclenchait pas). Le poll en cours
+    // continue de tourner en arrière-plan (jamais annulé, pas d'AbortController
+    // partagé) et écrira son résultat normalement à sa résolution — au pire
+    // une écriture de plus, sans incohérence (même donnée ESPN à quelques
+    // secondes d'écart).
+    if (forceFresh) {
+      console.warn('[useLiveMinute] forceFresh → poll forcé sans attendre le verrou en cours (', Date.now() - _pollStartedAt, 'ms)')
       _pollInProgress = false
     } else {
       _pollQueued = true
-      if (forceFresh) _pollQueuedForceFresh = true
       return
     }
   }
@@ -1301,13 +1322,12 @@ async function pollESPN(matches, queryClient, forceFresh = false) {
     await _doPollESPN(matches, queryClient, forceFresh)
   } finally {
     _pollInProgress = false
-    // Si un poll était en attente pendant qu'on était occupé, on le lance maintenant
+    // Si un poll NORMAL était en attente pendant qu'on était occupé, on le lance
+    // maintenant (jamais forceFresh ici, voir le commentaire plus haut)
     if (_pollQueued) {
       _pollQueued = false
-      const queuedForceFresh = _pollQueuedForceFresh
-      _pollQueuedForceFresh  = false
       // Léger délai pour laisser React traiter le setQueryData précédent
-      setTimeout(() => pollESPN(matches, queryClient, queuedForceFresh), 150)
+      setTimeout(() => pollESPN(matches, queryClient, false), 150)
     }
   }
 }
