@@ -1646,12 +1646,24 @@ export function useLiveMinute(matches) {
       // commentaire détaillé dans _doPollESPN).
       await pollESPN(matchesRef.current, queryClient, true)
 
-      // 2ème poll après 3s pour rattraper les buts marqués pendant l'arrière-plan iOS.
+      // 2ème poll pour rattraper les buts marqués pendant l'arrière-plan iOS, ET
+      // pour confirmer un coup d'envoi qui aurait eu lieu pendant l'arrière-plan :
+      // tant que cette 2e passe n'a pas vu ESPN confirmer STATUS_IN_PROGRESS
+      // (state.espnStatus/kickoffAt, voir calcMinute dans matchUtils.js),
+      // "Débute" reste affiché au lieu de la minute — comportement voulu
+      // (évite d'afficher "1'" avant la vraie confirmation ESPN, voir le
+      // commentaire de ce bloc dans matchUtils.js), mais retardé jusqu'à ce
+      // 2e poll si le 1er (immédiat) n'a pas encore vu la bascule. ⚠️ Délai
+      // resserré 3000→1500ms (14/10, constat utilisateur : "Débute" restait
+      // affiché plusieurs secondes après un retour d'arrière-plan alors que
+      // le score montrait déjà le but marqué) — rattrape la confirmation
+      // ESPN deux fois plus vite si le 1er poll l'a manquée de peu, sans
+      // changer la mécanique (toujours 2 polls, juste plus rapprochés).
       setTimeout(() => {
         if (document.visibilityState === 'visible') {
           pollESPN(matchesRef.current, queryClient, true)
         }
-      }, 3_000)
+      }, 1_500)
       const now = Date.now()
       // Invalider todayMatches si données > 2min
       const todayState = queryClient.getQueryState(['todayMatches'])

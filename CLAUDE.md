@@ -4170,6 +4170,26 @@ cf-worker/
   l'utilisateur sur son prochain retour d'arrière-plan pendant une transition de plusieurs matchs
   (déploiement automatique via Vercel, aucune action manuelle nécessaire pour ce fichier).
 
+- ✅ Précision du constat ci-dessus (14/10, même jour, retour utilisateur en réécoutant le
+  symptôme exact) : pas "le statut des buts" au sens littéral — en fait "Débute" (le placeholder
+  affiché tant qu'ESPN n'a pas confirmé le coup d'envoi, voir `calcMinute`/`matchUtils.js`),
+  visiblement mal retranscrit par la dictée vocale ("des buts" sonne proche de "Débute" à l'oral).
+  Le fix du jour (bypass inconditionnel sur `forceFresh`) retirait bien l'attente ACCIDENTELLE
+  (jusqu'à 10s), mais l'architecture garde volontairement 2 polls au retour d'arrière-plan — 1
+  immédiat + 1 second 3s plus tard, spécifiquement pour rattraper un but/KO survenu PENDANT la
+  mise en arrière-plan (`useLiveMinute.js`, `onVisible`) — et "Débute" ne se lève que lorsque l'UN
+  des deux a vu ESPN confirmer `STATUS_IN_PROGRESS` (comportement voulu, documenté dans
+  `calcMinute` : éviter d'afficher "1'" avant la vraie confirmation ESPN, cf. l'incident où ça
+  avait déjà été corrigé en sens inverse). Si le 1er poll (immédiat) rate cette confirmation de
+  peu, l'attente réelle jusqu'au 2e poll pouvait donc atteindre ~3s — resserré à 1.5s
+  (`useLiveMinute.js`, `onVisible`) : rattrape 2x plus vite sans changer la mécanique (toujours 2
+  polls, juste plus rapprochés). Honnêteté : un délai strictement nul n'est pas possible par
+  construction — "Débute" dépend de la confirmation RÉELLE d'ESPN, qui a elle-même un temps de
+  propagation ; ce resserrement réduit la fenêtre d'attente côté client, il ne peut pas la
+  supprimer entièrement si ESPN lui-même tarde à publier la bascule. 370 tests + lint (34 erreurs
+  pré-existantes, inchangé) + build vérifiés. À confirmer par l'utilisateur sur son prochain
+  retour d'arrière-plan pile au moment d'un coup d'envoi (déploiement automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
