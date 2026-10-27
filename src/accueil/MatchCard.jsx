@@ -486,7 +486,18 @@ export const MatchCard = memo(MatchCardImpl, sameMatchCardProps)
 // nisait la classe et l'heuristique native du navigateur — en ne repassant
 // JAMAIS au froid, ce risque de flicker/désync disparaît structurellement :
 // une carte déjà vue reste rendue, remonter ne coûte donc plus rien non plus.
-function useWarmOnIntersect(marginPx = 700) {
+// ⚠️ MARGE 700→1800 (27/10, même jour, retour utilisateur après test réel :
+// "un peu mieux mais encore noir ~1s sur certains scrolls rapides"). Cause
+// confirmée par lecture : 700px ne couvre qu'environ 1 hauteur d'écran de
+// chaque côté — insuffisant pour un vrai fling rapide (plusieurs hauteurs
+// d'écran parcourues avant que le callback IntersectionObserver, asynchrone,
+// n'ait eu le temps de se déclencher). 1800px donne une marge nettement plus
+// généreuse (~2-3 écrans), pour qu'une card ait largement le temps de
+// "chauffer" avant d'entrer réellement dans le viewport, même sur un fling
+// très rapide. Coût : plus de cards chaudes simultanément, accepté — le vrai
+// gain CPU de la virtualisation reste entier pour les cards VRAIMENT loin
+// (fin de la liste, actualités en bas de l'Accueil).
+function useWarmOnIntersect(marginPx = 1800) {
   const ref = useRef(null)
   const [warm, setWarm] = useState(false)
   useEffect(() => {
@@ -515,9 +526,28 @@ function useWarmOnIntersect(marginPx = 700) {
 // Placeholder "froid" — reprend la structure/les classes déjà existantes de
 // PosterSkeleton (même hauteur min, même habillage visuel gris animé) pour
 // qu'il n'y ait AUCUN saut de mise en page quand la carte bascule en chaud.
-function PosterPlaceholder({ innerRef }) {
+// ⚠️ `compTint` AJOUTÉ (27/10, même jour, suite au retour utilisateur "encore
+// un peu noir ~1s") : avant ce changement, le placeholder n'avait AUCUNE
+// variable `--poster-comp` posée — `.poster` retombe alors sur son fond brut
+// `#0e0e0e` (quasi noir), avec juste un léger shimmer blanc à 5-10% d'opacité
+// sur les 4 petites formes — exactement ce que l'utilisateur perçoit comme
+// "noir" pendant la fenêtre (courte mais réelle) où une card peut apparaître
+// dans le viewport avant que l'IntersectionObserver n'ait eu le temps de la
+// faire basculer en chaud. `compTint` (couleur du championnat, même donnée
+// que celle utilisée par MatchPoster.jsx pour le vrai fond) est une simple
+// recherche synchrone dans COMPETITIONS — aucun hook, aucun réseau, donc ne
+// réintroduit pas le coût que la virtualisation cherche à éviter — posée ici
+// pour que le placeholder affiche déjà une approximation proche du dégradé
+// final (voir `.poster--sk` dans accueil.css, même recette que
+// `.poster__bg--gradient`), rendant la transition froid→chaud quasi invisible
+// même si elle n'est pas instantanée.
+function PosterPlaceholder({ innerRef, compTint }) {
   return (
-    <div ref={innerRef} className="poster__frame poster__frame--sk">
+    <div
+      ref={innerRef}
+      className="poster__frame poster__frame--sk"
+      style={compTint ? { '--poster-comp': compTint } : undefined}
+    >
       <div className="poster poster--sk">
         <div className="poster__middle">
           <div className="poster__team-col poster__team-col--home">
@@ -539,7 +569,10 @@ function PosterPlaceholder({ innerRef }) {
 
 function LazyPoster({ match, espnScore, live, onMatchClick, onLiveClick, formMap, compMatches }) {
   const [ref, warm] = useWarmOnIntersect()
-  if (!warm) return <PosterPlaceholder innerRef={ref} />
+  if (!warm) {
+    const compTint = COMPETITIONS.find(c => c.id === match.competition?.code)?.tint ?? null
+    return <PosterPlaceholder innerRef={ref} compTint={compTint} />
+  }
   return (
     <MatchPoster
       match={match}

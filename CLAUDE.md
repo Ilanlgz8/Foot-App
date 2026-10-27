@@ -5336,6 +5336,51 @@ cf-worker/
   dans les minutes suivant ce push pour confirmer que le déploiement
   automatique a bien repris.
 
+- ✅ Flash noir au scroll rapide dans Accueil, 9e tentative — retour utilisateur après test réel du
+  8e fix (virtualisation) une fois réellement déployé (27/10, même jour : "c'est un peu mieux...
+  mais ça bug un peu des fois, encore un peu noir, les cartes qui se chargent pas bien... dure
+  peut-être une seconde") : amélioration partielle confirmée, pas une régression — le résidu
+  pointé a une cause concrète trouvée par lecture directe du code, pas une nouvelle théorie au
+  hasard. Root cause : `PosterPlaceholder` (le squelette "froid" du 8e fix, affiché tant que
+  l'IntersectionObserver n'a pas basculé la card en "chaud") hérite du fond brut `.poster` —
+  `#0e0e0e`, quasi noir — sans jamais poser `--poster-comp` (la variable de teinte du
+  championnat utilisée par le VRAI dégradé de fond, `.poster__bg--gradient`) ; seul un léger
+  shimmer blanc à 5-10% d'opacité habille les 4 petites formes dessus. Résultat : une card qui
+  entre dans le viewport AVANT que l'observer n'ait eu le temps de la chauffer (margin 700px —
+  environ 1 hauteur d'écran de chaque côté, insuffisant pour un vrai fling rapide qui peut
+  parcourir plusieurs écrans avant que ce callback asynchrone ne se déclenche) apparaît
+  effectivement quasi noire, pendant la fenêtre jusqu'au basculement en chaud — exactement
+  "les cartes qui se chargent pas bien... dure peut-être une seconde". 2 corrections cumulées,
+  aucune ne cherchant à re-deviner un autre mécanisme de rendu (déjà 8 tentatives sur ce
+  symptôme) :
+  1. **Marge élargie** (`MatchCard.jsx`, `useWarmOnIntersect`) : 700px → 1800px (~2-3 écrans de
+     chaque côté) — une card a désormais largement le temps de chauffer avant d'entrer
+     réellement dans le viewport, même sur un fling très rapide. Coût accepté : plus de cards
+     chaudes simultanément à un instant donné — le vrai gain de la virtualisation (éviter de
+     monter les 20-60+ cards du jour EN MÊME TEMPS) reste entier pour les cards vraiment loin
+     (fin de liste, actualités en bas de l'Accueil).
+  2. **Placeholder "pré-teinté"** (`MatchCard.jsx` + `accueil.css`) : `LazyPoster` calcule
+     désormais `compTint` (couleur du championnat, `COMPETITIONS.find(...).tint`) — une simple
+     recherche synchrone dans un tableau statique, AUCUN hook ni appel réseau, donc ne
+     réintroduit pas le coût que la virtualisation vise justement à éviter — et la transmet à
+     `PosterPlaceholder`, qui la pose comme variable CSS `--poster-comp` sur le frame. `.poster--
+     sk` reçoit un nouveau `background` qui reprend EXACTEMENT la recette de `.poster__bg--
+     gradient` (même 3 paliers `color-mix`) : le placeholder affiche désormais une approximation
+     très proche du dégradé final AVANT même que la card ne devienne chaude — la transition
+     froid→chaud devient quasi invisible visuellement, même si elle n'est techniquement pas
+     instantanée (elle ne peut structurellement jamais l'être, un switch React/IntersectionObserver
+     prend toujours au moins 1 frame). Les matchs de compétitions sans `tint` dédié retombent sur
+     le même fallback neutre `#16171f`/`#0e0f14`/`#0b0c10` déjà utilisé par le vrai calque —
+     cohérent avec le rendu final de ces compétitions-là. 378 tests + lint (35 erreurs
+     pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : comme pour les 8
+     tentatives précédentes sur ce symptôme, aucun accès à un vrai iPhone/PWA depuis cet
+     environnement pour confirmer en conditions réelles — mais ces 2 changements s'attaquent
+     directement et concrètement au résidu décrit par l'utilisateur (marge insuffisante +
+     placeholder visuellement "vide"/noir), confirmés par lecture du code plutôt que supposés ;
+     à confirmer par l'utilisateur sur son téléphone après ce déploiement (automatique via
+     Vercel, le pipeline de push/déploiement étant désormais vérifié fonctionnel — voir l'entrée
+     juste au-dessus sur le token GitHub).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

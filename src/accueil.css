@@ -1505,6 +1505,25 @@
   gap: 10px;
 }
 .poster--sk .poster__middle { position: relative; z-index: 1; }
+/* ⚠️ AJOUTÉ (27/10, même jour, 9e tentative sur le flash noir au scroll) :
+   sans ceci, `.poster--sk` retombe sur le fond brut `#0e0e0e` de `.poster`
+   (quasi noir) — exactement ce que l'utilisateur perçoit comme "noir" dans
+   la fenêtre, courte mais réelle, où une card peut entrer dans le viewport
+   avant que l'IntersectionObserver ne l'ait fait basculer en chaud (voir
+   MatchCard.jsx, `PosterPlaceholder`/`compTint`). Reprend EXACTEMENT la
+   même recette que `.poster__bg--gradient` (le calque de fond du vrai
+   poster, juste au-dessus) — avec la même variable `--poster-comp`, posée
+   sur le placeholder dès qu'on connaît la compétition du match (recherche
+   synchrone, zéro hook/réseau) — pour que le placeholder affiche déjà une
+   approximation très proche du dégradé final, rendant la transition
+   froid→chaud quasi invisible même si elle n'est techniquement pas
+   instantanée. */
+.poster--sk {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--poster-comp, #16171f) 85%, #0a0b10) 0%,
+    color-mix(in srgb, var(--poster-comp, #0e0f14) 68%, #08090d) 62%,
+    color-mix(in srgb, var(--poster-comp, #0b0c10) 48%, #07080b) 100%);
+}
 
 @media (max-width: 640px) {
   /* Panel matchs : retire la box sur mobile, posters sortent libres —
