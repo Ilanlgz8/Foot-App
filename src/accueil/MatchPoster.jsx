@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm }                from '../hooks/useTeamForm'
@@ -34,7 +34,19 @@ function formatHour(dateStr) {
 // hors du périmètre stats/live/notifs, et sujet sensible). Aucun autre
 // appelant ne la passait, donc l'affichage des cotes est strictement
 // inchangé partout (Accueil, Pronos...).
-export function MatchPoster({ match, espnScore = null, onClick, formMap: formMapProp, compMatches: compMatchesProp }) {
+function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, onLiveClick, formMap: formMapProp, compMatches: compMatchesProp }) {
+  // ⚠️ `onClick` reçu en calculé (27/10) : avant, MatchPanel construisait une
+  // nouvelle closure `clickHandler` à CHAQUE render et la passait directement
+  // en prop — une prop qui change de référence à chaque render casserait la
+  // mémoïsation ci-dessous (voir `samePosterProps`) puisqu'elle compare
+  // `onMatchClick`/`onLiveClick` PAR RÉFÉRENCE. En recevant les 2 callbacks
+  // stables (useCallback côté Accueil.jsx) + `live` (primitif) et en
+  // construisant le handler ICI, à l'intérieur du composant déjà mémoïsé, la
+  // fraîcheur de `match` dans la closure est automatique (ce render-ci) et
+  // aucune instabilité ne remonte vers le comparateur de memo.
+  const handleClick = live
+    ? (onLiveClick ? () => onLiveClick(match) : undefined)
+    : (onMatchClick ? () => onMatchClick(match) : undefined)
   const compCode = match.competition?.code ?? null
   const hasPropsData = formMapProp !== undefined
   // Hook TOUJOURS appelé (Rules of Hooks) — mais désactivé (enabled=false)
@@ -444,7 +456,7 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
         ...(posterComp?.tintPearl != null ? { '--poster-pearl': posterComp.tintPearl } : {}),
       } : undefined}
     >
-    <div className={cls} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+    <div className={cls} onClick={handleClick} style={{ cursor: handleClick ? 'pointer' : 'default' }}>
 
       {/* ── Fond : teinte du championnat, calques ANIMÉS ──
           Même recette que le fond de LiveMatchPage/MatchPage/Résultat
@@ -611,3 +623,44 @@ export function MatchPoster({ match, espnScore = null, onClick, formMap: formMap
     </div>
   )
 }
+
+// ── Mémoïsation (27/10, 7e tentative sur le flash noir au scroll rapide) ──
+// Voir le commentaire détaillé sur `sameJSON` (matchUtils.js) pour la root
+// cause complète. Comparateur volontairement asymétrique :
+// - `match`/`espnScore` : comparés PAR VALEUR (JSON.stringify) — ce sont les
+//   2 props dont la RÉFÉRENCE change très souvent en amont (espnScores
+//   toutes les ~15s, `match` reconstruit par plusieurs `.map()` dans
+//   Accueil.jsx) même quand leur CONTENU réel est identique pour cette card
+//   précise. Comparer par valeur ici est ce qui élimine le re-render inutile
+//   sans jamais risquer de rater un vrai changement (sameJSON ne peut
+//   jamais dire "égal" à tort).
+// - `onMatchClick`/`onLiveClick`/`formMap`/`compMatches` : comparés PAR
+//   RÉFÉRENCE (comportement par défaut) — `onMatchClick`/`onLiveClick` sont
+//   désormais stabilisés en amont (`useCallback` côté Accueil.jsx, voir son
+//   commentaire) et ne construisent plus la closure finale ici (voir
+//   `handleClick` ci-dessus, calculé à l'intérieur du composant déjà
+//   mémoïsé — pas besoin qu'il soit stable lui-même) ; `formMap`/
+//   `compMatches` viennent de requêtes React Query qui gardent déjà une
+//   référence stable tant que leurs données n'ont pas vraiment changé. Si
+//   l'un de ces 4 changeait quand même de référence sans raison, le seul
+//   effet serait un re-render qui aurait pu être évité — jamais une card
+//   figée sur une vieille valeur (aucune régression possible de ce côté,
+//   contrairement à `match`/`espnScore` où j'ai préféré ne rien supposer).
+// - `live` : primitif, comparé par `===` — redondant la plupart du temps
+//   avec `match` (voir `isCardLive`), mais peut changer SANS que `match` ne
+//   change (flag FT posé dans `matchStateTracker`, hors de l'objet `match`
+//   lui-même) : comparé explicitement pour ne jamais rater cette
+//   transition précise.
+function samePosterProps(prev, next) {
+  return (
+    prev.live === next.live &&
+    prev.onMatchClick === next.onMatchClick &&
+    prev.onLiveClick === next.onLiveClick &&
+    prev.formMap === next.formMap &&
+    prev.compMatches === next.compMatches &&
+    sameJSON(prev.match, next.match) &&
+    sameJSON(prev.espnScore, next.espnScore)
+  )
+}
+
+export const MatchPoster = memo(MatchPosterImpl, samePosterProps)

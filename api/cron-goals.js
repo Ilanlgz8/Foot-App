@@ -48,6 +48,7 @@ import {
   fuzzyTeamFifa, normalizeFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin,
+  pickUnsentGoalScorers, goalSignature,
 } from '../src/utils/liveDetection.js'
 
 const kv = new Redis({
@@ -958,6 +959,13 @@ export default async function handler(req, res) {
           try { await kv.del(`push:espn:goal:${eventId}:${side}:${i + 1}`) } catch {}
         }
 
+        // Voir pickUnsentGoalScorers plus bas : garde les signatures
+        // "déjà envoyées" cohérentes avec le compteur track[side] réduit.
+        const sentKeyCancel = `${side}Sent`
+        if (Array.isArray(track[sentKeyCancel])) {
+          track[sentKeyCancel] = track[sentKeyCancel].slice(0, newCount)
+        }
+
         track[side] = newCount
         trackChanged = true
       }
@@ -970,13 +978,24 @@ export default async function handler(req, res) {
           .filter(g => g.team === side)
           .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
 
+        // ⚠️ Appariement par SIGNATURE (nom+minute), pas par position — voir
+        // le commentaire de pickUnsentGoalScorers dans liveDetection.js (bug
+        // trouvé le 18/10 : un but déjà notifié pouvait se faire voler sa
+        // position par un réordonnancement ESPN entre 2 polls, décalant tous
+        // les buts suivants vers le mauvais buteur). Même fix que cf-worker/
+        // src/index.js (logique partagée, jamais l'un sans l'autre).
+        const sentKey = `${side}Sent`
+        const sentSigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
+        const pendingScorers = pickUnsentGoalScorers(goalScorers, sentSigs, targetCount)
+        let pendingIdx = 0
+
         // Un but à la fois — tant que track[side] < targetCount, il reste au
         // moins un but réel non notifié. Envoi immédiat, avec le nom du
         // buteur s'il est déjà connu côté ESPN à ce poll précis, sinon
         // message générique tout de suite (voir commentaire plus haut).
         while (track[side] < targetCount) {
           const goalIndex = track[side] // 0 = 1er but de ce camp, 1 = 2e, etc.
-          const scorer     = goalScorers[goalIndex] ?? null
+          const scorer     = pendingScorers[pendingIdx] ?? null
 
           // Format "But pour {équipe}" en titre + "joueur[, pen/csc] minute'"
           // puis le score sur une 2e ligne dans le body — même convention
@@ -1007,6 +1026,15 @@ export default async function handler(req, res) {
           if (sent > 0) notifsSent++
 
           track[side]++
+          // Mémorise la signature (nom+minute) du but notifié — c'est elle,
+          // pas la position, qui empêche de le reprendre à tort pour
+          // "nouveau" si ESPN réordonne sa liste au prochain poll.
+          if (scorer) {
+            const sigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
+            sigs.push(goalSignature(scorer))
+            track[sentKey] = sigs.slice(-30)
+          }
+          pendingIdx++
           trackChanged = true
         }
       }

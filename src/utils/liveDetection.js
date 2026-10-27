@@ -190,6 +190,76 @@ export function parseMin(m) {
   return parseInt(String(m ?? '').replace(/[^\d]/g, ''), 10) || 0
 }
 
+// ── Appariement but→buteur robuste aux réordonnancements ESPN ────────────
+// ⚠️ BUG TROUVÉ (constat utilisateur, 18/10 : une notif de but affiche parfois
+// le MÊME buteur/la MÊME minute qu'un but PRÉCÉDENT du même camp au lieu du
+// nouveau — ex. "but de Doué 11'" envoyé, puis le but suivant de ce camp à la
+// 45e envoie "but de Doué 45'" au lieu de "but de Dembélé 45'") — root cause
+// trouvée en lisant `goalScorers[track[side]]` (api/cron-goals.js,
+// cf-worker/src/index.js) : la liste des buteurs d'un camp est RECALCULÉE et
+// RETRIÉE PAR MINUTE à chaque poll depuis `comp.details` (ESPN), puis indexée
+// par POSITION via un compteur persisté (track[side]). Ça suppose que la
+// position d'un but DÉJÀ notifié ne change jamais — faux si ESPN publie ou
+// corrige un détail de but entre 2 polls (minute affinée après coup, buteur
+// ajouté en retard) : la liste retriée peut alors changer d'ordre, décalant
+// l'index de TOUS les buts suivants vers le mauvais buteur.
+// Corrigé : on identifie les buts déjà notifiés par leur SIGNATURE
+// (nom+minute brute, `goalSignature`) plutôt que par leur position — un
+// nouveau but est celui qui n'a pas (encore) de signature correspondante
+// parmi les buts déjà envoyés pour ce camp, peu importe sa position dans la
+// liste retriée. `pickUnsentGoalScorers` fait une différence de MULTI-SET
+// (chaque signature déjà envoyée n'annule qu'UNE SEULE occurrence
+// correspondante) pour rester correct même si 2 buts partagent exactement le
+// même nom+minute (très rare, ex. doublé à la même minute affichée).
+export function goalSignature(scorer) {
+  return `${scorer?.name ?? '?'}|${scorer?.minute ?? ''}`
+}
+
+export function pickUnsentGoalScorers(goalScorers, sentSignatures, targetCount) {
+  // ⚠️ BUG CORRIGÉ (22/10, constat utilisateur répété : score à jour (3-0)
+  // mais le but notifié porte le MÊME buteur ET LA MÊME minute que le but
+  // PRÉCÉDENT — impossible à expliquer par une coïncidence ("ça peut pas
+  // être la même minute, 30-70min plus tard") ni par le bug de position déjà
+  // corrigé le 18/10 (celui-là ne pouvait produire qu'un AUTRE nom erroné,
+  // pas une répétition exacte nom+minute). Root cause : ESPN peut lister en
+  // DOUBLE le détail d'un même but déjà réellement envoyé — ex. un but sur
+  // penalty parfois enregistré à la fois comme "Goal" ET comme "Penalty -
+  // Scored" dans `comp.details` (voir extractEspnScorers), ou une correction
+  // tardive ajoutée en PLUS de l'entrée d'origine plutôt qu'à sa place.
+  // L'ancienne diff en multi-set ne retire qu'UNE SEULE occurrence par
+  // signature déjà envoyée — un doublon ESPN en trop restait alors
+  // "non envoyé" et, trié par minute (plus ancien que le vrai nouveau but),
+  // se retrouvait choisi EN PREMIER à la place du vrai nouveau but.
+  // Corrigé SANS casser le cas légitime d'un vrai doublé à la même minute
+  // affichée (déjà testé/documenté juste au-dessus) : on ne dédoublonne QUE
+  // si `goalScorers` contient visiblement PLUS d'entrées que de buts réels
+  // pour ce camp (`targetCount`, le score ESPN/FD.org — la seule source
+  // fiable du nombre RÉEL de buts) — un vrai doublé a exactement autant
+  // d'entrées que de buts (condition jamais déclenchée), un doublon ESPN en
+  // a plus (condition déclenchée, dédoublonnage par signature). `targetCount`
+  // reste optionnel (si omis, aucun trim — comportement d'avant inchangé).
+  const scorers = goalScorers ?? []
+  const effective = (targetCount != null && scorers.length > targetCount)
+    ? (() => {
+        const seen = new Set()
+        return scorers.filter(g => {
+          const sig = goalSignature(g)
+          if (seen.has(sig)) return false
+          seen.add(sig)
+          return true
+        })
+      })()
+    : scorers
+  const remaining = [...(sentSignatures ?? [])]
+  return effective.filter(g => {
+    const sig = goalSignature(g)
+    const idx = remaining.indexOf(sig)
+    if (idx === -1) return true
+    remaining.splice(idx, 1)
+    return false
+  })
+}
+
 // ── Résumé auto de match (recap) ────────────────────────────────────────
 // Moteur de phrases déterministe (pas de LLM) : gratuit, ne peut jamais
 // échouer/timeout, toujours cohérent avec les vraies données du match.

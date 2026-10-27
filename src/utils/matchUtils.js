@@ -284,10 +284,26 @@ export function calcMinute(match) {
   ) {
     const utcMs = new Date(match.utcDate).getTime()
     if (now < utcMs) return null
-    if (now - utcMs < 30 * 60_000) return 'Débute'
-    // Au-delà de 30min sans confirmation ESPN : on laisse tomber vers les
-    // heuristiques utcDate plus bas plutôt que de rester bloqué sans rien
-    // afficher (cas rare : ESPN indisponible ou très en retard).
+    // ⚠️ BUG CORRIGÉ (18/10, constat utilisateur + capture d'écran : score
+    // déjà à jour — ex. "1-0", "3-0" — mais statut resté bloqué sur "Débute"
+    // sur plusieurs cards Premier League EN MÊME TEMPS). Cette fenêtre de
+    // grâce de 30min (pensée à l'origine pour ~30-60s, voir commentaire
+    // au-dessus) ignore VOLONTAIREMENT le statut FD.org pour ne pas afficher
+    // une minute non fiable avant la confirmation ESPN — mais rien ne
+    // vérifiait qu'un BUT avait déjà été marqué entre-temps. Un score FD.org
+    // non nul prouve à lui seul que le match est réellement en cours (aucune
+    // ambiguïté possible) : continuer d'afficher "Débute" dans ce cas est
+    // visiblement incohérent (score à jour, statut figé) plutôt que prudent.
+    // Dès qu'un but est connu, on laisse tomber vers l'heuristique utcDate
+    // plus bas (déjà utilisée ailleurs dans cette fonction, pas une nouvelle
+    // estimation) — elle donne une minute crédible sans dépendre d'ESPN.
+    const fsGate = finalScore(match.score)
+    const alreadyScored = (fsGate.home ?? 0) > 0 || (fsGate.away ?? 0) > 0
+    if (!alreadyScored && now - utcMs < 30 * 60_000) return 'Débute'
+    // Au-delà de 30min sans confirmation ESPN (ou dès qu'un but est connu) :
+    // on laisse tomber vers les heuristiques utcDate plus bas plutôt que de
+    // rester bloqué sans rien afficher (cas rare : ESPN indisponible ou très
+    // en retard).
   }
 
   // ── Tirs au but (period 5 / STATUS_SHOOTOUT) ──
@@ -586,6 +602,40 @@ export function isCardLive(match) {
   const isFinished = ms.ft === true || match.status === 'FINISHED'
   if (isFinished) return false
   return match.status === 'IN_PLAY' || match.status === 'PAUSED' || calcMinute(match) !== null
+}
+
+// ── Comparaison par VALEUR, pour les comparateurs React.memo ──
+// AJOUT (27/10, 7e tentative sur le flash noir au scroll rapide dans Accueil,
+// après 6 échecs successifs sur des pistes de compositing/peinture GPU) :
+// root cause réelle trouvée en lisant le code — `espnScores` (LiveProvider,
+// voir useEspnScores.js) change de RÉFÉRENCE à chaque poll live (~15s,
+// setQueryData reconstruit l'objet entier), ce qui cascade jusqu'à
+// `MatchPanel` et force TOUTES les cards du jour à re-render leur arbre
+// complet (chacune avec 5+ hooks : useTeamForm, useH2HHistory,
+// useEspnPregameOdds, useH2HRows...) À CHAQUE poll, y compris les cards
+// hors écran et les matchs qui ne sont même pas en direct — ni `MatchPoster`
+// ni `MatchCard` n'étaient mémoïsés. C'est du vrai travail JS synchrone sur
+// le thread principal, pas un problème de peinture/compositing GPU — ce qui
+// explique pourquoi les 6 tentatives CSS précédentes (content-visibility,
+// couches GPU sur `.appScroll`/`.poster`, retrait des animations de fond)
+// n'ont rien changé : elles corrigeaient toutes un symptôme de peinture,
+// jamais la cause réelle (trop de rendu React synchrone qui bloque le
+// thread principal pile au moment d'un scroll rapide).
+// `JSON.stringify` plutôt qu'un comparateur champ par champ fait à la main :
+// un comparateur partiel qui oublierait un champ (ex. `espnScore.stats`,
+// utilisé par le pronostic live) réintroduirait un risque de card figée —
+// déjà vu plusieurs fois dans ce projet (bug formMap fusionné, bug buteur
+// par position...). `JSON.stringify` est correct PAR CONSTRUCTION (ne peut
+// jamais manquer une vraie différence) et reste largement assez rapide pour
+// un objet match/score (quelques Ko) comparé à l'alternative qu'il évite
+// (re-render complet d'un composant à 5+ hooks).
+export function sameJSON(a, b) {
+  if (a === b) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
 }
 
 // ── Compétitions à hôte unique, terrain "neutre" pour les 2 équipes ──

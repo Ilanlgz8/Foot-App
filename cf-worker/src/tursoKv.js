@@ -142,20 +142,47 @@ export function createTursoKv({ url, authToken }) {
     })
   }
 
-  async function sadd(setName, member) {
+  // ⚠️ VARIADIQUE (15/10, incident "notifs coupées après ~20min de jeu un
+  // soir à 10-15 matchs simultanés" — confirmé par log réel : silence total
+  // de 2h+ sur 10 matchs, sans la moindre erreur, après les KO). Root cause
+  // trouvée par lecture directe du code : index.js appelait `kv.sadd`/
+  // `kv.srem` sur `cron:liveIds` UNE FOIS PAR MATCH dans la boucle principale
+  // (1 sous-requête Turso chacun) — en PLUS du writePipe déjà fusionné par
+  // match (1 sous-requête). Avec 15 matchs live, le seul bookkeeping "rien de
+  // spécial ce match cette minute" coûte déjà ~30 sous-requêtes (15×2),
+  // laissant une marge dérisoire avant le plafond de 50/exécution de
+  // Cloudflare (déjà documenté ailleurs dans ce fichier, voir
+  // SUBREQUEST_SAFE_LIVE_THRESHOLD dans index.js) — quelques buts/cartons
+  // dans la même passe (chacun +2-3 sous-requêtes via notifyVercel) suffisent
+  // alors à dépasser le plafond, et Cloudflare tue l'exécution NET, sans
+  // lever d'exception JS récupérable : aucun try/catch de ce fichier ne peut
+  // l'intercepter, d'où le silence total (ni erreur, ni notif) tant que le
+  // nombre de matchs live reste élevé — exactement le symptôme observé.
+  // Corrigé ici : sadd/srem acceptent désormais PLUSIEURS membres en un seul
+  // appel (`INSERT OR IGNORE ... VALUES (?,?),(?,?),...` / `DELETE ... WHERE
+  // member IN (...)`), permettant à index.js de regrouper TOUS les ids de
+  // TOUTE la passe en 1 seul sadd + 1 seul srem au lieu d'1 par match — même
+  // principe déjà éprouvé pour les lectures (mget) et pour writePipe
+  // (execSetBatch) ailleurs dans ce fichier/index.js.
+  async function sadd(setName, ...members) {
+    if (members.length === 0) return 0
     await ensureSchema()
+    const valuesSql = members.map(() => '(?,?)').join(',')
+    const args = members.flatMap(m => [setName, String(m)])
     const res = await client.execute({
-      sql: `INSERT OR IGNORE INTO worker_set (set_name, member) VALUES (?,?)`,
-      args: [setName, String(member)],
+      sql: `INSERT OR IGNORE INTO worker_set (set_name, member) VALUES ${valuesSql}`,
+      args,
     })
     return res.rowsAffected
   }
 
-  async function srem(setName, member) {
+  async function srem(setName, ...members) {
+    if (members.length === 0) return 0
     await ensureSchema()
+    const placeholders = members.map(() => '?').join(',')
     const res = await client.execute({
-      sql: `DELETE FROM worker_set WHERE set_name=? AND member=?`,
-      args: [setName, String(member)],
+      sql: `DELETE FROM worker_set WHERE set_name=? AND member IN (${placeholders})`,
+      args: [setName, ...members.map(String)],
     })
     return res.rowsAffected
   }

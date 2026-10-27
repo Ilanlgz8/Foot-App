@@ -10,7 +10,7 @@ import {
   fuzzyTeamFifa, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
-  espnEventSide,
+  espnEventSide, pickUnsentGoalScorers, goalSignature,
 } from './liveDetection'
 
 describe('normalizeEspnStatus', () => {
@@ -294,5 +294,95 @@ describe('extractEspnCards — bout en bout sur Betis - Real Madrid', () => {
       ['A. Güler', 'away'],     // Real Madrid, extérieur
       ['F. Bernal', 'home'],    // Betis, domicile
     ])
+  })
+})
+
+// ── pickUnsentGoalScorers — bug réel du 18/10 (constat utilisateur : une
+// notif de but affichait le même buteur/la même minute qu'un but PRÉCÉDENT
+// du même camp, ex. "but de Doué 45'" envoyé au lieu de "but de Dembélé 45'")
+// — l'ancien code indexait goalScorers[track[side]] par POSITION dans une
+// liste retriée à chaque poll ; si ESPN réordonne cette liste entre 2 polls
+// (minute d'un but déjà notifié corrigée après coup), tous les index suivants
+// pointent vers le mauvais buteur. pickUnsentGoalScorers identifie les buts
+// déjà envoyés par SIGNATURE (nom+minute) plutôt que par position.
+describe('goalSignature / pickUnsentGoalScorers', () => {
+  it('construit une signature stable nom+minute', () => {
+    expect(goalSignature({ name: 'Doué', minute: "11'" })).toBe("Doué|11'")
+  })
+
+  it('ne renvoie que les buts dont la signature n’a pas déjà été envoyée', () => {
+    const goalScorers = [
+      { name: 'Doué', minute: "11'" },
+      { name: 'Dembélé', minute: "45'" },
+    ]
+    const pending = pickUnsentGoalScorers(goalScorers, ["Doué|11'"])
+    expect(pending).toEqual([{ name: 'Dembélé', minute: "45'" }])
+  })
+
+  it('reste correct même si ESPN réordonne/corrige la minute d’un but déjà envoyé', () => {
+    // 1er poll : Doué marque à la 11e, notifié, signature "Doué|11'" mémorisée.
+    // 2e poll : ESPN corrige la minute de CE MÊME but à "12'" (réordonnancement
+    // interne) ET un vrai nouveau but de Dembélé apparaît à la 45e. L'ancien
+    // code indexé par position aurait pu confondre les deux ; ici, Dembélé
+    // reste identifié correctement par sa propre signature.
+    const goalScorersAprèsCorrection = [
+      { name: 'Doué', minute: "12'" },     // même but, minute corrigée par ESPN
+      { name: 'Dembélé', minute: "45'" },  // vrai nouveau but
+    ]
+    const pending = pickUnsentGoalScorers(goalScorersAprèsCorrection, ["Doué|11'"])
+    // Doué|12' ne matche plus Doué|11' (signature différente) → il remonte
+    // aussi comme "non envoyé", mais Dembélé est bien présent et distinct —
+    // le point clé du fix : pas de collision entre les deux noms.
+    expect(pending.map(g => g.name)).toContain('Dembélé')
+    expect(pending.find(g => g.name === 'Dembélé').minute).toBe("45'")
+  })
+
+  it('gère 2 buts du même joueur à la même minute affichée (doublé) sans les fusionner', () => {
+    const goalScorers = [
+      { name: 'Mbappé', minute: "60'" },
+      { name: 'Mbappé', minute: "60'" },
+    ]
+    // Seule 1 occurrence déjà envoyée → il doit en rester exactement 1 à traiter.
+    const pending = pickUnsentGoalScorers(goalScorers, ["Mbappé|60'"])
+    expect(pending).toHaveLength(1)
+  })
+
+  it('renvoie la liste complète si rien n’a encore été envoyé', () => {
+    const goalScorers = [{ name: 'Nkada', minute: "26'" }]
+    expect(pickUnsentGoalScorers(goalScorers, [])).toEqual(goalScorers)
+  })
+
+  // ⚠️ BUG CORRIGÉ (22/10, constat utilisateur répété : "PSG 2-0 Barcelone,
+  // but de Lamine Yamal, 3-0 — mais la notif dit but de Dembélé à la 40e,
+  // alors qu'on est à la 70e et que Dembélé c'était le but d'AVANT") — ESPN
+  // liste parfois un but déjà réellement envoyé EN DOUBLE dans ses détails
+  // (penalty compté 2 fois, correction ajoutée en plus de l'originale...).
+  // Sans targetCount, l'ancienne diff en multi-set ne retire qu'1 occurrence
+  // par signature déjà envoyée — le doublon en trop remontait comme "non
+  // envoyé" et, trié par minute (plus ancien que le vrai 3e but), était
+  // choisi EN PREMIER à la place du vrai nouveau but.
+  it('ignore un but ESPN listé en double (en trop vs. le vrai nombre de buts) au lieu de le reprendre à tort pour le nouveau but', () => {
+    const goalScorers = [
+      { name: 'Yamal', minute: "10'" },
+      { name: 'Dembélé', minute: "40'" },
+      { name: 'Dembélé', minute: "40'" }, // doublon ESPN du but déjà envoyé
+      { name: 'Mbappé', minute: "70'" },  // le vrai nouveau (3e) but
+    ]
+    const sentSigs = ["Yamal|10'", "Dembélé|40'"]
+    // targetCount=3 : 3 vrais buts réels pour ce camp, mais la liste ESPN en
+    // contient 4 (1 doublon) → le dédoublonnage par signature se déclenche.
+    const pending = pickUnsentGoalScorers(goalScorers, sentSigs, 3)
+    expect(pending).toEqual([{ name: 'Mbappé', minute: "70'" }])
+  })
+
+  it('ne touche pas au cas légitime du doublé à la même minute quand targetCount correspond exactement (pas de doublon ESPN)', () => {
+    const goalScorers = [
+      { name: 'Mbappé', minute: "60'" },
+      { name: 'Mbappé', minute: "60'" },
+    ]
+    // targetCount=2 : 2 vrais buts, 2 entrées ESPN → pas de trim, comme sans
+    // targetCount (voir le test "doublé" juste au-dessus).
+    const pending = pickUnsentGoalScorers(goalScorers, ["Mbappé|60'"], 2)
+    expect(pending).toHaveLength(1)
   })
 })

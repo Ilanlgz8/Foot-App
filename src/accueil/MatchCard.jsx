@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, memo } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, parseEspnClock } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, parseEspnClock, sameJSON } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
 import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
 import { MatchPoster } from './MatchPoster'
@@ -114,7 +114,7 @@ export function PosterSkeleton() {
 //   noWinnerLoser → si true, pas de style gagnant/perdant (ex: dans le widget live)
 //   espnScore     → { home, away } depuis ESPN (< 10s de délai), ou null
 //   noGradient    → si true, pas de dégradé couleurs équipes en fond (ex: panel Résultats)
-export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, noLive = false, noGradient = false, formMap = null, compMatches = null }) {
+function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnimation = false, noLive = false, noGradient = false, formMap = null, compMatches = null }) {
   // ⚠️ BUG CORRIGÉ (constat utilisateur : losanges "forme récente" vides sur
   // desktop) : même fix que MatchPoster.jsx — id ESPN vs id FD.org pour les
   // 6 grands championnats.
@@ -439,10 +439,119 @@ export function MatchCard({ match, noWinnerLoser = false, espnScore = null, noAn
   )
 }
 
+// ── Mémoïsation (27/10) — même raisonnement et même garde-fou que
+// `samePosterProps` dans MatchPoster.jsx (voir son commentaire détaillé, et
+// `sameJSON` dans matchUtils.js pour la root cause complète du flash noir au
+// scroll rapide) : `match`/`espnScore` comparés PAR VALEUR (ne peut jamais
+// rater un vrai changement), le reste PAR RÉFÉRENCE (déjà stable en amont
+// une fois `onClick` stabilisé via `useStableClickHandlers` ci-dessous).
+function sameMatchCardProps(prev, next) {
+  return (
+    prev.noWinnerLoser === next.noWinnerLoser &&
+    prev.noAnimation === next.noAnimation &&
+    prev.noLive === next.noLive &&
+    prev.noGradient === next.noGradient &&
+    prev.formMap === next.formMap &&
+    prev.compMatches === next.compMatches &&
+    sameJSON(prev.match, next.match) &&
+    sameJSON(prev.espnScore, next.espnScore)
+  )
+}
+
+export const MatchCard = memo(MatchCardImpl, sameMatchCardProps)
+
 // isCardLive : déplacée vers ../utils/matchUtils.js (demande utilisateur,
 // réutilisée par Accueil.jsx — un export non-composant ici cassait le Fast
 // Refresh, voir le commentaire détaillé dans matchUtils.js). Réimportée
 // ci-dessus (voir en-tête du fichier) pour un usage 100% inchangé ici.
+
+// ── Virtualisation réelle du poster-list mobile (27/10) ──
+// Root cause retenue après plusieurs tentatives ratées sur ce même flash noir
+// (content-visibility, marges IntersectionObserver, couches GPU — toutes
+// retirées, voir leur historique dans CLAUDE.md et dans accueil.css) : la
+// liste Accueil n'a JAMAIS été virtualisée — TOUTES les cards du jour (20 à
+// 60+ certains soirs à plusieurs compétitions) sont montées EN MÊME TEMPS,
+// chacune avec son propre poids (DOM, calculs, et jusqu'ici une couche GPU
+// individuelle). Le fix mémoïsation du même jour (React.memo + sameJSON)
+// réduit le RE-render inutile d'une card déjà affichée, mais ne change rien
+// au coût du tout premier rendu de chaque card — avec 30-60 cards montées
+// d'un coup, ce coût cumulé reste le vrai problème pendant un scroll rapide.
+// Ici : chaque card démarre "froide" (un simple placeholder skeleton, aucun
+// hook de données, aucune image, aucun calque) et ne devient "chaude" (le
+// vrai contenu, `MatchPoster`) qu'une fois réellement PROCHE du viewport —
+// et reste chaude pour le reste de la visite (switch à SENS UNIQUE, jamais
+// de retour en arrière). Ce choix à sens unique est délibéré : la tentative
+// du 10/10 (content-visibility + classe `--warm` réversible) avait justement
+// échoué à cause d'un changement de sens de scroll trop rapide qui désynchro-
+// nisait la classe et l'heuristique native du navigateur — en ne repassant
+// JAMAIS au froid, ce risque de flicker/désync disparaît structurellement :
+// une carte déjà vue reste rendue, remonter ne coûte donc plus rien non plus.
+function useWarmOnIntersect(marginPx = 700) {
+  const ref = useRef(null)
+  const [warm, setWarm] = useState(false)
+  useEffect(() => {
+    if (warm) return
+    const el = ref.current
+    if (!el) return
+    // `.appScroll` est LE seul conteneur de scroll de toute l'app (voir
+    // App.css) — utilisé comme root pour que la marge soit mesurée par
+    // rapport à la VRAIE zone visible, pas au document entier.
+    const root = el.closest('.appScroll') || null
+    const obs = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) {
+          setWarm(true)
+          obs.disconnect()
+        }
+      },
+      { root, rootMargin: `${marginPx}px 0px ${marginPx}px 0px` }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [warm])
+  return [ref, warm]
+}
+
+// Placeholder "froid" — reprend la structure/les classes déjà existantes de
+// PosterSkeleton (même hauteur min, même habillage visuel gris animé) pour
+// qu'il n'y ait AUCUN saut de mise en page quand la carte bascule en chaud.
+function PosterPlaceholder({ innerRef }) {
+  return (
+    <div ref={innerRef} className="poster__frame poster__frame--sk">
+      <div className="poster poster--sk">
+        <div className="poster__middle">
+          <div className="poster__team-col poster__team-col--home">
+            <div className="sk" style={{ width: '44px', height: '44px', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3rem', height: '0.7rem' }} />
+          </div>
+          <div className="poster__center">
+            <div className="sk" style={{ width: '3.5rem', height: '1.3rem', borderRadius: '0.4rem' }} />
+          </div>
+          <div className="poster__team-col poster__team-col--away">
+            <div className="sk" style={{ width: '44px', height: '44px', borderRadius: '50%' }} />
+            <div className="sk" style={{ width: '3rem', height: '0.7rem' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LazyPoster({ match, espnScore, live, onMatchClick, onLiveClick, formMap, compMatches }) {
+  const [ref, warm] = useWarmOnIntersect()
+  if (!warm) return <PosterPlaceholder innerRef={ref} />
+  return (
+    <MatchPoster
+      match={match}
+      espnScore={espnScore}
+      live={live}
+      onMatchClick={onMatchClick}
+      onLiveClick={onLiveClick}
+      formMap={formMap}
+      compMatches={compMatches}
+    />
+  )
+}
 
 // ── Liste des matchs du jour ──
 // Affiche en priorité les matchs non terminés, sinon tous les matchs
@@ -484,25 +593,39 @@ export function MatchPanel({ matches: allMatches, loading, espnScores = {}, onMa
       {!loading && displayed.length > 0 && (
         <>
           {/* Mobile : affiches poster */}
+          {/* ⚠️ `onClick` pré-construit remplacé par `live`+onMatchClick/
+              onLiveClick (27/10, voir le commentaire détaillé dans
+              MatchPoster.jsx, `samePosterProps`) : passer 2 callbacks
+              stables (useCallback côté Accueil.jsx) + un primitif plutôt
+              qu'une closure reconstruite à chaque render est ce qui rend la
+              mémoïsation de MatchPoster réellement effective.
+              ⚠️ `MatchPoster` direct → `LazyPoster` (27/10, même jour, vraie
+              virtualisation — voir le commentaire détaillé juste au-dessus
+              de `useWarmOnIntersect`) : seules les cards réellement proches
+              du viewport sont montées en version complète, les autres restent
+              un simple placeholder tant qu'on ne scrolle pas jusqu'à elles. */}
           <div className="accueil__posterList">
-            {displayed.map(match => {
-              const clickHandler = isCardLive(match)
-                ? (onLiveClick ? () => onLiveClick(match) : undefined)
-                : (onMatchClick ? () => onMatchClick(match) : undefined)
-              return (
-                <MatchPoster
-                  key={match.id}
-                  match={match}
-                  espnScore={espnScores[match.id] ?? null}
-                  onClick={clickHandler}
-                  formMap={formMapByComp?.[match.competition?.code] ?? null}
-                  compMatches={matchesByComp?.[match.competition?.code] ?? null}
-                />
-              )
-            })}
+            {displayed.map(match => (
+              <LazyPoster
+                key={match.id}
+                match={match}
+                espnScore={espnScores[match.id] ?? null}
+                live={isCardLive(match)}
+                onMatchClick={onMatchClick}
+                onLiveClick={onLiveClick}
+                formMap={formMapByComp?.[match.competition?.code] ?? null}
+                compMatches={matchesByComp?.[match.competition?.code] ?? null}
+              />
+            ))}
           </div>
 
           {/* Desktop : cards classiques */}
+          {/* ⚠️ `onClick` reste construit ici, pas de changement par rapport
+              à avant (27/10) : il est posé sur le DIV WRAPPER, jamais passé
+              EN PROP à `MatchCard` lui-même — sa recréation à chaque render
+              de MatchPanel ne casse donc aucune mémoïsation (MatchCard ne la
+              reçoit pas), inutile de la stabiliser ici contrairement au cas
+              MatchPoster ci-dessus. */}
           <div className="accueil__matchCards">
             {displayed.map(match => {
               const clickHandler = isCardLive(match)

@@ -4584,6 +4584,723 @@ cf-worker/
   puisque pour la première fois dans cet incident le serveur ET maintenant
   l'urgence du push sont tous les deux confirmés corrects.
 
+- 🔍 15e étape, MÊME INCIDENT, LE DIAGNOSTIC PIVOTE VERS L'APPAREIL — preuve
+  directe que la chaîne serveur fonctionne entièrement, le problème n'est
+  plus dans ce dépôt (14/10, même soir, suite directe du 14e fix urgency:
+  'high'). L'utilisateur a précisé le symptôme avec des horaires exacts :
+  les notifs des matchs de 18h45 (Feyenoord-Côme, LASK Linz-Liverpool, UEFA
+  Champions League — 2 matchs simultanés) ont bien été reçues, mais ZÉRO
+  notification pour aucun des 7 matchs de 21h (S Bratislava-Stuttgart,
+  Rome-Real Madrid, Aston Villa-Fenerbahce, Bodo/Glimt-Dortmund, Betis-Porto,
+  Shakhtar-AEK Athens, Man. City-PSG), y compris aucun but reçu alors que
+  plusieurs ont bien été marqués. Un nouveau `/api/debug-push?secret=...` a
+  été fourni et analysé en détail. Découverte n°1 : les lignes
+  `[vercel→push] [push] sent=X failed=Y` (ajoutées par le 13e fix du jour,
+  celui qui corrigeait le paramètre `log` jamais transmis à
+  `sendPushToMatch`) n'apparaissent QUE depuis 20:22:22 UTC ce soir-là —
+  alors que les KO des matchs de 21h ont eu lieu entre 19:01:04 et 19:04:07
+  UTC, et ceux des matchs de 18h45 à 16:48:06 UTC. Autrement dit, le
+  déploiement Vercel des 13e/14e fix (poussés plus tôt dans la même
+  conversation, auto-déployés) n'a pris effet qu'en PLEIN MILIEU de la
+  soirée de match, vers 20:20 UTC — tous les KO (18h45 ET 21h) et les
+  premiers buts/mi-temps/reprises des matchs de 21h (19:01 à 20:18 UTC) ont
+  donc tourné sur l'ANCIEN code, sans aucune visibilité sur le résultat
+  d'envoi (bug 13 pas encore actif) et avec `urgency: 'normal'` par défaut
+  (bug 14 pas encore actif) — ces événements précis, KO compris, restent
+  donc sans preuve ni dans un sens ni dans l'autre. Découverte n°2, la plus
+  importante de cette entrée : APRÈS 20:22:22 UTC (code déjà corrigé,
+  `urgency: 'high'` déjà actif), le log montre 6 lignes consécutives
+  `[vercel→push] [push] sent=5 failed=0 stale=0 total=5` à 20:22:22 /
+  20:24:25 / 20:25:31 / 20:26:22 / 20:33:35 / 20:36:25 — chacune suivant
+  IMMÉDIATEMENT un but détecté sur un match de 21h (S Bratislava-Stuttgart,
+  Betis-Porto, Man. City-PSG, Aston Villa-Fenerbahce...). `stale=0` à
+  chaque fois signifie qu'aucun des 5 abonnements enregistrés (2
+  `fcm.googleapis.com` + 3 `web.push.apple.com`) n'a été rejeté comme
+  invalide par le service de push — les 5 push ont bien été ACCEPTÉS avec
+  succès par Google/Apple, avec la bonne urgence déjà en place. Pourtant
+  l'utilisateur affirme un "zéro notification" total pour toute la soirée
+  des matchs de 21h, y compris pour ces buts précis envoyés après le fix.
+  Conclusion du diagnostic : pour la première fois dans cet incident (15
+  entrées), la preuve est désormais directe et sans ambiguïté que TOUTE la
+  chaîne serveur fonctionne correctement — détection ESPN (`cf-worker/`) →
+  appel Vercel → `webpush.sendNotification` → acceptation par le service de
+  push, avec la bonne urgence. Le problème se situe donc entre "le service
+  de push (Apple/Google) a accepté la notification" et "le téléphone de
+  l'utilisateur l'affiche" — un territoire entièrement côté appareil/OS,
+  hors de portée du code de ce dépôt, qu'aucun fix côté serveur ne peut
+  corriger davantage. Pistes à vérifier côté utilisateur, données en
+  réponse : Réglages iOS > Notifications > StatFootix (Autoriser les
+  notifications bien activé ? style d'alerte pas réglé sur "Aucun" ?
+  affichage sur écran verrouillé activé ?) ; un Focus/Ne pas déranger actif
+  pendant les matchs de 21h (mais pas pendant ceux de 18h45) ? ; le Mode
+  Faible consommation actif (connu pour différer certains push même en
+  urgence 'high' sur iOS) ? ; et la possibilité que les 5 abonnements
+  enregistrés ne correspondent pas tous à l'appareil réel de l'utilisateur
+  (ex. un ancien abonnement d'un autre appareil/navigateur jamais nettoyé —
+  si le vrai téléphone de l'utilisateur n'est qu'1 des 5, les 4 AUTRES
+  peuvent très bien "réussir" sans que ça dise quoi que ce soit sur le
+  sien). Honnêteté : aucun accès à un vrai iPhone/PWA ni aux vrais réglages
+  iOS de l'utilisateur depuis cet environnement pour confirmer laquelle de
+  ces pistes est la vraie cause — ce diagnostic déplace la responsabilité
+  du code vers l'appareil avec une preuve solide (sent=5/failed=0/stale=0
+  répété 6 fois après le fix), mais ne conclut pas encore sur LA cause
+  exacte. Aucun fix de code appliqué dans cette entrée, aucun déploiement
+  nécessaire — c'est une entrée de diagnostic en cours, pas un correctif ;
+  la prochaine étape utile serait que l'utilisateur vérifie ces réglages
+  côté appareil plutôt qu'un 16e changement de code côté serveur.
+
+- ✅ INCIDENT CLOS (15 entrées, 05/10→14/10) : CAUSE RÉELLE CONFIRMÉE CÔTÉ
+  APPAREIL, PAS LE CODE — l'utilisateur a constaté, en allant vérifier
+  Réglages iOS suite à la piste de l'entrée précédente, que les
+  notifications pour StatFootix étaient DÉSACTIVÉES ("les notifs s'etait
+  desactiver alors que j'ai rien fait"). Ça confirme exactement et
+  entièrement le diagnostic de l'entrée juste au-dessus : la chaîne
+  serveur (détection ESPN → cf-worker → Vercel → webpush.sendNotification,
+  avec la bonne urgence depuis le 14e fix) a été prouvée intégralement
+  fonctionnelle par les logs (`sent=5 failed=0 stale=0`, répété 6 fois le
+  soir du diagnostic) — le "zéro notification" ne venait donc d'aucun des
+  14 bugs corrigés dans ce fichier depuis le 05/10, mais du fait qu'iOS
+  avait coupé la permission de notification pour l'app, à l'insu de
+  l'utilisateur. Honnêteté sur le "j'ai rien fait" : plausible et courant —
+  iOS peut révoquer silencieusement une permission de notification pour
+  plusieurs raisons sans action consciente de l'utilisateur (une mise à
+  jour iOS qui réinitialise certains réglages d'app, un appui accidentel
+  dans Réglages ou dans un centre de notifications, une réinstallation de
+  la PWA depuis l'écran d'accueil qui repart sans la permission, ou un
+  comportement de gestion de permissions plus agressif après une longue
+  période d'inactivité de l'app) — aucun moyen de confirmer la cause exacte
+  depuis cet environnement (pas d'accès aux réglages/logs iOS de
+  l'utilisateur), mais ce n'est structurellement PAS un bug de ce dépôt :
+  aucun code serveur ou client de cette app ne peut révoquer une permission
+  OS, cette permission vit entièrement côté iOS/Safari, hors de portée du
+  code. Pas de nouveau fix de code dans cette entrée — l'action corrective
+  est côté utilisateur (réactiver Réglages > Notifications > StatFootix) ;
+  si la permission venait à être retirée puis ré-accordée, `usePushNotifications.js`
+  (auto-subscribe au 1er lancement + re-sync Redis/Turso toutes les 5min,
+  voir Architecture clé > Notifications) reprend normalement sans action
+  supplémentaire une fois l'app rouverte avec la permission active. Clôture
+  de cette série de 15 entrées : les 14 bugs corrigés entre le 05/10 et le
+  14/10 (deadlocks hotSlugs/noMatchFlags, blackout global emptyDay non
+  couvert, zombies staleIds, budget de sous-requêtes Cloudflare dépassé,
+  absorption silencieuse pendant la mi-temps, désync cron:anyLive/
+  cron:liveIds, trou de visibilité espn:batch, exception non catchée dans
+  runOnePass, paramètre log jamais transmis à sendPushToMatch, urgency
+  'normal' par défaut...) étaient tous des bugs RÉELS, confirmés par
+  lecture de code et/ou logs, et restent corrigés et utiles — mais aucun
+  d'eux n'était la cause de CE signalement précis, qui s'est révélé être un
+  problème de permission OS, hors du périmètre de ce dépôt.
+
+- ✅ NOUVEAU BUG CRITIQUE TROUVÉ ET CORRIGÉ PAR PREUVE DIRECTE (15/10, constat
+  utilisateur le lendemain de la clôture de l'incident ci-dessus : "tout se
+  passait bien dans les 20 premières minutes des matchs [...] et juste après,
+  plus rien. Plus de notif sur les buts, sur la mi-temps, sur la reprise
+  [...] ça fait plusieurs fois que ça arrive" — Europa League + Ligue
+  Conférence, "15 matchs en même temps"). Diagnostiqué via un vrai
+  `/api/debug-push?secret=...` (demandé avant toute théorie, comme établi
+  sur ce fichier) : `logHistory` montrait les KO confirmés pour 10 matchs de
+  Ligue Conférence à 16:46:55 et 16:48:57 UTC (push envoyés avec succès,
+  sent=6 failed=0), puis **plus RIEN du tout** — vérifié avec `date -u` au
+  moment du diagnostic : plus de 2h s'étaient écoulées (19:04 UTC) sans la
+  moindre ligne derrière, pas même une erreur. Avec 10+ matchs en direct
+  pendant 2h, il est statistiquement impossible qu'aucun but/carton/mi-temps
+  ne se soit produit — preuve directe d'un silence total, pas une
+  supposition. Ce qui distinguait ce silence des 14 bugs précédents : AUCUNE
+  ligne d'erreur, alors que presque tous les chemins d'échec connus loggent
+  désormais explicitement leur erreur (fixes des 10/10, 14/10) — un silence
+  aussi total ne peut venir que de quelque chose qu'AUCUN `try/catch` du
+  code ne peut intercepter : le plafond Cloudflare Workers (plan gratuit, 50
+  sous-requêtes/exécution, déjà documenté via `SUBREQUEST_SAFE_LIVE_
+  THRESHOLD`) — Cloudflare tue l'exécution NET en cas de dépassement, sans
+  lever d'exception JS récupérable, donc rien ne peut jamais s'écrire dans
+  `logHistory` pour en garder la trace.
+  Root cause confirmée par lecture directe du code (`cf-worker/src/
+  index.js`), pas une hypothèse : le `kv.sadd`/`kv.srem` sur `cron:liveIds`
+  (juste après le calcul de `stayTrackedAsLive`, dans la boucle principale)
+  était appelé **UNE FOIS PAR MATCH** — 1 sous-requête Turso chacun — EN PLUS
+  du writePipe déjà fusionné par match (1 sous-requête, lui, depuis le fix
+  du 10/10). Avec 15 matchs en direct, le seul bookkeeping "rien de spécial
+  ce match cette minute" coûtait déjà ~30 sous-requêtes (15×2) sur les 50
+  disponibles — avant même de compter le fetch ESPN groupé, le `scard`
+  initial, les mget `noMatchFlags`/`emptyDay`, le verrou de passe
+  (`cron:passLock`), et l'écriture finale `cron:liveSlugs` (~8 de plus) :
+  une marge résiduelle dérisoire avant que quelques buts/cartons dans la
+  MÊME passe (chacun +2-3 sous-requêtes via `notifyVercel`) ne fassent
+  dépasser le plafond. Et comme ce bookkeeping coûte EXACTEMENT la même
+  chose chaque minute tant que ~15 matchs restent en direct, le blocage ne
+  se corrige jamais seul — collant exactement à "20 minutes puis plus rien
+  du tout pour le reste du match", recommencé "plusieurs fois" (chaque soir
+  à beaucoup de matchs simultanés). Les 2 batches de 6 puis 4 KO à 16:46:55/
+  16:48:57 ont réussi parce que le tout premier passage (juste poser une
+  baseline + push) est plus léger que les passages suivants, qui doivent
+  comparer l'état de TOUS les matchs un par un — exactement le travail qui
+  franchit le plafond une fois que la charge de bookkeeping s'accumule.
+  Corrigé (`cf-worker/src/tursoKv.js` + `cf-worker/src/index.js`) : `sadd`/
+  `srem` de `tursoKv.js` acceptent désormais PLUSIEURS membres en un seul
+  appel (`INSERT OR IGNORE ... VALUES (?,?),(?,?),...` / `DELETE ... WHERE
+  member IN (...)` — chaque ligne reste indépendante, même principe déjà
+  éprouvé pour `execSetBatch`, voir son historique du 05/10) — le client
+  Redis (`@upstash/redis`, utilisé si Turso n'est pas configuré) supportait
+  déjà nativement `sadd(key, ...members)`/`srem(key, ...members)` variadique,
+  aucun changement nécessaire côté repli Redis. Dans `index.js` : les 2
+  points qui écrivaient immédiatement par match (la décision principale +
+  le cas rare "échec envoi FT, annule le retrait") notent désormais juste
+  leur décision dans 2 Sets locaux (`liveIdsToAdd`/`liveIdsToRemove`, 0
+  sous-requête, simple mémoire) ; UN SEUL `sadd` + UN SEUL `srem` regroupent
+  ensuite TOUTE la passe après la fin de la boucle principale — pour 15
+  matchs, ~30 sous-requêtes tombent à 1-2, libérant presque tout le budget
+  pour les vrais événements (buts/cartons) de la passe. Changement vérifié
+  sûr : le seul autre consommateur de `cron:liveIds` est `scard()`, lu
+  UNIQUEMENT en tout début et en toute fin de passe (jamais au milieu de la
+  boucle), donc différer les écritures jusqu'à la fin de la boucle ne change
+  aucun comportement observable — juste le nombre d'allers-retours réseau.
+  370 tests + lint (37 erreurs pré-existantes, confirmées IDENTIQUES avant/
+  après via `git stash` — aucune régression, la seule ligne cf-worker du
+  lint, `lockAcquired`/`no-useless-assignment`, déjà présente avant ce fix) +
+  build + `npx wrangler deploy --dry-run` (408.47 KiB) vérifiés.
+  Honnêteté : comme pour tout `cf-worker/`, aucun accès réseau réel depuis
+  cet environnement pour reproduire un dépassement du plafond Cloudflare en
+  conditions réelles ni confirmer ce fix contre la vraie prod (pas d'accès
+  au dashboard Cloudflare ni à `wrangler tail`) — mais cette fois la racine
+  du problème est un calcul arithmétique concret et vérifiable par simple
+  lecture du code (2 sous-requêtes par match pour du bookkeeping qui pourrait
+  n'en coûter qu'1-2 pour toute la passe), pas une théorie devinée au
+  hasard : avec 15 matchs, le budget de 50 sous-requêtes était structurellement
+  trop juste avant ce fix, il l'est beaucoup moins après. Ce fix réduit le
+  risque de dépassement mais ne l'élimine pas à 100% (le writePipe par match,
+  lui, reste non batché entre matchs — ~15 sous-requêtes restantes pour 15
+  matchs — un 2e gain possible mais plus risqué, pas fait ici : il
+  nécessiterait de restructurer la boucle principale en 2 passes, jugé
+  disproportionné sur ce fichier déjà le plus fragile de l'app sans preuve
+  que le 1er fix ne suffit pas). À déployer manuellement (`npm run deploy`
+  depuis `cf-worker/`, comme toujours pour ce dossier — aucun déploiement
+  automatique) ; à confirmer par l'utilisateur sur son prochain soir à
+  beaucoup de matchs simultanés — si le silence persiste malgré ce fix, ce
+  sera un signal que le writePipe par match (le 2e gain non fait ici) est
+  nécessaire, ou qu'une autre cause est en jeu.
+
+- ✅ Choix produit ajouté le même jour (15/10, demande explicite utilisateur
+  juste après le fix sadd/srem groupé ci-dessus : "quand une notif ne part
+  pas, ne la laisse pas en attente [...] si elle a plus de 5 minutes de
+  retard, on l'enlève, on la fait pas passer" — suite à un redémarrage du
+  Worker où tout le retard accumulé pendant l'arrêt est remonté d'un coup,
+  72 notifications reçues en rafale). Ajout d'un repère "depuis quand le
+  Worker a-t-il vraiment vérifié les matchs en cours" (`cron:heartbeat`,
+  `runOnePass`) : mis à jour à chaque passe qui a de vrais matchs à traiter
+  (jamais pendant les journées sans le moindre match, pour ne rien coûter en
+  période creuse). Si l'écart depuis la dernière mise à jour dépasse 5min,
+  le Worker vient forcément de reprendre après un arrêt/blocage prolongé —
+  tout ce qui serait détecté dans cette passe-là décrit alors des
+  évènements déjà trop vieux. Dans ce cas (`env._isRecoveryPass`), chaque
+  notif individuelle (KO/but/carton/mi-temps/reprise/fin) est abandonnée au
+  lieu d'être envoyée en retard — un seul point de contrôle dans
+  `sendToVercel` (la fonction par laquelle elles passent toutes) suffit :
+  elle fait comme si l'envoi avait réussi, sans jamais appeler Vercel, donc
+  le suivi interne (compteurs buts/cartons, dédup, cron:liveIds) avance
+  normalement et ces évènements ne sont jamais retentés plus tard non plus —
+  exactement "si elle passe pas, elle passe pas". Coût : 1 écriture Redis/
+  Turso de plus par passe, UNIQUEMENT les minutes où il y a vraiment des
+  matchs à vérifier (la lecture, elle, est gratuite — ajoutée à un mget déjà
+  existant). 370 tests + lint (35 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build + `npx wrangler deploy --dry-run` (409.36 KiB) vérifiés.
+  Honnêteté : comme pour tout `cf-worker/`, aucun accès réseau réel depuis
+  cet environnement pour reproduire un vrai redémarrage ni confirmer ce
+  comportement contre la vraie prod — le mécanisme est un raisonnement
+  simple et vérifiable par lecture du code (comparaison d'horodatages),
+  pas une certitude testée en conditions réelles. Effet de bord accepté et
+  voulu par l'utilisateur : un redémarrage pendant qu'un match vient
+  VRAIMENT de commencer à la même minute pourrait, dans de très rares cas,
+  voir son propre coup d'envoi avalé par ce garde-fou plutôt que notifié —
+  jugé largement préférable à une rafale de dizaines de notifs en retard.
+  À déployer manuellement (`npm run deploy` depuis `cf-worker/`, comme
+  toujours pour ce dossier).
+
+- ✅ 2 BUGS TROUVÉS ET CORRIGÉS, NOUVEAU SIGNALEMENT (18/10, capture d'écran à
+  l'appui — lock screen montrant 3 notifs quasi identiques "But pour Troyes !
+  T. Nkada 26'/27'/27'", les 2 dernières STRICTEMENT identiques, arrivées à
+  1min d'écart) + constat séparé : "des fois y'a le même buteur que le but
+  précédent... alors que c'est un autre", exemple donné "but de Doué 11'"
+  suivi de "but de Doué 45'" affiché à tort au lieu de "but de Dembélé 45'".
+  Diagnostiqué par lecture directe du code (pas de nouveau log en direct
+  demandé cette fois — les 2 mécanismes trouvés expliquent chacun un des 2
+  symptômes avec un raisonnement complet, pas une théorie partielle).
+
+  **1. Mauvais buteur/minute affiché** — root cause dans le bloc de
+  détection de but (`cf-worker/src/index.js` ET `api/cron-goals.js`, logique
+  dupliquée à l'identique) : `goalScorers[track[side]]` récupère le buteur
+  d'un nouveau but par sa POSITION dans la liste des buts de ce camp,
+  retriée PAR MINUTE à CHAQUE poll depuis `comp.details` (ESPN) — pas par
+  une identité stable. Si ESPN publie ou corrige un détail de but entre 2
+  polls (minute affinée après coup, buteur ajouté en retard — déjà vu
+  plusieurs fois dans l'historique de ce fichier pour d'autres symptômes),
+  la liste retriée peut changer d'ORDRE : la position d'un but déjà notifié
+  se décale, et le but suivant (vraiment nouveau) hérite alors de l'ancien
+  but à cette position — exactement "le même buteur que le but précédent".
+  Corrigé (`src/utils/liveDetection.js`, nouvelles fonctions exportées
+  `goalSignature`/`pickUnsentGoalScorers`, logique PARTAGÉE comme le reste
+  de ce fichier) : un but déjà notifié est désormais identifié par sa
+  SIGNATURE (nom+minute brute), pas sa position — `pickUnsentGoalScorers`
+  fait une différence de MULTI-SET entre la liste actuelle et les
+  signatures déjà envoyées pour ce camp (stockées dans un nouveau champ
+  `track[`${side}Sent`]`, un tableau de signatures, plafonné aux 30
+  dernières par sécurité), donc un but non trouvé dans les signatures
+  déjà envoyées est traité comme nouveau PEU IMPORTE sa position dans la
+  liste retriée. `goalIndex`/`track[side]` restent utilisés tels quels pour
+  la clé de dédup (`push:espn:goal:{id}:{side}:{goalIndex+1}`, format
+  inchangé, aucune régression sur les dédup déjà posées) — seul le CHOIX du
+  buteur à afficher change de mécanisme. Le bloc d'annulation de but
+  (`cancelledSides`) retaille aussi `track[`${side}Sent`]` à `newCount` pour
+  rester cohérent avec le compteur réduit. Branché à l'identique dans les 2
+  fichiers (cf-worker actif + cron-goals.js legacy), comme l'exige le
+  commentaire d'en-tête de `liveDetection.js` ("ne JAMAIS redupliquer dans
+  l'un des deux sans l'autre"). Honnêteté : explique bien l'exemple exact
+  donné par l'utilisateur (Doué/Dembélé) par un mécanisme confirmé en
+  lisant le code, mais aucun log réel n'est venu prouver que c'est EXACTEMENT
+  ce qui s'est passé sur CE match précis (symptôme décrit comme occasionnel,
+  pas reproductible à la demande) — à surveiller si le symptôme "mauvais
+  buteur" revient malgré ce fix.
+
+  **2. Triple notif identique** — root cause dans `handlePass()`
+  (`cf-worker/src/index.js`) : le verrou anti-concurrence `cron:passLock`
+  (TTL 55s, ajouté le 14/10) se libérait de façon INCONDITIONNELLE
+  (`kv.del(passLockKey)`), sans vérifier qu'il s'agissait bien de SON PROPRE
+  verrou. Scénario plausible sur un soir à beaucoup de matchs live (le
+  travail par match reste séquentiel malgré les batchings déjà faits, voir
+  les entrées du 15/10) : une passe A qui dépasse 55s voit son verrou
+  EXPIRER tout seul avant d'avoir fini — le tick suivant (60s) ne voit plus
+  de verrou, en pose un nouveau et démarre une passe B EN PARALLÈLE de A,
+  qui tourne toujours. Quand A finit enfin, son `kv.del` SUPPRIMAIT le
+  verrou de B (pas le sien, déjà expiré) avant que B ait terminé — ouvrant
+  la porte à une passe C en parallèle de B. Explique un TRIPLE envoi, pas
+  seulement un double : 2 ou 3 exécutions qui retraitent le même but
+  détectent chacune, indépendamment, la même transition de score (lues
+  avant qu'aucune des autres n'ait eu le temps d'écrire sa mise à jour) —
+  avec le fix du but (1) ci-dessus, 2 exécutions concurrentes PEUVENT même
+  recalculer 2 buteurs/minutes différents pour le "même" but détecté, selon
+  l'état exact de `comp.details` au moment de chaque lecture — cohérent avec
+  les 2 notifs légèrement différentes (26' puis 27') observées avant les 2
+  identiques. Corrigé : chaque passe génère désormais un jeton aléatoire
+  propre (`lockToken`) à l'acquisition, et ne supprime le verrou que s'il
+  porte encore CE jeton (`releasePassLock`, lecture puis suppression
+  conditionnelle) — une passe en retard ne peut plus jamais supprimer le
+  verrou d'une passe plus récente qu'elle n'a pas posé elle-même. N'élimine
+  pas le cas où une passe dépasse carrément 55s (reste possible sous forte
+  charge, ni plus ni moins qu'avant), mais casse la CASCADE qui transformait
+  un simple dépassement ponctuel en 2-3 exécutions concurrentes en chaîne.
+  Coût : 1 lecture Turso/Redis de plus par passe (le `kv.get` avant le
+  `kv.del`), négligeable face au risque de doublons corrigé.
+
+  375 tests (+5, nouveaux tests `pickUnsentGoalScorers`/`goalSignature` dans
+  `liveDetection.test.js`, dont un reproduisant explicitement le scénario
+  Doué/Dembélé) + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build + `npx wrangler deploy --dry-run` (410.74 KiB) vérifiés. Honnêteté
+  générale : comme pour tout `cf-worker/`, aucun accès réseau réel depuis cet
+  environnement pour reproduire la concurrence ou le réordonnancement ESPN
+  en conditions réelles ni confirmer ces 2 fixes contre la vraie prod — les 2
+  mécanismes sont cependant des défauts de conception réels et concrets,
+  confirmés par lecture directe du code (position non stable dans le temps
+  pour le 1er, libération de verrou non conditionnelle pour le 2e), pas des
+  théories devinées au hasard. À déployer manuellement (`npm run deploy`
+  depuis `cf-worker/`, comme toujours pour ce dossier — la partie
+  `api/cron-goals.js`/`src/utils/liveDetection.js` se déploie automatiquement
+  avec le reste de l'app via Vercel, mais n'a d'effet sur les notifs que le
+  Worker continue d'envoyer qu'une fois celui-ci aussi redéployé).
+
+  **3. Minute figée sur "Débute" quelques dizaines de secondes après un
+  retour d'arrière-plan** (3e symptôme du même signalement, score à jour
+  immédiatement, minute en retard) — investigué (`useLiveMinute.js`,
+  `matchUtils.js`/`calcMinute`) sans trouver de mécanisme concret expliquant
+  un délai de cet ordre : le repoll forcé au retour au premier plan
+  (`onVisible`) interroge déjà TOUS les matchs du jour (pas seulement ceux
+  déjà suivis comme live), et la détection du coup d'envoi (`kickoffAt`) se
+  pose dès le PREMIER poll qui voit `STATUS_IN_PROGRESS` avec une minute
+  ESPN exploitable — aucune double-confirmation/debounce trouvée sur ce
+  chemin précis qui expliquerait plusieurs dizaines de secondes (le fix du
+  14/10, resserré à 1.5s, devrait suffire). Honnêteté : pas de fix appliqué
+  ici faute d'avoir trouvé une cause concrète et vérifiable par lecture de
+  code — plutôt qu'inventer une 3e théorie non prouvée, ce point reste
+  ouvert ; si le symptôme se reproduit, il faudra soit une capture précise
+  de l'instant exact (comme le "gap:335" qui avait permis de percer le bug
+  de la barre du bas), soit confirmer que ce n'est "que" quelques secondes
+  de plus que prévu plutôt que les dizaines perçues.
+
+- ✅ "Débute" figé sur plusieurs cards EN MÊME TEMPS alors que le score est déjà à jour
+  (18/10, 2 captures d'écran à l'appui : Bournemouth-Sunderland 1-0 et Brighton-Crystal
+  Palace 3-0, toutes les deux sur "Débute" sur la grille `/live`) — root cause trouvée
+  dans `calcMinute()` (`src/utils/matchUtils.js`) : le garde-fou "Pending kickoff"
+  (ajouté lors d'une régression antérieure, voir commentaire juste au-dessus dans le
+  fichier) affiche "Débute" tant qu'ESPN n'a pas confirmé le coup d'envoi dans
+  `matchStateTracker` (localStorage) — un choix DÉLIBÉRÉ pour ignorer le statut FD.org
+  (`IN_PLAY`) tant qu'ESPN n'a rien confirmé, documenté explicitement dans le code —
+  mais avec une fenêtre de grâce de **30 minutes** (`30 * 60_000`), largement plus
+  longue que l'intention affichée dans le titre du bloc ("~30-60s"). Pendant toute
+  cette fenêtre, le SCORE affiché (`LiveCardWidget.jsx`, `mergeScore(espn?.home,
+  fsLiveCard.home ?? ...)`) peut déjà venir de FD.org (`match.score`, via
+  `finalScore()`) même si ESPN n'a toujours pas écrit son propre statut — d'où la
+  card qui affiche "1-0"/"3-0" (score réel, source FD.org) à côté de "Débute" (statut
+  resté bloqué, source ESPN pas encore arrivée pour CE match précis). Le fait que
+  ça touche PLUSIEURS matchs Premier League en même temps est cohérent avec une
+  même compétition dont le scoreboard ESPN met plus de temps à confirmer le KO pour
+  tous ses matchs un jour chargé (plusieurs coups d'envoi à la même heure), pendant
+  que FD.org, lui, a déjà le bon score pour chacun. Corrigé (`calcMinute`) : avant de
+  retourner "Débute", on vérifie maintenant si FD.org montre déjà un but marqué
+  (`finalScore(match.score)`, home ou away > 0) — un score non-nul est une preuve
+  CERTAINE que le match est réellement en cours, peu importe l'état d'ESPN, donc
+  continuer d'afficher "Débute" dans ce cas est juste incohérent (pas prudent). Dès
+  qu'un but est détecté, on laisse tomber vers l'heuristique "depuis utcDate" déjà
+  présente plus bas dans la même fonction (temps écoulé depuis le coup d'envoi
+  théorique) — un mécanisme DÉJÀ utilisé ailleurs dans `calcMinute` pour exactement ce
+  genre de repli, pas une nouvelle estimation inventée pour l'occasion — qui donne une
+  minute crédible sans dépendre d'ESPN. Le cas normal (match tout juste commencé, pas
+  encore de but, FD.org passé IN_PLAY avant ESPN) continue d'afficher "Débute" comme
+  avant — seul le cas "score déjà non-nul" change de comportement. Test dédié ajouté
+  (`matchUtils.test.js`) reproduisant exactement le scénario (même match, avec et sans
+  but, même position temporelle dans la fenêtre de 30min) : sans but → "Débute"
+  (inchangé) ; avec un but FD.org → "10'" (minute crédible) au lieu de "Débute". 376
+  tests (+1) + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
+  Honnêteté : contrairement à plusieurs fixes récents de cet incident, celui-ci est
+  confirmé par un mécanisme de code concret et démontrable (pas une théorie) — le
+  calcul de `calcMinute` est partagé par `LiveCardWidget`/`MatchCard`/`MatchPoster`/
+  `LiveMatchPage`, donc ce correctif s'applique partout où cette fonction est utilisée,
+  pas seulement à la grille `/live` des captures d'écran.
+
+- 🔍 Notif de but reçue avec ~93min de retard, MÊME SIGNALEMENT (18/10, capture
+  d'écran : "But pour Lecce ! K. Gaspar 11'" affiché "il y a 16 min" sur un écran
+  pris à 14:34 local, soit un affichage vers ~12:18 UTC) — croisé avec le
+  `/api/debug-push` déjà fourni par l'utilisateur un peu plus tôt le même jour : ce
+  but précis (Udinese-Lecce, `ita.1:401874771`, BUT away 1/1) a été détecté ET envoyé
+  avec succès (`sent=5 failed=0 stale=0`) à **10:44:35.026Z UTC** — soit ~93 minutes
+  AVANT l'affichage apparent sur le téléphone. Investigation du chemin complet `ts`
+  (le garde-fou client `sw-push.js` qui est censé IGNORER silencieusement toute notif
+  affichée plus de 20min après son `ts` serveur, voir l'historique du 10/09) : `ts`
+  est calculé UNE SEULE FOIS par envoi réussi, AVANT la boucle d'envoi aux 5
+  abonnements (`api/cron-goals.js`, `sendPushToMatch`) — aucun recalcul par abonné,
+  aucun chemin de retry trouvé qui regénèrerait un `ts` plus tard pour UN but déjà
+  confirmé `sent=5/failed=0` (la clé de dédup reste posée 3h, aucun 2e appel possible
+  côté serveur pour ce même but). Donc le `ts` embarqué dans le payload livré au
+  service de push était bien ~10:44:35 — si le Service Worker actif sur l'appareil
+  au moment de la réception contenait bien le garde-fou de 20min (`sw-push.js` ligne
+  73), cette notif aurait dû être supprimée silencieusement, jamais affichée 93min
+  plus tard. Elle l'a pourtant été. 2 explications restent possibles, aucune
+  tranchable depuis cet environnement (pas d'accès aux logs Apple/device) : (a) le
+  service de push (`web.push.apple.com`, cet abonné est un des 3 Apple sur 5) a
+  retardé la livraison effective bien au-delà du `TTL:1200` déjà demandé côté serveur
+  — le TTL web push est une requête, pas une garantie stricte de la part d'Apple ;
+  (b) le Service Worker exécuté sur cet appareil au moment de la réception était une
+  version PÉRIMÉE, antérieure au 10/09 (date d'ajout du garde-fou `ts`), qui n'avait
+  donc pas encore ce code — désynchro SW déjà documentée plusieurs fois dans ce
+  fichier par le passé (mécanismes de mise à jour forcée déjà en place, voir
+  `checkAppVersion`/`appUpdate.js`). Aucun fix de code appliqué ici : rien côté
+  serveur n'explique ce retard (le `ts` est posé correctement, une seule fois, au bon
+  moment), et je ne peux pas distinguer (a) de (b) sans logs côté appareil. Si ça se
+  reproduit, le point utile à vérifier côté utilisateur serait la version de l'app
+  affichée en bas de la page Accueil (ou équivalent) au moment de l'incident, pour
+  voir si elle correspond bien au dernier déploiement — sinon ce serait un signe fort
+  vers (b) plutôt que (a).
+
+- ✅ BUG CRITIQUE TROUVÉ ET CORRIGÉ : le fix du 18/10 (appariement par
+  signature) ne suffisait pas — un but notifié pouvait encore reprendre EXACTEMENT
+  le nom ET la minute du but PRÉCÉDENT (22/10, exemple précis donné par
+  l'utilisateur : "PSG 2-0 Barcelone, 3e but, la notif dit but de Dembélé à la
+  40e alors qu'on est à la 70e et que Dembélé c'était le but d'AVANT [...]
+  ça peut pas être la même minute [...] c'est un autre bug" — répété
+  plusieurs fois après le 18/10, donc pas l'ancien bug de position déjà réglé).
+  L'utilisateur avait raison : une répétition EXACTE nom+minute (pas juste un
+  nom différent) ne pouvait pas venir du bug de position (celui-là ne pouvait
+  produire qu'un AUTRE buteur erroné selon l'ordre de la liste, jamais une
+  répétition identique du but d'avant). Root cause trouvée dans
+  `pickUnsentGoalScorers` (`src/utils/liveDetection.js`) lui-même : sa diff en
+  multi-set (voir fix du 18/10) ne retire qu'UNE SEULE occurrence par
+  signature déjà envoyée — si ESPN liste en DOUBLE le détail d'un but déjà
+  réellement notifié (`comp.details`, voir `extractEspnScorers`) — ex. un
+  penalty parfois enregistré à la fois comme "Goal" ET comme "Penalty -
+  Scored", ou une correction tardive ajoutée EN PLUS de l'entrée d'origine au
+  lieu de la remplacer — ce doublon en trop ressort comme "non envoyé" après
+  la diff. Trié par minute (toujours plus ancien que le vrai nouveau but, qui
+  vient juste d'être marqué), ce doublon se retrouvait choisi EN PREMIER par
+  `pendingScorers[0]` à la place du vrai 3e but — collant exactement à
+  l'exemple donné (Dembélé 40' réapparaît au lieu de Mbappé/Yamal 70').
+  Corrigé (`pickUnsentGoalScorers`) SANS casser le cas légitime déjà testé le
+  18/10 (un vrai doublé par le même joueur à la même minute affichée, très
+  rare mais réel) : nouveau 3e paramètre optionnel `targetCount` (le nombre
+  RÉEL de buts pour ce camp, déjà disponible côté appelant via le score
+  ESPN/FD.org) — le dédoublonnage par signature ne se déclenche QUE si
+  `goalScorers.length > targetCount` (plus d'entrées ESPN que de buts réels
+  → preuve qu'il y a un doublon en trop, peu importe lequel). Un vrai doublé a
+  exactement autant d'entrées que de buts (`length === targetCount`, jamais
+  déclenché) ; un doublon ESPN en a strictement plus (déclenché, le doublon
+  est filtré par signature avant la diff). Branché aux 2 call-sites partagés
+  (`cf-worker/src/index.js` ET `api/cron-goals.js`, `targetCount` déjà en
+  scope dans les deux — simple ajout d'un 3e argument, aucun autre
+  changement). 2 tests dédiés ajoutés (`liveDetection.test.js`) : un
+  reproduisant explicitement le scénario Dembélé/Mbappé (doublon ESPN en trop
+  → le vrai nouveau but est bien choisi, pas le doublon) et un confirmant que
+  le cas légitime du doublé (`targetCount` correspond exactement, pas de
+  doublon) reste inchangé. 378 tests (+2) + lint (35 erreurs pré-existantes,
+  Pronos.jsx, inchangé) + build + `npx wrangler deploy --dry-run` (411.08 KiB)
+  vérifiés. Honnêteté : comme pour tout `cf-worker/`, aucun accès réseau réel
+  depuis cet environnement pour confirmer qu'ESPN liste RÉELLEMENT parfois un
+  but en double sur un vrai match (le mécanisme `extractEspnScorers`/
+  `comp.details` rend ça plausible et cohérent avec TOUS les éléments du
+  symptôme rapporté par l'utilisateur — score à jour, mais répétition EXACTE
+  nom+minute d'un but déjà envoyé, jamais une coïncidence possible sur la
+  minute) — mais cette fois le raisonnement de l'utilisateur lui-même
+  ("ça peut pas être ça, ça touche la minute ET le nom") a été le bon indice
+  pour écarter l'explication précédente et trouver ce 2e mécanisme, distinct
+  du premier. À déployer manuellement (`npm run deploy` depuis `cf-worker/`,
+  comme toujours pour ce dossier — la partie `api/cron-goals.js`/
+  `src/utils/liveDetection.js` se déploie automatiquement avec le reste de
+  l'app via Vercel, mais n'a d'effet sur les notifs que le Worker continue
+  d'envoyer qu'une fois celui-ci aussi redéployé).
+
+- ✅ QUOTA D'ÉCRITURES TURSO DÉPASSÉ, cause la plus probable trouvée et
+  corrigée (27/10, constat utilisateur : "j'ai dépassé la limite [...]
+  10 648 000 sur 10 000 000 [...] il y a une notif qui fonctionne plus",
+  demande explicite d'une solution qui "tienne à [lui]" plutôt que de
+  compter sur un usage qui reste par chance sous la limite). Point de
+  méthode clé qui change l'analyse de TOUTES les optimisations Turso
+  précédentes de ce fichier (05/10, 10/10, 15/10) : Turso facture par LIGNE
+  RÉELLEMENT ÉCRITE, pas par requête HTTP — fusionner plusieurs écritures en
+  1 seul aller-retour (`execSetBatch`, `sadd`/`srem` variadiques) réduit bien
+  le nombre de sous-requêtes Cloudflare (le vrai sujet de ces 3 fixes-là,
+  tous corrects pour leur propre problème) mais NE RÉDUIT PAS le nombre de
+  lignes écrites, le métrique qui vient d'être dépassé. Root cause la plus
+  plausible trouvée en relisant `cf-worker/src/index.js` avec cette
+  contrainte précise en tête : `stateKey` (`cron:espn:{eventId}`) était
+  écrit SANS AUCUNE CONDITION à CHAQUE passe (1x/minute), pour CHAQUE match
+  tracké (tout match live, mi-temps, ou terminé pas encore confirmé — pas
+  seulement les matchs avec un vrai événement) — alors que `status`/`score`
+  restent identiques l'immense majorité des minutes d'un match (aucun but,
+  aucun changement de statut pendant 45-90min d'affilée). Avec le Worker qui
+  tourne 1x/minute 24h/24 365j/an et, documenté à plusieurs reprises dans ce
+  même fichier, des soirées à 7, 10, 11 puis 15 matchs simultanés sur toute
+  une saison européenne (championnats domestiques + C1/Europa/Conférence +
+  sélections), cette seule écriture répétée pour rien — strictement la même
+  valeur réécrite minute après minute — est la source la plus massive et la
+  plus plausible des lignes écrites, largement devant les écritures
+  PONCTUELLES (but/carton/KO/FT, qui ne surviennent que quelques fois par
+  match). Corrigé (`cf-worker/src/index.js`, juste avant la construction du
+  writePipe par match) : comparaison de `prevState` (déjà lu GRATUITEMENT
+  via le `mget` groupé de toute la passe, une LECTURE — quota Turso 500M
+  lectures/mois gratuit, quasi illimité en pratique) à la nouvelle valeur
+  `${status}|${score}` — `stateKey` n'est désormais réécrit QUE s'il a
+  réellement changé. Sûr à 100% : `prevStatus`/`prevScore` (utilisés juste
+  après pour détecter les transitions KO/but/mi-temps/reprise/FT) restent lus
+  à chaque passe sans aucun changement de logique ; le TTL de 12h sur
+  `stateKey` reste largement suffisant même sans réécriture à chaque minute
+  (aucun match ne dure 12h) ; une valeur non réécrite reste simplement celle
+  du dernier VRAI changement, toujours correcte pour la comparaison de la
+  passe suivante. `koKey`/`finalConfirmKey` (dédup NX, coup d'envoi/1ère
+  confirmation FT) continuent d'être tentés à chaque passe comme avant — déjà
+  optimal de ce côté : une tentative NX refusée (verrou déjà acquis) n'écrit
+  de toute façon AUCUNE ligne (`execSetBatch` utilise `RETURNING key`, qui ne
+  retourne que les lignes RÉELLEMENT modifiées par le UPSERT — un refus de
+  verrou n'apparaît jamais dans ce retour), donc rien à gagner à les gater
+  aussi. Gain de bord supplémentaire : quand un match n'est ni live/final-now
+  ni changé (ex. un match reporté/annulé maintenu brièvement dans la boucle
+  avant la protection `STALE_MATCH_MS`), le pipeline entier n'a plus rien à
+  écrire — `exec()` n'est même plus appelé, 0 ligne ET 0 aller-retour réseau
+  au lieu d'1 ligne pour rien. Un bug trouvé et corrigé EN COURS
+  D'IMPLÉMENTATION (pas en prod, détecté en relisant mon propre changement
+  avant de le considérer fini) : les positions de `koKey`/`finalConfirmKey`
+  dans le pipeline dépendent désormais de `stateChanged` (`[0]` si `stateKey`
+  est omis, `[1]` sinon, voir `koFinalIdx`) — un premier jet laissait
+  `finalFirstSeen` lire l'index `[1]` en dur, ce qui aurait cassé la
+  confirmation FT (2e passe FINAL consécutive) dès la toute première fois où
+  `stateKey` serait omis pour un match déjà FINAL (score/statut inchangés
+  entre 2 passes FINAL, le cas normal) — corrigé avant tests/lint/build (les
+  2 usages, `koAcquired` et `finalFirstSeen`, utilisent maintenant
+  `koFinalIdx`, jamais un index en dur). 378 tests (inchangé, `cf-worker/`
+  n'a pas d'infra de test dédiée — voir son historique) + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build + `npx wrangler deploy
+  --dry-run` (411.36 KiB) vérifiés. Honnêteté : pas de confirmation par un
+  vrai log/dashboard Turso que c'était EXACTEMENT ce mécanisme qui a généré
+  la majorité des 10,6M lignes (aucun accès au dashboard Turso depuis cet
+  environnement) — mais c'est un vrai gaspillage structurel, confirmé par
+  lecture directe du code (une écriture inconditionnelle et identique,
+  répétée chaque minute, pour chaque match tracké, toute l'année), cohérent
+  en ordre de grandeur avec le dépassement constaté. Ce fix ne change AUCUN
+  comportement fonctionnel (mêmes détections, mêmes notifs) — uniquement le
+  nombre de lignes écrites pour un résultat identique, donc sans risque de
+  régression sur les ~37 bugs notifs déjà corrigés dans ce fichier. Si le
+  quota continue d'être dépassé malgré ce fix une fois le mois suivant
+  écoulé, l'étape suivante — qui "dépend de l'utilisateur" comme demandé,
+  contrairement à une optimisation qui dépend du volume de matchs — est le
+  passage à un plan Turso payant (facturé à l'usage au-delà du gratuit,
+  pas un abonnement fixe nécessaire dès le 1er dépassement) : décision que
+  seul l'utilisateur peut prendre (accès à son compte Turso), comme pour le
+  choix équivalent déjà fait côté Upstash le 30/09-01/10. À déployer
+  manuellement (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce
+  dossier — aucun déploiement automatique).
+
+- ✅ Minute du buteur passée du rouge au blanc dans le hero MatchPage/
+  LiveMatchPage (27/10, demande explicite : "les minutes des buts [...] c'est
+  en rouge actuellement [...] en blanc, juste"). Trouvé : `.lmp__heroScorerMin`
+  (`LiveMatchPage.css`), la minute affichée juste à côté du nom de chaque
+  buteur dans le bandeau "buteurs" du hero — partagé par MatchPage ET
+  LiveMatchPage (même fichier CSS, voir CLAUDE.md > Fichiers importants).
+  Distinct de `.lmp__heroMinute` (la minute DU MATCH, tout en haut, au-dessus
+  du score) : celle-là reste rouge, un choix explicite et confirmé une 2e
+  fois le 04/09 ("c'est pas rouge rouge, fais un vrai rouge") — la demande
+  d'aujourd'hui ne vise que la minute À CÔTÉ D'UN BUTEUR, pas celle-ci, donc
+  non touchée. `color: var(--red)` → `rgba(var(--white-rgb), 0.92)` (blanc
+  légèrement adouci, cohérent avec `.lmp__heroScorerItem` juste au-dessus qui
+  utilise déjà `rgba(var(--white-rgb), 0.72)` pour le nom du buteur — même
+  famille de blanc translucide plutôt qu'un blanc pur qui aurait tranché).
+  `.modal__goalMeta` (minute des buteurs dans la modale pré-match et dans
+  `MatchTimeline`, `matchModal.css`) n'a pas été touché : déjà gris
+  (`#94a3b8`), jamais rouge — pas concerné par cette demande. Build + lint
+  (35 erreurs pré-existantes, Pronos.jsx, inchangé) vérifiés (CSS non couvert
+  par les tests vitest). Honnêteté : rendu jamais vu en direct sur un vrai
+  appareil avant ce déploiement (juste lecture du CSS résultant) — à
+  confirmer par l'utilisateur, déploiement automatique via Vercel.
+
+- 🔍 Flash noir au scroll rapide dans Accueil, 6e signalement (27/10, même symptôme qu'avant :
+  "quand je scrolle trop vite vers le haut ou le bas, c'est noir [...] comme si ça chargeait pas
+  le contenu") — vérifié avant d'agir que les 5 fixes du 10/10 (GPU layer sur `.appScroll`, retrait
+  des animations de fond, 2 retraits de `content-visibility`) sont toujours en place dans le code
+  (confirmé via `git log`/lecture directe, aucune régression/réintroduction depuis) — donc soit ces
+  fixes étaient insuffisants, soit un mécanisme encore jamais essayé est en cause. Nouvelle piste,
+  distincte des précédentes : seul `.appScroll` (le CONTENEUR de scroll) était promu sur sa propre
+  couche GPU — jamais les CARDS elles-mêmes (`.poster`). `.poster` a un fond `#0e0e0e` (quasi noir)
+  qui reste visible tant que ses calques de dégradé par-dessus n'ont pas fini de peindre — si le
+  cache de tuiles de `.appScroll` (même promu) ne suffit pas à couvrir un scroll très rapide, le
+  contenu déjà peint d'une card peut quand même être redemandé au système de rendu, exposant ce
+  fond noir le temps de repeindre. Corrigé (`src/accueil.css`, `.poster`) : `transform:
+  translateZ(0)` + `backface-visibility: hidden` — promotion STATIQUE (aucune animation, contr-
+  airement à l'ancienne promotion animée retirée le 10/10 qui coûtait cher sur 20-40+ cards à la
+  fois) — chaque card garde son contenu déjà peint dans sa propre couche compositée stable,
+  indépendante du cache de `.appScroll`. 378 tests + lint (35 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés. Honnêteté totale : ce symptôme a déjà résisté à 5 tentatives
+  précédentes, jamais confirmées sur un vrai appareil depuis cet environnement — ce correctif
+  attaque un angle réellement différent (couche par CARD, jamais essayé jusqu'ici) mais n'est pas
+  une garantie ; si ça persiste malgré ce 6e essai, il faudra sérieusement envisager une vraie
+  virtualisation de la liste (démonter les cards hors écran, pas seulement les geler visuellement)
+  plutôt qu'un 7e réglage de couche de compositing.
+
+- ✅ ROOT CAUSE RÉELLE TROUVÉE ET CORRIGÉE, flash noir au scroll rapide dans Accueil (27/10,
+  8e tentative — retour utilisateur explicite après la 7e, jugée insuffisante : "trouve-moi la
+  meilleure des solutions possibles [...] c'est pas mieux du tout"). Les 7 tentatives précédentes
+  (content-visibility, marges IntersectionObserver, couches GPU sur `.appScroll` puis `.poster`,
+  retrait des animations de fond) corrigeaient toutes un symptôme de PEINTURE/COMPOSITING GPU —
+  jamais confirmé comme la vraie cause, juste la piste la plus documentée pour "ça devient noir au
+  scroll". Root cause réelle trouvée en LISANT le code plutôt qu'en devinant un nouveau réglage CSS
+  : `espnScores` (contexte `LiveProvider`, `useEspnScores.js`) est injecté par `useLiveMinute` via
+  `queryClient.setQueryData` toutes les ~15s — et reconstruit un objet ENTIÈREMENT NEUF à chaque
+  poll (nouvelle référence), même quand AUCUN match n'a de score qui change réellement. Ce
+  changement de référence cascade : `LiveProvider`'s `ctxValue` (useMemo, dépend de `espnScores`) →
+  TOUT consommateur de `useLiveData()` re-render, dont `Accueil.jsx` → `MatchPanel` re-render avec
+  un nouvel objet `espnScores` → comme `MatchPoster`/`MatchCard` n'étaient PAS mémoïsés, les ~30-60
+  cards du jour (live ET non-live, visibles ET hors écran) re-exécutaient INTÉGRALEMENT leur corps
+  de rendu TOUTES LES 15 SECONDES — chacune avec 5+ hooks (`useTeamForm`, `useH2HHistory`,
+  `useLowerDivisionStats`, `useEspnPregameOdds`, `useH2HRows`). C'est du vrai travail JS SYNCHRONE
+  sur le thread principal qui bloque la peinture — pas un problème de tile-cache GPU — ce qui
+  explique pourquoi 7 ajustements de compositing n'avaient rien changé : ils traitaient tous un
+  symptôme de peinture pour une cause qui n'en était pas une. Quand ce re-render de masse tombe
+  pile pendant un scroll rapide, le thread principal est occupé à re-calculer 30-60 composants
+  complexes au lieu de répondre au scroll → flash noir, rattrapage 1-2s après (le temps que React
+  finisse et que le navigateur peigne enfin la frame).
+  Corrigé (4 fichiers) :
+  - `src/utils/matchUtils.js` : nouveau helper exporté `sameJSON(a, b)` (comparaison par VALEUR via
+    `JSON.stringify`, pas par référence) — choisi plutôt qu'un comparateur champ par champ fait à
+    la main pour être correct PAR CONSTRUCTION (ne peut jamais manquer une vraie différence,
+    contrairement à un comparateur partiel qui oublierait un champ — ce projet a déjà eu ce genre
+    de bug, voir le bug formMap fusionné du 12/09 ou le bug buteur par position du 18/10).
+  - `src/accueil/MatchPoster.jsx` : `MatchPoster` enveloppé dans `React.memo` avec un comparateur
+    (`samePosterProps`) qui compare `match`/`espnScore` PAR VALEUR (`sameJSON`, ce sont les 2 props
+    dont la référence change le plus souvent en amont même à contenu identique) et `live`/
+    `onMatchClick`/`onLiveClick`/`formMap`/`compMatches` PAR RÉFÉRENCE (déjà stables une fois le
+    point suivant appliqué). Le prop `onClick` pré-construit est remplacé par `live`+
+    `onMatchClick`+`onLiveClick` (2 callbacks stables + 1 primitif) — le clic est désormais calculé
+    À L'INTÉRIEUR du composant déjà mémoïsé plutôt que reçu en prop, pour ne jamais avoir besoin de
+    stabiliser une closure construite par le parent.
+  - `src/accueil/MatchCard.jsx` : `MatchCard` enveloppé dans `React.memo` (même principe,
+    `sameMatchCardProps`) ; `MatchPanel` ne construit plus de `clickHandler` par item pour la liste
+    mobile (passe `live`/`onMatchClick`/`onLiveClick` directement à `MatchPoster`) — la liste
+    desktop garde son handler construit sur le DIV WRAPPER (pas changé : il n'est jamais passé EN
+    PROP à `MatchCard`, donc sa recréation à chaque render ne casse aucune mémoïsation).
+  - `src/components/Accueil.jsx` : `onMatchClick`/`onLiveClick` passés à `MatchPanel` sont
+    désormais des `useCallback` (dépendance unique `navigate`, garanti stable par react-router) —
+    sans ça, la mémoïsation de `MatchPoster` n'aurait servi à rien (une prop qui change de
+    référence à chaque render invalide n'importe quel comparateur).
+  Effet attendu : une card dont le score/les stats ESPN n'ont pas réellement bougé ce poll-ci ne
+  re-render plus du tout (son corps de rendu, ses 5+ hooks, ne se ré-exécutent plus) — seules les
+  quelques cards RÉELLEMENT live avec une vraie donnée changée continuent de re-render toutes les
+  15s, au lieu des 30-60 cards du jour. Réduit directement la probabilité qu'un gros re-render de
+  masse tombe pile pendant un geste de scroll rapide.
+  Piège rencontré en cours de route : une 1re version utilisait un cache de handlers construit via
+  `useRef` mutée PENDANT le rendu (lecture/écriture de `.current` dans le corps du composant,
+  hors effet) — violait la règle ESLint `react-hooks/refs` (11 nouvelles erreurs détectées,
+  46 au lieu des 35 pré-existantes). Corrigé en éliminant complètement ce cache : calculer le
+  handler de clic À L'INTÉRIEUR du composant mémoïsé (voir ci-dessus) rend le cache inutile — plus
+  simple ET conforme aux règles du projet. 378 tests + lint (35 erreurs pré-existantes, Pronos.jsx,
+  confirmées identiques via comparaison du nombre total avant/après) + build vérifiés.
+  Honnêteté : contrairement aux 7 tentatives précédentes (toutes des réglages CSS/compositing
+  jamais confirmés par lecture de code), celle-ci est appuyée sur une chaîne causale concrète et
+  vérifiée en lisant le code source à chaque étape (`useEspnScores.js` → `LiveProvider.jsx` →
+  `Accueil.jsx` → `MatchPanel` → absence de `React.memo`) — pas une hypothèse de plus. Ça reste
+  néanmoins un changement de performance (réduction de travail de rendu), pas une garantie absolue
+  que le flash noir ne peut plus jamais survenir pour une autre raison : si de nouvelles cards
+  visibles pour la première fois après un scroll très rapide nécessitent malgré tout un premier
+  rendu complet (mount initial, inévitable), un pic ponctuel reste possible dans ce cas précis —
+  mais le travail de fond répété toutes les 15s, lui, qui touchait TOUTES les cards en permanence,
+  est éliminé. Aucun accès à un vrai iPhone/PWA depuis cet environnement pour confirmer en
+  conditions réelles — à valider par l'utilisateur après ce déploiement (automatique via Vercel).
+
+- ✅ Flash noir au scroll rapide, EMPIRE après le 6e fix : layer GPU par card retiré + VRAIE
+  virtualisation du poster-list (27/10, même jour, retour utilisateur explicite et sans détour
+  après test réel : "pas mieux du tout [...] écran tout noir pendant quelques secondes" — pire que
+  tous les signalements précédents, qui décrivaient un flash bref ou une carte partiellement
+  rendue, pas l'écran ENTIER noir plusieurs secondes de suite). 2 actions distinctes :
+  1. **Retrait du 6e fix lui-même** (`src/accueil.css`, `.poster`) : la promotion GPU statique
+     posée plus tôt le même jour (`transform: translateZ(0)` + `backface-visibility: hidden` sur
+     CHAQUE `.poster`) a été appliquée à TOUTES les cards du jour — jusqu'à 60+ certains soirs à
+     plusieurs compétitions (documenté ailleurs dans ce fichier : 7, 11, 15 matchs simultanés déjà
+     vus cette saison). Empiler des dizaines de couches compositées INDIVIDUELLES est un vrai bug
+     documenté de WebKit/iOS Safari ("layer explosion") : au-delà d'un certain nombre, le
+     compositeur épuise son budget mémoire de textures et doit tout réorganiser — ce qui se
+     traduit justement par un écran qui devient noir le temps qu'il rattrape, PIRE que l'ancien
+     comportement (une seule couche partagée sur `.appScroll`). Cohérent avec le fait que ce soit
+     exactement CE fix-ci, posé juste avant que le symptôme ne s'aggrave, et avec le retour
+     immédiat de l'utilisateur après l'avoir testé ("pas mieux du tout"). Retiré entièrement —
+     plus aucune promotion GPU par card, seule celle de `.appScroll` (3e tentative du 10/10) reste
+     en place.
+  2. **Vraie virtualisation du poster-list mobile** (`src/accueil/MatchCard.jsx`) — le vrai
+     correctif structurel, jamais tenté jusqu'ici malgré 8 tentatives sur ce bug : la liste
+     Accueil n'a JAMAIS limité le nombre de cards réellement montées — TOUTES les cards du jour
+     sont dans le DOM en même temps, qu'elles soient visibles ou non. Le fix mémoïsation
+     (tentative précédente, même jour) réduit le RE-render d'une card déjà affichée mais ne change
+     rien au coût du tout PREMIER rendu de chacune — avec 30-60 cards montées d'un coup au
+     chargement de la page, ce coût cumulé (DOM, styles, et jusqu'ici une couche GPU chacune)
+     reste entier. Nouveau mécanisme : chaque card démarre "froide" — un simple placeholder
+     skeleton (`PosterPlaceholder`, réutilise exactement le markup déjà existant de
+     `PosterSkeleton`, même hauteur/habillage, donc aucun saut de mise en page) — et ne devient
+     "chaude" (le vrai `MatchPoster`, avec tous ses hooks de données/images/dégradés) qu'une fois
+     réellement proche du viewport, via un `IntersectionObserver` (`useWarmOnIntersect`, root =
+     `.appScroll`, marge ~700px de chaque côté — une card se réchauffe donc largement avant d'être
+     visible, pas juste au moment où elle apparaît). Point de conception déterminant : le switch
+     est à SENS UNIQUE — une fois chaude, une carte ne redevient JAMAIS froide. Choisi précisément
+     pour éviter la cause d'échec de la tentative du 10/10 (une classe `--warm` réversible pilotée
+     par IntersectionObserver, qui désynchronisait avec l'heuristique native de
+     `content-visibility:auto` sur un changement de sens de scroll rapide, retiré ce jour-là) : en
+     ne revenant jamais en arrière, ce risque de flicker/désync n'existe structurellement plus —
+     remonter dans la liste ne coûte plus rien non plus, puisque les cards déjà vues restent
+     rendues. Effet attendu : au lieu de 30-60 cards complètes montées au premier chargement, seule
+     une poignée (celles visibles + la marge de ~700px) le sont réellement — le reste n'existe
+     dans le DOM que comme un petit placeholder gris, sans hooks de données ni images ni dégradés.
+     Desktop (`MatchCard`, liste `.accueil__matchCards`) volontairement NON touché : le bug n'a
+     jamais été signalé sur cette liste, et ses cards n'avaient de toute façon jamais reçu la
+     promotion GPU individuelle retirée au point 1 — seul le poster-list mobile, là où le problème
+     est systématiquement rapporté, est concerné par ce changement.
+  378 tests + lint (35 erreurs pré-existantes, Pronos.jsx, confirmées identiques) + build vérifiés.
+  Honnêteté : comme pour chaque tentative précédente sur ce bug, aucun accès à un vrai iPhone/PWA
+  depuis cet environnement pour confirmer en conditions réelles avant ce déploiement — mais cette
+  fois, 2 changements distincts et complémentaires s'attaquent chacun à une cause plausible et
+  concrète (empilement de couches GPU confirmé comme un vrai bug WebKit documenté ; liste jamais
+  virtualisée confirmée par lecture directe du code), pas un réglage CSS de plus au hasard. Si le
+  symptôme persiste malgré ces 2 changements cumulés, la prochaine piste serait d'obtenir une
+  vidéo/capture de l'écran noir au moment exact où il survient plutôt qu'une 10e théorie — comme
+  ça avait permis de percer définitivement le bug de la barre du bas en septembre.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

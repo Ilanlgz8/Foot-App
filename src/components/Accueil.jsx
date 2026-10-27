@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
@@ -367,6 +367,23 @@ function Accueil() {
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
   const navigate = useNavigate()
+
+  // ⚠️ `useCallback` (27/10) : indispensable pour que la mémoïsation de
+  // MatchPoster/MatchCard (voir MatchCard.jsx, `samePosterProps`/
+  // `sameMatchCardProps`) serve à quelque chose — sans ça, ces 2 handlers
+  // seraient reconstruits (nouvelle closure) à chaque render d'Accueil.jsx
+  // et `useStableClickHandlers` (MatchCard.jsx) les verrait comme "changés"
+  // à chaque fois, invalidant son propre cache. `navigate` (react-router)
+  // est garanti stable entre renders, donc ce tableau de deps ne change
+  // jamais en pratique — ces 2 callbacks sont donc, de fait, permanents.
+  const handlePanelMatchClick = useCallback(
+    m => navigate(`/match/${m.id}`, { state: { match: m } }),
+    [navigate]
+  )
+  const handlePanelLiveClick = useCallback(
+    m => navigate(`/live/${m.id}`),
+    [navigate]
+  )
 
   // ── Bandeau "Mon équipe" ──
   // Cherche un match d'une équipe favorite UNIQUEMENT parmi les données déjà
@@ -926,8 +943,8 @@ function Accueil() {
               matches={matchPanelMatches}
               loading={matchesLoading}
               espnScores={espnScores}
-              onMatchClick={m => navigate(`/match/${m.id}`, { state: { match: m } })}
-              onLiveClick={m => navigate(`/live/${m.id}`)}
+              onMatchClick={handlePanelMatchClick}
+              onLiveClick={handlePanelLiveClick}
               formMapByComp={formMapByComp}
               matchesByComp={matchesByComp}
             />

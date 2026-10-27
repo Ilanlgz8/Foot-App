@@ -141,6 +141,24 @@ describe('calcMinute', () => {
     expect(calcMinute(match)).toBe('Débute')
   })
 
+  it('n\'affiche PLUS "Débute" dès qu\'un but FD.org prouve que le match est déjà en cours (18/10, capture d\'écran : score "1-0"/"3-0" mais statut figé sur "Débute")', () => {
+    // utcDate il y a 10min (system time 19:00, dans la fenêtre de grâce de 30min)
+    // — sans but, "Débute" reste l'affichage correct (cas normal, cf. test ci-dessus).
+    const noGoalYet = baseMatch({ status: 'IN_PLAY', utcDate: '2026-07-03T18:50:00.000Z' })
+    expect(calcMinute(noGoalYet)).toBe('Débute')
+
+    // Même match, mais FD.org montre déjà un but marqué → preuve certaine que le
+    // match est en cours, quel que soit l'état d'ESPN. On ne doit plus afficher
+    // "Débute" (incohérent avec un score déjà non-nul) — l'heuristique utcDate
+    // prend le relais et donne une minute crédible (10' écoulées).
+    const withGoal = baseMatch({
+      status: 'IN_PLAY',
+      utcDate: '2026-07-03T18:50:00.000Z',
+      score: { fullTime: { home: 1, away: 0 } },
+    })
+    expect(calcMinute(withGoal)).toBe('10\'')
+  })
+
   it('interpole la minute en temps réglementaire depuis le dernier poll ESPN (bootstrap, half2Start pas encore ancré)', () => {
     setEspnData(MID, { espnClock: '42:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 2 })
     vi.advanceTimersByTime(90_000) // +1min30 depuis le poll

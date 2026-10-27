@@ -1585,6 +1585,22 @@
   display: flex;
   flex-direction: column;
   background: #0e0e0e;
+  /* ⚠️ RETIRÉ (27/10, même jour — le 6e fix juste au-dessus avait promu
+     CHAQUE `.poster` sur sa propre couche GPU statique, dans l'idée que ça
+     protégerait son contenu déjà peint. Testé en direct par l'utilisateur :
+     "pas mieux du tout", et le signalement suivant décrit un symptôme PIRE
+     (écran ENTIER noir pendant plusieurs secondes, pas juste une carte).
+     Cause la plus probable, jamais envisagée jusqu'ici : empiler 20 à 60+
+     couches compositées INDIVIDUELLES sur un even mobile (chaque `.poster`
+     affiché aujourd'hui en reçoit une) épuise le budget mémoire du
+     compositeur WebKit — un vrai bug documenté sur iOS Safari ("layer
+     explosion"), qui se traduit justement par un écran qui devient noir
+     pendant que le compositeur réorganise/rastérise tout, pire qu'avant
+     cette promotion. Retiré : plus aucune promotion GPU par card — voir
+     plus bas dans ce fichier pour le vrai correctif structurel (une
+     virtualisation réelle du poster-list, qui réduit le nombre de cards
+     RÉELLEMENT montées/peintes à la fois, donc aussi le nombre de couches
+     potentielles, au lieu d'essayer de rendre chaque couche plus robuste). */
 }
 
 /* Fond de base */

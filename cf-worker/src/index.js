@@ -54,6 +54,7 @@ import {
   fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin,
+  pickUnsentGoalScorers, goalSignature,
 } from '../../src/utils/liveDetection.js'
 
 // EXTRA_NOTIFY_SLUGS (coupes nationales + NL/CAN/COPA, voir espnSlugs.js) :
@@ -470,6 +471,20 @@ async function acquireDedup(kv, dedupKey, ttl) {
 // désormais `true`/`false` : chaque appelant peut alors choisir de NE PAS
 // faire avancer son propre état tant que l'envoi n'est pas confirmé.
 async function sendToVercel(env, payload, slug, options = {}, log = null, attempt = 1) {
+  // ⚠️ AJOUT (15/10, voir `isRecoveryPass`/`cron:heartbeat` dans runOnePass) :
+  // un seul point de contrôle pour TOUTE notif (KO/but/carton/mi-temps/
+  // reprise/fin — ils passent tous par cette fonction, directement ou via
+  // notifyVercel). En passe de rattrapage, la notif est abandonnée plutôt
+  // qu'envoyée en retard — demande explicite utilisateur ("si elle passe
+  // pas, elle passe pas"), après une rafale de 72 notifications d'un coup
+  // au redémarrage du Worker. Renvoie `true` (comme un envoi réussi) SANS
+  // appeler Vercel : chaque appelant avance alors son état exactement comme
+  // si la notif était partie — jamais retentée plus tard non plus (la clé de
+  // dédup, elle, a déjà été posée par acquireDedup avant cet appel).
+  if (env._isRecoveryPass) {
+    log?.push(`[notify→vercel] passe de rattrapage — notif abandonnée (pas envoyée en retard)`)
+    return true
+  }
   try {
     // Secret passé en HEADER (pas en query string) : une URL avec ?secret=
     // finit dans les logs d'accès Vercel/Cloudflare en clair — le header ne
@@ -1074,11 +1089,51 @@ async function runOnePass(env) {
   // PENDANT cette passe (1ère fois) n'est pas concerné, traité normalement
   // comme avant.
   let alreadyDoneIds = new Set()
+  // ⚠️ AJOUT (15/10, demande explicite utilisateur après le fix sadd/srem
+  // groupé du même jour : "si une notif part pas à temps, ne la laisse pas
+  // en attente — si elle a plus de 5min de retard, on l'enlève, on l'envoie
+  // pas" — suite à un redémarrage du Worker ayant provoqué une rafale de 72
+  // notifications d'un coup, le temps de rattraper tout ce qui s'était
+  // accumulé pendant que le Worker était arrêté/bloqué). `cron:heartbeat`
+  // mémorise l'instant de la DERNIÈRE passe qui avait vraiment des matchs à
+  // traiter (`allEvents.length > 0`, donc jamais pendant les vraies journées
+  // sans le moindre match — cette lecture/écriture ne coûte donc rien
+  // pendant les périodes creuses, un sujet déjà sensible sur ce fichier, voir
+  // les incidents de quota Upstash/Turso documentés dans CLAUDE.md). Si
+  // l'écart depuis cette dernière vraie vérification dépasse 5min, c'est le
+  // signe que le Worker vient de reprendre après un arrêt/blocage prolongé
+  // (déploiement, panne Cloudflare, ou tout autre incident) plutôt qu'un
+  // cycle normal (60s) — tout ce qui sera détecté dans CETTE passe précise
+  // décrit forcément des évènements déjà vieux d'au moins 5min. `env.
+  // _isRecoveryPass` est alors posé pour toute la durée de cette exécution —
+  // lu par `sendToVercel` (voir son commentaire), qui abandonne alors
+  // CHAQUE notif individuelle (KO/but/carton/mi-temps/reprise/fin) au lieu de
+  // l'envoyer en retard, tout en laissant le suivi interne (track[side]/
+  // cardTrack/cron:liveIds/dédup) avancer normalement — ces évènements ne
+  // sont donc jamais retentés plus tard non plus, conformément à la demande
+  // ("si elle passe pas, elle passe pas"). Lu dans le MÊME mget que
+  // `finalDone:*` (1 clé de plus, toujours 1 seule sous-requête) ; écrit une
+  // seule fois par passe, UNIQUEMENT quand il y a vraiment des matchs à
+  // traiter — pas de coût ajouté les jours sans aucun match.
+  const HEARTBEAT_KEY = 'cron:heartbeat'
+  const RECOVERY_GAP_MS = 5 * 60 * 1000
+  let isRecoveryPass = false
   if (allEvents.length > 0) {
     try {
-      const doneFlags = await kv.mget(...allEvents.map(({ evt }) => `finalDone:${evt.id}`))
-      allEvents.forEach(({ evt }, i) => { if (doneFlags[i]) alreadyDoneIds.add(evt.id) })
+      const keys = [...allEvents.map(({ evt }) => `finalDone:${evt.id}`), HEARTBEAT_KEY]
+      const flags = await kv.mget(...keys)
+      allEvents.forEach(({ evt }, i) => { if (flags[i]) alreadyDoneIds.add(evt.id) })
+      const prevHeartbeat = flags[flags.length - 1]
+      if (prevHeartbeat) {
+        const gapMs = now.getTime() - Number(prevHeartbeat)
+        if (Number.isFinite(gapMs) && gapMs > RECOVERY_GAP_MS) isRecoveryPass = true
+      }
     } catch {}
+    try { await kv.set(HEARTBEAT_KEY, now.getTime(), { ex: 24 * 3600 }) } catch {}
+  }
+  env._isRecoveryPass = isRecoveryPass
+  if (isRecoveryPass) {
+    log.push(`[cron] passe de rattrapage (>${RECOVERY_GAP_MS / 60000}min depuis la dernière vérification) — notifs individuelles abandonnées pour cette passe, pas envoyées en retard`)
   }
 
   // Voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — compteur de matchs live
@@ -1129,6 +1184,43 @@ async function runOnePass(env) {
   // faire croire que "rien ne bouge aujourd'hui" et bloquer la découverte
   // d'un match réellement en cours ailleurs.
   const staleIds = new Set()
+
+  // ⚠️ BUG CRITIQUE TROUVÉ ET CORRIGÉ (15/10, constat utilisateur : "tout se
+  // passait bien dans les 20 premières minutes [...] et juste après, plus
+  // rien" sur Europa League/Ligue Conférence — "j'ai eu 15 matchs en même
+  // temps"). Confirmé par un vrai /api/debug-push : silence TOTAL de plus de
+  // 2h sur 10 matchs de Ligue Conférence après leurs KO, sans la MOINDRE
+  // ligne de log (pas même une erreur) — alors que presque tous les chemins
+  // d'échec connus loggent désormais explicitement leur erreur (voir les
+  // bugs précédents de cette série). Un silence aussi total pointe vers
+  // quelque chose qu'AUCUN try/catch de ce fichier ne peut intercepter : le
+  // plafond Cloudflare Workers (plan gratuit, 50 sous-requêtes/exécution,
+  // voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut) — Cloudflare tue
+  // l'exécution NET en cas de dépassement, sans lever d'exception JS
+  // récupérable. Root cause trouvée par lecture directe du code : le
+  // `kv.sadd`/`kv.srem` sur `cron:liveIds` (voir plus bas, juste après le
+  // calcul de `stayTrackedAsLive`) était appelé UNE FOIS PAR MATCH, 1 sous-
+  // requête chacun — EN PLUS du writePipe déjà fusionné par match (1 sous-
+  // requête). Avec 15 matchs live, le seul bookkeeping "rien de spécial ce
+  // match cette minute" coûtait déjà ~30 sous-requêtes (15×2) sur les 50
+  // disponibles — ne laissant qu'une marge dérisoire avant que quelques
+  // buts/cartons dans la même passe (chacun +2-3 sous-requêtes via
+  // notifyVercel) ne fassent dépasser le plafond, tuant l'exécution pour TOUS
+  // les matchs pas encore traités cette passe-ci — et comme ce blocage se
+  // reproduit à l'IDENTIQUE tant que ~15 matchs restent en direct (le même
+  // bookkeeping coûte la même chose chaque minute), le symptôme reste
+  // "permanent" tout le reste de la soirée plutôt qu'un raté isolé —
+  // collant exactement à "20 min puis plus rien du tout".
+  // Corrigé (ici + tursoKv.js, dont `sadd`/`srem` acceptent maintenant
+  // plusieurs membres en un seul appel) : au lieu d'écrire `cron:liveIds`
+  // immédiatement par match, chaque itération de la boucle principale note
+  // juste sa décision (ajouter ou retirer) dans ces 2 Sets locaux — AUCUNE
+  // sous-requête ici, une simple opération mémoire — puis UN SEUL sadd +
+  // UN SEUL srem regroupent TOUTE la passe en 1-2 sous-requêtes au lieu de
+  // jusqu'à 2×N. Pour 15 matchs : ~30 sous-requêtes → 1-2, libérant presque
+  // tout le budget pour les vrais événements (buts/cartons) de la passe.
+  const liveIdsToAdd = new Set()
+  const liveIdsToRemove = new Set()
 
   // ⚠️ AJOUT (10/10, incident 11 matchs simultanés — constat utilisateur :
   // "j'ai reçu aucune notif sur les buts [...] je les reçois soit après le
@@ -1441,20 +1533,70 @@ async function runOnePass(env) {
     // connaissait alreadyDone qu'APRÈS avoir déjà tout exécuté).
     if (alreadyDone) continue
 
+    // ⚠️ OPTIMISATION ÉCRITURES TURSO (27/10, constat utilisateur : "j'ai
+    // dépassé la limite [...] 10 648 000 sur 10 000 000" — quota mensuel
+    // d'ÉCRITURES Turso dépassé, au moins une notif déjà cassée en
+    // conséquence). Root cause la plus probable trouvée en relisant ce
+    // fichier avec cette contrainte précise en tête (Turso facture par LIGNE
+    // ÉCRITE, pas par requête — contrairement à Upstash/Redis, voir
+    // tursoKv.js : fusionner des requêtes, comme fait le 05/10/15/10, réduit
+    // le nombre d'allers-retours mais PAS le nombre de lignes réellement
+    // modifiées) : `stateKey` était écrit SANS CONDITION à CHAQUE passe, pour
+    // CHAQUE match tracké (tout match pas encore SCHEDULED/alreadyDone — live,
+    // mi-temps, terminé pas encore confirmé...) — alors que `status`/`score`
+    // restent identiques l'immense majorité des minutes d'un match (aucun but,
+    // aucun changement de statut). Avec le Worker qui tourne 1x/minute 24/7/
+    // 365 et plusieurs matchs trackés en moyenne plusieurs heures/jour sur
+    // toute une saison (documenté à plusieurs reprises dans ce fichier :
+    // soirées à 7, 10, 11, 15 matchs simultanés), cette seule écriture
+    // répétée pour rien est la source la plus plausible et la plus massive de
+    // lignes écrites — bien plus que les écritures PONCTUELLES (but/carton/
+    // KO/FT, qui ne surviennent que quelques fois par match). Corrigé : on
+    // compare `prevState` (déjà lu gratuitement via le mget groupé de toute
+    // la passe, voir `batchedReads` — une LECTURE, quasiment illimitée côté
+    // quota Turso) à la nouvelle valeur — `stateKey` n'est réécrit QUE si elle
+    // a réellement changé. Sûr : `prevStatus`/`prevScore` (utilisés juste en
+    // dessous pour détecter les transitions) restent lus à chaque passe sans
+    // aucun changement ; le TTL de 12h sur `stateKey` reste largement
+    // suffisant même sans réécriture à chaque minute (aucun match ne dure
+    // 12h), et une valeur non réécrite reste simplement celle du dernier VRAI
+    // changement, toujours correcte. koKey/finalConfirmKey (dédup NX)
+    // continuent d'être tentés à chaque passe comme avant — une tentative NX
+    // refusée (verrou déjà acquis) n'écrit de toute façon aucune ligne (voir
+    // `execSetBatch`, `RETURNING key` ne retourne que les lignes RÉELLEMENT
+    // modifiées), donc rien à optimiser de ce côté. Honnêteté : pas de
+    // confirmation par log réel que c'était EXACTEMENT la cause des 10,6M
+    // lignes constatées (aucun accès au dashboard Turso depuis cet
+    // environnement) — mais c'est un vrai gaspillage structurel, confirmé par
+    // lecture directe du code (une écriture inconditionnelle, identique,
+    // répétée chaque minute), cohérent avec l'ordre de grandeur du dépassement
+    // (le Worker tourne en continu, toute l'année, sur toutes les
+    // compétitions suivies) — et qui ne change RIEN au comportement
+    // fonctionnel (même détection, mêmes notifs), uniquement le nombre de
+    // lignes écrites pour un résultat identique.
+    const newStateValue = `${status}|${score}`
+    const stateChanged  = prevState !== newStateValue
     let writePipe = kv.pipeline()
-      .set(stateKey, `${status}|${score}`, { ex: 12 * 3600 })  // [0] (résultat inutilisé)
-    // [1] optionnel : dédup coup d'envoi (si live) OU 1ère acquisition de
-    // finalConfirmKey (si terminé) — isLive et isFinalNow sont mutuellement
-    // exclusifs (aucun statut n'appartient aux 2 ensembles à la fois),
-    // jamais les deux en même temps dans le même pipeline.
+    if (stateChanged) writePipe = writePipe.set(stateKey, newStateValue, { ex: 12 * 3600 })
+    // Position de koKey/finalConfirmKey dans le pipeline : [1] si stateKey a
+    // été inclus juste au-dessus, [0] sinon — calculé une seule fois ici pour
+    // que pickWrite() pointe toujours au bon endroit plus bas.
+    const koFinalIdx = stateChanged ? 1 : 0
+    // isLive et isFinalNow sont mutuellement exclusifs (aucun statut
+    // n'appartient aux 2 ensembles à la fois), jamais les deux en même temps
+    // dans le même pipeline.
     if (isLive) writePipe = writePipe.set(koKey, '1', { ex: 6 * 3600, nx: true })
     else if (isFinalNow) writePipe = writePipe.set(finalConfirmKey, '1', { ex: 300, nx: true })
 
     let writeResults = []
-    try {
-      writeResults = await writePipe.exec({ keepErrors: true })
-    } catch (e) {
-      log.push(`[espn:${slug}:${eventId}] pipeline error=${e.message}`)
+    // Rien à écrire du tout (match ni live/final-now, ni changé) : on
+    // n'appelle même pas exec() — 0 ligne, 0 aller-retour.
+    if (stateChanged || isLive || isFinalNow) {
+      try {
+        writeResults = await writePipe.exec({ keepErrors: true })
+      } catch (e) {
+        log.push(`[espn:${slug}:${eventId}] pipeline error=${e.message}`)
+      }
     }
     // ⚠️ AJOUT (01/10, suite du bug "lockAcquired toujours faux" — voir
     // tursoKv.js) : `pickWrite` traitait jusqu'ici une erreur par-opération
@@ -1470,16 +1612,16 @@ async function runOnePass(env) {
     })
     const pickWrite = (i) => (writeResults[i] && !writeResults[i].error) ? writeResults[i].result : null
 
-    // ⚠️ Index décalé de [2]→[1] (10/10) : `lockKey`/`goalLock` retiré du
-    // writePipe (voir le commentaire détaillé juste au-dessus de sa
-    // construction) — koKey/finalConfirmKey occupe maintenant la position [1].
-    const koAcquired     = isLive ? pickWrite(1) : false
+    // ⚠️ Index [1] ou [0] selon stateChanged (27/10, voir koFinalIdx
+    // ci-dessus) — avant, toujours [1] (10/10 : `lockKey`/`goalLock` retiré du
+    // writePipe, koKey/finalConfirmKey occupait alors systématiquement [1]).
+    const koAcquired     = isLive ? pickWrite(koFinalIdx) : false
     const recapAlready   = (!isLive && isFinalNow) ? recapRaw : null
     // true = c'est la 1ère fois qu'on voit ce match FINAL (clé tout juste
     // créée) → PAS encore confirmé. false/null = la clé existait déjà → au
     // moins une passe FINAL précédente → confirmation possible (sous réserve
     // du score inchangé, voir isFinalConfirmed plus bas).
-    const finalFirstSeen = isFinalNow ? pickWrite(1) : null
+    const finalFirstSeen = isFinalNow ? pickWrite(koFinalIdx) : null
 
     const [prevStatus = null, prevScore = null] = prevState ? prevState.split('|') : []
     // Confirmé seulement à la 2e passe FINAL consécutive (ou plus), avec un
@@ -1496,11 +1638,15 @@ async function runOnePass(env) {
     // effectivement un faux FINAL.
     const stayTrackedAsLive = isLive || (isFinalNow && !isFinalConfirmed)
     if (stayTrackedAsLive) hotSlugsThisPass.add(slug)
-    try {
-      if (stayTrackedAsLive) await kv.sadd('cron:liveIds', String(eventId))
-      else await kv.srem('cron:liveIds', String(eventId))
-    } catch (e) {
-      log.push(`[cron:liveIds:${eventId}] error=${e.message}`)
+    // ⚠️ MODIFIÉ (15/10, voir liveIdsToAdd/liveIdsToRemove en tête de
+    // fonction) : écriture immédiate remplacée par une simple note en
+    // mémoire — 0 sous-requête ici, le vrai sadd/srem groupé pour TOUTE la
+    // passe se fait APRÈS la boucle principale.
+    if (stayTrackedAsLive) {
+      liveIdsToRemove.delete(String(eventId))
+      liveIdsToAdd.add(String(eventId))
+    } else {
+      liveIdsToRemove.add(String(eventId))
     }
 
     // 🔴 Coup d'envoi — dédup déjà tenté ci-dessus (pipeline) : on n'envoie
@@ -1619,6 +1765,14 @@ async function runOnePass(env) {
           for (let i = newCount; i < prevCount; i++) {
             try { await kv.del(`push:espn:goal:${eventId}:${side}:${i + 1}`) } catch {}
           }
+          // Les signatures "déjà envoyées" (voir pickUnsentGoalScorers
+          // ci-dessous) doivent rester cohérentes avec le compteur track[side]
+          // qu'on vient de réduire — sinon un but réel qui remplace celui
+          // annulé pourrait être vu à tort comme "déjà notifié".
+          const sentKeyCancel = `${side}Sent`
+          if (Array.isArray(track[sentKeyCancel])) {
+            track[sentKeyCancel] = track[sentKeyCancel].slice(0, newCount)
+          }
           track[side] = newCount
           trackChanged = true
         }
@@ -1631,9 +1785,19 @@ async function runOnePass(env) {
             .filter(g => g.team === side)
             .sort((a, b) => parseMin(a.minute) - parseMin(b.minute))
 
+          // ⚠️ Appariement par SIGNATURE (nom+minute), pas par position — voir
+          // le commentaire de pickUnsentGoalScorers dans liveDetection.js
+          // (bug trouvé le 18/10 : un but déjà notifié pouvait se faire voler
+          // sa position par un réordonnancement ESPN entre 2 polls, décalant
+          // tous les buts suivants vers le mauvais buteur).
+          const sentKey = `${side}Sent`
+          const sentSigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
+          const pendingScorers = pickUnsentGoalScorers(goalScorers, sentSigs, targetCount)
+          let pendingIdx = 0
+
           while (track[side] < targetCount) {
             const goalIndex = track[side]
-            const scorer     = goalScorers[goalIndex] ?? null
+            const scorer     = pendingScorers[pendingIdx] ?? null
             const scorerSuffix = scorer ? (scorer.ownGoal ? ', csc' : scorer.penaltyKick ? ', pen' : '') : ''
             const minuteText   = scorer ? minuteLabel(scorer.minute) : ''
             const goalTitle    = `⚽ But pour ${scoringTeam} !`
@@ -1679,6 +1843,16 @@ async function runOnePass(env) {
               break
             }
             track[side]++
+            // Mémorise la signature (nom+minute) du but qu'on vient de
+            // notifier — c'est elle, pas la position, qui empêchera de le
+            // reprendre à tort pour "nouveau" si ESPN réordonne sa liste au
+            // prochain poll (voir pickUnsentGoalScorers).
+            if (scorer) {
+              const sigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
+              sigs.push(goalSignature(scorer))
+              track[sentKey] = sigs.slice(-30)
+            }
+            pendingIdx++
             trackChanged = true
           }
         }
@@ -1791,7 +1965,12 @@ async function runOnePass(env) {
         // fichier) avant de retenter — exactement le symptôme remonté par
         // l'utilisateur ("notifs reçues d'un coup ~10min plus tard").
         log.push(`[espn:${slug}:${eventId}] échec envoi FT — match gardé "en direct", retenté au prochain passage`)
-        try { await kv.sadd('cron:liveIds', String(eventId)) } catch {}
+        // ⚠️ MODIFIÉ (15/10, même fix que ci-dessus) : annule la décision
+        // "retirer" déjà notée plus haut dans cette même itération, remplacée
+        // par "ajouter" — toujours 0 sous-requête ici, réglé au moment du
+        // sadd/srem groupé après la boucle.
+        liveIdsToRemove.delete(String(eventId))
+        liveIdsToAdd.add(String(eventId))
       }
     } else if (isFinalNow) {
       log.push(`[espn:${slug}:${eventId}] FT potentiel (1ère passe, pas encore confirmé)`)
@@ -1859,6 +2038,22 @@ async function runOnePass(env) {
    } catch (e) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
    }
+  }
+
+  // ⚠️ AJOUT (15/10, voir liveIdsToAdd/liveIdsToRemove en tête de fonction) :
+  // UN SEUL sadd + UN SEUL srem pour TOUTE la passe, au lieu de jusqu'à 2×N
+  // (un par match) — le vrai correctif du silence total observé avec 15
+  // matchs simultanés. `liveIdsToAdd` prime toujours sur `liveIdsToRemove`
+  // (déjà garanti par les `.delete()` faits au moment de chaque décision,
+  // mais un filet de sécurité ici ne coûte rien et documente l'invariant) :
+  // un match qu'on vient de décider de GARDER en direct ne doit jamais être
+  // retiré par erreur dans le même appel groupé.
+  for (const id of liveIdsToAdd) liveIdsToRemove.delete(id)
+  try {
+    if (liveIdsToAdd.size > 0) await kv.sadd('cron:liveIds', ...liveIdsToAdd)
+    if (liveIdsToRemove.size > 0) await kv.srem('cron:liveIds', ...liveIdsToRemove)
+  } catch (e) {
+    log.push(`[cron:liveIds:batch] error=${e.message}`)
   }
 
   // `cron:anyLive` retiré (10/10, voir le commentaire détaillé sur
@@ -2124,12 +2319,42 @@ async function handlePass(env) {
   // lui-même ne peut pas être vérifié (Turso/Redis en panne) — même
   // principe que les autres garde-fous de ce fichier (noMatchFlags, etc.) :
   // on ne bloque jamais une vraie passe pour un verrou qu'on n'a pas pu lire.
+  // ⚠️ AJOUT (18/10, constat utilisateur : 2-3 notifs quasi identiques pour le
+  // MÊME but — même buteur, minutes 26'/27'/27' — reçues en rafale) : le
+  // verrou ci-dessus protège contre une 2e exécution qui démarre pendant
+  // qu'une 1ère tourne encore, MAIS sa libération (plus bas, `kv.del
+  // (passLockKey)`) était INCONDITIONNELLE — n'importe quelle passe pouvait
+  // supprimer le verrou, même celui d'une AUTRE passe plus récente. Scénario
+  // concret : une passe A, sur un gros soir à beaucoup de matchs live, prend
+  // plus de 55s (le TTL du verrou) à cause du travail séquentiel par match
+  // (writePipe + notifyVercel, non parallélisés) — son verrou EXPIRE tout
+  // seul avant qu'elle ait fini. Le tick suivant (60s) ne voit alors plus de
+  // verrou, en pose un NOUVEAU et démarre une passe B EN PARALLÈLE de A, qui
+  // tourne toujours — exactement la concurrence que ce verrou est censé
+  // empêcher. Pire : quand A finit enfin, son `kv.del` supprime le verrou de
+  // B (pas le sien, déjà expiré) avant que B ait terminé, ouvrant la porte à
+  // une 3e passe C en parallèle de B — explique un TRIPLE envoi, pas
+  // seulement double. Corrigé : chaque passe génère un jeton aléatoire propre
+  // (`lockToken`) et ne supprime le verrou QUE s'il porte encore CE jeton
+  // (comparaison avant suppression) — une passe en retard ne peut plus jamais
+  // supprimer le verrou d'une passe plus récente qu'elle n'a pas posé.
+  // N'élimine pas le cas où une passe dépasse carrément 55s (ça reste
+  // possible sous forte charge), mais empêche la cascade "A supprime le
+  // verrou de B" qui aggravait le problème au lieu de le limiter à un seul
+  // doublon.
   const passLockKey = 'cron:passLock'
+  const lockToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   let lockAcquired = false
-  try { lockAcquired = await kv.set(passLockKey, '1', { ex: 55, nx: true }) }
+  try { lockAcquired = await kv.set(passLockKey, lockToken, { ex: 55, nx: true }) }
   catch { lockAcquired = true }
   if (!lockAcquired) {
     return { events: 0, log: ['[cron] passe ignorée — une autre exécution est déjà en cours'], quiet: true }
+  }
+  async function releasePassLock() {
+    try {
+      const cur = await kv.get(passLockKey)
+      if (cur === lockToken) await kv.del(passLockKey)
+    } catch {}
   }
 
   const writeBookkeeping = shouldWriteDebugBookkeeping()
@@ -2174,7 +2399,7 @@ async function handlePass(env) {
       await kv.ltrim('cron:goals:logHistory', -30_000, -1)
       await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     } catch {}
-    try { await kv.del(passLockKey) } catch {}
+    await releasePassLock()
     return { events: 0, log: [], quiet: true }
   }
 
@@ -2202,7 +2427,7 @@ async function handlePass(env) {
     }
   } catch {}
 
-  try { await kv.del(passLockKey) } catch {}
+  await releasePassLock()
 
   return result
 }

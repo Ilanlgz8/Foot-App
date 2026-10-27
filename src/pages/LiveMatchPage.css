@@ -509,7 +509,13 @@
 
 .lmp__heroScorerMin {
   font-size: 0.65rem;
-  color: var(--red);
+  /* ⚠️ Passé de var(--red) au blanc (27/10, demande explicite utilisateur :
+     "la minute [du buteur] est en rouge [...] en blanc, juste") — ne concerne
+     QUE la minute d'un BUTEUR ici (nom + minute dans le bandeau buteurs du
+     hero), pas la minute du MATCH juste au-dessus (.lmp__heroMinute, voir son
+     commentaire du 04/09 : rouge demandé/confirmé explicitement pour celle-là,
+     non remis en cause par cette demande précise). */
+  color: rgba(var(--white-rgb), 0.92);
   font-weight: 700;
 }
 
