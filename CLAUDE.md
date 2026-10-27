@@ -5301,6 +5301,41 @@ cf-worker/
   vidéo/capture de l'écran noir au moment exact où il survient plutôt qu'une 10e théorie — comme
   ça avait permis de percer définitivement le bug de la barre du bas en septembre.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : 13 jours de fixes committés localement
+  mais JAMAIS poussés sur GitHub, donc jamais déployés (27/10, suite directe
+  du doute exprimé par l'utilisateur — "j'ai pas l'impression que tu fais un
+  truc depuis tout à l'heure" — après le fix flash noir du jour). Vérifié en
+  tentant un vrai `git push` plutôt qu'en se fiant à l'historique local :
+  échec immédiat avec `Invalid username or token. Password authentication is
+  not supported for Git operations.` — le token GitHub (Personal Access
+  Token) embarqué dans l'URL du remote `origin` était invalide/expiré.
+  `git log origin/main -1` a confirmé l'ampleur réelle : le DERNIER push
+  réussi datait du **14/10** (commit "urgency:high", 14e bug notifs) — tout
+  ce qui a été développé, testé et documenté dans ce fichier entre le 14/10
+  et le 27/10 (fix sadd/srem groupé, watchdog heartbeat de reprise, les 2
+  bugs buteur/minute du 18/10 et 22/10, le fix quota Turso du 27/10, la
+  couleur de la minute des buteurs, et les 3 tentatives du jour sur le flash
+  noir scroll) était resté **committé en local dans ce sandbox, invisible
+  pour GitHub ET pour Vercel** (qui déploie en suivant ce dépôt GitHub) —
+  donc jamais mis en ligne sur statfootix.vercel.app, malgré chaque entrée
+  marquée ✅ et vérifiée par tests/lint/build. Explique directement
+  l'impression de l'utilisateur que "rien ne change" malgré des jours de
+  correctifs réels. Résolu : l'utilisateur a généré un nouveau Personal
+  Access Token GitHub (scope `repo`) et me l'a transmis en chat ; remote
+  `origin` mis à jour avec ce nouveau token (`git remote set-url`), puis
+  `git push origin HEAD` réussi — confirmé par `git log origin/main -1`
+  montrant bien le commit du jour (`9bfa3e9`) comme dernier commit connu de
+  GitHub, et `git status` propre (plus rien en attente). Honnêteté : je ne
+  peux pas savoir depuis cet environnement QUAND exactement ce token a cessé
+  de fonctionner entre le 14/10 et aujourd'hui (pas d'accès aux logs
+  d'expiration GitHub), ni confirmer le déploiement Vercel final (pas
+  d'accès au dashboard Vercel depuis ce sandbox) — mais le push lui-même est
+  vérifié réussi, ce qui est la condition nécessaire et suffisante pour que
+  Vercel reprenne le déploiement automatique normalement. À surveiller par
+  l'utilisateur sur https://statfootix.vercel.app (ou le dashboard Vercel)
+  dans les minutes suivant ce push pour confirmer que le déploiement
+  automatique a bien repris.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
