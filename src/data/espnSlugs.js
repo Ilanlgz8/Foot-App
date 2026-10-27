@@ -143,8 +143,46 @@ export const EXTRA_NOTIFY_SLUGS = [
 // atteint là — seul le 3e appel (raccourci id-exact, jusqu'ici jamais
 // déclenché pour ces 6 comps) change de comportement.
 export function espnNativeSlug(match) {
-  if (!String(match?.id ?? '').startsWith('espn-')) return null
-  if (match.isCup) return DOMESTIC_CUP_SLUGS[match.competition?.code] ?? null
+  const id = String(match?.id ?? '')
+  if (!id.startsWith('espn-')) return null
+  // ⚠️ BUG CORRIGÉ (27/10, constat utilisateur : 2 matchs Copa del Rey
+  // restés bloqués "en direct" avec le score figé et aucune stat live,
+  // persistant même après fermeture/réouverture de l'app) — root cause :
+  // `markLive()`/`markPendingKickoff()` (src/hooks/liveTracker.js) ne
+  // persistaient PAS le champ `isCup` en localStorage (corrigé là-bas aussi,
+  // voir son commentaire) — tant qu'un match de coupe nationale reste dans
+  // le tableau `matches` passé en props à useLiveMinute, `match.isCup` est
+  // correct et tout fonctionne ; mais dès qu'il n'est plus que dans
+  // liveTracker (après reload, ou une fois sorti de la liste "matchs du
+  // jour"), le match reconstruit avait `isCup` à `undefined` — la branche
+  // DOMESTIC_CUP_SLUGS n'était alors jamais atteinte. Aucune des 2 autres
+  // tables (NATIONAL_COMP_SLUGS/EUROPEAN_CUP_SLUGS/NATIONAL_SUPER_CUP_SLUGS)
+  // n'a 'PD'/'FL1'/'PL' comme clé, et `match.competition.id` est l'id
+  // SYNTHÉTIQUE négatif de la coupe (voir SYNTHETIC_COMP_ID dans
+  // espnAdapter.js, ex. -102 pour PD_CUP) — jamais une clé de
+  // ESPN_SLUG_BY_COMP_ID (uniquement des id football-data.org réels,
+  // positifs) : le slug retombait donc sur `null`, plus aucun event ESPN
+  // n'était alors jamais retrouvé pour ce match, ni côté client ni côté
+  // serveur (api/fifa-live.js appelle cette même fonction) — jamais de
+  // confirmation FINAL possible (bloqué "en direct" indéfiniment), aucune
+  // stat live (plus aucune donnée serveur ne correspond à ce match), score
+  // figé sur la dernière valeur connue avant que le bug ne se déclenche.
+  // Persistant après fermeture/réouverture car l'entrée localStorage
+  // elle-même était déjà amputée du champ `isCup` dès l'écriture — rien ne
+  // pouvait jamais le régénérer tout seul.
+  // Fix à 2 niveaux : (1) `isCup` est désormais bien persisté par
+  // markLive/markPendingKickoff, pour les PROCHAINS matchs. (2) ICI, un
+  // repli supplémentaire basé sur le FORMAT de l'id lui-même — stable et
+  // déjà encodé dans l'id, jamais perdu à la persistance (`idPrefix:
+  // '${parentCode}-cup'`, voir fetchEspnCupMatches dans espnAdapter.js, d'où
+  // un id de la forme `espn-PD-cup-401874xxx`) — pour débloquer aussi les
+  // entrées DÉJÀ corrompues dans le localStorage des utilisateurs actuels,
+  // sans qu'ils aient besoin de vider quoi que ce soit.
+  const cupIdMatch = id.match(/^espn-([a-z0-9]+)-cup-/i)
+  if (match.isCup || cupIdMatch) {
+    const cupCode = cupIdMatch ? cupIdMatch[1].toUpperCase() : match.competition?.code
+    return DOMESTIC_CUP_SLUGS[cupCode] ?? null
+  }
   const code = match.competition?.code
   return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? NATIONAL_SUPER_CUP_SLUGS[code]
     ?? ESPN_SLUG_BY_COMP_ID[match.competition?.id] ?? null

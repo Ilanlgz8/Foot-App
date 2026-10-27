@@ -5434,6 +5434,88 @@ cf-worker/
   reste de l'app via Vercel, mais n'a d'effet sur les notifs que le Worker
   envoie qu'une fois celui-ci aussi redéployé).
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : 2 matchs Copa del Rey restés bloqués
+  "en direct" sur la page Live (grille /live), sans stats live, avec un
+  score figé/incohérent (constat utilisateur, 27/10 : "là, il y a deux
+  matchs. Il dit que c'est encore en direct, alors que non [...] il n'y a
+  pas les stats en live du match [...] un match à marquer 4-2 alors qu'il
+  n'y a que les deux buts de l'équipe à domicile et les quatre buts de
+  l'équipe à l'extérieur, on ne les voit pas [...] même quand j'ai fermé et
+  rouvert l'appli, ça les affiche encore"). Root cause trouvée par lecture
+  directe du code (pas de nouveau log — bug 100% côté client, reproductible
+  par raisonnement) : `markLive()`/`markPendingKickoff()`
+  (`src/hooks/liveTracker.js`, la source de vérité localStorage des matchs
+  "en cours") ne persistaient QUE `id/utcDate/status/homeTeam/awayTeam/
+  competition/score` — jamais le champ `isCup`, pourtant présent sur
+  l'objet match d'origine (voir `normalizeEvent`, `espnAdapter.js`). Tant
+  qu'un match de coupe nationale (Copa del Rey/Coupe de France/FA Cup,
+  sourcé ESPN, id de la forme `espn-PD-cup-{eventId}`) reste dans le
+  tableau `matches` passé en props à `useLiveMinute` (ex. tant qu'il est
+  encore dans la liste "matchs du jour"), tout fonctionne : `isCup` est
+  correct, `espnNativeSlug()` (`src/data/espnSlugs.js`) résout bien
+  `DOMESTIC_CUP_SLUGS['PD']` = `esp.copa_del_rey`. Mais dès que ce match
+  n'est plus QUE dans `liveTracker` (après un reload, ou simplement une
+  fois sorti de cette liste "du jour" — exactement ce qui arrive en
+  fermant/rouvrant l'app, `Live.jsx` refait un fetch frais), le match est
+  reconstruit depuis l'entrée localStorage via `getLiveMatches()` — SANS
+  `isCup` (`undefined`). `espnNativeSlug()` ne tombe alors plus dans la
+  branche `DOMESTIC_CUP_SLUGS` : aucune des 2 autres tables (NATIONAL_COMP_
+  SLUGS/EUROPEAN_CUP_SLUGS/NATIONAL_SUPER_CUP_SLUGS) n'a 'PD'/'FL1'/'PL'
+  comme clé, et `match.competition.id` est l'id SYNTHÉTIQUE négatif de la
+  coupe (voir `SYNTHETIC_COMP_ID` dans `espnAdapter.js`, ex. `-102` pour
+  `PD_CUP`) — jamais une clé de `ESPN_SLUG_BY_COMP_ID` (uniquement des id
+  football-data.org réels, positifs). Le slug retombe donc sur `null` —
+  aussi bien côté client (`useLiveMinute.js`) que côté serveur
+  (`api/fifa-live.js`, qui appelle la MÊME fonction partagée) : plus aucun
+  event ESPN n'est alors jamais retrouvé pour ce match précis. Conséquence
+  en cascade, expliquant les 3 symptômes à la fois : (1) jamais de donnée
+  serveur pour ce match → aucune stat live possible ; (2) jamais de
+  confirmation `STATUS_FINAL` possible (le serveur ne renvoie plus rien
+  pour cet id) → le match reste bloqué "en direct" indéfiniment, quel que
+  soit son vrai statut ; (3) le score affiché reste figé sur la dernière
+  valeur connue AVANT que le bug ne se déclenche (`espnScoresCache`, jamais
+  mis à jour depuis) — ce qui explique le score "4-2" incohérent avec la
+  réalité rapportée par l'utilisateur, probablement 2-4 ou un score encore
+  différent au moment du signalement. Persistant après fermeture/
+  réouverture car l'entrée localStorage elle-même est déjà amputée du champ
+  `isCup` DÈS L'ÉCRITURE — rien ne pouvait jamais le régénérer tout seul,
+  ce n'est pas un problème de cache qui se corrige avec le temps.
+  Corrigé à 2 niveaux : (1) `markLive()`/`markPendingKickoff()`
+  (`src/hooks/liveTracker.js`) persistent désormais `isCup: match.isCup ??
+  false` — règle le problème pour tous les PROCHAINS matchs de coupe. (2)
+  `espnNativeSlug()` (`src/data/espnSlugs.js`) gagne un repli
+  supplémentaire basé sur le FORMAT de l'id lui-même (regex `/^espn-
+  ([a-z0-9]+)-cup-/i`, capture le code de la compétition parente
+  directement depuis l'id, ex. "PD" dans `espn-PD-cup-401874123`) — stable
+  et jamais perdu à la persistance (contrairement à `isCup`, un champ
+  séparé qui PEUT être oublié) : ce 2e filet débloque aussi les entrées DÉJÀ
+  corrompues dans le localStorage des utilisateurs actuels (dont les 2
+  matchs signalés), sans qu'ils aient besoin de vider quoi que ce soit — dès
+  le prochain poll après ce déploiement, le slug se résout correctement, le
+  serveur retrouve l'event ESPN réel, et si ce dernier est bien FINAL, la
+  chaîne de confirmation FT normale (déjà en place, inchangée) retire le
+  match de liveTracker comme pour n'importe quel autre match. 7 nouveaux
+  tests dédiés ajoutés (`src/data/espnSlugs.test.js`, fichier inexistant
+  jusqu'ici pour ce module) couvrant explicitement le scénario `isCup`
+  perdu + id "-cup-" présent, les 3 coupes nationales, une compétition de
+  sélection (NL, pour vérifier qu'aucune fausse détection "cup" n'est
+  introduite), un grand championnat club (repli `ESPN_SLUG_BY_COMP_ID`) et
+  les cas `null` légitimes. 385 tests (+7) + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté :
+  diagnostic confirmé par lecture directe et complète de la chaîne de code
+  concernée (liveTracker.js → espnSlugs.js → useLiveMinute.js → 
+  api/fifa-live.js), pas par un log réel — mais chaque étape de la chaîne a
+  été vérifiée une par une (valeurs de `SYNTHETIC_COMP_ID` confirmées
+  négatives, clés de `ESPN_SLUG_BY_COMP_ID` confirmées toutes positives,
+  format exact de l'id confirmé dans `fetchEspnCupMatches`), donc un
+  raisonnement complet et vérifié plutôt qu'une simple hypothèse. Aucun
+  accès à un vrai iPhone/PWA depuis cet environnement pour confirmer que
+  les 2 matchs précis signalés par l'utilisateur se débloquent bien après
+  ce déploiement — mais le mécanisme de guérison (repli par format d'id)
+  ne dépend d'aucune action manuelle de l'utilisateur, juste du prochain
+  poll une fois le code déployé (automatique via Vercel, `src/` n'a pas
+  besoin de `npm run deploy` côté `cf-worker/`).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

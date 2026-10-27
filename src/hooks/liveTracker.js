@@ -97,6 +97,15 @@ export function markLive(match) {
       awayTeam:    match.awayTeam,
       competition: match.competition,
       score:       match.score,
+      // ⚠️ AJOUT (27/10, constat utilisateur : 2 matchs Copa del Rey restés
+      // bloqués "en direct" avec score figé et aucune stat live, persistant
+      // même après fermeture/réouverture de l'app) — ce champ manquait ici,
+      // voir le commentaire détaillé dans espnNativeSlug (src/data/
+      // espnSlugs.js) : sans `isCup`, un match de coupe nationale reconstruit
+      // depuis cette entrée perd toute chance de retrouver son vrai event
+      // ESPN (slug résolu à `null`), donc plus aucune confirmation FINAL
+      // possible — bloqué "en direct" pour de bon.
+      isCup:       match.isCup ?? false,
     },
     ts: Date.now(),
   }
@@ -122,6 +131,9 @@ export function markPendingKickoff(match) {
       awayTeam:    match.awayTeam,
       competition: match.competition,
       score:       match.score,
+      // Voir le commentaire détaillé dans markLive() ci-dessus / espnNativeSlug
+      // (src/data/espnSlugs.js) — même fix, même raison.
+      isCup:       match.isCup ?? false,
     },
     ts:      Date.now(),
     pending: true,
