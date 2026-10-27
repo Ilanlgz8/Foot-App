@@ -5516,6 +5516,49 @@ cf-worker/
   poll une fois le code déployé (automatique via Vercel, `src/` n'a pas
   besoin de `npm run deploy` côté `cf-worker/`).
 
+- 🔍 "Y'a eu des matchs de FA Cup, j'ai pas eu les matchs" (28/10) — PAS un bug
+  de notre code, vérifié EN DIRECT contre l'API ESPN (`eng.fa`, slug FA Cup)
+  plutôt que supposé : `scoreboard?dates=20261025` (période où un vrai tour
+  de qualification amateur — 4e tour qualificatif — se jouait dans la réalité)
+  renvoie `"events": []`, ET les métadonnées `calendar` de la compétition
+  elle-même (toujours renvoyées, indépendantes de la date demandée) listent
+  directement "First Round" (6-9 nov.) comme PREMIÈRE entrée — aucune entrée
+  "Qualifying"/"Preliminary" n'existe nulle part dans ce calendrier. Différent
+  du cas Copa del Rey documenté le 26/09 (ESPN exposait bien les qualifs,
+  juste avec un statut live cassé, filtré côté client via
+  `isUntrackedCupQualifyingRound`) : ici, ESPN n'expose tout simplement AUCUNE
+  donnée pour les tours qualificatifs de la FA Cup sous ce slug — rien à
+  filtrer, rien à corriger côté app, la donnée source n'existe pas. Les vrais
+  matchs pros (clubs de Premier League/Championship) n'entrent en lice qu'au
+  "First Round Proper", 6-9 novembre 2026 pour cette édition — les
+  notifications fonctionneront normalement à partir de cette date, par le
+  même mécanisme déjà confirmé opérationnel sur la Copa del Rey une fois ses
+  propres qualifs amateurs terminées (voir l'entrée du 26/09). Aucun code
+  touché : il n'y a rien à corriger, juste une différence de calendrier
+  (qualifs FA Cup étalées jusqu'à fin octobre, qualifs Copa del Rey terminées
+  dès début octobre) qui donnait l'impression d'un trou alors que c'est le
+  même type de source de données pour les 3 coupes nationales (Coupe de
+  France/Copa del Rey/FA Cup), juste pas encore au même stade du calendrier.
+
+- 🔍 Discussion coupes manquantes (Coppa Italia/DFB-Pokal), 28/10 — pas
+  implémenté, avis donné sur demande explicite de l'utilisateur plutôt qu'un
+  ajout direct. Constat : `DOMESTIC_CUPS` (`competitions.js`) ne couvre que
+  3 pays (FL1/Coupe de France, PD/Copa del Rey, PL/FA Cup) — l'Italie (Serie
+  A) et l'Allemagne (Bundesliga) n'ont pas leur coupe nationale câblée,
+  alors que leur championnat l'est. Le mécanisme est générique (ajouter une
+  entrée + le bon slug ESPN suffit), mais PAS gratuit en continu : chaque
+  entrée de `DOMESTIC_CUPS` ajoute un slug PERMANENT à `EXTRA_NOTIFY_SLUGS`
+  (voir `espnSlugs.js`), donc à la liste que `cf-worker/` interroge toutes
+  les minutes, 24h/24, 365j/an, qu'il y ait match ou non ce jour-là — un coût
+  constant, pas proportionnel au volume de matchs, mais réel et cumulatif
+  avec les autres compétitions déjà suivies. Avis donné à l'utilisateur :
+  vu le quota d'écritures Turso qui vient justement d'être dépassé le jour
+  même (voir l'entrée juste avant "QUOTA D'ÉCRITURES TURSO DÉPASSÉ"), plutôt
+  attendre que la situation se stabilise (reset mensuel ou upgrade de plan,
+  décision qui dépend de l'utilisateur) avant d'ajouter une compétition de
+  plus — même à coût modeste, ça s'additionne à un total déjà tendu. Pas de
+  décision finale de l'utilisateur obtenue dans cette conversation.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
