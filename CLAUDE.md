@@ -5381,6 +5381,59 @@ cf-worker/
      Vercel, le pipeline de push/déploiement étant désormais vérifié fonctionnel — voir l'entrée
      juste au-dessus sur le token GitHub).
 
+- ✅ Notif "minute du match" non voulue dès qu'un championnat est filtré dans
+  les favoris (27/10, constat utilisateur : "quand je sélectionne que
+  certains championnats, genre Ligue 1, Liga, Première Ligue [...] je reçois
+  les notifications des minutes du match aussi [...] c'est très chiant [...]
+  pas toutes les minutes, mais certaines minutes [...] quand je sélectionne
+  aucun championnat [...] j'ai pas ça") — root cause trouvée par lecture
+  directe du code : un ticker "score en direct" (icône horloge ⏱, titre =
+  équipes+score, corps = minute du match) existait depuis longtemps dans les
+  2 fichiers notifs (`cf-worker/src/index.js` — chemin actif en prod —
+  `pushLiveTicker`/`shouldSendLiveTicker`, ET `api/cron-goals.js` — fallback
+  legacy — même bloc dans la boucle `mode` complet), espacé à 1 passe sur 2
+  (explique "pas toutes les minutes, mais certaines minutes" — correspondance
+  exacte). Filtré par `matchesFavoriteStrict` : contrairement aux notifs
+  classiques (but/carton/KO/mi-temps/reprise/fin, où l'absence de filtre =
+  tout recevoir), ce filtre strict renvoyait `false` (rien) pour un abonné
+  SANS championnat suivi, et `true` pour un abonné AVEC au moins un
+  championnat suivi — exactement l'inverse de ce que rapportait l'utilisateur,
+  et strictement l'inverse de ce qu'il attend d'un filtre par championnat
+  (restreindre QUELS matchs déclenchent les vraies notifs d'événements,
+  jamais ajouter un type de notif entièrement nouveau). Le `silent: true`
+  censé rendre ce ticker discret (`silent`/`renotify` lus par
+  `public/sw-push.js`) ne supprime que le son/la vibration — PAS l'affichage
+  visuel (icône, titre, corps) — donc la notif restait bien visible malgré
+  cette intention, collant exactement à la description de l'utilisateur
+  (icône horloge + équipes + minute). Cette fonctionnalité n'avait jamais été
+  demandée explicitement comme telle par l'utilisateur — une déduction
+  implicite de conception ("championnat suivi" → "ticker minute par minute")
+  qui ne correspond pas à l'attente réelle. Retiré ENTIÈREMENT plutôt que
+  retouché (plus simple, plus direct, aligné avec le comportement déjà
+  attendu — celui observé sans filtre configuré) dans les 2 fichiers :
+  `pushLiveTicker`/`shouldSendLiveTicker`/`SUBREQUEST_SAFE_LIVE_THRESHOLD`/
+  `liveMatchesSeenThisPass`/`underSubrequestSafeLimit` (cf-worker/src/
+  index.js — vérifié par grep qu'aucun n'avait d'autre usage avant
+  suppression — `FINAL_SAFE_THRESHOLD`/`finalEventsSeenThisPass`, qui gatent
+  les bonus de fin de match, un mécanisme différent et non lié à ce symptôme,
+  non touchés) ; `matchesFavoriteStrict` + le paramètre `strict` de
+  `subscriberWantsThis` + le bloc d'appel dans la boucle `mode` complet
+  (api/cron-goals.js). Commentaires dangling (pointeurs vers les identifiants
+  supprimés dans d'autres parties du fichier) nettoyés au passage. 378 tests
+  + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build +
+  `npx wrangler deploy --dry-run` (409.80 KiB, légèrement réduit — cohérent
+  avec le retrait de code) vérifiés. Honnêteté : comme pour tout
+  `cf-worker/`, aucun accès réseau réel depuis cet environnement pour
+  confirmer ce retrait contre la vraie prod — mais cette fois ce n'est pas un
+  diagnostic déduit par raisonnement : la description de l'utilisateur
+  (icône horloge, équipes, minute, "pas toutes les minutes", présent
+  seulement avec un filtre de championnat) correspond exactement, point par
+  point, au mécanisme confirmé par lecture directe du code. À déployer
+  manuellement (`npm run deploy` depuis `cf-worker/`, comme toujours pour ce
+  dossier — la partie `api/cron-goals.js` se déploie automatiquement avec le
+  reste de l'app via Vercel, mais n'a d'effet sur les notifs que le Worker
+  envoie qu'une fois celui-ci aussi redéployé).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

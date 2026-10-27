@@ -163,16 +163,18 @@ function matchesFavorite(subComps, slug) {
   return subComps.includes(slug)
 }
 
-// Variante stricte pour le ticker live : contrairement aux notifs classiques
-// (KO/mi-temps/but/FT, où l'absence de filtre = tout recevoir, comportement
-// historique préservé), un abonné SANS championnat suivi ne doit PAS recevoir
-// de ticker en direct pour chaque match — sinon ça spamme tout le monde à
-// chaque minute pour chaque match en cours dans le monde entier.
-function matchesFavoriteStrict(subComps, slug) {
-  if (!Array.isArray(subComps) || subComps.length === 0) return false
-  if (!slug) return false
-  return subComps.includes(slug)
-}
+// ⚠️ `matchesFavoriteStrict` SUPPRIMÉE (27/10, constat utilisateur : "quand je
+// sélectionne que certains championnats [...] je reçois les notifications des
+// minutes du match aussi [...] très chiant [...] quand je sélectionne aucun
+// championnat [...] j'ai pas ça") — cette variante stricte ne servait qu'au
+// ticker "score en direct" (notif minute par minute, voir pushLiveTicker côté
+// cf-worker/src/index.js) : un abonné SANS championnat suivi recevait `false`
+// (rien), mais un abonné AVEC au moins un championnat suivi recevait `true` —
+// exactement l'inverse de ce que l'utilisateur attendait, puisqu'un filtre par
+// championnat ne devrait que restreindre QUELS matchs déclenchent les notifs
+// d'événements réels, jamais ajouter un nouveau type de notif. Le ticker lui-
+// même retiré entièrement (voir cf-worker/src/index.js) : cette fonction n'a
+// plus aucun appelant.
 
 // ⚠️ AJOUT (demande utilisateur explicite : "si je choisis que le PSG parmi
 // toutes les équipes, faut que j'aie que les notifs du PSG") : filtre par
@@ -212,10 +214,13 @@ function matchesFavoriteClub(subClubs, candidateNames) {
 // avec la bonne priorité (club > compétition) sans dupliquer cette logique
 // à chaque call site. candidateNames : [rawHomeTeam, homeTeam, rawAwayTeam,
 // awayTeam] — home ET away, brut ET traduit, peu importe lequel matche.
-function subscriberWantsThis(sub, slug, candidateNames, strict) {
+// ⚠️ paramètre `strict` RETIRÉ (27/10, voir matchesFavoriteStrict ci-dessus) —
+// ne servait qu'au ticker, retiré avec lui. Un seul comportement désormais,
+// identique pour toutes les notifs : pas de filtre configuré = tout recevoir.
+function subscriberWantsThis(sub, slug, candidateNames) {
   const clubResult = matchesFavoriteClub(sub.clubs, candidateNames ?? [])
   if (clubResult !== null) return clubResult
-  return strict ? matchesFavoriteStrict(sub.comps, slug) : matchesFavorite(sub.comps, slug)
+  return matchesFavorite(sub.comps, slug)
 }
 
 // ⚠️ AJOUT (question utilisateur : optimiser encore le CPU du cron) : avant,
@@ -326,7 +331,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   const candidateNames = [options.rawHomeTeam, options.homeTeam, options.rawAwayTeam, options.awayTeam]
 
   await Promise.allSettled(subs.map(async ({ endpoint, sub }) => {
-    if (!subscriberWantsThis(sub, slug, candidateNames, !!options.onlyFavorites)) return
+    if (!subscriberWantsThis(sub, slug, candidateNames)) return
     try {
       // urgency: 'high' — sans ça, les services de push (notamment Apple sur
       // iOS, largement majoritaire chez nos abonnés) peuvent différer la
@@ -1135,38 +1140,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // 📊 Ticker "score en direct" — uniquement pour les abonnés qui suivent
-    // une des deux équipes (jamais envoyé aux abonnés sans filtre configuré,
-    // pour ne pas transformer l'app en spam pour tout le monde). Même `tag`
-    // à chaque minute → remplace la notif précédente au lieu d'empiler
-    // (silent + renotify:false côté SW → pas de nouveau son/vibration).
-    // ⚠️ CORRIGÉ (demande utilisateur : "moins de délai sur le live") : ce
-    // ticker passait en urgency 'normal' par défaut (seul point de tout ce
-    // fichier oublié lors du fix urgency:'high' plus haut) — sur iOS, une
-    // notif 'normal' peut être différée par Apple pour économiser la
-    // batterie, ce qui allait justement à l'encontre de son rôle (suivre le
-    // direct). Passé en 'high' comme le reste des notifs importantes : le
-    // risque de limitation par excès de priorité reste faible ici (déjà
-    // restreint aux seuls abonnés qui suivent l'une des deux équipes, pas
-    // envoyé à tout le monde).
-    if (LIVE_ESPN.has(status)) {
-      const minuteLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
-      await sendPushToMatch(
-        {
-          title: `${homeTeam} ${scoreStr} ${awayTeam}`,
-          body:  minuteLabel ? `⏱ ${minuteLabel}` : 'En direct',
-          url:   '/live',
-          matchId: eventId,
-          tag:     `live-${eventId}`,
-          silent:  true,
-          renotify: false,
-        },
-        slug,
-        { onlyFavorites: true, urgency: 'high', homeTeam, awayTeam, rawHomeTeam, rawAwayTeam },
-        log,
-        subsCache,
-      )
-    }
+    // ⚠️ Ticker "score en direct" RETIRÉ (27/10, constat utilisateur : "quand
+    // je sélectionne que certains championnats [...] je reçois les
+    // notifications des minutes du match aussi [...] très chiant" — voir le
+    // commentaire détaillé sur matchesFavoriteStrict plus haut dans ce
+    // fichier, et le commentaire miroir dans cf-worker/src/index.js où vivait
+    // pushLiveTicker, le même mécanisme pour le mode actif en prod).
    } catch (e) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
    }

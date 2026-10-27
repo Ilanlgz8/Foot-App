@@ -174,8 +174,8 @@ async function fetchEspnEvents(slug, date, log) {
 // d'invocations proportionnel au nombre de slugs actifs à AU PLUS 2/minute,
 // sans aucune perte de fraîcheur (toujours `forceFresh=1`/`no-store`, chaque
 // slug fait toujours son propre vrai fetch ESPN côté Vercel). Bénéfice
-// secondaire pour le budget de 50 sous-requêtes/exécution de ce Worker (voir
-// SUBREQUEST_SAFE_LIVE_THRESHOLD plus bas) : la phase de récupération ESPN
+// secondaire pour le budget de 50 sous-requêtes/exécution de ce Worker : la
+// phase de récupération ESPN
 // consomme désormais au plus 2 sous-requêtes au lieu d'autant que de slugs
 // actifs, libérant de la marge pour les notifs push de la même passe.
 // Isolation des pannes : un échec sur l'appel groupé d'UNE date (timeout
@@ -381,7 +381,7 @@ async function recheckFinalMatch(env, kv, slug, eventId, expectedScore, homeTeam
       return
     }
     // ⚠️ REGROUPÉ EN PIPELINE (même audit perf que runOnePass, voir
-    // SUBREQUEST_SAFE_LIVE_THRESHOLD/FINAL_SAFE_THRESHOLD plus haut) : ces 4
+    // FINAL_SAFE_THRESHOLD plus haut) : ces 4
     // écritures/lecture étaient 4 sous-requêtes séparées — ce recheck à lui
     // seul en coûtait ~11, l'un des postes les plus chers de toute la passe.
     // Comportement identique (commandes indépendantes, aucune n'a besoin du
@@ -549,59 +549,40 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
   return true
 }
 
-// Ticker live (score en direct) : PAS de dédup (même tag remplace côté SW à
-// chaque minute, voir api/cron-goals.js d'origine), donc appelle Vercel
-// directement sans passer par notifyVercel() (qui exige une clé de dédup).
-// homeTeam/awayTeam transmis en plus (voir matchesFavoriteClub côté
-// api/cron-goals.js) : un abonné avec des clubs favoris configurés doit
-// pouvoir recevoir le ticker de SON club même sans championnat suivi (comps).
-async function pushLiveTicker(env, payload, slug, log, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam) {
-  try {
-    const res = await fetch(env.VERCEL_NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
-      body: JSON.stringify({ mode: 'notify', payload, slug, options: { onlyFavorites: true, urgency: 'high', homeTeam, awayTeam, rawHomeTeam, rawAwayTeam } }),
-      signal: AbortSignal.timeout(8_000),
-    })
-    if (!res.ok) log?.push(`[ticker→vercel] status=${res.status}`)
-  } catch (e) {
-    log?.push(`[ticker→vercel] error=${e.message}`)
-  }
-}
+// ⚠️ `pushLiveTicker` SUPPRIMÉ (27/10, constat utilisateur : "quand je
+// sélectionne que certains championnats [...] je reçois les notifications
+// des minutes du match aussi [...] très chiant [...] pas toutes les minutes
+// [...] quand je sélectionne aucun championnat [...] j'ai pas ça"). Root
+// cause : ce ticker "score en direct" (icône horloge ⏱, titre = équipes+score,
+// corps = minute du match) n'était envoyé QU'aux abonnés ayant configuré au
+// moins un championnat suivi (matchesFavoriteStrict, voir api/cron-goals.js —
+// un abonné SANS filtre recevait `false` donc rien) — exactement le symptôme
+// inversé décrit par l'utilisateur. Le `silent: true` censé le rendre discret
+// (voir sw-push.js) ne supprime que le son/la vibration, PAS l'affichage
+// visuel : la notif reste bien visible (icône, équipes, minute), ce que
+// l'utilisateur ne voulait jamais recevoir. Cette fonctionnalité n'avait
+// jamais été demandée explicitement comme telle — c'était une déduction
+// implicite ("championnat suivi" → "ticker minute par minute") qui ne
+// correspond pas à l'attente réelle de l'utilisateur (filtrer par
+// championnat doit juste restreindre QUELS matchs déclenchent les notifs
+// d'événements réels — but/carton/KO/mi-temps/reprise/fin — jamais ajouter
+// un nouveau type de notif). Retiré entièrement plutôt que retouché : plus
+// simple, plus direct, et aligné avec le comportement déjà attendu par
+// l'utilisateur (celui observé sans filtre configuré). `shouldSendLiveTicker`/
+// `SUBREQUEST_SAFE_LIVE_THRESHOLD`/`liveMatchesSeenThisPass`/
+// `underSubrequestSafeLimit` (uniquement utilisés par ce ticker, vérifié par
+// grep avant suppression) retirés avec lui plus bas dans ce fichier.
 
-// ⚠️ AJOUT (audit perf, question utilisateur : risque de dépasser la limite
-// Cloudflare Workers gratuit 50 sous-requêtes/exécution un jour très chargé) :
-// base fixe incompressible par passe = 34 (17 compétitions suivies × 2 fetchs
-// ESPN today+yesterday) + 1 (mget finalDone) = 35. Il reste ~15 de marge.
-// Le pipeline Redis par match (détection but/carton/mi-temps/fin — l'essentiel,
-// JAMAIS coupé) coûte 1 sous-requête/match live. Le ticker score discret
-// (pushLiveTicker) coûte 1 sous-requête EN PLUS, mais seulement les minutes
-// paires. Au-delà de ce seuil de matchs live traités dans la MÊME passe, on
-// coupe ce poste secondaire pour les matchs suivants (il est juste rattrapé à
-// la minute paire suivante, rien de perdu) — garde toujours de la marge pour
-// que le pipeline principal ne soit lui jamais impacté, quel que soit le
-// nombre de matchs.
-// ⚠️ ABAISSÉ 6 → 3 (28/08, incident réel : silence notifs + rattrapage très
-// en retard sur un pic de 5-8 matchs simultanés) : un recalcul complet du
-// budget (voir FINAL_SAFE_LIVE_THRESHOLD juste en dessous) a montré qu'avec
-// 8 matchs suivis et un minimum d'activité normale (quelques buts + une fin
-// de match), le total dépasse déjà 50 même à 1 seule passe/minute. Le seuil
-// de 6 laissait passer trop de résumés/tickers avant de couper — 3 laisse
-// beaucoup plus de marge au pipeline ESSENTIEL (but/carton/mi-temps/fin,
-// JAMAIS coupé par ce seuil) les jours chargés, au prix d'un résumé/ticker
-// un peu moins souvent rafraîchi au-delà des 3 premiers matchs vus dans
-// cette passe précise (rattrapé de toute façon à la minute paire suivante).
-const SUBREQUEST_SAFE_LIVE_THRESHOLD = 3
-
-// ⚠️ AJOUT (même incident, même audit) : les postes "bonus" liés à une fin de
-// match confirmée (résumé auto, priorisation warm FD.org, recap texte) et le
-// recheck ESPN accéléré à 18s (voir recheckFinalMatch) coûtent à eux seuls
-// ~8-11 sous-requêtes PAR match qui termine — et n'étaient protégés par
-// AUCUN seuil (contrairement à SUBREQUEST_SAFE_LIVE_THRESHOLD ci-dessus, qui
-// ne couvre que résumé "en cours"/ticker). Sur une passe où plusieurs matchs
-// finissent à peu près en même temps (très plausible : beaucoup de
-// championnats calent leurs coups d'envoi à la même heure), ce poste peut à
-// lui seul faire dépasser 50. Au-delà de ce seuil de fins de match traitées
+// ⚠️ AJOUT (même incident, même audit — SUBREQUEST_SAFE_LIVE_THRESHOLD, qui
+// gatait aussi le ticker "score en direct" retiré le 27/10, a été supprimé
+// avec lui) : les postes "bonus" liés à une fin de match confirmée (résumé
+// auto, priorisation warm FD.org, recap texte) et le recheck ESPN accéléré à
+// 18s (voir recheckFinalMatch) coûtent à eux seuls ~8-11 sous-requêtes PAR
+// match qui termine — et n'étaient protégés par AUCUN seuil. Sur une passe où
+// plusieurs matchs finissent à peu près en même temps (très plausible :
+// beaucoup de championnats calent leurs coups d'envoi à la même heure), ce
+// poste peut à lui seul faire dépasser le plafond Cloudflare (plan gratuit,
+// 50 sous-requêtes/exécution). Au-delà de ce seuil de fins de match traitées
 // dans la MÊME passe, on garde TOUJOURS l'envoi de la notif "Fin de match"
 // elle-même (jamais coupé) mais on saute les 3 bonus + le recheck accéléré —
 // rattrapés normalement au cycle suivant (60s) sans rien perdre, juste un
@@ -1012,8 +993,8 @@ async function runOnePass(env) {
   // toujours traité dans le MÊME ordre fixe (ESPN_SLUGS, toujours les mêmes
   // compétitions en tête) — si jamais le plafond de 50 sous-requêtes finit
   // par être atteint en cours de passe (résiduel possible malgré les
-  // garde-fous ci-dessus, voir SUBREQUEST_SAFE_LIVE_THRESHOLD/
-  // FINAL_SAFE_THRESHOLD), ce sont TOUJOURS les mêmes matchs (les derniers de
+  // garde-fous ci-dessus, voir FINAL_SAFE_THRESHOLD), ce sont TOUJOURS les
+  // mêmes matchs (les derniers de
   // la liste) qui se retrouvent pénalisés, minute après minute. Rotation
   // simple et déterministe (basée sur l'horloge, pas de random) : le point de
   // départ change chaque minute, donc un match désavantagé une minute a de
@@ -1136,13 +1117,9 @@ async function runOnePass(env) {
     log.push(`[cron] passe de rattrapage (>${RECOVERY_GAP_MS / 60000}min depuis la dernière vérification) — notifs individuelles abandonnées pour cette passe, pas envoyées en retard`)
   }
 
-  // Voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — compteur de matchs live
-  // vus DANS CETTE PASSE, sert à couper résumé+ticker au-delà du seuil sûr.
-  let liveMatchesSeenThisPass = 0
-  // Voir FINAL_SAFE_THRESHOLD plus haut — même principe, mais pour les
-  // matchs qui FINISSENT dans cette passe (résumé/FD-warm/recap/recheck
-  // accéléré), compteur séparé de liveMatchesSeenThisPass ci-dessus (un match
-  // FINAL n'est pas "isLive").
+  // Voir FINAL_SAFE_THRESHOLD plus haut — compteur de matchs qui FINISSENT
+  // dans cette passe (résumé/FD-warm/recap/recheck accéléré), sert à couper
+  // ces bonus au-delà du seuil sûr (un match FINAL n'est pas "isLive").
   let finalEventsSeenThisPass = 0
 
   // ⚠️ `anyStillLive`/`cron:anyLive` RETIRÉS (10/10, voir le commentaire
@@ -1194,8 +1171,8 @@ async function runOnePass(env) {
   // d'échec connus loggent désormais explicitement leur erreur (voir les
   // bugs précédents de cette série). Un silence aussi total pointe vers
   // quelque chose qu'AUCUN try/catch de ce fichier ne peut intercepter : le
-  // plafond Cloudflare Workers (plan gratuit, 50 sous-requêtes/exécution,
-  // voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut) — Cloudflare tue
+  // plafond Cloudflare Workers (plan gratuit, 50 sous-requêtes/exécution) —
+  // Cloudflare tue
   // l'exécution NET en cas de dépassement, sans lever d'exception JS
   // récupérable. Root cause trouvée par lecture directe du code : le
   // `kv.sadd`/`kv.srem` sur `cron:liveIds` (voir plus bas, juste après le
@@ -1394,8 +1371,6 @@ async function runOnePass(env) {
     const notPostponed  = status !== 'STATUS_POSTPONED' && status !== 'STATUS_CANCELED'
     const isFinalNow    = FINAL_ESPN.has(status)
 
-    if (isLive) liveMatchesSeenThisPass++
-    const underSubrequestSafeLimit = liveMatchesSeenThisPass <= SUBREQUEST_SAFE_LIVE_THRESHOLD
     // Voir FINAL_SAFE_THRESHOLD plus haut — même principe pour les bonus liés
     // à une fin de match (résumé/FD-warm/recap/recheck accéléré), jamais pour
     // la notif "Fin de match" elle-même (toujours envoyée, voir plus bas).
@@ -2021,20 +1996,10 @@ async function runOnePass(env) {
       }
     }
 
-    // 📊 Ticker "score en direct" — pas de dédup (même tag, remplace côté SW).
-    // Espacé à 1 passe sur 2 (shouldSendLiveTicker) — voir son commentaire.
-    if (isLive && underSubrequestSafeLimit && shouldSendLiveTicker()) {
-      const mLabel = status === 'STATUS_HALFTIME' ? 'Mi-temps' : `${comp.status?.displayClock ?? ''}`.trim()
-      await pushLiveTicker(env, {
-        title: `${homeTeam} ${scoreStr} ${awayTeam}`,
-        body:  mLabel ? `⏱ ${mLabel}` : 'En direct',
-        url:   '/live',
-        matchId: eventId,
-        tag:     `live-${eventId}`,
-        silent:  true,
-        renotify: false,
-      }, slug, log, homeTeam, awayTeam, rawHomeTeam, rawAwayTeam)
-    }
+    // ⚠️ Ticker "score en direct" RETIRÉ (27/10, voir le commentaire détaillé
+    // plus haut dans ce fichier, à l'endroit où vivait pushLiveTicker —
+    // constat utilisateur : notif minute par minute non voulue dès qu'un
+    // championnat est suivi).
    } catch (e) {
      log.push(`[espn:${slug}:${evt?.id ?? '?'}] ERREUR match ignoré : ${e.message}`)
    }
@@ -2216,25 +2181,11 @@ function shouldWriteDebugBookkeeping() {
   return new Date().getMinutes() % 15 === 0
 }
 
-// ⚠️ AJOUT (question utilisateur : "225K/500K commandes Upstash alors qu'il y
-// a eu des matchs en continu depuis début août, faut optimiser") : contrairement
-// à warmFdCache/shouldWriteDebugBookkeeping ci-dessus (déjà espacés),
-// pushLiveTicker (score en direct silencieux, filtré par club favori — voir
-// plus bas dans la boucle) tournait encore à CHAQUE passe (1min), pour
-// CHAQUE match en direct, sans aucun espacement — 1 appel Vercel + au
-// moins 1 lecture Redis (smembers push:subscriptions) par match live et par
-// minute, même si personne ne suit ce match en favori. Espacé à 1 passe sur 2,
-// même pattern que shouldWriteDebugBookkeeping : coupe ce poste en 2 les jours de
-// match chargés (plusieurs matchs simultanés). Contrepartie honnête, à
-// distinguer du reste : CETTE fonctionnalité EST directement visible par
-// l'utilisateur (le badge de notif "score en direct" silencieux, tray
-// Android/iOS) — son rafraîchissement passe de 1min à 2min. Les vraies
-// alertes (but/carton/mi-temps/fin, notifyVercel plus haut) ne sont PAS
-// concernées, restent instantanées comme avant — seul ce ticker de fond
-// ralentit légèrement.
-function shouldSendLiveTicker() {
-  return new Date().getMinutes() % 2 === 0
-}
+// ⚠️ `shouldSendLiveTicker` SUPPRIMÉE (27/10) — ne servait qu'au ticker
+// "score en direct" (pushLiveTicker), retiré entièrement le même jour (voir
+// le commentaire détaillé plus haut dans ce fichier, à l'endroit où vivait
+// pushLiveTicker — constat utilisateur : notif minute par minute non voulue
+// dès qu'un championnat est suivi).
 
 // ⚠️ ÉTUDIÉ, DÉPLOYÉ PUIS REVERTÉ (28/08, optimisation latence notifs) :
 // l'idée était de faire tourner runOnePass() 2 fois dans la même invocation
@@ -2245,8 +2196,8 @@ function shouldSendLiveTicker() {
 // notifs pendant un pic de 5 matchs simultanés, puis rattrapage isolé et très
 // en retard). Root cause identifiée : le plafond Workers gratuit de 50
 // sous-requêtes externes par invocation (ESPN + Upstash Redis confondus,
-// voir SUBREQUEST_SAFE_LIVE_THRESHOLD plus haut — déjà calé par une session
-// précédente pour 1 SEULE passe) était compté correctement pour 1 passe,
+// déjà calé par une session précédente pour 1 SEULE passe) était compté
+// correctement pour 1 passe,
 // mais le passage à 2 passes fait consommer ce même budget 2x DANS LA MÊME
 // invocation. Un seul match chargé (plusieurs buts + FT confirmé) coûte à
 // lui seul ~15 sous-requêtes (dédup+envoi Vercel par but/carton, écritures
