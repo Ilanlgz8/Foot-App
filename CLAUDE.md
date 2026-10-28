@@ -6001,6 +6001,51 @@ cf-worker/
   test), ce serait le signe d'un vrai dysfonctionnement ESPN plus large sur
   les coupes nationales plutôt qu'un cas isolé.
 
+- 🔍 Suite directe du point ci-dessus, même jour (28/10) : l'utilisateur a
+  contesté la conclusion "gap ESPN" avec un argument solide — "c'est pas
+  possible, ils étaient finis [...] ils peuvent pas se remettre au
+  lendemain [...] je suis pas fou [...] ou alors c'est qu'ils étaient en
+  doublon". Re-vérifié EN DIRECT, 2 fois, avec un cache-bust explicite
+  (`&_=N`) pour éviter de relire une réponse mise en cache côté outil : les
+  19 matchs du 27/10 sont TOUJOURS `STATUS_SCHEDULED` à l'instant présent,
+  jamais `FINAL`/`FINISHED` à aucun moment constaté — et `esp.copa_del_rey`
+  n'a AUCUN événement pour le 28/10 (confirmé 2 fois, à des minutes
+  d'écart). Vérifié aussi Coppa Italia (0 match le 28/10) et DFB-Pokal (13
+  matchs le 28/10, tous `SCHEDULED` — pas encore joués) pour écarter une
+  confusion entre les 2 coupes ajoutées le même jour : aucune des deux
+  n'a de match "fini aujourd'hui" non plus. Donc, à l'instant où j'écris
+  ceci, AUCUNE source ESPN ne montre un seul match de ces 3 coupes comme
+  terminé aujourd'hui — l'observation de l'utilisateur ne peut donc pas
+  venir de l'état ESPN actuel. Hypothèse la plus cohérente avec tous les
+  éléments (confirmée nulle part avec certitude absolue, honnêteté totale) :
+  AVANT le commit `53de5b1` de ce matin (14h46, celui qui corrige
+  `pastDayStaleTime`), le panneau "Résultats récents" verrouillait le
+  snapshot d'un jour passé pour 7 JOURS ENTIERS dès le tout premier fetch —
+  sans aucune condition. Si, sur l'appareil de l'utilisateur, ce tout
+  premier fetch d'hier (27/10) est tombé à un instant où ESPN affichait
+  BRIÈVEMENT un statut `FINAL`/score pour une partie de ces 19 matchs (un
+  vrai flottement connu et déjà documenté plusieurs fois dans ce fichier
+  pour d'autres endpoints ESPN), ce cache serait resté figé tel quel
+  pendant 7 jours — scores affichés compris — jusqu'à ce que MON PROPRE fix
+  de ce matin détecte qu'au moins un des 19 matchs n'est pas `FINISHED` et
+  force un refetch. Ce refetch révèle alors l'état RÉEL et actuel d'ESPN
+  (tout `SCHEDULED`, confirmé par 2 vérifications indépendantes) — qui ne
+  satisfait plus le filtre `status === 'FINISHED'` du panneau, faisant
+  disparaître ce qui semblait pourtant "fini" quelques heures plus tôt.
+  Explique précisément la coïncidence temporelle ("depuis les dernières
+  modifications") sans contredire la logique de l'utilisateur (un match
+  VRAIMENT fini ne redevient jamais programmé — c'est l'étiquette ESPN
+  elle-même, pas le résultat du match, qui aurait été incohérente d'un
+  moment à l'autre). Honnêteté : je n'ai aucun accès au cache réel de
+  l'appareil de l'utilisateur ni à un historique des réponses ESPN
+  d'hier/ce matin pour confirmer ce mécanisme précis avec certitude — c'est
+  l'explication la plus solide que je peux construire à partir de ce que
+  j'observe maintenant (ESPN unanimement `SCHEDULED`, jamais fini) croisé
+  avec le changement de code que j'ai moi-même déployé ce matin. Si ça se
+  reproduit, une capture d'écran du match/score exact avant qu'il ne
+  disparaisse permettrait de trancher avec certitude plutôt que de
+  raisonner après coup.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
