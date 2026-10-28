@@ -25,12 +25,12 @@ import '../../navbar.css'
 // depuis @tabler/icons") : aucun accès réseau possible dans cet environnement
 // vers les sources habituelles de ces icônes (raw.githubusercontent.com/
 // cdn.jsdelivr.net, les deux renvoient vide ici — déjà rencontré pour npm/
-// Turso, voir CLAUDE.md) pour en récupérer un tracé exact et vérifié. Un
-// écusson (shield) + une petite loupe : forme volontairement simple et
-// géométrique (jamais une icône de marque/chatbot), pour minimiser le risque
-// d'une "contrefaçon" bâclée déjà signalé 2 fois sur ce projet pour d'autres
-// icônes approximées à la main (21/09, voir le commentaire sur ICONS
-// ci-dessous) — ici aucune bibliothèque précise n'est prétendue reproduite.
+// Turso, voir CLAUDE.md) pour en récupérer un tracé exact et vérifié. Forme
+// volontairement simple et géométrique (jamais une icône de marque/chatbot),
+// pour minimiser le risque d'une "contrefaçon" bâclée déjà signalé 2 fois sur
+// ce projet pour d'autres icônes approximées à la main (21/09, voir le
+// commentaire sur ICONS ci-dessous) — aucune bibliothèque précise n'est
+// prétendue reproduite.
 // 28/10 — retour utilisateur round 2 : "il est trop petit, on voit à peine
 // l'icône" (entre la cloche et le brand, en haut). Bouton/svg agrandis dans
 // navbar.css (2.2rem→2.4rem / 1.2rem→1.5rem) + tracé épaissi (1.8→2.2).
@@ -39,12 +39,22 @@ import '../../navbar.css'
 // fois dans navbar.css (2.4rem→2.7rem / 1.5rem→1.8rem) ET le tracé repassé
 // à 2.4 — un tracé qui reste fin relativement à la taille du bouton se
 // perçoit toujours comme "petit" même quand le SVG grandit.
+// Round 4 (28/10, même jour) : le tracé lui-même (écusson + loupe) jugé
+// "pas ouf [...] mettre une vraie icône propre [...] dans le même style"
+// que les autres icônes du header — remplacé par une "fiche" (petite carte
+// avec un avatar schématique + lignes de texte, cohérent avec "Fiche
+// équipe") redessinée pour coller au style de NotificationBell.jsx (le
+// seul autre icône du header) : même strokeWidth 2 (au lieu de 2.4),
+// mêmes strokeLinecap/strokeLinejoin "round", même nombre réduit de
+// chemins simples — plutôt qu'un icône plus complexe/plus illustratif.
 function TeamSearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3l6 2.2v5.3c0 4.6-2.9 7.9-6 9-3.1-1.1-6-4.4-6-9V5.2L12 3z" />
-      <circle cx="10.4" cy="10.8" r="2.1" />
-      <path d="M11.9 12.3L13.5 13.9" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="4" width="17" height="16" rx="2.4" />
+      <circle cx="9" cy="10" r="1.9" />
+      <path d="M6 16.2c0-1.9 1.4-3.2 3-3.2s3 1.3 3 3.2" />
+      <path d="M14.3 9h4" />
+      <path d="M14.3 13h4" />
     </svg>
   )
 }

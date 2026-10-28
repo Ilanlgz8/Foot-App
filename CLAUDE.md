@@ -6074,6 +6074,82 @@ cf-worker/
   matchs. Si ESPN les confirme plus tard (même tardivement), ils
   réapparaîtront normalement au prochain refetch, sans action nécessaire.
 
+- 🔍 Suite (28/10, objection utilisateur explicite et logiquement fondée :
+  "hier soir, ils étaient dans résultat panel et ce matin, ils étaient plus.
+  Donc c'est qu'ils ont été marqués comme finis à un moment donné. Donc
+  c'est pas possible que ce soit ça" — rejet direct de l'hypothèse "cache
+  périmé" du point précédent, sur un argument solide : ce panneau ne filtre
+  QUE `status === 'FINISHED'`, donc s'ils y étaient visibles, ils ont dû
+  satisfaire ce filtre à un instant réel). Piste "jour précédent" testée et
+  ÉCARTÉE avec certitude : `esp.copa_del_rey/scoreboard?dates=20261026`
+  renvoie `events: []` ET les métadonnées `calendar` de la compétition
+  elle-même confirment que le "First Round" n'a démarré que le 27/10
+  ("First Round: Oct 27-Nov 13") — il n'existait tout simplement AUCUN match
+  Copa del Rey le 26/10, donc aucune bascule de jour ne peut expliquer une
+  disparition de résultats "d'hier" qui auraient été ceux de l'avant-veille.
+  Honnêteté sans détour : je n'ai trouvé, à ce stade, aucun mécanisme de
+  code qui expliquerait comment ce panneau précis aurait pu afficher ces
+  matchs comme `FINISHED` alors que l'API ESPN elle-même ne les a, à aucun
+  moment vérifiable depuis cet environnement, jamais montrés autrement que
+  `STATUS_SCHEDULED` — ce qui laisse 2 possibilités non départagées : (a) un
+  vrai flottement ESPN non capturé par mes vérifications (statut confirmé
+  FINAL puis redevenu SCHEDULED, un comportement jamais observé ailleurs
+  dans ce fichier mais pas formellement impossible), ou (b) une confusion
+  de jour/compétition côté utilisateur (quelque chose d'autre, réellement
+  fini, associé à tort à "Copa del Rey d'hier"). Je ne tranche pas entre les
+  deux sans plus d'éléments — si ça se reproduit, une capture d'écran prise
+  AU MOMENT où les résultats sont visibles (équipes + score + l'écran
+  complet) serait la seule façon de trancher avec certitude, plutôt que de
+  continuer à théoriser après coup sans preuve.
+
+- ✅ Couleur de Paris Saint-Germain affichée en vert (aléatoire) dans "Fiche
+  équipe" (28/10, constat utilisateur : "les couleurs du Paris Saint-Germain,
+  c'est bleu et rouge [...] couleur aléatoire") — root cause confirmée par
+  lecture directe du code : `TeamProfile` (`TeamSearchPage.jsx`) appelle
+  `getTeamColor(selected.displayName)`, et `translateTeam('PSG')` ET
+  `translateTeam('Paris Saint-Germain')` renvoient TOUS LES DEUX `'Paris SG'`
+  (`teamNames.js`) — une clé qui n'existe dans AUCUNE des 2 entrées déjà
+  présentes dans `TEAM_COLORS_FULL` (`'Paris Saint-Germain'`/`'PSG'`,
+  `teamPhotos.js`), et que `normalizeTeamKey()` ne rapproche pas non plus
+  d'elles ("paris sg" ≠ "paris saint germain" ≠ "psg"). Les 4 étapes de
+  `lookupColor()` (exact → normalisé → préfixe club retiré → mot-clé fuzzy)
+  échouaient donc toutes, et la fonction retombait sur `fallbackColor()` —
+  une couleur dérivée d'un hash du nom, donc effectivement "aléatoire" du
+  point de vue de l'utilisateur, qui tombait sur le vert pour cette chaîne
+  précise. Corrigé (`teamPhotos.js`) : 3e alias exact ajouté, `'Paris SG':
+  { p: '#004170', s: '#DA020E' }` (mêmes couleurs déjà correctes des 2
+  entrées existantes) — même principe déjà en place dans ce fichier pour
+  d'autres alias (`'PSG'` lui-même en est un). 398 tests + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : seul
+  PSG a été vérifié et corrigé ici (le cas précisément rapporté) — comme
+  `translateTeam` produit des noms d'affichage qui ne correspondent pas
+  toujours exactement aux clés de `TEAM_COLORS_FULL`, il est possible qu'un
+  autre club ait le même type de divergence non détectée ; à corriger au cas
+  par cas si signalé, plutôt qu'un audit complet non demandé.
+
+- ✅ Icône navbar "Fiche équipe" redessinée, round 4 (28/10, constat
+  utilisateur explicite : "elle est vraiment pas ouf [...] mettre une vraie
+  icône propre, un peu comme les autres [...] que ce soit pas un style
+  différent") — après 3 rounds qui n'avaient fait qu'agrandir le tracé
+  (écusson + loupe) sans jamais revoir sa forme elle-même, celle-ci est
+  remplacée (`navbar.jsx`, `TeamSearchIcon`) par une "fiche" (petite carte
+  avec un avatar schématique en cercle + 2 lignes évoquant du texte/stats —
+  cohérent avec le nom "Fiche équipe") redessinée pour reprendre EXACTEMENT
+  les propriétés de trait du seul autre icône du header
+  (`NotificationBell.jsx`) : `strokeWidth="2"` (au lieu de 2.4), mêmes
+  `strokeLinecap`/`strokeLinejoin` "round", un nombre de chemins tout aussi
+  réduit (1 rectangle + 1 cercle + 3 traits) — même famille de style que la
+  cloche plutôt qu'un tracé plus illustratif. Taille du bouton/svg
+  (2.7rem/1.8rem, déjà au max après les 3 rounds précédents) inchangée :
+  cette fois la demande portait sur le TRACÉ, pas la taille. 398 tests +
+  lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
+  Honnêteté : comme pour la version précédente, ce tracé est dessiné à la
+  main (toujours aucun accès réseau vers les sources d'icônes habituelles
+  depuis cet environnement) — rendu jamais vu en direct sur un vrai
+  appareil/navigateur avant ce déploiement, à confirmer par l'utilisateur
+  après ce déploiement (automatique via Vercel), nouvelle itération à
+  prévoir si le style ne convient toujours pas.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

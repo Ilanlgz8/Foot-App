@@ -121,6 +121,17 @@ export const TEAM_COLORS_FULL = {
   'Marseille':             { p: '#009BDE', s: '#1a1a1a' },
   'Lyon':                  { p: '#1A5EA2', s: '#D00000' },
   'PSG':                   { p: '#004170', s: '#DA020E' },
+  // ⚠️ AJOUT (28/10, bug utilisateur : PSG affiché en vert sur /equipe) —
+  // TeamSearchPage.jsx appelle getTeamColor(selected.displayName), et
+  // translateTeam('PSG')/translateTeam('Paris Saint-Germain') renvoient
+  // TOUS LES DEUX 'Paris SG' (voir teamNames.js) — une clé qui n'existe
+  // dans AUCUNE des 2 entrées ci-dessus ('Paris Saint-Germain'/'PSG'), et
+  // que normalizeTeamKey() ne rapproche pas non plus d'elles ("paris sg"
+  // ≠ "paris saint germain" ≠ "psg"). lookupColor() retombait donc sur
+  // fallbackColor() — une couleur dérivée d'un hash du nom, "aléatoire"
+  // en pratique (verte ici) — d'où le symptôme exact rapporté. Alias
+  // direct ajouté, même principe que les 2 entrées ci-dessus.
+  'Paris SG':              { p: '#004170', s: '#DA020E' },
   // UEFA — manquants
   'Wales':                 { p: '#C8102E', s: '#006B54' },
   'Scotland':              { p: '#003078', s: '#FFFFFF' },
