@@ -6102,6 +6102,37 @@ cf-worker/
   complet) serait la seule façon de trancher avec certitude, plutôt que de
   continuer à théoriser après coup sans preuve.
 
+- ✅ "Fiche équipe" (`/equipe`), round 5 — disposition générale repensée
+  (28/10, demandé via question de clarification : le nom "Fiche équipe" est
+  confirmé bon tel quel, le point à revoir est la "disposition générale" de
+  la page). Root du problème : les 3 sections de stats (Bilan / Buts /
+  Domicile-Extérieur) étaient chacune leur propre carte avec son propre
+  titre et sa propre marge — une suite de 3 blocs détachés les uns des
+  autres plutôt qu'une vraie lecture d'ensemble, l'exact symptôme "pas
+  assez structuré" pointé. Fusionnées (`TeamSearchPage.jsx` +
+  `teamSearchPage.css`) en UN seul panneau "Statistiques"
+  (`.teamSearchPage__statsPanel`), 3 rangées séparées par de fines lignes
+  internes (`.teamSearchPage__statsPanelDivider`) plutôt que par des cartes
+  répétées : (1) bilan global — gros chiffres V/N/D colorés + une barre de
+  répartition + le nombre de matchs joués, tout centré ; (2) buts — 4
+  pastilles alignées (marqués/concédés/différence/clean sheets) sans cadre
+  individuel, le cadre du panneau suffisant déjà ; (3) Domicile/Extérieur —
+  2 blocs côte à côte séparés par une fine ligne verticale au lieu de 2
+  cartes avec leur propre fond. Résultat : une seule respiration visuelle
+  pour toute la zone stats, la structure interne restant lisible via les
+  séparateurs et les libellés plutôt que via un empilement de boîtes. Hero
+  (identité + forme récente) et liste des matchs (déjà validés aux rounds
+  précédents, "pour le reste, c'est pas mal") non touchés — seule la zone
+  stats intermédiaire a changé. Anciennes classes CSS devenues mortes
+  (`.teamSearchPage__statsGrid*`, `.teamSearchPage__statCard*`,
+  `.teamSearchPage__homeAway` wrapper) retirées plutôt que laissées en code
+  mort. 398 tests (inchangé) + lint (35 erreurs pré-existantes, Pronos.jsx,
+  confirmées identiques) + build vérifiés. Honnêteté : comme pour les 4
+  rounds précédents de cette page, rendu jamais vu en direct sur un vrai
+  appareil/navigateur depuis cet environnement — à confirmer par
+  l'utilisateur après ce déploiement (automatique via Vercel), nouvelle
+  itération à prévoir si la disposition ne convainc toujours pas.
+
 - ✅ Couleur de Paris Saint-Germain affichée en vert (aléatoire) dans "Fiche
   équipe" (28/10, constat utilisateur : "les couleurs du Paris Saint-Germain,
   c'est bleu et rouge [...] couleur aléatoire") — root cause confirmée par

@@ -217,53 +217,55 @@ function TeamProfile({ rows, teamName, teamCrest }) {
         </div>
       )}
 
-      <section className="teamSearchPage__section">
-        <h3 className="teamSearchPage__sectionTitle">Bilan</h3>
-        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--4">
-          <div className="teamSearchPage__statCard">
-            <span className="teamSearchPage__statValue">{stats.played}</span>
-            <span className="teamSearchPage__statLabel">Joués</span>
+      {/* ⚠️ REDESSINÉ (28/10, round 4 — retour utilisateur : "disposition
+          générale" pointée comme le point à revoir). Les 3 anciennes sections
+          (Bilan / Buts / Domicile-Extérieur), chacune sa propre carte avec
+          son propre titre et sa propre marge, donnaient une suite de blocs
+          détachés les uns des autres plutôt qu'une vraie lecture d'ensemble.
+          Fusionnées en UN seul panneau "Statistiques", avec 3 rangées
+          séparées par de fines lignes internes plutôt que par des cartes
+          distinctes — un seul cadre, une seule respiration visuelle, la
+          structure interne reste lisible via les séparateurs et les
+          libellés, pas via un empilement de boîtes. */}
+      <section className="teamSearchPage__statsPanel">
+        <h3 className="teamSearchPage__sectionTitle">Statistiques</h3>
+
+        <div className="teamSearchPage__statsPanelRow teamSearchPage__statsPanelRow--record">
+          <div className="teamSearchPage__recordNums">
+            <span className="teamSearchPage__recordNum teamSearchPage__recordNum--w">{stats.wins}<small>V</small></span>
+            <span className="teamSearchPage__recordNum teamSearchPage__recordNum--d">{stats.draws}<small>N</small></span>
+            <span className="teamSearchPage__recordNum teamSearchPage__recordNum--l">{stats.losses}<small>D</small></span>
           </div>
-          <div className="teamSearchPage__statCard teamSearchPage__statCard--win">
-            <span className="teamSearchPage__statValue">{stats.wins}</span>
-            <span className="teamSearchPage__statLabel">Victoires</span>
+          <RecordBar wins={stats.wins} draws={stats.draws} losses={stats.losses} />
+          <span className="teamSearchPage__recordCaption">
+            {stats.played} match{stats.played > 1 ? 's' : ''} joué{stats.played > 1 ? 's' : ''}
+          </span>
+        </div>
+
+        <div className="teamSearchPage__statsPanelDivider" />
+
+        <div className="teamSearchPage__statsPanelRow teamSearchPage__statsPanelRow--goals">
+          <div className="teamSearchPage__goalPill">
+            <span className="teamSearchPage__goalPillValue">{stats.gf}</span>
+            <span className="teamSearchPage__goalPillLabel">Marqués</span>
           </div>
-          <div className="teamSearchPage__statCard teamSearchPage__statCard--draw">
-            <span className="teamSearchPage__statValue">{stats.draws}</span>
-            <span className="teamSearchPage__statLabel">Nuls</span>
+          <div className="teamSearchPage__goalPill">
+            <span className="teamSearchPage__goalPillValue">{stats.ga}</span>
+            <span className="teamSearchPage__goalPillLabel">Concédés</span>
           </div>
-          <div className="teamSearchPage__statCard teamSearchPage__statCard--loss">
-            <span className="teamSearchPage__statValue">{stats.losses}</span>
-            <span className="teamSearchPage__statLabel">Défaites</span>
+          <div className="teamSearchPage__goalPill">
+            <span className="teamSearchPage__goalPillValue">{stats.diff > 0 ? `+${stats.diff}` : stats.diff}</span>
+            <span className="teamSearchPage__goalPillLabel">Différence</span>
+          </div>
+          <div className="teamSearchPage__goalPill teamSearchPage__goalPill--cs">
+            <span className="teamSearchPage__goalPillValue">{stats.cleanSheets}</span>
+            <span className="teamSearchPage__goalPillLabel">Clean sheets</span>
           </div>
         </div>
-      </section>
 
-      <section className="teamSearchPage__section">
-        <h3 className="teamSearchPage__sectionTitle">Buts</h3>
-        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--4">
-          <div className="teamSearchPage__statCard">
-            <span className="teamSearchPage__statValue">{stats.gf}</span>
-            <span className="teamSearchPage__statLabel">Marqués</span>
-          </div>
-          <div className="teamSearchPage__statCard">
-            <span className="teamSearchPage__statValue">{stats.ga}</span>
-            <span className="teamSearchPage__statLabel">Concédés</span>
-          </div>
-          <div className="teamSearchPage__statCard">
-            <span className="teamSearchPage__statValue">{stats.diff > 0 ? `+${stats.diff}` : stats.diff}</span>
-            <span className="teamSearchPage__statLabel">Différence</span>
-          </div>
-          <div className="teamSearchPage__statCard teamSearchPage__statCard--cs">
-            <span className="teamSearchPage__statValue">{stats.cleanSheets}</span>
-            <span className="teamSearchPage__statLabel">Clean sheets</span>
-          </div>
-        </div>
-      </section>
+        <div className="teamSearchPage__statsPanelDivider" />
 
-      <section className="teamSearchPage__section">
-        <h3 className="teamSearchPage__sectionTitle">Domicile / Extérieur</h3>
-        <div className="teamSearchPage__homeAway">
+        <div className="teamSearchPage__statsPanelRow teamSearchPage__statsPanelRow--homeaway">
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Domicile</span>
             <span className="teamSearchPage__homeAwayRecord">
@@ -271,6 +273,7 @@ function TeamProfile({ rows, teamName, teamCrest }) {
             </span>
             <RecordBar wins={stats.home.wins} draws={stats.home.draws} losses={stats.home.losses} />
           </div>
+          <div className="teamSearchPage__homeAwayDivider" />
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Extérieur</span>
             <span className="teamSearchPage__homeAwayRecord">
