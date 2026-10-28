@@ -31,16 +31,19 @@ import '../../navbar.css'
 // d'une "contrefaçon" bâclée déjà signalé 2 fois sur ce projet pour d'autres
 // icônes approximées à la main (21/09, voir le commentaire sur ICONS
 // ci-dessous) — ici aucune bibliothèque précise n'est prétendue reproduite.
-// 28/10 — retour utilisateur : "il est trop petit, on voit à peine l'icône"
-// (entre la cloche et le brand, en haut). Le bouton/svg sont agrandis dans
-// navbar.css (2.2rem→2.4rem / 1.2rem→1.5rem) ET le tracé lui-même est
-// épaissi (1.8→2.2, aligné sur l'épaisseur de la cloche) — un tracé fin
-// reste peu visible même agrandi, l'épaisseur compte autant que la taille.
+// 28/10 — retour utilisateur round 2 : "il est trop petit, on voit à peine
+// l'icône" (entre la cloche et le brand, en haut). Bouton/svg agrandis dans
+// navbar.css (2.2rem→2.4rem / 1.2rem→1.5rem) + tracé épaissi (1.8→2.2).
+// Round 3, MÊME remarque malgré ce premier passage ("soit un peu plus gros
+// quand même [...] c'est un peu petit là") : bouton/svg réagrandis une 2e
+// fois dans navbar.css (2.4rem→2.7rem / 1.5rem→1.8rem) ET le tracé repassé
+// à 2.4 — un tracé qui reste fin relativement à la taille du bouton se
+// perçoit toujours comme "petit" même quand le SVG grandit.
 function TeamSearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l6 2.2v5.3c0 4.6-2.9 7.9-6 9-3.1-1.1-6-4.4-6-9V5.2L12 3z" />
-      <circle cx="10.4" cy="10.8" r="2" />
+      <circle cx="10.4" cy="10.8" r="2.1" />
       <path d="M11.9 12.3L13.5 13.9" />
     </svg>
   )

@@ -156,6 +156,14 @@ function TeamProfile({ rows, teamName, teamCrest }) {
 
   return (
     <div className="teamSearchPage__profile" style={{ '--team-color': color, '--team-color-rgb': rgb }}>
+      {/* ⚠️ REDESSINÉ (28/10, round 3 — retour utilisateur : "là où il y a la
+          forme récente [...] faut un peu améliorer ça [...] faire une
+          disposition vraiment carrée, vraiment propre. Bien lisible pour
+          l'utilisateur") : l'ancienne ligne horizontale (blason à gauche,
+          colonne texte à droite) devient une vraie carte carrée centrée —
+          blason en tête, nom, puis le bilan V/N/D, puis un bloc "Forme
+          récente" séparé et titré (au lieu d'un simple rang de losanges
+          collé sous le nom) pour une lecture plus claire, bloc par bloc. */}
       <div className="teamSearchPage__hero">
         <div className="teamSearchPage__profileCrestWrap">
           {teamCrest ? (
@@ -169,15 +177,18 @@ function TeamProfile({ rows, teamName, teamCrest }) {
             <span className="teamSearchPage__profileCrestFallback">{teamName.charAt(0)}</span>
           )}
         </div>
-        <div className="teamSearchPage__heroInfo">
-          <h2 className="teamSearchPage__profileName">{teamName}</h2>
-          {stats.form.length > 0 && <FormDiamonds form={stats.form} />}
-          <span className="teamSearchPage__heroRecord">
-            {stats.wins}V {stats.draws}N {stats.losses}D
-            <span className="teamSearchPage__heroRecordSep">·</span>
-            {stats.played} match{stats.played > 1 ? 's' : ''}
-          </span>
-        </div>
+        <h2 className="teamSearchPage__profileName">{teamName}</h2>
+        <span className="teamSearchPage__heroRecord">
+          {stats.wins}V {stats.draws}N {stats.losses}D
+          <span className="teamSearchPage__heroRecordSep">·</span>
+          {stats.played} match{stats.played > 1 ? 's' : ''}
+        </span>
+        {stats.form.length > 0 && (
+          <div className="teamSearchPage__heroForm">
+            <span className="teamSearchPage__heroFormLabel">Forme récente</span>
+            <FormDiamonds form={stats.form} />
+          </div>
+        )}
       </div>
 
       {comps.length > 1 && (

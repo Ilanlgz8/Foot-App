@@ -5920,6 +5920,45 @@ cf-worker/
   environnement — à confirmer par l'utilisateur après ce déploiement, avec une nouvelle itération
   si besoin.
 
+- ✅ "Fiche équipe" (`/equipe`), 3e round de retours (28/10, dicté verbatim : "l'icône de fiche
+  d'équipe là, en haut de l'app [...] soit un peu plus gros quand même [...] c'est un peu petit
+  là" + "la couleur verte là, pour les cadres de chaque match, c'est un peu trop [...] faire un
+  peu plus comme programme et résultat, alors à peu près les mêmes couleurs" + "là où il y a la
+  forme récente [...] faut un peu améliorer ça [...] faire une disposition vraiment carrée,
+  vraiment propre. Bien lisible") — 3 changements, "pour le reste, c'est pas mal" (round 2
+  inchangé) :
+  1. **Icône navbar réagrandie** (`navbar.jsx`/`navbar.css`) : malgré le passage 2.2rem→2.4rem du
+     round 2, toujours jugée petite — repoussée à 2.7rem (bouton) / 1.8rem (icône), tracé épaissi
+     2.2→2.4, opacité par défaut 0.55→0.6. Déjà plus grosse que `.notif-bell` (2.2rem/1.1rem)
+     avant ce 2e passage — confirme que le tracé bouclier+loupe restait visuellement fin à cette
+     échelle, pas qu'une pure question de taille numérique.
+  2. **Vert retiré des cadres de match** (`teamSearchPage.css`) : `.teamSearchPage__matchRow--w/
+     --d/--l` (bordure gauche verte/jaune/rouge selon résultat) supprimées entièrement — repris
+     EXACTEMENT le principe de `.resultats__card` (`resultats.css`, vérifié avant modification) :
+     une bordure/fond CONSTANTS, teintés à la couleur de l'équipe (l'équivalent du rouge toujours
+     présent sur Programme/Résultats, jamais dépendant du résultat), la distinction victoire/nul
+     se lisant uniquement sur la couleur du SCORE. `.teamSearchPage__matchScoreNum--win` passé du
+     vert `#4ade80` à l'or/ambre `#fbbf24` + lueur `rgba(245,158,11,0.4)` — couleur EXACTE de
+     `.resultats__scoreNum--win`. `--draw` (gris `#94a3b8`) déjà identique, inchangé. Portée
+     volontairement limitée aux "cadres de chaque match" nommés par l'utilisateur : les stats
+     W/D/L du Bilan (vert/jaune/rouge) et la RecordBar Domicile/Extérieur (mêmes teintes) ne sont
+     PAS concernées — ni nommées dans ce retour, ni des "cadres de match".
+  3. **Hero "forme récente" redessiné en disposition carrée** (`TeamSearchPage.jsx` +
+     `teamSearchPage.css`) : l'ancienne ligne horizontale (blason à gauche, colonne nom+losanges+
+     bilan tassée à droite) devient une colonne centrée — blason en tête, nom, bilan V/N/D, puis
+     un bloc "Forme récente" séparé par une fine ligne (`border-top`) et titré (nouveau libellé
+     `.teamSearchPage__heroFormLabel`, "FORME RÉCENTE" en petites capitales) au lieu des losanges
+     collés directement sous le nom sans légende — chaque information a désormais son propre
+     palier, plus lisible d'un coup d'œil ("bien lisible pour l'utilisateur"). `.teamSearchPage__
+     heroInfo` (l'ancien wrapper colonne, devenu sans usage) supprimé proprement plutôt que laissé
+     orphelin.
+  398 tests (inchangé) + lint (35 erreurs pré-existantes, Pronos.jsx, confirmées identiques) +
+  build vérifiés. Honnêteté : comme pour les 2 rounds précédents, rendu jamais vu en direct sur un
+  vrai appareil/navigateur depuis cet environnement — ces 3 changements répondent chacune à un
+  retour concret et précis de l'utilisateur (pas une supposition), avec le match-row et le score
+  directement calqués sur des valeurs déjà vérifiées dans `resultats.css`/`ResultCard.jsx` — à
+  confirmer visuellement après déploiement, nouvelle itération à prévoir si besoin.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

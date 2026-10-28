@@ -107,22 +107,30 @@
 /* Bouton "Fiche équipe" (/equipe, 28/10) — même gabarit que .notif-bell
    (notificationBell.css) pour rester visuellement cohérent dans le même
    groupe de boutons icône du header. */
+/* 28/10, 3e retour utilisateur : "soit un peu plus gros quand même [...]
+   c'est un peu petit là" — malgré le passage 2.2rem→2.4rem du round
+   précédent. Repoussé plus loin (2.4rem→2.7rem / icône 1.5rem→1.8rem, voir
+   plus bas) : déjà plus gros que .notif-bell (2.2rem/1.1rem) avant ce
+   changement, donc ce n'est pas qu'une question de taille numérique — le
+   tracé bouclier+loupe reste fin visuellement à cette échelle. */
 .teamSearchBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.7rem;
+  height: 2.7rem;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
   transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
-/* 28/10 — "trop petit, on voit à peine" : bouton + icône agrandis (2.2rem→
-   2.4rem / 1.2rem→1.5rem) et opacité par défaut remontée (0.45→0.55, voir
+/* 28/10 — "trop petit, on voit à peine" (round 2) puis "soit un peu plus
+   gros quand même [...] c'est un peu petit là" (round 3, même après le
+   passage à 2.4rem/1.5rem) : bouton + icône agrandis une 2e fois (2.4rem→
+   2.7rem / 1.5rem→1.8rem) et opacité par défaut remontée (0.55→0.6, voir
    TeamSearchIcon pour l'épaississement du tracé lui-même). */
-.teamSearchBtn svg { width: 1.5rem; height: 1.5rem; }
+.teamSearchBtn svg { width: 1.8rem; height: 1.8rem; }
 .teamSearchBtn:hover {
   color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.08);
