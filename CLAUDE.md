@@ -6046,6 +6046,34 @@ cf-worker/
   disparaisse permettrait de trancher avec certitude plutôt que de
   raisonner après coup.
 
+- 🔍 Suite (28/10, même soirée) : re-vérifié EN DIRECT contre l'API ESPN à
+  19:24 UTC (donc ~24-26h après les coups d'envoi du 27/10, 17h30-19h UTC) —
+  les 19 matchs de Copa del Rey du 27/10 sont TOUJOURS `STATUS_SCHEDULED`,
+  aucun `STATUS_FINAL` nulle part (vérifié par grep exhaustif sur la réponse
+  complète du scoreboard, 19 occurrences de `STATUS_SCHEDULED`, zéro autre
+  statut). C'est EXACTEMENT la même source que `fetchEspnCupMatches`
+  (`espnAdapter.js`) utilise pour alimenter l'app — donc par construction,
+  ces matchs ne peuvent structurellement pas apparaître dans "Résultats
+  récents" (filtré sur `status === 'FINISHED'`) tant qu'ESPN lui-même ne les
+  confirme pas. Ça contredit directement le constat de l'utilisateur ("hier
+  soir, quand tous les matchs étaient terminés, ils y étaient") : si ESPN
+  n'a JAMAIS, à aucun moment vérifiable depuis cet environnement, marqué un
+  seul de ces 19 matchs comme fini, ce qui a été vu hier soir ne pouvait pas
+  être le vrai statut ESPN de ces matchs précis. Honnêteté : je ne peux pas
+  prouver ce qui s'est réellement affiché sur l'appareil de l'utilisateur
+  hier soir (pas d'accès à son historique) — 2 explications restent
+  possibles sans pouvoir trancher entre elles : (a) une donnée en cache
+  erronée (potentiellement un résidu d'avant le fix `pastDayStaleTime` du
+  matin même) qui donnait l'illusion de matchs finis sans que ce soit
+  réellement confirmé par ESPN ; (b) une confusion de compétition/journée
+  (une autre coupe, ou un autre jour, montrant de vrais résultats finis,
+  associée par erreur à "Copa del Rey d'hier"). Dans tous les cas, l'état
+  ACTUEL d'ESPN pour ce round précis est un vrai trou de données persistant
+  (confirmé 2 fois à des heures différentes le même jour) — pas un bug de
+  code côté app, rien à corriger ici tant qu'ESPN ne confirme pas ces
+  matchs. Si ESPN les confirme plus tard (même tardivement), ils
+  réapparaîtront normalement au prochain refetch, sans action nécessaire.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
