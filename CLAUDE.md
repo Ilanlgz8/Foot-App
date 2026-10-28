@@ -5559,6 +5559,46 @@ cf-worker/
   plus — même à coût modeste, ça s'additionne à un total déjà tendu. Pas de
   décision finale de l'utilisateur obtenue dans cette conversation.
 
+- ✅ Coupe nationale (Copa del Rey/Coupe de France/FA Cup) séparée du championnat
+  dans Programme (28/10, demande explicite : "c'est mélangé avec la compétition
+  Copa del Rey [...] faudrait séparer tout ça [...] un onglet en plus [...]
+  pareil dans le truc de la Ligue 1, t'as Copa del Rey [sic, Coupe de France]
+  mais c'est que le classement [bracket], on voudrait les journées aussi") —
+  root cause confirmée par lecture de code : `fetchClubMatchesRaw`
+  (`useMatchs.js`) fusionne volontairement les matchs de coupe (`isCup:true`,
+  voir `DOMESTIC_CUPS`/`fetchEspnCupMatches`) dans le MÊME tableau que le
+  championnat ("fusionnée DANS ce même onglet plutôt que dans un onglet dédié
+  (demande explicite)" — ancien choix, aujourd'hui inversé). `Match.jsx`
+  (page Programme) avait déjà un onglet "{nom de la coupe}" MAIS il ne menait
+  qu'au tableau à élimination directe (`wcView: 'bracket'`, vide/désactivé
+  tant qu'un tour assez avancé n'est pas atteint — probablement ce que
+  l'utilisateur appelait "le classement") ; la vue "Par journée" elle-même
+  restait mélangée championnat+coupe, quel que soit l'onglet. Corrigé
+  (`Match.jsx`) : `matches` (hook `useMatches`) scindé en `leagueOnlyMatches`
+  (`!m.isCup`) et `cupOnlyMatches` (`m.isCup`) dès que `hasCup`. 3e mode de
+  `wcView` ajouté, `'cup'` — nouveau bouton de toggle, libellé avec le nom de
+  la coupe (`DOMESTIC_CUPS[selectedComp].name`), qui affiche les matchs de la
+  coupe en liste "Par journée" EXACTEMENT comme le championnat (même
+  mécanisme `groupRounds`/navigation par journée/recherche, juste sur
+  `cupOnlyMatches` au lieu de `leagueOnlyMatches` — `activeMatches`/
+  `activeGrouped`/`inListView` factorisent le choix). Le bouton "Par journée"
+  du championnat n'affiche désormais plus JAMAIS de matchs de coupe. L'ancien
+  bouton "{nom de la coupe}" (bracket) renommé "Tableau" (évite 2 boutons
+  avec le même libellé) — reste un tableau à élimination directe, inchangé
+  sinon ; son repli "vide" (`cupBracketDisabled`) et son CTA de secours
+  renvoient maintenant vers le nouvel onglet coupe plutôt que vers le
+  championnat. Portée volontairement limitée à Programme (`Match.jsx`), la
+  page explicitement nommée par l'utilisateur — `Resultat.jsx` a exactement
+  la même fusion ( `useMatches`/`groupRounds`, pas de split `isCup`) mais n'a
+  pas été touchée : à faire pareil si demandé. 385 tests (inchangé, aucun
+  nouveau test dédié — changement de composition/affichage, pas de nouvelle
+  logique pure testable isolément) + lint (35 erreurs pré-existantes,
+  Pronos.jsx, inchangé — 1 variable `grouped` devenue inutilisée après le
+  retrait de son seul usage, retirée de la déstructuration) + build vérifiés.
+  Honnêteté : rendu jamais vu en direct sur un vrai appareil avant ce
+  déploiement (juste lecture du JSX résultant) — à confirmer par
+  l'utilisateur, déploiement automatique via Vercel.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

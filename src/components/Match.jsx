@@ -12,7 +12,7 @@ import { lockBodyScroll } from '../utils/scrollLock'
 // compétitions à 1 seul match par an (USC/TDC/CS).
 const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
-import { useMatches } from '../hooks/useMatchs'
+import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { prefetchTeamForm } from '../hooks/useTeamForm'
 import { useWcKnockout, useCupKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { GroupModal } from './GroupModal'
@@ -804,7 +804,7 @@ function Matchs() {
   }, [])
 
   /* ── Data ── */
-  const { matches, loading, error, grouped } = useMatches(selectedComp, 'SCHEDULED', 'asc')
+  const { matches, loading, error } = useMatches(selectedComp, 'SCHEDULED', 'asc')
   // useTeamForm(selectedComp) retiré (10/07 cleanup) : formMap n'était jamais
   // consommé nulle part dans cette page (Programme n'affiche pas de losanges
   // de forme) — fetch réseau pur perte, contraire à l'effort de réduction du
@@ -822,6 +822,25 @@ function Matchs() {
   // tableau à élimination directe SI — voir useCupKnockout (source ESPN,
   // useWcKnockout.js) et DOMESTIC_CUPS (competitions.js).
   const hasCup       = !!DOMESTIC_CUPS[selectedComp]
+  // ⚠️ SÉPARATION championnat/coupe (28/10, demande explicite utilisateur :
+  // "c'est mélangé avec la compétition Copa del Rey [...] faudrait séparer
+  // tout ça") — `matches` (useMatches ci-dessus) contient TOUJOURS le
+  // championnat ET sa coupe nationale fusionnés pour les compétitions
+  // hasCup (voir fetchClubMatchesRaw/DOMESTIC_CUPS, isCup:true posé sur les
+  // matchs de coupe) : fusion volontaire à l'époque ("rester dans le même
+  // onglet"), mais qui mélangeait les 2 dans la même vue "Par journée" sans
+  // distinction. Séparés ici une fois pour toutes : leagueOnlyMatches pour
+  // le championnat (vue "Par journée" existante, désormais filtrée),
+  // cupOnlyMatches pour le nouvel onglet dédié à la coupe (voir
+  // showingCupList/activeMatches plus bas).
+  const leagueOnlyMatches = useMemo(
+    () => hasCup ? matches.filter(m => !m.isCup) : matches,
+    [matches, hasCup]
+  )
+  const cupOnlyMatches = useMemo(
+    () => hasCup ? matches.filter(m => m.isCup) : [],
+    [matches, hasCup]
+  )
   const {
     rounds:  cupRounds,
     loading: cupBracketLoading,
@@ -863,6 +882,16 @@ function Matchs() {
   // coupe nationale et auraient affiché "Par journée" ET le bracket en même
   // temps pour ces onglets.
   const hasToggle    = isWC || hasCup
+  // wcView 'cup' : nouvel onglet dédié aux matchs de la coupe nationale
+  // fusionnée, affichés "Par journée" exactement comme le championnat mais
+  // jamais mélangés avec lui (voir leagueOnlyMatches/cupOnlyMatches
+  // ci-dessus). inListView regroupe 'matchs' et 'cup' : les 2 partagent
+  // exactement le même rendu (recherche, nav par journée/tour), seule la
+  // liste de matchs sous-jacente change (activeMatches ci-dessous).
+  const showingCupList = hasCup && wcView === 'cup'
+  const inListView      = wcView === 'matchs' || wcView === 'cup'
+  const activeMatches   = showingCupList ? cupOnlyMatches : leagueOnlyMatches
+  const activeGrouped   = useMemo(() => groupRounds(activeMatches, 'asc'), [activeMatches])
   // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
   // à rien (le bracket est propre à la CdM, changer de championnat en sort de
   // toute façon) — on la masque et on laisse le tableau utiliser toute la
@@ -1006,7 +1035,11 @@ function Matchs() {
      journée" plutôt que d'afficher l'onglet actif mais désactivé. */
   useEffect(() => {
     if (cupBracketDisabled && wcView === 'bracket') {
-      setWcView('matchs')
+      // cupBracketDisabled n'est vrai QUE pour une coupe nationale (hasCup) —
+      // retombe sur l'onglet de la coupe elle-même ('cup'), pas sur le
+      // championnat : l'utilisateur regardait le tableau de la coupe, pas le
+      // programme du championnat.
+      setWcView('cup')
       setCurrentIndex(0)
     }
   }, [cupBracketDisabled, wcView, setWcView, setCurrentIndex])
@@ -1023,7 +1056,7 @@ function Matchs() {
      place ici — il est déjà visible dans le widget "EN DIRECT" de l'Accueil
      et sur la page /live, pas besoin de le montrer aussi dans "Programme". */
   const filteredGrouped = useMemo(() => {
-    return grouped
+    return activeGrouped
       .map(g => ({
         ...g,
         matches: applyKnockoutTeamOverrides(
@@ -1032,7 +1065,7 @@ function Matchs() {
         ),
       }))
       .filter(g => g.matches.length > 0)
-  }, [grouped, knockoutOverrides])
+  }, [activeGrouped, knockoutOverrides])
 
   /* Navigation journées */
   const total = filteredGrouped.length
@@ -1066,10 +1099,10 @@ function Matchs() {
     // Override AVANT le filtre de recherche : sinon un match dont le vrai
     // qualifié (bracket) correspond à la recherche, mais dont le nom encore
     // caché en cache ("à déterminer") ne correspond pas, serait exclu à tort.
-    return applyKnockoutTeamOverrides(matches, knockoutOverrides)
+    return applyKnockoutTeamOverrides(activeMatches, knockoutOverrides)
       .filter(m => m.status === 'TIMED' || m.status === 'SCHEDULED')
       .filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam))
-  }, [matches, knockoutOverrides, searchNorm])
+  }, [activeMatches, knockoutOverrides, searchNorm])
 
   /* ── Helpers ── */
   const handleSelectComp = (id) => {
@@ -1162,7 +1195,9 @@ function Matchs() {
 
           {/* Header */}
           <div className="matchs__header">
-            <h1 className="matchs__kicker">Matchs à venir</h1>
+            <h1 className="matchs__kicker">
+              {showingCupList ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Matchs à venir'}
+            </h1>
             <div className="matchs__headerRow">
               {/* Toggle vues CdM / coupe nationale */}
               {(isWC || hasCup) && (
@@ -1210,6 +1245,28 @@ function Matchs() {
                     Par journée
                   </button>
 
+                  {/* ── Coupe nationale (Copa del Rey/Coupe de France/FA Cup) :
+                       mêmes journées, mais UNIQUEMENT les matchs de coupe —
+                       jamais mélangés avec le championnat ci-dessus (demande
+                       explicite utilisateur, 28/10). ── */}
+                  {hasCup && (
+                  <button
+                    className={`matchs__wcToggleBtn ${wcView === 'cup' ? 'matchs__wcToggleBtn--active' : ''}`}
+                    onClick={() => { pickWcView('cup'); setCurrentIndex(0) }}
+                  >
+                    <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      {/* Coupe (trophée) */}
+                      <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity=".15"/>
+                      <path d="M7 5H4.5a1.5 1.5 0 0 0-1.5 1.5c0 2 1.5 3.5 3.5 3.8" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"/>
+                      <path d="M17 5h2.5A1.5 1.5 0 0 1 21 6.5c0 2-1.5 3.5-3.5 3.8" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"/>
+                      <path d="M12 12v3" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M8.5 20.5h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M9.5 18h5v2.5h-5V18Z" stroke="currentColor" strokeWidth="1.4" fill="currentColor" fillOpacity=".2"/>
+                    </svg>
+                    {DOMESTIC_CUPS[selectedComp]?.name}
+                  </button>
+                  )}
+
                   {/* ── Phase finale : arbre de tournoi ── */}
                   <button
                     className={`matchs__wcToggleBtn ${wcView === 'bracket' ? 'matchs__wcToggleBtn--active' : ''} ${cupBracketDisabled ? 'matchs__wcToggleBtn--disabled' : ''}`}
@@ -1234,7 +1291,7 @@ function Matchs() {
                       {/* Finale */}
                       <rect x="17" y="10.75" width="6" height="2.5" rx="0.8" fill="currentColor" opacity=".6"/>
                     </svg>
-                    {hasCup ? DOMESTIC_CUPS[selectedComp]?.name : 'Phase finale'}
+                    {hasCup ? 'Tableau' : 'Phase finale'}
                   </button>
                 </div>
               )}
@@ -1323,8 +1380,8 @@ function Matchs() {
                       ? "Le tableau apparaît dès que des matchs à partir des 32es de finale sont programmés ou joués."
                       : 'Le tableau des phases finales sera disponible dès la fin de la phase de groupes.'}
                   </p>
-                  <button className="bracket__emptyCta" onClick={() => pickWcView(isWC ? 'poules' : 'matchs')}>
-                    {isWC ? 'Voir les poules →' : 'Voir le programme →'}
+                  <button className="bracket__emptyCta" onClick={() => pickWcView(isWC ? 'poules' : (hasCup ? 'cup' : 'matchs'))}>
+                    {isWC ? 'Voir les poules →' : (hasCup ? `Voir les matchs de ${DOMESTIC_CUPS[selectedComp]?.name} →` : 'Voir le programme →')}
                   </button>
                 </div>
               )}
@@ -1336,8 +1393,9 @@ function Matchs() {
             </>
           )}
 
-          {/* ═══ Vue Par journée ═══ */}
-          {!loading && (!hasToggle || wcView === 'matchs') && (
+          {/* ═══ Vue Par journée (championnat OU coupe nationale, voir
+                 inListView/activeMatches — jamais les 2 mélangés) ═══ */}
+          {!loading && (!hasToggle || inListView) && (
             <div className="matchs__searchWrap">
               <input
                 type="text"
@@ -1352,7 +1410,7 @@ function Matchs() {
             </div>
           )}
 
-          {!loading && (!hasToggle || wcView === 'matchs') && searchNorm && (
+          {!loading && (!hasToggle || inListView) && searchNorm && (
             filteredSearchMatches.length === 0 ? (
               <p className="matchs__state">Aucun match à venir ne correspond à « {search} ».</p>
             ) : (
@@ -1362,7 +1420,7 @@ function Matchs() {
             )
           )}
 
-          {!loading && (!hasToggle || wcView === 'matchs') && !searchNorm && total > 0 && (
+          {!loading && (!hasToggle || inListView) && !searchNorm && total > 0 && (
             <>
               <div className="matchs__nav">
                 <button className="matchs__navBtn"
@@ -1379,8 +1437,12 @@ function Matchs() {
             </>
           )}
 
-          {!loading && !error && (!hasToggle || wcView === 'matchs') && matches.length === 0 && (
-            <p className="matchs__state">Aucun match à venir pour le moment.</p>
+          {!loading && !error && (!hasToggle || inListView) && activeMatches.length === 0 && (
+            <p className="matchs__state">
+              {showingCupList
+                ? `Aucun match de ${DOMESTIC_CUPS[selectedComp]?.name} à venir pour le moment.`
+                : 'Aucun match à venir pour le moment.'}
+            </p>
           )}
 
         </main>
