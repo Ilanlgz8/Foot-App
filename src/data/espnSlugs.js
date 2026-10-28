@@ -69,6 +69,12 @@ export const DOMESTIC_CUP_SLUGS = {
   FL1: 'fra.coupe_de_france',  // Coupe de France (code du championnat PARENT)
   PD:  'esp.copa_del_rey',     // Copa del Rey
   PL:  'eng.fa',                // FA Cup
+  // ⚠️ AJOUT (28/10, voir DOMESTIC_CUPS dans competitions.js pour le contexte
+  // complet) : doit rester en MIROIR EXACT de DOMESTIC_CUPS — duplication
+  // manuelle assumée (comme pour FL1/PD/PL ci-dessus), pas de dérivation
+  // automatique entre les 2 fichiers à ce jour.
+  SA:  'ita.coppa_italia',     // Coppa Italia
+  BL1: 'ger.dfb_pokal',        // DFB-Pokal
 }
 // Coupes d'Europe de club, standalone (pas fusionnées dans un championnat
 // parent, contrairement à DOMESTIC_CUP_SLUGS) — ajoutées suite à la demande

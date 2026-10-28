@@ -5691,6 +5691,110 @@ cf-worker/
   la fin réelle de ces matchs (ce qui confirmerait un blocage permanent comme
   pour les qualifs, plutôt qu'un simple retard de publication ESPN).
 
+- ✅ CORRECTION DE L'ENTRÉE CI-DESSUS : vraie root cause trouvée, ce n'était
+  PAS (seulement) un gap ESPN (28/10, retour utilisateur direct et précis,
+  juste après l'entrée 🔍 ci-dessus : "Bah si, dans résultat, quand je tape
+  sur la Liga et que je vais dans l'onglet Copa del Rey, il y a tous les
+  résultats d'hier. Mais par exemple, dans le résultat panel, il n'y a pas.
+  Donc, c'est pas normal.") — contre-exemple concret et vérifiable qui
+  contredisait directement ma conclusion précédente : si ESPN n'avait vraiment
+  confirmé AUCUN de ces matchs comme FINISHED, l'onglet Copa del Rey de
+  Resultat.jsx (lui aussi alimenté par `fetchEspnCupMatches('PD')`, exactement
+  la même fonction/les mêmes données ESPN) ne devrait rien montrer non plus —
+  or l'utilisateur y voit bien les résultats d'hier. Root cause réelle trouvée
+  en comparant les 2 chemins côte à côte (`src/hooks/useMatchs.js` vs
+  `src/hooks/useTodayMatches.js`) : les 2 appellent bien la MÊME fonction
+  ESPN, mais avec des `staleTime` TRÈS différents côté React Query —
+  `useMatches`/`fetchClubMatchesRaw` (Resultat.jsx) utilise `TTL.FINISHED` (1h,
+  `useMatchs.js` ligne 58), alors que `useRecentDaysMatches`'s jours PASSÉS
+  (`todayMatchesEspn`/`todayMatchesWcEc`, `useTodayMatches.js`) étaient figés à
+  **7 JOURS ENTIERS** (`staleTime: 7 * 24 * 60 * 60 * 1000`), sur l'hypothèse
+  explicitement commentée dans le code "Jour PASSÉ = matchs FINISHED,
+  immuables pour toujours" — hypothèse FAUSSE dans le cas précis déjà
+  documenté juste au-dessus (ESPN qui met plusieurs heures à confirmer un
+  match de coupe nationale comme FINISHED après son vrai coup d'envoi). Si le
+  TOUT PREMIER fetch de ce jour précis (sur l'appareil de l'utilisateur) est
+  tombé pendant cette fenêtre d'ESPN encore non confirmé (matchs encore
+  `STATUS_SCHEDULED`), ce snapshot figé (localStorage + React Query) ne se
+  corrige plus jamais pendant 7 jours, même une fois qu'ESPN finit par
+  confirmer le vrai résultat quelques heures plus tard — alors que
+  `useMatches` (staleTime 1h) se corrige de lui-même au prochain remontage/
+  retour sur la page. Même chemin de données (confirmé), fraîcheur de cache
+  totalement différente — exactement l'écart rapporté par l'utilisateur entre
+  les 2 pages, pour le MÊME jour, sur le MÊME appareil. Corrigé
+  (`src/hooks/useTodayMatches.js`) : nouvelle fonction `pastDayStaleTime`
+  (API react-query v5 déjà utilisée ailleurs dans ce projet pour un staleTime
+  dynamique, voir `formRefetchIntervalFor`/`formStaleFor` dans
+  `useTeamForm.js`) — inspecte `query.state.data` (le résultat déjà fetché
+  pour ce jour) : si ce jour contient encore au moins un match PAS confirmé
+  `FINISHED` (`SCHEDULED`/`TIMED`/`IN_PLAY`/`PAUSED`), retombe sur un délai
+  court (`PENDING_PAST_DAY_STALE_MS`, 5min) au lieu de 7 jours — le vrai cas
+  immuable (tout FINISHED, ou aucun match ce jour-là) garde le TTL 7j
+  inchangé, aucune régression sur le gain de perf/réseau d'origine (25/07,
+  voir le commentaire du code). Appliqué aux 2 blocs concernés
+  (`todayMatchesEspn` ET `todayMatchesWcEc`, même risque théorique côté
+  FD.org pour WC/EC). Aucun polling de fond ajouté (pas de
+  `refetchInterval`) — seul le PROCHAIN remontage de ce composant (nouvelle
+  visite de l'Accueil, retour au premier plan) retente, au lieu de rester
+  bloqué toute la semaine. 386 tests (+1, nouveau cas Coppa Italia/DFB-Pokal
+  dans `espnSlugs.test.js`, voir point suivant) + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Honnêteté : rendu
+  jamais revu en direct sur un vrai cas Copa del Rey après ce déploiement
+  (pas d'accès à un appareil ni à un cache déjà corrompu depuis cet
+  environnement) — mais le mécanisme est confirmé par lecture directe et
+  comparée des 2 chemins de code (pas une théorie), et explique précisément
+  pourquoi un même jour/une même donnée ESPN peut diverger entre 2 pages de
+  l'app selon celle visitée en premier après le déploiement ; le filet existant
+  (un match qui finit par être confirmé FINISHED par ESPN tôt ou tard) n'est
+  plus bloqué artificiellement une fois ce fix en place.
+
+- ✅ Coppa Italia (Serie A) et DFB-Pokal (Bundesliga) ajoutées à DOMESTIC_CUPS
+  (28/10, demande explicite utilisateur, juste après la correction ci-dessus :
+  "si on peut rajouter la coupe italienne et la coupe d'Allemagne [...] comme
+  FA Cup en Angleterre et tout. Comme ça, on a tout") — même mécanisme
+  générique que FL1/PD/PL (Coupe de France/Copa del Rey/FA Cup), slugs ESPN
+  VÉRIFIÉS EN DIRECT contre l'API réelle avant ajout (pas devinés) :
+  `ita.coppa_italia` (league id 3956, "Coppa Italia", vrais matchs Round of 16
+  confirmés, ex. Genoa-Internazionale) et `ger.dfb_pokal` (league id 3954,
+  "German Cup", vrais matchs First Round confirmés, ex. Kaiserslautern-SV
+  Waldhof Mannheim). 3 fichiers touchés, tous les endroits qui dupliquent
+  (volontairement, pas d'automatisation entre eux à ce jour) la liste des
+  coupes nationales : `src/data/competitions.js` (`DOMESTIC_CUPS`, la table
+  "source" consultée par `fetchEspnCupMatches`/Programme/Résultats/
+  `CUP_PARENT_COMPS`), `src/data/espnSlugs.js` (`DOMESTIC_CUP_SLUGS`, miroir
+  manuel utilisé par `espnNativeSlug`/`EXTRA_NOTIFY_SLUGS` — le cron
+  Cloudflare et le suivi live rapide en dépendent), `src/utils/espnAdapter.js`
+  (`SYNTHETIC_COMP_ID`, nouveaux ids négatifs `SA_CUP: -104`/`BL1_CUP: -105`
+  pour éviter que ces 2 nouvelles coupes ne se retrouvent fusionnées entre
+  elles ou avec une autre dans `groupByComp`/ResultPanel.jsx, voir le
+  commentaire déjà en place pour FL1_CUP/PD_CUP/PL_CUP). Effet automatique
+  (zéro code supplémentaire nécessaire, le mécanisme est déjà entièrement
+  générique) : onglet "Par journée" dédié + bouton nommé dans Programme ET
+  Résultats dès que Serie A/Bundesliga est sélectionnée (même fix que
+  Copa del Rey plus haut le même jour), notifs but/carton/KO/mi-temps/fin via
+  le Worker Cloudflare une fois celui-ci redéployé (voir caveat ci-dessous).
+  Honnêteté, caveat déjà signalé à l'utilisateur AVANT cet ajout (voir
+  l'entrée "Discussion coupes manquantes" plus haut dans ce fichier, 28/10) :
+  chaque entrée dans `DOMESTIC_CUP_SLUGS` étend `EXTRA_NOTIFY_SLUGS`
+  (`espnSlugs.js`) de façon PERMANENTE — le Worker Cloudflare (`cf-worker/`)
+  interroge ces 2 nouveaux slugs chaque minute, toute l'année, qu'il y ait
+  match ou non ce jour-là, un coût qui s'ajoute à celui déjà existant
+  (FL1/PD/PL + NL/CAN/COPA/UEL/UECL/USC/TDC/CS) — l'utilisateur a choisi de
+  procéder malgré le quota d'écritures Turso dépassé le jour même (voir
+  "QUOTA D'ÉCRITURES TURSO DÉPASSÉ" plus haut). 1 test ajouté
+  (`espnSlugs.test.js`, même principe que les cas FL1/PD/PL déjà présents) +
+  386 tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build +
+  `npx wrangler deploy --dry-run` (410.16 KiB, légère hausse cohérente avec
+  l'ajout de 2 slugs) vérifiés. Même limite de déploiement que tout
+  changement touchant `EXTRA_NOTIFY_SLUGS`/`cf-worker/` : la partie
+  `src/` (onglets Programme/Résultats, notifs côté client) se déploie
+  automatiquement avec le reste de l'app via Vercel, mais le Worker
+  Cloudflare lui-même nécessite un `npm run deploy` manuel depuis
+  `cf-worker/` pour commencer à interroger ces 2 nouveaux slugs et envoyer
+  leurs notifs — sans ce déploiement manuel, Serie A/Bundesliga auront bien
+  leur onglet Coupe dans Programme/Résultats, mais aucune notif push pour ces
+  2 compétitions tant que le Worker n'est pas redéployé.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -31,6 +31,13 @@ describe('espnNativeSlug', () => {
     expect(espnNativeSlug({ id: 'espn-PL-cup-1', competition: { id: -103, code: 'PL' } })).toBe('eng.fa')
   })
 
+  // ⚠️ Ajouté (28/10) suite à l'ajout de Coppa Italia (SA) et DFB-Pokal (BL1)
+  // dans DOMESTIC_CUP_SLUGS — mêmes règles que FL1/PD/PL ci-dessus.
+  it('fait de même pour la Coppa Italia (SA) et le DFB-Pokal (BL1)', () => {
+    expect(espnNativeSlug({ id: 'espn-SA-cup-1', competition: { id: -104, code: 'SA' } })).toBe('ita.coppa_italia')
+    expect(espnNativeSlug({ id: 'espn-BL1-cup-1', competition: { id: -105, code: 'BL1' } })).toBe('ger.dfb_pokal')
+  })
+
   it('résout une compétition de sélection nationale (NL) normalement, sans fausse détection "cup"', () => {
     const match = { id: 'espn-NL-401900000', isCup: false, competition: { id: -1, code: 'NL' } }
     expect(espnNativeSlug(match)).toBe('uefa.nations')

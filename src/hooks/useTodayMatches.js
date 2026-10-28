@@ -395,6 +395,33 @@ export function useRecentDaysMatches(numDays) {
   // toucher.
   const WCEC_STAGGER_MS = 2_000
 
+  // ⚠️ AJOUT (28/10, constat utilisateur : "dans Résultats, l'onglet Copa del
+  // Rey montre bien les résultats d'hier, mais pas ici" — root cause trouvée
+  // en comparant les 2 chemins : Resultat.jsx (useMatches, staleTime ~1h,
+  // TTL.FINISHED) se corrige vite ; CE hook fige chaque jour passé pour 7
+  // JOURS ENTIERS dès le tout premier fetch (voir staleTime juste en dessous,
+  // commentaire "immuables pour toujours"). Cette hypothèse est fausse dans
+  // un cas précis, déjà documenté par ailleurs pour Copa del Rey (CLAUDE.md,
+  // "isUntrackedCupQualifyingRound"/premier tour) : ESPN peut mettre
+  // plusieurs HEURES après le coup d'envoi réel à confirmer un match de coupe
+  // nationale comme FINISHED — si le tout premier fetch de ce jour (sur CET
+  // appareil) tombe pendant cette fenêtre, le snapshot (matchs encore
+  // SCHEDULED) est figé pour 7 jours, alors que le VRAI résultat est connu
+  // d'ESPN quelques heures plus tard. `pastDayStaleTime` retombe sur un délai
+  // court tant que le jour contient encore un match NON confirmé FINISHED —
+  // le vrai cas immuable (tout FINISHED, ou aucun match ce jour) garde le
+  // TTL 7j inchangé. Coût : aucun polling de fond ajouté (pas de
+  // refetchInterval) — seul le PROCHAIN remontage/retour au premier plan de
+  // ce composant retente, au lieu de rester bloqué toute la semaine.
+  const PENDING_PAST_DAY_STALE_MS = 5 * 60 * 1000
+  function pastDayStaleTime(query) {
+    const matches = query.state.data
+    if (matches?.length > 0 && matches.some(m => m.status !== 'FINISHED')) {
+      return PENDING_PAST_DAY_STALE_MS
+    }
+    return 7 * 24 * 60 * 60 * 1000
+  }
+
   const todayCacheKey = `matches_${today}`
   const todayQuery = {
     queryKey: ['todayMatches', today],
@@ -447,7 +474,10 @@ export function useRecentDaysMatches(numDays) {
           // dernier vrai fetch, presque toujours >30min) et redéclenchait un
           // refetch réseau à CHAQUE relance, alors que readCacheStale (7j)
           // suffit largement. Aligné sur le TTL du cache disque (25/07).
-          staleTime:            7 * 24 * 60 * 60 * 1000,
+          // ⚠️ Pas statique à 7j (28/10, voir pastDayStaleTime plus haut) :
+          // un match pas encore confirmé FINISHED par ESPN garde un délai
+          // court pour se corriger, le vrai cas immuable garde 7j.
+          staleTime:            pastDayStaleTime,
           retry:                false,
         },
         {
@@ -469,7 +499,10 @@ export function useRecentDaysMatches(numDays) {
           // comptait vraiment pour l'utilisateur : c'est ce staleTime qui
           // déclenchait un appel FD.org à chaque relance de l'app pour des
           // résultats WC/EC déjà terminés et jamais amenés à changer (25/07).
-          staleTime:            7 * 24 * 60 * 60 * 1000,
+          // ⚠️ Même garde-fou pastDayStaleTime que le bloc ESPN ci-dessus
+          // (28/10) : même risque théorique si FD.org tarde à confirmer un
+          // match WC/EC comme FINISHED.
+          staleTime:            pastDayStaleTime,
           retry:                false,
         },
       ]

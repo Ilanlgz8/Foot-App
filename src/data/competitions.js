@@ -141,10 +141,25 @@ export const LOWER_DIVISION_FD_CODE = {
 // parent (pas d'entrée sidebar dédiée, contrairement à NL/CAN/COPA/EC) —
 // demande explicite : "dans ligue 1 on rajoute coupe de france mais à
 // l'intérieur de ligue 1, sur les cards on précise juste le nom de la coupe".
+// ⚠️ AJOUT SA/BL1 (28/10, demande explicite utilisateur : "rajoute la coupe
+// italienne et la coupe d'Allemagne [...] comme ça on a tout") : Coppa
+// Italia (SA) et DFB-Pokal (BL1), même mécanisme que FL1/PD/PL — slugs
+// vérifiés en direct contre l'API ESPN réelle avant ajout (`ita.coppa_italia`
+// = league id 3956 "Coppa Italia" ; `ger.dfb_pokal` = league id 3954 "German
+// Cup", vrais matchs/équipes renvoyés pour les 2). Honnêteté, caveat déjà
+// signalé à l'utilisateur avant cet ajout : chaque entrée ici étend aussi
+// EXTRA_NOTIFY_SLUGS (espnSlugs.js) de façon PERMANENTE — le Worker
+// Cloudflare (cf-worker/) interroge ces 2 nouveaux slugs chaque minute, toute
+// l'année, qu'il y ait match ou non ce jour-là. Coût qui s'additionne à celui
+// déjà existant (FL1/PD/PL) — accepté par l'utilisateur malgré le quota
+// d'écritures Turso dépassé le jour même (voir l'entrée "QUOTA D'ÉCRITURES
+// TURSO DÉPASSÉ" plus haut dans ce fichier).
 export const DOMESTIC_CUPS = {
   FL1: { slug: 'fra.coupe_de_france', name: 'Coupe de France' },
   PD:  { slug: 'esp.copa_del_rey',    name: 'Copa del Rey' },
   PL:  { slug: 'eng.fa',              name: 'FA Cup' },
+  SA:  { slug: 'ita.coppa_italia',    name: 'Coppa Italia' },
+  BL1: { slug: 'ger.dfb_pokal',       name: 'DFB-Pokal' },
 }
 
 // ⚠️ RÉDUIT (26/09, constat utilisateur : "dans la page classement y'a pas
