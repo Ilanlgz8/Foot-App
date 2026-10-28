@@ -5647,6 +5647,50 @@ cf-worker/
   classement reste basé sur les standings FD.org/ESPN, jamais sur une liste
   de matchs mélangée) donc n'est pas concerné par ce type de bug.
 
+- 🔍 "Résultats d'hier" dans le panneau Résultats récents de l'Accueil : que
+  Serie A, pas de Copa del Rey (28/10, constat utilisateur : "y'a que les
+  résultats de la série A d'hier [...] faut que ce soit trié dans tous, faut
+  qu'il y ait tous les résultats de hier [...] juste pour cet endroit-là") —
+  investigué comme un bug de fusion/tri (le type de bug déjà corrigé 2 fois
+  le même jour sur Programme/Résultats), mais PAS confirmé comme tel après
+  lecture du code ET vérification en direct contre l'API ESPN réelle. Le
+  panneau (`accueil/ResultPanel.jsx`) reçoit ses données de `useRecentDaysMatches`
+  (`useTodayMatches.js`) → `fetchEspnPortion()`, qui boucle déjà sur
+  `CUP_PARENT_COMPS` (= `Object.keys(DOMESTIC_CUPS)`, donc FL1/PD/PL) et
+  appelle bien `fetchEspnCupMatches('PD')` pour la Copa del Rey — la fusion
+  multi-compétitions INCLUT donc déjà la Copa del Rey, aucun filtre ne
+  l'exclut de ce panneau précis. Vérifié ensuite en tapant l'API ESPN
+  directement (`esp.copa_del_rey/scoreboard?dates=20261027`, le vrai "hier"
+  au moment du constat) : une vingtaine de matchs de 1er Tour (saison.slug
+  `first-round`, donc PAS exclus par `isUntrackedCupQualifyingRound` — des
+  clubs amateurs/régionaux recevant des clubs pros, ex. Girona/Espanyol/
+  Almería/Las Palmas/Mirandés en déplacement), tous coup d'envoi ~19h+
+  avant ce test, et pourtant TOUS encore `STATUS_SCHEDULED`, score "0"-"0",
+  `winner:false` — ESPN lui-même n'a jamais marqué un seul de ces matchs
+  comme terminé, en direct, au moment du test (pas une copie en cache côté
+  app : `useTodayMatches.js` ne mémorise jamais plus de 8s la fenêtre ESPN
+  brute, et ce fetch a tapé l'API réelle, pas notre proxy). Notre code
+  (`normalizeEvent`, `espnAdapter.js`) ne fait que refléter le statut fourni
+  par ESPN (`mapStatus`) — tant qu'ESPN ne confirme pas `STATUS_FINAL`, ces
+  matchs ne peuvent structurellement jamais passer le filtre `status ===
+  'FINISHED'` utilisé par ce panneau (ni par aucun autre, Resultat.jsx/
+  Match.jsx compris — même source, même limite). Exactement la même classe
+  de problème déjà documentée 2 fois (06/09, 26/09) pour le Tour de
+  qualification de cette même coupe — sauf que cette fois ça touche le 1er
+  Tour (clubs pros déjà engagés), pas seulement les qualifs amateurs. Pas de
+  correctif appliqué : étendre le filtre `isUntrackedCupQualifyingRound` au
+  1er Tour masquerait ENCORE PLUS ces matchs (l'inverse de la demande), et
+  il n'existe aucune alternative gratuite connue plus fiable pour ces
+  rencontres précises (même limite déjà documentée ailleurs dans ce fichier
+  pour d'autres trous ESPN). Honnêteté : contrairement à une correction de
+  tri/fusion, ceci n'est pas réparable depuis le code de l'app — la donnée
+  "match terminé" n'existe simplement pas encore côté source au moment du
+  test ; si ESPN finit par mettre à jour ces matchs (même tardivement), ils
+  apparaîtront normalement dans ce panneau au prochain refetch, sans action
+  supplémentaire nécessaire. À signaler si ça persiste plusieurs jours après
+  la fin réelle de ces matchs (ce qui confirmerait un blocage permanent comme
+  pour les qualifs, plutôt qu'un simple retard de publication ESPN).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
