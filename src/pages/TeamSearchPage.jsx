@@ -53,7 +53,11 @@ function buildTeamProfile(matches, key) {
     if (homeKey === key) teamMatches.push({ match: m, isHome: true })
     else if (awayKey === key) teamMatches.push({ match: m, isHome: false })
   }
-  teamMatches.sort((a, b) => new Date(b.match.utcDate) - new Date(a.match.utcDate))
+  // Ordre chronologique (du plus ancien au plus récent, les matchs à venir
+  // ferment la liste) — demande explicite utilisateur du 28/10 : l'ancien tri
+  // "plus récent d'abord" plaçait les matchs à venir (date la plus grande) au
+  // tout début, ce qui repoussait TOUS les matchs déjà joués en bas de liste.
+  teamMatches.sort((a, b) => new Date(a.match.utcDate) - new Date(b.match.utcDate))
   return teamMatches
 }
 
@@ -93,11 +97,11 @@ function computeStats(rows) {
 
   // Forme récente : les 5 derniers matchs joués, du plus ancien (gauche) au
   // plus récent (droite) — même convention que FormDiamonds partout ailleurs
-  // dans l'app (rows est déjà trié du plus récent au plus ancien, on inverse).
+  // dans l'app. rows est maintenant trié du plus ancien au plus récent, donc
+  // les 5 derniers matchs JOUÉS de la liste sont déjà dans le bon ordre.
   const form = rows
     .filter(r => r.match.status === 'FINISHED')
-    .slice(0, 5)
-    .reverse()
+    .slice(-5)
     .map(r => outcomeForSide(r.match, r.isHome))
     .filter(Boolean)
 
@@ -106,6 +110,18 @@ function computeStats(rows) {
     home: { played: homePlayed, wins: homeWins, draws: homeDraws, losses: homeLosses },
     away: { played: awayPlayed, wins: awayWins, draws: awayDraws, losses: awayLosses },
   }
+}
+
+function RecordBar({ wins, draws, losses }) {
+  const total = wins + draws + losses
+  if (total === 0) return <div className="teamSearchPage__recordBar teamSearchPage__recordBar--empty" />
+  return (
+    <div className="teamSearchPage__recordBar">
+      <span className="teamSearchPage__recordBarSeg teamSearchPage__recordBarSeg--w" style={{ width: `${(wins / total) * 100}%` }} />
+      <span className="teamSearchPage__recordBarSeg teamSearchPage__recordBarSeg--d" style={{ width: `${(draws / total) * 100}%` }} />
+      <span className="teamSearchPage__recordBarSeg teamSearchPage__recordBarSeg--l" style={{ width: `${(losses / total) * 100}%` }} />
+    </div>
+  )
 }
 
 function TeamProfile({ rows, teamName, teamCrest }) {
@@ -136,18 +152,27 @@ function TeamProfile({ rows, teamName, teamCrest }) {
 
   return (
     <div className="teamSearchPage__profile" style={{ '--team-color': color, '--team-color-rgb': rgb }}>
-      <div className="teamSearchPage__profileHead">
-        {teamCrest && (
-          <img
-            src={teamCrest}
-            alt=""
-            className="teamSearchPage__profileCrest"
-            onError={e => { e.currentTarget.style.display = 'none' }}
-          />
-        )}
-        <div>
+      <div className="teamSearchPage__hero">
+        <div className="teamSearchPage__profileCrestWrap">
+          {teamCrest ? (
+            <img
+              src={teamCrest}
+              alt=""
+              className="teamSearchPage__profileCrest"
+              onError={e => { e.currentTarget.style.display = 'none' }}
+            />
+          ) : (
+            <span className="teamSearchPage__profileCrestFallback">{teamName.charAt(0)}</span>
+          )}
+        </div>
+        <div className="teamSearchPage__heroInfo">
           <h2 className="teamSearchPage__profileName">{teamName}</h2>
           {stats.form.length > 0 && <FormDiamonds form={stats.form} />}
+          <span className="teamSearchPage__heroRecord">
+            {stats.wins}V {stats.draws}N {stats.losses}D
+            <span className="teamSearchPage__heroRecordSep">·</span>
+            {stats.played} match{stats.played > 1 ? 's' : ''}
+          </span>
         </div>
       </div>
 
@@ -177,89 +202,106 @@ function TeamProfile({ rows, teamName, teamCrest }) {
         </div>
       )}
 
-      <div className="teamSearchPage__statsGrid">
-        <div className="teamSearchPage__statCard">
-          <span className="teamSearchPage__statValue">{stats.played}</span>
-          <span className="teamSearchPage__statLabel">Joués</span>
+      <section className="teamSearchPage__section">
+        <h3 className="teamSearchPage__sectionTitle">Bilan</h3>
+        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--4">
+          <div className="teamSearchPage__statCard">
+            <span className="teamSearchPage__statValue">{stats.played}</span>
+            <span className="teamSearchPage__statLabel">Joués</span>
+          </div>
+          <div className="teamSearchPage__statCard teamSearchPage__statCard--win">
+            <span className="teamSearchPage__statValue">{stats.wins}</span>
+            <span className="teamSearchPage__statLabel">Victoires</span>
+          </div>
+          <div className="teamSearchPage__statCard teamSearchPage__statCard--draw">
+            <span className="teamSearchPage__statValue">{stats.draws}</span>
+            <span className="teamSearchPage__statLabel">Nuls</span>
+          </div>
+          <div className="teamSearchPage__statCard teamSearchPage__statCard--loss">
+            <span className="teamSearchPage__statValue">{stats.losses}</span>
+            <span className="teamSearchPage__statLabel">Défaites</span>
+          </div>
         </div>
-        <div className="teamSearchPage__statCard teamSearchPage__statCard--win">
-          <span className="teamSearchPage__statValue">{stats.wins}</span>
-          <span className="teamSearchPage__statLabel">Victoires</span>
-        </div>
-        <div className="teamSearchPage__statCard teamSearchPage__statCard--draw">
-          <span className="teamSearchPage__statValue">{stats.draws}</span>
-          <span className="teamSearchPage__statLabel">Nuls</span>
-        </div>
-        <div className="teamSearchPage__statCard teamSearchPage__statCard--loss">
-          <span className="teamSearchPage__statValue">{stats.losses}</span>
-          <span className="teamSearchPage__statLabel">Défaites</span>
-        </div>
-        <div className="teamSearchPage__statCard">
-          <span className="teamSearchPage__statValue">{stats.gf}</span>
-          <span className="teamSearchPage__statLabel">Buts marqués</span>
-        </div>
-        <div className="teamSearchPage__statCard">
-          <span className="teamSearchPage__statValue">{stats.ga}</span>
-          <span className="teamSearchPage__statLabel">Buts concédés</span>
-        </div>
-        <div className="teamSearchPage__statCard">
-          <span className="teamSearchPage__statValue">{stats.diff > 0 ? `+${stats.diff}` : stats.diff}</span>
-          <span className="teamSearchPage__statLabel">Différence</span>
-        </div>
-      </div>
+      </section>
 
-      <div className="teamSearchPage__homeAway">
-        <div className="teamSearchPage__homeAwayBlock">
-          <span className="teamSearchPage__homeAwayLabel">Domicile</span>
-          <span className="teamSearchPage__homeAwayRecord">
-            {stats.home.wins}V {stats.home.draws}N {stats.home.losses}D
-          </span>
+      <section className="teamSearchPage__section">
+        <h3 className="teamSearchPage__sectionTitle">Buts</h3>
+        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--3">
+          <div className="teamSearchPage__statCard">
+            <span className="teamSearchPage__statValue">{stats.gf}</span>
+            <span className="teamSearchPage__statLabel">Marqués</span>
+          </div>
+          <div className="teamSearchPage__statCard">
+            <span className="teamSearchPage__statValue">{stats.ga}</span>
+            <span className="teamSearchPage__statLabel">Concédés</span>
+          </div>
+          <div className="teamSearchPage__statCard">
+            <span className="teamSearchPage__statValue">{stats.diff > 0 ? `+${stats.diff}` : stats.diff}</span>
+            <span className="teamSearchPage__statLabel">Différence</span>
+          </div>
         </div>
-        <div className="teamSearchPage__homeAwayBlock">
-          <span className="teamSearchPage__homeAwayLabel">Extérieur</span>
-          <span className="teamSearchPage__homeAwayRecord">
-            {stats.away.wins}V {stats.away.draws}N {stats.away.losses}D
-          </span>
+      </section>
+
+      <section className="teamSearchPage__section">
+        <h3 className="teamSearchPage__sectionTitle">Domicile / Extérieur</h3>
+        <div className="teamSearchPage__homeAway">
+          <div className="teamSearchPage__homeAwayBlock">
+            <span className="teamSearchPage__homeAwayLabel">Domicile</span>
+            <span className="teamSearchPage__homeAwayRecord">
+              {stats.home.wins}V {stats.home.draws}N {stats.home.losses}D
+            </span>
+            <RecordBar wins={stats.home.wins} draws={stats.home.draws} losses={stats.home.losses} />
+          </div>
+          <div className="teamSearchPage__homeAwayBlock">
+            <span className="teamSearchPage__homeAwayLabel">Extérieur</span>
+            <span className="teamSearchPage__homeAwayRecord">
+              {stats.away.wins}V {stats.away.draws}N {stats.away.losses}D
+            </span>
+            <RecordBar wins={stats.away.wins} draws={stats.away.draws} losses={stats.away.losses} />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <ul className="teamSearchPage__matchList">
-        {filteredRows.map(({ match, isHome }) => {
-          const opponent = isHome ? match.awayTeam : match.homeTeam
-          const opponentName = translateTeam(opponent?.shortName || opponent?.name || '?')
-          const fs = finalScore(match.score)
-          const played = match.status === 'FINISHED'
-          const outcome = played ? outcomeForSide(match, isHome) : null
-          const ownScore = isHome ? fs.home : fs.away
-          const oppScore = isHome ? fs.away : fs.home
+      <section className="teamSearchPage__section">
+        <h3 className="teamSearchPage__sectionTitle">Tous les matchs</h3>
+        <ul className="teamSearchPage__matchList">
+          {filteredRows.map(({ match, isHome }) => {
+            const opponent = isHome ? match.awayTeam : match.homeTeam
+            const opponentName = translateTeam(opponent?.shortName || opponent?.name || '?')
+            const fs = finalScore(match.score)
+            const played = match.status === 'FINISHED'
+            const outcome = played ? outcomeForSide(match, isHome) : null
+            const ownScore = isHome ? fs.home : fs.away
+            const oppScore = isHome ? fs.away : fs.home
+            const rowKind = played ? (outcome ? outcome.toLowerCase() : 'none') : 'upcoming'
 
-          return (
-            <li key={match.id} className="teamSearchPage__matchRow">
-              <span className="teamSearchPage__matchDate">{formatMatchDate(match.utcDate)}</span>
-              <span className="teamSearchPage__matchComp">{match.competition?.name}</span>
-              <span className="teamSearchPage__matchOpp">
-                <span className="teamSearchPage__matchVs">{isHome ? 'vs' : '@'}</span>
-                {opponent?.crest && (
-                  <img src={opponent.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
-                )}
-                {opponentName}
-              </span>
-              {played ? (
-                <>
-                  <span className="teamSearchPage__matchScore">
-                    {ownScore ?? '–'} - {oppScore ?? '–'}
+            return (
+              <li key={match.id} className={`teamSearchPage__matchRow teamSearchPage__matchRow--${rowKind}`}>
+                <div className="teamSearchPage__matchTop">
+                  <span className="teamSearchPage__matchDate">{formatMatchDate(match.utcDate)}</span>
+                  <span className="teamSearchPage__matchComp">{match.competition?.name}</span>
+                </div>
+                <div className="teamSearchPage__matchBottom">
+                  <span className="teamSearchPage__matchOpp">
+                    <span className="teamSearchPage__matchVs">{isHome ? 'vs' : '@'}</span>
+                    {opponent?.crest && (
+                      <img src={opponent.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                    )}
+                    {opponentName}
                   </span>
-                  {outcome && (
-                    <span className={`teamSearchPage__outcomeDot teamSearchPage__outcomeDot--${outcome.toLowerCase()}`} />
+                  {played ? (
+                    <span className={`teamSearchPage__matchScore teamSearchPage__matchScore--${rowKind}`}>
+                      {ownScore ?? '–'} - {oppScore ?? '–'}
+                    </span>
+                  ) : (
+                    <span className="teamSearchPage__matchUpcoming">{formatKickoffTime(match.utcDate)}</span>
                   )}
-                </>
-              ) : (
-                <span className="teamSearchPage__matchUpcoming">{formatKickoffTime(match.utcDate)}</span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
     </div>
   )
 }

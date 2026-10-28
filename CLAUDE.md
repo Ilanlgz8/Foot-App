@@ -5834,6 +5834,53 @@ cf-worker/
   couleur par équipe) — à confirmer par l'utilisateur après ce déploiement (automatique via
   Vercel), qui a explicitement prévu d'itérer ensemble sur le visuel une fois vu en vrai.
 
+- ✅ "Fiche équipe" (`/equipe`), 1er retour utilisateur après test réel — 3 corrections (28/10,
+  retour verbatim : "le logo il est trop petit [...] les matchs [...] tu les as mis dans le
+  mauvais sens [...] les matchs qui sont déjà été joués, ils sont tout en bas [...] il faudrait
+  qu'ils soient tout en haut [...] il faudrait un visuel encore meilleur [...] plus moderne, plus
+  design et mieux structuré") :
+  1. **Ordre des matchs inversé** (`src/pages/TeamSearchPage.jsx`, `buildTeamProfile`) : le tri
+     était `desc` (date la plus grande en premier) — comme les matchs À VENIR ont une date plus
+     grande que n'importe quel match déjà joué, ils remontaient TOUS en tête de liste, repoussant
+     la totalité des matchs joués (du plus récent au plus ancien) en dessous, jusqu'au match le
+     plus ancien de la saison tout en bas — exactement le symptôme décrit. Inversé en `asc`
+     (chronologique, du plus ancien au plus récent) : tous les matchs déjà joués passent
+     mécaniquement avant tous les matchs à venir (dates plus petites), et la liste se lit comme un
+     récap de saison du premier match à aujourd'hui, les prochains matchs fermant la liste.
+     `computeStats` (même fichier) recalée en conséquence : la "forme récente" (5 derniers matchs
+     joués pour `FormDiamonds`) prenait auparavant les 5 premiers de `rows` (triées desc) puis les
+     inversait pour obtenir l'ordre ancien→récent attendu par `FormDiamonds` ; avec `rows`
+     maintenant déjà ascendante, ce sont les 5 DERNIERS éléments filtrés sur `FINISHED` qui donnent
+     directement le bon ordre, sans `.reverse()`.
+  2. **Logo agrandi et mis en valeur** (`src/teamSearchPage.css`) : `56px` → `66px` à l'intérieur
+     d'un nouveau badge circulaire `.teamSearchPage__profileCrestWrap` (92px, halo radial +
+     anneau à la couleur de l'équipe, `box-shadow` coloré) — l'enjeu n'était pas que la taille
+     seule : un blason sur fond très sombre peut rester peu visible selon son propre contraste
+     (ex. un blason avec des éléments sombres ou fins) ; le badge derrière donne un fond clair +
+     une bordure colorée qui rendent le blason lisible quel que soit son propre jeu de couleurs,
+     pas seulement plus grand.
+  3. **Passe de design complète** (`TeamSearchPage.jsx` + `teamSearchPage.css`), pour répondre à
+     "plus moderne, plus design et mieux structuré" : l'ancien bloc tête-de-page (crest + nom à
+     plat) devient un vrai bandeau "hero" teinté (`.teamSearchPage__hero`, dégradé radial à la
+     couleur de l'équipe sur `--bg-panel-grad`, même esprit que les hero de match ailleurs dans
+     l'app) avec le blason-badge, le nom, les losanges de forme, et un résumé rapide ("14V 4N 2D ·
+     20 matchs"). Les 7 cartes de stats (auparavant une seule grille 4/3 sans titre) sont
+     regroupées en 3 sections titrées ("Bilan", "Buts", "Domicile / Extérieur") pour une
+     lecture plus claire. Nouveau : une mini barre de répartition V/N/D (`RecordBar`, 3 segments
+     colorés proportionnels) sous chaque bloc Domicile/Extérieur — lecture visuelle immédiate du
+     profil à domicile vs à l'extérieur, pas juste des chiffres. La liste des matchs
+     (`.teamSearchPage__matchRow`) passe d'une seule ligne en grille à 4 colonnes (avec un hack
+     `order:-1` pour placer la compétition) à une carte 2 lignes plus lisible (date + compétition
+     en haut, adversaire + score en bas), avec une bordure gauche colorée (vert/jaune/rouge selon
+     le résultat, couleur de l'équipe pour un match à venir) et le score affiché comme un badge
+     coloré par résultat (remplace l'ancien petit point `outcomeDot`, plus discret) — scan visuel
+     bien plus rapide dans une liste de 20-40 matchs. 398 tests + lint (35 erreurs pré-existantes,
+     Pronos.jsx, inchangé) + build vérifiés (nouveau chunk `TeamSearchPage` 11.57 kB). Honnêteté :
+     comme pour la 1ère version, rendu jamais vu en direct sur un vrai appareil/navigateur depuis
+     cet environnement — ces 3 corrections répondent chacune à un retour concret et précis de
+     l'utilisateur (pas une supposition), mais restent à confirmer visuellement après déploiement,
+     avec une nouvelle itération à prévoir si le rendu ne correspond pas encore à l'attente.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
