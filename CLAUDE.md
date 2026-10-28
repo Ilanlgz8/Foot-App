@@ -5959,6 +5959,48 @@ cf-worker/
   directement calqués sur des valeurs déjà vérifiées dans `resultats.css`/`ResultCard.jsx` — à
   confirmer visuellement après déploiement, nouvelle itération à prévoir si besoin.
 
+- 🔍 Cartes Copa del Rey "disparues" de l'Accueil (28/10, constat utilisateur :
+  "il y a les matchs de la Copa del Rey dans l'accueil, les cartes, elles ont
+  disparu [...] je comprends pas") — investigué comme une possible régression
+  liée aux ajouts du jour (Coppa Italia/DFB-Pokal dans `DOMESTIC_CUPS`, split
+  championnat/coupe Programme+Résultats) : lecture complète de
+  `fetchEspnCupMatches`/`SYNTHETIC_COMP_ID`/`groupByComp`/`ResultPanel.jsx` —
+  aucun bug de code trouvé (pas de collision d'id, pas de filtre cassé). Root
+  cause réelle confirmée EN DIRECT contre l'API ESPN elle-même (le même
+  endpoint scoreboard que `fetchEspnCupMatches` interroge) : les ~19 matchs du
+  1er Tour (pro, `season.slug:"first-round"` — PAS les qualifs amateurs déjà
+  documentées le 26/09, ce sont de vrais matchs comme Girona-Cuadrado,
+  Espanyol-Ses Salines, Mallorca-Celdán) joués le 27/10 (coups d'envoi
+  17h30-19h UTC) sont ENCORE renvoyés `STATUS_SCHEDULED` par ESPN plus de 24h
+  après leur coup d'envoi — vérifié à l'instant via
+  `esp.copa_del_rey/scoreboard?dates=20261027`, tous les événements montrent
+  toujours ce statut. Interroger le 28/10 et le 29/10 renvoie `events: []`
+  (rien de nouveau programmé non plus). Conséquence mécanique, pas un bug
+  d'affichage : ces matchs sortent du jour "aujourd'hui" une fois la date
+  passée (logique normale), mais comme ESPN ne les confirme jamais
+  `FINISHED`, ils ne satisfont jamais non plus le filtre `status ===
+  'FINISHED'` du panneau "Résultats récents" (`Accueil.jsx`) — ils ne sont
+  donc jamais affichés nulle part, ni en "à venir" ni en "résultat", d'où
+  l'impression de disparition. Aucune autre source ne couvre ces matchs
+  (confirmé par lecture de `useMatchs.js` : les coupes nationales sont
+  fusionnées exclusivement depuis `fetchEspnCupMatches`/ESPN, jamais depuis
+  football-data.org, qui ne les expose pas séparément du championnat) — donc
+  aucun filet de secours possible côté app. Plus sévère que le gap déjà
+  documenté le 26/09 (qui ne visait que le tour de QUALIFICATION amateur,
+  explicitement filtré via `isUntrackedCupQualifyingRound`) : celui-ci touche
+  le 1er Tour PRO lui-même, jamais rencontré/filtré jusqu'ici. Pas de
+  correctif appliqué : rien côté code ne peut inventer un score qu'ESPN ne
+  publie pas, et aucune alternative gratuite connue ne couvre mieux ce tour
+  précis (même limite déjà documentée ailleurs dans ce fichier pour d'autres
+  gaps ESPN). Si ESPN finit par confirmer ces matchs plus tard (même
+  tardivement), ils réapparaîtront normalement dans "Résultats récents" au
+  prochain refetch, sans action nécessaire. À surveiller : si ESPN ne
+  confirme JAMAIS ces 19 matchs précis dans les prochains jours, ou si le
+  même blocage touche aussi Coupe de France/FA Cup/Coppa Italia/DFB-Pokal
+  (pas vérifié, aucun de ces 4 n'avait de match ce jour-là au moment du
+  test), ce serait le signe d'un vrai dysfonctionnement ESPN plus large sur
+  les coupes nationales plutôt qu'un cas isolé.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
