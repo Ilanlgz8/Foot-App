@@ -7,7 +7,7 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
-import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
@@ -394,7 +394,26 @@ function Resultats() {
     return extra.length > 0 ? [...extra, ...fdMatches] : fdMatches
   }, [fdMatches, liveMatches, espnScores, selectedComp])
 
-  const grouped = useMemo(() => groupRounds(matches, 'desc'), [matches])
+  // ⚠️ AJOUT (même logique que Programme/Match.jsx, demande explicite
+  // utilisateur : "fais la même là où il faut" — séparer la coupe nationale
+  // du championnat ici aussi) — voir DOMESTIC_CUPS (competitions.js) et
+  // fetchClubMatchesRaw (useMatchs.js), qui fusionnent déjà les matchs de
+  // coupe (isCup:true) dans ce même tableau `matches`. On les sépare ici
+  // avant tout regroupement par journée : "Par journée" ne montre plus que
+  // le championnat, et un nouvel onglet dédié (viewMode==='cup') montre la
+  // coupe avec la même présentation (liste par journée/tour).
+  const hasCup = !!DOMESTIC_CUPS[selectedComp]
+  const leagueOnlyMatches = useMemo(() => hasCup ? matches.filter(m => !m.isCup) : matches, [matches, hasCup])
+  const cupOnlyMatches    = useMemo(() => hasCup ? matches.filter(m => m.isCup) : [], [matches, hasCup])
+  const showingCupList = hasCup && viewMode === 'cup'
+  // 'poule' reste exclusif à isWC (WC/EC n'ont jamais de coupe nationale,
+  // voir DOMESTIC_CUPS) — 'journee' et 'cup' partagent le même rendu liste
+  // plus bas (nav par round + resultats__list), juste sur 2 jeux de
+  // matchs différents.
+  const inListView    = viewMode === 'journee' || viewMode === 'cup'
+  const activeMatches = showingCupList ? cupOnlyMatches : leagueOnlyMatches
+
+  const grouped = useMemo(() => groupRounds(activeMatches, 'desc'), [activeMatches])
 
   const currentComp = COMPETITIONS.find(c => c.id === selectedComp)
   // WC ET Euro : même vue "poules" par groupes (voir même commentaire dans Match.jsx)
@@ -481,8 +500,8 @@ function Resultats() {
   // TOUS les résultats de la compétition (sinon une équipe absente de la
   // journée affichée semblerait n'avoir aucun résultat).
   const filteredMatches = useMemo(
-    () => matches.filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam)),
-    [matches, matchesTeamSearch]
+    () => activeMatches.filter(m => matchesTeamSearch(m.homeTeam) || matchesTeamSearch(m.awayTeam)),
+    [activeMatches, matchesTeamSearch]
   )
   const filteredWcGroups = useMemo(() => {
     if (!searchNorm) return wcGroups
@@ -589,13 +608,19 @@ function Resultats() {
         <main className="resultats__main">
 
           <div className="resultats__header">
-            <h1 className="resultats__kicker">Résultats</h1>
+            <h1 className="resultats__kicker">{showingCupList ? DOMESTIC_CUPS[selectedComp]?.name : 'Résultats'}</h1>
             {mainView === 'comp' && (
               <div className="resultats__titleRow">
                 {isWC && wcGroups.length > 0 && (
                   <div className="resultats__viewTabs">
                     <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
                     <button className={'resultats__viewTab' + (viewMode === 'poule' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('poule')}>Par poule</button>
+                  </div>
+                )}
+                {hasCup && (
+                  <div className="resultats__viewTabs">
+                    <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
+                    <button className={'resultats__viewTab' + (viewMode === 'cup' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('cup')}>{DOMESTIC_CUPS[selectedComp]?.name}</button>
                   </div>
                 )}
               </div>
@@ -649,8 +674,8 @@ function Resultats() {
               remplacer un affichage valide par une erreur. */}
           {error && matches.length === 0 && <p className="resultats__state resultats__state--error">{error}</p>}
 
-          {/* Vue par journée */}
-          {!loading && viewMode === 'journee' && grouped.length > 0 && (
+          {/* Vue par journée (championnat OU coupe nationale, voir inListView) */}
+          {!loading && inListView && grouped.length > 0 && (
             searchNorm ? (
               filteredMatches.length === 0 ? (
                 <p className="resultats__state">Aucun résultat ne correspond à « {search} ».</p>
@@ -712,8 +737,10 @@ function Resultats() {
             </div>
           )}
 
-          {!loading && !error && matches.length === 0 && (
-            <p className="resultats__state">Aucun résultat disponible.</p>
+          {!loading && !error && activeMatches.length === 0 && (
+            <p className="resultats__state">
+              {showingCupList ? `Aucun résultat de ${DOMESTIC_CUPS[selectedComp]?.name} pour le moment.` : 'Aucun résultat disponible.'}
+            </p>
           )}
           </>
           )}

@@ -5599,6 +5599,54 @@ cf-worker/
   déploiement (juste lecture du JSX résultant) — à confirmer par
   l'utilisateur, déploiement automatique via Vercel.
 
+- ✅ Même séparation championnat/coupe nationale étendue à Résultats (28/10,
+  confirmation explicite utilisateur juste après le fix Programme ci-dessus :
+  "fais la même là où il faut pour faire les changements") — `Resultat.jsx`
+  avait exactement la même fusion que `Match.jsx` avant son fix
+  (`fetchClubMatchesRaw`/`useMatches` mélangeant les matchs de coupe,
+  `isCup:true`, dans le même tableau que le championnat), confirmé par grep
+  avant de toucher au fichier. Même principe appliqué, adapté à la structure
+  propre de cette page (pas de copier-coller du JSX de Programme — toggle
+  `viewMode` existant réutilisé plutôt qu'un nouveau `wcView`) : `hasCup =
+  !!DOMESTIC_CUPS[selectedComp]`, `leagueOnlyMatches`/`cupOnlyMatches`
+  (filtrés sur `isCup` depuis le `matches` déjà calculé — celui qui inclut
+  déjà le pont ESPN live/`getRecentlyFinishedMatches`, donc le split profite
+  aussi de ce pont pour les matchs de coupe tout juste terminés, pas
+  seulement ceux de football-data.org), `showingCupList`/`inListView`
+  (`viewMode==='journee' || viewMode==='cup'` — 'poule' reste exclusif à
+  isWC/WC-EC, qui n'ont jamais de coupe nationale, donc aucun risque de
+  collision entre les 2 familles de toggle) et `activeMatches` (le set
+  actuellement affiché). `grouped` — déjà utilisé plus bas par toute la
+  navigation par round (`currentIndex`/`currentGroup`/`goToRoundIndex`,
+  inchangés) — redéfini sur `groupRounds(activeMatches, 'desc')` au lieu de
+  `matches` : l'ordre **desc** (plus récent d'abord, propre à cette page,
+  différent de l'asc de Programme) est préservé à l'identique, seul le jeu
+  de matchs source change. Nouvel onglet ajouté dans le bloc
+  `resultats__titleRow` (`{hasCup && (...)}`, bouton "Par journée" +
+  bouton nommé d'après `DOMESTIC_CUPS[selectedComp]?.name`, à côté — pas en
+  remplacement — du bloc `isWC` déjà existant, les deux étant mutuellement
+  exclusifs par compétition). Recherche (`filteredMatches`) et message
+  d'état vide final basculés de `matches`/`matches.length` vers
+  `activeMatches`/`activeMatches.length` (sûr pour les compétitions WC/EC :
+  `hasCup` y est toujours faux, donc `activeMatches === matches` dans ce
+  cas, aucune régression sur la vue "Par poule") — avec un texte dédié
+  ("Aucun résultat de {nom de la coupe} pour le moment.") quand l'onglet
+  coupe est vide, cas fréquent la majeure partie de la saison avant les
+  tours décisifs. Titre de page (`resultats__kicker`) affiche le nom de la
+  coupe à la place de "Résultats" quand cet onglet est actif, même principe
+  que le kicker de Programme. 385 tests (inchangé — même raison que le fix
+  Programme, changement de composition/affichage) + lint (35 erreurs
+  pré-existantes, Pronos.jsx, confirmées identiques — aucune régression
+  introduite) + build vérifiés. Honnêteté : comme pour le fix Programme,
+  rendu jamais vu en direct sur un vrai appareil avant ce déploiement (juste
+  lecture du JSX résultant) — à confirmer par l'utilisateur, déploiement
+  automatique via Vercel. Les 2 pages qui partagent `DOMESTIC_CUPS`/
+  `fetchClubMatchesRaw` (Programme et Résultats) ont maintenant le même
+  comportement de séparation ; `Classement.jsx` (3e page partageant
+  `shared_selectedComp`) n'a pas cette fusion championnat/coupe (son
+  classement reste basé sur les standings FD.org/ESPN, jamais sur une liste
+  de matchs mélangée) donc n'est pas concerné par ce type de bug.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
