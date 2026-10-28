@@ -90,7 +90,14 @@ export const TEAM_COLORS_FULL = {
   'Indonesia':        { p: '#CE1126', s: '#1a1a1a' },
   'Thailand':         { p: '#A51931', s: '#2D2A4A' },
   // Clubs (Ligue 1, PL, etc.)
-  'Paris Saint-Germain': { p: '#004170', s: '#DA020E' },
+  // p/s inversés le 28/10 (demande explicite utilisateur) : le bleu marine
+  // d'origine (#004170) est trop sombre/peu visible sur fond foncé — luminance
+  // perceptive ~51, sous le seuil ensureVisible (40) mais tout de même très
+  // terne à l'écran. getTeamColor() (teamPhotos.js, consommé par ResultCard/
+  // StandingsTable/TeamSearchPage/FavoritesPage/MyTeamBanner) renvoie
+  // toujours `.p` sans aucune vérification de contraste — le rouge est donc
+  // désormais la couleur PSG affichée partout dans l'app, de façon cohérente.
+  'Paris Saint-Germain': { p: '#DA020E', s: '#004170' },
   'Manchester City':  { p: '#6CABDD', s: '#1C2C5B' },
   'Manchester United':{ p: '#DA020E', s: '#FFE987' },
   'Liverpool':        { p: '#C8102E', s: '#00B2A9' },
@@ -120,7 +127,7 @@ export const TEAM_COLORS_FULL = {
   'Dortmund':              { p: '#FDE100', s: '#000000' },
   'Marseille':             { p: '#009BDE', s: '#1a1a1a' },
   'Lyon':                  { p: '#1A5EA2', s: '#D00000' },
-  'PSG':                   { p: '#004170', s: '#DA020E' },
+  'PSG':                   { p: '#DA020E', s: '#004170' }, // p/s inversés le 28/10, voir commentaire 'Paris Saint-Germain'
   // ⚠️ AJOUT (28/10, bug utilisateur : PSG affiché en vert sur /equipe) —
   // TeamSearchPage.jsx appelle getTeamColor(selected.displayName), et
   // translateTeam('PSG')/translateTeam('Paris Saint-Germain') renvoient
@@ -131,7 +138,7 @@ export const TEAM_COLORS_FULL = {
   // fallbackColor() — une couleur dérivée d'un hash du nom, "aléatoire"
   // en pratique (verte ici) — d'où le symptôme exact rapporté. Alias
   // direct ajouté, même principe que les 2 entrées ci-dessus.
-  'Paris SG':              { p: '#004170', s: '#DA020E' },
+  'Paris SG':              { p: '#DA020E', s: '#004170' }, // p/s inversés le 28/10, voir commentaire 'Paris Saint-Germain'
   // UEFA — manquants
   'Wales':                 { p: '#C8102E', s: '#006B54' },
   'Scotland':              { p: '#003078', s: '#FFFFFF' },

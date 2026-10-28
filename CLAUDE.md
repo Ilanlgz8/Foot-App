@@ -6181,6 +6181,56 @@ cf-worker/
   après ce déploiement (automatique via Vercel), nouvelle itération à
   prévoir si le style ne convient toujours pas.
 
+- ✅ Couleur PSG (bleu marine peu visible) inversée vers le rouge, PARTOUT
+  dans l'app, pas seulement "Fiche équipe" (28/10, demande explicite : "pour
+  le paris sg le bleu on voit casiment rien faut que ce soit en rouge pour
+  tout le monde comme l'app") — root cause : `getTeamColor()`
+  (`teamPhotos.js`) renvoie toujours le champ `.p` (primaire) sans aucune
+  vérification de contraste, et les 3 entrées PSG (`'Paris Saint-Germain'`/
+  `'PSG'`/`'Paris SG'`) avaient `p: '#004170'` (bleu marine, luminance
+  perceptive ~51 — sous le seuil `ensureVisible` à 40 mais quand même terne
+  à l'écran) / `s: '#DA020E'` (rouge). `getTeamColor` est consommé par 5
+  endroits (`ResultCard.jsx`, `StandingsTable.jsx`, `TeamSearchPage.jsx`,
+  `FavoritesPage.jsx`, `MyTeamBanner.jsx`) — le bleu terne touchait donc
+  potentiellement tous ces endroits, pas seulement la fiche équipe où le
+  symptôme a été repéré. Corrigé : `p`/`s` inversés pour les 3 entrées
+  (`{ p: '#DA020E', s: '#004170' }`) — le rouge devient la couleur PSG
+  renvoyée partout où `getTeamColor` est appelé, de façon cohérente dans
+  toute l'app. 398 tests + lint (35 erreurs pré-existantes, Pronos.jsx,
+  inchangé) + build vérifiés (changement de données + commentaires
+  uniquement, aucune logique touchée). Honnêteté : rendu jamais revu en
+  direct sur les 5 endroits concernés après ce déploiement — à confirmer par
+  l'utilisateur.
+
+- ✅ Onglets "Par journée"/nom de la coupe nationale (ex. Copa del Rey)/
+  "Tableau" qui cassaient sur 2 lignes sur mobile, Programme ET Résultats
+  (28/10, demande explicite : "pour les pages programme et resultat faut
+  que laliga, copa del rey et tableau et pour tout les autre championnat
+  tiennet sur la meme ligne stp [...] ca fait pas beau") — root cause :
+  `.matchs__wcToggle` (`match.css`, Programme) et `.resultats__viewTabs`
+  (`resultats.css`, Résultats) n'avaient, sur mobile (`@media max-width:
+  767px`/`900px`), aucun traitement de dépassement — `.matchs__wcToggle`
+  posait même explicitement `flex-wrap: wrap`, cassant les 2-3 boutons
+  (Par journée / nom de la coupe / Tableau) sur plusieurs lignes dès que
+  l'espace manquait — alors que le sélecteur de championnat lui-même
+  (`.matchs__sidebarNav`/`.resultats__sidebarNav`) avait déjà, juste
+  au-dessus dans le même fichier, exactement ce traitement (`flex-wrap:
+  nowrap; overflow-x: auto;` — scroll horizontal discret plutôt qu'un
+  retour à la ligne) depuis un fix antérieur, jamais étendu à ces 2 rangées
+  de boutons de vue. Corrigé en reprenant ce même mécanisme déjà éprouvé :
+  `.matchs__wcToggle` (Match.jsx, FL1/PD/PL/SA/BL1 — tous les championnats
+  avec une coupe nationale) et `.resultats__viewTabs` (Resultat.jsx) passent
+  à `flex-wrap: nowrap; overflow-x: auto;` (scrollbar masquée,
+  `-webkit-overflow-scrolling: touch`) + boutons `flex: 0 0 auto` et
+  police/padding légèrement réduits sur mobile — les boutons restent
+  TOUJOURS sur une seule ligne, un scroll horizontal prenant le relais si
+  l'espace manque vraiment, plutôt qu'un retour à la ligne. 398 tests
+  (inchangé) + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) +
+  build vérifiés (CSS uniquement, aucune logique touchée). Honnêteté : rendu
+  jamais vu en direct sur un vrai appareil/navigateur depuis cet
+  environnement — à confirmer par l'utilisateur après ce déploiement
+  (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

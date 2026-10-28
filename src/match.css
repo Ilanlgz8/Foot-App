@@ -1416,8 +1416,23 @@
   .matchs__scoreHour { font-size: 2.4rem; padding: 0.2rem 0.3rem; }
 
   .matchs__wcBoard { grid-template-columns: repeat(2, 1fr); }
-  .matchs__wcToggle { flex-wrap: wrap; }
-  .matchs__wcToggleBtn { font-size: 0.75rem; padding: 0.35rem 0.75rem; }
+  /* ⚠️ FIX (28/10, demande explicite utilisateur : "Par journée"/nom de la
+     coupe (ex. Copa del Rey)/"Tableau" cassaient sur 2 lignes, "ça fait pas
+     beau") — même traitement que .matchs__sidebarNav juste au-dessus
+     (overflow-x scrollable plutôt que flex-wrap: wrap) pour que les 2-3
+     boutons restent TOUJOURS sur une seule ligne, quel que soit le
+     championnat (y compris ceux avec une coupe nationale : FL1/PD/PL/
+     SA/BL1) — un scroll horizontal discret prend le relais plutôt qu'un
+     retour à la ligne si l'espace manque. */
+  .matchs__wcToggle {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .matchs__wcToggle::-webkit-scrollbar { display: none; }
+  .matchs__wcToggleBtn { font-size: 0.75rem; padding: 0.35rem 0.75rem; flex: 0 0 auto; }
   .matchs__headerRow { flex-direction: column; align-items: flex-start; }
 }
 

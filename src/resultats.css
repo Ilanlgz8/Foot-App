@@ -691,6 +691,22 @@
   .resultats__sidebarDot { display: none; }
 
   .resultats__competitionLogo--sidebar { width: 1.3rem; height: 1.3rem; flex-shrink: 0; }
+
+  /* ⚠️ FIX (28/10, demande explicite utilisateur : "Par journée"/nom de la
+     coupe (ex. Copa del Rey) cassaient sur 2 lignes sur les championnats
+     avec une coupe nationale (FL1/PD/PL/SA/BL1), "ça fait pas beau") —
+     même traitement que .resultats__sidebarNav juste au-dessus : scroll
+     horizontal discret plutôt qu'un retour à la ligne si l'espace manque,
+     les 2 boutons restent toujours sur une seule ligne. */
+  .resultats__viewTabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .resultats__viewTabs::-webkit-scrollbar { display: none; }
+  .resultats__viewTab { flex: 0 0 auto; font-size: 0.68rem; padding: 0.35rem 0.75rem; }
 }
 
 
