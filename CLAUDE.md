@@ -5881,6 +5881,45 @@ cf-worker/
      l'utilisateur (pas une supposition), mais restent à confirmer visuellement après déploiement,
      avec une nouvelle itération à prévoir si le rendu ne correspond pas encore à l'attente.
 
+- ✅ "Fiche équipe" (`/equipe`), 2e round de retours (28/10, dicté verbatim : "il est trop petit,
+  on voit à peine le logo... l'icône, je veux dire" + "pas assez design... surtout pour la liste
+  des matchs" + "mettre possiblement plus de stats, genre par exemple combien de clean sheets" +
+  "pour la liste des matchs, vraiment faire un truc vraiment plus pro, plus design, comme un peu
+  dans la page programme et résultats" + "améliorer un peu le dispositionnement de cette
+  page-là") — 4 changements distincts :
+  1. **Icône navbar agrandie** (`navbar.jsx`/`navbar.css`) : distincte du blason DANS la page
+     (déjà agrandi au round 1) — l'utilisateur précise explicitement "l'icône, je veux dire",
+     celle entre StatFootix et la cloche. Bouton 2.2rem→2.4rem, tracé SVG 1.2rem→1.5rem, épaisseur
+     de trait 1.8→2.2 (un tracé fin reste peu visible même agrandi — l'épaisseur comptait autant
+     que la taille), opacité par défaut 0.45→0.55.
+  2. **Clean sheets ajoutés** (`TeamSearchPage.jsx`, `computeStats`) : nouveau compteur
+     incrémenté quand un match FINISHED a `opp === 0` (adversaire à 0) — même boucle déjà
+     existante, aucun nouveau fetch. Affiché comme 4e carte de la section "Buts" (3→4 colonnes,
+     réutilise `teamSearchPage__statsGrid--4` déjà défini pour "Bilan", avec son repli mobile
+     2 colonnes déjà en place) avec une teinte bleue dédiée (`--cs`, `#38bdf8`) pour ne pas la
+     confondre avec les teintes vert/jaune/rouge des résultats W/D/L.
+  3. **Liste des matchs redessinée** (`TeamSearchPage.jsx` + `teamSearchPage.css`) — le vrai gros
+     du retour : l'ancien rendu (une ligne compacte "vs/@ Adversaire" + score en pastille) jugé
+     "pas ouf". Remplacé par la même grammaire visuelle que `ResultCard.jsx` (Résultats) et le
+     bloc `matchs__*` de `Match.jsx` (Programme), explicitement cité par l'utilisateur comme
+     référence : grille 3 colonnes équipe-domicile / centre / équipe-extérieur, gros blasons ronds
+     (2.5rem), score en grosse police d'affichage (`var(--sf-font-display)`, vert si victoire,
+     gris si nul), badge "Terminé" au-dessus du score, "À venir" + heure pour un match pas encore
+     joué — même dégradé de fond que les cards Résultats (`linear-gradient(160deg, couleur
+     d'équipe...)`). Pas identique à ces 2 pages (demande explicite : "pas totalement la même
+     chose, mais à peu près là même quand même") : le côté de l'équipe recherchée reçoit un
+     anneau coloré sur son blason + son nom en couleur d'équipe (`--self`) — une mise en évidence
+     qui n'a de sens que dans une fiche équipe, absente des 2 pages de référence.
+  4. **Polish layout général** ("dispositionnement") : marge entre sections 1.3rem→1.6rem (un peu
+     plus d'air), titre de section passé en flex avec un compteur à droite ("Tous les matchs 12")
+     sur la liste des matchs, hover sur chaque ligne de match (bordure + lueur à la couleur
+     d'équipe, cohérent avec le hover déjà existant sur `resultats__card`/`matchs__card`).
+  398 tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés (nouveau CSS
+  buildé `TeamSearchPage-*.css` 10.10 kB, JS `TeamSearchPage-*.js` 13.38 kB). Honnêteté : comme
+  pour le round 1, rendu jamais vu en direct sur un vrai appareil/navigateur depuis cet
+  environnement — à confirmer par l'utilisateur après ce déploiement, avec une nouvelle itération
+  si besoin.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

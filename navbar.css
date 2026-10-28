@@ -111,15 +111,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
-.teamSearchBtn svg { width: 1.2rem; height: 1.2rem; }
+/* 28/10 — "trop petit, on voit à peine" : bouton + icône agrandis (2.2rem→
+   2.4rem / 1.2rem→1.5rem) et opacité par défaut remontée (0.45→0.55, voir
+   TeamSearchIcon pour l'épaississement du tracé lui-même). */
+.teamSearchBtn svg { width: 1.5rem; height: 1.5rem; }
 .teamSearchBtn:hover {
   color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.08);

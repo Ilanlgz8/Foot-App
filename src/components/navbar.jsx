@@ -31,9 +31,14 @@ import '../../navbar.css'
 // d'une "contrefaçon" bâclée déjà signalé 2 fois sur ce projet pour d'autres
 // icônes approximées à la main (21/09, voir le commentaire sur ICONS
 // ci-dessous) — ici aucune bibliothèque précise n'est prétendue reproduite.
+// 28/10 — retour utilisateur : "il est trop petit, on voit à peine l'icône"
+// (entre la cloche et le brand, en haut). Le bouton/svg sont agrandis dans
+// navbar.css (2.2rem→2.4rem / 1.2rem→1.5rem) ET le tracé lui-même est
+// épaissi (1.8→2.2, aligné sur l'épaisseur de la cloche) — un tracé fin
+// reste peu visible même agrandi, l'épaisseur compte autant que la taille.
 function TeamSearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l6 2.2v5.3c0 4.6-2.9 7.9-6 9-3.1-1.1-6-4.4-6-9V5.2L12 3z" />
       <circle cx="10.4" cy="10.8" r="2" />
       <path d="M11.9 12.3L13.5 13.9" />

@@ -62,7 +62,7 @@ function buildTeamProfile(matches, key) {
 }
 
 function computeStats(rows) {
-  let played = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0
+  let played = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, cleanSheets = 0
   let homePlayed = 0, homeWins = 0, homeDraws = 0, homeLosses = 0
   let awayPlayed = 0, awayWins = 0, awayDraws = 0, awayLosses = 0
 
@@ -78,6 +78,10 @@ function computeStats(rows) {
     played++
     gf += own
     ga += opp
+    // Clean sheet = match terminé sans le moindre but encaissé (demande
+    // explicite utilisateur, 28/10 : "mettre possiblement plus de stats,
+    // genre par exemple combien de clean sheets").
+    if (opp === 0) cleanSheets++
     if (outcome === 'W') wins++
     else if (outcome === 'D') draws++
     else losses++
@@ -106,7 +110,7 @@ function computeStats(rows) {
     .filter(Boolean)
 
   return {
-    played, wins, draws, losses, gf, ga, diff: gf - ga, form,
+    played, wins, draws, losses, gf, ga, diff: gf - ga, cleanSheets, form,
     home: { played: homePlayed, wins: homeWins, draws: homeDraws, losses: homeLosses },
     away: { played: awayPlayed, wins: awayWins, draws: awayDraws, losses: awayLosses },
   }
@@ -226,7 +230,7 @@ function TeamProfile({ rows, teamName, teamCrest }) {
 
       <section className="teamSearchPage__section">
         <h3 className="teamSearchPage__sectionTitle">Buts</h3>
-        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--3">
+        <div className="teamSearchPage__statsGrid teamSearchPage__statsGrid--4">
           <div className="teamSearchPage__statCard">
             <span className="teamSearchPage__statValue">{stats.gf}</span>
             <span className="teamSearchPage__statLabel">Marqués</span>
@@ -238,6 +242,10 @@ function TeamProfile({ rows, teamName, teamCrest }) {
           <div className="teamSearchPage__statCard">
             <span className="teamSearchPage__statValue">{stats.diff > 0 ? `+${stats.diff}` : stats.diff}</span>
             <span className="teamSearchPage__statLabel">Différence</span>
+          </div>
+          <div className="teamSearchPage__statCard teamSearchPage__statCard--cs">
+            <span className="teamSearchPage__statValue">{stats.cleanSheets}</span>
+            <span className="teamSearchPage__statLabel">Clean sheets</span>
           </div>
         </div>
       </section>
@@ -263,39 +271,77 @@ function TeamProfile({ rows, teamName, teamCrest }) {
       </section>
 
       <section className="teamSearchPage__section">
-        <h3 className="teamSearchPage__sectionTitle">Tous les matchs</h3>
+        <h3 className="teamSearchPage__sectionTitle">
+          Tous les matchs
+          <span className="teamSearchPage__sectionCount">{filteredRows.length}</span>
+        </h3>
+        {/* ⚠️ REDESSINÉ (28/10, retour utilisateur : "pour la liste des matchs,
+            vraiment faire un truc vraiment plus pro, plus design, comme un peu
+            dans la page programme et résultats") — même grammaire visuelle que
+            ResultCard.jsx (Résultats) / le bloc "matchs__*" de Match.jsx
+            (Programme) : grille 3 colonnes équipe/centre/équipe, gros blasons
+            ronds, score en gros chiffres (police d'affichage, vert si
+            victoire), badge "Terminé". Pas identique : affiche les 2 VRAIS
+            côtés domicile/extérieur (comme sur ces 2 pages) mais met en
+            évidence le côté de l'équipe recherchée (anneau coloré + nom en
+            couleur d'équipe) — information que ces 2 pages n'ont pas besoin de
+            donner, propre à une fiche équipe. */}
         <ul className="teamSearchPage__matchList">
           {filteredRows.map(({ match, isHome }) => {
-            const opponent = isHome ? match.awayTeam : match.homeTeam
-            const opponentName = translateTeam(opponent?.shortName || opponent?.name || '?')
             const fs = finalScore(match.score)
             const played = match.status === 'FINISHED'
             const outcome = played ? outcomeForSide(match, isHome) : null
-            const ownScore = isHome ? fs.home : fs.away
-            const oppScore = isHome ? fs.away : fs.home
             const rowKind = played ? (outcome ? outcome.toLowerCase() : 'none') : 'upcoming'
+            const hs = fs.home
+            const as_ = fs.away
+            const hWin = played && hs != null && as_ != null && hs > as_
+            const aWin = played && hs != null && as_ != null && as_ > hs
+            const draw = played && hs != null && as_ != null && hs === as_
+            const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+            const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
 
             return (
               <li key={match.id} className={`teamSearchPage__matchRow teamSearchPage__matchRow--${rowKind}`}>
-                <div className="teamSearchPage__matchTop">
+                <div className="teamSearchPage__matchHead">
                   <span className="teamSearchPage__matchDate">{formatMatchDate(match.utcDate)}</span>
                   <span className="teamSearchPage__matchComp">{match.competition?.name}</span>
                 </div>
-                <div className="teamSearchPage__matchBottom">
-                  <span className="teamSearchPage__matchOpp">
-                    <span className="teamSearchPage__matchVs">{isHome ? 'vs' : '@'}</span>
-                    {opponent?.crest && (
-                      <img src={opponent.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                <div className="teamSearchPage__matchBody">
+                  <div className={`teamSearchPage__matchSide${isHome ? ' teamSearchPage__matchSide--self' : ''}`}>
+                    <div className="teamSearchPage__matchCrestWrap">
+                      {match.homeTeam?.crest
+                        ? <img src={match.homeTeam.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                        : <span className="teamSearchPage__matchCrestFb">{homeName.charAt(0)}</span>}
+                    </div>
+                    <span className="teamSearchPage__matchSideName">{homeName}</span>
+                  </div>
+
+                  <div className="teamSearchPage__matchCenter">
+                    {played ? (
+                      <>
+                        <span className="teamSearchPage__matchFtBadge">Terminé</span>
+                        <div className="teamSearchPage__matchScoreRow">
+                          <span className={`teamSearchPage__matchScoreNum${hWin ? ' teamSearchPage__matchScoreNum--win' : ''}${draw ? ' teamSearchPage__matchScoreNum--draw' : ''}`}>{hs ?? '–'}</span>
+                          <span className="teamSearchPage__matchScoreDash">–</span>
+                          <span className={`teamSearchPage__matchScoreNum${aWin ? ' teamSearchPage__matchScoreNum--win' : ''}${draw ? ' teamSearchPage__matchScoreNum--draw' : ''}`}>{as_ ?? '–'}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="teamSearchPage__matchKickoffLabel">À venir</span>
+                        <span className="teamSearchPage__matchKickoff">{formatKickoffTime(match.utcDate)}</span>
+                      </>
                     )}
-                    {opponentName}
-                  </span>
-                  {played ? (
-                    <span className={`teamSearchPage__matchScore teamSearchPage__matchScore--${rowKind}`}>
-                      {ownScore ?? '–'} - {oppScore ?? '–'}
-                    </span>
-                  ) : (
-                    <span className="teamSearchPage__matchUpcoming">{formatKickoffTime(match.utcDate)}</span>
-                  )}
+                  </div>
+
+                  <div className={`teamSearchPage__matchSide${!isHome ? ' teamSearchPage__matchSide--self' : ''}`}>
+                    <div className="teamSearchPage__matchCrestWrap">
+                      {match.awayTeam?.crest
+                        ? <img src={match.awayTeam.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                        : <span className="teamSearchPage__matchCrestFb">{awayName.charAt(0)}</span>}
+                    </div>
+                    <span className="teamSearchPage__matchSideName">{awayName}</span>
+                  </div>
                 </div>
               </li>
             )
