@@ -16,6 +16,31 @@ import { isCardLive } from '../utils/matchUtils'
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
+// ⚠️ AJOUT (28/10, demande explicite utilisateur : "on met fiche équipe [...]
+// pile poil entre [StatFootix et la cloche] [...] une icône bien propre qui
+// fait pas ChatGPT ou quoi") — bouton d'accès à la nouvelle route /equipe
+// (recherche d'équipe + récap de ses matchs, voir TeamSearchPage.jsx).
+// Icône dessinée à la main plutôt que copiée d'une bibliothèque externe
+// (contrairement aux icônes de la barre du bas, "récupérées directement
+// depuis @tabler/icons") : aucun accès réseau possible dans cet environnement
+// vers les sources habituelles de ces icônes (raw.githubusercontent.com/
+// cdn.jsdelivr.net, les deux renvoient vide ici — déjà rencontré pour npm/
+// Turso, voir CLAUDE.md) pour en récupérer un tracé exact et vérifié. Un
+// écusson (shield) + une petite loupe : forme volontairement simple et
+// géométrique (jamais une icône de marque/chatbot), pour minimiser le risque
+// d'une "contrefaçon" bâclée déjà signalé 2 fois sur ce projet pour d'autres
+// icônes approximées à la main (21/09, voir le commentaire sur ICONS
+// ci-dessous) — ici aucune bibliothèque précise n'est prétendue reproduite.
+function TeamSearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l6 2.2v5.3c0 4.6-2.9 7.9-6 9-3.1-1.1-6-4.4-6-9V5.2L12 3z" />
+      <circle cx="10.4" cy="10.8" r="2" />
+      <path d="M11.9 12.3L13.5 13.9" />
+    </svg>
+  )
+}
+
 const NAV = [
   { name: 'Accueil',    href: '/' },
   { name: 'Programme',  href: '/matchs' },
@@ -215,6 +240,16 @@ function Navbar() {
               {liveCount > 0 && <span className="sfLiveBtn__dot" />}
               DIRECT
               {liveCount > 0 && <span className="sfLiveBtn__count">{liveCount}</span>}
+            </NavLink>
+            <NavLink
+              to="/equipe"
+              className={({ isActive }) =>
+                isActive ? 'teamSearchBtn teamSearchBtn--active' : 'teamSearchBtn'
+              }
+              aria-label="Fiche équipe"
+              title="Fiche équipe"
+            >
+              <TeamSearchIcon />
             </NavLink>
             <NotificationBell />
           </div>

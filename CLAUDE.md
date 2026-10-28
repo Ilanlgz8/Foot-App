@@ -5795,6 +5795,45 @@ cf-worker/
   leur onglet Coupe dans Programme/Résultats, mais aucune notif push pour ces
   2 compétitions tant que le Worker n'est pas redéployé.
 
+- ✅ Nouvelle fonctionnalité "Fiche équipe" (28/10, demande explicite utilisateur : "on met fiche
+  équipe entre... tout en haut de l'app, là... entre statoutils et la cloche verte des
+  notifications, pile poil entre les deux... une icône bien propre qui fait pas ChatGPT... et
+  après, dedans... le plus beau truc, plus beau visuel de statistiques qu'on peut avoir pour
+  chaque équipe, quand on tape une équipe") : nouvelle route `/equipe`, accessible via une icône
+  dans la navbar entre "StatFootix" et la cloche de notifications (mobile : seuls ces 2 éléments
+  dans `sfHeader__right`, le pill DIRECT étant `display:none` sous le breakpoint desktop — donc
+  "pile poil entre les deux" respecté exactement). Recherche une équipe par nom (FR/EN/tla,
+  insensible aux accents/casse) et affiche sa fiche : blason+nom (coloré via `getTeamColor`),
+  losanges de forme récente (`FormDiamonds`, déjà existant), filtre par compétition (puces, affiché
+  seulement si l'équipe joue dans plusieurs), grille de stats (joués/V/N/D/buts marqués/concédés/
+  différence), bilan domicile/extérieur séparé, et la liste chronologique de tous les matchs
+  (score+résultat ou horaire à venir). **Problème de fond résolu** : FD.org (5 grands championnats
+  + C1) et ESPN (UEL/UECL) n'ont AUCUN id d'équipe commun — nouveau module `src/utils/
+  teamSearch.js` (12 tests dédiés, `teamSearch.test.js`) qui normalise les noms (accents/casse/
+  ponctuation) et s'appuie sur `translateTeam` (`teamNames.js`) comme clé d'identité stable entre
+  les 2 sources (vérifié : PSG "Paris SG" identique qu'il vienne du `tla` FD.org ou du `shortName`
+  ESPN ; homonymes Real Madrid/Atlético Madrid bien distingués). `outcomeForTeam`/`outcomeForSide`
+  (`matchUtils.js`) séparés pour que le calcul V/N/D puisse être piloté par un simple booléen
+  `isHome` déjà connu, plutôt que par une comparaison d'id — nécessaire puisqu'aucun id commun
+  n'existe ici. Données : nouveau hook `useTeamSearchMatches` (`hooks/useTeamSearch.js`) qui
+  réutilise `fetchClubMatchesRaw` (FL1/PL/PD/BL1/SA/CL, inclut déjà les coupes nationales fusionnées
+  côté FD.org) + `fetchEspnCompMatches` (UEL/UECL) via `useQueries`, avec un décalage de 1s entre
+  chaque requête FD.org (même précaution déjà utilisée ailleurs dans l'app, `useTeamFormMulti`/
+  `useLowerDivisionStatsMulti`, pour ne jamais rafaler FD.org — historique de suspensions de compte
+  documenté plus haut dans ce fichier) — aucun nouvel endpoint serverless créé (12/12 déjà utilisés,
+  voir Stack). Icône navbar (`TeamSearchIcon`, `navbar.jsx`) dessinée à la main (bouclier simple +
+  loupe stylisée) plutôt que sourcée d'une vraie librairie : tentative de récupérer un vrai tracé
+  SVG (Tabler icons via `raw.githubusercontent.com`/`cdn.jsdelivr.net`) infructueuse, ces domaines
+  renvoyant une réponse vide depuis cet environnement (même limite déjà documentée pour Turso/npm
+  le 01/10) — plutôt que d'approximer de mémoire un tracé précis d'une librairie connue (risque de
+  "contrefaçon" déjà signalé par l'utilisateur une fois, 21/09), un tracé volontairement simple et
+  générique a été dessiné, honnêteté du choix documentée directement en commentaire dans le code.
+  398 tests (+12) + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés
+  (nouveau chunk `TeamSearchPage` correctement scindé). Honnêteté : rendu jamais vu en direct sur
+  un vrai appareil/navigateur depuis cet environnement (ni la page, ni l'icône, ni le thème de
+  couleur par équipe) — à confirmer par l'utilisateur après ce déploiement (automatique via
+  Vercel), qui a explicitement prévu d'itérer ensemble sur le visuel une fois vu en vrai.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

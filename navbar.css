@@ -104,6 +104,30 @@
 /* Bouton DIRECT — desktop uniquement */
 .sfLiveBtn { display: none; }
 
+/* Bouton "Fiche équipe" (/equipe, 28/10) — même gabarit que .notif-bell
+   (notificationBell.css) pour rester visuellement cohérent dans le même
+   groupe de boutons icône du header. */
+.teamSearchBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.45);
+  text-decoration: none;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+.teamSearchBtn svg { width: 1.2rem; height: 1.2rem; }
+.teamSearchBtn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.1);
+}
+.teamSearchBtn:active { transform: scale(0.95); }
+.teamSearchBtn--active { color: var(--sf-red); }
+
 /* ───────────────────── BOTTOM TAB BAR (mobile) ───────────────── */
 /* ⚠️ `position: fixed` ABANDONNÉ ENTIÈREMENT (14/09, 14e signalement de la
    barre du bas décollée — historique complet des 13 tentatives précédentes

@@ -209,6 +209,20 @@ export function outcomeForTeam(match, teamId) {
   const isHome = match.homeTeam?.id === teamId
   const isAway = match.awayTeam?.id === teamId
   if (!isHome && !isAway) return null
+  return outcomeForSide(match, isHome)
+}
+
+// ⚠️ EXTRAIT (28/10, fiche équipe — voir teamSearch.js) : même logique que
+// outcomeForTeam() ci-dessus, mais paramétrée par le camp (isHome) plutôt que
+// par un id d'équipe. outcomeForTeam() ne peut comparer que des matchs d'UNE
+// SEULE source (l'id doit matcher match.homeTeam.id) — la fiche équipe
+// agrège des matchs de PLUSIEURS sources (FD.org + ESPN, voir teamSearch.js)
+// pour une même équipe identifiée par NOM, sans id commun fiable entre elles.
+// Le camp (home/away) est déjà connu à ce moment-là (déterminé par le
+// matching de nom), donc cette version évite de réclamer un id inexistant.
+// Même code, aucune logique dupliquée — outcomeForTeam() délègue ici.
+export function outcomeForSide(match, isHome) {
+  const isAway = !isHome
 
   // ⚠️ 2e BUG CORRIGÉ (l'utilisateur a signalé que le problème persistait
   // pour l'Angleterre après le 1er correctif ci-dessus) : l'ordre de check
