@@ -6231,6 +6231,91 @@ cf-worker/
   environnement — à confirmer par l'utilisateur après ce déploiement
   (automatique via Vercel).
 
+- ✅ "Fiche équipe" (`/equipe`) enrichie de 3 nouvelles sections, demande
+  explicite utilisateur (28/10 : "met le classement de l'equipe pour chaque
+  championat ou elle participe et en cours surtout [...] les meilleurs
+  buteurs de l'equipe et la compo la utilisé [...] avec la disposition des
+  joueurs") — la 4e partie de la demande (nombre de trophées, "si on peut")
+  n'a volontairement PAS été implémentée, voir le point honnêteté en bas de
+  cette entrée.
+  1. **Classement par compétition** : réutilise `fetchStandingsData`, extrait
+     SANS AUCUN changement de comportement de l'intérieur du `queryFn` de
+     `useStandings.js` (`src/hooks/useStandings.js`) — `useStandings`
+     l'appelle désormais lui aussi, à l'identique. Nouveau hook
+     `useTeamStandingsMulti(compCodes)` (`useTeamSearch.js`, `useQueries`)
+     avec la MÊME `queryKey` (`['standings', comp]`) que la page Classement —
+     un classement déjà consulté là-bas est servi instantanément ici, zéro
+     fetch en double, et vice-versa. `TeamProfile` (`TeamSearchPage.jsx`)
+     exclut les compétitions de type coupe nationale (`isCup`, détecté sur
+     chaque match — une coupe fusionnée garde le CODE FD.org du championnat
+     parent mais un `competition.id` synthétique distinct, voir
+     `SYNTHETIC_COMP_ID`/`espnAdapter.js` — sans ça, le classement de la
+     ligue aurait été redemandé une 2e fois sous l'entrée coupe, qui n'a de
+     toute façon aucun classement, c'est un tableau à élimination directe).
+     La compétition du tout prochain match à venir de l'équipe ("en cours
+     surtout", demande explicite) est épinglée en tête de liste avec un tag
+     "En cours" — calculée comme la compétition du premier match non-FINISHED
+     dans `rows` (déjà trié chronologiquement). La ligne de l'équipe dans
+     chaque tableau est trouvée par **nom normalisé** (`teamIdentityKey`,
+     `teamSearch.js`), pas par id — cohérent avec tout le reste de cette page
+     (aucun id commun entre FD.org et ESPN, voir son historique du 28/10) et
+     robuste même dans le cas rare où le classement d'une comp FD.org bascule
+     sur son repli ESPN (ids alors incompatibles entre le match et le
+     classement, le nom reste la seule clé fiable dans tous les cas).
+  2. **Meilleurs buteurs** : même principe, `fetchScorersData` extrait de
+     `useScorers.js` + `useTeamScorersMulti(compCodes)`, même `queryKey`
+     (`['scorers', comp]`) partagée avec Classement. Pour chaque compétition
+     FD.org couverte, filtre la liste des buteurs de TOUTE la compétition
+     (endpoint `/scorers`, pas par équipe) sur le nom de l'équipe recherchée,
+     trie par buts, garde le top 5. `NO_SCORERS_COMPS` (UEL/UECL, voir son
+     historique — données ESPN déjà invalidées le 26/09, fabriquées/fausses)
+     est explicitement retiré de la liste des compétitions interrogées pour
+     cette section : honnêteté, pas de bloc "0 buteur" trompeur affiché pour
+     ces 2 compétitions, simplement rien du tout (comme partout ailleurs dans
+     ce projet face à un vrai gap de données).
+  3. **Compo** : réutilise EXACTEMENT les 2 mêmes sources déjà actives pour un
+     match "normal" (`ComposTab`, `MatchModal.jsx`) — `useLineups` (ESPN,
+     prioritaire, gère aussi les 2 comps ESPN-only) puis `useFdLineups`
+     (football-data.org, `/v4/matches/{id}`, no-op silencieux sur un id
+     ESPN-sourcé) — sur le DERNIER match JOUÉ de l'équipe (`lastPlayedRow`),
+     pas une compo "la plus fréquente" statistique : interroger la compo de
+     chacun des 15-40 matchs de la saison coûterait autant de requêtes FD.org
+     individuelles, un risque de rafale déjà documenté comme sensible dans ce
+     projet (suspensions de compte répétées, voir tout l'historique FD.org
+     de ce fichier) pour un gain marginal — la dernière compo connue est déjà
+     l'information la plus directe et la plus utile, "la compo utilisée" au
+     sens propre du terme employé par l'utilisateur. Nouvelle prop
+     `singleTeam` sur `LineupPitch.jsx` (opt-in, défaut `false`, les 2 call
+     sites existants dans `MatchModal.jsx` strictement inchangés) : masque
+     l'onglet home/away (qui n'a pas de sens ici, affichait un adversaire
+     vide) et affiche directement le terrain + la disposition des joueurs
+     ("avec la disposition des joueurs etc", demande explicite) de la seule
+     équipe recherchée.
+  Honnêteté sur les trophées (4e partie de la demande, "si on peut le nombre
+  de trophée qu'elle a") : **non implémenté**, par choix plutôt que par oubli.
+  Aucune des 2 sources de données de ce projet (football-data.org, ESPN) ne
+  fournit de palmarès/nombre de trophées — vérifié en relisant tous les
+  endpoints déjà utilisés dans ce fichier (fixtures, standings, scorers,
+  summary/details), aucun n'expose cette donnée. La seule option aurait été
+  une liste CURÉE à la main (même principe que `BIG_TEAMS`/`NOTABLE_TEAMS`
+  dans `matchDuJour.js`, déjà un jugement assumé plutôt qu'une donnée
+  objective) — mais un nombre de trophées FAUX ou périmé (un titre gagné
+  cette saison, une coupe mal comptée) est une information beaucoup plus
+  vérifiable et "citable" par un utilisateur qu'un simple ordre d'affichage
+  de cartes Accueil, donc un risque plus grave d'erreur factuelle à assumer
+  sans source fiable — contraire à l'instruction explicite de l'utilisateur
+  ("n'invente rien [...] soit toujours honnête sur n'importe quoi"). L'ask
+  était lui-même hedgé par l'utilisateur ("si on peut") : pas de section
+  ajoutée plutôt qu'un chiffre non garanti.
+  398 tests (inchangé — changement de composition/affichage et d'extraction
+  pure de fonctions déjà existantes, pas de nouvelle logique isolée à tester)
+  + lint (35 erreurs pré-existantes, Pronos.jsx, confirmées identiques) +
+  build vérifiés (nouveau chunk `LineupPitch` séparé, `TeamSearchPage`
+  17.68 kB/4.61 kB gzip). Honnêteté générale : rendu jamais vu en direct sur
+  un vrai appareil/navigateur depuis cet environnement (classement/buteurs/
+  compo compris) — à confirmer par l'utilisateur après ce déploiement
+  (automatique via Vercel).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

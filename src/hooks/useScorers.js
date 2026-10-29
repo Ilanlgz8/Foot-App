@@ -57,6 +57,64 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // que le quota Upstash reste épuisé — voir NO_SCORERS_COMPS, competitions.js,
 // pour l'historique complet). NL rejoint CAN/COPA/UEL/UECL, aucune des 5 n'a
 // de source de buteurs fiable actuellement.
+// ⚠️ EXTRAIT (28/10, demande utilisateur : meilleurs buteurs de l'équipe
+// dans la fiche équipe, voir TeamSearchPage.jsx) : la logique de fetch
+// (NO_SCORERS_COMPS, repli limit=500→100, repli cache stale) vivait jusqu'ici
+// inline dans le `queryFn` de useScorers — extraite ici en fonction pure
+// réutilisable par useTeamScorersMulti (useTeamSearch.js), SANS AUCUN
+// changement de comportement : useScorers l'appelle désormais elle aussi, à
+// l'identique. Partage la MÊME queryKey (['scorers', compId]) que ce hook —
+// un classement buteurs déjà consulté via la page Classement n'est jamais
+// re-fetché pour la fiche équipe, et vice-versa.
+export async function fetchScorersData(compId, delayMs = 0) {
+  const key = `scorers3_${compId}`
+
+  if (NO_SCORERS_COMPS.has(compId)) { writeCache(key, [], STALE_MS); return [] }
+
+  if (delayMs > 0) await waitForFdSpacing(delayMs)
+  const isAnnualIntl = compId === 'WC' || compId === 'EC'
+  const season = new Date().getFullYear()
+
+  async function tryFetch(url) {
+    const fetchPromise = fdFetch(fdUrl(url))
+    registerFdCallAttempt(fetchPromise.then(resp => !resp.headers.get('X-Cache')).catch(() => false))
+    const r = await fetchPromise
+    if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
+    const fresh = !r.headers.get('X-Cache')
+    if (!r.ok) throw new Error(String(r.status))
+    const j = await r.json()
+    return { scorers: j.scorers ?? null, fresh }
+  }
+
+  let scorers = null
+  try {
+    let fresh = false
+    if (isAnnualIntl) {
+      const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
+      scorers = r.scorers
+      fresh = r.fresh
+    }
+    if (!scorers || scorers.length === 0) {
+      if (fresh) await new Promise(res => setTimeout(res, 6_000))
+      try {
+        const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+        scorers = r2.scorers
+      } catch (e) {
+        if (e.message === '429' || e.message === '403') throw e
+        const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
+        scorers = r3.scorers
+      }
+    }
+  } catch (err) {
+    const stale = readCacheStale(key)
+    if (stale) return stale
+    throw err
+  }
+  scorers = scorers ?? []
+  writeCache(key, scorers, STALE_MS)
+  return scorers
+}
+
 export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
@@ -77,128 +135,10 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['scorers', compId],
-    queryFn: async () => {
-      // ⚠️ NO_SCORERS_COMPS (voir commentaire au-dessus de la fonction) :
-      // aucune source fiable pour ces 5 comps — Classement.jsx cache le
-      // bouton "Buteurs" avant même d'appeler ce hook pour elles, mais on
-      // garde un filet ici aussi (défense en profondeur) plutôt que de
-      // laisser tomber dans la branche FD.org, qui échouerait (compId pas un
-      // vrai code FD.org) sans jamais rien avoir de mieux à proposer.
-      if (NO_SCORERS_COMPS.has(compId)) { writeCache(key, [], STALE_MS); return [] }
-
-      // delayMs>0 : attente ADAPTATIVE (voir fdSpacingTracker.js), pas un
-      // délai fixe — 0ms si aucun hook voisin (useStandings/useTeamForm,
-      // même page) n'a vraiment tapé FD.org juste avant.
-      if (delayMs > 0) await waitForFdSpacing(delayMs)
-      // football-data.org résout la "saison courante" comme "la saison à la date
-      // de début la plus récente" (doc officielle) — pour une compétition annuelle
-      // (WC, EC) qui ne revient que tous les 4 ans, ça peut pointer sur l'édition
-      // précédente au lieu de l'actuelle si on ne force pas ?season=. C'est déjà
-      // le cas connu pour /matches (voir useMatchs.js) et ça explique très
-      // probablement un classement buteurs qui semble "figé" à la phase de poules :
-      // sans season explicite, on lisait peut-être une saison qui n'était plus
-      // mise à jour en phase à élimination directe.
-      const isAnnualIntl = compId === 'WC' || compId === 'EC'
-      const season = new Date().getFullYear()
-
-      async function tryFetch(url) {
-        // Enregistré AVANT le await (voir fdSpacingTracker.js).
-        const fetchPromise = fdFetch(fdUrl(url))
-        registerFdCallAttempt(fetchPromise.then(resp => !resp.headers.get('X-Cache')).catch(() => false))
-        const r = await fetchPromise
-        if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
-        const fresh = !r.headers.get('X-Cache')
-        // ⚠️ BUG CORRIGÉ (constat utilisateur : "aucun buteur disponible" sur
-        // La Liga/Serie A alors que l'API a bien de vraies données — confirmé
-        // par appel réel direct sur /api/football?...scorers&limit=500,
-        // timeout backend FD.org reproduit plusieurs fois sur CES 2 comps
-        // précises à ce volume, alors que PL/FL1 répondent normalement) :
-        // un !r.ok (timeout, 500...) retournait { scorers: null } SANS lever
-        // d'exception — `scorers` finissait réécrit en [] plus bas et ÉCRIT
-        // EN CACHE comme une vraie réponse "0 buteur" (2min, ou 24h si
-        // NO_MATCH_STALE_MS) : un échec transitoire devenait un faux "aucun
-        // buteur" persistant. Lève maintenant une exception sur TOUT !r.ok,
-        // pas seulement 429/403 — tombe dans le vrai filet plus bas (repli
-        // limit=100, puis readCacheStale), jamais un [] inventé.
-        if (!r.ok) throw new Error(String(r.status))
-        const j = await r.json()
-        return { scorers: j.scorers ?? null, fresh }
-      }
-
-      // limit=500 : le paramètre "limit" n'est pas documenté officiellement
-      // pour /scorers (seuls season/matchday le sont dans la doc FD.org),
-      // mais il fonctionne déjà en pratique (validé avec 20 puis 100), et la
-      // doc générale FD.org confirme un paramètre limit [1-500] sur d'autres
-      // ressources de liste de la même API — 500 couvre en pratique TOUTE
-      // compétition réelle (une Coupe du Monde n'a jamais plus de ~250
-      // buteurs différents), donc plus de raison de rater un joueur cherché
-      // par équipe/pays dans la barre de recherche. Si l'API plafonne quand
-      // même plus bas en interne, on récupère simplement moins — pas d'erreur.
-      // ⚠️ BUG CORRIGÉ (même mécanisme que useStandings.js/useMatchs.js —
-      // constat utilisateur : "j'avais tout, 5min après plus rien") : tryFetch
-      // lève une exception sur 429/403, jamais interceptée ici → avec
-      // `retry: false`, une seule erreur transitoire faisait disparaître les
-      // buteurs sans repli, malgré readCacheStale déjà en place plus bas pour
-      // le cas "réponse vide".
-      let scorers = null
-      try {
-        let fresh = false
-        if (isAnnualIntl) {
-          const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
-          scorers = r.scorers
-          fresh = r.fresh
-        }
-        if (!scorers || scorers.length === 0) {
-          if (fresh) await new Promise(res => setTimeout(res, 6_000))
-          try {
-            const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
-            scorers = r2.scorers
-          } catch (e) {
-            // 429/403 : problème de compte/quota, pas de volume — retenter à
-            // un limit plus bas n'y changerait rien, direction le filet
-            // readCacheStale du catch englobant, comme avant.
-            if (e.message === '429' || e.message === '403') throw e
-            // ⚠️ AJOUT — filet spécifique au bug ci-dessus (voir tryFetch) :
-            // limit=500 a été vu timeout côté backend FD.org précisément sur
-            // La Liga et la Serie A (reproduit plusieurs fois, appel réel),
-            // alors qu'un limit plus bas répond instantanément avec de vraies
-            // données. Un dernier essai à limit=100 avant d'abandonner —
-            // couvre largement les buteurs réellement utiles à l'affichage
-            // (voir Classement.jsx), sans rien changer pour les compétitions
-            // où limit=500 marchait déjà (tenté en 1er, ce repli n'est qu'un
-            // 2e filet, jamais utilisé si le 1er essai réussit).
-            const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
-            scorers = r3.scorers
-          }
-        }
-      } catch (err) {
-        // ⚠️ BUG CORRIGÉ (constat utilisateur, 28/08 : "y'a aucun buteur" sur
-        // La Liga/Serie A juste après le déploiement du fix précédent — testé
-        // en direct sur l'API prod, les DEUX ont pourtant de vraies données)
-        // : ce catch avalait TOUT échec (y compris 429/403 — budget FD.org
-        // dépassé, cf CLAUDE.md) en un simple `scorers = null` → `[]`, sans
-        // jamais relancer l'erreur. Résultat : `error` ne remontait jamais à
-        // useQuery, `classifyFetchError` ne pouvait donc jamais afficher le
-        // vrai message "Veuillez patienter quelques instants" — l'UI
-        // affichait "Aucun buteur disponible" (repli readCacheStale absent)
-        // exactement comme un vrai 0 buteur, indiscernable. Pire : ce faux []
-        // était ensuite écrit en cache (writeCache 2min plus bas), donc même
-        // un rechargement immédiat restait bloqué sur le faux résultat tant
-        // que ce cache ne périmait pas. FL1/PL n'étaient jamais touchées
-        // (comp par défaut, chargée en 1er, gagne toujours la course au
-        // budget partagé) — La Liga/Serie A, chargées après un changement
-        // d'onglet, perdent plus souvent cette course. Même mécanisme déjà
-        // correct dans useStandings.js (`throw err` en dernier recours) —
-        // aligné ici : sans cache de secours, on relance l'erreur au lieu de
-        // fabriquer un faux "0 buteur".
-        const stale = readCacheStale(key)
-        if (stale) return stale
-        throw err
-      }
-      scorers = scorers ?? []
-      writeCache(key, scorers, STALE_MS)
-      return scorers
-    },
+    // ⚠️ Logique de fetch déplacée dans fetchScorersData (voir juste avant
+    // cette fonction, extraction du 28/10) — appelée ici à l'identique,
+    // aucun changement de comportement.
+    queryFn: () => fetchScorersData(compId, delayMs),
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,

@@ -26,6 +26,8 @@ import { useQueries } from '@tanstack/react-query'
 import { fetchClubMatchesRaw, TTL } from './useMatchs'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
+import { fetchStandingsData } from './useStandings'
+import { fetchScorersData } from './useScorers'
 
 const CLUB_FD_COMPS   = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const CLUB_ESPN_COMPS = ['UEL', 'UECL']
@@ -65,4 +67,68 @@ export function useTeamSearchMatches() {
   const matches = allResults.flatMap(r => (r.data ?? []).filter(m => !m._fromLastSeason))
 
   return { matches, isLoading }
+}
+
+// ⚠️ AJOUT (28/10, demande utilisateur : "met le classement de l'equipe pour
+// chaque championat ou elle participe") — classement de l'équipe par
+// compétition, pour chaque compétition NON-COUPE où elle joue. Réutilise
+// fetchStandingsData (extrait de useStandings.js, voir ce fichier) avec la
+// MÊME queryKey (['standings', comp]) que la page Classement — un classement
+// déjà consulté là-bas est servi instantanément ici, zéro fetch en double.
+// Stagger (même principe que ci-dessus) : jamais plus d'un vrai appel FD.org
+// à la fois au premier chargement à froid.
+export function useTeamStandingsMulti(compCodes) {
+  const results = useQueries({
+    queries: compCodes.map((comp, i) => ({
+      queryKey: ['standings', comp],
+      queryFn: async () => {
+        if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
+        return fetchStandingsData(comp)
+      },
+      staleTime: TTL.FINISHED,
+      retry: false,
+      enabled: !!comp,
+    })),
+  })
+
+  const byComp = {}
+  compCodes.forEach((comp, i) => {
+    byComp[comp] = {
+      standings: results[i]?.data?.table  ?? [],
+      groups:    results[i]?.data?.groups ?? [],
+      loading:   results[i]?.isLoading ?? false,
+    }
+  })
+  return byComp
+}
+
+// ⚠️ AJOUT (28/10, demande utilisateur : "les meilleurs buteurs de l'equipe")
+// — buteurs par compétition, même principe/mêmes garanties que ci-dessus
+// (réutilise fetchScorersData, même queryKey que la page Classement). Les
+// comps ESPN-only de cette page (UEL/UECL) sont déjà couvertes par
+// NO_SCORERS_COMPS DANS fetchScorersData lui-même (renvoie [] proprement,
+// voir son commentaire dans useScorers.js) — aucun filtre supplémentaire
+// nécessaire ici, le composant affiche juste "aucune donnée" le cas échéant.
+export function useTeamScorersMulti(compCodes) {
+  const results = useQueries({
+    queries: compCodes.map((comp, i) => ({
+      queryKey: ['scorers', comp],
+      queryFn: async () => {
+        if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
+        return fetchScorersData(comp)
+      },
+      staleTime: TTL.FINISHED,
+      retry: false,
+      enabled: !!comp,
+    })),
+  })
+
+  const byComp = {}
+  compCodes.forEach((comp, i) => {
+    byComp[comp] = {
+      scorers: results[i]?.data ?? [],
+      loading: results[i]?.isLoading ?? false,
+    }
+  })
+  return byComp
 }

@@ -662,13 +662,21 @@ function PlayerGrid({ starters, subs }) {
 }
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function LineupPitch({ home, away, isCountry = false, hColor = '#ef4444', aColor = '#eadfdfe4', goals = {} }) {
+// ⚠️ AJOUT `singleTeam` (28/10, demande utilisateur : compo de l'équipe dans
+// la fiche équipe, TeamSearchPage.jsx) : ce composant affichait TOUJOURS les
+// 2 onglets home/away, même en ne passant qu'un seul côté (`away` vide) —
+// pertinent dans un contexte "match" (les 2 côtés existent toujours), pas
+// dans une fiche équipe où il n'y a qu'UNE compo à montrer, sans adversaire
+// réel associé. `singleTeam=true` masque l'onglet et force `home` comme
+// seule équipe affichée — opt-in, par défaut `false` : les 2 call sites
+// existants (MatchModal.jsx, ComposTab) sont strictement inchangés.
+export default function LineupPitch({ home, away, isCountry = false, hColor = '#ef4444', aColor = '#eadfdfe4', goals = {}, singleTeam = false }) {
   const [activeTeam, setActiveTeam] = useState('home')
 
   if (!home?.starters?.length && !away?.starters?.length) return null
 
-  const team      = activeTeam === 'home' ? home : away
-  const teamColor = activeTeam === 'home' ? hColor : aColor
+  const team      = singleTeam || activeTeam === 'home' ? home : away
+  const teamColor = singleTeam || activeTeam === 'home' ? hColor : aColor
   const positions = getPositions(team.starters ?? [], team.formation)
 
   return (
@@ -680,8 +688,8 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
       maxWidth:     '480px',
       margin:       '0 auto',
     }}>
-      {/* Onglets équipes */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      {/* Onglets équipes (masqués en mode singleTeam) */}
+      {!singleTeam && <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         {[
           { key: 'home', t: home, c: hColor },
           { key: 'away', t: away, c: aColor },
@@ -739,7 +747,7 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
             </button>
           )
         })}
-      </div>
+      </div>}
 
       {/* Terrain */}
       <Pitch formation={team.formation} positions={positions} teamColor={teamColor} goals={goals} />

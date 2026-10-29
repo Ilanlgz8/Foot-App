@@ -12,7 +12,8 @@
  */
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTeamSearchMatches } from '../hooks/useTeamSearch'
+import { useTeamSearchMatches, useTeamStandingsMulti, useTeamScorersMulti } from '../hooks/useTeamSearch'
+import { useLineups, useFdLineups } from '../hooks/useMatchDetail'
 import {
   normalizeTeamQuery,
   teamMatchesQuery,
@@ -21,9 +22,10 @@ import {
 } from '../utils/teamSearch'
 import { outcomeForSide, finalScore } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, NO_SCORERS_COMPS } from '../data/competitions'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { FormDiamonds } from '../accueil/FormDiamonds'
+import LineupPitch from '../components/LineupPitch'
 import '../teamSearchPage.css'
 
 function compEmblem(code) {
@@ -128,7 +130,52 @@ function RecordBar({ wins, draws, losses }) {
   )
 }
 
-function TeamProfile({ rows, teamName, teamCrest }) {
+// ⚠️ AJOUT (28/10, demande utilisateur : "la compo la utilisé [...] avec la
+// disposition des joueurs etc") — réutilise EXACTEMENT les mêmes sources que
+// ComposTab (MatchModal.jsx) pour un match "normal" : ESPN en priorité
+// (useLineups, gère aussi les comps ESPN-only UEL/UECL via espnNativeSlug),
+// puis football-data.org en repli (useFdLineups, /v4/matches/{id} — no-op
+// silencieux si `match.id` n'est pas un vrai id FD.org numérique, ex. un
+// match ESPN-sourcé). `LineupPitch` en mode `singleTeam` (voir son
+// commentaire) affiche uniquement le côté de l'équipe recherchée, sans
+// l'onglet home/away qui n'aurait pas de sens ici (pas de "match" affiché).
+// Honnêteté : si aucune des 2 sources n'a la compo pour CE match précis
+// (fréquent avant le coup d'envoi suivant, ou pour un vieux match jamais
+// republié), rien n'est affiché plutôt qu'un terrain vide trompeur — même
+// principe que partout ailleurs dans ce projet (readCacheStale/gaps connus).
+function TeamLineupSection({ row, hColor, teamCrest }) {
+  const { match, isHome } = row
+  const isFinished = match.status === 'FINISHED'
+  const { data: espnLineups, isLoading: espnLoading } = useLineups(match, isFinished)
+  const { data: fdLineups,   isLoading: fdLoading   } = useFdLineups(match)
+
+  const espnHasData = espnLineups?.home?.starters?.length
+  const lineups = espnHasData ? espnLineups : (fdLineups?.home?.starters?.length ? fdLineups : null)
+  const loading = espnLoading || (!espnHasData && fdLoading)
+  const teamLineup = lineups ? (isHome ? lineups.home : lineups.away) : null
+
+  if (!teamLineup?.starters?.length) {
+    if (!loading) return null
+    return (
+      <section className="teamSearchPage__section">
+        <h3 className="teamSearchPage__sectionTitle">Compo</h3>
+        <span className="teamSearchPage__standingsHint">Chargement…</span>
+      </section>
+    )
+  }
+
+  return (
+    <section className="teamSearchPage__section">
+      <h3 className="teamSearchPage__sectionTitle">
+        Compo
+        <span className="teamSearchPage__sectionCount">dernier match</span>
+      </h3>
+      <LineupPitch home={{ ...teamLineup, crest: teamCrest }} hColor={hColor} singleTeam />
+    </section>
+  )
+}
+
+function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
   const [compFilter, setCompFilter] = useState(null)
 
   const comps = useMemo(() => {
@@ -140,10 +187,50 @@ function TeamProfile({ rows, teamName, teamCrest }) {
         id,
         code: match.competition?.code,
         name: match.competition?.name ?? match.competition?.code ?? 'Compétition',
+        // ⚠️ isCup (28/10, section Classement ci-dessous) : un match de coupe
+        // nationale garde le CODE FD.org du championnat parent (voir
+        // fetchEspnCupMatches, espnAdapter.js — ex. une coupe de PD a
+        // `competition.code: 'PD'`), seul `competition.id` (synthétique,
+        // négatif) le distingue vraiment de la vraie ligue — sans ce flag, un
+        // classement serait demandé 2 fois pour le même code FD.org, une pour
+        // la ligue et une pour sa coupe (qui n'a de toute façon aucun
+        // classement, c'est un tableau à élimination directe).
+        isCup: !!match.isCup,
       })
     }
     return [...byId.values()]
   }, [rows])
+
+  // ⚠️ AJOUT (28/10, demande utilisateur : "le classement de l'equipe pour
+  // chaque championat ou elle participe et en cours surtout") — seules les
+  // compétitions à classement (pas les coupes à élimination directe, voir
+  // isCup ci-dessus) sont envoyées au hook de classement.
+  const standingsCompCodes = useMemo(
+    () => [...new Set(comps.filter(c => !c.isCup && c.code).map(c => c.code))],
+    [comps]
+  )
+  const standingsByComp = useTeamStandingsMulti(standingsCompCodes)
+  // "en cours surtout" : la compétition du tout prochain match à venir de
+  // l'équipe (rows est trié chronologiquement, voir buildTeamProfile — le
+  // premier match pas encore joué dans cet ordre est le plus proche) est mise
+  // en avant en tête de liste ; si plus aucun match à venir (fin de saison),
+  // on garde l'ordre naturel des compétitions.
+  const currentCompId = useMemo(
+    () => rows.find(r => r.match.status !== 'FINISHED')?.match.competition?.id ?? null,
+    [rows]
+  )
+
+  // ⚠️ AJOUT (28/10, demande utilisateur : "les meilleurs buteurs de
+  // l'equipe") — NO_SCORERS_COMPS (UEL/UECL, voir competitions.js) renvoie
+  // déjà [] proprement depuis fetchScorersData, filtré ici uniquement pour
+  // ne PAS afficher de bloc vide "0 buteur" trompeur pour ces 2 compétitions
+  // — honnêteté : pas de source fiable, on ne montre rien plutôt qu'un faux
+  // "aucun buteur".
+  const scorersCompCodes = useMemo(
+    () => standingsCompCodes.filter(c => !NO_SCORERS_COMPS.has(c)),
+    [standingsCompCodes]
+  )
+  const scorersByComp = useTeamScorersMulti(scorersCompCodes)
 
   const filteredRows = useMemo(() => {
     if (compFilter == null) return rows
@@ -153,6 +240,19 @@ function TeamProfile({ rows, teamName, teamCrest }) {
   const stats = useMemo(() => computeStats(filteredRows), [filteredRows])
   const color = getTeamColor(teamName)
   const rgb = hexToRgbTriplet(color)
+
+  // ⚠️ AJOUT (28/10, demande utilisateur : "la compo la utilisé [...] avec la
+  // disposition des joueurs") — la compo du DERNIER match joué, pas une
+  // moyenne/compo la plus fréquente statistique : interroger la compo de
+  // chacun des 15-40 matchs de la saison coûterait autant de requêtes FD.org
+  // individuelles, un risque de rafale déjà documenté comme sensible dans ce
+  // projet (suspensions de compte FD.org, voir CLAUDE.md) pour un gain
+  // marginal — la dernière compo connue est déjà l'information la plus
+  // directe et la plus utile ("la compo utilisée" au sens propre).
+  const lastPlayedRow = useMemo(() => {
+    const played = rows.filter(r => r.match.status === 'FINISHED')
+    return played.length > 0 ? played[played.length - 1] : null
+  }, [rows])
 
   return (
     <div className="teamSearchPage__profile" style={{ '--team-color': color, '--team-color-rgb': rgb }}>
@@ -215,6 +315,55 @@ function TeamProfile({ rows, teamName, teamCrest }) {
             )
           })}
         </div>
+      )}
+
+      {/* ⚠️ AJOUT (28/10, demande utilisateur : "le classement de l'equipe
+          pour chaque championat ou elle participe et en cours surtout") —
+          une ligne de classement par compétition à classement (pas les
+          coupes nationales, à élimination directe, voir isCup plus haut) ;
+          la compétition du prochain match à venir ("en cours") passe en
+          tête, les autres gardent l'ordre de `comps`. */}
+      {standingsCompCodes.length > 0 && (
+        <section className="teamSearchPage__section">
+          <h3 className="teamSearchPage__sectionTitle">Classement</h3>
+          <ul className="teamSearchPage__standingsList">
+            {[...comps]
+              .filter(c => !c.isCup && standingsCompCodes.includes(c.code))
+              .sort((a, b) => (a.id === currentCompId ? -1 : b.id === currentCompId ? 1 : 0))
+              .map(c => {
+                const entry = standingsByComp[c.code] ?? { standings: [], loading: false }
+                const row = entry.standings.find(r => teamIdentityKey(r.team) === teamKey) ?? null
+                const emblem = compEmblem(c.code)
+                return (
+                  <li key={c.id} className="teamSearchPage__standingsRow">
+                    <div className="teamSearchPage__standingsComp">
+                      {emblem && <img src={emblem} alt="" />}
+                      <span>{c.name}</span>
+                      {c.id === currentCompId && (
+                        <span className="teamSearchPage__standingsLiveTag">En cours</span>
+                      )}
+                    </div>
+                    {entry.loading && !row ? (
+                      <span className="teamSearchPage__standingsHint">Chargement…</span>
+                    ) : row ? (
+                      <div className="teamSearchPage__standingsStats">
+                        <span className="teamSearchPage__standingsPos">{row.position}<small>e</small></span>
+                        <span className="teamSearchPage__standingsPts">{row.points ?? '–'} pts</span>
+                        <span className="teamSearchPage__standingsDetail">
+                          {row.playedGames ?? '–'}J · {row.won ?? '–'}V {row.draw ?? '–'}N {row.lost ?? '–'}D
+                        </span>
+                        <span className="teamSearchPage__standingsDetail">
+                          {row.goalsFor ?? '–'}–{row.goalsAgainst ?? '–'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="teamSearchPage__standingsHint">Classement indisponible</span>
+                    )}
+                  </li>
+                )
+              })}
+          </ul>
+        </section>
       )}
 
       {/* ⚠️ REDESSINÉ (28/10, round 4 — retour utilisateur : "disposition
@@ -283,6 +432,50 @@ function TeamProfile({ rows, teamName, teamCrest }) {
           </div>
         </div>
       </section>
+
+      {/* ⚠️ AJOUT (28/10, demande utilisateur : "les meilleurs buteurs de
+          l'equipe") — top 5 buteurs de l'équipe par compétition (football-
+          data.org, voir NO_SCORERS_COMPS plus haut pour les 2 compétitions
+          sans source fiable, UEL/UECL, volontairement absentes d'ici). */}
+      {scorersCompCodes.length > 0 && (
+        <section className="teamSearchPage__section">
+          <h3 className="teamSearchPage__sectionTitle">Meilleurs buteurs</h3>
+          {scorersCompCodes.map(code => {
+            const comp = comps.find(c => c.code === code && !c.isCup)
+            const entry = scorersByComp[code] ?? { scorers: [], loading: false }
+            const teamScorers = entry.scorers
+              .filter(s => teamIdentityKey(s.team) === teamKey)
+              .sort((a, b) => (b.goals ?? 0) - (a.goals ?? 0))
+              .slice(0, 5)
+            if (!entry.loading && teamScorers.length === 0) return null
+            return (
+              <div key={code} className="teamSearchPage__scorersBlock">
+                <span className="teamSearchPage__scorersCompLabel">{comp?.name ?? code}</span>
+                {entry.loading && teamScorers.length === 0 ? (
+                  <span className="teamSearchPage__standingsHint">Chargement…</span>
+                ) : (
+                  <ul className="teamSearchPage__scorersList">
+                    {teamScorers.map(s => (
+                      <li key={s.player?.id ?? s.player?.name} className="teamSearchPage__scorersRow">
+                        <span className="teamSearchPage__scorersName">{translateTeam(s.player?.name) || s.player?.name}</span>
+                        <span className="teamSearchPage__scorersGoals">{s.goals} but{s.goals > 1 ? 's' : ''}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      {/* ⚠️ AJOUT (28/10, demande utilisateur : "la compo la utilisé [...]
+          avec la disposition des joueurs") — voir TeamLineupSection plus bas
+          dans ce fichier pour le détail des sources (ESPN puis FD.org, même
+          mécanisme que ComposTab dans MatchModal.jsx). */}
+      {lastPlayedRow && (
+        <TeamLineupSection row={lastPlayedRow} hColor={color} teamCrest={teamCrest} />
+      )}
 
       <section className="teamSearchPage__section">
         <h3 className="teamSearchPage__sectionTitle">
@@ -462,7 +655,7 @@ export default function TeamSearchPage() {
 
       {selected && (
         teamRows.length > 0 ? (
-          <TeamProfile rows={teamRows} teamName={selected.displayName} teamCrest={selected.crest} />
+          <TeamProfile rows={teamRows} teamName={selected.displayName} teamCrest={selected.crest} teamKey={selected.key} />
         ) : (
           <p className="teamSearchPage__hint">
             {isLoading ? 'Chargement des matchs…' : 'Aucun match trouvé pour cette équipe cette saison.'}

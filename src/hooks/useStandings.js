@@ -44,6 +44,77 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // est recalculé à chaque re-render (donc à chaque vraie visite/remontage de
 // la page), ce qui couvre déjà l'immense majorité des cas réels sans code
 // supplémentaire.
+// ⚠️ EXTRAIT (28/10, demande utilisateur : classement de l'équipe par
+// compétition dans la fiche équipe, voir TeamSearchPage.jsx) : la logique
+// de fetch (FD.org prioritaire, repli ESPN, repli cache stale) vivait
+// jusqu'ici inline dans le `queryFn` de useStandings — extraite ici en
+// fonction pure réutilisable par useTeamStandingsMulti (useTeamSearch.js),
+// SANS AUCUN changement de comportement : useStandings l'appelle désormais
+// elle aussi, à l'identique. Permet à la fiche équipe de partager la MÊME
+// queryKey (['standings', comp]) que ce hook — un classement déjà consulté
+// via la page Classement n'est jamais re-fetché pour la fiche équipe, et
+// vice-versa.
+export async function fetchStandingsData(selectedComp) {
+  const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
+
+  const tryEspn = async () => {
+    if (!espnSlug) return null
+    try {
+      const espnRes = await fetch(`/espn?slug=${espnSlug}&standings=1`)
+      if (espnRes.ok) {
+        const espnResult = await espnRes.json()
+        if ((espnResult.table?.length ?? 0) > 0 || (espnResult.groups?.length ?? 0) > 0) return espnResult
+      }
+    } catch { /* → repli suivant */ }
+    return null
+  }
+
+  const tryFdOrg = async () => {
+    const fetchPromise = fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
+    registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
+    const res = await fetchPromise
+    if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
+    if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
+    const json = await res.json()
+    const allGroups = json.standings ?? []
+    const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
+    return realGroups.length > 1
+      ? {
+          table: realGroups.flatMap(g => g.table ?? []),
+          groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
+        }
+      : {
+          table: allGroups[0]?.table ?? [],
+          groups: [],
+        }
+  }
+
+  const key = `standings_v2_${selectedComp}`
+
+  try {
+    const fdResult = await tryFdOrg()
+    const allZeroPlayed = fdResult.table.length > 0
+      && fdResult.table.every(t => (t.playedGames ?? 0) === 0)
+    if (allZeroPlayed) {
+      const espnResult = await tryEspn()
+      const espnHasProgress = espnResult?.table?.some(t => (t.playedGames ?? 0) > 0)
+      if (espnHasProgress) {
+        writeCache(key, espnResult, STALE_MS)
+        return espnResult
+      }
+    }
+    writeCache(key, fdResult, STALE_MS)
+    return fdResult
+  } catch (err) {
+    const espnResult = await tryEspn()
+    if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
+
+    const stale = readCacheStale(key)
+    if (stale) return stale
+    throw err
+  }
+}
+
 export function useStandings(selectedComp, hasMatchToday = true) {
   // ⚠️ AJOUT "v2" (constat utilisateur, 24/07 : classement Coupe du Monde
   // affichait toujours le Groupe A au lieu du bon groupe des 2 équipes du
@@ -96,97 +167,10 @@ export function useStandings(selectedComp, hasMatchToday = true) {
     // (trompeur), donc retiré entièrement plutôt que corrigé : rien dans
     // l'offre gratuite de TheSportsDB ne permet d'obtenir la liste complète.
     // Voir l'historique git pour le détail (ajouté puis retiré le même jour).
-    queryFn: async () => {
-      const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
-
-      const tryEspn = async () => {
-        if (!espnSlug) return null
-        try {
-          const espnRes = await fetch(`/espn?slug=${espnSlug}&standings=1`)
-          if (espnRes.ok) {
-            const espnResult = await espnRes.json()
-            if ((espnResult.table?.length ?? 0) > 0 || (espnResult.groups?.length ?? 0) > 0) return espnResult
-          }
-        } catch { /* → repli suivant */ }
-        return null
-      }
-
-      // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais le classement, 5min après
-      // plus rien, sans erreur visible") : ce fetch n'était entouré d'AUCUN
-      // try/catch — combiné à `retry: false`, une SEULE erreur transitoire
-      // (réseau, 429/403 le temps qu'un nouveau compte FD.org se stabilise,
-      // blip Redis côté serveur...) faisait échouer la requête DÉFINITIVEMENT
-      // (React Query n'insiste pas sans retry), sans aucun repli —
-      // contrairement à l'intention du reste du fichier (readCacheStale
-      // existe déjà comme filet de secours, mais n'était en réalité jamais
-      // atteint sur ce chemin d'erreur). Même mécanisme déjà trouvé et
-      // corrigé côté ESPN (fetchEspnCompMatches/fetchEspnCupMatches,
-      // espnAdapter.js) — appliqué ici pour rester cohérent.
-      const tryFdOrg = async () => {
-        // Enregistré AVANT le await (voir fdSpacingTracker.js) — un hook
-        // voisin (useTeamForm/useScorers) doit pouvoir attendre CETTE
-        // promesse pour savoir si elle sera "fresh", pas lire un résultat
-        // qui n'existe pas encore.
-        const fetchPromise = fdFetch(fdUrl(`/api/v4/competitions/${selectedComp}/standings`))
-        registerFdCallAttempt(fetchPromise.then(r => !r.headers.get('X-Cache')).catch(() => false))
-        const res = await fetchPromise
-        if (res.status === 429 || res.status === 403) throw new Error(String(res.status))
-        if (!res.ok) throw new Error(`Erreur API: ${res.status}`)
-        const json = await res.json()
-        const allGroups = json.standings ?? []
-        const realGroups = allGroups.filter(g => g.group && (g.table?.length ?? 0) >= 2)
-        return realGroups.length > 1
-          ? {
-              table: realGroups.flatMap(g => g.table ?? []),
-              groups: realGroups.map(g => ({ name: g.group, table: g.table ?? [] })),
-            }
-          : {
-              table: allGroups[0]?.table ?? [],
-              groups: [],
-            }
-      }
-
-      try {
-        const fdResult = await tryFdOrg()
-        // ⚠️ BUG CORRIGÉ (constat utilisateur, 22/08 : Ligue 1 affichait 0
-        // point pour TOUTES les équipes alors que la 1ère journée était déjà
-        // jouée) : pas un problème de cache — vérifié en interrogeant FD.org
-        // en direct, leur classement renvoyait bien playedGames:0/points:0
-        // partout (réponse 200 valide, donc jamais dans le catch ci-dessous)
-        // pendant qu'ESPN, interrogé en parallèle, avait déjà les bons
-        // résultats de journée 1. FD.org peut mettre du retard à recalculer
-        // son classement juste après le début d'une saison — un classement
-        // "valide mais pas encore à jour" n'est jamais traité comme une
-        // erreur par tryFdOrg() (pas de throw), donc le repli ESPN
-        // (catch ci-dessous) ne se déclenchait jamais dans ce cas précis.
-        // Filet supplémentaire : si AUCUNE équipe n'a de match joué dans la
-        // réponse FD.org, on vérifie ESPN — si LUI montre au moins un match
-        // joué quelque part, c'est la preuve concrète que FD.org est en
-        // retard, on utilise ESPN à la place. Si ESPN est LUI AUSSI à 0
-        // partout (vrai 1er jour de saison, avant le tout premier match),
-        // les deux sources concordent de toute façon — sans risque de
-        // rendre pire un cas où c'est légitimement 0 partout.
-        const allZeroPlayed = fdResult.table.length > 0
-          && fdResult.table.every(t => (t.playedGames ?? 0) === 0)
-        if (allZeroPlayed) {
-          const espnResult = await tryEspn()
-          const espnHasProgress = espnResult?.table?.some(t => (t.playedGames ?? 0) > 0)
-          if (espnHasProgress) {
-            writeCache(key, espnResult, STALE_MS)
-            return espnResult
-          }
-        }
-        writeCache(key, fdResult, STALE_MS)
-        return fdResult
-      } catch (err) {
-        const espnResult = await tryEspn()
-        if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
-
-        const stale = readCacheStale(key)
-        if (stale) return stale
-        throw err
-      }
-    },
+    // ⚠️ Logique de fetch déplacée dans fetchStandingsData (voir juste avant
+    // cette fonction, extraction du 28/10) — appelée ici à l'identique,
+    // aucun changement de comportement.
+    queryFn: () => fetchStandingsData(selectedComp),
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
