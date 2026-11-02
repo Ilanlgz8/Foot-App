@@ -29,6 +29,42 @@ import { useLiveData }   from '../context/LiveProvider'
 import { getMatchState, getRecentlyFinishedMatches, clearRecentlyFinished } from '../utils/matchStateTracker'
 import { mergeScore } from '../utils/matchUtils'
 import { usePersistedState, NAV_POSITION_TTL } from '../hooks/usePersistedState'
+import { fuzzyTeam } from '../utils/espnSummaryParse'
+
+// ⚠️ BUG CORRIGÉ (02/11, captures d'écran utilisateur : Sassuolo-Fiorentina
+// affiché EN DOUBLE dans "Journée 10" Serie A, avec 2 scores différents —
+// 2-4 et 1-2 — pour le MÊME match réel) : le pont ESPN (bridgeSource, voir
+// `matches` plus bas) ne dédupliquait `extra` contre `fdMatches` QUE par
+// `m.id` (known.has(m.id)) — mais un match suivi en direct via liveTracker
+// (markLive, appelé depuis Accueil/Live.jsx qui sourcent ESPN pour l'onglet
+// "Aujourd'hui") porte l'id ESPN-natif de ce match, jamais l'id numérique
+// football-data.org utilisé par `fdMatches` ici. Pour les 6 grands
+// championnats (double-sourcés ESPN+FD.org), ces 2 ids ne coïncident
+// JAMAIS pour un même vrai match — `known.has(m.id)` était donc TOUJOURS
+// faux pour ce cas, et le match ESPN (avec un score potentiellement figé/
+// périmé au moment de la dernière écriture locale) rejoignait `extra` en
+// PLUS de l'entrée FD.org déjà correcte et à jour dans `fdMatches` : un
+// vrai doublon par IDENTITÉ RÉELLE (mêmes équipes, même date), pas par id.
+// Exactement la même classe de bug déjà résolue dans Accueil.jsx via
+// `isDuplicateMatch`/`fuzzyTeam` (comparaison par NOM d'équipe + fenêtre de
+// 24h, jamais adoptée ici). Corrigé avec le même mécanisme : `isSameRealMatch`
+// ci-dessous, utilisé pour exclure de `extra` tout match du pont qui
+// correspond déjà à une entrée de `fdMatches` par équipes+date plutôt que
+// par id seul.
+function isSameRealMatch(m, existingMatches) {
+  if (existingMatches.some(e => e.id === m.id)) return true
+  const mDate = m.utcDate ? new Date(m.utcDate).getTime() : null
+  const mHome = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
+  const mAway = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
+  if (!mDate || !mHome || !mAway) return false
+  return existingMatches.some(e => {
+    if (!e.utcDate) return false
+    if (Math.abs(new Date(e.utcDate).getTime() - mDate) > 24 * 60 * 60 * 1000) return false
+    const eHome = e.homeTeam?.name ?? e.homeTeam?.shortName ?? ''
+    const eAway = e.awayTeam?.name ?? e.awayTeam?.shortName ?? ''
+    return fuzzyTeam(mHome, eHome) && fuzzyTeam(mAway, eAway)
+  })
+}
 
 const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 const fmtDate = (d) => {
@@ -358,6 +394,11 @@ function Resultats() {
     }
     const extra = bridgeSource
       .filter(m => !known.has(m.id))
+      // ⚠️ Voir isSameRealMatch plus haut : filtre en PLUS de known.has(m.id)
+      // ci-dessus (qui ne peut jamais matcher un id ESPN contre un id FD.org)
+      // — compare par équipes+date pour ne jamais dupliquer un match déjà
+      // présent dans fdMatches sous un id différent.
+      .filter(m => !isSameRealMatch(m, fdMatches))
       .filter(m => recentIds.has(m.id) || getMatchState(m.id).ft === true)
       .map(m => {
         let lsHome = null, lsAway = null

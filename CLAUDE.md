@@ -6792,6 +6792,45 @@ cf-worker/
     entamé par les déploiements précédents, pour ne pas retomber dans la même confusion
     d'agrégat que celle qui a motivé cette 2e passe.
 
+- ✅ BUG TROUVÉ ET CORRIGÉ : match affiché EN DOUBLE dans Résultats "Par journée" avec 2 scores
+  différents pour le MÊME match réel (02/11, 5 captures d'écran utilisateur : Serie A, "Journée
+  10", Sassuolo-Fiorentina apparaît 2 fois — une fois "2-4" et une fois "1-2", toutes les deux
+  marquées "TERMINÉ" ; la liste de buts (Laurienté 25'/65' pour Sassuolo, Pellegrino 45+2'/Njie
+  50'/Mastantuono 79'/Valdepeñas 90+3' pour Fiorentina, soit 2-4) est identique sur les 2 entrées,
+  confirmant qu'il s'agit bien du MÊME match réel, pas de 2 matchs différents). Root cause trouvée
+  par lecture directe de `Resultat.jsx` (`matches`, le `useMemo` qui construit la liste affichée) :
+  un pont ESPN (`bridgeSource` = `liveMatches` + `getRecentlyFinishedMatches`, alimenté par
+  `LiveProvider`/`matchStateTracker.js`) complète la liste FD.org (`fdMatches`) pour faire
+  apparaître un match "Terminé" avant que football-data.org n'ait eu le temps de confirmer son
+  propre statut FINISHED — mais la dédup de ce pont (`extra = bridgeSource.filter(m =>
+  !known.has(m.id))...`) ne comparait QUE par `m.id`, jamais par identité réelle (équipes+date).
+  Pour les 6 grands championnats (double-sourcés ESPN ET FD.org, voir Stack), un match suivi en
+  direct via `liveTracker` (`markLive`, appelé depuis Accueil/Live.jsx qui sourcent ESPN pour
+  l'onglet "Aujourd'hui") porte l'ID ESPN-natif de ce match — JAMAIS l'id numérique football-
+  data.org utilisé par `fdMatches` ici. `known.has(m.id)` était donc TOUJOURS faux pour ce cas de
+  figure précis, et le match ESPN (avec un score potentiellement figé/périmé au moment de la
+  dernière écriture locale, `localStorage.foot_espn_{id}`/`espnScores`) rejoignait `extra` en PLUS
+  de l'entrée FD.org déjà correcte et à jour dans `fdMatches` — un vrai doublon par IDENTITÉ
+  RÉELLE (mêmes équipes, même date), jamais détecté par une comparaison d'id seule. Exactement la
+  même classe de bug déjà résolue dans `Accueil.jsx` le 24/07 via `isDuplicateMatch`/`fuzzyTeam`
+  (comparaison par NOM d'équipe + fenêtre de 24h), jamais adoptée dans ce 2e fichier qui a pourtant
+  le même mécanisme de pont ESPN. Corrigé (`Resultat.jsx`) : nouvelle fonction `isSameRealMatch(m,
+  existingMatches)`, copie quasi identique de `isDuplicateMatch` (même import `fuzzyTeam` depuis
+  `espnSummaryParse.js`, même fenêtre de 24h, même comparaison home+away simultanée — réduit le
+  risque de faux positif déjà documenté sur `fuzzyTeam` seul, voir `sideForTeam.test.js`) — ajoutée
+  comme filtre supplémentaire dans la construction de `extra`, en plus de `!known.has(m.id)` (gardé
+  tel quel, toujours utile pour le cas où les ids coïncident réellement). Score affiché une fois
+  dédupliqué : toujours celui de `fdMatches` (la source qui reste dans la liste finale), jamais
+  plus celui du pont ESPN potentiellement périmé — réglant à la fois le doublon ET l'incohérence de
+  score constatée. 398 tests (inchangé) + lint (35 erreurs pré-existantes, Pronos.jsx, confirmées
+  identiques — aucune nouvelle erreur dans `Resultat.jsx`) + build vérifiés. Honnêteté : je n'ai pas
+  pu confirmer en direct sur la prod le mécanisme EXACT qui a produit le score "1-2" précis de
+  l'entrée périmée (probablement un instantané ESPN/localStorage capturé à un moment antérieur du
+  match, avant les derniers buts) — mais la cause du DOUBLON lui-même (comparaison par id entre 2
+  sources dont les ids ne coïncident jamais) est confirmée avec certitude par lecture directe du
+  code, pas une supposition ; à confirmer par l'utilisateur sur son prochain match terminé dans un
+  des 6 grands championnats.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
