@@ -6871,6 +6871,97 @@ cf-worker/
   seule résolution, partagée) plutôt que de deviner laquelle des 2 était "la bonne" — à confirmer
   par l'utilisateur sur son prochain onglet Historique.
 
+- ✅ Blason Juventus invisible sur fond noir (02/11, demande explicite : "le logo de la Juventus,
+  faudrait mettre les contours du logo en blanc, mais genre un pré-blanc [...] sur du noir, on ne
+  voit pas") — le blason Juventus est en grande partie noir sur fond transparent, donc sans
+  contraste sur les fonds sombres/noirs déjà utilisés partout dans l'app (cards, hero, modal H2H,
+  classement, Pronos...). Corrigé (`index.css`) par une règle globale `img[data-team="Juventus"]`
+  — l'attribut `data-team` est DÉJÀ posé sur l'`<img>` du blason dans TOUS les contextes de rendu
+  de l'app (vérifié par grep exhaustif : `resultats__crest`, `mp__hero__crest`, `poster__crest`,
+  `classement__teamCrest`/`scorerCrest`, `matchs__crest`/`bracket__crest`, `h2h__bilanCrest`/
+  `rowCrest`, `pronos__crest`, `accueil__mdjCrest`/`matchCardCrest`/`liveChipCrest`...), donc une
+  seule règle CSS couvre automatiquement toute l'app sans toucher à aucun composant. Technique :
+  3 `drop-shadow` flous à 1px empilés (filtre standard pour dessiner un contour sur un PNG à fond
+  transparent) plutôt qu'une plaque de fond blanche pleine — donne un léger halo blanc ("un
+  pré-blanc", pas du blanc plein) qui distingue le tracé noir du fond, cohérent avec la demande.
+  398 tests (inchangé) + lint (35 erreurs pré-existantes, confirmées identiques) + build vérifiés
+  (CSS uniquement, aucune logique touchée). Honnêteté : rendu jamais vu en direct sur un vrai
+  appareil/navigateur depuis cet environnement — à confirmer par l'utilisateur après déploiement
+  (automatique via Vercel).
+
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : classement des buteurs de la Ligue des Champions bloqué sur
+  "Veuillez patienter quelques instants" pendant ~20s puis affichant rien (02/11, constat
+  utilisateur : "je voulais voir le classement des buteurs de la Ligue des Champions, que je
+  n'avais pas ouvert depuis nos dernières modifications [...] on attend 20 secondes, au final il
+  n'y a rien [...] c'est pas pro") — root cause confirmée par lecture directe du code : le flag
+  `live=0` ajouté PLUS TÔT LE MÊME JOUR dans `useScorers.js` (pour donner un TTL de 24h aux
+  compétitions sans match aujourd'hui au lieu de 2min fixe, voir l'entrée juste avant dans ce
+  fichier) est propagé jusqu'à la querystring de l'URL FD.org — et `api/football.js` construit sa
+  clé de cache Redis (`cacheKey`/`staleKey`) à partir du querystring COMPLET. Résultat : la
+  variante `live=0` d'une compétition est une clé Redis TOUTE NEUVE, même si la variante SANS ce
+  flag a déjà une copie parfaitement fraîche en cache (TTL normal 5min pour `/scorers`) — le
+  TOUT PREMIER appel `live=0` pour une compétition quelconque (ici : la toute première fois que
+  quelqu'un ouvre les buteurs LDC depuis ce déploiement) est donc un cache-miss GARANTI, qui vient
+  taper le budget/circuit-breaker FD.org partagé (`MINUTE_CAP`, historique de suspensions de
+  compte documenté extensivement plus haut dans ce fichier) pour rien — alors que la vraie donnée
+  est potentiellement déjà disponible sous l'ancienne clé. En cas de vrai 429/403 sur ce
+  cache-miss, le `retry: 2`/`retryDelay: 8s puis 16s` déjà en place côté client (`useScorers.js`,
+  volontairement long pour ne jamais retaper le verrou serveur trop vite, voir son historique du
+  02/09) explique exactement les "20 secondes" rapportées, suivi du message d'erreur persistant
+  `RATE_LIMITED_MESSAGE` ("Veuillez patienter quelques instants") une fois les 2 retries épuisés.
+  Corrigé (`api/football.js`) : avant de réserver le budget partagé, une nouvelle étape consulte
+  la clé Redis SANS `live=0` (hit normal OU copie stale) — si elle existe, elle est servie
+  directement, sans jamais toucher au budget ni au circuit breaker. Portée strictement limitée à
+  `/scorers` + `live=0` présent dans la querystring (vérifié par grep qu'aucun autre endpoint
+  n'utilise ce flag) — aucun risque de changer le comportement d'une autre route. `MINUTE_CAP`
+  lui-même N'A PAS été touché (trop risqué, historique de suspensions à répétition documenté
+  extensivement dans ce fichier) : ce fix élimine uniquement le cache-miss ÉVITABLE provoqué par
+  le changement de forme de clé, pas la contrainte de budget partagée elle-même — une vraie
+  compétition jamais consultée AVANT AUJOURD'HUI (aucune copie sous l'ancienne clé non plus) peut
+  toujours, dans l'absolu, retomber sur le même scénario de cache-miss une seule fois. 398 tests +
+  lint (35 erreurs pré-existantes, confirmées identiques) + build vérifiés. Honnêteté : je n'ai pas
+  pu reproduire ce 429/403 exact en direct depuis cet environnement (pas d'accès à FD.org ni au
+  vrai état Redis de prod) — mais le mécanisme (clé de cache fragmentée par un changement de
+  querystring déployé le même jour, confirmé par lecture directe de `getTtl`/la construction de
+  `cacheKey`) explique précisément le symptôme ET le timing rapportés (20s = 8s+16s de retry), pas
+  une simple coïncidence de contention FD.org générique ; à confirmer par l'utilisateur sur son
+  prochain classement de buteurs jamais ouvert depuis ce déploiement.
+
+- ✅ Page Pronos encore "pas instantanée" au clic sur un bouton, malgré le fix React.memo du même
+  jour (02/11, constat utilisateur : "la page prono est encore un peu buggée [...] quand je clique
+  sur un bouton, c'est pas instantané, ça bug un peu [...] comme s'il y avait suraffichage ou sur
+  trop de contenu affiché dans une page") — le fix `React.memo` appliqué plus tôt le même jour sur
+  `MatchPredictRow` (voir entrée précédente dans ce fichier, "Fix Pronos.jsx") évite bien les
+  RE-renders inutiles d'une ligne déjà montée quand une compétition sans rapport refetch, mais ne
+  change rien au coût du tout PREMIER rendu d'un onglet : basculer sur l'onglet "Pronos" (ou y
+  revenir depuis "Résultat"/"Classement") monte en une seule fois TOUS les `MatchPredictRow` de la
+  fenêtre à venir (potentiellement plusieurs dizaines/centaines de matchs sur 7 jours × 16
+  compétitions), chacun recalculant son prono Poisson — un vrai travail JS synchrone,
+  proportionnel au nombre de matchs affichés, qui bloque le thread principal PILE au moment du
+  clic (le memo n'aide pas ici : rien à comparer sur un composant qui vient d'être monté pour la
+  première fois). Root cause confirmée par lecture directe de la structure JSX de `Pronos()` :
+  chaque onglet (`activeTab === 'pronos'/'resultat'/'classement'`) est gated par un simple
+  court-circuit `&&`, donc React ne fait AUCUN travail pour les onglets inactifs — mais remonte
+  TOUT l'onglet actif d'un coup à chaque bascule, sans aucune priorité donnée à cette mise à jour
+  par rapport au clic lui-même qui l'a déclenchée. Corrigé (`src/pages/Pronos.jsx`) : `useTransition`
+  (React 19, déjà la version utilisée par ce projet) enveloppe désormais les 4 changements d'état
+  déclenchés par un clic de bouton (`goTab` pour Pronos/Résultat/Classement, et les 2 boutons du
+  switcher Pronos/Assistant IA) — le clic lui-même (mise en évidence du bouton actif) reste
+  instantané et prioritaire, pendant que React calcule le contenu lourd du nouvel onglet en tâche
+  de fond, de façon interruptible, au lieu de bloquer le thread principal pendant tout ce temps
+  comme un `setState` classique. Changement à risque minimal : `startTransition` ne change AUCUNE
+  logique métier (ni Poisson, ni filtrage, ni les données elles-mêmes), seulement la PRIORITÉ avec
+  laquelle React traite ce changement d'état précis. 398 tests (inchangé) + lint (35 erreurs
+  pré-existantes, confirmées identiques via `git stash`/`git stash pop`) + build vérifiés.
+  Honnêteté : rendu/ressenti jamais vérifié en direct sur un vrai appareil depuis cet
+  environnement (aucun moyen de mesurer un temps de blocage perçu sans un vrai navigateur) — le
+  diagnostic (coût du premier rendu d'une liste non virtualisée, confirmé par lecture directe de
+  la structure JSX et du nombre de matchs potentiellement affichés) est solide, et `useTransition`
+  est le mécanisme React standard conçu précisément pour ce symptôme (garder un clic réactif
+  pendant un rendu coûteux) — mais si la liste est VRAIMENT très grande (centaines de matchs), une
+  vraie virtualisation (même principe que les posters Accueil, voir leur historique du 27/10)
+  resterait l'étape suivante si ce fix ne suffit pas entièrement ; à confirmer par l'utilisateur.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

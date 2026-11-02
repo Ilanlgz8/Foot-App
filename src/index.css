@@ -232,6 +232,26 @@ body {
   transform: scale(1.6) !important;
 }
 
+/* ── Contour clair sur le blason Juventus (constat utilisateur, 02/11) ──
+   Le blason Juventus est en grande partie noir sur fond transparent — sur
+   les fonds sombres/noirs de l'app (cards, hero, modal...), il devient
+   quasiment invisible, aucun contraste entre le blason et le fond. `img[
+   data-team="Juventus"]` cible TOUTES les occurrences du blason dans
+   l'app en une seule règle (resultats__crest, mp__hero__crest, poster__
+   crest, classement__teamCrest, matchs__crest, h2h__*Crest, pronos__
+   crest... — chacune pose déjà `data-team` sur son <img>, convention déjà
+   utilisée pour le correctif drapeaux ci-dessus). Empilement de plusieurs
+   drop-shadow flous à 1px (technique standard pour dessiner un contour
+   sur un PNG à fond transparent) plutôt qu'une plaque de fond blanche
+   pleine : donne un léger halo blanc ("un pré-blanc", pas du blanc plein)
+   qui distingue le tracé noir du fond sans dénaturer le blason. */
+img[data-team="Juventus"] {
+  filter:
+    drop-shadow(0 0 1px rgba(255,255,255,.9))
+    drop-shadow(0 0 1px rgba(255,255,255,.9))
+    drop-shadow(0 0 1px rgba(255,255,255,.9));
+}
+
 /* ── Animations globales ── */
 @keyframes spin     { to { transform: rotate(360deg); } }
 @keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }

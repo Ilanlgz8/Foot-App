@@ -23,7 +23,7 @@
  * Identité : deviceId + pseudo persistés en localStorage (usePronosGroup),
  * aucune donnée sensible, groupe rejoint via un code à 6 caractères.
  */
-import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, memo, useTransition } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
@@ -614,6 +614,25 @@ function Pronos() {
   // AI_ASSISTANT_ENABLED ci-dessus).
   const [mode, setMode] = useState('pronos')
   const [activeTab, setActiveTab] = useState('pronos')
+  // ⚠️ AJOUT useTransition (02/11, constat utilisateur : "la page prono est
+  // encore un peu buggée [...] quand je clique sur un bouton c'est pas
+  // instantané, ça bug un peu [...] comme s'il y avait suraffichage" — suite
+  // au fix React.memo sur MatchPredictRow plus tôt le même jour, qui évite
+  // bien les RE-renders inutiles mais ne change rien au coût du tout PREMIER
+  // rendu d'un onglet : basculer sur "Pronos" (ou y revenir depuis Résultat/
+  // Classement) monte en une seule fois TOUS les MatchPredictRow de la
+  // fenêtre à venir (jusqu'à plusieurs dizaines/centaines de matchs sur 7
+  // jours × COMP_IDS), chacun recalculant son prono Poisson — un vrai travail
+  // JS synchrone, proportionnel au nombre de matchs, qui bloque le thread
+  // principal pile au moment du clic (le memo n'aide pas ici : il n'y a rien
+  // à comparer sur un composant qui vient d'être monté). React ne peut pas
+  // deviner qu'un changement d'onglet est "non urgent" sans qu'on le lui dise
+  // explicitement — corrigé en enveloppant les changements d'onglet/mode dans
+  // `startTransition` : le clic lui-même (highlight du bouton actif) reste
+  // instantané, React priorise cette mise à jour-là, et calcule le contenu
+  // lourd de l'onglet en tâche de fond, de façon interruptible — sans bloquer
+  // le thread principal pendant tout ce temps comme un setState classique.
+  const [, startTransition] = useTransition()
   // Filtre championnat (demande utilisateur, 21/08) — partagé entre les
   // onglets Pronos et Résultat, voir CompFilterBar plus haut.
   const [compFilter, setCompFilter] = useState(null)
@@ -763,7 +782,7 @@ function Pronos() {
   const filteredInProgress     = effectiveCompFilter ? inProgress.filter(m => m.competition?.id === effectiveCompFilter)     : inProgress
   const filteredRecentFinished = effectiveCompFilter ? recentFinished.filter(m => m.competition?.id === effectiveCompFilter) : recentFinished
 
-  const goTab = (t) => setActiveTab(t)
+  const goTab = (t) => startTransition(() => setActiveTab(t))
   const swipe = useSwipe(
     () => { const i = TABS.indexOf(activeTab); if (i < TABS.length - 1) goTab(TABS[i + 1]) },
     () => { const i = TABS.indexOf(activeTab); if (i > 0) goTab(TABS[i - 1]) }
@@ -846,13 +865,13 @@ function Pronos() {
         <div className="pronos__modeSwitch">
           <button
             className={`pronos__modeBtn${mode === 'pronos' ? ' pronos__modeBtn--active' : ''}`}
-            onClick={() => setMode('pronos')}
+            onClick={() => startTransition(() => setMode('pronos'))}
           >
             Pronos
           </button>
           <button
             className={`pronos__modeBtn${mode === 'ia' ? ' pronos__modeBtn--active' : ''}`}
-            onClick={() => setMode('ia')}
+            onClick={() => startTransition(() => setMode('ia'))}
           >
             Assistant IA
           </button>

@@ -309,6 +309,54 @@ export default async function handler(req, res) {
       } catch { /* Redis indisponible → on continue vers FD.org */ }
     }
 
+    // ── Repli sur la variante sans `live=0` (uniquement /scorers) ────────────
+    // AJOUT (02/11, constat utilisateur : "le classement des buteurs de la
+    // Ligue des Champions, jamais ouvert depuis le fix live=0 du matin même,
+    // met ~20s à charger puis affiche rien") — root cause : `live=0` (voir
+    // getTtl plus haut) est un flag purement COSMÉTIQUE côté FD.org, les
+    // données renvoyées pour une compétition donnée sont IDENTIQUES avec ou
+    // sans ce paramètre, seul le TTL de mise en cache diffère. Mais
+    // `cacheKey`/`staleKey` incluent le querystring EN ENTIER (voir plus
+    // haut) — la variante `live=0` est donc une clé Redis TOUTE NEUVE : même
+    // si la variante SANS ce flag a déjà une copie fraîche en cache (le cas
+    // normal, TTL 5min pour /scorers), elle n'est jamais consultée. Premier
+    // appel `live=0` pour une compétition = cache-miss garanti qui vient
+    // taper le budget/circuit-breaker partagé pour rien, alors que la vraie
+    // donnée est déjà disponible sous l'ancienne clé. Corrigé : avant de
+    // réserver le budget, on consulte aussi la clé SANS `live=0` (hit ou
+    // stale) — si elle existe, on la sert directement, sans jamais toucher
+    // au budget ni au circuit breaker. Portée strictement limitée à
+    // `/scorers` + `live=0` présent dans la qs : aucun autre endpoint n'a ce
+    // flag (vérifié par grep), donc aucun risque de changer le comportement
+    // d'une autre route.
+    if (ttl > 0 && redis && fdPath.includes('/scorers') && qs.includes('live=0')) {
+      const altQs  = qs.split('&').filter(p => p !== 'live=0').join('&')
+      const altKey = `fd:${fdPath}${altQs ? '?' + altQs : ''}`
+      try {
+        const cached = await redis.get(altKey)
+        if (cached) {
+          return res
+            .status(200)
+            .setHeader('Content-Type', 'application/json')
+            .setHeader('Cache-Control', getCacheControl())
+            .setHeader('X-Cache', 'HIT')
+            .send(typeof cached === 'string' ? cached : JSON.stringify(cached))
+        }
+      } catch { /* Redis indisponible → on continue */ }
+      try {
+        const altStaleKey = `fd:stale:${fdPath}${altQs ? '?' + altQs : ''}`
+        const stale = await redis.get(altStaleKey)
+        if (stale) {
+          return res
+            .status(200)
+            .setHeader('Content-Type', 'application/json')
+            .setHeader('Cache-Control', 'no-store')
+            .setHeader('X-Cache', 'STALE')
+            .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+        }
+      } catch { /* Redis indisponible → on continue */ }
+    }
+
     // ── Garde-fous avant d'attaquer FD.org : budget/minute + circuit breaker ──
     // Constat utilisateur : "on se prend un méchant tunnel à attendre parce
     // qu'on a déjà fait trop de requêtes en 1min". Le cache Redis ci-dessus
