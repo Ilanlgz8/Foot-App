@@ -215,7 +215,24 @@ const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pa
 // mois — élimine la quasi-totalité du coût de réécriture résiduel identifié
 // le 01/10, tout en gardant un filet (pas un cache littéralement infini qui
 // ne purgerait jamais une compétition retirée un jour de ALLOWED_SLUGS).
-const SCOREBOARD_PAST_CHUNK_TTL      = 24 * 60 * 60       // 24h — passé récent (≤10j)
+// ⚠️ RALLONGÉ (02/11, demande explicite utilisateur de réduire la
+// consommation d'écritures Turso après un pic de 250 000 lignes en quelques
+// heures sur un compte tout juste créé) : 24h pour le passé RÉCENT (≤10j)
+// voulait dire que CHAQUE tranche de ces 10 derniers jours, pour TOUTES les
+// compétitions couvertes (~25 avec les coupes), expirait et devait être
+// réécrite dès qu'un visiteur la consultait à nouveau — un vrai coût
+// récurrent, tous les jours, pour une donnée FINISHED qui ne change
+// quasiment jamais (même raisonnement déjà appliqué au passé ancien, voir
+// le 365j ci-dessous). Honnêteté : ce n'est très probablement PAS la cause
+// du pic de 250k (un pic ponctuel de cette taille colle bien plus à un
+// premier remplissage à froid d'une base neuve qu'à ce TTL précis) — mais
+// c'est un vrai gaspillage structurel et récurrent, indépendant de ce pic,
+// qui vaut la peine d'être corrigé pour réduire le coût de fond désormais.
+// Remonté 24h → 7 jours : un résultat de moins de 10 jours reste donc en
+// cache une semaine entière avant d'être revérifié, au lieu de chaque jour
+// — réduit ce poste jusqu'à 7x sans aucun risque de donnée périmée (un
+// match FINISHED ne redevient jamais SCHEDULED).
+const SCOREBOARD_PAST_CHUNK_TTL      = 7 * 24 * 60 * 60    // 7j — passé récent (≤10j)
 const SCOREBOARD_OLD_PAST_CHUNK_TTL  = 365 * 24 * 60 * 60 // 365j — passé ancien, quasi permanent
 const SCOREBOARD_PAST_RECENT_DAYS    = 10
 const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
@@ -423,7 +440,25 @@ const CHUNK_GROUP_DELAY_MS = 150
 // pour les grands championnats, déjà servi en 1 seule fois avant ce plafond)
 // sans jamais dépasser une fraction du budget d'exécution (`maxDuration: 30`,
 // vercel.json) même à froid total (aucune tranche déjà en cache).
-const MAX_FETCH_CHUNKS = 60
+//
+// ⚠️ RESSERRÉ (02/11, demande explicite utilisateur — "+15 000 lignes
+// écrites Turso en 5 minutes sans même avoir ouvert l'app" : preuve que ce
+// n'est pas QUE lui qui tape l'API, mais le trafic normal d'autres
+// visiteurs du site pendant un vrai jour de match, sur un compte Turso tout
+// juste créé donc intégralement froid). 60 tranches/comp/requête, multiplié
+// par ~10-20 compétitions chargées en parallèle sur une seule visite
+// Accueil, peut écrire jusqu'à 600-1200 lignes pour UN SEUL chargement de
+// page tant que rien n'est encore en cache — avec plusieurs visiteurs en
+// même temps un soir de match, ça explique largement un rythme de plusieurs
+// milliers de lignes/minute. Resserré 60 → 20 : réduit le pire cas par 3,
+// sans rien casser (les tranches gardées restent toujours les plus PROCHES
+// d'aujourd'hui, voir le tri ci-dessus — "forme récente"/prochain match
+// reste servi en 1 seule fois ; seul le remplissage du passé le plus
+// lointain pour les 8 compétitions sporadiques met plus de cycles à se
+// compléter). Honnêteté : ça ralentit le RYTHME du remplissage à froid, pas
+// le TOTAL final une fois tout le cache chaud — mais c'est exactement le
+// rythme qui inquiète ici, pas le total.
+const MAX_FETCH_CHUNKS = 20
 
 async function fetchScoreboardChunksStaggered(slug, chunkList) {
   const results = []

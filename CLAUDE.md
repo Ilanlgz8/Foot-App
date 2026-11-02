@@ -6353,6 +6353,48 @@ cf-worker/
   avec le reste de l'app via Vercel — aucune action manuelle `cf-worker/` nécessaire pour CE fix
   précis (le Worker lui-même n'a pas changé, c'est le serveur qu'il appelle qui était cassé).
 
+- ✅ Réduction du rythme d'écritures Turso (nouveau compte), suite directe du point ci-dessus
+  (02/11, demande explicite utilisateur : "on peut reduire cette consommation parce que c vrm
+  chaud" — puis preuve concrète donnée en cours de route : "en 5min je suis passé de 250000 a
+  265000 row written alors que je suis pas aller sur l'app"). Cette 2e preuve est importante :
+  elle écarte l'explication la plus simple (uniquement l'utilisateur lui-même qui teste) et
+  confirme que d'AUTRES visiteurs réels (l'app est publique) tapent le cache scoreboard ESPN
+  côté Vercel (`api/espn.js`/`tursoCache.js`) pendant un vrai soir de match, sur un compte Turso
+  tout juste créé donc **intégralement froid** — chaque tranche de date jamais encore mise en
+  cache sur cette nouvelle base déclenche une vraie écriture, quelle que soit la personne qui
+  charge la page. Honnêteté d'abord : à ce rythme (~3000 lignes/minute observées), le Worker
+  Cloudflare (qui tourne, lui, sans AUCUN visiteur) est écarté comme cause principale — même dans
+  le pire cas déjà documenté (15 matchs simultanés), son coût par passe reste de l'ordre de
+  quelques dizaines à centaines de lignes, pas plusieurs milliers — donc ce n'est très
+  probablement pas le Worker, mais bien le trafic normal du site sur un cache qui n'existe pas
+  encore. 2 corrections apportées (`api/espn.js`), aucune régression fonctionnelle, les 2 déjà
+  précédées par un raisonnement similaire dans ce même fichier (90j→365j le 01/10) :
+  1. `SCOREBOARD_PAST_CHUNK_TTL` (le TTL du passé RÉCENT, ≤10 jours) : 24h → 7 jours. Un résultat
+     FINISHED ne redevient jamais SCHEDULED — le garder en cache une semaine entière plutôt
+     qu'un jour réduit jusqu'à 7x le coût RÉCURRENT (chaque jour, chaque compétition, chaque
+     tranche des 10 derniers jours devait être réécrite dès qu'un visiteur la consultait à
+     nouveau). Ne réduit PAS le pic déjà observé (qui vient du remplissage à froid, pas de ce
+     TTL précis) — corrige le coût de FOND une fois la base chaude, pas le pic en cours.
+  2. `MAX_FETCH_CHUNKS` (plafond dur de tranches envoyées à ESPN par requête/compétition, ajouté
+     le 30/09) : 60 → 20. C'est le vrai levier pour RALENTIR le pic en cours : avec ~10-20
+     compétitions chargées en parallèle sur une seule visite Accueil et un cache totalement
+     froid, 60 tranches/comp pouvait écrire jusqu'à 600-1200 lignes pour UN SEUL chargement de
+     page — resserré à 20, le pire cas par chargement est divisé par 3. Les tranches gardées
+     restent toujours les plus PROCHES d'aujourd'hui (tri déjà en place, inchangé) — "forme
+     récente"/prochain match continuent d'être servis en une seule fois ; seul le remplissage du
+     passé le plus lointain (surtout les 8 compétitions sporadiques élargies à 400j, voir le
+     29/09) prend plus de cycles à se compléter entièrement. Honnêteté : ça ralentit le RYTHME du
+     remplissage à froid, pas le TOTAL final une fois tout le cache chaud (les mêmes tranches
+     devront quand même être écrites une fois, tôt ou tard) — mais c'est précisément le rythme
+     qui inquiète ici, pas le total final.
+  398 tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Portée :
+  uniquement `api/espn.js`, se déploie automatiquement avec le reste de l'app via Vercel, aucune
+  action manuelle `cf-worker/` nécessaire. À surveiller : si le rythme ne ralentit pas nettement
+  dans l'heure suivant ce déploiement malgré ces 2 changements, ce serait un signal fort que la
+  vraie cause est ailleurs qu'un simple remplissage à froid (ex. un bug de cohérence lecture/
+  écriture propre à cette nouvelle base Turso, jamais confirmé ni infirmé depuis cet
+  environnement, faute d'accès au dashboard Turso).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
