@@ -7,7 +7,10 @@ import { NO_SCORERS_COMPS } from '../data/competitions'
 
 // Aligné sur le TTL du cache serveur (api/football.js) — inutile d'être plus frais
 // côté client que la donnée que le serveur peut réellement fournir.
-const STALE_MS = 1000 * 60 * 2  // 2min (était 30min)
+// ⚠️ 2min → 5min (02/11, même changement que le TTL serveur, api/football.js
+// getTtl — garde les deux alignés, sinon React Query redemanderait côté
+// client avant même que le cache serveur ait expiré, sans aucun gain).
+const STALE_MS = 1000 * 60 * 5  // 5min (était 2min, 30min avant ça)
 
 // ⚠️ AJOUT (même optimisation que useStandings.js, 23/07 — idée utilisateur
 // appliquée par cohérence ici aussi) : les buteurs ne peuvent pas plus

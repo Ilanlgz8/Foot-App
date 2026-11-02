@@ -152,10 +152,21 @@ function getTtl(fdPath, qs) {
   // donc ces jours-là (l'immense majorité du temps), rien ne justifie de
   // retaper FD.org toutes les 2min — `live=0` (posé par le client via
   // hasMatchToday, même signal déjà utilisé côté client pour son propre
-  // staleTime) donne 24h de cache au lieu de 2min, sans toucher à la
-  // fraîcheur réelle d'un jour où ça joue (qs sans `live=0` → 120s inchangé).
+  // staleTime) donne 24h de cache au lieu de 2min.
+  // ⚠️ 120 → 300 (même jour, proposition explicite de l'utilisateur : "au
+  // pire on fait un appel toutes les 5min et on garde en cache 5min") :
+  // MÊME pendant la vraie fenêtre live (Classement.jsx, scorersLiveWindow),
+  // le TTL de 2min restait le point faible — un visiteur qui tombe juste
+  // après son expiration retape encore le chemin lent (verrou 12s+retries).
+  // 5min réduit À LA FOIS la fréquence de ce chemin lent ET le volume
+  // d'appels réels vers FD.org (max 12/h au lieu de 30/h par compétition en
+  // direct) — aucune des deux dimensions n'est un compromis, les deux vont
+  // dans le même sens. Les buteurs ne sont de toute façon jamais la source
+  // du direct minute par minute (ESPN/cron-goals.js, notifs push) — 5min de
+  // retard sur CE classement secondaire est un coût très raisonnable face
+  // au gain.
   if (fdPath.includes('/scorers') && qs.includes('live=0')) return 86400
-  if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min
+  if (fdPath.includes('/scorers'))                 return 300           // buteurs — 5min
   // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
   // Résultats récents, pourquoi pas le garder en cache 7 jours ?" — repéré
   // en creusant la rafale de 429 au lancement de l'Accueil). Un jour
