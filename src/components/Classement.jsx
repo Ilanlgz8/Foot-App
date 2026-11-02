@@ -127,6 +127,35 @@ function Classement() {
   const hasMatchToday = !wcSchedLoading && !wcFinLoading &&
     [...wcSched, ...wcFin].some(m => m.utcDate && new Date(m.utcDate).toLocaleDateString('sv-SE') === todayStr)
 
+  // ⚠️ AJOUT `scorersLiveWindow` (02/11, idée utilisateur : "si on détecte
+  // qu'un match du championnat est en cours, et qu'après sa fin on fait UN
+  // nouvel appel pour mettre à jour, c'est bon ?") — affine `hasMatchToday`
+  // UNIQUEMENT pour les buteurs : `hasMatchToday` dit "il y a un match
+  // aujourd'hui", vrai dès potentiellement minuit jusqu'à 23h59 pour ce
+  // championnat — avec le fix précédent (`live=0`/TTL 24h), ça gardait déjà
+  // un TTL de 2min pendant TOUTE cette journée, y compris les heures avant
+  // le coup d'envoi et après le coup de sifflet final, où rien ne peut
+  // bouger. Ici on ne regarde que la fenêtre RÉELLE où un but peut encore
+  // être marqué : du coup d'envoi jusqu'à ~200min après (90min + mi-temps +
+  // arrêts de jeu + marge large pour prolongations/tirs au but d'une coupe,
+  // + une marge de grâce pour laisser le temps à une correction tardive
+  // post-sifflet de remonter) — avant cette fenêtre (match pas commencé) ou
+  // après (match fini depuis longtemps), le classement buteurs ne PEUT pas
+  // avoir changé, donc aucune raison de retaper FD.org toutes les 2min.
+  // Résultat concret demandé : pendant la fenêtre → TTL court comme avant
+  // (but détecté en quasi temps réel) ; à la fin de la fenêtre → le tout
+  // prochain appel (dans les ~2min qui suivent, TTL encore court) retape
+  // FD.org une dernière fois pour capter le score final, PUIS retombe sur le
+  // cache 24h pour le reste de la journée — exactement "un nouvel appel
+  // après la fin, puis plus rien jusqu'au prochain match".
+  const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 200
+  const scorersLiveWindow = !wcSchedLoading && !wcFinLoading &&
+    [...wcSched, ...wcFin].some(m => {
+      if (!m.utcDate) return false
+      const elapsed = new Date().getTime() - new Date(m.utcDate).getTime()
+      return elapsed >= 0 && elapsed <= SCORERS_LIVE_WINDOW_MS
+    })
+
   // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429" demandé par
   // l'utilisateur) : le stagger précédent (2s/4s) supposait qu'espacer les 3
   // hooks entre eux suffisait — faux : le verrou global FD.org (spaceKey
@@ -152,7 +181,7 @@ function Classement() {
   // couvre pas (voir ESPN_SOURCED_SCORERS_COMPS, competitions.js, et le
   // commentaire détaillé dans useScorers.js) — aucun garde-fou nécessaire ici,
   // même mécanisme que pour Classement/Forme.
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, hasMatchToday, 12_000)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, scorersLiveWindow, 12_000)
   // Sélections nationales (crest rond, pas d'écusson club) — WC/EC déjà là,
   // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
   const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
