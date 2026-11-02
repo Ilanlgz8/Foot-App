@@ -66,7 +66,26 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // l'identique. Partage la MÊME queryKey (['scorers', compId]) que ce hook —
 // un classement buteurs déjà consulté via la page Classement n'est jamais
 // re-fetché pour la fiche équipe, et vice-versa.
-export async function fetchScorersData(compId, delayMs = 0) {
+// ⚠️ AJOUT `hasMatchToday` (02/11, constat utilisateur : "le classement des
+// buteurs met 24s à s'afficher c'est trop lent") — le vrai coût venait du
+// chemin LENT (verrou d'espacement 12s + retries 8s/16s, voir useScorers
+// plus bas) déclenché à chaque cache-miss serveur, et ce cache-miss arrivait
+// bien trop souvent : le TTL Redis de /scorers (api/football.js, getTtl)
+// est fixé à 2min QUEL QUE SOIT le contexte, alors que côté client cette
+// même donnée est déjà traitée comme stable 24h entières les jours SANS
+// match pour cette compétition (NO_MATCH_STALE_MS plus haut) — un buteur ne
+// peut tout simplement pas marquer hors d'un vrai match en cours. Le cache
+// client (localStorage) protège le même appareil, mais pas un autre
+// utilisateur/onglet qui retombe sur le serveur avec seulement 2min de TTL.
+// Corrigé en propageant ce même signal au serveur : `live=0` dans l'URL
+// (nouvelle clé de cache Redis distincte, aucun risque sur l'ancienne) quand
+// `hasMatchToday` est faux — `getTtl` (api/football.js) lui donne alors un
+// TTL de 24h au lieu de 2min. Résultat concret : les jours sans match pour
+// cette compétition (l'immense majorité du temps), N'IMPORTE QUEL visiteur
+// obtient un HIT Redis instantané, SANS jamais passer par le verrou
+// d'espacement ni les retries — le chemin lent (12-24s) ne se déclenche plus
+// que les jours où ça joue vraiment, là où la fraîcheur a un sens.
+export async function fetchScorersData(compId, delayMs = 0, hasMatchToday = true) {
   const key = `scorers3_${compId}`
 
   if (NO_SCORERS_COMPS.has(compId)) { writeCache(key, [], STALE_MS); return [] }
@@ -74,6 +93,7 @@ export async function fetchScorersData(compId, delayMs = 0) {
   if (delayMs > 0) await waitForFdSpacing(delayMs)
   const isAnnualIntl = compId === 'WC' || compId === 'EC'
   const season = new Date().getFullYear()
+  const liveFlag = hasMatchToday ? '' : '&live=0'
 
   async function tryFetch(url) {
     const fetchPromise = fdFetch(fdUrl(url))
@@ -90,18 +110,18 @@ export async function fetchScorersData(compId, delayMs = 0) {
   try {
     let fresh = false
     if (isAnnualIntl) {
-      const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}`)
+      const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}${liveFlag}`)
       scorers = r.scorers
       fresh = r.fresh
     }
     if (!scorers || scorers.length === 0) {
       if (fresh) await new Promise(res => setTimeout(res, 6_000))
       try {
-        const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500`)
+        const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500${liveFlag}`)
         scorers = r2.scorers
       } catch (e) {
         if (e.message === '429' || e.message === '403') throw e
-        const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100`)
+        const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100${liveFlag}`)
         scorers = r3.scorers
       }
     }
@@ -138,7 +158,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     // ⚠️ Logique de fetch déplacée dans fetchScorersData (voir juste avant
     // cette fonction, extraction du 28/10) — appelée ici à l'identique,
     // aucun changement de comportement.
-    queryFn: () => fetchScorersData(compId, delayMs),
+    queryFn: () => fetchScorersData(compId, delayMs, hasMatchToday),
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,

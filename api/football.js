@@ -143,6 +143,18 @@ function getTtl(fdPath, qs) {
   if (fdPath.includes('/head2head'))             return 86400          // H2H stable, change pas avant le match — 24h (relevé 26/07)
   if (qs.includes('status=FINISHED'))              return 120           // résultats — 2min
   if (fdPath.includes('/standings'))               return 120           // classements — 2min
+  // ⚠️ `live=0` AJOUTÉ (02/11, constat utilisateur : "le classement des
+  // buteurs met 24s à s'afficher") : un TTL de 2min FIXE, même les jours
+  // SANS AUCUN match pour cette compétition, forçait un cache-miss serveur
+  // très fréquent — et c'est justement ce cache-miss qui déclenche le
+  // chemin lent côté client (verrou d'espacement 12s + retries 8s/16s, voir
+  // useScorers.js). Un buteur ne peut pas marquer hors d'un match en cours,
+  // donc ces jours-là (l'immense majorité du temps), rien ne justifie de
+  // retaper FD.org toutes les 2min — `live=0` (posé par le client via
+  // hasMatchToday, même signal déjà utilisé côté client pour son propre
+  // staleTime) donne 24h de cache au lieu de 2min, sans toucher à la
+  // fraîcheur réelle d'un jour où ça joue (qs sans `live=0` → 120s inchangé).
+  if (fdPath.includes('/scorers') && qs.includes('live=0')) return 86400
   if (fdPath.includes('/scorers'))                 return 120           // buteurs — 2min
   // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
   // Résultats récents, pourquoi pas le garder en cache 7 jours ?" — repéré
