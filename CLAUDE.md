@@ -6831,6 +6831,46 @@ cf-worker/
   code, pas une supposition ; à confirmer par l'utilisateur sur son prochain match terminé dans un
   des 6 grands championnats.
 
+- ✅ BUG TROUVÉ ET CORRIGÉ : bilan H2H ("Historique") incohérent avec la liste de confrontations
+  juste en dessous (02/11, captures d'écran utilisateur : onglet Historique Sassuolo-Fiorentina,
+  bilan affiche "0 VICTOIRES" côté Sassuolo (domicile) / "3 NULS" / "8 VICTOIRES" côté Fiorentina,
+  alors que la liste de confrontations affichée immédiatement en dessous montre clairement au
+  moins 3 victoires Sassuolo — 06/12/25 "Sassuolo 3-1", 06/01/24 "Sassuolo 1-0", 26/02/22
+  "Sassuolo 2-1" — mathématiquement incompatible avec "0 victoires"). Root cause trouvée par
+  lecture directe de `MatchModal.jsx` : `H2HBilan` et `H2HTabContent` recalculaient leur PROPRE
+  `homeId` via `match.homeTeam?.id` (l'id brut du match courant, tel que porté par l'objet `match`
+  reçu en prop), alors que `useH2HRows` (le hook qui construit les lignes `rows` affichées dans
+  la liste juste en dessous) résout et utilise SON PROPRE `homeId`/`awayId`, via `resolveFdTeamId
+  (match?.homeTeam, compMatches, { loose })` — une résolution INDÉPENDANTE, documentée depuis le
+  20/08 comme volontairement découplée de ce que l'appelant a pu faire de son côté. Ces 2 calculs
+  d'id, faits séparément à 2 endroits différents pour le MÊME match, peuvent diverger — et
+  `H2HBilan` compare alors `winnerId === homeId` (`winnerId` provenant des lignes `rows`, dans
+  l'espace d'id résolu par `useH2HRows` ; `homeId` dans l'espace d'id brut de `match`) : si les 2
+  ne coïncident jamais, la comparaison échoue pour TOUTES les lignes, y compris les vraies
+  victoires Sassuolo, qui tombent alors systématiquement dans la branche `else awayWins++` —
+  exactement le symptôme observé (0 côté domicile, tout comptabilisé côté extérieur), sans qu'une
+  seule ligne individuelle de la liste (qui, elle, affiche directement `m.homeTeam`/`m.awayTeam`
+  sans comparaison d'id fragile) ne soit elle-même fausse. Corrigé (`MatchModal.jsx`) : `useH2HRows`
+  expose désormais aussi le `homeId` qu'il a déjà résolu en interne (`return { rows, isLoading,
+  homeId }`) — garanti cohérent avec `rows` par construction, puisque c'est le MÊME calcul, pas une
+  2e résolution indépendante. `H2HTabContent`/`H2HBilan` acceptent ce `homeId` en prop et l'utilisent
+  en priorité (repli sur `match.homeTeam?.id` brut seulement si non fourni, pour ne jamais casser un
+  appelant qui ne le passerait pas). 3 points d'appel mis à jour pour le transmettre : `MatchPage.jsx`
+  (2 rendus `H2HTabContent`) et `LiveMatchPage.jsx` (1 rendu) — tous les 3 déstructurent déjà `rows`/
+  `isLoading` depuis le même appel `useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true,
+  extendedH2H: true })`, il suffisait d'y ajouter `homeId: h2hHomeId` et de le repasser en prop. 398
+  tests (inchangé) + lint (35 erreurs pré-existantes — confirmées identiques par comptage total
+  avant/après, aucune nouvelle erreur sur les lignes touchées) + build vérifiés. Honnêteté : je n'ai
+  pas pu confirmer en direct sur la prod la cause EXACTE de la divergence entre les 2 résolutions
+  d'id pour CE match précis (`resolveFdTeamId` peut légitimement renvoyer un id différent de
+  `match.homeTeam?.id` brut selon la source d'où `match` a été ouvert — Accueil/Live ESPN-sourcé vs
+  MatchPage/LiveMatchPage FD.org-résolu — sans accès aux vraies valeurs d'id en jeu ce jour-là
+  depuis cet environnement) — mais la cause du bug lui-même (2 résolutions d'id indépendantes pour
+  une même comparaison, pouvant structurellement diverger) est confirmée avec certitude par lecture
+  directe du code, pas une supposition ; le fix élimine cette divergence par construction (une
+  seule résolution, partagée) plutôt que de deviner laquelle des 2 était "la bonne" — à confirmer
+  par l'utilisateur sur son prochain onglet Historique.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

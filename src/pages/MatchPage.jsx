@@ -941,7 +941,7 @@ export default function MatchPage() {
   // ici pour que resolveFdMatchId (le head2head AFFICHÉ) en profite aussi.
   const h2hHistory = useH2HHistory(compId, resolveMatches)
   const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
+  const { rows: h2hRows, isLoading: h2hLoading, homeId: h2hHomeId } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
   // ⚠️ RETIRÉ `!h2hLoading` (27/07, demande explicite utilisateur : "h2h
   // arrive direct la première fois sans que ça mette plusieurs secondes") :
   // useH2HRows retombe déjà, SANS requête supplémentaire, sur les
@@ -1026,7 +1026,7 @@ export default function MatchPage() {
                         proba algorithmique, déjà visible sur l'Accueil
                         via MatchPoster). */}
                     {statsView === 'live'       ? <MpMatchStats match={match} dataMatch={dataMatch} />
-                   : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                   : statsView === 'historique' ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} homeId={h2hHomeId} />
                    : (isLastSeason || compMatches.length === 0) ? <p className="pm__noData">Stats saison et forme récente disponibles dès le début de la saison</p>
                    :                              <MpSeasonStats match={match} compMatches={compMatches} />
                     }
@@ -1041,7 +1041,7 @@ export default function MatchPage() {
                         <StatsSubTabs view={statsView} onChange={setStatsView} showLive={false} showHistorique />
                       )}
                       {statsView === 'historique' && showH2HTab
-                        ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                        ? <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} homeId={h2hHomeId} />
                         : (isLastSeason || compMatches.length === 0)
                         // ⚠️ AJOUT (27/07, demande explicite utilisateur : "comme
                         // la les championnat ont pas commencé pas la peine de

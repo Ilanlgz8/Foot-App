@@ -1624,8 +1624,13 @@ function SeasonStatsSection({ homeId, awayId, homeName, awayName, compMatches })
 
 // ── Bilan des confrontations : victoires / nuls / victoires + barre de
 //    domination aux couleurs réelles des deux équipes (teamPhotos) ──────────
-function H2HBilan({ rows, match, isWC }) {
-  const homeId = match.homeTeam?.id
+function H2HBilan({ rows, match, isWC, homeId: homeIdProp }) {
+  // ⚠️ `homeIdProp` (02/11, voir le commentaire détaillé sur useH2HRows) :
+  // id déjà résolu de façon cohérente avec `rows` par l'appelant — préféré
+  // à `match.homeTeam?.id` brut, qui peut vivre dans un espace d'id
+  // différent (voir bug corrigé). Repli sur le brut uniquement si jamais
+  // un appelant futur n'a pas encore été mis à jour.
+  const homeId = homeIdProp ?? match.homeTeam?.id
   let homeWins = 0, awayWins = 0, draws = 0
   for (const m of rows) {
     const fs = finalScore(m.score)
@@ -1870,7 +1875,22 @@ export function useH2HRows(match, compMatches, delayMs = 0, { looseTeamMatch = f
     ? [match, ...baseRows]
     : baseRows
 
-  return { rows, isLoading }
+  // ⚠️ AJOUT (02/11, bug trouvé via capture d'écran utilisateur : bilan H2H
+  // affichant "0 VICTOIRES" pour l'équipe à domicile alors que la liste des
+  // confrontations juste en dessous en montre clairement plusieurs) — root
+  // cause : H2HBilan/H2HTabContent recalculaient leur PROPRE `homeId` via
+  // `match.homeTeam?.id` brut, un id DIFFÉRENT de celui utilisé ci-dessus
+  // pour attribuer les équipes aux lignes de `rows` (`homeId`/`awayId`,
+  // résolus via `resolveFdTeamId` avec le même `looseTeamMatch` que
+  // l'appelant). Les 2 calculs d'id étaient indépendants et pouvaient
+  // diverger — `winnerId === homeId` (H2HBilan) comparait alors 2 espaces
+  // d'id différents, créant un faux 0-0-tout-pour-l'adversaire silencieux
+  // sans qu'aucune ligne individuelle ne soit elle-même fausse (d'où la
+  // liste de confrontations correcte juste en dessous du bilan incohérent).
+  // On expose ici le `homeId` DÉJÀ résolu et déjà garanti cohérent avec
+  // `rows` (même calcul, pas une 2e résolution indépendante) pour que
+  // H2HTabContent/H2HBilan l'utilisent au lieu de recalculer le leur.
+  return { rows, isLoading, homeId }
 }
 
 // Nombre de confrontations affichées avant repli derrière "Voir plus" —
@@ -1995,16 +2015,20 @@ function H2HRowsList({ rows, homeId, isWC }) {
 // Le skeleton ne s'affiche plus que si on n'a VRAIMENT rien à montrer pour
 // l'instant (1re visite, aucune donnée en cache) — pas de nouvelle requête,
 // juste un meilleur usage de ce qui est déjà en main.
-export function H2HTabContent({ match, rows, isLoading }) {
+export function H2HTabContent({ match, rows, isLoading, homeId: homeIdProp }) {
   const isWC = isNationalTeamComp(match)
-  const homeId = match.homeTeam?.id
+  // ⚠️ `homeIdProp` (02/11, voir le commentaire détaillé sur useH2HRows) :
+  // id déjà résolu par useH2HRows, cohérent par construction avec `rows` —
+  // préféré à `match.homeTeam?.id` brut (bug corrigé : espace d'id parfois
+  // différent). Repli brut gardé pour un appelant qui ne le passerait pas.
+  const homeId = homeIdProp ?? match.homeTeam?.id
 
   if (isLoading && !rows.length) return <H2HSkeleton />
   if (!rows.length) return <p className="modal__noEvents">Aucune confrontation connue entre ces deux équipes</p>
 
   return (
     <>
-      <H2HBilan rows={rows} match={match} isWC={isWC} />
+      <H2HBilan rows={rows} match={match} isWC={isWC} homeId={homeId} />
       <H2HRowsList rows={rows} homeId={homeId} isWC={isWC} />
       {isLoading && <p className="pm__noData" style={{ marginTop: '8px' }}>Historique complet en cours de chargement…</p>}
     </>

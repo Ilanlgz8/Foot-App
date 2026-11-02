@@ -607,7 +607,7 @@ export default function LiveMatchPage() {
   // ce trou pour le head2head AFFICHÉ, pas seulement pour la cote de prono.
   const h2hHistory = useH2HHistory(compId, resolveMatches)
   const h2hPool = (resolveMatches?.length || h2hHistory?.length) ? [...resolveMatches, ...h2hHistory] : resolveMatches
-  const { rows: h2hRows, isLoading: h2hLoading } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
+  const { rows: h2hRows, isLoading: h2hLoading, homeId: h2hHomeId } = useH2HRows(match, h2hPool, 6_000, { looseTeamMatch: true, extendedH2H: true })
   // ⚠️ AJOUT (constat utilisateur, 02/09 : cotes différentes entre les cards
   // de l'Accueil et cette page). Le prono live ne doit PAS être nourri du
   // même historique que l'onglet "Historique" : celui-ci est volontairement
@@ -737,7 +737,7 @@ export default function LiveMatchPage() {
                     sinon "Stats live" reste seule sans sélecteur inutile. */}
                 <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
                 {statsView === 'historique' ? (
-                  <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} />
+                  <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} homeId={h2hHomeId} />
                 ) : statsView === 'saison' ? (
                   // ⚠️ isLastSeason (27/07, demande explicite utilisateur :
                   // "pas la peine de recuperer la forme recente et stat saison
