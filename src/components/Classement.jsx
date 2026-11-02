@@ -16,7 +16,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { useScorers } from '../hooks/useScorers'
+import { useScorers, isScorersLiveWindow } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
@@ -148,13 +148,11 @@ function Classement() {
   // FD.org une dernière fois pour capter le score final, PUIS retombe sur le
   // cache 24h pour le reste de la journée — exactement "un nouvel appel
   // après la fin, puis plus rien jusqu'au prochain match".
-  const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 200
+  // ⚠️ Calcul extrait dans isScorersLiveWindow (useScorers.js, 02/11) —
+  // réutilisé aussi par useTeamScorersMulti (TeamSearchPage), même règle
+  // partout plutôt que dupliquée.
   const scorersLiveWindow = !wcSchedLoading && !wcFinLoading &&
-    [...wcSched, ...wcFin].some(m => {
-      if (!m.utcDate) return false
-      const elapsed = new Date().getTime() - new Date(m.utcDate).getTime()
-      return elapsed >= 0 && elapsed <= SCORERS_LIVE_WINDOW_MS
-    })
+    [...wcSched, ...wcFin].some(m => isScorersLiveWindow(m.utcDate))
 
   // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429" demandé par
   // l'utilisateur) : le stagger précédent (2s/4s) supposait qu'espacer les 3

@@ -109,13 +109,25 @@ export function useTeamStandingsMulti(compCodes) {
 // NO_SCORERS_COMPS DANS fetchScorersData lui-même (renvoie [] proprement,
 // voir son commentaire dans useScorers.js) — aucun filtre supplémentaire
 // nécessaire ici, le composant affiche juste "aucune donnée" le cas échéant.
-export function useTeamScorersMulti(compCodes) {
+//
+// ⚠️ `liveCompCodes` AJOUTÉ (02/11, constat utilisateur : "si on fait un
+// appel pour la CAN alors qu'elle joue pas ce jour-là, ça sert à rien") —
+// avant ça, `fetchScorersData(comp)` était appelée SANS `hasMatchToday`,
+// donc avec sa valeur par défaut `true` pour TOUTE compétition, y compris
+// une compétition sporadique (CAN/Copa América) qui ne joue pas forcément
+// aujourd'hui pour l'équipe recherchée — ça forçait le TTL serveur COURT
+// (5min, voir api/football.js) en permanence au lieu du TTL long (24h),
+// même les jours où rien ne pouvait bouger. `liveCompCodes` (Set de codes
+// comp, calculé par l'appelant depuis les matchs déjà chargés de l'équipe —
+// voir TeamSearchPage.jsx, aucun fetch supplémentaire) dit précisément
+// lesquelles jouent réellement aujourd'hui pour CETTE équipe.
+export function useTeamScorersMulti(compCodes, liveCompCodes = new Set()) {
   const results = useQueries({
     queries: compCodes.map((comp, i) => ({
       queryKey: ['scorers', comp],
       queryFn: async () => {
         if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
-        return fetchScorersData(comp)
+        return fetchScorersData(comp, 0, liveCompCodes.has(comp))
       },
       staleTime: TTL.FINISHED,
       retry: false,

@@ -21,6 +21,27 @@ const STALE_MS = 1000 * 60 * 5  // 5min (était 2min, 30min avant ça)
 // jours sans match, 2min les jours où ça joue.
 const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 
+// ⚠️ EXTRAIT ici (02/11, constat utilisateur : "si on fait un appel pour la
+// CAN alors qu'elle joue pas ce jour-là, ça sert à rien") — ce calcul vivait
+// jusqu'ici UNIQUEMENT dans Classement.jsx (`scorersLiveWindow`), donc
+// TeamSearchPage.jsx (`useTeamScorersMulti`, useTeamSearch.js) ne l'utilisait
+// jamais : il appelait `fetchScorersData(comp)` avec `hasMatchToday` par
+// défaut (`true`), traitant TOUJOURS une compétition comme "ça joue
+// aujourd'hui" — même une compétition sporadique (CAN/Copa América) qui n'a
+// peut-être aucun match avant des mois. Résultat concret : une équipe
+// affichée dans la fiche équipe et jouant en CAN consommait le TTL serveur
+// court (5min) en PERMANENCE pour cette compétition, jamais le TTL long
+// (24h), même les jours où CAN ne joue littéralement pas — exactement le
+// gaspillage signalé. Extraction en fonction pure réutilisable par les deux
+// appelants (Classement.jsx ET useTeamSearch.js), AUCUN changement de
+// comportement pour Classement.jsx (même calcul, même fenêtre).
+export const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 200 // kickoff + 200min
+export function isScorersLiveWindow(utcDate) {
+  if (!utcDate) return false
+  const elapsed = new Date().getTime() - new Date(utcDate).getTime()
+  return elapsed >= 0 && elapsed <= SCORERS_LIVE_WINDOW_MS
+}
+
 // ⚠️ AJOUT `delayMs` (24/07, trouvé via l'audit chronologique demandé par
 // l'utilisateur) : Classement.jsx appelle useStandings + useTeamForm +
 // useScorers pour LA MÊME compétition quasi au même instant à chaque

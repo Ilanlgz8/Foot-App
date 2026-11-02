@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTeamSearchMatches, useTeamStandingsMulti, useTeamScorersMulti } from '../hooks/useTeamSearch'
 import { useLineups, useFdLineups } from '../hooks/useMatchDetail'
+import { isScorersLiveWindow } from '../hooks/useScorers'
 import {
   normalizeTeamQuery,
   teamMatchesQuery,
@@ -230,7 +231,22 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
     () => standingsCompCodes.filter(c => !NO_SCORERS_COMPS.has(c)),
     [standingsCompCodes]
   )
-  const scorersByComp = useTeamScorersMulti(scorersCompCodes)
+  // ⚠️ AJOUT (02/11, constat utilisateur : "si on fait un appel pour la CAN
+  // alors qu'elle joue pas ce jour-là, ça sert à rien") — calculé depuis
+  // `rows` (les matchs de l'équipe DÉJÀ chargés, aucun fetch en plus), même
+  // règle que Classement.jsx (isScorersLiveWindow, useScorers.js) : seules
+  // les compétitions ayant un match de CETTE équipe dans la vraie fenêtre
+  // live (coup d'envoi à +200min) gardent le TTL serveur court (5min) —
+  // les autres (ex. CAN hors période de tournoi) passent au TTL long (24h).
+  const liveCompCodes = useMemo(() => {
+    const live = new Set()
+    for (const r of rows) {
+      const code = r.match.competition?.code
+      if (code && isScorersLiveWindow(r.match.utcDate)) live.add(code)
+    }
+    return live
+  }, [rows])
+  const scorersByComp = useTeamScorersMulti(scorersCompCodes, liveCompCodes)
 
   const filteredRows = useMemo(() => {
     if (compFilter == null) return rows
