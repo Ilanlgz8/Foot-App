@@ -118,6 +118,46 @@ export function isTursoConfigured() {
   return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN)
 }
 
+// ── Verrou "write-once" (02/11) ──────────────────────────────────────────────
+// Ajouté suite à la découverte en direct (avec l'utilisateur, via la console
+// SQL Turso) que ~1701 clés distinctes dans espn_cache avaient généré 250 000+
+// LIGNES ÉCRITES — preuve chiffrée d'un effet "thundering herd" : sur une base
+// tout juste créée (donc intégralement froide), plusieurs visiteurs arrivant
+// dans la même fenêtre de quelques secondes voient chacun un cache miss pour
+// LA MÊME tranche de scoreboard ESPN avant qu'aucun n'ait eu le temps de
+// l'écrire — et la réécrivent chacun de leur côté, en pure perte. La réduction
+// de fréquence de polling côté client (useTeamForm.js, même jour) diminue le
+// RISQUE de collision mais ne l'élimine pas structurellement — ceci est le
+// vrai "write-once" demandé : avant de fetcher ESPN pour une tranche jamais
+// encore en cache, chaque requête tente de la RÉSERVER (émulation SET NX déjà
+// éprouvée ailleurs dans ce projet, voir cf-worker/src/tursoKv.js). Seule la
+// requête qui gagne la course fetch+écrit réellement ; les autres renvoient
+// juste "pas de données pour cette tranche cette fois" (traité par l'appelant,
+// voir mergeScoreboardChunks dans api/espn.js, exactement comme un échec ESPN
+// transitoire — jamais une fausse donnée "0 match") — la tranche sera en
+// cache quelques secondes plus tard, retrouvée au prochain poll/remontage.
+// Fail-open si Turso est indisponible (renvoie true, comme n'importe quel
+// autre verrou de ce type dans ce projet — jamais bloquer un vrai fetch pour
+// un verrou qu'on n'a pas pu poser).
+export async function tryLock(key, ttlSeconds) {
+  const c = client()
+  if (!c) return true
+  try {
+    await ensureSchema(c)
+    const now = Math.floor(Date.now() / 1000)
+    const expiresAt = now + ttlSeconds
+    const res = await c.execute({
+      sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, '1', ?)
+            ON CONFLICT(key) DO UPDATE SET value = '1', expires_at = excluded.expires_at
+            WHERE espn_cache.expires_at <= ?`,
+      args: [key, expiresAt, now],
+    })
+    return res.rowsAffected > 0
+  } catch {
+    return true
+  }
+}
+
 // ── Lecture de l'état du Worker Cloudflare (01/10) ──────────────────────────
 // cf-worker/src/tursoKv.js (migration du cron Cloudflare vers Turso, voir son
 // commentaire d'en-tête) écrit dans worker_kv/worker_queue — MÊME base Turso

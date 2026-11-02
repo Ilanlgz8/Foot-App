@@ -6436,6 +6436,49 @@ cf-worker/
   mécanisme peut se reproduire à plus petite échelle — à surveiller via la même méthode (`SELECT
   COUNT(*) FROM espn_cache` comparé au compteur d'écritures du dashboard Turso) plutôt que deviner.
 
+- ✅ VRAI VERROU "WRITE-ONCE" AJOUTÉ (02/11, même jour, suite directe du point ci-dessus — le compteur
+  Turso a continué de monter en direct pendant l'investigation, "300000 row written" quelques
+  minutes après le fix d'amplitude, confirmant que réduire la fréquence de polling ne suffisait
+  pas : ça réduit le RISQUE de collision, ça ne l'élimine pas). L'utilisateur a posé la bonne
+  question explicitement : "y'a pas un truc qui réécrit une fois pour tous". Réponse : oui, et
+  implémenté — un vrai verrou distribué, PAS juste moins de tentatives.
+  Nouvelle fonction `tryLock(key, ttlSeconds)` (`src/utils/tursoCache.js`) : émulation SET NX déjà
+  éprouvée ailleurs dans ce projet (`cf-worker/src/tursoKv.js`, `execSetBatch`, voir son historique
+  du 05/10) — `INSERT ... ON CONFLICT(key) DO UPDATE ... WHERE expires_at <= ?`, acquis seulement
+  si la clé n'existe pas OU est expirée (`rowsAffected > 0`). Fail-open si Turso est indisponible
+  (renvoie `true`, ne bloque jamais un vrai fetch) — même contrat que tous les verrous SET NX déjà
+  en place dans ce projet (`fifa-live.js`/`cron-goals.js`/`football.js`).
+  Branché dans `fetchScoreboardChunk` (`api/espn.js`) : AVANT de fetcher ESPN pour une tranche
+  CACHEABLE (celle qui a un TTL, donc celle normalement écrite en cache — jamais pour la zone
+  "live" ±2j, qui n'écrit de toute façon jamais rien), chaque requête tente de RÉSERVER cette
+  tranche précise (`tryClaimChunk`, clé `lock:espn:sb:{slug}:{dates}`, TTL 10s — couvre le timeout
+  fetch ESPN de 8s + marge d'écriture). Si le verrou est déjà pris par un AUTRE visiteur arrivé au
+  même instant (très probablement en train de faire EXACTEMENT ce même fetch+écriture), cette
+  requête-ci renvoie `{ok:false, events:[]}` pour CETTE tranche SANS fetcher ESPN ni rien écrire —
+  `mergeScoreboardChunks` (inchangé, déjà conçu pour ça) ne traite jamais ce `ok:false` comme "0
+  match" : ça n'écrase JAMAIS les autres tranches qui, elles, ont réussi, exactement le même
+  traitement qu'un échec ESPN transitoire. La tranche sera en cache quelques secondes plus tard
+  (dès que le gagnant de la course aura écrit), retrouvée normalement au prochain poll/remontage
+  (le mécanisme de polling de `useTeamForm.js`, voir le point juste au-dessus, est justement conçu
+  pour ça). Repli Redis (si Turso non configuré) : `kv.set(lockKey, '1', {ex:10, nx:true})`, même
+  convention déjà établie partout ailleurs dans ce fichier pour ce type de verrou.
+  Différence avec le fix précédent (réduction d'amplitude du polling) : celui-là RÉDUISAIT le
+  nombre de requêtes concurrentes possibles (division par 2) — celui-ci ÉLIMINE structurellement
+  la duplication d'écriture quel que soit le nombre de requêtes concurrentes, puisque UNE SEULE
+  d'entre elles peut gagner la course et écrire, peu importe combien d'autres arrivent au même
+  instant. Les 2 restent cumulés (aucune régression à les garder ensemble) : le polling réduit
+  reste utile pour la fréquence de requêtes ESPN/Vercel elle-même (indépendant du sujet écritures
+  Turso), le verrou règle directement le problème signalé. 398 tests + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Portée : uniquement `src/utils/
+  tursoCache.js` + `api/espn.js`, se déploie automatiquement avec le reste de l'app via Vercel,
+  aucune action manuelle `cf-worker/` nécessaire. Honnêteté : comme pour tout ce qui touche à
+  Turso, aucun accès direct à la vraie base depuis cet environnement pour exécuter ce SQL contre
+  une vraie instance avant déploiement (seule la syntaxe et la logique ont été relues attentivement,
+  en reprenant un pattern déjà validé ailleurs) — la vraie vérification sera la même que le fix
+  précédent : comparer `SELECT COUNT(*) FROM espn_cache` au compteur d'écritures du dashboard Turso
+  dans l'heure suivant ce déploiement, qui devrait désormais se rapprocher de 1:1 plutôt que
+  d'afficher un rapport ~147:1.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

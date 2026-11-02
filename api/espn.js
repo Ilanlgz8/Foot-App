@@ -26,7 +26,7 @@
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
-import { mget as tursoMget, set as tursoSet, isTursoConfigured } from '../src/utils/tursoCache.js'
+import { mget as tursoMget, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -358,8 +358,46 @@ async function readCachedChunks(slug, chunkList) {
 // toujours 200 avec `events:[]` en cas d'échec aurait donc fait écraser un
 // cache client valide par une liste vide à la moindre panne ESPN, PIRE que
 // le comportement d'avant ce correctif.
+// ⚠️ AJOUT (02/11, verrou "write-once" — voir tursoCache.js, tryLock, pour le
+// contexte complet du pic de 250 000+ écritures Turso confirmé par mesure
+// directe avec l'utilisateur) : LOCK_TTL_S couvre le timeout fetch ESPN (8s
+// ci-dessous) + une marge pour l'écriture cache qui suit — assez long pour
+// qu'un concurrent qui arrive pendant qu'on fetch voie le verrou encore posé,
+// assez court pour qu'un fetch qui échoue (timeout/erreur) ne bloque pas les
+// tentatives suivantes plus de 10s.
+const LOCK_TTL_S = 10
+
+async function tryClaimChunk(cacheKey) {
+  const lockKey = `lock:${cacheKey}`
+  try {
+    if (isTursoConfigured()) return await tursoTryLock(lockKey, LOCK_TTL_S)
+    const acquired = await kv.set(lockKey, '1', { ex: LOCK_TTL_S, nx: true })
+    return !!acquired
+  } catch {
+    return true // erreur réseau/Turso/Redis → fail-open, ne jamais bloquer un vrai fetch
+  }
+}
+
 async function fetchScoreboardChunk(slug, chunkDates) {
   const ttl = scoreboardChunkTtl(chunkDates)
+  const cacheKey = ttl != null ? `espn:sb:${slug}:${chunkDates}` : null
+
+  // Verrou "write-once" : avant de fetcher ESPN pour une tranche CACHEABLE,
+  // on tente de la réserver. Si un AUTRE visiteur l'a déjà réservée dans les
+  // 10 dernières secondes (donc très probablement en train de faire EXACTEMENT
+  // ce même fetch+écriture à cet instant), on laisse tomber cette tranche pour
+  // CETTE requête plutôt que de dupliquer le fetch ESPN et l'écriture
+  // Turso/Redis — elle sera en cache dans quelques secondes, retrouvée au
+  // prochain poll/remontage. Jamais appliqué à la zone "live" (ttl===null,
+  // cacheKey null) : elle n'écrit de toute façon jamais en cache, aucun
+  // risque de duplication d'écriture à éviter là. `ok:false` ici n'écrase
+  // jamais les AUTRES tranches qui ont réussi (voir mergeScoreboardChunks) —
+  // traité exactement comme un échec ESPN transitoire, jamais une fausse
+  // donnée "0 match".
+  if (cacheKey && !(await tryClaimChunk(cacheKey))) {
+    return { ok: false, events: [] }
+  }
+
   const controller = new AbortController()
   const timeoutId  = setTimeout(() => controller.abort(), 8_000)
   try {
@@ -370,8 +408,7 @@ async function fetchScoreboardChunk(slug, chunkDates) {
     })
     if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
     const json = await response.json()
-    if (ttl != null) {
-      const cacheKey = `espn:sb:${slug}:${chunkDates}`
+    if (cacheKey) {
       if (isTursoConfigured()) {
         tursoSet(cacheKey, JSON.stringify(json), ttl).catch(() => {})
       } else {
