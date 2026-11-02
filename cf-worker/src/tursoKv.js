@@ -134,10 +134,37 @@ export function createTursoKv({ url, authToken }) {
   // Seuls 2 appelants dans index.js (cron:goals:logHistory, fd:warmPriority),
   // tous deux des files (worker_queue) — jamais une clé worker_kv/worker_set.
   // Vérifié par grep avant implémentation, pas de généralité supposée à tort.
+  //
+  // ⚠️ BUG CRITIQUE TROUVÉ ET CORRIGÉ (02/11, confirmé via "Top Queries" du
+  // dashboard Turso — pas une théorie, LA requête n°1 par lignes écrites :
+  // 306,63K sur ~300K au total pour la journée, 545 appels) : la version
+  // d'origine faisait `UPDATE worker_queue SET expires_at=? WHERE
+  // queue_name=?` — SANS filtrer sur quelles lignes, donc réécrivant TOUTES
+  // les lignes déjà présentes dans la file à CHAQUE appel, pas seulement les
+  // nouvelles. Appelée juste après CHAQUE `rpush` (voir les 2 call-sites dans
+  // index.js, `cron:goals:logHistory` et `fd:warmPriority`) — c'est-à-dire à
+  // chaque fois qu'un KO/but/carton/mi-temps/reprise/FT est loggé, sur
+  // N'IMPORTE quel match. Une file qui grossit au fil d'une soirée (plusieurs
+  // centaines à quelques milliers de lignes avant trim à 30 000) voyait donc
+  // CHAQUE nouvel événement réécrire la file ENTIÈRE au lieu de juste la
+  // ligne qu'il venait d'ajouter — exactement le profil "quota épuisé en
+  // moins de 24h sur un compte flambant neuf" constaté par l'utilisateur,
+  // malgré un Worker par ailleurs déjà bien optimisé (stateKey conditionnel,
+  // sadd/srem groupés — voir leurs historiques respectifs plus haut).
+  // Root cause du bug lui-même : `rpush` n'assigne JAMAIS `expires_at` à
+  // l'insertion (laissé NULL, colonne nullable contrairement à worker_kv) —
+  // `expire()` est le SEUL endroit qui le pose, après coup, pour toute la
+  // file d'un coup. Corrigé en restreignant l'UPDATE aux lignes PAS ENCORE
+  // timestampées (`AND expires_at IS NULL`) : une ligne déjà posée par un
+  // appel précédent n'est plus jamais retouchée, seules les lignes tout
+  // juste insérées par le `rpush` qui précède reçoivent leur TTL — même
+  // résultat final (toute la file finit par avoir un `expires_at`), coût
+  // désormais proportionnel au nombre de NOUVELLES lignes à chaque appel
+  // (quelques-unes, pas toute la file), pas à sa taille totale.
   async function expire(queueName, seconds) {
     await ensureSchema()
     await client.execute({
-      sql: `UPDATE worker_queue SET expires_at=? WHERE queue_name=?`,
+      sql: `UPDATE worker_queue SET expires_at=? WHERE queue_name=? AND expires_at IS NULL`,
       args: [nowSec() + seconds, queueName],
     })
   }

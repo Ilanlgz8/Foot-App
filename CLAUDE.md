@@ -6479,6 +6479,50 @@ cf-worker/
   dans l'heure suivant ce déploiement, qui devrait désormais se rapprocher de 1:1 plutôt que
   d'afficher un rapport ~147:1.
 
+- ✅ BUG CRITIQUE TROUVÉ ET CORRIGÉ : LA vraie cause des 300K+ écritures Turso en moins de 24h sur
+  le nouveau compte (02/11, même jour — le fix "write-once" ci-dessus visait `espn_cache`, mais le
+  compteur a continué de grimper très vite ensuite, y compris constaté "y'a personne sur l'app" à
+  un moment). Diagnostiqué avec CERTITUDE cette fois, via le dashboard Turso lui-même (onglet "Top
+  Queries", trié par "Rows written") plutôt qu'une nouvelle théorie — la requête n°1, de très loin :
+  `UPDATE worker_queue SET expires_at=? WHERE queue_name=?`, **306,63K lignes écrites pour 545
+  appels** sur un total journalier de ~300K (quasiment 100% du volume). Root cause dans
+  `cf-worker/src/tursoKv.js`, fonction `expire(queueName, seconds)` — appelée par `index.js` juste
+  après CHAQUE `rpush` sur `cron:goals:logHistory` (donc à chaque KO/but/carton/mi-temps/reprise/FT
+  loggé, sur n'importe quel match) et sur `fd:warmPriority`. Le bug : l'`UPDATE` ne filtrait QUE sur
+  `queue_name=?` — aucune condition sur QUELLES lignes — donc à CHAQUE appel, TOUTES les lignes déjà
+  présentes dans la file étaient réécrites, pas seulement celle qui venait d'être ajoutée. `rpush`
+  n'assigne jamais `expires_at` à l'insertion (colonne nullable, laissée `NULL`) — `expire()` est le
+  SEUL endroit qui le pose, mais en retouchant toute la file à chaque fois au lieu de juste les
+  lignes neuves. Une file qui grossit au fil d'une soirée de plusieurs matchs (jusqu'à quelques
+  milliers de lignes avant le `ltrim` à 30 000) transformait donc CHAQUE nouvel événement en une
+  réécriture de la file ENTIÈRE — exactement le profil "quota épuisé en moins de 24h sur un compte
+  flambant neuf", malgré un Worker par ailleurs déjà bien optimisé (stateKey conditionnel depuis le
+  27/10, sadd/srem groupés depuis le 15/10, aucun verrou redondant depuis le 10/10 — tous vérifiés
+  par relecture complète du fichier avant de chercher ailleurs). Corrigé (`tursoKv.js`) : l'`UPDATE`
+  restreint aux lignes PAS ENCORE timestampées (`AND expires_at IS NULL`) — une ligne déjà posée par
+  un appel précédent n'est plus jamais retouchée, seules les lignes tout juste insérées reçoivent
+  leur TTL. Même résultat fonctionnel (toute la file finit par avoir un `expires_at`, le TTL de 4
+  jours sur `cron:goals:logHistory`/1h sur `fd:warmPriority` reste identique), mais le coût devient
+  proportionnel au nombre de NOUVELLES lignes à chaque appel plutôt qu'à la taille totale de la
+  file — élimine structurellement ce gaspillage, quelle que soit la taille future de la file.
+  Diagnostic confirmé par les 3 autres entrées du même tableau "Top Queries" : `INSERT INTO
+  espn_cache` (3,71K lignes, 2,52K appels) et `INSERT INTO worker_queue`/`worker_kv` (quelques
+  milliers chacune) sont tous dans des ordres de grandeur parfaitement normaux pour une vraie
+  journée de match — confirmant que le fix "write-once" du même jour (verrou sur `fetchScoreboardChunk`)
+  fonctionne bien et n'est PAS en cause, et que le reste du Worker (passLock, stateKey, sadd/srem)
+  n'est pas non plus le problème : tout le volume anormal venait de ce seul `expire()`. 398 tests +
+  lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build + `npx wrangler deploy --dry-run`
+  (431,23 KiB, bundle généré sans erreur) vérifiés. Portée : uniquement `cf-worker/src/tursoKv.js`
+  — nécessite un `npm run deploy` MANUEL depuis `cf-worker/` pour prendre effet (aucun déploiement
+  automatique pour ce dossier, comme toujours). Honnêteté : contrairement aux diagnostics précédents
+  de cette même journée (arithmétique/raisonnement non confirmés), celui-ci est basé sur une PREUVE
+  DIRECTE et chiffrée du dashboard Turso lui-même — la cause exacte, pas une probabilité. Seule
+  réserve : comme pour tout `cf-worker/`, le SQL corrigé n'a pas pu être testé contre une vraie base
+  Turso depuis cet environnement (aucun accès réseau sortant) — à confirmer après déploiement en
+  comparant à nouveau "Top Queries" : cette requête devrait quasiment disparaître du classement, et
+  le compteur d'écritures journalier devrait chuter à quelques milliers au lieu de plusieurs
+  centaines de milliers.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
