@@ -26,7 +26,7 @@ import { Component } from 'react'
 export class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false, error: null, retryCount: 0 }
   }
 
   static getDerivedStateFromError(error) {
@@ -40,12 +40,42 @@ export class ErrorBoundary extends Component {
     console.error('[ErrorBoundary]', error, info?.componentStack)
   }
 
+  // ⚠️ AJOUT (constat utilisateur, 02/11 : "quand y'a beaucoup de matchs [...]
+  // ça me met le message d'erreur [...] et quand j'appuie sur réessayer ça
+  // fait rien") : `handleRetry` se contentait de remettre `hasError` à false —
+  // si le bug qui a causé le crash est DÉTERMINISTE pour les données
+  // actuellement en mémoire (ex. une structure de données figée dans
+  // espnScoresCache/liveTracker qui redéclenche le même crash au prochain
+  // render), rien ne change entre le clic et le re-render suivant : l'erreur
+  // revient instantanément, donnant l'impression exacte "ça fait rien". Un
+  // simple reset de state ne peut PAS corriger ça — seul un VRAI rechargement
+  // (nouveau contexte JS, aucune donnée en mémoire conservée) le peut. On
+  // garde "Réessayer" (gratuit, suffit si la cause était transitoire — ex. un
+  // poll ESPN en vol au moment du crash) mais on ajoute "Recharger la page"
+  // juste en dessous, qui fait un vrai reload — recours garanti de fonctionner
+  // quelle que soit la cause exacte, au prix de perdre l'état de navigation en
+  // cours. Si un 2e "Réessayer" retombe sur la même erreur (retryCount > 0),
+  // le reload devient visuellement la seule option proposée pour ne pas
+  // laisser l'utilisateur recliquer sur un bouton qui ne peut déjà plus rien
+  // faire pour cette session.
   handleRetry = () => {
-    this.setState({ hasError: false, error: null })
+    this.setState(prev => ({ hasError: false, error: null, retryCount: prev.retryCount + 1 }))
+  }
+
+  handleReload = () => {
+    window.location.reload()
   }
 
   render() {
     if (!this.state.hasError) return this.props.children
+
+    // Message d'erreur affiché en toutes lettres (pas juste "une erreur est
+    // survenue") : aucun outil de tracking n'est branché sur ce projet (voir
+    // componentDidCatch) — sur un téléphone, l'utilisateur n'a aucun accès
+    // direct à la console pour savoir CE qui a planté. L'afficher ici est le
+    // seul moyen de récupérer cette info pour pouvoir corriger la vraie
+    // cause, plutôt que de deviner sans jamais pouvoir reproduire.
+    const message = this.state.error?.message || String(this.state.error ?? '')
 
     return (
       <div style={{
@@ -59,18 +89,42 @@ export class ErrorBoundary extends Component {
         </h2>
         <p style={{ color: 'rgba(var(--white-rgb),0.6)', fontSize: '0.9rem', maxWidth: '26rem', margin: 0 }}>
           Cette page a rencontré une erreur inattendue. Le reste de l'app reste
-          utilisable — tu peux réessayer ou changer de page depuis le menu.
+          utilisable — tu peux réessayer, recharger la page, ou changer de page
+          depuis le menu.
         </p>
-        <button
-          onClick={this.handleRetry}
-          style={{
-            marginTop: '0.5rem', padding: '0.6rem 1.4rem', borderRadius: '999px',
-            border: 'none', background: '#ef4444', color: '#fff',
-            fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          Réessayer
-        </button>
+        {message && (
+          <p style={{
+            color: 'rgba(var(--white-rgb),0.4)', fontSize: '0.75rem', maxWidth: '26rem',
+            margin: 0, fontFamily: 'monospace', wordBreak: 'break-word',
+          }}>
+            {message}
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {this.state.retryCount === 0 && (
+            <button
+              onClick={this.handleRetry}
+              style={{
+                padding: '0.6rem 1.4rem', borderRadius: '999px',
+                border: 'none', background: '#ef4444', color: '#fff',
+                fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Réessayer
+            </button>
+          )}
+          <button
+            onClick={this.handleReload}
+            style={{
+              padding: '0.6rem 1.4rem', borderRadius: '999px',
+              border: '1px solid rgba(var(--white-rgb),0.25)', background: 'transparent',
+              color: 'rgba(var(--white-rgb),0.92)',
+              fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Recharger la page
+          </button>
+        </div>
       </div>
     )
   }

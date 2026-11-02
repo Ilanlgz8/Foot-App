@@ -6523,6 +6523,45 @@ cf-worker/
   le compteur d'écritures journalier devrait chuter à quelques milliers au lieu de plusieurs
   centaines de milliers.
 
+- ✅ `MAX_FETCH_CHUNKS` remonté 20 → 60 (02/11, même jour, demande explicite utilisateur une fois la
+  vraie cause du pic Turso confirmée et corrigée ci-dessus) : le resserrement à 20 avait été fait
+  le même jour sur la base d'une 1ère hypothèse (trafic visiteurs sur un cache `espn_cache` froid)
+  — hypothèse pas fausse en soi (confirmée ensuite par "Top Queries" : rythme normal, 3,71K
+  lignes/jour) mais PAS la vraie cause du pic de 300K+ écritures/jour, qui venait en réalité du bug
+  `expire()` corrigé juste au-dessus (`cf-worker/src/tursoKv.js`, sans aucun rapport avec ce
+  fichier). Une fois cette vraie cause réglée, remonté à 60 : le verrou write-once (`tryLock`,
+  ajouté le même jour) protège déjà contre la duplication d'écriture par plusieurs visiteurs sur
+  LA MÊME tranche — ce que 20 au lieu de 60 ne protégeait pas mieux de toute façon (20 limite le
+  nombre de tranches DIFFÉRENTES par requête, pas la concurrence entre visiteurs sur une tranche
+  donnée). 398 tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés.
+
+- 🔍 Crash "Un problème est survenu" / bouton "Réessayer" inopérant dès que 5-15 matchs sont en
+  cours simultanément (constat utilisateur, 02/11) — investigation approfondie (Live.jsx,
+  LiveProvider.jsx, LiveCardWidget.jsx, useLiveMinute.js, Accueil.jsx, api/fifa-live.js, budget
+  FD.org `MINUTE_CAP`) sans trouver de cause concrète confirmée par lecture de code (contrairement
+  aux bugs Turso du même jour, qui avaient une preuve directe via "Top Queries") — aucun hardcode
+  à "5" trouvé, aucune donnée non-null-safe identifiée dans les composants qui rendent les cards
+  live, aucune configuration React Query `throwOnError`/`suspense` qui propagerait une erreur
+  réseau vers le rendu. Honnêteté : sans accès à un vrai appareil ni à la console navigateur de
+  l'utilisateur au moment du crash (aucun outil de tracking d'erreurs type Sentry branché sur ce
+  projet, voir `ErrorBoundary.jsx`), deviner la cause exacte à l'aveugle aurait été plus risqué
+  qu'utile. Corrigé à la place le symptôme le plus concret et actionnable immédiatement
+  (`src/components/ErrorBoundary.jsx`, filet de sécurité déjà en place autour de chaque route) :
+  (1) le message d'erreur réel (`error.message`) est désormais affiché en toutes lettres sous le
+  texte générique — jusqu'ici invisible pour l'utilisateur sur mobile, seule trace disponible
+  (`console.error`, inaccessible sans DevTools) ; au prochain crash, ce texte permettra enfin un
+  vrai diagnostic au lieu de deviner. (2) Un bouton "Recharger la page" (reload complet,
+  `window.location.reload()`) ajouté À CÔTÉ de "Réessayer" (simple reset de state React) :
+  explique directement la plainte "j'appuie sur réessayer, ça fait rien" — si le crash est
+  déterministe pour les données actuellement en mémoire (ex. une structure figée dans
+  `espnScoresCache`/liveTracker qui redéclenche le même crash au re-render suivant), un reset de
+  state ne peut structurellement rien changer, seul un vrai rechargement (nouveau contexte JS)
+  le peut. "Réessayer" disparaît après un 1er échec (retryCount > 0) pour ne pas laisser
+  l'utilisateur recliquer sur un bouton qui ne peut déjà plus rien faire pour cette session. 398
+  tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. À RECONFIRMER :
+  si le crash se reproduit, le message affiché (à copier/partager) donnera enfin la vraie cause à
+  corriger, plutôt qu'une 2e tentative de diagnostic à l'aveugle.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

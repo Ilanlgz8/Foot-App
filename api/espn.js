@@ -478,24 +478,36 @@ const CHUNK_GROUP_DELAY_MS = 150
 // sans jamais dépasser une fraction du budget d'exécution (`maxDuration: 30`,
 // vercel.json) même à froid total (aucune tranche déjà en cache).
 //
-// ⚠️ RESSERRÉ (02/11, demande explicite utilisateur — "+15 000 lignes
-// écrites Turso en 5 minutes sans même avoir ouvert l'app" : preuve que ce
-// n'est pas QUE lui qui tape l'API, mais le trafic normal d'autres
-// visiteurs du site pendant un vrai jour de match, sur un compte Turso tout
-// juste créé donc intégralement froid). 60 tranches/comp/requête, multiplié
-// par ~10-20 compétitions chargées en parallèle sur une seule visite
-// Accueil, peut écrire jusqu'à 600-1200 lignes pour UN SEUL chargement de
-// page tant que rien n'est encore en cache — avec plusieurs visiteurs en
-// même temps un soir de match, ça explique largement un rythme de plusieurs
-// milliers de lignes/minute. Resserré 60 → 20 : réduit le pire cas par 3,
-// sans rien casser (les tranches gardées restent toujours les plus PROCHES
-// d'aujourd'hui, voir le tri ci-dessus — "forme récente"/prochain match
-// reste servi en 1 seule fois ; seul le remplissage du passé le plus
-// lointain pour les 8 compétitions sporadiques met plus de cycles à se
-// compléter). Honnêteté : ça ralentit le RYTHME du remplissage à froid, pas
-// le TOTAL final une fois tout le cache chaud — mais c'est exactement le
-// rythme qui inquiète ici, pas le total.
-const MAX_FETCH_CHUNKS = 20
+// ⚠️ RESSERRÉ PUIS REREMONTÉ (02/11) : resserré 60 → 20 le même jour, sur la
+// base d'une 1ère hypothèse ("+15 000 lignes Turso en 5min sans ouvrir
+// l'app" — trafic d'autres visiteurs sur un compte Turso tout juste créé,
+// donc intégralement froid). Cette hypothèse n'était pas fausse en soi
+// (confirmé par "Top Queries" : `INSERT INTO espn_cache` reste à un rythme
+// tout à fait normal, 3,71K lignes/jour) mais elle n'était PAS la vraie
+// cause du pic de 300K+ écritures/jour constaté le même jour — la vraie
+// cause, trouvée ensuite via le même dashboard "Top Queries", était un bug
+// dans `cf-worker/src/tursoKv.js` (`expire()` réécrivait TOUTE la file
+// `worker_queue` à chaque appel au lieu des seules lignes neuves, voir
+// l'entrée CLAUDE.md du 02/11) — corrigé et déployé séparément, sans
+// rapport avec ce fichier. Une fois cette vraie cause réglée, remonté à 60
+// (demande explicite utilisateur) : le verrou write-once (`tryLock`,
+// `src/utils/tursoCache.js`, ajouté le même jour) protège déjà contre la
+// duplication d'écriture par PLUSIEURS visiteurs sur LA MÊME tranche — ce
+// que 20 au lieu de 60 ne protégeait pas mieux de toute façon (20 limite le
+// nombre de tranches DIFFÉRENTES par requête, pas la concurrence entre
+// visiteurs). 60 reste un plafond dur, indépendant de toute cause (Redis/
+// Turso en panne, fenêtre large) : jamais plus de 60 tranches réellement
+// envoyées à ESPN en une seule exécution, quelle que soit la largeur de la
+// fenêtre demandée — protège structurellement contre un scénario comme
+// celui du 30/09 (jusqu'à ~460 tranches sans ce plafond) sans dépendre de
+// deviner l'état de Redis/Turso à l'avance. Quand le nombre de tranches à
+// fetcher dépasse ce plafond, on garde seulement les plus PROCHES
+// d'aujourd'hui (triées par distance absolue) — c'est la partie la plus
+// utile (forme récente/prochain match) qui est préservée. 60 couvre
+// confortablement le besoin normal (~75j pour les grands championnats, déjà
+// servi en 1 seule fois) sans jamais dépasser une fraction du budget
+// d'exécution (`maxDuration: 30`, vercel.json) même à froid total.
+const MAX_FETCH_CHUNKS = 60
 
 async function fetchScoreboardChunksStaggered(slug, chunkList) {
   const results = []
