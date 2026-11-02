@@ -1061,9 +1061,31 @@ export default async function handler(req, res) {
       // nombre de visiteurs simultanés — un visiteur qui tombe sur un cache
       // Edge HIT ne déclenche même plus l'exécution de cette fonction,
       // donc zéro commande Redis ET zéro CPU Vercel pour lui.
+      // ⚠️ `s-maxage` 90 → 900 (02/11, constat utilisateur : "les row reads
+      // Turso augmentent beaucoup trop, 3,8M") : calcul fait en reprenant
+      // EXACTEMENT ce mécanisme — DAYS_BACK_SPARSE=400 (revert du même jour)
+      // + DAYS_FORWARD_SPARSE=60 donne jusqu'à ~460 clés scannées par
+      // `readCachedChunks`/mget à CHAQUE exécution réelle de cette branche.
+      // À 90s, le plancher théorique (même avec CE cache Edge qui fonctionne
+      // parfaitement) est de 86400/90 = 960 exécutions/jour × 8 compétitions
+      // sporadiques × 460 clés ≈ 3,53M lectures Turso/JOUR — qui colle
+      // précisément au chiffre observé. Ce n'est PAS un effet des 3
+      // changements buteurs faits juste avant (api/football.js, Redis
+      // Upstash — un système totalement séparé de Turso, aucun rapport),
+      // mais bien du retour à 400j décidé plus tôt dans cette même
+      // conversation. Ce mode ne sert JAMAIS le direct (le score en temps
+      // réel passe par un mécanisme séparé, voir le commentaire plus haut) —
+      // rien n'empêche de le garder en cache bien plus longtemps SANS
+      // sacrifier la largeur de fenêtre voulue (qui doit rester 400j pour
+      // que "forme récente" reste complète, demande explicite plus tôt).
+      // 900s (15min) ramène le plancher à 86400/900=96 exécutions/jour × 8 ×
+      // 460 ≈ 353k lectures/jour (~10,6M/mois) — une division par ~10, sans
+      // toucher à la complétude de la donnée, juste à la fréquence de son
+      // recalcul (une compétition qui ne joue que par cycles espacés n'a de
+      // toute façon aucune urgence à 15min près).
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=300')
+        .setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800')
         .json({ events: merged.events })
     }
 
