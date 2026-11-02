@@ -2347,7 +2347,7 @@ async function handlePass(env) {
     try {
       const line = `${new Date().toISOString()} [cron] ERREUR runOnePass (passe avortée) : ${e?.message || e}${e?.stack ? ' | ' + String(e.stack).slice(0, 400) : ''}`
       await kv.rpush('cron:goals:logHistory', line)
-      await kv.ltrim('cron:goals:logHistory', -30_000, -1)
+      if (shouldTrimLogHistory()) await kv.ltrim('cron:goals:logHistory', -30_000, -1)
       await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     } catch {}
     await releasePassLock()
@@ -2373,7 +2373,7 @@ async function handlePass(env) {
     if (result.log.length) {
       const stamped = result.log.map(l => `${new Date().toISOString()} ${l}`)
       await kv.rpush('cron:goals:logHistory', ...stamped)
-      await kv.ltrim('cron:goals:logHistory', -30_000, -1)
+      if (shouldTrimLogHistory()) await kv.ltrim('cron:goals:logHistory', -30_000, -1)
       await kv.expire('cron:goals:logHistory', 4 * 24 * 3600)
     }
   } catch {}
@@ -2588,6 +2588,27 @@ async function queueFdPriorityRefresh(kv, slug, log) {
 function shouldWarmFdCache(quiet) {
   const m = new Date().getMinutes()
   return quiet ? m % 30 === 0 : m % 4 === 0
+}
+
+// ⚠️ AJOUT (02/11, "Top Queries" Turso — c'était LE plus gros poste de
+// lecture de toute l'app : 2,58M lignes lues pour 900 appels, ~2870/appel).
+// `ltrim('cron:goals:logHistory', -30_000, -1)` était appelé après CHAQUE
+// rpush (donc à chaque KO/but/carton/mi-temps/reprise/FT loggé, sur
+// N'IMPORTE quel match) — pour vérifier et éventuellement couper une file
+// qui, en régime normal, est très loin d'avoir atteint son plafond de
+// 30 000 lignes. Même index posé dessus, SQLite doit comparer chaque ligne
+// de la partition pour savoir si elle fait partie des N à garder — coût
+// proportionnel à la taille de la file à CHAQUE appel, quasi toujours pour
+// ne rien couper du tout. Plutôt que de retenter d'optimiser la requête
+// elle-même (déjà tenté une fois pour expire(), limité), on réduit
+// simplement la fréquence : un tirage à faible probabilité (1 chance sur 50
+// en moyenne) suffit largement à garder la file sous 30 000 (le pire cas
+// réaliste — quelques dizaines de lignes de plus avant le prochain
+// passage — est totalement anodin face à ce plafond), tout en divisant le
+// coût par ~50x. Le TTL de 4 jours (expire()) reste la vraie garantie de
+// non-croissance infinie, ltrim n'est qu'un garde-fou de taille en plus.
+function shouldTrimLogHistory() {
+  return Math.random() < 0.02
 }
 
 async function warmFdCache(log, kv, quiet) {

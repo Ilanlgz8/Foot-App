@@ -6742,6 +6742,56 @@ cf-worker/
   événements logués), sans affecter le comportement fonctionnel (même résultat final, juste
   beaucoup moins de lignes parcourues pour y arriver).
 
+- ✅ 2e vague sur `worker_queue` (Turso), même jour (02/11, retour utilisateur après vérification
+  en direct sur le dashboard "Top Queries" : les 2 requêtes dominantes (`ltrim`/`expire` sur
+  `cron:goals:logHistory`) montraient toujours ~2870 lignes lues/appel APRÈS déploiement confirmé
+  de l'index `(queue_name, id)` — quasi identique à avant. Diagnostic affiné plutôt que supposer le
+  1er fix cassé : (1) la présence dans "Top Queries" d'une requête `UPDATE worker_queue SET
+  expires_at=? WHERE queue_name=?` SANS le filtre `AND expires_at IS NULL` (563 appels, lignes
+  lues = lignes écrites = 332,31K, signature EXACTE de l'ancien bug déjà corrigé plus tôt le même
+  jour) prouve que le dashboard "Today (UTC)" agrège TOUTE la journée, y compris le trafic
+  d'AVANT chacun des 2 déploiements précédents — les chiffres affichés ne permettent donc pas de
+  juger seuls si le DERNIER fix fonctionne. (2) En creusant indépendamment de cette pollution
+  d'agrégat, 2 vrais défauts structurels restaient malgré l'index `(queue_name, id)` :
+  - `expire()` (`UPDATE ... WHERE queue_name=? AND expires_at IS NULL`) : `expires_at IS NULL`
+    n'est PAS une colonne de cet index — SQLite peut sauter aux lignes de la bonne file grâce à
+    l'index, mais doit ENSUITE les lire TOUTES pour trouver lesquelles ont `expires_at IS NULL`
+    (en général seulement les quelques lignes tout juste insérées), coût proportionnel à la
+    taille de la partition peu importe l'index posé dessus. Corrigé (`tursoKv.js`,
+    `ensureSchema`) : INDEX PARTIEL `CREATE INDEX ... ON worker_queue(queue_name) WHERE
+    expires_at IS NULL` — ne contient QUE les lignes pas encore timestampées (minuscule en
+    régime stable), le WHERE de `expire()` correspond exactement à ce prédicat, SQLite peut
+    sauter direct aux lignes à mettre à jour sans toucher aux milliers d'autres déjà expirées.
+  - `ltrim('cron:goals:logHistory', -30_000, -1)` : appelé après CHAQUE rpush (donc à chaque
+    KO/but/carton/mi-temps/reprise/FT loggé, sur n'importe quel match) pour vérifier et
+    éventuellement couper une file très loin, en régime normal, d'avoir atteint son plafond de
+    30 000 — même indexé, SQLite doit comparer chaque ligne de la partition pour savoir si elle
+    fait partie des N à garder, coût proportionnel à la taille de la file à CHAQUE appel, quasi
+    toujours pour ne rien couper du tout. Corrigé (`index.js`, nouvelle fonction
+    `shouldTrimLogHistory()`) : au lieu de retenter d'optimiser la requête elle-même, réduit la
+    FRÉQUENCE — 2% de chance d'exécution par appel (~1 fois sur 50 en moyenne) — largement
+    suffisant pour garder la file sous 30 000 (le pire cas réaliste, quelques dizaines de lignes
+    de plus avant le prochain passage, est anodin face à ce plafond), tout en divisant le coût
+    par ~50x. Le TTL de 4 jours (`expire()`) reste la vraie garantie de non-croissance infinie,
+    `ltrim` n'est qu'un garde-fou de taille en plus. `queueFdPriorityRefresh`/`FD_PRIORITY_QUEUE_
+    KEY` (cap 60, bien plus petit, appelé seulement sur FT confirmé) non touché — pas le poste
+    dominant du dashboard. 398 tests + lint (36 problems inchangés — 35 erreurs pré-existantes +
+    1 warning, confirmés identiques) + build + `npx wrangler deploy --dry-run` (473,39 KiB,
+    bundle généré sans erreur — nécessité un nouveau `rm -rf node_modules && npm install` dans
+    `cf-worker/`, même mismatch binaire cross-plateforme déjà rencontré le même jour, résolu
+    pareil ; `package-lock.json` reverté après coup, diff purement métadonnées npm sans rapport)
+    vérifiés. Portée : uniquement `cf-worker/src/tursoKv.js` + `cf-worker/src/index.js` —
+    nécessite un `npm run deploy` MANUEL depuis `cf-worker/` pour prendre effet (aucun
+    déploiement automatique pour ce dossier, comme toujours). Honnêteté : comme pour tout
+    `cf-worker/`, aucun accès réseau réel depuis cet environnement pour exécuter ce SQL contre
+    une vraie base Turso avant déploiement, ni pour confirmer que l'INDEX PARTIEL est bien choisi
+    par le planificateur de requêtes de SQLite/libSQL en pratique (comportement documenté et
+    standard, mais jamais vérifié ici en conditions réelles) — la vraie preuve viendra du
+    dashboard Turso, mais seulement sur une fenêtre "Today (UTC)" FRAÎCHE (après minuit UTC, ou en
+    comparant le débit heure par heure si le dashboard le permet) plutôt que le total du jour déjà
+    entamé par les déploiements précédents, pour ne pas retomber dans la même confusion
+    d'agrégat que celle qui a motivé cette 2e passe.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

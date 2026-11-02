@@ -87,6 +87,23 @@ export function createTursoKv({ url, authToken }) {
       // 100% : `CREATE INDEX IF NOT EXISTS`, aucune migration de données,
       // construit automatiquement par SQLite sur les lignes déjà présentes.
       `CREATE INDEX IF NOT EXISTS idx_worker_queue_qn_id ON worker_queue(queue_name, id)`,
+      // ⚠️ AJOUT (02/11, même jour — après déploiement de l'index ci-dessus,
+      // "Top Queries" montrait toujours ~2870 lignes lues/appel sur `expire()`
+      // (UPDATE ... WHERE queue_name=? AND expires_at IS NULL), quasi identique
+      // à avant l'index. Cause : `expires_at IS NULL` n'est PAS une colonne de
+      // l'index (queue_name, id) — SQLite peut bien sauter direct aux lignes de
+      // la bonne file grâce à l'index, mais doit ENSUITE les lire TOUTES pour
+      // vérifier lesquelles ont `expires_at IS NULL` (en général seulement les
+      // quelques lignes tout juste insérées par le rpush qui précède), coût
+      // proportionnel à la taille de la partition peu importe l'index posé
+      // dessus. Corrigé par un INDEX PARTIEL : ne contient QUE les lignes avec
+      // `expires_at IS NULL` (donc minuscule en régime stable, quasi toujours
+      // juste les quelques lignes tout juste insérées) — le WHERE de `expire()`
+      // correspond exactement à ce prédicat, SQLite peut alors sauter direct
+      // aux lignes à mettre à jour sans toucher aux milliers d'autres déjà
+      // timestampées. Sûr à 100% : ajout pur, aucune migration, construit
+      // automatiquement par SQLite.
+      `CREATE INDEX IF NOT EXISTS idx_worker_queue_pending_expiry ON worker_queue(queue_name) WHERE expires_at IS NULL`,
     ], 'write')
     try {
       await schemaReady
