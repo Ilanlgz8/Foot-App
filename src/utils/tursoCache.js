@@ -184,16 +184,34 @@ export async function getWorkerKv(key) {
   }
 }
 
-export async function getWorkerQueueAll(queueName) {
+// ⚠️ BUG TROUVÉ ET CORRIGÉ (02/11, constat utilisateur : "2,8M de row reads
+// en 15h, c'énorme") : cette fonction lisait la file ENTIÈRE à CHAQUE appel
+// (`ORDER BY id ASC`, sans LIMIT) — `cron:goals:logHistory` peut grossir
+// jusqu'à 30 000 lignes (voir le ltrim dans cf-worker/src/index.js) avant
+// d'être tronquée, et chaque appel à `/api/debug-push` (très fréquent
+// pendant les sessions de debug des notifs live, voir tout l'historique de
+// ce fichier depuis début octobre) relisait donc jusqu'à 30 000 lignes d'un
+// coup — alors que `api/debug-push.js` n'affiche jamais plus de 200 lignes
+// (ou un sous-ensemble filtré par `?match=`) au final. Corrigé : `LIMIT`
+// ajouté directement dans le SQL (`ORDER BY id DESC LIMIT ?`, inversé en JS
+// pour revenir à l'ordre chronologique ASC attendu par l'appelant) — un
+// défaut de 8000 lignes couvre très largement une journée de matchs (bien
+// au-delà des quelques centaines/milliers de lignes qu'une vraie soirée à
+// plusieurs matchs simultanés génère), tout en divisant le pire cas par
+// ~4x. Honnêteté : un filtre `?match=` qui cherche un événement VRAIMENT
+// ancien (plus de 8000 lignes en arrière) pourrait ne plus le trouver —
+// compromis assumé, ce cas n'a jamais été utilisé dans ce projet (le
+// diagnostic porte toujours sur un match récent/en cours).
+export async function getWorkerQueueAll(queueName, limit = 8000) {
   const c = client()
   if (!c) return []
   try {
     const now = Math.floor(Date.now() / 1000)
     const res = await c.execute({
-      sql: `SELECT value FROM worker_queue WHERE queue_name=? AND (expires_at IS NULL OR expires_at>?) ORDER BY id ASC`,
-      args: [queueName, now],
+      sql: `SELECT value FROM worker_queue WHERE queue_name=? AND (expires_at IS NULL OR expires_at>?) ORDER BY id DESC LIMIT ?`,
+      args: [queueName, now, limit],
     })
-    return res.rows.map(r => r.value)
+    return res.rows.map(r => r.value).reverse()
   } catch {
     return []
   }

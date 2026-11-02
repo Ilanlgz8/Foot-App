@@ -6562,6 +6562,48 @@ cf-worker/
   si le crash se reproduit, le message affiché (à copier/partager) donnera enfin la vraie cause à
   corriger, plutôt qu'une 2e tentative de diagnostic à l'aveugle.
 
+- ✅ BUG TROUVÉ ET CORRIGÉ : "2,8M de row reads en 15h" sur Turso, constat utilisateur (02/11) —
+  investigation par lecture directe du code (pas de nouveau log/dashboard consulté cette fois,
+  math/raisonnement sur les 2 fichiers les plus susceptibles de lire beaucoup). 2 pistes
+  trouvées, une seule corrigée :
+  1. **`getWorkerQueueAll` (`src/utils/tursoCache.js`), confirmée et corrigée** : lisait la file
+     `cron:goals:logHistory` ENTIÈRE à chaque appel (`ORDER BY id ASC`, sans LIMIT) — cette file
+     peut grossir jusqu'à 30 000 lignes avant d'être tronquée (voir le `ltrim` dans
+     `cf-worker/src/index.js`), et `/api/debug-push` (donc cette fonction) a été appelé TRÈS
+     souvent pendant les sessions de debug des notifs live documentées dans tout ce fichier depuis
+     début octobre — chaque appel pouvait relire jusqu'à 30 000 lignes d'un coup, alors que
+     `api/debug-push.js` n'affiche jamais plus de 200 lignes (ou un sous-ensemble filtré par
+     `?match=`) au final. Corrigé : `LIMIT` ajouté directement dans le SQL (`ORDER BY id DESC
+     LIMIT 8000`, résultat réinversé en JS pour garder l'ordre chronologique attendu par
+     l'appelant) — 8000 couvre très largement une vraie journée de matchs (bien au-delà des
+     quelques centaines/milliers de lignes qu'une soirée à plusieurs matchs simultanés génère),
+     tout en divisant le pire cas par ~4x. Honnêteté : un filtre `?match=` qui chercherait un
+     événement vieux de plus de 8000 lignes ne le retrouverait plus — jamais arrivé dans ce
+     projet (le diagnostic porte toujours sur un match récent/en cours), compromis assumé.
+  2. **`readCachedChunks`/`mget` (`api/espn.js`), identifiée mais PAS corrigée, volontairement** :
+     ce `mget` lit autant de clés que la fenêtre de dates COMPLÈTE demandée par le client (jusqu'à
+     ~460 jours pour les 8 compétitions ESPN-only sporadiques, NL/CAN/COPA/UEL/UECL/TDC/CS/USC,
+     élargies le 29/09) — PAS bornée par `MAX_FETCH_CHUNKS` (qui ne limite que les tranches
+     réellement FETCHÉES auprès d'ESPN en cas de cache-miss, jamais la LECTURE du cache
+     lui-même). Tentation de la plafonner comme `MAX_FETCH_CHUNKS` (même tri "plus proche
+     d'aujourd'hui") — écartée après réflexion : contrairement à un cache-miss (qui ne coûte rien
+     à sacrifier au-delà du plafond, juste moins de fraîcheur), une donnée déjà EN CACHE
+     au-delà du plafond serait purement et simplement PERDUE de la réponse — réintroduirait
+     exactement le bug corrigé le 29/09 ("forme récente"/stats saison absentes pour ces 8 comps,
+     dont le dernier match peut remonter à plus de 60 jours). Capé à 60 comme les fetchs, ce
+     `mget` casserait la fonctionnalité pour économiser une ressource qui n'est actuellement PAS
+     en crise : Turso facture les LECTURES à 500M/mois gratuit (vs 10M écritures/mois, déjà source
+     de 2 incidents distincts début novembre) — la projection mensuelle au rythme observé
+     (2,8M × 24/15 × 30 ≈ 134M/mois) reste à ~27% du quota gratuit, pas une urgence comparable aux
+     2 crises d'écritures déjà réglées. Laissé tel quel : la vraie protection déjà en place contre
+     une croissance de ce coût est la fréquence de polling côté client (`useTeamForm.js`,
+     `ESPN_FORM_STALE`/`ESPN_FORM_POLL_MAX_ATTEMPTS`, déjà resserrés le 02/11 dans l'incident
+     précédent) — à revisiter si la projection mensuelle venait à dépasser une fraction
+     significative du quota, mais pas avant.
+  398 tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés. Portée :
+  uniquement `src/utils/tursoCache.js`, se déploie automatiquement avec le reste de l'app via
+  Vercel — aucune action manuelle `cf-worker/` nécessaire pour ce fix précis.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
