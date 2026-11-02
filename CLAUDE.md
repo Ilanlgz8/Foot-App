@@ -6604,21 +6604,31 @@ cf-worker/
   uniquement `src/utils/tursoCache.js`, se déploie automatiquement avec le reste de l'app via
   Vercel — aucune action manuelle `cf-worker/` nécessaire pour ce fix précis.
 
-- ✅ Fenêtre ESPN sporadique réduite 400j → 90j (02/11, demande explicite utilisateur en
-  désaccord avec ma décision du point précédent : "faut pas rechercher aussi loin, c'est ça qui
-  coûte énormément [...] 90 jours max, je pense que ça suffit") — `DAYS_BACK_SPARSE`
-  (`src/utils/espnAdapter.js`, les 8 compétitions ESPN-only NL/CAN/COPA/UEL/UECL/TDC/CS/USC,
-  élargie à 400j le 29/09 pour corriger "forme récente" absente) ramenée à 90. J'avais choisi de
-  laisser 400j tel quel (risque de régression jugé trop élevé) mais l'utilisateur a tranché dans
-  l'autre sens, en connaissance du compromis — priorité donnée à la réduction du coût de lecture
-  Turso (`readCachedChunks`/`mget`, identifié juste avant comme non borné par `MAX_FETCH_CHUNKS`)
-  plutôt qu'à la couverture maximale. `DAYS_FORWARD_SPARSE` (60j, jamais identifié comme la
-  source du coût, sert à trouver le PROCHAIN match d'un tournoi sporadique) laissé inchangé.
-  Honnêteté, tradeoff ASSUMÉ par l'utilisateur : 90j ne couvre plus les cas où le dernier match
-  d'une équipe dans CETTE compétition précise remonte à plus de 90 jours (équipe éliminée tôt
-  d'un cycle de Ligue des Nations, CAN/Copa América entre 2 éditions) — "forme récente"/"stats
-  saison" peuvent redevenir vides pour ces cas, comme avant le 29/09. 398 tests + lint (35
-  erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés (changement de constante +
+- ✅ Fenêtre ESPN sporadique : 400j → 90j puis REVERTÉE À 400j le même jour (02/11) — 1er
+  changement sur demande explicite ("faut pas rechercher aussi loin, c'est ça qui coûte
+  énormément [...] 90 jours max"), puis clarification immédiate de l'utilisateur : ce "90 jours"
+  visait la recherche du PROCHAIN match (forward, déjà 60j, jamais la source du coût identifiée),
+  pas la profondeur de "forme récente"/"stats saison" (backward) — "les forme recente et tout
+  faut que ça reste vu que ça bouge pas [...] on va pas chercher 400 jours en arrière si on a
+  déjà les données vu qu'elles sont dans le passé donc elles bougent pas [...] on la garde en
+  stock, c'est possible ça tu penses ou ça demande trop de stockage ?". Clarifié avec lui que le
+  stockage N'EST PAS le facteur limitant : chaque jour fetché pèse quelques Ko en JSON, une
+  fraction infime du quota gratuit Turso (5 Go) même cumulé sur 400j × 8 compétitions — et une
+  fois fetché, un jour PASSÉ est déjà conservé très longtemps (`SCOREBOARD_OLD_PAST_CHUNK_TTL` =
+  365j, `api/espn.js`, posé le 01/10) : il n'est PAS re-demandé à ESPN à chaque requête. Le vrai
+  coût identifié le même jour était les LECTURES Turso : `readCachedChunks`/`mget` relit une clé
+  par jour de toute la fenêtre à CHAQUE requête, que ce jour soit déjà en cache ou non — plus la
+  fenêtre est large, plus ce mget est gros, indépendamment du stockage. Mais ce coût de lecture
+  reste largement dans le quota gratuit (500M lectures/mois, projection ~134M/mois à 400j soit
+  ~27%) — sans rapport avec la crise d'ÉCRITURES (10M/mois, déjà réglée le même jour via le fix
+  `expire()`/`worker_queue` dans `cf-worker/`). `DAYS_BACK_SPARSE` (`src/utils/espnAdapter.js`,
+  les 8 compétitions ESPN-only NL/CAN/COPA/UEL/UECL/TDC/CS/USC) donc reverté 90 → 400 pour ne pas
+  sacrifier "forme récente" (le cas documenté le 29/09 : équipe éliminée tôt d'un cycle de Ligue
+  des Nations, CAN/Copa América entre 2 éditions, dont le dernier match remonte à plus de 90
+  jours). `DAYS_FORWARD_SPARSE` (60j, jamais identifié comme la source du coût, sert à trouver le
+  PROCHAIN match) resté inchangé tout du long — déjà bien sous les "90 jours max" visés par la
+  demande d'origine, aucun changement nécessaire de ce côté. 398 tests + lint (35 erreurs
+  pré-existantes, Pronos.jsx, inchangé) + build vérifiés à chaque étape (changement de constante +
   commentaire uniquement). Portée : `src/`, déploiement automatique via Vercel.
 
 - ✅ BUG TROUVÉ ET CORRIGÉ : page Pronos qui "bug trop" — clics sur les onglets Résultat/

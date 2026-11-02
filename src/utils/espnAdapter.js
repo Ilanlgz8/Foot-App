@@ -208,25 +208,24 @@ const SPARSE_INTL_SLUGS = new Set([
   'uefa.europa', 'uefa.europa.conf',
   'uefa.super_cup', 'fra.super_cup', 'eng.charity',
 ])
-// ⚠️ RÉDUIT 400 → 90 (02/11, demande explicite utilisateur après la découverte
-// que la lecture du cache ESPN sur Turso — readCachedChunks/mget, api/espn.js —
-// n'est PAS bornée par MAX_FETCH_CHUNKS (qui ne limite que les fetchs ESPN en
-// cas de cache-miss, jamais la taille du mget lui-même) : plus cette fenêtre
-// est large, plus chaque requête relit un mget énorme, même quand tout est
-// déjà en cache. J'avais d'abord choisi de laisser 400j tel quel (risque jugé
-// trop élevé de casser "forme récente" pour ces compétitions sporadiques), mais
-// l'utilisateur a tranché explicitement dans l'autre sens : "faut pas chercher
-// aussi loin, c'est ça qui coûte énormément [...] 90 jours max, je pense que
-// ça suffit" — priorité donnée à la réduction de coût plutôt qu'à la
-// couverture maximale. Honnêteté, tradeoff ASSUMÉ par l'utilisateur en
-// connaissance de cause : 90j ne couvre plus les cas déjà documentés le 29/09
-// où le dernier match d'UNE équipe dans CETTE compétition précise remonte à
-// plus de 90 jours (ex. une équipe éliminée tôt d'un cycle de Ligue des
-// Nations, ou CAN/Copa América — tournois biennaux) — "forme récente"/"stats
-// saison" peuvent redevenir vides pour ces cas-là, comme avant le 29/09. Le
-// forward (60j, utilisé pour trouver le PROCHAIN match d'un tournoi sporadique)
-// n'a jamais été identifié comme la source du coût — laissé inchangé.
-const DAYS_BACK_SPARSE    = 90
+// 90 → REVERTÉ À 400 le même jour (02/11), après clarification de l'utilisateur :
+// le "90 jours max" du message précédent visait la recherche du PROCHAIN match
+// (forward, déjà 60j, jamais la source du coût) — pas la profondeur de "forme
+// récente"/"stats saison" (backward), qui doit "rester" complète puisque les
+// données passées sont immuables ("elles bougent pas"). Clarifié avec lui que le
+// vrai coût n'était PAS du stockage (negligible : quelques Ko/jour/compétition,
+// une fraction infime du quota gratuit Turso de 5 Go — une fois une journée
+// fetchée elle est déjà conservée très longtemps, SCOREBOARD_OLD_PAST_CHUNK_TTL
+// = 365j dans api/espn.js) mais le nombre de LECTURES : readCachedChunks/mget
+// relit une clé par jour de toute la fenêtre à CHAQUE requête, que ce jour soit
+// déjà en cache ou non — plus la fenêtre est large, plus ce mget est gros,
+// indépendamment du stockage. Remis à 400j pour ne pas sacrifier "forme
+// récente" (le cas documenté le 29/09 : équipe éliminée tôt d'un cycle de Ligue
+// des Nations, CAN/Copa América entre 2 éditions) : le volume de lectures que ça
+// implique reste largement dans le quota gratuit Turso (500M lectures/mois,
+// projection ~134M/mois au pire soit ~27% — sans rapport avec la crise
+// d'ÉCRITURES déjà réglée le même jour, un quota séparé et 50x plus généreux).
+const DAYS_BACK_SPARSE    = 400
 const DAYS_FORWARD_SPARSE = 60
 
 function windowRange(slug) {
