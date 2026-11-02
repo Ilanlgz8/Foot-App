@@ -55,6 +55,20 @@ const ALLOWED_SLUGS = new Set([
   // suivi de près au bon moment — pas seulement TDC/CS, un vrai bug
   // préexistant révélé par cet ajout.
   'uefa.super_cup', 'fra.super_cup', 'eng.charity',
+  // ⚠️ AJOUT (02/11, BUG CRITIQUE TROUVÉ ET CORRIGÉ : ces 2 coupes ajoutées le
+  // 28/10 dans EXTRA_NOTIFY_SLUGS/DOMESTIC_CUP_SLUGS (espnSlugs.js) pour le
+  // suivi live côté Worker, mais JAMAIS ajoutées ici — même bug exact que
+  // celui documenté le 16/08 pour USC/TDC/CS (une liste séparée, jamais
+  // synchronisée). Conséquence bien plus grave cette fois : le mode `slugs`
+  // (batching multi-compétitions, voir plus bas) rejette l'INTÉGRALITÉ d'une
+  // requête groupée dès qu'UN SEUL slug de la liste n'est pas autorisé — pas
+  // seulement ce slug précis. Comme EXTRA_NOTIFY_SLUGS inclut ces 2 slugs à
+  // CHAQUE appel du Worker (today + yesterday, chaque minute), ÇA A CASSÉ LA
+  // DÉTECTION LIVE DE TOUTES LES COMPÉTITIONS (pas que Serie A/Bundesliga) —
+  // zéro notif but/carton/KO/mi-temps/fin pendant plusieurs jours (confirmé
+  // par /api/debug-push : `[espn:batch:DATE] status=400` sur CHAQUE passe,
+  // pour les 2 dates, en continu depuis le 28/10). Les 2 slugs manquants :
+  'ita.coppa_italia', 'ger.dfb_pokal',
 ])
 
 // ⚠️ HISTORIQUE (retour utilisateur : "Statistiques indisponibles" sur des

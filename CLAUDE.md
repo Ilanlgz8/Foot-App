@@ -6316,6 +6316,43 @@ cf-worker/
   compo compris) — à confirmer par l'utilisateur après ce déploiement
   (automatique via Vercel).
 
+- ✅ BUG CRITIQUE TROUVÉ ET CORRIGÉ : notifs but/carton/KO/mi-temps/fin totalement absentes pour
+  TOUTES les compétitions (pas seulement Serie A/Bundesliga) depuis le 28/10 (02/11, constat
+  utilisateur : "y'a eu quelques matchs hier soir, j'ai pas eu les notifs... et y'a eu 250 000
+  row write depuis hier soir" — dans le contexte de la migration du Worker Cloudflare vers un
+  nouveau compte Turso le même jour, ce qui a d'abord fait suspecter Turso à tort). Diagnostiqué
+  via un vrai `/api/debug-push?secret=...` plutôt que deviner : `logHistory` montrait
+  `[espn:batch:20261101] status=400` et `[espn:batch:20261102] status=400` À CHAQUE passe du
+  Worker (1x/minute), pour les 2 dates, en continu sur toute la fenêtre du log (90+ minutes) —
+  un taux d'échec de 100%, pas un aléa ESPN ponctuel. Root cause confirmée par lecture directe
+  du code : le 28/10 (ajout Coppa Italia/DFB-Pokal, voir plus haut), `DOMESTIC_CUP_SLUGS`/
+  `EXTRA_NOTIFY_SLUGS` (`src/data/espnSlugs.js`, consommé par le Worker pour construire
+  `slugDatePairs`) avaient bien reçu les 2 nouveaux slugs ESPN (`ita.coppa_italia`/
+  `ger.dfb_pokal`) — mais `ALLOWED_SLUGS` (`api/espn.js`, la liste blanche CÔTÉ SERVEUR,
+  séparée et jamais synchronisée automatiquement avec la première — même défaut structurel déjà
+  rencontré une fois le 16/08 pour USC/TDC/CS) n'avait PAS été mise à jour. Le mode `slugs`
+  (batching multi-compétitions du 02/10, `fetchEspnEventsBatch`) rejette l'INTÉGRALITÉ d'une
+  requête groupée (HTTP 400) dès qu'UN SEUL slug de la liste envoyée n'est pas dans
+  `ALLOWED_SLUGS` — pas seulement ce slug précis. Comme `EXTRA_NOTIFY_SLUGS` inclut ces 2 slugs
+  à CHAQUE appel du Worker (today + yesterday, chaque minute, pour toutes les compétitions
+  mélangées dans le même groupe par date), ça a cassé la détection ESPN de TOUT le Worker — zéro
+  événement récupéré pour AUCUNE compétition, donc zéro notif, depuis le 28/10 (plusieurs jours),
+  pas depuis "hier soir" comme le symptôme le suggérait au premier abord. Corrigé (`api/espn.js`,
+  `ALLOWED_SLUGS`) : les 2 slugs manquants ajoutés. Sur le volume d'écritures Turso signalé
+  (250k depuis la veille) : ce bug précis ne l'explique PAS — avec ce 400 systématique,
+  `allEvents` restait vide à chaque passe, donc la boucle de détection par match (qui écrit
+  `stateKey`/`trackKey`) ne s'exécutait jamais, le Worker tournait "à vide" et à moindre coût.
+  Honnêteté : la cause exacte des 250k écritures reste NON EXPLIQUÉE à ce stade — possiblement
+  le cache scoreboard ESPN côté Vercel (`espn_cache`, trafic visiteurs normal, chemin
+  indépendant de ce bug) ou un phénomène propre à la toute nouvelle base Turso (ex. délai de
+  réplication lecture-après-écriture) jamais confirmé ici faute d'accès au détail par table du
+  dashboard Turso — à surveiller après ce fix pour voir si le volume baisse une fois les vraies
+  notifs qui recommencent à circuler, ou si un 2e bug distinct reste actif. 398 tests + lint (35
+  erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés (ajout de données uniquement,
+  aucune logique touchée). Portée du fix : uniquement `api/espn.js`, se déploie automatiquement
+  avec le reste de l'app via Vercel — aucune action manuelle `cf-worker/` nécessaire pour CE fix
+  précis (le Worker lui-même n'a pas changé, c'est le serveur qu'il appelle qui était cassé).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
