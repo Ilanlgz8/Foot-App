@@ -72,6 +72,21 @@ export function createTursoKv({ url, authToken }) {
          id INTEGER PRIMARY KEY AUTOINCREMENT, queue_name TEXT NOT NULL,
          value TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER
        )`,
+      // ⚠️ AJOUT (02/11, confirmé via "Top Queries" du dashboard Turso, trié par
+      // rows read : la requête n°1 de la journée — le DELETE de ltrim — lisait
+      // 2,39M lignes pour seulement 876 appels, ~2730 lignes/appel en moyenne) —
+      // `worker_queue` n'avait AUCUN index hors de la clé primaire `id` : chaque
+      // requête filtrant sur `queue_name=?` (ltrim, expire, lpop — TOUTES les
+      // opérations de ce fichier sur cette table) forçait SQLite à parcourir la
+      // table ENTIÈRE pour trouver les lignes de cette file précise, coût
+      // proportionnel à la taille de la partition à chaque appel, pas à ce qui
+      // est réellement lu/modifié. Corrigé : index composite (queue_name, id) —
+      // couvre directement le filtre `queue_name=?` ET l'ordre `ORDER BY id
+      // ASC/DESC` déjà utilisé par lpop/ltrim, SQLite peut alors chercher
+      // directement les lignes de cette file sans scanner les autres. Sûr à
+      // 100% : `CREATE INDEX IF NOT EXISTS`, aucune migration de données,
+      // construit automatiquement par SQLite sur les lignes déjà présentes.
+      `CREATE INDEX IF NOT EXISTS idx_worker_queue_qn_id ON worker_queue(queue_name, id)`,
     ], 'write')
     try {
       await schemaReady

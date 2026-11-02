@@ -6705,6 +6705,43 @@ cf-worker/
   pré-existantes + 1 warning pré-existant, confirmés identiques) + build vérifiés. Portée :
   `api/espn.js` uniquement, déploiement automatique via Vercel.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : `worker_queue` (Turso, `cf-worker/`) sans AUCUN index
+  hors de sa clé primaire `id` (02/11, question directe de l'utilisateur sur le dashboard Turso,
+  onglet "Top Queries" trié par rows read : la requête n°1 de la journée — le DELETE de `ltrim`,
+  voir son historique du même jour juste au-dessus — lisait **2,39M lignes pour 876 appels**,
+  ~2730 lignes/appel en moyenne ; la n°2 (`UPDATE ... WHERE queue_name=? AND expires_at IS NULL`,
+  déjà la version CORRIGÉE le même jour du bug `expire()`) lisait encore 860,90K lignes pour 313
+  appels, ~2750/appel — la correction du 02/11 avait bien réglé les ÉCRITURES en trop (2,50K au
+  lieu de réécrire toute la file), mais pas du tout les LECTURES). Root cause confirmée par
+  lecture du schéma (`ensureSchema`, `tursoKv.js`) : `worker_queue` n'a que `id INTEGER PRIMARY
+  KEY AUTOINCREMENT` — AUCUN index sur `queue_name`, la colonne filtrée par absolument TOUTES les
+  opérations de cette table (`ltrim`, `expire`, `lpop`). Sans index, chaque requête force SQLite à
+  parcourir la table ENTIÈRE pour y trouver les quelques lignes de la file concernée
+  (`cron:goals:logHistory` ou `fd:warmPriority`) — un coût proportionnel à la taille de TOUTE la
+  table à chaque appel, peu importe que l'opération elle-même ne touche qu'une poignée de lignes.
+  `worker_kv`/`worker_set`, eux, n'ont jamais ce problème : leur clé primaire couvre déjà
+  exactement ce qui est filtré (`key` seul / `(set_name, member)`), confirmé par le reste du
+  classement "Top Queries" (aucune requête sur ces 2 tables n'apparaît dans le haut du
+  classement). Corrigé (`cf-worker/src/tursoKv.js`, `ensureSchema`) : `CREATE INDEX IF NOT
+  EXISTS idx_worker_queue_qn_id ON worker_queue(queue_name, id)` — couvre directement le filtre
+  `queue_name=?` partagé par les 3 opérations ET l'ordre `ORDER BY id ASC/DESC` déjà utilisé par
+  `lpop`/`ltrim`, SQLite peut alors chercher directement les lignes de la file concernée au lieu
+  de scanner toute la table. Sûr à 100% : ajout pur (`IF NOT EXISTS`), aucune migration de
+  données, construit automatiquement par SQLite/libSQL sur les lignes déjà présentes au premier
+  appel après déploiement. 398 tests + lint (36 problems inchangés — 35 erreurs pré-existantes +
+  1 warning pré-existant, confirmés identiques) + build + `npx wrangler deploy --dry-run`
+  (471,87 KiB, bundle généré sans erreur) vérifiés. Portée : uniquement `cf-worker/src/
+  tursoKv.js` — nécessite un `npm run deploy` MANUEL depuis `cf-worker/` pour prendre effet
+  (aucun déploiement automatique pour ce dossier, comme toujours). Honnêteté : comme pour tout
+  `cf-worker/`, aucun accès réseau réel depuis cet environnement pour exécuter ce SQL contre une
+  vraie base Turso avant déploiement — mais c'est, comme pour le diagnostic `expire()` du même
+  jour, une cause confirmée par une PREUVE DIRECTE et chiffrée du dashboard Turso lui-même (le
+  classement "Top Queries"), pas une théorie. À confirmer après déploiement en reconsultant ce
+  même classement : la requête `ltrim`/DELETE devrait chuter de plusieurs ordres de grandeur en
+  rows read (le gain devrait être visible dès la première heure suivant un match avec quelques
+  événements logués), sans affecter le comportement fonctionnel (même résultat final, juste
+  beaucoup moins de lignes parcourues pour y arriver).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
