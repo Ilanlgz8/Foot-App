@@ -6682,6 +6682,29 @@ cf-worker/
   depuis cet environnement) — si "Accueil"/"buteurs" restent lents malgré ce fix, une
   investigation dédiée sur ces 2 pages précises serait l'étape suivante.
 
+- ✅ Cache scoreboard ESPN sparse (NL/CAN/COPA/UEL/UECL/TDC/CS/USC) : `s-maxage` FIXE (90 puis 900)
+  → DYNAMIQUE, même jour (02/11, suite directe des 2 fixes précédents) : après le passage à
+  900s (15min) pour régler le pic de 3,8M lectures Turso/jour (voir l'entrée juste avant),
+  retour utilisateur immédiat et juste : "y'a pas besoin de refetch toutes les 5min [sic, 15min]
+  quand y'a pas de match en cours [...] toutes les heures stv mais pas h24" — un TTL fixe, même
+  allongé, reste aveugle à la vraie question : ces 8 compétitions ne jouent que par cycles
+  espacés, donc l'immense majorité du temps AUCUN événement de la fenêtre n'est réellement en
+  direct, et même 15min de cache est encore arbitrairement court pour rien dans ce cas. Corrigé
+  (`api/espn.js`, branche `chunks.length > 1`) : détection d'un VRAI match en direct dans
+  `merged.events` (déjà en main à cet instant, aucun fetch supplémentaire) — `isAnyEventLive`,
+  même table de statuts ESPN que `ESPN_STATUS_MAP`/`espnAdapter.js` (IN_PROGRESS/HALFTIME/1re-2e
+  mi-temps/prolongations/tirs au but, + `state:'in'` en filet générique) — si rien n'est en
+  direct, `scoreboardTtl = 3600` (1h) ; si un match tourne vraiment, `scoreboardTtl = 90`
+  (fraîcheur quasi temps réel, comme à l'origine avant le 1er fix du jour). `Cache-Control`
+  construit dynamiquement (`s-maxage=${scoreboardTtl}, stale-while-revalidate=${scoreboardTtl *
+  2}`) au lieu d'une valeur fixe. Honnêteté : ce mode ne sert de toute façon JAMAIS le direct
+  minute par minute (le score en temps réel passe par un mécanisme séparé, voir le commentaire
+  du fichier) — le cas "1h" ne dégrade donc rien de ce qui compte réellement pour l'utilisateur,
+  et la fenêtre de 400j (forme récente complète, décision du même jour) reste entièrement
+  intacte, aucun sacrifice de complétude. 398 tests + lint (36 problems inchangés — 35 erreurs
+  pré-existantes + 1 warning pré-existant, confirmés identiques) + build vérifiés. Portée :
+  `api/espn.js` uniquement, déploiement automatique via Vercel.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -1031,6 +1031,30 @@ export default async function handler(req, res) {
       // fetchScoreboardChunk, ça préserve le repli sur cache local périmé
       // déjà en place côté client (fetchEspnCompMatches, espnAdapter.js).
       if (!merged.ok) return res.status(502).json({ error: 'ESPN indisponible sur toutes les tranches' })
+      // ⚠️ AJOUT (02/11, retour utilisateur juste après le fix s-maxage=900 :
+      // "y'a pas besoin de refetch toutes les 5min [/15min] quand y'a pas de
+      // match en cours, toutes les heures stv mais pas h24") — exactement
+      // juste : un TTL FIXE ne distingue pas "une compétition sporadique qui
+      // ne joue littéralement pas aujourd'hui" (le cas 95% du temps pour
+      // NL/CAN/COPA/UEL/UECL/TDC/CS/USC) de "un match tourne en ce moment
+      // précis". `merged.events` est déjà en main à cet instant (aucun fetch
+      // supplémentaire) — on y cherche juste un statut ESPN réellement EN
+      // DIRECT (même table que ESPN_STATUS_MAP/espnAdapter.js : IN_PROGRESS/
+      // HALFTIME/1re-2e mi-temps/prolongations/tirs au but, + state:'in' en
+      // filet générique). Si RIEN n'est en direct → cache 1h (le calendrier
+      // d'une compétition qui ne joue pas aujourd'hui n'a aucune urgence à
+      // l'heure près) ; si un match tourne vraiment → on retombe sur 90s
+      // (fraîcheur quasi temps réel, comme avant ce fix).
+      const LIVE_ESPN_TYPE_NAMES = new Set([
+        'STATUS_IN_PROGRESS', 'STATUS_FIRST_HALF', 'STATUS_SECOND_HALF',
+        'STATUS_HALFTIME', 'STATUS_END_PERIOD', 'STATUS_EXTRA_TIME',
+        'STATUS_OVERTIME', 'STATUS_SHOOTOUT',
+      ])
+      const isAnyEventLive = merged.events.some(e => {
+        const type = e?.competitions?.[0]?.status?.type
+        return !!type && (LIVE_ESPN_TYPE_NAMES.has(type.name) || type.state === 'in')
+      })
+      const scoreboardTtl = isAnyEventLive ? 90 : 3600
       // ⚠️ AJOUT (21/09, demande explicite utilisateur — "si une seule
       // personne consulte l'app ça utilise trop de commandes Upstash") : le
       // kv.mget (voir readCachedChunks) réduit le coût PAR VISITEUR, mais ne
@@ -1061,31 +1085,35 @@ export default async function handler(req, res) {
       // nombre de visiteurs simultanés — un visiteur qui tombe sur un cache
       // Edge HIT ne déclenche même plus l'exécution de cette fonction,
       // donc zéro commande Redis ET zéro CPU Vercel pour lui.
-      // ⚠️ `s-maxage` 90 → 900 (02/11, constat utilisateur : "les row reads
-      // Turso augmentent beaucoup trop, 3,8M") : calcul fait en reprenant
-      // EXACTEMENT ce mécanisme — DAYS_BACK_SPARSE=400 (revert du même jour)
-      // + DAYS_FORWARD_SPARSE=60 donne jusqu'à ~460 clés scannées par
-      // `readCachedChunks`/mget à CHAQUE exécution réelle de cette branche.
-      // À 90s, le plancher théorique (même avec CE cache Edge qui fonctionne
-      // parfaitement) est de 86400/90 = 960 exécutions/jour × 8 compétitions
-      // sporadiques × 460 clés ≈ 3,53M lectures Turso/JOUR — qui colle
-      // précisément au chiffre observé. Ce n'est PAS un effet des 3
-      // changements buteurs faits juste avant (api/football.js, Redis
-      // Upstash — un système totalement séparé de Turso, aucun rapport),
-      // mais bien du retour à 400j décidé plus tôt dans cette même
-      // conversation. Ce mode ne sert JAMAIS le direct (le score en temps
-      // réel passe par un mécanisme séparé, voir le commentaire plus haut) —
-      // rien n'empêche de le garder en cache bien plus longtemps SANS
-      // sacrifier la largeur de fenêtre voulue (qui doit rester 400j pour
-      // que "forme récente" reste complète, demande explicite plus tôt).
-      // 900s (15min) ramène le plancher à 86400/900=96 exécutions/jour × 8 ×
-      // 460 ≈ 353k lectures/jour (~10,6M/mois) — une division par ~10, sans
-      // toucher à la complétude de la donnée, juste à la fréquence de son
-      // recalcul (une compétition qui ne joue que par cycles espacés n'a de
-      // toute façon aucune urgence à 15min près).
+      // ⚠️ `s-maxage` FIXE (90, puis 900) → DYNAMIQUE (02/11, 2 constats
+      // utilisateur à la suite : "les row reads Turso augmentent beaucoup
+      // trop, 3,8M", puis "y'a pas besoin de refetch toutes les 5min quand
+      // y'a pas de match en cours, toutes les heures mais pas h24"). Calcul
+      // du 1er fix, toujours valable pour comprendre l'ampleur : avec
+      // DAYS_BACK_SPARSE=400 + DAYS_FORWARD_SPARSE=60, `readCachedChunks`/
+      // mget scanne jusqu'à ~460 clés à CHAQUE exécution réelle de cette
+      // branche — à 90s fixe, ça donnait un plancher théorique de
+      // 86400/90=960 exécutions/jour × 8 compétitions sporadiques × 460 ≈
+      // 3,53M lectures Turso/JOUR, qui collait exactement au chiffre
+      // observé (confirmé AUCUN rapport avec les changements buteurs du même
+      // jour, qui passent par Redis Upstash, un système séparé). Un TTL fixe
+      // à 15min aurait divisé ça par 10 mais restait aveugle à la vraie
+      // question : CES compétitions (NL/CAN/COPA/UEL/UECL/TDC/CS/USC) ne
+      // jouent que par cycles espacés — 95%+ du temps, AUCUN de leurs
+      // événements dans la fenêtre n'est réellement en direct, donc même
+      // 15min de cache est encore arbitrairement court pour rien. Corrigé
+      // en détectant un VRAI match en direct dans `merged.events` (déjà en
+      // main, aucun fetch en plus — `isAnyEventLive` ci-dessus) : si rien ne
+      // tourne → 1h de cache (le calendrier d'une compétition qui ne joue
+      // pas aujourd'hui n'a aucune urgence à l'heure près) ; si un match
+      // tourne vraiment → 90s (fraîcheur quasi temps réel, comme à
+      // l'origine). Ce mode ne sert de toute façon JAMAIS le direct minute
+      // par minute (voir le commentaire plus haut) — le cas "1h" ne dégrade
+      // donc rien de ce qui compte réellement, et la fenêtre de 400j reste
+      // entièrement intacte (aucun sacrifice sur la complétude).
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
-        .setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800')
+        .setHeader('Cache-Control', `public, s-maxage=${scoreboardTtl}, stale-while-revalidate=${scoreboardTtl * 2}`)
         .json({ events: merged.events })
     }
 
