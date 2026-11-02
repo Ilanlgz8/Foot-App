@@ -6962,6 +6962,56 @@ cf-worker/
   vraie virtualisation (même principe que les posters Accueil, voir leur historique du 27/10)
   resterait l'étape suivante si ce fix ne suffit pas entièrement ; à confirmer par l'utilisateur.
 
+- ✅ Classement buteurs LDC "Veuillez patienter" : LE FIX `live=0` DU MATIN NE COUVRAIT PAS LE VRAI
+  CAS, root cause réelle trouvée et corrigée (02/11, retour utilisateur direct et juste après
+  test réel : "le problème, c'est que quand tu l'ouvres la première fois, il n'y a pas de cache
+  [...] j'ai même pas réussi à afficher les buteurs [...] faut que ça marche tout le temps [...]
+  sans bombarder les requêtes [...] faut vraiment creuser") — honnêteté d'abord : le fix précédent
+  (repli sur la clé Redis SANS `live=0` avant de taper le budget) ne pouvait structurellement pas
+  aider ici, et ne s'appliquait même pas à ce cas précis. `live=0` n'est ajouté que quand
+  `hasMatchToday` est FAUX (`useScorers.js`) — la Ligue des Champions, en pleine journée de
+  matchs au moment du test, n'avait jamais ce flag : la requête tapait directement la clé
+  "normale" (TTL serveur 5min, `api/football.js getTtl`), une clé qui, de l'aveu même de
+  l'utilisateur ("la première fois... il n'y a pas de cache"), n'avait JAMAIS été écrite par
+  personne auparavant — un vrai cold-cache, structurellement impossible à combler par n'importe
+  quelle astuce de repli de clé (on ne peut pas servir une copie stale d'une donnée qui n'a
+  jamais existé). Root cause réelle : dans ce cas précis, `api/football.js` n'a RIEN à servir si
+  le budget/minute partagé (`MINUTE_CAP=10`, TOUTE l'app, tous utilisateurs confondus) est déjà
+  consommé par d'autres trafics à cet instant — il répond alors un vrai 429 (`Retry-After: 15`,
+  voir `DOWN_TTL`), par construction, pour protéger le compte FD.org d'une nouvelle suspension
+  (historique de plusieurs incidents réels déjà documenté dans ce fichier). L'ancien calendrier
+  de retry côté client (`useScorers.js`, `retry: 2`, 8s puis 16s, 24s de patience totale) :
+  (1) ignorait complètement le `Retry-After` renvoyé par le serveur — pouvait retenter AVANT que
+  le serveur ait dit que c'était utile, gâchant une tentative pour rien ; (2) abandonnait bien
+  avant que le budget d'1 minute ait eu la moindre chance de se renouveler ou qu'un éventuel
+  circuit breaker (70s pour un vrai 429, voir `DOWN_TTL`) ne se termine. Corrigé en 2 temps,
+  SANS jamais toucher à `MINUTE_CAP` (risque de suspension déjà documenté à de multiples
+  reprises, jamais fait sans accord explicite) : (1) `tryFetch` (`useScorers.js`) capture
+  désormais le header `Retry-After` d'une réponse 429/403 et l'attache à l'erreur jetée
+  (`err.retryAfterMs`) — jusqu'ici jeté sans jamais être lu ; (2) `retry`/`retryDelay` du
+  `useQuery` : 2→4 tentatives, et chaque délai devient `Math.max(calendrier fixe [8s,16s,30s,45s],
+  retryAfterMs + 2s)` — n'attend donc JAMAIS moins que ce que le serveur a explicitement demandé
+  (zéro tentative gâchée par anticipation, donc toujours au moins aussi respectueux du budget
+  qu'avant, jamais plus agressif), mais continue d'essayer sur une fenêtre totale d'environ
+  90-110s — largement au-delà du cycle de renouvellement du budget (60s) et du circuit breaker
+  429 (70s), donc le cas le plus fréquent (simple contention passagère sur un budget partagé, pas
+  un vrai blocage) finit maintenant presque toujours par réussir au lieu d'abandonner à 24s. 398
+  tests + lint (36 problems inchangés — 35 erreurs pré-existantes + 1 warning, confirmés
+  identiques) + build vérifiés. Honnêteté totale, comme demandé explicitement par l'utilisateur :
+  un vrai blocage 403 prolongé (anti-abus FD.org, 300s/5min, voir `DOWN_TTL_FORBIDDEN` — un
+  scénario RARE et distinct d'une simple contention de budget, qui n'est plus survenu depuis la
+  correction de la vraie faille de sécurité du 28/09) peut encore dépasser cette fenêtre de
+  patience de ~110s ; dans ce cas précis et rare, aucune solution honnête ne peut garantir un
+  succès sans soit faire attendre l'utilisateur en silence pendant 5 minutes complètes (mauvaise
+  UX, pas acceptable), soit relever `MINUTE_CAP` (risque réel de suspension de compte, jamais pris
+  sans l'accord explicite de l'utilisateur après mise en garde). Le fix `live=0`/repli de clé du
+  matin même reste utile et en place (il couvre un AUTRE vrai cas : une compétition sans match
+  aujourd'hui, dont le cache avait existé puis expiré sous l'ancienne clé) — les deux corrections
+  sont complémentaires, pas contradictoires. Rendu/comportement jamais revu en direct sur un vrai
+  cold-cache après ce déploiement (aucun moyen de forcer un vrai état "jamais consulté" côté
+  serveur depuis cet environnement) — à confirmer par l'utilisateur sur sa prochaine compétition
+  jamais ouverte.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

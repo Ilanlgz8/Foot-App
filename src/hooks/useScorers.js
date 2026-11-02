@@ -123,7 +123,23 @@ export async function fetchScorersData(compId, delayMs = 0, hasMatchToday = true
     const fetchPromise = fdFetch(fdUrl(url))
     registerFdCallAttempt(fetchPromise.then(resp => !resp.headers.get('X-Cache')).catch(() => false))
     const r = await fetchPromise
-    if (r.status === 429 || r.status === 403) throw new Error(String(r.status))
+    if (r.status === 429 || r.status === 403) {
+      // ⚠️ AJOUT (02/11, suite directe du constat utilisateur "la première
+      // fois qu'on ouvre un classement buteurs jamais consulté, il n'y a
+      // AUCUN cache possible — ça doit quand même marcher, sans bombarder")
+      // — api/football.js répond déjà avec un en-tête `Retry-After` (15s pour
+      // un budget/minute épuisé, le cas le plus fréquent — voir son
+      // commentaire sur DOWN_TTL) : jusqu'ici cette info était jetée, et le
+      // client retentait selon un calendrier FIXE (8s/16s) choisi à l'aveugle,
+      // parfois AVANT que le serveur n'ait dit que c'était utile. On la lit et
+      // on l'attache à l'erreur pour que `retryDelay` (plus bas) puisse
+      // attendre AU MOINS ce que le serveur demande — jamais moins, donc
+      // jamais une retentative gâchée par anticipation.
+      const err = new Error(String(r.status))
+      const retryAfterS = Number(r.headers.get('Retry-After'))
+      if (Number.isFinite(retryAfterS) && retryAfterS > 0) err.retryAfterMs = retryAfterS * 1000
+      throw err
+    }
     const fresh = !r.headers.get('X-Cache')
     if (!r.ok) throw new Error(String(r.status))
     const j = await r.json()
@@ -205,8 +221,43 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     // serveur dure ~7,5s (SPACING_MS = 60000/MINUTE_CAP, voir api/football.js).
     // Retenter plus tôt retomberait dans le même verrou et gâcherait l'essai
     // sans rien tenter de réel.
-    retry: 2,
-    retryDelay: attempt => 8_000 * (attempt + 1),
+    // ⚠️ RETRY ÉTENDU (02/11, constat utilisateur après le fix `live=0`
+    // ci-dessus, qui ne couvrait qu'un cas précis : "quand tu l'ouvres la
+    // première fois, il n'y a pas de cache [...] faut que ça marche tout le
+    // temps [...] sans bombarder les requêtes [...] faut vraiment creuser").
+    // Root cause réelle, différente du fix précédent : pour une clé VRAIMENT
+    // jamais vue (aucune copie stale possible, ni sous l'ancienne ni sous la
+    // nouvelle clé — le cas exact que l'utilisateur a testé), api/football.js
+    // n'a structurellement RIEN à servir si le budget/minute partagé (10
+    // req/min, TOUTE l'app, voir MINUTE_CAP) est déjà consommé à cet instant
+    // précis par le trafic d'autres utilisateurs — il répond alors un vrai
+    // 429 (`Retry-After: 15`), par design, pour protéger le compte FD.org
+    // d'une nouvelle suspension (historique de plusieurs incidents réels,
+    // voir CLAUDE.md). AUCUNE astuce de cache ne peut combler un vide qui
+    // n'a encore jamais été rempli une seule fois — seule la PATIENCE peut.
+    // L'ancien calendrier (2 tentatives, 8s puis 16s, 24s de patience totale)
+    // abandonnait largement avant que le budget d'1 minute ait eu le temps
+    // de se renouveler. Corrigé : jusqu'à 4 tentatives, chacune attendant AU
+    // MOINS ce que le serveur a demandé (`retryAfterMs`, voir tryFetch
+    // ci-dessus, +2s de marge) plutôt qu'un délai fixe choisi à l'aveugle —
+    // ne retente jamais plus vite que ce que le serveur dit nécessaire (donc
+    // ne bombarde jamais plus qu'avant, juste plus intelligemment), mais
+    // continue d'essayer sur une fenêtre totale d'environ 90-110s — largement
+    // au-delà du cycle de 60s du budget/minute (donc le cas le plus courant,
+    // simple contention passagère, finit presque toujours par réussir) et du
+    // circuit breaker 429 (70s, voir DOWN_TTL). Honnêteté : un vrai blocage
+    // 403 prolongé (anti-abus FD.org, 300s/5min, voir DOWN_TTL_FORBIDDEN —
+    // scénario rare, distinct d'une simple contention de budget) peut encore
+    // dépasser cette fenêtre de patience ; dans ce cas précis, impossible de
+    // garantir un succès sans soit attendre 5 minutes en silence (mauvaise
+    // UX), soit relever MINUTE_CAP (risque de suspension déjà documenté à
+    // plusieurs reprises, jamais fait sans accord explicite de l'utilisateur).
+    retry: 4,
+    retryDelay: (attempt, error) => {
+      const serverHint = Number(error?.retryAfterMs) || 0
+      const base = [8_000, 16_000, 30_000, 45_000][attempt] ?? 45_000
+      return Math.max(base, serverHint + 2_000)
+    },
     enabled: !!compId,
   })
 
