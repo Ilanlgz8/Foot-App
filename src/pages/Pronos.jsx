@@ -23,7 +23,7 @@
  * Identité : deviceId + pseudo persistés en localStorage (usePronosGroup),
  * aucune donnée sensible, groupe rejoint via un code à 6 caractères.
  */
-import { useState, useEffect, useMemo, useRef, useCallback, memo, useTransition } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, memo, useTransition, useDeferredValue } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
@@ -825,13 +825,40 @@ function Pronos() {
     return map
   }, [finishedAll])
 
+  // ⚠️ useDeferredValue (02/11, constat utilisateur : "j'arrive même plus à
+  // revenir dans Accueil [...] obligé de fermer l'appli") — symptôme lié
+  // mais DISTINCT du fix React.memo/useTransition plus haut : ce calcul-ci
+  // (Poisson+H2H sur TOUS les matchs terminés affichés, toutes compétitions
+  // confondues) tourne au niveau de Pronos() LUI-MÊME, pas par ligne — ni le
+  // memo sur MatchPredictRow ni le useTransition des clics d'onglet ne le
+  // protègent. Il se redéclenche à CHAQUE poll d'arrière-plan
+  // (matchesByComp/formMapByComp changent de référence dès qu'UNE SEULE des
+  // ~16 compétitions suivies refetch, y compris les 8 compétitions ESPN
+  // sporadiques qui pollent toutes les 15-30s, voir useTeamForm.js) — y
+  // compris quand l'utilisateur ne fait QUE regarder la page, sans rien
+  // cliquer. Si ce recalcul tombe pile au moment d'un clic (changer
+  // d'onglet, ou même appuyer sur "Accueil" dans la navbar), React le
+  // traite par défaut en priorité normale (synchrone) : le clic reste bloqué
+  // derrière jusqu'à la fin du calcul. `useDeferredValue` indique à React
+  // que ce calcul peut utiliser une version légèrement EN RETARD de ses
+  // entrées plutôt que la toute dernière — React peut alors le reporter en
+  // tâche de fond, interruptible par un clic, au lieu de geler le thread
+  // principal pendant toute sa durée. Combiné au cache buildGoalModel/H2H
+  // (calcProno.js, même jour, qui réduit déjà fortement le coût brut de ce
+  // calcul), les deux changements s'additionnent : moins de travail, ET ce
+  // travail ne bloque plus jamais une interaction urgente.
+  const deferredFinishedAll    = useDeferredValue(finishedAll)
+  const deferredFormMapByComp  = useDeferredValue(formMapByComp)
+  const deferredMatchesByComp  = useDeferredValue(matchesByComp)
+  const deferredLowerDivByComp = useDeferredValue(lowerDivByComp)
+
   // % 1/N/2 (calcProno) par match terminé, pour scorer avec le même barème
   // que celui affiché avant le match (voir computePoints).
   const pronoByMatchId = useMemo(() => {
     const map = {}
-    finishedAll.forEach(m => { map[String(m.id)] = matchProno(m, formMapByComp, matchesByComp, lowerDivByComp) })
+    deferredFinishedAll.forEach(m => { map[String(m.id)] = matchProno(m, deferredFormMapByComp, deferredMatchesByComp, deferredLowerDivByComp) })
     return map
-  }, [finishedAll, formMapByComp, matchesByComp, lowerDivByComp])
+  }, [deferredFinishedAll, deferredFormMapByComp, deferredMatchesByComp, deferredLowerDivByComp])
 
   const leaderboard = useMemo(() => {
     return Object.entries(players)

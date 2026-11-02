@@ -7012,6 +7012,79 @@ cf-worker/
   serveur depuis cet environnement) — à confirmer par l'utilisateur sur sa prochaine compétition
   jamais ouverte.
 
+- ✅ Retry scorers encore "90-110s c'est hyper lent" + Pronos "j'arrive même plus à revenir dans
+  Accueil, obligé de fermer l'appli" — 2 fixes séparés le même jour (02/11, retour utilisateur
+  immédiat après le fix précédent) :
+  1. **Scorers, vraie cause du calendrier trop lent** : le fix du matin (retry adaptatif honorant
+     `Retry-After`) avait un bug de logique inversé — `retryDelay: Math.max(base, serverHint)`
+     avec `base` démarrant à 8000ms, donc même quand le serveur annonçait "réessaie dans 1s" (le
+     cas le PLUS fréquent, voir point 2), le client attendait quand même au moins 8s PAR
+     CONSTRUCTION — le plancher artificiel écrasait systématiquement un hint serveur court.
+  2. **Root cause du "quasi toujours 8-16s" côté serveur** (`api/football.js`) : l'en-tête
+     `Retry-After` envoyé en cas de budget épuisé était un **"15" FIXE et DEVINÉ**, sans aucun
+     rapport avec le vrai état Redis — menteur dans les 2 sens : le cas le plus fréquent (verrou
+     d'espacement `SPACING_MS`, 6s max, voir `reserveQuota`) a un vrai temps restant presque
+     toujours bien plus court que 15s (d'où la lenteur perçue comme systématique) ; le cas le plus
+     grave (circuit breaker `downKey`, un vrai 429/403 de FD.org, jusqu'à 300s) a un vrai temps
+     restant parfois bien PLUS LONG que 15s (annoncer 15s dans ce cas faisait retenter bien trop
+     tôt pour rien). Corrigé (`computeRetryAfterSeconds`, nouvelle fonction) : lit le VRAI état
+     Redis avant de répondre — `redis.ttl(downKey)` si bloqué par le circuit breaker (temps réel,
+     parfois 300s, honnête même si long) ; sinon compare le compteur réel de la minute en cours à
+     `MINUTE_CAP` (si atteint → temps réel jusqu'au début de la minute suivante, 1 à 60s) et le
+     PTTL réel du verrou d'espacement (`fd:quota:spacing`, 6s max) — retourne le plus pertinent des
+     deux au lieu d'un "15" arbitraire. Côté client (`useScorers.js`) : `retryDelay` fait désormais
+     CONFIANCE directement à ce hint serveur (`Math.max(500, serverHint)`, plancher minimal pour
+     ne jamais marteler à 0ms) au lieu de l'écraser avec un calendrier fixe — un calendrier court
+     ([1s, 3s, 6s, 10s]) ne sert plus que de repli pour une erreur SANS hint (coupure réseau, pas
+     un vrai 429/403 de notre proxy). Résultat honnête : le cas courant (simple contention
+     passagère) se résout maintenant en 1 à quelques secondes au lieu de 8-16s minimum, au plus
+     proche de "la seconde" honnêtement atteignable sans toucher à `MINUTE_CAP` ; le cas rare (403
+     anti-abus FD.org, jusqu'à 5min) reste honnêtement annoncé comme long plutôt que menti à 15s —
+     aucune promesse de "toujours sous 1s à 100%" n'est faite, ce serait faux tant que le budget
+     partagé existe.
+  3. **Pronos "j'arrive même plus à revenir dans Accueil"** — symptôme DIFFÉRENT du fix React.memo
+     du matin (qui protégeait les RE-renders d'une ligne déjà montée, pas le coût du calcul
+     lui-même). Root cause confirmée par lecture de `calcProno.js` : `buildGoalModel(compMatches)`
+     (balayage COMPLET de toute la saison d'une compétition, 300-400+ matchs) et `directMeetings`
+     (même balayage complet pour en extraire 2 équipes précises) étaient appelés UNE FOIS PAR
+     MATCH AFFICHÉ (`matchProno` → `calcPronoAdvanced`) — pour N matchs d'une même compétition
+     affichés dans la liste (jusqu'à plusieurs dizaines sur 7j × 16 compétitions), le MÊME balayage
+     de saison, pour un résultat strictement IDENTIQUE, était refait N FOIS — un gaspillage pur,
+     recalculé en plus à CHAQUE poll (15-30s pour les compétitions ESPN sporadiques, voir
+     `useTeamForm.js`) même sans que l'utilisateur ne clique sur rien. Corrigé (`calcProno.js`) :
+     `buildGoalModelCached`/`getH2HIndex`, 2 caches `WeakMap` keyés par la RÉFÉRENCE du tableau
+     `compMatches` — le même tableau (même référence, stable tant que cette compétition précise
+     n'a pas réellement refetché, voir `useTeamFormMulti`) renvoie désormais le résultat déjà
+     calculé au lieu de rebalayer toute la saison ; `directMeetings` passe d'un balayage complet à
+     une lecture O(1) dans un index équipe-paire → matchs construit une seule fois par tableau.
+     Transparent pour TOUS les appelants (Accueil, MatchPoster, Pronos) — aucune signature changée,
+     résultat identique (78 tests `calcProno.test.js` toujours verts sans modification). En plus de
+     ça, un 2e mécanisme DISTINCT trouvé au niveau de `Pronos.jsx` lui-même : `pronoByMatchId`
+     (Poisson+H2H sur TOUS les matchs terminés affichés, toutes compétitions confondues) tourne au
+     niveau du composant PAGE, pas par ligne — ni le memo sur `MatchPredictRow` ni le
+     `useTransition` des clics d'onglet (ajoutés le matin même) ne le protègent, puisqu'il se
+     redéclenche à chaque poll d'arrière-plan de N'IMPORTE LAQUELLE des ~16 compétitions suivies,
+     même pendant que l'utilisateur ne fait que regarder la page. Si ce recalcul tombe pile au
+     moment d'un clic (changer d'onglet, ou même appuyer sur "Accueil" dans la navbar), React le
+     traite par défaut en priorité SYNCHRONE — le clic reste bloqué derrière jusqu'à la fin du
+     calcul, collant exactement au symptôme "ça fait rien, obligé de fermer l'appli". Corrigé :
+     `useDeferredValue` sur les 4 entrées de ce calcul (`finishedAll`/`formMapByComp`/
+     `matchesByComp`/`lowerDivByComp`) — indique à React que ce calcul peut utiliser une version
+     légèrement en retard de ses entrées plutôt que la toute dernière, donc React peut le reporter
+     en tâche de fond, interruptible par un clic, au lieu de geler le thread principal pendant
+     toute sa durée. Les 2 fixes s'additionnent : moins de travail brut (cache), ET ce travail ne
+     bloque plus jamais une interaction urgente (deferred). 398 tests (inchangé, 78 sur
+     `calcProno.test.js` confirment un résultat identique après mise en cache) + lint (36 problems,
+     35 erreurs pré-existantes + 1 warning, baseline inchangée) + build vérifiés. Honnêteté : je
+     n'ai aucun accès à un vrai iPhone/PWA depuis cet environnement pour mesurer un temps de
+     blocage réel avant/après (ni pour confirmer que le symptôme "obligé de redémarrer l'appli" est
+     entièrement réglé, pas seulement atténué) — le diagnostic (balayage de saison redondant
+     confirmé par lecture directe du code, calcul au niveau page non protégé par les 2 fixes du
+     matin) est solide et les 2 changements sont standards/documentés pour ce type de symptôme
+     (memoization par référence, `useDeferredValue` pour une liste lourde), mais à confirmer par
+     l'utilisateur sur son prochain usage réel de la page Pronos avec plusieurs compétitions
+     actives en même temps.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -137,6 +137,44 @@ async function reserveQuota(redis) {
   } catch { return true }
 }
 
+// ⚠️ AJOUT (02/11, constat utilisateur : "90 à 110 secondes c'est hyper lent
+// [...] je veux que ça s'affiche dans la seconde") — l'ancien Retry-After
+// était un "15" FIXE, sans aucun rapport avec le VRAI temps d'attente. Or ce
+// chiffre est exactement ce que le client (useScorers.js, voir son
+// commentaire) utilise pour décider combien de temps patienter avant de
+// retenter — un flat 15s ment dans les 2 sens : (1) le cas le PLUS fréquent
+// est le verrou d'espacement (SPACING_MS, 6s max, voir reserveQuota) déjà
+// presque écoulé — le vrai temps restant est souvent BEAUCOUP plus court que
+// 15s, d'où la lenteur perçue à tort comme systématique ; (2) le cas le PLUS
+// grave est le circuit breaker (downKey, un vrai 429/403 de FD.org) dont le
+// vrai TTL peut aller jusqu'à 300s (DOWN_TTL_FORBIDDEN) — annoncer 15s dans
+// CE cas fait retenter bien trop tôt, pour rien. Honnête dans les 2 sens :
+// lit le VRAI état Redis plutôt que de deviner.
+async function computeRetryAfterSeconds(redis, downBlocked, downKey) {
+  if (!redis) return 15
+  try {
+    if (downBlocked) {
+      const ttl = await redis.ttl(downKey)
+      return Number.isFinite(ttl) && ttl > 0 ? ttl : 15
+    }
+    const now       = new Date()
+    const minuteKey = `fd:quota:${now.toISOString().slice(0, 16)}`
+    const [countRaw, spacingPttl] = await Promise.all([
+      redis.get(minuteKey),
+      redis.pttl('fd:quota:spacing'),
+    ])
+    const count = Number(countRaw) || 0
+    // Plafond/minute atteint : le vrai temps d'attente est jusqu'au début de
+    // la minute SUIVANTE (le compteur repart à 0), peu importe l'état du
+    // verrou d'espacement — qui, lui, peut déjà être libre entre-temps.
+    if (count >= MINUTE_CAP) return Math.max(1, 60 - now.getUTCSeconds())
+    // Sinon, seul le verrou d'espacement bloque — son vrai temps restant
+    // (quelques secondes au plus).
+    if (Number.isFinite(spacingPttl) && spacingPttl > 0) return Math.max(1, Math.ceil(spacingPttl / 1000))
+    return 2  // aucun des 2 compteurs ne semble réellement bloquer (race) → court repli
+  } catch { return 15 }
+}
+
 function getTtl(fdPath, qs) {
   if (qs.includes('status=IN_PLAY') || qs.includes('status=PAUSED')) return 0
   if (/^\/v4\/matches\/\d+$/.test(fdPath) && !qs) return 3600         // détail FT — 1h
@@ -370,7 +408,8 @@ export default async function handler(req, res) {
     // plus utile qu'une erreur ou une attente bloquante.
     if (redis) {
       let blocked = false
-      try { blocked = !!(await redis.get(downKey)) } catch {}
+      let downBlocked = false
+      try { downBlocked = !!(await redis.get(downKey)); blocked = downBlocked } catch {}
       if (!blocked) blocked = !(await reserveQuota(redis))
       if (blocked) {
         try {
@@ -396,9 +435,14 @@ export default async function handler(req, res) {
         // mieux vaut un message "réessaie dans un instant" (déjà géré
         // partout côté client, voir fetchErrors.js RATE_LIMITED_MESSAGE)
         // qu'un risque réel de nouvelle suspension de compte.
+        // Retry-After désormais calculé sur le VRAI état Redis (voir
+        // computeRetryAfterSeconds) plutôt qu'un "15" fixe — le client
+        // (useScorers.js) s'appuie dessus pour ne jamais retenter trop tôt
+        // NI trop tard.
+        const retryAfterSec = await computeRetryAfterSeconds(redis, downBlocked, downKey)
         return res
           .status(429)
-          .setHeader('Retry-After', '15')
+          .setHeader('Retry-After', String(retryAfterSec))
           .json({ error: 'Budget football-data.org temporairement épuisé' })
       }
     }

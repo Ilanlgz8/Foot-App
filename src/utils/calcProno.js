@@ -342,6 +342,74 @@ function buildGoalModel(compMatches) {
   return { per, leagueAvgHome: leagueHomeGoals / counted, leagueAvgAway: leagueAwayGoals / counted }
 }
 
+// ⚠️ CACHE AJOUTÉ (02/11, constat utilisateur Pronos.jsx : "j'arrive même
+// plus à revenir dans Accueil [...] gros problème d'optimisation [...] avec
+// tous les matchs") — root cause confirmée par lecture du code : Pronos.jsx
+// (et Accueil/MatchPoster) appellent calcPronoAdvanced UNE FOIS PAR MATCH
+// AFFICHÉ, qui appelle buildGoalModel(compMatches) — un balayage COMPLET de
+// toute la saison de la compétition (souvent 300-400+ matchs). Pour une
+// compétition qui affiche N matchs dans la liste (jusqu'à plusieurs dizaines
+// sur une fenêtre de 7 jours × 16 compétitions), le MÊME balayage de saison
+// était refait N FOIS pour un résultat strictement IDENTIQUE à chaque fois
+// (buildGoalModel ne dépend que de `compMatches`, jamais du match précis) —
+// un gaspillage pur, proportionnel au nombre de lignes affichées, recalculé
+// en plus à CHAQUE poll (toutes les 15-30s pour les compétitions ESPN
+// sporadiques, voir useTeamForm.js) même quand l'utilisateur ne fait que
+// regarder la page sans rien cliquer.
+// Mise en cache par RÉFÉRENCE du tableau `compMatches` (WeakMap) : le même
+// tableau (même référence) donne désormais le même résultat SANS refaire le
+// balayage — et comme ce tableau garde la MÊME référence tant que les
+// données de CETTE compétition précise n'ont pas réellement été refetchées
+// (voir useTeamFormMulti/useLowerDivisionStatsMulti : `byComp[code] =
+// results[i]?.data`, assigné depuis react-query, stable hors refetch —
+// même principe déjà exploité par le comparateur React.memo de
+// MatchPredictRow), le cache s'invalide tout seul, naturellement, dès qu'un
+// vrai nouveau résultat arrive — jamais de donnée périmée servie par erreur.
+// Transparent pour TOUS les appelants existants (Accueil, MatchPoster,
+// Pronos) : aucune signature changée, juste le point d'entrée interne
+// `buildGoalModel` remplacé par cette version cachée dans calcPronoAdvanced/
+// getGoalExpectancy ci-dessous.
+const goalModelCache = new WeakMap()
+function buildGoalModelCached(compMatches) {
+  if (!compMatches) return null
+  if (goalModelCache.has(compMatches)) return goalModelCache.get(compMatches)
+  const model = buildGoalModel(compMatches)
+  goalModelCache.set(compMatches, model)
+  return model
+}
+
+// Même principe pour directMeetings (confrontations directes) : au lieu de
+// rebalayer TOUTE la saison à CHAQUE match pour n'en extraire que les
+// quelques confrontations entre 2 équipes précises, un INDEX (paire
+// d'équipes → liste de leurs matchs) est construit UNE SEULE FOIS par
+// tableau `compMatches` (même cache par référence, WeakMap), puis chaque
+// appel ne fait plus qu'une lecture O(1) dans cet index suivie d'un petit
+// comptage sur une poignée de matchs (jamais toute la saison).
+const h2hIndexCache = new WeakMap()
+function pairKey(idA, idB) {
+  const a = String(idA), b = String(idB)
+  return a < b ? `${a}_${b}` : `${b}_${a}`
+}
+function buildH2HIndex(compMatches) {
+  const index = new Map()
+  ;(compMatches ?? []).forEach(m => {
+    if (m.status !== 'FINISHED') return
+    const hid = m.homeTeam?.id, aid = m.awayTeam?.id
+    if (hid == null || aid == null) return
+    const key = pairKey(hid, aid)
+    if (!index.has(key)) index.set(key, [])
+    index.get(key).push(m)
+  })
+  return index
+}
+function getH2HIndex(compMatches) {
+  if (!compMatches) return new Map()
+  if (h2hIndexCache.has(compMatches)) return h2hIndexCache.get(compMatches)
+  const index = buildH2HIndex(compMatches)
+  h2hIndexCache.set(compMatches, index)
+  return index
+}
+
 function clampLambda(l) {
   if (!Number.isFinite(l) || l <= 0) return 1
   return Math.min(5, Math.max(0.15, l))  // évite les extrêmes irréalistes sur petit échantillon
@@ -513,7 +581,7 @@ function computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches)
 // (même logique que "Total buts" côté ESPN, voir useMatchDetail.js).
 export function getGoalExpectancy(homeId, awayId, compMatches, opts = {}) {
   if (homeId == null || awayId == null) return null
-  const goalModel = buildGoalModel(compMatches)
+  const goalModel = buildGoalModelCached(compMatches)
   if (!goalModel) return null
   return computeLambdas(goalModel, homeId, awayId)
     ?? computeLambdasWithPromotion(goalModel, homeId, awayId, opts.lowerDivMatches)
@@ -627,11 +695,15 @@ export function scorerOddsPct(scorer, allScorers) {
 // appel réseau) — utilisées comme léger correctif, pas comme source
 // principale (échantillon quasi toujours petit : 0 à quelques matchs).
 function directMeetings(compMatches, homeId, awayId) {
+  // ⚠️ OPTIMISÉ (voir getH2HIndex ci-dessus) : au lieu de rebalayer TOUTE la
+  // saison à chaque appel, une seule lecture O(1) dans l'index déjà construit
+  // (et caché) pour ce tableau `compMatches`, suivie d'un comptage sur
+  // seulement les quelques matchs de CETTE paire précise — résultat
+  // strictement identique à l'ancien balayage complet, juste beaucoup moins
+  // de travail répété pour l'obtenir.
+  const relevant = getH2HIndex(compMatches).get(pairKey(homeId, awayId)) ?? []
   let hWins = 0, aWins = 0, draws = 0, count = 0
-  ;(compMatches ?? []).forEach(m => {
-    if (m.status !== 'FINISHED') return
-    const ids = [m.homeTeam?.id, m.awayTeam?.id]
-    if (!ids.includes(homeId) || !ids.includes(awayId)) return
+  relevant.forEach(m => {
     const outcome = outcomeForTeam(m, homeId)
     if (!outcome) return
     count++
@@ -713,7 +785,7 @@ export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayFor
   }
   if (homeId == null || awayId == null) return fallback()
 
-  const goalModel = buildGoalModel(compMatches)
+  const goalModel = buildGoalModelCached(compMatches)
   if (!goalModel) return fallback()
 
   // opts.lowerDivMatches absent pour tout appelant existant (Pronos.jsx,

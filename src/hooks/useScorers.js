@@ -221,42 +221,40 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     // serveur dure ~7,5s (SPACING_MS = 60000/MINUTE_CAP, voir api/football.js).
     // Retenter plus tôt retomberait dans le même verrou et gâcherait l'essai
     // sans rien tenter de réel.
-    // ⚠️ RETRY ÉTENDU (02/11, constat utilisateur après le fix `live=0`
-    // ci-dessus, qui ne couvrait qu'un cas précis : "quand tu l'ouvres la
-    // première fois, il n'y a pas de cache [...] faut que ça marche tout le
-    // temps [...] sans bombarder les requêtes [...] faut vraiment creuser").
-    // Root cause réelle, différente du fix précédent : pour une clé VRAIMENT
-    // jamais vue (aucune copie stale possible, ni sous l'ancienne ni sous la
-    // nouvelle clé — le cas exact que l'utilisateur a testé), api/football.js
-    // n'a structurellement RIEN à servir si le budget/minute partagé (10
-    // req/min, TOUTE l'app, voir MINUTE_CAP) est déjà consommé à cet instant
-    // précis par le trafic d'autres utilisateurs — il répond alors un vrai
-    // 429 (`Retry-After: 15`), par design, pour protéger le compte FD.org
-    // d'une nouvelle suspension (historique de plusieurs incidents réels,
-    // voir CLAUDE.md). AUCUNE astuce de cache ne peut combler un vide qui
-    // n'a encore jamais été rempli une seule fois — seule la PATIENCE peut.
-    // L'ancien calendrier (2 tentatives, 8s puis 16s, 24s de patience totale)
-    // abandonnait largement avant que le budget d'1 minute ait eu le temps
-    // de se renouveler. Corrigé : jusqu'à 4 tentatives, chacune attendant AU
-    // MOINS ce que le serveur a demandé (`retryAfterMs`, voir tryFetch
-    // ci-dessus, +2s de marge) plutôt qu'un délai fixe choisi à l'aveugle —
-    // ne retente jamais plus vite que ce que le serveur dit nécessaire (donc
-    // ne bombarde jamais plus qu'avant, juste plus intelligemment), mais
-    // continue d'essayer sur une fenêtre totale d'environ 90-110s — largement
-    // au-delà du cycle de 60s du budget/minute (donc le cas le plus courant,
-    // simple contention passagère, finit presque toujours par réussir) et du
-    // circuit breaker 429 (70s, voir DOWN_TTL). Honnêteté : un vrai blocage
-    // 403 prolongé (anti-abus FD.org, 300s/5min, voir DOWN_TTL_FORBIDDEN —
-    // scénario rare, distinct d'une simple contention de budget) peut encore
-    // dépasser cette fenêtre de patience ; dans ce cas précis, impossible de
-    // garantir un succès sans soit attendre 5 minutes en silence (mauvaise
-    // UX), soit relever MINUTE_CAP (risque de suspension déjà documenté à
-    // plusieurs reprises, jamais fait sans accord explicite de l'utilisateur).
+    // ⚠️ RETRY REVU UNE 2e FOIS (02/11, retour utilisateur immédiat sur le
+    // fix précédent : "90 à 110 secondes c'est hyper lent [...] je veux que
+    // ça s'affiche dans la seconde") — root cause du calendrier précédent :
+    // il forçait `Math.max(base, serverHint)` avec `base` démarrant à 8s —
+    // donc même quand le serveur répondait "réessaie dans 1s" (le cas le
+    // PLUS fréquent, voir ci-dessous), le client attendait quand même au
+    // moins 8s par construction. Le vrai goulot n'était pas le nombre de
+    // tentatives mais ce plancher artificiel.
+    // Changement de fond CÔTÉ SERVEUR (api/football.js, computeRetryAfterSeconds) :
+    // l'en-tête Retry-After n'est plus un "15" fixe et deviné, mais calculé
+    // sur le VRAI état Redis — la cause la plus fréquente de blocage est le
+    // verrou d'espacement (SPACING_MS, 6s max, voir reserveQuota), presque
+    // toujours déjà bien entamé → le serveur annonce maintenant souvent 1 à
+    // 3s, pas 15. Ici : on FAIT CONFIANCE à ce chiffre directement (plancher
+    // minimal 500ms pour ne jamais marteler à 0ms), au lieu de l'écraser avec
+    // un calendrier fixe choisi à l'aveugle — donc le cas courant (simple
+    // contention passagère) se résout maintenant en 1 à quelques secondes,
+    // au plus proche de "la seconde" honnêtement atteignable. Le calendrier
+    // [1s, 3s, 6s, 10s] ne sert plus que de repli pour une erreur SANS hint
+    // serveur (coupure réseau, pas un vrai 429/403 de notre proxy).
+    // Honnêteté, inchangée depuis le fix précédent : un vrai blocage 403
+    // prolongé (anti-abus FD.org, jusqu'à 300s/5min, voir DOWN_TTL_FORBIDDEN
+    // — rare, distinct d'une simple contention) reste honnêtement annoncé
+    // par le serveur (plus de mensonge à 15s dans ce cas non plus) — le
+    // client attend alors réellement ce que le serveur demande, jamais plus,
+    // jamais moins ; aucune solution ne peut raccourcir ce cas précis sans
+    // soit mal informer l'utilisateur, soit relever MINUTE_CAP (risque de
+    // suspension déjà documenté à plusieurs reprises, jamais fait sans
+    // accord explicite de l'utilisateur).
     retry: 4,
     retryDelay: (attempt, error) => {
-      const serverHint = Number(error?.retryAfterMs) || 0
-      const base = [8_000, 16_000, 30_000, 45_000][attempt] ?? 45_000
-      return Math.max(base, serverHint + 2_000)
+      const serverHint = Number(error?.retryAfterMs)
+      if (Number.isFinite(serverHint) && serverHint > 0) return Math.max(500, serverHint)
+      return [1_000, 3_000, 6_000, 10_000][attempt] ?? 10_000
     },
     enabled: !!compId,
   })
