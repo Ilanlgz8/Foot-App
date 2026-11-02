@@ -23,7 +23,7 @@
  * Identité : deviceId + pseudo persistés en localStorage (usePronosGroup),
  * aucune donnée sensible, groupe rejoint via un code à 6 caractères.
  */
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
@@ -318,7 +318,32 @@ function JoinCreateScreen({ onCreate, onJoin }) {
 // Domicile (match SUIVANT dans la liste affichée). `registerInputRef`/
 // `focusInput`/`nextMatchId` viennent de Pronos() (une seule Map de refs
 // pour toute la liste, pas un état local par ligne).
-function MatchPredictRow({ match, myPred, onSave, formMapByComp, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
+// ⚠️ PERF (02/11, constat utilisateur : "dans prono ça bug trop [...] j'appuie
+// sur résultat ou classement et ça veut pas cliquer, ça met du temps de fou")
+// — root cause : AUCUNE limite/mémoïsation sur la liste "Pronos" — jusqu'à
+// 16 compétitions (COMP_IDS = COMPETITIONS entière) × 7 jours, chaque ligne
+// recalculant calcPronoAdvanced (Poisson + H2H, pas gratuit) dans son propre
+// useMemo. Le vrai problème n'est PAS le nombre de lignes en soi, mais leur
+// DÉPENDANCE à `formMapByComp`/`matchesByComp`/`lowerDivByComp` ENTIERS :
+// ces 3 objets sont reconstruits (nouvelle référence) par useTeamFormMulti/
+// useLowerDivisionStatsMulti à CHAQUE re-render de Pronos — et React re-render
+// Pronos dès qu'UNE SEULE des ~16 requêtes qu'il track se rafraîchit (dont
+// les compétitions ESPN sporadiques, polling jusqu'à toutes les 30s, voir
+// useTeamForm.js). Sans mémoïsation, CE changement de référence (même si
+// aucune des données de CE match précis n'a changé) force TOUTES les lignes
+// à re-render ET recalculer leur Poisson — potentiellement 50-150+ matchs
+// recalculés en synchrone sur le thread principal, plusieurs fois par
+// minute : exactement la cause d'un clic qui "met du temps" (le JS est
+// occupé à recalculer des pronos pour des matchs qui n'ont pas bougé).
+// Corrigé : React.memo avec un comparateur qui ne regarde que la TRANCHE de
+// chaque objet propre à la compétition DE CE match (`formMapByComp[code]`
+// etc.) — cette tranche, elle, reste la MÊME référence tant que CETTE
+// compétition précise n'a pas réellement refetché (voir useTeamFormMulti :
+// `byComp[code] = results[i]?.data`, assigné depuis la donnée react-query,
+// stable hors refetch) — même principe déjà appliqué à MatchPoster.jsx/
+// MatchCard.jsx le 27/10 pour le même symptôme (flash noir au scroll Accueil,
+// cause réelle : re-render de masse non mémoïsé).
+const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, formMapByComp, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
 
@@ -405,7 +430,19 @@ function MatchPredictRow({ match, myPred, onSave, formMapByComp, matchesByComp, 
       </div>
     </div>
   )
-}
+}, (prev, next) => {
+  if (prev.match !== next.match) return false
+  if (prev.myPred?.home !== next.myPred?.home || prev.myPred?.away !== next.myPred?.away) return false
+  if (prev.nextMatchId !== next.nextMatchId) return false
+  if (prev.onSave !== next.onSave) return false
+  if (prev.registerInputRef !== next.registerInputRef) return false
+  if (prev.focusInput !== next.focusInput) return false
+  const code = next.match?.competition?.code
+  if (prev.formMapByComp?.[code] !== next.formMapByComp?.[code]) return false
+  if (prev.matchesByComp?.[code] !== next.matchesByComp?.[code]) return false
+  if (prev.lowerDivByComp?.[code] !== next.lowerDivByComp?.[code]) return false
+  return true // rien de pertinent n'a changé pour CE match → skip re-render
+})
 
 // Liste des pronos du groupe pour un match donné (déplié au clic sur "Voir
 // les pronos") — la donnée (predictions[matchId] = { deviceId: {home,away} })
@@ -741,15 +778,21 @@ function Pronos() {
   // capture l'ordre RÉELLEMENT affiché (jours puis matchs, celui de `grouped`
   // ci-dessus) : dernier match d'un jour → 1er match du jour suivant, jamais
   // un id issu d'un ordre différent.
+  // ⚠️ useCallback (02/11, voir le commentaire détaillé au-dessus de
+  // MatchPredictRow) : sans ça, ces 2 fonctions auraient une NOUVELLE
+  // référence à chaque render de Pronos — invalidant systématiquement le
+  // comparateur React.memo de MatchPredictRow (qui les compare par référence),
+  // rendant la mémoïsation inutile. inputRefsMap est un ref (jamais recréé),
+  // donc aucune dépendance réelle — tableau de deps vide, sûr.
   const inputRefsMap = useRef(new Map())
-  const registerInputRef = (matchId, field, el) => {
+  const registerInputRef = useCallback((matchId, field, el) => {
     if (!el) return
     if (!inputRefsMap.current.has(matchId)) inputRefsMap.current.set(matchId, {})
     inputRefsMap.current.get(matchId)[field] = el
-  }
-  const focusInput = (matchId, field) => {
+  }, [])
+  const focusInput = useCallback((matchId, field) => {
     inputRefsMap.current.get(matchId)?.[field]?.focus()
-  }
+  }, [])
   const nextIdByMatchId = useMemo(() => {
     const flat = grouped.flatMap(g => g.matches.map(m => m.id))
     const map = {}
@@ -785,7 +828,7 @@ function Pronos() {
       .sort((a, b) => b.points - a.points)
   }, [players, predictions, finishedById, pronoByMatchId])
 
-  const handlePredict = async (matchId, home, away) => {
+  const handlePredict = useCallback(async (matchId, home, away) => {
     try {
       await predict(matchId, home, away)
       refresh()
@@ -793,7 +836,7 @@ function Pronos() {
       // Échec silencieux (réseau) : la case garde la valeur saisie localement,
       // l'utilisateur peut réessayer en la modifiant à nouveau.
     }
-  }
+  }, [predict, refresh])
 
   const playerCount = Object.keys(players).length || 1
 

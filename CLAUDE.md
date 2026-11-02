@@ -6604,6 +6604,74 @@ cf-worker/
   uniquement `src/utils/tursoCache.js`, se déploie automatiquement avec le reste de l'app via
   Vercel — aucune action manuelle `cf-worker/` nécessaire pour ce fix précis.
 
+- ✅ Fenêtre ESPN sporadique réduite 400j → 90j (02/11, demande explicite utilisateur en
+  désaccord avec ma décision du point précédent : "faut pas rechercher aussi loin, c'est ça qui
+  coûte énormément [...] 90 jours max, je pense que ça suffit") — `DAYS_BACK_SPARSE`
+  (`src/utils/espnAdapter.js`, les 8 compétitions ESPN-only NL/CAN/COPA/UEL/UECL/TDC/CS/USC,
+  élargie à 400j le 29/09 pour corriger "forme récente" absente) ramenée à 90. J'avais choisi de
+  laisser 400j tel quel (risque de régression jugé trop élevé) mais l'utilisateur a tranché dans
+  l'autre sens, en connaissance du compromis — priorité donnée à la réduction du coût de lecture
+  Turso (`readCachedChunks`/`mget`, identifié juste avant comme non borné par `MAX_FETCH_CHUNKS`)
+  plutôt qu'à la couverture maximale. `DAYS_FORWARD_SPARSE` (60j, jamais identifié comme la
+  source du coût, sert à trouver le PROCHAIN match d'un tournoi sporadique) laissé inchangé.
+  Honnêteté, tradeoff ASSUMÉ par l'utilisateur : 90j ne couvre plus les cas où le dernier match
+  d'une équipe dans CETTE compétition précise remonte à plus de 90 jours (équipe éliminée tôt
+  d'un cycle de Ligue des Nations, CAN/Copa América entre 2 éditions) — "forme récente"/"stats
+  saison" peuvent redevenir vides pour ces cas, comme avant le 29/09. 398 tests + lint (35
+  erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés (changement de constante +
+  commentaire uniquement). Portée : `src/`, déploiement automatique via Vercel.
+
+- ✅ BUG TROUVÉ ET CORRIGÉ : page Pronos qui "bug trop" — clics sur les onglets Résultat/
+  Classement très lents, cards Accueil/classement buteurs également signalés lents le même jour
+  (02/11, constat utilisateur : "dans prono ça bug trop [...] j'appuie sur résultat ou classement
+  et ça veut pas cliquer, ça met du temps de fou [...] je crois c'est parce que les matchs sont
+  tous mis dedans pour faire les pronos [...] y'a pas de limites je crois"). Intuition de
+  l'utilisateur en grande partie juste, mais pas tout à fait comme imaginé : `COMP_IDS` (toute
+  `COMPETITIONS`, 16 compétitions) et la fenêtre 7 jours (`UPCOMING_WINDOW_MS`, `useMatchs.js`)
+  sont déjà bornées côté RÉSEAU — pas la vraie cause. Root cause réelle, confirmée par lecture
+  directe du code (`src/pages/Pronos.jsx`) : chaque ligne de l'onglet "Pronos" (`MatchPredictRow`)
+  recalcule `calcPronoAdvanced` (modèle Poisson + H2H, pas gratuit) dans son propre `useMemo`,
+  avec pour dépendances `formMapByComp`/`matchesByComp`/`lowerDivByComp` — 3 objets ENTIERS
+  reconstruits (nouvelle référence) par `useTeamFormMulti`/`useLowerDivisionStatsMulti` à CHAQUE
+  re-render de `Pronos()`. Sans mémoïsation sur `MatchPredictRow` (aucune jusqu'ici, ni
+  `React.memo` ni `useCallback` sur les handlers passés en props), un changement de référence de
+  CES OBJETS — qui survient dès qu'UNE SEULE des ~16 compétitions trackées refetch (dont les 8
+  compétitions ESPN sporadiques, polling jusqu'à toutes les 15-30s, voir `useTeamForm.js`), MÊME
+  SI AUCUNE des données de la compétition d'UN match précis n'a changé — force TOUTES les lignes
+  de la liste à re-render ET recalculer leur Poisson en synchrone sur le thread principal :
+  potentiellement 50-150+ matchs recalculés plusieurs fois par minute, exactement la cause d'un
+  clic qui "met du temps" (le JS est occupé à recalculer des pronos pour des matchs qui n'ont pas
+  bougé pendant que l'utilisateur clique sur un onglet). Corrigé (`src/pages/Pronos.jsx`) :
+  (1) `handlePredict`/`registerInputRef`/`focusInput` passés en `useCallback` (sans ça, leur
+  nouvelle référence à chaque render de `Pronos()` aurait de toute façon invalidé n'importe quel
+  comparateur de mémoïsation en aval) ; (2) `MatchPredictRow` enveloppé dans `React.memo` avec un
+  comparateur qui ne regarde que la TRANCHE de chaque objet propre à la compétition DU match
+  (`formMapByComp[match.competition.code]` etc.), pas l'objet entier — cette tranche garde la
+  MÊME référence tant que CETTE compétition précise n'a pas réellement refetché (`byComp[code] =
+  results[i]?.data`, assigné depuis la donnée react-query, stable hors refetch) — même principe
+  déjà appliqué à `MatchPoster.jsx`/`MatchCard.jsx` le 27/10 pour un symptôme de même nature
+  (flash noir au scroll Accueil, cause réelle : re-render de masse non mémoïsé). Effet attendu :
+  un match dont la compétition n'a pas changé ne recalcule plus jamais son prono au passage d'une
+  AUTRE compétition — réduit le travail synchrone par poll d'un facteur proche du nombre de
+  compétitions réellement affichées (potentiellement x10-x15 un jour chargé). Honnêteté sur les 2
+  autres symptômes du même message ("Accueil cards" et "classement buteurs" lents) : PAS corrigés
+  ici, faute de cause concrète confirmée par lecture de code pour ces 2-là (contrairement à
+  Pronos, où la cause est démontrable). `MatchPoster.jsx`/`MatchCard.jsx` ont déjà reçu le même
+  traitement de mémoïsation le 27/10 — la lenteur Accueil/buteurs ressemble davantage au budget
+  football-data.org partagé déjà documenté extensivement dans ce fichier (`MINUTE_CAP`
+  intentionnellement conservateur après plusieurs suspensions de compte, `useScorers.js` : 3
+  hooks — standings/forme/buteurs — se disputent le même verrou d'espacement sur la page
+  Classement, buteurs partent en dernier avec le plus gros stagger 12s et un retry 8-16s déjà en
+  place) qu'à un vrai bug de rendu — pas une certitude, juste l'explication la plus plausible sans
+  preuve directe (pas de log/dashboard disponible pour ces 2 symptômes). Pas de changement
+  risqué (ex. relever `MINUTE_CAP`) tenté sans demande explicite, vu l'historique de suspensions
+  documenté sur ce même levier. 398 tests + lint (36 problems inchangés — 35 erreurs
+  pré-existantes + 1 warning pré-existant dans un autre fichier, confirmés identiques via `git
+  stash`) + build vérifiés. Portée : `src/pages/Pronos.jsx` uniquement, déploiement automatique
+  via Vercel. À reconfirmer par l'utilisateur sur la vraie app (aucun accès à un vrai appareil
+  depuis cet environnement) — si "Accueil"/"buteurs" restent lents malgré ce fix, une
+  investigation dédiée sur ces 2 pages précises serait l'étape suivante.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

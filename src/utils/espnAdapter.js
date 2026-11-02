@@ -208,7 +208,25 @@ const SPARSE_INTL_SLUGS = new Set([
   'uefa.europa', 'uefa.europa.conf',
   'uefa.super_cup', 'fra.super_cup', 'eng.charity',
 ])
-const DAYS_BACK_SPARSE    = 400
+// ⚠️ RÉDUIT 400 → 90 (02/11, demande explicite utilisateur après la découverte
+// que la lecture du cache ESPN sur Turso — readCachedChunks/mget, api/espn.js —
+// n'est PAS bornée par MAX_FETCH_CHUNKS (qui ne limite que les fetchs ESPN en
+// cas de cache-miss, jamais la taille du mget lui-même) : plus cette fenêtre
+// est large, plus chaque requête relit un mget énorme, même quand tout est
+// déjà en cache. J'avais d'abord choisi de laisser 400j tel quel (risque jugé
+// trop élevé de casser "forme récente" pour ces compétitions sporadiques), mais
+// l'utilisateur a tranché explicitement dans l'autre sens : "faut pas chercher
+// aussi loin, c'est ça qui coûte énormément [...] 90 jours max, je pense que
+// ça suffit" — priorité donnée à la réduction de coût plutôt qu'à la
+// couverture maximale. Honnêteté, tradeoff ASSUMÉ par l'utilisateur en
+// connaissance de cause : 90j ne couvre plus les cas déjà documentés le 29/09
+// où le dernier match d'UNE équipe dans CETTE compétition précise remonte à
+// plus de 90 jours (ex. une équipe éliminée tôt d'un cycle de Ligue des
+// Nations, ou CAN/Copa América — tournois biennaux) — "forme récente"/"stats
+// saison" peuvent redevenir vides pour ces cas-là, comme avant le 29/09. Le
+// forward (60j, utilisé pour trouver le PROCHAIN match d'un tournoi sporadique)
+// n'a jamais été identifié comme la source du coût — laissé inchangé.
+const DAYS_BACK_SPARSE    = 90
 const DAYS_FORWARD_SPARSE = 60
 
 function windowRange(slug) {
