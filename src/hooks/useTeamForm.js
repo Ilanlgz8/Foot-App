@@ -70,8 +70,33 @@ const ESPN_SOURCED_FORM_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'TD
 // navigation de l'utilisateur — plus proche de "instantané" (quelques
 // dizaines de secondes à ~2min dans le pire cas) tout en restant borné dans
 // le temps (pas de polling infini une fois les données déjà synchronisées).
-const ESPN_FORM_STALE = 1000 * 15  // 15s (comps ESPN-only, jamais FD.org — aucun risque de suspension)
-const ESPN_FORM_POLL_MAX_ATTEMPTS = 8  // couvre le pire cas ~460j / 60 tranches par cycle (MAX_FETCH_CHUNKS, api/espn.js)
+// ⚠️ RALENTI (02/11, root cause trouvée d'un pic de 250 000+ lignes écrites
+// Turso en quelques heures sur un compte tout juste créé, confirmé via la
+// console SQL Turso elle-même : 1701 clés distinctes dans espn_cache pour
+// ~250 000 écritures, soit ~147 réécritures en moyenne PAR CLÉ — impossible
+// pour un simple remplissage à froid qui décroît tout seul (chaque clé a
+// une PRIMARY KEY, donc COUNT(*) ne grossit jamais sur une clé déjà écrite).
+// Root cause : `queryKey: ['teamForm2', code, ...]` (voir plus bas) est
+// partagé PAR COMPÉTITION dans le cache React Query d'UN visiteur — le cap à
+// ESPN_FORM_POLL_MAX_ATTEMPTS fonctionne donc bien PAR NAVIGATEUR — mais
+// CHAQUE NOUVEAU visiteur démarre son propre cycle de polling 15s/8 tentatives
+// dans son PROPRE cache (React Query n'est jamais partagé entre navigateurs).
+// Sur une base Turso neuve où TOUT est froid, plusieurs visiteurs arrivant
+// dans la même fenêtre de quelques secondes voient chacun un cache vide pour
+// les MÊMES tranches avant qu'aucun n'ait eu le temps d'écrire — classique
+// effet de meute (thundering herd) : chacun refetch ET réécrit la même
+// tranche, sans aucune coordination entre eux. Confirmé par la répartition
+// par compétition (requête SQL groupée) : les compétitions qui dominent
+// `espn_cache` sont EXACTEMENT celles avec ce polling actif (UEL, Trophée
+// des Champions, Community Shield, CAN, Supercoupe UEFA...), pas un hasard.
+// Pas de verrou distribué ajouté ici (plus de complexité/risque sur un
+// fichier déjà sensible, pour un effet qui devient de plus en plus rare à
+// mesure que le cache se réchauffe réellement) — réduit plutôt l'AMPLITUDE du
+// problème : staleTime 15s→30s + plafond 8→4 tentatives, même durée totale de
+// convergence pour un visiteur isolé (4×30s = 2min, identique à 8×15s=2min),
+// mais 2x moins de requêtes concurrentes possibles dans la fenêtre à risque.
+const ESPN_FORM_STALE = 1000 * 30  // 30s (comps ESPN-only, jamais FD.org — aucun risque de suspension)
+const ESPN_FORM_POLL_MAX_ATTEMPTS = 4  // même convergence totale (~2min) que l'ancien 8×15s, moitié moins de requêtes concurrentes
 
 // ⚠️ AJOUT (01/10, même jour, retour utilisateur juste après le fix ci-dessus
 // : "faudrait juste regarder les championnats actifs d'abord en premier et

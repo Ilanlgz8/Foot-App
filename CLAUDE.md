@@ -6395,6 +6395,47 @@ cf-worker/
   écriture propre à cette nouvelle base Turso, jamais confirmé ni infirmé depuis cet
   environnement, faute d'accès au dashboard Turso).
 
+- ✅ ROOT CAUSE RÉELLE DU PIC DE 250 000+ ÉCRITURES TURSO TROUVÉE ET CORRIGÉE (02/11, suite directe
+  du point ci-dessus — l'utilisateur a objecté à raison : "ça on le charge une fois [...] c'est
+  vraiment autre chose qui consomme") : diagnostic fait EN DIRECT avec l'utilisateur via la
+  console SQL du dashboard Turso (jamais accessible depuis cet environnement, mais l'utilisateur
+  a pu l'utiliser lui-même) — `SELECT COUNT(*) FROM espn_cache` renvoie **1701** clés distinctes,
+  alors que Turso facture 250 000+ LIGNES ÉCRITES sur la même période. Comme `key` est une
+  `PRIMARY KEY` (upsert, jamais de doublon de ligne), ça prouve mathématiquement que chaque clé a
+  été réécrite en moyenne ~147 fois (250000÷1701) — impossible pour un simple remplissage à froid,
+  qui décroît naturellement à mesure que le cache se garnit. Répartition par compétition
+  (`GROUP BY` sur le préfixe de clé) : les plus hauts compteurs (uefa.europa=164, fra.super_cup=
+  137, eng.charity=136, caf.nations=116, uefa.super_cup=114...) correspondent EXACTEMENT aux 8
+  compétitions ESPN-only à polling actif (`ESPN_SOURCED_FORM_COMPS`, `useTeamForm.js` : NL/CAN/
+  COPA/UEL/UECL/TDC/CS/USC) — pas un hasard. Root cause confirmée par lecture du code : `queryKey:
+  ['teamForm2', code, ...]` (`useTeamFormMulti`) est bien partagé PAR COMPÉTITION dans le cache
+  React Query d'UN visiteur — le plafond `ESPN_FORM_POLL_MAX_ATTEMPTS` (alors 8 tentatives/15s)
+  fonctionne donc correctement PAR NAVIGATEUR — mais React Query n'est JAMAIS partagé entre
+  navigateurs : chaque NOUVEAU visiteur démarre son propre cycle de polling, dans son propre
+  cache. Sur une base Turso neuve où tout est froid, plusieurs visiteurs arrivant dans la même
+  fenêtre de quelques secondes voient chacun un cache vide pour les MÊMES tranches avant qu'aucun
+  n'ait eu le temps d'écrire — un effet de meute (thundering herd) classique : chacun refetch ET
+  réécrit la même tranche, sans aucune coordination entre eux (`readCachedChunks`/
+  `fetchScoreboardChunk`, `api/espn.js`, n'ont jamais eu de verrou anti-concurrence — jamais
+  nécessaire tant que le cache était déjà chaud sur l'ancien compte Turso, le problème n'apparaît
+  en pratique que juste après une base neuve/entièrement froide). Corrigé (`src/hooks/
+  useTeamForm.js`) : pas de verrou distribué ajouté (plus de complexité/risque sur un fichier déjà
+  sensible, pour un effet de plus en plus rare à mesure que le cache se réchauffe réellement) —
+  réduit plutôt l'AMPLITUDE du problème : `ESPN_FORM_STALE` 15s→30s + `ESPN_FORM_POLL_MAX_ATTEMPTS`
+  8→4, même durée totale de convergence pour un visiteur isolé (4×30s = 2min, identique à
+  8×15s=2min, donc aucune régression sur la vitesse de "forme récente"/stats saison pour ces 8
+  compétitions), mais 2x moins de requêtes concurrentes possibles dans la fenêtre à risque. 398
+  tests + lint (35 erreurs pré-existantes, Pronos.jsx, inchangé) + build vérifiés (changement de 2
+  constantes numériques + commentaire, aucune autre logique touchée). Portée : uniquement `src/`,
+  se déploie automatiquement avec le reste de l'app via Vercel. Honnêteté : ce diagnostic est le
+  premier de cette série à reposer sur une PREUVE directe et chiffrée (1701 clés vs 250k+
+  écritures, répartition par compétition) plutôt qu'un raisonnement — mais le fix lui-même réduit
+  l'amplitude du problème, il ne l'élimine pas structurellement (un vrai verrou distribué le
+  ferait, mais au prix d'une complexité jugée disproportionnée ici) : si un nouveau pic survient
+  après un futur reset de base ou l'ajout d'une nouvelle compétition à fenêtre large, le même
+  mécanisme peut se reproduire à plus petite échelle — à surveiller via la même méthode (`SELECT
+  COUNT(*) FROM espn_cache` comparé au compteur d'écritures du dashboard Turso) plutôt que deviner.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
