@@ -869,6 +869,43 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   return matches
 }
 
+// ⚠️ AJOUT (02/11, constat utilisateur : "dans Résultats, Serie A, je ne vois
+// pas le match [Sassuolo-Fiorentina]" — vérifié en direct contre FD.org au
+// moment du signalement : le match était déjà FINISHED 2-4 côté serveur,
+// donc pas un vrai gap de données). Root cause : TTL.FINISHED (1h, voir son
+// commentaire plus haut) part du principe que la fraîcheur "en direct" vient
+// TOUJOURS du pont ESPN séparé (liveMatches/getRecentlyFinishedMatches,
+// LiveProvider) — mais ce pont n'est alimenté QUE si ce match précis a été
+// vu par Accueil/Live.jsx (markLive, voir liveTracker.js). Si l'utilisateur
+// va directement sur Résultats sans jamais passer par Accueil pour ce match,
+// le pont reste vide pour lui — un match qui bascule SCHEDULED/IN_PLAY →
+// FINISHED reste alors invisible jusqu'à 1h (staleTime React Query), peu
+// importe que le serveur ait déjà la bonne donnée. Repli dynamique : tant que
+// les données déjà en cache contiennent un match PAS ENCORE FINISHED dont le
+// coup d'envoi tombe dans une fenêtre où il peut être en cours ou venir de se
+// terminer (passé jusqu'à 3h — durée max d'un match + prolongations + marge ;
+// à venir jusqu'à 15min — laisse le temps à un KO déjà affiché de passer en
+// direct), le staleTime retombe à 2min (aligné sur le TTL serveur "today",
+// voir getTtl dans api/football.js) au lieu de 1h. Le cas normal (aucun match
+// "chaud" dans les données déjà en main) garde 1h inchangé — aucun coût
+// ajouté en dehors des jours où ça compte vraiment.
+const CLUB_SHARED_HOT_STALE_MS = 2 * 60 * 1000
+function clubSharedStaleTime(fallbackTtl) {
+  return (query) => {
+    const data = query.state.data
+    if (!Array.isArray(data) || data.length === 0) return fallbackTtl
+    const now = Date.now()
+    const hasHotMatch = data.some(m => {
+      if (m.status === 'FINISHED') return false
+      if (!m.utcDate) return false
+      const kt = new Date(m.utcDate).getTime()
+      if (!Number.isFinite(kt)) return false
+      return kt <= now + 15 * 60 * 1000 && kt >= now - 3 * 60 * 60 * 1000
+    })
+    return hasHotMatch ? CLUB_SHARED_HOT_STALE_MS : fallbackTtl
+  }
+}
+
 // options.staleTime : repli explicite pour un appelant précis (ex: Résultats,
 // voir Resultat.jsx) — n'affecte pas les autres appelants de ce même hook sur
 // la même compét/statut (Classement.jsx notamment), chacun garde son propre
@@ -1018,7 +1055,13 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
     select: isClubShared ? filterByStatus : undefined,
     initialData:          cachedData ?? undefined,
     initialDataUpdatedAt: cachedAt,
-    staleTime: ttl,
+    // ⚠️ `clubSharedStaleTime` (voir son commentaire plus haut) enveloppe `ttl`
+    // (déjà résolu avec un éventuel options.staleTime explicite, ex. Resultat.
+    // jsx qui force TTL.SCHEDULED=1h) plutôt que de le remplacer : s'applique
+    // aussi bien au staleTime par défaut qu'à un override explicite d'un
+    // appelant précis, puisque c'est justement l'override de Resultat.jsx qui
+    // portait la même hypothèse fausse (pont ESPN "toujours actif").
+    staleTime: isClubShared ? clubSharedStaleTime(ttl) : ttl,
     // ⚠️ AJOUT (constat utilisateur, 24/07 : "les matchs dans Programme sont en
     // cache mais quand y'a une mise à jour sur l'heure ou le jour exact ça ne
     // met pas à jour") : avec staleTime=1h (SCHEDULED) et refetchOnWindowFocus

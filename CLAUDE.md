@@ -7085,6 +7085,43 @@ cf-worker/
      l'utilisateur sur son prochain usage réel de la page Pronos avec plusieurs compétitions
      actives en même temps.
 
+- ✅ ROOT CAUSE TROUVÉE ET CORRIGÉE : match invisible dans Résultats (Sassuolo-Fiorentina, Serie A)
+  + "forme récente"/"stats saison" vides, constat utilisateur (02/11, juste après les 2 fixes
+  scorers/Pronos précédents — l'utilisateur craignait une régression des derniers commits) :
+  vérifié EN DIRECT contre l'API football-data.org au moment du signalement (`/api/football?
+  apiPath=/v4/competitions/SA/matches&dateFrom=...&dateTo=...`) — le match Sassuolo 2-4 Fiorentina
+  était déjà FINISHED côté SERVEUR, données correctes. Donc pas un vrai trou de données, ni une
+  régression des 4 fixes Pronos/scorers du soir (aucun ne touche `useMatchs.js`/`useTeamForm.js`,
+  vérifié par lecture). Root cause réelle, trouvée en lisant `useMatches` (`useMatchs.js`) :
+  `Resultat.jsx` force `staleTime: TTL.SCHEDULED` (1h) sur sa requête FD.org, avec un commentaire
+  explicite "la fraîcheur en direct vient du pont ESPN (liveMatches/getRecentlyFinishedMatches),
+  qui reste actif quel que soit ce staleTime" — mais ce pont n'est alimenté QUE si CE match précis
+  a été vu par Accueil/Live.jsx (`markLive`, voir `liveTracker.js`). Si l'utilisateur va directement
+  sur Résultats sans jamais passer par Accueil pour ce match, le pont reste vide — un match qui
+  bascule SCHEDULED→FINISHED reste alors invisible jusqu'à 1h (le temps que staleTime expire ET
+  qu'un remount déclenche un refetch), peu importe que le serveur ait déjà la bonne donnée.
+  Corrigé (`useMatchs.js`) : nouvelle fonction `clubSharedStaleTime(fallbackTtl)` (staleTime
+  dynamique React Query v5, même pattern déjà éprouvé pour `pastDayStaleTime` dans
+  `useTodayMatches.js`, 28/10) — tant que les données déjà en cache contiennent un match PAS
+  ENCORE FINISHED dont le coup d'envoi tombe dans une fenêtre où il peut être en cours ou venir de
+  se terminer (passé jusqu'à 3h, à venir jusqu'à 15min), le staleTime retombe à 2min (aligné sur le
+  TTL serveur "today", `getTtl` dans `api/football.js`) au lieu de 1h — sinon, 1h inchangé, aucun
+  coût ajouté en dehors des jours où ça compte. Enveloppe `ttl` (déjà résolu avec un éventuel
+  `options.staleTime` explicite) plutôt que de le remplacer : s'applique donc aussi à l'override
+  de Resultat.jsx (qui portait exactement la même hypothèse fausse), sans toucher à ce fichier.
+  Branché uniquement pour `isClubShared` (les 6 grands championnats double-sourcés FD.org+ESPN,
+  seuls concernés par ce pont) — WC/EC/ESPN_SOURCED_COMPS inchangés. Sur "forme récente"/"stats
+  saison" (`useTeamForm.js`) pour ce même match : staleTime déjà court pour SA (`FORM_STALE`=2min,
+  pas lié au bug ci-dessus) — la cause la plus probable est une contention FD.org transitoire
+  pendant la même soirée de tests intensifs (mes propres vérifications + les tests scorers de
+  l'utilisateur, tous sur le même budget `MINUTE_CAP` partagé), déjà résolue d'elle-même au moment
+  du diagnostic (re-testé en direct : données saines). 398 tests + lint (36 problems, baseline
+  inchangée) + build vérifiés. Honnêteté : pas de confirmation possible depuis cet environnement
+  que ce fix élimine à 100% le symptôme "forme récente vide" (aucune preuve directe d'un 2e bug
+  distinct trouvée, contrairement au bug Résultats confirmé par lecture de code) — mais le staleTime
+  dynamique corrige avec certitude le vrai bug démontré (Résultats), et réduit par construction le
+  risque que le même type de staleness touche d'autres widgets partageant `fetchClubMatchesRaw`.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
