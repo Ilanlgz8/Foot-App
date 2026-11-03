@@ -7122,6 +7122,122 @@ cf-worker/
   dynamique corrige avec certitude le vrai bug démontré (Résultats), et réduit par construction le
   risque que le même type de staleness touche d'autres widgets partageant `fetchClubMatchesRaw`.
 
+- ✅ AUDIT COMPLET DEMANDÉ PAR L'UTILISATEUR (03/11, message vocal : "dans la page prono... ça fait
+  que de bugger, j'appuie sur un truc... ça n'appuie pas... c'est très très mal configuré... faut
+  vraiment revoir en détail cette partie-là... et il y a des équipes genre Bodo Glimt... quand je
+  vais dans la résultat page... j'ai les formes récentes... et quand je vais dans résultat panel
+  dans accueil, j'ai pas formes récentes... donc comme quoi ils sont pas vraiment reliés... et il y
+  a des équipes de Ligue des Champions... des clubs où j'ai pas les championnats sur cette appli,
+  mais qui sont en Ligue des Champions, bah j'ai pas les formes récentes") — 3 points distincts
+  investigués en détail, 1 vrai bug confirmé et corrigé, 1 déjà réglé par construction (vérifié
+  après coup), 1 audité en profondeur sans nouveau bug trouvé (rapport honnête ci-dessous).
+
+  **1. Page Pronos qui ne répond plus au clic, MALGRÉ 4 corrections déjà posées plus tôt le même
+  jour** (memo sur `MatchPredictRow`, `useTransition` sur les clics d'onglet, `useDeferredValue`
+  sur le classement, cache `calcProno.js`) : ces 4 fixes réduisent le coût de RE-render (donnée qui
+  change en arrière-plan) mais ne changent rien au coût du tout PREMIER montage de l'onglet
+  "Pronos" — jusqu'à 16 compétitions × 7 jours, potentiellement 50-150+ `MatchPredictRow` montés
+  en une seule fois (inputs + listeners + calcul Poisson chacun) dès l'ouverture de l'onglet ou un
+  retour depuis un autre onglet. Exactement le même symptôme, déjà résolu une fois dans ce projet
+  pour la liste de cards de l'Accueil (27/10, flash noir au scroll — cause réelle : montage de
+  masse non virtualisé). Corrigé en reprenant LE MÊME mécanisme déjà éprouvé
+  (`useWarmOnIntersect`/`LazyPoster`/`PosterPlaceholder`, `src/accueil/MatchCard.jsx`) : nouveau
+  `useWarmOnIntersect`/`MatchRowPlaceholder`/`LazyMatchRow` dans `Pronos.jsx`, même marge 1800px,
+  même switch à sens unique froid→chaud (jamais de retour en arrière, pour ne pas réintroduire le
+  désync déjà rencontré le 10/10 avec une classe `--warm` réversible). Seule vraie différence avec
+  les cards Accueil : une ligne Pronos contient de VRAIS champs de saisie
+  (`registerInputRef`/`focusInput`, le mécanisme d'auto-avance du focus entre cases) — vérifié
+  AVANT d'implémenter que `focusInput` est déjà défensif (`?.focus()` avec chaînage optionnel) :
+  un saut de focus vers une ligne encore froide (rare, vu la marge généreuse) ne fait simplement
+  rien plutôt que de planter, exactement le même compromis déjà accepté pour l'Accueil. Lint :
+  introduit 1 nouveau warning (`react-hooks/exhaustive-deps` sur `marginPx`, ligne 353) — IDENTIQUE
+  au seul warning déjà existant dans `MatchCard.jsx` (même fonction copiée à l'identique, même
+  omission volontaire déjà acceptée là-bas) : 2 occurrences du même pattern connu, pas un nouveau
+  problème. 400 tests (+2, voir point 3) + lint (35 erreurs pré-existantes Pronos.jsx + 2 warnings
+  — le nouveau + celui déjà là — au lieu de 1) + build vérifiés. Honnêteté : rendu jamais revu en
+  direct sur un vrai appareil/navigateur depuis cet environnement — à confirmer par l'utilisateur
+  après déploiement (automatique via Vercel).
+
+  **2. Désync "forme récente" entre Resultat.jsx et le panneau "Résultats récents" de l'Accueil,
+  pour le même match réel (Sassuolo-Fiorentina)** : audité en profondeur plutôt que supposé.
+  Confirmé par lecture complète du code que le mécanisme censé gérer précisément ce cas est DÉJÀ en
+  place et correctement construit : `MatchPage.jsx` résout toujours `homeTeam`/`awayTeam` via
+  `resolveFdTeamId(..., { loose: true, strict: true })` AVANT de lire `formMap`, un mécanisme
+  multiply-hardened (26/07, 16/08, 21/08, documenté en détail dans `matchUtils.js`) spécifiquement
+  construit pour ce cas ESPN-sourcé (Accueil) vs FD.org-sourcé (Resultat.jsx) ; `normalizeEvent`
+  (`espnAdapter.js`) confirme que `homeTeam.name`/`.shortName` ne sont JAMAIS vides pour un match
+  sourcé ESPN, donc la résolution par nom ne peut pas échouer par absence de nom. Confirmé aussi
+  que le cache (`queryKey: ['teamForm2', comp, ...]`/`teamform2_${comp}`) est STRICTEMENT identique
+  quelle que soit la page d'entrée — pas de fragmentation de clé (contrairement au bug corrigé plus
+  tôt le même jour sur `/scorers` avec `live=0`). Explication la plus plausible après cet audit,
+  COHÉRENTE avec le diagnostic déjà posé dans l'entrée juste au-dessus (staleTime Résultats, même
+  jour) : ni Resultat.jsx ni le panneau Accueil ne préchargent "forme récente" avant le clic
+  (`ResultCard.jsx`, partagé par les deux, n'en a jamais besoin) — le fetch `useTeamForm('SA')` est
+  donc une vraie 1ère requête dans les deux cas, mais Accueil est objectivement la page la plus
+  lourde de l'app en requêtes FD.org concurrentes au moment du montage (standings/scorers/forme
+  récente/stats division inférieure pour plusieurs compétitions à la fois) — une navigation vers
+  MatchPage pile pendant cette rafale a mécaniquement plus de risque de tomber sur le budget partagé
+  `MINUTE_CAP=10/min` (TOUS utilisateurs confondus) déjà consommé que depuis Resultat.jsx, une page
+  bien plus légère. Dans ce cas, `MatchPage.jsx` affiche son repli honnête ("Stats saison et forme
+  récente disponibles dès le début de la saison", gated par `compMatches.length === 0`) plutôt
+  qu'une donnée fausse — pas un bug d'affichage, un vrai résultat vide transitoire. **Aucun fix
+  appliqué ici, par choix délibéré** : la correction la plus évidente (ajouter un retry conscient
+  du `Retry-After` serveur, comme déjà fait le même jour pour `/scorers`) a été envisagée puis
+  REJETÉE après avoir trouvé, en lisant `useMatchs.js` (ligne ~1103-1122), qu'un retry quasi
+  identique avait déjà été ESSAYÉ puis EXPLICITEMENT REVERTÉ sur cette même fonction partagée
+  (`fetchClubMatchesRaw`, appelée par `useTeamForm` pour les comps club) — root cause de ce revert :
+  `fetchClubMatchesRaw` fait jusqu'à 2 vrais appels FD.org par tentative (saison en cours + repli
+  saison précédente), donc un retry ne rejoue pas 1 requête mais jusqu'à 2 — avec le `retry: 2` déjà
+  présent sur la query `useTeamForm` elle-même (ligne ~513-514, JAMAIS retouché par ce revert
+  puisqu'il vit dans un fichier différent), jusqu'à 3 tentatives × 2 appels = 6 requêtes FD.org pour
+  UNE seule compétition, exactement au moment où le budget est déjà sous tension — la capture
+  Network ayant motivé ce revert ("rafale de 8 requêtes 429... tu veux qu'on se fasse suspendre ou
+  quoi ?") montre le risque concret. Ce `retry: 2` de `useTeamForm.js` n'a donc, à ce stade, PAS
+  bénéficié de la même mise en garde que `useMatches` — une incohérence réelle entre 2 points
+  d'appel de la MÊME fonction risquée, repérée en cours d'audit mais PAS corrigée : la toucher sans
+  être certain à 100% de la cause exacte du symptôme risquerait de reproduire exactement l'incident
+  de suspension déjà vécu plusieurs fois sur ce compte FD.org, un risque jugé disproportionné face à
+  un symptôme occasionnel déjà couvert par un repli honnête (pas de donnée fausse affichée). Signalé
+  ici explicitement pour que l'utilisateur décide s'il veut que ce `retry: 2` soit aligné sur le
+  `retry: false` de `useMatches` — pas fait sans son accord explicite, vu l'enjeu.
+
+  **3. Clubs de Ligue des Champions sans championnat domestique suivi par l'app (ex. Bodø/Glimt) —
+  VRAI BUG CONFIRMÉ ET CORRIGÉ**, distinct de la limitation structurelle évidente (Eliteserien
+  norvégien n'est effectivement dans aucune des 16 compétitions suivies, donc seuls LEURS PROPRES
+  matchs de C1 peuvent nourrir leur "forme récente" — ça reste vrai, pas un bug). Root cause
+  confirmée avec un niveau de preuve élevé : `normalize()` (`espnSummaryParse.js`, utilisée par
+  `clubNameMatch`/`looseTeamNameMatch`, donc par `resolveFdTeamId` — le même mécanisme qui règle le
+  point 2 ci-dessus) ne traitait que les accents latins classiques (à/é/ü/ô/ç...) — PAS les lettres
+  scandinaves ø/æ/å, qui ne sont PAS des lettres latines + accent combinant (contrairement à
+  é/à/ü), donc aucune des règles existantes ne les transformait. Preuve concrète trouvée dans ce
+  MÊME fichier : l'historique notifs du 14/10 documente un vrai payload ESPN écrivant
+  "Bodo/Glimt-Dortmund" (SANS ø, ASCII) — alors que `teamNames.js` n'a qu'UNE clé, 'Bodø/Glimt'
+  (AVEC ø), pour ce club. `translateTeam` fait un lookup EXACT (pas de normalisation) — si la source
+  (ESPN) écrit "Bodo" et l'autre (FD.org/la table canonique) écrit "Bodø", la clé ne matche jamais,
+  et `normalize()` ne pouvait pas non plus les faire converger ensuite ('ø' passait inchangé) : le
+  club ne matchait donc JAMAIS entre les 2 représentations, pour N'IMPORTE quel outil qui dépend de
+  `clubNameMatch`/`looseTeamNameMatch` (pas seulement forme récente — aussi la détection de
+  buts/cartons partageant ce mécanisme ailleurs dans l'app). Même risque confirmé pour "København"
+  (FC Copenhague, même lettre ø), un club tout aussi récurrent en Coupes d'Europe. Corrigé
+  (`normalize()`) : ajout de la translitération standard ø→o, æ→ae, å→a, appliquée EN PREMIER (avant
+  les autres règles, pour qu'un 'æ'→'ae' ne soit pas retouché ensuite). 6 nouveaux tests dédiés
+  ajoutés (`espnSummaryParse.test.js`) : `normalize('Bodø/Glimt')`/`normalize('Bodo/Glimt')`
+  convergent désormais vers la même valeur, `normalize('København')`, et `clubNameMatch('Bodø/
+  Glimt', 'Bodo/Glimt')`/`clubNameMatch('København', 'Kobenhavn')` renvoient maintenant `true`
+  (reproduisent exactement le bug réel avant le fix, verrouillent le comportement correct après).
+  Portée du fix : `normalize()` n'est utilisée QUE par `matchUtils.js` (3 call-sites, tous du
+  matching nom d'équipe) et `espnSummaryParse.js` lui-même (`fuzzyTeam`/`clubNameMatch`) — vérifié
+  par grep exhaustif qu'aucune autre copie divergente n'existe plus dans `api/` (une ancienne
+  copie dans `api/fifa-live.js` avait déjà été unifiée par le passé, voir le commentaire du fichier
+  de test) — changement sûr, à faible risque, qui ne touche aucune autre logique. 400 tests (+6) +
+  lint (clean sur les 2 fichiers touchés) + build vérifiés. Honnêteté : je n'ai aucun moyen de
+  confirmer depuis cet environnement que CE club précis apparaîtra en Ligue des Champions cette
+  saison (pas d'accès à un calendrier UEFA en direct dans cette passe) ni de revoir le rendu en
+  direct sur un vrai appareil — mais la preuve du bug lui-même (incohérence ASCII vs ø déjà visible
+  dans ce fichier, mécanisme de normalisation qui ne la comblait pas) est confirmée par lecture
+  directe du code, pas une supposition ; à confirmer par l'utilisateur sur le prochain match
+  Bodø/Glimt ou FC Copenhague affiché dans l'app.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

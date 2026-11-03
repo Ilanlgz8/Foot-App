@@ -308,6 +308,80 @@ function JoinCreateScreen({ onCreate, onJoin }) {
   )
 }
 
+// ⚠️ VIRTUALISATION (02/11, même jour, retour utilisateur immédiat APRÈS les
+// 4 corrections cumulées ci-dessous (memo/useTransition/useDeferredValue/cache
+// calcProno) : "j'appuie sur résultat ou classement, ça n'appuie pas, ça bug
+// trop" — persiste malgré ces 4 fixes. Root cause restante : ceux-ci
+// réduisent le coût de RE-render (donnée qui change) mais rien n'empêche le
+// MONTAGE initial de TOUTES les lignes de l'onglet "Pronos" en une seule
+// fois — jusqu'à 16 compétitions × 7 jours, potentiellement 50-150+
+// `MatchPredictRow` montés simultanément au premier rendu de l'onglet (ou à
+// chaque bascule depuis un autre onglet), chacun avec ses propres inputs/
+// listeners/images. Exactement le même symptôme, déjà résolu une fois dans
+// ce projet pour la liste de cards de l'Accueil (27/10, flash noir au
+// scroll — cause réelle : re-render/montage de masse non virtualisé) via
+// `useWarmOnIntersect`/`LazyPoster`/`PosterPlaceholder` (voir
+// `src/accueil/MatchCard.jsx`) — repris ici à l'identique (même marge
+// 1800px, même switch à sens unique froid→chaud, jamais de retour en
+// arrière une fois chaude). Seule différence avec les cards Accueil : une
+// ligne ici contient de VRAIS champs de saisie (`registerInputRef`/
+// `focusInput`, voir le commentaire juste en dessous) — sans risque pour
+// autant : `focusInput` est déjà défensif (`?.focus()`, ligne ~812), donc un
+// saut de focus vers une ligne encore froide ne fait simplement rien (pas de
+// crash) plutôt que de planter ; la marge généreuse (1800px, ~2-3 écrans)
+// rend ce cas rare en pratique, le même compromis déjà accepté pour
+// l'Accueil.
+function useWarmOnIntersect(marginPx = 1800) {
+  const ref = useRef(null)
+  const [warm, setWarm] = useState(false)
+  useEffect(() => {
+    if (warm) return
+    const el = ref.current
+    if (!el) return
+    const root = el.closest('.appScroll') || null
+    const obs = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) {
+          setWarm(true)
+          obs.disconnect()
+        }
+      },
+      { root, rootMargin: `${marginPx}px 0px ${marginPx}px 0px` }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [warm])
+  return [ref, warm]
+}
+
+// Placeholder "froid" — même gabarit (meta + 3 colonnes équipe/score/équipe)
+// que la vraie ligne, pour ne jamais sauter de mise en page à la bascule
+// froid→chaud. `.sk` (shimmer gris) déjà défini globalement (src/index.css),
+// réutilisé tel quel plutôt qu'une nouvelle classe.
+function MatchRowPlaceholder({ innerRef }) {
+  return (
+    <div ref={innerRef} className="pronos__matchRow pronos__matchRow--sk">
+      <div className="pronos__matchMeta">
+        <div className="sk" style={{ width: '5rem', height: '0.7rem', borderRadius: '0.3rem' }} />
+        <div className="sk" style={{ width: '2.5rem', height: '0.6rem', borderRadius: '0.3rem' }} />
+      </div>
+      <div className="pronos__matchTeams">
+        <div className="pronos__team">
+          <div className="sk" style={{ width: '1.9rem', height: '1.9rem', borderRadius: '50%' }} />
+          <div className="sk" style={{ width: '3.5rem', height: '0.7rem' }} />
+        </div>
+        <div className="pronos__scoreCol">
+          <div className="sk" style={{ width: '4.2rem', height: '2rem', borderRadius: '0.5rem' }} />
+        </div>
+        <div className="pronos__team">
+          <div className="sk" style={{ width: '1.9rem', height: '1.9rem', borderRadius: '50%' }} />
+          <div className="sk" style={{ width: '3.5rem', height: '0.7rem' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ⚠️ AJOUT auto-avance (21/08, demande explicite utilisateur : "quand
 // l'utilisateur remplit une case avec un chiffre ça switch direct à la case
 // suivante ... et si les cases A et B sont remplies ça passe au match en
@@ -443,6 +517,15 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, f
   if (prev.lowerDivByComp?.[code] !== next.lowerDivByComp?.[code]) return false
   return true // rien de pertinent n'a changé pour CE match → skip re-render
 })
+
+// Wrapper lazy : ne monte le vrai MatchPredictRow (et son calcul Poisson,
+// voir le commentaire détaillé juste au-dessus de useWarmOnIntersect) qu'une
+// fois réellement proche du viewport.
+function LazyMatchRow(props) {
+  const [ref, warm] = useWarmOnIntersect()
+  if (!warm) return <MatchRowPlaceholder innerRef={ref} />
+  return <MatchPredictRow {...props} />
+}
 
 // Liste des pronos du groupe pour un match donné (déplié au clic sur "Voir
 // les pronos") — la donnée (predictions[matchId] = { deviceId: {home,away} })
@@ -968,7 +1051,7 @@ function Pronos() {
                   <div key={g.key} className="pronos__day">
                     <div className="pronos__dayLabel">{g.label}</div>
                     {g.matches.map(m => (
-                      <MatchPredictRow
+                      <LazyMatchRow
                         key={m.id}
                         match={m}
                         myPred={predictions[String(m.id)]?.[deviceId]}

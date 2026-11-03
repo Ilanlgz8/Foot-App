@@ -123,8 +123,21 @@ export function compactEspnStandings(json) {
 // réels indépendants) — inutilisable pour un classement complet (18-20
 // équipes attendues). Voir l'historique git pour le code retiré.
 
+// ⚠️ AJOUT ø/æ/å (02/11, bug réel confirmé : "Bodø/Glimt" (nom canonique
+// FR, teamNames.js) ne matchait jamais "Bodo/Glimt" — l'ASCII sans ø vu
+// dans un vrai payload ESPN, voir l'historique notifs du 14/10 dans
+// CLAUDE.md, ligne "Bodo/Glimt-Dortmund") : ces 3 lettres scandinaves ne
+// sont PAS des lettres latines + accent combinant (contrairement à
+// é/à/ü...), donc aucune des 6 classes ci-dessus ne les touchait — un club
+// dont une source écrit le nom en ASCII et l'autre avec le vrai caractère
+// ne matchait jamais via clubNameMatch/looseTeamNameMatch, qui partagent
+// toutes les deux cette fonction. Concerne aussi "København" (FC
+// Copenhague, même lettre ø) — même risque, même club récurrent en Coupes
+// d'Europe. Translitération standard (ø→o, æ→ae, å→a), appliquée AVANT le
+// reste pour que 'æ'→'ae' ne soit pas re-touché par une règle suivante.
 export function normalize(name = '') {
   return name.toLowerCase()
+    .replace(/æ/g, 'ae').replace(/ø/g, 'o').replace(/å/g, 'a')
     .replace(/[àáâã]/g, 'a').replace(/[éèêë]/g, 'e')
     .replace(/[ûùüú]/g, 'u').replace(/[îïí]/g, 'i')
     .replace(/[ôöó]/g, 'o').replace(/ç/g, 'c')

@@ -132,6 +132,17 @@ describe('normalize', () => {
   it('conserve les espaces (nécessaire pour le découpage en mots de fuzzyTeam)', () => {
     expect(normalize('Ivory Coast')).toBe('ivory coast')
   })
+
+  // ⚠️ Bug réel (02/11) : "Bodø/Glimt" (nom canonique FR) vs "Bodo/Glimt"
+  // (ASCII, vu dans un vrai payload ESPN) ne matchaient jamais avant cet
+  // ajout — ø n'est pas une lettre latine + accent combinant, donc aucune
+  // des règles précédentes ne la touchait.
+  it('translittère les lettres scandinaves ø/æ/å', () => {
+    expect(normalize('Bodø/Glimt')).toBe('bodo/glimt')
+    expect(normalize('Bodo/Glimt')).toBe('bodo/glimt')
+    expect(normalize('København')).toBe('kobenhavn')
+    expect(normalize('Æbltoft Åse')).toBe('aebltoft ase')
+  })
 })
 
 describe('fuzzyTeam', () => {
@@ -190,6 +201,14 @@ describe('clubNameMatch', () => {
   it('renvoie false si un des deux noms est vide/absent', () => {
     expect(clubNameMatch('', 'Manchester City')).toBe(false)
     expect(clubNameMatch('Manchester City', undefined)).toBe(false)
+  })
+
+  // ⚠️ Bug réel (02/11) : une source écrit "Bodø/Glimt" (ø), une autre
+  // "Bodo/Glimt" (ASCII, vu dans un vrai payload ESPN) — ne matchaient
+  // jamais avant le fix de normalize() ci-dessus.
+  it('matche un club scandinave écrit avec ou sans le caractère ø (bug réel)', () => {
+    expect(clubNameMatch('Bodø/Glimt', 'Bodo/Glimt')).toBe(true)
+    expect(clubNameMatch('København', 'Kobenhavn')).toBe(true)
   })
 })
 
