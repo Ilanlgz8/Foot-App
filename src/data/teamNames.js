@@ -169,6 +169,37 @@ export const TEAM_NAMES_FR = {
   'Porto': 'Porto',
   'FC Porto': 'Porto',
   'Feyenoord': 'Feyenoord',
+  // ⚠️ AJOUT (03/11, constat utilisateur : "pour bodo climt c bon mais pour
+  // d'autre comme s bratislava et shakhtar c pas bon" — suite directe du fix
+  // Bodø/Glimt du même jour, ø/æ/å dans normalize()) : root cause DIFFÉRENTE
+  // pour ces 2 clubs — aucun des deux noms ne contient de diacritique
+  // scandinave, donc le fix ø/æ/å ne pouvait rien changer pour eux. Le nom
+  // OFFICIEL réel de ces 2 clubs porte un préfixe de type de club que
+  // clubNameMatch (préfixe uniquement, voir espnSummaryParse.js) ne peut PAS
+  // absorber quand il est placé devant (contrairement à un mot RAJOUTÉ en
+  // SUFFIXE, le seul cas que clubNameMatch gère) : "FC Shakhtar Donetsk" et
+  // "ŠK Slovan Bratislava" sont les noms complets officiels réels de ces
+  // clubs (fait vérifiable, pas inventé) — si football-data.org expose l'un
+  // de ces 2 comme `name` quand ESPN affiche la forme courte ("Shakhtar"
+  // seul, confirmé par un vrai payload ESPN déjà documenté dans l'historique
+  // notifs du 14/10 : "Shakhtar-AEK Athens" ; "Slovan Bratislava" sans "ŠK"
+  // pour l'autre), ni clubNameMatch (préfixe) ni looseTeamNameMatch (égalité
+  // après normalize) ne peuvent faire le lien sans une entrée ici — "šk
+  // slovan bratislava" ne commence PAS par "slovan bratislava" (c'est l'exact
+  // inverse d'un ajout en suffixe). Honnêteté : contrairement à Bodø/Glimt
+  // (preuve directe dans les logs), aucun accès réseau depuis cet
+  // environnement pour confirmer la forme EXACTE renvoyée par FD.org pour ces
+  // 2 clubs précis (même limite déjà documentée pour Porto/Feyenoord le
+  // 26/09) — les variantes les plus plausibles (nom officiel complet réel +
+  // forme courte) sont toutes les deux ajoutées par prudence, mêmes principe
+  // que Porto/Feyenoord juste au-dessus : à corriger si un vrai match révèle
+  // une autre forme.
+  'FC Shakhtar Donetsk': 'Shakhtar Donetsk',
+  'Shakhtar Donetsk': 'Shakhtar Donetsk',
+  'Shakhtar': 'Shakhtar Donetsk',
+  'ŠK Slovan Bratislava': 'Slovan Bratislava',
+  'SK Slovan Bratislava': 'Slovan Bratislava',
+  'Slovan Bratislava': 'Slovan Bratislava',
 
   // Euro / Nations
   'Germany': 'Allemagne',

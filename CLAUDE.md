@@ -7238,6 +7238,46 @@ cf-worker/
   directe du code, pas une supposition ; à confirmer par l'utilisateur sur le prochain match
   Bodø/Glimt ou FC Copenhague affiché dans l'app.
 
+- ✅ "Forme récente" toujours absente pour Shakhtar Donetsk et Slovan Bratislava malgré le fix
+  Bodø/Glimt (03/11, retour utilisateur direct et explicite : "pour bodo climt c bon mais pour
+  d'autre comme s bratislavaet shakhtar c pas bon reverifie bien tout stp") — root cause
+  DIFFÉRENTE confirmée par lecture directe du code, pas une diacritique scandinave (aucun des 2
+  noms n'en contient) : `clubNameMatch` (espnSummaryParse.js) ne fait qu'un matching par PRÉFIXE
+  (`na.startsWith(nb) || nb.startsWith(na)`) — conçu pour absorber un mot RAJOUTÉ EN SUFFIXE
+  ("Manchester City" → "Manchester City FC", voir son historique), jamais pour un préfixe de
+  type de club placé AVANT le nom. Or le nom OFFICIEL complet réel de ces 2 clubs porte
+  justement un tel préfixe : "FC Shakhtar Donetsk" et "ŠK Slovan Bratislava" (faits vérifiables,
+  pas inventés) — si football-data.org expose l'un de ces 2 comme `name` pendant qu'ESPN affiche
+  la forme courte ("Shakhtar" seul, confirmé par un vrai payload ESPN déjà documenté dans
+  l'historique notifs du 14/10 : "Shakhtar-AEK Athens" ; "Slovan Bratislava" sans "ŠK" pour
+  l'autre), ni `clubNameMatch` ni `looseTeamNameMatch` ne peuvent faire le lien : "šk slovan
+  bratislava" ne COMMENCE PAS par "slovan bratislava" (c'est l'exact inverse d'un ajout en
+  suffixe, la direction que `clubNameMatch` ne gère pas). Corrigé (`src/data/teamNames.js`,
+  section "Champions League / Europa") : 6 nouvelles entrées `TEAM_NAMES_FR` — `'FC Shakhtar
+  Donetsk'`/`'Shakhtar Donetsk'`/`'Shakhtar'` → `'Shakhtar Donetsk'`, et `'ŠK Slovan
+  Bratislava'`/`'SK Slovan Bratislava'`/`'Slovan Bratislava'` → `'Slovan Bratislava'` — même
+  principe déjà établi et éprouvé dans ce fichier (ex. Porto/Feyenoord du 26/09, Olympique
+  Lyon/Lyonnais du 27/07) : couvrir plusieurs variantes plausibles plutôt qu'une seule, pur ajout
+  de données qui ne peut jamais casser une résolution déjà fonctionnelle ailleurs (`translateTeam`
+  est un lookup par clé EXACTE, `TEAM_NAMES_FR[name] ?? name` — ajouter une clé ne change jamais
+  le comportement pour un nom qui n'y correspond pas). Volontairement PAS touché `clubNameMatch`
+  lui-même (risque déjà documenté 2 fois dans ce fichier : des tentatives passées de modifier cet
+  algorithme ont cassé l'Accueil en prod, cause jamais identifiée avec certitude) — rester sur le
+  mécanisme sûr et déjà prouvé (ajout de données dans `TEAM_NAMES_FR`) plutôt que de généraliser
+  la détection de préfixes de type de club (FC/ŠK/AC/SC/...), qui toucherait TOUTE résolution
+  d'équipe dans l'app pour un gain non confirmé. 400 tests + lint (35 erreurs + 2 warnings
+  pré-existants, confirmés identiques) + build vérifiés. Honnêteté totale, comme demandé
+  explicitement par l'utilisateur ("reverifie bien tout") : contrairement à Bodø/Glimt (preuve
+  directe dans un vrai log applicatif), je n'ai aucun accès réseau depuis cet environnement pour
+  confirmer la forme EXACTE renvoyée aujourd'hui par football-data.org/ESPN pour ces 2 clubs
+  précis — les 2 noms officiels complets utilisés ici sont des faits réels et vérifiables (pas
+  inventés), mais la variante AJOUTÉE est la plus plausible compte tenu du seul indice disponible
+  (le payload ESPN "Shakhtar" déjà loggé), pas une certitude à 100%. Si le symptôme persiste après
+  ce déploiement malgré ces 6 entrées, c'est le signe que la forme réelle rencontrée est encore
+  une AUTRE variante non couverte ici — la prochaine étape la plus utile serait un
+  `/api/debug-push?secret=...&match=...` ou une capture d'écran au moment précis du bug plutôt
+  qu'une 3e tentative devinée, pour obtenir la vraie chaîne de caractères en jeu.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
