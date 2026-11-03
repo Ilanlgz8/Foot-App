@@ -200,6 +200,29 @@ export const TEAM_NAMES_FR = {
   'ŠK Slovan Bratislava': 'Slovan Bratislava',
   'SK Slovan Bratislava': 'Slovan Bratislava',
   'Slovan Bratislava': 'Slovan Bratislava',
+  // ⚠️ AJOUT (03/11, constat utilisateur répété plusieurs fois : "y'a toujours
+  // saoussolo dans result panel qui n'as plus sa forme recente... y'a que
+  // cette equipe") : audit complet refait (caching/staleTime de
+  // fetchClubMatchesRaw, buildFormMap, isAmbiguousBarePrefixMatch,
+  // resolveFdTeamId) sans trouver de mécanisme qui exclurait spécifiquement
+  // Sassuolo — contrairement à Shakhtar/Slovan Bratislava (preuve dans un
+  // vrai payload ESPN), aucune preuve concrète trouvée ici. Par élimination
+  // (le seul maillon de toute la chaîne qui dépend du NOM précis d'un club
+  // est resolveFdTeamId/clubNameMatch — tout le reste traite la compétition
+  // entière, jamais un club en particulier) : si un vrai bug existe, c'est
+  // très probablement le même type de mismatch préfixe que Shakhtar/Slovan
+  // Bratislava — le nom OFFICIEL réel de ce club est "US Sassuolo Calcio"
+  // (fait vérifiable), qu'ESPN pourrait raccourcir en "Sassuolo" seul alors
+  // que FD.org exposerait la forme longue. Ajouté par précaution (aucun
+  // risque, purement additif) — honnêteté : pas une certitude comme pour
+  // Shakhtar, juste la piste la plus plausible après audit. Un diagnostic
+  // (`console.warn` dans resolveFdTeamId, matchUtils.js) a aussi été ajouté
+  // au même moment : si CE fix ne suffit pas, le prochain signalement
+  // donnera les vraies chaînes en jeu via la console du navigateur plutôt
+  // qu'une nouvelle hypothèse non vérifiable.
+  'US Sassuolo Calcio': 'Sassuolo',
+  'US Sassuolo': 'Sassuolo',
+  'Sassuolo Calcio': 'Sassuolo',
 
   // Euro / Nations
   'Germany': 'Allemagne',

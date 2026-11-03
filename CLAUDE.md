@@ -7278,6 +7278,53 @@ cf-worker/
   `/api/debug-push?secret=...&match=...` ou une capture d'écran au moment précis du bug plutôt
   qu'une 3e tentative devinée, pour obtenir la vraie chaîne de caractères en jeu.
 
+- 🔍 "Forme récente" TOUJOURS absente pour Sassuolo spécifiquement dans le panneau "Résultats
+  récents" de l'Accueil, même jour (03/11, constat répété : "y'a toujours saoussolo dans result
+  panel qui n'as plus sa forme recente c pas normal y'a que cette equipe") — audit COMPLET refait
+  de zéro plutôt que de supposer une cause déjà connue (vérifié : `ResultPanel.jsx`/`ResultCard.jsx`
+  n'affichent eux-mêmes AUCUN losange "forme récente" — le symptôme vise forcément MatchPage, ouvert
+  en cliquant la card). Chaîne entière relue : `ResultPanel` (Accueil) reçoit ses matchs de
+  `useRecentDaysMatches` (`useTodayMatches.js`) — pour Serie A (dans le `ESPN_SOURCED_COMPS` DE CE
+  FICHIER, les 6 grands championnats + coupes, à ne pas confondre avec `ESPN_SOURCED_FORM_COMPS` de
+  `useTeamForm.js`, un ensemble différent de 8 comps 100% ESPN), le match cliqué est donc
+  ESPN-sourcé (`fetchEspnCompMatches`), avec les ids ESPN (pas FD.org) sur `homeTeam`/`awayTeam` —
+  `resolveFdTeamId` doit donc résoudre Sassuolo PAR NOM contre `compMatches` (FD.org) pour que
+  MatchPage retrouve son `formMap`. Vérifié un par un et écartés, SANS trouver de cause concrète
+  pour ce club précis : `clubNameMatch` (préfixe, teste name ET shortName des 2 côtés — "Sassuolo"
+  n'a aucune raison structurelle de différer entre ESPN/FD.org comme Shakhtar/Slovan Bratislava, pas
+  de préfixe de type de club connu pour ce cas) ; `isAmbiguousBarePrefixMatch`
+  (`AMBIGUOUS_BARE_PREFIXES` ne contient pas "sassuolo") ; la collision d'id fast-path (979-982,
+  `matchUtils.js` — même en cas de collision numérique fortuite ESPN/FD.org, la boucle de recherche
+  par nom plus bas n'est jamais bloquée, elle s'exécute toujours indépendamment) ; `buildFormMap`
+  (traite tous les clubs identiquement, aucun filtre par nom) ; le cache/staleTime de
+  `fetchClubMatchesRaw` (FORM_STALE=2min côté `useTeamForm.js`, bien plus court que l'ancien bug 1h
+  de Resultat.jsx déjà corrigé le 02/11 ; `fetchClubMatchesRawInner` ne THROW une erreur que si
+  AUCUNE donnée n'est disponible ni en direct ni en cache — en novembre, Serie A a largement assez
+  de matchs FINISHED pour que ce chemin d'échec ne se déclenche quasiment jamais). Par élimination :
+  le SEUL maillon de toute cette chaîne qui dépend du nom PRÉCIS d'un club (donc seul capable
+  d'exclure UN SEUL club en particulier, jamais la compétition entière) est `resolveFdTeamId`/
+  `clubNameMatch` — tout le reste traite la compétition comme un bloc, sans distinction par équipe.
+  Honnêteté totale, comme explicitement demandé par l'utilisateur : contrairement à Shakhtar/Slovan
+  Bratislava (preuve directe dans un vrai payload ESPN loggé), AUCUNE preuve concrète n'a été
+  trouvée pour Sassuolo après cet audit complet — je ne peux pas confirmer avec certitude que c'est
+  bien un mismatch de nom (aucun accès réseau depuis cet environnement pour voir les vraies chaînes
+  ESPN/FD.org en jeu). 2 actions prises en conséquence, les 2 sans aucun risque de régression :
+  (1) ajout par précaution de 3 variantes `TEAM_NAMES_FR` (`teamNames.js`) pour le nom officiel réel
+  de ce club ("US Sassuolo Calcio"/"US Sassuolo"/"Sassuolo Calcio" → "Sassuolo") — purement additif,
+  même mécanique déjà éprouvée pour Shakhtar/Slovan Bratislava/Porto/Feyenoord, mais ici une
+  ASSURANCE plutôt qu'un fix confirmé ; (2) diagnostic ajouté dans `resolveFdTeamId` (`matchUtils.js`)
+  : un `console.warn` (dédoublonné par paire de noms via `_loggedResolveFailures`, pour ne jamais
+  spammer malgré les très nombreux appels de cette fonction) se déclenche désormais la PREMIÈRE fois
+  qu'un nom échoue à se résoudre malgré des données non vides des deux côtés — donne enfin les
+  vraies chaînes ESPN/FD.org en jeu (visibles dans la console du navigateur) si le symptôme persiste
+  malgré le fix (1), au lieu de devoir deviner une 2e fois. 400 tests + lint (35 erreurs
+  pré-existantes, Pronos.jsx, + 2 warnings pré-existants, baseline confirmée identique) + build
+  vérifiés. Honnêteté finale : si l'utilisateur peut, au prochain signalement, ouvrir la console du
+  navigateur (F12 sur desktop, ou outils de dev à distance sur mobile) au moment où "forme récente"
+  manque pour Sassuolo et partager ce que ce `console.warn` affiche, ce sera la toute première
+  preuve concrète sur ce cas précis — bien plus fiable que continuer à deviner depuis cet
+  environnement sans accès réseau.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

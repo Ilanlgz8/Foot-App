@@ -918,6 +918,10 @@ export function resolveFdMatchId(match, compMatches, opts = {}) {
 // FormDiamonds masqué ; calcPronoAdvanced traite déjà homeId/awayId null
 // comme "pas de H2H disponible", voir calcProno.js) — aucune régression,
 // juste un vrai "je ne sais pas" au lieu d'un faux positif silencieux.
+// Voir le commentaire dédié juste avant le `console.warn` plus bas dans
+// resolveFdTeamId — dédoublonnage du diagnostic ajouté le 03/11 (Sassuolo).
+const _loggedResolveFailures = new Set()
+
 export function resolveFdTeamId(team, compMatches, { loose = false, strict = false, allowBarePrefix = false } = {}) {
   const rawId = team?.id ?? null
   const giveUp = () => (strict ? null : rawId)
@@ -992,6 +996,30 @@ export function resolveFdTeamId(team, compMatches, { loose = false, strict = fal
     }
     if (matches(m.awayTeam?.name) || matches(m.awayTeam?.shortName)) {
       return m.awayTeam.id
+    }
+  }
+  // ⚠️ AJOUT diagnostic (03/11, constat utilisateur répété : "forme récente"
+  // manquante pour Sassuolo spécifiquement, "y'a que cette equipe" — audité en
+  // profondeur (caching, staleTime, buildFormMap, isAmbiguousBarePrefixMatch)
+  // sans trouver de mécanisme qui exclurait CE club en particulier : par
+  // élimination, si un vrai bug existe, il est quasi certainement ICI — un
+  // nom (ESPN) qui ne matche VRAIMENT aucun nom/shortName FD.org de toute la
+  // compétition, malgré des données non vides des deux côtés. Jusqu'ici,
+  // cet échec était totalement silencieux — impossible de savoir QUELLES
+  // chaînes exactes étaient en jeu sans accès réseau depuis cet
+  // environnement. Log UNE SEULE FOIS par paire de noms (dédoublonné,
+  // `_loggedResolveFailures`) pour ne jamais spammer la console malgré les
+  // très nombreux appels de cette fonction (chaque render de card/ligne) —
+  // au prochain signalement, ce log donnera enfin les vraies chaînes plutôt
+  // qu'une hypothèse non vérifiable.
+  if (loose) {
+    const sig = `${team.name ?? ''}|${team.shortName ?? ''}`
+    if (!_loggedResolveFailures.has(sig)) {
+      _loggedResolveFailures.add(sig)
+      console.warn(
+        '[resolveFdTeamId] échec de résolution par nom — "forme récente" sera vide pour ce club :',
+        { espnName: team.name, espnShortName: team.shortName, compSample: compMatches.slice(0, 3).map(m => ({ h: m.homeTeam?.name, hs: m.homeTeam?.shortName, a: m.awayTeam?.name, as: m.awayTeam?.shortName })) }
+      )
     }
   }
   return giveUp()
