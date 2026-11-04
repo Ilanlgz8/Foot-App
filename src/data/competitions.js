@@ -781,6 +781,12 @@ export const COMPETITIONS = [
     name: 'Ligue Europa',
     shortName: 'Europa L.',
     emblem: europaLeagueLogo,
+    // Pastille blanche retirée (05/11, demande utilisateur). Le fichier est déjà
+    // transparent ; la pastille était celle posée par défaut derrière tout logo
+    // sans `emblemOpaque`. Même traitement que la LDC : le logo se pose
+    // directement sur la carte, sans fond ni ombre rectangulaire.
+    emblemOpaque: true,
+    emblemTransparent: true,
   },
   {
     id: 'UECL',

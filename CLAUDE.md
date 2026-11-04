@@ -7713,6 +7713,8 @@ cf-worker/
 - **Buteurs** (remplace la fenêtre 12h/refetch 5min du même soir) : `scorersUpdateDue` (`useScorers.js`) = vrai quand tous les matchs du dernier jour (≤ 3 j) d'une compétition sont finis ET que la copie locale date d'avant la fin du dernier match (`lastUpdated` FD.org, sinon KO + 150min). Classement.jsx → `useScorers(…, due)` ; due → clé serveur SANS `live=0` (TTL 5min), refetch sur le front montant, puis UN nouvel essai 10min plus tard si le total de buts n'a pas bougé. Hors « due » : cache 6h (`NO_MATCH_STALE_MS`) et clé `live=0` (TTL serveur 6h). Plus aucun appel périodique pendant/entre les matchs. Sans copie locale : « due » si le jour s'est fini il y a moins de 8h. Tests : `useScorers.test.js`.
 - **Accueil** (Highlights) : une card par compétition (le match le plus intéressant) ; « + N autres matchs ▾ » déplie toute la liste de CETTE compétition sur place, « Réduire ▴ » la replie ; le bouton du bas « Voir les N matchs » mène à la page Match. Intention produit (utilisateur) : Accueil synthétique, pas de grand défilement, accès rapide aux articles en bas.
 
+- **Logo Ligue Europa sans pastille blanche (05/11)** : `emblemOpaque: true` + `emblemTransparent: true` sur l'entrée UEL de `competitions.js` (même traitement que la LDC). Le fichier `europa-league.png` est déjà transparent ; la pastille blanche était celle par défaut de `.accueil__mdjLeagueIcon` (Match du jour), aussi retirée dans les en-têtes MatchPage/LiveMatchPage/Cocoon.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
