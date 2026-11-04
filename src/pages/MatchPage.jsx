@@ -8,7 +8,7 @@ import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
 import { COMPETITIONS }            from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
-import { useMatches, useH2HHistory } from '../hooks/useMatchs'
+import { useMatches, useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
 import { getMatchThemeVars } from '../data/teamPhotos'
 import { finalScore, mergeScore, isNationalTeamComp, resolveFdTeamId, resolveFdMatchId, buildHeroSubline } from '../utils/matchUtils'
@@ -25,6 +25,7 @@ import { useEspnMatchDetail } from '../hooks/useEspnMatchDetail'
 import { useAflMatchStats } from '../hooks/useApiFootball'
 import {
   PreMatchSection,
+  PreMatchProno,
   ComposTab,
   ClassementTab,
   MatchTimeline,
@@ -952,6 +953,11 @@ export default function MatchPage() {
   // partiel), et son contenu (H2HTabContent) se met à jour tout seul avec
   // l'historique complet dès qu'il arrive.
   const showH2HTab = h2hRows.length > 0
+  // Cotes d'avant-match (voir PreMatchProno, MatchModal.jsx) : mêmes entrées que les
+  // cards Accueil — historique COURT (non étendu, delay 0) ou, à défaut, le pool brut.
+  const { rows: pronoH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
+  const pronoFullH2H = pronoH2H.length > 0 ? pronoH2H : h2hPool
+  const lowerDivMatches = useLowerDivisionStats(compId, compMatches)
   const TABS = ['statistiques', 'compos', 'classement']
 
   const [activeTab, setActiveTab] = useState('statistiques')
@@ -1034,6 +1040,15 @@ export default function MatchPage() {
                 : formLoading
                   ? <MpStatsSkeleton />
                   : <>
+                      {/* Cotes du match — tout en haut, au-dessus de Stats saison. */}
+                      <PreMatchProno
+                        match={match}
+                        compMatches={compMatches}
+                        hForm={hForm}
+                        aForm={aForm}
+                        fullH2H={pronoFullH2H}
+                        lowerDivMatches={lowerDivMatches}
+                      />
                       {/* Sous-onglets seulement si Historique dispo — pas de
                           "Stats live" avant le coup d'envoi (rien à
                           récapituler), donc juste Stats saison / Historique. */}

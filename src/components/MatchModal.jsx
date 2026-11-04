@@ -12,7 +12,7 @@ import { reconcileStandings } from '../utils/standingsLive'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
-import { calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
+import { calcLiveProno, calcPronoAdvanced, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
@@ -831,6 +831,46 @@ function LiveProno({ prono, match, isQualification = false }) {
         <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} pct={prono.home} isFavorite={favorite === 'home'} />
         <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} isFavorite={favorite === 'draw'} />
         <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} pct={prono.away} isFavorite={favorite === 'away'} />
+      </div>
+    </div>
+  )
+}
+
+// ── Cotes d'avant-match (page d'un match à venir) ───────────────────────────
+// Mêmes cotes que celles qu'affichaient les cards de l'Accueil avant leur retrait
+// (05/11, demande utilisateur : "les cotes ne sont plus que dans la page live,
+// remets-les dans la page du match") : vraie cote de marché ESPN quand elle est
+// disponible, sinon le modèle interne (calcPronoAdvanced) — exactement la logique
+// de MatchPoster.jsx. `fullH2H` = historique COURT (pas l'étendu de l'onglet
+// Historique), comme sur les cards : même entrée → même cote.
+export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lowerDivMatches }) {
+  const { data: espnOdds } = useEspnPregameOdds(match, true)
+  const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
+  const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
+  const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
+  const awayCode = (match.awayTeam?.tla || awayName).slice(0, 3).toUpperCase()
+
+  const prono = calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm ?? [], aForm ?? [], {
+    fullH2H, lowerDivMatches,
+    neutralVenue: isNeutralVenueComp(match),
+  })
+  const useMarket = !!espnOdds
+  const favorite  = pronoFavoriteKey(useMarket ? espnOdds.pct : prono)
+  const pill = (key, label) => (
+    <LivePronoPill
+      label={label}
+      value={useMarket ? espnOdds.decimal[key] : pronoToOdds(prono[key])}
+      pct={useMarket ? espnOdds.pct[key] : prono[key]}
+      isFavorite={favorite === key}
+    />
+  )
+  return (
+    <div className="modal__liveProno">
+      <div className="modal__liveProno__title">Cotes du match</div>
+      <div className="modal__liveProno__row">
+        {pill('home', homeCode)}
+        {pill('draw', 'Nul')}
+        {pill('away', awayCode)}
       </div>
     </div>
   )
