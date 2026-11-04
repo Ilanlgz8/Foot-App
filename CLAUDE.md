@@ -7626,6 +7626,22 @@ cf-worker/
   match) plutôt que la stabilité des références, puisque les 3 objets comparés par
   `MatchPredictRow` sont désormais tous les trois stables hors refetch réel.
 
+- **Logo Bundesliga mal cadré dans le cercle compHeader (Programme/Résultat/Classement,
+  mobile)** — constat utilisateur du 04/11 : "le logo de la bundesliga... il est mal
+  cadré". Root cause trouvée en inspectant le fichier source lui-même
+  (`src/assets/leagues/bundesliga-2026.png`, 246×246) : il contenait le logo COMPLET
+  (icône joueur rouge + texte "BUNDESLIGA" en dessous), alors que l'icône carrée rouge
+  à elle seule ne fait que 246×197 (vérifié pixel par pixel : zone pleine de y=0 à
+  y=196, texte noir sur fond transparent de y=197 à 245). `.compHeader__logo`
+  (`object-fit: contain`, compHeader.css) affichait donc tout le fichier dans le
+  cercle — l'icône se retrouvait poussée vers le haut/décentrée, avec la bande de
+  texte illisible à 28px prenant ~20% de la place. Fixé en recadrant le fichier
+  source sur l'icône seule (246×197, texte retiré) — même convention déjà appliquée
+  aux autres logos de ce fichier (Serie A/Premier League/Ligue 1, voir l'historique en
+  tête de competitions.js : recadrer au plus près du CONTENU réel, pas du canvas).
+  Aucun CSS touché (`object-fit: contain` gère déjà nativement un ratio non carré,
+  comme pour Serie A 172×256 déjà en prod) — seul le PNG change. Build vérifié.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
