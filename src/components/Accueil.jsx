@@ -580,13 +580,16 @@ function Accueil() {
   // passée — voir isRecentlyFinished (matchStateTracker.js) et le même
   // pattern dans Live.jsx/LiveSidebar.jsx. S'arrête tout seul.
   useEffect(() => {
-    if (!matches.some(m => isRecentlyFinished(m.id))) return
+    const justEnded = () =>
+      matches.some(m => isRecentlyFinished(m.id)) ||
+      (matchDuJour != null && isRecentlyFinished(matchDuJour.id))
+    if (!justEnded()) return
     const id = setInterval(() => {
       setTick(t => t + 1)
-      if (!matches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+      if (!justEnded()) clearInterval(id)
     }, 1000)
     return () => clearInterval(id)
-  }, [matches])
+  }, [matches, matchDuJour])
 
   // ── Compétitions disponibles dans les données actuelles ──
   const matchCompetitions = useMemo(() => {
@@ -838,7 +841,16 @@ function Accueil() {
             fonction partagée de matchUtils.js) — pas une condition
             réinventée ici, sinon les deux comportements divergeraient au
             prochain ajustement. */}
-        {matchDuJour && (
+        {/* 04/11 (demande utilisateur : "chaque match terminé ne doit plus être
+            affiché que dans Résultats et le panneau résultats") : la carte
+            suit EXACTEMENT la même règle que les cards de la liste
+            (stillVisibleToday) — elle s'efface TERMINE_GRACE_MS après le coup
+            de sifflet final détecté par le tracker, sans attendre que l'API
+            (FD.org) passe le statut à FINISHED, ce qui pouvait prendre
+            plusieurs minutes pendant lesquelles elle restait affichée
+            "Terminé". Le résultat reste dans "Résultats récents" et la page
+            Résultats (qui n'excluent jamais le match du jour). */}
+        {matchDuJour && stillVisibleToday(matchDuJour) && (
           <MatchDuJourCard
             match={matchDuJour}
             espnScore={espnScores[matchDuJour.id]}

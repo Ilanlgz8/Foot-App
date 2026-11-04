@@ -7658,6 +7658,11 @@ cf-worker/
 - **Conservé volontairement** : (1) la notification système `notifyGoal` (page en arrière-plan) — branchée au même détecteur de but dans MatchCard.jsx, seul le `setGoal`/timer visuel est retiré ; (2) le léger pulse de la pastille de score (`live__pill--scored`/`pillGoal`) dans LiveCardWidget — c'est une animation distincte, non demandée ; à retirer si l'utilisateur le veut aussi. Les posters mobiles (MatchPoster) n'avaient pas d'overlay.
 - Vérifié : eslint 34 erreurs + 2 warnings (baseline 35+2, une erreur de moins : le setState dans l'effet a disparu), vitest 400/400, build OK.
 
+### 04/11 — Match du jour : disparaît dès la fin du match (comme les autres cards)
+- Demande : "chaque match terminé ne doit plus être affiché que dans Résultats et le panneau résultats". `pickMatchDuJour` masquait déjà la carte, mais seulement quand l'API (FD.org) passait en `FINISHED` (parfois plusieurs minutes après, pendant lesquelles elle restait en "Terminé").
+- Fix (`Accueil.jsx`) : la carte est rendue seulement si `stillVisibleToday(matchDuJour)` — même règle que la liste (disparition `TERMINE_GRACE_MS` = 8s après le `ft` du tracker). Le ticker 1s de fin de match inclut aussi `matchDuJour`. `pickMatchDuJour` inchangé (le même match reste élu toute la journée, pas de remplaçant).
+- Le résultat reste dans "Résultats récents" et la page Résultats (jamais exclus du match du jour).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
