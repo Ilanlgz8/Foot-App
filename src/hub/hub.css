@@ -29,16 +29,14 @@
 }
 .hubCocoon__head--btn { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .hubCocoon__logo {
-  width: 26px; height: 26px; flex-shrink: 0;
-  border-radius: 8px;
+  height: 26px; min-width: 26px; max-width: 46px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.92);
-  overflow: hidden;
   font-size: 13px;
 }
-.hubCocoon__logo--opaque { background: transparent; }
-.hubCocoon__logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; box-sizing: border-box; }
-.hubCocoon__logo--opaque img { padding: 0; object-fit: cover; }
+/* Logo posé tel quel, sans fond (comme dans l'en-tête des cards Accueil) ; seul un
+   logo à fond plein (tuile Ligue 1, Serie A…) garde ses coins arrondis. */
+.hubCocoon__logo img { height: 100%; width: auto; max-width: 100%; object-fit: contain; display: block; }
+.hubCocoon__logo--opaque img { border-radius: 7px; }
 .hubCocoon__name {
   flex: 1; min-width: 0;
   font-family: 'Chakra Petch', system-ui, sans-serif;
