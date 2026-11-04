@@ -7681,6 +7681,9 @@ cf-worker/
 - `PENDING_KICKOFF_WINDOW_MS` (matchUtils.js) = 10 min (avant 30) : durée max du "Débute" quand ESPN n'a rien confirmé. Utilisée par `calcMinute`, `_checkPendingKickoffs` (useLiveMinute) et `LiveWidget`. Au-delà → `calcMinute` renvoie null, le match retourne dans la liste normale (« Coup d'envoi ») au lieu de rester en direct.
 - Contrepartie assumée : un coup d'envoi retardé de plus de 10 min n'apparaît en direct qu'une fois ESPN (ou FD.org IN_PLAY) confirmé.
 
+### 04/11 (soir) — Mode Card : logos/noms/forme remontés
+- `hub.css` : `.hubPosters .poster__middle` padding-top −6px (18px / 34px avec label) + `.poster__center { margin-top: 6px }` → logos, noms et forme récente montent de 6px, score et minute ne bougent pas.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

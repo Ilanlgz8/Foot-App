@@ -164,8 +164,10 @@
 .hubPosters .poster__topbar {
   position: absolute; top: 10px; right: 13px; left: auto; padding: 0; z-index: 2;
 }
-.hubPosters .poster__middle { flex: none; align-items: flex-start; padding: 24px 12px 16px; }
-.hubPosters .poster:has(.poster__min-labelCol) .poster__middle { padding-top: 40px; }
+/* Logos / noms / forme remontés de 6px ; le centre (score, minute) garde sa place via margin-top. */
+.hubPosters .poster__middle { flex: none; align-items: flex-start; padding: 18px 12px 16px; }
+.hubPosters .poster:has(.poster__min-labelCol) .poster__middle { padding-top: 34px; }
+.hubPosters .poster__center { margin-top: 6px; }
 .hubPosters .poster__team-col { width: 92px; }
 .hubPosters .poster__name { max-width: 92px; }
 .hubPosters .poster__center {
