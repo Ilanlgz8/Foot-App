@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
@@ -231,7 +232,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // propre plutôt que d'attendre une expiration naturelle.
   const key = `scorers3_${compId}`
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['scorers', compId],
     // ⚠️ Logique de fetch déplacée dans fetchScorersData (voir juste avant
     // cette fonction, extraction du 28/10) — appelée ici à l'identique,
@@ -296,6 +297,30 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     },
     enabled: !!compId,
   })
+
+  // ⚠️ AJOUT (04/11, bug trouvé en reproduisant en direct — vérifié sur la prod,
+  // navigateur SANS aucun cache — needsScorersCatchUp calculait bien "il faut
+  // rattraper", mais le classement affichait quand même encore l'ancien total
+  // 13h après la fin des matchs, alors que FD.org lui-même était déjà à jour
+  // depuis le matin, confirmé par un fetch brut) : changer `hasMatchToday` (donc
+  // `staleTime` ci-dessus) ne déclenche RIEN tout seul en React Query — une
+  // query déjà montée ne se refetch jamais automatiquement juste parce qu'elle
+  // redevient "stale" entre deux renders ; il faut un vrai déclencheur (montage,
+  // focus, refetchInterval, ou un refetch() explicite), et aucun des trois
+  // n'existe ici. `needsScorersCatchUp` (Classement.jsx) pouvait donc très bien
+  // calculer "il faut rattraper" sans que ça ne déclenche jamais le moindre
+  // nouveau fetch tant que le composant restait monté. Même trou, en fait, pour
+  // la transition "normale" (un match vient tout juste de commencer alors que
+  // Classement est déjà ouvert) — jamais remarqué avant car on remonte presque
+  // toujours le composant entre-temps (changement de compétition, navigation).
+  // refetch() explicite sur le FRONT MONTANT de hasMatchToday (false→true) :
+  // couvre les deux cas (vraie fenêtre live ET rattrapage) avec le même
+  // mécanisme, sans rien changer quand hasMatchToday reste stable ou redescend.
+  const prevHasMatchToday = useRef(hasMatchToday)
+  useEffect(() => {
+    if (hasMatchToday && !prevHasMatchToday.current) refetch()
+    prevHasMatchToday.current = hasMatchToday
+  }, [hasMatchToday, refetch])
 
   return {
     scorers: data ?? [],

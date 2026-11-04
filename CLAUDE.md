@@ -7492,6 +7492,34 @@ cf-worker/
   400 tests + lint (35 erreurs pré-existantes + 2 warnings pré-existants, baseline identique) +
   build vérifiés.
 
+- **04/11 — Classement buteurs toujours pas rafraîchi 13h après la fin des matchs, MALGRÉ
+  le fix needsScorersCatchUp du matin même** : reproduit en direct sur la prod, dans un
+  navigateur SANS AUCUN cache (localStorage vide, aucune excuse de donnée périmée côté
+  client) — l'app affichait toujours Fabián Ruiz à 2 buts, alors qu'un fetch brut de
+  `/v4/competitions/CL/scorers` à cet instant précis confirmait que FD.org lui-même était
+  DÉJÀ à jour depuis le matin (4 buts, 1 assist, X-Cache MISS puis STALE-mais-correct).
+  Root cause du VRAI bug, trouvée en lisant le state React Query par introspection Fiber :
+  `needsScorersCatchUp` (ajouté ce matin) calcule correctement qu'un rattrapage est
+  nécessaire et fait bien baisser `staleTime` sur `useScorers` — mais changer `staleTime`
+  sur une query DÉJÀ MONTÉE ne déclenche RIEN tout seul en React Query. Une query ne se
+  refetch automatiquement que sur un vrai déclencheur (montage du composant, focus fenêtre,
+  refetchInterval, ou un `refetch()` explicite) — redevenir "stale" entre deux renders,
+  sans qu'aucun de ces déclencheurs n'ait lieu, ne fait RIEN de plus que marquer la donnée
+  comme périmée en interne, indéfiniment, tant que le composant reste monté. `useScorers`
+  n'avait aucun de ces 3 déclencheurs branché sur le changement de `hasMatchToday` — un
+  trou qui, en réalité, touchait déjà la transition "normale" (un match qui démarre
+  pendant que Classement est déjà ouvert), jamais remarqué avant car on remonte presque
+  toujours le composant entre-temps (changement de compétition/navigation). Corrigé :
+  `refetch()` explicite dans un `useEffect` sur le FRONT MONTANT de `hasMatchToday`
+  (false→true) — couvre la vraie fenêtre live ET le rattrapage avec le même mécanisme,
+  sans rien changer quand `hasMatchToday` reste stable ou redescend. Leçon à retenir pour
+  la suite : changer `staleTime` seul NE SUFFIT JAMAIS à corriger un affichage figé sur une
+  query déjà montée — il faut toujours l'associer à un vrai déclencheur de refetch (mount,
+  focus, refetchInterval, ou refetch() explicite comme ici), sous peine de corriger le
+  calcul sans rien changer au résultat visible (exactement l'erreur commise ce matin avec
+  needsScorersCatchUp seul). 400 tests + lint (35 erreurs pré-existantes + 2 warnings
+  pré-existants, baseline identique) + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
