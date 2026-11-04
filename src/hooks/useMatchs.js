@@ -322,6 +322,29 @@ export function useH2HHistory(selectedComp, compMatches) {
 // non vérifié, voir son commentaire dans competitions.js — un échec ici ne
 // doit jamais remonter, juste priver ce repli de données).
 const LOWER_DIV_CACHE_TTL = 90 * 24 * 3600 * 1000  // 90j — même raisonnement que H2H_HISTORY_CACHE_TTL
+
+// ⚠️ AJOUT (04/11, constat utilisateur : "page prono ça lag/bug énormément à
+// chaque bouton, obligé de quitter l'appli" — persistant MALGRÉ le fix
+// React.memo du 02/11 sur MatchPredictRow, voir son commentaire détaillé,
+// Pronos.jsx) : ce fix comparait `lowerDivByComp[code]` par RÉFÉRENCE pour
+// décider de skip un re-render — mais `byComp[code] = results[i]?.data ?? []`
+// ci-dessous crée un NOUVEAU tableau `[]` littéral à CHAQUE appel de ce hook
+// (donc à chaque render de Pronos) pour toute compétition SANS repli "club
+// promu" configuré (LOWER_DIVISION_FD_CODE, src/data/competitions.js — SEULES
+// PL/FL1/PD/BL1/SA y figurent) : sa query reste `enabled: false` pour
+// toujours, `data` ne se résout donc JAMAIS, `?? []` est répété à chaque
+// appel. Concrètement : CL, EC, WC, NL, CAN, COPA, UEL, UECL, USC, TDC, CS et
+// toutes les coupes nationales — la MAJORITÉ des compétitions suivies dans
+// Pronos, dont justement la Ligue des Champions citée par l'utilisateur —
+// invalidaient donc TOUJOURS le comparateur du 02/11 pour ces matchs,
+// annulant sa protection pour la plupart des lignes affichées à chaque
+// re-render de Pronos (déclenché, entre autres, par le polling ESPN toutes
+// les 15-30s, voir useTeamForm.js) : recalcul Poisson+H2H synchrone pour
+// des dizaines de matchs, potentiellement en plein milieu d'un clic.
+// Fix : une seule constante `[]` PARTAGÉE (jamais recréée) au lieu d'un
+// littéral — même référence à chaque appel pour toute compétition sans
+// donnée, le comparateur de MatchPredictRow la voit enfin comme STABLE.
+const EMPTY_LOWER_DIV_STATS = []
 const inFlightLowerDiv = new Map()
 
 export function fetchLowerDivisionStats(selectedComp, compMatches) {
@@ -404,7 +427,7 @@ export function useLowerDivisionStatsMulti(compCodes, matchesByComp) {
   })
 
   const byComp = {}
-  codes.forEach((code, i) => { byComp[code] = results[i]?.data ?? [] })
+  codes.forEach((code, i) => { byComp[code] = results[i]?.data ?? EMPTY_LOWER_DIV_STATS })
   return byComp
 }
 

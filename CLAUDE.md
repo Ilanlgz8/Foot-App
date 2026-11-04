@@ -7400,6 +7400,36 @@ cf-worker/
   `setScorerPage`, sans rapport, vérifié par `git stash`] + 2 warnings pré-existants, baseline
   identique) + build vérifiés.
 
+- **04/11 — Page Pronos toujours "lag énormément" malgré le fix React.memo du 02/11** :
+  le fix du 02/11 (comparateur `React.memo` sur `MatchPredictRow`, comparant
+  `formMapByComp[code]`/`matchesByComp[code]`/`lowerDivByComp[code]` PAR RÉFÉRENCE
+  pour décider de skip un re-render) reposait sur une hypothèse fausse pour
+  `lowerDivByComp` : `useLowerDivisionStatsMulti` (useMatchs.js) construisait
+  `byComp[code] = results[i]?.data ?? []` — un littéral `[]` TOUT NEUF à chaque
+  appel du hook (donc à chaque render de Pronos) pour toute compétition SANS
+  repli "club promu" configuré (`LOWER_DIVISION_FD_CODE` ne couvre QUE PL/FL1/
+  PD/BL1/SA — sa query reste `enabled: false` pour toujours, `data` ne se résout
+  donc jamais). Concrètement : CL, EC, WC, NL, CAN, COPA, UEL, UECL, USC, TDC, CS
+  et toutes les coupes nationales — la MAJORITÉ des compétitions suivies dans
+  Pronos, dont précisément la Ligue des Champions citée par l'utilisateur —
+  invalidaient donc TOUJOURS le comparateur pour ces matchs, annulant sa
+  protection pour la plupart des lignes affichées à chaque re-render de Pronos
+  (déclenché entre autres par le polling ESPN toutes les 15-30s, voir
+  useTeamForm.js) : recalcul Poisson+H2H synchrone pour des dizaines de matchs,
+  potentiellement en plein milieu d'un clic — exactement le "ça lag à chaque
+  bouton" décrit. Corrigé : une seule constante `EMPTY_LOWER_DIV_STATS = []`
+  PARTAGÉE (jamais recréée) utilisée comme repli, au lieu d'un littéral — même
+  référence à chaque appel pour toute compétition sans donnée, le comparateur
+  de `MatchPredictRow` la voit enfin comme stable. `matchesByComp`/
+  `formMapByComp` (useTeamForm.js) ont le même motif `?? []`/`?? {}`, mais pas
+  le même bug : leurs queries restent `enabled` par défaut (jamais bloquées
+  pour toujours comme `lowerDivByComp`), donc une fois la 1ère donnée reçue,
+  `results[i].data` devient une référence stable réutilisée à chaque render —
+  seul un très bref flash au tout premier chargement, pas un problème
+  persistant comme celui corrigé ici. 400 tests + lint (35 erreurs
+  pré-existantes + 2 warnings pré-existants, baseline identique) + build
+  vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
