@@ -35,6 +35,7 @@
 import { readCacheStale, writeCache } from '../hooks/localCache'
 import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { countryFlagUrl } from '../data/countryFlags'
+import { isUnfollowedCupMatch } from './matchUtils'
 
 // Compétitions sélections nationales sourcées ESPN — voir countryFlags.js :
 // on remplace le blason ESPN (marge interne variable selon le pays, ne peut
@@ -442,13 +443,22 @@ function isUntrackedCupQualifyingRound(event) {
 // filtrés dans l'onglet du championnat parent, voir useMatchs.js) mais
 // competition.name = nom de la coupe + isCup:true, pour le relabeling sur les
 // cards de match.
+// 04/11 : Coupe de France, 7e tour (`seventh-round`) — ESPN liste le match mais ne le suit
+// jamais (0 événement, STATUS_SCHEDULED figé des heures après le KO, résultat final inconnu).
+// Même constat que les tours de qualification ci-dessus, mais le slug seul ne suffit pas à le
+// détecter pour tous les tours : on retire donc toute coupe jamais confirmée après son KO
+// (voir isUnfollowedCupMatch). Appliqué APRÈS le cache pour rester juste si ESPN se met à jour.
+function dropUnfollowedCup(matches) {
+  return matches.filter(m => !isUnfollowedCupMatch(m))
+}
+
 export async function fetchEspnCupMatches(parentCode) {
   const cup = DOMESTIC_CUPS[parentCode]
   if (!cup) return []
   const cacheKey = `matches_espn_cup_${parentCode}`
   try {
     const json = await fetchEspnWindowJson(cup.slug)
-    if (!json) return readCacheStale(cacheKey) ?? []
+    if (!json) return dropUnfollowedCup(readCacheStale(cacheKey) ?? [])
     const matches = (json.events ?? [])
       .filter(e => !isUntrackedCupQualifyingRound(e))
       .map(e => normalizeEvent(e, parentCode, {
@@ -473,8 +483,8 @@ export async function fetchEspnCupMatches(parentCode) {
     // une vraie information (rien de programmé pour l'instant), pas une
     // panne : on la fait remonter telle quelle.
     writeCache(cacheKey, matches, ESPN_MATCHES_TTL)
-    return matches
+    return dropUnfollowedCup(matches)
   } catch {
-    return readCacheStale(cacheKey) ?? []
+    return dropUnfollowedCup(readCacheStale(cacheKey) ?? [])
   }
 }

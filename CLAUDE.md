@@ -7687,7 +7687,8 @@ cf-worker/
 ### 04/11 (soir) — Cards live : chevauchement + coupes non suivies
 - `hub.css` : en mode Card, padding-top 38px quand la card a un badge de période (« 2ème mi-temps ») ou une minute-colonne → plus de chevauchement avec le logo visiteur.
 - `isUnfollowedCupMatch` (matchUtils.js) : match de coupe nationale (`isCup`) encore SCHEDULED/TIMED plus de 10 min après le coup d'envoi, sans aucune confirmation ESPN → masqué de Match > Tous les matchs et de l'Accueil. Il réapparaît tout seul si ESPN le passe en cours/terminé.
-- **Pourquoi** : Baie-Mahault–Les Abymes (7e tour de la Coupe de France, `season.slug: seventh-round`) : ESPN publie la fiche mais rien dedans (0 commentaire, 0 événement, statut STATUS_SCHEDULED 2h après le KO). Pas de source live pour ces tours préliminaires régionaux.
+- **Constat corrigé (04/11, plus tard)** : Baie-Mahault–Les Abymes (7e tour, `seventh-round`) : ESPN avait d'abord publié un horaire PLACEHOLDER (19:00Z) puis l'a corrigé à 22:00Z (vérifié en direct). Le « ESPN ne suit pas ce match » écrit plus haut venait de cet horaire erroné — NON démontré. On ne sait pas si ESPN suivra ce match à 22:00Z. La règle reste volontairement auto-correctrice : masqué seulement si toujours « programmé » 10 min après le VRAI coup d'envoi.
+- `fetchEspnCupMatches` applique le filtre à la source (après le cache) → le match disparaît de TOUTES les pages (Match, Accueil, Programme, Résultats, forme), pas seulement des listes du jour.
 
 ## Conventions
 - Noms français partout dans l'UI
