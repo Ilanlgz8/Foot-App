@@ -7642,6 +7642,17 @@ cf-worker/
   Aucun CSS touché (`object-fit: contain` gère déjà nativement un ratio non carré,
   comme pour Serie A 172×256 déjà en prod) — seul le PNG change. Build vérifié.
 
+- **Logo Bundesliga toujours mal cadré après le 1er recadrage — "pôles nord/sud
+  écrasés"** — suite directe du fix précédent (même jour) : retirer le texte
+  "BUNDESLIGA" avait laissé un canvas RECTANGULAIRE (246×197, ratio 1.25:1), alors
+  que le cercle compHeader est carré (1:1) — `object-fit: contain` ajoute alors une
+  marge transparente en haut ET en bas pour respecter les proportions, exactement le
+  symptôme signalé. Fix : canvas réétendu à 246×246 (carré), complété haut/bas avec
+  le rouge de fond du logo lui-même (`(210,5,21,255)`, uni, échantillonné au centre
+  de l'image — vérifié constant hors bord) plutôt que du transparent — l'icône n'est
+  ni redimensionnée ni recadrée, juste recentrée verticalement. Un canvas carré
+  remplit maintenant le cercle dans les 2 dimensions sans bande vide. Build vérifié.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
