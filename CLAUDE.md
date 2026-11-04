@@ -7653,6 +7653,11 @@ cf-worker/
   ni redimensionnée ni recadrée, juste recentrée verticalement. Un canvas carré
   remplit maintenant le cercle dans les 2 dimensions sans bande vide. Build vérifié.
 
+### 04/11 — Animation "BUT !" retirée (demande utilisateur : "ça sert à rien")
+- Supprimé : l'overlay plein-card "BUT !" (composant `GoalCelebration`, classes `.goal__*`, halo `--goal`/`goalCardGlow`) dans `accueil/MatchCard.jsx` (cards desktop Accueil) et `components/LiveCardWidget.jsx` (widgets /live + grille "En direct" desktop). CSS associé retiré de `accueil.css` et `live.css`.
+- **Conservé volontairement** : (1) la notification système `notifyGoal` (page en arrière-plan) — branchée au même détecteur de but dans MatchCard.jsx, seul le `setGoal`/timer visuel est retiré ; (2) le léger pulse de la pastille de score (`live__pill--scored`/`pillGoal`) dans LiveCardWidget — c'est une animation distincte, non demandée ; à retirer si l'utilisateur le veut aussi. Les posters mobiles (MatchPoster) n'avaient pas d'overlay.
+- Vérifié : eslint 34 erreurs + 2 warnings (baseline 35+2, une erreur de moins : le setState dans l'effet a disparu), vitest 400/400, build OK.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

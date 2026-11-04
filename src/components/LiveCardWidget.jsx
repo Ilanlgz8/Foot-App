@@ -92,18 +92,6 @@ function ScorerColumns({ scorers = [] }) {
   )
 }
 
-// ── Animation BUT ────────────────────────────────────────────────────────────
-function GoalCelebration({ teamName, scoreStr }) {
-  return (
-    <div className="goal__overlay" aria-hidden="true">
-      <span className="goal__text">BUT !</span>
-      <div className="goal__line" />
-      {teamName && <span className="goal__team">{teamName}</span>}
-      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
-    </div>
-  )
-}
-
 // ── Card match individuelle ───────────────────────────────────────────────────
 // Utilisée par Live.jsx (page /live, grille complète) ET Accueil.jsx (grille
 // "En direct" desktop, voir accueil__liveWidgetsGrid) — comportement/rendu
@@ -223,12 +211,10 @@ export function LiveCard({ match, espn, onClick }) {
 
   return (
     <div
-      className={`live__card${goal ? ' live__card--goal' : ''}`}
+      className="live__card"
       onClick={onClick} role="button" tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}
     >
-      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
-
       {/* Header : période seulement — le badge compétition est maintenant
           affiché une seule fois par section (voir groupByCompetition, Live.jsx) */}
       <div className="live__cardHeader--periodOnly">

@@ -8,17 +8,6 @@ import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
 import { COMPETITIONS } from '../data/competitions'
 
-function GoalCelebration({ teamName, scoreStr }) {
-  return (
-    <div className="goal__overlay" aria-hidden="true">
-      <span className="goal__text">BUT !</span>
-      <div className="goal__line" />
-      {teamName && <span className="goal__team">{teamName}</span>}
-      {scoreStr  && <span className="goal__score">{scoreStr}</span>}
-    </div>
-  )
-}
-
 // Formate une date UTC en heure locale "20:45"
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', {
@@ -240,8 +229,6 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
   const scoreKey = `foot_score_${match.id}`
   const prevHs   = useRef(null)
   const prevAs   = useRef(null)
-  const timerRef = useRef(null)
-  const [goal, setGoal] = useState(null) // { team: string } | null
 
   // Initialisation one-shot depuis localStorage pour éviter les fausses animations
   // au reload — useLayoutEffect (pas une mutation de ref pendant le render) :
@@ -269,19 +256,13 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
       if (!noAnimation) {
         const team = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '')
         const score = `${hs} – ${as_ ?? 0}`
-        setGoal({ team, scoreStr: score })
         notifyGoal({ teamName: team, scoreStr: score, minute: liveMinute })
-        clearTimeout(timerRef.current)
-        timerRef.current = setTimeout(() => setGoal(null), 5200)
       }
     } else if (prevAs.current !== null && as_ != null && as_ > prevAs.current) {
       if (!noAnimation) {
         const team = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '')
         const score = `${hs ?? 0} – ${as_}`
-        setGoal({ team, scoreStr: score })
         notifyGoal({ teamName: team, scoreStr: score, minute: liveMinute })
-        clearTimeout(timerRef.current)
-        timerRef.current = setTimeout(() => setGoal(null), 5200)
       }
     }
     if (hs  != null) prevHs.current = hs
@@ -298,8 +279,6 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
     // au moment où l'effet s'exécute réellement (au changement de score).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hs, as_, isLive])
-
-  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   // Qui a gagné ? (uniquement pour les matchs terminés, et si noWinnerLoser est false)
   // Aux tirs au but, fullTime est à égalité → le vainqueur se lit dans penalties.
@@ -362,11 +341,9 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
 
   return (
     <div
-      className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}${goal ? ' accueil__matchCard--goal' : ''}`}
+      className={`accueil__matchCard${isLive ? ' accueil__matchCard--live' : ''}`}
       style={cardGradient ? { '--match-card-gradient': cardGradient } : undefined}
     >
-      {goal && <GoalCelebration teamName={goal.team} scoreStr={goal.scoreStr} />}
-
       {/* Bandeau compétition (haut gauche, toujours visible — design 4★
           approuvé : "le championnat met le en haut a gauche de la card du
           match") + statut de période (haut droite, live uniquement) — même
