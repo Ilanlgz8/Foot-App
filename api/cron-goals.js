@@ -48,7 +48,7 @@ import {
   fuzzyTeamFifa, normalizeFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin,
-  pickUnsentGoalScorers, goalSignature,
+  pickScorersForNewGoals, goalSignature,
 } from '../src/utils/liveDetection.js'
 
 const kv = new Redis({
@@ -970,6 +970,8 @@ export default async function handler(req, res) {
         if (Array.isArray(track[sentKeyCancel])) {
           track[sentKeyCancel] = track[sentKeyCancel].slice(0, newCount)
         }
+        // Compteur "buts notifiés sans buteur" : jamais plus que (buts restants - buts signés).
+        track[`${side}Generic`] = Math.min(track[`${side}Generic`] || 0, Math.max(0, newCount - (Array.isArray(track[sentKeyCancel]) ? track[sentKeyCancel].length : 0)))
 
         track[side] = newCount
         trackChanged = true
@@ -991,7 +993,8 @@ export default async function handler(req, res) {
         // src/index.js (logique partagée, jamais l'un sans l'autre).
         const sentKey = `${side}Sent`
         const sentSigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
-        const pendingScorers = pickUnsentGoalScorers(goalScorers, sentSigs, targetCount)
+        const genericKey = `${side}Generic`
+        const pendingScorers = pickScorersForNewGoals(goalScorers, sentSigs, targetCount, track[genericKey] || 0)
         let pendingIdx = 0
 
         // Un but à la fois — tant que track[side] < targetCount, il reste au
@@ -1038,6 +1041,8 @@ export default async function handler(req, res) {
             const sigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
             sigs.push(goalSignature(scorer))
             track[sentKey] = sigs.slice(-30)
+          } else {
+            track[genericKey] = (track[genericKey] || 0) + 1
           }
           pendingIdx++
           trackChanged = true

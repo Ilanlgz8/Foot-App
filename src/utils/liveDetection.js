@@ -260,6 +260,20 @@ export function pickUnsentGoalScorers(goalScorers, sentSignatures, targetCount) 
   })
 }
 
+// ⚠️ BUG CORRIGÉ (04/11, constat utilisateur répété : un but notifié "But marqué"
+// (buteur pas encore publié par ESPN), puis le but SUIVANT part avec le buteur ET la
+// minute du but précédent — ex. City 3-2 (Haaland 80') notifié "Enzo Fernandez 58'").
+// Root cause : un but notifié en générique n'enregistre AUCUNE signature (pas de
+// buteur à signer). Quand ESPN publie ensuite son buteur, il reste "non envoyé" dans
+// pickUnsentGoalScorers et, étant le plus ancien, il était choisi pour le but suivant.
+// `genericCount` = nombre de buts déjà notifiés SANS buteur pour ce camp : ils
+// correspondent aux `genericCount` plus anciens buteurs non envoyés, qu'on écarte avant
+// d'attribuer un buteur aux nouveaux buts. Si le buteur du nouveau but n'est pas encore
+// publié, la liste est vide → notif générique, jamais un mauvais nom.
+export function pickScorersForNewGoals(goalScorers, sentSignatures, targetCount, genericCount = 0) {
+  return pickUnsentGoalScorers(goalScorers, sentSignatures, targetCount).slice(Math.max(0, genericCount || 0))
+}
+
 // ── Résumé auto de match (recap) ────────────────────────────────────────
 // Moteur de phrases déterministe (pas de LLM) : gratuit, ne peut jamais
 // échouer/timeout, toujours cohérent avec les vraies données du match.

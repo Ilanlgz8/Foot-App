@@ -803,12 +803,14 @@ function Accueil() {
                 panneau n'affiche plus la liste complète du jour mais 1 match par
                 compétition ; la liste complète (avec flèches de jour) est dans la
                 page Match (/live, onglet "Tous les matchs"). */}
-            <div className="accueil__dashPanelHeader">
-              <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">
-                {dayOffset === 0 ? 'À ne pas manquer' : `À ne pas manquer · ${getDayLabel(dayOffset)}`}
-              </h2>
-            </div>
-            <div className="accueil__dashPanelDivider" />
+            {dayOffset !== 0 && (
+              <>
+                <div className="accueil__dashPanelHeader">
+                  <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
+                </div>
+                <div className="accueil__dashPanelDivider" />
+              </>
+            )}
             <Highlights
               matches={matchPanelMatches}
               loading={matchesLoading}

@@ -37,6 +37,15 @@ export function useMatchDay(dayOffset) {
     return applyKnockoutTeamOverrides(merged, knockoutOverrides)
   }, [rawMatches, upcomingAllComps, targetDate, knockoutOverrides, dayOffset, liveMatches])
 
+  // "En direct" : un match suivi comme live mais que la liste du jour (ESPN/FD.org) donne déjà FINISHED
+  // n'est plus en direct (04/11 : Porto–Naples restait en « 90'+18 » après le coup de sifflet, alors
+  // que Résultats l'affichait terminé). Le suivi local peut rater la fin ; la liste, elle, est à jour.
+  const liveNow = useMemo(() => {
+    const finished = matches.filter(m => m.status === 'FINISHED')
+    if (finished.length === 0) return liveMatches
+    return liveMatches.filter(m => !isDuplicateMatch(m, finished))
+  }, [matches, liveMatches])
+
   const formCompCodes = useMemo(() => {
     const codes = new Set()
     for (const m of matches) if (m.competition?.code) codes.add(m.competition.code)
@@ -78,7 +87,7 @@ export function useMatchDay(dayOffset) {
   }, [dayOffset, loading, queryClient])
 
   return {
-    matches, loading, targetDate, espnScores, liveMatches,
+    matches, loading, targetDate, espnScores, liveMatches: liveNow,
     formMapByComp, matchesByComp,
     nextMatchDayOffset, prevMatchDayOffset,
   }

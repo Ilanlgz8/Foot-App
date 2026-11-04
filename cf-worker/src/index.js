@@ -54,7 +54,7 @@ import {
   fuzzyTeamFifa, fifaTeamNamesAll, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin,
-  pickUnsentGoalScorers, goalSignature,
+  pickScorersForNewGoals, goalSignature,
 } from '../../src/utils/liveDetection.js'
 
 // EXTRA_NOTIFY_SLUGS (coupes nationales + NL/CAN/COPA, voir espnSlugs.js) :
@@ -1748,6 +1748,8 @@ async function runOnePass(env) {
           if (Array.isArray(track[sentKeyCancel])) {
             track[sentKeyCancel] = track[sentKeyCancel].slice(0, newCount)
           }
+          // Compteur "buts notifiés sans buteur" : jamais plus que (buts restants - buts signés).
+          track[`${side}Generic`] = Math.min(track[`${side}Generic`] || 0, Math.max(0, newCount - (Array.isArray(track[sentKeyCancel]) ? track[sentKeyCancel].length : 0)))
           track[side] = newCount
           trackChanged = true
         }
@@ -1767,7 +1769,8 @@ async function runOnePass(env) {
           // tous les buts suivants vers le mauvais buteur).
           const sentKey = `${side}Sent`
           const sentSigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
-          const pendingScorers = pickUnsentGoalScorers(goalScorers, sentSigs, targetCount)
+          const genericKey = `${side}Generic`
+          const pendingScorers = pickScorersForNewGoals(goalScorers, sentSigs, targetCount, track[genericKey] || 0)
           let pendingIdx = 0
 
           while (track[side] < targetCount) {
@@ -1826,6 +1829,8 @@ async function runOnePass(env) {
               const sigs = Array.isArray(track[sentKey]) ? track[sentKey] : []
               sigs.push(goalSignature(scorer))
               track[sentKey] = sigs.slice(-30)
+            } else {
+              track[genericKey] = (track[genericKey] || 0) + 1
             }
             pendingIdx++
             trackChanged = true

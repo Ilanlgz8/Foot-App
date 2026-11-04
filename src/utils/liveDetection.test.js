@@ -10,7 +10,7 @@ import {
   fuzzyTeamFifa, fifaEffectiveStatus, fifaConfirmsShootoutOver,
   extractEspnScorers, extractEspnCards, generateRecap,
   minuteLabel, dateStr, parseMin, hasUsefulSummaryData,
-  espnEventSide, pickUnsentGoalScorers, goalSignature,
+  espnEventSide, pickUnsentGoalScorers, pickScorersForNewGoals, goalSignature,
 } from './liveDetection'
 
 describe('normalizeEspnStatus', () => {
@@ -305,6 +305,20 @@ describe('extractEspnCards — bout en bout sur Betis - Real Madrid', () => {
 // (minute d'un but déjà notifié corrigée après coup), tous les index suivants
 // pointent vers le mauvais buteur. pickUnsentGoalScorers identifie les buts
 // déjà envoyés par SIGNATURE (nom+minute) plutôt que par position.
+describe('pickScorersForNewGoals — but générique puis but suivant (04/11)', () => {
+  const enzo  = { name: 'Enzo Fernandez', minute: "58'", team: 'home' }
+  const haal  = { name: 'Erling Haaland', minute: "80'", team: 'home' }
+  it("n'attribue PAS le buteur du but précédent (notifié en générique) au nouveau but", () => {
+    // But 2 notifié "But marqué" (aucune signature), ESPN publie ensuite Enzo 58', puis 3e but sans buteur publié.
+    expect(pickScorersForNewGoals([enzo], [], 2, 1)).toEqual([])
+    // Même cas, buteur du 3e but déjà publié : on prend Haaland, pas Enzo.
+    expect(pickScorersForNewGoals([enzo, haal], [], 2, 1)).toEqual([haal])
+  })
+  it('sans but générique, se comporte comme pickUnsentGoalScorers', () => {
+    expect(pickScorersForNewGoals([enzo, haal], ["Enzo Fernandez|58'"], 2, 0)).toEqual([haal])
+  })
+})
+
 describe('goalSignature / pickUnsentGoalScorers', () => {
   it('construit une signature stable nom+minute', () => {
     expect(goalSignature({ name: 'Doué', minute: "11'" })).toBe("Doué|11'")

@@ -7699,6 +7699,12 @@ cf-worker/
 - Logos des équipes agrandis sur la page Match uniquement (`.hubPosters--lg` : crestWrap 52px au lieu de 44, centre à 52px).
 - Cocon : la tuile bleue pleine du logo Ligue 1 est remplacée par `ligue1-2026-transparent.png` (blanc détouré, généré depuis ligue1-2026.png : alpha = (R-8)/247) — uniquement dans l'en-tête de cocon (Cocoon.jsx), pas dans la card « Match du jour ».
 
+### 04/11 (nuit) — Match fini resté en direct + mauvais buteur dans les notifs
+- **Onglet En direct** : `useMatchDay` retire de `liveMatches` tout match que la liste du jour (ESPN/FD.org) donne déjà FINISHED (même match via `isDuplicateMatch`). Cas réel : Porto–Naples restait « 90'+18 » (le suivi local avait raté la fin, état figé en STATUS_IN_PROGRESS + interpolation de l'horloge) alors que Résultats l'affichait terminé. ESPN publie la fin des matchs de LDC sous `STATUS_FULL_TIME` (pas `STATUS_FINAL`).
+- **Notifs de but — mauvais buteur** : un but notifié « But marqué » (buteur pas encore publié) n'enregistrait aucune signature ; une fois son buteur publié il restait « non envoyé » et était repris pour le but SUIVANT (ex. City 3-2 notifié « Enzo Fernandez 58' » au lieu de Haaland 80'). Fix : compteur `${side}Generic` dans le track (buts notifiés sans buteur) + `pickScorersForNewGoals` (liveDetection.js) qui écarte les N plus anciens buteurs non envoyés. Appliqué dans `api/cron-goals.js` ET `cf-worker/src/index.js` (le Worker Cloudflare doit être REDÉPLOYÉ à la main : `wrangler deploy`). Reste possible : ESPN qui change la minute d'un but déjà notifié (signature différente) → but « non envoyé » fantôme ; non traité.
+- Accueil : le titre « À ne pas manquer » est retiré (seule l'étiquette du jour reste quand on n'est pas sur aujourd'hui).
+- Coupe de France Baie-Mahault–Les Abymes : vérifié, 13 min après le vrai KO (22:00Z) ESPN le laisse STATUS_SCHEDULED, 0 événement → le filtre `isUnfollowedCupMatch` le retire bien (confirmé en prod).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
