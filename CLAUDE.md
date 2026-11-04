@@ -7596,6 +7596,36 @@ cf-worker/
   réseau lu en direct dans le navigateur de l'utilisateur (javascript_tool) — confiance totale
   sur les 2 corrections ci-dessus, aucune devinette cette fois.
 
+- **Pronos toujours lent/"pas navigable" malgré le fix lowerDivByComp (même jour)** —
+  constat utilisateur persistant le 04/11, après le fix `EMPTY_LOWER_DIV_STATS` déjà
+  déployé plus tôt dans la journée pour ce même symptôme : "ça à l'air pas trop mal là
+  c mieux mais la page prono bug trop encore faut vraiment optimiser". Root cause :
+  EXACTEMENT le même bug de fond que le fix précédent (référence recréée à chaque appel
+  qui défait le comparateur `React.memo` de `MatchPredictRow`, Pronos.jsx), mais dans le
+  hook FRÈRE — `useTeamFormMulti` (useTeamForm.js), jamais audité pour ce défaut précis
+  alors qu'il alimente `formMapByComp`/`matchesByComp`, 2 des 3 objets comparés par ce
+  même composant. `formMapByComp[c] = resultByCode[c]?.data?.formMap ?? {}` et
+  `matchesByComp[code] = results[i]?.data?.matches ?? []` créaient un NOUVEL objet/
+  tableau vide à chaque re-render de Pronos dès qu'une compétition n'avait pas encore de
+  données (chargement initial, ESPN sans match terminé ce jour-là, etc.) — situation très
+  fréquente avec jusqu'à 16 compétitions suivies sur Pronos, dont 8 compétitions ESPN-only
+  qui pollent jusqu'à toutes les 30s (chaque poll de CES compétitions-là re-render Pronos
+  entier et recrée ces littéraux vides pour TOUTES les autres). Ce changement de référence,
+  même sur un repli vide, force le recalcul Poisson (`calcPronoAdvanced`) de potentiellement
+  des dizaines de lignes de match à chaque re-render — le fix du matin (lowerDivByComp)
+  réglait bien SA part du problème, mais seulement 1 des 3 objets comparés, laissant les 2
+  autres entiers. Fix : 2 constantes vides au niveau module (`EMPTY_FORM_MAP`,
+  `EMPTY_MATCHES`) remplacent ces littéraux recréés — même principe EXACT
+  qu'`EMPTY_LOWER_DIV_STATS` (useMatchs.js, même jour), purement additif, `clubNameMatch`/
+  `resolveFdTeamId`/le calcul Poisson lui-même non touchés. 400 tests + lint (35 erreurs
+  pré-existantes + 2 warnings pré-existants, baseline identique) + build vérifiés.
+  Honnêteté : comme pour le fix du matin, je ne peux pas mesurer depuis cet environnement
+  le ressenti exact sur le téléphone de l'utilisateur après déploiement — à confirmer au
+  prochain lancement. Si "pas navigable" persiste malgré ces 2 fixes cumulés, la piste
+  suivante la plus probable serait `calcPronoAdvanced` lui-même (coût du calcul Poisson par
+  match) plutôt que la stabilité des références, puisque les 3 objets comparés par
+  `MatchPredictRow` sont désormais tous les trois stables hors refetch réel.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

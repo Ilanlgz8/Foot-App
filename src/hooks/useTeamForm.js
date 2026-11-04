@@ -14,6 +14,13 @@ import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTrack
 // pourtant déjà plus fraîche côté serveur.
 const FORM_STALE = 1000 * 60 * 2  // 2min (était 30min)
 
+// Voir le commentaire détaillé dans useTeamFormMulti (même principe EXACT
+// qu'EMPTY_LOWER_DIV_STATS, useMatchs.js, plus tôt cette session) : repli
+// stable pour formMapByComp/matchesByComp, jamais un littéral {}/[] recréé à
+// chaque appel du hook.
+const EMPTY_FORM_MAP = {}
+const EMPTY_MATCHES  = []
+
 // ⚠️ BUG CORRIGÉ (constat utilisateur : "es-tu sûr que c'est la bonne logique
 // pour VRAIMENT tous les matchs ?") : Ligue des Nations/CAN/Copa America ne
 // sont PAS couvertes par football-data.org en free tier (voir competitions.js,
@@ -634,6 +641,29 @@ export function useTeamFormMulti(compCodes) {
   // reconstruire son formMap — un id ESPN qui ne correspond au nom
   // d'AUCUN club FD.org du jour ne peut plus jamais entrer dans le formMap
   // partagé, qu'une clé soit déjà prise ou non.
+  // ⚠️ AJOUT fallbacks STABLES (04/11, suite directe du fix EMPTY_LOWER_DIV_STATS
+  // plus tôt cette session — useLowerDivisionStatsMulti, useMatchs.js — même
+  // bug, constat utilisateur persistant : "la page prono bug trop encore...
+  // c pas navigable" MALGRÉ ce fix déjà en place) : exactement le même
+  // mécanisme, mais dans ce hook FRÈRE plutôt que useLowerDivisionStatsMulti.
+  // `formMapByComp[c] = resultByCode[c]?.data?.formMap ?? {}` et
+  // `matchesByComp[code] = results[i]?.data?.matches ?? []` créaient un
+  // NOUVEL objet/tableau vide à CHAQUE appel de useTeamFormMulti (donc à
+  // chaque render de Pronos/Accueil) dès qu'une compétition n'avait pas
+  // encore de données (chargement, ESPN sans match terminé, etc.) —
+  // situation très fréquente sur Pronos (jusqu'à 16 compétitions suivies,
+  // dont les 8 ESPN-only qui pollent jusqu'à toutes les 30s). Même si
+  // `byComp`/`formMapByComp` lui-même (l'objet conteneur) est reconstruit à
+  // chaque appel — sans importance, le comparateur de MatchPredictRow
+  // (Pronos.jsx) ne regarde jamais CET objet, seulement `formMapByComp[code]`
+  // — ce repli-ci, LUI, doit être une référence STABLE pour que `prev.
+  // formMapByComp?.[code] !== next.formMapByComp?.[code]` reste `false`
+  // (rien à re-render) tant que cette compétition précise n'a pas réellement
+  // refetché. Fix : 2 constantes vides au niveau module (même principe EXACT
+  // qu'EMPTY_LOWER_DIV_STATS) remplacent les littéraux `{}`/`[]` recréés à
+  // chaque appel — recalcule le Poisson (calcPronoAdvanced, Pronos.jsx)
+  // beaucoup plus rarement, plus seulement quand une compétition a
+  // réellement de nouvelles données.
   const formMap    = {}
   const resultByCode = Object.fromEntries(codes.map((c, i) => [c, results[i]]))
   const fdCodes   = codes.filter(c => !ESPN_SOURCED_FORM_COMPS.has(c))
@@ -701,7 +731,7 @@ export function useTeamFormMulti(compCodes) {
   // PAR compétition (la moyenne du championnat n'a de sens que dans une
   // seule compétition à la fois).
   const matchesByComp = {}
-  codes.forEach((code, i) => { matchesByComp[code] = results[i]?.data?.matches ?? [] })
+  codes.forEach((code, i) => { matchesByComp[code] = results[i]?.data?.matches ?? EMPTY_MATCHES })
 
   // ⚠️ AJOUT `formMapByComp` (constat utilisateur, 12/09 : "real madrid a
   // joué quatre match déjà et la sur la card dans accueil ya que un losange
@@ -744,8 +774,8 @@ export function useTeamFormMulti(compCodes) {
   // `formMap` (fusionné) est conservé tel quel ci-dessus pour compat/tests
   // existants, mais n'est plus utilisé par aucun appelant depuis ce fix.
   const formMapByComp = {}
-  for (const c of fdCodes) formMapByComp[c] = resultByCode[c]?.data?.formMap ?? {}
-  for (const c of espnCodes) formMapByComp[c] = espnFormMapByCode[c] ?? {}
+  for (const c of fdCodes) formMapByComp[c] = resultByCode[c]?.data?.formMap ?? EMPTY_FORM_MAP
+  for (const c of espnCodes) formMapByComp[c] = espnFormMapByCode[c] ?? EMPTY_FORM_MAP
 
   return { formMap, formMapByComp, matchesByComp, isLoading: results.some(r => r.isLoading) }
 }
