@@ -200,6 +200,47 @@ export const TEAM_NAMES_FR = {
   'ŠK Slovan Bratislava': 'Slovan Bratislava',
   'SK Slovan Bratislava': 'Slovan Bratislava',
   'Slovan Bratislava': 'Slovan Bratislava',
+  // ⚠️ CORRECTIF (04/11, audit complet demandé par l'utilisateur : "pour
+  // toutes les equipes" en LdC, pas club par club) : l'entrée 'FC Shakhtar
+  // Donetsk' ci-dessus (ajoutée le 03/11) reposait sur une variante DEVINÉE,
+  // jamais confirmée en direct à l'époque (honnêteté déjà documentée dans son
+  // propre commentaire). Vérifié maintenant avec un accès réseau réel
+  // (endpoint football-data.org /v4/competitions/CL/teams, saison 2026-27,
+  // les 36 clubs) : le nom OFFICIEL réel exposé par FD.org est "FK Shakhtar
+  // Donetsk" (préfixe "FK", pas "FC" — la variante devinée le 03/11 était
+  // fausse, elle n'a simplement jamais été exercée car Shakhtar n'a pas
+  // affronté de club hors championnat suivi avant aujourd'hui) et son
+  // shortName est "Shaktar" (sans le 2e "h" — faute de frappe réelle côté
+  // FD.org, pas une erreur de transcription ici). Clé correcte ajoutée ;
+  // l'ancienne entrée devinée est laissée en place (inoffensive, aucune
+  // collision possible avec un autre club).
+  'FK Shakhtar Donetsk': 'Shakhtar Donetsk',
+  'Shaktar': 'Shakhtar Donetsk',
+  // ⚠️ AJOUT (04/11, constat utilisateur : "y'a des equipe en ldc comme aek
+  // athens ou autres qui ne sont pas dans les championnat qu'on mis... y'a
+  // pas leur forme recente... faire en sorte que pour toutes les equipes ça
+  // mettent leur forme recente") : AEK Athènes (Grèce, hors des ~5 grands
+  // championnats suivis) joue en Ligue des Champions cette saison — son
+  // "forme récente" passe par la même résolution FD.org/ESPN que tout club
+  // de LdC (resolveFdTeamId avec loose:true, useTeamForm.js — CL n'est PAS
+  // dans ESPN_SOURCED_FORM_COMPS). Vérifié en direct (mêmes 2 endpoints que
+  // Shakhtar ci-dessus) : FD.org expose ce club comme "PAE AEK" (name ET
+  // shortName identiques — pas de nom long distinct), ESPN comme "AEK
+  // Athens" (name ET shortDisplayName identiques). Les deux chaînes ne
+  // partagent AUCUN préfixe commun (ni "PAE AEK" ne commence par "AEK
+  // Athens", ni l'inverse) : clubNameMatch ne peut structurellement jamais
+  // les rapprocher, d'où l'absence totale de forme récente malgré des matchs
+  // déjà joués et présents dans les données FD.org. Fixé en ajoutant
+  // uniquement une entrée ici (looseTeamNameMatch, déjà actif pour CL) —
+  // clubNameMatch lui-même, volontairement, n'est pas touché.
+  // Audit complet des 36 clubs de la phase de ligue LdC 2026-27 (FD.org
+  // /v4/competitions/CL/teams + ESPN uefa.champions, comparés un par un,
+  // name ET shortName des 2 côtés) : SEULS Shakhtar et AEK Athènes étaient
+  // encore non résolus — les 34 autres passent déjà (clubNameMatch direct,
+  // ou looseTeamNameMatch via des entrées déjà présentes : Barcelona/Lens/
+  // Slavia Praha/Slovan Bratislava/Bodø-Glimt). Pas de 37e cas caché à
+  // corriger plus tard pour cette saison.
+  'PAE AEK': 'AEK Athens',
   // ⚠️ AJOUT (03/11, constat utilisateur répété plusieurs fois : "y'a toujours
   // saoussolo dans result panel qui n'as plus sa forme recente... y'a que
   // cette equipe") : audit complet refait (caching/staleTime de

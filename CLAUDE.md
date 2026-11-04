@@ -7557,6 +7557,45 @@ cf-worker/
   généreux. 400 tests + lint (35 erreurs pré-existantes + 2 warnings pré-existants, baseline
   identique) + build vérifiés.
 
+- **"Forme récente" manquante pour les clubs de Ligue des Champions hors des 5 grands
+  championnats suivis (AEK Athènes, Shakhtar Donetsk)** — constat utilisateur du 04/11,
+  explicitement formulé comme un problème GÉNÉRAL ("pour toutes les equipes"), pas un nouveau
+  cas isolé comme Bodø/Glimt la veille. Root cause structurelle : `useTeamForm.js` résout
+  l'identité d'un club de LdC entre ESPN et football-data.org via `resolveFdTeamId(...,
+  { loose: true, strict: true })` (CL n'est pas dans `ESPN_SOURCED_FORM_COMPS`) — `clubNameMatch`
+  (préfixe complet uniquement) échoue dès que le nom FD.org porte un préfixe de type de club
+  que ESPN omet, et `looseTeamNameMatch` (égalité après `translateTeam`/`TEAM_NAMES_FR`) ne
+  peut rapprocher 2 noms que si une entrée existe déjà pour l'un des deux. Plutôt que
+  d'ajouter une entrée au coup par coup à chaque signalement (ce qui avait déjà échoué une
+  fois : l'entrée 'FC Shakhtar Donetsk' ajoutée le 03/11 était une variante DEVINÉE, jamais
+  vérifiée, et se révèle fausse), audit complet et systématique des 36 clubs de la phase de
+  ligue LdC 2026-27 cette fois : récupéré en direct `name`+`shortName` des 2 sources
+  (football-data.org `/v4/competitions/CL/teams`, ESPN `uefa.champions` sur toute la saison)
+  et testé les 4 combinaisons (name/shortName × 2 côtés) via le vrai code du projet
+  (`clubNameMatch`/`looseTeamNameMatch`/`translateTeam` importés directement, pas réimplémentés
+  à la main). Résultat : 34 des 36 clubs résolvent déjà correctement (la plupart via
+  `clubNameMatch` directement grâce au `shortName`, les autres via des entrées `TEAM_NAMES_FR`
+  déjà en place pour Barcelona/Lens/Slavia Praha/Slovan Bratislava/Bodø-Glimt) — seuls 2 clubs
+  échouaient réellement : Shakhtar Donetsk (FD.org expose en vérité "FK Shakhtar Donetsk" et
+  shortName "Shaktar" avec une faute de frappe réelle côté FD.org — "FK", pas "FC" comme deviné
+  le 03/11 ; l'ancienne entrée devinée est inoffensive et laissée en place) et AEK Athènes
+  (FD.org expose "PAE AEK" comme name ET shortName, sans aucune forme longue, contre "AEK
+  Athens" chez ESPN — zéro relation de préfixe possible dans un sens comme dans l'autre, cas
+  structurellement plus dur que Shakhtar/Slovan Bratislava qui avaient au moins un préfixe mal
+  placé). 2 entrées `TEAM_NAMES_FR` ajoutées (`'FK Shakhtar Donetsk'`, `'Shaktar'`, `'PAE AEK'`),
+  aucune touchée/retirée, `clubNameMatch` et `resolveFdTeamId` strictement intacts (même
+  principe de prudence que pour Shakhtar/Slovan Bratislava le 03/11, ce mécanisme a déjà cassé
+  l'Accueil en prod 2 fois par le passé quand modifié directement). Vérifié par du code réel
+  (pas une relecture) : `looseTeamNameMatch` renvoie bien `true` pour les 2 paires une fois les
+  entrées ajoutées. EL/UECL exclus de cet audit par construction : ces 2 compétitions sont
+  dans `ESPN_SOURCED_FORM_COMPS`, donc leur "forme récente" est 100% ESPN, sans aucune
+  résolution FD.org — cette classe de bug ne peut structurellement pas s'y produire. 400 tests
+  + lint (35 erreurs pré-existantes + 2 warnings pré-existants, baseline identique) + build
+  vérifiés. Honnêteté : contrairement au diagnostic Sassuolo du 03/11 (basé sur une hypothèse
+  non vérifiable depuis cet environnement), chaque chaîne de ce fix vient d'un vrai payload
+  réseau lu en direct dans le navigateur de l'utilisateur (javascript_tool) — confiance totale
+  sur les 2 corrections ci-dessus, aucune devinette cette fois.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
