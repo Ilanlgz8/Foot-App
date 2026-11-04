@@ -117,6 +117,15 @@ export default function Live() {
   // sa mutation et ne doit de toute façon pas être lu pendant le rendu
   // (react-hooks/refs).
   const [permanentlyEndedIds, setPermanentlyEndedIds] = useState(() => new Set())
+  // Battement 1s tant qu'il y a du direct : `isCardLive` (stateless) est réévalué même si aucun poll
+  // n'a modifié le contexte entre-temps — un match qui vient de finir part donc tout de suite.
+  const [liveBeat, setLiveBeat] = useState(0)
+  const hasTracked = liveMatches.length > 0
+  useEffect(() => {
+    if (!hasTracked) return
+    const id = setInterval(() => setLiveBeat(b => b + 1), 1000)
+    return () => clearInterval(id)
+  }, [hasTracked])
   useEffect(() => {
     const currentlyLiveIds = new Set(
       liveMatches.filter(m => isCardLive(m) && !permanentlyEndedIds.has(m.id)).map(m => m.id)
@@ -138,7 +147,7 @@ export default function Live() {
       }, 1_000)
       timersRef.current.set(id, handle)
     })
-  }, [liveMatches, permanentlyEndedIds])
+  }, [liveMatches, permanentlyEndedIds, liveBeat])
   // Cleanup uniquement au démontage de la page (deps vides) — pas à chaque
   // poll, voir le commentaire ci-dessus.
   useEffect(() => () => timersRef.current.forEach(clearTimeout), [])

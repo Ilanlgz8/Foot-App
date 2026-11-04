@@ -123,11 +123,11 @@ function MatchRowImpl({ match, espnScore = null, live = false, onMatchClick, onL
       <div className="mhRow__mid">
         {isLive && minute && (isHt ? (
           <>
-            <div className="poster__min-label mhRow__minLabel"><span className="poster__live-dot" />MT</div>
+            <div className="poster__min-label mhRow__minLabel"><span className="poster__live-dot" />MT<span className="poster__live-dot poster__live-dot--ghost" aria-hidden="true" /></div>
             <div className="poster__reprise-label mhRow__reprise">{htLabel ?? 'Mi-temps'}</div>
           </>
         ) : (
-          <div className="poster__min-label mhRow__minLabel"><span className="poster__live-dot" />{minute}</div>
+          <div className="poster__min-label mhRow__minLabel"><span className="poster__live-dot" />{minute}<span className="poster__live-dot poster__live-dot--ghost" aria-hidden="true" /></div>
         ))}
         {isUpcoming && <div className="poster__env-label mhRow__envLabel">Coup d&apos;envoi</div>}
         {isFinished && <div className="poster__env-label mhRow__envLabel">Terminé</div>}

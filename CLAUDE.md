@@ -7671,6 +7671,11 @@ cf-worker/
 - Mode **Ligne** = `hub/MatchRow.jsx` : même logique d'état que MatchPoster (recopiée, MatchPoster non touché), mêmes classes de typo `poster__*` (tailles surchargées dans hub.css).
 - Vérifié hors données réelles : lint 34 erreurs + 2 warnings (inchangé), vitest 407/407, build OK, rendu headless des composants avec matchs fictifs (à venir / live / mi-temps) + démarrage de l'app (/live et /) sans erreur. **Non vérifié avec des données réelles de l'API.**
 
+### 04/11 (soir) — Page Match : retrait immédiat des matchs finis + réglages d'affichage
+- `Live.jsx` : battement 1s tant que `liveMatches` n'est pas vide (et `liveBeat` dans les deps de l'effet justEnded) → `isCardLive` est réévalué sans attendre un poll, un match fini part tout de suite (même mécanisme qu'avant : stateless + 1s de "Terminé").
+- `MatchRow` : pastille fantôme symétrique (comme MatchPoster) → minute centrée sur le tiret ; colonne centrale remontée de 2px. Mode Card : minute 1rem, score/heure 2.2rem (libellé "Coup d'envoi" rapproché).
+- **Constat live (04/11)** : ESPN ne suit PAS le match de Coupe de France Baie-Mahault–Les Abymes (statut resté STATUS_SCHEDULED 0-0 deux heures après le coup d'envoi) alors que la Ligue des Champions/Europa sont bien suivies. `calcMinute` (matchUtils.js) affiche "Débute" pendant 30 min après l'heure du coup d'envoi quand ESPN est muet, puis abandonne et la card redevient "Coup d'envoi" — c'est ce que l'utilisateur a vu.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -96,6 +96,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .mhRow__mid {
+  position: relative; top: -2px;
   min-width: 78px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
 }
 .mhRow__envLabel { margin-bottom: 3px; }
@@ -176,11 +177,12 @@
   position: absolute; bottom: 100%; left: calc(50% + 2px); transform: translateX(-50%);
   margin: 0 0 -11px; white-space: nowrap;
 }
-.hubPosters .poster__center > .poster__min-label { font-size: 0.8rem; margin-bottom: -9px; }
+.hubPosters .poster__center > .poster__min-label { font-size: 1rem; margin-bottom: -9px; }
 .hubPosters .poster__center > .poster__min-labelCol { margin-bottom: -9px; }
 .hubPosters .poster__reprise-label { margin: 0; }
+.hubPosters .poster__center > .poster__env-label { margin-bottom: -5px; }
 #root .hubPosters .poster__score,
-#root .hubPosters .poster__time { font-size: 1.73rem; transform: translateY(4px); }
+#root .hubPosters .poster__time { font-size: 2.2rem; transform: translateY(4px); }
 
 /* ── Bouton "Voir les N matchs" (Accueil) ── */
 .hubCta {
