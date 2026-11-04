@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTeamSearchMatches, useTeamStandingsMulti, useTeamScorersMulti } from '../hooks/useTeamSearch'
 import { useLineups, useFdLineups } from '../hooks/useMatchDetail'
-import { isScorersLiveWindow } from '../hooks/useScorers'
+import { isScorersLiveWindow, needsScorersCatchUp } from '../hooks/useScorers'
 import {
   normalizeTeamQuery,
   teamMatchesQuery,
@@ -240,9 +240,21 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
   // les autres (ex. CAN hors période de tournoi) passent au TTL long (24h).
   const liveCompCodes = useMemo(() => {
     const live = new Set()
+    const finishedByComp = {}
     for (const r of rows) {
       const code = r.match.competition?.code
-      if (code && isScorersLiveWindow(r.match.utcDate)) live.add(code)
+      if (!code) continue
+      if (isScorersLiveWindow(r.match.utcDate)) live.add(code)
+      if (r.match.status === 'FINISHED') {
+        if (!finishedByComp[code]) finishedByComp[code] = []
+        finishedByComp[code].push(r.match)
+      }
+    }
+    // ⚠️ AJOUT (04/11, même trou que Classement.jsx — voir needsScorersCatchUp,
+    // useScorers.js) : sans ça, un match fini pendant que personne n'avait la
+    // fiche équipe ouverte reste bloqué 24h sur le total d'avant le match.
+    for (const code of Object.keys(finishedByComp)) {
+      if (needsScorersCatchUp(finishedByComp[code], code)) live.add(code)
     }
     return live
   }, [rows])

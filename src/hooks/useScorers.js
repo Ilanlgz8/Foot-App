@@ -42,6 +42,44 @@ export function isScorersLiveWindow(utcDate) {
   return elapsed >= 0 && elapsed <= SCORERS_LIVE_WINDOW_MS
 }
 
+// ⚠️ AJOUT (04/11, constat utilisateur : « Fabián Ruiz a marqué hier soir en
+// Ligue des Champions, le classement buteurs affiche toujours son ancien total ») :
+// `isScorersLiveWindow` suppose qu'un composant reste MONTé pendant toute la fenêtre
+// (coup d'envoi → +200min) pour capter le fetch « une dernière fois » promis par le
+// commentaire plus haut (02/11) — mais rien ne déclenche ce dernier fetch tout seul si
+// personne n'a la page Classement ouverte pile à ce moment (le cas largement majoritaire :
+// un match de Ligue des Champions se termine vers minuit, personne n'est sur Classement à
+// cette heure-là). Conséquence vérifiée en direct (fetch brut `/v4/competitions/CL/scorers`,
+// X-Cache: MISS donc pas un problème de cache serveur non plus à ce stade) : football-data.org
+// lui-même met à jour `/standings` quasi instantanément (PSG bien à 4 victoires/20 buts pour)
+// mais `/scorers` accuse un vrai retard côté FOURNISSEUR (Fabián Ruiz encore à 2 buts alors
+// qu'il en a marqué 2 de plus hier soir, confirmé via le résumé ESPN du match) — donc même
+// un fetch garanti frais aurait affiché la mauvaise valeur à l'instant T. Le vrai risque n'est
+// pas à l'instant T mais APRÈS : une fois que FD.org aura fini de mettre à jour sa propre
+// donnée (dans les heures qui suivent), sans ce correctif rien ne redemande jamais —
+// `hasMatchToday`/`scorersLiveWindow` restent `false` jusqu'au prochain match, donc le
+// staleTime (24h, NO_MATCH_STALE_MS) ET le TTL Redis serveur (`live=0`, même durée) gardent
+// la première réponse (encore périmée) en cache pour toute une journée, là où la vraie
+// correction aurait pourtant fini par arriver côté FD.org entre-temps.
+// `needsScorersCatchUp` referme ce trou : vrai si un match FINISHED de cette compétition a sa
+// fenêtre (même `SCORERS_LIVE_WINDOW_MS`, par cohérence — aucune nouvelle constante) qui se
+// termine APRÈS le dernier fetch réussi (`cacheSavedAt`, donc le cache local est forcément
+// trop vieux pour avoir pu capter CE match) — peu importe depuis combien de temps l'app a
+// été fermée entre-temps. Combiné en `||` avec `isScorersLiveWindow` dans Classement.jsx :
+// force UN SEUL fetch à staleTime court (comme en direct) au tout prochain montage, qui
+// repasse ensuite naturellement en cache 24h une fois `cacheSavedAt` rafraîchi — exactement
+// « un nouveau fetch si besoin, puis plus rien jusqu'au prochain match », sans jamais dépendre
+// de qui était sur l'app à quel moment précis.
+export function needsScorersCatchUp(finishedMatches, compId) {
+  const cacheSavedAt = getCacheSavedAt(`scorers3_${compId}`)
+  if (!cacheSavedAt) return false // pas encore de cache : fetchScorersData fetch de toute façon
+  return (finishedMatches ?? []).some(m => {
+    if (!m.utcDate) return false
+    const windowEnd = new Date(m.utcDate).getTime() + SCORERS_LIVE_WINDOW_MS
+    return windowEnd > cacheSavedAt
+  })
+}
+
 // ⚠️ AJOUT `delayMs` (24/07, trouvé via l'audit chronologique demandé par
 // l'utilisateur) : Classement.jsx appelle useStandings + useTeamForm +
 // useScorers pour LA MÊME compétition quasi au même instant à chaque

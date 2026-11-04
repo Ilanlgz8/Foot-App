@@ -7371,6 +7371,35 @@ cf-worker/
   `clubNameMatch` eux-mêmes restent totalement INTACTS. 400 tests + lint (35 erreurs
   pré-existantes, Pronos.jsx, + 2 warnings pré-existants, baseline identique) + build vérifiés.
 
+- **04/11 — Classement buteurs (scorers) pas mis à jour après des matchs terminés (ex. Fabián
+  Ruiz resté à 2 buts après la Ligue des Champions de la veille au soir, alors qu'ESPN confirmait
+  2 buts supplémentaires marqués 17' et 50' dans Villarreal-PSG)** : double constat en reproduisant
+  en live (requête forcée fraîche sur `/v4/competitions/CL/scorers`, `X-Cache: MISS` garanti) —
+  (a) football-data.org lui-même est parfois en retard sur SES PROPRES données scorers par rapport
+  à SES PROPRES données standings (confirmé : `/standings` avait déjà bien pris en compte le résultat
+  PSG, alors que `/scorers` donnait toujours l'ancien total) — ceci est hors de notre contrôle, se
+  corrige seul une fois FD.org à jour ; (b) MAIS même une fois FD.org corrigé côté serveur, le
+  mécanisme de rafraîchissement côté app (`isScorersLiveWindow`, useScorers.js — fenêtre coup
+  d'envoi → +200min pendant laquelle le cache est traité comme "live" donc TTL court) a un angle
+  mort réel et indépendant : il ne déclenche un re-fetch que si un composant qui l'utilise est monté
+  PENDANT cette fenêtre de 200min. Si personne n'a la page Classement (ou Fiche équipe) ouverte à ce
+  moment précis, le cache (client localStorage ET serveur Redis, TTL 24h hors fenêtre live) reste
+  figé sur la donnée d'avant-match jusqu'à 24h, sans aucun mécanisme de rattrapage — même après que
+  FD.org ait lui-même fini par se mettre à jour. Corrigé en ajoutant `needsScorersCatchUp(finishedMatches,
+  compId)` (useScorers.js) : compare la date de sauvegarde du cache scorers (`getCacheSavedAt`) à la
+  fin de fenêtre live (`utcDate + SCORERS_LIVE_WINDOW_MS`) de chaque match terminé connu ; si le cache
+  est antérieur à cette fin de fenêtre pour au moins un match, force un dernier fetch au prochain
+  montage, quelle que soit la durée écoulée depuis. Branché en `||` dans le calcul de
+  `scorersLiveWindow` de `Classement.jsx` (sur `wcFin`, les matchs terminés de la compétition
+  sélectionnée) ET dans `liveCompCodes` de `TeamSearchPage.jsx` (même angle mort, indépendant,
+  pour l'affichage scorers de la Fiche équipe — calculé par code de compétition à partir des
+  matchs terminés de l'équipe dans `rows`). N'affecte en rien le comportement normal (cache déjà
+  à jour après la fenêtre live → `needsScorersCatchUp` renvoie `false`, aucun fetch forcé
+  supplémentaire). 400 tests + lint (35 erreurs pré-existantes, Pronos.jsx, + 1 erreur pré-existante
+  déjà présente avant ce fix dans Classement.jsx [`react-hooks/set-state-in-effect` sur
+  `setScorerPage`, sans rapport, vérifié par `git stash`] + 2 warnings pré-existants, baseline
+  identique) + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
