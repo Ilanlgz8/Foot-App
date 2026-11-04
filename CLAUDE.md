@@ -7430,6 +7430,38 @@ cf-worker/
   pré-existantes + 2 warnings pré-existants, baseline identique) + build
   vérifiés.
 
+- **04/11 — Mauvaise journée affichée au lancement (mercredi/jeudi invisibles, saut direct
+  à vendredi) — ⚠️ NON reproduit en live, hypothèse raisonnée mais PAS confirmée (contrairement
+  aux 2 entrées précédentes du jour)** : le bug avait déjà disparu tout seul au moment de
+  l'investigation (corrigé par l'utilisateur en relançant l'app, cache localStorage déjà
+  retombé sur un état correct) — pas de console/capture au moment exact du bug, donc pas de
+  confirmation directe comme pour Sassuolo/buteurs plus haut. À prendre avec cette réserve.
+  Hypothèse, basée sur un motif DÉJÀ confirmé une fois pour ce même symptôme exact (voir le
+  commentaire du 23/07 sur `ALL_COMPS_TTL`, useMatchs.js : "Accueil saute direct au 21 août,
+  des matchs le 15 et entre le 15-20 août sont invisibles" — déjà réduit 24h→1h à l'époque,
+  mais seulement pour UNE cause, la publication tardive du calendrier FD.org) : la flèche
+  "jour suivant"/le saut automatique de jour vide (Accueil.jsx) cherchent tous deux le
+  prochain match dans `useUpcomingMatchesAllComps` (useMatchs.js) — si son résultat mis en
+  cache est INCOMPLET (une compétition absente du merge), les jours qu'elle couvre
+  deviennent invisibles jusqu'au prochain vrai refetch. Le 23/07 ne couvrait que la cause
+  "calendrier publié après coup" ; une 2e cause, jamais traitée, reste possible : un échec
+  TRANSITOIRE (429/503/timeout) d'UNE SEULE compétition parmi la quinzaine suivie (géré par
+  `Promise.allSettled`, volontairement — pour qu'une compétition en erreur ne vide pas tout le
+  reste) produit un résultat partiel mis en cache avec le MÊME staleTime de 1h plein qu'un
+  résultat complet, sans rien pour distinguer les deux cas. Correctif ajouté par précaution,
+  risque quasi nul (n'ajoute aucune requête réseau dans le cas normal, ne touche pas la
+  machine à états fragile d'Accueil.jsx déjà identifiée comme sensible) : `staleTime` en
+  fonction sur `useUpcomingMatchesAllComps`, consultant une Map module-level tenue à jour par
+  `queryFn` — tant qu'un résultat récent a eu au moins 1 échec partiel, le prochain montage/
+  retour au premier plan retente sous 15s au lieu d'attendre jusqu'à 1h (même principe déjà
+  utilisé pour `pastDayStaleTime`/`needsScorersCatchUp`, voir plus haut). ⚠️ Si le symptôme
+  revient : la prochaine fois, ouvrir la console AVANT de relancer l'app (voir
+  `foot_matches_ALL_V3_30_SCHEDULED` dans localStorage — vérifier si une compétition attendue
+  manque du merge) plutôt que de fermer/rouvrir, pour confirmer ou infirmer cette hypothèse
+  avec de vraies données. 400 tests + lint (35 erreurs pré-existantes + 2 warnings
+  pré-existants, baseline identique) + build vérifiés — correction du mécanisme de cache
+  uniquement, aucun changement visuel/fonctionnel si l'hypothèse est fausse.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

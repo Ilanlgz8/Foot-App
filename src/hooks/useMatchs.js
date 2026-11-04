@@ -1270,6 +1270,35 @@ const ALL_COMPS_TTL = TTL.SCHEDULED
 // de plus qu'un Network tab plus lisible.
 const ALL_COMPS_STAGGER_MS = 150  // 150ms x jusqu'à 13 ≈ 2s pour la dernière compétition
 
+// ⚠️ AJOUT (04/11, constat utilisateur : "au lancement, j'avais les matchs
+// d'hier au lieu d'aujourd'hui, puis ça sautait direct à vendredi" — mercredi
+// et jeudi, pourtant avec de vrais matchs, invisibles ; résolu seulement en
+// fermant/rouvrant l'app) : MÊME CLASSE DE BUG que celui déjà documenté et
+// corrigé le 23/07 juste au-dessus (24h→1h) — la flèche "jour suivant"/le
+// saut auto (Accueil.jsx) cherchent tous les deux le prochain match dans CE
+// hook ; si son résultat mis en cache est INCOMPLET (une compétition absente
+// du merge), le jour qu'elle couvre devient invisible jusqu'au prochain vrai
+// refetch. Le 23/07 ne traitait qu'UNE cause (calendrier FD.org publié après
+// le dernier fetch) ; `Promise.allSettled` ci-dessous en laisse une 2e,
+// jamais couverte : un échec TRANSITOIRE (429/503/timeout) d'UNE SEULE
+// compétition parmi la quinzaine suivie ne fait pas échouer la query entière
+// (c'est voulu, voir le commentaire de `useUpcomingMatchesAllComps` — contre
+// qu'UNE compétition en erreur vide tout le reste) mais le résultat partiel
+// qui en sort est écrit en cache avec le MÊME staleTime de 1h plein qu'un
+// résultat complet — rien ne distingue "vraiment à jour" de "incomplet par
+// accident", donc rien ne déclenche de nouvelle tentative avant 1h, pendant
+// lesquelles les jours de LA compétition en échec restent invisibles pour la
+// navigation. Repli court le temps qu'un échec partiel se corrige (plutôt que
+// de retravailler le staleTime fixe en dur, voir déjà le même principe pour
+// `pastDayStaleTime`, useTodayMatches.js, et `needsScorersCatchUp`,
+// useScorers.js) : staleTime en fonction, consultant une Map module-level
+// tenue à jour par queryFn — tant qu'un résultat récent a eu au moins 1 échec,
+// le prochain montage/retour au premier plan retente sous 3min au lieu
+// d'attendre jusqu'à 1h, sans rien changer au cas normal (aucun échec →
+// staleTime 1h inchangé, zéro requête FD.org/ESPN supplémentaire).
+const PARTIAL_FAILURE_RETRY_MS = 3 * 60 * 1000  // 3min — assez court pour corriger vite, assez long pour ne pas re-rafaler ESPN/FD.org
+const allCompsPartialFailureUntil = new Map()  // queryKey (string) → timestamp jusqu'auquel rester "stale" volontairement
+
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const windowMs   = windowDays * 24 * 60 * 60 * 1000
   // ⚠️ V3 (24/07) : bascule des 6 grands championnats FD.org→ESPN pour ce
@@ -1281,6 +1310,7 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const cachedData = readCacheStale(key)
   const cachedAt   = getCacheSavedAt(key)
   const ttl        = ALL_COMPS_TTL
+  const queryKeyStr = `ALL_V3|${compIds.join(',')}|${windowDays}`
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['matches', 'ALL_V3', 'SCHEDULED', compIds.join(','), windowDays],
@@ -1291,6 +1321,14 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
           return fetchMatchesForComp(id, 'SCHEDULED', { preferEspnForMajors: true })
         })
       )
+      // Voir le commentaire détaillé au-dessus de PARTIAL_FAILURE_RETRY_MS :
+      // un résultat partiel (≥1 compétition en échec transitoire) garde un
+      // staleTime court le temps de se corriger, au lieu du 1h plein normal.
+      if (results.some(r => r.status === 'rejected')) {
+        allCompsPartialFailureUntil.set(queryKeyStr, Date.now() + PARTIAL_FAILURE_RETRY_MS)
+      } else {
+        allCompsPartialFailureUntil.delete(queryKeyStr)
+      }
       const now = Date.now()
       const merged = filterUpcomingWindow(
         results.filter(r => r.status === 'fulfilled' && Array.isArray(r.value)).flatMap(r => r.value),
@@ -1312,7 +1350,14 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
     // sans changer le résultat.
     initialData:          () => filterUpcomingWindow(cachedData, Date.now(), windowMs),
     initialDataUpdatedAt: cachedAt,
-    staleTime: ttl,
+    staleTime: () => {
+      const until = allCompsPartialFailureUntil.get(queryKeyStr)
+      // 15s plutôt que 0 : laisse une marge si plusieurs composants montent
+      // la même query coup sur coup (pas une vraie rafale réseau en plus,
+      // React Query déduplique déjà les requêtes concurrentes sur CETTE
+      // queryKey — juste évite de retenter à la milliseconde près).
+      return (until && Date.now() < until) ? 15_000 : ttl
+    },
     retry: false,
   })
 
