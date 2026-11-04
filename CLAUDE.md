@@ -7325,6 +7325,52 @@ cf-worker/
   preuve concrète sur ce cas précis — bien plus fiable que continuer à deviner depuis cet
   environnement sans accès réseau.
 
+- ✅ ROOT CAUSE RÉELLE TROUVÉE ET CORRIGÉE (04/11, suite directe de l'audit Sassuolo du
+  03/11 ci-dessus) : cette fois avec un vrai accès navigateur (ordinateur de l'utilisateur lié à
+  la session) — reproduction live confirmée (Accueil → « Résultats récents » → Sassuolo 2-4
+  Fiorentina, lundi 2 nov., match ESPN `espn-SA-401874963`) : Fiorentina affiche son losange
+  « forme récente », Sassuolo aucun. Le diagnostic `console.warn` ajouté le 03/11
+  (`resolveFdTeamId`) ne s'est JAMAIS déclenché pour Sassuolo, sur cette page, après plusieurs
+  rechargements complets — première preuve concrète que l'hypothèse « mismatch de nom » du 03/11
+  était fausse (confirmé ensuite : ESPN nomme Sassuolo « Sassuolo »/« Sassuolo », identique au
+  shortName FD.org — correspondance triviale, jamais le problème). Root cause trouvée en rejouant
+  EXACTEMENT `resolveFdTeamId` (matchUtils.js) dans la console du navigateur avec les vraies
+  données FD.org/ESPN de cette page (fetch direct des endpoints internes de l'app) puis en lisant
+  les props React réellement rendues (fiber du composant hero) : `match.homeTeam.id` valait
+  l'id ESPN brut `"3997"` (jamais résolu vers l'id FD.org 471, alors que `formMap["471"]` existait
+  bien et était correct — `["D","L","L","L","L"]`, vérifié directement dans le cache localStorage
+  de l'app). En reconstituant `resolveMatches` (MatchPage.jsx) exactement comme l'app le fait —
+  `[...scheduledMatches, ...compMatches]` — la contamination vient de `scheduledMatches`
+  (`useMatches('SA','SCHEDULED')`, useMatchs.js) : Sassuolo a un match de Coppa Italia PROGRAMMÉ
+  dans cette fenêtre (Sassuolo-Juventus, 03/12, confirmé via l'endpoint ESPN `ita.coppa_italia`),
+  et `fetchClubMatchesRawInner` (useMatchs.js) fusionnait TOUJOURS les matchs de coupe
+  (`fetchEspnCupMatches`) TELS QUELS dans le cache RAW partagé (Programme/Résultats ET
+  `scheduledMatches` de MatchPage) — homeTeam.id/awayTeam.id en id ESPN BRUT, jamais résolus vers
+  FD.org à cet endroit précis (contrairement à la copie SÉPARÉE déjà résolue dans
+  useTeamForm.js, fix Deportivo/Alavés du 16/08, qui elle ne touche jamais ce cache partagé).
+  Conséquence exacte : le raccourci `idMatch` de `resolveFdTeamId` (« un id déjà présent dans
+  compMatches dont le nom correspond est accepté tel quel », pensé pour « id déjà dans le bon
+  référentiel, rien à résoudre ») trouvait l'id ESPN brut de Sassuolo dans cette entrée de coupe
+  non résolue présente dans `resolveMatches`, validait le nom (« Sassuolo », forcément identique
+  puisque c'est le même club) et retournait directement `"3997"` — sans jamais atteindre la
+  recherche par nom plus bas qui aurait trouvé le vrai id FD.org 471. `formMap`, keyé uniquement
+  par id FD.org, n'avait donc logiquement aucune entrée pour `"3997"`. Explique aussi pourquoi « il
+  n'y a que cette équipe » (constat utilisateur) : le bug ne touche QUE le club actuellement affiché
+  s'il a un match de coupe programmé/récent dans la fenêtre ESPN — la très grande majorité des clubs
+  n'en ont pas à un instant donné, Sassuolo si (Coppa Italia, 03/12), d'où le symptome isolé à ce
+  seul club ce jour-là (n'importe quel autre club avec un match de coupe programmé aurait le même
+  problème). Corrigé à la source plutôt que dans `resolveFdTeamId`/`clubNameMatch` eux-mêmes
+  (zone déjà identifiée comme fragile le 03/11, 2 tentatives passées de la modifier directement ont
+  cassé l'Accueil en prod) : `fetchClubMatchesRawInner` (useMatchs.js) résout maintenant chaque
+  équipe des matchs de coupe (`resolveFdTeamId(..., all, { loose: true, strict: true })`) contre
+  les matchs de championnat déjà chargés AVANT de les fusionner dans le cache RAW partagé —
+  exactement le même appel, les mêmes paramètres, le même repli (`?? id ESPN brut` si non
+  résolvable, ex. adversaire amateur d'un 1er tour) que le code déjà en prod depuis le 16/08 dans
+  useTeamForm.js pour EXACTEMENT ce même besoin — aucune nouvelle logique de matching écrite,
+  juste appliquée un cran plus tôt, là où la fuite avait vraiment lieu. `resolveFdTeamId`/
+  `clubNameMatch` eux-mêmes restent totalement INTACTS. 400 tests + lint (35 erreurs
+  pré-existantes, Pronos.jsx, + 2 warnings pré-existants, baseline identique) + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

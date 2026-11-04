@@ -1,6 +1,7 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
+import { resolveFdTeamId } from '../utils/matchUtils'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID, LOWER_DIVISION_FD_CODE } from '../data/competitions'
@@ -734,7 +735,44 @@ async function fetchClubMatchesRawInner(selectedComp) {
   // (Programme/Résultats) profitent du filtrage commun plus bas.
   if (DOMESTIC_CUPS[selectedComp]) {
     const cupMatches = await fetchEspnCupMatches(selectedComp)
-    if (cupMatches.length > 0) all = [...all, ...cupMatches]
+    // ⚠️ AJOUT résolution id FD.org (04/11, root cause trouvée du bug
+    // "forme récente" manquante pour Sassuolo spécifiquement, voir CLAUDE.md,
+    // audit complet du 03/11 qui n'avait rien trouvé dans resolveFdTeamId/
+    // clubNameMatch eux-mêmes) : cupMatches (ESPN, homeTeam.id/awayTeam.id en
+    // id ESPN) était fusionné ici TEL QUEL, sans résolution vers l'espace
+    // d'id FD.org — contrairement à la copie SÉPARÉE déjà résolue dans
+    // useTeamForm.js (même fonction fetchEspnCupMatches, fix du 16/08 pour
+    // Deportivo/Alavés). Un club avec un match de coupe SCHEDULED dans cette
+    // fenêtre (ex. Sassuolo-Juventus, Coppa Italia, 03/12) se retrouvait donc
+    // dans ce cache RAW partagé (Programme/Résultats ET `scheduledMatches` de
+    // MatchPage.jsx) avec son id ESPN brut sur homeTeam/awayTeam. Root cause
+    // trouvée en traçant le chemin en direct (navigateur, hors environnement
+    // habituel) : resolveFdTeamId (matchUtils.js), appelé par MatchPage.jsx
+    // pour retrouver l'id réel du match ESPN affiché, a un raccourci
+    // `idMatch` qui fait confiance à TOUT id déjà présent dans compMatches
+    // dès que le nom associé correspond — un id ESPN qui coïncide (normal :
+    // même club) avec le rawId recherché validait ainsi ce raccourci à tort,
+    // retournant l'id ESPN brut au lieu de continuer vers la recherche par
+    // nom qui aurait trouvé le vrai id FD.org. formMap (useTeamForm.js) est
+    // lui keyé par id FD.org uniquement → "forme récente" vide pour CE club
+    // précis, alors même que ses données existent bel et bien. Résolu à la
+    // source, exactement comme déjà fait pour useTeamForm.js : chaque équipe
+    // du match de coupe résolue par nom contre les matchs de championnat
+    // déjà chargés (`all`, encore 100% championnat à ce stade — la fusion
+    // cup a lieu APRÈS, juste en dessous), id ESPN brut gardé en repli
+    // UNIQUEMENT si non résolvable (adversaire amateur hors FD.org, ex. 1er
+    // tour de coupe) — comportement inchangé pour ce cas-là, seul le cas
+    // "club suivi, résolvable" change.
+    const resolvedCupMatches = cupMatches.map(m => {
+      const homeId = resolveFdTeamId(m.homeTeam, all, { loose: true, strict: true })
+      const awayId = resolveFdTeamId(m.awayTeam, all, { loose: true, strict: true })
+      return {
+        ...m,
+        homeTeam: { ...m.homeTeam, id: homeId ?? m.homeTeam?.id },
+        awayTeam: { ...m.awayTeam, id: awayId ?? m.awayTeam?.id },
+      }
+    })
+    if (resolvedCupMatches.length > 0) all = [...all, ...resolvedCupMatches]
   }
 
   // ⚠️ BUG CORRIGÉ (25/07, constat utilisateur : Serie A/LaLiga affichaient
