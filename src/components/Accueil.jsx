@@ -7,7 +7,7 @@ import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } f
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
-import { mergeScore, isCardLive } from '../utils/matchUtils'
+import { mergeScore, isCardLive, isUnfollowedCupMatch } from '../utils/matchUtils'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
@@ -596,7 +596,7 @@ function Accueil() {
   // conservé tel quel.
   const stillVisibleToday = m =>
     m != null &&
-    m.status !== 'FINISHED' &&
+    m.status !== 'FINISHED' && !isUnfollowedCupMatch(m) &&
     (getMatchState(m.id).ft ? isRecentlyFinished(m.id) : true)
 
   const matchPanelMatches = useMemo(() => {

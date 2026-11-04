@@ -4,7 +4,7 @@
 // prolongations/tab...). Objectif : figer ces cas limites déjà corrigés pour
 // ne pas avoir à refaire cette vérification manuelle à chaque nouveau bug.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId, buildHeroSubline, canAnchorHalf2 } from './matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, matchOutcome, resolveFdTeamId, resolveFdCrest, isRealFdMatchId, resolveFdMatchId, buildHeroSubline, canAnchorHalf2, isUnfollowedCupMatch } from './matchUtils'
 import { setEspnData, setKickoffAt, setHalf2Start, trackMatchState, recordEspnMiss } from './matchStateTracker'
 
 const MID = 1
@@ -157,6 +157,14 @@ describe('calcMinute', () => {
       score: { fullTime: { home: 1, away: 0 } },
     })
     expect(calcMinute(withGoal)).toBe('10\'')
+  })
+
+  it('isUnfollowedCupMatch : coupe jamais suivie par ESPN après la fenêtre = masquée', () => {
+    const cup = (o) => baseMatch({ isCup: true, status: 'TIMED', utcDate: '2026-07-03T18:40:00.000Z', ...o })
+    expect(isUnfollowedCupMatch(cup({}))).toBe(true)
+    expect(isUnfollowedCupMatch(cup({ utcDate: '2026-07-03T18:55:00.000Z' }))).toBe(false) // dans la fenêtre
+    expect(isUnfollowedCupMatch(cup({ status: 'IN_PLAY' }))).toBe(false)
+    expect(isUnfollowedCupMatch(cup({ isCup: false }))).toBe(false)
   })
 
   it('n\'affiche plus "Débute" au-delà de la fenêtre sans confirmation ESPN (pas de source live)', () => {

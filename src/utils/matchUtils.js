@@ -268,6 +268,18 @@ export function outcomeForSide(match, isHome) {
 // plus en direct (retour dans la liste normale), au lieu d'un faux "Débute" de 30 min.
 export const PENDING_KICKOFF_WINDOW_MS = 10 * 60_000
 
+// Match de coupe nationale listé par ESPN mais jamais suivi en direct : coup d'envoi passé
+// depuis plus que la fenêtre "Débute" et ESPN le laisse "programmé" (ex. 7e tour de la
+// Coupe de France, 04/11 : aucun live, aucun commentaire, statut figé). On ne l'affiche plus.
+// Réapparaît tout seul si ESPN finit par le passer en cours/terminé.
+export function isUnfollowedCupMatch(match, now = Date.now()) {
+  if (!match?.isCup) return false
+  if (match.status !== 'SCHEDULED' && match.status !== 'TIMED') return false
+  if (now - new Date(match.utcDate).getTime() <= PENDING_KICKOFF_WINDOW_MS) return false
+  const st = getMatchState(match.id)
+  return !st.kickoffAt && (!st.espnStatus || st.espnStatus === 'STATUS_SCHEDULED')
+}
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
   const now   = Date.now()

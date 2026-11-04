@@ -7,7 +7,7 @@
 // Un match terminé n'apparaît plus ici : son résultat est dans Résultats.
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { isCardLive } from '../utils/matchUtils'
+import { isCardLive, isUnfollowedCupMatch } from '../utils/matchUtils'
 import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
 import { useMatchDay } from '../hooks/useMatchDay'
 import { getDayLabel } from '../utils/dayUtils'
@@ -28,7 +28,7 @@ const nbMatchs = n => `${n} match${n > 1 ? 's' : ''}`
 // Un match terminé quitte la liste quelques secondes après son coup de sifflet
 // (même règle que `stillVisibleToday` de l'Accueil).
 const stillVisible = m =>
-  m != null && m.status !== 'FINISHED' &&
+  m != null && m.status !== 'FINISHED' && !isUnfollowedCupMatch(m) &&
   (getMatchState(m.id).ft ? isRecentlyFinished(m.id) : true)
 
 function dayDateLabel(offset) {

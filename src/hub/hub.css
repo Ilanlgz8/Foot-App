@@ -166,7 +166,8 @@
 }
 /* Logos / noms / forme remontés de 6px ; le centre (score, minute) garde sa place via margin-top. */
 .hubPosters .poster__middle { flex: none; align-items: flex-start; padding: 18px 12px 16px; }
-.hubPosters .poster:has(.poster__min-labelCol) .poster__middle { padding-top: 34px; }
+.hubPosters .poster:has(.poster__min-labelCol) .poster__middle,
+.hubPosters .poster:has(.poster__topbarPeriod) .poster__middle { padding-top: 38px; }
 .hubPosters .poster__center { margin-top: 6px; }
 .hubPosters .poster__team-col { width: 92px; }
 .hubPosters .poster__name { max-width: 92px; }
