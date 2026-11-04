@@ -7709,6 +7709,10 @@ cf-worker/
 - Constat (vérifié en direct) : après les matchs de LDC du soir, `/scorers` clé `live=0` répondait `X-Cache: STALE` avec Haaland à 4 buts, la clé sans `live=0` (`MISS`) avec 5 — football-data.org était à jour (~45min après les coups de sifflet), pas la copie servie au client hors « fenêtre live ».
 - `SCORERS_LIVE_WINDOW_MS` 200min → 12h (TTL court 5min jusqu'à 12h après le coup d'envoi, laisse le temps au retard de mise à jour de FD.org), `refetchInterval` 5min pendant la fenêtre (page ouverte = mise à jour toute seule), TTL serveur de `live=0` 24h → 6h (`api/football.js`, doit rester ≤ la fenêtre). Cause du retard côté FD.org : non maîtrisable, seulement contournée par ce délai.
 
+### 04/11 (nuit, suite) — Buteurs : un seul appel à la fin + liste dépliable dans l'Accueil
+- **Buteurs** (remplace la fenêtre 12h/refetch 5min du même soir) : `scorersUpdateDue` (`useScorers.js`) = vrai quand tous les matchs du dernier jour (≤ 3 j) d'une compétition sont finis ET que la copie locale date d'avant la fin du dernier match (`lastUpdated` FD.org, sinon KO + 150min). Classement.jsx → `useScorers(…, due)` ; due → clé serveur SANS `live=0` (TTL 5min), refetch sur le front montant, puis UN nouvel essai 10min plus tard si le total de buts n'a pas bougé. Hors « due » : cache 6h (`NO_MATCH_STALE_MS`) et clé `live=0` (TTL serveur 6h). Plus aucun appel périodique pendant/entre les matchs. Sans copie locale : « due » si le jour s'est fini il y a moins de 8h. Tests : `useScorers.test.js`.
+- **Accueil** (Highlights) : une card par compétition (le match le plus intéressant) ; « + N autres matchs ▾ » déplie toute la liste de CETTE compétition sur place, « Réduire ▴ » la replie ; le bouton du bas « Voir les N matchs » mène à la page Match. Intention produit (utilisateur) : Accueil synthétique, pas de grand défilement, accès rapide aux articles en bas.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

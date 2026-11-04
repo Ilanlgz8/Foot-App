@@ -20,7 +20,7 @@ const STALE_MS = 1000 * 60 * 5  // 5min (était 2min, 30min avant ça)
 // (passé par l'appelant, même valeur déjà calculée pour useStandings dans
 // Classement.jsx — aucun calcul en double) bascule le staleTime : 24h les
 // jours sans match, 2min les jours où ça joue.
-const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
+const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 6  // 6h (voir scorersUpdateDue : hors mise à jour attendue, inutile de redemander)
 
 // ⚠️ EXTRAIT ici (02/11, constat utilisateur : "si on fait un appel pour la
 // CAN alors qu'elle joue pas ce jour-là, ça sert à rien") — ce calcul vivait
@@ -36,58 +36,39 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // gaspillage signalé. Extraction en fonction pure réutilisable par les deux
 // appelants (Classement.jsx ET useTeamSearch.js), AUCUN changement de
 // comportement pour Classement.jsx (même calcul, même fenêtre).
-// ⚠️ 200min → 12h (04/11 soir, constat utilisateur : après les matchs de LDC, le classement
-// buteurs n'était PAS à jour). Deux causes cumulées : (1) football-data.org met `/scorers` à
-// jour avec du retard APRÈS le coup de sifflet (mesuré ce soir : pas encore à jour à la fin,
-// à jour ~45min plus tard ; plusieurs heures constatées un autre jour) — un seul fetch « à la
-// fin du match » tombe donc sur la donnée d'avant ; (2) la clé serveur `live=0` (TTL 24h) gardait
-// la copie d'AVANT le match (vérifié en direct : réponse `X-Cache: STALE`, Haaland à 4 buts
-// alors que la clé sans `live=0` donnait 5). On reste donc en TTL court (5min) jusqu'à 12h
-// après le coup d'envoi, et le TTL serveur de `live=0` ne dépasse plus cette fenêtre
-// (api/football.js : 6h), sinon une copie créée avant le match survivrait à la fenêtre.
-export const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 60 * 12 // kickoff + 12h
-export function isScorersLiveWindow(utcDate) {
-  if (!utcDate) return false
-  const elapsed = new Date().getTime() - new Date(utcDate).getTime()
-  return elapsed >= 0 && elapsed <= SCORERS_LIVE_WINDOW_MS
-}
-
-// ⚠️ AJOUT (04/11, constat utilisateur : « Fabián Ruiz a marqué hier soir en
-// Ligue des Champions, le classement buteurs affiche toujours son ancien total ») :
-// `isScorersLiveWindow` suppose qu'un composant reste MONTé pendant toute la fenêtre
-// (coup d'envoi → +200min) pour capter le fetch « une dernière fois » promis par le
-// commentaire plus haut (02/11) — mais rien ne déclenche ce dernier fetch tout seul si
-// personne n'a la page Classement ouverte pile à ce moment (le cas largement majoritaire :
-// un match de Ligue des Champions se termine vers minuit, personne n'est sur Classement à
-// cette heure-là). Conséquence vérifiée en direct (fetch brut `/v4/competitions/CL/scorers`,
-// X-Cache: MISS donc pas un problème de cache serveur non plus à ce stade) : football-data.org
-// lui-même met à jour `/standings` quasi instantanément (PSG bien à 4 victoires/20 buts pour)
-// mais `/scorers` accuse un vrai retard côté FOURNISSEUR (Fabián Ruiz encore à 2 buts alors
-// qu'il en a marqué 2 de plus hier soir, confirmé via le résumé ESPN du match) — donc même
-// un fetch garanti frais aurait affiché la mauvaise valeur à l'instant T. Le vrai risque n'est
-// pas à l'instant T mais APRÈS : une fois que FD.org aura fini de mettre à jour sa propre
-// donnée (dans les heures qui suivent), sans ce correctif rien ne redemande jamais —
-// `hasMatchToday`/`scorersLiveWindow` restent `false` jusqu'au prochain match, donc le
-// staleTime (24h, NO_MATCH_STALE_MS) ET le TTL Redis serveur (`live=0`, même durée) gardent
-// la première réponse (encore périmée) en cache pour toute une journée, là où la vraie
-// correction aurait pourtant fini par arriver côté FD.org entre-temps.
-// `needsScorersCatchUp` referme ce trou : vrai si un match FINISHED de cette compétition a sa
-// fenêtre (même `SCORERS_LIVE_WINDOW_MS`, par cohérence — aucune nouvelle constante) qui se
-// termine APRÈS le dernier fetch réussi (`cacheSavedAt`, donc le cache local est forcément
-// trop vieux pour avoir pu capter CE match) — peu importe depuis combien de temps l'app a
-// été fermée entre-temps. Combiné en `||` avec `isScorersLiveWindow` dans Classement.jsx :
-// force UN SEUL fetch à staleTime court (comme en direct) au tout prochain montage, qui
-// repasse ensuite naturellement en cache 24h une fois `cacheSavedAt` rafraîchi — exactement
-// « un nouveau fetch si besoin, puis plus rien jusqu'au prochain match », sans jamais dépendre
-// de qui était sur l'app à quel moment précis.
-export function needsScorersCatchUp(finishedMatches, compId) {
+// ── Quand mettre à jour le classement buteurs (04/11 nuit, demande utilisateur) ─────────
+// Règle voulue : UN appel dès que TOUS les matchs d'une compétition d'un même jour sont finis
+// (football-data.org met `/scorers` à jour dans la minute), puis plus rien pendant des heures —
+// pas d'appel toutes les 5min pendant les matchs, pas de rafraîchissement la nuit.
+// `scorersUpdateDue` est vrai quand : le dernier jour avec des matchs terminés (≤ 3 jours) n'a
+// plus aucun match non terminé, ET la copie locale date d'AVANT la fin probable de ce dernier
+// match (`lastUpdated` FD.org, sinon coup d'envoi + 150min). Une fois la donnée récupérée, `cacheSavedAt` dépasse ce seuil →
+// faux → on retombe sur NO_MATCH_STALE_MS (6h). Sans copie locale (premier lancement) : vrai si
+// ce jour-là s'est terminé il y a moins de 8h (sinon la copie serveur `live=0`, jusqu'à 6h, pouvait
+// dater d'avant le match — constaté : Haaland à 4 buts au lieu de 5).
+const SCORERS_END_AFTER_KICKOFF_MS = 1000 * 60 * 150
+const SCORERS_FRESH_INSTALL_MS = 1000 * 60 * 60 * 8
+const NOT_PLAYED = new Set(['POSTPONED', 'CANCELLED', 'SUSPENDED', 'AWARDED'])
+export function scorersUpdateDue(finishedMatches, compId, scheduledMatches = null, now = Date.now()) {
+  const t = m => (m?.utcDate ? new Date(m.utcDate).getTime() : NaN)
+  const day = m => new Date(t(m)).toLocaleDateString('sv-SE')
+  const finished = (finishedMatches ?? []).filter(m => Number.isFinite(t(m)) && t(m) <= now && now - t(m) < 3 * 86_400_000)
+  if (finished.length === 0) return false
+  const lastDay = finished.map(day).sort().at(-1)
+  const sameDay = [...finished, ...(scheduledMatches ?? [])].filter(m => Number.isFinite(t(m)) && day(m) === lastDay && !NOT_PLAYED.has(m.status))
+  // Un match de ce jour pas encore terminé (programmé, ou commencé il y a < 150min) : on attend.
+  const pending = sameDay.some(m => m.status !== 'FINISHED' && (t(m) > now || now - t(m) < SCORERS_END_AFTER_KICKOFF_MS))
+  if (pending) return false
+  // Fin du dernier match : `lastUpdated` de football-data.org (moment où il l'a passé FINISHED) si
+  // présent, sinon coup d'envoi + 150min (matchs sourcés ESPN, sans ce champ).
+  const endOf = m => {
+    const lu = Date.parse(m.lastUpdated)
+    return Number.isFinite(lu) && lu > t(m) ? lu : t(m) + SCORERS_END_AFTER_KICKOFF_MS
+  }
+  const lastEnd = Math.max(...sameDay.map(endOf))
   const cacheSavedAt = getCacheSavedAt(`scorers3_${compId}`)
-  if (!cacheSavedAt) return false // pas encore de cache : fetchScorersData fetch de toute façon
-  return (finishedMatches ?? []).some(m => {
-    if (!m.utcDate) return false
-    const windowEnd = new Date(m.utcDate).getTime() + SCORERS_LIVE_WINDOW_MS
-    return windowEnd > cacheSavedAt
-  })
+  if (!cacheSavedAt) return now - lastEnd < SCORERS_FRESH_INSTALL_MS
+  return cacheSavedAt < lastEnd
 }
 
 // ⚠️ AJOUT `delayMs` (24/07, trouvé via l'audit chronologique demandé par
@@ -250,8 +231,6 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
-    // Page ouverte pendant la fenêtre : se remet à jour toute seule (5min, comme le TTL serveur).
-    refetchInterval:      hasMatchToday ? STALE_MS : false,
     // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "le classement des buteurs
     // a du mal à se charger, faut changer de championnat et revenir sur celui
     // qu'on voulait voir"). Ce `retry: false` était la cause exacte du
@@ -327,11 +306,26 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   // refetch() explicite sur le FRONT MONTANT de hasMatchToday (false→true) :
   // couvre les deux cas (vraie fenêtre live ET rattrapage) avec le même
   // mécanisme, sans rien changer quand hasMatchToday reste stable ou redescend.
+  // 04/11 : `hasMatchToday` = « une mise à jour est due » (scorersUpdateDue). Vérification : si le
+  // total de buts du classement n'a pas bougé après ce refetch, UN seul nouvel essai 10min plus
+  // tard (le cache serveur de 5min a pu servir une copie d'avant la fin des matchs).
   const prevHasMatchToday = useRef(hasMatchToday)
+  const retryTimer = useRef(null)
+  const dataRef = useRef(data)
+  useEffect(() => { dataRef.current = data }, [data])
   useEffect(() => {
-    if (hasMatchToday && !prevHasMatchToday.current) refetch()
+    if (hasMatchToday && !prevHasMatchToday.current) {
+      const total = d => (d ?? []).reduce((n, x) => n + (x.goals || 0), 0)
+      const before = total(dataRef.current)
+      refetch().then(res => {
+        if (total(res?.data) === before && !retryTimer.current) {
+          retryTimer.current = setTimeout(() => { retryTimer.current = null; refetch() }, 10 * 60_000)
+        }
+      }).catch(() => {})
+    }
     prevHasMatchToday.current = hasMatchToday
   }, [hasMatchToday, refetch])
+  useEffect(() => () => { clearTimeout(retryTimer.current); retryTimer.current = null }, [])
 
   return {
     scorers: data ?? [],

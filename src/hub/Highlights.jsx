@@ -1,5 +1,7 @@
-// "À ne pas manquer" (Accueil) : 1 match par compétition — le plus intéressant —
-// dans le cocon de sa compétition, + un accès à la page Match pour tout voir.
+// Accueil : 1 match par compétition — le plus intéressant — dans le cocon de sa compétition.
+// « + N autres matchs » déplie la liste de CETTE compétition sur place (et la replie), le bouton du
+// bas mène à la page Match pour tout voir.
+import { useState } from 'react'
 import { isCardLive } from '../utils/matchUtils'
 import { groupMatchesByCompetition, pickBestMatch } from '../utils/competitionGroups'
 import { Cocoon } from './Cocoon'
@@ -9,6 +11,12 @@ const nbMatchs = n => `${n} match${n > 1 ? 's' : ''}`
 
 export function Highlights({ matches, loading, espnScores = {}, onMatchClick, onLiveClick, matchesByComp = null, formMapByComp = null, onSeeAll, emptyText }) {
   const groups = groupMatchesByCompetition(matches)
+  const [openKeys, setOpenKeys] = useState(() => new Set())
+  const toggle = key => setOpenKeys(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   return (
     <div className="accueil__dashPanelBody">
@@ -20,28 +28,34 @@ export function Highlights({ matches, loading, espnScores = {}, onMatchClick, on
           {groups.map(g => {
             const best = pickBestMatch(g.matches, isCardLive)
             const others = g.matches.length - 1
+            const isOpen = openKeys.has(g.key)
+            const shown = isOpen ? g.matches : [best]
             return (
               <Cocoon
                 key={g.key}
                 group={g}
                 count={nbMatchs(g.matches.length)}
                 footer={others > 0 ? (
-                  <div className="hubCocoon__foot">
-                    <span>+ {others} autre{others > 1 ? 's' : ''} match{others > 1 ? 's' : ''}</span>
-                    <button type="button" onClick={onSeeAll}>Voir tout ›</button>
+                  <div className="hubCocoon__foot hubCocoon__foot--center">
+                    <button type="button" onClick={() => toggle(g.key)} aria-expanded={isOpen}>
+                      {isOpen ? 'Réduire ▴' : `+ ${others} autre${others > 1 ? 's' : ''} match${others > 1 ? 's' : ''} ▾`}
+                    </button>
                   </div>
                 ) : null}
               >
                 <div className="hubPosters">
-                  <LazyPoster
-                    match={best}
-                    espnScore={espnScores[best.id] ?? null}
-                    live={isCardLive(best)}
-                    onMatchClick={onMatchClick}
-                    onLiveClick={onLiveClick}
-                    formMap={formMapByComp?.[best.competition?.code] ?? null}
-                    compMatches={matchesByComp?.[best.competition?.code] ?? null}
-                  />
+                  {shown.map(m => (
+                    <LazyPoster
+                      key={m.id}
+                      match={m}
+                      espnScore={espnScores[m.id] ?? null}
+                      live={isCardLive(m)}
+                      onMatchClick={onMatchClick}
+                      onLiveClick={onLiveClick}
+                      formMap={formMapByComp?.[m.competition?.code] ?? null}
+                      compMatches={matchesByComp?.[m.competition?.code] ?? null}
+                    />
+                  ))}
                 </div>
               </Cocoon>
             )

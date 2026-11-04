@@ -16,7 +16,7 @@ import { translateTeam } from '../data/teamNames.js'
 import { useStandings } from '../hooks/useStandings'
 import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
-import { useScorers, isScorersLiveWindow, needsScorersCatchUp } from '../hooks/useScorers'
+import { useScorers, scorersUpdateDue } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { finalScore } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
@@ -151,13 +151,10 @@ function Classement() {
   // ⚠️ Calcul extrait dans isScorersLiveWindow (useScorers.js, 02/11) —
   // réutilisé aussi par useTeamScorersMulti (TeamSearchPage), même règle
   // partout plutôt que dupliquée.
+  // 04/11 : un seul appel quand TOUS les matchs du dernier jour de cette compétition sont finis, puis
+  // cache 6h (voir scorersUpdateDue, useScorers.js) — plus de fenêtre « live » à 5min.
   const scorersLiveWindow = !wcSchedLoading && !wcFinLoading &&
-    ([...wcSched, ...wcFin].some(m => isScorersLiveWindow(m.utcDate)) ||
-      // ⚠️ AJOUT (04/11, voir needsScorersCatchUp dans useScorers.js) : couvre le
-      // cas où personne n'était sur cette page pendant la fenêtre ci-dessus — force
-      // un dernier fetch au prochain montage plutôt que de rester bloqué 24h sur une
-      // donnée d'avant le match.
-      needsScorersCatchUp(wcFin, selectedComp))
+    scorersUpdateDue(wcFin, selectedComp, wcSched)
 
   // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429" demandé par
   // l'utilisateur) : le stagger précédent (2s/4s) supposait qu'espacer les 3

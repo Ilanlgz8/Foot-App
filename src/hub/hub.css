@@ -56,6 +56,7 @@
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-size: 0.7rem; color: rgba(255,255,255,0.66);
 }
+.hubCocoon__foot--center { justify-content: center; }
 .hubCocoon__foot button {
   background: none; border: 0; padding: 0; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
 }

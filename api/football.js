@@ -203,9 +203,9 @@ function getTtl(fdPath, qs) {
   // du direct minute par minute (ESPN/cron-goals.js, notifs push) — 5min de
   // retard sur CE classement secondaire est un coût très raisonnable face
   // au gain.
-  // 04/11 : 24h → 6h. Doit rester ≤ SCORERS_LIVE_WINDOW_MS (12h, useScorers.js) : une copie créée
-  // juste avant un match ne doit pas survivre à la fenêtre où le client redevient « hors match »
-  // (sinon il lisait les buteurs d'avant le match — vérifié : Haaland 4 buts au lieu de 5).
+  // 04/11 : 24h → 6h. Une copie créée avant un match ne doit pas survivre longtemps après sa fin ;
+  // le client (scorersUpdateDue, useScorers.js) passe de toute façon par la clé SANS `live=0`
+  // (TTL 5min) quand une mise à jour est due, y compris au premier lancement.
   if (fdPath.includes('/scorers') && qs.includes('live=0')) return 21600
   if (fdPath.includes('/scorers'))                 return 300           // buteurs — 5min
   // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
