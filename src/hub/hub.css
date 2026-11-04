@@ -99,11 +99,11 @@
   min-width: 78px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
 }
 .mhRow__envLabel { margin-bottom: 3px; }
-.mhRow__minLabel { font-size: 0.7rem; margin-bottom: 2px; }
+.mhRow__minLabel { font-size: 0.78rem; margin-bottom: 2px; }
 .mhRow--ht .mhRow__minLabel { margin-bottom: 6px; }
 .mhRow__reprise { font-size: 0.5rem; margin-bottom: 2px; }
 #root .mhRow .poster__score,
-#root .mhRow .poster__time { font-size: 1.6rem; }
+#root .mhRow .poster__time { font-size: 1.5rem; }
 
 /* ── Onglets / outils ── */
 .mh { max-width: 640px; margin: 0 auto; }
@@ -176,11 +176,11 @@
   position: absolute; bottom: 100%; left: calc(50% + 2px); transform: translateX(-50%);
   margin: 0 0 -11px; white-space: nowrap;
 }
-.hubPosters .poster__center > .poster__min-label { font-size: 0.66rem; margin-bottom: -9px; }
+.hubPosters .poster__center > .poster__min-label { font-size: 0.8rem; margin-bottom: -9px; }
 .hubPosters .poster__center > .poster__min-labelCol { margin-bottom: -9px; }
 .hubPosters .poster__reprise-label { margin: 0; }
 #root .hubPosters .poster__score,
-#root .hubPosters .poster__time { font-size: 2.1rem; transform: translateY(4px); }
+#root .hubPosters .poster__time { font-size: 1.73rem; transform: translateY(4px); }
 
 /* ── Bouton "Voir les N matchs" (Accueil) ── */
 .hubCta {
