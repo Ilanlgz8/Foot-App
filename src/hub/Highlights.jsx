@@ -1,6 +1,6 @@
 // Accueil : 1 match par compétition — le plus intéressant — dans le cocon de sa compétition.
-// « + N autres matchs » déplie la liste de CETTE compétition sur place (et la replie), le bouton du
-// bas mène à la page Match pour tout voir.
+// La flèche de l'en-tête (« 17 matchs ›», comme la page Match) déplie la liste de CETTE compétition
+// sur place et la replie ; le bouton du bas mène à la page Match pour tout voir.
 import { useState } from 'react'
 import { isCardLive } from '../utils/matchUtils'
 import { groupMatchesByCompetition, pickBestMatch } from '../utils/competitionGroups'
@@ -35,13 +35,9 @@ export function Highlights({ matches, loading, espnScores = {}, onMatchClick, on
                 key={g.key}
                 group={g}
                 count={nbMatchs(g.matches.length)}
-                footer={others > 0 ? (
-                  <div className="hubCocoon__foot hubCocoon__foot--center">
-                    <button type="button" onClick={() => toggle(g.key)} aria-expanded={isOpen}>
-                      {isOpen ? 'Réduire ▴' : `+ ${others} autre${others > 1 ? 's' : ''} match${others > 1 ? 's' : ''} ▾`}
-                    </button>
-                  </div>
-                ) : null}
+                open={isOpen}
+                alwaysBody
+                onToggle={others > 0 ? () => toggle(g.key) : undefined}
               >
                 <div className="hubPosters">
                   {shown.map(m => (

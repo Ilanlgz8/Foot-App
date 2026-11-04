@@ -7715,6 +7715,8 @@ cf-worker/
 
 - **Logo Ligue Europa sans pastille blanche (05/11)** : `emblemOpaque: true` + `emblemTransparent: true` sur l'entrée UEL de `competitions.js` (même traitement que la LDC). Le fichier `europa-league.png` est déjà transparent ; la pastille blanche était celle par défaut de `.accueil__mdjLeagueIcon` (Match du jour), aussi retirée dans les en-têtes MatchPage/LiveMatchPage/Cocoon.
 
+- **Accueil/Match : flèche en haut, logos alignés, forme Ligue Europa (05/11)** : (1) Accueil `Highlights` : la flèche de l'en-tête du cocon (« 17 matchs ›», comme la page Match, `Cocoon` avec `onToggle` + `alwaysBody`) déplie/replie la liste ; le bouton du bas est supprimé (il renvoyait au niveau des actus au repli). (2) `.hubPosters` : colonnes équipe `flex:1` égales + centre de largeur fixe 96px → le logo est centré entre le bord de la card et l'heure, au même endroit sur toutes les cards. (3) « Coup d'envoi » 3px plus haut, heure 3px plus bas (seulement quand la card affiche une heure). (4) BUG forme UEL : `formMapByComp` des comps ESPN-only (UEL/UECL/NL…) était clé sur des ids FD.org résolus par nom, alors que les lecteurs (MatchPoster/MatchCard/Pronos) cherchent avec l'id ESPN natif (résolu contre `matchesByComp[code]`) → forme vide pour les clubs des grands championnats (Real Sociedad 89 vs FD 92), présente en UECL car ces clubs n'étaient pas résolus. Maintenant clé sur les ids natifs ESPN (le `formMap` fusionné legacy garde la résolution par nom).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

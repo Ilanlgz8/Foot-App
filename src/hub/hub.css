@@ -108,14 +108,16 @@
   position: absolute; top: 10px; right: 13px; left: auto; padding: 0; z-index: 2;
 }
 /* Logos / noms / forme remontés de 6px ; le centre (score, minute) garde sa place via margin-top. */
-.hubPosters .poster__middle { flex: none; align-items: flex-start; padding: 18px 12px 16px; }
+.hubPosters .poster__middle { flex: none; align-items: flex-start; padding: 18px 0 16px; }
 .hubPosters .poster:has(.poster__min-labelCol) .poster__middle,
 .hubPosters .poster:has(.poster__topbarPeriod) .poster__middle { padding-top: 38px; }
 .hubPosters .poster__center { margin-top: 6px; }
-.hubPosters .poster__team-col { width: 92px; }
-.hubPosters .poster__name { max-width: 92px; }
+/* Colonnes équipe égales + centre de largeur fixe : le logo est centré entre le bord de la
+   card et l'heure, au même endroit sur toutes les cards quelle que soit la longueur du nom. */
+.hubPosters .poster__team-col { flex: 1; min-width: 0; width: auto; align-items: center; }
+.hubPosters .poster__name { max-width: 100px; text-align: center; }
 .hubPosters .poster__center {
-  position: relative; height: 44px; flex: 1; gap: 0; justify-content: center;
+  position: relative; height: 44px; flex: none; width: 96px; gap: 0; justify-content: center;
 }
 .hubPosters .poster__center > .poster__env-label,
 .hubPosters .poster__center > .poster__min-label,
@@ -127,11 +129,14 @@
 .hubPosters .poster__center > .poster__min-labelCol { margin-bottom: -9px; }
 .hubPosters .poster__reprise-label { margin: 0; }
 .hubPosters .poster__center > .poster__env-label { margin-bottom: -5px; }
+/* « Coup d'envoi » un peu plus haut, l'heure un peu plus bas (plus d'air entre les deux). */
+.hubPosters .poster__center:has(.poster__time) > .poster__env-label { margin-bottom: -2px; }
 /* Page Match : logos des équipes agrandis (44 -> 52px), le centre suit. */
 .hubPosters--lg .poster__crestWrap { width: 52px; height: 52px; }
 .hubPosters.hubPosters--lg .poster__center { height: 52px; }
 #root .hubPosters .poster__score,
 #root .hubPosters .poster__time { font-size: 2.2rem; transform: translateY(4px); }
+#root .hubPosters .poster__time { transform: translateY(7px); }
 
 /* ── Bouton "Voir les N matchs" (Accueil) ── */
 .hubCta {

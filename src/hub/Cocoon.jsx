@@ -21,7 +21,9 @@ export function CompetitionHead({ group, count }) {
   )
 }
 
-export function Cocoon({ group, count, open = true, onToggle, footer = null, children }) {
+// `alwaysBody` : le corps reste affiché même quand `open` est faux (Accueil : le 1er match
+// reste visible, la flèche de l'en-tête déplie/replie le reste de la liste).
+export function Cocoon({ group, count, open = true, onToggle, footer = null, alwaysBody = false, children }) {
   return (
     <section className="hubCocoon" style={{ '--acc': group.accent }}>
       {onToggle ? (
@@ -39,7 +41,7 @@ export function Cocoon({ group, count, open = true, onToggle, footer = null, chi
           <CompetitionHead group={group} count={count} />
         </div>
       )}
-      {open && <div className="hubCocoon__body">{children}</div>}
+      {(open || alwaysBody) && <div className="hubCocoon__body">{children}</div>}
       {open && footer}
     </section>
   )

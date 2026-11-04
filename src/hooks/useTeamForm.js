@@ -716,8 +716,19 @@ export function useTeamFormMulti(compCodes) {
             },
           }
         })
-      const espnFormMap = buildFormMap(resolved.map(r => r.match))
-      espnFormMapByCode[c] = espnFormMap
+      // ⚠️ BUG CORRIGÉ (05/11, constat utilisateur : forme récente absente sur les
+      // cards Ligue Europa de l'Accueil, présente en Conférence) : cette table
+      // était construite avec les ids FD.org résolus par nom. Or CHAQUE lecteur de
+      // `formMapByComp` (MatchPoster, MatchCard, Pronos) résout l'id du club
+      // contre `matchesByComp[code]`, c'est-à-dire les matchs ESPN de la
+      // compétition → il cherche avec l'id ESPN natif. Un club d'un grand
+      // championnat (Real Sociedad, Lyon…) était donc rangé sous son id FD.org
+      // (ex. 92) et jamais retrouvé avec son id ESPN (89). La Conférence marchait
+      // parce que ses clubs, absents des championnats du jour, gardaient leur id
+      // ESPN. Cette table est propre à UNE compétition (jamais fusionnée) : on la
+      // clé donc sur les ids natifs, sans résolution. La résolution par nom ne
+      // sert plus qu'au `formMap` fusionné (`safeFormMap` ci-dessous).
+      espnFormMapByCode[c] = buildFormMap(espnMatches.filter(m => m.status === 'FINISHED'))
       const safeFormMap = buildFormMap(resolved.filter(r => !r.bothUnresolved).map(r => r.match))
       for (const [id, form] of Object.entries(safeFormMap)) {
         if (!(id in formMap)) formMap[id] = form
