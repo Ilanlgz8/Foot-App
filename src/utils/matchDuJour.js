@@ -266,7 +266,7 @@ const ELITE_TEAMS = new Set([
 // ⚠️ DEVENU LE CRITÈRE PRINCIPAL (26/09, voir l'en-tête du fichier) : décide
 // maintenant EN PREMIER, COMP_PRIORITY ne sert plus qu'à départager une
 // égalité de score d'affiche.
-function bigTeamScore(match) {
+export function bigTeamScore(match) {
   const rank = (team) =>
     teamMatchesSet(team, ELITE_TEAMS) ? 3
       : teamMatchesSet(team, BIG_TEAMS) ? 2

@@ -1,39 +1,57 @@
-import { useNavigate } from 'react-router-dom'
-import { useState, useEffect, useRef } from 'react'
-import { useLiveData } from '../context/LiveProvider'
+// Page Match (route /live) — remplace l'ancienne page "En Direct" (04/11, demande
+// utilisateur). Deux onglets :
+//   • En direct       : les matchs en cours, regroupés par compétition
+//   • Tous les matchs : le programme du jour (flèches de jour comme sur l'Accueil)
+// Chaque compétition est enveloppée dans son cocon coloré ; chaque match est
+// affiché en "Ligne" (fine) ou en "Card" (les vraies cards de l'Accueil), au choix.
+// Un match terminé n'apparaît plus ici : son résultat est dans Résultats.
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { isCardLive } from '../utils/matchUtils'
-import { COMPETITIONS } from '../data/competitions'
-import { LiveCard } from './LiveCardWidget'
+import { getMatchState, isRecentlyFinished } from '../utils/matchStateTracker'
+import { useMatchDay } from '../hooks/useMatchDay'
+import { getDayLabel } from '../utils/dayUtils'
+import { groupMatchesByCompetition } from '../utils/competitionGroups'
+import { Cocoon } from '../hub/Cocoon'
+import { MatchRow } from '../hub/MatchRow'
+import { LazyPoster } from '../accueil/MatchCard'
+import '../accueil.css'
 import '../live.css'
+import '../hub/hub.css'
 
-// Regroupe les matchs live par championnat — un seul badge compétition par
-// section au lieu d'un par card (redondant).
-// Ordre (retour utilisateur) : Coupe du Monde toujours en tête (pas un
-// "championnat" club à proprement parler), puis Ligue 1 en premier parmi les
-// championnats club, puis le reste par ordre alphabétique.
-const SECTION_PRIORITY = { WC: 0, FL1: 1 }
-function groupByCompetition(matches) {
-  const map = new Map()
-  for (const m of matches) {
-    const code   = m.competition?.code ?? 'AUTRE'
-    const comp   = COMPETITIONS.find(c => c.id === code)
-    const name   = comp?.name ?? m.competition?.name ?? 'Autre compétition'
-    const emblem = comp?.emblem ?? m.competition?.emblem ?? null
-    if (!map.has(code)) map.set(code, { code, name, emblem, matches: [] })
-    map.get(code).matches.push(m)
-  }
-  return [...map.values()].sort((a, b) => {
-    const pa = SECTION_PRIORITY[a.code] ?? 2
-    const pb = SECTION_PRIORITY[b.code] ?? 2
-    if (pa !== pb) return pa - pb
-    return a.name.localeCompare(b.name, 'fr')
-  })
+const VIEW_KEY = 'foot_matchView'
+const readView = () => {
+  try { return localStorage.getItem(VIEW_KEY) === 'card' ? 'card' : 'row' } catch { return 'row' }
+}
+const nbMatchs = n => `${n} match${n > 1 ? 's' : ''}`
+
+// Un match terminé quitte la liste quelques secondes après son coup de sifflet
+// (même règle que `stillVisibleToday` de l'Accueil).
+const stillVisible = m =>
+  m != null && m.status !== 'FINISHED' &&
+  (getMatchState(m.id).ft ? isRecentlyFinished(m.id) : true)
+
+function dayDateLabel(offset) {
+  const d = new Date(); d.setDate(d.getDate() + offset)
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-// ── Page Live ─────────────────────────────────────────────────────────────────
+// ── Page Match ────────────────────────────────────────────────────────────────
 export default function Live() {
   const navigate = useNavigate()
-  const { liveMatches, espnScores } = useLiveData()
+  const location = useLocation()
+  const initial = location.state ?? {}
+
+  const [dayOffset, setDayOffset] = useState(() => Number.isInteger(initial.dayOffset) ? initial.dayOffset : 0)
+  const [view, setView] = useState(readView)
+  const [closed, setClosed] = useState(() => new Set())
+
+  // Données : "En direct" ne dépend pas du jour affiché, on charge alors celles d'aujourd'hui.
+  const [tab, setTab] = useState(initial.tab ?? null)
+  const {
+    matches: dayMatches, loading, espnScores, liveMatches,
+    formMapByComp, matchesByComp, nextMatchDayOffset, prevMatchDayOffset,
+  } = useMatchDay(tab === 'prog' ? dayOffset : 0)
 
   // ⚠️ REVU EN PROFONDEUR (constat utilisateur, 20/08 : "quand le match est
   // terminé, la card du match dans Accueil a le bon comportement [même si
@@ -129,52 +147,153 @@ export default function Live() {
     (isCardLive(m) && !permanentlyEndedIds.has(m.id)) || justEndedIds.has(m.id)
   )
 
+
+  // Onglet par défaut : "En direct" s'il y a du direct, sinon le programme.
+  const hasLive = live.length > 0
+  const activeTab = tab ?? (hasLive ? 'live' : 'prog')
+
+  // Seconde de grâce : tant qu'un match vient de finir, on rafraîchit chaque seconde
+  // pour qu'il disparaisse de la liste sans attendre le prochain poll.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!dayMatches.some(m => isRecentlyFinished(m.id))) return
+    const id = setInterval(() => {
+      setTick(t => t + 1)
+      if (!dayMatches.some(m => isRecentlyFinished(m.id))) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [dayMatches])
+
+  const progMatches = dayOffset === 0
+    ? dayMatches.filter(stillVisible)
+    : dayMatches.filter(m => m.status !== 'FINISHED')
+
+  const onMatchClick = useCallback(m => navigate(`/match/${m.id}`, { state: { match: m } }), [navigate])
+  const onLiveClick  = useCallback(m => navigate(`/live/${m.id}`), [navigate])
+
+  const changeView = v => {
+    setView(v)
+    try { localStorage.setItem(VIEW_KEY, v) } catch { /* stockage indisponible : le choix vaut pour cette visite */ }
+  }
+  const toggleGroup = key => setClosed(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
+
+  const renderMatches = list => view === 'card' ? (
+    <div className="hubPosters">
+      {list.map(m => (
+        <LazyPoster
+          key={m.id}
+          match={m}
+          espnScore={espnScores[m.id] ?? null}
+          live={isCardLive(m)}
+          onMatchClick={onMatchClick}
+          onLiveClick={onLiveClick}
+          formMap={formMapByComp?.[m.competition?.code] ?? null}
+          compMatches={matchesByComp?.[m.competition?.code] ?? null}
+        />
+      ))}
+    </div>
+  ) : list.map(m => (
+    <MatchRow
+      key={m.id}
+      match={m}
+      espnScore={espnScores[m.id] ?? null}
+      live={isCardLive(m)}
+      onMatchClick={onMatchClick}
+      onLiveClick={onLiveClick}
+      compMatches={matchesByComp?.[m.competition?.code] ?? null}
+    />
+  ))
+
+  const viewSwitch = (
+    <div className="hubSeg hubSeg--mini" role="group" aria-label="Affichage">
+      <button type="button" className={view === 'row' ? 'is-on' : ''} onClick={() => changeView('row')}>Ligne</button>
+      <button type="button" className={view === 'card' ? 'is-on' : ''} onClick={() => changeView('card')}>Card</button>
+    </div>
+  )
+
   return (
     <section className="live__page">
-      <div className="live__pageInner">
+      <div className="mh">
+        <h1 className="mh__title">Match</h1>
 
-        {/* Header */}
-        <div className="live__pageHeader">
-          <button className="live__backBtn" onClick={() => navigate(-1)}>
-            ‹ Retour
+        <div className="hubSeg" role="tablist">
+          <button type="button" role="tab" aria-selected={activeTab === 'live'} className={activeTab === 'live' ? 'is-on' : ''} onClick={() => setTab('live')}>
+            En direct{hasLive && <span className="hubSeg__cnt">{live.length}</span>}
           </button>
-          <div className="live__pageTitleWrap">
-            <span className="live__pageDot" />
-            <h1 className="live__pageTitle">En Direct</h1>
-            <span className="live__pageCount">{live.length}</span>
-          </div>
+          <button type="button" role="tab" aria-selected={activeTab === 'prog'} className={activeTab === 'prog' ? 'is-on' : ''} onClick={() => setTab('prog')}>
+            Tous les matchs
+          </button>
         </div>
 
-        {/* Grille */}
-        {live.length === 0 ? (
-          <div className="live__empty">
-            <span className="live__emptyIcon" aria-hidden="true">⚽</span>
-            <p className="live__emptyTitle">Aucun match en direct</p>
-            <p className="live__emptyHint">Reviens à l'heure du coup d'envoi pour suivre les scores en temps réel.</p>
-            <button className="live__emptyCta" onClick={() => navigate('/matchs')}>
-              Voir le programme →
-            </button>
-          </div>
-        ) : (
-          groupByCompetition(live).map(group => (
-            <div key={group.code} className="live__section">
-              <div className="live__sectionHeader">
-                {group.emblem && <img src={group.emblem} alt="" className="live__sectionLogo" />}
-                <span className="live__sectionName">{group.name}</span>
-                <span className="live__sectionCount">{group.matches.length} en direct</span>
-              </div>
-              <div className="live__grid">
-                {group.matches.map(match => (
-                  <LiveCard
-                    key={match.id}
-                    match={match}
-                    espn={espnScores[match.id] ?? null}
-                    onClick={() => navigate(`/live/${match.id}`)}
-                  />
-                ))}
-              </div>
+        {activeTab === 'live' && (
+          !hasLive ? (
+            <div className="hubEmpty">
+              <b>Aucun match en direct</b>
+              Reviens à l'heure du coup d'envoi pour suivre les scores en temps réel.
+              <br />
+              <button type="button" onClick={() => setTab('prog')}>Voir tous les matchs →</button>
             </div>
-          ))
+          ) : (
+            <>
+              <div className="hubTools hubTools--end">{viewSwitch}</div>
+              {groupMatchesByCompetition(live).map(g => (
+                <Cocoon key={g.key} group={g} count={`${g.matches.length} en direct`}>
+                  {renderMatches(g.matches)}
+                </Cocoon>
+              ))}
+            </>
+          )
+        )}
+
+        {activeTab === 'prog' && (
+          <>
+            <div className="hubTools">
+              <div className="hubDay">
+                <button type="button" className="hubDay__arrow" aria-label="Jour précédent"
+                  disabled={prevMatchDayOffset == null}
+                  onClick={() => { if (prevMatchDayOffset != null) setDayOffset(prevMatchDayOffset) }}>‹</button>
+                <div className="hubDay__label">
+                  {getDayLabel(dayOffset)}
+                  <small>{dayDateLabel(dayOffset)}</small>
+                </div>
+                <button type="button" className="hubDay__arrow" aria-label="Jour suivant"
+                  disabled={nextMatchDayOffset == null}
+                  onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}>›</button>
+              </div>
+              {viewSwitch}
+            </div>
+
+            {loading && progMatches.length === 0 ? (
+              <div className="hubEmpty">Chargement des matchs…</div>
+            ) : progMatches.length === 0 ? (
+              <div className="hubEmpty">
+                <b>{dayOffset === 0 ? "Plus de match à suivre aujourd'hui" : 'Aucun match ce jour-là'}</b>
+                Les matchs terminés sont dans « Résultats ».
+                {nextMatchDayOffset != null && (
+                  <>
+                    <br />
+                    <button type="button" onClick={() => setDayOffset(nextMatchDayOffset)}>Prochain jour de matchs →</button>
+                  </>
+                )}
+              </div>
+            ) : (
+              groupMatchesByCompetition(progMatches).map(g => (
+                <Cocoon
+                  key={g.key}
+                  group={g}
+                  count={nbMatchs(g.matches.length)}
+                  open={!closed.has(g.key)}
+                  onToggle={() => toggleGroup(g.key)}
+                >
+                  {renderMatches(g.matches)}
+                </Cocoon>
+              ))
+            )}
+          </>
         )}
       </div>
     </section>

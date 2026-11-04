@@ -318,7 +318,7 @@ export function BottomTabBar({ hidden = false }) {
           <BallIcon />
           {liveCount > 0 && <span className="sfTabLive__count">{liveCount}</span>}
         </span>
-        <span className="sfTab__label">Live</span>
+        <span className="sfTab__label">Match</span>
       </NavLink>
 
       {NAV.slice(2).map(item => (

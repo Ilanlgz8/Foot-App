@@ -544,7 +544,7 @@ function PosterPlaceholder({ innerRef, compTint }) {
   )
 }
 
-function LazyPoster({ match, espnScore, live, onMatchClick, onLiveClick, formMap, compMatches }) {
+export function LazyPoster({ match, espnScore, live, onMatchClick, onLiveClick, formMap, compMatches }) {
   const [ref, warm] = useWarmOnIntersect()
   if (!warm) {
     const compTint = COMPETITIONS.find(c => c.id === match.competition?.code)?.tint ?? null

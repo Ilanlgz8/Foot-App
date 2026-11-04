@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useNews } from '../hooks/useNews'
-import { useTodayMatches, prefetchMatchesForDate, useRecentDaysMatches } from '../hooks/useTodayMatches'
+import { useTodayMatches, useRecentDaysMatches } from '../hooks/useTodayMatches'
 import { useUpcomingMatchesAllComps } from '../hooks/useMatchs'
 import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } from '../hooks/useWcKnockout'
 import { useTeamFormMulti } from '../hooks/useTeamForm'
@@ -14,11 +13,12 @@ import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { pickMatchDuJour, MDJ_STATUSES } from '../utils/matchDuJour'
-import { MatchPanel } from '../accueil/MatchCard'
+import { Highlights } from '../hub/Highlights'
+import '../hub/hub.css'
 import { ResultPanel } from '../accueil/ResultPanel'
 import { NewsCarousel } from '../accueil/NewsCarousel'
 import { LiveCard } from './LiveCardWidget'
-import { fuzzyTeam } from '../utils/espnSummaryParse'
+import { getTargetDate, getDayLabel, isDuplicateMatch } from '../utils/dayUtils'
 import '../accueil.css'
 import '../live.css'
 
@@ -31,66 +31,9 @@ import '../live.css'
 // CompFilter n'a plus aucun appelant depuis ce retrait, supprimée pour
 // éviter le code mort.
 
-// ⚠️ AJOUT (nécessaire suite au passage de FL1/PL/PD/BL1/SA/CL sur ESPN dans
-// useTodayMatches.js, 23/07) : `rawMatches` (widget "jour", désormais ESPN
-// pour ces 6 comps, id façon `espn-FL1-123`) et `upcomingAllComps` (reste
-// FD.org pour elles, id numérique FD.org classique) peuvent désormais
-// représenter le MÊME match réel avec des `id` de format complètement
-// différent — un simple Set de `m.id` (utilisé dans les filets de sécurité
-// `extra` ci-dessous) ne détecterait pas ce doublon et afficherait la même
-// rencontre deux fois.
-//
-// ⚠️ BUG CORRIGÉ (constat utilisateur, 24/07 : "j'ai que des doublons") :
-// la 1ère version de ce filet comparait `homeTeam.id`/`awayTeam.id` — mais
-// `home.team?.id` côté ESPN (espnAdapter.js, normalizeEvent) est l'ID INTERNE
-// D'ESPN, alors que le `id` côté FD.org est l'ID INTERNE DE FOOTBALL-DATA.ORG —
-// deux systèmes d'ID totalement indépendants, qui ne se recoupent JAMAIS pour
-// la même équipe réelle. Résultat : la comparaison échouait TOUJOURS pour
-// exactement le cas qu'elle devait détecter (les 6 grands championnats,
-// désormais sourcés ESPN dans rawMatches ET toujours FD.org dans
-// upcomingAllComps) — le filet de sécurité n'a jamais réellement filtré quoi
-// que ce soit depuis son ajout, chaque match de ces 6 comps s'affichait deux
-// fois. Remplacé par une comparaison sur le NOM d'équipe (fuzzyTeam, déjà
-// utilisée ailleurs dans l'app — api/fifa-live.js — pour ce même problème de
-// rapprochement inter-sources, éprouvée toute la Coupe du Monde) : les noms
-// d'équipe, contrairement aux ID, sont comparables entre sources.
-function isDuplicateMatch(m, existingMatches) {
-  if (existingMatches.some(e => e.id === m.id)) return true
-  const mDate = m.utcDate ? new Date(m.utcDate).getTime() : null
-  const mHome = m.homeTeam?.name ?? m.homeTeam?.shortName ?? ''
-  const mAway = m.awayTeam?.name ?? m.awayTeam?.shortName ?? ''
-  if (!mDate || !mHome || !mAway) return false
-  return existingMatches.some(e => {
-    if (!e.utcDate) return false
-    // Marge large (24h) : les 2 sources peuvent classer un match juste après
-    // minuit sur des jours locaux légèrement différents selon leur propre
-    // fuseau de référence — seuls les NOMS d'équipe garantissent vraiment
-    // qu'il s'agit du même match, la date n'est qu'un filtre grossier pour
-    // éviter de comparer les noms de TOUS les matchs de la fenêtre 30j.
-    if (Math.abs(new Date(e.utcDate).getTime() - mDate) > 24 * 60 * 60 * 1000) return false
-    const eHome = e.homeTeam?.name ?? e.homeTeam?.shortName ?? ''
-    const eAway = e.awayTeam?.name ?? e.awayTeam?.shortName ?? ''
-    return fuzzyTeam(mHome, eHome) && fuzzyTeam(mAway, eAway)
-  })
-}
+// (getTargetDate / getDayLabel / isDuplicateMatch : déplacés dans utils/dayUtils.js,
+// partagés avec la page Match — l'historique du filet anti-doublon ESPN/FD.org y est resté.)
 
-function getDayLabel(offset) {
-  if (offset === 0) return "Aujourd'hui"
-  if (offset === 1) return 'Demain'
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-}
-
-function getTargetDate(offset) {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  // Utiliser la date locale (pas UTC) pour éviter le décalage après minuit
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// Toutes les compétitions suivies — pour la recherche du prochain jour avec
-// un match (voir useUpcomingMatchesAllComps plus bas).
 const ACCUEIL_COMP_IDS = COMPETITIONS.map(c => c.id)
 
 // Persisté au niveau module pour survivre aux navigations (remounts)
@@ -132,7 +75,6 @@ function Accueil() {
   // existant et éprouvé, zéro risque de casser cette logique en la touchant.
   const compFilterResult = null
   const [resultView, setResultView] = useState('chrono') // 'chrono' | 'comp'
-  const queryClient  = useQueryClient()
 
   // ── Refonte layout desktop (demande utilisateur) ──────────────────────────
   // Détection desktop/mobile en JS (nécessaire ici : contrairement au
@@ -362,7 +304,7 @@ function Accueil() {
   // useTeamForm.js/useTeamFormMulti) — chaque card pioche maintenant la
   // forme de SA PROPRE compétition, jamais celle d'une autre compétition du
   // même club affichée ailleurs sur la page.
-  const { formMapByComp, matchesByComp } = useTeamFormMulti(formCompCodes)
+  const { matchesByComp } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
@@ -508,64 +450,8 @@ function Accueil() {
     return () => clearTimeout(id)
   }, [upcomingAllComps, matchesLoading, dayOffset, todayDateStr])
 
-  // Toute navigation MANUELLE (flèches jour précédent/suivant) doit être
-  // considérée définitive — reset du flag pour que l'effet de correction
-  // ci-dessus ne vienne jamais contredire un choix explicite de l'utilisateur.
-  const goToDay = (offset) => { wasAutoJumped.current = false; setDayOffset(offset) }
-
-  // ── Flèche "jour suivant" : saut DIRECT au prochain jour qui a un match ──
-  // (retour utilisateur : cliquer avançait d'un seul jour à la fois, et sur
-  // un jour vide ne se corrigeait qu'après coup via l'effet passif ci-dessus
-  // — délai visible + "ça revient au jour d'aujourd'hui" ressenti comme un
-  // bug. Même logique de recherche que l'effet passif (prochain match dans
-  // les 30j, toutes compétitions), mais déclenchée immédiatement au clic au
-  // lieu d'attendre un re-render + 800ms.) Vaut `null` si aucun match à venir
-  // n'est connu dans la fenêtre → sert aussi à désactiver la flèche.
-  const nextMatchDayOffset = useMemo(() => {
-    const endOfTargetDay = new Date(`${targetDate}T23:59:59`).getTime()
-    const next = upcomingAllComps.find(m => new Date(m.utcDate).getTime() > endOfTargetDay)
-    if (!next) return null
-    const today0 = new Date(); today0.setHours(0, 0, 0, 0)
-    const next0  = new Date(next.utcDate); next0.setHours(0, 0, 0, 0)
-    return Math.round((next0 - today0) / 86_400_000)
-  }, [targetDate, upcomingAllComps])
-
-  // ── Flèche "jour précédent" : même saut direct, mais vers le jour AVEC
-  // match le plus proche en revenant vers aujourd'hui (retour utilisateur :
-  // "quand je retourne en arrière... ça ne saute pas le jour où y'a pas de
-  // match" — ne décrémentait qu'un jour à la fois). On ne considère que les
-  // matchs strictement avant le jour affiché : upcomingAllComps ne contient
-  // de toute façon que des matchs à venir (>= maintenant), donc tout candidat
-  // trouvé est automatiquement >= aujourd'hui — le plancher à 0 reste
-  // garanti sans logique supplémentaire. S'il n'y a AUCUN match connu entre
-  // aujourd'hui et le jour affiché, on retombe directement sur aujourd'hui
-  // (0) plutôt que de décrémenter un par un.
-  const prevMatchDayOffset = useMemo(() => {
-    if (dayOffset <= 0) return null
-    const startOfTargetDay = new Date(`${targetDate}T00:00:00`).getTime()
-    const before = upcomingAllComps.filter(m => new Date(m.utcDate).getTime() < startOfTargetDay)
-    if (before.length === 0) return 0  // rien entre aujourd'hui et ici → aujourd'hui directement
-    const prev = before[before.length - 1]  // trié croissant → le plus proche du jour affiché
-    const today0 = new Date(); today0.setHours(0, 0, 0, 0)
-    const prev0  = new Date(prev.utcDate); prev0.setHours(0, 0, 0, 0)
-    return Math.max(0, Math.round((prev0 - today0) / 86_400_000))
-  }, [targetDate, upcomingAllComps, dayOffset])
-
-  // ── Préchargement des jours adjacents ──
-  useEffect(() => {
-    if (matchesLoading) return
-    let cancelled = false
-    const run = async () => {
-      await new Promise(r => setTimeout(r, 2000))
-      if (cancelled) return
-      await prefetchMatchesForDate(queryClient, getTargetDate(dayOffset + 1))
-      if (dayOffset > 0 && !cancelled) {
-        await prefetchMatchesForDate(queryClient, getTargetDate(dayOffset - 1))
-      }
-    }
-    run()
-    return () => { cancelled = true }
-  }, [dayOffset, matchesLoading, queryClient])
+  // (04/11) Plus de flèches de jour sur l'Accueil : la navigation par jour est dans
+  // la page Match (/live). Seul le saut AUTOMATIQUE ci-dessus subsiste.
 
   // ── Ticker 10s pour faire avancer calcMinute() et détecter pending kickoffs ──
   const [, setTick] = useState(0)
@@ -912,53 +798,26 @@ function Accueil() {
               la transition soit visible, avant de passer définitivement dans
               "Résultats récents". */}
           <div className="accueil__dashPanel accueil__dashPanel--matchPanel">
+            {/* 04/11 (demande utilisateur : "au lieu de mettre tous les matchs, le
+                match du jour + le plus intéressant de chaque championnat") : ce
+                panneau n'affiche plus la liste complète du jour mais 1 match par
+                compétition ; la liste complète (avec flèches de jour) est dans la
+                page Match (/live, onglet "Tous les matchs"). */}
             <div className="accueil__dashPanelHeader">
-              {/* BUG CORRIGÉ (retour utilisateur : "on peut retourner en
-                  arrière... alors que les matchs sont finis") : plancher à
-                  dayOffset 0 ("aujourd'hui") — ce panneau affiche les matchs
-                  À VENIR, revenir avant aujourd'hui n'a pas de sens ici (ces
-                  jours-là sont déjà couverts par le panneau "Résultats
-                  récents" juste en dessous). Contrairement à l'ancien
-                  minDayOffset (supprimé plus haut car il se verrouillait
-                  dynamiquement sur un saut auto lointain), ce plancher est
-                  FIXE à 0 : jamais de blocage sur un jour autre que le vrai
-                  "aujourd'hui". */}
-              <button
-                className="accueil__dayArrow"
-                onClick={() => { if (prevMatchDayOffset != null) goToDay(prevMatchDayOffset) }}
-                disabled={prevMatchDayOffset == null}
-                aria-label="Jour précédent"
-              >‹</button>
-              <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">{getDayLabel(dayOffset)}</h2>
-              {/* Saut direct au prochain jour avec un match (voir
-                  nextMatchDayOffset ci-dessus) — désactivée si aucun match à
-                  venir n'est connu dans les 30 prochains jours. */}
-              <button
-                className="accueil__dayArrow"
-                onClick={() => { if (nextMatchDayOffset != null) goToDay(nextMatchDayOffset) }}
-                disabled={nextMatchDayOffset == null}
-                aria-label="Jour suivant"
-              >›</button>
+              <h2 className="accueil__dashPanelTitle accueil__dashPanelTitle--center">
+                {dayOffset === 0 ? 'À ne pas manquer' : `À ne pas manquer · ${getDayLabel(dayOffset)}`}
+              </h2>
             </div>
-            {/* ⚠️ RETIRÉ (demande utilisateur, 23/07 : "enlève la barre où
-                y'a tous/[compétition]... au-dessus dans accueil sur mobile
-                et desktop aussi") : ancienne barre de filtre inline
-                (matchCompetitions, scopée au jour affiché) — redondante
-                avec la barre topFilters ci-dessus (déjà seule visible sur
-                desktop, activeCompetitions) et non désirée sur mobile non
-                plus. compFilterMatch reste utilisé par topFilters (desktop)
-                et par filteredMatches/filteredResults plus haut — retrait
-                purement visuel de ce point d'entrée mobile, pas de la
-                logique de filtrage elle-même. */}
             <div className="accueil__dashPanelDivider" />
-            <MatchPanel
+            <Highlights
               matches={matchPanelMatches}
               loading={matchesLoading}
               espnScores={espnScores}
               onMatchClick={handlePanelMatchClick}
               onLiveClick={handlePanelLiveClick}
-              formMapByComp={formMapByComp}
               matchesByComp={matchesByComp}
+              onSeeAll={() => navigate('/live', { state: { tab: 'prog', dayOffset } })}
+              emptyText={dayOffset === 0 ? "Plus de match à suivre aujourd'hui." : 'Aucun match ce jour-là.'}
             />
           </div>
 

@@ -1,0 +1,170 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Page Match + "à ne pas manquer" de l'Accueil (cocons, lignes, onglets).
+   Valeurs reprises de la maquette validée (04/11). Les polices du centre des
+   lignes viennent des classes `poster__*` (même rendu que les cards Accueil) ;
+   ici on ne règle que les tailles.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Cocon ── */
+.hubCocoon {
+  --acc: #6b7a99;
+  margin: 0 0 14px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 20%, #0a0a0d) 0%, #09090c 150px);
+  border: 1px solid color-mix(in srgb, var(--acc) 42%, transparent);
+  box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--acc) 55%, transparent);
+}
+.hubCocoon__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 14px 11px;
+  background: none;
+  border: 0;
+  color: #fff;
+  text-align: left;
+  font: inherit;
+}
+.hubCocoon__head--btn { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hubCocoon__logo {
+  width: 26px; height: 26px; flex-shrink: 0;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.92);
+  overflow: hidden;
+  font-size: 13px;
+}
+.hubCocoon__logo--opaque { background: transparent; }
+.hubCocoon__logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; box-sizing: border-box; }
+.hubCocoon__logo--opaque img { padding: 0; object-fit: cover; }
+.hubCocoon__name {
+  flex: 1; min-width: 0;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.03em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hubCocoon__count {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.66rem; color: rgba(255,255,255,0.66); white-space: nowrap;
+}
+.hubCocoon__chev { font-size: 0.85rem; color: rgba(255,255,255,0.66); transition: transform .2s; }
+.hubCocoon__head.is-open .hubCocoon__chev { transform: rotate(90deg); }
+.hubCocoon__body { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.hubCocoon__foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 2px 14px 12px;
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 0.7rem; color: rgba(255,255,255,0.66);
+}
+.hubCocoon__foot button {
+  background: none; border: 0; padding: 0; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+
+/* ── Ligne de match ── */
+.mhRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 19px 10px 9px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  transition: background .15s, border-color .15s, transform .12s;
+}
+.mhRow--click { cursor: pointer; }
+.mhRow--click:hover { background: rgba(255,255,255,0.075); border-color: rgba(255,255,255,0.14); }
+.mhRow--click:active { transform: scale(0.985); }
+.mhRow--click:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.mhRow--live { border-color: rgba(var(--red-rgb), 0.4); }
+.mhRow__period {
+  position: absolute; top: 5px; right: 10px;
+  font-size: 0.5rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.75); line-height: 1;
+}
+.mhRow__team { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.mhRow__crest {
+  width: 28px; height: 28px; border-radius: 50%; overflow: hidden;
+  border: 1px solid rgba(200,210,225,0.28);
+  background: rgba(10,14,24,0.88);
+}
+.mhRow__crest img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.18); }
+.mhRow__crestSpacer { width: 28px; height: 28px; }
+.mhRow__name {
+  max-width: 100%; text-align: center;
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mhRow__mid {
+  min-width: 78px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+}
+.mhRow__envLabel { margin-bottom: 3px; }
+.mhRow__minLabel { font-size: 0.88rem; margin-bottom: 2px; }
+.mhRow--ht .mhRow__minLabel { margin-bottom: 6px; }
+.mhRow__reprise { font-size: 0.5rem; margin-bottom: 2px; }
+#root .mhRow .poster__score,
+#root .mhRow .poster__time { font-size: 1.3rem; }
+
+/* ── Onglets / outils ── */
+.mh { max-width: 640px; margin: 0 auto; }
+.mh__title {
+  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-size: 1.5rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #fff; margin: 0 0 1rem;
+}
+.hubSeg {
+  display: flex; gap: 2px; padding: 3px;
+  background: #0b0b0e; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px;
+}
+.hubSeg button {
+  flex: 1; padding: 8px 10px; border: 0; border-radius: 999px; cursor: pointer;
+  background: none; color: rgba(255,255,255,0.66);
+  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+}
+.hubSeg button.is-on { background: rgba(var(--red-rgb), 0.2); color: #fff; }
+.hubSeg__cnt {
+  margin-left: 5px; padding: 1px 6px; border-radius: 999px;
+  background: var(--red); color: #fff; font-size: 0.62rem;
+}
+.hubSeg--mini button { padding: 6px 11px; font-size: 0.66rem; }
+.hubTools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; }
+.hubTools--end { justify-content: flex-end; }
+.hubDay { display: flex; align-items: center; gap: 2px; }
+.hubDay__arrow {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  background: #0b0b0e; border: 1px solid rgba(255,255,255,0.08); color: #fff; font-size: 0.95rem;
+}
+.hubDay__arrow:disabled { opacity: 0.3; cursor: default; }
+.hubDay__label {
+  min-width: 112px; text-align: center;
+  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; color: #fff;
+}
+.hubDay__label small { display: block; font-weight: 400; font-size: 0.62rem; color: rgba(255,255,255,0.38); }
+.hubEmpty {
+  margin: 1.5rem 0; padding: 1.6rem 1rem; text-align: center;
+  border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px;
+  color: rgba(255,255,255,0.66); font-size: 0.8rem; line-height: 1.5;
+}
+.hubEmpty b { display: block; margin-bottom: 6px; color: #fff; font-size: 0.9rem; }
+.hubEmpty button {
+  margin-top: 12px; background: none; border: 0; cursor: pointer;
+  color: var(--red); font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.75rem;
+}
+
+/* ── Mode card : vraies cards Accueil (MatchPoster), réglées comme la maquette ── */
+.hubPosters { display: flex; flex-direction: column; gap: 8px; }
+.hubCocoon__body .poster__topbarComp,
+.hubCocoon__body .poster__footer { display: none; }
+.hubCocoon__body .poster__topbarPeriod { margin-left: auto; }
+
+/* ── Bouton "Voir les N matchs" (Accueil) ── */
+.hubCta {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  margin: 4px 0 6px; padding: 14px; border-radius: 14px; cursor: pointer;
+  background: rgba(var(--red-rgb), 0.14); border: 1px solid rgba(var(--red-rgb), 0.5);
+  color: #fff; font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
+}
