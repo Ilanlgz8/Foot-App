@@ -598,21 +598,21 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
         <div className="poster__prono-row">
           <div
             className="poster__prono-pill"
-            style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home) } : { borderColor: 'transparent' }}
+            style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel">{homeCode}</span>
             <span className="poster__prono-pillVal">{homeOdd.toFixed(2)}</span>
           </div>
           <div
             className="poster__prono-pill"
-            style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw) } : { borderColor: 'transparent' }}
+            style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel">Nul</span>
             <span className="poster__prono-pillVal">{drawOdd.toFixed(2)}</span>
           </div>
           <div
             className="poster__prono-pill"
-            style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away) } : { borderColor: 'transparent' }}
+            style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel">{awayCode}</span>
             <span className="poster__prono-pillVal">{awayOdd.toFixed(2)}</span>

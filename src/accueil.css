@@ -2580,6 +2580,11 @@
   border-radius: 9px;
   border: 2.5px solid transparent;
   background: #ffffff;
+  /* Le blanc s'arrête au bord intérieur : sinon il passe sous la bordure
+     transparente des pilules non favorites, qui paraissent plus grandes que
+     la favorite (liseré rouge). Favorite remise en border-box en style inline
+     (MatchDuJourCard.jsx / MatchPoster.jsx) pour garder son liseré inchangé. */
+  background-clip: padding-box;
 }
 /* (.poster__prono-row--pickable retiré le 02/09 : n'existait que pour les
    cotes cliquables de la page "Mes Paris", fonctionnalité supprimée — voir

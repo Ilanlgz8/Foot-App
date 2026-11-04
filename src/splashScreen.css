@@ -34,7 +34,6 @@
   max-height: 520px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(var(--red-rgb), 0.35) 0%, rgba(var(--red-rgb), 0) 70%);
-  filter: blur(10px);
   animation: splashGlowPulse 2.6s ease-in-out infinite;
 }
 
@@ -61,6 +60,8 @@
   display: inline-block;
   opacity: 0;
 }
+
+.splash__doti { position: relative; }
 
 .splash__stat {
   color: var(--red-light);
@@ -97,92 +98,67 @@
   100% { opacity: 1; transform: translateX(0); filter: brightness(1); }
 }
 
-/* Petit trait rouge qui se dessine sous "Stat" une fois le texte assemblé */
+/* Petit trait rouge qui se dessine sous "Stat" une fois le texte assemblé
+   (transform, pas width : n'oblige plus à recalculer la mise en page). */
 .splash__underline {
   position: absolute;
   left: 0;
   bottom: -8px;
   height: 2px;
-  width: 0;
+  width: 38%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0;
   background: var(--red);
   box-shadow: 0 0 10px var(--red), 0 0 20px var(--red);
   animation: splashUnderline 1.2s cubic-bezier(.2,.7,.3,1) 0.9s forwards;
 }
 
 @keyframes splashUnderline {
-  0%   { width: 0; opacity: 0; }
-  100% { width: 38%; opacity: 1; }
+  0%   { transform: scaleX(0); opacity: 0; }
+  100% { transform: scaleX(1); opacity: 1; }
 }
 
-/* Ballon : ne monte dans le DOM qu'une fois --ball-start-x/y et --ball-ix/iy
-   posés par SplashScreen.jsx (voir ballReady) — jamais de valeur de repli à
-   deviner, l'animation démarre directement avec les bonnes coordonnées. */
+/* Ballon : enfant du "ı", donc toujours collé à lui, quelle que soit la police
+   ou la taille d'écran — plus aucune mesure JavaScript. Il est centré sur le
+   point d'atterrissage (juste au-dessus du ı, là où serait son point) et ne
+   s'anime qu'en transform/opacity (compositeur, fluide même quand le
+   téléphone charge encore l'app). Les décalages sont en `em` (taille du texte
+   du logo) : le trajet s'adapte tout seul à l'écran. Il démarre 1,4 s après
+   l'affichage, quand le texte est en place, pour un atterrissage à ~4,6 s.
+   Départ sous le texte, à gauche (roule), puis arc, petit rebond, pose. */
 .splash__ball {
   position: absolute;
-  left: var(--ball-start-x);
-  top: var(--ball-start-y);
-  font-size: clamp(1.9rem, 7.5vw, 3.1rem);
+  left: 50%;
+  top: -2px;
+  width: 0.9em;
+  height: 0.9em;
+  margin: -0.45em 0 0 -0.45em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9em;
+  line-height: 1;
+  text-shadow: none;
   z-index: 2;
+  opacity: 0;
+  will-change: transform, opacity;
   filter: drop-shadow(0 0 6px rgba(var(--red-rgb), 0.9));
-  transform-origin: center;
-  /* ⚠️ linear (pas cubic-bezier) : un easing type "ease-out" appliqué à
-     CHAQUE segment entre keyframes ralentit vers zéro à la fin de chaque
-     segment avant de réaccélérer au suivant — avec 7 segments, ça se voyait
-     comme un ballon qui "s'arrête" plusieurs fois pendant son vol (retour
-     utilisateur). linear = vitesse constante par segment, mouvement continu.
-     L'aisance n'est réintroduite QUE là où elle a un sens : sur les 2
-     derniers segments (l'atterrissage), via animation-timing-function posé
-     directement sur les keyframes 80%/90% ci-dessous. */
-  animation: splashBallFly 3.2s linear forwards;
+  /* linear : vitesse constante entre keyframes (un easing par segment donnait
+     un ballon qui "s'arrête" plusieurs fois) ; l'aisance n'est remise que sur
+     les 2 derniers segments (atterrissage). */
+  animation: splashBallFly 3.2s linear 1.4s forwards;
 }
 
-/* Trajectoire interpolée par calc() entre le point de départ (--ball-start-*)
-   et le point d'atterrissage réel (--ball-ix/iy, mesuré sur le vrai point du
-   "i") : roulé sous le texte, puis arc montant, léger rebond (dépassement +
-   retour) pour éviter un atterrissage trop "robotique", posé exactement sur
-   le i. Rotation continue ~2.5 tours sur tout le vol (vitesse constante,
-   modérément rapide), qui ralentit naturellement pendant le rebond final.
-   9 keyframes → 8, pour réduire encore le risque de saccade perçue. */
 @keyframes splashBallFly {
-  0%   {
-    left: var(--ball-start-x); top: var(--ball-start-y);
-    transform: translate(-50%, -50%) rotate(0deg) scale(0.55);
-    opacity: 0;
-  }
-  5%   {
-    opacity: 1;
-    transform: translate(-50%, -50%) rotate(50deg) scale(1.25);
-  }
-  28%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.48);
-    top: var(--ball-start-y);
-    transform: translate(-50%, -50%) rotate(330deg) scale(1.2);
-  }
-  48%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.78);
-    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.4);
-    transform: translate(-50%, -50%) rotate(570deg) scale(1.02);
-  }
-  66%  {
-    left: calc(var(--ball-start-x) + (var(--ball-ix) - var(--ball-start-x)) * 0.97);
-    top: calc(var(--ball-start-y) + (var(--ball-iy) - var(--ball-start-y)) * 0.85);
-    transform: translate(-50%, -50%) rotate(770deg) scale(0.84);
-  }
-  80%  {
-    left: calc(var(--ball-ix) + 7px); top: calc(var(--ball-iy) - 8px);
-    transform: translate(-50%, -50%) rotate(900deg) scale(0.72);
-    animation-timing-function: ease-out;
-  }
-  90%  {
-    left: calc(var(--ball-ix) - 3px); top: calc(var(--ball-iy) + 5px);
-    transform: translate(-50%, -50%) rotate(900deg) scale(0.67);
-    animation-timing-function: ease-out;
-  }
-  100% {
-    left: var(--ball-ix); top: var(--ball-iy);
-    transform: translate(-50%, -50%) rotate(900deg) scale(0.64);
-    opacity: 1;
-  }
+  0%   { opacity: 0; transform: translate(-5.5em, 1.9em)    rotate(0deg)   scale(0.55); }
+  5%   { opacity: 1; transform: translate(-5.3em, 1.9em)    rotate(50deg)  scale(1.25); }
+  28%  { opacity: 1; transform: translate(-2.86em, 1.9em)   rotate(330deg) scale(1.2); }
+  48%  { opacity: 1; transform: translate(-1.21em, 1.14em)  rotate(570deg) scale(1.02); }
+  66%  { opacity: 1; transform: translate(-0.17em, 0.29em)  rotate(770deg) scale(0.84); }
+  80%  { opacity: 1; transform: translate(0.15em, -0.2em)   rotate(900deg) scale(0.72); animation-timing-function: ease-out; }
+  90%  { opacity: 1; transform: translate(-0.06em, 0.12em)  rotate(900deg) scale(0.67); animation-timing-function: ease-out; }
+  100% { opacity: 1; transform: translate(0, 0)             rotate(900deg) scale(0.64); }
 }
 
 /* Repli accessibilité : `animation:none` seul laisserait le texte à opacity:0
@@ -206,7 +182,7 @@
     transform: none;
   }
   .splash__underline {
-    width: 38%;
+    transform: none;
     opacity: 1;
   }
   .splash__ball {

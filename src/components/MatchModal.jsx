@@ -866,7 +866,6 @@ export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lower
   )
   return (
     <div className="modal__liveProno">
-      <div className="modal__liveProno__title">Cotes du match</div>
       <div className="modal__liveProno__row">
         {pill('home', homeCode)}
         {pill('draw', 'Nul')}
