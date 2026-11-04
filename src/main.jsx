@@ -155,6 +155,34 @@ const UNPERSISTED_QUERY_KEYS = new Set([
   'matchVenueInfo',    // stade/ville/arbitre
   'h2h-fd',            // confrontations directes
   'aflFixtureInfo', 'aflLineups', 'aflStats', 'aflMatchStats', // api-football (désactivé, voir CLAUDE.md, mais même principe si jamais réactivé)
+  // ⚠️ AJOUT (04/11, constat utilisateur : "ça met 10 à 15 secondes à
+  // afficher les cartes sur Accueil au lancement" — mesuré en direct sur la
+  // prod, pas une impression : localStorage à 10,9 Mo au total sur 225 clés,
+  // dont `REACT_QUERY_OFFLINE_CACHE` (CE blob, gcTime 24h) à lui seul 3,85 Mo
+  // — très proche du quota localStorage mobile (5-10 Mo selon navigateurs,
+  // voir déjà le commentaire au-dessus sur le bug Coupe du Monde qui l'avait
+  // dépassé une fois). `createSyncStoragePersister` relit et JSON.parse ce
+  // blob ENTIER en SYNCHRONE à chaque démarrage, avant que quoi que ce soit
+  // ne puisse s'afficher — un coût réel sur mobile (localStorage est
+  // nettement plus lent qu'sur desktop, en particulier sur iOS Safari), qui
+  // s'ajoute aux ~225 lectures localStorage SÉPARÉES que les hooks de ce
+  // fichier font déjà individuellement au premier rendu (voir localCache.js,
+  // `readCacheStale`/`getCacheSavedAt`, appelé par la quasi-totalité des
+  // hooks de ce projet). Les clés ci-dessous (confirmées une par une en
+  // lisant leur code, jamais au jugé) ont TOUTES déjà leur propre cache
+  // disque indépendant via `writeCache`/`readCacheStale` (localCache.js,
+  // TTL dédié par clé — 90j pour lowerDivisionStats, etc.) : les persister
+  // EN PLUS dans CE blob React Query ne sert donc à rien (double stockage
+  // strictement redondant de la même donnée, sous 2 formats différents) —
+  // seule la sauvegarde dans CE blob-ci est sautée, le cache mémoire React
+  // Query pendant la session ET le cache disque dédié de chaque hook restent
+  // tous les deux inchangés, aucune perte de fraîcheur ni de persistance.
+  'lowerDivisionStats', // repli "club promu" — useLowerDivisionStats(Multi), cache disque 90j (LOWER_DIV_CACHE_TTL)
+  'teamForm2',          // forme récente — useTeamForm(Multi), cache disque dédié (teamform2_*)
+  'scorers',            // classement buteurs — useScorers, cache disque dédié (scorers3_*)
+  'standings',          // classement — useStandings, cache disque dédié (standings_*)
+  'todayMatches', 'todayMatchesEspn', 'todayMatchesWcEc', // Accueil (cartes + Résultats récents) — useTodayMatches.js, cache disque dédié (matches_*/matches_espn_*/matches_wcec_*)
+  'h2hHistory', // confrontations directes enrichies (saisons passées) — useH2HHistory, cache disque dédié (h2hHistory_*), l'un des plus gros contributeurs mesurés (~390 Ko par compétition/saison)
 ])
 
 // ⚠️ BUG TROUVÉ DE NOUVEAU (constat utilisateur : "j'ai pas autant de stats
@@ -253,7 +281,15 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // du buster pour purger IMMÉDIATEMENT ces résultats vides déjà persistés
 // chez les utilisateurs actuels (même mécanisme que v14 ci-dessus) plutôt
 // que d'attendre une expiration naturelle.
-const CACHE_BUSTER = 'v15-2026-09-16-fix-espn-dates-cache-vide'
+const CACHE_BUSTER = 'v16-2026-11-04-exclude-redundant-persisted-queries'
+// v16 : voir le commentaire détaillé au-dessus de UNPERSISTED_QUERY_KEYS —
+// exclut du blob persisté les clés déjà doublement mises en cache (leur
+// propre cache disque dédié existe déjà) pour réduire sa taille (3,85 Mo
+// avant ce fix) et le temps de restauration synchrone au démarrage. Bump
+// nécessaire pour que l'exclusion s'applique IMMÉDIATEMENT (sans ça, le
+// vieux blob déjà gonflé resterait servi tel quel jusqu'à sa prochaine
+// réécriture complète) plutôt que d'attendre que chaque clé expire une par
+// une selon son propre gcTime.
 
 // ══════════════════════════════════════════════════════════════════════
 // FILET ANTI-ÉCRAN BLANC (02/09, constat utilisateur : "pourquoi j'ai un

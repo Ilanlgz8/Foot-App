@@ -7520,6 +7520,43 @@ cf-worker/
   needsScorersCatchUp seul). 400 tests + lint (35 erreurs pré-existantes + 2 warnings
   pré-existants, baseline identique) + build vérifiés.
 
+- **04/11 — Accueil met 10-15s à afficher les cartes au lancement sur téléphone (PWA),
+  contredit mon affirmation du matin que le cache s'affiche "déjà instantanément"** :
+  l'utilisateur avait raison de contester, et il fallait vérifier plutôt que défendre
+  l'affirmation initiale. Mesuré en direct sur la prod (navigateur, pas une estimation) :
+  localStorage à 10,9 Mo au total sur 225 clés — très proche du quota localStorage mobile
+  (5-10 Mo selon navigateurs, déjà dépassé une fois par le passé, voir le bug Coupe du Monde
+  documenté plus haut sur `UNPERSISTED_QUERY_KEYS`). À lui seul, `REACT_QUERY_OFFLINE_CACHE`
+  (le blob persisté par `createSyncStoragePersister`, gcTime 24h, main.jsx) pesait 3,85 Mo —
+  lu et JSON.parsé en SYNCHRONE à chaque démarrage, avant que quoi que ce soit ne puisse
+  s'afficher, en plus des ~225 lectures localStorage SÉPARÉES que les hooks du projet font
+  déjà individuellement au premier rendu (`readCacheStale`/`getCacheSavedAt`, localCache.js).
+  Un coût que je n'avais pas mesuré en affirmant "cache instantané" ce matin — réel sur
+  mobile (localStorage nettement plus lent que sur desktop, surtout iOS Safari), largement
+  invisible en testant sur un navigateur desktop. Cause du gonflement de CE blob précis :
+  double stockage — la quasi-totalité des hooks du projet ont DÉJÀ leur propre cache disque
+  dédié (`writeCache`/`readCacheStale`, localCache.js, TTL propre à chaque clé), mais leurs
+  résultats de requête étaient AUSSI persistés une 2e fois, sous un format différent, dans ce
+  blob React Query générique — strictement redondant. Vérifié clé par clé (jamais au jugé,
+  même principe que pour les autres fixes du jour) avant d'exclure : `lowerDivisionStats`,
+  `teamForm2`, `scorers`, `standings`, `todayMatches`/`todayMatchesEspn`/`todayMatchesWcEc`,
+  `h2hHistory` ont chacun un `writeCache`/`readCacheStale`/`initialData` confirmé en lisant
+  leur code — ajoutés à `UNPERSISTED_QUERY_KEYS` (déjà utilisé pour les données par match,
+  voir plus haut) avec le même mécanisme exact. `h2hHistory` à lui seul pesait ~390 Ko PAR
+  compétition/saison (plusieurs comps concernées) rien que dans son cache disque dédié — un
+  gros contributeur probable au blob React Query équivalent. Bump du `CACHE_BUSTER` (v15→v16,
+  convention déjà établie dans ce fichier) pour que l'exclusion s'applique immédiatement sur
+  le blob déjà gonflé chez les utilisateurs actuels, sans attendre une réécriture complète.
+  Aucune perte de fraîcheur ni de persistance : le cache mémoire React Query pendant la
+  session ET le cache disque dédié de chaque hook restent tous les deux inchangés, seule la
+  double sauvegarde dans CE blob-ci est supprimée. ⚠️ Honnêteté : je n'ai pas pu mesurer
+  l'impact exact en millisecondes sur un vrai téléphone depuis cet environnement (pas d'accès
+  direct au téléphone de l'utilisateur) — à confirmer une fois déployé si le ressenti "10-15s"
+  s'améliore nettement ; si ce n'est pas suffisant, la suite logique serait de réduire aussi
+  `gcTime` (24h) et/ou auditer les ~225 clés localCache.js individuelles pour des TTL trop
+  généreux. 400 tests + lint (35 erreurs pré-existantes + 2 warnings pré-existants, baseline
+  identique) + build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
