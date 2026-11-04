@@ -368,6 +368,12 @@
   border-radius: 10px;
   border: 3px solid transparent;
   background: #ffffff;
+  /* Le blanc s'arrête au bord intérieur : sans ça il passait sous la bordure
+     transparente des pilules non favorites, qui paraissaient 6px plus grandes
+     que la pilule favorite (bordure rouge visible). Les 3 ont maintenant la
+     même taille de blanc ; la favorite repasse en border-box (voir
+     LivePronoPill) pour garder son liseré inchangé. */
+  background-clip: padding-box;
 }
 .modal__liveProno__pillLabel {
   font-size: 0.5rem;

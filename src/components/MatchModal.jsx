@@ -878,7 +878,7 @@ export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lower
 
 function LivePronoPill({ label, value, pct, isFavorite = false }) {
   const style = isFavorite
-    ? { borderColor: `rgba(159,30,52,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct) }
+    ? { borderColor: `rgba(159,30,52,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct), backgroundClip: 'border-box' }
     : { borderColor: 'transparent' }
   return (
     <div className="modal__liveProno__pill" style={style}>
