@@ -84,13 +84,11 @@
   color: rgba(255,255,255,0.75); line-height: 1;
 }
 .mhRow__team { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
-.mhRow__crest {
-  width: 28px; height: 28px; border-radius: 50%; overflow: hidden;
-  border: 1px solid rgba(200,210,225,0.28);
-  background: rgba(10,14,24,0.88);
-}
-.mhRow__crest img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.18); }
-.mhRow__crestSpacer { width: 28px; height: 28px; }
+/* Logo posé tel quel (pas de cercle ni de recadrage : certains écussons, ex. Rennes,
+   étaient coupés). Boîte carrée, image entière (contain). */
+.mhRow__crest { width: 30px; height: 30px; }
+.mhRow__crest img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.mhRow__crestSpacer { width: 30px; height: 30px; }
 .mhRow__name {
   max-width: 100%; text-align: center;
   font-size: 0.7rem; font-weight: 800; letter-spacing: 0.01em;
