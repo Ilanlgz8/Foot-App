@@ -203,7 +203,10 @@ function getTtl(fdPath, qs) {
   // du direct minute par minute (ESPN/cron-goals.js, notifs push) — 5min de
   // retard sur CE classement secondaire est un coût très raisonnable face
   // au gain.
-  if (fdPath.includes('/scorers') && qs.includes('live=0')) return 86400
+  // 04/11 : 24h → 6h. Doit rester ≤ SCORERS_LIVE_WINDOW_MS (12h, useScorers.js) : une copie créée
+  // juste avant un match ne doit pas survivre à la fenêtre où le client redevient « hors match »
+  // (sinon il lisait les buteurs d'avant le match — vérifié : Haaland 4 buts au lieu de 5).
+  if (fdPath.includes('/scorers') && qs.includes('live=0')) return 21600
   if (fdPath.includes('/scorers'))                 return 300           // buteurs — 5min
   // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
   // Résultats récents, pourquoi pas le garder en cache 7 jours ?" — repéré

@@ -36,7 +36,16 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // gaspillage signalé. Extraction en fonction pure réutilisable par les deux
 // appelants (Classement.jsx ET useTeamSearch.js), AUCUN changement de
 // comportement pour Classement.jsx (même calcul, même fenêtre).
-export const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 200 // kickoff + 200min
+// ⚠️ 200min → 12h (04/11 soir, constat utilisateur : après les matchs de LDC, le classement
+// buteurs n'était PAS à jour). Deux causes cumulées : (1) football-data.org met `/scorers` à
+// jour avec du retard APRÈS le coup de sifflet (mesuré ce soir : pas encore à jour à la fin,
+// à jour ~45min plus tard ; plusieurs heures constatées un autre jour) — un seul fetch « à la
+// fin du match » tombe donc sur la donnée d'avant ; (2) la clé serveur `live=0` (TTL 24h) gardait
+// la copie d'AVANT le match (vérifié en direct : réponse `X-Cache: STALE`, Haaland à 4 buts
+// alors que la clé sans `live=0` donnait 5). On reste donc en TTL court (5min) jusqu'à 12h
+// après le coup d'envoi, et le TTL serveur de `live=0` ne dépasse plus cette fenêtre
+// (api/football.js : 6h), sinon une copie créée avant le match survivrait à la fenêtre.
+export const SCORERS_LIVE_WINDOW_MS = 1000 * 60 * 60 * 12 // kickoff + 12h
 export function isScorersLiveWindow(utcDate) {
   if (!utcDate) return false
   const elapsed = new Date().getTime() - new Date(utcDate).getTime()
@@ -241,6 +250,8 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
+    // Page ouverte pendant la fenêtre : se remet à jour toute seule (5min, comme le TTL serveur).
+    refetchInterval:      hasMatchToday ? STALE_MS : false,
     // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "le classement des buteurs
     // a du mal à se charger, faut changer de championnat et revenir sur celui
     // qu'on voulait voir"). Ce `retry: false` était la cause exacte du

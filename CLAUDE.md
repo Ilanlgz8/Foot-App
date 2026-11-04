@@ -7705,6 +7705,10 @@ cf-worker/
 - Accueil : le titre « À ne pas manquer » est retiré (seule l'étiquette du jour reste quand on n'est pas sur aujourd'hui).
 - Coupe de France Baie-Mahault–Les Abymes : vérifié, 13 min après le vrai KO (22:00Z) ESPN le laisse STATUS_SCHEDULED, 0 événement → le filtre `isUnfollowedCupMatch` le retire bien (confirmé en prod).
 
+### 04/11 (nuit) — Classement buteurs pas à jour après les matchs
+- Constat (vérifié en direct) : après les matchs de LDC du soir, `/scorers` clé `live=0` répondait `X-Cache: STALE` avec Haaland à 4 buts, la clé sans `live=0` (`MISS`) avec 5 — football-data.org était à jour (~45min après les coups de sifflet), pas la copie servie au client hors « fenêtre live ».
+- `SCORERS_LIVE_WINDOW_MS` 200min → 12h (TTL court 5min jusqu'à 12h après le coup d'envoi, laisse le temps au retard de mise à jour de FD.org), `refetchInterval` 5min pendant la fenêtre (page ouverte = mise à jour toute seule), TTL serveur de `live=0` 24h → 6h (`api/football.js`, doit rester ≤ la fenêtre). Cause du retard côté FD.org : non maîtrisable, seulement contournée par ce délai.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
