@@ -7694,6 +7694,11 @@ cf-worker/
 - Demande utilisateur : « on laisse tout en card, pas ligne ». `MatchRow.jsx`, le toggle Ligne/Card, la clé localStorage `foot_matchView` et tout le CSS `.mhRow` sont supprimés.
 - Page Match (`Live.jsx`) et « À ne pas manquer » (`Highlights.jsx`, Accueil) affichent maintenant des `LazyPoster` dans `.hubPosters` (forme récente passée via `formMapByComp` de `useTeamFormMulti`).
 
+### 04/11 (soir) — Page Match : titre retiré, navigation jour, logos
+- Titre « Match » de la page retiré. Navigation du jour = même rendu que l'ancien Accueil (`accueil__dayArrow`, flèche gauche tout à gauche / droite tout à droite, libellé centré plus gros : « Aujourd'hui » + date 0.8rem).
+- Logos des équipes agrandis sur la page Match uniquement (`.hubPosters--lg` : crestWrap 52px au lieu de 44, centre à 52px).
+- Cocon : la tuile bleue pleine du logo Ligue 1 est remplacée par `ligue1-2026-transparent.png` (blanc détouré, généré depuis ligue1-2026.png : alpha = (R-8)/247) — uniquement dans l'en-tête de cocon (Cocoon.jsx), pas dans la card « Match du jour ».
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

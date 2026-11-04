@@ -1,13 +1,18 @@
 // Cocon d'une compétition : enveloppe colorée (couleur de la compétition) qui
 // regroupe ses matchs — page Match et "à ne pas manquer" de l'Accueil.
 import './hub.css'
+import ligue1Tile from '../assets/leagues/ligue1-2026.png'
+import ligue1Clean from '../assets/leagues/ligue1-2026-transparent.png'
 
 export function CompetitionHead({ group, count }) {
+  // Logo Ligue 1 : la tuile bleue pleine est remplacée par sa version détourée (blanc sur transparent).
+  const emblem = group.emblem === ligue1Tile ? ligue1Clean : group.emblem
+  const opaque = group.emblemOpaque && emblem !== ligue1Clean
   return (
     <>
-      <span className={'hubCocoon__logo' + (group.emblemOpaque ? ' hubCocoon__logo--opaque' : '')}>
-        {group.emblem
-          ? <img src={group.emblem} alt="" loading="lazy" />
+      <span className={'hubCocoon__logo' + (opaque ? ' hubCocoon__logo--opaque' : '')}>
+        {emblem
+          ? <img src={emblem} alt="" loading="lazy" />
           : <span aria-hidden="true">⚽</span>}
       </span>
       <b className="hubCocoon__name">{group.name}</b>

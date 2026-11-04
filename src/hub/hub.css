@@ -62,11 +62,6 @@
 
 /* ── Onglets / outils ── */
 .mh { max-width: 640px; margin: 0 auto; }
-.mh__title {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-size: 1.5rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
-  color: #fff; margin: 0 0 1rem;
-}
 .hubSeg {
   display: flex; gap: 2px; padding: 3px;
   background: #0b0b0e; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px;
@@ -82,17 +77,12 @@
   background: var(--red); color: #fff; font-size: 0.62rem;
 }
 .hubTools { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; }
-.hubDay { display: flex; align-items: center; gap: 2px; }
-.hubDay__arrow {
-  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
-  background: #0b0b0e; border: 1px solid rgba(255,255,255,0.08); color: #fff; font-size: 0.95rem;
-}
-.hubDay__arrow:disabled { opacity: 0.3; cursor: default; }
+.hubDay { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
 .hubDay__label {
-  min-width: 112px; text-align: center;
-  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; color: #fff;
+  flex: 1; min-width: 0; text-align: center;
+  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.03em; color: #fff;
 }
-.hubDay__label small { display: block; font-weight: 400; font-size: 0.62rem; color: rgba(255,255,255,0.38); }
+.hubDay__label small { display: block; margin-top: 2px; font-weight: 500; font-size: 0.8rem; color: rgba(255,255,255,0.55); }
 .hubEmpty {
   margin: 1.5rem 0; padding: 1.6rem 1rem; text-align: center;
   border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px;
@@ -136,6 +126,9 @@
 .hubPosters .poster__center > .poster__min-labelCol { margin-bottom: -9px; }
 .hubPosters .poster__reprise-label { margin: 0; }
 .hubPosters .poster__center > .poster__env-label { margin-bottom: -5px; }
+/* Page Match : logos des équipes agrandis (44 -> 52px), le centre suit. */
+.hubPosters--lg .poster__crestWrap { width: 52px; height: 52px; }
+.hubPosters.hubPosters--lg .poster__center { height: 52px; }
 #root .hubPosters .poster__score,
 #root .hubPosters .poster__time { font-size: 2.2rem; transform: translateY(4px); }
 

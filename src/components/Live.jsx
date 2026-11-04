@@ -181,7 +181,7 @@ export default function Live() {
   })
 
   const renderMatches = list => (
-    <div className="hubPosters">
+    <div className="hubPosters hubPosters--lg">
       {list.map(m => (
         <LazyPoster
           key={m.id}
@@ -200,8 +200,6 @@ export default function Live() {
   return (
     <section className="live__page">
       <div className="mh">
-        <h1 className="mh__title">Match</h1>
-
         <div className="hubSeg" role="tablist">
           <button type="button" role="tab" aria-selected={activeTab === 'live'} className={activeTab === 'live' ? 'is-on' : ''} onClick={() => setTab('live')}>
             En direct{hasLive && <span className="hubSeg__cnt">{live.length}</span>}
@@ -234,14 +232,14 @@ export default function Live() {
           <>
             <div className="hubTools">
               <div className="hubDay">
-                <button type="button" className="hubDay__arrow" aria-label="Jour précédent"
+                <button type="button" className="accueil__dayArrow" aria-label="Jour précédent"
                   disabled={prevMatchDayOffset == null}
                   onClick={() => { if (prevMatchDayOffset != null) setDayOffset(prevMatchDayOffset) }}>‹</button>
                 <div className="hubDay__label">
                   {getDayLabel(dayOffset)}
                   <small>{dayDateLabel(dayOffset)}</small>
                 </div>
-                <button type="button" className="hubDay__arrow" aria-label="Jour suivant"
+                <button type="button" className="accueil__dayArrow" aria-label="Jour suivant"
                   disabled={nextMatchDayOffset == null}
                   onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}>›</button>
               </div>
