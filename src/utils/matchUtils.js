@@ -263,6 +263,11 @@ export function outcomeForSide(match, isHome) {
   return (isHome && homeWon) || (isAway && !homeWon) ? 'W' : 'L'
 }
 
+// Fenêtre pendant laquelle un match SANS confirmation ESPN est présenté comme "Débute"
+// (retard de coup d'envoi, poll en retard). Au-delà : pas de source live → on ne l'affiche
+// plus en direct (retour dans la liste normale), au lieu d'un faux "Débute" de 30 min.
+export const PENDING_KICKOFF_WINDOW_MS = 10 * 60_000
+
 export function calcMinute(match) {
   const state = getMatchState(match.id)
   const now   = Date.now()
@@ -313,7 +318,7 @@ export function calcMinute(match) {
     // estimation) — elle donne une minute crédible sans dépendre d'ESPN.
     const fsGate = finalScore(match.score)
     const alreadyScored = (fsGate.home ?? 0) > 0 || (fsGate.away ?? 0) > 0
-    if (!alreadyScored && now - utcMs < 30 * 60_000) return 'Débute'
+    if (!alreadyScored && now - utcMs < PENDING_KICKOFF_WINDOW_MS) return 'Débute'
     // Au-delà de 30min sans confirmation ESPN (ou dès qu'un but est connu) :
     // on laisse tomber vers les heuristiques utcDate plus bas plutôt que de
     // rester bloqué sans rien afficher (cas rare : ESPN indisponible ou très

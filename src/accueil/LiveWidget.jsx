@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
+import { calcMinute, mergeScore, finalScore, isNationalTeamComp, PENDING_KICKOFF_WINDOW_MS } from '../utils/matchUtils'
 import { MatchCard } from './MatchCard'
 
 // ── Widget live — version allégée ───────────────────────────────────────────
@@ -68,7 +68,7 @@ export function LiveWidget({ liveMatches = [], espnScores = {}, onMatchClick }) 
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
     if (m.status === 'SCHEDULED' || m.status === 'TIMED') {
       const utcMs = new Date(m.utcDate).getTime()
-      if (now >= utcMs && now - utcMs < 30 * 60_000) return true
+      if (now >= utcMs && now - utcMs < PENDING_KICKOFF_WINDOW_MS) return true
     }
     return false
   })

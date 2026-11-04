@@ -7676,6 +7676,11 @@ cf-worker/
 - `MatchRow` : pastille fantôme symétrique (comme MatchPoster) → minute centrée sur le tiret ; colonne centrale remontée de 2px. Mode Card : minute 1rem, score/heure 2.2rem (libellé "Coup d'envoi" rapproché).
 - **Constat live (04/11)** : ESPN ne suit PAS le match de Coupe de France Baie-Mahault–Les Abymes (statut resté STATUS_SCHEDULED 0-0 deux heures après le coup d'envoi) alors que la Ligue des Champions/Europa sont bien suivies. `calcMinute` (matchUtils.js) affiche "Débute" pendant 30 min après l'heure du coup d'envoi quand ESPN est muet, puis abandonne et la card redevient "Coup d'envoi" — c'est ce que l'utilisateur a vu.
 
+### 04/11 (soir) — Fin du faux "Débute" de 30 min
+- Demande utilisateur : si on n'a pas de données live pour un match, on ne l'affiche pas en direct.
+- `PENDING_KICKOFF_WINDOW_MS` (matchUtils.js) = 10 min (avant 30) : durée max du "Débute" quand ESPN n'a rien confirmé. Utilisée par `calcMinute`, `_checkPendingKickoffs` (useLiveMinute) et `LiveWidget`. Au-delà → `calcMinute` renvoie null, le match retourne dans la liste normale (« Coup d'envoi ») au lieu de rester en direct.
+- Contrepartie assumée : un coup d'envoi retardé de plus de 10 min n'apparaît en direct qu'une fois ESPN (ou FD.org IN_PLAY) confirmé.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

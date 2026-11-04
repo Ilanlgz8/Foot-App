@@ -30,7 +30,7 @@ import {
 } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
-import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2 } from '../utils/matchUtils'
+import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2, PENDING_KICKOFF_WINDOW_MS } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 import { readCacheStale, removeCache } from './localCache'
 
@@ -445,8 +445,8 @@ function _checkPendingKickoffs(matches, queryClient) {
     if (!slug) continue // compétition non suivie → skip
 
     const utcMs = new Date(match.utcDate).getTime()
-    // Fenêtre : entre l'heure prévue et +30min (sécurité si ESPN tarde ou match annulé)
-    if (now < utcMs || now - utcMs > 30 * 60_000) continue
+    // Fenêtre : entre l'heure prévue et +10min (sécurité si ESPN tarde ou match annulé)
+    if (now < utcMs || now - utcMs > PENDING_KICKOFF_WINDOW_MS) continue
 
     markPendingKickoff(match)
 

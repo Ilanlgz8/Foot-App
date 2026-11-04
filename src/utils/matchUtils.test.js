@@ -144,7 +144,7 @@ describe('calcMinute', () => {
   it('n\'affiche PLUS "Débute" dès qu\'un but FD.org prouve que le match est déjà en cours (18/10, capture d\'écran : score "1-0"/"3-0" mais statut figé sur "Débute")', () => {
     // utcDate il y a 10min (system time 19:00, dans la fenêtre de grâce de 30min)
     // — sans but, "Débute" reste l'affichage correct (cas normal, cf. test ci-dessus).
-    const noGoalYet = baseMatch({ status: 'IN_PLAY', utcDate: '2026-07-03T18:50:00.000Z' })
+    const noGoalYet = baseMatch({ status: 'IN_PLAY', utcDate: '2026-07-03T18:52:00.000Z' })
     expect(calcMinute(noGoalYet)).toBe('Débute')
 
     // Même match, mais FD.org montre déjà un but marqué → preuve certaine que le
@@ -157,6 +157,11 @@ describe('calcMinute', () => {
       score: { fullTime: { home: 1, away: 0 } },
     })
     expect(calcMinute(withGoal)).toBe('10\'')
+  })
+
+  it('n\'affiche plus "Débute" au-delà de la fenêtre sans confirmation ESPN (pas de source live)', () => {
+    const stale = baseMatch({ status: 'SCHEDULED', utcDate: '2026-07-03T18:40:00.000Z' })
+    expect(calcMinute(stale)).toBeNull()
   })
 
   it('interpole la minute en temps réglementaire depuis le dernier poll ESPN (bootstrap, half2Start pas encore ancré)', () => {
