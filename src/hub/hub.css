@@ -60,52 +60,6 @@
   background: none; border: 0; padding: 0; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
 }
 
-/* ── Ligne de match ── */
-.mhRow {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
-  padding: 19px 10px 9px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 14px;
-  transition: background .15s, border-color .15s, transform .12s;
-}
-.mhRow--click { cursor: pointer; }
-.mhRow--click:hover { background: rgba(255,255,255,0.075); border-color: rgba(255,255,255,0.14); }
-.mhRow--click:active { transform: scale(0.985); }
-.mhRow--click:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.mhRow--live { border-color: rgba(var(--red-rgb), 0.4); }
-.mhRow__period {
-  position: absolute; top: 5px; right: 10px;
-  font-size: 0.5rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-  color: rgba(255,255,255,0.75); line-height: 1;
-}
-.mhRow__team { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
-/* Logo posé tel quel (pas de cercle ni de recadrage : certains écussons, ex. Rennes,
-   étaient coupés). Boîte carrée, image entière (contain). */
-.mhRow__crest { width: 30px; height: 30px; }
-.mhRow__crest img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.mhRow__crestSpacer { width: 30px; height: 30px; }
-.mhRow__name {
-  max-width: 100%; text-align: center;
-  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.01em;
-  color: rgba(255,255,255,0.92);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.mhRow__mid {
-  position: relative; top: -2px;
-  min-width: 78px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
-}
-.mhRow__envLabel { margin-bottom: 3px; }
-.mhRow__minLabel { font-size: 0.78rem; margin-bottom: 2px; }
-.mhRow--ht .mhRow__minLabel { margin-bottom: 6px; }
-.mhRow__reprise { font-size: 0.5rem; margin-bottom: 2px; }
-#root .mhRow .poster__score,
-#root .mhRow .poster__time { font-size: 1.5rem; }
-
 /* ── Onglets / outils ── */
 .mh { max-width: 640px; margin: 0 auto; }
 .mh__title {
@@ -127,9 +81,7 @@
   margin-left: 5px; padding: 1px 6px; border-radius: 999px;
   background: var(--red); color: #fff; font-size: 0.62rem;
 }
-.hubSeg--mini button { padding: 6px 11px; font-size: 0.66rem; }
-.hubTools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; }
-.hubTools--end { justify-content: flex-end; }
+.hubTools { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; }
 .hubDay { display: flex; align-items: center; gap: 2px; }
 .hubDay__arrow {
   width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
@@ -152,7 +104,7 @@
   color: var(--red); font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.75rem;
 }
 
-/* ── Mode card : vraies cards Accueil (MatchPoster), réglées comme la maquette ──
+/* ── Cards : vraies cards Accueil (MatchPoster), réglées comme la maquette ──
    Le nom de la compétition (déjà dans l'en-tête du cocon) et les pastilles de
    pronostic sont masqués ; la card est compacte ; l'heure/le score sont à hauteur
    des logos, avec le libellé (minute / "Terminé" / "Coup d'envoi") collé juste

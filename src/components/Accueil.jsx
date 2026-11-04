@@ -304,7 +304,7 @@ function Accueil() {
   // useTeamForm.js/useTeamFormMulti) — chaque card pioche maintenant la
   // forme de SA PROPRE compétition, jamais celle d'une autre compétition du
   // même club affichée ailleurs sur la page.
-  const { matchesByComp } = useTeamFormMulti(formCompCodes)
+  const { matchesByComp, formMapByComp } = useTeamFormMulti(formCompCodes)
 
   // ── Données live (depuis LiveProvider — polling continu même hors de cette page) ──
   // liveMatches/espnScores remontés plus haut (voir exception minuit dans `matches`)
@@ -816,6 +816,7 @@ function Accueil() {
               onMatchClick={handlePanelMatchClick}
               onLiveClick={handlePanelLiveClick}
               matchesByComp={matchesByComp}
+              formMapByComp={formMapByComp}
               onSeeAll={() => navigate('/live', { state: { tab: 'prog', dayOffset } })}
               emptyText={dayOffset === 0 ? "Plus de match à suivre aujourd'hui." : 'Aucun match ce jour-là.'}
             />

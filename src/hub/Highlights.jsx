@@ -3,12 +3,11 @@
 import { isCardLive } from '../utils/matchUtils'
 import { groupMatchesByCompetition, pickBestMatch } from '../utils/competitionGroups'
 import { Cocoon } from './Cocoon'
-import { MatchRow } from './MatchRow'
-import { PanelSkeleton, PosterSkeleton } from '../accueil/MatchCard'
+import { PanelSkeleton, PosterSkeleton, LazyPoster } from '../accueil/MatchCard'
 
 const nbMatchs = n => `${n} match${n > 1 ? 's' : ''}`
 
-export function Highlights({ matches, loading, espnScores = {}, onMatchClick, onLiveClick, matchesByComp = null, onSeeAll, emptyText }) {
+export function Highlights({ matches, loading, espnScores = {}, onMatchClick, onLiveClick, matchesByComp = null, formMapByComp = null, onSeeAll, emptyText }) {
   const groups = groupMatchesByCompetition(matches)
 
   return (
@@ -33,14 +32,17 @@ export function Highlights({ matches, loading, espnScores = {}, onMatchClick, on
                   </div>
                 ) : null}
               >
-                <MatchRow
-                  match={best}
-                  espnScore={espnScores[best.id] ?? null}
-                  live={isCardLive(best)}
-                  onMatchClick={onMatchClick}
-                  onLiveClick={onLiveClick}
-                  compMatches={matchesByComp?.[best.competition?.code] ?? null}
-                />
+                <div className="hubPosters">
+                  <LazyPoster
+                    match={best}
+                    espnScore={espnScores[best.id] ?? null}
+                    live={isCardLive(best)}
+                    onMatchClick={onMatchClick}
+                    onLiveClick={onLiveClick}
+                    formMap={formMapByComp?.[best.competition?.code] ?? null}
+                    compMatches={matchesByComp?.[best.competition?.code] ?? null}
+                  />
+                </div>
               </Cocoon>
             )
           })}

@@ -7690,6 +7690,10 @@ cf-worker/
 - **Constat corrigé (04/11, plus tard)** : Baie-Mahault–Les Abymes (7e tour, `seventh-round`) : ESPN avait d'abord publié un horaire PLACEHOLDER (19:00Z) puis l'a corrigé à 22:00Z (vérifié en direct). Le « ESPN ne suit pas ce match » écrit plus haut venait de cet horaire erroné — NON démontré. On ne sait pas si ESPN suivra ce match à 22:00Z. La règle reste volontairement auto-correctrice : masqué seulement si toujours « programmé » 10 min après le VRAI coup d'envoi.
 - `fetchEspnCupMatches` applique le filtre à la source (après le cache) → le match disparaît de TOUTES les pages (Match, Accueil, Programme, Résultats, forme), pas seulement des listes du jour.
 
+### 04/11 (soir) — Tout en Card (suppression de la vue Ligne)
+- Demande utilisateur : « on laisse tout en card, pas ligne ». `MatchRow.jsx`, le toggle Ligne/Card, la clé localStorage `foot_matchView` et tout le CSS `.mhRow` sont supprimés.
+- Page Match (`Live.jsx`) et « À ne pas manquer » (`Highlights.jsx`, Accueil) affichent maintenant des `LazyPoster` dans `.hubPosters` (forme récente passée via `formMapByComp` de `useTeamFormMulti`).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

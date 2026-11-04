@@ -13,16 +13,11 @@ import { useMatchDay } from '../hooks/useMatchDay'
 import { getDayLabel } from '../utils/dayUtils'
 import { groupMatchesByCompetition } from '../utils/competitionGroups'
 import { Cocoon } from '../hub/Cocoon'
-import { MatchRow } from '../hub/MatchRow'
 import { LazyPoster } from '../accueil/MatchCard'
 import '../accueil.css'
 import '../live.css'
 import '../hub/hub.css'
 
-const VIEW_KEY = 'foot_matchView'
-const readView = () => {
-  try { return localStorage.getItem(VIEW_KEY) === 'card' ? 'card' : 'row' } catch { return 'row' }
-}
 const nbMatchs = n => `${n} match${n > 1 ? 's' : ''}`
 
 // Un match terminé quitte la liste quelques secondes après son coup de sifflet
@@ -43,7 +38,6 @@ export default function Live() {
   const initial = location.state ?? {}
 
   const [dayOffset, setDayOffset] = useState(() => Number.isInteger(initial.dayOffset) ? initial.dayOffset : 0)
-  const [view, setView] = useState(readView)
   const [closed, setClosed] = useState(() => new Set())
 
   // Données : "En direct" ne dépend pas du jour affiché, on charge alors celles d'aujourd'hui.
@@ -180,17 +174,13 @@ export default function Live() {
   const onMatchClick = useCallback(m => navigate(`/match/${m.id}`, { state: { match: m } }), [navigate])
   const onLiveClick  = useCallback(m => navigate(`/live/${m.id}`), [navigate])
 
-  const changeView = v => {
-    setView(v)
-    try { localStorage.setItem(VIEW_KEY, v) } catch { /* stockage indisponible : le choix vaut pour cette visite */ }
-  }
   const toggleGroup = key => setClosed(prev => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
     return next
   })
 
-  const renderMatches = list => view === 'card' ? (
+  const renderMatches = list => (
     <div className="hubPosters">
       {list.map(m => (
         <LazyPoster
@@ -204,23 +194,6 @@ export default function Live() {
           compMatches={matchesByComp?.[m.competition?.code] ?? null}
         />
       ))}
-    </div>
-  ) : list.map(m => (
-    <MatchRow
-      key={m.id}
-      match={m}
-      espnScore={espnScores[m.id] ?? null}
-      live={isCardLive(m)}
-      onMatchClick={onMatchClick}
-      onLiveClick={onLiveClick}
-      compMatches={matchesByComp?.[m.competition?.code] ?? null}
-    />
-  ))
-
-  const viewSwitch = (
-    <div className="hubSeg hubSeg--mini" role="group" aria-label="Affichage">
-      <button type="button" className={view === 'row' ? 'is-on' : ''} onClick={() => changeView('row')}>Ligne</button>
-      <button type="button" className={view === 'card' ? 'is-on' : ''} onClick={() => changeView('card')}>Card</button>
     </div>
   )
 
@@ -248,7 +221,6 @@ export default function Live() {
             </div>
           ) : (
             <>
-              <div className="hubTools hubTools--end">{viewSwitch}</div>
               {groupMatchesByCompetition(live).map(g => (
                 <Cocoon key={g.key} group={g} count={`${g.matches.length} en direct`}>
                   {renderMatches(g.matches)}
@@ -273,7 +245,6 @@ export default function Live() {
                   disabled={nextMatchDayOffset == null}
                   onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}>›</button>
               </div>
-              {viewSwitch}
             </div>
 
             {loading && progMatches.length === 0 ? (
