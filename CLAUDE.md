@@ -7462,6 +7462,36 @@ cf-worker/
   pré-existants, baseline identique) + build vérifiés — correction du mécanisme de cache
   uniquement, aucun changement visuel/fonctionnel si l'hypothèse est fausse.
 
+- **04/11 — Résultats CL absents de "Résultats récents" après relance d'app (+ renforce le
+  fix "mauvaise journée au lancement" du dessus)** : `refetchOnWindowFocus: false` est le
+  défaut GLOBAL de l'app (main.jsx, volontaire — évite une rafale FD.org/ESPN à chaque
+  changement d'onglet desktop, jamais documenté plus précisément avant aujourd'hui). Sur PWA
+  mobile, "fermer" l'app suspend très souvent l'onglet en arrière-plan au lieu de le tuer pour
+  de vrai (même constat déjà documenté et corrigé UNE FOIS, mais seulement pour `dayOffset`,
+  voir Accueil.jsx/'visibilitychange') : le composant n'est jamais démonté, donc ni
+  `refetchOnMount` (pas de montage) ni `refetchOnWindowFocus` (désactivé globalement) ne se
+  déclenchent au retour au premier plan — la query garde son tout dernier résultat, même déjà
+  périmé selon son PROPRE staleTime, jusqu'au prochain démontage/remontage réel. Pour
+  "Résultats récents" : les matchs de Ligue des Champions d'hier soir, si l'app a été ouverte
+  (même brièvement) pendant qu'ils étaient encore SCHEDULED/IN_PLAY, restent figés dans ce
+  snapshot jusqu'à ce qu'un vrai refetch se déclenche — avec refetchOnWindowFocus désactivé et
+  sans remount, ça n'arrive jamais tout seul avant le staleTime normal (60s pour aujourd'hui,
+  mais encore faut-il qu'un TRIGGER vérifie — mount ou focus — pas juste que le temps passe).
+  Corrigé : `refetchOnWindowFocus: true` réactivé, mais SEULEMENT sur les queries concernées
+  (`useTodayMatches`, les 3 queries d'`useRecentDaysMatches` dans useTodayMatches.js, et
+  `useUpcomingMatchesAllComps` dans useMatchs.js — celle qui alimente aussi la flèche "jour
+  suivant"/le saut auto d'Accueil.jsx, voir l'entrée juste au-dessus) — PAS globalement, pour
+  ne pas réintroduire le risque de rafale que le défaut global évite ailleurs (pages match
+  détaillé, lineups, etc., non concernées par ce symptôme). Le retour au premier plan déclenche
+  alors la MÊME vérification de fraîcheur qu'un remontage normal, bornée par le staleTime de
+  CHAQUE query comme d'habitude — aucun fetch forcé supplémentaire si la donnée est encore
+  fraîche. Cette même cause renforce aussi l'hypothèse de l'entrée précédente ("mauvaise
+  journée au lancement") : un échec partiel qui vient de se corriger côté serveur ne remontait
+  jusqu'ici au client qu'au prochain VRAI remontage, potentiellement bien après les 15s déjà
+  ajoutées — le retour au premier plan est maintenant un déclencheur de plus pour le vérifier.
+  400 tests + lint (35 erreurs pré-existantes + 2 warnings pré-existants, baseline identique) +
+  build vérifiés.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

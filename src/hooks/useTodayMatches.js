@@ -8,6 +8,28 @@ import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTrack
 
 const VALID_STATUS = ['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED']
 
+// ⚠️ AJOUT (04/11, constat utilisateur : "relancé l'app après la fin des
+// matchs de Ligue des Champions hier soir, les résultats n'étaient pas dans
+// Résultats récents" + symptôme voisin, jour affiché resté bloqué au
+// lancement) : `refetchOnWindowFocus: false` est le défaut GLOBAL de
+// l'app (voir main.jsx — volontaire, évite une rafale FD.org/ESPN à chaque
+// changement d'onglet desktop) — mais sur PWA mobile, "fermer" l'app suspend
+// souvent l'onglet en arrière-plan au lieu de le tuer (même constat déjà
+// documenté et corrigé UNE FOIS pour dayOffset, voir Accueil.jsx,
+// 'visibilitychange') : le composant n'est jamais démonté, donc ni
+// `refetchOnMount` (pas de montage) ni `refetchOnWindowFocus` (désactivé
+// globalement) ne se déclenchent au retour au premier plan — la query garde
+// son tout dernier résultat, même déjà périmé selon son PROPRE staleTime,
+// jusqu'au prochain démontage/remontage réel du composant. Réactivé
+// seulement ICI (pas globalement, pour ne pas réintroduire le risque de
+// rafale que le défaut global évite ailleurs) : le retour au premier plan
+// déclenche la MÊME vérification de fraîcheur qu'un remontage normal — ne
+// redéclenche un vrai fetch QUE si staleTime (60s pour "aujourd'hui", voir
+// pastDayStaleTime pour les jours passés) est déjà dépassé, exactement le
+// même garde-fou que d'habitude, juste un déclencheur de plus pour le
+// vérifier.
+const REFETCH_ON_FOCUS = { refetchOnWindowFocus: true }
+
 // ⚠️ AJOUT (constat utilisateur : la flèche "jour suivant" de l'Accueil
 // sautait jusqu'au 16 août — un vrai match ce jour-là — mais le panneau
 // affichait "aucun match"). Cause : cette fonction (fetchTodayMatches,
@@ -297,6 +319,7 @@ export function useTodayMatches(targetDate) {
     staleTime: isToday ? 60 * 1000 : 30 * 60 * 1000,
     refetchInterval: isToday ? getRefetchInterval : false,
     retry: false,
+    ...REFETCH_ON_FOCUS,
   })
 
   return { matches: data ?? [], loading: isLoading }
@@ -445,6 +468,7 @@ export function useRecentDaysMatches(numDays) {
     staleTime:            60 * 1000,
     refetchInterval:      getRefetchInterval,
     retry:                false,
+    ...REFETCH_ON_FOCUS,
   }
 
   const pastQueries = dates
@@ -479,6 +503,7 @@ export function useRecentDaysMatches(numDays) {
           // court pour se corriger, le vrai cas immuable garde 7j.
           staleTime:            pastDayStaleTime,
           retry:                false,
+          ...REFETCH_ON_FOCUS,
         },
         {
           queryKey: ['todayMatchesWcEc', date],
@@ -504,6 +529,7 @@ export function useRecentDaysMatches(numDays) {
           // match WC/EC comme FINISHED.
           staleTime:            pastDayStaleTime,
           retry:                false,
+          ...REFETCH_ON_FOCUS,
         },
       ]
     })

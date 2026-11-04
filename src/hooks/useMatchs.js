@@ -1359,6 +1359,15 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       return (until && Date.now() < until) ? 15_000 : ttl
     },
     retry: false,
+    // ⚠️ AJOUT (04/11, même constat/mécanisme qu'useTodayMatches.js —
+    // REFETCH_ON_FOCUS, voir son commentaire détaillé) : ce hook alimente
+    // directement la flèche "jour suivant" et le saut auto d'Accueil.jsx —
+    // sans ça, une reprise d'app depuis une suspension PWA (onglet jamais
+    // démonté) ne revérifie jamais la fraîcheur de ce cache avant 1h pleine,
+    // même déjà périmé selon son propre staleTime. refetchOnWindowFocus
+    // global désactivé ailleurs (main.jsx, volontaire) — réactivé seulement
+    // ICI, borné par le staleTime ci-dessus comme d'habitude.
+    refetchOnWindowFocus: true,
   })
 
   return {
