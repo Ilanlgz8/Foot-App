@@ -133,7 +133,18 @@ export default function Live() {
     const currentlyLiveIds = new Set(
       liveMatches.filter(m => isCardLive(m) && !permanentlyEndedIds.has(m.id)).map(m => m.id)
     )
-    const justEnded = [...prevLiveIdsRef.current].filter(id => !currentlyLiveIds.has(id))
+    // ⚠️ FIX (05/11, constat utilisateur : « dans En direct j'ai que 4 matchs sur 18, dans Tous les
+    // matchs j'ai tout ») : un match qui sortait du direct UNE SEULE FOIS pendant que la page était
+    // ouverte (coup d'envoi pas encore confirmé par ESPN, minute momentanément nulle, match absent d'un
+    // poll…) partait dans permanentlyEndedIds et n'était plus jamais réaffiché, alors qu'il était bien
+    // en cours. On ne retire définitivement que les matchs VRAIMENT terminés (FT confirmé ou statut
+    // FINISHED) ; les autres peuvent simplement réapparaître au poll suivant.
+    const byId = new Map(liveMatches.map(m => [m.id, m]))
+    const justEnded = [...prevLiveIdsRef.current].filter(id => {
+      if (currentlyLiveIds.has(id)) return false
+      const m = byId.get(id)
+      return getMatchState(id).ft === true || m?.status === 'FINISHED'
+    })
     prevLiveIdsRef.current = currentlyLiveIds
     if (justEnded.length === 0) return
     setPermanentlyEndedIds(prev => new Set([...prev, ...justEnded]))
