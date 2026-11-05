@@ -827,6 +827,15 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         data.espnEventId != null &&
         String(liveStateInfo.espnEventId) === String(data.espnEventId) &&
         (now - (liveStateInfo.endedAt ?? 0)) < REVERSAL_GRACE_MS &&
+        // ⚠️ AJOUT (05/11, constat utilisateur : app en arrière-plan pendant les fins de match, au
+        // retour « 97' » puis retour à « 84' » alors que les matchs étaient finis, restés dans
+        // « En direct » jusqu'à fermer/rouvrir l'app). Cause : un poll parti AVANT la mise en veille
+        // (match à la 84e) reste suspendu avec l'app, puis se termine APRÈS que le poll de reprise a
+        // confirmé la fin — sa réponse périmée « en cours » levait ce verrou et remettait le match en
+        // direct. `now` est l'heure de DÉPART de ce poll (voir _doPollESPN) : on n'accepte une
+        // « résurrection » que d'une donnée demandée APRÈS la fin déclarée. Même principe que
+        // isStaleFtReversal plus bas, qui ne protégeait que clearFtFlags, pas ce verrou.
+        now > (liveStateInfo.endedAt ?? 0) &&
         LIVE_ISH_STATUSES.has(safeStatus)
       if (isFalseEndedReversal) {
         console.log(`[useLiveMinute] Faux FT corrigé (même espnEventId, match ${mid} toujours actif) — déblocage du verrou anti-résurrection`)
