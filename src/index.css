@@ -412,25 +412,26 @@ img[data-team="Juventus"] {
         de match), il ne fallait donc surtout pas la retirer de la requête
         Google Fonts en passant.
    Choix explicite de l'utilisateur pour chacun des deux. */
-/* ⚠️ HEURES : Chakra Petch 700 italique (05/11, choix utilisateur après
-   comparaison de ~20 polices). Remplace Inter 900 / Orbitron / Archivo Black
-   pour l'HEURE UNIQUEMENT. Les SCORES gardent leur police d'avant (Inter 900,
-   voir le bloc suivant ; Archivo Black pour le score du Match du jour) :
-   demande utilisateur du 05/11 (« juste pour le score, reviens à l'ancienne
-   de partout »). Chakra Petch n'existe qu'en 600/700 (+ italique 700). Les
-   minutes de match, noms de buteurs et autres textes ne sont PAS concernés. */
+/* ⚠️ HEURES : Bricolage Grotesque 800 (05/11, choix utilisateur après
+   comparaison de ~30 polices ; avant : Chakra Petch 700 italique, Orbitron,
+   Inter 900). Pour l'HEURE UNIQUEMENT. Les SCORES gardent leur police d'avant
+   (Inter 900, voir le bloc suivant ; Archivo Black pour le score du Match du
+   jour) : demande utilisateur du 05/11. Ses chiffres sont ~8% moins hauts
+   qu'Inter à taille égale (0,68 vs 0,74 em) : cards +9% (2.4rem), Match du
+   jour réglé en conséquence. Les minutes de match, noms de buteurs et autres
+   textes ne sont PAS concernés. */
 #root .poster__time,
 #root .matchs__scoreHour,
 #root .mp__hero__time,
 #root .modal__hour,
 #root .teamSearchPage__matchKickoff,
 #root .pronos__metaTime {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 700;
-  font-style: italic;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  font-style: normal;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 /* SCORES : police d'origine (Inter 900), inchangée. */
@@ -521,17 +522,17 @@ img[data-team="Juventus"] {
    Orbitron a des glyphes larges et une grande hauteur d'x : taille réduite
    d'environ 20% par rapport à Archivo Black pour occuper la même place. */
 #root .accueil__mdjClock .accueil__mdjBigNum {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 700;
-  font-style: italic;
-  font-size: 3rem;
-  letter-spacing: 0.02em;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  font-style: normal;
+  font-size: 3.1rem;
+  letter-spacing: 0.01em;
 }
 #root .accueil__mdjClock .accueil__mdjClockSep {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 700;
-  font-style: italic;
-  font-size: 2.4rem;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  font-style: normal;
+  font-size: 2.5rem;
 }
 
 
