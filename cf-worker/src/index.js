@@ -2616,8 +2616,36 @@ function shouldTrimLogHistory() {
   return Math.random() < 0.02
 }
 
+// 05/11 (demande utilisateur : "le classement buteurs met ~1 min à charger, il faut que ce soit
+// instantané") : les buteurs n'étaient JAMAIS préchauffés (FD_WARM_LIST = matches + classement
+// seulement) — le premier visiteur d'une ligue après un moment calme déclenchait un vrai appel
+// FD.org, et s'il tombait sur un budget saturé, il attendait ou échouait. On préchauffe donc la
+// clé EXACTE que demande le client quand aucune mise à jour n'est due (`limit=500&live=0`, voir
+// fetchScorersData dans useScorers.js, TTL serveur 6 h — api/football.js getTtl). Un tick sur deux
+// créneaux libres (m%4===2 ; m%30===15 en mode calme) : jamais la même minute que le préchauffage
+// existant (m%4===0 / m%30===0), donc 1 seul appel par minute au maximum comme avant. Tant que la
+// copie Redis est valide, l'appel est un simple HIT côté serveur (0 appel FD.org, 0 budget) — il ne
+// coûte un vrai appel que quand la copie a expiré (≤ 1 fois / 6 h / compétition).
+const FD_WARM_SCORERS_COMPS = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
+async function warmScorersLive0(log, quiet) {
+  const slot = quiet ? 30 * 60_000 : 240_000
+  const comp = FD_WARM_SCORERS_COMPS[Math.floor(Date.now() / slot) % FD_WARM_SCORERS_COMPS.length]
+  const url = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(`/v4/competitions/${comp}/scorers`)}&limit=500&live=0`
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+    if (!res.ok) log.push(`[fd-warm:scorers:${comp}] status=${res.status}`)
+  } catch (e) {
+    log.push(`[fd-warm:scorers:${comp}] error=${e.message}`)
+  }
+}
+
 async function warmFdCache(log, kv, quiet) {
   try {
+    const mnt = new Date().getMinutes()
+    if (quiet ? mnt % 30 === 15 : mnt % 4 === 2) {
+      await warmScorersLive0(log, quiet)
+      return
+    }
     if (kv && shouldWarmFdCache(quiet)) {
       try {
         const queued = await kv.lpop(FD_PRIORITY_QUEUE_KEY)
