@@ -35,11 +35,6 @@ function compEmblem(code) {
   return COMPETITIONS.find(c => c.id === code)?.emblem ?? null
 }
 
-// « 6 victoires », « 1 défaite », « 0 nul » — accord au pluriel dès 2.
-function plural(n, word) {
-  return `${n} ${word}${n > 1 ? 's' : ''}`
-}
-
 function formatMatchDate(utcDate) {
   const d = new Date(utcDate)
   const now = new Date()
@@ -179,6 +174,89 @@ function TeamLineupSection({ row, hColor, teamCrest }) {
         <span className="teamSearchPage__sectionCount">dernier match</span>
       </h3>
       <LineupPitch home={{ ...teamLineup, crest: teamCrest }} hColor={hColor} singleTeam />
+    </section>
+  )
+}
+
+// 05/11 (demande utilisateur : « un onglet Ligue 1, l'autre Ligue des Champions […] une flèche pour
+// dérouler le classement ») : un onglet par compétition (la compétition « en cours » d'abord), un seul
+// tableau affiché à la fois. Replié par défaut : le leader + la ligne de l'équipe (surlignée) ; la flèche
+// déroule le classement entier. Même tableau (StandingsTable) que la page Classement ; les données
+// viennent de useTeamStandingsMulti (mêmes queryKey que la page Classement, aucun appel en plus). Colonne
+// Forme masquée : elle demanderait des matchs en plus et resterait vide.
+function TeamStandingsSection({ comps, standingsByComp, teamKey }) {
+  const [activeId, setActiveId] = useState(null)
+  const [expandedIds, setExpandedIds] = useState({})
+
+  const active = comps.find(c => c.id === activeId) ?? comps[0]
+  if (!active) return null
+
+  const entry = standingsByComp[active.code] ?? { standings: [], loading: false }
+  const rows = entry.standings
+  const teamRow = rows.find(r => teamIdentityKey(r.team) === teamKey) ?? null
+  const expanded = !!expandedIds[active.id]
+  const collapsedRows = rows.length > 0
+    ? (teamRow && teamRow !== rows[0] ? [rows[0], teamRow] : [rows[0]])
+    : []
+  const canFold = rows.length > collapsedRows.length
+
+  return (
+    <section className="teamSearchPage__section teamSearchPage__standingsSection">
+      <h3 className="teamSearchPage__sectionTitle">Classement</h3>
+      {comps.length > 1 && (
+        <div className="teamSearchPage__compChips" role="tablist">
+          {comps.map(c => {
+            const emblem = compEmblem(c.code)
+            return (
+              <button
+                key={c.id}
+                type="button"
+                role="tab"
+                aria-selected={c.id === active.id}
+                className={`teamSearchPage__compChip${c.id === active.id ? ' teamSearchPage__compChip--active' : ''}`}
+                onClick={() => setActiveId(c.id)}
+              >
+                {emblem && <img src={emblem} alt="" />}
+                <span>{c.name}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {comps.length === 1 && (
+        <div className="teamSearchPage__standingsComp">
+          {compEmblem(active.code) && <img src={compEmblem(active.code)} alt="" />}
+          <span>{active.name}</span>
+        </div>
+      )}
+      {rows.length > 0 ? (
+        <>
+          <StandingsTable
+            rows={expanded ? rows : collapsedRows}
+            qualificationRules={COMP_RULES[active.code] ?? []}
+            highlightTeams={teamRow ? [teamRow.team] : []}
+            showForm={false}
+          />
+          {canFold && (
+            <button
+              type="button"
+              className="teamSearchPage__standingsToggle"
+              aria-expanded={expanded}
+              onClick={() => setExpandedIds(prev => ({ ...prev, [active.id]: !prev[active.id] }))}
+            >
+              <span>{expanded ? 'Réduire' : 'Voir tout le classement'}</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          )}
+        </>
+      ) : entry.loading ? (
+        <span className="teamSearchPage__standingsHint">Chargement…</span>
+      ) : (
+        <span className="teamSearchPage__standingsHint">Classement indisponible</span>
+      )}
     </section>
   )
 }
@@ -359,47 +437,13 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
           la compétition du prochain match à venir ("en cours") passe en
           tête, les autres gardent l'ordre de `comps`. */}
       {standingsCompCodes.length > 0 && (
-        <section className="teamSearchPage__section">
-          <h3 className="teamSearchPage__sectionTitle">Classement</h3>
-          {/* 05/11 (demande utilisateur) : classement ENTIER de chaque championnat, même tableau que la
-              page Classement (StandingsTable), ligne de l'équipe en fond rouge rosé. Données déjà
-              chargées par useTeamStandingsMulti (même queryKey que la page Classement) : aucun appel
-              en plus. Colonne Forme masquée — elle demanderait un chargement de matchs par
-              compétition, et resterait vide ("—") sinon. */}
-          <div className="teamSearchPage__standingsBlocks">
-            {[...comps]
-              .filter(c => !c.isCup && standingsCompCodes.includes(c.code))
-              .sort((a, b) => (a.id === currentCompId ? -1 : b.id === currentCompId ? 1 : 0))
-              .map(c => {
-                const entry = standingsByComp[c.code] ?? { standings: [], loading: false }
-                const teamRow = entry.standings.find(r => teamIdentityKey(r.team) === teamKey) ?? null
-                const emblem = compEmblem(c.code)
-                return (
-                  <div key={c.id} className="teamSearchPage__standingsBlock">
-                    <div className="teamSearchPage__standingsComp">
-                      {emblem && <img src={emblem} alt="" />}
-                      <span>{c.name}</span>
-                      {c.id === currentCompId && (
-                        <span className="teamSearchPage__standingsLiveTag">En cours</span>
-                      )}
-                    </div>
-                    {entry.standings.length > 0 ? (
-                      <StandingsTable
-                        rows={entry.standings}
-                        qualificationRules={COMP_RULES[c.code] ?? []}
-                        highlightTeams={teamRow ? [teamRow.team] : []}
-                        showForm={false}
-                      />
-                    ) : entry.loading ? (
-                      <span className="teamSearchPage__standingsHint">Chargement…</span>
-                    ) : (
-                      <span className="teamSearchPage__standingsHint">Classement indisponible</span>
-                    )}
-                  </div>
-                )
-              })}
-          </div>
-        </section>
+        <TeamStandingsSection
+          comps={[...comps]
+            .filter(c => !c.isCup && standingsCompCodes.includes(c.code))
+            .sort((a, b) => (a.id === currentCompId ? -1 : b.id === currentCompId ? 1 : 0))}
+          standingsByComp={standingsByComp}
+          teamKey={teamKey}
+        />
       )}
 
       {/* ⚠️ REDESSINÉ (28/10, round 4 — retour utilisateur : "disposition
@@ -453,21 +497,17 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
         <div className="teamSearchPage__statsPanelRow teamSearchPage__statsPanelRow--homeaway">
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Domicile</span>
-            <ul className="teamSearchPage__homeAwayLines">
-              <li>{plural(stats.home.wins, 'victoire')}</li>
-              <li>{plural(stats.home.draws, 'nul')}</li>
-              <li>{plural(stats.home.losses, 'défaite')}</li>
-            </ul>
+            <span className="teamSearchPage__homeAwayRecord">
+              {stats.home.wins}V {stats.home.draws}N {stats.home.losses}D
+            </span>
             <RecordBar wins={stats.home.wins} draws={stats.home.draws} losses={stats.home.losses} />
           </div>
           <div className="teamSearchPage__homeAwayDivider" />
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Extérieur</span>
-            <ul className="teamSearchPage__homeAwayLines">
-              <li>{plural(stats.away.wins, 'victoire')}</li>
-              <li>{plural(stats.away.draws, 'nul')}</li>
-              <li>{plural(stats.away.losses, 'défaite')}</li>
-            </ul>
+            <span className="teamSearchPage__homeAwayRecord">
+              {stats.away.wins}V {stats.away.draws}N {stats.away.losses}D
+            </span>
             <RecordBar wins={stats.away.wins} draws={stats.away.draws} losses={stats.away.losses} />
           </div>
         </div>
