@@ -426,6 +426,35 @@ export default async function handler(req, res) {
               .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
           }
         } catch {}
+        // ⚠️ AJOUT (05/11, constat utilisateur : « le classement des buteurs de
+        // la Ligue 1 charge depuis une minute ») — mesuré sur la prod : la
+        // variante SANS `live=0` (celle que le client demande quand une mise à
+        // jour est due) répondait 429 + Retry-After: 103 alors que la variante
+        // `live=0` de la MÊME compétition était en cache (HIT en 0,4s). Les deux
+        // clés contiennent des données identiques (voir plus haut, seul le TTL
+        // diffère) : si le budget est épuisé et qu'on n'a pas de copie sous la
+        // clé demandée, on sert la clé jumelle (fraîche puis stale) au lieu de
+        // faire attendre ~2 min. Marquée STALE : le client ne la prend pas pour
+        // une donnée à jour (voir useScorers.js). Uniquement /scorers.
+        if (fdPath.includes('/scorers')) {
+          const twinQs  = qs.includes('live=0')
+            ? qs.split('&').filter(p => p !== 'live=0').join('&')
+            : (qs ? `${qs}&live=0` : 'live=0')
+          const twinPath = `${fdPath}${twinQs ? '?' + twinQs : ''}`
+          for (const k of [`fd:${twinPath}`, `fd:stale:${twinPath}`]) {
+            try {
+              const twin = await redis.get(k)
+              if (twin) {
+                return res
+                  .status(200)
+                  .setHeader('Content-Type', 'application/json')
+                  .setHeader('Cache-Control', 'no-store')
+                  .setHeader('X-Cache', 'STALE')
+                  .send(typeof twin === 'string' ? twin : JSON.stringify(twin))
+              }
+            } catch {}
+          }
+        }
         // ⚠️ CORRIGÉ (trou réel trouvé après une nouvelle suspension FD.org
         // malgré MINUTE_CAP=5 déjà en place) : l'ancien code, faute de copie
         // stale disponible pour une clé jamais vue (nouvelle compétition,

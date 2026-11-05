@@ -474,13 +474,25 @@ img[data-team="Juventus"] {
    Six essais : le point de départ était le bon.
    L'affiche "Match du jour" garde Archivo Black pour le score et Orbitron pour
    l'heure — surface bien plus grande, l'écart reste assumé. */
-#root .lmp__hero .mp__hero__score,
-#root .lmp__hero .mp__hero__time {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 700;
+/* ⚠️ 05/11 (demande utilisateur : « t'as oublié la page match et la page live
+   match ») : ces deux pages (même panneau .lmp__hero) suivent désormais le
+   reste de l'app — SCORE en Inter 900 (comme les cards/Résultats), HEURE en
+   Bricolage Grotesque 800. Avant : Chakra Petch 700 pour les deux (historique
+   ci-dessus conservé pour mémoire). Tailles réglées pour garder la même hauteur
+   de chiffres qu'avant (Inter 0,74 em, Chakra 0,70, Bricolage 0,68). */
+#root .lmp__hero .mp__hero__score {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 900;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
+}
+#root .lmp__hero .mp__hero__time {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  -webkit-text-stroke: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 /* Le +20% qui compensait l'étroitesse de Bebas n'a plus lieu d'être : ces
@@ -506,8 +518,8 @@ img[data-team="Juventus"] {
    avant le 02/09) : 2.4rem pour le score, 2rem pour l'heure. C'est plus petit
    que tout ce qu'on a essayé depuis — cohérent avec la demande de réduire le
    score faite plus tôt dans la journée. */
-#root .lmp__hero .mp__hero__score { font-size: 2.4rem; line-height: 1; }
-#root .lmp__hero .mp__hero__time  { font-size: 2rem;   line-height: 1; }
+#root .lmp__hero .mp__hero__score { font-size: 2.3rem; line-height: 1; }
+#root .lmp__hero .mp__hero__time  { font-size: 2.05rem; line-height: 1; }
 
 /* ⚠️ EXCEPTION assumée (04/09, demande utilisateur : "changer juste pour match
    du jour la police de l'heure") : sur l'affiche "Match du jour" UNIQUEMENT,

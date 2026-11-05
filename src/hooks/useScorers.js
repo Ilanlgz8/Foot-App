@@ -172,22 +172,29 @@ export async function fetchScorersData(compId, delayMs = 0, hasMatchToday = true
     const fresh = !r.headers.get('X-Cache')
     if (!r.ok) throw new Error(String(r.status))
     const j = await r.json()
-    return { scorers: j.scorers ?? null, fresh }
+    return { scorers: j.scorers ?? null, fresh, stale: r.headers.get('X-Cache') === 'STALE' }
   }
 
   let scorers = null
+  // 05/11 : vrai si le serveur a répondu avec une copie de repli (X-Cache: STALE — budget
+  // football-data.org épuisé, voir api/football.js). On l'affiche tout de suite (au lieu d'attendre
+  // la minute que demande le serveur) mais on ne l'enregistre PAS comme « à jour » dans le cache
+  // local : `scorersUpdateDue` doit continuer à voir qu'une mise à jour reste due.
+  let servedStale = false
   try {
     let fresh = false
     if (isAnnualIntl) {
       const r = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500&season=${season}${liveFlag}`)
       scorers = r.scorers
       fresh = r.fresh
+      servedStale = r.stale
     }
     if (!scorers || scorers.length === 0) {
       if (fresh) await new Promise(res => setTimeout(res, 6_000))
       try {
         const r2 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=500${liveFlag}`)
         scorers = r2.scorers
+        servedStale = r2.stale
       } catch (e) {
         if (e.message === '429' || e.message === '403') throw e
         const r3 = await tryFetch(`/api/v4/competitions/${compId}/scorers?limit=100${liveFlag}`)
@@ -200,7 +207,7 @@ export async function fetchScorersData(compId, delayMs = 0, hasMatchToday = true
     throw err
   }
   scorers = scorers ?? []
-  writeCache(key, scorers, STALE_MS)
+  if (!servedStale) writeCache(key, scorers, STALE_MS)
   return scorers
 }
 
