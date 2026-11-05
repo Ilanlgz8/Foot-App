@@ -135,13 +135,29 @@ export function compactEspnStandings(json) {
 // Copenhague, même lettre ø) — même risque, même club récurrent en Coupes
 // d'Europe. Translitération standard (ø→o, æ→ae, å→a), appliquée AVANT le
 // reste pour que 'æ'→'ae' ne soit pas re-touché par une règle suivante.
+// ⚠️ PERF (05/11, profilage de la page Pronos) : normalize() est appelée
+// des centaines de milliers de fois sur les MÊMES noms d'équipes (résolution
+// ESPN→football-data.org : matchs × pool d'équipes, voir resolveFdTeamId) —
+// 4,8 s sur 30 s de profil à CPU ralenti ×6. Fonction pure → cache par chaîne
+// (borné), résultat strictement identique.
+const _normalizeCache = new Map()
 export function normalize(name = '') {
-  return name.toLowerCase()
+  const cacheable = typeof name === 'string'
+  if (cacheable) {
+    const hit = _normalizeCache.get(name)
+    if (hit !== undefined) return hit
+  }
+  const out = name.toLowerCase()
     .replace(/æ/g, 'ae').replace(/ø/g, 'o').replace(/å/g, 'a')
     .replace(/[àáâã]/g, 'a').replace(/[éèêë]/g, 'e')
     .replace(/[ûùüú]/g, 'u').replace(/[îïí]/g, 'i')
     .replace(/[ôöó]/g, 'o').replace(/ç/g, 'c')
     .trim()
+  if (cacheable) {
+    if (_normalizeCache.size > 5000) _normalizeCache.clear()
+    _normalizeCache.set(name, out)
+  }
+  return out
 }
 
 export function fuzzyTeam(a, b) {

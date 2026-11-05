@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
@@ -607,8 +608,11 @@ export function useTeamFormMulti(compCodes) {
         // Voir le commentaire détaillé dans useTeamForm ci-dessus (même fix,
         // même symptôme possible sur l'Accueil : readCache strict → formMap
         // vide dès qu'un 429 FD.org tombe pile sur le tout premier fetch).
-        initialData:          readCacheStale(cacheKey) ?? undefined,
-        initialDataUpdatedAt: getCacheSavedAt(cacheKey),
+        // ⚠️ PERF (05/11) : forme FONCTION — évalué seulement quand la requête est créée
+        // (React Query l'ignore ensuite), au lieu d'un JSON.parse du cache localStorage
+        // (x2 : donnée + date) pour CHAQUE compétition à CHAQUE rendu de la page.
+        initialData:          () => readCacheStale(cacheKey) ?? undefined,
+        initialDataUpdatedAt: () => getCacheSavedAt(cacheKey),
         staleTime:            formStaleFor(code),
         // Voir le commentaire de ESPN_FORM_STALE/formRefetchIntervalFor plus
         // haut dans ce fichier — polling borné uniquement pour les 8 comps
@@ -664,6 +668,13 @@ export function useTeamFormMulti(compCodes) {
   // chaque appel — recalcule le Poisson (calcPronoAdvanced, Pronos.jsx)
   // beaucoup plus rarement, plus seulement quand une compétition a
   // réellement de nouvelles données.
+  // ⚠️ PERF (05/11) : tout ce qui suit est DÉRIVÉ des données des requêtes — on ne le
+  // recalcule que quand l'une d'elles a réellement été mise à jour (dataUpdatedAt),
+  // plus à chaque rendu. Bonus : formMap/formMapByComp/matchesByComp gardent la même
+  // référence entre deux rendus, donc les useMemo des pages (Pronos : pronoByMatchId,
+  // etc.) ne se relancent plus à vide.
+  const derivedKey = codes.join(',') + '#' + results.map(r => r.dataUpdatedAt).join(',')
+  const derived = useMemo(() => {
   const formMap    = {}
   const resultByCode = Object.fromEntries(codes.map((c, i) => [c, results[i]]))
   const fdCodes   = codes.filter(c => !ESPN_SOURCED_FORM_COMPS.has(c))
@@ -700,13 +711,28 @@ export function useTeamFormMulti(compCodes) {
   const espnFormMapByCode = {}
   if (espnCodes.length) {
     const fdTeamPool = fdCodes.flatMap(c => resultByCode[c]?.data?.matches ?? [])
+    // ⚠️ PERF (05/11, "la page Pronos est innavigable") : mesuré avec un processeur
+    // de téléphone, ~96 % du rendu de Pronos (et d'Accueil) passait ICI —
+    // resolveFdTeamId parcourt TOUT fdTeamPool (1 800+ matchs) en normalisant les
+    // noms à chaque comparaison, pour chaque équipe de chaque match européen,
+    // et ça se refaisait à CHAQUE rendu. Le résultat ne dépend que de l'équipe
+    // (id + noms) et du pool : on le calcule une fois par équipe distincte, et
+    // tout ce bloc est mémoïsé plus bas (useMemo).
+    const resolveCache = new Map()
+    const resolveCached = (team) => {
+      const k = `${team?.id}|${team?.name}|${team?.shortName}`
+      if (resolveCache.has(k)) return resolveCache.get(k)
+      const id = resolveFdTeamId(team, fdTeamPool, { loose: true, strict: true })
+      resolveCache.set(k, id)
+      return id
+    }
     for (const c of espnCodes) {
       const espnMatches = resultByCode[c]?.data?.matches ?? []
       const resolved = espnMatches
         .filter(m => m.status === 'FINISHED')
         .map(m => {
-          const homeId = resolveFdTeamId(m.homeTeam, fdTeamPool, { loose: true, strict: true })
-          const awayId = resolveFdTeamId(m.awayTeam, fdTeamPool, { loose: true, strict: true })
+          const homeId = resolveCached(m.homeTeam)
+          const awayId = resolveCached(m.awayTeam)
           return {
             bothUnresolved: homeId == null && awayId == null,
             match: {
@@ -788,5 +814,9 @@ export function useTeamFormMulti(compCodes) {
   for (const c of fdCodes) formMapByComp[c] = resultByCode[c]?.data?.formMap ?? EMPTY_FORM_MAP
   for (const c of espnCodes) formMapByComp[c] = espnFormMapByCode[c] ?? EMPTY_FORM_MAP
 
-  return { formMap, formMapByComp, matchesByComp, isLoading: results.some(r => r.isLoading) }
+  return { formMap, formMapByComp, matchesByComp }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [derivedKey])
+
+  return { ...derived, isLoading: results.some(r => r.isLoading) }
 }

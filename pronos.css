@@ -245,6 +245,14 @@
   text-align: center;
   margin: 0 0.2rem 0.5rem;
 }
+/* PERF : les lignes "froides" (hors écran, voir LazyMatchRow) sont jusqu'à
+   ~100 × 6 blocs .sk — l'animation shimmer (background-position, infinie)
+   les faisait recalculer/repeindre en continu (~600 animations actives,
+   constat au profilage) et rendait la page inutilisable sur téléphone. Ces
+   lignes sont hors écran : squelette statique, aucune perte visuelle. */
+.pronos__matchRow--sk .sk {
+  animation: none;
+}
 .pronos__matchRow {
   background: var(--bg-card);
   border: 1px solid var(--border);
