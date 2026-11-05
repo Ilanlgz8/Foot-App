@@ -135,16 +135,8 @@
 .hubPosters--lg .poster__crestWrap { width: 52px; height: 52px; }
 .hubPosters.hubPosters--lg .poster__center { height: 52px; }
 #root .hubPosters .poster__score,
-#root .hubPosters .poster__time { font-size: 2.2rem; transform: translateY(4px); }
+#root .hubPosters .poster__time { font-size: 2.33rem; transform: translateY(4px); white-space: nowrap; }
 #root .hubPosters .poster__time { transform: translateY(7px); }
-/* Heure des cards (Accueil + page Match) : Orbitron 800 (choix utilisateur,
-   05/11 — style tableau d'affichage). Le Match du jour garde son propre style
-   (.accueil__mdjClock). Même hauteur de chiffres que l'ancien Inter 900. */
-#root .hubPosters .poster__time {
-  font-family: 'Orbitron', 'Archivo Black', system-ui, sans-serif;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-}
 
 /* ── Bouton "Voir les N matchs" (Accueil) ── */
 .hubCta {
