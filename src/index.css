@@ -440,6 +440,8 @@ img[data-team="Juventus"] {
 #root .resultHero__scoreSep,
 #root .resultats__scoreNum,
 #root .resultats__scoreDash,
+#root .teamSearchPage__matchScoreNum,
+#root .teamSearchPage__matchScoreDash,
 #root .live__pill,
 #root .lmpSide__score,
 #root .myTeamBanner__score {

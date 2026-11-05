@@ -12,7 +12,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTeamSearchMatches, useTeamStandingsMulti, useTeamScorersMulti } from '../hooks/useTeamSearch'
+import { useTeamSearchMatches, useTeamStandingsMulti, useTeamScorersMulti, NATIONAL_COMP_CODES } from '../hooks/useTeamSearch'
 import { useLineups, useFdLineups } from '../hooks/useMatchDetail'
 import { scorersUpdateDue } from '../hooks/useScorers'
 import {
@@ -207,7 +207,8 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
   // compétitions à classement (pas les coupes à élimination directe, voir
   // isCup ci-dessus) sont envoyées au hook de classement.
   const standingsCompCodes = useMemo(
-    () => [...new Set(comps.filter(c => !c.isCup && c.code).map(c => c.code))],
+    // Sélections nationales : pas de classement/buteurs ici (voir NATIONAL_COMP_CODES).
+    () => [...new Set(comps.filter(c => !c.isCup && c.code && !NATIONAL_COMP_CODES.has(c.code)).map(c => c.code))],
     [comps]
   )
   const standingsByComp = useTeamStandingsMulti(standingsCompCodes)
@@ -644,7 +645,7 @@ export default function TeamSearchPage() {
           type="text"
           value={query}
           onChange={handleQueryChange}
-          placeholder="Cherche une équipe… (PSG, Real Madrid, Liverpool…)"
+          placeholder="Cherche une équipe ou un pays… (PSG, Real Madrid, France…)"
           autoFocus
         />
 
@@ -671,8 +672,8 @@ export default function TeamSearchPage() {
 
       {!selectedKey && normalizedQuery.length < 2 && (
         <p className="teamSearchPage__hint">
-          Tape le nom d'une équipe pour voir tous ses matchs de la saison, toutes compétitions confondues
-          (championnat, coupe nationale, coupes européennes).
+          Tape le nom d'une équipe ou d'un pays pour voir tous ses matchs, toutes compétitions confondues
+          (championnat, coupe nationale, coupes européennes, compétitions de sélections).
         </p>
       )}
 

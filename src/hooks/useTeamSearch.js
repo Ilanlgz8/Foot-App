@@ -8,10 +8,9 @@
  * couverture FD.org gratuite pour elles, voir ESPN_SOURCED_COMPS dans
  * useMatchs.js).
  *
- * Volontairement HORS PÉRIMÈTRE (pas demandé, et chaque entrée de plus
- * alourdirait cette page sans rapport clair avec "chercher une équipe de
- * club") : équipes nationales (WC/EC/NL/CAN/COPA) et compétitions à un seul
- * match/an (USC/TDC/CS).
+ * Équipes nationales (NL/WC/EC/CAN/COPA, via ESPN) ajoutées le 05/11 sur demande
+ * utilisateur. Volontairement HORS PÉRIMÈTRE : compétitions à un seul match/an
+ * (USC/TDC/CS).
  *
  * Mêmes fonctions de fetch que Programme/Résultats (fetchClubMatchesRaw/
  * fetchEspnCompMatches) — chacune a déjà son propre cache (localStorage +
@@ -31,7 +30,15 @@ import { fetchScorersData } from './useScorers'
 
 const CLUB_FD_COMPS   = ['FL1', 'PL', 'PD', 'BL1', 'SA', 'CL']
 const CLUB_ESPN_COMPS = ['UEL', 'UECL']
+// 05/11 (demande utilisateur : « j'ai recherché la France et j'ai pas pu voir ») : les sélections
+// nationales sont ajoutées — mêmes compétitions et même source (ESPN, fenêtre « sparse » 400 j en
+// arrière / 60 j en avant, voir espnAdapter.js) que celles déjà gérées ailleurs dans l'app. Pas de
+// classement ni de buteurs pour elles ici (voir NATIONAL_COMP_CODES, TeamSearchPage.jsx) : aucun
+// appel FD.org en plus.
+export const NATIONAL_COMP_CODES = new Set(['NL', 'WC', 'EC', 'CAN', 'COPA'])
+const ESPN_COMPS = [...CLUB_ESPN_COMPS, ...NATIONAL_COMP_CODES]
 const STAGGER_MS = 1_000
+const ESPN_STAGGER_MS = 400
 
 export function useTeamSearchMatches() {
   const fdResults = useQueries({
@@ -47,10 +54,10 @@ export function useTeamSearchMatches() {
   })
 
   const espnResults = useQueries({
-    queries: CLUB_ESPN_COMPS.map((comp, i) => ({
+    queries: ESPN_COMPS.map((comp, i) => ({
       queryKey: ['teamSearchEspn', comp],
       queryFn: async () => {
-        if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
+        if (i > 0) await new Promise(r => setTimeout(r, i * ESPN_STAGGER_MS))
         return fetchEspnCompMatches(comp, COMPETITION_ESPN_SLUG[comp])
       },
       staleTime: 2 * 60 * 1000,
