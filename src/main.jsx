@@ -1,4 +1,7 @@
 
+// Doit rester le TOUT PREMIER import : protège chaque écriture localStorage contre le stockage plein
+// (voir storageGuard.js), y compris celles faites au chargement des autres modules.
+import './utils/storageGuard'
 import { createRoot } from 'react-dom/client'
 import './fonts.js'
 import './index.css'
@@ -182,6 +185,11 @@ const UNPERSISTED_QUERY_KEYS = new Set([
   'scorers',            // classement buteurs — useScorers, cache disque dédié (scorers3_*)
   'standings',          // classement — useStandings, cache disque dédié (standings_*)
   'todayMatches', 'todayMatchesEspn', 'todayMatchesWcEc', // Accueil (cartes + Résultats récents) — useTodayMatches.js, cache disque dédié (matches_*/matches_espn_*/matches_wcec_*)
+  // 05/11 (stockage plein sur iPhone, voir storageGuard.js) : 3 des plus gros postes mesurés du blob
+  // (~4,8 Mo à eux trois), tous déjà en cache disque dédié — doublon pur.
+  'matches',        // useMatches (Programme/Résultats) — cache disque matches_* (readStaleWithMigration)
+  'teamSearchRaw',  // fiche équipe, fetchClubMatchesRaw — cache disque matches_current_*
+  'teamSearchEspn', // fiche équipe, fetchEspnCompMatches — cache disque matches_espn_*
   'h2hHistory', // confrontations directes enrichies (saisons passées) — useH2HHistory, cache disque dédié (h2hHistory_*), l'un des plus gros contributeurs mesurés (~390 Ko par compétition/saison)
 ])
 
@@ -281,7 +289,7 @@ const UNPERSISTED_QUERY_KEYS = new Set([
 // du buster pour purger IMMÉDIATEMENT ces résultats vides déjà persistés
 // chez les utilisateurs actuels (même mécanisme que v14 ci-dessus) plutôt
 // que d'attendre une expiration naturelle.
-const CACHE_BUSTER = 'v16-2026-11-04-exclude-redundant-persisted-queries'
+const CACHE_BUSTER = 'v17-2026-11-05-storage-full-iphone'
 // v16 : voir le commentaire détaillé au-dessus de UNPERSISTED_QUERY_KEYS —
 // exclut du blob persisté les clés déjà doublement mises en cache (leur
 // propre cache disque dédié existe déjà) pour réduire sa taille (3,85 Mo
