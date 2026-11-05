@@ -42,6 +42,15 @@ export default function Live() {
 
   // Données : "En direct" ne dépend pas du jour affiché, on charge alors celles d'aujourd'hui.
   const [tab, setTab] = useState(initial.tab ?? null)
+  // ⚠️ FIX (05/11, constat utilisateur : « j'appuie sur Demain, ça m'affiche encore
+  // les matchs d'aujourd'hui, je suis obligé d'aller sur En direct puis de
+  // revenir sur Tous les matchs »). Root cause : sans onglet choisi (`tab` =
+  // null, cas par défaut quand aucun match n'est en direct), la page est bien
+  // sur « Tous les matchs » (`activeTab === 'prog'`) mais le hook ci-dessous
+  // n'est alimenté qu'avec `tab === 'prog'` → il chargeait TOUJOURS aujourd'hui
+  // (offset 0) pendant que le libellé et les flèches montraient « Demain ».
+  // Changer de jour fixe donc explicitement l'onglet « Tous les matchs ».
+  const goToDay = useCallback(offset => { setTab('prog'); setDayOffset(offset) }, [])
   const {
     matches: dayMatches, loading, espnScores, liveMatches,
     formMapByComp, matchesByComp, nextMatchDayOffset, prevMatchDayOffset,
@@ -157,6 +166,21 @@ export default function Live() {
 
   // Seconde de grâce : tant qu'un match vient de finir, on rafraîchit chaque seconde
   // pour qu'il disparaisse de la liste sans attendre le prochain poll.
+  // ⚠️ FIX (05/11, même constat : « je clique sur un match de demain, je fais
+  // Retour, ça me remet à aujourd'hui »). Le jour et l'onglet n'existaient
+  // qu'en état local : en quittant la page vers /match/:id puis en revenant,
+  // le composant est remonté avec `location.state` d'origine (vide). On les
+  // inscrit donc dans l'état de l'entrée d'historique courante (replace, pas
+  // de nouvelle entrée) ; `initial` ci-dessus les relit au retour. Même clés
+  // (`tab`, `dayOffset`) que celles déjà passées par l'Accueil (« Voir les N
+  // matchs »).
+  useEffect(() => {
+    const st = location.state ?? {}
+    if ((st.dayOffset ?? 0) === dayOffset && (st.tab ?? null) === tab) return
+    navigate(location.pathname, { replace: true, state: { ...st, dayOffset, tab } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayOffset, tab])
+
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!dayMatches.some(m => isRecentlyFinished(m.id))) return
@@ -234,14 +258,14 @@ export default function Live() {
               <div className="hubDay">
                 <button type="button" className="accueil__dayArrow" aria-label="Jour précédent"
                   disabled={prevMatchDayOffset == null}
-                  onClick={() => { if (prevMatchDayOffset != null) setDayOffset(prevMatchDayOffset) }}>‹</button>
+                  onClick={() => { if (prevMatchDayOffset != null) goToDay(prevMatchDayOffset) }}>‹</button>
                 <div className="hubDay__label">
                   {getDayLabel(dayOffset)}
                   <small>{dayDateLabel(dayOffset)}</small>
                 </div>
                 <button type="button" className="accueil__dayArrow" aria-label="Jour suivant"
                   disabled={nextMatchDayOffset == null}
-                  onClick={() => { if (nextMatchDayOffset != null) setDayOffset(nextMatchDayOffset) }}>›</button>
+                  onClick={() => { if (nextMatchDayOffset != null) goToDay(nextMatchDayOffset) }}>›</button>
               </div>
             </div>
 
@@ -254,7 +278,7 @@ export default function Live() {
                 {nextMatchDayOffset != null && (
                   <>
                     <br />
-                    <button type="button" onClick={() => setDayOffset(nextMatchDayOffset)}>Prochain jour de matchs →</button>
+                    <button type="button" onClick={() => goToDay(nextMatchDayOffset)}>Prochain jour de matchs →</button>
                   </>
                 )}
               </div>
