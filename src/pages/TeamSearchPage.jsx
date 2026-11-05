@@ -26,11 +26,18 @@ import { translateTeam } from '../data/teamNames'
 import { COMPETITIONS, NO_SCORERS_COMPS } from '../data/competitions'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { FormDiamonds } from '../accueil/FormDiamonds'
+import { StandingsTable } from '../components/StandingsTable'
+import { COMP_RULES } from '../data/standingsRules'
 import LineupPitch from '../components/LineupPitch'
 import '../teamSearchPage.css'
 
 function compEmblem(code) {
   return COMPETITIONS.find(c => c.id === code)?.emblem ?? null
+}
+
+// « 6 victoires », « 1 défaite », « 0 nul » — accord au pluriel dès 2.
+function plural(n, word) {
+  return `${n} ${word}${n > 1 ? 's' : ''}`
 }
 
 function formatMatchDate(utcDate) {
@@ -354,16 +361,21 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
       {standingsCompCodes.length > 0 && (
         <section className="teamSearchPage__section">
           <h3 className="teamSearchPage__sectionTitle">Classement</h3>
-          <ul className="teamSearchPage__standingsList">
+          {/* 05/11 (demande utilisateur) : classement ENTIER de chaque championnat, même tableau que la
+              page Classement (StandingsTable), ligne de l'équipe en fond rouge rosé. Données déjà
+              chargées par useTeamStandingsMulti (même queryKey que la page Classement) : aucun appel
+              en plus. Colonne Forme masquée — elle demanderait un chargement de matchs par
+              compétition, et resterait vide ("—") sinon. */}
+          <div className="teamSearchPage__standingsBlocks">
             {[...comps]
               .filter(c => !c.isCup && standingsCompCodes.includes(c.code))
               .sort((a, b) => (a.id === currentCompId ? -1 : b.id === currentCompId ? 1 : 0))
               .map(c => {
                 const entry = standingsByComp[c.code] ?? { standings: [], loading: false }
-                const row = entry.standings.find(r => teamIdentityKey(r.team) === teamKey) ?? null
+                const teamRow = entry.standings.find(r => teamIdentityKey(r.team) === teamKey) ?? null
                 const emblem = compEmblem(c.code)
                 return (
-                  <li key={c.id} className="teamSearchPage__standingsRow">
+                  <div key={c.id} className="teamSearchPage__standingsBlock">
                     <div className="teamSearchPage__standingsComp">
                       {emblem && <img src={emblem} alt="" />}
                       <span>{c.name}</span>
@@ -371,26 +383,22 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
                         <span className="teamSearchPage__standingsLiveTag">En cours</span>
                       )}
                     </div>
-                    {entry.loading && !row ? (
+                    {entry.standings.length > 0 ? (
+                      <StandingsTable
+                        rows={entry.standings}
+                        qualificationRules={COMP_RULES[c.code] ?? []}
+                        highlightTeams={teamRow ? [teamRow.team] : []}
+                        showForm={false}
+                      />
+                    ) : entry.loading ? (
                       <span className="teamSearchPage__standingsHint">Chargement…</span>
-                    ) : row ? (
-                      <div className="teamSearchPage__standingsStats">
-                        <span className="teamSearchPage__standingsPos">{row.position}<small>e</small></span>
-                        <span className="teamSearchPage__standingsPts">{row.points ?? '–'} pts</span>
-                        <span className="teamSearchPage__standingsDetail">
-                          {row.playedGames ?? '–'}J · {row.won ?? '–'}V {row.draw ?? '–'}N {row.lost ?? '–'}D
-                        </span>
-                        <span className="teamSearchPage__standingsDetail">
-                          {row.goalsFor ?? '–'}–{row.goalsAgainst ?? '–'}
-                        </span>
-                      </div>
                     ) : (
                       <span className="teamSearchPage__standingsHint">Classement indisponible</span>
                     )}
-                  </li>
+                  </div>
                 )
               })}
-          </ul>
+          </div>
         </section>
       )}
 
@@ -445,17 +453,21 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
         <div className="teamSearchPage__statsPanelRow teamSearchPage__statsPanelRow--homeaway">
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Domicile</span>
-            <span className="teamSearchPage__homeAwayRecord">
-              {stats.home.wins}V {stats.home.draws}N {stats.home.losses}D
-            </span>
+            <ul className="teamSearchPage__homeAwayLines">
+              <li>{plural(stats.home.wins, 'victoire')}</li>
+              <li>{plural(stats.home.draws, 'nul')}</li>
+              <li>{plural(stats.home.losses, 'défaite')}</li>
+            </ul>
             <RecordBar wins={stats.home.wins} draws={stats.home.draws} losses={stats.home.losses} />
           </div>
           <div className="teamSearchPage__homeAwayDivider" />
           <div className="teamSearchPage__homeAwayBlock">
             <span className="teamSearchPage__homeAwayLabel">Extérieur</span>
-            <span className="teamSearchPage__homeAwayRecord">
-              {stats.away.wins}V {stats.away.draws}N {stats.away.losses}D
-            </span>
+            <ul className="teamSearchPage__homeAwayLines">
+              <li>{plural(stats.away.wins, 'victoire')}</li>
+              <li>{plural(stats.away.draws, 'nul')}</li>
+              <li>{plural(stats.away.losses, 'défaite')}</li>
+            </ul>
             <RecordBar wins={stats.away.wins} draws={stats.away.draws} losses={stats.away.losses} />
           </div>
         </div>

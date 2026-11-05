@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { resolveFdTeamId } from '../utils/matchUtils'
+import { teamIdentityKey } from '../utils/teamSearch'
 // Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
 // pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
 // visitée au moins une fois (chunk lazy pas encore chargé), l'onglet Classement de
@@ -101,11 +102,16 @@ function Forme({ results }) {
  * @param {function} onToggleFavorite — (team) => void, requis si favoritable
  * @param {boolean}  favLimitReached  — désactive l'ajout (pas le retrait) si le plafond est atteint
  * @param {string}   compCode         — code compétition transmis à onToggleFavorite (contexte du favori)
+ * @param {object[]} highlightTeams   — équipes à surligner (fond rouge rosé), comparées par id puis par nom
+ * @param {boolean}  showForm         — affiche la colonne Forme (true par défaut)
  */
 export function StandingsTable({
   rows, compact = false, formMap = {}, compMatches = [], qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false,
   favoritable = false, isFavorite = null, onToggleFavorite = null, favLimitReached = false, compCode = null,
+  highlightTeams = [], showForm = true,
 }) {
+  const highlightKeys = useMemo(() => new Set(highlightTeams.map(t => teamIdentityKey(t)).filter(Boolean)), [highlightTeams])
+  const highlightIds  = useMemo(() => new Set(highlightTeams.map(t => t?.id).filter(v => v != null)), [highlightTeams])
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
@@ -125,7 +131,7 @@ export function StandingsTable({
             <th>D</th>
             <th>Diff</th>
             {!compact && <th>BM</th>}
-            <th>Forme</th>
+            {showForm && <th>Forme</th>}
           </tr>
         </thead>
         <tbody>
@@ -164,6 +170,7 @@ export function StandingsTable({
             const prevPos = prevSnapshot[team.team.id]
             const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0
             const isFav   = favoritable && isFavorite ? isFavorite(team.team.id) : false
+            const isHighlight = highlightTeams.length > 0 && (highlightIds.has(team.team.id) || highlightKeys.has(teamIdentityKey(team.team)))
             // Couleur réelle de l'équipe (drapeau/maillot curé) — donne à chaque
             // ligne favorite sa propre teinte au lieu d'un rouge/ambre uniforme
             // pour toutes les équipes suivies.
@@ -177,6 +184,7 @@ export function StandingsTable({
                   'classement__row',
                   topRank ? `classement__row--top${team.position}` : '',
                   isFav ? 'classement__row--favorite' : '',
+                  isHighlight ? 'classement__row--highlight' : '',
                 ].filter(Boolean).join(' ')}
                 style={isFav ? { '--fav-color': favColor, '--fav-color-rgb': favColorRgb } : undefined}
               >
@@ -224,7 +232,7 @@ export function StandingsTable({
                 <td>{team.lost}</td>
                 <td>{team.goalDifference > 0 ? `+${team.goalDifference}` : team.goalDifference}</td>
                 {!compact && <td>{team.goalsFor}</td>}
-                <td><Forme results={formeSlice} /></td>
+                {showForm && <td><Forme results={formeSlice} /></td>}
               </tr>
             )
           })}

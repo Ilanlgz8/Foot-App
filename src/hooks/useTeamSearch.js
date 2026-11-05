@@ -24,6 +24,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { fetchClubMatchesRaw, TTL } from './useMatchs'
 import { fetchEspnCompMatches } from '../utils/espnAdapter'
+import { readCacheStale, getCacheSavedAt } from './localCache'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { fetchStandingsData } from './useStandings'
 import { fetchScorersData } from './useScorers'
@@ -60,7 +61,13 @@ export function useTeamSearchMatches() {
         if (i > 0) await new Promise(r => setTimeout(r, i * ESPN_STAGGER_MS))
         return fetchEspnCompMatches(comp, COMPETITION_ESPN_SLUG[comp])
       },
-      staleTime: 2 * 60 * 1000,
+      // 05/11 : repart des matchs ESPN déjà gardés en local par le reste de l'app (même clé
+      // `matches_espn_<comp>` que Programme/Résultats/forme récente — voir fetchEspnCompMatches) et ne
+      // les redemande qu'après 30 min, au lieu de 2 min : revisiter la fiche équipe ne refait plus
+      // d'appels ESPN à chaque fois.
+      initialData: readCacheStale(`matches_espn_${comp}`) ?? undefined,
+      initialDataUpdatedAt: getCacheSavedAt(`matches_espn_${comp}`),
+      staleTime: 30 * 60 * 1000,
       retry: 1,
     })),
   })

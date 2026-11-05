@@ -6,6 +6,7 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
+import { DEFAULT_RULES, COMP_RULES } from '../data/standingsRules'
 import { useStandings }       from '../hooks/useStandings'
 import { useMatches }         from '../hooks/useMatchs'
 import { reconcileStandings } from '../utils/standingsLive'
@@ -1304,16 +1305,6 @@ export function ComposTab({ match, dataMatch, compMatches, scorers = [] }) {
 // WC : affiche uniquement le(s) groupe(s) contenant les deux équipes
 // Autres : affiche le classement complet
 
-const WC_RULES = [
-  { label: 'Qualifié', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl' },
-  { label: 'Éliminé',  start: 3, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--elimine' },
-]
-const DEFAULT_RULES = [
-  { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl' },
-  { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel' },
-  { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl' },
-]
-const COMP_RULES = { WC: WC_RULES, FL1: DEFAULT_RULES, PL: DEFAULT_RULES, PD: DEFAULT_RULES, BL1: DEFAULT_RULES, SA: DEFAULT_RULES }
 
 export function ClassementTab({ match, compId }) {
   // ⚠️ delayMs CORRIGÉ (26/07, audit "élimine tous les 429") : 2s < verrou
@@ -1355,6 +1346,8 @@ export function ClassementTab({ match, compId }) {
   const awayId = match?.awayTeam?.id
   const homeName = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
   const awayName = match?.awayTeam?.name ?? match?.awayTeam?.shortName ?? ''
+  // 05/11 : les 2 équipes du match sont surlignées dans le tableau (fond rouge rosé).
+  const highlightTeams = [match?.homeTeam, match?.awayTeam].filter(Boolean)
 
   // WC → filtrer les groupes contenant les deux équipes
   if (groups.length > 0) {
@@ -1386,7 +1379,7 @@ export function ClassementTab({ match, compId }) {
                 {g.name.replace('GROUP_', 'Groupe ')}
               </p>
             )}
-            <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} />
+            <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
           </div>
         ))}
       </div>
@@ -1400,7 +1393,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} />
+      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
     </div>
   )
 }
