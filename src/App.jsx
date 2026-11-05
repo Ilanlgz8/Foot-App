@@ -273,6 +273,7 @@ function App() {
       '700 16px "Archivo"', '900 16px "Archivo"',
       '400 16px "Archivo Black"',
       '700 16px "Orbitron"',
+      '800 16px "Orbitron"',
       '400 16px "Russo One"',
       '400 16px "Bebas Neue"',
     ]
