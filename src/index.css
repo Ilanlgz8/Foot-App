@@ -412,36 +412,18 @@ img[data-team="Juventus"] {
         de match), il ne fallait donc surtout pas la retirer de la requête
         Google Fonts en passant.
    Choix explicite de l'utilisateur pour chacun des deux. */
-/* ⚠️ POLICE UNIQUE POUR TOUTES LES HEURES ET TOUS LES SCORES (05/11, choix
-   utilisateur après comparaison de ~20 polices : « Chakra Petch 700
-   italique, mets-la partout, que tout soit en harmonie »). Chakra Petch est
-   déjà la police d'interface de l'app ; l'italique 700 donne l'élan « sport ».
-   Remplace : Inter 900 (cards, Programme, Résultats), Archivo Black (Match du
-   jour, score), Orbitron (Match du jour, heure ; cards, heure). Les minutes
-   de match, noms de buteurs et tout autre texte ne sont PAS concernés.
-   Chakra Petch n'existe qu'en 600/700 (+ italique 700) : on demande 700. */
-#root .poster__score,
+/* ⚠️ HEURES : Chakra Petch 700 italique (05/11, choix utilisateur après
+   comparaison de ~20 polices). Remplace Inter 900 / Orbitron / Archivo Black
+   pour l'HEURE UNIQUEMENT. Les SCORES gardent leur police d'avant (Inter 900,
+   voir le bloc suivant ; Archivo Black pour le score du Match du jour) :
+   demande utilisateur du 05/11 (« juste pour le score, reviens à l'ancienne
+   de partout »). Chakra Petch n'existe qu'en 600/700 (+ italique 700). Les
+   minutes de match, noms de buteurs et autres textes ne sont PAS concernés. */
 #root .poster__time,
-#root .resultHero__score,
-#root .resultHero__scoreSep,
-#root .resultats__scoreNum,
-#root .resultats__scoreDash,
-#root .live__pill,
 #root .matchs__scoreHour,
-#root .lmpSide__score,
-#root .myTeamBanner__score,
-#root .accueil__liveChipScore,
-#root .mp__hero__score,
 #root .mp__hero__time,
 #root .modal__hour,
-#root .modal__scoreNum,
-#root .modal__h2hScore,
-#root .pm__formScoreMain,
-#root .h2h__score,
-#root .bracket__scoreDesktop,
-#root .teamSearchPage__matchScoreNum,
 #root .teamSearchPage__matchKickoff,
-#root .pronos__liveScore,
 #root .pronos__metaTime {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-weight: 700;
@@ -450,22 +432,31 @@ img[data-team="Juventus"] {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
 }
-/* Séparateurs (« – », « : ») : même police, graisse d'origine conservée. */
-#root .modal__scoreSep,
-#root .teamSearchPage__matchScoreDash {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-style: italic;
+
+/* SCORES : police d'origine (Inter 900), inchangée. */
+#root .poster__score,
+#root .resultHero__score,
+#root .resultHero__scoreSep,
+#root .resultats__scoreNum,
+#root .resultats__scoreDash,
+#root .live__pill,
+#root .lmpSide__score,
+#root .myTeamBanner__score {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 900;
+  -webkit-text-stroke: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 
 #root .accueil__mdjBigNum,
 #root .accueil__mdjClockSep,
 #root .accueil__mdjScoreSep {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
-  font-weight: 700;
-  font-style: italic;
+  font-family: 'Archivo Black', 'Archivo', system-ui, sans-serif;
+  font-weight: 400;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 /* ⚠️ RETOUR À LA POLICE D'ORIGINE (05/09, demande utilisateur : "au final je
@@ -532,12 +523,14 @@ img[data-team="Juventus"] {
 #root .accueil__mdjClock .accueil__mdjBigNum {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-weight: 700;
+  font-style: italic;
   font-size: 3rem;
   letter-spacing: 0.02em;
 }
 #root .accueil__mdjClock .accueil__mdjClockSep {
   font-family: 'Chakra Petch', system-ui, sans-serif;
   font-weight: 700;
+  font-style: italic;
   font-size: 2.4rem;
 }
 

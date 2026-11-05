@@ -135,7 +135,8 @@
 .hubPosters--lg .poster__crestWrap { width: 52px; height: 52px; }
 .hubPosters.hubPosters--lg .poster__center { height: 52px; }
 #root .hubPosters .poster__score,
-#root .hubPosters .poster__time { font-size: 2.33rem; transform: translateY(4px); white-space: nowrap; }
+#root .hubPosters .poster__time { font-size: 2.2rem; transform: translateY(4px); white-space: nowrap; }
+#root .hubPosters .poster__time { font-size: 2.33rem; }
 #root .hubPosters .poster__time { transform: translateY(7px); }
 
 /* ── Bouton "Voir les N matchs" (Accueil) ── */
