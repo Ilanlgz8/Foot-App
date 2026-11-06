@@ -21,6 +21,38 @@ function storageInfo() {
   return { chars, keys, writeOk }
 }
 
+// 06/11 : répartition du stockage local par type d'entrée (ids, dates et codes de compétition
+// regroupés), pour repérer doublons et données jamais nettoyées sur le téléphone de l'utilisateur.
+function StorageBreakdown() {
+  const groups = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? ''
+      const v = localStorage.getItem(k) ?? ''
+      const g = k
+        .replace(/espn-[A-Za-z0-9_]+-\d+/g, '#id')
+        .replace(/\d{4}-\d{2}-\d{2}/g, '#date')
+        .replace(/\d{4,}/g, '#n')
+        .replace(/_[A-Z][A-Z0-9]{1,4}(?=_|$)/g, '_#C')
+      groups[g] = groups[g] || { n: 0, c: 0 }
+      groups[g].n++
+      groups[g].c += k.length + v.length
+    }
+  } catch { /* ignore */ }
+  const list = Object.entries(groups)
+  const bySize = [...list].sort((a, b) => b[1].c - a[1].c).slice(0, 14)
+  const byCount = [...list].sort((a, b) => b[1].n - a[1].n).slice(0, 8)
+  const fmt = ([k, v]) => `${k} ×${v.n} ${Math.round(v.c / 1000)}k`
+  return (
+    <div style={{ marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+      <div>plus gros :</div>
+      {bySize.map(e => <div key={'s' + e[0]} style={{ opacity: 0.85 }}>{fmt(e)}</div>)}
+      <div style={{ marginTop: '0.3rem' }}>plus nombreux :</div>
+      {byCount.map(e => <div key={'n' + e[0]} style={{ opacity: 0.85 }}>{fmt(e)}</div>)}
+    </div>
+  )
+}
+
 function LaunchInfo() {
   const l = window.__sfLaunch
   const g = window.__sfGuard
@@ -66,6 +98,7 @@ export function LiveDiag({ dayMatches, liveMatches, live, espnScores }) {
       <div>en direct affichés : {live.length} · suivis (mémoire) : {liveMatches.length} · suivis (disque) : {trackerKeys}</div>
       <div>matchs du jour : {dayMatches.length} · commencés (&lt;150 min) : {started.length} · scores ESPN : {Object.keys(espnScores ?? {}).length}</div>
       <LaunchInfo />
+      <StorageBreakdown />
       <div style={{ marginTop: '0.5rem' }}>
         {started.map(m => {
           const ms = getMatchState(m.id)
