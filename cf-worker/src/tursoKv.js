@@ -56,12 +56,40 @@ function ttlSecFromOpts(opts) {
 
 export function createTursoKv({ url, authToken }) {
   if (!url || !authToken) return null
-  const client = createClient({ url, authToken })
+  const rawClient = createClient({ url, authToken })
+
+  // ⚠️ ALLÈGEMENT (07/11, plan gratuit Cloudflare — 10 ms CPU/passe, 50
+  // sous-requêtes) : avant, CHAQUE passe (1/minute, un nouveau client par
+  // passe) commençait par un batch de 5 `CREATE ... IF NOT EXISTS` — 1
+  // sous-requête + 1 transaction d'écriture Turso par minute pour des tables
+  // qui existent depuis le 01/10. Désormais le schéma n'est créé QUE si Turso
+  // répond "no such table" (base neuve/réinitialisée) : on crée alors les
+  // tables puis on rejoue UNE fois la même requête. Sûr : une requête qui
+  // échoue sur une table absente n'a rien écrit (batch 'write' = transaction
+  // annulée), la rejouer ne peut pas doubler un effet. Toute autre erreur est
+  // propagée exactement comme avant.
+  const isMissingTable = (e) => /no such table/i.test(String(e?.message ?? e))
+  const client = {
+    async execute(stmt) {
+      try { return await rawClient.execute(stmt) } catch (e) {
+        if (!isMissingTable(e)) throw e
+        await ensureSchema()
+        return rawClient.execute(stmt)
+      }
+    },
+    async batch(stmts, mode) {
+      try { return await rawClient.batch(stmts, mode) } catch (e) {
+        if (!isMissingTable(e)) throw e
+        await ensureSchema()
+        return rawClient.batch(stmts, mode)
+      }
+    },
+  }
 
   let schemaReady = null
   async function ensureSchema() {
     if (schemaReady) return schemaReady
-    schemaReady = client.batch([
+    schemaReady = rawClient.batch([
       `CREATE TABLE IF NOT EXISTS worker_kv (
          key TEXT PRIMARY KEY, value TEXT NOT NULL, expires_at INTEGER NOT NULL
        )`,
@@ -115,7 +143,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function get(key) {
-    await ensureSchema()
     const res = await client.execute({
       sql: `SELECT value FROM worker_kv WHERE key=? AND expires_at>?`,
       args: [key, nowSec()],
@@ -125,7 +152,6 @@ export function createTursoKv({ url, authToken }) {
 
   async function mget(...keys) {
     if (keys.length === 0) return []
-    await ensureSchema()
     const placeholders = keys.map(() => '?').join(',')
     const res = await client.execute({
       sql: `SELECT key,value FROM worker_kv WHERE key IN (${placeholders}) AND expires_at>?`,
@@ -136,7 +162,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function set(key, value, opts = {}) {
-    await ensureSchema()
     const val = typeof value === 'string' ? value : String(value)
     const now = nowSec()
     const expiresAt = now + ttlSecFromOpts(opts)
@@ -158,7 +183,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function del(key) {
-    await ensureSchema()
     const res = await client.execute({ sql: `DELETE FROM worker_kv WHERE key=?`, args: [key] })
     return res.rowsAffected
   }
@@ -194,7 +218,6 @@ export function createTursoKv({ url, authToken }) {
   // désormais proportionnel au nombre de NOUVELLES lignes à chaque appel
   // (quelques-unes, pas toute la file), pas à sa taille totale.
   async function expire(queueName, seconds) {
-    await ensureSchema()
     await client.execute({
       sql: `UPDATE worker_queue SET expires_at=? WHERE queue_name=? AND expires_at IS NULL`,
       args: [nowSec() + seconds, queueName],
@@ -225,7 +248,6 @@ export function createTursoKv({ url, authToken }) {
   // (execSetBatch) ailleurs dans ce fichier/index.js.
   async function sadd(setName, ...members) {
     if (members.length === 0) return 0
-    await ensureSchema()
     const valuesSql = members.map(() => '(?,?)').join(',')
     const args = members.flatMap(m => [setName, String(m)])
     const res = await client.execute({
@@ -237,7 +259,6 @@ export function createTursoKv({ url, authToken }) {
 
   async function srem(setName, ...members) {
     if (members.length === 0) return 0
-    await ensureSchema()
     const placeholders = members.map(() => '?').join(',')
     const res = await client.execute({
       sql: `DELETE FROM worker_set WHERE set_name=? AND member IN (${placeholders})`,
@@ -247,7 +268,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function scard(setName) {
-    await ensureSchema()
     const res = await client.execute({
       sql: `SELECT COUNT(*) as c FROM worker_set WHERE set_name=?`,
       args: [setName],
@@ -256,7 +276,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function rpush(queueName, ...values) {
-    await ensureSchema()
     const now = nowSec()
     const stmts = values.map(v => ({
       sql: `INSERT INTO worker_queue (queue_name, value, created_at) VALUES (?,?,?)`,
@@ -268,7 +287,6 @@ export function createTursoKv({ url, authToken }) {
   }
 
   async function lpop(queueName) {
-    await ensureSchema()
     // DELETE...RETURNING : pop atomique en 1 aller-retour (supporté par
     // SQLite ≥3.35 / libSQL), évite une fenêtre de course SELECT puis DELETE.
     const res = await client.execute({
@@ -290,7 +308,6 @@ export function createTursoKv({ url, authToken }) {
       throw new Error('tursoKv.ltrim: seul le motif (-N, -1) est supporté')
     }
     const keepLast = -start
-    await ensureSchema()
     await client.execute({
       sql: `DELETE FROM worker_queue WHERE queue_name=? AND id NOT IN (
               SELECT id FROM worker_queue WHERE queue_name=? ORDER BY id DESC LIMIT ?
@@ -410,7 +427,6 @@ export function createTursoKv({ url, authToken }) {
       del(key) { ops.push({ type: 'del', key }); return builder },
       srem(setName, member) { ops.push({ type: 'srem', setName, member }); return builder },
       async exec(options = {}) {
-        await ensureSchema()
         const allSets = ops.length > 0 && ops.every(op => op.type === 'set')
         if (allSets) {
           try {
@@ -445,7 +461,6 @@ export function createTursoKv({ url, authToken }) {
   // Renvoie un tableau de résultats DANS L'ORDRE des `ops` reçues ('OK' ou
   // null pour un nx refusé) — même contrat que l'exécution séquentielle.
   async function execSetBatch(ops) {
-    await ensureSchema()
     const now = nowSec()
     const valuesSql = ops.map(() => '(?,?,?)').join(',')
     const args = []

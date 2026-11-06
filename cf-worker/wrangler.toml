@@ -15,6 +15,13 @@ compatibility_date = "2026-07-01"
 [triggers]
 crons = ["* * * * *"]
 
+# Observabilité Cloudflare (07/11) : gratuite sur le plan Free (200 000
+# événements/jour, ce Worker en produit ~1 500) — donne le temps CPU RÉEL de
+# chaque passe (onglet Observability du tableau de bord), pour mesurer avant
+# d'optimiser au lieu de deviner.
+[observability]
+enabled = true
+
 # Secrets à configurer via `wrangler secret put <NOM>` (JAMAIS dans ce fichier,
 # voir cf-worker/README.md pour la procédure complète) :
 #   KV_REST_API_URL     — même Redis Upstash que Vercel (partagé)

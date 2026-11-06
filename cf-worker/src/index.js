@@ -37,7 +37,7 @@
 // Cloudflare Workers par Upstash eux-mêmes. Mêmes identifiants que côté
 // Vercel (KV_REST_API_URL / KV_REST_API_TOKEN) : c'est LE MÊME Redis, partagé.
 
-import { Redis } from '@upstash/redis'
+// Chargé à la demande dans createKv() (repli Redis seulement) — voir son commentaire.
 import { createTursoKv } from './tursoKv.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
 import {
@@ -2336,16 +2336,23 @@ function shouldWriteDebugBookkeeping() {
 // Vercel, état de ce Worker) peuvent être LA MÊME base `statfootix` — tables
 // différentes (`worker_kv`/`worker_set`/`worker_queue` ici vs `espn_cache`
 // côté Vercel), aucune collision.
-function createKv(env) {
+// ⚠️ ALLÈGEMENT (07/11) : `@upstash/redis` n'est plus importé en tête de
+// fichier — en production Turso est configuré, ce module ne servait JAMAIS
+// mais était évalué à chaque démarrage d'isolate (≈ chaque minute, la passe
+// tourne dans un datacenter différent presque à chaque fois). Import
+// dynamique : chargé uniquement si le repli Redis est réellement utilisé,
+// comportement du repli strictement identique.
+async function createKv(env) {
   if (env.TURSO_DATABASE_URL && env.TURSO_AUTH_TOKEN) {
     const tursoKv = createTursoKv({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN })
     if (tursoKv) return tursoKv
   }
+  const { Redis } = await import('@upstash/redis')
   return new Redis({ url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN })
 }
 
 async function handlePass(env) {
-  const kv = createKv(env)
+  const kv = await createKv(env)
   env._kv = kv
 
   // ⚠️ AJOUT (14/10, constat utilisateur : "un but à la 63e, je reçois la
