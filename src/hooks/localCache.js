@@ -12,10 +12,60 @@ export function readCache(key) {
   return entry.data
 }
 
+// ⚠️ 06/11 (stockage plein sur iPhone, accord explicite de l'utilisateur) : chaque match football-data.org
+// d'une liste arrive avec 3 champs que l'app n'affiche jamais depuis ces listes — `odds` (sans abonnement,
+// juste le message « Activate Odds-Package… » ; les cotes affichées viennent d'ESPN), `area` (pays de la
+// compétition) et `referees` (les arbitres affichés viennent de /v4/matches/{id}, jamais des listes).
+// Mesuré sur la Premier League : ~21 % de la place de la liste. On les retire AVANT d'écrire sur le disque
+// (la donnée en mémoire, elle, n'est pas modifiée). Une vraie cote (si l'abonnement était activé un jour)
+// est conservée.
+function compactFdMatch(m) {
+  if (!m || typeof m !== 'object' || !m.homeTeam || !('utcDate' in m)) return m
+  if (!('odds' in m) && !('area' in m) && !('referees' in m)) return m
+  // eslint-disable-next-line no-unused-vars
+  const { odds, area, referees, ...rest } = m
+  if (odds && !odds.msg) rest.odds = odds
+  return rest
+}
+function compactData(data) {
+  if (Array.isArray(data)) return data.map(compactFdMatch)
+  if (data && typeof data === 'object') {
+    let changed = false
+    const out = {}
+    for (const [k, v] of Object.entries(data)) {
+      if (Array.isArray(v)) { out[k] = v.map(compactFdMatch); changed = true } else out[k] = v
+    }
+    return changed ? out : data
+  }
+  return data
+}
+
 export function writeCache(key, data, ttlMs) {
   try {
-    localStorage.setItem(PREFIX + key, JSON.stringify({ data, exp: Date.now() + ttlMs, savedAt: Date.now() }))
+    localStorage.setItem(PREFIX + key, JSON.stringify({ data: compactData(data), exp: Date.now() + ttlMs, savedAt: Date.now() }))
   } catch {}
+}
+
+// Migration unique des caches déjà écrits avant compactData (06/11) — réécrit chaque entrée concernée
+// en gardant son `exp`/`savedAt` d'origine. Drapeau hors préfixe `foot_` (purgeExpiredCache supprime les
+// `foot_*` sans `exp`).
+const COMPACT_FLAG = 'sf_compact_v1'
+export function compactExistingCaches() {
+  try {
+    if (localStorage.getItem(COMPACT_FLAG)) return
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(PREFIX)) continue
+      const raw = localStorage.getItem(key)
+      if (!raw || !raw.includes('"referees"') && !raw.includes('"Activate Odds')) continue
+      try {
+        const entry = JSON.parse(raw)
+        if (!entry || typeof entry.exp !== 'number') continue
+        localStorage.setItem(key, JSON.stringify({ ...entry, data: compactData(entry.data) }))
+      } catch { /* entrée illisible : laissée à purgeExpiredCache */ }
+    }
+    localStorage.setItem(COMPACT_FLAG, '1')
+  } catch { /* pas bloquant */ }
 }
 
 // Retourne les données même expirées (fallback si l'API échoue)

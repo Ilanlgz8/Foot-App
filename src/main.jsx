@@ -74,7 +74,7 @@ import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { removeOldestQuery } from '@tanstack/query-persist-client-core'
-import { purgeExpiredCache } from './hooks/localCache'
+import { purgeExpiredCache, compactExistingCaches } from './hooks/localCache'
 
 // ⚠️ AJOUT (question utilisateur : "on aura assez de place pour garder tout
 // ce qu'on met en cache ?") : le cache disque par match (lineups_*/stats_*,
@@ -84,6 +84,7 @@ import { purgeExpiredCache } from './hooks/localCache'
 // négligeable (scan local, pas de réseau), borne la croissance à la fenêtre
 // de TTL réellement active plutôt qu'à tout l'historique jamais consulté.
 purgeExpiredCache()
+compactExistingCaches()
 
 const queryClient = new QueryClient({
   defaultOptions: {
