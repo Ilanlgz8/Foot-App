@@ -26,7 +26,7 @@
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
-import { mget as tursoMget, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
+import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -325,22 +325,45 @@ function safeJsonChunk(val) {
 // tranches trouvées en cache. Les tranches absentes de cette Map (cache
 // miss OU zone "live" jamais cachée) doivent encore être fetchées pour de
 // vrai (voir `fetchScoreboardChunksStaggered`).
+// ⚠️ 06/11 (capture du diagnostic sur le téléphone de l'utilisateur : Accueil à 33 s, ~10 requêtes
+// /espn à +30 s chacune = maxDuration Vercel atteint) : les jours À VENIR ne sont gardés que 2 h
+// (SCOREBOARD_FUTURE_CHUNK_TTL). Après 2 h sans visite, le 1er visiteur faisait retélécharger à ESPN
+// 42 à 57 jours PAR compétition (fenêtre client 45-60 j), par groupes de 6 → au-delà de 30 s.
+// Désormais (Turso) on renvoie aussi les jours expirés (`stale`) : ils sont servis tels quels, et
+// seuls les STALE_REFRESH_PER_REQUEST plus proches d'aujourd'hui sont rafraîchis à chaque requête —
+// la fenêtre se remet à jour progressivement au fil des visites, sans jamais faire attendre.
+// Sans Turso (repli Redis) : comportement d'avant, inchangé.
 async function readCachedChunks(slug, chunkList) {
   const cacheable = chunkList
     .map(chunk => ({ chunk, ttl: scoreboardChunkTtl(chunk) }))
     .filter(x => x.ttl != null)
   const hits = new Map()
-  if (cacheable.length === 0) return hits
+  const stale = new Map()
+  if (cacheable.length === 0) return { hits, stale }
   const keys = cacheable.map(x => `espn:sb:${slug}:${x.chunk}`)
   try {
-    const values = isTursoConfigured() ? await tursoMget(keys) : await kv.mget(...keys)
-    cacheable.forEach((x, i) => {
-      const parsed = safeJsonChunk(values[i])
-      if (parsed) hits.set(x.chunk, { ok: true, events: parsed.events ?? [] })
-    })
+    if (isTursoConfigured()) {
+      const rows = await tursoMgetWithStale(keys)
+      cacheable.forEach((x, i) => {
+        const row = rows[i]
+        const parsed = row ? safeJsonChunk(row.value) : null
+        if (!parsed) return
+        const val = { ok: true, events: parsed.events ?? [] }
+        if (row.expired) stale.set(x.chunk, val)
+        else hits.set(x.chunk, val)
+      })
+    } else {
+      const values = await kv.mget(...keys)
+      cacheable.forEach((x, i) => {
+        const parsed = safeJsonChunk(values[i])
+        if (parsed) hits.set(x.chunk, { ok: true, events: parsed.events ?? [] })
+      })
+    }
   } catch { /* Turso/Redis indisponible → toutes les tranches retombent en fetch direct */ }
-  return hits
+  return { hits, stale }
 }
+
+const STALE_REFRESH_PER_REQUEST = 6 // = CHUNK_GROUP_SIZE : un seul groupe de requêtes ESPN en plus, au maximum
 
 // Fetch RÉEL d'une tranche auprès d'ESPN (le cache a déjà été vérifié en
 // amont par `readCachedChunks` — cette fonction n'est plus appelée QUE pour
@@ -1011,19 +1034,25 @@ export default async function handler(req, res) {
       // coup (voir readCachedChunks plus haut) — seules celles non trouvées
       // (vrai cache miss ou zone "live") sont réellement fetchées auprès
       // d'ESPN, toujours par petits groupes espacés (anti-rafale, inchangé).
-      const cachedByChunk = await readCachedChunks(slug, chunks)
-      let toFetch = chunks.filter(c => !cachedByChunk.has(c))
+      const { hits: cachedByChunk, stale: staleByChunk } = await readCachedChunks(slug, chunks)
+      const todayUtc = new Date(); todayUtc.setUTCHours(0, 0, 0, 0)
+      const byNearest = (a, b) => Math.abs(parseYmd(a) - todayUtc) - Math.abs(parseYmd(b) - todayUtc)
+      let toFetch = chunks.filter(c => !cachedByChunk.has(c) && !staleByChunk.has(c))
       // Voir MAX_FETCH_CHUNKS plus haut : plafond dur, indépendant de la
       // cause (Redis en panne, fenêtre large, ou les deux à la fois) — garde
       // les tranches les plus proches d'aujourd'hui en priorité.
       if (toFetch.length > MAX_FETCH_CHUNKS) {
-        const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-        toFetch = [...toFetch]
-          .sort((a, b) => Math.abs(parseYmd(a) - today) - Math.abs(parseYmd(b) - today))
-          .slice(0, MAX_FETCH_CHUNKS)
+        toFetch = [...toFetch].sort(byNearest).slice(0, MAX_FETCH_CHUNKS)
       }
-      const fetched = await fetchScoreboardChunksStaggered(slug, toFetch)
-      const results = [...cachedByChunk.values(), ...fetched]
+      // Jours expirés (voir readCachedChunks) : on n'en rafraîchit que quelques-uns, les plus proches.
+      const staleToRefresh = [...staleByChunk.keys()].sort(byNearest).slice(0, STALE_REFRESH_PER_REQUEST)
+      const refreshSet = new Set(staleToRefresh)
+      const fetchList = [...toFetch, ...staleToRefresh]
+      const fetchedRaw = await fetchScoreboardChunksStaggered(slug, fetchList)
+      // Un rafraîchissement raté (ESPN lent, verrou pris par une autre requête…) retombe sur la copie expirée.
+      const fetched = fetchedRaw.map((r, i) => (r.ok || !staleByChunk.has(fetchList[i])) ? r : staleByChunk.get(fetchList[i]))
+      const staleServed = [...staleByChunk.entries()].filter(([c]) => !refreshSet.has(c)).map(([, v]) => v)
+      const results = [...cachedByChunk.values(), ...fetched, ...staleServed]
       clearTimeout(timeoutId)
       const merged = mergeScoreboardChunks(results)
       // Toutes les tranches ont échoué (ESPN en panne/bloque) : un vrai

@@ -97,6 +97,27 @@ export async function mget(keys) {
 // fire-and-forget côté appelant (même pattern que l'actuel
 // kv.set(...).catch(()=>{}) dans fetchScoreboardChunk) : jamais bloquant
 // pour la réponse HTTP, les erreurs sont avalées silencieusement ici.
+// ⚠️ 06/11 : comme mget, mais renvoie AUSSI les lignes expirées (jamais supprimées de la table, seulement
+// écrasées) avec leur date d'expiration — permet de servir une copie un peu ancienne tout de suite plutôt
+// que d'attendre ESPN (voir readCachedChunks, api/espn.js). → [{ value, expired } | null]
+export async function mgetWithStale(keys) {
+  const c = client()
+  if (!c || keys.length === 0) return keys.map(() => null)
+  try {
+    await ensureSchema(c)
+    const placeholders = keys.map(() => '?').join(',')
+    const now = Math.floor(Date.now() / 1000)
+    const res = await c.execute({
+      sql: `SELECT key, value, expires_at FROM espn_cache WHERE key IN (${placeholders})`,
+      args: [...keys],
+    })
+    const found = new Map(res.rows.map(r => [r.key, { value: r.value, expired: Number(r.expires_at) <= now }]))
+    return keys.map(k => found.get(k) ?? null)
+  } catch {
+    return keys.map(() => null)
+  }
+}
+
 export async function set(key, value, ttlSeconds) {
   const c = client()
   if (!c) return
