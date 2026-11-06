@@ -188,7 +188,7 @@ const UNPERSISTED_QUERY_KEYS = new Set([
   // 05/11 (stockage plein sur iPhone, voir storageGuard.js) : 3 des plus gros postes mesurés du blob
   // (~4,8 Mo à eux trois), tous déjà en cache disque dédié — doublon pur.
   'matches',        // useMatches (Programme/Résultats) — cache disque matches_* (readStaleWithMigration)
-  'teamSearchRaw',  // fiche équipe, fetchClubMatchesRaw — cache disque matches_current_*
+  'teamSearchRaw',  // fiche équipe, fetchClubMatchesRaw — cache disque matches_*_RAW
   'teamSearchEspn', // fiche équipe, fetchEspnCompMatches — cache disque matches_espn_*
   'h2hHistory', // confrontations directes enrichies (saisons passées) — useH2HHistory, cache disque dédié (h2hHistory_*), l'un des plus gros contributeurs mesurés (~390 Ko par compétition/saison)
 ])

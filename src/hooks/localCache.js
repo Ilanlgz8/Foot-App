@@ -45,6 +45,20 @@ export function getCacheSavedAt(key) { return _parse(key)?.savedAt ?? 0 }
 // lancement de l'app (voir main.jsx) — borne la croissance à la fenêtre de
 // TTL réellement en cours (max 90j pour les compos/stats confirmées) plutôt
 // qu'à la totalité de l'historique jamais consulté par cet utilisateur.
+// ⚠️ 06/11 (stockage plein sur iPhone, mesuré sur le téléphone de l'utilisateur : 711 entrées, dont
+// ~600 par match) : les données PAR MATCH restaient jusqu'à 90 jours (stats/compos) voire 180 jours
+// (correspondance d'identifiants ESPN→FD.org), pour des matchs qu'on ne rouvre presque jamais. On ne
+// garde plus en local que les plus récentes ; un vieux match rouvert les redemande à notre serveur, qui
+// les garde de façon permanente. Et `matches_current_*` (ancien doublon de `matches_*_RAW`, voir
+// fetchClubMatchesRaw) est supprimé.
+const DAY = 24 * 3600 * 1000
+const PER_MATCH_MAX_AGE = [
+  [/^foot_(stats|lineups)_.+_v2$/, 7 * DAY],
+  [/^foot_matchdetail_/, 7 * DAY],
+  [/^foot_fdMatchIdMap_/, 30 * DAY],
+]
+const OBSOLETE_PREFIXES = ['foot_matches_current_']
+
 export function purgeExpiredCache() {
   try {
     const now = Date.now()
@@ -52,8 +66,11 @@ export function purgeExpiredCache() {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (!key || !key.startsWith(PREFIX)) continue
+      if (OBSOLETE_PREFIXES.some(p => key.startsWith(p))) { toRemove.push(key); continue }
       try {
         const entry = JSON.parse(localStorage.getItem(key))
+        const maxAge = PER_MATCH_MAX_AGE.find(([re]) => re.test(key))?.[1]
+        if (maxAge && entry && typeof entry.savedAt === 'number' && now - entry.savedAt > maxAge) { toRemove.push(key); continue }
         // Entrée sans `exp` valide (corrompue/ancien format) : autant la
         // nettoyer aussi plutôt que la laisser traîner indéfiniment.
         if (!entry || typeof entry.exp !== 'number' || now > entry.exp) toRemove.push(key)

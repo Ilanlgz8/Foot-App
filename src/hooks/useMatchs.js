@@ -587,7 +587,13 @@ async function fetchClubMatchesRawInner(selectedComp) {
   // FD.org. Même remède : cache dédié pour CE résultat précis, relu comme
   // repli si l'appel échoue cette fois, pour ne jamais régresser une donnée
   // déjà bonne.
-  const currentKey = `matches_current_${selectedComp}`
+  // ⚠️ 06/11 (stockage plein sur iPhone, mesuré sur le téléphone de l'utilisateur) : la réponse brute
+  // était gardée sous `matches_current_<comp>` ET, quelques lignes plus loin, quasiment la même liste
+  // (+ coupe nationale, + saison passée si besoin) sous `matches_<comp>_RAW` (useMatches) — ~360 000
+  // caractères en double par championnat. Une seule copie maintenant : la liste complète sous la clé
+  // RAW (écrite en fin de fonction, même clé et même durée que useMatches), et le repli en cas d'échec
+  // FD.org la relit en retirant ce qui a été ajouté après coup (saison passée, coupe).
+  const rawKey = cacheKey(selectedComp, 'RAW')
   let current = null
   try {
     const r = await tryFetchWithMeta(`/api/v4/competitions/${selectedComp}/matches`)
@@ -595,14 +601,12 @@ async function fetchClubMatchesRawInner(selectedComp) {
     primaryFresh = r.fresh
   } catch (e) { lastErr = e /* → repli ci-dessous, ne pas abandonner tout de suite */ }
 
-  if (current != null) {
-    // `current` peut légitimement être un tableau vide (vraie info : aucun
-    // match programmé actuellement) — seule l'absence de réponse exploitable
-    // (null, voir tryFetchWithMeta) déclenche le repli cache ci-dessous.
-    writeCache(currentKey, current, 24 * 3600 * 1000)
-  } else {
-    const cachedCurrent = readCacheStale(currentKey)
-    if (cachedCurrent != null) current = cachedCurrent
+  // `current` peut légitimement être un tableau vide (vraie info : aucun
+  // match programmé actuellement) — seule l'absence de réponse exploitable
+  // (null, voir tryFetchWithMeta) déclenche le repli cache ci-dessous.
+  if (current == null) {
+    const cachedRaw = readCacheStale(rawKey)
+    if (cachedRaw != null) current = cachedRaw.filter(m => !m._fromLastSeason && !m.isCup)
   }
 
   const hasFinished = (current ?? []).some(m => m.status === 'FINISHED')
@@ -823,6 +827,7 @@ async function fetchClubMatchesRawInner(selectedComp) {
   // redondant, supprimé.
   if (all.length === 0 && lastErr) throw lastErr
 
+  if (all.length > 0) writeCache(rawKey, all, 24 * 3600 * 1000) // même clé/durée que useMatches (diskTtl club)
   return all
 }
 
