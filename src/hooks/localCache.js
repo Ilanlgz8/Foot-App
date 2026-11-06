@@ -1,14 +1,102 @@
 const PREFIX = 'foot_'
 
+// ── Moteur de stockage (06/11, refonte « un seul cache ») ───────────────────────────────────────────
+// Jusqu'ici chaque cache était une entrée localStorage (~5 Mo maxi sur iPhone → stockage plein, garde-fou
+// qui supprimait des données, forme récente qui disparaissait…). Désormais, quand IndexedDB est
+// disponible, les caches vivent dans IndexedDB (limite bien plus large) avec une copie EN MÉMOIRE chargée
+// une seule fois au démarrage (initCacheStore, appelé par main.jsx AVANT le premier rendu) : les lectures
+// restent synchrones et instantanées (initialData de React Query), les écritures partent en arrière-plan.
+// Les ~100 appels readCache/writeCache de l'app ne changent pas. On garde en mémoire la chaîne JSON
+// brute (et non l'objet) : chaque lecture renvoie une copie neuve, exactement comme avant — aucun risque
+// qu'un appelant modifie la donnée d'un autre. Sans IndexedDB (navigation privée stricte, tests) :
+// localStorage, comportement d'avant inchangé.
+const STORE_DB = 'statfootix-store'
+const STORE_NAME = 'cache'
+const mem = new Map()
+let store = null
+let frozen = false
+// Si IndexedDB tarde trop, main.jsx démarre quand même en localStorage : on fige alors ce choix pour toute
+// la session (jamais de bascule en cours de route, qui ferait lire deux sources différentes).
+export function freezeCacheStore() { frozen = true }
+
+function rawGet(fullKey) { return store ? (mem.get(fullKey) ?? null) : localStorage.getItem(fullKey) }
+function rawSet(fullKey, str) {
+  if (store) { mem.set(fullKey, str); store.put(fullKey, str) } else localStorage.setItem(fullKey, str)
+}
+function rawDel(fullKey) {
+  if (store) { mem.delete(fullKey); store.del(fullKey) } else localStorage.removeItem(fullKey)
+}
+function isWriteCacheRaw(v) {
+  return typeof v === 'string' && v.startsWith('{"data":') && /,"exp":\d+,"savedAt":\d+\}$/.test(v.slice(-64))
+}
+
+export async function initCacheStore() {
+  if (store || frozen || typeof indexedDB === 'undefined') return !!store
+  try {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open(STORE_DB, 1)
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME)
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    const [keys, vals] = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const os = tx.objectStore(STORE_NAME)
+      const k = os.getAllKeys()
+      const v = os.getAll()
+      tx.oncomplete = () => resolve([k.result, v.result])
+      tx.onerror = () => reject(tx.error)
+    })
+    if (frozen) return false
+    keys.forEach((k, i) => { if (typeof vals[i] === 'string') mem.set(k, vals[i]) })
+    store = {
+      put(k, v) { try { db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(v, k) } catch { /* ignore */ } },
+      del(k)    { try { db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(k) } catch { /* ignore */ } },
+    }
+    // Reprise des caches encore dans localStorage (aucun retéléchargement), puis libération de la place.
+    const lsKeys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(PREFIX)) lsKeys.push(k)
+    }
+    // Une seule transaction, et localStorage n'est vidé qu'APRÈS sa validation : si l'app est rechargée
+    // pendant la reprise (mise à jour…), rien n'est perdu, la reprise recommencera au lancement suivant.
+    const toMove = []
+    for (const k of lsKeys) {
+      const v = localStorage.getItem(k)
+      if (isWriteCacheRaw(v)) toMove.push([k, v])
+    }
+    if (toMove.length > 0) {
+      for (const [k, v] of toMove) if (!mem.has(k)) mem.set(k, v)
+      const ok = await new Promise(resolve => {
+        try {
+          const tx = db.transaction(STORE_NAME, 'readwrite')
+          const os = tx.objectStore(STORE_NAME)
+          for (const [k] of toMove) os.put(mem.get(k), k)
+          tx.oncomplete = () => resolve(true)
+          tx.onerror = () => resolve(false)
+          tx.onabort = () => resolve(false)
+        } catch { resolve(false) }
+      })
+      if (ok) for (const [k] of toMove) localStorage.removeItem(k)
+    }
+    return true
+  } catch {
+    store = null
+    mem.clear()
+    return false
+  }
+}
+
 // Helper interne : parse l'entrée brute (sans vérification TTL)
 function _parse(key) {
-  try { return JSON.parse(localStorage.getItem(PREFIX + key)) } catch { return null }
+  try { return JSON.parse(rawGet(PREFIX + key)) } catch { return null }
 }
 
 export function readCache(key) {
   const entry = _parse(key)
   if (!entry) return null
-  if (Date.now() > entry.exp) { localStorage.removeItem(PREFIX + key); return null }
+  if (Date.now() > entry.exp) { try { rawDel(PREFIX + key) } catch { /* ignore */ } return null }
   return entry.data
 }
 
@@ -42,7 +130,7 @@ function compactData(data) {
 
 export function writeCache(key, data, ttlMs) {
   try {
-    localStorage.setItem(PREFIX + key, JSON.stringify({ data: compactData(data), exp: Date.now() + ttlMs, savedAt: Date.now() }))
+    rawSet(PREFIX + key, JSON.stringify({ data: compactData(data), exp: Date.now() + ttlMs, savedAt: Date.now() }))
   } catch {}
 }
 
@@ -103,7 +191,7 @@ export function readCacheStale(key) { return _parse(key)?.data ?? null }
 // de suppression ciblée d'une entrée précise — seul readCache() en supprime
 // une, mais seulement en effet de bord d'une lecture d'une clé EXPIRÉE, pas
 // utilisable pour vider une entrée encore "fraîche" à la demande.
-export function removeCache(key) { try { localStorage.removeItem(PREFIX + key) } catch {} }
+export function removeCache(key) { try { rawDel(PREFIX + key) } catch {} }
 
 // Retourne le timestamp d'écriture (pour initialDataUpdatedAt de TanStack)
 export function getCacheSavedAt(key) { return _parse(key)?.savedAt ?? 0 }
@@ -136,7 +224,23 @@ const PER_MATCH_MAX_AGE = [
 ]
 const OBSOLETE_PREFIXES = ['foot_matches_current_']
 
+function shouldPurge(key, raw, now) {
+  if (OBSOLETE_PREFIXES.some(p => key.startsWith(p))) return true
+  try {
+    const entry = JSON.parse(raw)
+    const maxAge = PER_MATCH_MAX_AGE.find(([re]) => re.test(key))?.[1]
+    if (maxAge && entry && typeof entry.savedAt === 'number' && now - entry.savedAt > maxAge) return true
+    return !entry || typeof entry.exp !== 'number' || now > entry.exp
+  } catch { return true }
+}
+
 export function purgeExpiredCache() {
+  // Caches dans IndexedDB (copie mémoire) — voir initCacheStore.
+  if (store) {
+    const now = Date.now()
+    for (const key of [...mem.keys()]) { if (shouldPurge(key, mem.get(key), now)) rawDel(key) }
+  }
+  // Entrées restées dans localStorage (inchangé).
   try {
     const now = Date.now()
     const toRemove = []

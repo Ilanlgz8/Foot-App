@@ -74,7 +74,7 @@ import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { removeOldestQuery } from '@tanstack/query-persist-client-core'
-import { purgeExpiredCache, compactExistingCaches } from './hooks/localCache'
+import { purgeExpiredCache, compactExistingCaches, initCacheStore, freezeCacheStore } from './hooks/localCache'
 
 // ⚠️ AJOUT (question utilisateur : "on aura assez de place pour garder tout
 // ce qu'on met en cache ?") : le cache disque par match (lineups_*/stats_*,
@@ -83,8 +83,6 @@ import { purgeExpiredCache, compactExistingCaches } from './hooks/localCache'
 // la relit précisément après coup. Purge une fois au lancement, coût
 // négligeable (scan local, pas de réseau), borne la croissance à la fenêtre
 // de TTL réellement active plutôt qu'à tout l'historique jamais consulté.
-purgeExpiredCache()
-compactExistingCaches()
 // 06/11 : déplace les gros caches lus seulement en async vers IndexedDB (voir idbCache.js) — différé
 // pour ne pas ralentir le démarrage.
 setTimeout(() => { import('./hooks/idbCache').then(m => m.migrateBigCachesToIdb()).catch(() => {}) }, 3000)
@@ -352,6 +350,22 @@ window.addEventListener('unhandledrejection', e => showBootError(e.reason))
 // toujours rien monté au bout de 8s, c'est un blocage silencieux.
 setTimeout(() => showBootError(new Error('L\'application n\'a pas fini de démarrer (aucune erreur remontée).')), 8000)
 
+// 06/11 (refonte « un seul cache », voir initCacheStore dans localCache.js) : les caches sont chargés
+// depuis IndexedDB AVANT le premier rendu (lectures synchrones ensuite). Si IndexedDB ne répond pas en
+// 1,5 s, on démarre quand même, en localStorage comme avant, pour toute la session.
+let booted = false
+function boot() {
+  if (booted) return
+  booted = true
+  freezeCacheStore()
+  purgeExpiredCache()
+  compactExistingCaches()
+  renderApp()
+}
+initCacheStore().then(boot, boot)
+setTimeout(boot, 1500)
+
+function renderApp() {
 try {
 createRoot(document.getElementById('root')).render(
   <PersistQueryClientProvider
@@ -376,4 +390,5 @@ createRoot(document.getElementById('root')).render(
   // Échec synchrone du montage (persister illisible, API manquante...) :
   // sans ce catch, la page resterait blanche sans aucune explication.
   showBootError(err)
+}
 }
