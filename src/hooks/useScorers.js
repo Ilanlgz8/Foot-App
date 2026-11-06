@@ -295,6 +295,26 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     enabled: !!compId,
   })
 
+  // ⚠️ 06/11 (constat utilisateur : « après Toulouse-Strasbourg, le classement des buteurs a mis 15 s ») :
+  // sans copie locale, la requête principale attend son tour face au budget football-data.org (jusqu'à
+  // `delayMs` = 12 s sur la page Classement) puis rate le cache serveur juste après un match (clé « à
+  // jour », 5 min). Affichage immédiat : la copie `live=0`, préchauffée en permanence par le Worker (HIT
+  // serveur, ~0,5 s, aucun appel FD.org), sert d'affichage provisoire le temps que la vraie mise à jour
+  // arrive. Uniquement s'il n'y a rien à montrer (pas de copie locale, requête principale pas finie).
+  const needQuick = !!compId && !NO_SCORERS_COMPS.has(compId) && data == null
+  const { data: quickData } = useQuery({
+    queryKey: ['scorersQuick', compId],
+    queryFn: async () => {
+      const r = await fdFetch(fdUrl(`/api/v4/competitions/${compId}/scorers?limit=500&live=0`))
+      if (!r.ok) throw new Error(String(r.status))
+      const j = await r.json()
+      return j.scorers ?? null
+    },
+    enabled: needQuick,
+    staleTime: NO_MATCH_STALE_MS,
+    retry: 1,
+  })
+
   // ⚠️ AJOUT (04/11, bug trouvé en reproduisant en direct — vérifié sur la prod,
   // navigateur SANS aucun cache — needsScorersCatchUp calculait bien "il faut
   // rattraper", mais le classement affichait quand même encore l'ancien total
@@ -334,9 +354,10 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
   }, [hasMatchToday, refetch])
   useEffect(() => () => { clearTimeout(retryTimer.current); retryTimer.current = null }, [])
 
+  const shown = data ?? quickData ?? null
   return {
-    scorers: data ?? [],
-    loading: isLoading,
+    scorers: shown ?? [],
+    loading: isLoading && shown == null,
     // Voir classifyFetchError (utils/fetchErrors.js).
     error:   classifyFetchError(error?.message),
   }
