@@ -39,6 +39,13 @@ function isWriteCacheEntry(value) {
 const guardStats = { evictions: 0, removed: [] }
 if (typeof window !== 'undefined') window.__sfGuard = guardStats
 
+// 0 = supprimé en premier … 2 = supprimé en dernier.
+function evictTier(k) {
+  if (/^foot_(teamform2_|standings|scorers3_)/.test(k) || /^foot_matches_.+_RAW$/.test(k) || /^foot_matches_(espn_)?\d{4}-\d{2}-\d{2}$/.test(k)) return 2
+  if (/^foot_(h2hHistory_|lowerDiv_|matches_lastSeason_|matches_espn_cup_|stats_|lineups_|matchdetail_|h2h_|espnOdds_)/.test(k)) return 0
+  return 1
+}
+
 function freeSpace(storage, removeItem, keyBeingWritten) {
   guardStats.evictions++
   let freed = 0
@@ -56,7 +63,9 @@ function freeSpace(storage, removeItem, keyBeingWritten) {
       if (isWriteCacheEntry(v)) candidates.push([k, v.length])
     }
   } catch { /* ignore */ }
-  candidates.sort((a, b) => b[1] - a[1])
+  // 06/11 (forme récente qui disparaissait) : on supprime d'abord ce qui est le moins utile au démarrage,
+  // et en tout dernier les caches dont dépendent l'Accueil et la forme récente.
+  candidates.sort((a, b) => (evictTier(a[0]) - evictTier(b[0])) || (b[1] - a[1]))
   for (const [k, len] of candidates) {
     if (freed >= FREE_TARGET_CHARS) break
     try { removeItem.call(storage, k); freed += len; guardStats.removed.push(k) } catch { /* ignore */ }

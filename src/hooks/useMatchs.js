@@ -1,5 +1,6 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache, compactH2HMatch } from './localCache'
+import { readBigCache, writeBigCache } from './idbCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { resolveFdTeamId } from '../utils/matchUtils'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
@@ -267,7 +268,7 @@ async function fetchH2HHistoryInner(selectedComp, baseYear) {
   for (let back = 1; back <= EXTRA_H2H_SEASONS_BACK; back++) {
     const year = baseYear - back
     const cacheKey = `h2hHistory_${selectedComp}_${year}`
-    const cached = readCache(cacheKey)
+    const cached = await readBigCache(cacheKey) // IndexedDB (06/11, voir idbCache.js)
     if (cached != null) { results.push(...cached); continue }
     await waitForFdSpacing()
     try {
@@ -278,7 +279,7 @@ async function fetchH2HHistoryInner(selectedComp, baseYear) {
         // Allégé (06/11, voir compactH2HMatch) — en mémoire comme sur le disque, pour que le 1er
         // affichage et les suivants (relus du disque) se comportent exactement pareil.
         const compact = matches.map(compactH2HMatch)
-        writeCache(cacheKey, compact, H2H_HISTORY_CACHE_TTL)
+        await writeBigCache(cacheKey, compact, H2H_HISTORY_CACHE_TTL)
         results.push(...compact)
       }
     } catch (e) {
@@ -368,7 +369,7 @@ async function fetchLowerDivisionStatsInner(lowerCode, baseYear) {
   // notre promu).
   const year = baseYear - 1
   const cacheKey = `lowerDiv_${lowerCode}_${year}`
-  const cached = readCache(cacheKey)
+  const cached = await readBigCache(cacheKey) // IndexedDB (06/11, voir idbCache.js)
   if (cached != null) return cached
   await waitForFdSpacing()
   try {
@@ -376,7 +377,7 @@ async function fetchLowerDivisionStatsInner(lowerCode, baseYear) {
       `/api/v4/competitions/${lowerCode}/matches?dateFrom=${year}-07-01&dateTo=${year + 1}-06-30`
     )
     const finished = (matches ?? []).filter(m => m.status === 'FINISHED')
-    if (finished.length > 0) writeCache(cacheKey, finished, LOWER_DIV_CACHE_TTL)
+    if (finished.length > 0) await writeBigCache(cacheKey, finished, LOWER_DIV_CACHE_TTL)
     return finished
   } catch (e) {
     void e   // code non vérifié ou 429/403 transitoire : best-effort, jamais bloquant

@@ -85,6 +85,9 @@ import { purgeExpiredCache, compactExistingCaches } from './hooks/localCache'
 // de TTL réellement active plutôt qu'à tout l'historique jamais consulté.
 purgeExpiredCache()
 compactExistingCaches()
+// 06/11 : déplace les gros caches lus seulement en async vers IndexedDB (voir idbCache.js) — différé
+// pour ne pas ralentir le démarrage.
+setTimeout(() => { import('./hooks/idbCache').then(m => m.migrateBigCachesToIdb()).catch(() => {}) }, 3000)
 
 const queryClient = new QueryClient({
   defaultOptions: {
