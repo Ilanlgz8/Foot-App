@@ -46,14 +46,28 @@ export function writeCache(key, data, ttlMs) {
   } catch {}
 }
 
+// ⚠️ 06/11 (stockage plein sur iPhone, accord explicite de l'utilisateur « vérifie avant de supprimer ») :
+// les saisons passées gardées pour les confrontations directes (h2hHistory_*, ~360 000 caractères par
+// compétition) ne servent qu'à useH2HRows (onglet Historique, MatchModal.jsx), calcProno (directMeetings :
+// équipes, score, statut) et resolveFdTeamId/resolveFdCrest (équipes). Vérifié dans ces 4 endroits : ni
+// `season`, ni `lastUpdated`, ni `stage`, ni `group`, ni `matchday` n'y sont lus, et de `competition`
+// seul `name` est affiché (on garde aussi id/code). Équipes, date, statut et score restent intacts.
+export function compactH2HMatch(m) {
+  if (!m || typeof m !== 'object') return m
+  // eslint-disable-next-line no-unused-vars
+  const { season, lastUpdated, stage, group, matchday, competition, ...rest } = m
+  if (competition) rest.competition = { id: competition.id, name: competition.name, code: competition.code }
+  return rest
+}
+
 // Migration unique des caches déjà écrits avant compactData (06/11) — réécrit chaque entrée concernée
 // en gardant son `exp`/`savedAt` d'origine. Drapeau hors préfixe `foot_` (purgeExpiredCache supprime les
 // `foot_*` sans `exp`).
 const COMPACT_FLAG = 'sf_compact_v1'
+const COMPACT_H2H_FLAG = 'sf_compact_h2h_v1'
 export function compactExistingCaches() {
   try {
-    if (localStorage.getItem(COMPACT_FLAG)) return
-    for (let i = 0; i < localStorage.length; i++) {
+    if (!localStorage.getItem(COMPACT_FLAG)) for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (!key || !key.startsWith(PREFIX)) continue
       const raw = localStorage.getItem(key)
@@ -65,6 +79,19 @@ export function compactExistingCaches() {
       } catch { /* entrée illisible : laissée à purgeExpiredCache */ }
     }
     localStorage.setItem(COMPACT_FLAG, '1')
+  } catch { /* pas bloquant */ }
+  try {
+    if (localStorage.getItem(COMPACT_H2H_FLAG)) return
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(PREFIX + 'h2hHistory_')) continue
+      try {
+        const entry = JSON.parse(localStorage.getItem(key))
+        if (!entry || typeof entry.exp !== 'number' || !Array.isArray(entry.data)) continue
+        localStorage.setItem(key, JSON.stringify({ ...entry, data: entry.data.map(compactH2HMatch) }))
+      } catch { /* entrée illisible : laissée à purgeExpiredCache */ }
+    }
+    localStorage.setItem(COMPACT_H2H_FLAG, '1')
   } catch { /* pas bloquant */ }
 }
 

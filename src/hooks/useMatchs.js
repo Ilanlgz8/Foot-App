@@ -1,5 +1,5 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
-import { readCache, readCacheStale, getCacheSavedAt, writeCache } from './localCache'
+import { readCache, readCacheStale, getCacheSavedAt, writeCache, compactH2HMatch } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { resolveFdTeamId } from '../utils/matchUtils'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
@@ -275,8 +275,11 @@ async function fetchH2HHistoryInner(selectedComp, baseYear) {
         `/api/v4/competitions/${selectedComp}/matches?dateFrom=${year}-07-01&dateTo=${year + 1}-06-30`
       )
       if (matches != null && matches.length > 0) {
-        writeCache(cacheKey, matches, H2H_HISTORY_CACHE_TTL)
-        results.push(...matches)
+        // Allégé (06/11, voir compactH2HMatch) — en mémoire comme sur le disque, pour que le 1er
+        // affichage et les suivants (relus du disque) se comportent exactement pareil.
+        const compact = matches.map(compactH2HMatch)
+        writeCache(cacheKey, compact, H2H_HISTORY_CACHE_TTL)
+        results.push(...compact)
       }
     } catch (e) {
       // Une saison manquante (compétition trop jeune) ou un 429/403 transitoire
