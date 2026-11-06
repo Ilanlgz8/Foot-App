@@ -7,6 +7,7 @@ import { useWcKnockout, getKnockoutTeamOverrides, applyKnockoutTeamOverrides } f
 import { useTeamFormMulti } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
+import { useMatchEndedRefresh } from '../hooks/useMatchEndedRefresh'
 import { mergeScore, isCardLive, isUnfollowedCupMatch } from '../utils/matchUtils'
 import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
@@ -392,6 +393,8 @@ function Accueil() {
   // plus tard) d'un dayOffset choisi MANUELLEMENT par l'utilisateur (jamais
   // recorrigé — voir l'effet de correction arrière juste en dessous).
   const wasAutoJumped = useRef(false)
+  // 06/11 : nouveau rendu dès qu'un match se termine, puis à la fin de la fenêtre « Terminé ».
+  const endedVersion = useMatchEndedRefresh()
 
   useEffect(() => {
     if (matchesLoading) return
@@ -406,8 +409,13 @@ function Accueil() {
     // change la date "aujourd'hui" de force. Repris de MDJ_STATUSES.
     // DEAD_STATUSES (matchDuJour.js, déjà la référence pour "ce statut ne
     // compte pour rien") plutôt que dupliquer la liste ici.
+    // 06/11 (demande utilisateur : « dès que tous les matchs du jour sont terminés, afficher ceux de
+    // demain directement, sans attendre minuit ») : un match dont la fin est déjà confirmée (ft) compte
+    // comme terminé même si la liste n'a pas encore reçu FINISHED — on attend juste la fin de sa fenêtre
+    // « Terminé » (isRecentlyFinished) pour ne pas couper l'affichage du score final.
     const hasUpcoming = matches.some(m =>
-      m.status !== 'FINISHED' && !MDJ_STATUSES.DEAD_STATUSES.has(m.status)
+      m.status !== 'FINISHED' && !MDJ_STATUSES.DEAD_STATUSES.has(m.status) &&
+      (getMatchState(m.id).ft !== true || isRecentlyFinished(m.id))
     )
     if (hasUpcoming) return
 
@@ -423,7 +431,7 @@ function Accueil() {
     // Petit délai pour éviter un flash si les données arrivent en deux temps
     const id = setTimeout(() => { wasAutoJumped.current = true; setDayOffset(diffDays) }, 800)
     return () => clearTimeout(id)
-  }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps])
+  }, [matches, matchesLoading, dayOffset, targetDate, upcomingAllComps, endedVersion])
 
   // ⚠️ AJOUT (retour utilisateur : "y'avait plus que les matchs à partir du
   // 22 août ... je peux pas aller avant" alors que des matchs existent bien
@@ -458,7 +466,7 @@ function Accueil() {
   // la page Match (/live). Seul le saut AUTOMATIQUE ci-dessus subsiste.
 
   // ── Ticker 10s pour faire avancer calcMinute() et détecter pending kickoffs ──
-  const [, setTick] = useState(0)
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 10_000)
     return () => clearInterval(id)
@@ -608,7 +616,10 @@ function Accueil() {
       ? filteredMatches.filter(m => m.id !== matchDuJour?.id && stillVisibleToday(m))
       : filteredMatches
     return desktopHasLive ? base.filter(m => !isCardLive(m)) : base
-  }, [dayOffset, filteredMatches, desktopHasLive, matchDuJour])
+    // `tick`/`endedVersion` : sans eux, une card terminée restait affichée tant qu'aucune nouvelle
+    // donnée n'arrivait (06/11, constat utilisateur) — stillVisibleToday dépend de l'heure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayOffset, filteredMatches, desktopHasLive, matchDuJour, tick, endedVersion])
 
   // Résultats récents partagés (utilisés dans le panneau résultats)
   const resultPanel = (() => {

@@ -140,6 +140,30 @@ function formStaleFor(comp) {
 // ne montre aucune activité récente/imminente (compétition dormante) — jamais
 // un polling permanent ni un sondage "pour rien" sur une compétition hors
 // saison.
+// ⚠️ 06/11 (constat utilisateur : « sur les cards la forme récente n'apparaît pas, alors que sur la page
+// du match on la voit ») : au lancement, si la forme d'une compétition échouait (budget football-data.org
+// pris, données retéléchargées…), la requête des cards restait vide sans jamais réessayer (pas de
+// polling pour les compétitions FD.org) — et ce résultat vide était même enregistré comme cache. La page
+// du match, ouverte plus tard, relançait la même requête avec succès, d'où la différence. Désormais : un
+// résultat sans forme n'est jamais enregistré, et la requête réessaie toute seule chaque minute tant
+// qu'elle n'a pas de forme.
+function hasForm(d) {
+  return !!d?.formMap && Object.keys(d.formMap).length > 0
+}
+const EMPTY_FORM_RETRY_MS = 60_000
+const EMPTY_FORM_MAX_ATTEMPTS = 6
+function formRefetchWhenEmpty(comp) {
+  const base = formRefetchIntervalFor(comp)
+  return query => {
+    // Borné : une compétition réellement sans forme (aucun match joué) ne réessaie pas indéfiniment.
+    if (!hasForm(query.state.data)) {
+      const attempts = (query.state.dataUpdateCount ?? 0) + (query.state.errorUpdateCount ?? 0)
+      return attempts < EMPTY_FORM_MAX_ATTEMPTS ? EMPTY_FORM_RETRY_MS : false
+    }
+    return typeof base === 'function' ? base(query) : base
+  }
+}
+
 function formRefetchIntervalFor(comp) {
   if (!ESPN_SOURCED_FORM_COMPS.has(comp)) return false
   return query => {
@@ -493,7 +517,7 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
       // console. Le `.catch(() => {})` ne fait qu'absorber CETTE promesse
       // dérivée précise (write en cache, best-effort) — ne change rien au
       // `result` original ni à sa gestion d'erreur/retry par React Query.
-      result.then(r => writeCache(cacheKey, r, FORM_STALE)).catch(() => {})
+      result.then(r => { if (hasForm(r)) writeCache(cacheKey, r, FORM_STALE) }).catch(() => {})
       return result
     },
     enabled:              !!selectedComp && enabled,
@@ -517,7 +541,7 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
     // Voir le commentaire de ESPN_FORM_STALE/formRefetchIntervalFor plus haut
     // — polling borné UNIQUEMENT pour les 8 comps ESPN-only, `false` (aucun
     // changement de comportement) pour toutes les autres.
-    refetchInterval:      formRefetchIntervalFor(selectedComp),
+    refetchInterval:      formRefetchWhenEmpty(selectedComp),
     retry:                2,
     retryDelay:           attempt => Math.min(1000 * 2 ** attempt, 15_000)
   })
@@ -601,8 +625,8 @@ export function useTeamFormMulti(compCodes) {
         queryFn:              async () => {
           if (i > 0) await new Promise(r => setTimeout(r, i * STAGGER_MS))
           const result = await fetchTeamForm(code)
-          // Voir le commentaire équivalent dans useTeamForm ci-dessus.
-          writeCache(cacheKey, result, FORM_STALE)
+          // Voir le commentaire équivalent dans useTeamForm ci-dessus. Jamais un résultat vide (06/11).
+          if (hasForm(result)) writeCache(cacheKey, result, FORM_STALE)
           return result
         },
         // Voir le commentaire détaillé dans useTeamForm ci-dessus (même fix,
@@ -617,7 +641,7 @@ export function useTeamFormMulti(compCodes) {
         // Voir le commentaire de ESPN_FORM_STALE/formRefetchIntervalFor plus
         // haut dans ce fichier — polling borné uniquement pour les 8 comps
         // ESPN-only (NL/CAN/COPA/UEL/UECL/TDC/CS/USC).
-        refetchInterval:      formRefetchIntervalFor(code),
+        refetchInterval:      formRefetchWhenEmpty(code),
         retry:                2,
         retryDelay:           attempt => Math.min(1000 * 2 ** attempt, 15_000),
       }

@@ -400,7 +400,14 @@ export function markRecentlyFinished(match) {
       ts: Date.now(),
     }))
   } catch {}
+  // 06/11 (constat utilisateur : « la card d'un match fini reste, je dois changer de page pour qu'elle
+  // parte ») : prévient les pages affichées qu'un match vient de finir, pour qu'elles se mettent à jour
+  // tout de suite puis à la fin de la fenêtre « Terminé » (TERMINE_GRACE_MS), sans attendre de
+  // nouvelles données. Voir Accueil.jsx / Live.jsx (useMatchEndedRefresh).
+  try { window.dispatchEvent(new CustomEvent(MATCH_ENDED_EVENT, { detail: { id: match.id } })) } catch { /* hors navigateur */ }
 }
+
+export const MATCH_ENDED_EVENT = 'sf:matchEnded'
 
 /**
  * Matchs récemment confirmés terminés (ft) mais pas encore repris par FD.org,

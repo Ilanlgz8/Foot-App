@@ -15,6 +15,7 @@ import { groupMatchesByCompetition } from '../utils/competitionGroups'
 import { Cocoon } from '../hub/Cocoon'
 import { LazyPoster } from '../accueil/MatchCard'
 import { LiveDiag } from './LiveDiag'
+import { useMatchEndedRefresh } from '../hooks/useMatchEndedRefresh'
 import '../accueil.css'
 import '../live.css'
 import '../hub/hub.css'
@@ -51,7 +52,10 @@ export default function Live() {
   // n'est alimenté qu'avec `tab === 'prog'` → il chargeait TOUJOURS aujourd'hui
   // (offset 0) pendant que le libellé et les flèches montraient « Demain ».
   // Changer de jour fixe donc explicitement l'onglet « Tous les matchs ».
-  const goToDay = useCallback(offset => { setTab('prog'); setDayOffset(offset) }, [])
+  // 06/11 : vrai si l'utilisateur a choisi lui-même un jour (flèches, bouton) — le saut automatique
+  // vers le prochain jour de matchs (voir plus bas) ne s'applique alors plus.
+  const userPickedDayRef = useRef(Number.isInteger(initial.dayOffset) && initial.dayOffset !== 0)
+  const goToDay = useCallback(offset => { userPickedDayRef.current = true; setTab('prog'); setDayOffset(offset) }, [])
   const {
     matches: dayMatches, loading, espnScores, liveMatches,
     formMapByComp, matchesByComp, nextMatchDayOffset, prevMatchDayOffset,
@@ -206,6 +210,18 @@ export default function Live() {
   const progMatches = dayOffset === 0
     ? dayMatches.filter(stillVisible)
     : dayMatches.filter(m => m.status !== 'FINISHED')
+
+  // 06/11 (demande utilisateur) : la card d'un match fini part toute seule (~8 s après « Terminé »)…
+  const endedVersion = useMatchEndedRefresh()
+  // …et quand tous les matchs d'aujourd'hui sont finis, « Tous les matchs » passe directement au prochain
+  // jour de matchs au lieu d'afficher une page vide jusqu'à minuit. Pas si l'utilisateur a choisi un jour.
+  const todayAllDone = dayOffset === 0 && !loading && dayMatches.length > 0 && progMatches.length === 0 &&
+    !dayMatches.some(m => isRecentlyFinished(m.id))
+  useEffect(() => {
+    if (!todayAllDone || userPickedDayRef.current || nextMatchDayOffset == null || nextMatchDayOffset <= 0) return
+    const id = setTimeout(() => setDayOffset(nextMatchDayOffset), 800)
+    return () => clearTimeout(id)
+  }, [todayAllDone, nextMatchDayOffset, endedVersion])
 
   // Diagnostic temporaire (05/11, voir LiveDiag.jsx) : 5 appuis rapides sur « En direct ».
   const [showDiag, setShowDiag] = useState(false)
