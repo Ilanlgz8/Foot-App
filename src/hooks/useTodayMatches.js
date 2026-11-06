@@ -1,7 +1,7 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCacheStale, getCacheSavedAt, writeCache, readCache } from './localCache'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
-import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
+import { fetchEspnCompMatches, fetchEspnCupMatches, normalizeEspnCompEvents, normalizeEspnCupEvents } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
@@ -216,7 +216,41 @@ async function fetchWcEcPortion(date, delayMs = 0) {
   return settled.flatMap(r => r.status === 'fulfilled' ? r.value : [])
 }
 
+// ── Matchs du jour préparés par le serveur (06/11, refonte « le serveur prépare l'Accueil ») ──────
+// UNE requête (`/espn?feed=1`, matchs du jour et de la veille publiés chaque minute par le Worker) au
+// lieu d'une vingtaine de calendriers. Uniquement pour AUJOURD'HUI. Retombe sur fetchEspnPortion (méthode
+// d'avant) si le serveur n'a rien, si ce n'est pas frais, si la date locale n'est pas couverte ou si une
+// compétition manque — jamais de liste incomplète.
+function ymdLocal(dateStr) { return dateStr.replace(/-/g, '') }
+async function fetchEspnPortionFromFeed(date) {
+  try {
+    const r = await fetch(`/espn?feed=1&date=${ymdLocal(date)}`)
+    if (!r.ok) return null
+    const j = await r.json()
+    if (!j?.ok || !j.fresh || !j.bySlug) return null
+    if (!(j.dates ?? []).includes(ymdLocal(date))) return null
+    const needed = [
+      ...ESPN_SOURCED_COMPS.map(id => COMPETITION_ESPN_SLUG[id]),
+      ...CUP_PARENT_COMPS.map(id => DOMESTIC_CUPS[id]?.slug),
+    ].filter(Boolean)
+    if (needed.some(s => !j.slugDates?.[s]?.includes(ymdLocal(date)))) return null
+    const out = [
+      ...ESPN_SOURCED_COMPS.flatMap(id => normalizeEspnCompEvents(id, j.bySlug[COMPETITION_ESPN_SLUG[id]], { compId: REAL_COMP_ID[id] })),
+      ...CUP_PARENT_COMPS.flatMap(id => normalizeEspnCupEvents(id, j.bySlug[DOMESTIC_CUPS[id].slug])),
+    ]
+    return out.filter(m => VALID_STATUS.includes(m.status))
+  } catch {
+    return null
+  }
+}
+
+function localTodayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 async function fetchTodayMatches(date) {
+  const espnFromFeed = date === localTodayStr() ? await fetchEspnPortionFromFeed(date) : null
   // ⚠️ BUG CORRIGÉ (constat utilisateur : "j'avais tout, 5min après plus
   // rien" — même mécanisme que useStandings.js/useMatchs.js/useScorers.js/
   // useWcKnockout.js, mais amplifié ici) : Promise.all() rejette DÈS QUE UN
@@ -232,7 +266,7 @@ async function fetchTodayMatches(date) {
   // possible, pas besoin de séparer ESPN/WC-EC ici, voir plus bas pour
   // useRecentDaysMatches qui, lui, en a besoin).
   const [espnMatches, wcEcMatches] = await Promise.all([
-    fetchEspnPortion(),
+    espnFromFeed ?? fetchEspnPortion(),
     fetchWcEcPortion(date),
   ])
   return dedupeAndFilterByDate([...wcEcMatches, ...espnMatches], date)

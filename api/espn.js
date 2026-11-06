@@ -26,6 +26,7 @@
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
+import { workerKvGet } from '../src/utils/tursoCache.js'
 import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
@@ -725,6 +726,40 @@ export default async function handler(req, res) {
   // en annulait d'autres). Ce n'est pas la même classe de risque : ici chaque
   // slug est un `fetch()` indépendant, `Promise.allSettled` garantit qu'aucun
   // ne peut faire échouer les autres.
+  // ── Mode « feed » (06/11, refonte « le serveur prépare l'Accueil ») ─────────────────────────────
+  // Matchs du jour et de la veille (UTC) de toutes les compétitions, préparés chaque minute par le
+  // Worker (`pub:sbFeed`, cf-worker/src/index.js publishScoreboardFeed) — une seule lecture Turso, au
+  // lieu d'une vingtaine de calendriers. Réponse : { ok, fresh, updatedAt, dates, bySlug: { slug:
+  // events[] } } (événements au format ESPN réduit, normalisés côté client par normalizeEvent).
+  // `fresh` : publié il y a moins de 5 min, OU Worker volontairement au repos (aucun match en cours et
+  // prochain contrôle programmé / journée sans match connue — rien ne peut avoir changé). Le client
+  // retombe sur l'ancienne méthode si ce n'est pas frais ou si une compétition manque.
+  if (req.query.feed) {
+    const [rawFeed, rawNext, rawEmpty] = await Promise.all([
+      workerKvGet('pub:sbFeed'), workerKvGet('cron:nextCheck'), workerKvGet('cron:emptyDay'),
+    ])
+    let feed
+    try { feed = rawFeed ? JSON.parse(rawFeed) : null } catch { feed = null }
+    if (!feed?.entries) {
+      return res.status(200).setHeader('Cache-Control', 'no-store').json({ ok: false })
+    }
+    const ageMs = Date.now() - (feed.updatedAt ?? 0)
+    const workerResting = (rawNext && Number(rawNext) > Date.now()) || !!rawEmpty
+    const fresh = ageMs < 5 * 60_000 || (workerResting && ageMs < 12 * 3600_000)
+    const bySlug = {}
+    const slugDates = {}
+    for (const [k, v] of Object.entries(feed.entries)) {
+      const [d, s] = k.split('|')
+      if (!s) continue
+      ;(bySlug[s] ??= []).push(...(v?.events ?? []))
+      ;(slugDates[s] ??= []).push(d)
+    }
+    return res.status(200)
+      .setHeader('Content-Type', 'application/json')
+      .setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=40')
+      .json({ ok: true, fresh, updatedAt: feed.updatedAt, dates: feed.dates ?? [], slugDates, bySlug })
+  }
+
   if (slugs) {
     const slugList = String(slugs).split(',').map(s => s.trim()).filter(Boolean)
     if (slugList.length === 0) return res.status(400).json({ error: 'Paramètre slugs vide' })

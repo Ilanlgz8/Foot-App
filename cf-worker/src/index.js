@@ -632,6 +632,61 @@ async function publishLiveState(kv, allEvents, finalIds, now, log) {
   }
 }
 
+// ── Matchs du jour préparés par le serveur (06/11, refonte « le serveur prépare l'Accueil ») ──────
+// Le Worker récupère déjà chaque minute les matchs ESPN du jour et de la veille (UTC) de toutes les
+// compétitions suivies. On publie ce résultat, réduit aux champs que l'app lit (normalizeEvent,
+// src/utils/espnAdapter.js), sous `pub:sbFeed` : l'Accueil fait UNE requête (api/espn.js, mode feed)
+// au lieu d'une vingtaine de calendriers de 75 à 460 jours. Fusion avec la version précédente (toutes
+// les compétitions ne sont pas interrogées à chaque minute) ; seules les 2 dates courantes sont gardées.
+// 1 lecture + 1 écriture par passe qui interroge ESPN, rien sinon.
+const PUB_SB_FEED_KEY = 'pub:sbFeed'
+function compactScoreboardEvent(e) {
+  const c = e?.competitions?.[0]
+  const st = c?.status
+  return {
+    id: e?.id,
+    date: e?.date,
+    season: e?.season ? { year: e.season.year ?? null, slug: e.season.slug ?? null } : null,
+    competitions: c ? [{
+      status: st ? {
+        type: st.type ? { name: st.type.name ?? null, state: st.type.state ?? null, completed: st.type.completed ?? null } : null,
+        displayClock: st.displayClock ?? null,
+        period: st.period ?? null,
+      } : null,
+      competitors: (c.competitors ?? []).map(x => ({
+        homeAway: x.homeAway,
+        score: x.score ?? null,
+        winner: x.winner ?? null,
+        team: x.team ? {
+          id: x.team.id ?? null,
+          displayName: x.team.displayName ?? null,
+          name: x.team.name ?? null,
+          shortDisplayName: x.team.shortDisplayName ?? null,
+          logo: x.team.logo ?? null,
+        } : null,
+      })),
+    }] : [],
+  }
+}
+async function publishScoreboardFeed(kv, allResults, today, yesterday, now, log) {
+  const fetched = (allResults ?? []).filter(r => r.status === 'fulfilled' && r.value?.res?.ok)
+  if (fetched.length === 0) return
+  try {
+    const nowMs = now.getTime()
+    const prev = safeJsonParse(await kv.get(PUB_SB_FEED_KEY), {})?.entries ?? {}
+    const keep = new Set([today, yesterday])
+    const entries = {}
+    for (const [k, v] of Object.entries(prev)) if (keep.has(k.split('|')[0])) entries[k] = v
+    for (const r of fetched) {
+      const { pair, res } = r.value
+      entries[`${pair.date}|${pair.slug}`] = { at: nowMs, events: (res.events ?? []).map(compactScoreboardEvent) }
+    }
+    await kv.set(PUB_SB_FEED_KEY, JSON.stringify({ updatedAt: nowMs, dates: [today, yesterday], entries }), { ex: 36 * 3600 })
+  } catch (e) {
+    log.push(`[pub:sbFeed] error=${e.message}`)
+  }
+}
+
 async function runOnePass(env) {
   const kv = env._kv
   const log      = []
@@ -2206,6 +2261,7 @@ async function runOnePass(env) {
   }
 
   await publishLiveState(kv, allEvents, alreadyDoneIds, now, log)
+  await publishScoreboardFeed(kv, allResults, today, yesterday, now, log)
   return { events: allEvents.length, log }
 }
 

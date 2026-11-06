@@ -452,6 +452,25 @@ function dropUnfollowedCup(matches) {
   return matches.filter(m => !isUnfollowedCupMatch(m))
 }
 
+// 06/11 (feed serveur, voir useTodayMatches.js) : mêmes transformations que fetchEspnCompMatches /
+// fetchEspnCupMatches, appliquées à des événements déjà reçus (sans requête).
+export function normalizeEspnCompEvents(compCode, events, overrides = {}) {
+  return (events ?? []).map(e => normalizeEvent(e, compCode, overrides)).filter(Boolean)
+}
+export function normalizeEspnCupEvents(parentCode, events) {
+  const cup = DOMESTIC_CUPS[parentCode]
+  if (!cup) return []
+  return dropUnfollowedCup((events ?? [])
+    .filter(e => !isUntrackedCupQualifyingRound(e))
+    .map(e => normalizeEvent(e, parentCode, {
+      idPrefix: `${parentCode}-cup`,
+      isCup: true,
+      compId: SYNTHETIC_COMP_ID[`${parentCode}_CUP`] ?? null,
+      compName: cup.name,
+    }))
+    .filter(Boolean))
+}
+
 export async function fetchEspnCupMatches(parentCode) {
   const cup = DOMESTIC_CUPS[parentCode]
   if (!cup) return []
