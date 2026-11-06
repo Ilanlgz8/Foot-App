@@ -21,6 +21,26 @@ function storageInfo() {
   return { chars, keys, writeOk }
 }
 
+function LaunchInfo() {
+  const l = window.__sfLaunch
+  const g = window.__sfGuard
+  const slow = performance.getEntriesByType('resource')
+    .filter(e => /\/api\/|\/espn\?/.test(e.name))
+    .map(e => ({ u: e.name.replace(location.origin, '').replace('/api/football?apiPath=', 'fd:').replace(/%2F/g, '/').slice(0, 58), s: Math.round(e.startTime), d: Math.round(e.duration) }))
+    .sort((a, b) => b.d - a.d)
+    .slice(0, 10)
+  const nApi = performance.getEntriesByType('resource').filter(e => /\/api\/|\/espn\?/.test(e.name)).length
+  return (
+    <div style={{ marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+      <div>lancement : {l ? `${l.keys} clés, ${Math.round(l.chars / 1000)} k car., ${l.matchKeys} caches matchs, cache du jour ${l.hadTodayCache ? 'OUI' : 'NON'}` : '—'}</div>
+      <div>Accueil affiché à : {window.__sfAccueilReadyAt != null ? `${(window.__sfAccueilReadyAt / 1000).toFixed(1)} s` : '— (pas passé par l\'Accueil)'} après le lancement</div>
+      <div>garde-fou stockage : {g ? `${g.evictions} purge(s)${g.removed.length ? ' — ' + g.removed.slice(-4).join(', ') : ''}` : '—'}</div>
+      <div>requêtes depuis le lancement : {nApi} · les plus lentes :</div>
+      {slow.map((r, i) => <div key={i} style={{ opacity: 0.85 }}>{(r.s / 1000).toFixed(1)}s +{(r.d / 1000).toFixed(1)}s {r.u}</div>)}
+    </div>
+  )
+}
+
 export function LiveDiag({ dayMatches, liveMatches, live, espnScores }) {
   const st = storageInfo()
   let lastPoll = '—'
@@ -45,6 +65,7 @@ export function LiveDiag({ dayMatches, liveMatches, live, espnScores }) {
       <div>dernier poll ESPN : {lastPoll}</div>
       <div>en direct affichés : {live.length} · suivis (mémoire) : {liveMatches.length} · suivis (disque) : {trackerKeys}</div>
       <div>matchs du jour : {dayMatches.length} · commencés (&lt;150 min) : {started.length} · scores ESPN : {Object.keys(espnScores ?? {}).length}</div>
+      <LaunchInfo />
       <div style={{ marginTop: '0.5rem' }}>
         {started.map(m => {
           const ms = getMatchState(m.id)

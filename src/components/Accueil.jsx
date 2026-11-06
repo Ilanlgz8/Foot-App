@@ -146,6 +146,10 @@ function Accueil() {
   // ── Données ──
   const { news, loading: newsLoading, error: newsError } = useNews()
   const { matches: rawMatches, loading: matchesLoading } = useTodayMatches(targetDate)
+  // Diagnostic (06/11, voir LiveDiag.jsx) : instant du 1er affichage des matchs depuis le lancement.
+  useEffect(() => {
+    if (rawMatches.length > 0 && window.__sfAccueilReadyAt == null) window.__sfAccueilReadyAt = Math.round(performance.now())
+  }, [rawMatches.length])
 
   // Remonté ici (était plus bas, juste avant la nav cartes) pour être
   // disponible au moment de calculer `matches` — voir l'exception minuit

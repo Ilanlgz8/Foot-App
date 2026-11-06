@@ -35,11 +35,16 @@ function isWriteCacheEntry(value) {
     /,"exp":\d+,"savedAt":\d+\}$/.test(value.slice(-64))
 }
 
+// Diagnostic (05-06/11, voir LiveDiag.jsx) : évictions faites par ce garde-fou pendant cette session.
+const guardStats = { evictions: 0, removed: [] }
+if (typeof window !== 'undefined') window.__sfGuard = guardStats
+
 function freeSpace(storage, removeItem, keyBeingWritten) {
+  guardStats.evictions++
   let freed = 0
   try {
     const rq = storage.getItem(RQ_KEY)
-    if (rq && keyBeingWritten !== RQ_KEY) { removeItem.call(storage, RQ_KEY); freed += rq.length }
+    if (rq && keyBeingWritten !== RQ_KEY) { removeItem.call(storage, RQ_KEY); freed += rq.length; guardStats.removed.push(RQ_KEY) }
   } catch { /* ignore */ }
   if (freed >= FREE_TARGET_CHARS) return
   const candidates = []
@@ -54,7 +59,7 @@ function freeSpace(storage, removeItem, keyBeingWritten) {
   candidates.sort((a, b) => b[1] - a[1])
   for (const [k, len] of candidates) {
     if (freed >= FREE_TARGET_CHARS) break
-    try { removeItem.call(storage, k); freed += len } catch { /* ignore */ }
+    try { removeItem.call(storage, k); freed += len; guardStats.removed.push(k) } catch { /* ignore */ }
   }
 }
 
@@ -79,4 +84,23 @@ if (typeof Storage !== 'undefined' && !Storage.prototype.__sfGuarded) {
     }
   }
   Storage.prototype.__sfGuarded = true
+}
+
+// Diagnostic de lancement (06/11, constat utilisateur : « après l'animation, au moins 5 s avant que
+// l'Accueil s'affiche » sur iPhone, non reproductible ailleurs) : état du stockage au tout début du
+// lancement + tampon de mesures réseau agrandi (250 par défaut) pour garder toutes les requêtes du
+// lancement. Lu par LiveDiag.jsx, n'écrit rien.
+if (typeof window !== 'undefined') {
+  try { performance.setResourceTimingBufferSize?.(1500) } catch { /* ignore */ }
+  try {
+    let chars = 0, matchKeys = 0
+    const today = new Date()
+    const todayKey = `foot_matches_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      chars += (k?.length ?? 0) + (localStorage.getItem(k)?.length ?? 0)
+      if (k?.startsWith('foot_matches_')) matchKeys++
+    }
+    window.__sfLaunch = { keys: localStorage.length, chars, matchKeys, hadTodayCache: localStorage.getItem(todayKey) != null }
+  } catch { /* ignore */ }
 }
