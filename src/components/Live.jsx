@@ -219,7 +219,8 @@ export default function Live() {
     !dayMatches.some(m => isRecentlyFinished(m.id))
   useEffect(() => {
     if (!todayAllDone || userPickedDayRef.current || nextMatchDayOffset == null || nextMatchDayOffset <= 0) return
-    const id = setTimeout(() => setDayOffset(nextMatchDayOffset), 800)
+    // setTab('prog') indispensable : sans onglet choisi, useMatchDay reste sur aujourd'hui (voir goToDay).
+    const id = setTimeout(() => { setTab(t => t ?? 'prog'); setDayOffset(nextMatchDayOffset) }, 800)
     return () => clearTimeout(id)
   }, [todayAllDone, nextMatchDayOffset, endedVersion])
 
