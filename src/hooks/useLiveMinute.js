@@ -33,6 +33,7 @@ import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
 import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2, PENDING_KICKOFF_WINDOW_MS } from '../utils/matchUtils'
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 import { readCacheStale, removeCache } from './localCache'
+import { serverStateVerdict } from '../utils/serverLiveState'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -805,6 +806,13 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       }
 
       const liveStateInfo = getLiveState(mid)
+      // ── État officiel du serveur (06/11, voir serverLiveState.js) ─────────────────
+      // `final` : fin confirmée par le Worker → le match est terminé, aucune réponse (même « en cours »)
+      // ne peut le remettre en direct. `live` : le Worker voit le match en cours (vu APRÈS la fin
+      // enregistrée sur ce téléphone) → le verrou local « terminé » est levé. Sans donnée récente : rien
+      // ne change, logique d'avant.
+      const sv = serverStateVerdict(data.serverState)
+      const serverLiftsLock = sv.live && liveStateInfo.state === 'ended' && sv.seenAt > (liveStateInfo.endedAt ?? 0)
       // ⚠️ BUG CORRIGÉ (constat utilisateur : un match VRAIMENT terminé
       // depuis longtemps réapparaît "en cours" quand on rouvre l'app
       // quelques minutes après, avant de redisparaître peu après) : cette
@@ -821,7 +829,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // réellement un match encore actif (le vrai cas "faux FT" que ce
       // mécanisme est censé corriger) — un FINAL fraîchement reconfirmé ne
       // lève plus jamais le verrou pour rien.
-      const isFalseEndedReversal =
+      const localFalseEndedReversal =
         liveStateInfo.state === 'ended' &&
         liveStateInfo.espnEventId != null &&
         data.espnEventId != null &&
@@ -837,8 +845,9 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         // isStaleFtReversal plus bas, qui ne protégeait que clearFtFlags, pas ce verrou.
         now > (liveStateInfo.endedAt ?? 0) &&
         LIVE_ISH_STATUSES.has(safeStatus)
+      const isFalseEndedReversal = !sv.final && (serverLiftsLock || localFalseEndedReversal)
       if (isFalseEndedReversal) {
-        console.log(`[useLiveMinute] Faux FT corrigé (même espnEventId, match ${mid} toujours actif) — déblocage du verrou anti-résurrection`)
+        console.log(`[useLiveMinute] ${serverLiftsLock ? 'Serveur : match en cours' : 'Faux FT corrigé (même espnEventId)'} — match ${mid} — déblocage du verrou anti-résurrection`)
         setLiveState(mid, 'live')
         clearFtFlags(mid)
       }
@@ -867,6 +876,26 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
 
       // Toujours écrire les données ESPN (pour calcMinute + interpolation)
       setEspnData(mid, { espnClock, espnStatus: safeStatus, espnPeriod: safePeriod })
+
+      // Fin confirmée par le serveur (voir sv plus haut) : terminé tout de suite, sans attendre la
+      // double confirmation locale (pendingFt). Score/buteurs de CE poll gardés pour l'instantané final.
+      if (sv.final && !alreadyEnded) {
+        console.log(`[useLiveMinute] Serveur : fin confirmée — match ${mid}`)
+        delete pendingFt[mid]
+        const prev = espnScoresCache[mid] ?? {}
+        espnScoresCache[mid] = {
+          ...prev,
+          ...(home != null ? { home } : {}),
+          ...(away != null ? { away } : {}),
+          ...(scorers ? { scorers } : {}),
+          ...(cards ? { cards } : {}),
+          ...(stats ? { stats } : {}),
+          espnEventId: data.espnEventId ?? prev.espnEventId,
+          espnSlug:    data.espnSlug ?? prev.espnSlug,
+        }
+        confirmFt(match, now, queryClient, data.espnEventId)
+        continue
+      }
 
       // ════════════════════════════════════════════════════════════════════
       // CAS 1 : Match EN COURS — utilise safeStatus (statuts corrigés inclus)

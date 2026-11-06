@@ -590,6 +590,48 @@ async function notifyVercel(env, dedupKey, payload, slug, options = {}, log = nu
 const FINAL_SAFE_THRESHOLD = 3
 
 // ── Une passe complète (équivalent runOnePass() de api/cron-goals.js) ──────
+// ── État officiel des matchs (06/11, étape 1 « le serveur décide, le téléphone affiche ») ──────────
+// À chaque passe, résumé de chaque événement ESPN vu : état ESPN (pre/in/post), statut, minute, score, et
+// `final` = fin CONFIRMÉE (finalDone, posé par recheckFinalMatch — la même double vérification que la
+// notif « Fin de match »). Lu par api/fifa-live.js et joint aux réponses : le téléphone suit cet état au
+// lieu de deviner seul (src/utils/serverLiveState.js). Fusionné avec la version précédente (les
+// compétitions « froides » ne sont interrogées qu'une minute sur deux) ; un événement non revu depuis 6 h
+// est retiré. 1 lecture + 1 écriture par passe AVEC événements, rien sinon.
+const PUB_LIVE_KEY = 'pub:liveState'
+const PUB_LIVE_KEEP_MS = 6 * 3600 * 1000
+async function publishLiveState(kv, allEvents, finalIds, now, log) {
+  if (!allEvents?.length) return
+  try {
+    const nowMs = now.getTime()
+    const prev = safeJsonParse(await kv.get(PUB_LIVE_KEY), {})?.events ?? {}
+    const events = { ...prev }
+    for (const { slug, evt } of allEvents) {
+      const comp = evt?.competitions?.[0]
+      const st = comp?.status ?? evt?.status
+      if (!evt?.id || !st) continue
+      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+      events[String(evt.id)] = {
+        slug,
+        state:  st.type?.state ?? null,
+        status: st.type?.name ?? null,
+        clock:  st.displayClock ?? null,
+        period: st.period ?? null,
+        home:   homeC?.score != null ? Number(homeC.score) : null,
+        away:   awayC?.score != null ? Number(awayC.score) : null,
+        final:  finalIds.has(evt.id) || finalIds.has(String(evt.id)),
+        seenAt: nowMs,
+      }
+    }
+    for (const [id, e] of Object.entries(events)) {
+      if (!e || nowMs - (e.seenAt ?? 0) > PUB_LIVE_KEEP_MS) delete events[id]
+    }
+    await kv.set(PUB_LIVE_KEY, JSON.stringify({ updatedAt: nowMs, events }), { ex: 6 * 3600 })
+  } catch (e) {
+    log.push(`[pub:liveState] error=${e.message}`)
+  }
+}
+
 async function runOnePass(env) {
   const kv = env._kv
   const log      = []
@@ -2163,6 +2205,7 @@ async function runOnePass(env) {
     await Promise.allSettled(pendingFinalRechecks)
   }
 
+  await publishLiveState(kv, allEvents, alreadyDoneIds, now, log)
   return { events: allEvents.length, log }
 }
 

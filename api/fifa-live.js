@@ -20,6 +20,35 @@ import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../src/data/espnSlugs.js'
 // même comportement que celui déjà utilisé (et éprouvé toute la Coupe du
 // Monde) par le reste de l'app pour ce même problème.
 import { fuzzyTeam } from '../src/utils/espnSummaryParse.js'
+import { workerKvGet } from '../src/utils/tursoCache.js'
+
+// ── État officiel des matchs (06/11, étape 1 « le serveur décide, le téléphone affiche ») ──────────
+// Publié chaque minute par le Worker (cf-worker/src/index.js, publishLiveState) sous `pub:liveState` :
+// { updatedAt, events: { [espnEventId]: { state, status, clock, period, home, away, final, seenAt } } }.
+// Joint ici à chaque match de la réponse (`serverState`) quand son espnEventId y figure. Lu au plus une
+// fois toutes les 10 s par instance (mémoire), pour ne pas ajouter une lecture Turso à chaque appel.
+// Aucune donnée (Worker pas encore déployé, autre base…) → réponse strictement inchangée.
+let _liveStateMemo = { at: 0, events: null }
+async function getPublishedLiveState() {
+  if (Date.now() - _liveStateMemo.at < 10_000) return _liveStateMemo.events
+  let events
+  try {
+    const raw = await workerKvGet('pub:liveState')
+    events = raw ? (JSON.parse(raw)?.events ?? null) : null
+  } catch { events = null }
+  _liveStateMemo = { at: Date.now(), events }
+  return events
+}
+async function withServerState(payload) {
+  const events = await getPublishedLiveState()
+  if (!events) return payload
+  for (const v of Object.values(payload)) {
+    if (!v || v.espnEventId == null) continue
+    const s = events[String(v.espnEventId)]
+    if (s) v.serverState = s
+  }
+  return payload
+}
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -641,7 +670,7 @@ export default async function handler(req, res) {
     if (allFresh) {
       const fast = {}
       matches.forEach(m => { fast[m.id] = { ...storedData[m.id], fromCache: true } })
-      return res.json(fast)
+      return res.json(await withServerState(fast))
     }
   }
 
@@ -680,7 +709,7 @@ export default async function handler(req, res) {
     if (!lockAcquired) {
       const fallback = {}
       matches.forEach(m => { if (storedData[m.id]) fallback[m.id] = { ...storedData[m.id], fromCache: true } })
-      return res.json(fallback)
+      return res.json(await withServerState(fallback))
     }
   }
 
@@ -1410,5 +1439,5 @@ export default async function handler(req, res) {
     if (stored) result[m.id] = { ...stored, fromCache: true }
   }
 
-  return res.json(result)
+  return res.json(await withServerState(result))
 }

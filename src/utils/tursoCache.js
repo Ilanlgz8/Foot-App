@@ -135,6 +135,23 @@ export async function set(key, value, ttlSeconds) {
 // Permet à api/espn.js de choisir le chemin Turso seulement si les
 // identifiants sont bien configurés côté Vercel — sinon repli intégral et
 // silencieux sur Redis (voir commentaire d'en-tête).
+// 06/11 : lecture d'une clé écrite par le Worker Cloudflare (table worker_kv, voir cf-worker/src/tursoKv.js)
+// — utilisée pour l'état officiel des matchs (`pub:liveState`, lu par api/fifa-live.js). Table absente
+// (Worker branché sur une autre base, ou sur Redis) → null, sans erreur.
+export async function workerKvGet(key) {
+  const c = client()
+  if (!c) return null
+  try {
+    const res = await c.execute({
+      sql: `SELECT value FROM worker_kv WHERE key = ? AND expires_at > ?`,
+      args: [key, Math.floor(Date.now() / 1000)],
+    })
+    return res.rows[0]?.value ?? null
+  } catch {
+    return null
+  }
+}
+
 export function isTursoConfigured() {
   return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN)
 }
