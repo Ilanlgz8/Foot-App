@@ -736,10 +736,14 @@ export default async function handler(req, res) {
   // retombe sur l'ancienne méthode si ce n'est pas frais ou si une compétition manque.
   if (req.query.feed) {
     const [rawFeed, rawNext, rawEmpty] = await Promise.all([
-      workerKvGet('pub:sbFeed'), workerKvGet('cron:nextCheck'), workerKvGet('cron:emptyDay'),
+      workerKvGet('pub:all'), workerKvGet('cron:nextCheck'), workerKvGet('cron:emptyDay'),
     ])
+    // Clé commune `pub:all` (06/11, une seule écriture par passe côté Worker — plan gratuit Cloudflare).
     let feed
-    try { feed = rawFeed ? JSON.parse(rawFeed) : null } catch { feed = null }
+    try {
+      const all = rawFeed ? JSON.parse(rawFeed) : null
+      feed = all?.feed ? { ...all.feed, updatedAt: all.updatedAt } : null
+    } catch { feed = null }
     if (!feed?.entries) {
       return res.status(200).setHeader('Cache-Control', 'no-store').json({ ok: false })
     }

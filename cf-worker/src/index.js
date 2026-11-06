@@ -597,49 +597,15 @@ const FINAL_SAFE_THRESHOLD = 3
 // lieu de deviner seul (src/utils/serverLiveState.js). Fusionné avec la version précédente (les
 // compétitions « froides » ne sont interrogées qu'une minute sur deux) ; un événement non revu depuis 6 h
 // est retiré. 1 lecture + 1 écriture par passe AVEC événements, rien sinon.
-const PUB_LIVE_KEY = 'pub:liveState'
+// ⚠️ PLAN GRATUIT CLOUDFLARE (06/11) : 10 ms de calcul et 50 sous-requêtes par exécution, et ce Worker
+// en consomme déjà beaucoup les soirs chargés. Les 2 publications (état officiel + matchs du jour) tiennent
+// donc dans UNE clé `pub:all` : lecture de la version précédente dans le mget de début de passe (0
+// sous-requête en plus), et au plus 1 écriture — seulement si le contenu a changé (minute, score, statut)
+// ou si la dernière écriture a plus de 2 min (pour que les lecteurs sachent que c'est toujours à jour).
+const PUB_ALL_KEY = 'pub:all'
 const PUB_LIVE_KEEP_MS = 6 * 3600 * 1000
-async function publishLiveState(kv, allEvents, finalIds, now, log) {
-  if (!allEvents?.length) return
-  try {
-    const nowMs = now.getTime()
-    const prev = safeJsonParse(await kv.get(PUB_LIVE_KEY), {})?.events ?? {}
-    const events = { ...prev }
-    for (const { slug, evt } of allEvents) {
-      const comp = evt?.competitions?.[0]
-      const st = comp?.status ?? evt?.status
-      if (!evt?.id || !st) continue
-      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
-      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
-      events[String(evt.id)] = {
-        slug,
-        state:  st.type?.state ?? null,
-        status: st.type?.name ?? null,
-        clock:  st.displayClock ?? null,
-        period: st.period ?? null,
-        home:   homeC?.score != null ? Number(homeC.score) : null,
-        away:   awayC?.score != null ? Number(awayC.score) : null,
-        final:  finalIds.has(evt.id) || finalIds.has(String(evt.id)),
-        seenAt: nowMs,
-      }
-    }
-    for (const [id, e] of Object.entries(events)) {
-      if (!e || nowMs - (e.seenAt ?? 0) > PUB_LIVE_KEEP_MS) delete events[id]
-    }
-    await kv.set(PUB_LIVE_KEY, JSON.stringify({ updatedAt: nowMs, events }), { ex: 6 * 3600 })
-  } catch (e) {
-    log.push(`[pub:liveState] error=${e.message}`)
-  }
-}
+const PUB_REFRESH_MS = 2 * 60_000
 
-// ── Matchs du jour préparés par le serveur (06/11, refonte « le serveur prépare l'Accueil ») ──────
-// Le Worker récupère déjà chaque minute les matchs ESPN du jour et de la veille (UTC) de toutes les
-// compétitions suivies. On publie ce résultat, réduit aux champs que l'app lit (normalizeEvent,
-// src/utils/espnAdapter.js), sous `pub:sbFeed` : l'Accueil fait UNE requête (api/espn.js, mode feed)
-// au lieu d'une vingtaine de calendriers de 75 à 460 jours. Fusion avec la version précédente (toutes
-// les compétitions ne sont pas interrogées à chaque minute) ; seules les 2 dates courantes sont gardées.
-// 1 lecture + 1 écriture par passe qui interroge ESPN, rien sinon.
-const PUB_SB_FEED_KEY = 'pub:sbFeed'
 function compactScoreboardEvent(e) {
   const c = e?.competitions?.[0]
   const st = c?.status
@@ -668,22 +634,65 @@ function compactScoreboardEvent(e) {
     }] : [],
   }
 }
-async function publishScoreboardFeed(kv, allResults, today, yesterday, now, log) {
-  const fetched = (allResults ?? []).filter(r => r.status === 'fulfilled' && r.value?.res?.ok)
-  if (fetched.length === 0) return
+// Empreinte courte (FNV-1a 32 bits) du contenu, gardée dans la publication : évite de recalculer celle de
+// la version précédente à chaque passe (budget de 10 ms de calcul du plan gratuit).
+function fnv1a(str) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) }
+  return (h >>> 0).toString(36)
+}
+function pubSignature(live, feed) {
+  // Contenu sans les horodatages qui changent à chaque passe.
+  const l = Object.entries(live).map(([id, e]) => `${id}:${e.state}:${e.status}:${e.clock}:${e.period}:${e.home}:${e.away}:${e.final}`).sort().join('|')
+  const f = Object.entries(feed).map(([k, v]) => `${k}:${JSON.stringify(v.events)}`).sort().join('|')
+  return `${l}#${f}`
+}
+
+async function publishAll(kv, rawPrev, allEvents, allResults, finalIds, today, yesterday, now, log) {
+  if (!allEvents?.length && !(allResults ?? []).some(r => r.value?.res?.ok)) return
   try {
     const nowMs = now.getTime()
-    const prev = safeJsonParse(await kv.get(PUB_SB_FEED_KEY), {})?.entries ?? {}
-    const keep = new Set([today, yesterday])
-    const entries = {}
-    for (const [k, v] of Object.entries(prev)) if (keep.has(k.split('|')[0])) entries[k] = v
-    for (const r of fetched) {
-      const { pair, res } = r.value
-      entries[`${pair.date}|${pair.slug}`] = { at: nowMs, events: (res.events ?? []).map(compactScoreboardEvent) }
+    const prev = safeJsonParse(rawPrev, {}) ?? {}
+    // 1. état officiel des matchs (voir api/fifa-live.js, src/utils/serverLiveState.js)
+    const live = { ...(prev.live?.events ?? {}) }
+    for (const { slug, evt } of allEvents ?? []) {
+      const comp = evt?.competitions?.[0]
+      const st = comp?.status ?? evt?.status
+      if (!evt?.id || !st) continue
+      const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
+      const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+      live[String(evt.id)] = {
+        slug,
+        state:  st.type?.state ?? null,
+        status: st.type?.name ?? null,
+        clock:  st.displayClock ?? null,
+        period: st.period ?? null,
+        home:   homeC?.score != null ? Number(homeC.score) : null,
+        away:   awayC?.score != null ? Number(awayC.score) : null,
+        final:  finalIds.has(evt.id) || finalIds.has(String(evt.id)),
+        seenAt: nowMs,
+      }
     }
-    await kv.set(PUB_SB_FEED_KEY, JSON.stringify({ updatedAt: nowMs, dates: [today, yesterday], entries }), { ex: 36 * 3600 })
+    for (const [id, e] of Object.entries(live)) if (!e || nowMs - (e.seenAt ?? 0) > PUB_LIVE_KEEP_MS) delete live[id]
+    // 2. matchs du jour et de la veille (voir api/espn.js mode feed, useTodayMatches.js)
+    const keep = new Set([today, yesterday])
+    const feed = {}
+    for (const [k, v] of Object.entries(prev.feed?.entries ?? {})) if (keep.has(k.split('|')[0])) feed[k] = v
+    for (const r of allResults ?? []) {
+      if (r.status !== 'fulfilled' || !r.value?.res?.ok) continue
+      const { pair, res } = r.value
+      feed[`${pair.date}|${pair.slug}`] = { at: nowMs, events: (res.events ?? []).map(compactScoreboardEvent) }
+    }
+    const sig = fnv1a(pubSignature(live, feed))
+    if (sig === prev.sig && nowMs - (prev.updatedAt ?? 0) < PUB_REFRESH_MS) return
+    await kv.set(PUB_ALL_KEY, JSON.stringify({
+      updatedAt: nowMs,
+      sig,
+      live: { events: live },
+      feed: { dates: [today, yesterday], entries: feed },
+    }), { ex: 36 * 3600 })
   } catch (e) {
-    log.push(`[pub:sbFeed] error=${e.message}`)
+    log.push(`[pub:all] error=${e.message}`)
   }
 }
 
@@ -874,6 +883,7 @@ async function runOnePass(env) {
   // (aucune sous-requête en plus), même si ce chemin fait un early-return :
   // coût négligeable, évite un aller-retour Redis séparé plus bas.
   let rawLiveSlugs = null
+  let rawPubAll = null // publication précédente (voir publishAll), lue dans le mget existant : 0 sous-requête en plus
   // ⚠️ BUG CRITIQUE CORRIGÉ (14/10, même soirée que le fix hotSlugs/
   // noMatchFlags/runOnePass try-catch ci-dessus/plus bas — nouveau trou de
   // 69min, 17:24→18:33, confirmé par /api/debug-push : zéro ligne de log
@@ -906,7 +916,8 @@ async function runOnePass(env) {
     log.push(`[cron:liveIds:scard] error=${e.message}`)
   }
   try {
-    const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey)
+    const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending, rawPub] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey, PUB_ALL_KEY)
+    rawPubAll = rawPub
     knownEmpty = !!rawEmpty
     skipUntil  = rawNextCheck
     emptyPendingAtStart = rawEmptyPending
@@ -2260,8 +2271,7 @@ async function runOnePass(env) {
     await Promise.allSettled(pendingFinalRechecks)
   }
 
-  await publishLiveState(kv, allEvents, alreadyDoneIds, now, log)
-  await publishScoreboardFeed(kv, allResults, today, yesterday, now, log)
+  await publishAll(kv, rawPubAll, allEvents, allResults, alreadyDoneIds, today, yesterday, now, log)
   return { events: allEvents.length, log }
 }
 

@@ -33,8 +33,9 @@ async function getPublishedLiveState() {
   if (Date.now() - _liveStateMemo.at < 10_000) return _liveStateMemo.events
   let events
   try {
-    const raw = await workerKvGet('pub:liveState')
-    events = raw ? (JSON.parse(raw)?.events ?? null) : null
+    // Clé commune `pub:all` (06/11, une seule écriture par passe côté Worker — plan gratuit Cloudflare).
+    const raw = await workerKvGet('pub:all')
+    events = raw ? (JSON.parse(raw)?.live?.events ?? null) : null
   } catch { events = null }
   _liveStateMemo = { at: Date.now(), events }
   return events
