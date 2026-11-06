@@ -483,6 +483,22 @@ function _checkPendingKickoffs(matches, queryClient) {
 // ─────────────────────────────────────────────
 // Safeguards FT — appelés avant le early return, même sans slugs à poller
 // ─────────────────────────────────────────────
+// ── Étape 2 (06/11) : le serveur décide de la fin des matchs qu'il suit ─────────────────────────
+// `serverManagedAt[mid]` = dernière fois qu'une réponse a apporté un état officiel RÉCENT pour ce match
+// (voir serverStateVerdict). Tant que c'est le cas (≤ 10 min), les règles « terminé » du téléphone
+// (garde-fous ci-dessous, double confirmation locale) ne s'appliquent PAS à ce match : seule la fin
+// confirmée par le serveur le termine. Elles restent la règle pour les matchs que le Worker ne suit
+// pas, et reprennent d'elles-mêmes si le serveur ne publie plus rien (panne).
+// Filet de sécurité : si ESPN annonce la fin depuis SERVER_FT_FALLBACK_MS sans confirmation serveur,
+// le téléphone termine le match lui-même (aucun match ne peut rester bloqué en direct à cause du serveur).
+const SERVER_MANAGED_MS      = 10 * 60_000
+const SERVER_FT_FALLBACK_MS  = 10 * 60_000
+const serverManagedAt = {}
+const espnFinalSince  = {}
+function isServerManaged(mid) {
+  return Date.now() - (serverManagedAt[mid] ?? 0) < SERVER_MANAGED_MS
+}
+
 function _runFtSafeguards(matches, now, queryClient) {
   // Pool combiné : matches FD.org du jour + matchs stockés dans liveTracker
   const allLive = [...matches]
@@ -508,6 +524,7 @@ function _runFtSafeguards(matches, now, queryClient) {
     if (!match) continue
     const mid = match.id
     if (getLiveState(mid).state === 'ended') continue
+    if (isServerManaged(mid)) continue
     if (!isTrackedLive(mid)) continue
     console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
     confirmFt(match, now, queryClient)
@@ -522,6 +539,7 @@ function _runFtSafeguards(matches, now, queryClient) {
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
+    if (isServerManaged(mid)) continue
     if (pendingFt[mid]) continue
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
     const espnStatus2 = getMatchState(mid).espnStatus
@@ -542,6 +560,7 @@ function _runFtSafeguards(matches, now, queryClient) {
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
+    if (isServerManaged(mid)) continue
     if (pendingFt[mid]) continue
     const fdMatch = allLive.find(m => m.id === mid)
     if (!fdMatch || fdMatch.status !== 'FINISHED') continue
@@ -606,6 +625,7 @@ function _runFtSafeguards(matches, now, queryClient) {
   for (const lm of getLiveMatches()) {
     const mid = lm.id
     if (getLiveState(mid).state === 'ended') continue
+    if (isServerManaged(mid)) continue
     if (pendingFt[mid]) continue
     if (!lastSeenInEspn[mid]) lastSeenInEspn[mid] = now
     const lastSeen = lastSeenInEspn[mid]
@@ -812,6 +832,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // enregistrée sur ce téléphone) → le verrou local « terminé » est levé. Sans donnée récente : rien
       // ne change, logique d'avant.
       const sv = serverStateVerdict(data.serverState)
+      if (sv.seenAt) serverManagedAt[mid] = Date.now()
       const serverLiftsLock = sv.live && liveStateInfo.state === 'ended' && sv.seenAt > (liveStateInfo.endedAt ?? 0)
       // ⚠️ BUG CORRIGÉ (constat utilisateur : un match VRAIMENT terminé
       // depuis longtemps réapparaît "en cours" quand on rouvre l'app
@@ -901,6 +922,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // CAS 1 : Match EN COURS — utilise safeStatus (statuts corrigés inclus)
       // ════════════════════════════════════════════════════════════════════
       if (!alreadyEnded && LIVE_ISH_STATUSES.has(safeStatus)) {
+        delete espnFinalSince[mid]
         if (getLiveState(mid).state !== 'live') setLiveState(mid, 'live')
         delete pendingFt[mid]
         if (!isStaleFtReversal) clearFtFlags(mid)
@@ -1107,6 +1129,25 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         if (espnStatus === 'STATUS_POSTPONED' || espnStatus === 'STATUS_CANCELED') {
           setLiveState(mid, 'ended', { endedAt: now })
           setTimeout(() => { markEnded(mid); clearMatchState(mid) }, 5 * 60_000)
+          continue
+        }
+
+        // Étape 2 (voir isServerManaged) : ESPN annonce la fin, mais pour un match suivi par le serveur,
+        // c'est lui qui tranche (sv.final est traité plus haut, avant CAS 1).
+        if (sv.seenAt) {
+          delete pendingFt[mid]
+          if (sv.live) {
+            // Le serveur le voit encore en cours : fausse fin ESPN, le match reste en direct.
+            delete espnFinalSince[mid]
+            markLive(match)
+            if (!isStaleFtReversal) clearFtFlags(mid)
+            continue
+          }
+          espnFinalSince[mid] ??= now
+          if (now - espnFinalSince[mid] < SERVER_FT_FALLBACK_MS) continue // on attend la confirmation serveur
+          console.log(`[useLiveMinute] Fin ESPN depuis ${Math.round((now - espnFinalSince[mid]) / 60000)} min sans confirmation serveur → FT local — match ${mid}`)
+          delete espnFinalSince[mid]
+          confirmFt(match, now, queryClient, data.espnEventId)
           continue
         }
 
