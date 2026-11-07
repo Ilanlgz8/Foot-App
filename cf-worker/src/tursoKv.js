@@ -39,7 +39,12 @@
 //
 // Cloudflare Workers n'a pas d'API réseau Node (pas de net/tls) — import
 // obligatoire de la variante edge-safe du client, basée sur fetch/HTTP.
-import { createClient } from '@libsql/client/web'
+// ⚠️ (08/11) Client Turso léger maison au lieu de @libsql/client/web : paquet
+// du Worker 456 → 342 Ko, ~20 % de CPU en moins mesuré en local (workerd),
+// même nombre d'appels HTTP (requêtes simultanées regroupées). Validé contre
+// la VRAIE base par scripts/test-turso-http.mjs (14/14, résultats identiques
+// au client officiel). @libsql/client reste en dépendance pour ce script.
+import { createTursoHttpClient } from './tursoHttp.js'
 
 function nowSec() { return Math.floor(Date.now() / 1000) }
 
@@ -56,7 +61,7 @@ function ttlSecFromOpts(opts) {
 
 export function createTursoKv({ url, authToken }) {
   if (!url || !authToken) return null
-  const rawClient = createClient({ url, authToken })
+  const rawClient = createTursoHttpClient({ url, authToken })
 
   // ⚠️ ALLÈGEMENT (07/11, plan gratuit Cloudflare — 10 ms CPU/passe, 50
   // sous-requêtes) : avant, CHAQUE passe (1/minute, un nouveau client par
