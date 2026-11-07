@@ -648,11 +648,14 @@ function pubSignature(live, feed) {
   return `${l}#${f}`
 }
 
-async function publishAll(kv, rawPrev, allEvents, allResults, finalIds, today, yesterday, now, log) {
-  if (!allEvents?.length && !(allResults ?? []).some(r => r.value?.res?.ok)) return
+async function publishAll(kv, prevParsed, allEvents, allResults, finalIds, today, yesterday, now, log, skippedIdlePairs = 0) {
+  // Couples « au repos » sautés (voir pairIsIdle dans runOnePass) : leur version
+  // publiée reste valable, on continue donc de rafraîchir updatedAt (sinon
+  // l'app jugerait le flux périmé et retomberait sur ~20 appels ESPN).
+  if (!allEvents?.length && !(allResults ?? []).some(r => r.value?.res?.ok) && !skippedIdlePairs) return
   try {
     const nowMs = now.getTime()
-    const prev = safeJsonParse(rawPrev, {}) ?? {}
+    const prev = prevParsed ?? {}
     // 1. état officiel des matchs (voir api/fifa-live.js, src/utils/serverLiveState.js)
     const live = { ...(prev.live?.events ?? {}) }
     for (const { slug, evt } of allEvents ?? []) {
@@ -1070,10 +1073,44 @@ async function runOnePass(env) {
   // match au lieu de 2-3), ce resserrement ne risque pas de recréer le
   // dépassement de budget qu'il visait justement à corriger.
   const NOMATCH_PROBE_EVERY_N_MIN = 2
+  // ⚠️ ÉCONOMIE (08/11, quota Vercel « Fluid Active CPU » du plan Hobby à
+  // 3h39/4h sur 30 jours glissants — au-delà Vercel met le projet en pause) :
+  // /api/espn = ~65 % du CPU Vercel, dont l'essentiel vient de CE Worker
+  // (21K appels ESPN en 12 h). Un couple slug+date dont la dernière version
+  // publiée (pub:all, déjà lu en début de passe : 0 sous-requête en plus) ne
+  // contient QUE des matchs pas encore proches du coup d'envoi (> 10 min) ou
+  // terminés depuis longtemps (coup d'envoi > 3 h) n'a rien à apprendre
+  // chaque minute → il n'est plus interrogé que 2 minutes sur 15 (les deux
+  // parités, pour garder la couverture complète qui arme le mode repos plus
+  // bas) ou si sa version publiée a plus d'1 h. Jamais sauté : slug en direct
+  // (hotSlugs), couple sans version publiée, liste vide (logique noMatch
+  // inchangée), match au statut inattendu, coup d'envoi passé mais pas encore
+  // « post », match fini depuis moins de 3 h (confirmation de fin + retours
+  // en arrière). Les couples sautés gardent leur dernière version dans pub:all.
+  const prevPub = safeJsonParse(rawPubAll, null)
+  const prevFeedEntries = prevPub?.feed?.entries ?? {}
+  const nowMsPairs = now.getTime()
+  const idleRefreshMinute = now.getMinutes() % 15 < 2
+  const pairIsIdle = (p) => {
+    const entry = prevFeedEntries[`${p.date}|${p.slug}`]
+    if (!entry || !Array.isArray(entry.events) || entry.events.length === 0) return false
+    if (nowMsPairs - (entry.at ?? 0) > 60 * 60_000) return false
+    return entry.events.every(e => {
+      const ko = Date.parse(e?.date)
+      const state = e?.competitions?.[0]?.status?.type?.state
+      if (!Number.isFinite(ko)) return false
+      if (state === 'pre') return ko > nowMsPairs + 10 * 60_000
+      if (state === 'post') return ko < nowMsPairs - 3 * 3600_000
+      return false
+    })
+  }
+  let skippedIdlePairs = 0
   const pairsToFetch = slugDatePairs.filter(p => {
     if (hotSlugs.has(p.slug)) return true
     if (noMatchFlags.has(p.key)) return now.getMinutes() % NOMATCH_PROBE_EVERY_N_MIN === 0
-    return isColdSlugActiveThisMinute(p.slug)
+    if (!isColdSlugActiveThisMinute(p.slug)) return false
+    if (!idleRefreshMinute && pairIsIdle(p)) { skippedIdlePairs++; return false }
+    return true
   })
   // Voir fetchEspnEventsBatch (plus haut) : regroupe tous les pairsToFetch
   // par date (today/yesterday, au plus 2 groupes) en au plus 2 appels Vercel
@@ -2271,7 +2308,7 @@ async function runOnePass(env) {
     await Promise.allSettled(pendingFinalRechecks)
   }
 
-  await publishAll(kv, rawPubAll, allEvents, allResults, alreadyDoneIds, today, yesterday, now, log)
+  await publishAll(kv, prevPub, allEvents, allResults, alreadyDoneIds, today, yesterday, now, log, skippedIdlePairs)
   return { events: allEvents.length, log }
 }
 
