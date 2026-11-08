@@ -417,13 +417,20 @@ function MatchRowPlaceholder({ innerRef }) {
 // stable hors refetch) — même principe déjà appliqué à MatchPoster.jsx/
 // MatchCard.jsx le 27/10 pour le même symptôme (flash noir au scroll Accueil,
 // cause réelle : re-render de masse non mémoïsé).
-const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, formMapByComp, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
+const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, saveStatus, onSave, formMapByComp, matchesByComp, lowerDivByComp, nextMatchId, registerInputRef, focusInput }) {
   const [home, setHome] = useState(myPred?.home ?? '')
   const [away, setAway] = useState(myPred?.away ?? '')
+  // Dernières valeurs saisies, lues par commit() : le blur d'une case part
+  // AVANT le re-rendu qui suit la frappe — avec l'état seul, il envoyait
+  // l'ancienne valeur (ex. 1-0 → taper 2 à domicile envoyait encore 1-0).
+  const homeRef = useRef(home)
+  const awayRef = useRef(away)
 
   useEffect(() => {
     setHome(myPred?.home ?? '')
     setAway(myPred?.away ?? '')
+    homeRef.current = myPred?.home ?? ''
+    awayRef.current = myPred?.away ?? ''
   }, [myPred?.home, myPred?.away, match.id])
 
   const commitScore = (h, a) => {
@@ -431,20 +438,22 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, f
       onSave(match.id, h, a)
     }
   }
-  const commit = () => commitScore(parseInt(home, 10), parseInt(away, 10))
+  const commit = () => commitScore(parseInt(homeRef.current, 10), parseInt(awayRef.current, 10))
 
   const isFreshDigit = (v) => v.length === 1 && /^[0-9]$/.test(v)
 
   const handleHomeChange = (e) => {
     const v = e.target.value
+    homeRef.current = v
     setHome(v)
     if (isFreshDigit(v)) focusInput(match.id, 'away')
   }
   const handleAwayChange = (e) => {
     const v = e.target.value
+    awayRef.current = v
     setAway(v)
     if (isFreshDigit(v)) {
-      commitScore(parseInt(home, 10), parseInt(v, 10))
+      commitScore(parseInt(homeRef.current, 10), parseInt(v, 10))
       if (nextMatchId) focusInput(nextMatchId, 'home')
     }
   }
@@ -490,6 +499,11 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, f
               ref={el => registerInputRef(match.id, 'away', el)}
             />
           </div>
+          {saveStatus && (
+            <div className={`pronos__saveStatus${saveStatus.error ? ' pronos__saveStatus--error' : ''}`}>
+              {saveStatus.error ? `Non enregistré : ${saveStatus.error}` : 'Envoi en cours… (gardé sur ton téléphone)'}
+            </div>
+          )}
           {potentialPoints != null && (
             <div className="pronos__pointsHint">
               <span className="pronos__pointsHintValue">+{potentialPoints}</span> pt{potentialPoints > 1 ? 's' : ''} si bon résultat
@@ -507,6 +521,7 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, onSave, f
 }, (prev, next) => {
   if (prev.match !== next.match) return false
   if (prev.myPred?.home !== next.myPred?.home || prev.myPred?.away !== next.myPred?.away) return false
+  if (prev.saveStatus?.error !== next.saveStatus?.error || !!prev.saveStatus !== !!next.saveStatus) return false
   if (prev.nextMatchId !== next.nextMatchId) return false
   if (prev.onSave !== next.onSave) return false
   if (prev.registerInputRef !== next.registerInputRef) return false
@@ -684,7 +699,7 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
 const AI_ASSISTANT_ENABLED = false
 
 function Pronos() {
-  const { deviceId, groupCode, hasGroup, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
+  const { deviceId, groupCode, hasGroup, myPreds, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
   // Switcher tout en haut de page (demande utilisateur, 28/08 : "faudrait que
   // tout en haut de la page on puisse switch entre la page actuel prono et
   // une page simulateur") — PAS un 4e onglet mélangé à Pronos/Résultat/
@@ -730,7 +745,7 @@ function Pronos() {
   // active dès l'arrivée sur la page). Désormais lancée dès qu'on a un groupe,
   // comme upcoming — la donnée est déjà chaude quand on clique sur l'onglet.
   const { matches: finished } = useFinishedMatchesAllComps(COMP_IDS, hasGroup)
-  const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup)
+  const { players, predictions, refresh } = usePronosGroupData(groupCode, hasGroup, deviceId, myPreds)
   const { liveMatches, espnScores } = useLiveData()
 
   // Forme récente (pour calcProno → système de points variable, voir plus
@@ -962,8 +977,8 @@ function Pronos() {
       await predict(matchId, home, away)
       refresh()
     } catch {
-      // Échec silencieux (réseau) : la case garde la valeur saisie localement,
-      // l'utilisateur peut réessayer en la modifiant à nouveau.
+      // Échec : le prono reste gardé sur le téléphone et sera renvoyé
+      // automatiquement (voir usePronosGroup) ; la ligne affiche l'état.
     }
   }, [predict, refresh])
 
@@ -1055,6 +1070,7 @@ function Pronos() {
                         key={m.id}
                         match={m}
                         myPred={predictions[String(m.id)]?.[deviceId]}
+                        saveStatus={myPreds[String(m.id)] && !myPreds[String(m.id)].synced ? myPreds[String(m.id)] : null}
                         onSave={handlePredict}
                         formMapByComp={formMapByComp}
                         matchesByComp={matchesByComp}

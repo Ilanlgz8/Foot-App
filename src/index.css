@@ -245,7 +245,10 @@ body {
    sur un PNG à fond transparent) plutôt qu'une plaque de fond blanche
    pleine : donne un léger halo blanc ("un pré-blanc", pas du blanc plein)
    qui distingue le tracé noir du fond sans dénaturer le blason. */
-img[data-team="Juventus"] {
+/* (08/11) `*=` + `i` : les classements (football-data.org) nomment le club
+   « Juventus FC », pas « Juventus » → l'ancien sélecteur exact ne s'y
+   appliquait pas (constat utilisateur : pas de contour dans Classement). */
+img[data-team*="Juventus" i] {
   filter:
     drop-shadow(0 0 1px rgba(255,255,255,.9))
     drop-shadow(0 0 1px rgba(255,255,255,.9))

@@ -51,7 +51,7 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
         <span className="myTeamBanner__team">
           {match.homeTeam?.crest
             ? <span className="myTeamBanner__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-                <img src={match.homeTeam.crest} alt="" className="myTeamBanner__crest" />
+                <img src={match.homeTeam.crest} alt="" className="myTeamBanner__crest" data-team={match.homeTeam?.name} />
               </span>
             : <span className="myTeamBanner__crestEmpty" />}
           <span className="myTeamBanner__name">{homeName}</span>
@@ -69,7 +69,7 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
         <span className="myTeamBanner__team myTeamBanner__team--away">
           {match.awayTeam?.crest
             ? <span className="myTeamBanner__crestWrap" data-crest={isWC ? 'country' : 'club'}>
-                <img src={match.awayTeam.crest} alt="" className="myTeamBanner__crest" />
+                <img src={match.awayTeam.crest} alt="" className="myTeamBanner__crest" data-team={match.awayTeam?.name} />
               </span>
             : <span className="myTeamBanner__crestEmpty" />}
           <span className="myTeamBanner__name">{awayName}</span>

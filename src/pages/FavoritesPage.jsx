@@ -152,7 +152,7 @@ export default function FavoritesPage() {
                   onClick={() => handleToggleClub(t)}
                   type="button"
                 >
-                  {t.crest && <img src={t.crest} alt="" />}
+                  {t.crest && <img src={t.crest} alt="" data-team={t.name} />}
                   <span>{translateTeam(t.shortName || t.name)}</span>
                   <span className="favPage__clubChipX" aria-hidden="true">×</span>
                 </button>

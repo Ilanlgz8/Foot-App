@@ -597,7 +597,7 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
                   <div className={`teamSearchPage__matchSide${isHome ? ' teamSearchPage__matchSide--self' : ''}`}>
                     <div className="teamSearchPage__matchCrestWrap">
                       {match.homeTeam?.crest
-                        ? <img src={match.homeTeam.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                        ? <img src={match.homeTeam.crest} alt="" data-team={match.homeTeam?.name} onError={e => { e.currentTarget.style.display = 'none' }} />
                         : <span className="teamSearchPage__matchCrestFb">{homeName.charAt(0)}</span>}
                     </div>
                     <span className="teamSearchPage__matchSideName">{homeName}</span>
@@ -624,7 +624,7 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
                   <div className={`teamSearchPage__matchSide${!isHome ? ' teamSearchPage__matchSide--self' : ''}`}>
                     <div className="teamSearchPage__matchCrestWrap">
                       {match.awayTeam?.crest
-                        ? <img src={match.awayTeam.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                        ? <img src={match.awayTeam.crest} alt="" data-team={match.awayTeam?.name} onError={e => { e.currentTarget.style.display = 'none' }} />
                         : <span className="teamSearchPage__matchCrestFb">{awayName.charAt(0)}</span>}
                     </div>
                     <span className="teamSearchPage__matchSideName">{awayName}</span>
@@ -713,7 +713,7 @@ export default function TeamSearchPage() {
                   className="teamSearchPage__suggestItem"
                   onClick={() => handlePick(c)}
                 >
-                  {c.crest && <img src={c.crest} alt="" onError={e => { e.currentTarget.style.display = 'none' }} />}
+                  {c.crest && <img src={c.crest} alt="" data-team={c.name} onError={e => { e.currentTarget.style.display = 'none' }} />}
                   <span>{c.displayName}</span>
                 </button>
               ))

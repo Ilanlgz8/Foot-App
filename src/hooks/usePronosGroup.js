@@ -12,12 +12,35 @@
  * Toutes les requêtes réseau passent par api/pulse.js (createGroup/join/predict),
  * même fichier que la courbe de bascule — pas de nouvel endpoint (limite
  * 12/12 functions Vercel Hobby).
+ *
+ * ⚠️ PRONOS QUI NE S'ENREGISTRAIENT PAS (08/11, constat utilisateur : « ça
+ * enregistre pas dès que je push une modif sur Vercel et quand je redémarre
+ * l'app »). Avant : le prono n'existait QUE côté serveur. Un envoi raté
+ * (réseau, app rechargée par une mise à jour pendant l'envoi, Redis
+ * indisponible, limite de requêtes) était ignoré en silence — la case gardait
+ * le chiffre tapé, donc tout semblait enregistré… jusqu'au redémarrage. Et la
+ * relecture juste après l'envoi passait par un cache CDN (8 s + 30 s
+ * stale-while-revalidate) qui pouvait renvoyer l'ancienne version.
+ * Désormais :
+ *   1. chaque prono est d'abord écrit en localStorage (`pronos_my_preds`),
+ *      AVANT l'envoi — il survit à un rechargement, une mise à jour, un
+ *      redémarrage ;
+ *   2. tant que le serveur n'a pas confirmé, il est renvoyé automatiquement
+ *      (au retour sur l'app, au retour du réseau, puis toutes les 30 s) ;
+ *   3. l'affichage de MES pronos utilise la copie locale (toujours la dernière
+ *      saisie), plus jamais une relecture serveur périmée ;
+ *   4. la ligne indique l'état : envoi en cours / pas encore enregistré.
+ * Erreurs définitives (400/403 : groupe expiré, joueur absent du groupe) :
+ * pas de renvoi en boucle, la ligne affiche l'erreur.
  */
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 const LS_DEVICE = 'pronos_device_id'
 const LS_GROUP  = 'pronos_group' // { code, name }
+const LS_MY_PREDS = 'pronos_my_preds' // { [code]: { [matchId]: { home, away, at, synced, error } } }
+const RETRY_EVERY_MS = 30_000
+const LOCAL_KEEP_MS = 60 * 24 * 3600 * 1000 // même durée que GROUP_TTL côté serveur
 
 function getDeviceId() {
   try {
@@ -49,6 +72,60 @@ function persistGroupInfo(info) {
   } catch {}
 }
 
+// ── Copie locale de MES pronos ─────────────────────────────────────────────
+// Petit magasin externe (useSyncExternalStore) : toutes les lignes et la page
+// voient la même version, mise à jour immédiatement à chaque saisie.
+let myPredsCache = null
+const listeners = new Set()
+
+function readAllMyPreds() {
+  if (myPredsCache) return myPredsCache
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_MY_PREDS) ?? 'null')
+    myPredsCache = raw && typeof raw === 'object' ? raw : {}
+  } catch {
+    myPredsCache = {}
+  }
+  return myPredsCache
+}
+
+function writeAllMyPreds(next) {
+  // Purge des pronos trop anciens (le serveur les a oubliés aussi).
+  const now = Date.now()
+  for (const code of Object.keys(next)) {
+    for (const [mid, p] of Object.entries(next[code] ?? {})) {
+      if (!p || now - (p.at ?? 0) > LOCAL_KEEP_MS) delete next[code][mid]
+    }
+    if (Object.keys(next[code] ?? {}).length === 0) delete next[code]
+  }
+  myPredsCache = next
+  try { localStorage.setItem(LS_MY_PREDS, JSON.stringify(next)) } catch {}
+  for (const l of listeners) l()
+}
+
+function updateMyPred(code, matchId, patch) {
+  const all = readAllMyPreds()
+  const forCode = { ...(all[code] ?? {}) }
+  forCode[matchId] = { ...(forCode[matchId] ?? {}), ...patch }
+  writeAllMyPreds({ ...all, [code]: forCode })
+}
+
+function subscribe(l) {
+  listeners.add(l)
+  const onStorage = (e) => { if (e.key === LS_MY_PREDS) { myPredsCache = null; l() } }
+  window.addEventListener('storage', onStorage)
+  return () => { listeners.delete(l); window.removeEventListener('storage', onStorage) }
+}
+
+function useMyPreds(code) {
+  const all = useSyncExternalStore(subscribe, readAllMyPreds, readAllMyPreds)
+  return code ? (all[code] ?? {}) : {}
+}
+
+class PulseError extends Error {
+  constructor(message, status) { super(message); this.status = status }
+}
+
 async function postPulse(body) {
   const res = await fetch('/api/pulse', {
     method:  'POST',
@@ -56,19 +133,69 @@ async function postPulse(body) {
     body:    JSON.stringify(body),
   })
   const json = await res.json().catch(() => ({}))
-  if (!res.ok || !json.ok) throw new Error(json.error || `Erreur ${res.status}`)
+  if (!res.ok || !json.ok) throw new PulseError(json.error || `Erreur ${res.status}`, res.status)
   return json
+}
+
+// Erreur définitive = la requête ne réussira jamais telle quelle (données
+// refusées, joueur absent du groupe). Tout le reste (réseau, 429, 5xx) se
+// réessaie.
+const isPermanentError = (e) => e?.status === 400 || e?.status === 403 || e?.status === 413
+
+const inFlight = new Set()
+
+async function sendPred(deviceId, code, matchId, p) {
+  const key = `${code}|${matchId}`
+  if (inFlight.has(key)) return
+  inFlight.add(key)
+  try {
+    await postPulse({ action: 'predict', deviceId, code, matchId: String(matchId), home: p.home, away: p.away })
+    // Ne marque « enregistré » que si la saisie n'a pas changé pendant l'envoi.
+    const cur = readAllMyPreds()[code]?.[matchId]
+    if (cur && cur.home === p.home && cur.away === p.away) updateMyPred(code, matchId, { synced: true, error: null })
+  } catch (e) {
+    updateMyPred(code, matchId, { synced: false, error: isPermanentError(e) ? e.message : null })
+    throw e
+  } finally {
+    inFlight.delete(key)
+  }
+}
+
+function flushPending(deviceId, code) {
+  if (!code) return
+  const preds = readAllMyPreds()[code] ?? {}
+  for (const [matchId, p] of Object.entries(preds)) {
+    if (p && !p.synced && !p.error) sendPred(deviceId, code, matchId, p).catch(() => {})
+  }
 }
 
 export function usePronosGroup() {
   const [deviceId]  = useState(getDeviceId)
   const [group, setGroup] = useState(getGroupInfo)
+  const myPreds = useMyPreds(group?.code)
 
   useEffect(() => {
     const onStorage = (e) => { if (e.key === LS_GROUP) setGroup(getGroupInfo()) }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
+
+  // Renvoi automatique des pronos pas encore confirmés par le serveur.
+  const code = group?.code
+  useEffect(() => {
+    if (!code) return
+    const flush = () => flushPending(deviceId, code)
+    flush()
+    const onVisible = () => { if (document.visibilityState === 'visible') flush() }
+    window.addEventListener('online', flush)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(flush, RETRY_EVERY_MS)
+    return () => {
+      window.removeEventListener('online', flush)
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(timer)
+    }
+  }, [deviceId, code])
 
   const createGroup = useCallback(async (name) => {
     const json = await postPulse({ action: 'createGroup', deviceId, name })
@@ -94,7 +221,14 @@ export function usePronosGroup() {
 
   const predict = useCallback(async (matchId, home, away) => {
     if (!group?.code) throw new Error('Aucun groupe actif')
-    return postPulse({ action: 'predict', deviceId, code: group.code, matchId: String(matchId), home, away })
+    const mid = String(matchId)
+    const prev = readAllMyPreds()[group.code]?.[mid]
+    // Rien à faire si c'est exactement le prono déjà enregistré.
+    if (prev && prev.home === home && prev.away === away && prev.synced) return { ok: true }
+    // 1) copie locale d'abord — survit à un rechargement pendant l'envoi
+    updateMyPred(group.code, mid, { home, away, at: Date.now(), synced: false, error: null })
+    // 2) envoi ; en cas d'échec réseau/serveur, le renvoi automatique prend le relais
+    return sendPred(deviceId, group.code, mid, { home, away })
   }, [deviceId, group])
 
   return {
@@ -102,6 +236,7 @@ export function usePronosGroup() {
     groupCode: group?.code ?? null,
     pseudo:    group?.name ?? null,
     hasGroup:  !!group?.code,
+    myPreds,
     createGroup,
     joinGroup,
     leaveGroup,
@@ -109,10 +244,10 @@ export function usePronosGroup() {
   }
 }
 
-// Données du groupe (joueurs + pronostics) — pollées légèrement pour voir les
-// pronostics des amis se mettre à jour (lecture Redis seule, coût minime,
-// aucun appel ESPN/FD.org donc aucun impact sur le budget cron).
-export function usePronosGroupData(code, enabled = true) {
+// `deviceId` + `myPreds` (optionnels) : MES pronos sont remplacés par la copie
+// locale, toujours la plus récente — une relecture serveur encore en cache
+// (CDN 8 s + 30 s) ne peut plus faire « disparaître » un prono tout juste saisi.
+export function usePronosGroupData(code, enabled = true, deviceId = null, myPreds = null) {
   const queryClient = useQueryClient()
 
   const { data, isLoading, error } = useQuery({
@@ -133,9 +268,21 @@ export function usePronosGroupData(code, enabled = true) {
     queryClient.invalidateQueries({ queryKey: ['pronosGroup', code] })
   }, [queryClient, code])
 
+  const serverPredictions = data?.predictions
+  const predictions = useMemo(() => {
+    const base = serverPredictions ?? {}
+    if (!deviceId || !myPreds || Object.keys(myPreds).length === 0) return base
+    const merged = { ...base }
+    for (const [mid, p] of Object.entries(myPreds)) {
+      if (!p || !Number.isInteger(p.home) || !Number.isInteger(p.away)) continue
+      merged[mid] = { ...(merged[mid] ?? {}), [deviceId]: { home: p.home, away: p.away } }
+    }
+    return merged
+  }, [serverPredictions, deviceId, myPreds])
+
   return {
     players:     data?.players ?? {},
-    predictions: data?.predictions ?? {},
+    predictions,
     isLoading,
     error: error?.message ?? null,
     refresh: invalidate,

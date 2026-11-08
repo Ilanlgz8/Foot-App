@@ -352,6 +352,14 @@
    la barre de pronostic de l'Accueil) : un outsider rapporte plus qu'un
    favori évident. Le bonus score exact est affiché en dessous, plus discret
    (il s'ajoute, il ne remplace pas). */
+.pronos__saveStatus {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.35;
+}
+.pronos__saveStatus--error { color: #f87171; }
 .pronos__pointsHint {
   font-size: 0.62rem;
   font-weight: 600;

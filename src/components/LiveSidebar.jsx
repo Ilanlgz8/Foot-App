@@ -58,14 +58,14 @@ function SidebarRow({ match, isActive, onClick }) {
       <span className={`lmpSide__badge${isTermine ? ' lmpSide__badge--ft' : ''}`}>{label}</span>
       <span className="lmpSide__team">
         {match.homeTeam?.crest
-          ? <span className="lmpSide__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="lmpSide__crest" /></span>
+          ? <span className="lmpSide__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.homeTeam.crest} alt="" className="lmpSide__crest" data-team={match.homeTeam?.name} /></span>
           : <span className="lmpSide__crestFb">{homeName?.[0] ?? ''}</span>}
         <span className="lmpSide__name">{homeName}</span>
         <span className="lmpSide__score">{hs ?? '-'}</span>
       </span>
       <span className="lmpSide__team">
         {match.awayTeam?.crest
-          ? <span className="lmpSide__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="lmpSide__crest" /></span>
+          ? <span className="lmpSide__crestWrap" data-crest={isWC ? 'country' : 'club'}><img src={match.awayTeam.crest} alt="" className="lmpSide__crest" data-team={match.awayTeam?.name} /></span>
           : <span className="lmpSide__crestFb">{awayName?.[0] ?? ''}</span>}
         <span className="lmpSide__name">{awayName}</span>
         <span className="lmpSide__score">{as_ ?? '-'}</span>
