@@ -423,14 +423,17 @@ img[data-team*="Juventus" i] {
    qu'Inter à taille égale (0,68 vs 0,74 em) : cards +9% (2.4rem), Match du
    jour réglé en conséquence. Les minutes de match, noms de buteurs et autres
    textes ne sont PAS concernés. */
+/* (08/11) HEURES → Rajdhani 700 (choix utilisateur n°4 parmi 13 polices
+   comparées : angles carrés, look tableau d'affichage). Bricolage Grotesque
+   reste chargée (autres usages possibles), seule l'heure change. */
 #root .poster__time,
 #root .matchs__scoreHour,
 #root .mp__hero__time,
 #root .modal__hour,
 #root .teamSearchPage__matchKickoff,
 #root .pronos__metaTime {
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-  font-weight: 800;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-weight: 700;
   font-style: normal;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
@@ -493,8 +496,8 @@ img[data-team*="Juventus" i] {
   letter-spacing: 0.04em;
 }
 #root .lmp__hero .mp__hero__time {
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-  font-weight: 800;
+  font-family: 'Rajdhani', system-ui, sans-serif; /* 08/11 : comme toutes les heures */
+  font-weight: 700;
   -webkit-text-stroke: 0;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -539,15 +542,15 @@ img[data-team*="Juventus" i] {
    Orbitron a des glyphes larges et une grande hauteur d'x : taille réduite
    d'environ 20% par rapport à Archivo Black pour occuper la même place. */
 #root .accueil__mdjClock .accueil__mdjBigNum {
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-  font-weight: 800;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-weight: 700;
   font-style: normal;
   font-size: 3.1rem;
   letter-spacing: 0.01em;
 }
 #root .accueil__mdjClock .accueil__mdjClockSep {
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-  font-weight: 800;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-weight: 700;
   font-style: normal;
   font-size: 2.5rem;
 }

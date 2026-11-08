@@ -269,7 +269,7 @@ function App() {
   useEffect(() => {
     if (!('fonts' in document)) return
     const FACES = [
-      '600 16px "Chakra Petch"', '700 16px "Chakra Petch"', '800 16px "Bricolage Grotesque"',
+      '600 16px "Chakra Petch"', '700 16px "Chakra Petch"', '800 16px "Bricolage Grotesque"', '700 16px "Rajdhani"',
       '700 16px "Archivo"', '900 16px "Archivo"',
       '400 16px "Archivo Black"',
       '400 16px "Russo One"',
