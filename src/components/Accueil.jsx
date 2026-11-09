@@ -685,15 +685,19 @@ function Accueil() {
       // badge "(x-y tab)" de MatchCard restait vide pour un match qu'ESPN
       // détecte fini avant que football-data.org ne le confirme.
       const wentToPens = es?.homeShootout != null && es?.awayShootout != null
+      // 09/11 : même correctif que Resultat.jsx — score de la liste (match déjà TERMINÉ) prioritaire,
+      // sinon le suivi direct pendant la séance de tab pouvait cumuler score 120 min + tab.
+      const listFinal = m.status === 'FINISHED' && m.score?.fullTime?.home != null && m.score?.fullTime?.away != null
+      const listPens  = m.score?.duration === 'PENALTY_SHOOTOUT' && m.score?.penalties?.home != null
       return {
         ...m,
         score: {
           ...m.score,
-          fullTime: {
+          fullTime: listFinal ? m.score.fullTime : {
             home: mergeScore(es?.home, lsHome ?? m.score?.fullTime?.home),
             away: mergeScore(es?.away, lsAway ?? m.score?.fullTime?.away),
           },
-          ...(wentToPens ? {
+          ...(wentToPens && !listPens ? {
             duration: 'PENALTY_SHOOTOUT',
             penalties: { home: es.homeShootout, away: es.awayShootout },
           } : {}),

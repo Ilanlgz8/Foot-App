@@ -26,7 +26,7 @@
 //     que le fallback par jour pour NL/CAN/COPA si leurs phases finales
 //     utilisent la même convention de nommage (pas vérifié, sans impact si
 //     faux : retombe simplement sur le regroupement par jour existant).
-//   - Pas de score.penalties : ESPN ne distingue pas clairement le score
+//   - (Obsolète depuis le 09/11 : score.penalties est rempli depuis shootoutScore, voir normalizeEvent.) Pas de score.penalties : ESPN ne distingue pas clairement le score
 //     120min du score final en cas de tirs au but sur ces flux (contrairement
 //     à FD.org, voir finalScore() dans matchUtils.js) — un match de coupe
 //     décidé aux tab peut donc afficher un score à égalité dans le tableau
@@ -257,6 +257,19 @@ function normalizeEvent(event, compCode, overrides = {}) {
   const homeScore = played && home.score != null ? parseInt(home.score, 10) : null
   const awayScore = played && away.score != null ? parseInt(away.score, 10) : null
 
+  // ⚠️ (09/11, constat utilisateur : match de FA Cup aux tirs au but affiché avec le score
+  // 120 min + les tab cumulés dans Résultats). ESPN donne le score 120 min dans `score` et
+  // les tirs au but à part dans `shootoutScore` (vérifié : Stafford Rangers–Grimsby, score
+  // 3-3, shootoutScore 2-3, STATUS_FINAL_PEN). On les expose comme football-data.org :
+  // `duration: 'PENALTY_SHOOTOUT'` + `penalties` → les cards affichent « 3 – 3 » et
+  // « T.A.B (2-3) » en dessous, et le vainqueur est bien celui des tab.
+  const statusName = comp.status?.type?.name ?? null
+  const toInt = (v) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null))
+  const homeShootout = toInt(home.shootoutScore)
+  const awayShootout = toInt(away.shootoutScore)
+  const wentToPens = status === 'FINISHED' && homeShootout != null && awayShootout != null &&
+    (statusName === 'STATUS_FINAL_PEN' || homeShootout + awayShootout > 0)
+
   // ESPN indique directement qui a été éliminé/qualifié via winner/advance
   // (fiable même quand le score affiché est à égalité après tirs au but,
   // contrairement à une simple comparaison home>away — voir getWinnerTeamId
@@ -322,8 +335,8 @@ function normalizeEvent(event, compCode, overrides = {}) {
       winner: scoreWinner,
       fullTime: { home: homeScore, away: awayScore },
       halfTime: { home: null, away: null },
-      duration: 'REGULAR',
-      penalties: { home: null, away: null },
+      duration: wentToPens ? 'PENALTY_SHOOTOUT' : statusName === 'STATUS_FINAL_AET' ? 'EXTRA_TIME' : 'REGULAR',
+      penalties: wentToPens ? { home: homeShootout, away: awayShootout } : { home: null, away: null },
     },
   }
 }

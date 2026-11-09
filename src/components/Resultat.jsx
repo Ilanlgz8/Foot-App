@@ -415,16 +415,22 @@ function Resultats() {
         // score.fullTime reconstruit ci-dessous écrasait score.duration/
         // penalties → le badge "(x-y tab)" restait vide pour ces matchs-là.
         const wentToPens = es?.homeShootout != null && es?.awayShootout != null
+        // ⚠️ (09/11) Match déjà donné TERMINÉ par ESPN avec son score : ce score (120 min,
+        // tab exclus) fait foi. `mergeScore` garde le plus grand des deux, or le suivi en
+        // direct pendant la séance de tirs au but pouvait avoir compté les tab dans le
+        // score → « score 120 min + tab » cumulés (constat utilisateur, FA Cup).
+        const listFinal = m.status === 'FINISHED' && m.score?.fullTime?.home != null && m.score?.fullTime?.away != null
+        const listPens  = m.score?.duration === 'PENALTY_SHOOTOUT' && m.score?.penalties?.home != null
         return {
           ...m,
           matchday: inferMatchday(m),
           score: {
             ...m.score,
-            fullTime: {
+            fullTime: listFinal ? m.score.fullTime : {
               home: mergeScore(es?.home, lsHome ?? m.score?.fullTime?.home),
               away: mergeScore(es?.away, lsAway ?? m.score?.fullTime?.away),
             },
-            ...(wentToPens ? {
+            ...(wentToPens && !listPens ? {
               duration: 'PENALTY_SHOOTOUT',
               penalties: { home: es.homeShootout, away: es.awayShootout },
             } : {}),
