@@ -287,10 +287,26 @@ export async function prefetchMatchesForDate(queryClient, date) {
 }
 
 // Calcule l'intervalle de refetch selon si un match est en cours ou non
+// ⚠️ (09/11, demande utilisateur : « quand aucun match n'est en direct, l'app doit faire
+// beaucoup moins d'appels ; une mise à jour toutes les 30 min suffit pour les matchs à venir
+// (horaire modifié, match reporté) ») : avant, 10 min dès qu'aucun match n'était en direct.
+//   • match en direct, OU coup d'envoi dans moins de 15 min, OU coup d'envoi passé depuis
+//     moins de 3 h sans statut terminé (retard, statut pas encore mis à jour) → 2 min ;
+//   • sinon → 30 min.
+// La détection du coup d'envoi et le direct eux-mêmes passent par le suivi ESPN
+// (useLiveMinute), qui ne fait aucun appel tant qu'aucun match n'est proche.
+const SOON_MS = 15 * 60_000
+const RECENT_KO_MS = 3 * 3600_000
 function getRefetchInterval(query) {
   const matches = query.state.data ?? []
-  const hasLive = matches.some(m => m.status === 'IN_PLAY' || m.status === 'PAUSED')
-  return hasLive ? 2 * 60 * 1000 : 10 * 60 * 1000  // 2min si live, 10min sinon
+  const now = Date.now()
+  const active = matches.some(m => {
+    if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
+    if (m.status === 'FINISHED' || m.status === 'POSTPONED' || m.status === 'CANCELLED') return false
+    const ko = Date.parse(m.utcDate)
+    return Number.isFinite(ko) && ko - now <= SOON_MS && now - ko <= RECENT_KO_MS
+  })
+  return active ? 2 * 60 * 1000 : 30 * 60 * 1000
 }
 
 function getLocalDateStr() {

@@ -1082,7 +1082,7 @@ async function runOnePass(env) {
   // publiée (pub:all, déjà lu en début de passe : 0 sous-requête en plus) ne
   // contient QUE des matchs pas encore proches du coup d'envoi (> 10 min) ou
   // terminés depuis longtemps (coup d'envoi > 3 h) n'a rien à apprendre
-  // chaque minute → il n'est plus interrogé que 2 minutes sur 15 (les deux
+  // chaque minute → il n'est plus interrogé que 2 minutes sur 30 (les deux
   // parités, pour garder la couverture complète qui arme le mode repos plus
   // bas) ou si sa version publiée a plus d'1 h. Jamais sauté : slug en direct
   // (hotSlugs), couple sans version publiée, liste vide (logique noMatch
@@ -1092,7 +1092,9 @@ async function runOnePass(env) {
   const prevPub = safeJsonParse(rawPubAll, null)
   const prevFeedEntries = prevPub?.feed?.entries ?? {}
   const nowMsPairs = now.getTime()
-  const idleRefreshMinute = now.getMinutes() % 15 < 2
+  // 09/11 : 2 minutes sur 30 (avant 2 sur 15) — demande utilisateur, une vérification toutes les
+  // 30 min suffit pour un horaire modifié ; à 10 min du coup d'envoi, le couple n'est plus « au repos ».
+  const idleRefreshMinute = now.getMinutes() % 30 < 2
   const pairIsIdle = (p) => {
     const entry = prevFeedEntries[`${p.date}|${p.slug}`]
     if (!entry || !Array.isArray(entry.events) || entry.events.length === 0) return false
@@ -2520,7 +2522,12 @@ async function handlePass(env) {
   // Programme/Résultats/Classement sont consultés par les visiteurs même les
   // jours sans match en direct, donc ce préchauffage doit tourner tout le
   // temps, pas seulement pendant les fenêtres où le direct est actif.
-  await warmFdCache(result.log, kv, result.quiet)
+  // 09/11 (demande utilisateur : beaucoup moins d'appels quand aucun match n'est en direct) :
+  // le préchauffage du calendrier/classements/buteurs passe au rythme « repos » (toutes les
+  // 30 min) dès qu'aucun championnat n'est en direct — avant, toutes les 4 min dès que la
+  // passe n'était pas en mode repos (jours de match, même des heures avant le 1er coup d'envoi).
+  const anyLiveNow = !!result.warmPlan && Object.values(result.warmPlan).some(p => p?.lastLiveAt && Date.now() - p.lastLiveAt < WARM_LIVE_GRACE_MS)
+  await warmFdCache(result.log, kv, result.quiet || !anyLiveNow)
   await warmLiveCompetitions(kv, result.warmPlan, result.log)
 
   if (writeBookkeeping) {
