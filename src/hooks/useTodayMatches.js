@@ -292,6 +292,7 @@ export async function prefetchMatchesForDate(queryClient, date) {
 // (horaire modifié, match reporté) ») : avant, 10 min dès qu'aucun match n'était en direct.
 //   • match en direct, OU coup d'envoi dans moins de 15 min, OU coup d'envoi passé depuis
 //     moins de 3 h sans statut terminé (retard, statut pas encore mis à jour) → 2 min ;
+//   • coup d'envoi dans 15 à 60 min → 10 min ;
 //   • sinon → 30 min.
 // La détection du coup d'envoi et le direct eux-mêmes passent par le suivi ESPN
 // (useLiveMinute), qui ne fait aucun appel tant qu'aucun match n'est proche.
@@ -306,7 +307,15 @@ function getRefetchInterval(query) {
     const ko = Date.parse(m.utcDate)
     return Number.isFinite(ko) && ko - now <= SOON_MS && now - ko <= RECENT_KO_MS
   })
-  return active ? 2 * 60 * 1000 : 30 * 60 * 1000
+  if (active) return 2 * 60 * 1000
+  // Dernière heure avant un coup d'envoi : toutes les 10 min — un horaire avancé au dernier
+  // moment (jusqu'à 1 h) est vu au plus 10 min après, avant la fenêtre « 2 min » ci-dessus.
+  const soonish = matches.some(m => {
+    if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
+    const ko = Date.parse(m.utcDate)
+    return Number.isFinite(ko) && ko - now > SOON_MS && ko - now <= 60 * 60_000
+  })
+  return soonish ? 10 * 60 * 1000 : 30 * 60 * 1000
 }
 
 function getLocalDateStr() {

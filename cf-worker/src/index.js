@@ -1095,6 +1095,10 @@ async function runOnePass(env) {
   // 09/11 : 2 minutes sur 30 (avant 2 sur 15) — demande utilisateur, une vérification toutes les
   // 30 min suffit pour un horaire modifié ; à 10 min du coup d'envoi, le couple n'est plus « au repos ».
   const idleRefreshMinute = now.getMinutes() % 30 < 2
+  // 09/11 : dans l'heure qui précède un coup d'envoi, le couple est revérifié toutes les 10 min
+  // (minutes % 10 < 2, les deux parités) au lieu de 30 — un horaire avancé au dernier moment
+  // (jusqu'à 1 h) est vu au plus ~10 min après ; à 10 min du coup d'envoi : chaque passe.
+  const preKickoffMinute = now.getMinutes() % 10 < 2
   const pairIsIdle = (p) => {
     const entry = prevFeedEntries[`${p.date}|${p.slug}`]
     if (!entry || !Array.isArray(entry.events) || entry.events.length === 0) return false
@@ -1103,7 +1107,11 @@ async function runOnePass(env) {
       const ko = Date.parse(e?.date)
       const state = e?.competitions?.[0]?.status?.type?.state
       if (!Number.isFinite(ko)) return false
-      if (state === 'pre') return ko > nowMsPairs + 10 * 60_000
+      if (state === 'pre') {
+        if (ko <= nowMsPairs + 10 * 60_000) return false
+        if (ko <= nowMsPairs + 60 * 60_000 && preKickoffMinute) return false
+        return true
+      }
       if (state === 'post') return ko < nowMsPairs - 3 * 3600_000
       return false
     })
