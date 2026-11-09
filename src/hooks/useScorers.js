@@ -211,7 +211,10 @@ export async function fetchScorersData(compId, delayMs = 0, hasMatchToday = true
   return scorers
 }
 
-export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
+// `live` (09/11, demande utilisateur) : pendant un match de CETTE compétition, mise à jour
+// automatique toutes les 10 min tant qu'on regarde le classement des buteurs (copie serveur
+// gardée 5 min). Sinon aucune requête périodique.
+export function useScorers(compId, hasMatchToday = true, delayMs = 0, { live = false } = {}) {
   // ⚠️ Clé bumpée scorers_ → scorers2_ (même fix qu'ailleurs dans l'app pour
   // ce type de bug, voir Pronos.jsx classement) : le bug corrigé ci-dessus
   // (tryFetch) a pu déjà écrire un [] en cache localStorage AVANT ce
@@ -238,6 +241,7 @@ export function useScorers(compId, hasMatchToday = true, delayMs = 0) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
+    refetchInterval:      live ? 10 * 60_000 : false,
     // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "le classement des buteurs
     // a du mal à se charger, faut changer de championnat et revenir sur celui
     // qu'on voulait voir"). Ce `retry: false` était la cause exacte du

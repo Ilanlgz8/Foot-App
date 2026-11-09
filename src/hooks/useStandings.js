@@ -115,7 +115,12 @@ export async function fetchStandingsData(selectedComp) {
   }
 }
 
-export function useStandings(selectedComp, hasMatchToday = true) {
+// `live` (09/11, demande utilisateur) : vrai seulement pendant qu'un match de CETTE
+// compétition se joue (voir Classement.jsx, `liveWindow`) → le classement se met à jour tout
+// seul toutes les 5 min tant qu'on le regarde. football-data.org intègre le match en cours
+// au classement (vérifié le 04/09, voir standingsLive.js) ; le serveur garde sa copie 2 min,
+// donc 5 min ne gaspille aucun appel. Sinon : aucune requête périodique, comme avant.
+export function useStandings(selectedComp, hasMatchToday = true, { live = false } = {}) {
   // ⚠️ AJOUT "v2" (constat utilisateur, 24/07 : classement Coupe du Monde
   // affichait toujours le Groupe A au lieu du bon groupe des 2 équipes du
   // match) : root cause confirmée — FD.org est bien prioritaire dans le code
@@ -174,6 +179,7 @@ export function useStandings(selectedComp, hasMatchToday = true) {
     initialData:          readCacheStale(key) ?? undefined,
     initialDataUpdatedAt: getCacheSavedAt(key),
     staleTime:            hasMatchToday ? STALE_MS : NO_MATCH_STALE_MS,
+    refetchInterval:      live ? 5 * 60_000 : false,
     // Pas de refetchInterval : voir commentaire en tête de fichier — la mise
     // à jour pendant un match live vient maintenant de l'invalidation
     // événementielle (but/FT, useLiveMinute.js), pas d'un sondage périodique.

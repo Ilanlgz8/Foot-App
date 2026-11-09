@@ -174,14 +174,29 @@ function Classement() {
   // attendre 6 secondes pour chaque truc c'est chiant") : un délai fixe à
   // chaque visite, même quand inutile, était effectivement une mauvaise
   // expérience — corrigé ici sans réintroduire la collision.
-  const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday)
+  // 09/11 (demande utilisateur) : un match de CETTE compétition est en cours (coup d'envoi il y a
+  // moins de 2 h 30) → classement mis à jour toutes les 5 min, buteurs toutes les 10 min, tant que
+  // la page est ouverte. Les autres compétitions ne font aucune requête périodique. Recalculé
+  // chaque minute (`nowTs`) pour démarrer/arrêter tout seul au coup d'envoi et après le match.
+  const [nowTs, setNowTs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const liveWindow = !wcSchedLoading && !wcFinLoading &&
+    [...wcSched, ...wcFin].some(m => {
+      const ko = Date.parse(m.utcDate)
+      return Number.isFinite(ko) && nowTs >= ko - 60_000 && nowTs <= ko + 150 * 60_000
+    })
+
+  const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday, { live: liveWindow })
   const { formMap, compMatches: formCompMatches } = useTeamForm(selectedComp, 6_000)
   // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09) : useScorers sait
   // désormais aller chercher ces 5 via ESPN plutôt que FD.org, qui ne les
   // couvre pas (voir ESPN_SOURCED_SCORERS_COMPS, competitions.js, et le
   // commentaire détaillé dans useScorers.js) — aucun garde-fou nécessaire ici,
   // même mécanisme que pour Classement/Forme.
-  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, scorersLiveWindow, 12_000)
+  const { scorers, loading: scorersLoading, error: scorersError } = useScorers(selectedComp, scorersLiveWindow, 12_000, { live: liveWindow })
   // Sélections nationales (crest rond, pas d'écusson club) — WC/EC déjà là,
   // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
   const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
