@@ -1308,6 +1308,23 @@ const ALL_COMPS_STAGGER_MS = 150  // 150ms x jusqu'à 13 ≈ 2s pour la dernièr
 const PARTIAL_FAILURE_RETRY_MS = 3 * 60 * 1000  // 3min — assez court pour corriger vite, assez long pour ne pas re-rafaler ESPN/FD.org
 const allCompsPartialFailureUntil = new Map()  // queryKey (string) → timestamp jusqu'auquel rester "stale" volontairement
 
+// ⚠️ (09/11, suite) Une compétition absente de la liste fusionnée alors que SA PROPRE copie
+// locale (`matches_espn_<code>`, remplie par Programme → la page de la compétition) contient
+// des matchs à venir : on les y ajoute. Constat utilisateur : Programme → Ligue des Nations
+// affichait bien les matchs des 12-17/11, mais « jour suivant » dans « Tous les matchs »
+// sautait au vendredi 20 — la liste fusionnée, gardée 1 h, avait été construite à un moment où
+// la Ligue des Nations était revenue vide. Appliqué à l'affichage initial ET à chaque fetch.
+function fillFromCompCaches(list, compIds, now, windowMs) {
+  const present = new Set((list ?? []).map(m => m.competition?.code))
+  const extra = []
+  for (const id of compIds) {
+    if (present.has(id)) continue
+    const own = readCacheStale(`matches_espn_${id}`)
+    if (Array.isArray(own) && own.length) extra.push(...own.filter(m => m.status !== 'FINISHED'))
+  }
+  return extra.length ? filterUpcomingWindow([...(list ?? []), ...extra], now, windowMs) : list
+}
+
 export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
   const windowMs   = windowDays * 24 * 60 * 60 * 1000
   // ⚠️ V3 (24/07) : bascule des 6 grands championnats FD.org→ESPN pour ce
@@ -1365,16 +1382,17 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       // journées) — évite d'effacer un cache valide avec un résultat vide.
       // Le fallback est lui aussi re-filtré (même fenêtre) : jamais de vieux
       // match déjà joué réintroduit via le cache stale.
-      if (merged.length === 0) return filterUpcomingWindow(readCacheStale(key), now, windowMs)
-      writeCache(key, merged, ttl)
-      return merged
+      if (merged.length === 0) return fillFromCompCaches(filterUpcomingWindow(readCacheStale(key), now, windowMs), compIds, now, windowMs)
+      const filled = fillFromCompCaches(merged, compIds, now, windowMs)
+      writeCache(key, filled, ttl)
+      return filled
     },
     // Forme fonction (déjà utilisée dans useEspnScores.js) plutôt qu'une valeur
     // calculée directement dans le corps du hook : Date.now() n'est alors appelé
     // que quand React Query en a réellement besoin (1ère fois pour cette
     // queryKey), pas à chaque render — résout l'appel impur pendant le render
     // sans changer le résultat.
-    initialData:          () => filterUpcomingWindow(cachedData, Date.now(), windowMs),
+    initialData:          () => fillFromCompCaches(filterUpcomingWindow(cachedData, Date.now(), windowMs), compIds, Date.now(), windowMs),
     initialDataUpdatedAt: cachedAt,
     staleTime: () => {
       const until = allCompsPartialFailureUntil.get(queryKeyStr)
