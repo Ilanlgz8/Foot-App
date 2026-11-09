@@ -1333,14 +1333,31 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       // Voir le commentaire détaillé au-dessus de PARTIAL_FAILURE_RETRY_MS :
       // un résultat partiel (≥1 compétition en échec transitoire) garde un
       // staleTime court le temps de se corriger, au lieu du 1h plein normal.
-      if (results.some(r => r.status === 'rejected')) {
+      const now = Date.now()
+      // ⚠️ (09/11, constat utilisateur : « jour suivant » dans « Tous les matchs » sautait de
+      // lundi à vendredi 20 — les 8 matchs de Ligue des Nations du jeudi 12 manquaient alors
+      // que le serveur les renvoyait bien). Une compétition qui revient VIDE (réseau, fenêtre
+      // ESPN indisponible : fetchEspnCompMatches renvoie [] sans erreur) faisait disparaître
+      // tous ses matchs de cette liste pendant 1 h (TTL.SCHEDULED). Désormais : si la version
+      // précédente contenait des matchs à venir de cette compétition, on les garde et on
+      // retente vite (même mécanisme que pour un échec explicite).
+      const prevList = filterUpcomingWindow(readCacheStale(key), now, windowMs) ?? []
+      const carried = []
+      let partial = results.some(r => r.status === 'rejected')
+      compIds.forEach((id, i) => {
+        const r = results[i]
+        const got = r?.status === 'fulfilled' && Array.isArray(r.value) && r.value.length > 0
+        if (got) return
+        const keep = prevList.filter(m => m.competition?.code === id)
+        if (keep.length > 0) { carried.push(...keep); partial = true }
+      })
+      if (partial) {
         allCompsPartialFailureUntil.set(queryKeyStr, Date.now() + PARTIAL_FAILURE_RETRY_MS)
       } else {
         allCompsPartialFailureUntil.delete(queryKeyStr)
       }
-      const now = Date.now()
       const merged = filterUpcomingWindow(
-        results.filter(r => r.status === 'fulfilled' && Array.isArray(r.value)).flatMap(r => r.value),
+        [...results.filter(r => r.status === 'fulfilled' && Array.isArray(r.value)).flatMap(r => r.value), ...carried],
         now, windowMs
       )
 
