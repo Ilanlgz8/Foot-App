@@ -755,6 +755,10 @@ function Accueil() {
             plusieurs minutes pendant lesquelles elle restait affichée
             "Terminé". Le résultat reste dans "Résultats récents" et la page
             Résultats (qui n'excluent jamais le match du jour). */}
+        {/* 10/11 (PageSpeed : décalage de mise en page 0,69 — la carte du match du jour apparaissait
+            après le chargement et poussait tout le reste vers le bas) : sa place est réservée tant
+            que les matchs du jour chargent. */}
+        {!matchDuJour && matchesLoading && <div className="accueil__mdjPlaceholder" aria-hidden="true" />}
         {matchDuJour && stillVisibleToday(matchDuJour) && (
           <MatchDuJourCard
             match={matchDuJour}

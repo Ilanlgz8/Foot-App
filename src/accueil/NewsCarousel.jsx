@@ -86,12 +86,13 @@ export function NewsCarousel({ news, loading, error, perPage = 1 }) {
           }}
         >
           {slice.length === 0 && <p className="accueil__empty">Aucun article disponible.</p>}
-          {slice.map(article => (
+          {slice.map((article, idx) => (
             <a key={article.url} href={article.url}
               target="_blank" rel="noreferrer" className="accueil__card">
               {article.image && (
                 <div className="accueil__cardImgWrap">
                   <img src={article.image} alt={article.title}
+                    fetchPriority={idx === 0 ? 'high' : undefined}
                     className="accueil__cardImg"
                     onError={e => e.currentTarget.style.display = 'none'} />
                 </div>

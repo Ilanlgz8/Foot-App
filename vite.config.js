@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        // 10/11 : script d'enregistrement du service worker en `defer` (PageSpeed : « requête de
+        // blocage du rendu », ~480 ms sur mobile 4G lente) — même comportement, il ne bloque plus
+        // le premier affichage.
+        injectRegister: 'script-defer',
         includeAssets: ['statfootix.png', 'statfootix.png', 'statfootix.png'],
         manifest: {
           name: 'StatFootix',
