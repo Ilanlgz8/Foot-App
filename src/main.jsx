@@ -2,6 +2,8 @@
 // Doit rester le TOUT PREMIER import : protège chaque écriture localStorage contre le stockage plein
 // (voir storageGuard.js), y compris celles faites au chargement des autres modules.
 import './utils/storageGuard'
+import { initReloadTrace, markReload } from './utils/reloadTrace'
+initReloadTrace()
 import { createRoot } from 'react-dom/client'
 import './fonts.js'
 import './index.css'
@@ -25,7 +27,7 @@ if ('serviceWorker' in navigator) {
   // un rechargement gratuit à chaque première visite.
   const avaitDejaUnSW = !!navigator.serviceWorker.controller
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (avaitDejaUnSW) window.location.reload()
+    if (avaitDejaUnSW) { markReload('nouvelle version installée (service worker)'); window.location.reload() }
   })
 
   // Le check natif du navigateur ne se déclenche que sur une vraie navigation.
@@ -338,6 +340,7 @@ function showBootError(err) {
       const regs = await navigator.serviceWorker?.getRegistrations?.() ?? []
       await Promise.all(regs.map(r => r.unregister()))
     } catch { /* pas de SW/caches : rien à nettoyer */ }
+    markReload('bouton « Vider les données »')
     location.reload()
   })
 }

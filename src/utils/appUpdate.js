@@ -1,3 +1,4 @@
+import { markReload } from './reloadTrace'
 /**
  * appUpdate — garantit que l'app affichée est bien la dernière déployée.
  *
@@ -119,6 +120,7 @@ async function purgeAndReload() {
     const keys = await caches?.keys?.() ?? []
     await Promise.all(keys.map(k => caches.delete(k)))
   } catch { /* idem */ }
+  markReload('mise à jour forcée (caches vidés)')
   window.location.reload()
 }
 
@@ -170,6 +172,7 @@ export async function checkAppVersion() {
 
   if (action === 'reload') {
     try { sessionStorage.setItem(FLAG, '1') } catch {}
+    markReload('nouvelle version détectée')
     window.location.reload()
   } else {
     await purgeAndReload()

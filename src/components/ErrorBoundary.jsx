@@ -1,3 +1,4 @@
+import { markReload } from '../utils/reloadTrace'
 import { Component } from 'react'
 
 // ── Error Boundary ────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ export class ErrorBoundary extends Component {
   }
 
   handleReload = () => {
+    markReload(`bouton « Recharger » après une erreur : ${String(this.state.error?.message ?? '').slice(0, 80)}`)
     window.location.reload()
   }
 

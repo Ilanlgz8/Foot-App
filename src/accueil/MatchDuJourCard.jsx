@@ -16,8 +16,9 @@ import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { FormDiamonds } from './FormDiamonds'
 import { TEAM_SHORT } from '../data/teamShortNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
-import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
+import { getMatchState } from '../utils/matchStateTracker'
+import { halftimeLabel } from '../utils/halftimeCountdown'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
@@ -105,26 +106,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const [htLabel, setHtLabel] = useState(null)
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
-    const compute = () => {
-      let state = getMatchState(match.id)
-      // Filet de sécurité (même cas que MatchPoster.jsx) : si aucun autre
-      // hook n'a encore posé pausedAt pour ce match, on l'estime nous-mêmes
-      // à partir de l'horloge ESPN gelée plutôt que de rester bloqué sur
-      // "Mi-temps" statique.
-      if (!state.pausedAt && !state.half2Start) {
-        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
-        const parsedClock  = parseEspnClock(state.espnClock)
-        const realHalfMins = parsedClock ? parsedClock.base + (parsedClock.extra ?? 0) : null
-        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
-        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
-        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
-        state = getMatchState(match.id)
-      }
-      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
-      const elapsed = Date.now() - state.pausedAt
-      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
-      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
-    }
+    const compute = () => setHtLabel(halftimeLabel(match))
     compute()
     const id = setInterval(compute, 60_000)
     return () => clearInterval(id)
@@ -222,8 +204,18 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // plus) à celui du match lui-même (ESPN pour ces 6 championnats).
   const homeCrest = resolveFdCrest(match.homeTeam, resolvedHomeId, teamIdPool)
   const awayCrest = resolveFdCrest(match.awayTeam, resolvedAwayId, teamIdPool)
-  const hForm = formMap?.[resolvedHomeId] ?? []
-  const aForm = formMap?.[resolvedAwayId] ?? []
+  // ⚠️ (09/11, constat utilisateur : forme de la Lazio différente entre la card « En
+  // direct » et la page du match, après clic puis retour) : la forme est rangée par id
+  // football-data.org. `teamIdPool` contient aussi `dedicatedH2H`, dont les lignes peuvent
+  // venir d'un autre espace d'ids (repli ESPN quand compMatches n'est pas encore chargé —
+  // exactement au remontage après un retour) : l'id résolu pouvait alors désigner un AUTRE
+  // club (même famille que le bug Racing du 16/08). Pour la forme : uniquement le pool
+  // football-data.org (compMatches + historique), comme la page du match. Rien trouvé →
+  // pas de forme affichée plutôt qu'une forme fausse.
+  const formHomeId = resolveFdTeamId(match.homeTeam, h2hPool, { loose: true, strict: true })
+  const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
+  const hForm = formMap?.[formHomeId] ?? []
+  const aForm = formMap?.[formAwayId] ?? []
   const prono = isLive
     ? calcLiveProno(hForm, aForm, hs, as_, liveMinute, {
         homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,

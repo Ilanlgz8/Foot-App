@@ -161,10 +161,18 @@ export function StandingsTable({
             // aucun appel réseau supplémentaire). Chemin normal (rows déjà en
             // ids FD.org, cas de loin le plus fréquent) inchangé : le lookup
             // direct réussit et ce fallback n'est jamais atteint.
-            let forme = formMap[team.team.id]
-            if (forme === undefined && compMatches?.length) {
-              const fdId = resolveFdTeamId(team.team, compMatches, { loose: true })
-              if (fdId != null) forme = formMap[fdId]
+            // ⚠️ (09/11, constat utilisateur : Málaga 0 victoire mais un « V » dans sa forme,
+            // M'gladbach 1 victoire et deux « V ») : le classement vient souvent d'ESPN (ids
+            // ESPN) alors que la forme est rangée par id football-data.org. `formMap[id ESPN]`
+            // tombait alors sur un AUTRE club qui a le même numéro → forme d'une autre équipe.
+            // Quand les matchs football-data.org sont là, l'id est vérifié (même id ET même
+            // nom) ou retrouvé par le nom (strict : jamais de repli sur l'id brut).
+            let forme
+            if (compMatches?.length) {
+              const fdId = resolveFdTeamId(team.team, compMatches, { loose: true, strict: true })
+              forme = fdId != null ? formMap[fdId] : undefined
+            } else {
+              forme = formMap[team.team.id]
             }
             const formeSlice = compact && forme ? forme.slice(-3) : forme
             const prevPos = prevSnapshot[team.team.id]

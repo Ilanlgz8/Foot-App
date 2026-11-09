@@ -3,6 +3,7 @@
 // vide alors que les matchs sont en cours, impossible à reproduire ailleurs). S'ouvre en tapant 5 fois
 // de suite sur l'onglet « En direct » (une PWA iOS n'a pas de barre d'adresse). Lecture seule : n'écrit
 // rien, sauf une clé de test de 2 caractères aussitôt supprimée.
+import { getBootLog } from '../utils/reloadTrace'
 import { getMatchState } from '../utils/matchStateTracker'
 import { isTrackedLive } from '../hooks/liveTracker'
 import { isCardLive, calcMinute } from '../utils/matchUtils'
@@ -67,6 +68,8 @@ function LaunchInfo() {
       <div>lancement : {l ? `${l.keys} clés, ${Math.round(l.chars / 1000)} k car., ${l.matchKeys} caches matchs, cache du jour ${l.hadTodayCache ? 'OUI' : 'NON'}` : '—'}</div>
       <div>Accueil affiché à : {window.__sfAccueilReadyAt != null ? `${(window.__sfAccueilReadyAt / 1000).toFixed(1)} s` : '— (pas passé par l\'Accueil)'} après le lancement</div>
       <div>garde-fou stockage : {g ? `${g.evictions} purge(s)${g.removed.length ? ' — ' + g.removed.slice(-4).join(', ') : ''}` : '—'}</div>
+      <div>derniers lancements (le plus récent en bas) :</div>
+      {getBootLog().slice(-6).map((b, i) => <div key={'b' + i} style={{ opacity: 0.85, color: /NON DEMANDÉE/.test(b.reason) ? '#fca5a5' : undefined }}>{new Date(b.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {b.reason}{b.err ? ` (dernière erreur : ${b.err})` : ''}</div>)}
       <div>requêtes depuis le lancement : {nApi} · les plus lentes :</div>
       {slow.map((r, i) => <div key={i} style={{ opacity: 0.85 }}>{(r.s / 1000).toFixed(1)}s +{(r.d / 1000).toFixed(1)}s {r.u}</div>)}
     </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, memo } from 'react'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, parseEspnClock, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
-import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
+import { getMatchState } from '../utils/matchStateTracker'
+import { halftimeLabel } from '../utils/halftimeCountdown'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
 import { useTeamForm }                from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
@@ -178,8 +179,18 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // celui du match lui-même (ESPN pour ces 6 championnats).
   const homeCrest = resolveFdCrest(match.homeTeam, resolvedHomeId, teamIdPool)
   const awayCrest = resolveFdCrest(match.awayTeam, resolvedAwayId, teamIdPool)
-  const hForm     = formMap?.[resolvedHomeId] ?? []
-  const aForm     = formMap?.[resolvedAwayId] ?? []
+  // ⚠️ (09/11, constat utilisateur : forme de la Lazio différente entre la card « En
+  // direct » et la page du match, après clic puis retour) : la forme est rangée par id
+  // football-data.org. `teamIdPool` contient aussi `dedicatedH2H`, dont les lignes peuvent
+  // venir d'un autre espace d'ids (repli ESPN quand compMatches n'est pas encore chargé —
+  // exactement au remontage après un retour) : l'id résolu pouvait alors désigner un AUTRE
+  // club (même famille que le bug Racing du 16/08). Pour la forme : uniquement le pool
+  // football-data.org (compMatches + historique), comme la page du match. Rien trouvé →
+  // pas de forme affichée plutôt qu'une forme fausse.
+  const formHomeId = resolveFdTeamId(match.homeTeam, h2hPool, { loose: true, strict: true })
+  const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
+  const hForm     = formMap?.[formHomeId] ?? []
+  const aForm     = formMap?.[formAwayId] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
   // card en live en fonction du score") : cette barre utilisait TOUJOURS
   // calcPronoAdvanced (le prior pré-match figé), même une fois le match en
@@ -375,46 +386,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   const [htLabel, setHtLabel] = useState(null)
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
-    const compute = () => {
-      let state = getMatchState(match.id)
-      // Filet de sécurité (constat utilisateur : "c'était déjà la mi-temps
-      // quand t'as fait les modifs, y'a pas 'reprise dans 15min'") : si
-      // aucun autre hook (useLiveMatches.js/useLiveMinute.js) n'a encore posé
-      // pausedAt pour ce match — fenêtre entre un déploiement et le prochain
-      // poll live, ou app ouverte directement en pleine mi-temps sans avoir
-      // witnessed la transition IN_PLAY→PAUSED — on le pose nous-mêmes ici
-      // plutôt que de rester bloqué indéfiniment sur le texte statique.
-      // ⚠️ Ne PAS utiliser Date.now() comme instant de pause : si la mi-temps
-      // a déjà commencé depuis 10min quand l'app s'ouvre, ça ferait repartir
-      // le countdown à 15min au lieu d'afficher les 5min restantes (constat
-      // utilisateur). Même estimation que useLiveMinute.js : ESPN GÈLE son
-      // horloge (espnClock) sur la minute réelle atteinte au coup de sifflet
-      // et la garde identique tant que dure la pause — déjà en localStorage
-      // ici, posée par le watchdog global (LiveProvider) qui tourne sur
-      // toutes les pages, donc dispo même si on n'a jamais vu la transition
-      // nous-mêmes. pausedAt = kickoff + cette vraie durée jouée.
-      if (!state.pausedAt && !state.half2Start) {
-        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
-        // ⚠️ `base + extra` et non `base` seul (05/09) : parseEspnClock rend
-        // "45'+3'" comme { base: 45, extra: 3 }. En ne gardant que la base, la
-        // pause était estimée 3 minutes trop tôt — et comme la 2ème mi-temps
-        // se déduit ensuite de `pausedAt + 15 min`, tout le temps additionnel
-        // de la 1ère période se retrouvait ajouté à la minute affichée à la
-        // reprise. C'est la seconde moitié du "ça a repris à la 50' au lieu
-        // de la 46'" (l'autre étant canAnchorHalf2, voir matchUtils.js).
-        const parsedClock  = parseEspnClock(state.espnClock)
-        const realHalfMins = parsedClock ? parsedClock.base + (parsedClock.extra ?? 0) : null
-        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
-        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
-        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
-        state = getMatchState(match.id)
-      }
-      // Arrêter le décompte si la 2ème MT a démarré
-      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
-      const elapsed = Date.now() - state.pausedAt
-      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
-      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
-    }
+    const compute = () => setHtLabel(halftimeLabel(match))
     compute()
     // Mise à jour chaque minute (le décompte est en minutes)
     const id = setInterval(compute, 60_000)

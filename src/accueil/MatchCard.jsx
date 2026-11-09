@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, memo } from 'react'
 import { translateTeam } from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, parseEspnClock, sameJSON } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
-import { getMatchState, trackMatchState } from '../utils/matchStateTracker'
+import { getMatchState } from '../utils/matchStateTracker'
+import { halftimeLabel } from '../utils/halftimeCountdown'
 import { MatchPoster } from './MatchPoster'
 import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
@@ -163,22 +164,7 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
   const [htLabel, setHtLabel] = useState(null)
   useEffect(() => {
     if (liveMinute !== 'MT') { setHtLabel(null); return }
-    const compute = () => {
-      let state = getMatchState(match.id)
-      if (!state.pausedAt && !state.half2Start) {
-        const koReference  = state.kickoffAt ?? new Date(match.utcDate).getTime()
-        const realHalfMins = parseEspnClock(state.espnClock)?.base
-        const halfMins     = (realHalfMins != null && realHalfMins > 0) ? realHalfMins : 47
-        const estimatedPausedAt = Math.min(Date.now(), koReference + halfMins * 60_000)
-        trackMatchState({ ...match, status: 'PAUSED' }, estimatedPausedAt)
-        state = getMatchState(match.id)
-      }
-      // Arrêter le décompte si la 2ème MT a démarré
-      if (!state.pausedAt || state.half2Start) { setHtLabel(null); return }
-      const elapsed = Date.now() - state.pausedAt
-      const remMin  = Math.max(0, Math.ceil((15 * 60_000 - elapsed) / 60_000))
-      setHtLabel(remMin > 0 ? `Reprise dans ${remMin} min` : 'Reprise imminente')
-    }
+    const compute = () => setHtLabel(halftimeLabel(match))
     compute()
     // Mise à jour chaque minute (le décompte est en minutes)
     const id = setInterval(compute, 60_000)
