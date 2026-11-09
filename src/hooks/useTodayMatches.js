@@ -287,16 +287,15 @@ export async function prefetchMatchesForDate(queryClient, date) {
 }
 
 // Calcule l'intervalle de refetch selon si un match est en cours ou non
-// ⚠️ (09/11, demande utilisateur : « quand aucun match n'est en direct, l'app doit faire
-// beaucoup moins d'appels ; une mise à jour toutes les 30 min suffit pour les matchs à venir
-// (horaire modifié, match reporté) ») : avant, 10 min dès qu'aucun match n'était en direct.
-//   • match en direct, OU coup d'envoi dans moins de 15 min, OU coup d'envoi passé depuis
-//     moins de 3 h sans statut terminé (retard, statut pas encore mis à jour) → 2 min ;
-//   • coup d'envoi dans 15 à 60 min → 10 min ;
-//   • sinon → 30 min.
-// La détection du coup d'envoi et le direct eux-mêmes passent par le suivi ESPN
-// (useLiveMinute), qui ne fait aucun appel tant qu'aucun match n'est proche.
-const SOON_MS = 15 * 60_000
+// ⚠️ (09/11, demandes utilisateur : « quand aucun match n'est en direct, beaucoup moins
+// d'appels — toutes les 30 min pour les matchs à venir », puis « un match en retard dans
+// l'app à cause d'un horaire avancé, il faut que ça n'arrive jamais ») :
+//   • match en direct, OU coup d'envoi dans moins de 3 h, OU coup d'envoi passé depuis moins
+//     de 3 h sans statut terminé → 2 min (un horaire avancé le jour même, même de plusieurs
+//     heures, est vu en 2 min au plus — comme la détection normale d'un coup d'envoi) ;
+//   • sinon (aucun match avant 3 h) → 30 min.
+// Pendant ces 3 h, la requête lit le flux préparé par le Worker (1 appel léger, cache CDN).
+const PRE_KICKOFF_MS = 3 * 3600_000
 const RECENT_KO_MS = 3 * 3600_000
 function getRefetchInterval(query) {
   const matches = query.state.data ?? []
@@ -305,17 +304,9 @@ function getRefetchInterval(query) {
     if (m.status === 'IN_PLAY' || m.status === 'PAUSED') return true
     if (m.status === 'FINISHED' || m.status === 'POSTPONED' || m.status === 'CANCELLED') return false
     const ko = Date.parse(m.utcDate)
-    return Number.isFinite(ko) && ko - now <= SOON_MS && now - ko <= RECENT_KO_MS
+    return Number.isFinite(ko) && ko - now <= PRE_KICKOFF_MS && now - ko <= RECENT_KO_MS
   })
-  if (active) return 2 * 60 * 1000
-  // Dernière heure avant un coup d'envoi : toutes les 10 min — un horaire avancé au dernier
-  // moment (jusqu'à 1 h) est vu au plus 10 min après, avant la fenêtre « 2 min » ci-dessus.
-  const soonish = matches.some(m => {
-    if (m.status !== 'SCHEDULED' && m.status !== 'TIMED') return false
-    const ko = Date.parse(m.utcDate)
-    return Number.isFinite(ko) && ko - now > SOON_MS && ko - now <= 60 * 60_000
-  })
-  return soonish ? 10 * 60 * 1000 : 30 * 60 * 1000
+  return active ? 2 * 60 * 1000 : 30 * 60 * 1000
 }
 
 function getLocalDateStr() {
