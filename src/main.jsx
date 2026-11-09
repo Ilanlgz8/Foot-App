@@ -74,7 +74,8 @@ setTimeout(runVersionCheck, 4000)
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import { rqIdbStorage } from './utils/rqIdbStorage'
 import { removeOldestQuery } from '@tanstack/query-persist-client-core'
 import { purgeExpiredCache, compactExistingCaches, initCacheStore, freezeCacheStore } from './hooks/localCache'
 
@@ -126,8 +127,10 @@ const queryClient = new QueryClient({
 // supprimant la requête la plus ancienne du blob à chaque échec, jusqu'à ce
 // que ça rentre — élimination progressive des plus vieux matchs consultés
 // plutôt qu'une perte totale/aléatoire de la donnée la plus récente.
-const persister = createSyncStoragePersister({
-  storage: window.localStorage,
+// 10/11 : cache React Query dans IndexedDB (voir utils/rqIdbStorage.js) — avant, un bloc
+// synchrone de ~800 ko dans localStorage, relu en entier à chaque lancement.
+const persister = createAsyncStoragePersister({
+  storage: rqIdbStorage,
   retry: removeOldestQuery,
 })
 
