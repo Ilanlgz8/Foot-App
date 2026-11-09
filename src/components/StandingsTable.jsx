@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { resolveFdTeamId } from '../utils/matchUtils'
+import { buildFormMap } from '../hooks/useTeamForm'
 import { teamIdentityKey } from '../utils/teamSearch'
 // Le CSS (classement__*, y compris les tableaux de poules CdM) doit être chargé ici,
 // pas seulement dans Classement.jsx : sinon, tant que la page /classement n'a pas été
@@ -112,6 +113,18 @@ export function StandingsTable({
 }) {
   const highlightKeys = useMemo(() => new Set(highlightTeams.map(t => teamIdentityKey(t)).filter(Boolean)), [highlightTeams])
   const highlightIds  = useMemo(() => new Set(highlightTeams.map(t => t?.id).filter(v => v != null)), [highlightTeams])
+  // ⚠️ (09/11, constat utilisateur : Málaga 0 victoire au classement mais un « V » dans sa
+  // forme ; M'gladbach 1 victoire, deux « V »). Vérifié sur les données de l'app : `formMap`
+  // (useTeamForm) inclut volontairement la coupe nationale (Coupe du Roi, DFB-Pokal — matchs
+  // ESPN `isCup`, ex. Málaga vainqueur en Coupe du Roi le 27/10) : c'est la « forme récente »
+  // des cards. Dans un CLASSEMENT, la forme doit correspondre aux colonnes V/N/D → recalculée
+  // sur les seuls matchs de championnat de la saison en cours. Sans eux : `formMap` comme avant.
+  const leagueFormMap = useMemo(() => {
+    if (!compMatches?.length) return null
+    const latest = compMatches.reduce((acc, m) => (m.season?.startDate && m.season.startDate > acc ? m.season.startDate : acc), '')
+    const league = compMatches.filter(m => m.status === 'FINISHED' && !m.isCup && (!latest || m.season?.startDate === latest))
+    return league.length ? buildFormMap(league) : null
+  }, [compMatches])
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
@@ -170,7 +183,7 @@ export function StandingsTable({
             let forme
             if (compMatches?.length) {
               const fdId = resolveFdTeamId(team.team, compMatches, { loose: true, strict: true })
-              forme = fdId != null ? formMap[fdId] : undefined
+              forme = fdId != null ? (leagueFormMap ? leagueFormMap[fdId] : formMap[fdId]) : undefined
             } else {
               forme = formMap[team.team.id]
             }
