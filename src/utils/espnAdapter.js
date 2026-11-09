@@ -389,11 +389,17 @@ async function fetchEspnWindowJson(slug) {
   const cached = espnWindowCache.get(slug)
   if (cached && Date.now() - cached.ts < ESPN_WINDOW_CACHE_MS) return cached.json
   if (inFlightEspnWindowFetch.has(slug)) return inFlightEspnWindowFetch.get(slug)
+  // Diagnostic (09/11, Ligue des Nations absente de « Tous les matchs » sur l'iPhone de
+  // l'utilisateur, non reproduit ailleurs) : dernier résultat par slug, affiché par LiveDiag.
+  const t0 = Date.now()
+  const note = (info) => {
+    try { (window.__sfEspnWin ??= {})[slug] = { at: t0, ms: Date.now() - t0, ...info } } catch { /* hors navigateur */ }
+  }
   const promise = fetch(`/espn?slug=${slug}&dates=${windowRange(slug)}`)
-    .then(res => (res.ok ? res.json() : null))
-    .catch(() => null)
+    .then(res => { if (!res.ok) note({ status: res.status }); return res.ok ? res.json() : null })
+    .catch(e => { note({ err: String(e?.message ?? e).slice(0, 60) }); return null })
     .then(json => {
-      if (json) espnWindowCache.set(slug, { json, ts: Date.now() })
+      if (json) { espnWindowCache.set(slug, { json, ts: Date.now() }); note({ status: 200, n: (json.events ?? []).length }) }
       return json
     })
     .finally(() => inFlightEspnWindowFetch.delete(slug))

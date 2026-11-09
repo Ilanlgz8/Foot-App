@@ -224,12 +224,22 @@ const PER_MATCH_MAX_AGE = [
 ]
 const OBSOLETE_PREFIXES = ['foot_matches_current_']
 
+// ⚠️ (09/11, Ligue des Nations absente de « Tous les matchs » après une relance) : ces copies
+// servent aussi de SECOURS quand une requête échoue (readCacheStale). Les supprimer au
+// démarrage dès leur TTL dépassé (2 min pour `matches_espn_*`, 1 h pour la liste « à venir »)
+// faisait disparaître le secours à chaque relance. Gardées 24 h après leur dernière écriture.
+const KEEP_STALE_FOR = [
+  [/^foot_matches_espn_/, DAY],
+  [/^foot_matches_ALL_V3_/, DAY],
+]
 function shouldPurge(key, raw, now) {
   if (OBSOLETE_PREFIXES.some(p => key.startsWith(p))) return true
   try {
     const entry = JSON.parse(raw)
     const maxAge = PER_MATCH_MAX_AGE.find(([re]) => re.test(key))?.[1]
     if (maxAge && entry && typeof entry.savedAt === 'number' && now - entry.savedAt > maxAge) return true
+    const keep = KEEP_STALE_FOR.find(([re]) => re.test(key))?.[1]
+    if (keep && entry && typeof entry.savedAt === 'number') return now - entry.savedAt > keep
     return !entry || typeof entry.exp !== 'number' || now > entry.exp
   } catch { return true }
 }
@@ -247,15 +257,7 @@ export function purgeExpiredCache() {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (!key || !key.startsWith(PREFIX)) continue
-      if (OBSOLETE_PREFIXES.some(p => key.startsWith(p))) { toRemove.push(key); continue }
-      try {
-        const entry = JSON.parse(localStorage.getItem(key))
-        const maxAge = PER_MATCH_MAX_AGE.find(([re]) => re.test(key))?.[1]
-        if (maxAge && entry && typeof entry.savedAt === 'number' && now - entry.savedAt > maxAge) { toRemove.push(key); continue }
-        // Entrée sans `exp` valide (corrompue/ancien format) : autant la
-        // nettoyer aussi plutôt que la laisser traîner indéfiniment.
-        if (!entry || typeof entry.exp !== 'number' || now > entry.exp) toRemove.push(key)
-      } catch { toRemove.push(key) }
+      if (shouldPurge(key, localStorage.getItem(key), now)) toRemove.push(key)
     }
     toRemove.forEach(k => localStorage.removeItem(k))
   } catch { /* localStorage indisponible (navigation privée stricte, quota...) → pas bloquant */ }

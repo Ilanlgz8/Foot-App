@@ -68,6 +68,8 @@ function LaunchInfo() {
       <div>lancement : {l ? `${l.keys} clés, ${Math.round(l.chars / 1000)} k car., ${l.matchKeys} caches matchs, cache du jour ${l.hadTodayCache ? 'OUI' : 'NON'}` : '—'}</div>
       <div>Accueil affiché à : {window.__sfAccueilReadyAt != null ? `${(window.__sfAccueilReadyAt / 1000).toFixed(1)} s` : '— (pas passé par l\'Accueil)'} après le lancement</div>
       <div>garde-fou stockage : {g ? `${g.evictions} purge(s)${g.removed.length ? ' — ' + g.removed.slice(-4).join(', ') : ''}` : '—'}</div>
+      <div>liste « à venir » (jour suivant) : {window.__sfAllComps ? `${window.__sfAllComps.total} matchs, dont Ligue des Nations ${window.__sfAllComps.nl} — par compétition : ${Object.entries(window.__sfAllComps.byComp).map(([k, v]) => `${k} ${v}`).join(', ')}` : 'pas encore chargée'}</div>
+      <div>ESPN Ligue des Nations : {window.__sfEspnWin?.['uefa.nations'] ? JSON.stringify(window.__sfEspnWin['uefa.nations']) : 'aucune requête'}</div>
       <div>derniers lancements (le plus récent en bas) :</div>
       {getBootLog().slice(-6).map((b, i) => <div key={'b' + i} style={{ opacity: 0.85, color: /NON DEMANDÉE/.test(b.reason) ? '#fca5a5' : undefined }}>{new Date(b.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {b.reason}{b.err ? ` (dernière erreur : ${b.err})` : ''}</div>)}
       <div>requêtes depuis le lancement : {nApi} · les plus lentes :</div>

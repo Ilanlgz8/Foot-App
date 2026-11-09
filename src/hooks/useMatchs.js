@@ -1384,6 +1384,14 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       // match déjà joué réintroduit via le cache stale.
       if (merged.length === 0) return fillFromCompCaches(filterUpcomingWindow(readCacheStale(key), now, windowMs), compIds, now, windowMs)
       const filled = fillFromCompCaches(merged, compIds, now, windowMs)
+      try {
+        window.__sfAllComps = {
+          at: now,
+          byComp: Object.fromEntries(compIds.map((id, i) => [id, results[i]?.status === 'rejected' ? 'échec' : (Array.isArray(results[i]?.value) ? results[i].value.length : 'vide')])),
+          total: filled.length,
+          nl: filled.filter(m => m.competition?.code === 'NL').length,
+        }
+      } catch { /* hors navigateur */ }
       writeCache(key, filled, ttl)
       return filled
     },
