@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { reconcileStandings } from '../utils/standingsLive'
+import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
@@ -18,7 +18,7 @@ import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers, scorersUpdateDue } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
-import { finalScore } from '../utils/matchUtils'
+import { finalScore, resolveFdTeamId } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
 import { PanelSkeleton } from '../accueil/MatchCard'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -226,7 +226,12 @@ function Classement() {
   // terminé, matchs EN COURS compris, avec les identifiants football-data et
   // le score du moment : aucune requête supplémentaire.
   const liveNow = (wcSched ?? []).filter(m => m?.status === 'IN_PLAY' || m?.status === 'PAUSED')
-  const standingsLive = reconcileStandings(standings, liveNow)
+  // 09/11 : classement football-data.org en retard sur les matchs terminés → rattrapé
+  // (voir catchUpStandings, standingsLive.js).
+  const standingsLive = reconcileStandings(
+    catchUpStandings(standings, formCompMatches, (team, ms) => resolveFdTeamId(team, ms, { loose: true, strict: true })),
+    liveNow,
+  )
   const filteredStandings = standingsLive.filter(row => matchesTeamSearch(row.team))
 
   const scorerBase = scorers

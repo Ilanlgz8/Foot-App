@@ -102,3 +102,77 @@ export function reconcileStandings(rows, liveMatches) {
     return match ? reconcileRow(row, liveOutcomeFor(match, id)) : row
   })
 }
+
+/**
+ * catchUpStandings — rattrape un classement football-data.org EN RETARD sur les résultats.
+ *
+ * CONSTAT (09/11, utilisateur) : « une équipe a une victoire dans la forme récente mais zéro
+ * victoire dans la colonne ». Vérifié sur les données de l'app : Málaga 12 matchs / 0 V au
+ * classement alors que les matchs football-data.org en comptent 13 dont 1 victoire ;
+ * M'gladbach 9 matchs / 1 V au classement contre 10 / 2 V dans les matchs. Le classement
+ * football-data.org est mis à jour avec du retard (plusieurs heures) après la fin d'une
+ * journée, alors que la liste des matchs, d'où vient la forme, est déjà à jour.
+ *
+ * Correction : pour chaque équipe dont le nombre de matchs de championnat TERMINÉS (saison
+ * en cours) dépasse `playedGames`, les derniers matchs manquants sont ajoutés à sa ligne
+ * (V/N/D, buts, points, différence). Limité à 3 matchs manquants : au-delà, les deux sources
+ * ne parlent pas de la même chose et on ne touche à rien. Puis reclassement par points ;
+ * à égalité, l'ordre d'origine (règles de départage du championnat) est conservé entre deux
+ * lignes non modifiées, sinon différence de buts puis buts marqués.
+ * Les équipes en plein match ne sont pas concernées : football-data.org compte déjà le match
+ * en cours au classement, il y a alors autant (ou plus) de matchs joués que de matchs terminés.
+ *
+ * @param {object[]} rows         lignes de classement ({ position, team, playedGames, won, draw, lost, points, goalsFor, goalsAgainst, goalDifference })
+ * @param {object[]} compMatches  matchs football-data.org du championnat (useTeamForm)
+ * @param {(team, matches) => any} resolveId  id football-data.org d'une ligne (ou null)
+ */
+export function catchUpStandings(rows, compMatches, resolveId) {
+  if (!rows?.length || !compMatches?.length) return rows
+  const latest = compMatches.reduce((acc, m) => (m.season?.startDate && m.season.startDate > acc ? m.season.startDate : acc), '')
+  const league = compMatches.filter(m =>
+    m.status === 'FINISHED' && !m.isCup &&
+    (!latest || m.season?.startDate === latest) &&
+    Number.isInteger(m.score?.fullTime?.home) && Number.isInteger(m.score?.fullTime?.away))
+  if (!league.length) return rows
+  const byTeam = new Map()
+  for (const m of [...league].sort((a, b) => Date.parse(a.utcDate) - Date.parse(b.utcDate))) {
+    for (const id of [m.homeTeam?.id, m.awayTeam?.id]) {
+      if (id == null) continue
+      if (!byTeam.has(id)) byTeam.set(id, [])
+      byTeam.get(id).push(m)
+    }
+  }
+  let changed = false
+  const updated = rows.map((row, idx) => {
+    const base = { ...row, _idx: idx }
+    if ([row.playedGames, row.won, row.draw, row.lost, row.points].some(v => typeof v !== 'number')) return base
+    const fdId = resolveId(row.team, league)
+    if (fdId == null) return base
+    const played = byTeam.get(fdId) ?? []
+    const missing = played.length - row.playedGames
+    if (missing <= 0 || missing > 3) return base
+    let { won, draw, lost, points, playedGames } = row
+    let gf = row.goalsFor ?? 0
+    let ga = row.goalsAgainst ?? 0
+    for (const m of played.slice(-missing)) {
+      const home = m.homeTeam.id === fdId
+      const f = home ? m.score.fullTime.home : m.score.fullTime.away
+      const a = home ? m.score.fullTime.away : m.score.fullTime.home
+      gf += f; ga += a; playedGames += 1
+      if (f > a) { won += 1; points += 3 } else if (f === a) { draw += 1; points += 1 } else { lost += 1 }
+    }
+    changed = true
+    return { ...base, playedGames, won, draw, lost, points, goalsFor: gf, goalsAgainst: ga, goalDifference: gf - ga, _caughtUp: true }
+  })
+  if (!changed) return rows
+  updated.sort((a, b) =>
+    (b.points - a.points) ||
+    ((a._caughtUp || b._caughtUp)
+      ? ((b.goalDifference ?? 0) - (a.goalDifference ?? 0)) || ((b.goalsFor ?? 0) - (a.goalsFor ?? 0)) || (a._idx - b._idx)
+      : (a._idx - b._idx)))
+  return updated.map((r, i) => {
+    const { _idx, ...rest } = r
+    void _idx
+    return { ...rest, position: i + 1 }
+  })
+}

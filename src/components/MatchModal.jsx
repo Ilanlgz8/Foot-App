@@ -9,7 +9,7 @@ import { StandingsTable }     from './StandingsTable'
 import { DEFAULT_RULES, COMP_RULES } from '../data/standingsRules'
 import { useStandings }       from '../hooks/useStandings'
 import { useMatches }         from '../hooks/useMatchs'
-import { reconcileStandings } from '../utils/standingsLive'
+import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
@@ -1393,7 +1393,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={reconcileStandings(standings, liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
+      <StandingsTable rows={reconcileStandings(catchUpStandings(standings, formCompMatches, (team, ms) => resolveFdTeamId(team, ms, { loose: true, strict: true })), liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
     </div>
   )
 }
