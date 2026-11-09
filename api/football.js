@@ -180,7 +180,9 @@ function getTtl(fdPath, qs) {
   if (/^\/v4\/matches\/\d+$/.test(fdPath) && !qs) return 3600         // détail FT — 1h
   if (fdPath.includes('/head2head'))             return 86400          // H2H stable, change pas avant le match — 24h (relevé 26/07)
   if (qs.includes('status=FINISHED'))              return 120           // résultats — 2min
-  if (fdPath.includes('/standings'))               return 120           // classements — 2min
+  // 09/11 : 5 min (avant 2) — le Worker la rafraîchit toutes les 4 min pendant les matchs du
+  // championnat (warmLiveCompetitions, cf-worker) : la copie est toujours prête, jamais périmée.
+  if (fdPath.includes('/standings'))               return 300           // classements — 5min
   // ⚠️ `live=0` AJOUTÉ (02/11, constat utilisateur : "le classement des
   // buteurs met 24s à s'afficher") : un TTL de 2min FIXE, même les jours
   // SANS AUCUN match pour cette compétition, forçait un cache-miss serveur
@@ -207,7 +209,8 @@ function getTtl(fdPath, qs) {
   // le client (scorersUpdateDue, useScorers.js) passe de toute façon par la clé SANS `live=0`
   // (TTL 5min) quand une mise à jour est due, y compris au premier lancement.
   if (fdPath.includes('/scorers') && qs.includes('live=0')) return 21600
-  if (fdPath.includes('/scorers'))                 return 300           // buteurs — 5min
+  // 09/11 : 10 min (avant 5) — rafraîchie par le Worker toutes les 8 min pendant les matchs.
+  if (fdPath.includes('/scorers'))                 return 600           // buteurs — 10min
   // ⚠️ AJOUT (24/07, question utilisateur directe : "ça va pas bouger dans
   // Résultats récents, pourquoi pas le garder en cache 7 jours ?" — repéré
   // en creusant la rafale de 429 au lancement de l'Accueil). Un jour

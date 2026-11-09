@@ -887,6 +887,7 @@ async function runOnePass(env) {
   // coût négligeable, évite un aller-retour Redis séparé plus bas.
   let rawLiveSlugs = null
   let rawPubAll = null // publication précédente (voir publishAll), lue dans le mget existant : 0 sous-requête en plus
+  let rawWarmPlan = null // plan de préchauffage classement/buteurs (voir warmLiveCompetitions), même mget
   // ⚠️ BUG CRITIQUE CORRIGÉ (14/10, même soirée que le fix hotSlugs/
   // noMatchFlags/runOnePass try-catch ci-dessus/plus bas — nouveau trou de
   // 69min, 17:24→18:33, confirmé par /api/debug-push : zéro ligne de log
@@ -919,8 +920,9 @@ async function runOnePass(env) {
     log.push(`[cron:liveIds:scard] error=${e.message}`)
   }
   try {
-    const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending, rawPub] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey, PUB_ALL_KEY)
+    const [rawEmpty, rawNextCheck, rawSlugs, rawEmptyPending, rawPub, rawWarm] = await kv.mget(emptyDayKey, nextCheckKey, 'cron:liveSlugs', emptyDayPendingKey, PUB_ALL_KEY, WARM_PLAN_KEY)
     rawPubAll = rawPub
+    rawWarmPlan = rawWarm
     knownEmpty = !!rawEmpty
     skipUntil  = rawNextCheck
     emptyPendingAtStart = rawEmptyPending
@@ -929,10 +931,10 @@ async function runOnePass(env) {
 
   if (trackingLiveAtStart === 0) {
     if (knownEmpty) {
-      return { events: 0, log: [], quiet: true }
+      return { events: 0, log: [], quiet: true, warmPlan: safeJsonParse(rawWarmPlan, null) }
     }
     if (skipUntil && Number(skipUntil) > now.getTime()) {
-      return { events: 0, log: [], quiet: true }
+      return { events: 0, log: [], quiet: true, warmPlan: safeJsonParse(rawWarmPlan, null) }
     }
   }
 
@@ -2309,7 +2311,8 @@ async function runOnePass(env) {
   }
 
   await publishAll(kv, prevPub, allEvents, allResults, alreadyDoneIds, today, yesterday, now, log, skippedIdlePairs)
-  return { events: allEvents.length, log }
+  const warmPlan = await updateWarmPlan(kv, rawWarmPlan, allEvents, now, log)
+  return { events: allEvents.length, log, warmPlan }
 }
 
 // ⚠️ AJOUT (même contexte que le log ci-dessus, quota Upstash 1,4M/500K) :
@@ -2518,6 +2521,7 @@ async function handlePass(env) {
   // jours sans match en direct, donc ce préchauffage doit tourner tout le
   // temps, pas seulement pendant les fenêtres où le direct est actif.
   await warmFdCache(result.log, kv, result.quiet)
+  await warmLiveCompetitions(kv, result.warmPlan, result.log)
 
   if (writeBookkeeping) {
     try {
@@ -2834,6 +2838,89 @@ async function warmFdCache(log, kv, quiet) {
 // qui pourrait fuiter via son propre timing) et on XOR chaque caractère sans
 // sortir en avance sur une différence, pour ne pas laisser le temps de réponse
 // varier selon où survient le premier caractère différent.
+// ── Classement + buteurs tenus à jour par le serveur pendant les matchs (09/11) ──────────
+// Demande utilisateur : « que le Worker mette à jour le classement et les buteurs, seulement
+// pendant les matchs en cours, puis une dernière fois environ 1 h après les matchs ».
+// `warm:plan` = { [codeFD]: { lastLiveAt, finalDone } } — lu dans le mget de début de passe
+// (0 sous-requête en plus, même en mode repos), écrit au plus toutes les 4 min par
+// championnat en direct + une fois pour la mise à jour finale.
+//   • en direct (vu en direct il y a < 6 min) : classement toutes les 4 min, buteurs toutes
+//     les 8 min, décalés par championnat — juste avant l'expiration de la copie serveur
+//     (api/football.js : classement 5 min, buteurs 10 min) → l'app lit toujours une copie
+//     prête, instantanée ;
+//   • 60 min après la dernière fois où le championnat était en direct : une dernière mise à
+//     jour (classement + buteurs), puis plus rien jusqu'au prochain match.
+// Les appels ne lisent pas la réponse (même principe que warmScorersLive0) : coût CPU
+// quasi nul ici ; au plus 4 appels par passe.
+const WARM_PLAN_KEY = 'warm:plan'
+const WARM_LIVE_GRACE_MS = 6 * 60_000
+const WARM_FINAL_AFTER_MS = 60 * 60_000
+const WARM_FINAL_MAX_MS = 6 * 3600_000
+const WARM_MAX_PER_PASS = 4
+
+async function updateWarmPlan(kv, rawPlan, allEvents, now, log) {
+  const plan = safeJsonParse(rawPlan, null) ?? {}
+  try {
+    const nowMs = now.getTime()
+    const liveSlugs = new Set()
+    for (const { slug, evt } of allEvents ?? []) {
+      const st = evt?.competitions?.[0]?.status ?? evt?.status
+      if (st?.type?.state === 'in') liveSlugs.add(slug)
+    }
+    let changed = false
+    for (const [slug, comp] of Object.entries(FD_SLUG_TO_WARM_COMP)) {
+      if (!liveSlugs.has(slug)) continue
+      const p = plan[comp]
+      if (!p?.lastLiveAt || p.finalDone || nowMs - p.lastLiveAt >= 4 * 60_000) {
+        plan[comp] = { lastLiveAt: nowMs, finalDone: false }
+        changed = true
+      }
+    }
+    if (changed) await kv.set(WARM_PLAN_KEY, JSON.stringify(plan), { ex: 2 * 86400 })
+  } catch (e) {
+    log.push(`[warm:plan] error=${e.message}`)
+  }
+  return plan
+}
+
+async function warmLiveCompetitions(kv, plan, log) {
+  if (!plan || typeof plan !== 'object') return
+  const nowMs = Date.now()
+  const minute = new Date().getMinutes()
+  const finals = []
+  const live = []
+  let changed = false
+  FD_WARM_COMPS.forEach((comp, idx) => {
+    const p = plan[comp]
+    if (!p?.lastLiveAt) return
+    const since = nowMs - p.lastLiveAt
+    const standingsUrl = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(`/v4/competitions/${comp}/standings`)}`
+    const scorersUrl = `${FD_WARM_BASE_URL}?apiPath=${encodeURIComponent(`/v4/competitions/${comp}/scorers`)}&limit=500`
+    if (since < WARM_LIVE_GRACE_MS) {
+      if ((minute + idx) % 4 === 0) live.push([comp, 'classement', standingsUrl])
+      if ((minute + idx) % 8 === 2) live.push([comp, 'buteurs', scorersUrl])
+    } else if (!p.finalDone && since >= WARM_FINAL_AFTER_MS && since < WARM_FINAL_MAX_MS) {
+      finals.push([comp, 'classement final', standingsUrl], [comp, 'buteurs final', scorersUrl])
+      plan[comp] = { ...p, finalDone: true }
+      changed = true
+    }
+  })
+  const todo = [...finals, ...live].slice(0, WARM_MAX_PER_PASS)
+  if (todo.length) {
+    await Promise.allSettled(todo.map(async ([comp, what, url]) => {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+        if (!res.ok) log.push(`[warm:${comp}:${what}] status=${res.status}`)
+      } catch (e) {
+        log.push(`[warm:${comp}:${what}] error=${e.message}`)
+      }
+    }))
+  }
+  if (changed) {
+    try { await kv.set(WARM_PLAN_KEY, JSON.stringify(plan), { ex: 2 * 86400 }) } catch (e) { log.push(`[warm:plan] error=${e.message}`) }
+  }
+}
+
 function safeCompare(received, expected) {
   let diff = received.length === expected.length ? 0 : 1
   const len = expected.length
