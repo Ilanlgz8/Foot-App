@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { readCache, readCacheStale, getCacheSavedAt, writeCache, compactH2HMatch } from './localCache'
 import { readBigCache, writeBigCache } from './idbCache'
@@ -1384,6 +1385,10 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
       // match déjà joué réintroduit via le cache stale.
       if (merged.length === 0) return fillFromCompCaches(filterUpcomingWindow(readCacheStale(key), now, windowMs), compIds, now, windowMs)
       const filled = fillFromCompCaches(merged, compIds, now, windowMs)
+      if (filled.length > merged.length) {
+        // une compétition est revenue vide mais sa propre copie a des matchs → on retente vite
+        allCompsPartialFailureUntil.set(queryKeyStr, Date.now() + PARTIAL_FAILURE_RETRY_MS)
+      }
       try {
         window.__sfAllComps = {
           at: now,
@@ -1422,8 +1427,18 @@ export function useUpcomingMatchesAllComps(compIds, windowDays = 7) {
     refetchOnWindowFocus: true,
   })
 
+  // Complété aussi à l'AFFICHAGE (pas seulement au fetch) : la liste en cache peut rester
+  // valable 1 h sans nouvel appel ; une compétition chargée entre-temps ailleurs (ex.
+  // Programme → Ligue des Nations) y apparaît alors dès le prochain affichage de la page.
+  const [fillNow] = useState(() => Date.now())
+  const compIdsKey = compIds.join(',')
+  const filledData = useMemo(
+    () => fillFromCompCaches(data ?? [], compIdsKey.split(','), fillNow, windowMs),
+    [data, compIdsKey, fillNow, windowMs],
+  )
+
   return {
-    matches: data ?? [],
+    matches: filledData,
     loading: isLoading,
     error: classifyFetchError(error?.message),
   }

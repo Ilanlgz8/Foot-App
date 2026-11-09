@@ -4,6 +4,7 @@
 // de suite sur l'onglet « En direct » (une PWA iOS n'a pas de barre d'adresse). Lecture seule : n'écrit
 // rien, sauf une clé de test de 2 caractères aussitôt supprimée.
 import { getBootLog } from '../utils/reloadTrace'
+import { readCacheStale, getCacheSavedAt } from '../hooks/localCache'
 import { getMatchState } from '../utils/matchStateTracker'
 import { isTrackedLive } from '../hooks/liveTracker'
 import { isCardLive, calcMinute } from '../utils/matchUtils'
@@ -70,6 +71,8 @@ function LaunchInfo() {
       <div>garde-fou stockage : {g ? `${g.evictions} purge(s)${g.removed.length ? ' — ' + g.removed.slice(-4).join(', ') : ''}` : '—'}</div>
       <div>liste « à venir » (jour suivant) : {window.__sfAllComps ? `${window.__sfAllComps.total} matchs, dont Ligue des Nations ${window.__sfAllComps.nl} — par compétition : ${Object.entries(window.__sfAllComps.byComp).map(([k, v]) => `${k} ${v}`).join(', ')}` : 'pas encore chargée'}</div>
       <div>ESPN Ligue des Nations : {window.__sfEspnWin?.['uefa.nations'] ? JSON.stringify(window.__sfEspnWin['uefa.nations']) : 'aucune requête'}</div>
+      <div>copie « à venir » : {(() => { const l = readCacheStale('matches_ALL_V3_30_SCHEDULED'); if (!Array.isArray(l)) return 'absente'; const by = {}; for (const m of l) by[m.competition?.code] = (by[m.competition?.code] ?? 0) + 1; return `${l.length} matchs, enregistrée il y a ${Math.round((Date.now() - getCacheSavedAt('matches_ALL_V3_30_SCHEDULED')) / 60000)} min — ${Object.entries(by).map(([k, v]) => `${k} ${v}`).join(', ')}` })()}</div>
+      <div>copie Ligue des Nations : {(() => { const l = readCacheStale('matches_espn_NL'); return Array.isArray(l) ? `${l.length} matchs (${l.filter(m => m.status !== 'FINISHED').length} à venir), il y a ${Math.round((Date.now() - getCacheSavedAt('matches_espn_NL')) / 60000)} min` : 'absente' })()}</div>
       <div>derniers lancements (le plus récent en bas) :</div>
       {getBootLog().slice(-6).map((b, i) => <div key={'b' + i} style={{ opacity: 0.85, color: /NON DEMANDÉE/.test(b.reason) ? '#fca5a5' : undefined }}>{new Date(b.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {b.reason}{b.err ? ` (dernière erreur : ${b.err})` : ''}</div>)}
       <div>requêtes depuis le lancement : {nApi} · les plus lentes :</div>
