@@ -465,8 +465,14 @@ export function calcMinute(match) {
       // Le clock ESPN continue naturellement de compter en prolongations
       // (91'…105', pause, 106'…120', +arrêts éventuels) : même logique
       // d'interpolation que le temps réglementaire, pas de calcul spécial requis.
+      // ⚠️ (10/11, constat utilisateur : match de FA Cup gagné en prolongation, carton à la 120e,
+      // retour dans l'app → « Prolongation » au lieu de la minute). Le temps additionnel extrapolé
+      // depuis un relevé ESPN ancien (app revenue d'arrière-plan) dépasse le plafond. Après la 90e,
+      // « Prolongation » reste la bonne hypothèse ; après la 120e il n'y a plus de prolongation
+      // possible (fin ou tirs au but, confirmés au prochain relevé ESPN) → « 120+' ».
+      const overrunLabel = (p) => (p?.base === 120 ? "120+'" : 'Prolongation')
       const interpolated = interpolateEspnMinute(state)
-      if (interpolated === 'OVERRUN') return 'Prolongation'
+      if (interpolated === 'OVERRUN') return overrunLabel(parseEspnClock(state.espnClock))
       if (interpolated) return interpolated
       // Fallback si interpolation non disponible (capturedAt absent ou trop vieux)
       const parsed = parseEspnClock(state.espnClock)
@@ -474,7 +480,7 @@ export function calcMinute(match) {
         // Même plafond que l'interpolation (voir STOPPAGE_CAP) : le clock
         // brut peut lui aussi être resté figé au-delà du raisonnable si le
         // dernier poll remonte à un moment déjà tardif de la pause.
-        if (isEndOfPeriodBase(parsed.base) && parsed.extra > STOPPAGE_CAP) return 'Prolongation'
+        if (isEndOfPeriodBase(parsed.base) && parsed.extra > STOPPAGE_CAP) return overrunLabel(parsed)
         return parsed.extra > 0
           ? `${parsed.base}+${parsed.extra}'`
           : `${Math.max(1, parsed.base)}'`

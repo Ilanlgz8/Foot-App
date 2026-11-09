@@ -283,6 +283,13 @@ describe('calcMinute', () => {
     expect(calcMinute(baseMatch())).toBe('Prolongation')
   })
 
+  it('temps additionnel de la 2e prolongation dépassé (retour d\'arrière-plan) : « 120+\' », jamais « Prolongation »', () => {
+    setEspnData(MID, { espnClock: '120:00+2:00', espnStatus: 'STATUS_IN_PROGRESS', espnPeriod: 4 })
+    expect(calcMinute(baseMatch())).toBe("120+2'")
+    vi.advanceTimersByTime(20 * 60_000)
+    expect(calcMinute(baseMatch())).toBe("120+'")
+  })
+
   it('affiche "TAB" pendant la séance de tirs au but', () => {
     setEspnData(MID, { espnClock: '120:00', espnStatus: 'STATUS_SHOOTOUT', espnPeriod: 5 })
     expect(calcMinute(baseMatch())).toBe('TAB')
