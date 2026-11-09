@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, memo } from 'react'
+import { formKey } from '../hooks/useTeamForm'
 import { translateTeam } from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore , isNationalTeamComp, isCardLive, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
 import { notifyGoal } from '../utils/notifications'
@@ -355,7 +356,7 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
         <span className={homeNameCls}>
           {translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')}
         </span>
-        <FormDiamonds form={formMap?.[resolvedHomeId]} />
+        <FormDiamonds form={formMap?.[formKey(match, resolvedHomeId)]} />
       </div>
 
       {/* Centre : minute/heure/FT + score */}
@@ -396,7 +397,7 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
         <span className={awayNameCls}>
           {translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')}
         </span>
-        <FormDiamonds form={formMap?.[resolvedAwayId]} />
+        <FormDiamonds form={formMap?.[formKey(match, resolvedAwayId)]} />
       </div>
     </div>
   )

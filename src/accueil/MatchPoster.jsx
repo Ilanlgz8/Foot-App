@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react'
+import { formKey } from '../hooks/useTeamForm'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
@@ -189,8 +190,8 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // pas de forme affichée plutôt qu'une forme fausse.
   const formHomeId = resolveFdTeamId(match.homeTeam, h2hPool, { loose: true, strict: true })
   const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
-  const hForm     = formMap?.[formHomeId] ?? []
-  const aForm     = formMap?.[formAwayId] ?? []
+  const hForm     = formMap?.[formKey(match, formHomeId)] ?? []
+  const aForm     = formMap?.[formKey(match, formAwayId)] ?? []
   // BUG CORRIGÉ (constat utilisateur : "le prono ne bougeait pas dans la
   // card en live en fonction du score") : cette barre utilisait TOUJOURS
   // calcPronoAdvanced (le prior pré-match figé), même une fois le match en

@@ -20,7 +20,7 @@ import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp,
 import { getMatchState } from '../utils/matchStateTracker'
 import { halftimeLabel } from '../utils/halftimeCountdown'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
-import { useTeamForm } from '../hooks/useTeamForm'
+import { useTeamForm, formKey } from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
@@ -214,8 +214,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // pas de forme affichée plutôt qu'une forme fausse.
   const formHomeId = resolveFdTeamId(match.homeTeam, h2hPool, { loose: true, strict: true })
   const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
-  const hForm = formMap?.[formHomeId] ?? []
-  const aForm = formMap?.[formAwayId] ?? []
+  const hForm = formMap?.[formKey(match, formHomeId)] ?? []
+  const aForm = formMap?.[formKey(match, formAwayId)] ?? []
   const prono = isLive
     ? calcLiveProno(hForm, aForm, hs, as_, liveMinute, {
         homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,

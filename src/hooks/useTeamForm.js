@@ -263,6 +263,24 @@ export function buildFormMap(matches) {
   return formMap
 }
 
+// ⚠️ (09/11, demande utilisateur : « la forme récente, faut que ce soit par compétition, pas
+// mélangé entre la Liga et la Copa del Rey ») : la coupe nationale (matchs ESPN `isCup`,
+// fusionnés dans les matchs du championnat) a désormais sa PROPRE forme, rangée sous
+// `cup:<id>` dans le même formMap. Un match de championnat lit `formMap[id]` (championnat
+// seul), un match de coupe lit `formMap['cup:' + id]` (coupe seule) — via formKey().
+export const CUP_FORM_PREFIX = 'cup:'
+export function formKey(match, id) {
+  if (id == null) return null
+  return match?.isCup ? `${CUP_FORM_PREFIX}${id}` : id
+}
+function buildSplitFormMap(finishedMatches) {
+  const out = buildFormMap(finishedMatches.filter(m => !m.isCup))
+  for (const [id, form] of Object.entries(buildFormMap(finishedMatches.filter(m => m.isCup)))) {
+    out[`${CUP_FORM_PREFIX}${id}`] = form
+  }
+  return out
+}
+
 // Logique de fetch factorisée — réutilisée par useTeamForm (1 compétition) et
 // useTeamFormMulti (plusieurs compétitions mélangées, voir plus bas).
 async function fetchTeamForm(selectedComp) {
@@ -323,7 +341,7 @@ async function fetchTeamForm(selectedComp) {
   if (isClub) {
     const raw = await fetchClubMatchesRaw(selectedComp)
     if (raw == null) {
-      const stale = readCacheStale(`teamform2_${selectedComp}`)
+      const stale = readCacheStale(`teamform3_${selectedComp}`)
       if (stale) return stale
       return { formMap: {}, matches: [], isLastSeason: false }
     }
@@ -419,7 +437,7 @@ async function fetchTeamForm(selectedComp) {
         // intersaison) donne donc un formMap vide. `matches` RETOURNÉ
         // (compMatches, 2e champ) reste `fallbackMatches` — le modèle de
         // pronostic et le repli H2H continuent d'utiliser la saison passée.
-        return { formMap: buildFormMap(matches), matches: fallbackMatches, isLastSeason: true }
+        return { formMap: buildSplitFormMap(matches), matches: fallbackMatches, isLastSeason: true }
       }
     }
 
@@ -443,7 +461,7 @@ async function fetchTeamForm(selectedComp) {
     // jamais toucher au `compMatches` utilisé ici pour Forme récente/Stats
     // saison — la bonne séparation était d'utiliser ce hook-là pour ce
     // besoin-là, pas d'élargir ce que ce fichier-ci expose partout.
-    return { formMap: buildFormMap(matches), matches, isLastSeason: false }
+    return { formMap: buildSplitFormMap(matches), matches, isLastSeason: false }
   }
 
   // ── WC/EC : compétitions non-annuelles, pas de "saison précédente"
@@ -460,7 +478,7 @@ async function fetchTeamForm(selectedComp) {
   // propre garde-fou serveur (verrou d'espacement ~6s).
   const { should, fresh } = await shouldQueryWcEcWithMeta()
   if (!should) {
-    const stale = readCacheStale(`teamform2_${selectedComp}`)
+    const stale = readCacheStale(`teamform3_${selectedComp}`)
     if (stale) return stale
     return { formMap: {}, matches: [], isLastSeason: false }
   }
@@ -492,7 +510,7 @@ async function fetchTeamForm(selectedComp) {
 // — évite un fetch FD.org redondant avec celui déjà fait ailleurs (ex.
 // useTeamFormMulti côté Accueil.jsx) pour la même compétition.
 export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
-  const cacheKey = `teamform2_${selectedComp}`
+  const cacheKey = `teamform3_${selectedComp}`
 
   const { data, isLoading } = useQuery({
     queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
@@ -583,7 +601,7 @@ export function useTeamForm(selectedComp, delayMs = 0, enabled = true) {
 // vol/en cache au montage, sans le redemander.
 export function prefetchTeamForm(queryClient, selectedComp) {
   if (!selectedComp) return
-  const cacheKey = `teamform2_${selectedComp}`
+  const cacheKey = `teamform3_${selectedComp}`
   queryClient.prefetchQuery({
     queryKey: ['teamForm2', selectedComp, selectedComp === 'WC' ? '2026' : 'cur'],
     queryFn: async () => {
@@ -619,7 +637,7 @@ export function useTeamFormMulti(compCodes) {
 
   const results = useQueries({
     queries: codes.map((code, i) => {
-      const cacheKey = `teamform2_${code}`
+      const cacheKey = `teamform3_${code}`
       return {
         queryKey:             ['teamForm2', code, code === 'WC' ? '2026' : 'cur'],
         queryFn:              async () => {

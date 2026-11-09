@@ -185,7 +185,7 @@ const UNPERSISTED_QUERY_KEYS = new Set([
   // Query pendant la session ET le cache disque dédié de chaque hook restent
   // tous les deux inchangés, aucune perte de fraîcheur ni de persistance.
   'lowerDivisionStats', // repli "club promu" — useLowerDivisionStats(Multi), cache disque 90j (LOWER_DIV_CACHE_TTL)
-  'teamForm2',          // forme récente — useTeamForm(Multi), cache disque dédié (teamform2_*)
+  'teamForm2',          // forme récente — useTeamForm(Multi), cache disque dédié (teamform3_*, 09/11 : forme séparée championnat/coupe)
   'scorers',            // classement buteurs — useScorers, cache disque dédié (scorers3_*)
   'standings',          // classement — useStandings, cache disque dédié (standings_*)
   'todayMatches', 'todayMatchesEspn', 'todayMatchesWcEc', // Accueil (cartes + Résultats récents) — useTodayMatches.js, cache disque dédié (matches_*/matches_espn_*/matches_wcec_*)

@@ -6,6 +6,7 @@
  * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
 import { useParams, useNavigate } from 'react-router-dom'
+import { formKey } from '../hooks/useTeamForm'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
@@ -578,8 +579,8 @@ export default function LiveMatchPage() {
   const homeCrest = resolveFdCrest(match?.homeTeam, match?.homeTeam?.id, resolveMatches)
   const awayCrest = resolveFdCrest(match?.awayTeam, match?.awayTeam?.id, resolveMatches)
 
-  const hForm = formMap?.[match?.homeTeam?.id]
-  const aForm = formMap?.[match?.awayTeam?.id]
+  const hForm = formMap?.[formKey(match, match?.homeTeam?.id)]
+  const aForm = formMap?.[formKey(match, match?.awayTeam?.id)]
   // Le pronostic live (calcLiveProno, score + minute + cartons rouges +
   // possession) est désormais calculé DANS LiveStatsTab (MatchModal.jsx) —
   // c'est là qu'on a déjà les stats live sous la main pour l'enrichir, et ça

@@ -3,6 +3,7 @@
  * Route : /match/:matchId
  */
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { formKey } from '../hooks/useTeamForm'
 import { useState, useMemo }       from 'react'
 import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
@@ -898,8 +899,8 @@ export default function MatchPage() {
     return (resolvedId != null && resolvedId !== match.id) ? { ...match, id: resolvedId } : match
   }, [match, resolveMatches])
 
-  const hForm = formMap?.[match?.homeTeam?.id]
-  const aForm = formMap?.[match?.awayTeam?.id]
+  const hForm = formMap?.[formKey(match, match?.homeTeam?.id)]
+  const aForm = formMap?.[formKey(match, match?.awayTeam?.id)]
 
   // ⚠️ AJOUT (badge ballon à côté du buteur dans la compo, demande explicite)
   // : même appel que dans MatchPageHero (React Query dédup par queryKey donc

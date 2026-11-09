@@ -26,7 +26,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, memo, useTransition, useDeferredValue } from 'react'
 import { usePronosGroup, usePronosGroupData } from '../hooks/usePronosGroup'
 import { useUpcomingMatchesAllComps, useFinishedMatchesAllComps, useLowerDivisionStatsMulti } from '../hooks/useMatchs'
-import { useTeamFormMulti } from '../hooks/useTeamForm'
+import { useTeamFormMulti, formKey } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
@@ -184,8 +184,8 @@ function matchProno(match, formMapByComp, matchesByComp, lowerDivByComp) {
   // calcProno.js), aucune régression.
   const resolvedHomeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true, strict: true })
   const resolvedAwayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true, strict: true })
-  const hForm = formMap?.[resolvedHomeId] ?? []
-  const aForm = formMap?.[resolvedAwayId] ?? []
+  const hForm = formMap?.[formKey(match, resolvedHomeId)] ?? []
+  const aForm = formMap?.[formKey(match, resolvedAwayId)] ?? []
   // Repli "club promu" (03/08, cohérence demandée avec Accueil — voir
   // calcProno.js computeLambdasWithPromotion) : lowerDivByComp fourni par
   // useLowerDivisionStatsMulti, absent/vide pour toute compétition sans
