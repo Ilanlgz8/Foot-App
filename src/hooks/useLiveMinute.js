@@ -499,6 +499,21 @@ function isServerManaged(mid) {
   return Date.now() - (serverManagedAt[mid] ?? 0) < SERVER_MANAGED_MS
 }
 
+// ── Journal de l'ANCIENNE logique (10/11) ───────────────────────────────────────────────────
+// Demande utilisateur : « supprimer l'ancienne logique du direct, mais garder le code ». Depuis
+// l'étape 2 (06/11, validée le week-end des 7-8/11, ~60 matchs), elle ne tourne plus pour les
+// matchs suivis par le serveur ; elle reste un SECOURS (match non suivi, serveur muet > 10 min).
+// Avant de l'éteindre pour de bon, on note chaque fois qu'elle termine un match elle-même
+// (`sf_legacy_ft`, 20 derniers, visible dans LiveDiag) : si ce journal reste vide, le code peut
+// être désactivé sans risque.
+function noteLegacyFt(kind, match) {
+  try {
+    const list = JSON.parse(localStorage.getItem('sf_legacy_ft') ?? '[]')
+    list.push({ at: Date.now(), kind, id: String(match?.id ?? ''), name: `${match?.homeTeam?.name ?? '?'} – ${match?.awayTeam?.name ?? '?'}` })
+    localStorage.setItem('sf_legacy_ft', JSON.stringify(list.slice(-20)))
+  } catch { /* stockage indisponible */ }
+}
+
 function _runFtSafeguards(matches, now, queryClient) {
   // Pool combiné : matches FD.org du jour + matchs stockés dans liveTracker
   const allLive = [...matches]
@@ -527,6 +542,7 @@ function _runFtSafeguards(matches, now, queryClient) {
     if (isServerManaged(mid)) continue
     if (!isTrackedLive(mid)) continue
     console.log(`[useLiveMinute] pendingFt timeout → FT auto-confirmé match ${mid}`)
+    noteLegacyFt('garde-fou 1 (confirmation locale)', match)
     confirmFt(match, now, queryClient)
   }
 
@@ -551,6 +567,7 @@ function _runFtSafeguards(matches, now, queryClient) {
     const limit = stillGoingPerEspn ? 200 : 150
     if (ageMin < limit) continue
     console.log(`[useLiveMinute] match ${mid} > ${limit}min → FT forcé`)
+    noteLegacyFt('garde-fou 2', lm)
     confirmFt(lm, now, queryClient)
   }
 
@@ -588,6 +605,7 @@ function _runFtSafeguards(matches, now, queryClient) {
       continue
     }
     console.log(`[useLiveMinute] match ${mid} FINISHED (FD.org, ${Math.round(ageMin3)}min) → FT`)
+    noteLegacyFt('garde-fou 3', lm)
     confirmFt(lm, now, queryClient)
   }
 
@@ -633,6 +651,7 @@ function _runFtSafeguards(matches, now, queryClient) {
     const ageMin = (now - new Date(lm.utcDate)) / 60_000
     if (ageMin < 90) continue
     console.log(`[useLiveMinute] match ${mid} disparu d'ESPN depuis ${Math.round((now - lastSeen) / 60_000)}min → FT`)
+    noteLegacyFt('garde-fou 4', lm)
     confirmFt(lm, now, queryClient)
   }
 }
@@ -1147,6 +1166,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
           if (now - espnFinalSince[mid] < SERVER_FT_FALLBACK_MS) continue // on attend la confirmation serveur
           console.log(`[useLiveMinute] Fin ESPN depuis ${Math.round((now - espnFinalSince[mid]) / 60000)} min sans confirmation serveur → FT local — match ${mid}`)
           delete espnFinalSince[mid]
+          noteLegacyFt('fin ESPN sans confirmation serveur (10 min)', match)
           confirmFt(match, now, queryClient, data.espnEventId)
           continue
         }
@@ -1248,6 +1268,7 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
         const pft = pendingFt[mid]
         if (pft && pft.score === currentScore) {
           delete pendingFt[mid]
+          noteLegacyFt('double confirmation locale (match sans état serveur)', match)
           confirmFt(match, now, queryClient, data.espnEventId)
         } else {
           pendingFt[mid] = { since: now, score: currentScore }

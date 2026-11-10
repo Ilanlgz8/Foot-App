@@ -172,6 +172,7 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 ### Temporaire (à retirer quand tout est stable)
 - `LiveDiag.jsx` (5 taps sur « En direct ») + `utils/reloadTrace.js` (journal des relances) + diagnostics `window.__sfAllComps` / `__sfEspnWin`.
+- Journal de l'ancienne logique du direct (`noteLegacyFt` → `sf_legacy_ft`, useLiveMinute.js, affiché dans LiveDiag) : chaque fin de match décidée par le TÉLÉPHONE (garde-fous 1-4, double confirmation locale, repli 10 min). S'il reste vide pendant une semaine de matchs, désactiver ces chemins (code gardé) — étape prévue après validation.
 
 ### Déploiement
 - App : push sur `main` → Vercel. Dire à l'utilisateur de recharger l'app 2 fois.
