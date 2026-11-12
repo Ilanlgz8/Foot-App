@@ -202,11 +202,14 @@ function Classement() {
 
   const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday, { live: liveWindow })
   // Ligue 3 : pas de source football-data.org → forme calculée sur ses propres matchs (API FFF).
-  const isL3 = selectedComp === 'L3'
-  const { formMap: fdFormMap, compMatches: fdFormCompMatches } = useTeamForm(selectedComp, 6_000, !isL3)
-  const l3FormMap = useMemo(() => (isL3 ? buildLigue3FormMap(wcFin) : null), [isL3, wcFin])
-  const formMap = isL3 ? l3FormMap : fdFormMap
-  const formCompMatches = isL3 ? [] : fdFormCompMatches
+  // Ligue 2 (12/11, constat utilisateur : « que les 4 derniers matchs en forme récente ») : la
+  // forme par défaut ne voit que la fenêtre ESPN de 30 jours ; ses matchs de championnat
+  // (saison complète grâce à la FFF, voir ligue2Rounds.js) donnent les 5 vrais derniers.
+  const ownForm = selectedComp === 'L3' || selectedComp === 'FL2'
+  const { formMap: fdFormMap, compMatches: fdFormCompMatches } = useTeamForm(selectedComp, 6_000, !ownForm)
+  const ownFormMap = useMemo(() => (ownForm ? buildLigue3FormMap(wcFin) : null), [ownForm, wcFin])
+  const formMap = ownForm ? ownFormMap : fdFormMap
+  const formCompMatches = ownForm ? [] : fdFormCompMatches
   // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09) : useScorers sait
   // désormais aller chercher ces 5 via ESPN plutôt que FD.org, qui ne les
   // couvre pas (voir ESPN_SOURCED_SCORERS_COMPS, competitions.js, et le
