@@ -10,7 +10,7 @@ import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
-import { COMPETITIONS }               from '../data/competitions'
+import { compForMatch } from '../data/competitions'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -296,7 +296,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // identique. `posterComp` (nom + logo du championnat) était déjà calculé
   // plus bas dans ce fichier — remonté ici pour être réutilisé aux deux
   // endroits sans dupliquer la recherche dans COMPETITIONS.
-  const posterComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const posterComp = compForMatch(match)
   const compTint    = posterComp?.tint ?? null
   // ⚠️ AJOUTÉ (05/09, même jour, demande explicite : "un mélange de blanc et
   // rouge... des taches blanche" + reflet façon verre/eau, PAS un fondu de

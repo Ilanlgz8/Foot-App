@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { translateTeam } from '../data/teamNames'
 import { finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchTeamColors } from '../data/teamPhotos'
-import { COMPETITIONS } from '../data/competitions'
+import { compForMatch } from '../data/competitions'
 import { KNOCKOUT_LABELS } from '../hooks/useWcKnockout'
 
 // ── Carte "résultat en héros" (redesign panneau Résultats récents, Accueil) ──
@@ -61,7 +61,7 @@ export function ResultHeroCard({ match, compMatches = null }) {
   // couleur du dégradé équipe sert aussi à guider l'œil vers le résultat.
   const accentColor = homeWins ? homeColor.main : awayWins ? awayColor.main : homeColor.main
 
-  const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const comp = compForMatch(match)
   // Nom complet (pas l'abréviation shortName) + logo — retour utilisateur :
   // "Mondial" remplacé par "Coupe du Monde", même logo que sur les autres
   // pages (LiveMatchPage/MatchPage, voir mp__hero__comp). Round ajouté quand

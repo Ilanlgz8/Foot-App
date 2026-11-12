@@ -11,7 +11,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock, buildHeroSubline } from '../utils/matchUtils'
-import { COMPETITIONS, withPageTheme } from '../data/competitions'
+import { withPageTheme, compForMatch } from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchThemeVars } from '../data/teamPhotos'
@@ -132,7 +132,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
 
   const minute  = isTermine ? null : calcMinute(match)
   const period  = getMatchPeriod(match)
-  const comp    = withPageTheme(COMPETITIONS.find(c => c.id === match.competition?.code))
+  const comp    = withPageTheme(compForMatch(match))
   const emblem  = comp?.emblem ?? match.competition?.emblem
   // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) : match.competition?.name
   // vient de football-data.org (toujours en anglais) — comp?.name (COMPETITIONS,
@@ -342,7 +342,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                  une pastille blanche sur CES pages — un carré de couleur dans
                  un carré blanc, le défaut corrigé ailleurs mais pas ici. */
               data-opaque={comp?.emblemOpaque ? '1' : undefined}
-              style={comp?.emblemBg ? { background: comp.emblemBg } : undefined}
+              style={{ ...(comp?.emblemBg ? { background: comp.emblemBg } : {}), ...(comp?.emblemHeroHeight ? { height: comp.emblemHeroHeight, maxWidth: 'none' } : {}) }}
             >
               <img src={emblem} alt="" />
             </span>

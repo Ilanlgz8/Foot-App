@@ -8,7 +8,7 @@ import { halftimeLabel } from '../utils/halftimeCountdown'
 import { MatchPoster } from './MatchPoster'
 import { FormDiamonds } from './FormDiamonds'
 import { getMatchGradient } from '../data/teamPhotos'
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, compForMatch } from '../data/competitions'
 
 // Formate une date UTC en heure locale "20:45"
 function formatHour(dateStr) {
@@ -310,7 +310,7 @@ function MatchCardImpl({ match, noWinnerLoser = false, espnScore = null, noAnima
   // l'UI", voir CLAUDE.md ; même ordre que compInfo() dans Pronos.jsx).
   // match.competition?.name ne sert plus que de repli si la compétition
   // n'est pas (encore) dans COMPETITIONS.
-  const liveComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const liveComp = compForMatch(match)
   const liveCompEmblem = liveComp?.emblem ?? match.competition?.emblem
   // ⚠️ AJOUT `match.isCup` (26/09, voir le commentaire détaillé dans
   // MatchPoster.jsx) : un match de coupe domestique garde le `code` du

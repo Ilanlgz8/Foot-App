@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import '../resultats.css'
-import { COMPETITIONS } from '../data/competitions'
+import { compForMatch } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { FavStarBadge } from './FavStarBadge'
@@ -65,7 +65,7 @@ export function ResultCard({ match, showComp = false }) {
   const aWin = wentToPens ? (hp != null && ap != null && ap > hp) : as_ > hs
   const draw = !wentToPens && hs === as_
 
-  const comp     = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const comp     = compForMatch(match)
   const compName = match.isCup ? match.competition?.name : (comp?.name ?? match.competition?.name ?? '')
   const compLogo = comp?.emblem ?? match.competition?.emblem
 

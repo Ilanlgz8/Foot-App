@@ -74,6 +74,11 @@ import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
 import ligue3Logo from '../assets/leagues/ligue3.png'
 // Logo officiel Ligue 2 BKT (fourni par l'utilisateur le 12/11, coins blancs détourés).
 import ligue2Logo from '../assets/leagues/ligue2.png'
+import coupeDeFranceLogo from '../assets/leagues/coupe-de-france.png'
+import copaDelReyLogo from '../assets/leagues/copa-del-rey.png'
+import faCupLogo from '../assets/leagues/fa-cup.png'
+import coppaItaliaLogo from '../assets/leagues/coppa-italia.png'
+import dfbPokalLogo from '../assets/leagues/dfb-pokal.png'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
@@ -160,12 +165,15 @@ export const LOWER_DIVISION_FD_CODE = {
 // déjà existant (FL1/PD/PL) — accepté par l'utilisateur malgré le quota
 // d'écritures Turso dépassé le jour même (voir l'entrée "QUOTA D'ÉCRITURES
 // TURSO DÉPASSÉ" plus haut dans ce fichier).
+// `emblem` (12/11) : logos officiels fournis par l'utilisateur, fond blanc détouré, recadrés et
+// mis à 256 px de haut. Lisibilité sur fond sombre : texte noir « DFB-POKAL » et bleu nuit
+// « COPPA ITALIA » passés en blanc, bandeau sponsor Frecciarossa retiré.
 export const DOMESTIC_CUPS = {
-  FL1: { slug: 'fra.coupe_de_france', name: 'Coupe de France' },
-  PD:  { slug: 'esp.copa_del_rey',    name: 'Copa del Rey' },
-  PL:  { slug: 'eng.fa',              name: 'FA Cup' },
-  SA:  { slug: 'ita.coppa_italia',    name: 'Coppa Italia' },
-  BL1: { slug: 'ger.dfb_pokal',       name: 'DFB-Pokal' },
+  FL1: { slug: 'fra.coupe_de_france', name: 'Coupe de France', emblem: coupeDeFranceLogo },
+  PD:  { slug: 'esp.copa_del_rey',    name: 'Copa del Rey',    emblem: copaDelReyLogo },
+  PL:  { slug: 'eng.fa',              name: 'FA Cup',          emblem: faCupLogo },
+  SA:  { slug: 'ita.coppa_italia',    name: 'Coppa Italia',    emblem: coppaItaliaLogo },
+  BL1: { slug: 'ger.dfb_pokal',       name: 'DFB-Pokal',       emblem: dfbPokalLogo },
 }
 
 // ⚠️ RÉDUIT (26/09, constat utilisateur : "dans la page classement y'a pas
@@ -405,6 +413,7 @@ export const COMPETITIONS = [
     name: 'Ligue 2 BKT',
     shortName: 'Ligue 2',
     emblem: ligue2Logo,
+    emblemHeroHeight: 30, // logo vertical : 20 px (défaut des pages match) le rendait trop petit
     // Couleurs du logo (relevées sur le fichier : bleu nuit #091c3e, turquoise #15ffcf) — UNIQUEMENT
     // sur les pages match (demande utilisateur 12/11 : « pas comme la Ligue 1 », donc pas sur les
     // cartes de l'Accueil/Programme). Lues via withPageTheme(), même mécanique que l'Euro.
@@ -1115,7 +1124,7 @@ export function getCompFamily(compId) {
   for (const c of COMPETITIONS) if (c.parent === compId) out.push({ key: c.id, kind: 'comp', id: c.id, name: c.name, emblem: c.emblem })
   if (compId === 'FL1') out.push({ key: 'L3', kind: 'comp', id: 'L3', name: LIGUE3_COMPETITION.name, emblem: LIGUE3_COMPETITION.emblem })
   const cup = DOMESTIC_CUPS[compId]
-  if (cup) out.push({ key: 'cup', kind: 'cup', id: compId, name: cup.name, emblem: null })
+  if (cup) out.push({ key: 'cup', kind: 'cup', id: compId, name: cup.name, emblem: cup.emblem ?? null })
   return out.length > 1 ? out : []
 }
 
@@ -1135,4 +1144,23 @@ export function resolveCompFamily(compId, subKey, { withCup = true } = {}) {
 // les autres écrans lisent l'objet brut et ne la voient pas.
 export function withPageTheme(comp) {
   return comp?.pageTheme ? { ...comp, ...comp.pageTheme } : comp
+}
+
+// Compétition à afficher pour un match : un match de coupe nationale garde le `code` du
+// championnat parent dans les données (Copa del Rey → PD) — on renvoie alors le nom et le logo
+// de la COUPE (12/11), la teinte du championnat restant celle du parent.
+export function compForMatch(match) {
+  const base = COMPETITIONS.find(c => c.id === match?.competition?.code)
+  const cup = match?.isCup ? DOMESTIC_CUPS[match?.competition?.code] : null
+  if (!cup) return base
+  return {
+    ...(base ?? {}),
+    name: cup.name,
+    shortName: cup.name,
+    emblem: cup.emblem ?? base?.emblem,
+    emblemOpaque: true,      // logo détouré : pas de pastille blanche derrière
+    emblemTransparent: true,
+    emblemBg: undefined,
+    emblemHeroHeight: 28,
+  }
 }

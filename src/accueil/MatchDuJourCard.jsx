@@ -24,7 +24,7 @@ import { useTeamForm, formKey } from '../hooks/useTeamForm'
 import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
-import { COMPETITIONS, getCompetitionCampColors } from '../data/competitions'
+import { getCompetitionCampColors, compForMatch } from '../data/competitions'
 
 function shortenName(name) {
   if (!name) return name
@@ -174,7 +174,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
     : rawPeriod === 'T.A.B.'        ? 'T.A.B.'
     : null
 
-  const mdjComp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const mdjComp = compForMatch(match)
   const mdjCompEmblem = mdjComp?.emblem ?? match.competition?.emblem
   // ⚠️ AJOUT `match.isCup` (26/09, voir le commentaire détaillé dans
   // MatchPoster.jsx) : un match de coupe domestique garde le `code` du
