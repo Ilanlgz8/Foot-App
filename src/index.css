@@ -558,3 +558,16 @@ img[data-team*="Juventus" i] {
 
 
 
+
+/* ── Minute du match : MÊME police partout (12/11, demande utilisateur) ───────────────────────
+   Référence = cartes de l'Accueil (.poster__min-label : Inter 900, blanc, lettres espacées).
+   Appliquée à la page du match en direct (.lmp__heroMinute) et aux cartes de l'onglet
+   Match → En direct / Tous les matchs (.live__minute). Tailles propres à chaque endroit
+   conservées. Le point rouge pulsant garde l'indication « direct ». */
+#root .lmp__heroMinute,
+#root .live__minute {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+}
