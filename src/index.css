@@ -590,16 +590,21 @@ img[data-team*="Juventus" i] {
 /* Sélecteur à 2 classes : LiveMatchPage.css (chargé APRÈS index.css) fixe déjà ce margin avec
    « #root .lmp__hero .mp__hero__center » — à spécificité égale c'est lui qui gagnait, d'où une
    remontée restée sans effet au 1er essai. */
-/* 12/11 (capture utilisateur : score plus haut que les logos quand une équipe n'a ni logo ni forme
-   et qu'un diffuseur est affiché) : la colonne centrale n'est plus centrée verticalement par
-   rapport aux équipes — sa hauteur variait (diffuseur présent ou non), celle des équipes aussi
-   (forme présente ou non). Tout est maintenant calé sur le HAUT : le centre du score tombe sur le
-   centre du logo (54 px, 72 px sur grand écran), et le diffuseur descend au niveau des noms. */
-#root .lmp__hero.lmp__hero--live .mp__hero__mid { align-items: flex-start; }
-#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -34px; } /* mesuré : centre du score = centre du logo */
-#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 12px; }
+/* 12/11 (captures utilisateur) : la hauteur du score ne doit plus dépendre de ce qu'il y a sous
+   les équipes (forme récente ou non, logo ou non) ni du diffuseur. Avant, la colonne centrale était
+   centrée verticalement sur les colonnes d'équipes, dont la hauteur variait → score plus haut
+   quand la forme manquait. Tout est désormais calé sur le HAUT des équipes, avec la même règle sur
+   la page du direct et sur celle d'un match terminé : le centre du score est ~15 px SOUS le centre
+   du logo (le rendu « carré » validé sur un match terminé avec forme). Le diffuseur tombe au
+   niveau des noms. Valeurs mesurées en ligne (logo 54 px ; 72 px à partir de 768 px de large). */
+#root .lmp__hero.lmp__hero--live .mp__hero__mid,
+#root .lmp__hero.lmp__hero--ft .mp__hero__mid { align-items: flex-start; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -19px; }
+#root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 2px; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 0; }
 @media (min-width: 768px) {
-  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -25px; }
+  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -10px; }
+  #root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 11px; }
 }
 
 /* Mi-temps sur les cartes (Accueil et onglet Match) : bloc « MT + Reprise dans X min » remonté
