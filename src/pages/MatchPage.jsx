@@ -2,6 +2,7 @@
  * MatchPage — page dédiée à un match à venir / terminé
  * Route : /match/:matchId
  */
+import { keepParticles } from '../utils/nameBreak'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { formKey } from '../hooks/useTeamForm'
 import { useState, useMemo }       from 'react'
@@ -359,7 +360,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
                     au 1er mot et la minute au dernier (espaces insécables). */}
                 <span className="lmp__heroScorerText">
                   <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
-                  {e.name}
+                  {keepParticles(e.name)}
                   {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
                 </span>
               </span>
@@ -373,7 +374,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
                     au 1er mot et la minute au dernier (espaces insécables). */}
                 <span className="lmp__heroScorerText">
                   <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
-                  {e.name}
+                  {keepParticles(e.name)}
                   {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
                 </span>
               </span>
