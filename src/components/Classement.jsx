@@ -20,9 +20,8 @@ import { RATE_LIMITED_MESSAGE } from '../utils/fetchErrors'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers, scorersUpdateDue } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
-import { finalScore, resolveFdTeamId } from '../utils/matchUtils'
+import { resolveFdTeamId } from '../utils/matchUtils'
 import { StandingsTable } from './StandingsTable'
-import { PanelSkeleton } from '../accueil/MatchCard'
 import { usePersistedState } from '../hooks/usePersistedState'
 // Étoile de favori RETIRÉE de cette page (retour utilisateur : pas concluant
 // ici) — ne reste que dans FavoritesPage.jsx (page /favoris, ouverte depuis
@@ -67,7 +66,6 @@ function Classement() {
   }, [pickedComp, setPickedComp, setSubComp])
   const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
   const [search, setSearch] = usePersistedState('classement_search', '')
-  const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)
   const searchNorm = search.trim().toLowerCase()
   const SCORERS_PER_PAGE = 20
   const [scorerPage, setScorerPage] = useState(0)
@@ -313,20 +311,17 @@ function Classement() {
 
   const selectedCompetition = competitions.find((c) => c.id === pickedComp)
 
-  // Auto-ouvre le groupe si on vient d'une modal match (ex: GROUP_A depuis WC)
+  // Arrivée depuis un match (ex. GROUP_A, CdM) : on fait défiler jusqu'au groupe — il n'y a plus
+  // de fenêtre de groupe à ouvrir (12/11, voir MultiGroupView).
   useEffect(() => {
     if (didAutoOpen.current || !initGroup || groups.length === 0) return
     const normG = g => (g ?? '').toUpperCase().replace(/\s+/g, '_')
     const found = groups.find(g => normG(g.name) === initGroup)
     if (found) {
-      setSelectedGroupName(found.name)
       didAutoOpen.current = true
+      setTimeout(() => document.getElementById(`classement-group-${normG(found.name)}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300)
     }
-  }, [groups, initGroup, setSelectedGroupName])
-
-  // Groupe réellement affiché — dérivé du nom persisté + données groups
-  // fraîchement récupérées (évite d'afficher un tableau figé/périmé).
-  const selectedGroup = selectedGroupName ? groups.find(g => g.name === selectedGroupName) ?? null : null
+  }, [groups, initGroup])
 
   const competitionRules = {
     FL1: [
@@ -444,165 +439,6 @@ function Classement() {
     ...buildRelegationRules(selectedComp, standings.length),
   ]
 
-  /* Modal groupe — rendue via createPortal pour échapper au overflow:hidden */
-  function GroupModal({ group, onClose, schedMatches, finMatches, loadingM }) {
-    const [tab, setTab] = useState('classement') // 'classement' | 'programme' | 'resultats'
-
-    useEffect(() => {
-      const handler = e => { if (e.key === 'Escape') onClose() }
-      window.addEventListener('keydown', handler)
-      // Verrou de scroll partagé (11/09, voir scrollLock.js — remplace le
-      // pattern position:fixed direct sur body, qui décalait .sfTabbar depuis
-      // son passage en portail direct dans body).
-      const unlock = lockBodyScroll()
-      return () => {
-        window.removeEventListener('keydown', handler)
-        unlock()
-      }
-    }, [onClose])
-
-    // standings: "Group A" / matches: "GROUP_A" → normaliser pour comparer
-    const normGroup = g => (g ?? '').toUpperCase().replace(/\s+/g, '_')
-    const gn = normGroup(group.name)
-    const upcoming = schedMatches.filter(m => normGroup(m.group) === gn && ['SCHEDULED','TIMED','IN_PLAY','PAUSED'].includes(m.status))
-    const finished = finMatches.filter(m => normGroup(m.group) === gn)
-
-    function formatDate(utcDate) {
-      if (!utcDate) return ''
-      const d = new Date(utcDate)
-      return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-    }
-    function formatTime(utcDate) {
-      if (!utcDate) return ''
-      return new Date(utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    }
-
-    function MatchRow({ m, showScore }) {
-      const hn  = translateTeam(m.homeTeam?.shortName || m.homeTeam?.name || '?')
-      const an  = translateTeam(m.awayTeam?.shortName || m.awayTeam?.name || '?')
-      const fsGroupRow = finalScore(m.score)
-      const sh  = fsGroupRow.home ?? m.score?.halfTime?.home
-      const sa  = fsGroupRow.away ?? m.score?.halfTime?.away
-      const live = ['IN_PLAY','PAUSED'].includes(m.status)
-      const isFinished = m.status === 'FINISHED'
-      // Score 120min (finalScore) : à égalité par définition si le match est allé aux tab.
-      const wentToPens = m.score?.duration === 'PENALTY_SHOOTOUT'
-      const pH = m.score?.penalties?.home ?? null
-      const pA = m.score?.penalties?.away ?? null
-      const homeWin = isFinished && (wentToPens
-        ? (pH != null && pA != null && pH > pA)
-        : (sh != null && sh > sa))
-      const awayWin = isFinished && (wentToPens
-        ? (pH != null && pA != null && pA > pH)
-        : (sa != null && sa > sh))
-
-      const label = live ? (m.minute ? `${m.minute}'` : 'LIVE')
-                  : isFinished ? 'Terminé'
-                  : formatDate(m.utcDate)
-
-      const value = (showScore || live) && sh != null
-        ? `${sh} – ${sa}`
-        : formatTime(m.utcDate)
-
-      return (
-        <div className={`accueil__matchCard${live ? ' accueil__matchCard--live' : ''}`}>
-          {/* Équipe domicile */}
-          <div className="accueil__matchCardTeam">
-            <div className="accueil__matchCardCrestWrap" data-crest="country">
-              {m.homeTeam?.crest
-                ? <img src={m.homeTeam.crest} alt="" className="accueil__matchCardCrest" data-team={m.homeTeam?.name} />
-                : <div className="accueil__matchCardCrestEmpty" />}
-            </div>
-            <span className={`accueil__matchCardName${homeWin ? ' accueil__matchCardName--winner' : ''}`}>{hn}</span>
-          </div>
-
-          {/* Centre */}
-          <div className="accueil__matchCardCenter">
-            <div className="accueil__matchCardLabelRow">
-              {live && <span className="accueil__matchCardLiveDot" />}
-              <span className={`accueil__matchCardLabel${live ? ' accueil__matchCardLabel--live' : ''}`}>{label}</span>
-            </div>
-            <span className={`accueil__matchCardValue${live ? ' accueil__matchCardValue--live' : ''}`}>{value}</span>
-          </div>
-
-          {/* Équipe extérieur */}
-          <div className="accueil__matchCardTeam accueil__matchCardTeam--away">
-            <div className="accueil__matchCardCrestWrap" data-crest="country">
-              {m.awayTeam?.crest
-                ? <img src={m.awayTeam.crest} alt="" className="accueil__matchCardCrest" data-team={m.awayTeam?.name} />
-                : <div className="accueil__matchCardCrestEmpty" />}
-            </div>
-            <span className={`accueil__matchCardName${awayWin ? ' accueil__matchCardName--winner' : ''}`}>{an}</span>
-          </div>
-        </div>
-      )
-    }
-
-    function MatchList({ list, showScore, empty }) {
-      if (loadingM) return <PanelSkeleton />
-      if (!list.length) return (
-        <div className="gm__empty">
-          <span className="gm__emptyIcon" aria-hidden="true">⚽</span>
-          <p className="gm__emptyTitle">{empty}</p>
-        </div>
-      )
-      return <div className="accueil__matchCards">{list.map(m => <MatchRow key={m.id} m={m} showScore={showScore} />)}</div>
-    }
-
-    return createPortal(
-      <div className="classement__modalOverlay" onClick={onClose}>
-        <div className="classement__modalBox classement__modalBox--tabs" onClick={e => e.stopPropagation()}>
-          <div className="classement__modalHeader">
-            <h3 className="classement__modalTitle">{formatGroupName(group.name)}</h3>
-            <button className="classement__modalClose" onClick={onClose} aria-label="Fermer">✕</button>
-          </div>
-
-          {/* Onglets */}
-          <div className="gm__tabs">
-            {[['classement','Classement'],['programme','Programme'],['resultats','Résultats']].map(([id, label]) => (
-              <button
-                key={id}
-                className={`gm__tab${tab === id ? ' gm__tab--active' : ''}`}
-                onClick={() => setTab(id)}
-              >{label}</button>
-            ))}
-          </div>
-
-          {/* Contenu */}
-          <div className="gm__body">
-            {tab === 'classement' && (
-              <StandingsTable
-                rows={group.table}
-                compact={false}
-                formMap={formMap}
-                compMatches={formCompMatches}
-                qualificationRules={qualificationRules}
-                snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
-                isCountry={isCountryComp}
-              />
-            )}
-
-            {tab === 'programme'  && (
-              <MatchList
-                list={upcoming}
-                showScore={false}
-                empty="Aucun match à venir dans ce groupe."
-              />
-            )}
-            {tab === 'resultats'  && (
-              <MatchList
-                list={[...finished].reverse()}
-                showScore={true}
-                empty="Aucun résultat disponible pour ce groupe."
-              />
-            )}
-          </div>
-        </div>
-      </div>,
-      document.body
-    )
-  }
-
   /* Affichage multi-groupes (CdM, etc.) */
   function MultiGroupView() {
     // Recherche : ne garder que les groupes contenant une équipe correspondante,
@@ -619,19 +455,21 @@ function Classement() {
         )}
         <div className="classement__groups">
           {visibleGroups.map(group => (
+            // 12/11 (demande utilisateur) : plus de fenêtre au clic — chaque groupe montre son
+            // classement COMPLET (toutes les colonnes) et défile de gauche à droite sous le doigt,
+            // seul (la page, elle, ne bouge que verticalement). Voir .classement__groupBlock dans
+            // classement.css.
             <div
               key={group.name}
-              className="classement__groupBlock classement__groupBlock--clickable"
-              onClick={() => setSelectedGroupName(group.name)}
-              title="Voir le groupe en détail"
+              id={`classement-group-${(group.name ?? '').toUpperCase().replace(/\s+/g, '_')}`}
+              className="classement__groupBlock"
             >
               <div className="classement__groupHeader">
                 <h3 className="classement__groupTitle">{formatGroupName(group.name)}</h3>
-                <span className="classement__groupExpandHint">↗</span>
               </div>
               <StandingsTable
                 rows={group.table}
-                compact
+                compact={false}
                 formMap={formMap}
                 compMatches={formCompMatches}
                 qualificationRules={qualificationRules}
@@ -642,15 +480,6 @@ function Classement() {
             </div>
           ))}
         </div>
-        {selectedGroup && (
-          <GroupModal
-            group={selectedGroup}
-            onClose={() => setSelectedGroupName(null)}
-            schedMatches={wcSched}
-            finMatches={wcFin}
-            loadingM={wcSchedLoading || wcFinLoading}
-          />
-        )}
       </>
     )
   }

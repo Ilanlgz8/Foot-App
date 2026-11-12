@@ -681,6 +681,12 @@
 .classement__groupBlock .classement__tableWrap {
   border-radius: 0;
   border: none;
+  /* Glisser à gauche/droite fait défiler CE tableau seulement ; le geste vertical reste à la
+     page, et arriver au bout ne fait pas « rebondir » la page (12/11). */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .classement__groupBlock .classement__table {
