@@ -591,3 +591,10 @@ img[data-team*="Juventus" i] {
    « #root .lmp__hero .mp__hero__center » — à spécificité égale c'est lui qui gagnait, d'où une
    remontée restée sans effet au 1er essai. */
 #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -54px; }
+
+/* Mi-temps sur les cartes (Accueil et onglet Match) : bloc « MT + Reprise dans X min » remonté
+   de 5 px pour l'aérer du score en dessous (12/11, demande utilisateur). translateY : le score,
+   lui, ne bouge pas. */
+#root .poster__min-labelCol { transform: translateY(-5px); }
+#root .live__minuteWrap:has(+ .live__reprise),
+#root .live__minuteWrap + .live__reprise { transform: translateY(-5px); }
