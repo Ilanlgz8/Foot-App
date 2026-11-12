@@ -72,6 +72,8 @@ import euroLogo from '../assets/leagues/euro-generic.png'
 import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
 // Logo officiel Ligue 3 (fourni par l'utilisateur le 12/11, coins blancs détourés).
 import ligue3Logo from '../assets/leagues/ligue3.png'
+// Logo officiel Ligue 2 BKT (fourni par l'utilisateur le 12/11, coins blancs détourés).
+import ligue2Logo from '../assets/leagues/ligue2.png'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
@@ -402,7 +404,7 @@ export const COMPETITIONS = [
     parent: 'FL1',
     name: 'Ligue 2 BKT',
     shortName: 'Ligue 2',
-    emblem: 'https://a.espncdn.com/i/leaguelogos/soccer/500-dark/96.png',
+    emblem: ligue2Logo,
   },
   {
     id: 'PL',

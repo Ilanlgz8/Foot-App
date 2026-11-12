@@ -17,7 +17,6 @@ export const FFF_API = 'https://api-dofa.fff.fr'
 // (/api/clubs/3225/resultat → competition.cp_no). Change à chaque saison : à mettre à jour en
 // août (sinon l'API renvoie la saison précédente ou rien).
 export const L3_CP_NO = 452039
-const POULE_PATH = `/api/compets/${L3_CP_NO}/phases/1/poules/1`
 
 // Décalage pour que les ids d'équipes FFF (cl_no, petits entiers) ne croisent jamais un id
 // football-data.org ou ESPN dans les caches/maps de l'app.
@@ -175,6 +174,13 @@ async function getJson(fetchImpl, path, timeoutMs) {
 // Saison complète (306 matchs, 30 par page côté FFF → ~11 pages en parallèle) + classement.
 // ~12 requêtes légères (~3 s au total), mises en cache côté client (src/utils/ligue3.js).
 export async function fetchLigue3FromFff(fetchImpl = fetch, timeoutMs = 20_000) {
+  return fetchFffCompetition(L3_CP_NO, fetchImpl, timeoutMs)
+}
+
+// Même lecture pour n'importe quel championnat FFF à poule unique (la Ligue 2 s'en sert pour les
+// numéros de journée, voir src/utils/ligue2Rounds.js).
+export async function fetchFffCompetition(cpNo, fetchImpl = fetch, timeoutMs = 20_000) {
+  const POULE_PATH = `/api/compets/${cpNo}/phases/1/poules/1`
   const first = await getJson(fetchImpl, `${POULE_PATH}/matchs?page=1`, timeoutMs)
   const total = first['hydra:totalItems'] ?? 0
   const perPage = (first['hydra:member'] ?? []).length || 30

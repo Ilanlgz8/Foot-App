@@ -8,6 +8,7 @@ import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID, LOWER_DIVISION_FD_CODE } from '../data/competitions'
 import { L3_ID, fetchLigue3Matches } from '../utils/ligue3'
+import { enrichLigue2Safe } from '../utils/ligue2Rounds'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
@@ -849,7 +850,9 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
     (opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp))
   if (useEspn) {
     const slug = COMPETITION_ESPN_SLUG[selectedComp]
-    const all  = await fetchEspnCompMatches(selectedComp, slug, { compId: MAJOR_LEAGUE_FD_ID[selectedComp] })
+    let all  = await fetchEspnCompMatches(selectedComp, slug, { compId: MAJOR_LEAGUE_FD_ID[selectedComp] })
+    // Ligue 2 : numéros de journée + reste de la saison repris de la FFF (ligue2Rounds.js).
+    if (selectedComp === 'FL2') all = await enrichLigue2Safe(all)
     if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
     // 'SCHEDULED' ici couvre aussi TIMED/IN_PLAY/PAUSED — même logique que
     // Programme pour WC/EC qui affiche "à venir" au sens large (voir filtre
