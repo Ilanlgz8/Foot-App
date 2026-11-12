@@ -1223,7 +1223,7 @@ function Matchs() {
             </h1>
             <div className="matchs__headerRow">
               {/* Toggle vues CdM / coupe nationale */}
-              {(isWC || hasCup) && (
+              {hasToggle && (
                 <div className="matchs__wcToggle">
                   {/* ── Poules : terrain de foot vu du dessus (WC/EC seulement — pas de phase de groupes pour une coupe nationale) ── */}
                   {isWC && (

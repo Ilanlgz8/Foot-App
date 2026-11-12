@@ -49,7 +49,9 @@ export default function CompFamilyMenu({ family, active, onPick, fallbackName, v
         </svg>
       </button>
       {open && createPortal(
-        <>
+        // Le portail remonte quand même les clics dans l'arbre React (jusqu'au bandeau, qui ouvre
+        // « Changer ») → on les arrête ici.
+        <div onClick={e => e.stopPropagation()}>
           <div className="compFamily__backdrop" onClick={() => setOpen(false)} />
           {pos && (
             <div className="compFamily__menu" role="listbox" style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}>
@@ -70,7 +72,7 @@ export default function CompFamilyMenu({ family, active, onPick, fallbackName, v
               ))}
             </div>
           )}
-        </>,
+        </div>,
         document.body,
       )}
     </>
