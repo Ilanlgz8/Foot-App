@@ -1399,7 +1399,7 @@ export default async function handler(req, res) {
     writes.push(kv.set(`fm:match:${midStr}`, JSON.stringify(data), { ex: MATCH_TTL }))
     if (ablyClient) {
       ablyPublishes.push(
-        ablyClient.channels.get(`live-${midStr}`).publish('update', { t: Date.now() }).catch(() => {})
+        ablyClient.channels.get(`live:${midStr}`).publish('update', { t: Date.now() }).catch(() => {})
       )
     }
   }

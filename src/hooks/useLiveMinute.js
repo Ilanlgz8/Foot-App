@@ -1579,8 +1579,11 @@ export function useLiveMinute(matches) {
     for (const id of relevantIds) {
       if (_ablySubscribed.has(id)) continue
       try {
-        const channel = client.channels.get(`live-${id}`)
-        channel.subscribe('update', wake)
+        // `live:` (espace de noms Ably) — voir la capability dans api/vapid-key.js.
+        const channel = client.channels.get(`live:${id}`)
+        // subscribe() renvoie une promesse : un refus d'Ably ne doit pas remonter en erreur non
+        // gérée (le poll classique suffit seul).
+        channel.subscribe('update', wake)?.catch?.(() => {})
         _ablySubscribed.set(id, channel)
       } catch { /* Ably indisponible → le poll classique suffit seul */ }
     }

@@ -53,7 +53,11 @@ export default async function handler(req, res) {
     try {
       const client = new Ably.Rest(apiKey)
       const tokenRequest = await client.auth.createTokenRequest({
-        capability: { 'live-*': ['subscribe'] },
+        // ⚠️ 12/11 (Sentry : « Channel denied access based on given capability ») : chez Ably, `*`
+        // n'est un joker qu'en entier ou après un espace de noms (`live:*`). `live-*` ne visait
+        // que le salon nommé littéralement « live-* » → tous les abonnements étaient refusés.
+        // Salons renommés `live:<id>` (ici, useLiveMinute.js et fifa-live.js).
+        capability: { 'live:*': ['subscribe'] },
       })
       return res.status(200).json(tokenRequest)
     } catch (e) {
