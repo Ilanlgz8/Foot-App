@@ -577,9 +577,9 @@ img[data-team*="Juventus" i] {
    chouïa trop à gauche »). L'espacement des lettres ajoute un vide APRÈS le dernier caractère,
    et l'apostrophe (« 67' ») est plus fine que les chiffres : le texte paraît décalé à gauche.
    Décalage minimal vers la droite (~1,5 px). */
-#root .poster__min-label,
-#root .lmp__heroMinute,
-#root .live__minute {
+/* Page du direct SEULEMENT (précisé par l'utilisateur) : les cartes de l'Accueil et de l'onglet
+   Match gardent leur position d'origine. */
+#root .lmp__heroMinute {
   transform: translateX(0.1em);
 }
 
