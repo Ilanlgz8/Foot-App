@@ -7,6 +7,7 @@ import { resolveFdTeamId } from '../utils/matchUtils'
 import { KNOCKOUT_ORDER, KNOCKOUT_LABELS } from './useWcKnockout'
 import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { COMPETITION_ESPN_SLUG, DOMESTIC_CUPS, MAJOR_LEAGUE_FD_ID, LOWER_DIVISION_FD_CODE } from '../data/competitions'
+import { L3_ID, fetchLigue3Matches } from '../utils/ligue3'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { shouldQueryWcEcWithMeta } from '../utils/wcEcGate'
 import { registerFdCallAttempt, waitForFdSpacing } from '../utils/fdSpacingTracker'
@@ -837,6 +838,13 @@ async function fetchClubMatchesRawInner(selectedComp) {
 }
 
 async function fetchMatchesForComp(selectedComp, status, opts = {}) {
+  // Ligue 3 : source FFF (voir src/utils/ligue3.js). Les matchs « coup d'envoi passé, score pas
+  // encore publié » (AWAITING_RESULT) ne vont ni dans Programme ni dans Résultats.
+  if (selectedComp === L3_ID) {
+    const all = await fetchLigue3Matches()
+    if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
+    return all.filter(m => m.status === 'TIMED' || m.status === 'POSTPONED')
+  }
   const useEspn = ESPN_SOURCED_COMPS.has(selectedComp) ||
     (opts.preferEspnForMajors && MAJOR_LEAGUE_COMPS.has(selectedComp))
   if (useEspn) {
@@ -998,7 +1006,7 @@ export function useMatches(selectedComp, status = 'SCHEDULED', order = 'asc', op
   // WC/EC et ESPN_SOURCED_COMPS gardent le comportement historique (clés
   // séparées) : ces branches de fetchMatchesForComp fonctionnent différemment
   // et n'ont pas le même besoin (voir fetchClubMatchesRaw, dédié aux clubs).
-  const isClubShared = selectedComp !== 'WC' && selectedComp !== 'EC' && !ESPN_SOURCED_COMPS.has(selectedComp)
+  const isClubShared = selectedComp !== 'WC' && selectedComp !== 'EC' && selectedComp !== L3_ID && !ESPN_SOURCED_COMPS.has(selectedComp)
 
   const key         = cacheKey(selectedComp, isClubShared ? 'RAW' : status)
   // RAW contient à la fois les matchs à venir et terminés — on aligne le TTL

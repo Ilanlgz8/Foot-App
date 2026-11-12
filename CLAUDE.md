@@ -179,6 +179,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 - Worker : l'utilisateur lance lui-même `cd cf-worker && npm run deploy` ; retour arrière `npx wrangler rollback`.
 - Observability Cloudflare activée (gratuit) : CPU réel par passe.
 
+- **Ligue 3 (12/11)** : source = API publique FFF (`api-dofa.fff.fr`, sans clé ; ESPN/FD ne l'ont pas). `src/utils/ligue3Parse.js` (serveur, mode `/espn?l3=1`, cache CDN 15 min) + `src/utils/ligue3.js` (client). Visible SEULEMENT dans Programme/Résultats/Classement via `PAGE_COMPETITIONS` (competitions.js) — jamais dans `COMPETITIONS` (Accueil, Tous les matchs, direct, notifs, Worker), car la FFF publie le score ~2 h après le match (pas de direct). Pas de buteurs, pas de page détail (`_noDetail`). ⚠️ `L3_CP_NO` change chaque saison (à mettre à jour en août).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

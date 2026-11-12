@@ -7,7 +7,7 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
-import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
+import { PAGE_COMPETITIONS as COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de

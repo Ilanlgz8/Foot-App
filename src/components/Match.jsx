@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
-import { COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { PAGE_COMPETITIONS as COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
@@ -188,6 +188,8 @@ function MatchRow({ match, index, inModal = false }) {
         // (prono/Stats saison/H2H, voir useTeamForm dans MatchPage.jsx).
         // Précharge ciblée sur CE match précis, au moment du clic — jamais
         // pour les matchs jamais cliqués.
+        // Ligue 3 (source FFF) : pas de page détail possible (ni compos, ni stats, ni prono).
+        if (match._noDetail) return
         prefetchTeamForm(queryClient, match.competition?.code)
         navigate(`/match/${match.id}`, { state: { match } })
       }}

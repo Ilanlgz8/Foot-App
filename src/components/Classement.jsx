@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
+import { PAGE_COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
+import { buildLigue3FormMap } from '../utils/ligue3'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ RÉDUIT (26/09, voir le commentaire détaillé sur NO_STANDINGS_COMPS dans
@@ -190,7 +191,12 @@ function Classement() {
     })
 
   const { standings, groups, loading, error } = useStandings(selectedComp, hasMatchToday, { live: liveWindow })
-  const { formMap, compMatches: formCompMatches } = useTeamForm(selectedComp, 6_000)
+  // Ligue 3 : pas de source football-data.org → forme calculée sur ses propres matchs (API FFF).
+  const isL3 = selectedComp === 'L3'
+  const { formMap: fdFormMap, compMatches: fdFormCompMatches } = useTeamForm(selectedComp, 6_000, !isL3)
+  const l3FormMap = useMemo(() => (isL3 ? buildLigue3FormMap(wcFin) : null), [isL3, wcFin])
+  const formMap = isL3 ? l3FormMap : fdFormMap
+  const formCompMatches = isL3 ? [] : fdFormCompMatches
   // ⚠️ NL/CAN/COPA/UEL/UECL rejoignent le sélecteur (26/09) : useScorers sait
   // désormais aller chercher ces 5 via ESPN plutôt que FD.org, qui ne les
   // couvre pas (voir ESPN_SOURCED_SCORERS_COMPS, competitions.js, et le
@@ -352,6 +358,11 @@ function Classement() {
     // rapport avec CL/UEL/UECL) — jamais remarqué car EC était déjà dans le
     // sélecteur avant ce fix. Vidée ici aussi, même principe.
     NL: [], CAN: [], COPA: [], UEL: [], UECL: [], EC: [],
+    // Règlement sportif L3 2026-27 (FFF) : 1er-2e promus en L2, 3e à 6e en play-off d'accession.
+    L3: [
+      { label: 'Montée en Ligue 2',    start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
+      { label: "Play-off d'accession", start: 3, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
+    ],
     default: [
       { label: 'Ligue des champions', start: 1, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
       { label: 'Europa League',       start: 6, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
@@ -381,6 +392,7 @@ function Classement() {
     PL:  { direct: 3, playoff: 0 },
     PD:  { direct: 3, playoff: 0 },
     SA:  { direct: 3, playoff: 0 },
+    L3:  { direct: 3, playoff: 0 }, // 16e, 17e et 18e relégués en N1 (règlement 2026-27)
   }
 
   const buildRelegationRules = (compId, teamCount) => {

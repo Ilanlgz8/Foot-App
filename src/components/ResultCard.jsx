@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import '../resultats.css'
-import { COMPETITIONS } from '../data/competitions'
+import { PAGE_COMPETITIONS as COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { FavStarBadge } from './FavStarBadge'
@@ -70,7 +70,7 @@ export function ResultCard({ match, showComp = false }) {
   const compLogo = comp?.emblem ?? match.competition?.emblem
 
   return (
-    <div className="resultats__card" onClick={() => navigate(`/match/${match.id}`, { state: { match } })} style={{ cursor: 'pointer' }}>
+    <div className="resultats__card" onClick={() => { if (!match._noDetail) navigate(`/match/${match.id}`, { state: { match } }) }} style={{ cursor: match._noDetail ? 'default' : 'pointer' }}>
       {isFav && <FavStarBadge variant="row" color={favColor} />}
       {showComp && compName && (
         <div className="resultats__cardCompBadge">

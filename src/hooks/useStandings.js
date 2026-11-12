@@ -4,6 +4,7 @@ import { readCacheStale, getCacheSavedAt, writeCache } from './localCache'
 import { classifyFetchError } from '../utils/fetchErrors'
 import { COMPETITION_ESPN_SLUG } from '../data/competitions'
 import { registerFdCallAttempt } from '../utils/fdSpacingTracker'
+import { fetchLigue3Standings } from '../utils/ligue3'
 
 // Aligné sur le TTL du cache serveur (api/football.js).
 const STALE_MS = 1000 * 60 * 2  // 2min (était 10min) — se met à jour pendant les matchs live
@@ -55,6 +56,19 @@ const NO_MATCH_STALE_MS = 1000 * 60 * 60 * 24  // 24h
 // via la page Classement n'est jamais re-fetché pour la fiche équipe, et
 // vice-versa.
 export async function fetchStandingsData(selectedComp) {
+  // Ligue 3 : classement officiel FFF (voir src/utils/ligue3.js).
+  if (selectedComp === 'L3') {
+    const key = `standings_v2_${selectedComp}`
+    try {
+      const res = await fetchLigue3Standings()
+      if (res.table.length > 0) writeCache(key, res, STALE_MS)
+      return res
+    } catch (err) {
+      const stale = readCacheStale(key)
+      if (stale) return stale
+      throw err
+    }
+  }
   const espnSlug = COMPETITION_ESPN_SLUG[selectedComp]
 
   const tryEspn = async () => {

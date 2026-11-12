@@ -70,6 +70,8 @@ import nationsLeagueLogo from '../assets/leagues/nations-league-real.png'
 import canLogo from '../assets/leagues/caf-can.png'
 import euroLogo from '../assets/leagues/euro-generic.png'
 import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
+// Pastille « L3 » maison (12/11) : pas le logo officiel de la Ligue 3, aucun fichier fiable dispo.
+import ligue3Logo from '../assets/leagues/ligue3.svg'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
@@ -227,7 +229,7 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
 // maison) et git history si le calcul maison doit être repris un jour une
 // fois le quota Upstash résolu (code supprimé, pas juste désactivé).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL'])
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'L3'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -1062,3 +1064,23 @@ export function getCompetitionCampColors(comp) {
   }
   return null
 }
+
+// ── Ligue 3 (12/11, demande utilisateur) ─────────────────────────────────────────────────────
+// Visible UNIQUEMENT dans Programme, Résultats et Classement (sélecteur de compétition) — jamais
+// dans COMPETITIONS, qui alimente l'Accueil, « Tous les matchs », le direct et les notifications.
+// Raison : la source (API FFF, src/utils/ligue3Parse.js) n'a pas de direct, le score final arrive
+// ~1 h 30 à 2 h après le match. Pas de buteurs (NO_SCORERS_COMPS), pas de page détail de match.
+export const LIGUE3_COMPETITION = {
+  id: 'L3',
+  name: 'Ligue 3',
+  shortName: 'Ligue 3',
+  emblem: ligue3Logo,
+}
+export const PAGE_ONLY_COMPETITIONS = [LIGUE3_COMPETITION]
+
+// Liste des sélecteurs Programme/Résultats/Classement : la Ligue 3 juste après la Ligue 1.
+export const PAGE_COMPETITIONS = [
+  ...COMPETITIONS.slice(0, 1),
+  ...PAGE_ONLY_COMPETITIONS,
+  ...COMPETITIONS.slice(1),
+]
