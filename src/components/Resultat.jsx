@@ -9,6 +9,7 @@ import './../compHeader.css'
 import './../match.css'
 import { COMPETITIONS, TOP_COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS, resolveCompFamily } from '../data/competitions'
 import CompFamilyMenu from './CompFamilyMenu'
+import { formatGroupName } from '../utils/groupName'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
@@ -67,7 +68,6 @@ function isSameRealMatch(m, existingMatches) {
   })
 }
 
-const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 const fmtDate = (d) => {
   const today = new Date(); today.setHours(0,0,0,0)
   const date  = new Date(d); date.setHours(0,0,0,0)

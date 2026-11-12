@@ -6,6 +6,7 @@ import './../match.css'
 import './../compHeader.css'
 import { COMPETITIONS, TOP_COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS, resolveCompFamily } from '../data/competitions'
 import CompFamilyMenu from './CompFamilyMenu'
+import { formatGroupName } from '../utils/groupName'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
@@ -1132,7 +1133,6 @@ function Matchs() {
     setSelectedComp(id); setSubComp(null); setCurrentIndex(0); setWcView(targetIsWC ? 'poules' : 'matchs'); setOpenedGroup(null)
   }
 
-  const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
 
   /* ── Rendu ── */
   return (

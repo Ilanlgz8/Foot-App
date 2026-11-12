@@ -1,4 +1,5 @@
 import { useState }      from 'react'
+import { formatGroupName } from '../utils/groupName'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { useQuery }                from '@tanstack/react-query'
 import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups, useEspnPregameOdds } from '../hooks/useMatchDetail'
@@ -1376,7 +1377,7 @@ export function ClassementTab({ match, compId }) {
           <div key={g.name}>
             {toShow.length > 1 && (
               <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginBottom: '6px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                {g.name.replace('GROUP_', 'Groupe ')}
+                {formatGroupName(g.name)}
               </p>
             )}
             <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />

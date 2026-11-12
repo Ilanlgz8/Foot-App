@@ -21,6 +21,7 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { useScorers, scorersUpdateDue } from '../hooks/useScorers'
 import { useMatches } from '../hooks/useMatchs'
 import { resolveFdTeamId } from '../utils/matchUtils'
+import { formatGroupName } from '../utils/groupName'
 import { StandingsTable } from './StandingsTable'
 import { usePersistedState } from '../hooks/usePersistedState'
 // Étoile de favori RETIRÉE de cette page (retour utilisateur : pas concluant
@@ -384,8 +385,6 @@ function Classement() {
   }
 
   /* Formate "GROUP_A" → "Groupe A" */
-  const formatGroupName = (raw = '') =>
-    raw.replace('GROUP_', 'Groupe ')
 
   // ── Zones de relégation (02/09, demande utilisateur) ────────────────────
   // Règles réelles en vigueur dans les 5 grands championnats :
