@@ -184,3 +184,5 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 - `translateTeam(name)` pour tout nom d'équipe affiché
 - Pas de `sofascore` dans les noms de hooks/variables (remplacé par apifootball)
 - CSS variables : `--bg`, `--fg`, couleurs rouges `#ef4444`
+- Coupe de France (12/11, vérifié) : ESPN publie le calendrier des tours régionaux (7e tour) mais jamais leurs scores (matchs restés `pre`) ; scores à partir des 32es de finale (décembre), comme la saison dernière. Résultats affiche une note dans la vue coupe vide. Copa del Rey : scores bien publiés dès le 1er tour.
+- « Tous les matchs » (Live.jsx) : sans aucun match aujourd'hui, saut automatique au prochain jour de matchs (comme quand tous les matchs du jour sont finis), sauf si l'utilisateur a choisi un jour.

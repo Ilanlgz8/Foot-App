@@ -787,6 +787,13 @@ function Resultats() {
           {!loading && !error && activeMatches.length === 0 && (
             <p className="resultats__state">
               {showingCupList ? `Aucun résultat de ${DOMESTIC_CUPS[selectedComp]?.name} pour le moment.` : 'Aucun résultat disponible.'}
+              {/* 12/11 (constat utilisateur : aucun résultat de Coupe de France alors que des matchs
+                  ont eu lieu) : vérifié, ESPN publie le calendrier des tours régionaux (7e tour) mais
+                  JAMAIS leurs scores (matchs restés « à venir ») ; les scores n'arrivent qu'à partir
+                  des 32es de finale (décembre), comme la saison dernière. */}
+              {showingCupList && (
+                <span className="resultats__stateNote"> Les scores des premiers tours ne sont pas publiés par notre source : ils apparaîtront à partir des 32es de finale.</span>
+              )}
             </p>
           )}
           </>

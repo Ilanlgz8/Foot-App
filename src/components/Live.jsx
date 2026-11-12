@@ -215,8 +215,13 @@ export default function Live() {
   const endedVersion = useMatchEndedRefresh()
   // …et quand tous les matchs d'aujourd'hui sont finis, « Tous les matchs » passe directement au prochain
   // jour de matchs au lieu d'afficher une page vide jusqu'à minuit. Pas si l'utilisateur a choisi un jour.
-  const todayAllDone = dayOffset === 0 && !loading && dayMatches.length > 0 && progMatches.length === 0 &&
-    !dayMatches.some(m => isRecentlyFinished(m.id))
+  // 12/11 (demande utilisateur) : aussi quand il n'y a AUCUN match aujourd'hui — on arrive
+  // directement sur le prochain jour de matchs (demain, dans 4 jours…), sans devoir appuyer
+  // plusieurs fois sur « jour suivant ». Inchangé si l'utilisateur a choisi un jour lui-même.
+  const todayAllDone = dayOffset === 0 && !loading && (
+    dayMatches.length === 0 ||
+    (progMatches.length === 0 && !dayMatches.some(m => isRecentlyFinished(m.id)))
+  )
   useEffect(() => {
     if (!todayAllDone || userPickedDayRef.current || nextMatchDayOffset == null || nextMatchDayOffset <= 0) return
     // setTab('prog') indispensable : sans onglet choisi, useMatchDay reste sur aujourd'hui (voir goToDay).
