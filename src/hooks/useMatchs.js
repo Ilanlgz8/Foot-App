@@ -851,8 +851,10 @@ async function fetchMatchesForComp(selectedComp, status, opts = {}) {
   if (useEspn) {
     const slug = COMPETITION_ESPN_SLUG[selectedComp]
     let all  = await fetchEspnCompMatches(selectedComp, slug, { compId: MAJOR_LEAGUE_FD_ID[selectedComp] })
-    // Ligue 2 : numéros de journée + reste de la saison repris de la FFF (ligue2Rounds.js).
-    if (selectedComp === 'FL2') all = await enrichLigue2Safe(all)
+    // Ligue 2 : numéros de journée + reste de la saison repris de la FFF (ligue2Rounds.js) —
+    // seulement pour Programme/Résultats/Classement (useMatches). L'Accueil (preferEspnForMajors)
+    // n'en a pas besoin : évite ~12 requêtes FFF à chaque ouverture de l'app (12/11).
+    if (selectedComp === 'FL2' && !opts.preferEspnForMajors) all = await enrichLigue2Safe(all)
     if (status === 'FINISHED') return all.filter(m => m.status === 'FINISHED')
     // 'SCHEDULED' ici couvre aussi TIMED/IN_PLAY/PAUSED — même logique que
     // Programme pour WC/EC qui affiche "à venir" au sens large (voir filtre
