@@ -1,6 +1,6 @@
 // Regroupement des matchs par compétition (cocons de la page Match et
 // sélection "à ne pas manquer" de l'Accueil) — une seule source de vérité.
-import { COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS, DOMESTIC_CUPS } from '../data/competitions'
 import { bigTeamScore } from './matchDuJour'
 
 // Couleur d'accent de chaque compétition (liseré/halo du cocon). Reprise des
@@ -8,7 +8,7 @@ import { bigTeamScore } from './matchDuJour'
 // que le cocon "parle" comme les cards de la même compétition.
 export const COMP_ACCENT = {
   CL: '#2f55ff',   UEL: '#e0661f',  UECL: '#2f8a3e',
-  FL1: '#2a7bff',  PL: '#a23ab0',   PD: '#d23b3b',  BL1: '#e30613',  SA: '#3bb3c7',
+  FL1: '#2a7bff',  FL2: '#15ffcf', PL: '#a23ab0',   PD: '#d23b3b',  BL1: '#e30613',  SA: '#3bb3c7',
   WC: '#f2c232',   EC: '#2f6fd6',   NL: '#4f7cff',  CAN: '#1fb050',  COPA: '#2a7bff',
 }
 const FALLBACK_ACCENT = '#6b7a99'
@@ -17,7 +17,8 @@ export const accentFor = code => COMP_ACCENT[code] ?? FALLBACK_ACCENT
 // Ordre des sections : Coupe du Monde, Ligue 1 (app francophone — choix déjà
 // fait dans l'ancienne page Live), puis coupes d'Europe, puis le reste par nom.
 // Une coupe nationale passe juste après son championnat (même code).
-const SECTION_ORDER = { WC: 0, FL1: 1, CL: 2, UEL: 3, UECL: 4 }
+// Ligue 2 juste après la Ligue 1 et la Coupe de France.
+const SECTION_ORDER = { WC: 0, FL1: 1, FL2: 1.7, CL: 2, UEL: 3, UECL: 4 }
 const sectionRank = g => (SECTION_ORDER[g.code] ?? 10) + (g.isCup ? 0.5 : 0)
 
 export function groupMatchesByCompetition(matches) {
@@ -31,8 +32,10 @@ export function groupMatchesByCompetition(matches) {
       map.set(key, {
         key, code, isCup,
         name:   isCup ? (m.competition?.name ?? comp?.name ?? 'Coupe') : (comp?.name ?? m.competition?.name ?? 'Autre compétition'),
-        emblem: isCup ? (m.competition?.emblem ?? comp?.emblem ?? null) : (comp?.emblem ?? m.competition?.emblem ?? null),
-        emblemOpaque: !isCup && comp?.emblemOpaque === true,
+        // Coupe : son propre logo (12/11, constat utilisateur : la Copa del Rey affichait celui de
+        // LaLiga) — détouré, donc sans pastille blanche (emblemOpaque).
+        emblem: isCup ? (DOMESTIC_CUPS[code]?.emblem ?? m.competition?.emblem ?? comp?.emblem ?? null) : (comp?.emblem ?? m.competition?.emblem ?? null),
+        emblemOpaque: isCup ? !!DOMESTIC_CUPS[code]?.emblem : comp?.emblemOpaque === true,
         accent: accentFor(code),
         matches: [],
       })

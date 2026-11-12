@@ -23,7 +23,7 @@ import {
 } from '../utils/teamSearch'
 import { outcomeForSide, finalScore } from '../utils/matchUtils'
 import { translateTeam } from '../data/teamNames'
-import { COMPETITIONS, NO_SCORERS_COMPS } from '../data/competitions'
+import { COMPETITIONS, NO_SCORERS_COMPS, DOMESTIC_CUPS } from '../data/competitions'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { FormDiamonds } from '../accueil/FormDiamonds'
 import { StandingsTable } from '../components/StandingsTable'
@@ -31,7 +31,9 @@ import { COMP_RULES } from '../data/standingsRules'
 import LineupPitch from '../components/LineupPitch'
 import '../teamSearchPage.css'
 
-function compEmblem(code) {
+// isCup : un match de coupe garde le code du championnat parent → logo de la COUPE (12/11).
+function compEmblem(code, isCup = false) {
+  if (isCup && DOMESTIC_CUPS[code]?.emblem) return DOMESTIC_CUPS[code].emblem
   return COMPETITIONS.find(c => c.id === code)?.emblem ?? null
 }
 
@@ -206,7 +208,7 @@ function TeamStandingsSection({ comps, standingsByComp, teamKey }) {
       {comps.length > 1 && (
         <div className="teamSearchPage__compChips" role="tablist">
           {comps.map(c => {
-            const emblem = compEmblem(c.code)
+            const emblem = compEmblem(c.code, c.isCup)
             return (
               <button
                 key={c.id}
@@ -225,7 +227,7 @@ function TeamStandingsSection({ comps, standingsByComp, teamKey }) {
       )}
       {comps.length === 1 && (
         <div className="teamSearchPage__standingsComp">
-          {compEmblem(active.code) && <img src={compEmblem(active.code)} alt="" />}
+          {compEmblem(active.code, active.isCup) && <img src={compEmblem(active.code, active.isCup)} alt="" />}
           <span>{active.name}</span>
         </div>
       )}
@@ -414,7 +416,7 @@ function TeamProfile({ rows, teamName, teamCrest, teamKey }) {
             Toutes
           </button>
           {comps.map(c => {
-            const emblem = compEmblem(c.code)
+            const emblem = compEmblem(c.code, c.isCup)
             return (
               <button
                 key={c.id}

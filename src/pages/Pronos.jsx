@@ -31,7 +31,7 @@ import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { calcPronoAdvanced } from '../utils/calcProno'
-import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS, compForMatch } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
 import { AiAssistant } from './AiAssistant'
@@ -63,7 +63,8 @@ const isWCMatch = (match) => isNationalTeamComp(match)
 // + emblème), même mapping que COMPETITIONS (data/competitions.js) utilisé
 // partout ailleurs (Live.jsx, etc.).
 const compInfo = (match) => {
-  const comp = COMPETITIONS.find(c => c.id === match.competition?.code)
+  // compForMatch : nom + logo de la coupe pour un match de coupe nationale (12/11).
+  const comp = compForMatch(match)
   return { name: comp?.name ?? match.competition?.name ?? '', emblem: comp?.emblem ?? null }
 }
 
@@ -860,7 +861,8 @@ function Pronos() {
       if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
         seen.add(id)
         const meta = COMPETITIONS.find(c => c.id === id)
-        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+        const cupEmblem = m.isCup ? DOMESTIC_CUPS[m.competition?.code]?.emblem : null
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: cupEmblem ?? meta?.emblem ?? null })
       }
     }
     return out

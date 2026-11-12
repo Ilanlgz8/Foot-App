@@ -9,7 +9,7 @@ import { useLiveData } from '../context/LiveProvider'
 import { getMatchState, isRecentlyFinished, shouldShowLiveWidget } from '../utils/matchStateTracker'
 import { useMatchEndedRefresh } from '../hooks/useMatchEndedRefresh'
 import { mergeScore, isCardLive, isUnfollowedCupMatch } from '../utils/matchUtils'
-import { COMPETITIONS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
 import { MatchDuJourCard } from '../accueil/MatchDuJourCard'
 import { MyTeamBanner } from '../accueil/MyTeamBanner'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
@@ -498,7 +498,9 @@ function Accueil() {
       if (id && !seen.has(id) && !SINGLE_MATCH_COMPS.has(m.competition?.code)) {
         seen.add(id)
         const meta = COMPETITIONS.find(c => c.id === id)
-        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+        // Coupe nationale : son logo, pas celui du championnat parent (12/11).
+        const cupEmblem = m.isCup ? DOMESTIC_CUPS[m.competition?.code]?.emblem : null
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: cupEmblem ?? meta?.emblem ?? null })
       }
     }
     return out
@@ -521,7 +523,9 @@ function Accueil() {
       if (id && !seen.has(id)) {
         seen.add(id)
         const meta = COMPETITIONS.find(c => c.id === id)
-        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: meta?.emblem ?? null })
+        // Coupe nationale : son logo, pas celui du championnat parent (12/11).
+        const cupEmblem = m.isCup ? DOMESTIC_CUPS[m.competition?.code]?.emblem : null
+        out.push({ id, shortName: meta?.shortName ?? m.competition?.name ?? id, emblem: cupEmblem ?? meta?.emblem ?? null })
       }
     }
     return out
