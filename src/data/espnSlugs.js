@@ -196,6 +196,8 @@ export function espnNativeSlug(match) {
     return DOMESTIC_CUP_SLUGS[cupCode] ?? null
   }
   const code = match.competition?.code
-  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? NATIONAL_SUPER_CUP_SLUGS[code]
+  // LOWER_LEAGUE_SLUGS (Ligue 2, 12/11) : sans elle, la page match d'un match de Ligue 2 ne
+  // retrouvait pas son event ESPN → ni buteurs, ni cartons, ni stats.
+  return NATIONAL_COMP_SLUGS[code] ?? EUROPEAN_CUP_SLUGS[code] ?? NATIONAL_SUPER_CUP_SLUGS[code] ?? LOWER_LEAGUE_SLUGS[code]
     ?? ESPN_SLUG_BY_COMP_ID[match.competition?.id] ?? null
 }
