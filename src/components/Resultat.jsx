@@ -803,8 +803,8 @@ function Resultats() {
                   ont eu lieu) : vérifié, ESPN publie le calendrier des tours régionaux (7e tour) mais
                   JAMAIS leurs scores (matchs restés « à venir ») ; les scores n'arrivent qu'à partir
                   des 32es de finale (décembre), comme la saison dernière. */}
-              {showingCupList && (
-                <span className="resultats__stateNote"> Les scores des premiers tours ne sont pas publiés par notre source : ils apparaîtront à partir des 32es de finale.</span>
+              {showingCupList && selectedComp === 'FL1' && (
+                <span style={{ display: 'block', marginTop: 6 }} className="resultats__stateNote"> Les scores des premiers tours ne sont pas publiés par notre source : ils apparaîtront à partir des 32es de finale.</span>
               )}
             </p>
           )}
