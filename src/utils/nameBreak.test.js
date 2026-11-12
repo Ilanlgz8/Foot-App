@@ -10,5 +10,6 @@ describe('nameBreak', () => {
   })
   it('minute insécable', () => {
     expect(keepTogether("120'+4' (pen)")).toBe(`120'+4'${N}(pen)`)
+    expect(keepTogether("26', 75' (pen)")).toBe(`26', 75'${N}(pen)`)
   })
 })

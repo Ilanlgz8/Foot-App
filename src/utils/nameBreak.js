@@ -21,9 +21,11 @@ export function keepParticles(name) {
 }
 
 // Minute « 120'+4' (pen) » : jamais coupée en deux.
-export const keepTogether = (txt) => String(txt ?? '').replace(/ /g, NBSP)
+// Plusieurs buts (« 26', 75' (pen) ») : coupure permise seulement après une virgule.
+export const keepTogether = (txt) => String(txt ?? '').split(', ').map(t => t.replace(/ /g, NBSP)).join(', ')
 
 // Entre le nom et la minute : insécable pour une minute courte (« 53' », « 120'+2' ») qui reste
-// donc sur la ligne du dernier mot ; espace normal pour une minute longue (« 120'+4' (pen) »),
+// donc sur la ligne du dernier mot ; espace normal pour une minute longue (« 120'+4' (pen) »,
+// « 26', 75' (pen) »),
 // qui peut alors passer seule à la ligne plutôt que de faire déborder la colonne.
-export const minuteJoiner = (minute) => (String(minute ?? '').includes(' ') ? ' ' : NBSP)
+export const minuteJoiner = (minute) => (String(minute ?? '').length > 8 ? ' ' : NBSP)

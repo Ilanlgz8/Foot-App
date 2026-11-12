@@ -478,7 +478,9 @@
      insécable élargissait sa colonne et poussait l'autre hors de la carte (12/11). */
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   gap: 0 0.5rem;
-  margin: 0.8rem 1rem 0;
+  /* Marges latérales réduites (1rem → 0.25rem, 12/11) : plus de place pour les noms longs et
+     les buts multiples (« P. Esposito 26', 75' (pen) ») avant de passer à la ligne. */
+  margin: 0.8rem 0.25rem 0;
   padding-top: 0.65rem;
   border-top: 1px solid rgba(var(--white-rgb),0.1);
   position: relative;
