@@ -415,8 +415,12 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
     })
   })
 
-  events.home.sort((a, b) => a.sort - b.sort)
-  events.away.sort((a, b) => a.sort - b.sort)
+  // 12/11 (demande utilisateur) : les BUTS d'abord, puis les cartons, puis les remplacements —
+  // chaque groupe dans l'ordre des minutes — pour lire les buteurs sans qu'ils soient mélangés.
+  const rank = e => (e.icon === '⚽' ? 0 : e.icon === '🔁' ? 2 : 1)
+  const byKindThenMinute = (a, b) => rank(a) - rank(b) || a.sort - b.sort
+  events.home.sort(byKindThenMinute)
+  events.away.sort(byKindThenMinute)
   return events
 }
 
