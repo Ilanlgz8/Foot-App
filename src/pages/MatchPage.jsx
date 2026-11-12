@@ -7,7 +7,7 @@ import { formKey } from '../hooks/useTeamForm'
 import { useState, useMemo }       from 'react'
 import { useQuery }                from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
-import { COMPETITIONS }            from '../data/competitions'
+import { COMPETITIONS, withPageTheme } from '../data/competitions'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
@@ -98,7 +98,7 @@ function formatTime(utcDate) {
 
 // ── Hero gradient plein-écran ─────────────────────────────────────────────────
 function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
-  const comp       = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const comp       = withPageTheme(COMPETITIONS.find(c => c.id === match.competition?.code))
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après la redirection accélérée

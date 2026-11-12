@@ -405,6 +405,16 @@ export const COMPETITIONS = [
     name: 'Ligue 2 BKT',
     shortName: 'Ligue 2',
     emblem: ligue2Logo,
+    // Couleurs du logo (relevées sur le fichier : bleu nuit #091c3e, turquoise #15ffcf) — UNIQUEMENT
+    // sur les pages match (demande utilisateur 12/11 : « pas comme la Ligue 1 », donc pas sur les
+    // cartes de l'Accueil/Programme). Lues via withPageTheme(), même mécanique que l'Euro.
+    pageTheme: {
+      tint: '#091c3e',
+      tint2: '#15ffcf',
+      tintStops: { base: '22%', c2: '55%', c3: '85%' },
+      tintPearl: 0.45,
+      tintSoft: true,
+    },
   },
   {
     id: 'PL',
@@ -1117,4 +1127,10 @@ export function resolveCompFamily(compId, subKey, { withCup = true } = {}) {
   const dataComp = active?.kind === 'comp' ? active.id : compId
   const showingCup = active?.kind === 'cup'
   return { family: family.length > 1 ? family : [], active, dataComp, showingCup }
+}
+
+// Teinte propre aux pages match (`pageTheme`, ex. Ligue 2) fusionnée dans l'objet compétition —
+// les autres écrans lisent l'objet brut et ne la voient pas.
+export function withPageTheme(comp) {
+  return comp?.pageTheme ? { ...comp, ...comp.pageTheme } : comp
 }

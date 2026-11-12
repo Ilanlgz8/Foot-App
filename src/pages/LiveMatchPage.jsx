@@ -11,7 +11,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock, buildHeroSubline } from '../utils/matchUtils'
-import { COMPETITIONS }     from '../data/competitions'
+import { COMPETITIONS, withPageTheme } from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
 import { getMatchThemeVars } from '../data/teamPhotos'
@@ -132,7 +132,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
 
   const minute  = isTermine ? null : calcMinute(match)
   const period  = getMatchPeriod(match)
-  const comp    = COMPETITIONS.find(c => c.id === match.competition?.code)
+  const comp    = withPageTheme(COMPETITIONS.find(c => c.id === match.competition?.code))
   const emblem  = comp?.emblem ?? match.competition?.emblem
   // ⚠️ BUG CORRIGÉ (nom de compétition pas en français) : match.competition?.name
   // vient de football-data.org (toujours en anglais) — comp?.name (COMPETITIONS,
