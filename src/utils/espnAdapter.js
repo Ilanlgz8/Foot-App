@@ -52,6 +52,7 @@ const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'COPA'])
 // fait fusionner ensemble dans un seul groupe "Autre".
 const SYNTHETIC_COMP_ID = {
   NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5, USC: -6, TDC: -7, CS: -8,
+  FL2: -9, // Ligue 2 (12/11)
   FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103,
   // ⚠️ AJOUT (28/10, Coppa Italia/DFB-Pokal — voir DOMESTIC_CUPS dans
   // competitions.js) : mêmes raisons que FL1_CUP/PD_CUP/PL_CUP ci-dessus,

@@ -105,6 +105,15 @@ export async function fetchStandingsData(selectedComp) {
 
   const key = `standings_v2_${selectedComp}`
 
+  // Ligue 2 : pas dans l'offre gratuite football-data.org → directement ESPN.
+  if (selectedComp === 'FL2') {
+    const espnResult = await tryEspn()
+    if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
+    const stale = readCacheStale(key)
+    if (stale) return stale
+    throw new Error('Erreur API')
+  }
+
   try {
     const fdResult = await tryFdOrg()
     const allZeroPlayed = fdResult.table.length > 0

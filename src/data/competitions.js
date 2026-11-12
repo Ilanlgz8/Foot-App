@@ -92,6 +92,8 @@ export const COMPETITION_ESPN_SLUG = {
   COPA: 'conmebol.america',
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
+  // Ligue 2 (12/11) : ESPN la couvre en direct (scores, buts, cartons, compos, stats — vérifié).
+  FL2:  'fra.2',
   USC:  'uefa.super_cup',
   // Supercoupes nationales (16/08, demande explicite utilisateur) — voir
   // NATIONAL_SUPER_CUP_SLUGS dans espnSlugs.js pour le détail/la vérification.
@@ -229,7 +231,7 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
 // maison) et git history si le calcul maison doit être repris un jour une
 // fois le quota Upstash résolu (code supprimé, pas juste désactivé).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'L3'])
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'L3', 'FL2'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -391,6 +393,16 @@ export const COMPETITIONS = [
     // ⚠️ Logo à FOND PLEIN (tuile bleue), pas un tracé sur transparent —
     // voir emblemOpaque plus bas dans ce fichier.
     emblemOpaque: true,
+  },
+  {
+    // Ligue 2 (12/11, demande utilisateur) : vraie compétition suivie en direct (source ESPN
+    // `fra.2`), mais rangée SOUS la Ligue 1 — `parent` la retire des sélecteurs de compétition
+    // (choisie via le menu déroulant du nom « Ligue 1 », voir COMP_FAMILIES).
+    id: 'FL2',
+    parent: 'FL1',
+    name: 'Ligue 2 BKT',
+    shortName: 'Ligue 2',
+    emblem: 'https://a.espncdn.com/i/leaguelogos/soccer/500-dark/96.png',
   },
   {
     id: 'PL',
@@ -1075,4 +1087,32 @@ export const LIGUE3_COMPETITION = {
   name: 'Ligue 3',
   shortName: 'Ligue 3',
   emblem: ligue3Logo,
+}
+
+// ── Menu déroulant du nom de la compétition (12/11, demande utilisateur) ─────────────────────
+// Dans Programme/Résultats/Classement, toucher le nom (« Ligue 1 ▾ ») ouvre ce menu au lieu
+// d'onglets « Coupe de France / Ligue 3 » : chaque entrée a sa propre page.
+//   kind 'comp' → une compétition à part entière (données de `id`)
+//   kind 'cup'  → la coupe nationale du championnat (vue coupe : Par journée + Tableau)
+export function getCompFamily(compId) {
+  const base = COMPETITIONS.find(c => c.id === compId)
+  if (!base || base.parent) return []
+  const out = [{ key: compId, kind: 'comp', id: compId, name: base.name, emblem: base.emblem }]
+  for (const c of COMPETITIONS) if (c.parent === compId) out.push({ key: c.id, kind: 'comp', id: c.id, name: c.name, emblem: c.emblem })
+  if (compId === 'FL1') out.push({ key: 'L3', kind: 'comp', id: 'L3', name: LIGUE3_COMPETITION.name, emblem: LIGUE3_COMPETITION.emblem })
+  const cup = DOMESTIC_CUPS[compId]
+  if (cup) out.push({ key: 'cup', kind: 'cup', id: compId, name: cup.name, emblem: null })
+  return out.length > 1 ? out : []
+}
+
+// Compétitions affichées dans les sélecteurs (sans les « filles » comme la Ligue 2).
+export const TOP_COMPETITIONS = COMPETITIONS.filter(c => !c.parent)
+
+// Résout le choix du menu pour une compétition : entrée active, compétition des données, vue coupe.
+export function resolveCompFamily(compId, subKey, { withCup = true } = {}) {
+  const family = getCompFamily(compId).filter(f => withCup || f.kind !== 'cup')
+  const active = family.find(f => f.key === subKey) ?? family[0] ?? null
+  const dataComp = active?.kind === 'comp' ? active.id : compId
+  const showingCup = active?.kind === 'cup'
+  return { family: family.length > 1 ? family : [], active, dataComp, showingCup }
 }

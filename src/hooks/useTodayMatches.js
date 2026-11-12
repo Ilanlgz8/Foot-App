@@ -72,7 +72,7 @@ const REFETCH_ON_FOCUS = { refetchOnWindowFocus: true }
 // réutilisé aussi par useUpcomingMatchesAllComps (useMatchs.js) pour corriger
 // un bug lié (doublons/jours manquants dans Accueil, voir son commentaire).
 const REAL_COMP_ID = MAJOR_LEAGUE_FD_ID
-const ESPN_SOURCED_COMPS = ['CL', 'PL', 'FL1', 'PD', 'BL1', 'SA', 'NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC', 'TDC', 'CS']
+const ESPN_SOURCED_COMPS = ['CL', 'PL', 'FL1', 'FL2', 'PD', 'BL1', 'SA', 'NL', 'CAN', 'COPA', 'UEL', 'UECL', 'USC', 'TDC', 'CS']
 const CUP_PARENT_COMPS   = Object.keys(DOMESTIC_CUPS) // ['FL1', 'PD', 'PL']
 
 

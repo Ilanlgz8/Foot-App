@@ -1,0 +1,136 @@
+/* Menu déroulant du nom de la compétition — voir CompFamilyMenu.jsx */
+.compFamily__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 9px 4px 0;
+  background: none;
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.compFamily__btnName {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compFamily__chevron {
+  flex-shrink: 0;
+  color: rgba(var(--red-rgb), 0.9);
+  transition: transform 0.2s ease;
+}
+
+.compFamily__btn--open .compFamily__chevron {
+  transform: rotate(180deg);
+}
+
+.compFamily__label--mobile {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Version grand écran : pastille au-dessus du contenu (le header mobile y est masqué) */
+.compFamily__btn--desktop {
+  padding: 7px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(var(--white-rgb), 0.05);
+  border: 1px solid rgba(var(--red-rgb), 0.3);
+}
+
+.compFamily__btn--desktop .compFamily__btnName {
+  font-size: 14px;
+}
+
+.compFamily__label--desktop {
+  display: none;
+}
+
+.compFamily__desktopOnly {
+  display: none;
+}
+
+@media (min-width: 953px) {
+  .compFamily__desktopOnly {
+    display: flex;
+    margin-bottom: 10px;
+  }
+}
+
+.compFamily__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+}
+
+.compFamily__menu {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: #0f1218;
+  border: 1px solid rgba(var(--white-rgb), 0.1);
+  border-radius: 0.85rem;
+  box-shadow: 0 12px 32px rgba(var(--black-rgb), 0.5);
+  animation: compFamilyIn 0.16s ease;
+}
+
+@keyframes compFamilyIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.compFamily__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0.55rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.compFamily__item:hover {
+  background: rgba(var(--white-rgb), 0.06);
+}
+
+.compFamily__item--active {
+  background: rgba(var(--red-rgb), 0.14);
+}
+
+.compFamily__itemLogo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.compFamily__itemCup {
+  width: 22px;
+  text-align: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.compFamily__itemName {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(var(--white-rgb), 0.75);
+  white-space: nowrap;
+}
+
+.compFamily__item--active .compFamily__itemName {
+  color: #fff;
+}

@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
+import { TOP_COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS, resolveCompFamily } from '../data/competitions'
+import CompFamilyMenu from './CompFamilyMenu'
 import { buildLigue3FormMap } from '../utils/ligue3'
 import { lockBodyScroll } from '../utils/scrollLock'
 
@@ -55,15 +56,15 @@ function Classement() {
   // (venant d'une navigation explicite, ex. clic sur une équipe) garde la
   // priorité comme avant.
   const [pickedComp, setPickedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'FL1')
-  // Ligue 3 : onglet dans la Ligue 1 (12/11, demande utilisateur). `pickedComp` = compétition
-  // choisie dans le sélecteur ; `selectedComp` = celle dont on affiche les données.
-  const [l3On, setL3On] = usePersistedState('classement_l3', false)
-  const selectedComp = pickedComp === 'FL1' && l3On ? 'L3' : pickedComp
-  const setSelectedComp = useCallback(id => { setL3On(false); setPickedComp(id) }, [setL3On, setPickedComp])
-  // Migration : la Ligue 3 a été un choix du sélecteur pendant quelques minutes le 12/11.
+  // Menu déroulant du nom (12/11) : `pickedComp` = compétition du sélecteur, `selectedComp` =
+  // celle dont on affiche le classement (Ligue 2/Ligue 3 choisies dans le menu). Pas de coupe ici.
+  const [subComp, setSubComp] = usePersistedState('shared_subComp', null)
+  const { family, active: famActive, dataComp: selectedComp } = resolveCompFamily(pickedComp, subComp, { withCup: false })
+  const setSelectedComp = useCallback(id => { setSubComp(null); setPickedComp(id) }, [setSubComp, setPickedComp])
+  // Migration : Ligue 3/Ligue 2 n'ont été des choix du sélecteur que quelques minutes le 12/11.
   useEffect(() => {
-    if (pickedComp === 'L3') { setPickedComp('FL1'); setL3On(true) }
-  }, [pickedComp, setPickedComp, setL3On])
+    if (pickedComp === 'L3' || pickedComp === 'FL2') { setSubComp(pickedComp); setPickedComp('FL1') }
+  }, [pickedComp, setPickedComp, setSubComp])
   const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
   const [search, setSearch] = usePersistedState('classement_search', '')
   const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)
@@ -367,6 +368,11 @@ function Classement() {
     // rapport avec CL/UEL/UECL) — jamais remarqué car EC était déjà dans le
     // sélecteur avant ce fix. Vidée ici aussi, même principe.
     NL: [], CAN: [], COPA: [], UEL: [], UECL: [], EC: [],
+    // Ligue 2 2026-27 : 1er-2e promus, 3e à 5e en play-offs (vainqueur contre le 16e de Ligue 1).
+    FL2: [
+      { label: 'Montée en Ligue 1', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
+      { label: 'Play-offs',         start: 3, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
+    ],
     // Règlement sportif L3 2026-27 (FFF) : 1er-2e promus en L2, 3e à 6e en play-off d'accession.
     L3: [
       { label: 'Montée en Ligue 2',    start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
@@ -402,6 +408,7 @@ function Classement() {
     PD:  { direct: 3, playoff: 0 },
     SA:  { direct: 3, playoff: 0 },
     L3:  { direct: 3, playoff: 0 }, // 16e, 17e et 18e relégués en N1 (règlement 2026-27)
+    FL2: { direct: 2, playoff: 1 }, // 16e en barrage contre le vainqueur du play-off de Ligue 3 (règlement L3 2026-27)
   }
 
   const buildRelegationRules = (compId, teamCount) => {
@@ -657,12 +664,14 @@ function Classement() {
         {/* ── Mobile : header compétition vedette (Option B) ── */}
         <div className={`compHeader${compOpen ? ' compHeader--open' : ''}`}>
           <div className="compHeader__hero" ref={compHeroRef} onClick={() => setCompOpen(o => !o)}>
-            {selectedCompetition?.emblem && (
-              <img src={selectedCompetition.emblem} alt="" className="compHeader__logo"
+            {(famActive?.emblem ?? selectedCompetition?.emblem) && (
+              <img src={famActive?.emblem ?? selectedCompetition.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
             <div className="compHeader__info">
-              <span className="compHeader__name">{selectedCompetition?.name}</span>
+              {family.length > 0
+                ? <CompFamilyMenu family={family} active={famActive} onPick={setSubComp} fallbackName={selectedCompetition?.name} />
+                : <span className="compHeader__name">{selectedCompetition?.name}</span>}
             </div>
             <button className="compHeader__btn" aria-label={compOpen ? 'Fermer la liste des compétitions' : 'Changer de compétition'}>
               {compOpen ? 'Fermer' : 'Changer'}
@@ -734,21 +743,10 @@ function Classement() {
             <h1 className="classement__panelTitle">Classement</h1>
           </div>
 
-          {/* Ligue 1 / Ligue 3 (Ligue 3 rangée dans l'onglet Ligue 1) */}
-          {pickedComp === 'FL1' && (
-            <div className="classement__viewToggle">
-              <button
-                className={`classement__viewBtn ${!l3On ? 'classement__viewBtn--active' : ''}`}
-                onClick={() => setL3On(false)}
-              >
-                Ligue 1
-              </button>
-              <button
-                className={`classement__viewBtn ${l3On ? 'classement__viewBtn--active' : ''}`}
-                onClick={() => setL3On(true)}
-              >
-                Ligue 3
-              </button>
+          {/* Grand écran : menu du nom (le header mobile est masqué) */}
+          {family.length > 0 && (
+            <div className="compFamily__desktopOnly">
+              <CompFamilyMenu family={family} active={famActive} onPick={setSubComp} fallbackName={selectedCompetition?.name} variant="desktop" />
             </div>
           )}
 

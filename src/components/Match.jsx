@@ -4,13 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
-import { COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS, LIGUE3_COMPETITION } from '../data/competitions'
+import { COMPETITIONS, TOP_COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS, resolveCompFamily } from '../data/competitions'
+import CompFamilyMenu from './CompFamilyMenu'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
 // Resultat.jsx) : le sélecteur de championnat n'affiche pas les
 // compétitions à 1 seul match par an (USC/TDC/CS).
-const SWITCHER_COMPETITIONS = COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
+const SWITCHER_COMPETITIONS = TOP_COMPETITIONS.filter(c => !SINGLE_MATCH_COMPS.has(c.id))
 import { translateTeam } from '../data/teamNames.js'
 import { useMatches, groupRounds } from '../hooks/useMatchs'
 import { prefetchTeamForm } from '../hooks/useTeamForm'
@@ -737,7 +738,11 @@ function Matchs() {
   // défaut jusqu'à la reprise des championnats de club fin août.
   const [selectedComp,  setSelectedComp]  = usePersistedState('shared_selectedComp', 'FL1')
   // Migration : la Ligue 3 a été un choix du sélecteur pendant quelques minutes le 12/11 → Ligue 1.
-  useEffect(() => { if (selectedComp === 'L3') setSelectedComp('FL1') }, [selectedComp, setSelectedComp])
+  useEffect(() => { if (selectedComp === 'L3' || selectedComp === 'FL2') setSelectedComp('FL1') }, [selectedComp, setSelectedComp])
+  // Menu déroulant du nom (12/11) : Ligue 1 / Ligue 2 / Ligue 3 / Coupe de France — clé partagée
+  // avec Résultats et Classement. `dataComp` = compétition dont on affiche les matchs.
+  const [subComp, setSubComp] = usePersistedState('shared_subComp', null)
+  const { family, active: famActive, dataComp, showingCup } = resolveCompFamily(selectedComp, subComp)
   // ⚠️ FIX (30/07, constat utilisateur : "dans programme dans ligue 1 je vois
   // que a partir de la journée 3") : clé UNIQUE globale avant ce fix — si
   // l'utilisateur avait consulté une AUTRE compétition (ex. Ligue des
@@ -751,8 +756,12 @@ function Matchs() {
   // TTL : voir usePersistedState.js — une position de journée mémorisée sert
   // à retrouver sa place en revenant d'une fiche match, pas à figer la page
   // sur une journée consultée il y a plusieurs jours.
-  const [currentIndex,  setCurrentIndex]  = usePersistedState(`matchs_currentIndex_${selectedComp}`, 0, NAV_POSITION_TTL)
-  const [wcView,        setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs'
+  const [currentIndex,  setCurrentIndex]  = usePersistedState(`matchs_currentIndex_${famActive && famActive.key !== selectedComp ? `${selectedComp}_${famActive.key}` : selectedComp}`, 0, NAV_POSITION_TTL)
+  const [rawWcView,     setWcView]        = usePersistedState('matchs_wcView', 'poules') // 'poules' | 'bracket' | 'matchs' | 'cup'
+  // Vue réellement affichée : poules/tableau seulement pour CdM/Euro, et pour une coupe nationale
+  // choisie dans le menu (« Par journée » = 'cup', « Tableau » = 'bracket'). Championnat → liste.
+  const isWCComp = selectedComp === 'WC' || selectedComp === 'EC'
+  const wcView = isWCComp ? rawWcView : showingCup ? (rawWcView === 'bracket' ? 'bracket' : 'cup') : 'matchs'
   const [openedGroup,   setOpenedGroup]   = useState(null)
   const [compOpen,      setCompOpen]      = useState(false)
   // Recherche équipe (vue "Par journée" uniquement) — même pattern que
@@ -808,14 +817,9 @@ function Matchs() {
   }, [])
 
   /* ── Data ── */
-  const { matches, loading: compLoading, error: compError } = useMatches(selectedComp, 'SCHEDULED', 'asc')
-  // Ligue 3 : onglet DANS la Ligue 1 (12/11, demande utilisateur « sinon ça fait trop »), même
-  // principe que la coupe nationale. Chargée seulement quand la Ligue 1 est affichée.
-  const hasL3      = selectedComp === 'FL1'
-  const showingL3  = hasL3 && wcView === 'l3'
-  const { matches: l3Matches, loading: l3Loading, error: l3Error } = useMatches('L3', 'SCHEDULED', 'asc', { enabled: hasL3 })
-  const loading = showingL3 ? l3Loading : compLoading
-  const error   = showingL3 ? l3Error   : compError
+  // dataComp : Ligue 2/Ligue 3 choisies dans le menu, sinon la compétition elle-même (championnat
+  // + sa coupe, fusionnés comme avant puis séparés plus bas).
+  const { matches, loading, error } = useMatches(dataComp, 'SCHEDULED', 'asc')
   // useTeamForm(selectedComp) retiré (10/07 cleanup) : formMap n'était jamais
   // consommé nulle part dans cette page (Programme n'affiche pas de losanges
   // de forme) — fetch réseau pur perte, contraire à l'effort de réduction du
@@ -892,16 +896,16 @@ function Matchs() {
   // "!isWC"/"isWC" isolés dans les vues ci-dessous, qui ignoraient le cas
   // coupe nationale et auraient affiché "Par journée" ET le bracket en même
   // temps pour ces onglets.
-  const hasToggle    = isWC || hasCup
+  const hasToggle    = isWC || showingCup
   // wcView 'cup' : nouvel onglet dédié aux matchs de la coupe nationale
   // fusionnée, affichés "Par journée" exactement comme le championnat mais
   // jamais mélangés avec lui (voir leagueOnlyMatches/cupOnlyMatches
   // ci-dessus). inListView regroupe 'matchs' et 'cup' : les 2 partagent
   // exactement le même rendu (recherche, nav par journée/tour), seule la
   // liste de matchs sous-jacente change (activeMatches ci-dessous).
-  const showingCupList = hasCup && wcView === 'cup'
-  const inListView      = wcView === 'matchs' || wcView === 'cup' || showingL3
-  const activeMatches   = showingL3 ? l3Matches : showingCupList ? cupOnlyMatches : leagueOnlyMatches
+  const showingCupList = showingCup && wcView === 'cup'
+  const inListView      = wcView === 'matchs' || wcView === 'cup'
+  const activeMatches   = showingCupList ? cupOnlyMatches : leagueOnlyMatches
   const activeGrouped   = useMemo(() => groupRounds(activeMatches, 'asc'), [activeMatches])
   // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
   // à rien (le bracket est propre à la CdM, changer de championnat en sort de
@@ -1125,7 +1129,7 @@ function Matchs() {
     // attendre la correction réactive ci-dessus (voir son commentaire) — zéro
     // flash, correct dès le premier rendu, peu importe la vitesse du réseau.
     const targetIsWC = id === 'WC' || id === 'EC'
-    setSelectedComp(id); setCurrentIndex(0); setWcView(targetIsWC ? 'poules' : 'matchs'); setOpenedGroup(null)
+    setSelectedComp(id); setSubComp(null); setCurrentIndex(0); setWcView(targetIsWC ? 'poules' : 'matchs'); setOpenedGroup(null)
   }
 
   const formatGroupName = (raw = '') => raw.replace('GROUP_', 'Groupe ').replace(/_/g, ' ')
@@ -1141,12 +1145,14 @@ function Matchs() {
         {/* ── Mobile : header compétition vedette (Option B) ── */}
         <div className={`compHeader${compOpen ? ' compHeader--open' : ''}`}>
           <div className="compHeader__hero" ref={compHeroRef} onClick={() => setCompOpen(o => !o)}>
-            {currentComp?.emblem && (
-              <img src={currentComp.emblem} alt="" className="compHeader__logo"
+            {(famActive?.emblem ?? currentComp?.emblem) && (
+              <img src={famActive?.emblem ?? currentComp.emblem} alt="" className="compHeader__logo"
                 onError={e => e.currentTarget.style.display = 'none'} />
             )}
             <div className="compHeader__info">
-              <span className="compHeader__name">{currentComp?.name}</span>
+              {family.length > 0
+                ? <CompFamilyMenu family={family} active={famActive} onPick={k => { setSubComp(k); setCurrentIndex(0) }} fallbackName={currentComp?.name} />
+                : <span className="compHeader__name">{currentComp?.name}</span>}
             </div>
             <button className="compHeader__btn" aria-label="Changer de compétition">
               {compOpen ? 'Fermer ✕' : 'Changer ›'}
@@ -1206,8 +1212,14 @@ function Matchs() {
 
           {/* Header */}
           <div className="matchs__header">
+            {/* Grand écran : le header mobile (avec le menu du nom) est masqué → même menu ici. */}
+            {family.length > 0 && (
+              <div className="compFamily__desktopOnly">
+                <CompFamilyMenu family={family} active={famActive} onPick={k => { setSubComp(k); setCurrentIndex(0) }} fallbackName={currentComp?.name} variant="desktop" />
+              </div>
+            )}
             <h1 className="matchs__kicker">
-              {showingL3 ? 'Ligue 3 à venir' : showingCupList ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Matchs à venir'}
+              {showingCupList ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Matchs à venir'}
             </h1>
             <div className="matchs__headerRow">
               {/* Toggle vues CdM / coupe nationale */}
@@ -1239,8 +1251,8 @@ function Matchs() {
 
                   {/* ── Par journée : liste de matchs ── */}
                   <button
-                    className={`matchs__wcToggleBtn ${wcView === 'matchs' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => { pickWcView('matchs'); setCurrentIndex(0) }}
+                    className={`matchs__wcToggleBtn ${wcView === 'matchs' || wcView === 'cup' ? 'matchs__wcToggleBtn--active' : ''}`}
+                    onClick={() => { pickWcView(showingCup ? 'cup' : 'matchs'); setCurrentIndex(0) }}
                   >
                     <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       {/* Fond carte */}
@@ -1256,38 +1268,7 @@ function Matchs() {
                     Par journée
                   </button>
 
-                  {/* ── Coupe nationale (Copa del Rey/Coupe de France/FA Cup) :
-                       mêmes journées, mais UNIQUEMENT les matchs de coupe —
-                       jamais mélangés avec le championnat ci-dessus (demande
-                       explicite utilisateur, 28/10). ── */}
-                  {hasCup && (
-                  <button
-                    className={`matchs__wcToggleBtn ${wcView === 'cup' ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => { pickWcView('cup'); setCurrentIndex(0) }}
-                  >
-                    <svg className="matchs__wcToggleIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      {/* Coupe (trophée) */}
-                      <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity=".15"/>
-                      <path d="M7 5H4.5a1.5 1.5 0 0 0-1.5 1.5c0 2 1.5 3.5 3.5 3.8" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"/>
-                      <path d="M17 5h2.5A1.5 1.5 0 0 1 21 6.5c0 2-1.5 3.5-3.5 3.8" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"/>
-                      <path d="M12 12v3" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M8.5 20.5h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      <path d="M9.5 18h5v2.5h-5V18Z" stroke="currentColor" strokeWidth="1.4" fill="currentColor" fillOpacity=".2"/>
-                    </svg>
-                    {DOMESTIC_CUPS[selectedComp]?.name}
-                  </button>
-                  )}
 
-                  {/* ── Ligue 3 (dans l'onglet Ligue 1) ── */}
-                  {hasL3 && (
-                  <button
-                    className={`matchs__wcToggleBtn ${showingL3 ? 'matchs__wcToggleBtn--active' : ''}`}
-                    onClick={() => { pickWcView('l3'); setCurrentIndex(0) }}
-                  >
-                    <img src={LIGUE3_COMPETITION.emblem} alt="" className="matchs__wcToggleIcon" style={{ objectFit: 'contain' }} />
-                    Ligue 3
-                  </button>
-                  )}
 
                   {/* ── Phase finale : arbre de tournoi ── */}
                   <button
@@ -1463,8 +1444,8 @@ function Matchs() {
             <p className="matchs__state">
               {showingCupList
                 ? `Aucun match de ${DOMESTIC_CUPS[selectedComp]?.name} à venir pour le moment.`
-                : showingL3
-                ? 'Aucun match de Ligue 3 à venir pour le moment.'
+                : famActive && famActive.kind === 'comp' && famActive.id !== selectedComp
+                ? `Aucun match de ${famActive.name} à venir pour le moment.`
                 : 'Aucun match à venir pour le moment.'}
             </p>
           )}

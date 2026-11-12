@@ -106,7 +106,13 @@ export const NATIONAL_SUPER_CUP_SLUGS = {
 
 // Liste à plat pour le cron (api/cron-goals.js, cf-worker/src/index.js) —
 // aucun besoin d'id précis à cet endroit, il parcourt juste tous les slugs.
+// Ligue 2 (12/11) : suivie en direct comme les autres (notifs comprises).
+export const LOWER_LEAGUE_SLUGS = {
+  FL2: 'fra.2',
+}
+
 export const EXTRA_NOTIFY_SLUGS = [
+  ...Object.values(LOWER_LEAGUE_SLUGS),
   ...Object.values(NATIONAL_COMP_SLUGS),
   ...Object.values(DOMESTIC_CUP_SLUGS),
   ...Object.values(EUROPEAN_CUP_SLUGS),
