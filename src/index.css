@@ -595,6 +595,8 @@ img[data-team*="Juventus" i] {
 /* Mi-temps sur les cartes (Accueil et onglet Match) : bloc « MT + Reprise dans X min » remonté
    de 5 px pour l'aérer du score en dessous (12/11, demande utilisateur). translateY : le score,
    lui, ne bouge pas. */
-#root .poster__min-labelCol { transform: translateY(-5px); }
+/* ⚠️ Propriété `translate` (et non `transform`) : sur les cartes de l'Accueil le bloc est déjà
+   centré par un `transform: translateX(-50%)` — l'écraser l'avait décalé vers la droite. */
+#root .poster__min-labelCol { translate: 0 -5px; }
 #root .live__minuteWrap:has(+ .live__reprise),
-#root .live__minuteWrap + .live__reprise { transform: translateY(-5px); }
+#root .live__minuteWrap + .live__reprise { translate: 0 -5px; }
