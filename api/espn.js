@@ -25,7 +25,6 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
-import { fetchLigue3FromFff } from '../src/utils/ligue3Parse.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
 import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
@@ -702,20 +701,6 @@ export default async function handler(req, res) {
 
   const { slug, slugs, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
 
-  // ── Mode « l3 » (12/11) : Ligue 3 depuis l'API publique de la FFF (voir src/utils/ligue3Parse.js).
-  // Saison complète + classement en une réponse, en cache CDN 15 min (+ 1 jour de secours si la
-  // FFF ne répond pas) : la FFF n'est donc interrogée qu'environ 4 fois par heure au maximum,
-  // quel que soit le nombre d'utilisateurs. Pas de direct (la FFF publie les scores ~2 h après).
-  if (req.query.l3) {
-    try {
-      const data = await fetchLigue3FromFff(fetch, 20_000)
-      return res.status(200)
-        .setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=86400')
-        .json({ ok: true, updatedAt: new Date().toISOString(), ...data })
-    } catch (e) {
-      return res.status(502).setHeader('Cache-Control', 'no-store').json({ ok: false, error: String(e?.message ?? e) })
-    }
-  }
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant
   // toute lecture/écriture du mapping — évite d'accepter n'importe quelle

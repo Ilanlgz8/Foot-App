@@ -98,8 +98,7 @@ function team(side) {
 
 // Match FFF → format football-data.org utilisé partout dans l'app. Le statut n'est que
 // FINISHED (score publié) ou TIMED : « coup d'envoi passé, score pas encore publié » est
-// calculé CÔTÉ CLIENT (l3Status, src/utils/ligue3.js) — ici la réponse est en cache CDN
-// 15 min, l'heure serveur serait déjà fausse au moment de l'affichage.
+// calculé au moment de l'affichage (l3Status, src/utils/ligue3.js), pas figé dans le cache.
 export function normalizeFffMatch(m) {
   const hs = m?.home_score
   const as = m?.away_score
@@ -149,22 +148,10 @@ async function getJson(fetchImpl, path, timeoutMs) {
   const ctl = new AbortController()
   const t = setTimeout(() => ctl.abort(), timeoutMs)
   try {
-    // En-têtes d'un navigateur venant de fff.fr : sans eux, l'API répond 403 aux serveurs
-    // (constaté le 12/11 depuis Vercel, alors que le navigateur passe).
-    const r = await fetchImpl(`${FFF_API}${path}`, {
-      signal: ctl.signal,
-      headers: {
-        accept: 'application/ld+json, application/json',
-        'accept-language': 'fr-FR,fr;q=0.9',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-        origin: 'https://www.fff.fr',
-        referer: 'https://www.fff.fr/',
-      },
-    })
-    if (!r.ok) {
-      const body = await r.text().catch(() => '')
-      throw new Error(`FFF ${r.status} ${r.headers.get('server') ?? ''} ${body.replace(/\s+/g, ' ').slice(0, 160)}`)
-    }
+    // Uniquement l'en-tête `accept` (autorisé en CORS sans requête préalable) : l'appel part
+    // du navigateur de l'utilisateur, voir fetchLigue3 (src/utils/ligue3.js).
+    const r = await fetchImpl(`${FFF_API}${path}`, { signal: ctl.signal, headers: { accept: 'application/ld+json' } })
+    if (!r.ok) throw new Error(`FFF ${r.status}`)
     return await r.json()
   } finally {
     clearTimeout(t)
@@ -172,7 +159,7 @@ async function getJson(fetchImpl, path, timeoutMs) {
 }
 
 // Saison complète (306 matchs, 30 par page côté FFF → ~11 pages en parallèle) + classement.
-// Appelé au plus ~1 fois / 15 min grâce au cache CDN de /espn?l3=1.
+// ~12 requêtes légères (~3 s au total), mises en cache côté client (src/utils/ligue3.js).
 export async function fetchLigue3FromFff(fetchImpl = fetch, timeoutMs = 20_000) {
   const first = await getJson(fetchImpl, `${POULE_PATH}/matchs?page=1`, timeoutMs)
   const total = first['hydra:totalItems'] ?? 0

@@ -1,22 +1,24 @@
 // Ligue 3 côté client — voir src/utils/ligue3Parse.js pour la source (API FFF) et ses limites.
-// Une seule requête (/espn?l3=1, en cache CDN 15 min) sert les 3 pages : Programme, Résultats
-// et Classement. Dédoublonnée ici pour que les 3 hooks d'une même page ne la tirent qu'une fois.
+// ⚠️ Appel DIRECT depuis le navigateur (12/11) : l'API FFF répond 403 (page de blocage HTML) aux
+// serveurs Vercel, même avec des en-têtes de navigateur — blocage par adresse IP de serveur.
+// Depuis un téléphone ou un ordinateur normal elle répond, et elle autorise les appels depuis
+// un autre site (CORS vérifié). D'où `connect-src https://api-dofa.fff.fr` dans vercel.json.
+// Une seule récupération sert les 3 pages (Programme, Résultats, Classement), dédoublonnée ici.
+import { fetchLigue3FromFff } from './ligue3Parse'
 
 export const L3_ID = 'L3'
 
 let inflight = null
 let memo = null
 let memoAt = 0
-const MEMO_MS = 60_000
+const MEMO_MS = 5 * 60_000
 
 export async function fetchLigue3() {
   if (memo && Date.now() - memoAt < MEMO_MS) return memo
   if (inflight) return inflight
   inflight = (async () => {
-    const r = await fetch('/espn?l3=1')
-    if (!r.ok) throw new Error(`Erreur API: ${r.status}`)
-    const j = await r.json()
-    if (!Array.isArray(j?.matches)) throw new Error('Erreur API')
+    const j = await fetchLigue3FromFff(fetch, 20_000)
+    if (!Array.isArray(j?.matches) || j.matches.length === 0) throw new Error('Erreur API')
     memo = j
     memoAt = Date.now()
     return j
