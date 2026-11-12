@@ -573,3 +573,12 @@ img[data-team*="Juventus" i] {
 }
 /* theme-v2.css (chargé après) recolore #root .live__minute en rose-rouge → sélecteur plus précis. */
 #root .live__minuteWrap .live__minute { color: #ffffff; }
+/* Centrage optique de la minute sous le tiret du score (12/11, demande utilisateur : « un
+   chouïa trop à gauche »). L'espacement des lettres ajoute un vide APRÈS le dernier caractère,
+   et l'apostrophe (« 67' ») est plus fine que les chiffres : le texte paraît décalé à gauche.
+   Décalage minimal vers la droite (~1,5 px). */
+#root .poster__min-label,
+#root .lmp__heroMinute,
+#root .live__minute {
+  transform: translateX(0.1em);
+}
