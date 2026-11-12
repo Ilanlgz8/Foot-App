@@ -149,7 +149,18 @@ async function getJson(fetchImpl, path, timeoutMs) {
   const ctl = new AbortController()
   const t = setTimeout(() => ctl.abort(), timeoutMs)
   try {
-    const r = await fetchImpl(`${FFF_API}${path}`, { signal: ctl.signal, headers: { accept: 'application/ld+json' } })
+    // En-têtes d'un navigateur venant de fff.fr : sans eux, l'API répond 403 aux serveurs
+    // (constaté le 12/11 depuis Vercel, alors que le navigateur passe).
+    const r = await fetchImpl(`${FFF_API}${path}`, {
+      signal: ctl.signal,
+      headers: {
+        accept: 'application/ld+json, application/json',
+        'accept-language': 'fr-FR,fr;q=0.9',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+        origin: 'https://www.fff.fr',
+        referer: 'https://www.fff.fr/',
+      },
+    })
     if (!r.ok) throw new Error(`FFF ${r.status}`)
     return await r.json()
   } finally {
