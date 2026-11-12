@@ -165,9 +165,10 @@ export const LOWER_DIVISION_FD_CODE = {
 // déjà existant (FL1/PD/PL) — accepté par l'utilisateur malgré le quota
 // d'écritures Turso dépassé le jour même (voir l'entrée "QUOTA D'ÉCRITURES
 // TURSO DÉPASSÉ" plus haut dans ce fichier).
-// `emblem` (12/11) : logos officiels fournis par l'utilisateur, fond blanc détouré, recadrés et
-// mis à 256 px de haut. Lisibilité sur fond sombre : texte noir « DFB-POKAL » et bleu nuit
-// « COPPA ITALIA » passés en blanc, bandeau sponsor Frecciarossa retiré.
+// `emblem` (12/11) : logos officiels fournis par l'utilisateur, fond détouré, recadrés et mis à
+// 256 px de haut. 2e série (même jour) pour FA Cup (tuile rouge), Copa del Rey (sans texte ni
+// filigrane) et DFB-Pokal (disque blanc, fond noir retiré). Coppa Italia : texte bleu nuit passé
+// en blanc et bandeau sponsor Frecciarossa retiré, pour la lisibilité sur fond sombre.
 export const DOMESTIC_CUPS = {
   FL1: { slug: 'fra.coupe_de_france', name: 'Coupe de France', emblem: coupeDeFranceLogo },
   PD:  { slug: 'esp.copa_del_rey',    name: 'Copa del Rey',    emblem: copaDelReyLogo },
