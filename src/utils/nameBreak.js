@@ -22,3 +22,8 @@ export function keepParticles(name) {
 
 // Minute « 120'+4' (pen) » : jamais coupée en deux.
 export const keepTogether = (txt) => String(txt ?? '').replace(/ /g, NBSP)
+
+// Entre le nom et la minute : insécable pour une minute courte (« 53' », « 120'+2' ») qui reste
+// donc sur la ligne du dernier mot ; espace normal pour une minute longue (« 120'+4' (pen) »),
+// qui peut alors passer seule à la ligne plutôt que de faire déborder la colonne.
+export const minuteJoiner = (minute) => (String(minute ?? '').includes(' ') ? ' ' : NBSP)

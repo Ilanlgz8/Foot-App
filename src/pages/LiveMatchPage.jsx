@@ -5,7 +5,7 @@
  * Style : même visuel que MatchPage (hero gradient plein-écran + onglets)
  * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
-import { keepParticles, keepTogether } from '../utils/nameBreak'
+import { keepParticles, keepTogether, minuteJoiner } from '../utils/nameBreak'
 import { useParams, useNavigate } from 'react-router-dom'
 import { formKey } from '../hooks/useTeamForm'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
@@ -466,7 +466,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                   <span className="lmp__heroScorerText">
                     <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
-                    {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
+                    {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
                 </span>
               ))}
@@ -480,7 +480,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                   <span className="lmp__heroScorerText">
                     <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
-                    {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
+                    {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
                 </span>
               ))}

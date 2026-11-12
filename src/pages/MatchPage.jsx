@@ -2,7 +2,7 @@
  * MatchPage — page dédiée à un match à venir / terminé
  * Route : /match/:matchId
  */
-import { keepParticles, keepTogether } from '../utils/nameBreak'
+import { keepParticles, keepTogether, minuteJoiner } from '../utils/nameBreak'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { formKey } from '../hooks/useTeamForm'
 import { useState, useMemo }       from 'react'
@@ -361,7 +361,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
                 <span className="lmp__heroScorerText">
                   <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                   {keepParticles(e.name)}
-                  {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
+                  {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
               </span>
             ))}
@@ -375,7 +375,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
                 <span className="lmp__heroScorerText">
                   <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                   {keepParticles(e.name)}
-                  {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
+                  {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
               </span>
             ))}
