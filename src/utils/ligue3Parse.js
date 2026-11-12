@@ -150,7 +150,13 @@ async function getJson(fetchImpl, path, timeoutMs) {
   try {
     // Uniquement l'en-tête `accept` (autorisé en CORS sans requête préalable) : l'appel part
     // du navigateur de l'utilisateur, voir fetchLigue3 (src/utils/ligue3.js).
-    const r = await fetchImpl(`${FFF_API}${path}`, { signal: ctl.signal, headers: { accept: 'application/ld+json' } })
+    // `sf=` : l'API FFF passe par un cache qui garde l'en-tête CORS du PREMIER site à avoir
+    // demandé une adresse (constaté le 12/11 : `matchs?page=1`, déjà demandée ailleurs, refusée
+    // depuis StatFootix ; la même avec `&sf=…` passe). Une adresse propre à l'app, qui change
+    // toutes les 10 min, évite ce piège — et reste partagée entre utilisateurs de l'app.
+    const sep = path.includes('?') ? '&' : '?'
+    const url = `${FFF_API}${path}${sep}sf=${Math.floor(Date.now() / 600_000)}`
+    const r = await fetchImpl(url, { signal: ctl.signal, headers: { accept: 'application/ld+json' } })
     if (!r.ok) throw new Error(`FFF ${r.status}`)
     return await r.json()
   } finally {
