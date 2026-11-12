@@ -354,8 +354,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
       {(homeEvents.length > 0 || awayEvents.length > 0) && (
         <div className="lmp__heroScorers">
           <div className="lmp__heroScorersHome">
-            {homeEvents.map(e => (
-              <span key={e.key} className="lmp__heroScorerItem">
+            {homeEvents.map((e, i, list) => (
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                 <span className="lmp__heroScorerText">
@@ -368,8 +368,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           </div>
           <div className="lmp__heroScorersDiv" />
           <div className="lmp__heroScorersAway">
-            {awayEvents.map(e => (
-              <span key={e.key} className="lmp__heroScorerItem">
+            {awayEvents.map((e, i, list) => (
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                 <span className="lmp__heroScorerText">

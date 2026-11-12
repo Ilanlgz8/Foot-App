@@ -517,6 +517,12 @@
   line-height: 1.25;
 }
 .lmp__heroScorersHome .lmp__heroScorerItem { text-align: right; }
+/* Séparation buts / cartons (12/11) : trait fin et discret au-dessus du 1er carton. */
+.lmp__heroScorerItem--sep {
+  margin-top: 0.3rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(var(--white-rgb), 0.12);
+}
 .lmp__heroScorersAway .lmp__heroScorerItem { text-align: left; }
 .lmp__heroScorerText {
   white-space: normal;
