@@ -1,3 +1,4 @@
+import { reportError } from '../utils/errorReporting'
 import { markReload } from '../utils/reloadTrace'
 import { Component } from 'react'
 
@@ -35,10 +36,9 @@ export class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Pas d'outil de tracking d'erreurs (Sentry etc.) branché sur ce projet —
-    // console.error reste visible dans les logs Vercel côté SSR/build et dans
-    // la console navigateur côté client, seule trace dispo pour l'instant.
     console.error('[ErrorBoundary]', error, info?.componentStack)
+    // Envoyé à Sentry si configuré (voir utils/errorReporting.js).
+    reportError(error, { componentStack: info?.componentStack })
   }
 
   // ⚠️ AJOUT (constat utilisateur, 02/11 : "quand y'a beaucoup de matchs [...]

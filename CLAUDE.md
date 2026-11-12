@@ -183,6 +183,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Ligue 2 + menu du nom (12/11)** : Ligue 2 = `FL2` (ESPN `fra.2`, direct complet : scores, buts, compos, stats ; notifs via `LOWER_LEAGUE_SLUGS` dans espnSlugs.js → Worker à redéployer). Entrée `COMPETITIONS` avec `parent: 'FL1'` : absente des sélecteurs (`TOP_COMPETITIONS`), choisie via le menu déroulant du nom (`CompFamilyMenu`, `getCompFamily`/`resolveCompFamily` dans competitions.js, clé partagée `shared_subComp`) : Ligue 1 ▾ → Ligue 2 / Ligue 3 / Coupe de France (autres championnats → leur coupe). Coupe = vue « Par journée » + « Tableau » ; Classement sans coupe. Journées de Ligue 2 : rapprochement ESPN↔FFF (`src/utils/ligue2Rounds.js`, `L2_CP_NO` à mettre à jour en août) + matchs FFF hors fenêtre ESPN (toute la saison, sans page détail).
 
+- **Sentry (12/11)** : `src/utils/errorReporting.js` (chargé en temps mort, ErrorBoundary + erreurs globales). Inactif tant que `VITE_SENTRY_DSN` n'est pas défini dans Vercel. CSP `connect-src` autorise `*.ingest.sentry.io` (US/EU).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

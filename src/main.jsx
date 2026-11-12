@@ -9,6 +9,8 @@ import './fonts.js'
 import './index.css'
 import App from './App.jsx'
 import { checkAppVersion } from './utils/appUpdate'
+import { initErrorReporting } from './utils/errorReporting'
+initErrorReporting()
 
 // Efface le garde-fou anti-boucle posé par le script inline d'index.html
 // (voir son commentaire) : si CE module s'exécute, c'est que le script
