@@ -356,8 +356,12 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
             {homeEvents.map(e => (
               <span key={e.key} className="lmp__heroScorerItem">
                 <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
-                {e.name}
-                {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
+                {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; la minute reste
+                    collée au dernier mot (espace insécable). */}
+                <span className="lmp__heroScorerText">
+                  {e.name}
+                  {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
+                </span>
               </span>
             ))}
           </div>
@@ -366,8 +370,12 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
             {awayEvents.map(e => (
               <span key={e.key} className="lmp__heroScorerItem">
                 <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
-                {e.name}
-                {e.minute && <span className="lmp__heroScorerMin"> {e.minute}</span>}
+                {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; la minute reste
+                    collée au dernier mot (espace insécable). */}
+                <span className="lmp__heroScorerText">
+                  {e.name}
+                  {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
+                </span>
               </span>
             ))}
           </div>
