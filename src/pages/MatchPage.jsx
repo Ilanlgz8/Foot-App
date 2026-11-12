@@ -6,9 +6,10 @@ import { keepParticles, keepTogether, minuteJoiner } from '../utils/nameBreak'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { formKey } from '../hooks/useTeamForm'
 import { useState, useMemo }       from 'react'
-import { useQuery }                from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { translateTeam }           from '../data/teamNames'
-import { withPageTheme, compForMatch } from '../data/competitions'
+import { withPageTheme, compForMatch, COMPETITION_ESPN_SLUG, MAJOR_LEAGUE_FD_ID } from '../data/competitions'
+import { fetchEspnCompMatches, fetchEspnCupMatches } from '../utils/espnAdapter'
 import { useTeamForm }             from '../hooks/useTeamForm'
 import { useMatches, useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useSwipe }                from '../hooks/useSwipe'
@@ -56,10 +57,38 @@ import './LiveMatchPage.css'
 
 
 // ── Fetch fallback si accès direct par URL ────────────────────────────────────
+// Match introuvable dans les listes déjà chargées → rechercher dans le cache React Query
+// (Accueil, Programme, Résultats… ont pu le charger) avant tout appel réseau.
+function findInQueryCache(queryClient, id) {
+  for (const [, data] of queryClient.getQueriesData({})) {
+    const list = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : null
+    const hit = list?.find?.(m => m && String(m.id) === String(id))
+    if (hit) return hit
+  }
+  return null
+}
+
 function useMatchData(matchId, initialMatch) {
+  const queryClient = useQueryClient()
   return useQuery({
     queryKey:  ['match', matchId],
     queryFn:   async () => {
+      // 12/11 (bug constaté : page rechargée par son adresse → chargement infini) : les matchs
+      // venant d'ESPN (« espn-NL-401861151 », « espn-PD-cup-401928527 ») n'existent pas chez
+      // football-data.org. On les retrouve dans le cache, sinon dans la fenêtre ESPN de leur
+      // compétition (30 derniers jours / 45 prochains).
+      const cached = findInQueryCache(queryClient, matchId)
+      if (cached) return cached
+      const espn = /^espn-([A-Za-z0-9]+)(-cup)?-\d+$/.exec(String(matchId))
+      if (espn) {
+        const code = espn[1].toUpperCase()
+        const list = espn[2]
+          ? await fetchEspnCupMatches(code)
+          : await fetchEspnCompMatches(code, COMPETITION_ESPN_SLUG[code], { compId: MAJOR_LEAGUE_FD_ID[code] })
+        const hit = (list ?? []).find(m => String(m.id) === String(matchId))
+        if (!hit) throw new Error('introuvable')
+        return hit
+      }
       // ⚠️ fdFetch et NON fetch() brut (04/09) : cet appel était le seul de la
       // page à contourner le wrapper — il n'avait donc ni le timeout de 15s
       // (une requête partie mais jamais revenue laissait la page en
@@ -71,6 +100,7 @@ function useMatchData(matchId, initialMatch) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
     },
+    retry: 1,
     enabled:   !initialMatch && !!matchId,
     staleTime: 5 * 60_000,
   })
@@ -798,7 +828,7 @@ export default function MatchPage() {
   const location    = useLocation()
 
   const stateMatch = location.state?.match ?? null
-  const { data: fetchedMatch, isLoading } = useMatchData(matchId, stateMatch)
+  const { data: fetchedMatch, isLoading, isError: matchError } = useMatchData(matchId, stateMatch)
   const rawMatch = stateMatch ?? fetchedMatch
 
   // Même correction que dans MatchPageHero — voir le commentaire là-bas.
@@ -991,6 +1021,16 @@ export default function MatchPage() {
     }
   )
 
+  // Match vraiment introuvable (trop ancien pour la fenêtre ESPN, lien cassé) : un message plutôt
+  // qu'un chargement infini.
+  if (!match && matchError) {
+    return (
+      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.75)' }}>
+        <p style={{ marginBottom: '1rem' }}>Ce match n'est plus disponible.</p>
+        <button type="button" className="lmp__backBtn" onClick={() => navigate("/resultats")}>Voir les résultats</button>
+      </div>
+    )
+  }
   if (isLoading || !match) {
     return <MpPageSkeleton />
   }
