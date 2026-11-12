@@ -510,20 +510,18 @@
   /* 12/11 (demande utilisateur) : un nom trop long passe à la ligne au lieu de déborder sur
      l'autre moitié — coupure UNIQUEMENT entre deux mots (jamais au milieu d'un nom), la
      minute reste attachée au dernier mot. Icône à part, alignée sur la 1re ligne. */
-  display: flex;
-  align-items: flex-start;
-  gap: 0.2rem;
+  display: block;
   max-width: 100%;
   line-height: 1.25;
 }
-.lmp__heroScorersHome .lmp__heroScorerItem { justify-content: flex-end; text-align: right; }
-.lmp__heroScorersAway .lmp__heroScorerItem { justify-content: flex-start; text-align: left; }
+.lmp__heroScorersHome .lmp__heroScorerItem { text-align: right; }
+.lmp__heroScorersAway .lmp__heroScorerItem { text-align: left; }
 .lmp__heroScorerText {
-  min-width: 0;
   white-space: normal;
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
+  text-wrap: balance; /* 2 lignes de longueur proche plutôt qu'un mot seul en bas */
 }
 
 .lmp__heroScorerMin {
@@ -542,7 +540,7 @@
    (page Résultat), qui fusionne désormais buts + cartons dans cette liste
    (même icônes que le Fil du match : ⚽ 🟨 🟥). */
 .lmp__heroScorerIcon {
-  flex: none;
+  display: inline;
 }
 
 .lmp__page {

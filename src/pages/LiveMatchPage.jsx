@@ -460,10 +460,10 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
             <div className="lmp__heroScorersHome">
               {homeEvents.map(e => (
                 <span key={e.key} className="lmp__heroScorerItem">
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
-                  {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; la minute reste
-                      collée au dernier mot (espace insécable). */}
+                  {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
+                      au 1er mot et la minute au dernier (espaces insécables). */}
                   <span className="lmp__heroScorerText">
+                    <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {e.name}
                     {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
                   </span>
@@ -474,10 +474,10 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
             <div className="lmp__heroScorersAway">
               {awayEvents.map(e => (
                 <span key={e.key} className="lmp__heroScorerItem">
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
-                  {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; la minute reste
-                      collée au dernier mot (espace insécable). */}
+                  {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
+                      au 1er mot et la minute au dernier (espaces insécables). */}
                   <span className="lmp__heroScorerText">
+                    <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {e.name}
                     {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
                   </span>
