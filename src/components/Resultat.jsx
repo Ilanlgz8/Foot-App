@@ -7,7 +7,7 @@ import './../compHeader.css'
 // Resultat.jsx ne l'importait pas lui-même, ces classes restaient sans style
 // tant qu'on n'avait pas visité Programme au moins une fois dans la session.
 import './../match.css'
-import { PAGE_COMPETITIONS as COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
+import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur) : le sélecteur de
@@ -214,6 +214,8 @@ function Resultats() {
   // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
   // défaut jusqu'à la reprise des championnats de club fin août.
   const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', 'FL1')
+  // Migration : la Ligue 3 a été un choix du sélecteur pendant quelques minutes le 12/11 → Ligue 1.
+  useEffect(() => { if (selectedComp === 'L3') setSelectedComp('FL1') }, [selectedComp, setSelectedComp])
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué sur une journée
   // passée puis cliqué sur un match puis "retour", on retombait sur la
   // journée la plus récente au lieu de celle consultée) : l'ancien
@@ -286,7 +288,11 @@ function Resultats() {
   // ci-dessous (liveMatches/getRecentlyFinishedMatches + ticker 5s), qui
   // reste actif quel que soit le staleTime FD.org. On peut donc aligner le
   // cache FD.org sur celui de Programme sans rien perdre en réactivité.
-  const { matches: fdMatches, loading, error } = useMatches(selectedComp, 'FINISHED', 'desc', {
+  // Ligue 3 : onglet dans la Ligue 1 (12/11), voir Match.jsx.
+  const hasL3     = selectedComp === 'FL1'
+  const showingL3 = hasL3 && viewMode === 'l3'
+  const { matches: l3Finished, loading: l3Loading, error: l3Error } = useMatches('L3', 'FINISHED', 'desc', { enabled: hasL3 })
+  const { matches: fdMatches, loading: compLoading, error: compError } = useMatches(selectedComp, 'FINISHED', 'desc', {
     staleTime: TTL.SCHEDULED,
   })
 
@@ -453,12 +459,14 @@ function Resultats() {
   const leagueOnlyMatches = useMemo(() => hasCup ? matches.filter(m => !m.isCup) : matches, [matches, hasCup])
   const cupOnlyMatches    = useMemo(() => hasCup ? matches.filter(m => m.isCup) : [], [matches, hasCup])
   const showingCupList = hasCup && viewMode === 'cup'
+  const loading = showingL3 ? l3Loading : compLoading
+  const error   = showingL3 ? l3Error   : compError
   // 'poule' reste exclusif à isWC (WC/EC n'ont jamais de coupe nationale,
   // voir DOMESTIC_CUPS) — 'journee' et 'cup' partagent le même rendu liste
   // plus bas (nav par round + resultats__list), juste sur 2 jeux de
   // matchs différents.
-  const inListView    = viewMode === 'journee' || viewMode === 'cup'
-  const activeMatches = showingCupList ? cupOnlyMatches : leagueOnlyMatches
+  const inListView    = viewMode === 'journee' || viewMode === 'cup' || showingL3
+  const activeMatches = showingL3 ? l3Finished : showingCupList ? cupOnlyMatches : leagueOnlyMatches
 
   const grouped = useMemo(() => groupRounds(activeMatches, 'desc'), [activeMatches])
 
@@ -655,7 +663,7 @@ function Resultats() {
         <main className="resultats__main">
 
           <div className="resultats__header">
-            <h1 className="resultats__kicker">{showingCupList ? DOMESTIC_CUPS[selectedComp]?.name : 'Résultats'}</h1>
+            <h1 className="resultats__kicker">{showingL3 ? 'Ligue 3' : showingCupList ? DOMESTIC_CUPS[selectedComp]?.name : 'Résultats'}</h1>
             {mainView === 'comp' && (
               <div className="resultats__titleRow">
                 {isWC && wcGroups.length > 0 && (
@@ -668,6 +676,9 @@ function Resultats() {
                   <div className="resultats__viewTabs">
                     <button className={'resultats__viewTab' + (viewMode === 'journee' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('journee')}>Par journée</button>
                     <button className={'resultats__viewTab' + (viewMode === 'cup' ? ' resultats__viewTab--active' : '')} onClick={() => setViewMode('cup')}>{DOMESTIC_CUPS[selectedComp]?.name}</button>
+                    {hasL3 && (
+                      <button className={'resultats__viewTab' + (showingL3 ? ' resultats__viewTab--active' : '')} onClick={() => { setViewMode('l3'); setCurrentRoundKey(null) }}>Ligue 3</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -786,7 +797,7 @@ function Resultats() {
 
           {!loading && !error && activeMatches.length === 0 && (
             <p className="resultats__state">
-              {showingCupList ? `Aucun résultat de ${DOMESTIC_CUPS[selectedComp]?.name} pour le moment.` : 'Aucun résultat disponible.'}
+              {showingL3 ? 'Aucun résultat de Ligue 3 pour le moment.' : showingCupList ? `Aucun résultat de ${DOMESTIC_CUPS[selectedComp]?.name} pour le moment.` : 'Aucun résultat disponible.'}
               {/* 12/11 (constat utilisateur : aucun résultat de Coupe de France alors que des matchs
                   ont eu lieu) : vérifié, ESPN publie le calendrier des tours régionaux (7e tour) mais
                   JAMAIS leurs scores (matchs restés « à venir ») ; les scores n'arrivent qu'à partir

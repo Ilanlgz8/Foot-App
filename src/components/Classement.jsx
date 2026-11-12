@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react'
 import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import './../classement.css'
 import './../compHeader.css'
-import { PAGE_COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
+import { COMPETITIONS as allCompetitions, NO_STANDINGS_COMPS, NO_SCORERS_COMPS } from '../data/competitions'
 import { buildLigue3FormMap } from '../utils/ligue3'
 import { lockBodyScroll } from '../utils/scrollLock'
 
@@ -54,7 +54,16 @@ function Classement() {
   // défaut jusqu'à la reprise des championnats de club fin août. navCompId
   // (venant d'une navigation explicite, ex. clic sur une équipe) garde la
   // priorité comme avant.
-  const [selectedComp, setSelectedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'FL1')
+  const [pickedComp, setPickedComp] = usePersistedState('shared_selectedComp', navCompId ?? 'FL1')
+  // Ligue 3 : onglet dans la Ligue 1 (12/11, demande utilisateur). `pickedComp` = compétition
+  // choisie dans le sélecteur ; `selectedComp` = celle dont on affiche les données.
+  const [l3On, setL3On] = usePersistedState('classement_l3', false)
+  const selectedComp = pickedComp === 'FL1' && l3On ? 'L3' : pickedComp
+  const setSelectedComp = useCallback(id => { setL3On(false); setPickedComp(id) }, [setL3On, setPickedComp])
+  // Migration : la Ligue 3 a été un choix du sélecteur pendant quelques minutes le 12/11.
+  useEffect(() => {
+    if (pickedComp === 'L3') { setPickedComp('FL1'); setL3On(true) }
+  }, [pickedComp, setPickedComp, setL3On])
   const [view, setView] = usePersistedState('classement_view', 'classement') // 'classement' | 'buteurs'
   const [search, setSearch] = usePersistedState('classement_search', '')
   const [selectedGroupName, setSelectedGroupName] = usePersistedState('classement_selectedGroupName', null)
@@ -298,7 +307,7 @@ function Classement() {
   // Fetch dédié à l'onglet Tendances retiré avec l'onglet lui-même (mis de
   // côté, voir TendancesView.jsx) — évite un appel réseau pour rien.
 
-  const selectedCompetition = competitions.find((c) => c.id === selectedComp)
+  const selectedCompetition = competitions.find((c) => c.id === pickedComp)
 
   // Auto-ouvre le groupe si on vient d'une modal match (ex: GROUP_A depuis WC)
   useEffect(() => {
@@ -668,7 +677,7 @@ function Classement() {
           </div>
           <div className="compHeader__dots">
             {competitions.map(c => (
-              <span key={c.id} className={`compHeader__dot${c.id === selectedComp ? ' compHeader__dot--active' : ''}`} />
+              <span key={c.id} className={`compHeader__dot${c.id === pickedComp ? ' compHeader__dot--active' : ''}`} />
             ))}
           </div>
           {compAnchor && createPortal(
@@ -680,7 +689,7 @@ function Classement() {
                 {competitions.map(comp => (
                   <button
                     key={comp.id}
-                    className={`compHeader__item${comp.id === selectedComp ? ' compHeader__item--active' : ''}`}
+                    className={`compHeader__item${comp.id === pickedComp ? ' compHeader__item--active' : ''}`}
                     onClick={() => { setSelectedComp(comp.id); setCompOpen(false) }}
                   >
                     <img src={comp.emblem} alt="" className="compHeader__itemLogo"
@@ -702,14 +711,14 @@ function Classement() {
               <button
                 key={comp.id}
                 onClick={() => setSelectedComp(comp.id)}
-                className={`classement__sidebarItem ${selectedComp === comp.id ? 'classement__sidebarItem--active' : ''}`}
+                className={`classement__sidebarItem ${pickedComp === comp.id ? 'classement__sidebarItem--active' : ''}`}
               >
                 <img src={comp.emblem} alt=""
                   className="classement__sidebarLogo"
                   onError={e => e.currentTarget.style.display = 'none'} />
                 <span className="classement__sidebarName classement__sidebarName--full">{comp.name}</span>
                 <span className="classement__sidebarName classement__sidebarName--short">{comp.shortName ?? comp.name}</span>
-                {selectedComp === comp.id && <span className="classement__sidebarDot" />}
+                {pickedComp === comp.id && <span className="classement__sidebarDot" />}
               </button>
             ))}
           </nav>
@@ -724,6 +733,24 @@ function Classement() {
           <div>
             <h1 className="classement__panelTitle">Classement</h1>
           </div>
+
+          {/* Ligue 1 / Ligue 3 (Ligue 3 rangée dans l'onglet Ligue 1) */}
+          {pickedComp === 'FL1' && (
+            <div className="classement__viewToggle">
+              <button
+                className={`classement__viewBtn ${!l3On ? 'classement__viewBtn--active' : ''}`}
+                onClick={() => setL3On(false)}
+              >
+                Ligue 1
+              </button>
+              <button
+                className={`classement__viewBtn ${l3On ? 'classement__viewBtn--active' : ''}`}
+                onClick={() => setL3On(true)}
+              >
+                Ligue 3
+              </button>
+            </div>
+          )}
 
           {/* Toggle classement / buteurs */}
           <div className="classement__viewToggle">

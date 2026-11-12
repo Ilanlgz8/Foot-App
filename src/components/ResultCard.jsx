@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import '../resultats.css'
-import { PAGE_COMPETITIONS as COMPETITIONS } from '../data/competitions'
+import { COMPETITIONS } from '../data/competitions'
 import { translateTeam } from '../data/teamNames.js'
 import { finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { FavStarBadge } from './FavStarBadge'

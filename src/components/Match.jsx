@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import './../match.css'
 import './../compHeader.css'
-import { PAGE_COMPETITIONS as COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS } from '../data/competitions'
+import { COMPETITIONS, DOMESTIC_CUPS, SINGLE_MATCH_COMPS, LIGUE3_COMPETITION } from '../data/competitions'
 import { lockBodyScroll } from '../utils/scrollLock'
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur — même fix que
@@ -736,6 +736,8 @@ function Matchs() {
   // 2026 est terminée (finale le 19/07), plus de raison de l'avoir par
   // défaut jusqu'à la reprise des championnats de club fin août.
   const [selectedComp,  setSelectedComp]  = usePersistedState('shared_selectedComp', 'FL1')
+  // Migration : la Ligue 3 a été un choix du sélecteur pendant quelques minutes le 12/11 → Ligue 1.
+  useEffect(() => { if (selectedComp === 'L3') setSelectedComp('FL1') }, [selectedComp, setSelectedComp])
   // ⚠️ FIX (30/07, constat utilisateur : "dans programme dans ligue 1 je vois
   // que a partir de la journée 3") : clé UNIQUE globale avant ce fix — si
   // l'utilisateur avait consulté une AUTRE compétition (ex. Ligue des
@@ -806,7 +808,14 @@ function Matchs() {
   }, [])
 
   /* ── Data ── */
-  const { matches, loading, error } = useMatches(selectedComp, 'SCHEDULED', 'asc')
+  const { matches, loading: compLoading, error: compError } = useMatches(selectedComp, 'SCHEDULED', 'asc')
+  // Ligue 3 : onglet DANS la Ligue 1 (12/11, demande utilisateur « sinon ça fait trop »), même
+  // principe que la coupe nationale. Chargée seulement quand la Ligue 1 est affichée.
+  const hasL3      = selectedComp === 'FL1'
+  const showingL3  = hasL3 && wcView === 'l3'
+  const { matches: l3Matches, loading: l3Loading, error: l3Error } = useMatches('L3', 'SCHEDULED', 'asc', { enabled: hasL3 })
+  const loading = showingL3 ? l3Loading : compLoading
+  const error   = showingL3 ? l3Error   : compError
   // useTeamForm(selectedComp) retiré (10/07 cleanup) : formMap n'était jamais
   // consommé nulle part dans cette page (Programme n'affiche pas de losanges
   // de forme) — fetch réseau pur perte, contraire à l'effort de réduction du
@@ -891,8 +900,8 @@ function Matchs() {
   // exactement le même rendu (recherche, nav par journée/tour), seule la
   // liste de matchs sous-jacente change (activeMatches ci-dessous).
   const showingCupList = hasCup && wcView === 'cup'
-  const inListView      = wcView === 'matchs' || wcView === 'cup'
-  const activeMatches   = showingCupList ? cupOnlyMatches : leagueOnlyMatches
+  const inListView      = wcView === 'matchs' || wcView === 'cup' || showingL3
+  const activeMatches   = showingL3 ? l3Matches : showingCupList ? cupOnlyMatches : leagueOnlyMatches
   const activeGrouped   = useMemo(() => groupRounds(activeMatches, 'asc'), [activeMatches])
   // Sur l'onglet "Phase finale" en desktop, la sidebar "Championnats" ne sert
   // à rien (le bracket est propre à la CdM, changer de championnat en sort de
@@ -1198,7 +1207,7 @@ function Matchs() {
           {/* Header */}
           <div className="matchs__header">
             <h1 className="matchs__kicker">
-              {showingCupList ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Matchs à venir'}
+              {showingL3 ? 'Ligue 3 à venir' : showingCupList ? `${DOMESTIC_CUPS[selectedComp]?.name} à venir` : 'Matchs à venir'}
             </h1>
             <div className="matchs__headerRow">
               {/* Toggle vues CdM / coupe nationale */}
@@ -1266,6 +1275,17 @@ function Matchs() {
                       <path d="M9.5 18h5v2.5h-5V18Z" stroke="currentColor" strokeWidth="1.4" fill="currentColor" fillOpacity=".2"/>
                     </svg>
                     {DOMESTIC_CUPS[selectedComp]?.name}
+                  </button>
+                  )}
+
+                  {/* ── Ligue 3 (dans l'onglet Ligue 1) ── */}
+                  {hasL3 && (
+                  <button
+                    className={`matchs__wcToggleBtn ${showingL3 ? 'matchs__wcToggleBtn--active' : ''}`}
+                    onClick={() => { pickWcView('l3'); setCurrentIndex(0) }}
+                  >
+                    <img src={LIGUE3_COMPETITION.emblem} alt="" className="matchs__wcToggleIcon" style={{ objectFit: 'contain' }} />
+                    Ligue 3
                   </button>
                   )}
 
@@ -1443,6 +1463,8 @@ function Matchs() {
             <p className="matchs__state">
               {showingCupList
                 ? `Aucun match de ${DOMESTIC_CUPS[selectedComp]?.name} à venir pour le moment.`
+                : showingL3
+                ? 'Aucun match de Ligue 3 à venir pour le moment.'
                 : 'Aucun match à venir pour le moment.'}
             </p>
           )}

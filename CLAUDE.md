@@ -179,7 +179,7 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 - Worker : l'utilisateur lance lui-même `cd cf-worker && npm run deploy` ; retour arrière `npx wrangler rollback`.
 - Observability Cloudflare activée (gratuit) : CPU réel par passe.
 
-- **Ligue 3 (12/11)** : source = API publique FFF (`api-dofa.fff.fr`, sans clé ; ESPN/FD ne l'ont pas). `src/utils/ligue3Parse.js` + `src/utils/ligue3.js` : appel DIRECT depuis le navigateur (l'API FFF bloque les IP serveur Vercel → 403 ; CORS ouvert ; `connect-src` dans vercel.json). Visible SEULEMENT dans Programme/Résultats/Classement via `PAGE_COMPETITIONS` (competitions.js) — jamais dans `COMPETITIONS` (Accueil, Tous les matchs, direct, notifs, Worker), car la FFF publie le score ~2 h après le match (pas de direct). Pas de buteurs, pas de page détail (`_noDetail`). ⚠️ `L3_CP_NO` change chaque saison (à mettre à jour en août).
+- **Ligue 3 (12/11)** : source = API publique FFF (`api-dofa.fff.fr`, sans clé ; ESPN/FD ne l'ont pas). `src/utils/ligue3Parse.js` + `src/utils/ligue3.js` : appel DIRECT depuis le navigateur (l'API FFF bloque les IP serveur Vercel → 403 ; CORS ouvert ; `connect-src` dans vercel.json). Onglet « Ligue 3 » DANS la Ligue 1 de Programme/Résultats/Classement (`wcView`/`viewMode` = 'l3', `classement_l3`) — jamais dans `COMPETITIONS` (Accueil, Tous les matchs, direct, notifs, Worker), car la FFF publie le score ~2 h après le match (pas de direct). Pas de buteurs, pas de page détail (`_noDetail`). Logos détourés par `/espn?l3logo=` (`src/utils/logoNoBg.js`, cache CDN 1 an). ⚠️ `L3_CP_NO` change chaque saison (à mettre à jour en août).
 
 ## Conventions
 - Noms français partout dans l'UI

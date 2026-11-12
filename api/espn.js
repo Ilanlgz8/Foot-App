@@ -25,6 +25,7 @@
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
 import { Redis } from '@upstash/redis'
+import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
 import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
@@ -700,6 +701,26 @@ export default async function handler(req, res) {
   } catch {}
 
   const { slug, slugs, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
+
+  // ── Mode « l3logo » (12/11) : logo d'un club de Ligue 3 détouré (fond blanc retiré), voir
+  // src/utils/logoNoBg.js. Calculé une fois par logo puis servi par le cache CDN pendant 1 an.
+  if (req.query.l3logo) {
+    const id = String(req.query.l3logo)
+    if (!/^BC\d{3,9}$/.test(id)) return res.status(400).json({ error: 'id invalide' })
+    const src = `https://cdn-transverse.azureedge.net/phlogos/${id}.jpg`
+    try {
+      const r = await fetch(src)
+      if (!r.ok) throw new Error(String(r.status))
+      const png = removeWhiteBackground(Buffer.from(await r.arrayBuffer()))
+      return res.status(200)
+        .setHeader('Content-Type', 'image/png')
+        .setHeader('Cache-Control', 'public, max-age=604800, s-maxage=31536000, immutable')
+        .send(png)
+    } catch {
+      // Repli : le logo d'origine (avec son fond blanc) plutôt que rien.
+      return res.status(302).setHeader('Cache-Control', 'public, s-maxage=3600').setHeader('Location', src).end()
+    }
+  }
 
   const skipCache = forceFresh === '1' || forceFresh === 'true'
   // Validation minimale (fdMatchId doit être un id FD.org numérique) avant

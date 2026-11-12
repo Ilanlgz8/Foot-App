@@ -70,8 +70,8 @@ import nationsLeagueLogo from '../assets/leagues/nations-league-real.png'
 import canLogo from '../assets/leagues/caf-can.png'
 import euroLogo from '../assets/leagues/euro-generic.png'
 import copaAmericaLogo from '../assets/leagues/copa-america-real.png'
-// Pastille « L3 » maison (12/11) : pas le logo officiel de la Ligue 3, aucun fichier fiable dispo.
-import ligue3Logo from '../assets/leagues/ligue3.svg'
+// Logo officiel Ligue 3 (fourni par l'utilisateur le 12/11, coins blancs détourés).
+import ligue3Logo from '../assets/leagues/ligue3.png'
 
 
 // Slug ESPN correspondant à chaque compétition — c'est cet identifiant que
@@ -1066,21 +1066,13 @@ export function getCompetitionCampColors(comp) {
 }
 
 // ── Ligue 3 (12/11, demande utilisateur) ─────────────────────────────────────────────────────
-// Visible UNIQUEMENT dans Programme, Résultats et Classement (sélecteur de compétition) — jamais
-// dans COMPETITIONS, qui alimente l'Accueil, « Tous les matchs », le direct et les notifications.
-// Raison : la source (API FFF, src/utils/ligue3Parse.js) n'a pas de direct, le score final arrive
-// ~1 h 30 à 2 h après le match. Pas de buteurs (NO_SCORERS_COMPS), pas de page détail de match.
+// Rangée comme un ONGLET de la Ligue 1 (12/11, demande utilisateur « sinon ça fait trop »), dans
+// Programme, Résultats et Classement — jamais dans COMPETITIONS (Accueil, Tous les matchs, direct,
+// notifications, Worker). Raison : la source (API FFF, src/utils/ligue3Parse.js) n'a pas de direct,
+// le score final arrive ~1 h 30 à 2 h après le match. Pas de buteurs, pas de page détail de match.
 export const LIGUE3_COMPETITION = {
   id: 'L3',
   name: 'Ligue 3',
   shortName: 'Ligue 3',
   emblem: ligue3Logo,
 }
-export const PAGE_ONLY_COMPETITIONS = [LIGUE3_COMPETITION]
-
-// Liste des sélecteurs Programme/Résultats/Classement : la Ligue 3 juste après la Ligue 1.
-export const PAGE_COMPETITIONS = [
-  ...COMPETITIONS.slice(0, 1),
-  ...PAGE_ONLY_COMPETITIONS,
-  ...COMPETITIONS.slice(1),
-]

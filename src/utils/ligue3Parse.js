@@ -6,7 +6,7 @@
 // ESPN). Limite connue et assumée : PAS de direct — la FFF publie le score final ~1 h 30 à 2 h
 // après le coup de sifflet (mesuré sur la 12e journée : Rouen–Bastia 14h45, score publié 18h30).
 // C'est pour ça que la Ligue 3 n'existe QUE dans Programme/Résultats/Classement
-// (PAGE_ONLY_COMPETITIONS, competitions.js) et jamais dans COMPETITIONS (Accueil, Tous les
+// (onglet de la Ligue 1, voir LIGUE3_COMPETITION dans competitions.js) et jamais dans COMPETITIONS (Accueil, Tous les
 // matchs, direct, notifications, Worker).
 //
 // ⚠️ API non documentée publiquement : si la FFF la change, seule la Ligue 3 est touchée
@@ -84,6 +84,12 @@ function parisOffsetMinutes(ts) {
   return Math.round((asUtc - ts) / 60_000)
 }
 
+// Logo FFF (JPEG sur fond blanc) → version détourée servie par /espn?l3logo (voir logoNoBg.js).
+export function l3Crest(url) {
+  const m = /\/phlogos\/(BC\d+)\.jpg/i.exec(String(url ?? ''))
+  return m ? `/espn?l3logo=${m[1].toUpperCase()}` : (url ?? null)
+}
+
 function team(side) {
   const clNo = side?.club?.cl_no
   const name = teamName(clNo, side?.short_name)
@@ -92,7 +98,7 @@ function team(side) {
     name,
     shortName: name,
     tla: null,
-    crest: side?.club?.logo ?? null,
+    crest: l3Crest(side?.club?.logo),
   }
 }
 
