@@ -523,7 +523,8 @@
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
-  text-wrap: balance; /* 2 lignes de longueur proche plutôt qu'un mot seul en bas */
+  /* Pas de text-wrap: balance : il raccourcissait la 1re ligne et laissait du vide sur le
+     côté (constat utilisateur 12/11) — on remplit d'abord toute la largeur disponible. */
 }
 
 .lmp__heroScorerMin {
