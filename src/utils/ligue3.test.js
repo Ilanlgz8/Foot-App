@@ -26,9 +26,10 @@ describe('Ligue 3 (API FFF)', () => {
   })
 
   it('classement et forme', () => {
-    const t = normalizeFffStandings([{ rank: 2, equipe: { short_name: 'SC BASTIA', club: { cl_no: 3225 } }, point_count: 15 },
+    const t = normalizeFffStandings([{ rank: 2, equipe: { short_name: 'SC BASTIA', club: { cl_no: 3225 } }, point_count: 15, goals_for_count: 10, goals_against_count: 14, goals_diff: 4 },
       { rank: 1, equipe: { short_name: 'NOUVEAU CLUB FC', club: { cl_no: 1 } }, point_count: 27 }])
     expect(t.map(r => r.team.name)).toEqual(['Nouveau Club FC', 'SC Bastia'])
+    expect(t[1].goalDifference).toBe(-4)
     expect(prettyName('LE PUY EN VELAY FC')).toBe('Le Puy En Velay FC')
     const f = buildLigue3FormMap([
       { status: 'FINISHED', utcDate: '2026-11-01T00:00:00Z', homeTeam: { id: 1 }, awayTeam: { id: 2 }, score: { fullTime: { home: 1, away: 0 } } },

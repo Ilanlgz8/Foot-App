@@ -139,7 +139,9 @@ export function normalizeFffStandings(rows) {
         points: r.point_count ?? 0,
         goalsFor: r.goals_for_count ?? 0,
         goalsAgainst: r.goals_against_count ?? 0,
-        goalDifference: r.goals_diff ?? 0,
+        // `goals_diff` de la FFF est SANS signe (Villefranche « +16 » avec 8 défaites, constaté le
+        // 12/11) → recalculée.
+        goalDifference: (r.goals_for_count ?? 0) - (r.goals_against_count ?? 0),
       }
     })
 }
