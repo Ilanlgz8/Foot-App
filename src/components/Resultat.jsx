@@ -466,7 +466,9 @@ function Resultats() {
   // voir DOMESTIC_CUPS) — 'journee' et 'cup' partagent le même rendu liste
   // plus bas (nav par round + resultats__list), juste sur 2 jeux de
   // matchs différents.
-  const inListView    = viewMode === 'journee' || viewMode === 'cup' || showingCupList
+  // Liste par journée partout, sauf la vue « Par poule » de la CdM/Euro (les anciens choix
+  // 'cup'/'l3' mémorisés avant le menu du nom ne doivent plus rien masquer).
+  const inListView    = !((selectedComp === 'WC' || selectedComp === 'EC') && viewMode === 'poule')
   const activeMatches = showingCupList ? cupOnlyMatches : leagueOnlyMatches
 
   const grouped = useMemo(() => groupRounds(activeMatches, 'desc'), [activeMatches])
