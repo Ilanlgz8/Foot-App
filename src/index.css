@@ -583,8 +583,11 @@ img[data-team*="Juventus" i] {
   transform: translateX(0.1em);
 }
 
-/* Page du match EN DIRECT uniquement (12/11, demande utilisateur) : score ×1,35 (2.3 → 3.1rem)
-   et bloc minute + score remonté de 10 px pour être au niveau des logos. La page d'un match
+/* Page du match EN DIRECT uniquement (12/11, demande utilisateur) : score un peu plus gros
+   (×1,35 jugé trop gros → ~×1,13) et bloc minute + score remonté de 20 px pour être au niveau des logos. La page d'un match
    terminé (MatchPage, même classe .lmp__hero) n'est pas touchée. */
-#root .lmp__hero--live .mp__hero__score { font-size: 3.1rem; }
-#root .lmp__hero--live .mp__hero__center { margin-top: -44px; }
+#root .lmp__hero.lmp__hero--live .mp__hero__score { font-size: 2.6rem; }   /* 2.3 × ~1,13 */
+/* Sélecteur à 2 classes : LiveMatchPage.css (chargé APRÈS index.css) fixe déjà ce margin avec
+   « #root .lmp__hero .mp__hero__center » — à spécificité égale c'est lui qui gagnait, d'où une
+   remontée restée sans effet au 1er essai. */
+#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -54px; }
