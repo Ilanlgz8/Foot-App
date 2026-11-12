@@ -1086,7 +1086,7 @@ export function getCompetitionCampColors(comp) {
 // le score final arrive ~1 h 30 à 2 h après le match. Pas de buteurs, pas de page détail de match.
 export const LIGUE3_COMPETITION = {
   id: 'L3',
-  name: 'Ligue 3',
+  name: 'Ligue 3 Betclic', // sponsor titre (FFF, « Ligue 3 Betclic »)
   shortName: 'Ligue 3',
   emblem: ligue3Logo,
 }
