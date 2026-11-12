@@ -1,11 +1,15 @@
-// Suivi des plantages avec Sentry (12/11). Ne fait RIEN tant que la variable Vercel
-// VITE_SENTRY_DSN n'est pas définie (compte Sentry gratuit à créer, voir CLAUDE.md).
+// Suivi des plantages avec Sentry (12/11).
 //
 // Chargé APRÈS l'affichage (import dynamique, en temps mort) pour ne pas alourdir le premier
 // chargement mesuré par PageSpeed. Les erreurs survenues avant sont mises en file et envoyées
 // dès que Sentry est prêt. Offre gratuite : 5 000 erreurs/mois — pas de suivi de performance
 // (tracesSampleRate 0) ni d'enregistrement de session, pour rester dedans.
-const DSN = import.meta.env.VITE_SENTRY_DSN
+// DSN du projet Sentry « foot-app » (organisation moi-iw, région UE). Ce n'est PAS un secret :
+// il permet seulement d'ENVOYER des erreurs à ce projet (Sentry le prévoit visible dans le code
+// du site). VITE_SENTRY_DSN (Vercel) le remplace si on change de projet. Uniquement en
+// production : pas d'erreurs de développement local envoyées.
+const DEFAULT_DSN = 'https://23c2060cb786854b0fd11be972251cf7@o4512420491493376.ingest.de.sentry.io/4512420533502032'
+const DSN = import.meta.env.PROD ? (import.meta.env.VITE_SENTRY_DSN || DEFAULT_DSN) : null
 let sentry = null
 const queue = []
 
