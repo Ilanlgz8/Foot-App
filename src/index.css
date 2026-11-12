@@ -596,10 +596,10 @@ img[data-team*="Juventus" i] {
    (forme présente ou non). Tout est maintenant calé sur le HAUT : le centre du score tombe sur le
    centre du logo (54 px, 72 px sur grand écran), et le diffuseur descend au niveau des noms. */
 #root .lmp__hero.lmp__hero--live .mp__hero__mid { align-items: flex-start; }
-#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -22px; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -34px; } /* mesuré : centre du score = centre du logo */
 #root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 12px; }
 @media (min-width: 768px) {
-  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -13px; }
+  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -25px; }
 }
 
 /* Mi-temps sur les cartes (Accueil et onglet Match) : bloc « MT + Reprise dans X min » remonté
