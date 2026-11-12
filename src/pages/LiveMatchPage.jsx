@@ -5,7 +5,7 @@
  * Style : même visuel que MatchPage (hero gradient plein-écran + onglets)
  * Contenu live préservé : minute, score temps réel, buteurs, xG, stats live
  */
-import { keepParticles } from '../utils/nameBreak'
+import { keepParticles, keepTogether } from '../utils/nameBreak'
 import { useParams, useNavigate } from 'react-router-dom'
 import { formKey } from '../hooks/useTeamForm'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
@@ -462,11 +462,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               {homeEvents.map(e => (
                 <span key={e.key} className="lmp__heroScorerItem">
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
-                      au 1er mot et la minute au dernier (espaces insécables). */}
+                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                   <span className="lmp__heroScorerText">
                     <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
-                    {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
+                    {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
                 </span>
               ))}
@@ -476,11 +476,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               {awayEvents.map(e => (
                 <span key={e.key} className="lmp__heroScorerItem">
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
-                      au 1er mot et la minute au dernier (espaces insécables). */}
+                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                   <span className="lmp__heroScorerText">
                     <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
-                    {e.minute && <span className="lmp__heroScorerMin">{'\u00A0'}{e.minute}</span>}
+                    {e.minute && <> <span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
                 </span>
               ))}

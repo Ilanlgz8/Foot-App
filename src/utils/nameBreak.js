@@ -15,3 +15,6 @@ export function keepParticles(name) {
   })
   return out
 }
+
+// Minute « 120'+4' (pen) » : jamais coupée en deux.
+export const keepTogether = (txt) => String(txt ?? '').replace(/ /g, '\u00A0')
