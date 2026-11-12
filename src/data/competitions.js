@@ -411,9 +411,11 @@ export const COMPETITIONS = [
     pageTheme: {
       tint: '#091c3e',
       tint2: '#15ffcf',
-      tintStops: { base: '22%', c2: '55%', c3: '85%' },
-      tintPearl: 0.45,
+      // bleu nuit dominant, turquoise en accent (1er essai 22/55/85 % : presque tout turquoise)
+      tintStops: { base: '45%', c2: '80%', c3: '100%' },
+      tintPearl: 0.3,
       tintSoft: true,
+      tintLight: true, // « Terminé » / minute en blanc : le rouge se lit mal sur le turquoise
     },
   },
   {
