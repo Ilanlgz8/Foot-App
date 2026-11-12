@@ -590,7 +590,17 @@ img[data-team*="Juventus" i] {
 /* Sélecteur à 2 classes : LiveMatchPage.css (chargé APRÈS index.css) fixe déjà ce margin avec
    « #root .lmp__hero .mp__hero__center » — à spécificité égale c'est lui qui gagnait, d'où une
    remontée restée sans effet au 1er essai. */
-#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -54px; }
+/* 12/11 (capture utilisateur : score plus haut que les logos quand une équipe n'a ni logo ni forme
+   et qu'un diffuseur est affiché) : la colonne centrale n'est plus centrée verticalement par
+   rapport aux équipes — sa hauteur variait (diffuseur présent ou non), celle des équipes aussi
+   (forme présente ou non). Tout est maintenant calé sur le HAUT : le centre du score tombe sur le
+   centre du logo (54 px, 72 px sur grand écran), et le diffuseur descend au niveau des noms. */
+#root .lmp__hero.lmp__hero--live .mp__hero__mid { align-items: flex-start; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -22px; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 12px; }
+@media (min-width: 768px) {
+  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -13px; }
+}
 
 /* Mi-temps sur les cartes (Accueil et onglet Match) : bloc « MT + Reprise dans X min » remonté
    de 5 px pour l'aérer du score en dessous (12/11, demande utilisateur). translateY : le score,
