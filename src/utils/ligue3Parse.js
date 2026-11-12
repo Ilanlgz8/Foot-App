@@ -161,7 +161,10 @@ async function getJson(fetchImpl, path, timeoutMs) {
         referer: 'https://www.fff.fr/',
       },
     })
-    if (!r.ok) throw new Error(`FFF ${r.status}`)
+    if (!r.ok) {
+      const body = await r.text().catch(() => '')
+      throw new Error(`FFF ${r.status} ${r.headers.get('server') ?? ''} ${body.replace(/\s+/g, ' ').slice(0, 160)}`)
+    }
     return await r.json()
   } finally {
     clearTimeout(t)
