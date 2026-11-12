@@ -571,3 +571,5 @@ img[data-team*="Juventus" i] {
   letter-spacing: 0.06em;
   color: #ffffff;
 }
+/* theme-v2.css (chargé après) recolore #root .live__minute en rose-rouge → sélecteur plus précis. */
+#root .live__minuteWrap .live__minute { color: #ffffff; }
