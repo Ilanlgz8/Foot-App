@@ -105,8 +105,8 @@ export async function fetchStandingsData(selectedComp) {
 
   const key = `standings_v2_${selectedComp}`
 
-  // Ligue 2 : pas dans l'offre gratuite football-data.org → directement ESPN.
-  if (selectedComp === 'FL2') {
+  // Ligue 2 et qualifications CAN : absentes de l'offre gratuite football-data.org → directement ESPN.
+  if (selectedComp === 'FL2' || selectedComp === 'CANQ') {
     const espnResult = await tryEspn()
     if (espnResult) { writeCache(key, espnResult, STALE_MS); return espnResult }
     const stale = readCacheStale(key)

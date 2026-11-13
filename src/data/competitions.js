@@ -96,6 +96,9 @@ export const COMPETITION_ESPN_SLUG = {
   EC:  'uefa.euro',
   NL:  'uefa.nations',
   CAN: 'caf.nations',
+  // Qualifications CAN 2027 (14/11, constat utilisateur : Maroc–Niger absent) : ESPN les couvre en
+  // direct (scores, buts, compos, stats, 12 groupes au classement — vérifié).
+  CANQ: 'caf.nations_qual',
   COPA: 'conmebol.america',
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
@@ -242,7 +245,7 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
 // maison) et git history si le calcul maison doit être repris un jour une
 // fois le quota Upstash résolu (code supprimé, pas juste désactivé).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'COPA', 'UEL', 'UECL', 'L3', 'FL2'])
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'L3', 'FL2'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -997,6 +1000,16 @@ export const COMPETITIONS = [
     id: 'CAN',
     name: 'Coupe d’Afrique des Nations',
     shortName: 'CAN',
+    emblem: canLogo,
+    tintTheme: 'can',
+  },
+  {
+    // Qualifications CAN 2027 (14/11) : rangées SOUS la CAN (menu déroulant du nom), suivies en
+    // direct comme les autres compétitions ESPN. Nom à changer pour la prochaine édition.
+    id: 'CANQ',
+    parent: 'CAN',
+    name: 'Qualifications CAN 2027',
+    shortName: 'Qualif. CAN',
     emblem: canLogo,
     tintTheme: 'can',
   },

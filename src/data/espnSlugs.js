@@ -63,6 +63,7 @@ export const ESPN_SLUG_BY_COMP_ID = {
 export const NATIONAL_COMP_SLUGS = {
   NL:   'uefa.nations',       // Ligue des Nations
   CAN:  'caf.nations',        // CAN
+  CANQ: 'caf.nations_qual',   // Qualifications CAN (14/11)
   COPA: 'conmebol.america',   // Copa America
 }
 export const DOMESTIC_CUP_SLUGS = {

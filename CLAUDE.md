@@ -185,6 +185,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Sentry (12/11)** : `src/utils/errorReporting.js` (chargé en temps mort, ErrorBoundary + erreurs globales). DSN du projet `foot-app` (org moi-iw, UE) en dur dans errorReporting.js (non secret), surchargeable par `VITE_SENTRY_DSN` ; actif en production seulement. CSP `connect-src` autorise `*.ingest.sentry.io` (US/EU).
 
+- **Qualifications CAN 2027 (14/11)** : `CANQ` (ESPN `caf.nations_qual`, direct complet), `parent: 'CAN'` → dans le menu du nom « CAN ▾ ». Sélection nationale (drapeaux), notifs via NATIONAL_COMP_SLUGS (Worker à redéployer). Renommer pour la prochaine édition.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

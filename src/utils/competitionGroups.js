@@ -9,7 +9,7 @@ import { bigTeamScore } from './matchDuJour'
 export const COMP_ACCENT = {
   CL: '#2f55ff',   UEL: '#e0661f',  UECL: '#2f8a3e',
   FL1: '#2a7bff',  FL2: '#15ffcf', PL: '#a23ab0',   PD: '#d23b3b',  BL1: '#e30613',  SA: '#3bb3c7',
-  WC: '#f2c232',   EC: '#2f6fd6',   NL: '#4f7cff',  CAN: '#1fb050',  COPA: '#2a7bff',
+  WC: '#f2c232',   EC: '#2f6fd6',   NL: '#4f7cff',  CAN: '#1fb050',  CANQ: '#1fb050',  COPA: '#2a7bff',
 }
 const FALLBACK_ACCENT = '#6b7a99'
 export const accentFor = code => COMP_ACCENT[code] ?? FALLBACK_ACCENT

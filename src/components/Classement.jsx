@@ -218,7 +218,7 @@ function Classement() {
   // Sélections nationales (crest rond, pas d'écusson club) — WC/EC déjà là,
   // NL/CAN/COPA ajoutées le 26/09 en même temps que leur classement.
   const isCountryComp = selectedComp === 'WC' || selectedComp === 'EC'
-    || selectedComp === 'NL' || selectedComp === 'CAN' || selectedComp === 'COPA'
+    || selectedComp === 'NL' || selectedComp === 'CAN' || selectedComp === 'CANQ' || selectedComp === 'COPA'
   // ⚠️ AJOUT (26/09, filet pour NO_SCORERS_COMPS ci-dessus) : le bouton
   // "Buteurs" est caché pour ces comps, mais `view` est persisté
   // (usePersistedState) — un utilisateur déjà sur la vue "buteurs" avant de
@@ -366,7 +366,7 @@ function Classement() {
     // depuis toujours, pour exactement la même raison (poule Euro à 4, aucun
     // rapport avec CL/UEL/UECL) — jamais remarqué car EC était déjà dans le
     // sélecteur avant ce fix. Vidée ici aussi, même principe.
-    NL: [], CAN: [], COPA: [], UEL: [], UECL: [], EC: [],
+    NL: [], CAN: [], CANQ: [], COPA: [], UEL: [], UECL: [], EC: [],
     // Ligue 2 2026-27 : 1er-2e promus, 3e à 5e en play-offs (vainqueur contre le 16e de Ligue 1).
     FL2: [
       { label: 'Montée en Ligue 1', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
