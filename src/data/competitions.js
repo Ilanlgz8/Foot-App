@@ -112,7 +112,7 @@ export const COMPETITION_ESPN_SLUG = {
   // Compléments de saison (14/11, demande utilisateur : « qu'on suive tout, de 0 à 100 ») — slugs
   // ESPN vérifiés le 14/11 (scoreboard 200, saisons précédentes présentes).
   ECQ:   'uefa.euroq',                   // Qualifications Euro 2028 (mars 2027 → mars 2028)
-  BARL1: 'fra.1.promotion.relegation',   // Barrage Ligue 1 / Ligue 2 (fin mai)
+  BARL1: 'fra.1.promotion.relegation',   // Play-offs Ligue 2 + barrage L1/L2 (mai)
   BARBL: 'ger.playoff.relegation',       // Barrage Bundesliga / 2. Bundesliga (fin mai)
   SCE:   'esp.super_cup',                // Supercoupe d'Espagne (janvier)
   SCI:   'ita.super_cup',                // Supercoupe d'Italie (décembre/janvier)
@@ -908,7 +908,7 @@ export const COMPETITIONS = [
     emblem: null,
   },
   // Compléments de saison (14/11) : rangés sous leur championnat (menu déroulant du nom).
-  { id: 'BARL1', parent: 'FL1', name: 'Barrage Ligue 1 / Ligue 2', shortName: 'Barrage L1', emblem: null },
+  { id: 'BARL1', parent: 'FL1', name: 'Play-offs et barrage L1/L2', shortName: 'Barrages L1', emblem: null },
   { id: 'SCE',   parent: 'PD',  name: "Supercoupe d'Espagne",      shortName: 'Supercopa',  emblem: null },
   { id: 'DSC',   parent: 'BL1', name: "Supercoupe d'Allemagne",    shortName: 'Supercup',   emblem: null },
   { id: 'BARBL', parent: 'BL1', name: 'Barrage Bundesliga',        shortName: 'Barrage BL', emblem: null },
