@@ -188,18 +188,25 @@ async function fetchEspnEvents(slug, date, log) {
 // (voir CLAUDE.md, 01-02/10) qui, lui, groupait plusieurs ÉCRITURES dans une
 // seule transaction atomique (un échec en annulait d'autres) — ici, lecture
 // seule, chaque slug est un `fetch()` ESPN indépendant côté Vercel.
-async function fetchEspnEventsBatch(pairs, log) {
+async function fetchEspnEventsBatch(pairs, log, env) {
+  // Groupes de 20 slugs max par appel (14/11) : 32 compétitions suivies depuis les qualifs/barrages/
+  // supercoupes, au-delà de la limite d'un appel groupé côté Vercel.
+  const BATCH_MAX = 20
   const byDate = new Map()
   for (const p of pairs) {
-    if (!byDate.has(p.date)) byDate.set(p.date, [])
-    byDate.get(p.date).push(p)
+    if (!byDate.has(p.date)) byDate.set(p.date, [[]])
+    const groups = byDate.get(p.date)
+    if (groups[groups.length - 1].length >= BATCH_MAX) groups.push([])
+    groups[groups.length - 1].push(p)
   }
   const out = []
-  await Promise.all([...byDate.entries()].map(async ([date, group]) => {
+  const jobs = [...byDate.entries()].flatMap(([date, groups]) => groups.map(g => [date, g]))
+  await Promise.all(jobs.map(async ([date, group]) => {
     const slugsParam = group.map(p => p.slug).join(',')
     try {
       const r = await fetch(`${VERCEL_ESPN_PROXY}?slugs=${encodeURIComponent(slugsParam)}&dates=${date}&forceFresh=1`, {
-        headers: { 'Accept': 'application/json' },
+        // Secret partagé (14/11) : le mode groupé est réservé au Worker côté Vercel.
+        headers: { 'Accept': 'application/json', 'x-cron-secret': env?.CRON_SECRET ?? '' },
         signal: AbortSignal.timeout(8_000),
       })
       if (!r.ok) {
@@ -1126,7 +1133,7 @@ async function runOnePass(env) {
   // au lieu d'un par slug — `.map(v => ({status:'fulfilled', value:v}))`
   // pour garder EXACTEMENT la même forme que l'ancien Promise.allSettled,
   // aucun changement nécessaire dans la boucle de traitement ci-dessous.
-  const allResults = (await fetchEspnEventsBatch(pairsToFetch, log)).map(v => ({ status: 'fulfilled', value: v }))
+  const allResults = (await fetchEspnEventsBatch(pairsToFetch, log, env)).map(v => ({ status: 'fulfilled', value: v }))
 
   const allEvents = []
   const newlyEmptyKeys   = [] // 2e confirmation consécutive → skip réel (20h, ou 2h si sporadique)

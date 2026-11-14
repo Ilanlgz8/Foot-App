@@ -24,6 +24,7 @@
 // réduit CE QUI EST MIS EN CACHE ET RENVOYÉ AU CLIENT au strict nécessaire —
 // { scorers, cards, stats, lineups }, ~1-2 Ko/match — même donnée affichée à
 // l'écran, permanent sans jamais s'approcher de la limite.
+import { timingSafeEqual } from 'node:crypto'
 import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
@@ -248,6 +249,16 @@ const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
 function ymd(d) {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
 }
+// Requête du Worker Cloudflare : en-tête x-cron-secret = CRON_SECRET (comparaison à temps constant).
+function isWorkerRequest(req) {
+  const expected = process.env.CRON_SECRET
+  const given = String(req.headers['x-cron-secret'] ?? '')
+  if (!expected || !given) return false
+  const a = Buffer.from(given)
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
 function parseYmd(s) {
   return new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T00:00:00Z`)
 }
@@ -698,13 +709,17 @@ export default async function handler(req, res) {
   // limite imposée par ESPN elle-même : 100/60s reste largement en dessous
   // de ce qu'un vrai scraping ressemblerait, tout en gardant de la marge
   // pour un chargement de page légitime plus chargé qu'avant.
+  // Worker Cloudflare (secret partagé, 14/11) : exempté de la limite par IP (ses IP sont partagées).
+  const fromWorker = isWorkerRequest(req)
   const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
   const rlKey = `ratelimit:espn:${ip}`
-  try {
-    const count = await kv.incr(rlKey)
-    if (count === 1) await kv.expire(rlKey, 60)
-    if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
-  } catch {}
+  if (!fromWorker) {
+    try {
+      const count = await kv.incr(rlKey)
+      if (count === 1) await kv.expire(rlKey, 60)
+      if (count > 100) return res.status(429).json({ error: 'Trop de requêtes' })
+    } catch {}
+  }
 
   const { slug, slugs, dates, eventId, recap, forceFresh, fdMatchId, lookupMap, standings } = req.query
 
@@ -795,7 +810,19 @@ export default async function handler(req, res) {
   if (slugs) {
     const slugList = String(slugs).split(',').map(s => s.trim()).filter(Boolean)
     if (slugList.length === 0) return res.status(400).json({ error: 'Paramètre slugs vide' })
-    if (slugList.length > 25) return res.status(400).json({ error: 'Trop de slugs (max 25)' })
+    // 25 → 40 (14/11) : 32 slugs suivis depuis l'ajout des qualifs/barrages/supercoupes — à 25, un
+    // passage du Worker avec toutes les compétitions actives aurait été refusé en bloc (plus aucun direct).
+    if (slugList.length > 40) return res.status(400).json({ error: 'Trop de slugs (max 40)' })
+    // Mode réservé au Worker (jusqu'à 40 appels ESPN par requête, sans cache) : sans le secret,
+    // 6 requêtes / minute / IP au plus — de quoi laisser tourner un Worker pas encore redéployé.
+    if (!fromWorker) {
+      try {
+        const k = `ratelimit:espnslugs:${ip}`
+        const n = await kv.incr(k)
+        if (n === 1) await kv.expire(k, 60)
+        if (n > 6) return res.status(429).json({ error: 'Trop de requêtes' })
+      } catch {}
+    }
     for (const s of slugList) {
       if (!ALLOWED_SLUGS.has(s)) return res.status(400).json({ error: `Slug non autorisé : ${s}` })
     }
@@ -1088,6 +1115,15 @@ export default async function handler(req, res) {
     // Cache-Control public/s-maxage) — ce mode ne sert jamais le direct,
     // voir le commentaire détaillé à cet endroit.
     if (dates && !/^\d{8}(-\d{8})?$/.test(dates)) return res.status(400).json({ error: 'Format dates invalide (YYYYMMDD ou YYYYMMDD-YYYYMMDD attendu)' })
+    // Sécurité (audit 14/11) : sans plafond, une seule requête « dates=19000101-21001231 » faisait
+    // relire ~73 000 jours dans Turso et lancer 60 appels ESPN — quelques requêtes suffisaient à vider
+    // le quota du mois. Le client n'utilise jamais plus de ~460 jours (windowRange, espnAdapter.js).
+    if (dates && dates.includes('-')) {
+      const [a, b] = dates.split('-').map(parseYmd)
+      const span = (b - a) / 86_400_000
+      const yearOk = d => d.getUTCFullYear() >= 2015 && d.getUTCFullYear() <= new Date().getUTCFullYear() + 2
+      if (!(span >= 0 && span <= 480) || !yearOk(a) || !yearOk(b)) return res.status(400).json({ error: 'Plage de dates refusée (480 jours max)' })
+    }
 
     // ⚠️ AJOUT (15/09, durci le 16/09) : ESPN rejette désormais (400) TOUTE
     // plage avec un tiret, même 2 jours — voir le commentaire détaillé de
