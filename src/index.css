@@ -615,3 +615,27 @@ img[data-team*="Juventus" i] {
 #root .poster__min-labelCol { translate: 0 -5px; }
 #root .live__minuteWrap:has(+ .live__reprise),
 #root .live__minuteWrap + .live__reprise { translate: 0 -5px; }
+
+/* ── Habillage CAN (14/11, demande utilisateur : « vert avec un peu de jaune mélangé, une touche
+   de noir légère, pas un dégradé ») ─────────────────────────────────────────────────────────
+   Remplace l'ancien « mode peinture » (12 taches nettes saturées). Ici : 4 grands nuages fondus
+   (vert dominant, jaune or en accent) sur un fond vert profond, 2 voiles noirs très légers, le
+   tout flouté pour un rendu mélangé. Couleurs du logo CAN (vert #00903c / #1fb050, or #d8b400 /
+   #f0cc20). Cartes (Accueil, onglet Match) et bandeau des pages match. */
+#root .poster--theme-can .poster__bg--gradient,
+#root .lmp__hero--theme-can .lmp__heroTintC {
+  inset: -40px;
+  background:
+    radial-gradient(55% 50% at 18% 22%, rgba(240,204,32,0.50) 0%, transparent 70%),
+    radial-gradient(50% 55% at 88% 80%, rgba(216,180,0,0.38) 0%, transparent 70%),
+    radial-gradient(65% 60% at 72% 18%, rgba(31,176,80,0.85) 0%, transparent 72%),
+    radial-gradient(65% 65% at 22% 88%, rgba(0,144,60,0.90) 0%, transparent 72%),
+    radial-gradient(38% 34% at 52% 55%, rgba(0,0,0,0.28) 0%, transparent 70%),
+    radial-gradient(34% 30% at 96% 6%, rgba(0,0,0,0.30) 0%, transparent 70%),
+    #0a5a2b;
+  filter: blur(16px) saturate(1.05);
+  animation: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+#root .lmp__hero--theme-can { background: #0a5a2b; }
