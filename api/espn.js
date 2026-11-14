@@ -1105,7 +1105,10 @@ export default async function handler(req, res) {
       // Voir MAX_FETCH_CHUNKS plus haut : plafond dur, indépendant de la
       // cause (Redis en panne, fenêtre large, ou les deux à la fois) — garde
       // les tranches les plus proches d'aujourd'hui en priorité.
-      if (toFetch.length > MAX_FETCH_CHUNKS) {
+      // Réponse partielle (jours non encore en cache laissés de côté) : cache court, sinon
+      // le CDN garde 1 h une liste incomplète (14/11 : qualifs LDC vides au 1er chargement).
+      const partial = toFetch.length > MAX_FETCH_CHUNKS
+      if (partial) {
         toFetch = [...toFetch].sort(byNearest).slice(0, MAX_FETCH_CHUNKS)
       }
       // Jours expirés (voir readCachedChunks) : on n'en rafraîchit que quelques-uns, les plus proches.
@@ -1147,7 +1150,7 @@ export default async function handler(req, res) {
         const type = e?.competitions?.[0]?.status?.type
         return !!type && (LIVE_ESPN_TYPE_NAMES.has(type.name) || type.state === 'in')
       })
-      const scoreboardTtl = isAnyEventLive ? 90 : 3600
+      const scoreboardTtl = (isAnyEventLive || partial) ? 90 : 3600
       // ⚠️ AJOUT (21/09, demande explicite utilisateur — "si une seule
       // personne consulte l'app ça utilise trop de commandes Upstash") : le
       // kv.mget (voir readCachedChunks) réduit le coût PAR VISITEUR, mais ne
