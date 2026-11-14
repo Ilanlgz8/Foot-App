@@ -12,12 +12,21 @@ const BEAT_KEY   = 'sf_heartbeat'
 const LOG_KEY    = 'sf_boot_log'
 const ERR_KEY    = 'sf_last_error'
 const LOG_MAX    = 15
+const SKIP_SPLASH_KEY = 'sf_skip_splash'
 
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k) ?? 'null') } catch { return null } }
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* plein ou bloqué */ } }
 
 export function markReload(reason) {
   write(INTENT_KEY, { reason, at: Date.now() })
+  // Rechargement voulu par l'app (mise à jour…) : pas d'écran de lancement au redémarrage (14/11 :
+  // « éviter de relancer l'animation deux voire trois fois » après un déploiement).
+  try { sessionStorage.setItem(SKIP_SPLASH_KEY, String(Date.now())) } catch { /* bloqué */ }
+}
+
+// Vrai si ce lancement suit (moins d'une minute) un rechargement déclenché par l'app.
+export function shouldSkipSplash() {
+  try { return Date.now() - Number(sessionStorage.getItem(SKIP_SPLASH_KEY) || 0) < 60_000 } catch { return false }
 }
 
 export function getBootLog() {

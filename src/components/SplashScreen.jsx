@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import '../splashScreen.css'
+import { shouldSkipSplash } from '../utils/reloadTrace'
 
 // ⚠️ AJOUT (25/07, demande explicite utilisateur) : écran de lancement animé
 // (fond noir/gris, "StatFootix" en néon rouge) pendant le tout premier
@@ -41,7 +42,8 @@ const MAX_MS  = 5300
 const FADE_MS = 500
 
 export function SplashScreen() {
-  const [visible, setVisible] = useState(true)
+  // Pas d'animation quand l'app se recharge d'elle-même (mise à jour) — voir reloadTrace.js.
+  const [visible, setVisible] = useState(() => !shouldSkipSplash())
   const [fading, setFading]   = useState(false)
   // Lazy initializer (pas un appel direct à Date.now() dans le corps du
   // composant) : seule forme d'appel impur tolérée pendant le rendu par les
