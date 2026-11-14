@@ -54,6 +54,7 @@ const SYNTHETIC_COMP_ID = {
   NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5, USC: -6, TDC: -7, CS: -8,
   FL2: -9, // Ligue 2 (12/11)
   CANQ: -10, // Qualifications CAN (14/11)
+  CLQ: -11, UELQ: -12, UECLQ: -13, // Qualifications coupes d'Europe (14/11)
   FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103,
   // ⚠️ AJOUT (28/10, Coppa Italia/DFB-Pokal — voir DOMESTIC_CUPS dans
   // competitions.js) : mêmes raisons que FL1_CUP/PD_CUP/PL_CUP ci-dessus,
@@ -209,6 +210,7 @@ const DAYS_FORWARD = 45
 const SPARSE_INTL_SLUGS = new Set([
   'uefa.nations', 'caf.nations', 'caf.nations_qual', 'conmebol.america',
   'uefa.europa', 'uefa.europa.conf',
+  'uefa.champions_qual', 'uefa.europa_qual', 'uefa.europa.conf_qual',
   'uefa.super_cup', 'fra.super_cup', 'eng.charity',
 ])
 // 90 → REVERTÉ À 400 le même jour (02/11), après clarification de l'utilisateur :

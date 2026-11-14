@@ -187,6 +187,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Qualifications CAN 2027 (14/11)** : `CANQ` (ESPN `caf.nations_qual`, direct complet), `parent: 'CAN'` → dans le menu du nom « CAN ▾ ». Sélection nationale (drapeaux), notifs via NATIONAL_COMP_SLUGS (Worker à redéployer). Renommer pour la prochaine édition.
 
+- **Qualifications coupes d'Europe (14/11)** : `CLQ`/`UELQ`/`UECLQ` (ESPN `uefa.*_qual`), `parent` CL/UEL/UECL → menu du nom ; pas de classement (NO_STANDINGS_COMPS, exclus du menu dans Classement) ni de buteurs. Worker à redéployer.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

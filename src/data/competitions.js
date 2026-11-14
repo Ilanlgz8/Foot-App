@@ -102,6 +102,11 @@ export const COMPETITION_ESPN_SLUG = {
   COPA: 'conmebol.america',
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
+  // Tours de qualification des coupes d'Europe (14/11, demande utilisateur) : ESPN, direct complet
+  // (vérifié sur juillet-août 2026). Joués de juillet à fin août.
+  CLQ:   'uefa.champions_qual',
+  UELQ:  'uefa.europa_qual',
+  UECLQ: 'uefa.europa.conf_qual',
   // Ligue 2 (12/11) : ESPN la couvre en direct (scores, buts, cartons, compos, stats — vérifié).
   FL2:  'fra.2',
   USC:  'uefa.super_cup',
@@ -202,7 +207,7 @@ export const DOMESTIC_CUPS = {
 // USC/TDC/CS restent exclues pour une raison différente et toujours valide :
 // un seul match par an, aucun classement n'a jamais de sens ici (même
 // principe que SINGLE_MATCH_COMPS ci-dessus, pour Programme/Résultats).
-export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
+export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS', 'CLQ', 'UELQ', 'UECLQ'])
 
 // ⚠️ AJOUT, "CORRIGÉ" PAR ERREUR, PUIS RE-RÉTABLI LE MÊME JOUR (26/09) :
 // d'abord introduit en partant du gap documenté de longue date ("aucune
@@ -245,7 +250,7 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS'])
 // l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
 // maison) et git history si le calcul maison doit être repris un jour une
 // fois le quota Upstash résolu (code supprimé, pas juste désactivé).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'L3', 'FL2'])
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'L3', 'FL2', 'CLQ', 'UELQ', 'UECLQ'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -845,6 +850,26 @@ export const COMPETITIONS = [
     shortName: 'Conférence L.',
     emblem: conferenceLeagueLogo,
   },
+  // Tours de qualification (14/11) : sous leur coupe dans le menu déroulant du nom (`parent`).
+  // Élimination directe → pas de classement ni de buteurs.
+  {
+    id: 'CLQ', parent: 'CL',
+    tintTheme: 'ucl', tintLight: true,
+    name: 'Qualifications Ligue des Champions', shortName: 'Qualif. C1',
+    emblem: championsLeagueLogo, emblemOpaque: true,
+  },
+  {
+    id: 'UELQ', parent: 'UEL',
+    tintTheme: 'uel', tintLight: true,
+    name: 'Qualifications Ligue Europa', shortName: 'Qualif. C3',
+    emblem: europaLeagueLogo, emblemOpaque: true, emblemTransparent: true,
+  },
+  {
+    id: 'UECLQ', parent: 'UECL',
+    tintTheme: 'uecl',
+    name: 'Qualifications Ligue Conférence', shortName: 'Qualif. C4',
+    emblem: conferenceLeagueLogo,
+  },
   {
     // Supercoupe de l'UEFA (vainqueur C1 vs vainqueur Ligue Europa) — un seul
     // match par an, 100% ESPN comme NL/CAN/COPA/UEL/UECL (pas d'id
@@ -1146,8 +1171,8 @@ export function getCompFamily(compId) {
 export const TOP_COMPETITIONS = COMPETITIONS.filter(c => !c.parent)
 
 // Résout le choix du menu pour une compétition : entrée active, compétition des données, vue coupe.
-export function resolveCompFamily(compId, subKey, { withCup = true } = {}) {
-  const family = getCompFamily(compId).filter(f => withCup || f.kind !== 'cup')
+export function resolveCompFamily(compId, subKey, { withCup = true, exclude = null } = {}) {
+  const family = getCompFamily(compId).filter(f => (withCup || f.kind !== 'cup') && !(exclude?.has(f.id)))
   const active = family.find(f => f.key === subKey) ?? family[0] ?? null
   const dataComp = active?.kind === 'comp' ? active.id : compId
   const showingCup = active?.kind === 'cup'

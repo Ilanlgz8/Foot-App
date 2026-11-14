@@ -625,9 +625,13 @@ img[data-team*="Juventus" i] {
 #root .poster--theme-can .poster__bg--gradient,
 #root .lmp__hero--theme-can .lmp__heroTintC {
   inset: -40px;
+  /* + jaune sur les bords (2e passe, 14/11 : « un peu plus de jaune sur les extrémités ») */
   background:
-    radial-gradient(55% 50% at 18% 22%, rgba(240,204,32,0.50) 0%, transparent 70%),
-    radial-gradient(50% 55% at 88% 80%, rgba(216,180,0,0.38) 0%, transparent 70%),
+    radial-gradient(40% 35% at 0% 50%, rgba(240,204,32,0.55) 0%, transparent 70%),
+    radial-gradient(40% 35% at 100% 40%, rgba(240,204,32,0.45) 0%, transparent 70%),
+    radial-gradient(45% 30% at 50% 100%, rgba(216,180,0,0.40) 0%, transparent 70%),
+    radial-gradient(55% 50% at 18% 22%, rgba(240,204,32,0.55) 0%, transparent 70%),
+    radial-gradient(50% 55% at 88% 80%, rgba(216,180,0,0.45) 0%, transparent 70%),
     radial-gradient(65% 60% at 72% 18%, rgba(31,176,80,0.85) 0%, transparent 72%),
     radial-gradient(65% 65% at 22% 88%, rgba(0,144,60,0.90) 0%, transparent 72%),
     radial-gradient(38% 34% at 52% 55%, rgba(0,0,0,0.28) 0%, transparent 70%),

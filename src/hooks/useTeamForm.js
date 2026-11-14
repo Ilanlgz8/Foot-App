@@ -53,7 +53,7 @@ const EMPTY_MATCHES  = []
 // différente, corrigée séparément — mais même trou de données sous-jacent).
 // COMPETITION_ESPN_SLUG (competitions.js) couvre déjà ces 3 codes depuis le
 // 16/08 — seule cette liste n'avait pas été mise à jour en même temps.
-const ESPN_SOURCED_FORM_COMPS = new Set(['FL2', 'NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'TDC', 'CS', 'USC'])
+const ESPN_SOURCED_FORM_COMPS = new Set(['FL2', 'NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'CLQ', 'UELQ', 'UECLQ', 'TDC', 'CS', 'USC'])
 
 // ⚠️ AJOUT (01/10, demande explicite utilisateur après un push Vercel qui a
 // réinitialisé le cache ESPN sporadique — "nn 5 a 10min c beaucoup trop

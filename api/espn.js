@@ -39,6 +39,7 @@ const ALLOWED_SLUGS = new Set([
   'fra.1', 'eng.1', 'esp.1', 'ger.1', 'ita.1',
   'fra.2', // Ligue 2 (12/11)
   'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
+  'uefa.champions_qual', 'uefa.europa_qual', 'uefa.europa.conf_qual', // qualifications (14/11)
   'fifa.world', 'uefa.euro',
   // Ligue des Nations / CAN / Copa America — tournois ponctuels, absents de
   // football-data.org en free tier (voir CLAUDE.md), couverts via ESPN.

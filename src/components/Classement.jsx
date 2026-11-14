@@ -59,7 +59,7 @@ function Classement() {
   // Menu déroulant du nom (12/11) : `pickedComp` = compétition du sélecteur, `selectedComp` =
   // celle dont on affiche le classement (Ligue 2/Ligue 3 choisies dans le menu). Pas de coupe ici.
   const [subComp, setSubComp] = usePersistedState('shared_subComp', null)
-  const { family, active: famActive, dataComp: selectedComp } = resolveCompFamily(pickedComp, subComp, { withCup: false })
+  const { family, active: famActive, dataComp: selectedComp } = resolveCompFamily(pickedComp, subComp, { withCup: false, exclude: NO_STANDINGS_COMPS })
   const setSelectedComp = useCallback(id => { setSubComp(null); setPickedComp(id) }, [setSubComp, setPickedComp])
   // Migration : Ligue 3/Ligue 2 n'ont été des choix du sélecteur que quelques minutes le 12/11.
   useEffect(() => {

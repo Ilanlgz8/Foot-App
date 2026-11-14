@@ -8,6 +8,7 @@ import { bigTeamScore } from './matchDuJour'
 // que le cocon "parle" comme les cards de la même compétition.
 export const COMP_ACCENT = {
   CL: '#2f55ff',   UEL: '#e0661f',  UECL: '#2f8a3e',
+  CLQ: '#2f55ff',  UELQ: '#e0661f', UECLQ: '#2f8a3e',
   FL1: '#2a7bff',  FL2: '#15ffcf', PL: '#a23ab0',   PD: '#d23b3b',  BL1: '#e30613',  SA: '#3bb3c7',
   WC: '#f2c232',   EC: '#2f6fd6',   NL: '#4f7cff',  CAN: '#1fb050',  CANQ: '#1fb050',  COPA: '#2a7bff',
 }
@@ -18,7 +19,7 @@ export const accentFor = code => COMP_ACCENT[code] ?? FALLBACK_ACCENT
 // fait dans l'ancienne page Live), puis coupes d'Europe, puis le reste par nom.
 // Une coupe nationale passe juste après son championnat (même code).
 // Ligue 2 juste après la Ligue 1 et la Coupe de France.
-const SECTION_ORDER = { WC: 0, FL1: 1, FL2: 1.7, CL: 2, UEL: 3, UECL: 4 }
+const SECTION_ORDER = { WC: 0, FL1: 1, FL2: 1.7, CL: 2, CLQ: 2.2, UEL: 3, UELQ: 3.2, UECL: 4, UECLQ: 4.2 }
 const sectionRank = g => (SECTION_ORDER[g.code] ?? 10) + (g.isCup ? 0.5 : 0)
 
 export function groupMatchesByCompetition(matches) {

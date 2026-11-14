@@ -89,6 +89,11 @@ export const DOMESTIC_CUP_SLUGS = {
 export const EUROPEAN_CUP_SLUGS = {
   UEL:  'uefa.europa',
   UECL: 'uefa.europa.conf',
+  // Tours de qualification (14/11) — juillet/août seulement : le Worker les met au repos le reste
+  // de l'année (aucun match proche → contrôle toutes les 30 min).
+  CLQ:   'uefa.champions_qual',
+  UELQ:  'uefa.europa_qual',
+  UECLQ: 'uefa.europa.conf_qual',
   USC:  'uefa.super_cup', // Supercoupe UEFA (vainqueur C1 vs vainqueur Ligue Europa) — 1 match/an
 }
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "PSG-Lens pour le trophée
