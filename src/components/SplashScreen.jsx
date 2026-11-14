@@ -37,8 +37,9 @@ import { shouldSkipSplash } from '../utils/reloadTrace'
 // Honnêteté : l'écran de lancement dure maintenant ~4.8s minimum (+ 0.5s de
 // fondu) à chaque lancement à froid — nettement plus long qu'un splash
 // screen typique, mais c'est la demande explicite ("ralentir tout").
-const MIN_MS  = 4800
-const MAX_MS  = 5300
+// 14/11 : 4,8 s → 3,5 s (demande utilisateur) — texte 1,1 s, ballon parti à 0,9 s, posé à 3,1 s.
+const MIN_MS  = 3500
+const MAX_MS  = 4000
 const FADE_MS = 500
 
 export function SplashScreen() {

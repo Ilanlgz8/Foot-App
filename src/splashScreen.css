@@ -70,7 +70,7 @@
   /* Rouge franc (14/11 : « pas assez rouge ») : le halo serré blanchissait les lettres. */
   color: var(--red);
   text-shadow: 0 0 22px rgba(var(--red-rgb), 0.45);
-  animation: splashTextFromLeft 1.3s cubic-bezier(.2,.7,.3,1) forwards;
+  animation: splashTextFromLeft 1.1s cubic-bezier(.2,.7,.3,1) forwards;
 }
 
 .splash__foot,
@@ -78,7 +78,7 @@
 .splash__x {
   color: #fff;
   text-shadow: 0 0 22px rgba(var(--red-rgb), 0.25);
-  animation: splashTextFromRight 1.3s cubic-bezier(.2,.7,.3,1) forwards;
+  animation: splashTextFromRight 1.1s cubic-bezier(.2,.7,.3,1) forwards;
 }
 
 @keyframes splashTextFromLeft {
@@ -106,7 +106,7 @@
   opacity: 0;
   background: var(--red);
   box-shadow: 0 0 10px var(--red), 0 0 20px var(--red);
-  animation: splashUnderline 1.2s cubic-bezier(.2,.7,.3,1) 0.9s forwards;
+  animation: splashUnderline 1s cubic-bezier(.2,.7,.3,1) 0.7s forwards;
 }
 
 @keyframes splashUnderline {
@@ -143,7 +143,7 @@
   /* linear : vitesse constante entre keyframes (un easing par segment donnait
      un ballon qui "s'arrête" plusieurs fois) ; l'aisance n'est remise que sur
      les 2 derniers segments (atterrissage). */
-  animation: splashBallFly 3.2s linear 1.4s forwards;
+  animation: splashBallFly 2.2s linear 0.9s forwards;
 }
 
 @keyframes splashBallFly {
