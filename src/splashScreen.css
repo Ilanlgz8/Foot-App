@@ -126,7 +126,7 @@
   position: absolute;
   left: 50%;
   /* Archivo 900 (14/11) : point du « i » mesuré ~0,42em sous le haut de la ligne (interligne 1.6). */
-  top: calc(0.42em - 2px);
+  top: calc(0.465em - 2px); /* em du ballon = 0,9 × celui du texte */
   width: 0.9em;
   height: 0.9em;
   margin: -0.45em 0 0 -0.45em;
