@@ -22,6 +22,9 @@ const IGNORE = [
   'NetworkError',
   'Load failed',
   'Non-Error promise rejection captured',
+  // Enregistrement du service worker raté pour cause de réseau (Safari, 14/11 : FOOT-APP-4) —
+  // il est retenté automatiquement au chargement suivant, sans effet pour l'utilisateur.
+  'sw.js load failed',
 ]
 
 export function reportError(error, context) {

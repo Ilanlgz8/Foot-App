@@ -19,6 +19,20 @@ initErrorReporting()
 // à cause d'un incident réseau ponctuel résolu depuis.
 try { sessionStorage.removeItem('sfModuleRetry') } catch { /* stockage inaccessible */ }
 
+// Page restée ouverte pendant un déploiement (14/11, Sentry FOOT-APP-5) : les morceaux de code
+// chargés à la demande (pages en lazy) de l'ANCIENNE version n'existent plus sur le serveur →
+// l'ouverture d'une page échoue. Vite émet alors `vite:preloadError` : on recharge pour prendre
+// la nouvelle version (au plus une fois par 20 s, pour ne jamais boucler si le réseau est coupé).
+window.addEventListener('vite:preloadError', e => {
+  let last = 0
+  try { last = Number(sessionStorage.getItem('sfChunkReload')) || 0 } catch { /* stockage inaccessible */ }
+  if (Date.now() - last < 20_000) return
+  e.preventDefault()
+  try { sessionStorage.setItem('sfChunkReload', String(Date.now())) } catch { /* idem */ }
+  markReload('nouvelle version (morceau de code introuvable)')
+  window.location.reload()
+})
+
 // Auto-reload quand le SW prend le contrôle (skipWaiting + clientsClaim)
 // → plus besoin de vider le cache Safari après chaque déploiement
 if ('serviceWorker' in navigator) {
