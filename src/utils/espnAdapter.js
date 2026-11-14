@@ -42,7 +42,7 @@ import { isUnfollowedCupMatch } from './matchUtils'
 // pas être compensée par un simple zoom CSS uniforme) par un drapeau
 // flagcdn.com bord-à-bord quand on a le code du pays. Les coupes nationales
 // (FL1/PD/PL) sont des clubs, jamais concernées.
-const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA'])
+const NATIONAL_TEAM_ESPN_COMPS = new Set(['NL', 'CAN', 'CANQ', 'ECQ', 'COPA'])
 
 // Id numérique synthétique par compétition ESPN — négatif pour ne jamais
 // entrer en collision avec un vrai id football-data.org (tous positifs, ex:
@@ -54,6 +54,7 @@ const SYNTHETIC_COMP_ID = {
   NL: -1, CAN: -2, COPA: -3, UEL: -4, UECL: -5, USC: -6, TDC: -7, CS: -8,
   FL2: -9, // Ligue 2 (12/11)
   CANQ: -10, // Qualifications CAN (14/11)
+  ECQ: -14, BARL1: -15, BARBL: -16, SCE: -17, SCI: -18, DSC: -19, // compléments de saison (14/11)
   CLQ: -11, UELQ: -12, UECLQ: -13, // Qualifications coupes d'Europe (14/11)
   FL1_CUP: -101, PD_CUP: -102, PL_CUP: -103,
   // ⚠️ AJOUT (28/10, Coppa Italia/DFB-Pokal — voir DOMESTIC_CUPS dans
@@ -211,6 +212,8 @@ const SPARSE_INTL_SLUGS = new Set([
   'uefa.nations', 'caf.nations', 'caf.nations_qual', 'conmebol.america',
   'uefa.europa', 'uefa.europa.conf',
   'uefa.champions_qual', 'uefa.europa_qual', 'uefa.europa.conf_qual',
+  'uefa.euroq', 'fra.1.promotion.relegation', 'ger.playoff.relegation',
+  'esp.super_cup', 'ita.super_cup', 'ger.super_cup',
   'uefa.super_cup', 'fra.super_cup', 'eng.charity',
 ])
 // 90 → REVERTÉ À 400 le même jour (02/11), après clarification de l'utilisateur :

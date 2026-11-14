@@ -45,6 +45,9 @@ const ALLOWED_SLUGS = new Set([
   // football-data.org en free tier (voir CLAUDE.md), couverts via ESPN.
   'uefa.nations', 'caf.nations', 'conmebol.america',
   'caf.nations_qual', // Qualifications CAN (14/11)
+  // Compléments de saison (14/11) : qualifs Euro, barrages, supercoupes ESP/ITA/ALL
+  'uefa.euroq', 'fra.1.promotion.relegation', 'ger.playoff.relegation',
+  'esp.super_cup', 'ita.super_cup', 'ger.super_cup',
   // Coupes nationales — absentes de football-data.org en free tier, fusionnées
   // dans l'onglet du championnat parent (voir espnAdapter.js / useMatchs.js).
   'fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa',

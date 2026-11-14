@@ -64,6 +64,7 @@ export const NATIONAL_COMP_SLUGS = {
   NL:   'uefa.nations',       // Ligue des Nations
   CAN:  'caf.nations',        // CAN
   CANQ: 'caf.nations_qual',   // Qualifications CAN (14/11)
+  ECQ:  'uefa.euroq',         // Qualifications Euro (14/11)
   COPA: 'conmebol.america',   // Copa America
 }
 export const DOMESTIC_CUP_SLUGS = {
@@ -108,6 +109,9 @@ export const EUROPEAN_CUP_SLUGS = {
 export const NATIONAL_SUPER_CUP_SLUGS = {
   TDC: 'fra.super_cup', // Trophée des Champions
   CS:  'eng.charity',   // Community Shield (nom ESPN historique "Charity Shield")
+  SCE: 'esp.super_cup', // Supercoupe d'Espagne (14/11)
+  SCI: 'ita.super_cup', // Supercoupe d'Italie (14/11)
+  DSC: 'ger.super_cup', // Supercoupe d'Allemagne (14/11)
 }
 
 // Liste à plat pour le cron (api/cron-goals.js, cf-worker/src/index.js) —
@@ -115,6 +119,9 @@ export const NATIONAL_SUPER_CUP_SLUGS = {
 // Ligue 2 (12/11) : suivie en direct comme les autres (notifs comprises).
 export const LOWER_LEAGUE_SLUGS = {
   FL2: 'fra.2',
+  // Barrages de fin de saison (14/11)
+  BARL1: 'fra.1.promotion.relegation',
+  BARBL: 'ger.playoff.relegation',
 }
 
 export const EXTRA_NOTIFY_SLUGS = [

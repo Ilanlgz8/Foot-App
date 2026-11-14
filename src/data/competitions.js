@@ -109,6 +109,14 @@ export const COMPETITION_ESPN_SLUG = {
   UECLQ: 'uefa.europa.conf_qual',
   // Ligue 2 (12/11) : ESPN la couvre en direct (scores, buts, cartons, compos, stats — vérifié).
   FL2:  'fra.2',
+  // Compléments de saison (14/11, demande utilisateur : « qu'on suive tout, de 0 à 100 ») — slugs
+  // ESPN vérifiés le 14/11 (scoreboard 200, saisons précédentes présentes).
+  ECQ:   'uefa.euroq',                   // Qualifications Euro 2028 (mars 2027 → mars 2028)
+  BARL1: 'fra.1.promotion.relegation',   // Barrage Ligue 1 / Ligue 2 (fin mai)
+  BARBL: 'ger.playoff.relegation',       // Barrage Bundesliga / 2. Bundesliga (fin mai)
+  SCE:   'esp.super_cup',                // Supercoupe d'Espagne (janvier)
+  SCI:   'ita.super_cup',                // Supercoupe d'Italie (décembre/janvier)
+  DSC:   'ger.super_cup',                // Supercoupe d'Allemagne (août)
   USC:  'uefa.super_cup',
   // Supercoupes nationales (16/08, demande explicite utilisateur) — voir
   // NATIONAL_SUPER_CUP_SLUGS dans espnSlugs.js pour le détail/la vérification.
@@ -207,7 +215,7 @@ export const DOMESTIC_CUPS = {
 // USC/TDC/CS restent exclues pour une raison différente et toujours valide :
 // un seul match par an, aucun classement n'a jamais de sens ici (même
 // principe que SINGLE_MATCH_COMPS ci-dessus, pour Programme/Résultats).
-export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS', 'CLQ', 'UELQ', 'UECLQ'])
+export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS', 'CLQ', 'UELQ', 'UECLQ', 'BARL1', 'BARBL', 'SCE', 'SCI', 'DSC'])
 
 // ⚠️ AJOUT, "CORRIGÉ" PAR ERREUR, PUIS RE-RÉTABLI LE MÊME JOUR (26/09) :
 // d'abord introduit en partant du gap documenté de longue date ("aucune
@@ -250,7 +258,7 @@ export const NO_STANDINGS_COMPS = new Set(['USC', 'TDC', 'CS', 'CLQ', 'UELQ', 'U
 // l'historique complet des 2 tentatives (endpoint /statistics, puis calcul
 // maison) et git history si le calcul maison doit être repris un jour une
 // fois le quota Upstash résolu (code supprimé, pas juste désactivé).
-export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'L3', 'FL2', 'CLQ', 'UELQ', 'UECLQ'])
+export const NO_SCORERS_COMPS = new Set(['NL', 'CAN', 'CANQ', 'COPA', 'UEL', 'UECL', 'L3', 'FL2', 'CLQ', 'UELQ', 'UECLQ', 'ECQ', 'BARL1', 'BARBL', 'SCE', 'SCI', 'DSC'])
 
 // ⚠️ AJOUT (16/08, demande explicite utilisateur : "ce genre de championnat
 // où c'est qu'un match par an, ne le mets pas dans la liste où y'a tous les
@@ -899,6 +907,12 @@ export const COMPETITIONS = [
     shortName: 'Comm. Shield',
     emblem: null,
   },
+  // Compléments de saison (14/11) : rangés sous leur championnat (menu déroulant du nom).
+  { id: 'BARL1', parent: 'FL1', name: 'Barrage Ligue 1 / Ligue 2', shortName: 'Barrage L1', emblem: null },
+  { id: 'SCE',   parent: 'PD',  name: "Supercoupe d'Espagne",      shortName: 'Supercopa',  emblem: null },
+  { id: 'DSC',   parent: 'BL1', name: "Supercoupe d'Allemagne",    shortName: 'Supercup',   emblem: null },
+  { id: 'BARBL', parent: 'BL1', name: 'Barrage Bundesliga',        shortName: 'Barrage BL', emblem: null },
+  { id: 'SCI',   parent: 'SA',  name: "Supercoupe d'Italie",       shortName: 'Supercoppa', emblem: null },
   {
     // ⚠️ TEINTE AJOUTÉE (10/09, demande utilisateur : "regarder les couleurs
     // pour la ligue des nations... etc" → confirmé via AskUserQuestion :
@@ -947,6 +961,21 @@ export const COMPETITIONS = [
     id: 'EC',
     name: 'Euro',
     shortName: 'Euro',
+    emblem: euroLogo,
+    tint: '#00489c',
+    tint2: '#d8000c',
+    tintStops: { base: '22%', c2: '55%', c3: '85%' },
+    tintLight: true,
+    tintPearl: 0.45,
+    tintSoft: true,
+  },
+  {
+    // Qualifications Euro 2028 (14/11) : sous l'Euro dans le menu du nom. Tirage le 6/12/2026,
+    // matchs de mars 2027 à novembre 2027, barrages en mars 2028. Groupes → classement ESPN.
+    id: 'ECQ',
+    parent: 'EC',
+    name: 'Qualifications Euro 2028',
+    shortName: 'Qualif. Euro',
     emblem: euroLogo,
     tint: '#00489c',
     tint2: '#d8000c',

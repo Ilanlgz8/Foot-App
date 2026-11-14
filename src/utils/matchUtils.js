@@ -615,7 +615,7 @@ export function getMatchPeriod(match) {
 // Nations, CAN, Copa America) = drapeau affiché en blason carré quelque part
 // sans que ce soit repéré. Centralisé ici, un seul endroit à mettre à jour.
 const NATIONAL_TEAM_COMP_IDS   = new Set([2000, 2018]) // WC, Euro (id numérique football-data.org)
-const NATIONAL_TEAM_COMP_CODES = new Set(['WC', 'EC', 'NL', 'CAN', 'CANQ', 'COPA'])
+const NATIONAL_TEAM_COMP_CODES = new Set(['WC', 'EC', 'ECQ', 'NL', 'CAN', 'CANQ', 'COPA'])
 export function isNationalTeamComp(match) {
   const id   = match?.competition?.id
   const code = match?.competition?.code

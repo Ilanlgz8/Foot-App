@@ -36,7 +36,7 @@ const CLUB_ESPN_COMPS = ['UEL', 'UECL']
 // arrière / 60 j en avant, voir espnAdapter.js) que celles déjà gérées ailleurs dans l'app. Pas de
 // classement ni de buteurs pour elles ici (voir NATIONAL_COMP_CODES, TeamSearchPage.jsx) : aucun
 // appel FD.org en plus.
-export const NATIONAL_COMP_CODES = new Set(['NL', 'WC', 'EC', 'CAN', 'CANQ', 'COPA'])
+export const NATIONAL_COMP_CODES = new Set(['NL', 'WC', 'EC', 'ECQ', 'CAN', 'CANQ', 'COPA'])
 const ESPN_COMPS = [...CLUB_ESPN_COMPS, ...NATIONAL_COMP_CODES]
 const STAGGER_MS = 1_000
 const ESPN_STAGGER_MS = 400
