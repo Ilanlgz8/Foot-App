@@ -51,6 +51,7 @@
   font-family: Archivo, 'Chakra Petch', system-ui, sans-serif;
   font-size: clamp(2rem, 8vw, 3.4rem);
   font-weight: 900;
+  line-height: 1.6;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
@@ -124,7 +125,8 @@
 .splash__ball {
   position: absolute;
   left: 50%;
-  top: -2px;
+  /* Archivo 900 (14/11) : point du « i » mesuré ~0,42em sous le haut de la ligne (interligne 1.6). */
+  top: calc(0.42em - 2px);
   width: 0.9em;
   height: 0.9em;
   margin: -0.45em 0 0 -0.45em;
