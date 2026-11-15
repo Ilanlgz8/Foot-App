@@ -34,7 +34,6 @@ import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS, compForMatch } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
-import { AiAssistant } from './AiAssistant'
 import { FormDiamonds } from '../accueil/FormDiamonds'
 import '../../pronos.css'
 
@@ -712,26 +711,8 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono, formM
   )
 }
 
-// ⚠️ AI_ASSISTANT_ENABLED = false (28/08, demande utilisateur : "on garde
-// l'assistant ia de côté pour le moment... qu'on le voit plus sur l'app") —
-// masque juste le switcher/l'accès UI, AiAssistant.jsx et api/apifootball.js
-// (mode=ask) restent intacts. Réactivation triviale : repasser cette
-// constante à true, aucun autre changement nécessaire.
-const AI_ASSISTANT_ENABLED = false
-
 function Pronos() {
   const { deviceId, groupCode, hasGroup, myPreds, createGroup, joinGroup, leaveGroup, predict } = usePronosGroup()
-  // Switcher tout en haut de page (demande utilisateur, 28/08 : "faudrait que
-  // tout en haut de la page on puisse switch entre la page actuel prono et
-  // une page simulateur") — PAS un 4e onglet mélangé à Pronos/Résultat/
-  // Classement (1er essai, corrigé) : page à part entière, avec son propre
-  // switcher au-dessus des onglets historiques. Le Simulateur (confrontation
-  // hypothétique) a ensuite été remplacé par un Assistant IA (même jour,
-  // constat utilisateur : scores encore trop plats malgré 2 réécritures du
-  // modèle) — voir AiAssistant.jsx. Valeur d'état 'ia' gardée courte comme
-  // 'pronos', même convention. Masqué de l'UI pour le moment (voir
-  // AI_ASSISTANT_ENABLED ci-dessus).
-  const [mode, setMode] = useState('pronos')
   const [activeTab, setActiveTab] = useState('pronos')
   // ⚠️ AJOUT useTransition (02/11, constat utilisateur : "la page prono est
   // encore un peu buggée [...] quand je clique sur un bouton c'est pas
@@ -1013,26 +994,7 @@ function Pronos() {
 
   return (
     <div className="pronos__page">
-      {AI_ASSISTANT_ENABLED && (
-        <div className="pronos__modeSwitch">
-          <button
-            className={`pronos__modeBtn${mode === 'pronos' ? ' pronos__modeBtn--active' : ''}`}
-            onClick={() => startTransition(() => setMode('pronos'))}
-          >
-            Pronos
-          </button>
-          <button
-            className={`pronos__modeBtn${mode === 'ia' ? ' pronos__modeBtn--active' : ''}`}
-            onClick={() => startTransition(() => setMode('ia'))}
-          >
-            Assistant IA
-          </button>
-        </div>
-      )}
-
-      {AI_ASSISTANT_ENABLED && mode === 'ia' ? (
-        <AiAssistant />
-      ) : !hasGroup ? (
+      {!hasGroup ? (
         <JoinCreateScreen onCreate={createGroup} onJoin={joinGroup} />
       ) : (
         <>
