@@ -35,7 +35,7 @@ export function reportError(error, context) {
 
 export function initErrorReporting() {
   if (!DSN || typeof window === 'undefined') return
-  const start = () => import('@sentry/react').then(S => {
+  const start = () => import('./sentryLite.js').then(S => {
     S.init({
       dsn: DSN,
       release: import.meta.env.VITE_APP_VERSION || undefined,
