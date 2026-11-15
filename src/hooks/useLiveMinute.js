@@ -26,8 +26,7 @@ import {
   getMatchState, trackMatchState, clearMatchState, clearFtFlags,
   setKickoffAt, setHalf2Start,
   clearAllMatchStates, setEspnData, setEspnWorking, recordEspnMiss,
-  getLiveState, setLiveState, markRecentlyFinished,
-} from '../utils/matchStateTracker'
+  getLiveState, setLiveState, markRecentlyFinished, emitMatchStateChange } from '../utils/matchStateTracker'
 import { markLive, markEnded, markPendingKickoff, isTrackedLive, getLiveMatches, purgeStaleTracker } from './liveTracker'
 import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../data/espnSlugs.js'
 import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2, PENDING_KICKOFF_WINDOW_MS } from '../utils/matchUtils'
@@ -306,6 +305,7 @@ function confirmFt(match, now, queryClient, espnEventId) {
       termineAt: now,
     }))
   } catch {}
+  emitMatchStateChange()
 
   queryClient.invalidateQueries({ queryKey: ['liveMatches'] })
 

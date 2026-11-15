@@ -12,7 +12,23 @@
  */
 import { NavLink } from 'react-router-dom'
 import { useLiveData } from '../context/LiveProvider'
+import { useEffect, useState } from 'react'
 import { isCardLive } from '../utils/matchUtils'
+import { onMatchStateChange, espnSaysFinal } from '../utils/matchStateTracker'
+
+// Nombre de matchs en direct pour le bouton « Match » et le bouton « Direct » (15/11, « faut que ce
+// soit vraiment carré ») : recalculé à chaque donnée ESPN reçue (abonnement) + toutes les 5 s en filet,
+// et un match sort du compte dès qu'ESPN siffle la fin — sans attendre la double confirmation.
+function useLiveCount(liveMatches) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setTick(t => t + 1)
+    const off = onMatchStateChange(bump)
+    const id = setInterval(bump, 5_000)
+    return () => { off(); clearInterval(id) }
+  }, [])
+  return liveMatches.filter(m => isCardLive(m) && !espnSaysFinal(m.id)).length
+}
 import NotificationBell from './NotificationBell'
 import '../../navbar.css'
 
@@ -192,7 +208,7 @@ function Navbar() {
   // revoir ce flicker. Plus besoin de ticker dédié : `liveCount` se
   // recalcule déjà naturellement au rythme du polling ESPN/FD.org
   // (LiveProvider), exactement comme la card Accueil.
-  const liveCount = liveMatches.filter(isCardLive).length
+  const liveCount = useLiveCount(liveMatches)
 
   return (
     <header className="sfHeader">
@@ -282,7 +298,7 @@ function Navbar() {
 // en flux, toujours au bas de l'écran par construction.
 export function BottomTabBar({ hidden = false }) {
   const { liveMatches } = useLiveData()
-  const liveCount = liveMatches.filter(isCardLive).length
+  const liveCount = useLiveCount(liveMatches)
 
   return (
     <nav

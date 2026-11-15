@@ -29,6 +29,27 @@ export const isEspnWorking  = ()  => _espnWorking
 
 const key = (id) => `foot_ms_${id}`
 
+// Abonnement aux changements d'état (15/11) : le compteur « en direct » de la barre du bas se recalcule
+// dès qu'un poll ESPN écrit une donnée, au lieu d'attendre un autre rendu (constat utilisateur : le
+// néon et le nombre restaient plusieurs minutes après la fin des matchs).
+const _stateListeners = new Set()
+export function onMatchStateChange(cb) {
+  _stateListeners.add(cb)
+  return () => _stateListeners.delete(cb)
+}
+export function emitMatchStateChange() {
+  for (const cb of _stateListeners) { try { cb() } catch { /* ignore */ } }
+}
+
+// ESPN annonce le match fini (coup de sifflet final), donnée récente. Plus rapide que la fin
+// « confirmée » (double vérification, ~1-2 min de plus) : sert au compteur de la barre du bas, où un
+// faux « fini » (rare) se corrige seul au poll suivant (15 s).
+const ESPN_FINAL_STATUSES = new Set(['STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FINAL_AET', 'STATUS_FINAL_PEN'])
+export function espnSaysFinal(matchId, nowMs = Date.now()) {
+  const st = readState(matchId)
+  return ESPN_FINAL_STATUSES.has(st.espnStatus) && nowMs - (st.espnCapturedAt ?? 0) < 30 * 60_000
+}
+
 // Lecture protégée de l'état stocké — un localStorage corrompu (écriture
 // interrompue, quota dépassé, format d'une ancienne version de l'app...)
 // ferait planter JSON.parse() sans catch ; comme getMatchState() est appelé
@@ -122,6 +143,7 @@ export function setLiveState(matchId, state, { since, endedAt, espnEventId } = {
 
     localStorage.setItem(key(matchId), JSON.stringify(stored))
   } catch {}
+  emitMatchStateChange()
 }
 
 /**
@@ -178,6 +200,7 @@ export function setEspnData(matchId, { espnClock, espnStatus, espnPeriod }) {
   stored.espnMissStreak = 0
   if (espnPeriod != null) stored.espnPeriod = espnPeriod
   localStorage.setItem(key(matchId), JSON.stringify(stored))
+  emitMatchStateChange()
 }
 
 /**
