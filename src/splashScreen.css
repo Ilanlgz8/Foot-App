@@ -127,7 +127,7 @@
   left: 50%;
   /* Archivo 900 (14/11) : point du « i » mesuré ~0,42em sous le haut de la ligne (interligne 1.6). */
   /* em du ballon = 0,9 × celui du texte. 15/11 : remonté de ~1,5 mm (« il écrase un peu le i »). */
-  top: calc(0.32em - 2px);
+  top: calc(0.465em - 11px); /* 9 px ≈ 1,5 mm sur un téléphone */
   width: 0.9em;
   height: 0.9em;
   margin: -0.45em 0 0 -0.45em;
