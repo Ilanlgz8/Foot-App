@@ -599,7 +599,8 @@ function PredictionsPanel({ matchId, players, predictions, deviceId, actual, pro
 // se joue, entre l'onglet Pronos (avant coup d'envoi) et Classement (une fois
 // terminé). Ticker 5s pour faire avancer calcMinute() entre deux polls ESPN,
 // même logique que LiveCard (Live.jsx).
-function LiveResultRow({ match, espn, players, predictions, deviceId }) {
+function LiveResultRow({ match, espn, players, predictions, deviceId, formMapByComp, matchesByComp }) {
+  const [homeForm, awayForm] = useMemo(() => matchForms(match, formMapByComp, matchesByComp), [match, formMapByComp, matchesByComp])
   const [, setTick] = useState(0)
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -624,6 +625,7 @@ function LiveResultRow({ match, espn, players, predictions, deviceId }) {
         <div className="pronos__team">
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+          <FormDiamonds form={homeForm} />
         </div>
         <div className="pronos__scoreGroup">
           <span className="pronos__liveScore">{hs ?? '-'}</span>
@@ -633,6 +635,7 @@ function LiveResultRow({ match, espn, players, predictions, deviceId }) {
         <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
+          <FormDiamonds form={awayForm} />
         </div>
       </div>
       {predCount > 0 && (
@@ -653,7 +656,8 @@ function LiveResultRow({ match, espn, players, predictions, deviceId }) {
 // Sous le score : le prono qu'on avait mis + les points gagnés pour CE match
 // (même formule variable que computePoints, cf. classement), et un bouton
 // pour déplier les pronos de tout le groupe (voir PredictionsPanel).
-function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
+function FinishedResultRow({ match, players, predictions, deviceId, prono, formMapByComp, matchesByComp }) {
+  const [homeForm, awayForm] = useMemo(() => matchForms(match, formMapByComp, matchesByComp), [match, formMapByComp, matchesByComp])
   const [open, setOpen] = useState(false)
   const fs = finalScore(match.score)
   const actual = (fs.home != null && fs.away != null) ? { home: fs.home, away: fs.away } : null
@@ -673,6 +677,7 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
         <div className="pronos__team">
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+          <FormDiamonds form={homeForm} />
         </div>
         <div className="pronos__scoreGroup">
           <span className="pronos__liveScore">{fs.home ?? '-'}</span>
@@ -682,6 +687,7 @@ function FinishedResultRow({ match, players, predictions, deviceId, prono }) {
         <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
+          <FormDiamonds form={awayForm} />
         </div>
       </div>
       {(myPred || predCount > 0) && (
@@ -1121,6 +1127,7 @@ function Pronos() {
                         <LiveResultRow
                           key={m.id} match={m} espn={espnScores[m.id] ?? null}
                           players={players} predictions={predictions} deviceId={deviceId}
+                          formMapByComp={formMapByComp} matchesByComp={matchesByComp}
                         />
                       ))}
                     </div>
@@ -1133,6 +1140,7 @@ function Pronos() {
                           key={m.id} match={m}
                           players={players} predictions={predictions} deviceId={deviceId}
                           prono={pronoByMatchId[String(m.id)]}
+                          formMapByComp={formMapByComp} matchesByComp={matchesByComp}
                         />
                       ))}
                     </div>
