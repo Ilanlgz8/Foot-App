@@ -47,10 +47,8 @@ import '@fontsource/chakra-petch/latin-600.css'
 import '@fontsource/chakra-petch/latin-ext-600.css'
 import '@fontsource/chakra-petch/latin-700.css'
 import '@fontsource/chakra-petch/latin-ext-700.css'
-import '@fontsource/rajdhani/latin-700.css'
-import '@fontsource/rajdhani/latin-ext-700.css'
-import '@fontsource/bricolage-grotesque/latin-800.css'
-import '@fontsource/bricolage-grotesque/latin-ext-800.css'
+// 15/11 (check-up) : Rajdhani et Bricolage Grotesque retirées — plus utilisées nulle part, mais
+// téléchargées à chaque lancement (~120 Ko).
 import '@fontsource/archivo/latin-700.css'
 import '@fontsource/archivo/latin-ext-700.css'
 import '@fontsource/lexend/latin-700.css'

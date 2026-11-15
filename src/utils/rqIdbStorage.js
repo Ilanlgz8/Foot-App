@@ -18,6 +18,10 @@ let dbPromise = null
 function openDb() {
   if (dbPromise) return dbPromise
   dbPromise = new Promise((resolve) => {
+    // Filet (15/11, check-up) : si IndexedDB ne répond jamais (bug connu de certains Safari, base
+    // bloquée…), la restauration du cache attendait indéfiniment et AUCUNE donnée ne se chargeait —
+    // app vide. Au bout de 1,5 s on continue en localStorage, comme sans IndexedDB.
+    setTimeout(() => resolve(null), 1500)
     try {
       if (typeof indexedDB === 'undefined') return resolve(null)
       const req = indexedDB.open(DB_NAME, 1)

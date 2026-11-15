@@ -2,7 +2,7 @@
 // Doit rester le TOUT PREMIER import : protège chaque écriture localStorage contre le stockage plein
 // (voir storageGuard.js), y compris celles faites au chargement des autres modules.
 import './utils/storageGuard'
-import { initReloadTrace, markReload } from './utils/reloadTrace'
+import { initReloadTrace, markReload, noteBootCache } from './utils/reloadTrace'
 initReloadTrace()
 import { createRoot } from 'react-dom/client'
 import './fonts.js'
@@ -376,16 +376,18 @@ setTimeout(() => showBootError(new Error('L\'application n\'a pas fini de démar
 // depuis IndexedDB AVANT le premier rendu (lectures synchrones ensuite). Si IndexedDB ne répond pas en
 // 1,5 s, on démarre quand même, en localStorage comme avant, pour toute la session.
 let booted = false
-function boot() {
+const bootT0 = performance.now()
+function boot(how = 'idb') {
   if (booted) return
   booted = true
+  noteBootCache(how, Math.round(performance.now() - bootT0))
   freezeCacheStore()
   purgeExpiredCache()
   compactExistingCaches()
   renderApp()
 }
-initCacheStore().then(boot, boot)
-setTimeout(boot, 1500)
+initCacheStore().then(() => boot('idb'), () => boot('erreur'))
+setTimeout(() => boot('délai dépassé'), 1500)
 
 function renderApp() {
 try {

@@ -29,6 +29,15 @@ export function shouldSkipSplash() {
   try { return Date.now() - Number(sessionStorage.getItem(SKIP_SPLASH_KEY) || 0) < 60_000 } catch { return false }
 }
 
+// Durée du chargement du cache au démarrage (15/11, check-up) : visible dans le diagnostic pour savoir
+// si le téléphone attend le délai de secours de 1,5 s (IndexedDB lent) à chaque ouverture.
+export function noteBootCache(how, ms) {
+  const log = read(LOG_KEY) ?? []
+  if (log.length === 0) return
+  log[log.length - 1].cache = `${how} ${ms} ms`
+  write(LOG_KEY, log)
+}
+
 export function getBootLog() {
   return read(LOG_KEY) ?? []
 }

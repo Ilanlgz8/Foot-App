@@ -75,7 +75,7 @@ function LaunchInfo() {
       <div>copie Ligue des Nations : {(() => { const l = readCacheStale('matches_espn_NL'); return Array.isArray(l) ? `${l.length} matchs (${l.filter(m => m.status !== 'FINISHED').length} à venir), il y a ${Math.round((Date.now() - getCacheSavedAt('matches_espn_NL')) / 60000)} min` : 'absente' })()}</div>
       <div>ancienne logique du direct (fins décidées par le téléphone) : {(() => { try { const l = JSON.parse(localStorage.getItem('sf_legacy_ft') ?? '[]'); return l.length ? l.slice(-4).map(x => `${new Date(x.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} ${x.kind} — ${x.name}`).join(' · ') : 'aucune ✅' } catch { return '—' } })()}</div>
       <div>derniers lancements (le plus récent en bas) :</div>
-      {getBootLog().slice(-6).map((b, i) => <div key={'b' + i} style={{ opacity: 0.85, color: /NON DEMANDÉE/.test(b.reason) ? '#fca5a5' : undefined }}>{new Date(b.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {b.reason}{b.err ? ` (dernière erreur : ${b.err})` : ''}</div>)}
+      {getBootLog().slice(-6).map((b, i) => <div key={'b' + i} style={{ opacity: 0.85, color: /NON DEMANDÉE/.test(b.reason) ? '#fca5a5' : undefined }}>{new Date(b.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {b.reason}{b.cache ? ` · cache ${b.cache}` : ''}{b.err ? ` (dernière erreur : ${b.err})` : ''}</div>)}
       <div>requêtes depuis le lancement : {nApi} · les plus lentes :</div>
       {slow.map((r, i) => <div key={i} style={{ opacity: 0.85 }}>{(r.s / 1000).toFixed(1)}s +{(r.d / 1000).toFixed(1)}s {r.u}</div>)}
     </div>

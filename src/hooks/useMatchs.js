@@ -309,7 +309,9 @@ export function useH2HHistory(selectedComp, compMatches) {
   const { data } = useQuery({
     queryKey: ['h2hHistory', selectedComp, baseYear],
     queryFn: () => fetchH2HHistory(selectedComp, compMatches),
-    enabled: !!selectedComp,
+    // Compétitions absentes de football-data.org (NL, CAN, coupes…) : rien à demander (15/11, check-up :
+    // l'Accueil appelait /competitions/NL/matches → 404 puis 429, du quota football-data gâché).
+    enabled: !!selectedComp && !ESPN_SOURCED_COMPS.has(selectedComp),
     staleTime: H2H_HISTORY_CACHE_TTL,
     retry: 1,
   })
