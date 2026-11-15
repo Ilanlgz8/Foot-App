@@ -79,6 +79,11 @@ const ESPN_STATUS_MAP = {
   STATUS_FINAL_PEN:   'FINISHED',
   STATUS_POSTPONED:   'POSTPONED',
   STATUS_CANCELED:    'CANCELLED',
+  // Match interrompu (15/11, Rayo–Athletic : arrêté puis reprogrammé au 9/12). ESPN le marque
+  // « post » : sans cette ligne il passait pour TERMINÉ 0-0, et restait en tête des « Terminés 24 h »
+  // des Pronos jusqu'à sa nouvelle date.
+  STATUS_SUSPENDED:   'SUSPENDED',
+  STATUS_ABANDONED:   'SUSPENDED',
 }
 
 // ⚠️ BUG CORRIGÉ (15/08, confirmé en DIRECT sur Séville-Rayo, LaLiga : fetch
@@ -255,7 +260,9 @@ function normalizeEvent(event, compCode, overrides = {}) {
   const comp = event?.competitions?.[0]
   if (!comp) return null
 
-  const status = mapStatus(comp.status?.type)
+  let status = mapStatus(comp.status?.type)
+  // Interrompu mais déjà reprogrammé (date future) : à venir, pour apparaître dans Programme.
+  if (status === 'SUSPENDED' && Date.parse(event?.date ?? comp.date) > Date.now()) status = 'TIMED'
   const home = comp.competitors?.find(c => c.homeAway === 'home')
   const away = comp.competitors?.find(c => c.homeAway === 'away')
   if (!home || !away) return null

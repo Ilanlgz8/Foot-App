@@ -35,6 +35,7 @@ import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS, compForMatch } from '.
 import { translateTeam } from '../data/teamNames'
 import { useSwipe } from '../hooks/useSwipe'
 import { AiAssistant } from './AiAssistant'
+import { FormDiamonds } from '../accueil/FormDiamonds'
 import '../../pronos.css'
 
 const TABS = ['pronos', 'resultat', 'classement']
@@ -174,6 +175,16 @@ function outcomeOf(h, a) {
 // forme d'une compétition écraser celle de l'autre — même bug que sur
 // l'Accueil, ce calcul de prono partage la même source de données). On
 // pioche maintenant le formMap DE LA COMPÉTITION du match, jamais fusionné.
+// Forme récente des 2 équipes (5 derniers résultats, même source que le calcul du prono) —
+// aussi affichée sous les noms dans la ligne de saisie (15/11, demande utilisateur).
+function matchForms(match, formMapByComp, matchesByComp) {
+  const compMatches = matchesByComp?.[match?.competition?.code] ?? []
+  const formMap = formMapByComp?.[match?.competition?.code] ?? {}
+  const homeId = resolveFdTeamId(match?.homeTeam, compMatches, { loose: true, strict: true })
+  const awayId = resolveFdTeamId(match?.awayTeam, compMatches, { loose: true, strict: true })
+  return [formMap?.[formKey(match, homeId)] ?? [], formMap?.[formKey(match, awayId)] ?? []]
+}
+
 function matchProno(match, formMapByComp, matchesByComp, lowerDivByComp) {
   const compMatches = matchesByComp?.[match?.competition?.code] ?? []
   const formMap = formMapByComp?.[match?.competition?.code] ?? {}
@@ -467,6 +478,7 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, saveStatu
   const a = parseInt(away, 10)
   const hasValidPred = Number.isInteger(h) && Number.isInteger(a) && h >= 0 && h <= 20 && a >= 0 && a <= 20
   const prono = useMemo(() => matchProno(match, formMapByComp, matchesByComp, lowerDivByComp), [match, formMapByComp, matchesByComp, lowerDivByComp])
+  const [homeForm, awayForm] = useMemo(() => matchForms(match, formMapByComp, matchesByComp), [match, formMapByComp, matchesByComp])
   const potentialPoints = hasValidPred ? pronoPointsForProb(prono[outcomeOf(h, a)]) : null
 
   return (
@@ -479,6 +491,7 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, saveStatu
         <div className="pronos__team">
           <TeamCrest team={match.homeTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.homeTeam)}</span>
+          <FormDiamonds form={homeForm} />
         </div>
         <div className="pronos__scoreCol">
           <div className="pronos__scoreGroup">
@@ -515,6 +528,7 @@ const MatchPredictRow = memo(function MatchPredictRow({ match, myPred, saveStatu
         <div className="pronos__team">
           <TeamCrest team={match.awayTeam} isWC={isWCMatch(match)} />
           <span className="pronos__teamName">{teamName(match.awayTeam)}</span>
+          <FormDiamonds form={awayForm} />
         </div>
       </div>
     </div>
@@ -844,7 +858,12 @@ function Pronos() {
     // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
     return finishedAll
-      .filter(m => now - new Date(m.utcDate).getTime() < FINISHED_DISPLAY_MS)
+      .filter(m => {
+        // Coup d'envoi passé obligatoire : un match « terminé » daté dans le futur (match
+        // interrompu puis reprogrammé) ne doit pas rester affiché ici jusqu'à sa nouvelle date.
+        const age = now - new Date(m.utcDate).getTime()
+        return age >= 0 && age < FINISHED_DISPLAY_MS
+      })
       .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
   }, [finishedAll])
 
