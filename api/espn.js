@@ -29,7 +29,7 @@ import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
-import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock, tursoStats } from '../src/utils/tursoCache.js'
+import { tursoStats } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -241,10 +241,6 @@ const LINEUPS_PENDING_TTL = 24 * 60 * 60 // 24h — match terminé mais compo pa
 // cache une semaine entière avant d'être revérifié, au lieu de chaque jour
 // — réduit ce poste jusqu'à 7x sans aucun risque de donnée périmée (un
 // match FINISHED ne redevient jamais SCHEDULED).
-const SCOREBOARD_PAST_CHUNK_TTL      = 7 * 24 * 60 * 60    // 7j — passé récent (≤10j)
-const SCOREBOARD_OLD_PAST_CHUNK_TTL  = 365 * 24 * 60 * 60 // 365j — passé ancien, quasi permanent
-const SCOREBOARD_PAST_RECENT_DAYS    = 10
-const SCOREBOARD_FUTURE_CHUNK_TTL = 2  * 60 * 60 // 2h
 
 function ymd(d) {
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`
@@ -282,48 +278,7 @@ function splitScoreboardRange(dates) {
   return chunks
 }
 
-// TTL Redis (secondes) pour une tranche donnée, ou `null` si elle doit rester
-// live (jamais mise en cache) — voir le commentaire au-dessus.
-function scoreboardChunkTtl(chunkDates) {
-  const [startStr, endStr] = chunkDates.includes('-') ? chunkDates.split('-') : [chunkDates, chunkDates]
-  const today        = new Date(); today.setUTCHours(0, 0, 0, 0)
-  const todayPlus2    = new Date(today.getTime() + 2 * 86_400_000)
-  const recentPastCutoff = new Date(today.getTime() - SCOREBOARD_PAST_RECENT_DAYS * 86_400_000)
-  if (parseYmd(endStr) < today) {
-    return parseYmd(endStr) < recentPastCutoff ? SCOREBOARD_OLD_PAST_CHUNK_TTL : SCOREBOARD_PAST_CHUNK_TTL
-  }
-  if (parseYmd(startStr) > todayPlus2) return SCOREBOARD_FUTURE_CHUNK_TTL
-  return null
-}
 
-// ⚠️ AJOUT (21/09, demande explicite utilisateur — commandes Upstash/CPU actif
-// Vercel en forte hausse) : jusqu'ici, `fetchScoreboardChunk` faisait un
-// `kv.get` INDIVIDUEL par tranche pour vérifier le cache — avec des fenêtres
-// désormais découpées en dates individuelles (16/09, voir plus haut, jusqu'à
-// ~75 tranches par compétition) et ~17 compétitions ESPN suivies au total
-// (ESPN_SOURCED_COMPS + coupes nationales, voir useTodayMatches.js), un seul
-// chargement de page pouvait déclencher plus de 1000 commandes Redis rien
-// que pour VÉRIFIER le cache. Même principe déjà en place ailleurs dans ce
-// projet pour exactement ce problème (voir api/fifa-live.js, `kv.mget` sur
-// `espn:sum:*`/`espn:fb:*`, et cf-worker/src/index.js, MGET sur les clés de
-// suivi par match, 10/09) : Upstash facture un MGET de N clés comme UNE
-// SEULE commande, peu importe N. Toutes les clés de cache des tranches
-// CACHEABLES (celles qui ont un TTL défini — passé/futur lointain, voir
-// `scoreboardChunkTtl` ; la zone "live" ±2j autour d'aujourd'hui n'est
-// JAMAIS mise en cache, inchangé) sont donc lues en un seul aller-retour
-// AVANT de lancer le moindre fetch ESPN — voir `readCachedChunks` plus bas,
-// appelée une fois dans le handler avant `fetchScoreboardChunksStaggered`.
-// Seules les tranches réellement absentes du cache (vrai cache miss) ou
-// "live" déclenchent encore un vrai fetch ESPN, TOUJOURS par petits groupes
-// espacés (voir `fetchScoreboardChunksStaggered` plus bas, INCHANGÉE — c'est
-// ce qui protège contre le blocage anti-rafale ESPN, incident 403 du 15/09,
-// voir plus haut) : ce changement ne touche QUE la lecture du cache, jamais
-// la façon dont ESPN lui-même est interrogé.
-function safeJsonChunk(val) {
-  if (!val) return null
-  if (typeof val === 'string') { try { return JSON.parse(val) } catch { return null } }
-  return val
-}
 
 // ⚠️ MIGRÉ vers Turso le 01/10 (src/utils/tursoCache.js) : ce cache précis
 // (résultats de matchs déjà terminés, TTL jusqu'à 365j pour le passé ancien)
@@ -394,224 +349,8 @@ function slimEvent(e) {
   }
 }
 
-async function readCachedChunks(slug, chunkList) {
-  const cacheable = chunkList
-    .map(chunk => ({ chunk, ttl: scoreboardChunkTtl(chunk) }))
-    .filter(x => x.ttl != null)
-  const hits = new Map()
-  const stale = new Map()
-  if (cacheable.length === 0) return { hits, stale }
-  const keys = cacheable.map(x => `espn:sb2:${slug}:${x.chunk}`) // sb2 (16/11) : tranches allégées
-  try {
-    if (isTursoConfigured()) {
-      const rows = await tursoMgetWithStale(keys)
-      cacheable.forEach((x, i) => {
-        const row = rows[i]
-        const parsed = row ? safeJsonChunk(row.value) : null
-        if (!parsed) return
-        const val = { ok: true, events: parsed.events ?? [] }
-        if (row.expired) stale.set(x.chunk, val)
-        else hits.set(x.chunk, val)
-      })
-    } else {
-      const values = await kv.mget(...keys)
-      cacheable.forEach((x, i) => {
-        const parsed = safeJsonChunk(values[i])
-        if (parsed) hits.set(x.chunk, { ok: true, events: parsed.events ?? [] })
-      })
-    }
-  } catch { /* Turso/Redis indisponible → toutes les tranches retombent en fetch direct */ }
-  return { hits, stale }
-}
-
-const STALE_REFRESH_PER_REQUEST = 6 // = CHUNK_GROUP_SIZE : un seul groupe de requêtes ESPN en plus, au maximum
-
-// Fetch RÉEL d'une tranche auprès d'ESPN (le cache a déjà été vérifié en
-// amont par `readCachedChunks` — cette fonction n'est plus appelée QUE pour
-// un vrai cache miss ou une tranche "live"). AbortController dédié par
-// tranche (indépendant de celui de la requête simple plus bas) : plusieurs
-// tranches sont interrogées en petits groupes (voir
-// fetchScoreboardChunksStaggered plus bas), chacune doit pouvoir s'annuler
-// sans affecter les autres.
-// ⚠️ Retourne `{ ok, events }` et NON directement `{ events }` (15/09,
-// corrigé avant même le 1er déploiement de ce mécanisme) : si une tranche
-// échoue réellement (ESPN en panne/bloque, timeout), la confondre avec "0
-// match sur cette période" aurait fait perdre le filet de sécurité déjà en
-// place côté client (`fetchEspnCompMatches`, espnAdapter.js) — qui ne retombe
-// sur le cache local périmé QUE si `res.ok` est faux. Un merge qui renvoyait
-// toujours 200 avec `events:[]` en cas d'échec aurait donc fait écraser un
-// cache client valide par une liste vide à la moindre panne ESPN, PIRE que
-// le comportement d'avant ce correctif.
-// ⚠️ AJOUT (02/11, verrou "write-once" — voir tursoCache.js, tryLock, pour le
-// contexte complet du pic de 250 000+ écritures Turso confirmé par mesure
-// directe avec l'utilisateur) : LOCK_TTL_S couvre le timeout fetch ESPN (8s
-// ci-dessous) + une marge pour l'écriture cache qui suit — assez long pour
-// qu'un concurrent qui arrive pendant qu'on fetch voie le verrou encore posé,
-// assez court pour qu'un fetch qui échoue (timeout/erreur) ne bloque pas les
-// tentatives suivantes plus de 10s.
-const LOCK_TTL_S = 10
-
-async function tryClaimChunk(cacheKey) {
-  // 16/11 : verrou désactivé — 1 écriture Turso par jour de calendrier (jusqu'à 60 par requête), dans le
-  // chemin critique de la réponse, et c'est justement l'écriture qui rame chez Turso (mesuré : 6 verrous
-  // au-delà de 2,5 s → réponse en 11 s). Avec le trafic actuel, deux visiteurs qui remplissent le même
-  // jour en même temps ne coûtent qu'un appel ESPN en double, sans risque.
-  if (cacheKey) return true
-  const lockKey = `lock:${cacheKey}`
-  try {
-    if (isTursoConfigured()) return await tursoTryLock(lockKey, LOCK_TTL_S)
-    const acquired = await kv.set(lockKey, '1', { ex: LOCK_TTL_S, nx: true })
-    return !!acquired
-  } catch {
-    return true // erreur réseau/Turso/Redis → fail-open, ne jamais bloquer un vrai fetch
-  }
-}
-
-async function fetchScoreboardChunk(slug, chunkDates) {
-  const ttl = scoreboardChunkTtl(chunkDates)
-  const cacheKey = ttl != null ? `espn:sb2:${slug}:${chunkDates}` : null
-
-  // Verrou "write-once" : avant de fetcher ESPN pour une tranche CACHEABLE,
-  // on tente de la réserver. Si un AUTRE visiteur l'a déjà réservée dans les
-  // 10 dernières secondes (donc très probablement en train de faire EXACTEMENT
-  // ce même fetch+écriture à cet instant), on laisse tomber cette tranche pour
-  // CETTE requête plutôt que de dupliquer le fetch ESPN et l'écriture
-  // Turso/Redis — elle sera en cache dans quelques secondes, retrouvée au
-  // prochain poll/remontage. Jamais appliqué à la zone "live" (ttl===null,
-  // cacheKey null) : elle n'écrit de toute façon jamais en cache, aucun
-  // risque de duplication d'écriture à éviter là. `ok:false` ici n'écrase
-  // jamais les AUTRES tranches qui ont réussi (voir mergeScoreboardChunks) —
-  // traité exactement comme un échec ESPN transitoire, jamais une fausse
-  // donnée "0 match".
-  if (cacheKey && !(await tryClaimChunk(cacheKey))) {
-    return { ok: false, events: [] }
-  }
-
-  const controller = new AbortController()
-  const timeoutId  = setTimeout(() => controller.abort(), 8_000)
-  try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${chunkDates}&limit=100`
-    const response = await fetch(url, {
-      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-      signal: controller.signal,
-    })
-    if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
-    const json = await response.json()
-    const events = (json.events ?? []).map(slimEvent)
-    if (cacheKey) {
-      const stored = JSON.stringify({ events })
-      if (isTursoConfigured()) {
-        tursoSet(cacheKey, stored, ttl).catch(() => {})
-      } else {
-        kv.set(cacheKey, stored, { ex: ttl }).catch(() => {})
-      }
-    }
-    return { ok: true, events }
-  } catch {
-    return { ok: false, events: [] }
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-// ⚠️ AJOUT (15/09, incident constaté PENDANT le tout premier test de ce
-// mécanisme) : envoyer TOUTES les tranches d'un coup en Promise.all (jusqu'à
-// ~31 pour la fenêtre complète 60j/150j) a fait répondre ESPN en 403 sur les
-// requêtes suivantes, y compris des requêtes simples déjà validées quelques
-// minutes plus tôt — un vrai blocage anti-rafale côté ESPN, déclenché par ce
-// nombre de requêtes simultanées depuis la même IP serveur (celle de Vercel).
-// Même principe déjà appliqué côté client pour la même raison
-// (ESPN_CALL_STAGGER_MS, useTodayMatches.js/useMatchs.js) : petits groupes de
-// GROUP_SIZE tranches à la fois, avec une pause entre chaque groupe, plutôt
-// qu'une rafale totale. Les tranches déjà en cache Redis (le cas normal une
-// fois la fenêtre "chauffée" une 1ère fois) ne comptent pas dans la rafale —
-// seuls les VRAIS appels ESPN sont espacés (le cache répond immédiatement).
-// ⚠️ AJUSTÉ (16/09, en même temps que le passage à des tranches d'1 jour) :
-// beaucoup plus de tranches par fenêtre désormais (jusqu'à ~75 au lieu de
-// ~31) — groupes légèrement plus larges (6 au lieu de 5) avec un espacement
-// un peu réduit (150ms au lieu de 200ms) pour rester sous la limite
-// d'exécution Vercel (maxDuration, voir vercel.json) sur un cache totalement
-// froid, tout en gardant un vrai espacement anti-rafale (l'incident 403 du
-// 15/09 avait été déclenché par une rafale de ~31 requêtes SIMULTANÉES sans
-// aucun espacement — un groupe de 6 espacé de 150ms reste loin de ce
-// scénario).
-const CHUNK_GROUP_SIZE   = 6
-const CHUNK_GROUP_DELAY_MS = 150
-
-// ⚠️ AJOUT (30/09, suite au constat utilisateur "Fluid Active CPU" toujours
-// trop élevé après le retrait des buteurs NL — root cause bien PLUS grosse
-// trouvée en creusant plus loin) : `readCachedChunks` (voir plus haut) ne
-// fait AUCUNE distinction entre "vrai cache miss" et "Redis indisponible" —
-// dans ce 2e cas (`catch` silencieux, quota Upstash épuisé confirmé le
-// 26/09), TOUTES les tranches d'une fenêtre retombent en fetch ESPN réel,
-// pour CHAQUE requête non absorbée par le cache Edge 90s ci-dessous. Combiné
-// à l'élargissement à 400j+60j pour les 8 slugs sporadiques (NL/CAN/COPA/
-// UEL/UECL/TDC/CS/USC, voir espnAdapter.js, fix du 29/09 pour "forme
-// récente"/"stats saison" absentes) — jusqu'à ~460 tranches/jour à fetcher
-// RÉELLEMENT sur ESPN à CHAQUE cycle de cache Edge (toutes les ~90s tant
-// qu'il y a du trafic), au lieu des ~75 tranches du défaut normal (30j+45j)
-// — plus de 6x le volume, largement suffisant pour expliquer la majorité du
-// pic CPU à lui seul, sans même compter le bug buteurs déjà corrigé. Plutôt
-// que de re-réduire la fenêtre (qui règle le confort actuel de NL en pleine
-// journée internationale, voir son propre commentaire), plafond DUR
-// indépendant de la cause : jamais plus de MAX_FETCH_CHUNKS tranches
-// réellement envoyées à ESPN en une seule exécution de cette fonction, quelle
-// que soit la largeur de la fenêtre demandée — protège structurellement
-// contre CE scénario (Redis en panne + fenêtre large) ET contre toute
-// combinaison future du même genre, sans dépendre de deviner correctement
-// l'état de Redis à l'avance. Quand le nombre de tranches à fetcher dépasse
-// ce plafond, on garde seulement les plus PROCHES d'aujourd'hui (triées par
-// distance absolue) — c'est la partie la plus utile (forme récente/prochain
-// match) qui est préservée, les tranches lointaines (passé ancien/futur
-// lointain) sont sacrifiées en premier plutôt qu'un tronquage arbitraire par
-// ordre chronologique. 60 : couvre confortablement le besoin normal (~75j
-// pour les grands championnats, déjà servi en 1 seule fois avant ce plafond)
-// sans jamais dépasser une fraction du budget d'exécution (`maxDuration: 30`,
-// vercel.json) même à froid total (aucune tranche déjà en cache).
-//
-// ⚠️ RESSERRÉ PUIS REREMONTÉ (02/11) : resserré 60 → 20 le même jour, sur la
-// base d'une 1ère hypothèse ("+15 000 lignes Turso en 5min sans ouvrir
-// l'app" — trafic d'autres visiteurs sur un compte Turso tout juste créé,
-// donc intégralement froid). Cette hypothèse n'était pas fausse en soi
-// (confirmé par "Top Queries" : `INSERT INTO espn_cache` reste à un rythme
-// tout à fait normal, 3,71K lignes/jour) mais elle n'était PAS la vraie
-// cause du pic de 300K+ écritures/jour constaté le même jour — la vraie
-// cause, trouvée ensuite via le même dashboard "Top Queries", était un bug
-// dans `cf-worker/src/tursoKv.js` (`expire()` réécrivait TOUTE la file
-// `worker_queue` à chaque appel au lieu des seules lignes neuves, voir
-// l'entrée CLAUDE.md du 02/11) — corrigé et déployé séparément, sans
-// rapport avec ce fichier. Une fois cette vraie cause réglée, remonté à 60
-// (demande explicite utilisateur) : le verrou write-once (`tryLock`,
-// `src/utils/tursoCache.js`, ajouté le même jour) protège déjà contre la
-// duplication d'écriture par PLUSIEURS visiteurs sur LA MÊME tranche — ce
-// que 20 au lieu de 60 ne protégeait pas mieux de toute façon (20 limite le
-// nombre de tranches DIFFÉRENTES par requête, pas la concurrence entre
-// visiteurs). 60 reste un plafond dur, indépendant de toute cause (Redis/
-// Turso en panne, fenêtre large) : jamais plus de 60 tranches réellement
-// envoyées à ESPN en une seule exécution, quelle que soit la largeur de la
-// fenêtre demandée — protège structurellement contre un scénario comme
-// celui du 30/09 (jusqu'à ~460 tranches sans ce plafond) sans dépendre de
-// deviner l'état de Redis/Turso à l'avance. Quand le nombre de tranches à
-// fetcher dépasse ce plafond, on garde seulement les plus PROCHES
-// d'aujourd'hui (triées par distance absolue) — c'est la partie la plus
-// utile (forme récente/prochain match) qui est préservée. 60 couvre
-// confortablement le besoin normal (~75j pour les grands championnats, déjà
-// servi en 1 seule fois) sans jamais dépasser une fraction du budget
-// d'exécution (`maxDuration: 30`, vercel.json) même à froid total.
-const MAX_FETCH_CHUNKS = 60
-
-async function fetchScoreboardChunksStaggered(slug, chunkList) {
-  const results = []
-  for (let i = 0; i < chunkList.length; i += CHUNK_GROUP_SIZE) {
-    const group = chunkList.slice(i, i + CHUNK_GROUP_SIZE)
-    results.push(...await Promise.all(group.map(c => fetchScoreboardChunk(slug, c))))
-    if (i + CHUNK_GROUP_SIZE < chunkList.length) {
-      await new Promise(r => setTimeout(r, CHUNK_GROUP_DELAY_MS))
-    }
-  }
-  return results
-}
-
+// 16/11 : tranches par jour + cache Turso + verrous supprimés — remplacés par un appel ESPN par mois
+// (voir le mode « plage de dates » du handler).
 // Fusionne les tranches : `ok:false` si TOUTES ont échoué (préserve le filet
 // de sécurité client, voir commentaire de fetchScoreboardChunk), sinon
 // combine les `events` de celles qui ont réussi — dédupliqués par id (les
@@ -1186,32 +925,38 @@ export default async function handler(req, res) {
       // coup (voir readCachedChunks plus haut) — seules celles non trouvées
       // (vrai cache miss ou zone "live") sont réellement fetchées auprès
       // d'ESPN, toujours par petits groupes espacés (anti-rafale, inchangé).
-      const tCache0 = Date.now()
-      const { hits: cachedByChunk, stale: staleByChunk } = await readCachedChunks(slug, chunks)
-      const tCache = Date.now() - tCache0
-      const todayUtc = new Date(); todayUtc.setUTCHours(0, 0, 0, 0)
-      const byNearest = (a, b) => Math.abs(parseYmd(a) - todayUtc) - Math.abs(parseYmd(b) - todayUtc)
-      let toFetch = chunks.filter(c => !cachedByChunk.has(c) && !staleByChunk.has(c))
-      // Voir MAX_FETCH_CHUNKS plus haut : plafond dur, indépendant de la
-      // cause (Redis en panne, fenêtre large, ou les deux à la fois) — garde
-      // les tranches les plus proches d'aujourd'hui en priorité.
-      // Réponse partielle (jours non encore en cache laissés de côté) : cache court, sinon
-      // le CDN garde 1 h une liste incomplète (14/11 : qualifs LDC vides au 1er chargement).
-      const partial = toFetch.length > MAX_FETCH_CHUNKS
-      if (partial) {
-        toFetch = [...toFetch].sort(byNearest).slice(0, MAX_FETCH_CHUNKS)
+      // 16/11 : un appel ESPN par MOIS (`dates=YYYYMM`, vérifié sur 7 compétitions — Ligue 1, LDC,
+      // Ligue des Nations, Premier League, qualifs…) au lieu d'un par JOUR. Une fenêtre de 15 mois = 16
+      // appels en parallèle (~0,3-0,5 s), toujours complète, sans passer par Turso (dont les écritures
+      // ralentissaient tout : réponses jusqu'à 30 s le 16/11). Le cache CDN de Vercel (plus bas) évite de
+      // refaire ces appels à chaque visiteur.
+      const tCache = 0
+      const months = []
+      {
+        const first = parseYmd(chunks[0]); const last = parseYmd(chunks[chunks.length - 1])
+        const d = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1))
+        while (d <= last) {
+          months.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+          d.setUTCMonth(d.getUTCMonth() + 1)
+        }
       }
-      // Jours expirés (voir readCachedChunks) : on n'en rafraîchit que quelques-uns, les plus proches.
-      const staleToRefresh = [...staleByChunk.keys()].sort(byNearest).slice(0, STALE_REFRESH_PER_REQUEST)
-      const refreshSet = new Set(staleToRefresh)
-      const fetchList = [...toFetch, ...staleToRefresh]
+      const fetchList = months
+      const partial = false
       const tFetch0 = Date.now()
-      const fetchedRaw = await fetchScoreboardChunksStaggered(slug, fetchList)
+      const results = await Promise.all(months.map(async ym => {
+        try {
+          const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${ym}&limit=300`, {
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+            signal: AbortSignal.timeout(8_000),
+          })
+          if (!r.ok) return { ok: false, events: [] }
+          const j = await r.json()
+          return { ok: true, events: (j.events ?? []).map(slimEvent) }
+        } catch {
+          return { ok: false, events: [] }
+        }
+      }))
       const tFetch = Date.now() - tFetch0
-      // Un rafraîchissement raté (ESPN lent, verrou pris par une autre requête…) retombe sur la copie expirée.
-      const fetched = fetchedRaw.map((r, i) => (r.ok || !staleByChunk.has(fetchList[i])) ? r : staleByChunk.get(fetchList[i]))
-      const staleServed = [...staleByChunk.entries()].filter(([c]) => !refreshSet.has(c)).map(([, v]) => v)
-      const results = [...cachedByChunk.values(), ...fetched, ...staleServed]
       clearTimeout(timeoutId)
       const merged = mergeScoreboardChunks(results)
       // Toutes les tranches ont échoué (ESPN en panne/bloque) : un vrai

@@ -14,7 +14,6 @@ vi.mock('../utils/tursoCache.js', () => ({
   tursoStats: { timeouts: 0, byOp: {} },
 }))
 
-const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, '')
 function res() {
   const r = { code: 200, headers: {}, body: null }
   r.status = c => { r.code = c; return r }
@@ -25,24 +24,22 @@ function res() {
   return r
 }
 
-describe('fenêtre ESPN avec jours expirés', () => {
-  beforeEach(() => { rows.clear(); vi.restoreAllMocks() })
+describe('fenêtre ESPN : un appel par mois (16/11)', () => {
+  beforeEach(() => { vi.restoreAllMocks() })
 
-  it("sert les jours expirés sans tous les retélécharger", async () => {
-    const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-    const start = new Date(today.getTime() + 3 * 86400000)
-    const days = []
-    for (let i = 0; i < 40; i++) days.push(ymd(new Date(start.getTime() + i * 86400000)))
-    days.forEach((d, i) => rows.set(`espn:sb2:fra.1:${d}`, { value: JSON.stringify({ events: [{ id: `e${i}` }] }), expired: true }))
-    const fetchMock = vi.fn(async url => ({ ok: true, json: async () => ({ events: [{ id: 'fresh-' + url.match(/dates=(\d+)/)[1] }] }) }))
+  it('découpe la plage en mois, fusionne et allège les matchs', async () => {
+    const fetchMock = vi.fn(async url => {
+      const ym = url.match(/dates=(\d{6})&/)[1]
+      return { ok: true, json: async () => ({ events: [{ id: 'e' + ym, date: '2026-01-01T20:00Z', odds: [1, 2, 3], competitions: [{ competitors: [] }] }] }) }
+    })
     vi.stubGlobal('fetch', fetchMock)
     const { default: handler } = await import('../../api/espn.js')
     const r = res()
-    await handler({ method: 'GET', headers: {}, query: { slug: 'fra.1', dates: `${days[0]}-${days[39]}` } }, r)
+    await handler({ method: 'GET', headers: {}, query: { slug: 'fra.1', dates: '20261017-20270115' } }, r)
     expect(r.code).toBe(200)
-    expect(fetchMock).toHaveBeenCalledTimes(6)          // seuls les 6 jours les plus proches sont rafraîchis
-    const ids = (r.body.events ?? []).map(e => e.id)
-    expect(ids.length).toBe(40)                          // tous les jours sont servis
-    expect(ids.filter(id => id.startsWith('fresh-')).length).toBe(6)
+    expect(fetchMock).toHaveBeenCalledTimes(4)            // oct, nov, déc, janv
+    const ids = r.body.events.map(e => e.id).sort()
+    expect(ids).toEqual(['e202610', 'e202611', 'e202612', 'e202701'])
+    expect(r.body.events[0].odds).toBeUndefined()         // champs inutiles retirés
   })
 })
