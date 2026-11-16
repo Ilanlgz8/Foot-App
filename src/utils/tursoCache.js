@@ -35,29 +35,8 @@
 
 import { createClient } from '@libsql/client'
 
-// Délai maximal par appel Turso (16/11 : requêtes « calendrier » bloquées 30 s puis 504 sur le
-// téléphone de l'utilisateur, Accueil affiché après 11,6 s). Turso lent ou injoignable ne doit jamais
-// bloquer une réponse : passé ce délai, on fait comme si le cache était vide (lecture) ou libre (verrou).
-const TURSO_TIMEOUT_MS = 2500
-export const tursoStats = { timeouts: 0, byOp: {} }
-// Après un délai dépassé, Turso est mis de côté 60 s pour CETTE instance : les appels suivants
-// répondent tout de suite (cache vide / verrou libre) au lieu d'attendre 2,5 s chacun.
-let tursoPausedUntil = 0
-function withTimeout(run, fallback, op = '?') {
-  if (Date.now() < tursoPausedUntil) return Promise.resolve(fallback)
-  let t
-  return Promise.race([
-    Promise.resolve().then(run).finally(() => clearTimeout(t)),
-    new Promise(resolve => {
-      t = setTimeout(() => {
-        tursoStats.timeouts++
-        tursoStats.byOp[op] = (tursoStats.byOp[op] ?? 0) + 1
-        tursoPausedUntil = Date.now() + 60_000
-        resolve(fallback)
-      }, TURSO_TIMEOUT_MS)
-    }),
-  ])
-}
+// 16/11 : le cache calendrier (table espn_cache) n'existe plus — calendriers par mois, voir api/espn.js.
+// Ce module ne sert plus qu'à LIRE ce que le Worker écrit (worker_kv / worker_queue).
 
 let _client = null
 function client() {
@@ -67,95 +46,6 @@ function client() {
   if (!url || !authToken) return null
   _client = createClient({ url, authToken })
   return _client
-}
-
-// Créée au premier appel réel (pas au chargement du module, pour ne jamais
-// payer ce coût si Turso n'est pas configuré) — `CREATE TABLE IF NOT EXISTS`
-// est sans risque à rappeler à chaque cold start Vercel (idempotent), le
-// cache en mémoire du module (schemaReady) évite de la refaire à chaque
-// invocation tant que l'instance serverless reste chaude.
-// ⚠️ 16/11 : le « CREATE TABLE IF NOT EXISTS » lancé avant CHAQUE premier appel d'une instance était
-// LA cause des lenteurs (mesuré : seule opération Turso à dépasser 2,5 s — une écriture de schéma,
-// lente chez Turso). La table existe : on ne la crée plus qu'en cas d'erreur « no such table »
-// (base neuve), une seule fois, en tâche de fond.
-let schemaCreating = null
-function createSchemaIfMissing(c, err) {
-  if (schemaCreating || !/no such table/i.test(String(err?.message ?? err))) return
-  schemaCreating = c.execute(`
-    CREATE TABLE IF NOT EXISTS espn_cache (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      expires_at INTEGER NOT NULL
-    )
-  `).catch(() => {}).finally(() => { schemaCreating = null })
-}
-async function ensureSchema() { /* voir createSchemaIfMissing */ }
-
-// Équivalent kv.mget : renvoie un tableau aligné sur `keys`, `null` pour
-// toute clé absente OU expirée — même contrat que le kv.mget actuel (voir
-// son usage dans readCachedChunks, api/espn.js). Jamais d'exception
-// propagée : une erreur réseau/Turso renvoie simplement tout en `null`
-// (traité par l'appelant exactement comme un cache miss générique).
-export async function mget(keys) {
-  const c = client()
-  if (!c || keys.length === 0) return keys.map(() => null)
-  try {
-    await ensureSchema(c)
-    const placeholders = keys.map(() => '?').join(',')
-    const now = Math.floor(Date.now() / 1000)
-    const res = await withTimeout(() => c.execute({
-      sql: `SELECT key, value FROM espn_cache WHERE key IN (${placeholders}) AND expires_at > ?`,
-      args: [...keys, now],
-    }), null, 'mgetStale')
-    if (!res) return keys.map(() => null)
-    const found = new Map(res.rows.map(r => [r.key, r.value]))
-    return keys.map(k => found.get(k) ?? null)
-  } catch (e) {
-    createSchemaIfMissing(c, e)
-    return keys.map(() => null)
-  }
-}
-
-// Équivalent kv.set(key, value, { ex: ttlSeconds }) — upsert (remplace la
-// valeur existante pour la même clé si déjà présente). Pensé pour un usage
-// fire-and-forget côté appelant (même pattern que l'actuel
-// kv.set(...).catch(()=>{}) dans fetchScoreboardChunk) : jamais bloquant
-// pour la réponse HTTP, les erreurs sont avalées silencieusement ici.
-// ⚠️ 06/11 : comme mget, mais renvoie AUSSI les lignes expirées (jamais supprimées de la table, seulement
-// écrasées) avec leur date d'expiration — permet de servir une copie un peu ancienne tout de suite plutôt
-// que d'attendre ESPN (voir readCachedChunks, api/espn.js). → [{ value, expired } | null]
-export async function mgetWithStale(keys) {
-  const c = client()
-  if (!c || keys.length === 0) return keys.map(() => null)
-  try {
-    await ensureSchema(c)
-    const placeholders = keys.map(() => '?').join(',')
-    const now = Math.floor(Date.now() / 1000)
-    const res = await withTimeout(() => c.execute({
-      sql: `SELECT key, value, expires_at FROM espn_cache WHERE key IN (${placeholders})`,
-      args: [...keys],
-    }), null, 'mget')
-    if (!res) return keys.map(() => null)
-    const found = new Map(res.rows.map(r => [r.key, { value: r.value, expired: Number(r.expires_at) <= now }]))
-    return keys.map(k => found.get(k) ?? null)
-  } catch (e) {
-    createSchemaIfMissing(c, e)
-    return keys.map(() => null)
-  }
-}
-
-export async function set(key, value, ttlSeconds) {
-  const c = client()
-  if (!c) return
-  try {
-    await ensureSchema(c)
-    const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds
-    await withTimeout(() => c.execute({
-      sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`,
-      args: [key, value, expiresAt],
-    }), null, 'set')
-  } catch (e) { createSchemaIfMissing(c, e) /* sinon silencieux — même contrat que kv.set(...).catch(()=>{}) */ }
 }
 
 // Permet à api/espn.js de choisir le chemin Turso seulement si les
@@ -182,46 +72,6 @@ export function isTursoConfigured() {
   return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN)
 }
 
-// ── Verrou "write-once" (02/11) ──────────────────────────────────────────────
-// Ajouté suite à la découverte en direct (avec l'utilisateur, via la console
-// SQL Turso) que ~1701 clés distinctes dans espn_cache avaient généré 250 000+
-// LIGNES ÉCRITES — preuve chiffrée d'un effet "thundering herd" : sur une base
-// tout juste créée (donc intégralement froide), plusieurs visiteurs arrivant
-// dans la même fenêtre de quelques secondes voient chacun un cache miss pour
-// LA MÊME tranche de scoreboard ESPN avant qu'aucun n'ait eu le temps de
-// l'écrire — et la réécrivent chacun de leur côté, en pure perte. La réduction
-// de fréquence de polling côté client (useTeamForm.js, même jour) diminue le
-// RISQUE de collision mais ne l'élimine pas structurellement — ceci est le
-// vrai "write-once" demandé : avant de fetcher ESPN pour une tranche jamais
-// encore en cache, chaque requête tente de la RÉSERVER (émulation SET NX déjà
-// éprouvée ailleurs dans ce projet, voir cf-worker/src/tursoKv.js). Seule la
-// requête qui gagne la course fetch+écrit réellement ; les autres renvoient
-// juste "pas de données pour cette tranche cette fois" (traité par l'appelant,
-// voir mergeScoreboardChunks dans api/espn.js, exactement comme un échec ESPN
-// transitoire — jamais une fausse donnée "0 match") — la tranche sera en
-// cache quelques secondes plus tard, retrouvée au prochain poll/remontage.
-// Fail-open si Turso est indisponible (renvoie true, comme n'importe quel
-// autre verrou de ce type dans ce projet — jamais bloquer un vrai fetch pour
-// un verrou qu'on n'a pas pu poser).
-export async function tryLock(key, ttlSeconds) {
-  const c = client()
-  if (!c) return true
-  try {
-    await ensureSchema(c)
-    const now = Math.floor(Date.now() / 1000)
-    const expiresAt = now + ttlSeconds
-    const res = await withTimeout(() => c.execute({
-      sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, '1', ?)
-            ON CONFLICT(key) DO UPDATE SET value = '1', expires_at = excluded.expires_at
-            WHERE espn_cache.expires_at <= ?`,
-      args: [key, expiresAt, now],
-    }), null, 'lock')
-    if (!res) return true // délai dépassé → verrou considéré libre (comme une erreur)
-    return res.rowsAffected > 0
-  } catch {
-    return true
-  }
-}
 
 // ── Lecture de l'état du Worker Cloudflare (01/10) ──────────────────────────
 // cf-worker/src/tursoKv.js (migration du cron Cloudflare vers Turso, voir son

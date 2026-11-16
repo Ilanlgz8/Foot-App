@@ -11,7 +11,6 @@ vi.mock('../utils/tursoCache.js', () => ({
   tryLock: async () => true,
   mget: async keys => keys.map(() => null),
   workerKvGet: async () => null,
-  tursoStats: { timeouts: 0, byOp: {} },
 }))
 
 function res() {

@@ -29,7 +29,6 @@ import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
-import { tursoStats } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -930,7 +929,6 @@ export default async function handler(req, res) {
       // appels en parallèle (~0,3-0,5 s), toujours complète, sans passer par Turso (dont les écritures
       // ralentissaient tout : réponses jusqu'à 30 s le 16/11). Le cache CDN de Vercel (plus bas) évite de
       // refaire ces appels à chaque visiteur.
-      const tCache = 0
       const months = []
       {
         const first = parseYmd(chunks[0]); const last = parseYmd(chunks[chunks.length - 1])
@@ -1048,7 +1046,7 @@ export default async function handler(req, res) {
         .setHeader('Content-Type', 'application/json')
         .setHeader('Cache-Control', `public, s-maxage=${scoreboardTtl}, stale-while-revalidate=${scoreboardTtl * 2}`)
         // Durées (16/11) : lecture du cache Turso, appels ESPN, nombre d'appels ESPN, délais Turso dépassés.
-        .setHeader('Server-Timing', `cache;dur=${tCache}, espn;dur=${tFetch};desc="${fetchList.length}", tto;desc="${tursoStats.timeouts} ${Object.entries(tursoStats.byOp).map(([k, v]) => k + '=' + v).join(' ')}"`)
+        .setHeader('Server-Timing', `espn;dur=${tFetch};desc="${fetchList.length}"`)
         .json({ events: merged.events })
     }
 
