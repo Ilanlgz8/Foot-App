@@ -409,7 +409,8 @@ async function fetchEspnWindowJson(slug) {
   const note = (info) => {
     try { (window.__sfEspnWin ??= {})[slug] = { at: t0, ms: Date.now() - t0, ...info } } catch { /* hors navigateur */ }
   }
-  const promise = fetch(`/espn?slug=${slug}&dates=${windowRange(slug)}`)
+  // 12 s max (16/11) : un serveur bloqué ne doit plus faire attendre 30 s avant le repli sur le cache.
+  const promise = fetch(`/espn?slug=${slug}&dates=${windowRange(slug)}`, { signal: AbortSignal.timeout?.(12_000) })
     .then(res => { if (!res.ok) note({ status: res.status }); return res.ok ? res.json() : null })
     .catch(e => { note({ err: String(e?.message ?? e).slice(0, 60) }); return null })
     .then(json => {

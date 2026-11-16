@@ -10,6 +10,8 @@ vi.mock('../utils/tursoCache.js', () => ({
   set: async () => {},
   tryLock: async () => true,
   mget: async keys => keys.map(() => null),
+  workerKvGet: async () => null,
+  tursoStats: { timeouts: 0 },
 }))
 
 const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, '')

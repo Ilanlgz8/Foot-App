@@ -29,7 +29,7 @@ import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
-import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock } from '../src/utils/tursoCache.js'
+import { mgetWithStale as tursoMgetWithStale, set as tursoSet, isTursoConfigured, tryLock as tursoTryLock, tursoStats } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -1137,7 +1137,9 @@ export default async function handler(req, res) {
       // coup (voir readCachedChunks plus haut) — seules celles non trouvées
       // (vrai cache miss ou zone "live") sont réellement fetchées auprès
       // d'ESPN, toujours par petits groupes espacés (anti-rafale, inchangé).
+      const tCache0 = Date.now()
       const { hits: cachedByChunk, stale: staleByChunk } = await readCachedChunks(slug, chunks)
+      const tCache = Date.now() - tCache0
       const todayUtc = new Date(); todayUtc.setUTCHours(0, 0, 0, 0)
       const byNearest = (a, b) => Math.abs(parseYmd(a) - todayUtc) - Math.abs(parseYmd(b) - todayUtc)
       let toFetch = chunks.filter(c => !cachedByChunk.has(c) && !staleByChunk.has(c))
@@ -1154,7 +1156,9 @@ export default async function handler(req, res) {
       const staleToRefresh = [...staleByChunk.keys()].sort(byNearest).slice(0, STALE_REFRESH_PER_REQUEST)
       const refreshSet = new Set(staleToRefresh)
       const fetchList = [...toFetch, ...staleToRefresh]
+      const tFetch0 = Date.now()
       const fetchedRaw = await fetchScoreboardChunksStaggered(slug, fetchList)
+      const tFetch = Date.now() - tFetch0
       // Un rafraîchissement raté (ESPN lent, verrou pris par une autre requête…) retombe sur la copie expirée.
       const fetched = fetchedRaw.map((r, i) => (r.ok || !staleByChunk.has(fetchList[i])) ? r : staleByChunk.get(fetchList[i]))
       const staleServed = [...staleByChunk.entries()].filter(([c]) => !refreshSet.has(c)).map(([, v]) => v)
@@ -1249,6 +1253,8 @@ export default async function handler(req, res) {
       return res.status(200)
         .setHeader('Content-Type', 'application/json')
         .setHeader('Cache-Control', `public, s-maxage=${scoreboardTtl}, stale-while-revalidate=${scoreboardTtl * 2}`)
+        // Durées (16/11) : lecture du cache Turso, appels ESPN, nombre d'appels ESPN, délais Turso dépassés.
+        .setHeader('Server-Timing', `cache;dur=${tCache}, espn;dur=${tFetch};desc="${fetchList.length}", tto;desc="${tursoStats.timeouts}"`)
         .json({ events: merged.events })
     }
 
