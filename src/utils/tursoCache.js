@@ -39,11 +39,11 @@ import { createClient } from '@libsql/client'
 // téléphone de l'utilisateur, Accueil affiché après 11,6 s). Turso lent ou injoignable ne doit jamais
 // bloquer une réponse : passé ce délai, on fait comme si le cache était vide (lecture) ou libre (verrou).
 const TURSO_TIMEOUT_MS = 2500
-export const tursoStats = { timeouts: 0 }
+export const tursoStats = { timeouts: 0, byOp: {} }
 // Après un délai dépassé, Turso est mis de côté 60 s pour CETTE instance : les appels suivants
 // répondent tout de suite (cache vide / verrou libre) au lieu d'attendre 2,5 s chacun.
 let tursoPausedUntil = 0
-function withTimeout(run, fallback) {
+function withTimeout(run, fallback, op = '?') {
   if (Date.now() < tursoPausedUntil) return Promise.resolve(fallback)
   let t
   return Promise.race([
@@ -51,6 +51,7 @@ function withTimeout(run, fallback) {
     new Promise(resolve => {
       t = setTimeout(() => {
         tursoStats.timeouts++
+        tursoStats.byOp[op] = (tursoStats.byOp[op] ?? 0) + 1
         tursoPausedUntil = Date.now() + 60_000
         resolve(fallback)
       }, TURSO_TIMEOUT_MS)
@@ -84,7 +85,7 @@ async function ensureSchema(c) {
     )
   `)
   try {
-    const ok = await withTimeout(() => schemaReady.then(() => true), false)
+    const ok = await withTimeout(() => schemaReady.then(() => true), false, 'schema')
     if (!ok) { schemaReady = null; throw new Error('Turso : délai dépassé (schéma)') }
   } catch (e) {
     schemaReady = null // un échec ne doit pas rester "en cache" pour toujours
@@ -108,7 +109,7 @@ export async function mget(keys) {
     const res = await withTimeout(() => c.execute({
       sql: `SELECT key, value FROM espn_cache WHERE key IN (${placeholders}) AND expires_at > ?`,
       args: [...keys, now],
-    }), null)
+    }), null, 'mgetStale')
     if (!res) return keys.map(() => null)
     const found = new Map(res.rows.map(r => [r.key, r.value]))
     return keys.map(k => found.get(k) ?? null)
@@ -135,7 +136,7 @@ export async function mgetWithStale(keys) {
     const res = await withTimeout(() => c.execute({
       sql: `SELECT key, value, expires_at FROM espn_cache WHERE key IN (${placeholders})`,
       args: [...keys],
-    }), null)
+    }), null, 'mget')
     if (!res) return keys.map(() => null)
     const found = new Map(res.rows.map(r => [r.key, { value: r.value, expired: Number(r.expires_at) <= now }]))
     return keys.map(k => found.get(k) ?? null)
@@ -154,7 +155,7 @@ export async function set(key, value, ttlSeconds) {
       sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, ?, ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`,
       args: [key, value, expiresAt],
-    }), null)
+    }), null, 'set')
   } catch { /* silencieux — même contrat que kv.set(...).catch(()=>{}) actuel */ }
 }
 
@@ -215,7 +216,7 @@ export async function tryLock(key, ttlSeconds) {
             ON CONFLICT(key) DO UPDATE SET value = '1', expires_at = excluded.expires_at
             WHERE espn_cache.expires_at <= ?`,
       args: [key, expiresAt, now],
-    }), null)
+    }), null, 'lock')
     if (!res) return true // délai dépassé → verrou considéré libre (comme une erreur)
     return res.rowsAffected > 0
   } catch {

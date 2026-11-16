@@ -11,7 +11,7 @@ vi.mock('../utils/tursoCache.js', () => ({
   tryLock: async () => true,
   mget: async keys => keys.map(() => null),
   workerKvGet: async () => null,
-  tursoStats: { timeouts: 0 },
+  tursoStats: { timeouts: 0, byOp: {} },
 }))
 
 const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, '')

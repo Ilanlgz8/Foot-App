@@ -1254,7 +1254,7 @@ export default async function handler(req, res) {
         .setHeader('Content-Type', 'application/json')
         .setHeader('Cache-Control', `public, s-maxage=${scoreboardTtl}, stale-while-revalidate=${scoreboardTtl * 2}`)
         // Durées (16/11) : lecture du cache Turso, appels ESPN, nombre d'appels ESPN, délais Turso dépassés.
-        .setHeader('Server-Timing', `cache;dur=${tCache}, espn;dur=${tFetch};desc="${fetchList.length}", tto;desc="${tursoStats.timeouts}"`)
+        .setHeader('Server-Timing', `cache;dur=${tCache}, espn;dur=${tFetch};desc="${fetchList.length}", tto;desc="${tursoStats.timeouts} ${Object.entries(tursoStats.byOp).map(([k, v]) => k + '=' + v).join(' ')}"`)
         .json({ events: merged.events })
     }
 
