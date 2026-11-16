@@ -314,14 +314,33 @@ function getLocalDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+const UPCOMING_COPY_KEYS = ['matches_ALL_V3_30_SCHEDULED', 'matches_ALL_V3_7_SCHEDULED']
+function matchesOfDayFromUpcoming(day) {
+  for (const k of UPCOMING_COPY_KEYS) {
+    const list = readCacheStale(k)
+    if (!Array.isArray(list)) continue
+    const out = list.filter(m => {
+      if (!m?.utcDate) return false
+      const d = new Date(m.utcDate)
+      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return local === day
+    })
+    if (out.length > 0) return out
+  }
+  return null
+}
+
 export function useTodayMatches(targetDate) {
   const today = targetDate ?? getLocalDateStr()
   const isToday = today === getLocalDateStr()
   const isPastDay = today < getLocalDateStr()   // strictement avant aujourd'hui → FINISHED, immuable
   const cacheKey = `matches_${today}`
 
-  const cachedData    = readCacheStale(cacheKey)
-  const cachedSavedAt = getCacheSavedAt(cacheKey)
+  // Pas encore de copie pour ce jour (1re ouverture de la journée) : on pioche les matchs de ce jour
+  // dans la copie « à venir » (30 jours, 16/11) — affichage immédiat, mise à jour réseau juste après.
+  const ownCopy       = readCacheStale(cacheKey)
+  const cachedData    = ownCopy ?? (isPastDay ? null : matchesOfDayFromUpcoming(today))
+  const cachedSavedAt = ownCopy ? getCacheSavedAt(cacheKey) : 0
 
   const { data, isLoading } = useQuery({
     queryKey: ['todayMatches', today],

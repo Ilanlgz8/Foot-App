@@ -234,7 +234,7 @@ const KEEP_STALE_FOR = [
   // attendait le réseau au lieu d'afficher tout de suite la dernière copie puis de la mettre à jour.
   [/^foot_matches_\d{4}-\d{2}-\d{2}$/, 3 * DAY],
   [/^foot_matches_espn_/, DAY],
-  [/^foot_matches_ALL_V3_/, DAY],
+  [/^foot_matches_ALL_V3_/, 3 * DAY],
 ]
 function shouldPurge(key, raw, now) {
   if (OBSOLETE_PREFIXES.some(p => key.startsWith(p))) return true
