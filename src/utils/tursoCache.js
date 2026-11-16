@@ -74,25 +74,22 @@ function client() {
 // est sans risque à rappeler à chaque cold start Vercel (idempotent), le
 // cache en mémoire du module (schemaReady) évite de la refaire à chaque
 // invocation tant que l'instance serverless reste chaude.
-let schemaReady = null
-async function ensureSchema(c) {
-  if (schemaReady) return schemaReady
-  schemaReady = c.execute(`
+// ⚠️ 16/11 : le « CREATE TABLE IF NOT EXISTS » lancé avant CHAQUE premier appel d'une instance était
+// LA cause des lenteurs (mesuré : seule opération Turso à dépasser 2,5 s — une écriture de schéma,
+// lente chez Turso). La table existe : on ne la crée plus qu'en cas d'erreur « no such table »
+// (base neuve), une seule fois, en tâche de fond.
+let schemaCreating = null
+function createSchemaIfMissing(c, err) {
+  if (schemaCreating || !/no such table/i.test(String(err?.message ?? err))) return
+  schemaCreating = c.execute(`
     CREATE TABLE IF NOT EXISTS espn_cache (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       expires_at INTEGER NOT NULL
     )
-  `)
-  try {
-    const ok = await withTimeout(() => schemaReady.then(() => true), false, 'schema')
-    if (!ok) { schemaReady = null; throw new Error('Turso : délai dépassé (schéma)') }
-  } catch (e) {
-    schemaReady = null // un échec ne doit pas rester "en cache" pour toujours
-    throw e
-  }
-  return schemaReady
+  `).catch(() => {}).finally(() => { schemaCreating = null })
 }
+async function ensureSchema() { /* voir createSchemaIfMissing */ }
 
 // Équivalent kv.mget : renvoie un tableau aligné sur `keys`, `null` pour
 // toute clé absente OU expirée — même contrat que le kv.mget actuel (voir
@@ -113,7 +110,8 @@ export async function mget(keys) {
     if (!res) return keys.map(() => null)
     const found = new Map(res.rows.map(r => [r.key, r.value]))
     return keys.map(k => found.get(k) ?? null)
-  } catch {
+  } catch (e) {
+    createSchemaIfMissing(c, e)
     return keys.map(() => null)
   }
 }
@@ -140,7 +138,8 @@ export async function mgetWithStale(keys) {
     if (!res) return keys.map(() => null)
     const found = new Map(res.rows.map(r => [r.key, { value: r.value, expired: Number(r.expires_at) <= now }]))
     return keys.map(k => found.get(k) ?? null)
-  } catch {
+  } catch (e) {
+    createSchemaIfMissing(c, e)
     return keys.map(() => null)
   }
 }
@@ -156,7 +155,7 @@ export async function set(key, value, ttlSeconds) {
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`,
       args: [key, value, expiresAt],
     }), null, 'set')
-  } catch { /* silencieux — même contrat que kv.set(...).catch(()=>{}) actuel */ }
+  } catch (e) { createSchemaIfMissing(c, e) /* sinon silencieux — même contrat que kv.set(...).catch(()=>{}) */ }
 }
 
 // Permet à api/espn.js de choisir le chemin Turso seulement si les
