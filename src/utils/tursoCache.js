@@ -40,11 +40,21 @@ import { createClient } from '@libsql/client'
 // bloquer une réponse : passé ce délai, on fait comme si le cache était vide (lecture) ou libre (verrou).
 const TURSO_TIMEOUT_MS = 2500
 export const tursoStats = { timeouts: 0 }
-function withTimeout(promise, fallback) {
+// Après un délai dépassé, Turso est mis de côté 60 s pour CETTE instance : les appels suivants
+// répondent tout de suite (cache vide / verrou libre) au lieu d'attendre 2,5 s chacun.
+let tursoPausedUntil = 0
+function withTimeout(run, fallback) {
+  if (Date.now() < tursoPausedUntil) return Promise.resolve(fallback)
   let t
   return Promise.race([
-    promise.finally(() => clearTimeout(t)),
-    new Promise(resolve => { t = setTimeout(() => { tursoStats.timeouts++; resolve(fallback) }, TURSO_TIMEOUT_MS) }),
+    Promise.resolve().then(run).finally(() => clearTimeout(t)),
+    new Promise(resolve => {
+      t = setTimeout(() => {
+        tursoStats.timeouts++
+        tursoPausedUntil = Date.now() + 60_000
+        resolve(fallback)
+      }, TURSO_TIMEOUT_MS)
+    }),
   ])
 }
 
@@ -74,7 +84,7 @@ async function ensureSchema(c) {
     )
   `)
   try {
-    const ok = await withTimeout(schemaReady.then(() => true), false)
+    const ok = await withTimeout(() => schemaReady.then(() => true), false)
     if (!ok) { schemaReady = null; throw new Error('Turso : délai dépassé (schéma)') }
   } catch (e) {
     schemaReady = null // un échec ne doit pas rester "en cache" pour toujours
@@ -95,7 +105,7 @@ export async function mget(keys) {
     await ensureSchema(c)
     const placeholders = keys.map(() => '?').join(',')
     const now = Math.floor(Date.now() / 1000)
-    const res = await withTimeout(c.execute({
+    const res = await withTimeout(() => c.execute({
       sql: `SELECT key, value FROM espn_cache WHERE key IN (${placeholders}) AND expires_at > ?`,
       args: [...keys, now],
     }), null)
@@ -122,7 +132,7 @@ export async function mgetWithStale(keys) {
     await ensureSchema(c)
     const placeholders = keys.map(() => '?').join(',')
     const now = Math.floor(Date.now() / 1000)
-    const res = await withTimeout(c.execute({
+    const res = await withTimeout(() => c.execute({
       sql: `SELECT key, value, expires_at FROM espn_cache WHERE key IN (${placeholders})`,
       args: [...keys],
     }), null)
@@ -140,7 +150,7 @@ export async function set(key, value, ttlSeconds) {
   try {
     await ensureSchema(c)
     const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds
-    await withTimeout(c.execute({
+    await withTimeout(() => c.execute({
       sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, ?, ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`,
       args: [key, value, expiresAt],
@@ -200,7 +210,7 @@ export async function tryLock(key, ttlSeconds) {
     await ensureSchema(c)
     const now = Math.floor(Date.now() / 1000)
     const expiresAt = now + ttlSeconds
-    const res = await withTimeout(c.execute({
+    const res = await withTimeout(() => c.execute({
       sql: `INSERT INTO espn_cache (key, value, expires_at) VALUES (?, '1', ?)
             ON CONFLICT(key) DO UPDATE SET value = '1', expires_at = excluded.expires_at
             WHERE espn_cache.expires_at <= ?`,
