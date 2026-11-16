@@ -1,4 +1,5 @@
 {
+  "regions": ["dub1"],
   "functions": {
     "api/cron-goals.js": { "maxDuration": 30 },
     "api/espn.js": { "maxDuration": 30 }
