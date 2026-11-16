@@ -92,7 +92,9 @@ const FIFA_TIMEOUT  = 7_000
 // lui-même tourne à 30-45s, voir espnTimerWorker.js, et Ably réveille de
 // toute façon un client dès qu'un AUTRE utilisateur détecte un vrai
 // changement) — aucune perte de fraîcheur perceptible attendue.
-const FRESH_TTL     = 18
+// 18 → 8 s (16/11) : avec le rythme « direct » à 15 s côté app, une copie de 18 s rendait la moitié des
+// interrogations inutiles (même donnée renvoyée).
+const FRESH_TTL     = 8
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

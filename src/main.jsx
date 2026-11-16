@@ -386,6 +386,10 @@ function boot(how = 'idb') {
   compactExistingCaches()
   renderApp()
 }
+// Animations d'entrée de l'Accueil seulement au premier affichage (16/11, « ça fait comme un refresh et
+// ça se voit ») : quand les données fraîches remplacent la copie du téléphone, des blocs se
+// re-montaient et rejouaient leur fondu. Passé 1,5 s, plus aucun fondu (voir .sf-settled, accueil.css).
+setTimeout(() => document.documentElement.classList.add('sf-settled'), 1500)
 initCacheStore().then(() => boot('idb'), () => boot('erreur'))
 setTimeout(() => boot('délai dépassé'), 1500)
 

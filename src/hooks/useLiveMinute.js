@@ -1538,10 +1538,21 @@ export function useLiveMinute(matches) {
       if (Date.now() - lastTickAt.t > 60_000) tick()
     }, 60_000)
 
+    // Rythme « direct » (16/11, constat utilisateur : scores qui ne bougent pas pendant plusieurs
+    // minutes app ouverte, alors qu'un passage en arrière-plan puis retour les met à jour) : le tick de
+    // base est à 45 s. Dès qu'un match est en cours et l'app à l'écran, on interroge toutes les 15 s.
+    const liveTickId = setInterval(() => {
+      if (document.visibilityState === 'hidden') return
+      const anyLive = (matchesRef.current ?? []).some(m =>
+        m.status === 'IN_PLAY' || m.status === 'PAUSED' || isTrackedLive(m.id))
+      if (anyLive) tick()
+    }, 15_000)
+
     return () => {
       worker?.terminate()
       if (fallbackId) clearInterval(fallbackId)
       clearInterval(watchdogId)
+      clearInterval(liveTickId)
     }
   }, [queryClient])
 

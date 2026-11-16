@@ -3450,3 +3450,14 @@
   .resultHero__score { font-size: 1.5rem; }
 }
 .formDiamonds__item--l { background: var(--red); }
+
+/* Voir main.jsx (sf-settled, 16/11) : plus de fondu d'entrée après le premier affichage — la mise à
+   jour des données remplace le contenu sans effet visible. */
+.sf-settled .accueil__liveSection,
+.sf-settled .accueil__mainGrid,
+.sf-settled .accueil__section,
+.sf-settled .accueil__ticker,
+.sf-settled .accueil__tickerEmpty,
+.sf-settled .accueil__grid--carousel {
+  animation: none;
+}
