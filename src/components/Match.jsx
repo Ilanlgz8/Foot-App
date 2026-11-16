@@ -196,7 +196,7 @@ function MatchRow({ match, index, inModal = false }) {
         navigate(`/match/${match.id}`, { state: { match } })
       }}
     >
-      {match.isCup && <span className="matchs__cupBadge">{match.competition?.name}</span>}
+      {/* Badge du nom de la coupe retiré (16/11) : redondant, la coupe est déjà choisie dans le menu du nom. */}
       <span className="matchs__scoreDate">{_fmtD(match.utcDate)}</span>
       <div className="matchs__team matchs__team--home">
         {match.homeTeam.crest && (
