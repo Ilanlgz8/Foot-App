@@ -33,7 +33,7 @@ describe('fenêtre ESPN avec jours expirés', () => {
     const start = new Date(today.getTime() + 3 * 86400000)
     const days = []
     for (let i = 0; i < 40; i++) days.push(ymd(new Date(start.getTime() + i * 86400000)))
-    days.forEach((d, i) => rows.set(`espn:sb:fra.1:${d}`, { value: JSON.stringify({ events: [{ id: `e${i}` }] }), expired: true }))
+    days.forEach((d, i) => rows.set(`espn:sb2:fra.1:${d}`, { value: JSON.stringify({ events: [{ id: `e${i}` }] }), expired: true }))
     const fetchMock = vi.fn(async url => ({ ok: true, json: async () => ({ events: [{ id: 'fresh-' + url.match(/dates=(\d+)/)[1] }] }) }))
     vi.stubGlobal('fetch', fetchMock)
     const { default: handler } = await import('../../api/espn.js')

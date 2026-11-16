@@ -352,6 +352,48 @@ function safeJsonChunk(val) {
 // seuls les STALE_REFRESH_PER_REQUEST plus proches d'aujourd'hui sont rafraîchis à chaque requête —
 // la fenêtre se remet à jour progressivement au fil des visites, sans jamais faire attendre.
 // Sans Turso (repli Redis) : comportement d'avant, inchangé.
+// Événement ESPN allégé pour les calendriers (16/11) : un match brut pèse ~10 Ko (cotes, diffuseurs,
+// stats, liens…), dont l'app n'utilise ici qu'une poignée de champs (voir normalizeEvent,
+// espnAdapter.js). Les tranches stockées dans Turso et les réponses calendrier pesaient donc plusieurs
+// Mo — c'est ce volume qui rendait la lecture Turso lente (> 2,5 s). ~10× plus léger.
+function slimEvent(e) {
+  const c = e?.competitions?.[0]
+  const st = c?.status
+  return {
+    id: e?.id,
+    date: e?.date,
+    name: e?.name,
+    shortName: e?.shortName,
+    season: e?.season ? { year: e.season.year ?? null, slug: e.season.slug ?? null, type: e.season.type ?? null } : null,
+    competitions: c ? [{
+      id: c.id,
+      date: c.date,
+      status: st ? {
+        type: st.type ? {
+          name: st.type.name ?? null, state: st.type.state ?? null, completed: st.type.completed ?? null,
+          detail: st.type.detail ?? null, shortDetail: st.type.shortDetail ?? null,
+        } : null,
+        displayClock: st.displayClock ?? null,
+        period: st.period ?? null,
+      } : null,
+      competitors: (c.competitors ?? []).map(x => ({
+        id: x.id,
+        homeAway: x.homeAway,
+        score: x.score ?? null,
+        shootoutScore: x.shootoutScore ?? null,
+        winner: x.winner ?? null,
+        team: x.team ? {
+          id: x.team.id ?? null, displayName: x.team.displayName ?? null, name: x.team.name ?? null,
+          shortDisplayName: x.team.shortDisplayName ?? null, abbreviation: x.team.abbreviation ?? null,
+          logo: x.team.logo ?? null,
+        } : null,
+      })),
+      ...(c.leg ? { leg: c.leg } : {}),
+      ...(c.series ? { series: c.series } : {}),
+    }] : [],
+  }
+}
+
 async function readCachedChunks(slug, chunkList) {
   const cacheable = chunkList
     .map(chunk => ({ chunk, ttl: scoreboardChunkTtl(chunk) }))
@@ -359,7 +401,7 @@ async function readCachedChunks(slug, chunkList) {
   const hits = new Map()
   const stale = new Map()
   if (cacheable.length === 0) return { hits, stale }
-  const keys = cacheable.map(x => `espn:sb:${slug}:${x.chunk}`)
+  const keys = cacheable.map(x => `espn:sb2:${slug}:${x.chunk}`) // sb2 (16/11) : tranches allégées
   try {
     if (isTursoConfigured()) {
       const rows = await tursoMgetWithStale(keys)
@@ -422,7 +464,7 @@ async function tryClaimChunk(cacheKey) {
 
 async function fetchScoreboardChunk(slug, chunkDates) {
   const ttl = scoreboardChunkTtl(chunkDates)
-  const cacheKey = ttl != null ? `espn:sb:${slug}:${chunkDates}` : null
+  const cacheKey = ttl != null ? `espn:sb2:${slug}:${chunkDates}` : null
 
   // Verrou "write-once" : avant de fetcher ESPN pour une tranche CACHEABLE,
   // on tente de la réserver. Si un AUTRE visiteur l'a déjà réservée dans les
@@ -450,14 +492,16 @@ async function fetchScoreboardChunk(slug, chunkDates) {
     })
     if (!response.ok) return { ok: false, events: [] } // une tranche en échec ne doit pas faire tomber tout le reste
     const json = await response.json()
+    const events = (json.events ?? []).map(slimEvent)
     if (cacheKey) {
+      const stored = JSON.stringify({ events })
       if (isTursoConfigured()) {
-        tursoSet(cacheKey, JSON.stringify(json), ttl).catch(() => {})
+        tursoSet(cacheKey, stored, ttl).catch(() => {})
       } else {
-        kv.set(cacheKey, JSON.stringify(json), { ex: ttl }).catch(() => {})
+        kv.set(cacheKey, stored, { ex: ttl }).catch(() => {})
       }
     }
-    return { ok: true, events: json.events ?? [] }
+    return { ok: true, events }
   } catch {
     return { ok: false, events: [] }
   } finally {
