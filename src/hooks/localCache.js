@@ -229,6 +229,10 @@ const OBSOLETE_PREFIXES = ['foot_matches_current_']
 // démarrage dès leur TTL dépassé (2 min pour `matches_espn_*`, 1 h pour la liste « à venir »)
 // faisait disparaître le secours à chaque relance. Gardées 24 h après leur dernière écriture.
 const KEEP_STALE_FOR = [
+  // Matchs d'un jour (Accueil) : gardés 3 jours même périmés (16/11, Accueil affiché après 11,6 s) —
+  // le cache « aujourd'hui » expire au bout d'1 h et était effacé au lancement suivant, donc l'Accueil
+  // attendait le réseau au lieu d'afficher tout de suite la dernière copie puis de la mettre à jour.
+  [/^foot_matches_\d{4}-\d{2}-\d{2}$/, 3 * DAY],
   [/^foot_matches_espn_/, DAY],
   [/^foot_matches_ALL_V3_/, DAY],
 ]
