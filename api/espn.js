@@ -452,6 +452,11 @@ const STALE_REFRESH_PER_REQUEST = 6 // = CHUNK_GROUP_SIZE : un seul groupe de re
 const LOCK_TTL_S = 10
 
 async function tryClaimChunk(cacheKey) {
+  // 16/11 : verrou désactivé — 1 écriture Turso par jour de calendrier (jusqu'à 60 par requête), dans le
+  // chemin critique de la réponse, et c'est justement l'écriture qui rame chez Turso (mesuré : 6 verrous
+  // au-delà de 2,5 s → réponse en 11 s). Avec le trafic actuel, deux visiteurs qui remplissent le même
+  // jour en même temps ne coûtent qu'un appel ESPN en double, sans risque.
+  if (cacheKey) return true
   const lockKey = `lock:${cacheKey}`
   try {
     if (isTursoConfigured()) return await tursoTryLock(lockKey, LOCK_TTL_S)
