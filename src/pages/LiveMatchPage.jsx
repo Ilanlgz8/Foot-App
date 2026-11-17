@@ -462,9 +462,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               {homeEvents.map((e, i, list) => (
                 <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
-                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
+                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
+                      17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
+                      prénom, plus sous le ballon. */}
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
                   <span className="lmp__heroScorerText">
-                    <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
                     {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
@@ -476,9 +478,11 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               {awayEvents.map((e, i, list) => (
                 <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
-                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
+                      au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
+                      17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
+                      prénom, plus sous le ballon. */}
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
                   <span className="lmp__heroScorerText">
-                    <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                     {keepParticles(e.name)}
                     {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>

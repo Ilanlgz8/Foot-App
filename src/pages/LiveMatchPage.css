@@ -551,6 +551,18 @@
 .lmp__heroScorerIcon {
   display: inline;
 }
+/* 17/11 (demande utilisateur) : quand le nom passe à la ligne, la 2e ligne commence sous le
+   prénom et pas sous le ballon — l'icône est une colonne à part, le texte se replie à côté. */
+.lmp__heroScorerItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+.lmp__heroScorersHome .lmp__heroScorerItem { justify-content: flex-end; }
+.lmp__heroScorerItem .lmp__heroScorerIcon { flex-shrink: 0; }
+.lmp__heroScorerItem .lmp__heroScorerText { min-width: 0; }
+/* Côté domicile aussi : le bloc reste calé à droite, mais ses lignes partent toutes du prénom. */
+.lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: left; }
 
 .lmp__page {
   min-height: 100vh;
