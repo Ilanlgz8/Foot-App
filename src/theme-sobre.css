@@ -270,7 +270,7 @@
    Activé par :root[data-odds="jaune"] (posé par index.html / utils/theme.js, en plus de
    data-theme="sobre"). Cotes : jaune doux, nom de l'équipe en entier (data-long), gros chiffres
    noirs en italique avec virgule (data-comma), bord du haut légèrement en biais ; la favorite
-   (box-shadow inline posé par le JSX) un ton plus vif avec un liseré en bas. Score dans une case grise. */
+   (box-shadow inline posé par le JSX) un ton plus vif avec un liseré en bas. */
 :root[data-odds="jaune"] #root .poster__prono-pill,
 :root[data-odds="jaune"] #root .modal__liveProno__pill {
   background: #f2e4a8 !important;
@@ -321,11 +321,4 @@
   letter-spacing: -0.01em;
   line-height: 1.1;
   color: #111;
-}
-/* Score des cartes dans une case grise */
-:root[data-odds="jaune"] #root .accueil__mdjScore,
-:root[data-odds="jaune"] #root .poster__score {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 2px 14px;
 }
