@@ -134,3 +134,80 @@
 :root[data-theme="sobre"] #root .poster__overlay {
   opacity: 0.45;
 }
+
+/* ═══ 17/11, 2e passe (retour « t'as rien changé ») : les blocs les plus visibles n'étaient pas couverts ═══ */
+
+/* ── Fond des pages : graphite uni, plus de halos rouges/verts ── */
+:root[data-theme="sobre"] body { background: #101216; }
+:root[data-theme="sobre"] #root .accueil,
+:root[data-theme="sobre"] #root .matchs,
+:root[data-theme="sobre"] #root .resultats,
+:root[data-theme="sobre"] #root .classement,
+:root[data-theme="sobre"] #root .mentions { background: #101216; }
+:root[data-theme="sobre"] #root [class*="__backdrop"] { display: none; }
+
+/* ── Match du jour (Accueil) : fond graphite, couleurs des 2 camps en voile léger ── */
+:root[data-theme="sobre"] #root .accueil__mdj {
+  background: #181b21;
+  border: 1px solid #23262d;
+  box-shadow: none;
+  animation: none;
+}
+:root[data-theme="sobre"] #root .accueil__mdjCamp { opacity: 0.3; animation: none; }
+:root[data-theme="sobre"] #root .accueil__mdjClash,
+:root[data-theme="sobre"] #root .accueil__mdjVeil,
+:root[data-theme="sobre"] #root .accueil__mdjVsGlow,
+:root[data-theme="sobre"] #root .accueil__mdjVsOutline { display: none; }
+:root[data-theme="sobre"] #root .accueil__mdjLeagueIcon,
+:root[data-theme="sobre"] #root .accueil__mdjCrestWrap { box-shadow: none; }
+:root[data-theme="sobre"] #root .accueil__mdjCrestWrap { background: #1d2026; border-color: #2a2e36; }
+:root[data-theme="sobre"] #root .accueil__mdjLeagueName,
+:root[data-theme="sobre"] #root .accueil__mdjTeamName,
+:root[data-theme="sobre"] #root .accueil__mdjWhenLabel,
+:root[data-theme="sobre"] #root .accueil__mdjVsCore,
+:root[data-theme="sobre"] #root .accueil__mdjBigNum,
+:root[data-theme="sobre"] #root .accueil__mdjClockSep { text-shadow: none; filter: none; }
+:root[data-theme="sobre"] #root .accueil__mdjLeagueName,
+:root[data-theme="sobre"] #root .accueil__mdjWhenLabel { color: #9aa0ab; }
+:root[data-theme="sobre"] #root .accueil__mdjVsCore { color: #6f7682; }
+
+/* Cotes : pastilles graphite ; la favorite (box-shadow posé en inline par le JSX) garde un contour rouge fin */
+:root[data-theme="sobre"] #root .poster__prono-pill {
+  background: #1d2026;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pill[style*="box-shadow"] {
+  background: #24282f;
+  border-color: rgba(255, 77, 94, 0.6) !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pillLabel { color: #9aa0ab; }
+:root[data-theme="sobre"] #root .poster__prono-pillVal { color: #eceef2; }
+
+/* ── Blocs par compétition (Accueil) : carte graphite, la couleur reste sur les matchs ── */
+:root[data-theme="sobre"] #root .hubCocoon { background: #181b21; border-color: #23262d; box-shadow: none; }
+:root[data-theme="sobre"] #root .poster__crestWrap { box-shadow: none; }
+:root[data-theme="sobre"] #root .poster__name { text-shadow: none; }
+
+/* ── Haut d'écran ── */
+:root[data-theme="sobre"] #root .sfHeader { background: rgba(16, 18, 22, 0.92); border-bottom-color: #23262d; box-shadow: none; }
+
+/* ── Bandeau compétition + menus (Programme, Résultats, Classement) : gris, rouge seulement sur l'élément actif ── */
+:root[data-theme="sobre"] #root .compHeader { border-bottom-color: #23262d; background: #181b21; box-shadow: none; }
+:root[data-theme="sobre"] #root .compHeader::before { display: none; }
+:root[data-theme="sobre"] #root .compHeader__logo { border-color: #2a2e36; box-shadow: none; }
+:root[data-theme="sobre"] #root .compHeader__btn { background: #1d2026; border-color: #2a2e36; color: #eceef2; box-shadow: none; }
+:root[data-theme="sobre"] #root .compHeader__dot--active,
+:root[data-theme="sobre"] #root [class*="__sidebarDot"] { box-shadow: none; }
+:root[data-theme="sobre"] #root .compFamily__btn { border-color: #2a2e36; }
+:root[data-theme="sobre"] #root [class*="__sidebar"] { border-color: #23262d; }
+:root[data-theme="sobre"] #root [class*="__sidebarItem--active"],
+:root[data-theme="sobre"] #root [class*="ToggleBtn--active"],
+:root[data-theme="sobre"] #root [class*="__viewBtn--active"] {
+  background: #24282f;
+  border-color: #2f333b;
+  color: #fff;
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root [class*="__navBtn"] { color: #eceef2; }
+:root[data-theme="sobre"] #root .classement__panel { background: #181b21; border-color: #23262d; box-shadow: none; }
