@@ -132,8 +132,9 @@ export function ResultPanel({ results, loading, view = 'chrono', limit = null, o
                   <span>{name}</span>
                 </p>
                 <div className="accueil__matchCards">
+                  {/* 17/11 : pas de badge championnat sur chaque card ici — le bloc a déjà son titre + logo */}
                   {matches.map((match, i) => (
-                    <ResultCard key={match.id ?? i} match={match} showComp />
+                    <ResultCard key={match.id ?? i} match={match} />
                   ))}
                 </div>
               </div>
