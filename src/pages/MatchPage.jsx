@@ -389,8 +389,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
                 <span className="lmp__heroScorerText">
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                   {keepParticles(e.name)}
                   {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
@@ -403,8 +403,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
                 <span className="lmp__heroScorerText">
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>{'\u00A0'}
                   {keepParticles(e.name)}
                   {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
