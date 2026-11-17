@@ -269,21 +269,16 @@
 /* ═══ Thème « Jaune » (17/11) = Sobre + cotes façon site de paris ═══════════════════════════════
    Activé par :root[data-odds="jaune"] (posé par index.html / utils/theme.js, en plus de
    data-theme="sobre"). Cotes : jaune doux, nom de l'équipe en entier (data-long), gros chiffres
-   noirs en italique avec virgule (data-comma), bord du haut légèrement en biais ; la favorite
-   (box-shadow inline posé par le JSX) un ton plus vif avec un liseré en bas. */
+   noirs en italique avec virgule (data-comma), bord du haut légèrement en biais ; les trois
+   cotes dans le même jaune vif (17/11 : plus de favorite marquée, la cote la plus basse suffit). */
 :root[data-odds="jaune"] #root .poster__prono-pill,
 :root[data-odds="jaune"] #root .modal__liveProno__pill {
-  background: #f2e4a8 !important;
+  background: #f6d43f !important;
   border: none !important;
   box-shadow: none !important;
   border-radius: 10px;
   clip-path: polygon(0 6%, 100% 0, 100% 100%, 0 100%);
   color: #111;
-}
-:root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"],
-:root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] {
-  background: #f6d43f !important;
-  box-shadow: inset 0 -3px 0 #c9a200 !important;
 }
 /* Libellé : le nom en entier remplace le code (PAY → Pays de Galles) */
 :root[data-odds="jaune"] #root .poster__prono-pillLabel[data-long],
