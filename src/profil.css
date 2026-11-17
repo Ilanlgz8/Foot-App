@@ -116,21 +116,18 @@
 .profil__themeCheck svg { width: 14px; height: 14px; }
 .profil__note { margin: -4px 0 0; font-size: 12px; color: #6f7682; }
 
-/* Icône profil du haut d'écran */
+/* Icône profil du haut d'écran : même gabarit que .teamSearchBtn (navbar.css) */
 .sfProfileBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 2.7rem; height: 2.7rem; flex-shrink: 0;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
+  transition: color 0.2s ease, background 0.2s ease;
 }
-.sfProfileBtn__ring {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: #2a2e36;
-  border: 2px solid var(--sf-red, #ff4d5e);
-  display: flex; align-items: center; justify-content: center;
-  color: #eceef2;
-}
-.sfProfileBtn__ring svg { width: 17px; height: 17px; }
-.sfProfileBtn--active .sfProfileBtn__ring { background: var(--sf-red, #ff4d5e); color: #fff; }
+.sfProfileBtn svg { width: 1.8rem; height: 1.8rem; }
+.sfProfileBtn:hover { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.08); }
+.sfProfileBtn--active { color: #fff; }
 /* Icône profil : à gauche sur mobile (sfHeader__leftGroup), à droite sur ordinateur (le groupe
    de gauche y est masqué). Sélecteur avec .sfHeader pour passer devant les règles de navbar.css. */
 .sfHeader .sfProfileBtn--desktop { display: none; }

@@ -3103,6 +3103,9 @@
 /* Minute de jeu : prend la place du libellé, avec un vrai espace avant le
    score pour qu'elle respire (demande explicite "un peu plus haut"). */
 .accueil__mdjMinute {
+  /* 17/11 : le point rouge à gauche (+ l'espacement après l'apostrophe) décalait visuellement les
+     chiffres d'environ 3 px vers la droite par rapport au score (mesuré) — recentrage. */
+  transform: translateX(-3px);
   display: inline-flex;
   align-items: center;
   gap: 7px;

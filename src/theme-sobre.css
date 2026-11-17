@@ -230,3 +230,81 @@
 :root[data-theme="sobre"] #root .accueil__mdjVsCore { color: #9aa0ab; }
 :root[data-theme="sobre"] #root .accueil__mdjLeagueName,
 :root[data-theme="sobre"] #root .accueil__mdjWhenLabel { color: #c9ccd3; }
+
+/* ═══ 17/11, 4e passe (retour : « pas l'impression qu'il y ait trop de changements », détails) ═══ */
+
+/* ── Cotes, partout (Accueil : Match du jour + cartes ; pages match : pronostic en direct) :
+      jaune vif, chiffres en noir. La favorite (box-shadow posé en inline par le JSX) : contour blanc. ── */
+:root[data-theme="sobre"] #root .poster__prono-pill,
+:root[data-theme="sobre"] #root .modal__liveProno__pill {
+  background: #ffd60a !important;
+  border: 2px solid #ffd60a !important;
+  box-shadow: none !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pill[style*="box-shadow"],
+:root[data-theme="sobre"] #root .modal__liveProno__pill[style*="box-shadow"] {
+  border-color: #fff !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pillLabel,
+:root[data-theme="sobre"] #root .modal__liveProno__pillLabel {
+  color: rgba(17, 17, 17, 0.65);
+  text-shadow: none;
+}
+:root[data-theme="sobre"] #root .poster__prono-pillVal,
+:root[data-theme="sobre"] #root .modal__liveProno__pillVal {
+  color: #111;
+  text-shadow: none;
+}
+:root[data-theme="sobre"] #root .modal__liveProno__dot { box-shadow: none; }
+
+/* ── Accueil : plus de rouge sur les boutons et cadres ── */
+:root[data-theme="sobre"] #root .hubCta {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #2f333b;
+  color: #eceef2;
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root .accueil__dashPanel--result {
+  border-color: #23262d;
+  box-shadow: none;
+  animation: none;
+}
+:root[data-theme="sobre"] #root .accueil__dashPanel::before { display: none; }
+:root[data-theme="sobre"] #root .accueil__resultTab--active {
+  background: #24282f;
+  border-color: #2f333b;
+  color: #fff;
+}
+/* Onglet « En direct » de la page Match : fond gris, le compteur rouge reste */
+:root[data-theme="sobre"] #root .hubSeg .is-on { background: #24282f; box-shadow: none; }
+/* Direct : le rouge reste (point et minute), mais sans halo */
+:root[data-theme="sobre"] #root .accueil__mdjMinute,
+:root[data-theme="sobre"] #root .poster__min-label,
+:root[data-theme="sobre"] #root .poster__score { text-shadow: none; }
+:root[data-theme="sobre"] #root .accueil__mdjLiveDot,
+:root[data-theme="sobre"] #root .poster__live-dot,
+:root[data-theme="sobre"] #root .lmp__heroLiveDot { box-shadow: none; text-shadow: none; }
+
+/* ── Pages match (direct / avant / après) : plus de contour néon qui tourne ── */
+:root[data-theme="sobre"] #root .sf-liveBorder::before,
+:root[data-theme="sobre"] #root .sf-liveBorder::after { display: none; }
+:root[data-theme="sobre"] #root .lmp__hero {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root .mp__tab--active {
+  color: #fff;
+  border-bottom-color: #eceef2;
+  text-shadow: none;
+}
+:root[data-theme="sobre"] #root .tabDots__dot--active { background: #eceef2; box-shadow: none; }
+:root[data-theme="sobre"] #root .statsSubTabs__btn--active {
+  background: #2a2e36;
+  color: #fff;
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root .modal__espnStats::before { display: none; }
+:root[data-theme="sobre"] #root .lmpSide__row--active {
+  background: #24282f;
+  border-color: #2f333b;
+}

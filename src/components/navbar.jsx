@@ -72,6 +72,17 @@ import '../../navbar.css'
 // seul autre icône du header) : même strokeWidth 2 (au lieu de 2.4),
 // mêmes strokeLinecap/strokeLinejoin "round", même nombre réduit de
 // chemins simples — plutôt qu'un icône plus complexe/plus illustratif.
+// Icône « Mon profil » (17/11) : même trait et même taille que l'icône fiche équipe, sans pastille.
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.2" />
+      <circle cx="12" cy="10" r="3.1" />
+      <path d="M6.4 18.3c1.3-2.1 3.3-3.2 5.6-3.2s4.3 1.1 5.6 3.2" />
+    </svg>
+  )
+}
+
 function TeamSearchIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -239,9 +250,7 @@ function Navbar() {
               aria-label="Mon profil"
               title="Mon profil"
             >
-              <span className="sfProfileBtn__ring">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
-              </span>
+              <ProfileIcon />
             </NavLink>
           </div>
 
@@ -299,9 +308,7 @@ function Navbar() {
               aria-label="Mon profil"
               title="Mon profil"
             >
-              <span className="sfProfileBtn__ring">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
-              </span>
+              <ProfileIcon />
             </NavLink>
             <PushResync />
           </div>
