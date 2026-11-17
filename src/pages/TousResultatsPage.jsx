@@ -7,7 +7,6 @@
  * groupé par compétition.
  */
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useRecentDaysMatches } from '../hooks/useTodayMatches'
 import { useLiveData } from '../context/LiveProvider'
 import { buildRecentResults } from '../utils/recentResults'
@@ -18,7 +17,6 @@ import '../tousResultats.css'
 const RESULTS_DAYS_BACK = 7 // même valeur qu'Accueil.jsx (même cache React Query)
 
 export default function TousResultatsPage() {
-  const navigate = useNavigate()
   const { liveMatches, espnScores } = useLiveData()
   const { matches: resultsSourceMatches, loading } = useRecentDaysMatches(RESULTS_DAYS_BACK)
   const [view, setView] = useState('comp')
@@ -29,18 +27,7 @@ export default function TousResultatsPage() {
   return (
     <section className="tousRes">
       <div className="tousRes__inner">
-        <div className="tousRes__head">
-          <button
-            type="button"
-            className="tousRes__back"
-            aria-label="Retour"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
-          </button>
-          <h1 className="tousRes__title">Tous les résultats</h1>
-        </div>
-
+        {/* 17/11 : plus de titre ni de flèche retour (demande utilisateur) — la barre du bas suffit */}
         <div className="accueil__resultTabs tousRes__tabs">
           <button className={'accueil__resultTab' + (view === 'comp' ? ' accueil__resultTab--active' : '')} onClick={() => setView('comp')}>Par compétition</button>
           <button className={'accueil__resultTab' + (view === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setView('chrono')}>Tous</button>

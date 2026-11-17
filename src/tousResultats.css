@@ -20,7 +20,7 @@
 }
 .tousRes__back svg { width: 18px; height: 18px; }
 .tousRes__title { margin: 0; font-family: var(--sf-font-ui); font-size: 21px; font-weight: 800; color: #fff; }
-.tousRes__tabs { align-self: flex-start; }
+.tousRes__tabs { align-self: center; }
 /* En plein écran : jamais de défilement interne, le panneau prend toute sa hauteur */
 .tousRes__panel .accueil__dashPanelBody { max-height: none; overflow: visible; }
 
