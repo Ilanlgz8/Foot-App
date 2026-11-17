@@ -11,6 +11,7 @@ import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
 import { compForMatch } from '../data/competitions'
+import { frOdd } from '../utils/frNum'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -574,21 +575,21 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long={homeShort}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={homeOdd.toFixed(2).replace('.', ',')}>{homeOdd.toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(homeOdd)}>{frOdd(homeOdd)}</span>
           </div>
           <div
             className="poster__prono-pill"
             style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={drawOdd.toFixed(2).replace('.', ',')}>{drawOdd.toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(drawOdd)}>{frOdd(drawOdd)}</span>
           </div>
           <div
             className="poster__prono-pill"
             style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long={awayShort}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={awayOdd.toFixed(2).replace('.', ',')}>{awayOdd.toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(awayOdd)}>{frOdd(awayOdd)}</span>
           </div>
         </div>
       </div>

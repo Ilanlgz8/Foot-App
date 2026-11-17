@@ -53,6 +53,7 @@ import '../live.css'
 // risque de dérive entre les deux (même pattern déjà utilisé ailleurs dans
 // l'app, ex: Resultat.jsx qui importe match.css).
 import './LiveMatchPage.css'
+import { frNum } from '../utils/frNum'
 
 
 
@@ -429,11 +430,11 @@ function MpStatRow({ label, homeVal, awayVal, homeBetter, awayBetter, homeColor,
     <div className="statBar__wrap">
       <div className="mp__statRow">
         <span className={`mp__statVal${homeBetter ? ' mp__statVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>
-          {homeVal ?? '–'}
+          {frNum(homeVal) ?? '–'}
         </span>
         <span className="mp__statLabel">{label}</span>
         <span className={`mp__statVal mp__statVal--r${awayBetter ? ' mp__statVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>
-          {awayVal ?? '–'}
+          {frNum(awayVal) ?? '–'}
         </span>
       </div>
       <StatTrack homeVal={homeVal} awayVal={awayVal} noCompare={noCompare} />

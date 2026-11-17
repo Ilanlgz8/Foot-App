@@ -20,6 +20,7 @@ import { fuzzyTeam } from '../utils/espnSummaryParse'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
 import { groupScorers } from '../utils/groupScorers'
 import './../matchModal.css'
+import { frNum, frOdd } from '../utils/frNum'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
 // Sauvegardées par useLiveMinute dans foot_espn_{matchId} lors de la détection FT.
@@ -126,9 +127,9 @@ function StatBar({ homeVal, awayVal, label, noCompare = false, homeColor = null,
   return (
     <div className="statBar__wrap">
       <div className="modal__statTableRow">
-        <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>{homeVal ?? '–'}</span>
+        <span className={`modal__statTableVal${homeLeads ? ' modal__statTableVal--home' : ''}`} style={homeColor ? { color: homeColor } : undefined}>{frNum(homeVal) ?? '–'}</span>
         <span className="modal__statTableLabel">{label}</span>
-        <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>{awayVal ?? '–'}</span>
+        <span className={`modal__statTableVal modal__statTableVal--right${awayLeads ? ' modal__statTableVal--away' : ''}`} style={awayColor ? { color: awayColor } : undefined}>{frNum(awayVal) ?? '–'}</span>
       </div>
       <StatTrack homeVal={homeVal} awayVal={awayVal} noCompare={noCompare} />
     </div>
@@ -891,7 +892,7 @@ function LivePronoPill({ label, longLabel, value, pct, isFavorite = false }) {
   return (
     <div className="modal__liveProno__pill" style={style}>
       <span className="modal__liveProno__pillLabel" data-long={longLabel || label}>{label}</span>
-      <span className="modal__liveProno__pillVal" data-comma={value.toFixed(2).replace('.', ',')}>{value.toFixed(2)}</span>
+      <span className="modal__liveProno__pillVal" data-comma={frOdd(value)}>{frOdd(value)}</span>
     </div>
   )
 }

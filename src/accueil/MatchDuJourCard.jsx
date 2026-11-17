@@ -25,6 +25,7 @@ import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
 import { useEspnPregameOdds } from '../hooks/useMatchDetail'
 import { useH2HRows } from '../components/MatchModal'
 import { getCompetitionCampColors, compForMatch } from '../data/competitions'
+import { frOdd } from '../utils/frNum'
 
 function shortenName(name) {
   if (!name) return name
@@ -469,15 +470,15 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)))}>{frOdd((useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)))}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)))}>{frOdd((useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)))}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)))}>{frOdd((useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)))}</span>
           </div>
         </div>
       </div>

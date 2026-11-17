@@ -29,6 +29,7 @@ import { useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { finalScore } from '../utils/matchUtils'
 import '../tendances.css'
+import { frNum } from '../utils/frNum'
 
 // ⚠️ Partout ci-dessous : NE PAS lire match.score.fullTime directement — pour
 // un match décidé aux tirs au but, FD.org y met regularTime+extraTime+
@@ -191,7 +192,7 @@ export function TendancesView({ matches, loading, isCountry }) {
           <span className="trends__kpiLabel">Matchs joués</span>
         </div>
         <div className="trends__kpi">
-          <span className="trends__kpiValue">{avgGoals.toFixed(2)}</span>
+          <span className="trends__kpiValue">{frNum(avgGoals.toFixed(2))}</span>
           <span className="trends__kpiLabel">Buts / match</span>
         </div>
       </div>

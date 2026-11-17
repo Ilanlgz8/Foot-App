@@ -317,3 +317,8 @@
   line-height: 1.1;
   color: #111;
 }
+
+/* ── Grand bloc du haut des pages match (17/11) : couleurs de la compétition adoucies, comme les
+      cartes de l'Accueil (avant : à fond, plus fort que tout le reste de l'écran). Sobre et Jaune. ── */
+:root[data-theme="sobre"] #root .lmp__hero { background-color: #181b21; }
+:root[data-theme="sobre"] #root .lmp__hero > [class*="lmp__heroTint"] { filter: brightness(0.5) saturate(0.8); }
