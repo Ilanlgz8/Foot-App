@@ -211,3 +211,22 @@
 }
 :root[data-theme="sobre"] #root [class*="__navBtn"] { color: #eceef2; }
 :root[data-theme="sobre"] #root .classement__panel { background: #181b21; border-color: #23262d; box-shadow: none; }
+
+/* ═══ 17/11, 3e passe (retour « les cotes, fond noir, on voit pas trop ») ═══ */
+/* Cotes : fond blanc translucide + contour blanc, chiffres en blanc ; la favorite en rouge franc */
+:root[data-theme="sobre"] #root .poster__prono-pill {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pill[style*="box-shadow"] {
+  background: rgba(255, 77, 94, 0.16);
+  border: 1.5px solid #ff4d5e !important;
+}
+:root[data-theme="sobre"] #root .poster__prono-pillLabel { color: #c9ccd3; }
+:root[data-theme="sobre"] #root .poster__prono-pillVal { color: #fff; }
+/* Match du jour un peu plus clair : couleurs des camps à 50 %, contour blanc léger */
+:root[data-theme="sobre"] #root .accueil__mdjCamp { opacity: 0.5; }
+:root[data-theme="sobre"] #root .accueil__mdj { border-color: rgba(255, 255, 255, 0.14); }
+:root[data-theme="sobre"] #root .accueil__mdjVsCore { color: #9aa0ab; }
+:root[data-theme="sobre"] #root .accueil__mdjLeagueName,
+:root[data-theme="sobre"] #root .accueil__mdjWhenLabel { color: #c9ccd3; }
