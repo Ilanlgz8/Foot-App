@@ -3464,3 +3464,25 @@
 .sf-settled .accueil__grid--carousel {
   animation: none;
 }
+
+/* ── Résultats récents (17/11) : plus de défilement interne (le doigt « accrochait » la liste au
+      lieu de descendre vers les actualités) — 5 matchs max + bouton vers « Tous les résultats ». ── */
+.accueil__dashPanel--result .accueil__dashPanelBody {
+  max-height: none;
+  overflow: visible;
+}
+.accueil__resultSeeAll {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #eceef2;
+  font-family: var(--sf-font-ui);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.accueil__resultSeeAll:active { background: rgba(255, 255, 255, 0.1); }
+.accueil__resultSeeAllCount { color: var(--sf-muted, #9aa0ab); font-weight: 600; }

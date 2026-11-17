@@ -26,6 +26,7 @@ const FavoritesPage = lazy(() => import('./pages/FavoritesPage.jsx'))
 const Pronos = lazy(() => import('./pages/Pronos.jsx'))
 const TeamSearchPage = lazy(() => import('./pages/TeamSearchPage.jsx'))
 const ProfilPage = lazy(() => import('./pages/ProfilPage.jsx'))
+const TousResultatsPage = lazy(() => import('./pages/TousResultatsPage.jsx'))
 
 // ⚠️ AJOUT (constat utilisateur : "cliquer sur un bouton pour changer de page
 // c'est pas fluide") : chaque page est en lazy() — au tout premier clic vers
@@ -351,6 +352,7 @@ function App() {
                     <Route path="/equipe" element={<TeamSearchPage />} />
                     <Route path="/pronos" element={<Pronos />} />
                     <Route path="/profil" element={<ProfilPage />} />
+                    <Route path="/tous-les-resultats" element={<TousResultatsPage />} />
                     <Route path="/mentions-legales" element={<MentionsLegales />} />
                   </Routes>
                 </Suspense>

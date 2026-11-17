@@ -49,7 +49,10 @@ function formatDayLabel(dateStr) {
 // d'ailleurs plus du tout depuis le 12/09 (voir useTeamForm.js/
 // useTeamFormMulti — `formMap` fusionné remplacé par `formMapByComp`,
 // jamais consommé ici de toute façon).
-export function ResultPanel({ results, loading, view = 'chrono' }) {
+// 17/11 (demande utilisateur) : `limit` = nombre de matchs montrés sur l'Accueil (le reste via
+// `onSeeAll` → page « Tous les résultats », qui réutilise ce même composant sans limite, en grand).
+// Le jour affiché est partagé entre les deux (même clé persistée `accueil_resultDay`).
+export function ResultPanel({ results, loading, view = 'chrono', limit = null, onSeeAll = null }) {
   const grouped  = groupByDay(results)
   // ⚠️ BUG CORRIGÉ (constat utilisateur : après avoir navigué jusqu'à un
   // jour précédent (ex: 8 juillet), cliqué sur un match, puis "retour",
@@ -82,7 +85,9 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
     if (g) setCurrentDayStr(g[0])
   }
 
-  const compGroups = groupByComp(currentMatches)
+  const hiddenCount  = limit != null ? Math.max(0, currentMatches.length - limit) : 0
+  const shownMatches = hiddenCount > 0 ? currentMatches.slice(0, limit) : currentMatches
+  const compGroups = groupByComp(shownMatches)
 
   return (
     <>
@@ -109,7 +114,7 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
         {/* Chronologique */}
         {!loading && view === 'chrono' && currentMatches.length > 0 && (
           <div className="accueil__matchCards">
-            {currentMatches.map((match, i) => (
+            {shownMatches.map((match, i) => (
               <ResultCard key={match.id ?? i} match={match} showComp />
             ))}
           </div>
@@ -129,6 +134,12 @@ export function ResultPanel({ results, loading, view = 'chrono' }) {
               </div>
             ))}
           </div>
+        )}
+
+        {!loading && onSeeAll && hiddenCount > 0 && (
+          <button type="button" className="accueil__resultSeeAll" onClick={() => onSeeAll(currentDay?.[0])}>
+            Voir tous les résultats <span className="accueil__resultSeeAllCount">({currentMatches.length})</span> →
+          </button>
         )}
       </div>
 
