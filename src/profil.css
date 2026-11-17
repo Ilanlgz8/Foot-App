@@ -131,8 +131,9 @@
 }
 .sfProfileBtn__ring svg { width: 17px; height: 17px; }
 .sfProfileBtn--active .sfProfileBtn__ring { background: var(--sf-red, #ff4d5e); color: #fff; }
-/* Loupe (fiche équipe) : à gauche sur mobile, à droite sur ordinateur */
-.teamSearchBtn--desktop { display: none; }
+/* Icône profil : à gauche sur mobile (sfHeader__leftGroup), à droite sur ordinateur (le groupe
+   de gauche y est masqué). Sélecteur avec .sfHeader pour passer devant les règles de navbar.css. */
+.sfHeader .sfProfileBtn--desktop { display: none; }
 @media (min-width: 640px) {
-  .teamSearchBtn--desktop { display: inline-flex; }
+  .sfHeader .sfProfileBtn--desktop { display: inline-flex; }
 }
