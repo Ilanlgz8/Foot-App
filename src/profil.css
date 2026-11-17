@@ -121,11 +121,11 @@
   display: inline-flex; align-items: center; justify-content: center;
   width: 2.7rem; height: 2.7rem; flex-shrink: 0;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   transition: color 0.2s ease, background 0.2s ease;
 }
-.sfProfileBtn svg { width: 1.8rem; height: 1.8rem; }
+.sfProfileBtn svg { width: 1.9rem; height: 1.9rem; } /* un peu plus grande (demande 17/11) */
 .sfProfileBtn:hover { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.08); }
 .sfProfileBtn--active { color: #fff; }
 /* Icône profil : à gauche sur mobile (sfHeader__leftGroup), à droite sur ordinateur (le groupe

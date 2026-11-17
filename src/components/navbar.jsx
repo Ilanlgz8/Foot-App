@@ -74,23 +74,23 @@ import '../../navbar.css'
 // chemins simples — plutôt qu'un icône plus complexe/plus illustratif.
 // Icône « Mon profil » (17/11) : même trait et même taille que l'icône fiche équipe, sans pastille.
 function ProfileIcon() {
+  // P1 (choix utilisateur 17/11) : tête + épaules, sans cercle, trait comme la barre du bas.
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.2" />
-      <circle cx="12" cy="10" r="3.1" />
-      <path d="M6.4 18.3c1.3-2.1 3.3-3.2 5.6-3.2s4.3 1.1 5.6 3.2" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" />
     </svg>
   )
 }
 
 function TeamSearchIcon() {
+  // F1 (choix utilisateur 17/11) : une fiche avec un crayon.
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3.5" y="4" width="17" height="16" rx="2.4" />
-      <circle cx="9" cy="10" r="1.9" />
-      <path d="M6 16.2c0-1.9 1.4-3.2 3-3.2s3 1.3 3 3.2" />
-      <path d="M14.3 9h4" />
-      <path d="M14.3 13h4" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M8.5 13h4M8.5 16.5h6" />
+      <path d="m15.5 11.5 3.8-3.8 1.6 1.6-3.8 3.8-2 .4z" />
     </svg>
   )
 }
