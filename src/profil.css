@@ -97,6 +97,15 @@
   border: 1px solid rgba(251,59,78,0.22);
   box-shadow: 0 0 22px rgba(251,59,78,0.07);
 }
+.profil__theme--jaune .profil__themePreview {
+  background: linear-gradient(110deg, rgba(37,72,160,0.28) 0%, #1f2228 45%, #1f2228 55%, rgba(170,25,40,0.28) 100%);
+  border: 1px solid #2a2e36;
+}
+/* aperçu du thème Jaune : l'heure dans une pastille jaune, comme une cote */
+.profil__theme--jaune .profil__themeTime {
+  background: #f6d43f; color: #111; font-family: 'Inter', sans-serif; font-style: italic; font-weight: 900;
+  font-size: 22px; padding: 2px 14px; border-radius: 10px;
+}
 .profil__themeFlag { width: 36px; height: 36px; border-radius: 9px; }
 .profil__themeFlag--a { background: linear-gradient(90deg, #111 33%, #f5d50a 33% 66%, #e3242b 66%); }
 .profil__themeFlag--b { background: linear-gradient(90deg, #008c45 33%, #f4f5f0 33% 66%, #cd212a 66%); }

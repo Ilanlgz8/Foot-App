@@ -468,16 +468,16 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             rétrécies) — plus aucune surcharge de dimension ici. */}
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
-            <span className="poster__prono-pillLabel">{homeCode}</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
+            <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
+            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)).toFixed(2)}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
-            <span className="poster__prono-pillLabel">Nul</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
+            <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
+            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)).toFixed(2)}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
-            <span className="poster__prono-pillLabel">{awayCode}</span>
-            <span className="poster__prono-pillVal">{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
+            <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
+            <span className="poster__prono-pillVal" data-comma={(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2).replace('.', ',')}>{(useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)).toFixed(2)}</span>
           </div>
         </div>
       </div>

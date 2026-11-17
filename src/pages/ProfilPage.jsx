@@ -119,6 +119,7 @@ export default function ProfilPage() {
         <div className="profil__themes">
           <ThemeCard id="sobre" active={theme === 'sobre'} onPick={pickTheme} title="Sobre" sub="Clair et lisible · par défaut" />
           <ThemeCard id="neon" active={theme === 'neon'} onPick={pickTheme} title="Néon" sub="Le style d'origine de StatFootix" />
+          <ThemeCard id="jaune" active={theme === 'jaune'} onPick={pickTheme} title="Jaune" sub="Sobre, avec les cotes en jaune" />
         </div>
         <p className="profil__note">Ton choix est gardé sur ce téléphone.</p>
 

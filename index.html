@@ -60,8 +60,9 @@
     <script>
       (function () {
         var t = 'sobre'
-        try { t = localStorage.getItem('sf_theme') === 'neon' ? 'neon' : 'sobre' } catch (e) {}
-        document.documentElement.setAttribute('data-theme', t)
+        try { t = localStorage.getItem('sf_theme') || 'sobre' } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t === 'neon' ? 'neon' : 'sobre')
+        if (t === 'jaune') document.documentElement.setAttribute('data-odds', 'jaune')
       })()
     </script>
     <script>

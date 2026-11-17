@@ -819,8 +819,8 @@ function LiveProno({ prono, match, isQualification = false }) {
           Qualification
         </div>
         <div className="modal__liveProno__row">
-          <LivePronoPill label={homeCode} value={pronoToOdds(qualif.home)} pct={qualif.home} isFavorite={favorite === 'home'} />
-          <LivePronoPill label={awayCode} value={pronoToOdds(qualif.away)} pct={qualif.away} isFavorite={favorite === 'away'} />
+          <LivePronoPill label={homeCode} longLabel={homeName} value={pronoToOdds(qualif.home)} pct={qualif.home} isFavorite={favorite === 'home'} />
+          <LivePronoPill label={awayCode} longLabel={awayName} value={pronoToOdds(qualif.away)} pct={qualif.away} isFavorite={favorite === 'away'} />
         </div>
       </div>
     )
@@ -834,9 +834,9 @@ function LiveProno({ prono, match, isQualification = false }) {
         Pronostic en direct
       </div>
       <div className="modal__liveProno__row">
-        <LivePronoPill label={homeCode} value={pronoToOdds(prono.home)} pct={prono.home} isFavorite={favorite === 'home'} />
+        <LivePronoPill label={homeCode} longLabel={homeName} value={pronoToOdds(prono.home)} pct={prono.home} isFavorite={favorite === 'home'} />
         <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} isFavorite={favorite === 'draw'} />
-        <LivePronoPill label={awayCode} value={pronoToOdds(prono.away)} pct={prono.away} isFavorite={favorite === 'away'} />
+        <LivePronoPill label={awayCode} longLabel={awayName} value={pronoToOdds(prono.away)} pct={prono.away} isFavorite={favorite === 'away'} />
       </div>
     </div>
   )
@@ -862,9 +862,10 @@ export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lower
   })
   const useMarket = !!espnOdds
   const favorite  = pronoFavoriteKey(useMarket ? espnOdds.pct : prono)
-  const pill = (key, label) => (
+  const pill = (key, label, longLabel) => (
     <LivePronoPill
       label={label}
+      longLabel={longLabel}
       value={useMarket ? espnOdds.decimal[key] : pronoToOdds(prono[key])}
       pct={useMarket ? espnOdds.pct[key] : prono[key]}
       isFavorite={favorite === key}
@@ -873,22 +874,24 @@ export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lower
   return (
     <div className="modal__liveProno">
       <div className="modal__liveProno__row">
-        {pill('home', homeCode)}
+        {pill('home', homeCode, homeName)}
         {pill('draw', 'Nul')}
-        {pill('away', awayCode)}
+        {pill('away', awayCode, awayName)}
       </div>
     </div>
   )
 }
 
-function LivePronoPill({ label, value, pct, isFavorite = false }) {
+// `longLabel` / `data-comma` (17/11) : nom en entier et virgule française, affichés seulement par
+// le thème « Jaune » (voir theme-sobre.css, :root[data-odds="jaune"]) — les autres thèmes gardent le code.
+function LivePronoPill({ label, longLabel, value, pct, isFavorite = false }) {
   const style = isFavorite
     ? { borderColor: `rgba(159,30,52,${pronoIntensity(pct)})`, boxShadow: pronoGlowShadow(pct), backgroundClip: 'border-box' }
     : { borderColor: 'transparent' }
   return (
     <div className="modal__liveProno__pill" style={style}>
-      <span className="modal__liveProno__pillLabel">{label}</span>
-      <span className="modal__liveProno__pillVal">{value.toFixed(2)}</span>
+      <span className="modal__liveProno__pillLabel" data-long={longLabel || label}>{label}</span>
+      <span className="modal__liveProno__pillVal" data-comma={value.toFixed(2).replace('.', ',')}>{value.toFixed(2)}</span>
     </div>
   )
 }
