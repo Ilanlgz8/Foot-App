@@ -23,3 +23,34 @@
 .tousRes__tabs { align-self: flex-start; }
 /* En plein écran : jamais de défilement interne, le panneau prend toute sa hauteur */
 .tousRes__panel .accueil__dashPanelBody { max-height: none; overflow: visible; }
+
+/* Chaque championnat dans son propre bloc, bien espacé (17/11 : « espace bien chaque championnat
+   pour bien différencier »). Le panneau lui-même devient transparent : seuls les blocs se voient. */
+#root .tousRes .tousRes__panel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  animation: none;
+}
+#root .tousRes .tousRes__panel::before { display: none; }
+#root .tousRes .accueil__dashPanelDivider { display: none; }
+#root .tousRes .accueil__compGroups { gap: 22px; }
+#root .tousRes .accueil__compGroup {
+  background: var(--sf-surface, #141419);
+  border: 1px solid var(--sf-border, rgba(255, 255, 255, 0.09));
+  border-radius: 18px;
+  padding: 12px 10px 10px;
+}
+#root .tousRes .accueil__compGroup:last-child { border-bottom: 1px solid var(--sf-border, rgba(255, 255, 255, 0.09)); }
+#root .tousRes .accueil__compGroupTitle {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #fff;
+  padding: 2px 6px 12px;
+  margin: 0 0 10px;
+  border-bottom: 1px solid var(--sf-border, rgba(255, 255, 255, 0.09));
+}
+#root .tousRes .accueil__resultNav { margin-bottom: 14px; }

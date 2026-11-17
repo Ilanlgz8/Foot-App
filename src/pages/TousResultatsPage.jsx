@@ -46,7 +46,7 @@ export default function TousResultatsPage() {
           <button className={'accueil__resultTab' + (view === 'chrono' ? ' accueil__resultTab--active' : '')} onClick={() => setView('chrono')}>Tous</button>
         </div>
 
-        <div className="accueil__dashPanel accueil__dashPanel--result tousRes__panel">
+        <div className="accueil__dashPanel tousRes__panel">
           <ResultPanel results={results} loading={loading} view={view} />
         </div>
       </div>
