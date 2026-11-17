@@ -29,7 +29,16 @@ function useLiveCount(liveMatches) {
   }, [])
   return liveMatches.filter(m => isCardLive(m) && !espnSaysFinal(m.id)).length
 }
-import NotificationBell from './NotificationBell'
+import '../profil.css' // icône profil du haut d'écran (.sfProfileBtn)
+import { usePushNotifications } from '../hooks/usePushNotifications'
+
+// La cloche (17/11) est passée dans la page Profil. Son hook faisait aussi, à chaque lancement,
+// le re-envoi silencieux de l'abonnement push au serveur (voir usePushNotifications) : on le
+// garde monté ici, sans rien afficher, pour ne pas perdre ce re-envoi.
+function PushResync() {
+  usePushNotifications()
+  return null
+}
 import '../../navbar.css'
 
 // ⚠️ AJOUT (28/10, demande explicite utilisateur : "on met fiche équipe [...]
@@ -221,19 +230,18 @@ function Navbar() {
               — classement 18+ des stores, cadre ANJ en France) ; il est
               conservé tel quel pour ne pas toucher au grid-template-columns
               existant du header. */}
+          {/* 17/11 : à gauche, la loupe (fiche équipe) — « Pronos » et la cloche sont passés dans la
+              page Profil (icône à droite). Mobile uniquement, comme avant. */}
           <div className="sfHeader__leftGroup">
             <NavLink
-              to="/pronos"
+              to="/equipe"
               className={({ isActive }) =>
-                isActive ? 'sfHeader__pronosBtn sfHeader__pronosBtn--active' : 'sfHeader__pronosBtn'
+                isActive ? 'teamSearchBtn teamSearchBtn--active' : 'teamSearchBtn'
               }
+              aria-label="Fiche équipe"
+              title="Fiche équipe"
             >
-              <svg className="sfHeader__pronosIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <circle cx="12" cy="12" r="4.5" />
-                <circle cx="12" cy="12" r="0.6" fill="currentColor" />
-              </svg>
-              <span>Pronos</span>
+              <TeamSearchIcon />
             </NavLink>
           </div>
 
@@ -278,14 +286,24 @@ function Navbar() {
             <NavLink
               to="/equipe"
               className={({ isActive }) =>
-                isActive ? 'teamSearchBtn teamSearchBtn--active' : 'teamSearchBtn'
+                isActive ? 'teamSearchBtn teamSearchBtn--desktop teamSearchBtn--active' : 'teamSearchBtn teamSearchBtn--desktop'
               }
               aria-label="Fiche équipe"
               title="Fiche équipe"
             >
               <TeamSearchIcon />
             </NavLink>
-            <NotificationBell />
+            <NavLink
+              to="/profil"
+              className={({ isActive }) => isActive ? 'sfProfileBtn sfProfileBtn--active' : 'sfProfileBtn'}
+              aria-label="Mon profil"
+              title="Mon profil"
+            >
+              <span className="sfProfileBtn__ring">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
+              </span>
+            </NavLink>
+            <PushResync />
           </div>
         </div>
       </header>
