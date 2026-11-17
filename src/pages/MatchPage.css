@@ -160,7 +160,7 @@
   text-align: center;
 }
 .mp__hero__score {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 2.4rem;
   font-weight: 900;
   color: #fff;
@@ -169,7 +169,7 @@
   text-shadow: 0 2px 12px rgba(var(--black-rgb),.5);
 }
 .mp__hero__time {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 2rem;
   font-weight: 700;
   color: #fff;

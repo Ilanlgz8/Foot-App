@@ -206,7 +206,7 @@
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1.1rem;
   font-weight: 800;
   color: #fff;
@@ -905,7 +905,7 @@
 .accueil__matchCardValue--live {
   /* Même police/poids que .mp__hero__score (LiveMatchPage) — score en blanc,
      plus affirmé qu'un score "à venir/terminé" classique. */
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1.3rem;
   color: #ffffff;
   text-shadow: 0 2px 10px rgba(var(--black-rgb),0.5);
@@ -2691,7 +2691,7 @@
   flex-shrink: 0;
 }
 .accueil__liveChipScore {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.9rem;
   font-weight: 800;
   color: #fff;
@@ -2938,7 +2938,7 @@
   min-width: 0;
 }
 .accueil__mdjLeagueName {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.9rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -2972,7 +2972,7 @@
    libre par la pastille de statut supprimée). ── */
 .accueil__mdjPeriod {
   flex-shrink: 0;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -3024,7 +3024,7 @@
   transform: scale(1.18);
 }
 .accueil__mdjCrestFb {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1.3rem;
   font-weight: 800;
   color: rgba(235,240,250,0.7);
@@ -3106,7 +3106,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -3386,7 +3386,7 @@
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1.9rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;

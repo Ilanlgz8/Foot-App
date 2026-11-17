@@ -434,15 +434,15 @@ export const COMPETITIONS = [
     // Couleurs du logo (relevées sur le fichier : bleu nuit #091c3e, turquoise #15ffcf) — UNIQUEMENT
     // sur les pages match (demande utilisateur 12/11 : « pas comme la Ligue 1 », donc pas sur les
     // cartes de l'Accueil/Programme). Lues via withPageTheme(), même mécanique que l'Euro.
-    pageTheme: {
-      tint: '#091c3e',
-      tint2: '#15ffcf',
-      // bleu nuit dominant, turquoise en accent (1er essai 22/55/85 % : presque tout turquoise)
-      tintStops: { base: '45%', c2: '80%', c3: '100%' },
-      tintPearl: 0.3,
-      tintSoft: true,
-      tintLight: true, // « Terminé » / minute en blanc : le rouge se lit mal sur le turquoise
-    },
+    // 17/11 (thème Sobre) : la teinte Ligue 2 s'applique partout (cartes de l'Accueil comprises), plus
+    // seulement sur la page match — « actuellement les cartes, elles sont noires ».
+    tint: '#091c3e',
+    tint2: '#15ffcf',
+    // bleu nuit dominant, turquoise en accent (1er essai 22/55/85 % : presque tout turquoise)
+    tintStops: { base: '45%', c2: '80%', c3: '100%' },
+    tintPearl: 0.3,
+    tintSoft: true,
+    tintLight: true, // « Terminé » / minute en blanc : le rouge se lit mal sur le turquoise
   },
   {
     id: 'PL',
@@ -908,11 +908,12 @@ export const COMPETITIONS = [
     emblem: null,
   },
   // Compléments de saison (14/11) : rangés sous leur championnat (menu déroulant du nom).
-  { id: 'BARL1', parent: 'FL1', name: 'Play-offs et barrage L1/L2', shortName: 'Barrages L1', emblem: null },
-  { id: 'SCE',   parent: 'PD',  name: "Supercoupe d'Espagne",      shortName: 'Supercopa',  emblem: null },
-  { id: 'DSC',   parent: 'BL1', name: "Supercoupe d'Allemagne",    shortName: 'Supercup',   emblem: null },
-  { id: 'BARBL', parent: 'BL1', name: 'Barrage Bundesliga',        shortName: 'Barrage BL', emblem: null },
-  { id: 'SCI',   parent: 'SA',  name: "Supercoupe d'Italie",       shortName: 'Supercoppa', emblem: null },
+  // 17/11 : ils reprennent les couleurs de leur championnat sur les cartes (avant : cartes noires).
+  { id: 'BARL1', parent: 'FL1', name: 'Play-offs et barrage L1/L2', shortName: 'Barrages L1', emblem: null, tintTheme: 'fl1', tintLight: true },
+  { id: 'SCE',   parent: 'PD',  name: "Supercoupe d'Espagne",      shortName: 'Supercopa',  emblem: null, tintTheme: 'pd', tintLight: true },
+  { id: 'DSC',   parent: 'BL1', name: "Supercoupe d'Allemagne",    shortName: 'Supercup',   emblem: null, tintTheme: 'bl1', tintLight: true },
+  { id: 'BARBL', parent: 'BL1', name: 'Barrage Bundesliga',        shortName: 'Barrage BL', emblem: null, tintTheme: 'bl1', tintLight: true },
+  { id: 'SCI',   parent: 'SA',  name: "Supercoupe d'Italie",       shortName: 'Supercoppa', emblem: null, tintTheme: 'sa', tintLight: true },
   {
     // ⚠️ TEINTE AJOUTÉE (10/09, demande utilisateur : "regarder les couleurs
     // pour la ligue des nations... etc" → confirmé via AskUserQuestion :

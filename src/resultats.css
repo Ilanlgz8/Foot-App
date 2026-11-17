@@ -510,7 +510,7 @@
   /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap ci-dessus). */
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   color: #e2e8f0;
   text-align: center;
   white-space: nowrap;
@@ -549,7 +549,7 @@
   /* ⚠️ Remonté (demande utilisateur, après réduction initiale). */
   font-size: 1.8rem;
   font-weight: 800;
-  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   color: #f1f5f9;
   text-shadow: 0 0 9px rgba(var(--red-rgb),0.4);
   min-width: 2.4rem;

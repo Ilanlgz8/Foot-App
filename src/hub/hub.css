@@ -39,12 +39,12 @@
 .hubCocoon__logo--opaque img { border-radius: 7px; }
 .hubCocoon__name {
   flex: 1; min-width: 0;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.8rem; font-weight: 700; letter-spacing: 0.03em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hubCocoon__count {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.66rem; color: rgba(255,255,255,0.66); white-space: nowrap;
 }
 .hubCocoon__chev { font-size: 0.85rem; color: rgba(255,255,255,0.66); transition: transform .2s; }
@@ -53,7 +53,7 @@
 .hubCocoon__foot {
   display: flex; justify-content: space-between; align-items: center;
   padding: 2px 14px 12px;
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.7rem; color: rgba(255,255,255,0.66);
 }
 .hubCocoon__foot--center { justify-content: center; }
@@ -70,7 +70,7 @@
 .hubSeg button {
   flex: 1; padding: 8px 10px; border: 0; border-radius: 999px; cursor: pointer;
   background: none; color: rgba(255,255,255,0.66);
-  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+  font-family: var(--sf-font-ui); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
 }
 .hubSeg button.is-on { background: rgba(var(--red-rgb), 0.2); color: #fff; }
 .hubSeg__cnt {
@@ -81,7 +81,7 @@
 .hubDay { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
 .hubDay__label {
   flex: 1; min-width: 0; text-align: center;
-  font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.03em; color: #fff;
+  font-family: var(--sf-font-ui); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.03em; color: #fff;
 }
 .hubDay__label small { display: block; margin-top: 2px; font-weight: 500; font-size: 0.8rem; color: rgba(255,255,255,0.55); }
 .hubEmpty {
@@ -92,7 +92,7 @@
 .hubEmpty b { display: block; margin-bottom: 6px; color: #fff; font-size: 0.9rem; }
 .hubEmpty button {
   margin-top: 12px; background: none; border: 0; cursor: pointer;
-  color: var(--red); font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.75rem;
+  color: var(--red); font-family: var(--sf-font-ui); font-size: 0.75rem;
 }
 
 /* ── Cards : vraies cards Accueil (MatchPoster), réglées comme la maquette ──
@@ -144,5 +144,5 @@
   display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
   margin: 4px 0 6px; padding: 14px; border-radius: 14px; cursor: pointer;
   background: rgba(var(--red-rgb), 0.14); border: 1px solid rgba(var(--red-rgb), 0.5);
-  color: #fff; font-family: 'Chakra Petch', system-ui, sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
+  color: #fff; font-family: var(--sf-font-ui); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
 }

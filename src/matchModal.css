@@ -283,7 +283,7 @@
 }
 
 .modal__liveMinute {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.78rem;
   font-weight: 800;
   color: var(--red);
@@ -1444,7 +1444,7 @@
 .pm__statRow:nth-child(even) { background: rgba(var(--white-rgb),0.025); }
 
 .pm__statVal {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.88rem;
   font-weight: 700;
   /* 0.75 → 0.95 : trop gris/peu visible sur fond sombre, demande explicite

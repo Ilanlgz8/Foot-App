@@ -51,7 +51,7 @@
 }
 
 .live__pageTitle {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 1.5rem;
   font-weight: 800;
   color: #fff;
@@ -149,7 +149,7 @@
 }
 
 .live__period {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.55rem;
   font-weight: 700;
   color: rgba(var(--white-rgb),0.55);
@@ -211,7 +211,7 @@
   color: rgba(230,235,245,0.55);
 }
 .live__teamName {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.82rem;
   font-weight: 700;
   color: rgba(var(--white-rgb),0.92);
@@ -238,7 +238,7 @@
   justify-content: center;
 }
 .live__minute {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--red);
@@ -261,7 +261,7 @@
   gap: 0.3rem;
 }
 .live__pill {
-  font-family: 'Chakra Petch', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   font-size: 2rem;
   font-weight: 700;
   color: #f0d0d0;

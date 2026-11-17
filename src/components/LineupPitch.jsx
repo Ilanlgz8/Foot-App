@@ -394,7 +394,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0 }) {
         justifyContent: 'center',
         fontSize:       'clamp(12px, 3.4vw, 16px)',
         fontWeight:     800,
-        fontFamily:     "'Chakra Petch', monospace",
+        fontFamily:     'var(--sf-font-ui)',
         color,
         background:     alpha(color, 0.13),
         border:         `1.5px solid ${color}`,
@@ -423,7 +423,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0 }) {
         }} aria-label={`${goalCount} but${goalCount > 1 ? 's' : ''}`}>
           <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
           {goalCount > 1 && (
-            <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', fontFamily: "'Chakra Petch', monospace" }}>
+            <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--sf-font-ui)' }}>
               x{goalCount}
             </span>
           )}
@@ -435,7 +435,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0 }) {
         fontWeight:    600,
         color:         isGK ? alpha('#f59e0b', 0.65) : 'rgba(255,255,255,0.52)',
         whiteSpace:    'nowrap',
-        fontFamily:    "'Chakra Petch', monospace",
+        fontFamily:    'var(--sf-font-ui)',
         textShadow:    '0 1px 5px rgba(0,0,0,0.95)',
         letterSpacing: '0.01em',
         maxWidth:      'clamp(52px, 15vw, 64px)',
@@ -548,7 +548,7 @@ function Pitch({ formation, positions, teamColor, goals }) {
           fontWeight:    700,
           letterSpacing: '0.12em',
           color:         'rgba(255,255,255,0.15)',
-          fontFamily:    "'Chakra Petch', monospace",
+          fontFamily:    'var(--sf-font-ui)',
           pointerEvents: 'none',
         }}>
           {formation}
@@ -598,7 +598,7 @@ function PlayerCell({ player, isSub }) {
         fontSize:      8,
         fontWeight:    700,
         flexShrink:    0,
-        fontFamily:    "'Chakra Petch', monospace",
+        fontFamily:    'var(--sf-font-ui)',
         letterSpacing: '0.03em',
         color:         isSub ? 'rgba(255,255,255,0.38)' : catC,
         background:    isSub ? 'rgba(255,255,255,0.05)' : alpha(catC, 0.1),
@@ -627,7 +627,7 @@ function PlayerCell({ player, isSub }) {
         fontWeight: 700,
         color:      'rgba(255,255,255,0.2)',
         flexShrink: 0,
-        fontFamily: "'Chakra Petch', monospace",
+        fontFamily: 'var(--sf-font-ui)',
       }}>
         {player.number ?? ''}
       </span>
@@ -643,7 +643,7 @@ function PlayerGrid({ starters, subs }) {
     letterSpacing: '1.2px',
     textTransform: 'uppercase',
     color:         'rgba(255,255,255,0.22)',
-    fontFamily:    "'Chakra Petch', monospace",
+    fontFamily:    'var(--sf-font-ui)',
   }
   return (
     <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -724,7 +724,7 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
               <span style={{
                 fontSize:      10,
                 fontWeight:    700,
-                fontFamily:    "'Chakra Petch', monospace",
+                fontFamily:    'var(--sf-font-ui)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 color:         act ? c : 'rgba(255,255,255,0.35)',
@@ -734,7 +734,7 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
               {t?.formation && (
                 <span style={{
                   fontSize:     9.5,
-                  fontFamily:   "'Chakra Petch', monospace",
+                  fontFamily:   'var(--sf-font-ui)',
                   color:        act ? c : 'rgba(255,255,255,0.2)',
                   background:   act ? alpha(c, 0.1) : 'transparent',
                   border:       `1px solid ${act ? alpha(c, 0.3) : 'transparent'}`,

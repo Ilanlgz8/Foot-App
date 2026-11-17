@@ -316,6 +316,9 @@ img[data-team*="Juventus" i] {
   --sf-radius-s:  10px;
 
   --sf-font-display: 'Archivo', 'Chakra Petch', system-ui, sans-serif;
+  /* Police des textes de l'interface (16/11, thèmes) : Chakra Petch = thème Néon (style d'origine),
+     Inter en thème Sobre (theme-sobre.css). Les polices des chiffres (heures, scores) ne changent pas. */
+  --sf-font-ui: 'Chakra Petch', 'Inter', system-ui, sans-serif;
   --sf-font-body:    'Inter', system-ui, -apple-system, sans-serif;
 }
 

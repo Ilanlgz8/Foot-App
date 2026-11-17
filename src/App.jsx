@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import './App.css'
 import './theme-v2.css'
+import './theme-sobre.css' // thème Sobre (17/11) — surcharges actives seulement sous data-theme="sobre"
 import Navbar, { BottomTabBar } from './components/navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Accueil from './components/Accueil.jsx'

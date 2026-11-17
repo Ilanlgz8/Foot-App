@@ -55,6 +55,15 @@
          sessionStorage anti-boucle si le vrai problème est ailleurs, ex.
          panne réseau totale — voir main.jsx qui efface ce garde-fou dès que
          l'app démarre vraiment). -->
+    <!-- Thème (17/11) : posé avant le premier affichage pour éviter tout flash. « sobre » par défaut,
+         « neon » = style d'origine (choix dans Profil > Thème, gardé dans localStorage `sf_theme`). -->
+    <script>
+      (function () {
+        var t = 'sobre'
+        try { t = localStorage.getItem('sf_theme') === 'neon' ? 'neon' : 'sobre' } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t)
+      })()
+    </script>
     <script>
       window.addEventListener('error', function (e) {
         var t = e.target

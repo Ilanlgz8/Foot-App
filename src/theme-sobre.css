@@ -1,0 +1,136 @@
+/* ═════════════════════════════════════════════════════════════════════════════
+   Thème « Sobre » (17/11, style D validé sur maquette : « Média sport + affichage actuel »).
+   Le thème « Néon » = les styles d'origine de l'app, sans rien de ce fichier. Ce fichier ne fait que
+   SURCHARGER, sous :root[data-theme="sobre"] (posé au démarrage par index.html, choix gardé dans
+   localStorage `sf_theme`, Sobre par défaut).
+   Règles :
+   • textes en Inter (variable --sf-font-ui) — les polices des CHIFFRES ne changent pas (heures
+     Lexend, scores Inter 900, score du Match du jour Archivo Black) ;
+   • fond graphite neutre, cartes plates à bordure fine grise, plus de lueur rouge ;
+   • rouge réservé au logo, au direct et aux éléments actifs ;
+   • petits titres en gris (plus de rouge en majuscules espacées).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root[data-theme="sobre"] {
+  --sf-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --bg-deep:       #0f1115;
+  --bg-dark:       #101216;
+  --bg-mid:        #13161b;
+  --bg-card:       #181b21;
+  --bg-panel:      #181b21;
+  --bg-panel-grad: linear-gradient(160deg, #191c22 0%, #16191f 100%);
+  --bg-page-grad:  linear-gradient(180deg, #101216 0%, #101216 100%);
+  --bg-detail:     #13161b;
+  --sf-bg:         #101216;
+  --sf-surface:    #181b21;
+  --sf-surface-2:  #1d2026;
+  --sf-surface-3:  #24282f;
+  --sf-border:     #23262d;
+  --border:        #23262d;
+  --border-red:    #23262d;
+  --sf-muted:      #9aa0ab;
+  --text-mid:      #9aa0ab;
+}
+
+/* ── Cartes de match (Programme, Résultats) : plates, bordure grise, sans lueur ── */
+:root[data-theme="sobre"] #root .matchs__match,
+:root[data-theme="sobre"] #root .resultats__card {
+  border-color: #23262d;
+  box-shadow: none;
+  background: #181b21;
+}
+:root[data-theme="sobre"] #root .matchs__match:hover,
+:root[data-theme="sobre"] #root .resultats__card:hover {
+  border-color: #2f333b;
+  box-shadow: none;
+}
+
+/* ── Chiffres : mêmes polices, sans lueur (sauf direct) ── */
+:root[data-theme="sobre"] #root .matchs__scoreHour,
+:root[data-theme="sobre"] #root .matchs__match:hover .matchs__scoreHour,
+:root[data-theme="sobre"] #root .poster__time,
+:root[data-theme="sobre"] #root .resultats__scoreNum {
+  text-shadow: none;
+}
+
+/* ── Écussons et boutons : plus de halo rouge ── */
+:root[data-theme="sobre"] #root .matchs__crestWrap,
+:root[data-theme="sobre"] #root .resultats__crestWrap,
+:root[data-theme="sobre"] #root .resultHero__team--winner .resultHero__crestWrap,
+:root[data-theme="sobre"] #root .matchs__navBtn:hover:not(:disabled),
+:root[data-theme="sobre"] #root .resultats__navBtn:hover:not(:disabled),
+:root[data-theme="sobre"] #root .matchs__wcCard:hover,
+:root[data-theme="sobre"] #root .matchs__wcGroupCard:hover,
+:root[data-theme="sobre"] #root .matchs__wcToggleBtn--active,
+:root[data-theme="sobre"] #root .matchs__wcToggleBtn--active .matchs__wcToggleIcon,
+:root[data-theme="sobre"] #root .matchs__sidebarItem--active,
+:root[data-theme="sobre"] #root .resultats__sidebarItem--active,
+:root[data-theme="sobre"] #root .accueil__compChip--active,
+:root[data-theme="sobre"] #root .accueil__resultTab--active {
+  box-shadow: none;
+}
+
+/* ── Petits titres : gris au lieu de rouge (le direct garde son rouge) ── */
+:root[data-theme="sobre"] #root .matchs__kicker,
+:root[data-theme="sobre"] #root .resultats__kicker,
+:root[data-theme="sobre"] #root .matchs__sidebarLabel,
+:root[data-theme="sobre"] #root .resultats__sidebarLabel,
+:root[data-theme="sobre"] #root .classement__sidebarLabel,
+:root[data-theme="sobre"] #root .classement__panelKicker,
+:root[data-theme="sobre"] #root .classement__table thead th,
+:root[data-theme="sobre"] #root .matchs__scoreDate,
+:root[data-theme="sobre"] #root .matchs__wcGroupCard__label,
+:root[data-theme="sobre"] #root .accueil__cardSource,
+:root[data-theme="sobre"] #root .resultats__ftBadge,
+:root[data-theme="sobre"] #root .lmp__teamXg,
+:root[data-theme="sobre"] #root .mentions__section h2,
+:root[data-theme="sobre"] #root .footer__modalBody h3 {
+  color: #9aa0ab;
+  text-shadow: none;
+}
+:root[data-theme="sobre"] #root .classement__panelTitle,
+:root[data-theme="sobre"] #root .classement__groupTitle,
+:root[data-theme="sobre"] #root .accueil__compGroupTitle,
+:root[data-theme="sobre"] #root .accueil__liveSectionTitle,
+:root[data-theme="sobre"] #root .resultats__pouleGroupTitle,
+:root[data-theme="sobre"] #root .matchs__wcGroupTitle,
+:root[data-theme="sobre"] #root .pm__sectionTitle {
+  color: #eceef2;
+  text-shadow: none;
+}
+
+/* ── Bouton « Match » de la barre du bas : en direct, anneau rouge fixe (plus de néon qui respire) ── */
+:root[data-theme="sobre"] #root .sfTabLive__orb {
+  background: #1f2228;
+}
+:root[data-theme="sobre"] #root .sfTabLive--hasLive .sfTabLive__orb::before {
+  animation: none;
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root .sfTabLive--hasLive .sfTabLive__orb::after {
+  animation: none;
+}
+
+/* ── Logo du haut : rouge franc, sans halo ── */
+:root[data-theme="sobre"] #root .sfHeader__brand span {
+  text-shadow: none;
+}
+
+/* ── Cartes de l'Accueil (posters) : couleur du championnat gardée, en version douce (~40 %) ──
+   Fond graphite, la teinte n'est plus qu'un voile ; contour fin teinté, plus d'ombre portée. */
+:root[data-theme="sobre"] #root .poster__frame {
+  background: color-mix(in srgb, var(--poster-comp, #23262d) 35%, #23262d);
+  box-shadow: none;
+}
+:root[data-theme="sobre"] #root .poster {
+  background: #181b21;
+}
+:root[data-theme="sobre"] #root .poster__bg--gradient,
+:root[data-theme="sobre"] #root .poster__bg--gradientAlt,
+:root[data-theme="sobre"] #root .poster__bg--gradientTri {
+  opacity: 0.42;
+}
+:root[data-theme="sobre"] #root .poster__overlay {
+  opacity: 0.45;
+}

@@ -899,7 +899,7 @@
   /* ⚠️ Réduit de moitié en desktop (même demande que crestWrap ci-dessus). */
   font-size: 0.85rem;
   font-weight: 700;
-  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   color: #e2e8f0;
   min-width: 0;
   white-space: nowrap;
@@ -973,7 +973,7 @@
   /* ⚠️ Remonté (demande utilisateur, après réduction initiale). */
   font-size: 2rem;
   font-weight: 700;
-  font-family: 'Chakra Petch', 'Inter', system-ui, sans-serif;
+  font-family: var(--sf-font-ui);
   /* ⚠️ Alignée sur la couleur des noms d'équipe (.matchs__teamName), demande
      utilisateur — même teinte que le reste du texte de la card. */
   color: #e2e8f0;
