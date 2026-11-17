@@ -558,13 +558,13 @@
   align-items: baseline;
   gap: 0.3em;
 }
-/* Côté domicile : en miroir du côté extérieur — icône contre le trait du milieu (à droite du nom),
-   texte aligné à droite. Avant (même jour) : icône à gauche + texte aligné à gauche → un nom sur
-   2 lignes prenait toute la largeur et se décalait à gauche des autres (constat utilisateur). */
-.lmp__heroScorersHome .lmp__heroScorerItem { flex-direction: row-reverse; justify-content: flex-start; }
-.lmp__heroScorerItem .lmp__heroScorerIcon { flex-shrink: 0; }
-.lmp__heroScorerItem .lmp__heroScorerText { min-width: 0; }
-.lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: right; }
+/* Côté domicile (17/11, version validée) : comme le côté extérieur — icône à gauche du nom, texte
+   aligné à gauche, mais en partant du bord gauche de la carte (avant : collé au trait du milieu,
+   « trop compact », et un nom sur 2 lignes se décalait). Deux colonnes lues de la même façon. */
+.lmp__heroScorersHome { align-items: flex-start; padding-left: 0.6rem; }
+.lmp__heroScorersHome .lmp__heroScorerItem { justify-content: flex-start; text-align: left; }
+.lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: left; }
+.lmp__heroScorersHome .lmp__heroScorerItem--sep { align-self: stretch; }
 
 .lmp__page {
   min-height: 100vh;
