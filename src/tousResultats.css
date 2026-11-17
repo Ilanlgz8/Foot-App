@@ -54,3 +54,5 @@
   border-bottom: 1px solid var(--sf-border, rgba(255, 255, 255, 0.09));
 }
 #root .tousRes .accueil__resultNav { margin-bottom: 14px; }
+#root .tousRes .accueil__compGroupTitle { gap: 10px; }
+#root .tousRes .accueil__compGroupLogo { width: 26px; height: 26px; }

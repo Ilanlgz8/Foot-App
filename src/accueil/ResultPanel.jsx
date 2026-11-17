@@ -7,6 +7,7 @@ import { PanelSkeleton } from './MatchCard'
 // compétitions (comme l'onglet "Tous"), le badge championnat y a donc sa
 // place — voir ResultCard.jsx pour le détail complet.
 import { ResultCard } from '../components/ResultCard'
+import { compForMatch } from '../data/competitions'
 import { usePersistedState, NAV_POSITION_TTL } from '../hooks/usePersistedState'
 
 // Rétabli (retour utilisateur : la navigation par jour — aujourd'hui ⇄ hier —
@@ -29,7 +30,8 @@ function groupByComp(matches) {
   matches.forEach(m => {
     const key  = m.competition?.id ?? 'other'
     const name = m.competition?.name ?? 'Autre'
-    if (!groups[key]) groups[key] = { name, matches: [] }
+    // emblem (17/11) : logo du championnat devant son nom (même source que les cartes de match)
+    if (!groups[key]) groups[key] = { name, emblem: compForMatch(m)?.emblem ?? m.competition?.emblem ?? null, matches: [] }
     groups[key].matches.push(m)
   })
   return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))
@@ -123,9 +125,12 @@ export function ResultPanel({ results, loading, view = 'chrono', limit = null, o
         {/* Par compétition */}
         {!loading && view === 'comp' && currentMatches.length > 0 && (
           <div className="accueil__compGroups">
-            {compGroups.map(({ name, matches }) => (
+            {compGroups.map(({ name, emblem, matches }) => (
               <div key={name} className="accueil__compGroup">
-                <p className="accueil__compGroupTitle">{name}</p>
+                <p className="accueil__compGroupTitle">
+                  {emblem && <img className="accueil__compGroupLogo" src={emblem} alt="" loading="lazy" />}
+                  <span>{name}</span>
+                </p>
                 <div className="accueil__matchCards">
                   {matches.map((match, i) => (
                     <ResultCard key={match.id ?? i} match={match} showComp />
