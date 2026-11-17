@@ -558,11 +558,13 @@
   align-items: baseline;
   gap: 0.3em;
 }
-.lmp__heroScorersHome .lmp__heroScorerItem { justify-content: flex-end; }
+/* Côté domicile : en miroir du côté extérieur — icône contre le trait du milieu (à droite du nom),
+   texte aligné à droite. Avant (même jour) : icône à gauche + texte aligné à gauche → un nom sur
+   2 lignes prenait toute la largeur et se décalait à gauche des autres (constat utilisateur). */
+.lmp__heroScorersHome .lmp__heroScorerItem { flex-direction: row-reverse; justify-content: flex-start; }
 .lmp__heroScorerItem .lmp__heroScorerIcon { flex-shrink: 0; }
 .lmp__heroScorerItem .lmp__heroScorerText { min-width: 0; }
-/* Côté domicile aussi : le bloc reste calé à droite, mais ses lignes partent toutes du prénom. */
-.lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: left; }
+.lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: right; }
 
 .lmp__page {
   min-height: 100vh;
