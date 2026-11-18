@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { useFavoriteTeams } from '../hooks/useFavoriteTeams'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
-import { getTheme, setTheme } from '../utils/theme'
+import { getTheme, setTheme, getCardOdds, setCardOdds } from '../utils/theme'
 import '../profil.css'
 
 function readPronosGroup() {
@@ -66,6 +66,8 @@ export default function ProfilPage() {
   const { favorites: favComps } = useFavoriteTeams()
   const { favorites: favClubs } = useFavoriteClubs()
   const [theme, setThemeState] = useState(getTheme)
+  const [cardOdds, setCardOddsState] = useState(getCardOdds)
+  const toggleCardOdds = () => { const v = !cardOdds; setCardOdds(v); setCardOddsState(v) }
   const group = readPronosGroup()
 
   const pickTheme = (t) => { setTheme(t); setThemeState(t) }
@@ -122,6 +124,17 @@ export default function ProfilPage() {
           <ThemeCard id="jaune" active={theme === 'jaune'} onPick={pickTheme} title="Jaune" sub="Sobre, avec les cotes en jaune" />
         </div>
         <p className="profil__note">Ton choix est gardé sur ce téléphone.</p>
+
+        <h2 className="profil__section">Affichage</h2>
+        <div className="profil__list">
+          <button type="button" className="profil__row profil__row--toggle" role="switch" aria-checked={cardOdds} onClick={toggleCardOdds}>
+            <span className="profil__rowText">
+              <span className="profil__rowTitle">Cotes sur les cartes</span>
+              <span className="profil__rowSub">Accueil et page Match. Les pages des matchs les gardent.</span>
+            </span>
+            <span className={`profil__switch${cardOdds ? ' profil__switch--on' : ''}`} aria-hidden="true"><span /></span>
+          </button>
+        </div>
 
         <nav className="profil__list" aria-label="Informations">
           <Link to="/mentions-legales" className="profil__row profil__row--plain">

@@ -150,3 +150,13 @@
   background: rgba(var(--red-rgb), 0.14); border: 1px solid rgba(var(--red-rgb), 0.5);
   color: #fff; font-family: var(--sf-font-ui); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
 }
+
+/* Réglage Profil « Cotes sur les cartes » désactivé (18/11) : Accueil (cartes + Match du jour) et
+   page Match seulement — les pages d'un match gardent leurs cotes. */
+:root[data-card-odds="off"] .hubPosters .poster__footer,
+:root[data-card-odds="off"] .accueil__mdj .poster__prono-row { display: none; }
+
+/* Cotes des cartes un peu plus petites (18/11, « vraiment pas beaucoup ») : 54 → 48 px de haut. */
+.hubPosters .poster__prono-pill { height: 48px; max-width: 96px; }
+.hubPosters .poster__prono-pillVal { font-size: 0.98rem; }
+:root[data-odds="jaune"] #root .hubPosters .poster__prono-pillVal[data-comma]::after { font-size: 19px; }

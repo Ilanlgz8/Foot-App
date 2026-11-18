@@ -143,3 +143,29 @@
 @media (min-width: 640px) {
   .sfHeader .sfProfileBtn--desktop { display: inline-flex; }
 }
+
+/* Interrupteur (réglage « Cotes sur les cartes », 18/11) */
+.profil__row--toggle {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.profil__switch {
+  width: 46px; height: 28px; border-radius: 999px;
+  background: #3a3f48;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+.profil__switch span {
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+.profil__switch--on { background: #4ade80; }
+.profil__switch--on span { transform: translateX(18px); }

@@ -2,6 +2,8 @@
 // Doit rester le TOUT PREMIER import : protège chaque écriture localStorage contre le stockage plein
 // (voir storageGuard.js), y compris celles faites au chargement des autres modules.
 import './utils/storageGuard'
+import { applyCardOdds } from './utils/theme'
+applyCardOdds() // réglage Profil « cotes sur les cartes », avant le 1er rendu (pas de flash)
 import { initReloadTrace, markReload, noteBootCache } from './utils/reloadTrace'
 initReloadTrace()
 import { createRoot } from 'react-dom/client'

@@ -22,3 +22,26 @@ export function setTheme(t) {
   if (v === 'jaune') root.setAttribute('data-odds', 'jaune')
   else root.removeAttribute('data-odds')
 }
+
+// ── Cotes sur les cartes (18/11) ─────────────────────────────────────────────────────────────────
+// Réglage du Profil : masquer les cotes sur les cartes de l'Accueil (Match du jour compris) et de
+// la page Match (onglets En direct / Tous les matchs). Les pages d'un match gardent toujours leurs
+// cotes. Posé sur <html data-card-odds="off"> (CSS dans hub.css), appliqué au démarrage par main.jsx.
+const ODDS_KEY = 'sf_cardOdds'
+
+export function getCardOdds() {
+  try { return localStorage.getItem(ODDS_KEY) !== 'off' } catch { return true }
+}
+
+export function applyCardOdds(show = getCardOdds()) {
+  if (show) document.documentElement.removeAttribute('data-card-odds')
+  else document.documentElement.setAttribute('data-card-odds', 'off')
+}
+
+export function setCardOdds(show) {
+  try {
+    if (show) localStorage.removeItem(ODDS_KEY)
+    else localStorage.setItem(ODDS_KEY, 'off')
+  } catch { /* navigation privée : vaut pour la session */ }
+  applyCardOdds(show)
+}
