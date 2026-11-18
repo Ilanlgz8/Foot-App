@@ -27,37 +27,7 @@ import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 
-// ── Mémoire partagée de la dernière cote de marché d'avant-match ─────────────────────────────────
-const LS_KEY = 'sf_pregameOdds'
-const KEEP_MS = 2 * 24 * 3600 * 1000
-let memo = null
-function store() {
-  if (memo) return memo
-  memo = {}
-  try {
-    const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? 'null')
-    if (raw && typeof raw === 'object') {
-      const now = Date.now()
-      for (const [id, v] of Object.entries(raw)) if (v?.at && now - v.at < KEEP_MS) memo[id] = v
-    }
-  } catch { /* stockage indisponible : mémoire seule */ }
-  return memo
-}
-export function rememberPregameOdds(matchId, odds) {
-  if (!matchId || !odds?.pct) return
-  const s = store()
-  const prev = s[matchId]
-  if (prev && prev.pct?.home === odds.pct.home && prev.pct?.away === odds.pct.away && prev.pct?.draw === odds.pct.draw
-      && prev.decimal?.home === odds.decimal?.home) return
-  s[matchId] = { pct: odds.pct, decimal: odds.decimal ?? null, at: Date.now() }
-  try { localStorage.setItem(LS_KEY, JSON.stringify(s)) } catch { /* plein : mémoire seule */ }
-}
-export function recallPregamePct(matchId) {
-  return store()[matchId]?.pct ?? null
-}
-function recallPregame(matchId) {
-  return store()[matchId] ?? null
-}
+import { rememberPregameOdds, recallPregamePct, recallPregame } from '../utils/pregameOdds'
 
 // ── Le hook ──────────────────────────────────────────────────────────────────────────────────────
 // opts.formMap / opts.compMatches : données déjà chargées par le parent (listes de cartes) — sinon
@@ -105,7 +75,7 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
   // Direct sans cote d'avant-match mémorisée (app jamais ouverte avant le coup d'envoi) : repli sur
   // la cote de marché d'avant-match ESPN si elle existe — posée AVANT le calcul, pour ne pas sauter
   // au rendu suivant.
-  if (isLive && !recallPregamePct(match.id) && espnOdds?.pct) rememberPregameOdds(match.id, espnOdds)
+  if (isLive && !recallPregamePct(match.id) && espnOdds?.pct) rememberPregameOdds(match.id, espnOdds, 'fallback')
   const st = espnScore?.stats
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, liveMinute, {
@@ -135,7 +105,7 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
   let odds = useMarketOdds
     ? { home: espnOdds.decimal.home, draw: espnOdds.decimal.draw, away: espnOdds.decimal.away }
     : { home: pronoToOdds(prono.home), draw: pronoToOdds(prono.draw), away: pronoToOdds(prono.away) }
-  if (isUpcoming) rememberPregameOdds(match.id, { pct: displayPct, decimal: odds })
+  if (isUpcoming) rememberPregameOdds(match.id, { pct: displayPct, decimal: odds }, 'display')
   // En direct : la cote de marché a sa propre marge, différente de celle de pronoToOdds — sans
   // correction, « 2,30 » avant le match devenait « 2,34 » à la 1re minute. On applique à chaque issue
   // le petit écart (borné ±10 %) constaté sur la cote d'avant-match, pour repartir PILE de son chiffre.

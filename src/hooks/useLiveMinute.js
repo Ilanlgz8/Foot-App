@@ -33,6 +33,7 @@ import { isNationalTeamComp, isRealFdMatchId, canAnchorHalf2, PENDING_KICKOFF_WI
 import { normalize, fuzzyTeam } from '../utils/espnSummaryParse'
 import { readCacheStale, removeCache } from './localCache'
 import { serverStateVerdict } from '../utils/serverLiveState'
+import { rememberServerPregameOdds } from '../utils/pregameOdds'
 
 // Notifications gérées exclusivement par le cron /api/cron-goals (VAPID web-push)
 // → fonctionne même quand l'app est fermée, sans doublons.
@@ -851,6 +852,9 @@ async function _doPollESPN(matches, queryClient, forceFresh = false) {
       // enregistrée sur ce téléphone) → le verrou local « terminé » est levé. Sans donnée récente : rien
       // ne change, logique d'avant.
       const sv = serverStateVerdict(data.serverState)
+      // Cote d'avant-match relevée par le Worker (19/11) : point de départ commun du direct pour toutes
+      // les apps (utilisée seulement si ce téléphone n'a pas lui-même affiché la cote avant le match).
+      if (data.serverState?.po) rememberServerPregameOdds(mid, data.serverState.po)
       if (sv.seenAt) serverManagedAt[mid] = Date.now()
       const serverLiftsLock = sv.live && liveStateInfo.state === 'ended' && sv.seenAt > (liveStateInfo.endedAt ?? 0)
       // ⚠️ BUG CORRIGÉ (constat utilisateur : un match VRAIMENT terminé

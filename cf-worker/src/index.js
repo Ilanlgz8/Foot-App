@@ -39,6 +39,7 @@
 
 // Chargé à la demande dans createKv() (repli Redis seulement) — voir son commentaire.
 import { createTursoKv } from './tursoKv.js'
+import { extractPregameOddsFromComp } from '../../src/utils/espnOdds.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
 import {
   ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS,
@@ -674,6 +675,15 @@ async function publishAll(kv, prevParsed, allEvents, allResults, finalIds, today
       if (!evt?.id || !st) continue
       const homeC = comp?.competitors?.find(c => c.homeAway === 'home')
       const awayC = comp?.competitors?.find(c => c.homeAway === 'away')
+      // Cote d'avant-match (19/11) : relevée tant que le match n'a pas commencé, puis GARDÉE telle
+      // quelle (`po`, 3 cotes décimales domicile/nul/extérieur) — toutes les apps font repartir le
+      // direct de ce même chiffre, même ouvertes après le coup d'envoi. Aucun appel en plus : la
+      // donnée est dans le scoreboard déjà téléchargé ; publiée avec le reste (pas d'écriture en plus).
+      let po = live[String(evt.id)]?.po ?? null
+      if ((st.type?.state ?? null) === 'pre') {
+        const o = extractPregameOddsFromComp(comp)
+        if (o) po = [o.decimal.home, o.decimal.draw, o.decimal.away].map(x => Math.round(x * 100) / 100)
+      }
       live[String(evt.id)] = {
         slug,
         state:  st.type?.state ?? null,
@@ -684,6 +694,7 @@ async function publishAll(kv, prevParsed, allEvents, allResults, finalIds, today
         away:   awayC?.score != null ? Number(awayC.score) : null,
         final:  finalIds.has(evt.id) || finalIds.has(String(evt.id)),
         seenAt: nowMs,
+        ...(po ? { po } : {}),
       }
     }
     for (const [id, e] of Object.entries(live)) if (!e || nowMs - (e.seenAt ?? 0) > PUB_LIVE_KEEP_MS) delete live[id]

@@ -189,6 +189,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Qualifications coupes d'Europe (14/11)** : `CLQ`/`UELQ`/`UECLQ` (ESPN `uefa.*_qual`), `parent` CL/UEL/UECL → menu du nom ; pas de classement (NO_STANDINGS_COMPS, exclus du menu dans Classement) ni de buteurs. Worker à redéployer.
 
+- **Cotes (19/11)** : un seul calcul pour toute l'app, `src/hooks/useMatchOdds.js` (cartes, Match du jour, pages de match) — ne jamais recréer un calcul de cotes ailleurs. Le direct repart de la cote d'avant-match mémorisée (`src/utils/pregameOdds.js`, priorité : affichée sur ce téléphone > publiée par le Worker (`po` dans `pub:all` live.events, relevée tant que `state === 'pre'`, `src/utils/espnOdds.js` partagé app/Worker) > cote de marché lue après le coup d'envoi). `calcLiveProno` : intensités de buts calées sur `marketPre`, possession/tirs/corners pondérés progressivement sur 30 min. Prolongations/tab : 2 cotes de qualification partout. Animation : `AnimatedOdd.jsx`.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
