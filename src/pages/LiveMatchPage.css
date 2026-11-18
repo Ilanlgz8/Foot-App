@@ -462,6 +462,22 @@
 }
 
 /* Score des tab en direct, sous le badge de période */
+/* Tirs au but EN DIRECT, entre « TAB » et le score (18/11) : hors du flux (absolu) → le score ne
+   bouge pas ; la minute remonte de 10 px pour lui laisser la place. */
+.lmp__heroStatus--pens { position: relative; }
+#root .lmp__heroStatus--pens .lmp__heroMinute { transform: translate(0.1em, -10px); } /* garde le décalage horizontal d index.css */
+.lmp__heroPensTop {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  color: rgba(var(--white-rgb), 0.9);
+}
 .lmp__heroPens {
   display: block;
   margin-top: 0.25rem;

@@ -408,7 +408,14 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
               du score, centré. Le diffuseur (WatchBadge) reste sous le score,
               conformément à la demande : c'est une info d'une autre nature,
               pas un état de match. */}
-          <div className="lmp__heroStatus">
+          {/* 18/11 (demande utilisateur) : pendant la séance EN DIRECT, « (x-y) » se place entre « TAB »
+              et le score — en position absolue (la minute remonte un peu) pour que le score des
+              120 min ne bouge pas d'un pixel et reste au niveau des logos. Une fois terminé : sous le
+              score, comme sur les cartes de résultats. */}
+          <div className={`lmp__heroStatus${showLivePens && !isTermine ? ' lmp__heroStatus--pens' : ''}`}>
+            {showLivePens && !isTermine && (
+              <span className="lmp__heroPensTop">({homeShootout ?? 0}-{awayShootout ?? 0})</span>
+            )}
             <span className={`lmp__heroMinute${isTermine ? ' lmp__heroMinute--ft' : ''}`}>
               {/* Dot fantôme symétrique à droite : sans lui, le point live à
                   gauche décale visuellement le texte de la minute par rapport
@@ -423,7 +430,7 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
           {/* Score des tab en direct — ESPN expose un champ shootoutScore dédié
               par compétiteur (voir api/fifa-live.js), déjà tracké côté client
               dans espnScoresCache (useLiveMinute.js) mais pas encore affiché ici. */}
-          {showLivePens && (
+          {showLivePens && isTermine && (
             <span className="lmp__heroPens">({homeShootout ?? 0}-{awayShootout ?? 0} tab)</span>
           )}
           {/* ⚠️ DÉPLACÉ (28/08, demande utilisateur : "en haut à droite y'a
