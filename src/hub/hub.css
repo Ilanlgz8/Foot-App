@@ -159,4 +159,4 @@
 /* Cotes des cartes un peu plus petites (18/11, « vraiment pas beaucoup ») : 54 → 48 px de haut. */
 .hubPosters .poster__prono-pill { height: 48px; max-width: 96px; }
 .hubPosters .poster__prono-pillVal { font-size: 0.98rem; }
-:root[data-odds="jaune"] #root .hubPosters .poster__prono-pillVal[data-comma]::after { font-size: 19px; }
+:root[data-odds="jaune"] #root .hubPosters .poster__prono-pillVal[data-comma]::after { font-size: 16px; }

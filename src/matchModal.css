@@ -1785,7 +1785,8 @@
   overflow: hidden;
 }
 #root .modal__liveProno__pill > * { transform: skewX(9deg); display: block; max-width: 100%; }
-#root .modal__liveProno__pill[style*="box-shadow"] { background: #9f1e34; }
+/* Favorite (18/11, 2e version) : plus remplie ni écrite en blanc — liseré bordeaux, texte comme les autres. */
+#root .modal__liveProno__pill[style*="box-shadow"] { box-shadow: inset 0 0 0 2px #9f1e34 !important; }
 #root .modal__liveProno__pillLabel[data-long] {
   font-size: 0;
   letter-spacing: 0;
@@ -1813,5 +1814,4 @@
   letter-spacing: -0.01em;
   color: #9f1e34;
 }
-#root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after,
-#root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after { color: #fff; }
+

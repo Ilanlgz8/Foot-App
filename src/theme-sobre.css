@@ -276,9 +276,7 @@
   background: #f6d43f !important;
   border: none !important;
   box-shadow: none !important;
-  border-radius: 10px;
-  clip-path: polygon(0 6%, 100% 0, 100% 100%, 0 100%);
-  color: #111;
+  color: #111; /* 18/11 : plus de biseau — forme « Penché » commune à tous les thèmes (accueil.css / matchModal.css) */
 }
 /* Libellé : le nom en entier remplace le code (PAY → Pays de Galles) */
 :root[data-odds="jaune"] #root .poster__prono-pillLabel[data-long],
@@ -296,7 +294,7 @@
 :root[data-odds="jaune"] #root .poster__prono-pillLabel[data-long]::after,
 :root[data-odds="jaune"] #root .modal__liveProno__pillLabel[data-long]::after {
   content: attr(data-long);
-  font-size: 11.5px;
+  font-size: 10px;
   font-weight: 500;
   text-transform: none;
 }
@@ -310,7 +308,7 @@
 :root[data-odds="jaune"] #root .modal__liveProno__pillVal[data-comma]::after {
   content: attr(data-comma);
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 21px;
+  font-size: 18px; /* même taille que les autres thèmes (forme « Penché », 18/11) */
   font-weight: 900;
   font-style: italic;
   letter-spacing: -0.01em;
@@ -328,3 +326,13 @@
 :root[data-odds="jaune"] #root .modal__liveProno__pill { clip-path: none; }
 :root[data-odds="jaune"] #root .modal__liveProno__pillVal[data-comma]::after { font-size: 19px; color: #111; }
 :root[data-odds="jaune"] #root .modal__liveProno__pillLabel[data-long]::after { font-size: 10.5px; color: #111; }
+
+/* Thème Jaune : la cote la plus basse reste écrite en NOIR comme les autres (18/11, demande
+   utilisateur) — la règle « favorite en blanc » des autres thèmes ne s'applique pas ici. */
+:root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillLabel[data-long]::after,
+:root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
+:root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after,
+:root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after { color: #111; }
+/* Thème Jaune : pas de liseré non plus — les 3 cotes identiques. */
+:root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"],
+:root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] { box-shadow: none !important; }
