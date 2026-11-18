@@ -733,3 +733,21 @@ describe('scorerOddsPct', () => {
     expect(scorerOddsPct(allScorers[0], [])).toBeNull()
   })
 })
+
+describe('calcLiveProno — continuité avec la cote d\'avant-match (19/11)', () => {
+  const homeForm = ['W', 'W', 'D', 'L', 'W']
+  const awayForm = ['L', 'D', 'L', 'W', 'L']
+  const marketPre = { home: 30, draw: 28, away: 42 }
+  it('à la 2e minute, 0-0, reste quasi identique à la cote affichée avant le match', () => {
+    const live = calcLiveProno(homeForm, awayForm, 0, 0, "2'", {
+      marketPre, homePoss: 75, awayPoss: 25, homeShotsOnTarget: 1, awayShotsOnTarget: 0,
+    })
+    expect(Math.abs(live.home - marketPre.home)).toBeLessThanOrEqual(3)
+    expect(Math.abs(live.away - marketPre.away)).toBeLessThanOrEqual(3)
+    expect(Math.abs(live.draw - marketPre.draw)).toBeLessThanOrEqual(3)
+  })
+  it('un but fait ensuite bien bouger la cote', () => {
+    const live = calcLiveProno(homeForm, awayForm, 1, 0, "20'", { marketPre })
+    expect(live.home).toBeGreaterThan(marketPre.home + 15)
+  })
+})

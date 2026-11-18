@@ -47,12 +47,16 @@ export function rememberPregameOdds(matchId, odds) {
   if (!matchId || !odds?.pct) return
   const s = store()
   const prev = s[matchId]
-  if (prev && prev.pct?.home === odds.pct.home && prev.pct?.away === odds.pct.away) return
-  s[matchId] = { pct: odds.pct, at: Date.now() }
+  if (prev && prev.pct?.home === odds.pct.home && prev.pct?.away === odds.pct.away && prev.pct?.draw === odds.pct.draw
+      && prev.decimal?.home === odds.decimal?.home) return
+  s[matchId] = { pct: odds.pct, decimal: odds.decimal ?? null, at: Date.now() }
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)) } catch { /* plein : mémoire seule */ }
 }
 export function recallPregamePct(matchId) {
   return store()[matchId]?.pct ?? null
+}
+function recallPregame(matchId) {
+  return store()[matchId] ?? null
 }
 
 // ── Le hook ──────────────────────────────────────────────────────────────────────────────────────
@@ -83,7 +87,6 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
   const isUpcoming = !!match && !isFinished && !isLive
 
   const { data: espnOdds } = useEspnPregameOdds(match, !!match && !isFinished)
-  if (espnOdds?.pct && match) rememberPregameOdds(match.id, espnOdds)
 
   if (!match) return null
 
@@ -99,6 +102,10 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
   const hForm = formMap?.[formKey(match, formHomeId)] ?? []
   const aForm = formMap?.[formKey(match, formAwayId)] ?? []
 
+  // Direct sans cote d'avant-match mémorisée (app jamais ouverte avant le coup d'envoi) : repli sur
+  // la cote de marché d'avant-match ESPN si elle existe — posée AVANT le calcul, pour ne pas sauter
+  // au rendu suivant.
+  if (isLive && !recallPregamePct(match.id) && espnOdds?.pct) rememberPregameOdds(match.id, espnOdds)
   const st = espnScore?.stats
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, liveMinute, {
@@ -122,9 +129,30 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
 
   const useMarketOdds = isUpcoming && !!espnOdds
   const displayPct = useMarketOdds ? espnOdds.pct : prono
-  const odds = useMarketOdds
+  // 19/11 : on mémorise la cote AFFICHÉE avant le match (marché ESPN OU modèle interne) — c'est d'elle
+  // que le direct repart (calcLiveProno, marketPre), pour qu'il n'y ait plus de saut au coup d'envoi.
+  // Repli si l'app n'a jamais montré ce match avant le coup d'envoi : la cote de marché d'avant-match.
+  let odds = useMarketOdds
     ? { home: espnOdds.decimal.home, draw: espnOdds.decimal.draw, away: espnOdds.decimal.away }
     : { home: pronoToOdds(prono.home), draw: pronoToOdds(prono.draw), away: pronoToOdds(prono.away) }
+  if (isUpcoming) rememberPregameOdds(match.id, { pct: displayPct, decimal: odds })
+  // En direct : la cote de marché a sa propre marge, différente de celle de pronoToOdds — sans
+  // correction, « 2,30 » avant le match devenait « 2,34 » à la 1re minute. On applique à chaque issue
+  // le petit écart (borné ±10 %) constaté sur la cote d'avant-match, pour repartir PILE de son chiffre.
+  if (isLive) {
+    const pre = recallPregame(match.id)
+    if (pre?.decimal && pre?.pct) {
+      const adj = k => {
+        const f = pre.decimal[k] / pronoToOdds(pre.pct[k])
+        return Number.isFinite(f) ? Math.min(1.1, Math.max(0.9, f)) : 1
+      }
+      odds = {
+        home: Math.max(1.01, Math.round(odds.home * adj('home') * 100) / 100),
+        draw: Math.max(1.01, Math.round(odds.draw * adj('draw') * 100) / 100),
+        away: Math.max(1.01, Math.round(odds.away * adj('away') * 100) / 100),
+      }
+    }
+  }
 
   // Prolongations / tirs au but (périodes ESPN 3, 4, 5) : plus de match nul possible → cotes de
   // QUALIFICATION à 2 issues, exactement comme la page du direct (LiveStatsTab → LiveProno,

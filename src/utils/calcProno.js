@@ -1078,7 +1078,13 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   const measuredLambdas = goalModel
     ? (computeLambdas(goalModel, homeId, awayId) ?? computeLambdasWithPromotion(goalModel, homeId, awayId, lowerDivMatches))
     : null
-  const { lambdaHome: rawLambdaHome, lambdaAway: rawLambdaAway } = measuredLambdas ?? fitLambdasToPreMatch(pre)
+  // 19/11 (constat utilisateur : « au coup d'envoi, la cote saute d'un coup au lieu de partir de
+  // celle d'avant-match ») : quand on connaît la cote AFFICHÉE avant le match (`marketPre`), les
+  // intensités de buts sont calées SUR ELLE (fitLambdasToPreMatch reproduit exactement ses %) —
+  // sinon les intensités « mesurées » du championnat donnaient, dès la 1re minute, un autre point
+  // de départ que la cote vue juste avant. Ensuite seuls le score, la minute et les faits du match
+  // la font bouger, en continu.
+  const { lambdaHome: rawLambdaHome, lambdaAway: rawLambdaAway } = (marketPre ? null : measuredLambdas) ?? fitLambdasToPreMatch(pre)
 
   // ── Correctif surconfiance EN DIRECT (retour utilisateur : "pour l'équipe
   // favorite à la base... je trouve qu'on est un peu trop sévère sur les
@@ -1222,11 +1228,15 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   let swing = 0
   const redDiff = (awayRedCards ?? 0) - (homeRedCards ?? 0)   // >0 = domicile en supériorité numérique
   swing += Math.max(-2, Math.min(2, redDiff)) * 14            // jusqu'à ±28 pts pour 2 cartons d'écart
+  // Possession / tirs cadrés / corners : poids qui monte PROGRESSIVEMENT sur les 30 premières
+  // minutes (19/11) — à la 2e minute, « 70 % de possession » ne veut rien dire et faisait sauter la
+  // cote dès le coup d'envoi. Les cartons rouges (ci-dessus) comptent tout de suite.
+  let statsSwing = 0
   if (homePoss != null && awayPoss != null) {
-    swing += Math.max(-8, Math.min(8, (homePoss - awayPoss) * 0.15))
+    statsSwing += Math.max(-8, Math.min(8, (homePoss - awayPoss) * 0.15))
   }
   if (homeShotsOnTarget != null && awayShotsOnTarget != null) {
-    swing += Math.max(-10, Math.min(10, (homeShotsOnTarget - awayShotsOnTarget) * 1.5))
+    statsSwing += Math.max(-10, Math.min(10, (homeShotsOnTarget - awayShotsOnTarget) * 1.5))
   }
   // Corners : indicateur de pression territoriale plus faible/bruyant que
   // les tirs cadrés (beaucoup de corners ne débouchent sur rien) — poids et
@@ -1234,8 +1244,9 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // supplémentaire (extractBoxscoreStats, api/fifa-live.js), juste jamais
   // exploitée jusqu'ici.
   if (homeCorners != null && awayCorners != null) {
-    swing += Math.max(-6, Math.min(6, (homeCorners - awayCorners) * 0.8))
+    statsSwing += Math.max(-6, Math.min(6, (homeCorners - awayCorners) * 0.8))
   }
+  swing += statsSwing * Math.min(1, Math.max(0, min) / 30)
   if (swing !== 0) {
     home = Math.max(1, home + swing)
     away = Math.max(1, away - swing)

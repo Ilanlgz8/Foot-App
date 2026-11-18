@@ -12,6 +12,7 @@ import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
 import { compForMatch } from '../data/competitions'
 import { frOdd } from '../utils/frNum'
+import { AnimatedOdd } from '../components/AnimatedOdd'
 
 function formatHour(dateStr) {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -517,7 +518,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long={homeShort}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(homeOdd)}>{frOdd(homeOdd)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(homeOdd)}><AnimatedOdd value={homeOdd} /></span>
           </div>
           {!qualif && (
           <div
@@ -525,7 +526,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(drawOdd)}>{frOdd(drawOdd)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(drawOdd)}><AnimatedOdd value={drawOdd} /></span>
           </div>
           )}
           <div
@@ -533,7 +534,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
             <span className="poster__prono-pillLabel" data-long={awayShort}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(awayOdd)}>{frOdd(awayOdd)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(awayOdd)}><AnimatedOdd value={awayOdd} /></span>
           </div>
         </div>
       </div>

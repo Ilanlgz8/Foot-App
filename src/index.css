@@ -656,3 +656,32 @@ img[data-team*="Juventus" i] {
 /* Avant-match (18/11) : sans la date au-dessus, l'heure remonte — +4 px pour garder son centre pile
    au niveau du centre des logos (mesuré). */
 #root .lmp__hero:not(.lmp__hero--ft):not(.lmp__hero--live) .mp__hero__time { margin-top: 4px; }
+
+/* ── Cotes animées (AnimatedOdd.jsx, 19/11) ─────────────────────────────────────────────────────── */
+.oddAnim {
+  display: inline-flex; align-items: center; gap: 0.18em;
+  font-family: 'Inter', system-ui, sans-serif; font-weight: 900; font-style: italic;
+  letter-spacing: -0.01em; line-height: 1;
+  color: #9f1e34;
+  transition: color 0.4s ease;
+}
+.oddAnim__num { display: inline-flex; height: 1em; overflow: hidden; font-variant-numeric: tabular-nums; }
+.oddAnim__col { display: inline-block; height: 1em; overflow: hidden; }
+.oddAnim__strip { display: flex; flex-direction: column; transition: transform 0.7s cubic-bezier(.2,.8,.2,1); }
+.oddAnim__strip > span, .oddAnim__sep { height: 1em; line-height: 1em; }
+.oddAnim__arrow { font-size: 0.55em; font-style: normal; opacity: 0; transition: opacity 0.25s ease; width: 0; overflow: visible; }
+.oddAnim__arrow--show { opacity: 1; width: auto; }
+.oddAnim--up { color: #16a34a; }
+.oddAnim--down { color: #dc2626; }
+.oddAnim--up .oddAnim__arrow { color: #16a34a; }
+.oddAnim--down .oddAnim__arrow { color: #dc2626; }
+:root[data-odds="jaune"] .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #111; }
+@media (prefers-reduced-motion: reduce) {
+  .oddAnim__strip, .oddAnim { transition: none; }
+}
+/* Les cotes animées remplacent le chiffre « ::after » des pastilles */
+#root .poster__prono-pillVal.has-anim::after,
+#root .modal__liveProno__pillVal.has-anim::after { content: none; }
+#root .poster__prono-pillVal.has-anim .oddAnim { font-size: 18px; }
+#root .hubPosters .poster__prono-pillVal.has-anim .oddAnim { font-size: 16px; }
+#root .modal__liveProno__pillVal.has-anim .oddAnim { font-size: 19px; }

@@ -26,6 +26,7 @@ import { useMatchOdds } from '../hooks/useMatchOdds'
 import { useH2HRows } from '../components/MatchModal'
 import { getCompetitionCampColors, compForMatch } from '../data/competitions'
 import { frOdd } from '../utils/frNum'
+import { AnimatedOdd } from '../components/AnimatedOdd'
 
 function shortenName(name) {
   if (!name) return name
@@ -430,17 +431,17 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.home)}>{frOdd(oddsShown.home)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(oddsShown.home)}><AnimatedOdd value={oddsShown.home} /></span>
           </div>
           {!qualif && (
             <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.draw)}>{frOdd(oddsShown.draw)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(oddsShown.draw)}><AnimatedOdd value={oddsShown.draw} /></span>
           </div>
           )}
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.away)}>{frOdd(oddsShown.away)}</span>
+            <span className="poster__prono-pillVal has-anim" data-comma={frOdd(oddsShown.away)}><AnimatedOdd value={oddsShown.away} /></span>
           </div>
         </div>
       </div>

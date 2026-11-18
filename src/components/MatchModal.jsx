@@ -22,6 +22,7 @@ import { groupScorers } from '../utils/groupScorers'
 import './../matchModal.css'
 import { frNum, frOdd } from '../utils/frNum'
 import { useMatchOdds } from '../hooks/useMatchOdds'
+import { AnimatedOdd } from './AnimatedOdd'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
 // Sauvegardées par useLiveMinute dans foot_espn_{matchId} lors de la détection FT.
@@ -753,7 +754,7 @@ export function LiveStatsTab({ match, espnScore }) {
 
   return (
     <div>
-      {liveProno && <LiveProno prono={liveProno} match={match} isQualification={isExtraTimeOrTab} />}
+      {liveProno && <LiveProno prono={liveProno} odds={matchOdds?.odds} match={match} isQualification={isExtraTimeOrTab} />}
       {statsBody}
     </div>
   )
@@ -773,7 +774,10 @@ export function LiveStatsTab({ match, espnScore }) {
 // utilisateur : "la bordure rouge mais que sur la côte la plus basse" — les
 // 2 autres restent neutres. Pas d'animation sur les pilules elles-mêmes : le
 // point qui pulse (kicker ci-dessus) suffit déjà à signaler "en direct".
-function LiveProno({ prono, match, isQualification = false }) {
+function LiveProno({ prono, odds = null, match, isQualification = false }) {
+  // `odds` : cotes déjà calculées par useMatchOdds (mêmes chiffres que les cartes, ajustement de marge
+  // compris) — sinon conversion directe des % comme avant.
+  const oddOf = k => odds?.[k] ?? pronoToOdds(prono[k])
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
@@ -807,9 +811,9 @@ function LiveProno({ prono, match, isQualification = false }) {
         Pronostic en direct
       </div>
       <div className="modal__liveProno__row">
-        <LivePronoPill label={homeCode} longLabel={homeName} value={pronoToOdds(prono.home)} pct={prono.home} isFavorite={favorite === 'home'} />
-        <LivePronoPill label="Nul" value={pronoToOdds(prono.draw)} pct={prono.draw} isFavorite={favorite === 'draw'} />
-        <LivePronoPill label={awayCode} longLabel={awayName} value={pronoToOdds(prono.away)} pct={prono.away} isFavorite={favorite === 'away'} />
+        <LivePronoPill label={homeCode} longLabel={homeName} value={oddOf('home')} pct={prono.home} isFavorite={favorite === 'home'} />
+        <LivePronoPill label="Nul" value={oddOf('draw')} pct={prono.draw} isFavorite={favorite === 'draw'} />
+        <LivePronoPill label={awayCode} longLabel={awayName} value={oddOf('away')} pct={prono.away} isFavorite={favorite === 'away'} />
       </div>
     </div>
   )
@@ -859,7 +863,7 @@ function LivePronoPill({ label, longLabel, value, pct, isFavorite = false }) {
   return (
     <div className="modal__liveProno__pill" style={style}>
       <span className="modal__liveProno__pillLabel" data-long={longLabel || label}>{label}</span>
-      <span className="modal__liveProno__pillVal" data-comma={frOdd(value)}>{frOdd(value)}</span>
+      <span className="modal__liveProno__pillVal has-anim" data-comma={frOdd(value)}><AnimatedOdd value={value} /></span>
     </div>
   )
 }
