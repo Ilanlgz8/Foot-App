@@ -606,7 +606,9 @@ img[data-team*="Juventus" i] {
    logo, mesuré) et minute remontée d'autant ; diffuseur décollé du score (10 px) pour aérer. */
 #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -34px; }
 #root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 2px; }
-#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 10px; }
+/* Diffuseur « scotché en bas » (18/11, demande utilisateur) : entre le nom des équipes et leur forme
+   récente, qu'il y ait une forme ou non. Le score ne bouge pas (il est au-dessus, calé sur les logos). */
+#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 28px; }
 @media (min-width: 768px) {
   #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -25px; }
   #root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 11px; }
