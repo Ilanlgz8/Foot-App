@@ -629,6 +629,9 @@ function compactScoreboardEvent(e) {
       competitors: (c.competitors ?? []).map(x => ({
         homeAway: x.homeAway,
         score: x.score ?? null,
+        // 18/11 : score des tirs au but (ESPN le donne à part du score 120 min). Il manquait ici →
+        // Accueil/Résultats/page du match terminé affichaient « 0 – 0 » sans « T.A.B (4-1) ».
+        shootoutScore: x.shootoutScore ?? null,
         winner: x.winner ?? null,
         team: x.team ? {
           id: x.team.id ?? null,
