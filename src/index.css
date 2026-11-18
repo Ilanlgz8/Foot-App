@@ -652,3 +652,7 @@ img[data-team*="Juventus" i] {
   opacity: 1;
 }
 #root .lmp__hero--theme-can { background: #0a5a2b; }
+
+/* Avant-match (18/11) : sans la date au-dessus, l'heure remonte — +4 px pour garder son centre pile
+   au niveau du centre des logos (mesuré). */
+#root .lmp__hero:not(.lmp__hero--ft):not(.lmp__hero--live) .mp__hero__time { margin-top: 4px; }

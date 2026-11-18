@@ -109,21 +109,6 @@ function useMatchData(matchId, initialMatch) {
 }
 
 // ── Formatage date / heure ────────────────────────────────────────────────────
-function isSameDay(a, b) {
-  return a.getDate() === b.getDate() &&
-    a.getMonth() === b.getMonth() &&
-    a.getFullYear() === b.getFullYear()
-}
-function formatDate(utcDate) {
-  if (!utcDate) return '–'
-  const d = new Date(utcDate)
-  const today    = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(today.getDate() + 1)
-  if (isSameDay(d, today))    return "Aujourd'hui"
-  if (isSameDay(d, tomorrow)) return 'Demain'
-  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-}
 function formatTime(utcDate) {
   if (!utcDate) return '–'
   return new Date(utcDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -344,9 +329,11 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               plutôt qu'une couleur posée sur .lmp__heroWhenLabel : cette même
               classe sert AUSSI à la date d'un match à venir ("Aujourd'hui",
               "Demain"…), qui n'a aucune raison de passer en rouge. */}
-          <span className={`lmp__heroWhenLabel${isFinished ? ' lmp__heroWhenLabel--ft' : ''}`}>
-            {isFinished ? 'Terminé' : formatDate(match.utcDate)}
-          </span>
+          {/* 18/11 (demande utilisateur) : avant-match, plus de date au-dessus de l'heure — elle était en
+              double avec celle sous le nom du championnat (plus discrète, gardée). « Terminé » reste. */}
+          {isFinished && (
+            <span className="lmp__heroWhenLabel lmp__heroWhenLabel--ft">Terminé</span>
+          )}
           {isFinished ? (
             <>
               <span className="mp__hero__score">{hs} – {as_}</span>
