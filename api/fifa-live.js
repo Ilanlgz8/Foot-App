@@ -363,6 +363,9 @@ function extractEspnScorers(comp, homeTeamId, awayTeamId) {
         team:        side,
         ownGoal:     d.ownGoal ?? txt.includes('own') ?? false,
         penaltyKick: d.penaltyKick ?? txt.includes('penalty') ?? false,
+        // 18/11 : tir réussi de la SÉANCE de tirs au but (ESPN `shootout: true`, vérifié sur
+        // Portugalete–Real Unión) — gardé pour l'affichage (« t.a.b. »), JAMAIS compté dans le score.
+        shootout:    d.shootout === true,
       }
     })
     .filter(Boolean)
@@ -1092,16 +1095,17 @@ export default async function handler(req, res) {
     //    terme resté ci-dessous) n'est pas affectée, seul ce cas de
     //    "migration" ponctuel — obsolète depuis longtemps — est retiré.
     const bestScorers = confirmedListOrLonger(scorers, prevData?.scorers, prevData?.rawScorersLen)
-    const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home').length
-    const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away').length
+    // Tirs au but exclus du comptage (18/11 : score gonflé à 4-1 au lieu de 0-0 pendant/après la séance).
+    const homeGoalsFromScorers = bestScorers.filter(s => s.team === 'home' && !s.shootout).length
+    const awayGoalsFromScorers = bestScorers.filter(s => s.team === 'away' && !s.shootout).length
 
     // Valeur la plus récente, sans protection anti-glitch historique (voir
     // commentaire ci-dessus).
     const homeNumeric = rawHome
     const awayNumeric = rawAway
 
-    const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home').length
-    const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away').length
+    const prevHomeScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'home' && !s.shootout).length
+    const prevAwayScorersLen = (prevData?.scorers ?? []).filter(s => s.team === 'away' && !s.shootout).length
     const homeNewlyCancelled = Math.max(prevHomeScorersLen - homeGoalsFromScorers, 0)
     const awayNewlyCancelled = Math.max(prevAwayScorersLen - awayGoalsFromScorers, 0)
     const homeCancelledGoals = (prevData?.homeCancelledGoals ?? 0) + homeNewlyCancelled

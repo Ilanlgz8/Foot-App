@@ -233,7 +233,7 @@ describe('extractMatchDetails — buts et cartons', () => {
       ],
     })
     const { scorers, cards } = extractMatchDetails(comp, '11')
-    expect(scorers).toEqual([{ name: 'F. Torres', minute: "106'", team: 'home', ownGoal: false, penaltyKick: false }])
+    expect(scorers).toEqual([{ name: 'F. Torres', minute: "106'", team: 'home', ownGoal: false, penaltyKick: false, shootout: false }])
     expect(cards).toEqual([])
   })
 

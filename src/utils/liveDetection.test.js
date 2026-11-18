@@ -400,3 +400,15 @@ describe('goalSignature / pickUnsentGoalScorers', () => {
     expect(pending).toHaveLength(1)
   })
 })
+
+describe('extractEspnScorers — tirs au but (18/11)', () => {
+  it('ignore les tirs de la séance de tirs au but (shootout: true)', () => {
+    const comp = { details: [
+      { type: { id: '57', text: 'Goal' }, clock: { displayValue: "34'" }, team: { id: 'h' }, shootout: false, athletesInvolved: [{ shortName: 'A. Buteur' }] },
+      { type: { id: '104', text: 'Penalty - Scored' }, clock: { displayValue: "120'" }, team: { id: 'h' }, shootout: true, athletesInvolved: [{ shortName: 'B. Tireur' }] },
+    ] }
+    const scorers = extractEspnScorers(comp, 'h', 'a')
+    expect(scorers).toHaveLength(1)
+    expect(scorers[0].name).toBe('A. Buteur')
+  })
+})

@@ -330,7 +330,7 @@ export function extractMatchDetails(comp, homeTeamId, commentary) {
     const name = ath?.shortName ?? ath?.displayName ?? '?'
     const minute = d.clock?.displayValue ?? ''
     if (d.scoringPlay === true) {
-      scorers.push({ name, minute, team: teamSide, ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false })
+      scorers.push({ name, minute, team: teamSide, ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false, shootout: d.shootout === true })
     } else {
       cards.push({ name, minute, team: teamSide, red: d.redCard === true })
     }
@@ -372,7 +372,7 @@ export function extractMatchDetails(comp, homeTeamId, commentary) {
         scorers.push({
           name: ath?.shortName ?? ath?.displayName ?? '?', minute: d.clock?.displayValue ?? '',
           team: side,
-          ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false,
+          ownGoal: d.ownGoal ?? false, penaltyKick: d.penaltyKick ?? false, shootout: d.shootout === true,
         })
       } else if (id === '93' || id === '94') {
         const ath = d.athletesInvolved?.[0]

@@ -35,7 +35,8 @@ export function getEspnData(matchId) {
 
 // ── Buteurs ESPN (format espnScoresCache.scorers) ────────────────────────────
 // ESPN scorers : { name, minute (ex "24:00"), team ('home'|'away'), ownGoal, penaltyKick }
-export function ESPNScorers({ scorers = [] }) {
+export function ESPNScorers({ scorers: allScorers = [] }) {
+  const scorers = allScorers.filter(s => !s.shootout) // tirs au but : pas des buts du match (18/11)
   if (scorers.length === 0) return null
 
   const homeGoals = groupScorers(scorers.filter(s => s.team === 'home'))
@@ -374,6 +375,10 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
     })
   }
 
+  // 18/11 (demande utilisateur) : les tirs réussis de la séance de tirs au but ne sont PAS des buts
+  // du match — retirés des buts, puis affichés à part tout en bas, avec la mention « t.a.b. ».
+  const shootoutKicks = espnScorers.filter(s => s.shootout)
+  espnScorers = espnScorers.filter(s => !s.shootout)
   if (espnScorers.length > 0) {
     const withMeta = espnScorers.map(s => ({ ...s, _sort: minuteSort(s.minute), _label: espnMinuteLabel(s.minute) }))
     pushGroupedGoals(withMeta.filter(s => s.team === 'home'), 'home')
@@ -423,6 +428,13 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
   const byKindThenMinute = (a, b) => rank(a) - rank(b) || a.sort - b.sort
   events.home.sort(byKindThenMinute)
   events.away.sort(byKindThenMinute)
+  // Tirs au but réussis : tout en bas, séparés (kind 'tab'), sans minute (« 120' » ne veut rien dire
+  // ici) mais avec la mention « t.a.b. » pour qu'on ne les prenne jamais pour des buts du match.
+  shootoutKicks.forEach(s => {
+    events[s.team === 'home' ? 'home' : 'away'].push({
+      key: `e${k++}`, sort: 999, minute: 't.a.b.', icon: '⚽', name: s.name, kind: 'tab',
+    })
+  })
   return events
 }
 

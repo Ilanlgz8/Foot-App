@@ -122,6 +122,9 @@ export function espnEventSide(detail, homeTeamId, awayTeamId) {
 // ── Extraction buteurs/cartons depuis comp.details (scoreboard ESPN) ──────
 export function extractEspnScorers(comp, homeTeamId, awayTeamId) {
   return (comp.details ?? [])
+    // 18/11 : tirs de la séance de tirs au but (ESPN `shootout: true`) exclus — ce ne sont pas des
+    // buts du match (sinon : notification « BUT » à chaque tir réussi et score gonflé).
+    .filter(d => d.shootout !== true)
     .filter(d => {
       const txt = (d.type?.text ?? '').toLowerCase()
       const id  = String(d.type?.id ?? '')

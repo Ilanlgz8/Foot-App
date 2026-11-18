@@ -386,7 +386,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         <div className="lmp__heroScorers">
           <div className="lmp__heroScorersHome">
             {homeEvents.map((e, i, list) => (
-              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                 <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
@@ -400,7 +400,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           <div className="lmp__heroScorersDiv" />
           <div className="lmp__heroScorersAway">
             {awayEvents.map((e, i, list) => (
-              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && e.icon !== '⚽' && list[i - 1].icon === '⚽' ? ' lmp__heroScorerItem--sep' : ''}`}>
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
                 <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>

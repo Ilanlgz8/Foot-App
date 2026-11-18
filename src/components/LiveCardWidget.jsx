@@ -61,7 +61,8 @@ function ScoreDisplay({ homeScore, awayScore, minute, isTermine, repriseImminent
   )
 }
 
-function ScorerColumns({ scorers = [] }) {
+function ScorerColumns({ scorers: allScorers = [] }) {
+  const scorers = allScorers.filter(s => !s.shootout) // tirs au but : pas des buts du match (18/11)
   const homeGoals = groupScorers(scorers.filter(s => s.team === 'home'))
   const awayGoals = groupScorers(scorers.filter(s => s.team === 'away'))
   if (!homeGoals.length && !awayGoals.length) return null
