@@ -11,7 +11,7 @@ import { formKey } from '../hooks/useTeamForm'
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useLiveData }      from '../context/LiveProvider'
 import { getMatchState, TERMINE_GRACE_MS, trackMatchState } from '../utils/matchStateTracker'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock, buildHeroSubline } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, parseEspnClock } from '../utils/matchUtils'
 import { withPageTheme, compForMatch } from '../data/competitions'
 import { translateTeam }    from '../data/teamNames'
 import { TEAM_SHORT }       from '../data/teamShortNames'
@@ -141,8 +141,10 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   // prioritaire, comme partout ailleurs dans l'app (convention "Noms français
   // partout dans l'UI", voir CLAUDE.md ; même ordre que ResultHeroCard.jsx/Pronos.jsx).
   const compName = comp?.name ?? match.competition?.name ?? ''
-  // "Journée N · date" sous le nom du championnat — voir buildHeroSubline.
-  const heroSubline = buildHeroSubline(match)
+  // "Journée N" sous le nom du championnat (date retirée le 18/11 sur cette page).
+  // 18/11 (demande utilisateur) : plus de date sous le nom de la compétition sur la page du direct
+  // (on sait que c'est aujourd'hui) — place libérée pour remonter minute + score. La journée reste.
+  const heroSubline = Number.isFinite(match?.matchday) ? `Journée ${match.matchday}` : null
 
   const isHalftime = match.status === 'PAUSED' || matchSt.espnStatus === 'STATUS_HALFTIME'
   // Une seule valeur, utilisée de façon cohérente pour tout ce render (même

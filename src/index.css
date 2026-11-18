@@ -602,11 +602,13 @@ img[data-team*="Juventus" i] {
    niveau des noms. Valeurs mesurées en ligne (logo 54 px ; 72 px à partir de 768 px de large). */
 #root .lmp__hero.lmp__hero--live .mp__hero__mid,
 #root .lmp__hero.lmp__hero--ft .mp__hero__mid { align-items: flex-start; }
-#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -19px; }
+/* 18/11 (demande utilisateur) : direct — score AU NIVEAU des logos (centre du score = centre du
+   logo, mesuré) et minute remontée d'autant ; diffuseur décollé du score (10 px) pour aérer. */
+#root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -34px; }
 #root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 2px; }
-#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 0; }
+#root .lmp__hero.lmp__hero--live .mp__hero__center .watchBadge--score { margin-top: 10px; }
 @media (min-width: 768px) {
-  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -10px; }
+  #root .lmp__hero.lmp__hero--live .mp__hero__center { margin-top: -25px; }
   #root .lmp__hero.lmp__hero--ft .mp__hero__center { margin-top: 11px; }
 }
 
