@@ -1,13 +1,13 @@
 import { useState, useEffect, memo } from 'react'
 import { formKey } from '../hooks/useTeamForm'
 import { translateTeam }              from '../data/teamNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { halftimeLabel } from '../utils/halftimeCountdown'
-import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
+import { pronoIntensity, pronoGlowShadow } from '../utils/calcProno'
 import { useTeamForm }                from '../hooks/useTeamForm'
-import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
-import { useEspnPregameOdds }         from '../hooks/useMatchDetail'
+import { useH2HHistory } from '../hooks/useMatchs'
+import { useMatchOdds }               from '../hooks/useMatchOdds'
 import { useH2HRows }                 from '../components/MatchModal'
 import { FormDiamonds }               from './FormDiamonds'
 import { compForMatch } from '../data/competitions'
@@ -89,13 +89,11 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // supplémentaire par carte.
   const h2hPool = (compMatches?.length || h2hHistory?.length) ? [...compMatches, ...h2hHistory] : compMatches
   const { rows: dedicatedH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
-  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : h2hPool
   // Repli "club promu" (02/08, voir calcProno.js computeLambdasWithPromotion) —
   // fetch best-effort, une seule fois par compétition (jamais par carte), vide
   // silencieusement pour toute comp sans division inférieure connue
   // (LOWER_DIVISION_FD_CODE) ou toute équipe déjà bien pourvue en données
   // saison en cours.
-  const lowerDivMatches = useLowerDivisionStats(compCode, compMatches)
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
   const isWC = isNationalTeamComp(match)
 
@@ -218,73 +216,15 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // interne (calcPronoAdvanced) qui peut diverger du marché sur la base
   // "forme récente" seule — surtout en tout début de saison, quand peu de
   // matchs de la saison en cours existent encore pour affiner le modèle.
-  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
-  // ⚠️ AJOUT (constat utilisateur, 29/09 : "pourquoi tu changes la côte dès
-  // que le match commence au lieu de laisser la côte et après monter/
-  // baisser [...] en fonction du score/carton rouge/minute ?") — root cause
-  // trouvée dans `useEspnPregameOdds` (voir son commentaire, `useMatchDetail.js`) :
-  // ce hook exclut explicitement tout provider dont le nom contient "live"
-  // (`ODDS_PROVIDER_SKIP`), car ESPN publie une ligne "Live Odds" séparée une
-  // fois le match commencé. Au moment précis où `isLive` bascule à `true`,
-  // ESPN peut avoir déjà relabellisé la ligne pré-match en "*Live Odds*" —
-  // `espnOdds` retombe alors à `null` pile à cet instant, et `calcLiveProno`
-  // (qui, à 0-0/minute 0, est censé renvoyer EXACTEMENT `marketPre` sans
-  // aucun calcul, voir son early-return) se rabat sur son prior interne
-  // (`calcPronoAdvanced`) — une valeur différente de la vraie cote marché
-  // affichée une seconde plus tôt. D'où le saut visible pile au coup d'envoi,
-  // alors que rien ne s'est réellement passé sur le terrain à cet instant.
-  // Fix : on fige la DERNIÈRE cote de marché valide vue (forcément une cote
-  // pré-match, puisque c'est la seule sorte que ce hook renvoie jamais) dans
-  // un state, et on l'utilise comme point de départ du direct à la place de
-  // `espnOdds` en direct — qui peut disparaître, alors que la vraie valeur de
-  // référence, elle, ne change plus une fois le match commencé. Une fois
-  // figée, plus aucun saut n'est possible à la transition pré-match → live ;
-  // le direct continue ensuite de bouger normalement selon le score/les
-  // cartons/la minute (mécanisme Poisson de calcLiveProno, inchangé).
-  // `useState` (pas `useRef`) : lu directement dans le calcul ci-dessous, et
-  // la règle react-hooks/refs interdit d'accéder à `.current` pendant le
-  // rendu (lecture ou écriture) — seul un state est sûr à lire ici. Mis à
-  // jour PENDANT le rendu (pas dans un `useEffect`) selon le pattern officiel
-  // React "Adjusting state when a prop changes" — évite le rendu en plus
-  // qu'un `useEffect` provoquerait ici (et la règle react-hooks/set-state-in-
-  // effect, qui déconseille justement ce pattern).
-  const [lastPregameOdds, setLastPregameOdds] = useState(null)
-  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
-  if (espnOdds !== prevEspnOdds) {
-    setPrevEspnOdds(espnOdds)
-    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
-  }
-
-  const prono = isLive
-    ? calcLiveProno(hForm, aForm, homeScore, awayScore, minute, {
-        homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
-        fullH2H, lowerDivMatches,
-        neutralVenue:      isNeutralVenueComp(match),
-        homeRedCards:      espnScore?.stats?.home?.redCards,
-        awayRedCards:      espnScore?.stats?.away?.redCards,
-        homePoss:          espnScore?.stats?.home?.poss,
-        awayPoss:          espnScore?.stats?.away?.poss,
-        homeShotsOnTarget: espnScore?.stats?.home?.shotsOnTarget,
-        awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
-        homeCorners:       espnScore?.stats?.home?.corners,
-        awayCorners:       espnScore?.stats?.away?.corners,
-        marketPre:         lastPregameOdds?.pct ?? null,
-      })
-    : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
-        fullH2H, lowerDivMatches,
-        neutralVenue: isNeutralVenueComp(match),
-      })
-
-  const useMarketOdds = isUpcoming && !!espnOdds
-  const displayPct    = useMarketOdds ? espnOdds.pct : prono
-  // Pilule favorite (% le plus haut) — seule à recevoir le liseré/glow
-  // bordeaux, voir footer plus bas (pronoFavoriteKey, calcProno.js).
-  const pronoFavorite = pronoFavoriteKey(displayPct)
-  // Cotes affichées — calculées une seule fois ici plutôt qu'avec le même
-  // ternaire répété 3x dans le footer.
-  const homeOdd = useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)
-  const drawOdd = useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)
-  const awayOdd = useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)
+  // 18/11 : cotes calculées par le hook PARTAGÉ useMatchOdds (même calcul que la page du match,
+  // voir son en-tête) — l'ancien calcul local (identique) est retiré pour qu'il ne puisse plus
+  // jamais diverger. Les commentaires ci-dessus restent valables : la logique a été déplacée telle quelle.
+  const matchOdds = useMatchOdds(match, espnScore, { formMap: formMapProp, compMatches: compMatchesProp })
+  const displayPct    = matchOdds.displayPct
+  const pronoFavorite = matchOdds.favorite
+  const homeOdd = matchOdds.odds.home
+  const drawOdd = matchOdds.odds.draw
+  const awayOdd = matchOdds.odds.away
 
   // ⚠️ REMPLACÉ (05/09, demande explicite utilisateur : "les cards accueil
   // sur mobile pareil que livematchpage, les couleurs du championnat au lieu

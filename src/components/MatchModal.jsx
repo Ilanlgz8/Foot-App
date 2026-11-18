@@ -2,7 +2,7 @@ import { useState }      from 'react'
 import { formatGroupName } from '../utils/groupName'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { useQuery }                from '@tanstack/react-query'
-import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups, useEspnPregameOdds } from '../hooks/useMatchDetail'
+import { useLineups, useFifaStats, useH2H, useEspnMatchStats, useProbableLineups, useFdLineups } from '../hooks/useMatchDetail'
 import { useTeamForm } from '../hooks/useTeamForm'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
@@ -13,14 +13,15 @@ import { useMatches }         from '../hooks/useMatchs'
 import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
 import { translateTeam }       from '../data/teamNames'
 import { getLiveState, getMatchState } from '../utils/matchStateTracker'
-import { calcMinute, mergeScore, finalScore, outcomeForTeam, isNationalTeamComp, isNeutralVenueComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
-import { calcLiveProno, calcPronoAdvanced, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
+import { finalScore, outcomeForTeam, isNationalTeamComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
+import { pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { fuzzyTeam } from '../utils/espnSummaryParse'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
 import { groupScorers } from '../utils/groupScorers'
 import './../matchModal.css'
 import { frNum, frOdd } from '../utils/frNum'
+import { useMatchOdds } from '../hooks/useMatchOdds'
 
 // ── Lecture des données ESPN persistées au moment du FT ──────────────────────
 // Sauvegardées par useLiveMinute dans foot_espn_{matchId} lors de la détection FT.
@@ -518,7 +519,9 @@ const STAT_FR = {
 // ⚠️ `pronoH2H` (ajouté 02/09) — voir le commentaire détaillé sur `fullH2H`
 // plus bas, au niveau de calcLiveProno : l'historique utilisé pour CALCULER
 // la cote n'est pas forcément celui AFFICHÉ dans l'onglet Historique.
-export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hRows, pronoH2H = null, lowerDivMatches }) {
+// compMatches / hForm / aForm / h2hRows / pronoH2H / lowerDivMatches : encore passés par les pages,
+// plus utilisés ici depuis le 18/11 (cotes = useMatchOdds, qui charge les mêmes données que les cartes).
+export function LiveStatsTab({ match, espnScore }) {
   // isLive : vrai si FD.org dit IN_PLAY/PAUSED OU si le tracker local sait que c'est live
   // (cas où FD.org est temporairement en retard ou rapporte un statut différent)
   const isLive      = match.status === 'IN_PLAY' || match.status === 'PAUSED'
@@ -576,11 +579,6 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
   // mêmes noms de champs que fifaStats/mergedStats (voir extractBoxscoreStats,
   // api/fifa-live.js), donc valable quelle que soit la source finale des
   // stats détaillées affichées plus bas.
-  const liveMinute = calcMinute(match)
-  const fsLive      = finalScore(match.score)
-  const homeGoals   = mergeScore(espnScore?.home, fsLive.home ?? match.score?.halfTime?.home)
-  const awayGoals   = mergeScore(espnScore?.away, fsLive.away ?? match.score?.halfTime?.away)
-  const pronoStats  = espnScore?.stats
   // ⚠️ AJOUT `marketPre` (constat utilisateur, 20/08 : "les pronos côte en
   // live dans la page LiveMatchPage sont pas les mêmes que dans Accueil sur
   // les cards des matchs en live") : MatchPoster.jsx/MatchDuJourCard.jsx
@@ -612,49 +610,11 @@ export function LiveStatsTab({ match, espnScore, compMatches, hForm, aForm, h2hR
   // officiel, mêmes raisons déjà documentées côté MatchPoster.jsx : useState
   // plutôt que useRef à cause de react-hooks/refs, pendant le rendu plutôt
   // qu'un useEffect à cause de react-hooks/set-state-in-effect).
-  const isFinished = match.status === 'FINISHED'
-  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
-  const [lastPregameOdds, setLastPregameOdds] = useState(null)
-  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
-  if (espnOdds !== prevEspnOdds) {
-    setPrevEspnOdds(espnOdds)
-    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
-  }
-  const liveProno   = (hForm != null || aForm != null) ? calcLiveProno(
-    hForm, aForm, homeGoals, awayGoals, liveMinute,
-    {
-      homeId: match?.homeTeam?.id, awayId: match?.awayTeam?.id, compMatches,
-      // ⚠️ BUG CORRIGÉ (constat utilisateur, 02/09 : "c'est pas les mêmes
-      // cotes dans les cards de l'Accueil que sur la page live/:matchId").
-      // Root cause trouvée en comparant les entrées des deux calculs, ligne à
-      // ligne : ce n'était NI le modèle, NI la cote de marché (les deux
-      // passent bien `marketPre`), mais la PROFONDEUR D'HISTORIQUE fournie au
-      // modèle. LiveMatchPage construit ses `h2hRows` avec
-      // `extendedH2H: true` — jusqu'à 6 saisons via football-data.co.uk —
-      // alors que les cards de l'Accueil (MatchPoster.jsx) n'utilisent que
-      // l'historique court, non étendu. Même match, même minute, même score,
-      // mais un prior nourri de 6 saisons d'un côté et de quelques matchs de
-      // l'autre : les cotes divergent forcément.
-      // Décision (demande explicite) : la référence, c'est la cote des cards
-      // de l'Accueil. Le calcul utilise donc `pronoH2H` (historique COURT,
-      // identique à celui des cards) quand l'appelant le fournit. L'onglet
-      // "Historique" AFFICHÉ continue lui d'utiliser `h2hRows` étendu : plus
-      // de confrontations à lire est un plus pour l'utilisateur, ça n'a
-      // aucune raison d'être aligné sur le calcul.
-      fullH2H:           pronoH2H ?? h2hRows,
-      lowerDivMatches,
-      neutralVenue:      isNeutralVenueComp(match),
-      homeRedCards:      pronoStats?.home?.redCards,
-      awayRedCards:      pronoStats?.away?.redCards,
-      homePoss:          pronoStats?.home?.poss,
-      awayPoss:          pronoStats?.away?.poss,
-      homeShotsOnTarget: pronoStats?.home?.shotsOnTarget,
-      awayShotsOnTarget: pronoStats?.away?.shotsOnTarget,
-      homeCorners:       pronoStats?.home?.corners,
-      awayCorners:       pronoStats?.away?.corners,
-      marketPre:         lastPregameOdds?.pct ?? null,
-    }
-  ) : null
+  // 18/11 : cotes via le hook PARTAGÉ useMatchOdds — EXACTEMENT les mêmes chiffres que les cartes
+  // de l'Accueil / de la page Match (constat utilisateur : « c'est pas les mêmes cotes »). L'ancien
+  // calcul local (ids, H2H, score et cote de marché pris à d'autres sources) est retiré.
+  const matchOdds = useMatchOdds(match)
+  const liveProno = matchOdds && !matchOdds.isFinished ? matchOdds.displayPct : null
 
   // ── Priorité 1 : Stats FIFA live (WC 2026) — vérifié AVANT le scoreboard
   // basique ci-dessous (l'ancien ordre laissait un match CM avec juste
@@ -850,26 +810,21 @@ function LiveProno({ prono, match, isQualification = false }) {
 // disponible, sinon le modèle interne (calcPronoAdvanced) — exactement la logique
 // de MatchPoster.jsx. `fullH2H` = historique COURT (pas l'étendu de l'onglet
 // Historique), comme sur les cards : même entrée → même cote.
-export function PreMatchProno({ match, compMatches, hForm, aForm, fullH2H, lowerDivMatches }) {
-  const { data: espnOdds } = useEspnPregameOdds(match, true)
+export function PreMatchProno({ match }) {
+  // 18/11 : hook PARTAGÉ useMatchOdds — mêmes cotes que la carte du match (Accueil / page Match).
+  const matchOdds = useMatchOdds(match)
+  if (!matchOdds || matchOdds.isFinished) return null
   const homeName = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
   const homeCode = (match.homeTeam?.tla || homeName).slice(0, 3).toUpperCase()
   const awayCode = (match.awayTeam?.tla || awayName).slice(0, 3).toUpperCase()
-
-  const prono = calcPronoAdvanced(match.homeTeam?.id, match.awayTeam?.id, compMatches, hForm ?? [], aForm ?? [], {
-    fullH2H, lowerDivMatches,
-    neutralVenue: isNeutralVenueComp(match),
-  })
-  const useMarket = !!espnOdds
-  const favorite  = pronoFavoriteKey(useMarket ? espnOdds.pct : prono)
   const pill = (key, label, longLabel) => (
     <LivePronoPill
       label={label}
       longLabel={longLabel}
-      value={useMarket ? espnOdds.decimal[key] : pronoToOdds(prono[key])}
-      pct={useMarket ? espnOdds.pct[key] : prono[key]}
-      isFavorite={favorite === key}
+      value={matchOdds.odds[key]}
+      pct={matchOdds.displayPct[key]}
+      isFavorite={matchOdds.favorite === key}
     />
   )
   return (

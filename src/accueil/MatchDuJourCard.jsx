@@ -16,13 +16,13 @@ import { translateTeam } from '../data/teamNames'
 import { getMatchTeamColors } from '../data/teamPhotos'
 import { FormDiamonds } from './FormDiamonds'
 import { TEAM_SHORT } from '../data/teamShortNames'
-import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
+import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest } from '../utils/matchUtils'
 import { getMatchState } from '../utils/matchStateTracker'
 import { halftimeLabel } from '../utils/halftimeCountdown'
-import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey } from '../utils/calcProno'
+import { pronoIntensity, pronoGlowShadow } from '../utils/calcProno'
 import { useTeamForm, formKey } from '../hooks/useTeamForm'
-import { useH2HHistory, useLowerDivisionStats } from '../hooks/useMatchs'
-import { useEspnPregameOdds } from '../hooks/useMatchDetail'
+import { useH2HHistory } from '../hooks/useMatchs'
+import { useMatchOdds } from '../hooks/useMatchOdds'
 import { useH2HRows } from '../components/MatchModal'
 import { getCompetitionCampColors, compForMatch } from '../data/competitions'
 import { frOdd } from '../utils/frNum'
@@ -75,9 +75,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // les noms ESPN qui sont un SUFFIXE du nom FD.org (ex. "Lyon"), alors que la
   // résolution d'id d'ÉQUIPE juste en dessous est déjà en loose.
   const { rows: dedicatedH2H } = useH2HRows(match, h2hPool, 0, { looseTeamMatch: true })
-  const fullH2H = dedicatedH2H.length > 0 ? dedicatedH2H : h2hPool
   // Repli "club promu" — voir commentaire détaillé dans MatchPoster.jsx.
-  const lowerDivMatches = useLowerDivisionStats(compCode, compMatches)
 
   // ── État live/terminé — même logique que accueil/MatchCard.jsx ──
   const _ms       = match ? getMatchState(match.id) : null
@@ -93,7 +91,6 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
     match.status === 'PAUSED'  ||
     liveMinute !== null
   )
-  const isUpcoming = !!match && !isFinished && !isLive
 
   // Countdown mi-temps "Reprise dans X min" → "Reprise imminente" (demande
   // explicite, 02/10 : "dans la card du match du jour [...] quand c la mi
@@ -128,23 +125,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   // requête active en live, indispensable si l'app est ouverte APRÈS le coup
   // d'envoi et jamais avant. Même hook, même cache, aucun appel réseau en
   // plus — juste jamais branché ici.
-  const { data: espnOdds } = useEspnPregameOdds(match, !isFinished)
-  // ⚠️ AJOUT (même fix que MatchPoster.jsx — voir son commentaire détaillé,
-  // constat utilisateur 29/09 : saut de cote visible pile au coup d'envoi) :
-  // `espnOdds` peut devenir `null` dès que le match passe en direct (ESPN
-  // relabellise la ligne en "*Live Odds*", filtrée par `useEspnPregameOdds`)
-  // — on fige donc la dernière valeur pré-match valide vue, plutôt que de
-  // laisser `calcLiveProno` retomber sur son prior interne à cet instant.
-  // `useState` (pas `useRef`) : la règle react-hooks/refs interdit d'accéder
-  // à `.current` pendant le rendu (lecture ou écriture, voir MatchPoster.jsx).
-  // Mis à jour PENDANT le rendu (pattern officiel React "Adjusting state when
-  // a prop changes"), pas dans un `useEffect` (react-hooks/set-state-in-effect).
-  const [lastPregameOdds, setLastPregameOdds] = useState(null)
-  const [prevEspnOdds, setPrevEspnOdds]       = useState(espnOdds)
-  if (espnOdds !== prevEspnOdds) {
-    setPrevEspnOdds(espnOdds)
-    if (espnOdds?.pct) setLastPregameOdds(espnOdds)
-  }
+  // 18/11 : cotes via le hook PARTAGÉ useMatchOdds (même calcul que les cartes et la page du match).
+  const matchOdds = useMatchOdds(match, espnScore)
 
   if (!match) return null
 
@@ -217,33 +199,8 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
   const hForm = formMap?.[formKey(match, formHomeId)] ?? []
   const aForm = formMap?.[formKey(match, formAwayId)] ?? []
-  const prono = isLive
-    ? calcLiveProno(hForm, aForm, hs, as_, liveMinute, {
-        homeId: resolvedHomeId, awayId: resolvedAwayId, compMatches,
-        fullH2H, lowerDivMatches,
-        neutralVenue:      isNeutralVenueComp(match),
-        homeRedCards:      espnScore?.stats?.home?.redCards,
-        awayRedCards:      espnScore?.stats?.away?.redCards,
-        homePoss:          espnScore?.stats?.home?.poss,
-        awayPoss:          espnScore?.stats?.away?.poss,
-        homeShotsOnTarget: espnScore?.stats?.home?.shotsOnTarget,
-        awayShotsOnTarget: espnScore?.stats?.away?.shotsOnTarget,
-        homeCorners:       espnScore?.stats?.home?.corners,
-        awayCorners:       espnScore?.stats?.away?.corners,
-        // Point de départ RÉEL du calcul live : la cote de marché ESPN, comme
-        // dans MatchPoster.jsx et LiveStatsTab. Sans elle, cette carte partait
-        // du prior interne (forme récente) et divergeait des deux autres pour
-        // le même match — voir le commentaire de useEspnPregameOdds plus haut.
-        marketPre:         lastPregameOdds?.pct ?? null,
-      })
-    : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
-        fullH2H, lowerDivMatches,
-        neutralVenue: isNeutralVenueComp(match),
-      })
-
-  const useMarketOdds = isUpcoming && !!espnOdds
-  const displayPct    = useMarketOdds ? espnOdds.pct : prono
-  const pronoFavorite = pronoFavoriteKey(displayPct)
+  const displayPct    = matchOdds?.displayPct
+  const pronoFavorite = matchOdds?.favorite
 
   const homeCode = (homeName || match.homeTeam?.tla || '').slice(0, 3).toUpperCase()
   const awayCode = (awayName || match.awayTeam?.tla || '').slice(0, 3).toUpperCase()
@@ -470,15 +427,15 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)))}>{frOdd((useMarketOdds ? espnOdds.decimal.home : pronoToOdds(prono.home)))}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.home)}>{frOdd(matchOdds.odds.home)}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)))}>{frOdd((useMarketOdds ? espnOdds.decimal.draw : pronoToOdds(prono.draw)))}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.draw)}>{frOdd(matchOdds.odds.draw)}</span>
           </div>
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd((useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)))}>{frOdd((useMarketOdds ? espnOdds.decimal.away : pronoToOdds(prono.away)))}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.away)}>{frOdd(matchOdds.odds.away)}</span>
           </div>
         </div>
       </div>
