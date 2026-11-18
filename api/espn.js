@@ -27,7 +27,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
-import { compactEspnSummary, compactEspnStandings } from '../src/utils/espnSummaryParse.js'
+import { compactEspnSummary, compactEspnStandings, extractMatchDetails } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
 
 const kv = new Redis({
@@ -391,6 +391,35 @@ function mergeScoreboardChunks(results) {
 // boxscore encore vide) ne doit PAS être traité comme "match terminé" — un
 // match encore EN COURS doit garder un TTL court (LIVE_SUMMARY_CACHE_TTL),
 // seul un match réellement terminé passe en cache permanent.
+// Tirs au but (18/11, constat utilisateur : sur Reus–Barakaldo, page du match terminé sans les
+// tireurs « t.a.b. ») : le /summary d'ESPN NE contient PAS les tirs de la séance, alors que le
+// scoreboard du jour, si (`details[].shootout: true`, vérifié sur 2 matchs de Copa del Rey).
+// Pour un match décidé aux tab, on va donc les chercher UNE fois dans le scoreboard du jour du
+// match (résultat mis en cache permanent avec le reste du résumé → 1 seul appel par match).
+async function addShootoutKicks(compact, parsed, slug, eventId) {
+  try {
+    const comp = parsed?.header?.competitions?.[0]
+    const statusName = comp?.status?.type?.name ?? ''
+    if (!/PEN|SHOOTOUT/i.test(statusName)) return compact
+    if ((compact.scorers ?? []).some(s => s.shootout)) return compact
+    const d = new Date(comp?.date ?? parsed?.header?.competitions?.[0]?.date ?? Date.now())
+    const ymd = x => `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}`
+    for (const day of [d, new Date(d.getTime() - 864e5)]) {
+      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${ymd(day)}&limit=300`)
+      if (!r.ok) continue
+      const sb = await r.json()
+      const ev = (sb?.events ?? []).find(e => String(e.id) === String(eventId))
+      const evComp = ev?.competitions?.[0]
+      if (!evComp) continue
+      const homeId = (evComp.competitors ?? []).find(c => c.homeAway === 'home')?.team?.id
+      const kicks = extractMatchDetails(evComp, homeId).scorers.filter(s => s.shootout)
+      if (kicks.length) return { ...compact, scorers: [...(compact.scorers ?? []), ...kicks] }
+      return compact
+    }
+  } catch { /* best-effort : sans les tireurs, le reste du résumé reste valable */ }
+  return compact
+}
+
 function isMatchFinished(json) {
   const statusName = json?.header?.competitions?.[0]?.status?.type?.name
   const completed  = json?.header?.competitions?.[0]?.status?.type?.completed
@@ -792,7 +821,8 @@ export default async function handler(req, res) {
       // les matchs à venir seulement, et l'utilisateur aurait continué à voir
       // le même défaut sur tous les matchs déjà consultés.
       // À REFAIRE à chaque fois que compactEspnSummary change de résultat.
-      const cacheKey = `espn:summary:v2:${slug}:${eventId}`
+      // v3 (18/11) : les résumés déjà en cache n'avaient pas les tirs au but (voir addShootoutKicks)
+      const cacheKey = `espn:summary:v3:${slug}:${eventId}`
       try {
         const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {
@@ -858,6 +888,7 @@ export default async function handler(req, res) {
       try {
         const parsed = JSON.parse(rawBody)
         compact = compactEspnSummary(parsed)
+        compact = await addShootoutKicks(compact, parsed, slug, eventId)
         if (hasUsefulData(compact)) {
           const hasLineups = !!compact.lineups?.home?.starters?.length
           // Match terminé + compo publiée : donnée définitivement complète et
