@@ -54,6 +54,7 @@ import '../live.css'
 // l'app, ex: Resultat.jsx qui importe match.css).
 import './LiveMatchPage.css'
 import { frNum } from '../utils/frNum'
+import { useLiveData } from '../context/LiveProvider'
 
 
 
@@ -130,6 +131,7 @@ function formatTime(utcDate) {
 
 // ── Hero gradient plein-écran ─────────────────────────────────────────────────
 function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
+  const { espnScores } = useLiveData()
   const comp       = withPageTheme(compForMatch(match))
   const homeName   = translateTeam(match.homeTeam?.shortName || match.homeTeam?.name || '?')
   const awayName   = translateTeam(match.awayTeam?.shortName || match.awayTeam?.name || '?')
@@ -186,8 +188,13 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // (4-3 → 3-3 → 4-3). cachedEspn est écrit une seule fois par confirmFt()
   // avec la valeur ESPN déjà anti-régressée (voir useLiveMinute.js) et ne
   // change plus jamais après → sert de plancher fiable.
-  const hPens = mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null)
-  const aPens = mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null)
+  // 18/11 : 3e source, le suivi direct (LiveProvider) — sur un match ESPN ouvert depuis la liste,
+  // `score.penalties`/`duration` peuvent manquer et le snapshot local aussi : « (4-1) » ne
+  // s'affichait pas sous le 0 – 0 (constat utilisateur, Portugalete–Real Unión).
+  const liveEspn = espnScores?.[match?.id]
+  const hPens = mergeScore(mergeScore(match.score?.penalties?.home ?? null, cachedEspn?.homeShootout ?? null), liveEspn?.homeShootout ?? null)
+  const aPens = mergeScore(mergeScore(match.score?.penalties?.away ?? null, cachedEspn?.awayShootout ?? null), liveEspn?.awayShootout ?? null)
+  const pensKnown = hPens != null && aPens != null && (hPens + aPens) > 0
   // ⚠️ BUG CORRIGÉ (constat utilisateur : le déroulement buts/cartons
   // n'affichait QUE les buts marqués pendant qu'il regardait le match — les
   // buts marqués après qu'il s'est endormi/a fermé l'app manquaient) : un
@@ -343,7 +350,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           {isFinished ? (
             <>
               <span className="mp__hero__score">{hs} – {as_}</span>
-              {wentToPens && hPens != null && aPens != null && (
+              {(wentToPens || pensKnown) && hPens != null && aPens != null && (
                 <div className="mp__hero__pensBlock">
                   <span className="mp__hero__pensLabel">T.A.B</span>
                   <span className="mp__hero__pensScore">({hPens}-{aPens})</span>
