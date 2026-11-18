@@ -224,7 +224,10 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
   // Score des tab en direct (mêmes champs que MatchModal.jsx)
   const homeShootout = espn?.homeShootout ?? null
   const awayShootout = espn?.awayShootout ?? null
-  const showLivePens = period === 'T.A.B.' && (homeShootout != null || awayShootout != null)
+  // 18/11 : le score des tirs au but entre parenthèses reste affiché APRÈS la fin du match aussi
+  // (avant : seulement pendant la séance) — le gros score, lui, est toujours celui des 120 minutes.
+  const hadShootout = (homeShootout ?? 0) + (awayShootout ?? 0) > 0
+  const showLivePens = (period === 'T.A.B.' && (homeShootout != null || awayShootout != null)) || (isTermine && hadShootout)
 
   // Score localStorage (partagé avec Live.jsx)
   const scoreKey = `foot_lv_score_${match.id}`
