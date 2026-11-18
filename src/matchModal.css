@@ -1766,3 +1766,52 @@
   width: 14px;
   border-radius: 3px;
 }
+
+/* ═══ Cotes des pages de match : forme « B · Penché » (18/11, choix utilisateur, inspirée de Betclic) ═══
+   Parallélogramme (skew), moins haut (62 → 44 px), nom de l'équipe en entier au-dessus (data-long),
+   gros chiffres italiques avec virgule (data-comma). Le contenu est redressé (skew inverse) pour
+   rester droit. Favorite : remplie en bordeaux (repérée par le box-shadow inline posé par le JSX).
+   Tous thèmes ; le thème Jaune garde ses couleurs (voir theme-sobre.css). */
+#root .modal__liveProno__row { gap: 9px; padding: 0 5px; } /* padding : le penché ne déborde plus de la marge */
+#root .modal__liveProno__pill {
+  height: 44px;
+  border: none;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: none !important;
+  transform: skewX(-9deg);
+  gap: 4px;            /* nom un peu décollé des chiffres (demande utilisateur) */
+  padding: 1px 6px 0;
+  overflow: hidden;
+}
+#root .modal__liveProno__pill > * { transform: skewX(9deg); display: block; max-width: 100%; }
+#root .modal__liveProno__pill[style*="box-shadow"] { background: #9f1e34; }
+#root .modal__liveProno__pillLabel[data-long] {
+  font-size: 0;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: -2px;    /* remonté d'un cran */
+}
+#root .modal__liveProno__pillLabel[data-long]::after {
+  content: attr(data-long);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: none;
+  color: #111;
+}
+#root .modal__liveProno__pillVal[data-comma] { font-size: 0; line-height: 1; }
+#root .modal__liveProno__pillVal[data-comma]::after {
+  content: attr(data-comma);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: #9f1e34;
+}
+#root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after,
+#root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after { color: #fff; }

@@ -322,3 +322,9 @@
       cartes de l'Accueil (avant : à fond, plus fort que tout le reste de l'écran). Sobre et Jaune. ── */
 :root[data-theme="sobre"] #root .lmp__hero { background-color: #181b21; }
 :root[data-theme="sobre"] #root .lmp__hero > [class*="lmp__heroTint"] { filter: brightness(0.5) saturate(0.8); }
+
+/* Thème Jaune + forme « Penché » des pages de match (18/11) : pas de biseau en plus du penché,
+   même taille de chiffres que les autres thèmes, chiffres noirs. */
+:root[data-odds="jaune"] #root .modal__liveProno__pill { clip-path: none; }
+:root[data-odds="jaune"] #root .modal__liveProno__pillVal[data-comma]::after { font-size: 19px; color: #111; }
+:root[data-odds="jaune"] #root .modal__liveProno__pillLabel[data-long]::after { font-size: 10.5px; color: #111; }
