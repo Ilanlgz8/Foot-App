@@ -199,8 +199,11 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
   const formAwayId = resolveFdTeamId(match.awayTeam, h2hPool, { loose: true, strict: true })
   const hForm = formMap?.[formKey(match, formHomeId)] ?? []
   const aForm = formMap?.[formKey(match, formAwayId)] ?? []
-  const displayPct    = matchOdds?.displayPct
-  const pronoFavorite = matchOdds?.favorite
+  // Prolongations / tab : 2 cotes de qualification (plus de nul), comme la page du direct.
+  const qualif        = matchOdds?.qualification
+  const displayPct    = qualif ? qualif.pct : matchOdds?.displayPct
+  const pronoFavorite = qualif ? qualif.favorite : matchOdds?.favorite
+  const oddsShown     = qualif ? { ...matchOdds.odds, ...qualif.odds } : matchOdds?.odds
 
   const homeCode = (homeName || match.homeTeam?.tla || '').slice(0, 3).toUpperCase()
   const awayCode = (awayName || match.awayTeam?.tla || '').slice(0, 3).toUpperCase()
@@ -427,15 +430,17 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.home)}>{frOdd(matchOdds.odds.home)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.home)}>{frOdd(oddsShown.home)}</span>
           </div>
-          <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
+          {!qualif && (
+            <div className="poster__prono-pill" style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.draw)}>{frOdd(matchOdds.odds.draw)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.draw)}>{frOdd(oddsShown.draw)}</span>
           </div>
+          )}
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
             <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
-            <span className="poster__prono-pillVal" data-comma={frOdd(matchOdds.odds.away)}>{frOdd(matchOdds.odds.away)}</span>
+            <span className="poster__prono-pillVal" data-comma={frOdd(oddsShown.away)}>{frOdd(oddsShown.away)}</span>
           </div>
         </div>
       </div>

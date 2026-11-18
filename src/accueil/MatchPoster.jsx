@@ -220,11 +220,13 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
   // voir son en-tête) — l'ancien calcul local (identique) est retiré pour qu'il ne puisse plus
   // jamais diverger. Les commentaires ci-dessus restent valables : la logique a été déplacée telle quelle.
   const matchOdds = useMatchOdds(match, espnScore, { formMap: formMapProp, compMatches: compMatchesProp })
-  const displayPct    = matchOdds.displayPct
-  const pronoFavorite = matchOdds.favorite
-  const homeOdd = matchOdds.odds.home
+  // Prolongations / tab : 2 cotes de qualification (plus de nul), comme la page du direct.
+  const qualif        = matchOdds.qualification
+  const displayPct    = qualif ? qualif.pct : matchOdds.displayPct
+  const pronoFavorite = qualif ? qualif.favorite : matchOdds.favorite
+  const homeOdd = qualif ? qualif.odds.home : matchOdds.odds.home
   const drawOdd = matchOdds.odds.draw
-  const awayOdd = matchOdds.odds.away
+  const awayOdd = qualif ? qualif.odds.away : matchOdds.odds.away
 
   // ⚠️ REMPLACÉ (05/09, demande explicite utilisateur : "les cards accueil
   // sur mobile pareil que livematchpage, les couleurs du championnat au lieu
@@ -517,6 +519,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             <span className="poster__prono-pillLabel" data-long={homeShort}>{homeCode}</span>
             <span className="poster__prono-pillVal" data-comma={frOdd(homeOdd)}>{frOdd(homeOdd)}</span>
           </div>
+          {!qualif && (
           <div
             className="poster__prono-pill"
             style={pronoFavorite === 'draw' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.draw)})`, boxShadow: pronoGlowShadow(displayPct.draw), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
@@ -524,6 +527,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             <span className="poster__prono-pillLabel" data-long="Nul">Nul</span>
             <span className="poster__prono-pillVal" data-comma={frOdd(drawOdd)}>{frOdd(drawOdd)}</span>
           </div>
+          )}
           <div
             className="poster__prono-pill"
             style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}

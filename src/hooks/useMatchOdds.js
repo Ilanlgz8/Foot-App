@@ -25,7 +25,7 @@ import { useH2HRows } from '../components/MatchModal'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, mergeScore, finalScore, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
-import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoFavoriteKey } from '../utils/calcProno'
+import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 
 // ── Mémoire partagée de la dernière cote de marché d'avant-match ─────────────────────────────────
 const LS_KEY = 'sf_pregameOdds'
@@ -126,8 +126,22 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
     ? { home: espnOdds.decimal.home, draw: espnOdds.decimal.draw, away: espnOdds.decimal.away }
     : { home: pronoToOdds(prono.home), draw: pronoToOdds(prono.draw), away: pronoToOdds(prono.away) }
 
+  // Prolongations / tirs au but (périodes ESPN 3, 4, 5) : plus de match nul possible → cotes de
+  // QUALIFICATION à 2 issues, exactement comme la page du direct (LiveStatsTab → LiveProno,
+  // même règle espnPeriod, même qualificationOdds, même favori). 18/11, constat utilisateur.
+  const isQualification = isLive && (ms.espnPeriod === 3 || ms.espnPeriod === 4 || ms.espnPeriod === 5)
+  let qualification = null
+  if (isQualification) {
+    const q = qualificationOdds(displayPct)
+    qualification = {
+      pct: q,
+      odds: { home: pronoToOdds(q.home), away: pronoToOdds(q.away) },
+      favorite: q.home >= q.away ? 'home' : 'away',
+    }
+  }
+
   return {
-    displayPct, odds, favorite: pronoFavoriteKey(displayPct), prono, useMarketOdds,
+    displayPct, odds, favorite: pronoFavoriteKey(displayPct), prono, useMarketOdds, qualification,
     isLive, isFinished, isUpcoming, liveMinute, homeScore, awayScore,
     hForm, aForm, teamIdPool, h2hPool, resolvedHomeId, resolvedAwayId, compMatches, formMap,
   }
