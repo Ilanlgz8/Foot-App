@@ -28,6 +28,7 @@ import { calcMinute, mergeScore, finalScore, isNeutralVenueComp, resolveFdTeamId
 import { calcPronoAdvanced, calcLiveProno, pronoToOdds, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 
 import { rememberPregameOdds, recallPregamePct, recallPregame } from '../utils/pregameOdds'
+import { eloTableCached, matchEloProbs } from '../utils/elo'
 
 // ── Le hook ──────────────────────────────────────────────────────────────────────────────────────
 // opts.formMap / opts.compMatches : données déjà chargées par le parent (listes de cartes) — sinon
@@ -76,6 +77,8 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
   // la cote de marché d'avant-match ESPN si elle existe — posée AVANT le calcul, pour ne pas sauter
   // au rendu suivant.
   if (isLive && !recallPregamePct(match.id) && espnOdds?.pct) rememberPregameOdds(match.id, espnOdds, 'fallback')
+  // Elo (19/11) : saison en cours + saison précédente déjà chargée (h2hHistory) — aucune requête en plus.
+  const elo = matchEloProbs(eloTableCached(compMatches, h2hHistory), resolvedHomeId, resolvedAwayId, isNeutralVenueComp(match))
   const st = espnScore?.stats
   const prono = isLive
     ? calcLiveProno(hForm, aForm, homeScore, awayScore, liveMinute, {
@@ -91,10 +94,12 @@ export function useMatchOdds(match, espnScoreArg, opts = {}) {
         homeCorners:       st?.home?.corners,
         awayCorners:       st?.away?.corners,
         marketPre:         recallPregamePct(match.id),
+        elo,
       })
     : calcPronoAdvanced(resolvedHomeId, resolvedAwayId, compMatches, hForm, aForm, {
         fullH2H, lowerDivMatches,
         neutralVenue: isNeutralVenueComp(match),
+        elo,
       })
 
   const useMarketOdds = isUpcoming && !!espnOdds

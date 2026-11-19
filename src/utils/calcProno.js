@@ -1,4 +1,5 @@
 import { finalScore, outcomeForTeam } from './matchUtils'
+import { blendWithElo } from './elo'
 
 // Force d'une équipe sur sa forme récente (0-3, comme des points/match).
 function strength(form) {
@@ -755,7 +756,17 @@ function directMeetings(compMatches, homeId, awayId) {
  *   le modèle buts) applique un bonus FIXE non dérivé des données — c'est
  *   uniquement CE bonus-là qu'il faut neutraliser.
  */
+// opts.elo (19/11) : probabilités Elo du match (src/utils/elo.js, matchEloProbs) — mélangées au
+// résultat (ELO_WEIGHT, validé par scripts/backtest-elo.mjs). Absent → comportement inchangé.
 export function calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
+  const res = calcPronoAdvancedBase(homeId, awayId, compMatches, homeForm, awayForm, opts)
+  if (!opts.elo) return res
+  const out = blendWithElo(res, opts.elo)
+  if (res._debug) out._debug = res._debug
+  return out
+}
+
+function calcPronoAdvancedBase(homeId, awayId, compMatches, homeForm, awayForm, opts = {}) {
   const { fullH2H, debug, neutralVenue, lowerDivMatches } = opts
 
   // Repli enrichi : pas (encore) assez de données saison pour le modèle buts
@@ -1024,6 +1035,7 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     homeShotsOnTarget = null, awayShotsOnTarget = null,
     homeCorners = null, awayCorners = null,
     marketPre = null,
+    elo = null,
   } = opts
   // ⚠️ AJOUT (constat utilisateur : Lens-PSG, PSG favori à la vraie cote
   // bookmaker pré-match, mais dès le coup d'envoi le direct affichait Lens
@@ -1048,7 +1060,7 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // Comportement strictement inchangé pour tout appelant qui ne passe pas
   // fullH2H (retombe exactement sur calcProno comme avant).
   const pre = marketPre ?? ((homeId != null && awayId != null)
-    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue, lowerDivMatches })
+    ? calcPronoAdvanced(homeId, awayId, compMatches, homeForm, awayForm, { fullH2H, neutralVenue, lowerDivMatches, elo })
     : calcProno(homeForm, awayForm, { neutralVenue }))
   const diff = (homeGoals ?? 0) - (awayGoals ?? 0)
 

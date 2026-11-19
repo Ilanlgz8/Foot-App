@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs'
 import { calcPronoAdvanced } from '../src/utils/calcProno.js'
 import { finalScore, outcomeForTeam } from '../src/utils/matchUtils.js'
+import { buildEloTable, eloProbs, blendWithElo } from '../src/utils/elo.js'
 
 try {
   const raw = readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
@@ -43,26 +44,7 @@ async function tryFetch(code, yr) {
   catch (e) { console.log(`  (ignoré : ${e.message})`); return [] }
 }
 
-// ── Elo ──────────────────────────────────────────────────────────────
-const ELO_K = 20, ELO_HOME = 60
-function eloUpdate(R, m) {
-  const h = m.homeTeam.id, a = m.awayTeam.id
-  const fs = finalScore(m.score)
-  if (fs.home == null) return
-  const rh = R.get(h) ?? 1500, ra = R.get(a) ?? 1500
-  const exp = 1 / (1 + 10 ** (-(rh + ELO_HOME - ra) / 400))
-  const res = fs.home > fs.away ? 1 : fs.home < fs.away ? 0 : 0.5
-  const gd = Math.abs(fs.home - fs.away)
-  const mult = gd <= 1 ? 1 : gd === 2 ? 1.5 : (11 + gd) / 8
-  const d = ELO_K * mult * (res - exp)
-  R.set(h, rh + d); R.set(a, ra - d)
-}
-// Elo → 1X2. Le nul est le plus probable quand les équipes sont proches.
-function eloProbs(rh, ra) {
-  const e = 1 / (1 + 10 ** (-(rh + ELO_HOME - ra) / 400))
-  const draw = Math.max(0.12, 0.30 - 0.5 * Math.abs(e - 0.5) ** 1.3)
-  return { home: Math.max(0.02, e - draw / 2), draw, away: Math.max(0.02, 1 - e - draw / 2) }
-}
+// Elo : EXACTEMENT le code de l'app (src/utils/elo.js), pour que le test mesure ce qui tourne.
 
 // ── Fatigue : jours de repos depuis le dernier match (toutes compétitions) ──
 function restDays(teamId, date, allMatches) {
@@ -90,18 +72,6 @@ async function run() {
   const cl = []  // fatigue écartée (19/11 : moins bon sur les 4 championnats)
   const allComps = [...cur, ...cl].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
 
-  // Elo initial : saison précédente, puis compression vers 1500 (1/3) ;
-  // promus = moyenne des 3 plus faibles.
-  const R = new Map()
-  for (const m of prev) eloUpdate(R, m)
-  for (const [k, v] of R) R.set(k, 1500 + (v - 1500) * 2 / 3)
-  const weakest = [...R.values()].sort((a, b) => a - b).slice(0, 3)
-  const promoted = weakest.length ? weakest.reduce((s, x) => s + x, 0) / weakest.length : 1500
-  for (const m of cur) for (const id of [m.homeTeam.id, m.awayTeam.id]) if (!R.has(id)) R.set(id, promoted)
-  // Elo « à froid » : toutes les équipes à 1500 au début de la saison, sans
-  // saison précédente (ce que l'app aurait sans requête en plus).
-  const Rc = new Map()
-
   const W_ELO = [0, 0.35, 0.5, 0.65, 0.8, 1]
   const variants = []
   for (const w of W_ELO) for (const mode of w ? (prev.length ? ['chaud', 'froid'] : ['froid']) : ['—'])
@@ -117,12 +87,14 @@ async function run() {
       const h = m.homeTeam.id, a = m.awayTeam.id
       const base = calcPronoAdvanced(h, a, prior, recentForm(h, cur, date), recentForm(a, cur, date))
       const b = norm({ home: base.home / 100, draw: base.draw / 100, away: base.away / 100 })
-      const eW = eloProbs(R.get(h), R.get(a))
-      const eC = eloProbs(Rc.get(h) ?? 1500, Rc.get(a) ?? 1500)
+      const RW = buildEloTable(prev, cur, date), RC = buildEloTable([], cur, date)
+      const eW = eloProbs(RW.get(h), RW.get(a))
+      const eC = eloProbs(RC.get(h), RC.get(a))
       const th = tired(restDays(h, date, allComps)), ta = tired(restDays(a, date, allComps))
       for (const v of variants) {
         const e = v.mode === 'froid' ? eC : eW
-        let p = { home: b.home * (1 - v.w) + e.home * v.w, draw: b.draw * (1 - v.w) + e.draw * v.w, away: b.away * (1 - v.w) + e.away * v.w }
+        const bl = v.w ? blendWithElo(base, e, v.w) : base
+        let p = norm({ home: bl.home / 100, draw: bl.draw / 100, away: bl.away / 100 })
         const shift = v.f * (th - ta)  // >0 : domicile plus fatigué
         p = norm({ home: Math.max(0.01, p.home - shift), draw: p.draw, away: Math.max(0.01, p.away + shift) })
         v.brier += ['home', 'draw', 'away'].reduce((s, k) => s + (p[k] - (k === act ? 1 : 0)) ** 2, 0)
@@ -132,7 +104,6 @@ async function run() {
       }
       n++
     }
-    eloUpdate(R, m); eloUpdate(Rc, m)
   }
 
   if (!n) { console.log('Pas assez de matchs.'); return }

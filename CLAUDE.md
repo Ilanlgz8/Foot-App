@@ -191,6 +191,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Cotes (19/11)** : un seul calcul pour toute l'app, `src/hooks/useMatchOdds.js` (cartes, Match du jour, pages de match) — ne jamais recréer un calcul de cotes ailleurs. Le direct repart de la cote d'avant-match mémorisée (`src/utils/pregameOdds.js`, priorité : affichée sur ce téléphone > publiée par le Worker (`po` dans `pub:all` live.events, relevée tant que `state === 'pre'`, `src/utils/espnOdds.js` partagé app/Worker) > cote de marché lue après le coup d'envoi). `calcLiveProno` : intensités de buts calées sur `marketPre`, possession/tirs/corners pondérés progressivement sur 30 min. Prolongations/tab : 2 cotes de qualification partout. Animation : `AnimatedOdd.jsx`.
 
+- **Elo (19/11)** : `src/utils/elo.js`, mélangé à 65 % au modèle maison (`calcPronoAdvanced`, option `elo`) pour les matchs SANS cote de bookmaker (et le direct qui en repart). Saison en cours + saison précédente déjà chargée (`h2hHistory`) → aucune requête en plus. Validé par `scripts/backtest-elo.mjs` (PL/FL1/PD/SA 2023 et 2024, log loss meilleur partout) — toute retouche d'elo.js doit être re-mesurée avec ce script. Fatigue (jours de repos) testée et écartée (moins bonne partout). Pronos.jsx (jeu entre amis) reste sans Elo.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
