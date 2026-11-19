@@ -3507,7 +3507,7 @@
   padding: 1px 6px 0;
   overflow: hidden;
 }
-#root .hubPosters .poster__prono-pill { height: 48px; max-width: 110px; }
+#root .hubPosters .poster__prono-pill { height: 52px; max-width: 118px; } /* 19/11 : les cartes de l'Accueil sont des hubPosters — même taille que les autres */
 #root .poster__prono-pill > * { transform: skewX(9deg); display: block; max-width: 100%; }
 /* Favorite (18/11, 2e version) : plus remplie ni écrite en blanc — liseré bordeaux, texte comme les autres. */
 #root .poster__prono-pill[style*="box-shadow"] { box-shadow: inset 0 0 0 2px #9f1e34 !important; }
