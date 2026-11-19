@@ -410,9 +410,9 @@
 :root:not([data-odds="jaune"]) #root .hubPosters .poster__prono-pillVal.has-anim .oddAnim { font-size: 22px; }
 :root:not([data-odds="jaune"]) #root .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pillVal[data-comma]::after,
-:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: rgba(255, 255, 255, 0.82); }
+:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ffffff; }
 /* Favorite (19/11, 2e version) : plus de rouge (se perdait sur les cartes rouges ou foncées) — blanc pur,
-   un peu plus grande, nom en blanc, petit trait lumineux dessous ; les deux autres en blanc légèrement atténué. */
+   un peu plus grande, nom en blanc, petit trait lumineux dessous ; les deux autres en blanc aussi (atténuées : refusé). */
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ffffff; text-shadow: none; }

@@ -54,7 +54,9 @@ if ('serviceWorker' in navigator) {
   // jamais découvrir qu'une nouvelle version est dispo. On force la vérif
   // à chaque passage au premier plan (via le header Cache-Control: no-cache
   // posé sur /sw.js côté vercel.json, sw.js est toujours revalidé ici).
-  const checkForUpdate = () => navigator.serviceWorker.getRegistration().then(reg => reg?.update())
+  // .catch : une vérif ratée (réseau coupé, site momentanément indisponible) n'est pas une erreur
+  // — on réessaiera au prochain passage au premier plan (Sentry FOOT-APP-8, 19/11).
+  const checkForUpdate = () => navigator.serviceWorker.getRegistration().then(reg => reg?.update()).catch(() => {})
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkForUpdate()
