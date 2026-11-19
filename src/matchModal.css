@@ -1774,7 +1774,7 @@
    Tous thèmes ; le thème Jaune garde ses couleurs (voir theme-sobre.css). */
 #root .modal__liveProno__row { gap: 9px; padding: 0 5px; } /* padding : le penché ne déborde plus de la marge */
 #root .modal__liveProno__pill {
-  height: 44px;
+  height: 50px; /* 19/11 : un peu plus hautes (44 → 50), demande utilisateur */
   border: none;
   border-radius: 7px;
   background: #ffffff;
