@@ -29,7 +29,10 @@ import { withCpuMeter } from './_cpuMeter.js'
 let kv = null
 function getKv() {
   if (!kv && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+    // 19/11 (CPU Vercel) : automaticDeserialization désactivé — sinon chaque lecture du cache (réponses
+    // football-data.org de plusieurs centaines de Ko) était relue en objet puis réécrite en texte avant
+    // d'être renvoyée : deux passes inutiles (67 ms de CPU par appel mesurés). Le texte part tel quel.
+    kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN, automaticDeserialization: false })
   }
   return kv
 }
