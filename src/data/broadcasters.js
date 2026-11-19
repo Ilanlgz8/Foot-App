@@ -38,6 +38,7 @@ const FREE_M6_STAGES = new Set(['SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])
 // le détail de la programmation.
 const PAID_BY_COMP = {
   FL1:  { name: 'Ligue 1+' },
+  FL2:  { name: 'beIN Sports' },   // 19/11 : beIN, 100 % des matchs en exclusivité, contrat 2024-2029 (vérifié)
   PL:   { name: 'CANAL+' },
   CL:   { name: 'CANAL+' },
   UEL:  { name: 'CANAL+' },
