@@ -339,7 +339,11 @@ function Classement() {
   const movementMatches = []
   {
     const seen = new Set()
-    for (const m of [...(formCompMatches ?? []), ...(wcFin ?? []), ...liveNow]) {
+    // Une seule source à la fois : matchs football-data.org (mêmes ids que le classement) si on les a,
+    // sinon ceux de la compétition (ESPN / FFF). Mélanger les deux faussait le recomptage : ids ESPN
+    // et football-data.org différents, parfois identiques pour deux clubs différents (19/11, Bundesliga).
+    const base = (!ownForm && formCompMatches?.length) ? formCompMatches : (wcFin ?? [])
+    for (const m of [...base, ...liveNow]) {
       if (m?.id == null || seen.has(m.id)) continue
       seen.add(m.id); movementMatches.push(m)
     }
