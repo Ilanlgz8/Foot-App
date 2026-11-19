@@ -3530,3 +3530,9 @@
 }
 #root .hubPosters .poster__prono-pillVal[data-comma]::after { font-size: 16px; }
 
+
+/* Cartes à venir (Accueil, Match) : heure du match un peu plus bas (19/11, demande utilisateur).
+   Mesuré : l'heure seule était déjà à ~2 px du centre de la zone, mais « COUP D'ENVOI » posé au-dessus
+   rendait le bloc lourd en haut — l'heure paraissait trop haute. +6 px : l'heure tombe pile entre le haut
+   des écussons et les pastilles de forme. Cartes en direct / terminées inchangées. */
+#root .poster:not(.poster--live):not(.poster--ft) .poster__center { transform: translateY(6px); }
