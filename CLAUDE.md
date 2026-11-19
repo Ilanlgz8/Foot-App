@@ -155,6 +155,12 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 - App : matchs du jour toutes les 2 min si un match est en direct / commence dans < 3 h / a commencé il y a < 3 h ; sinon 30 min. Page Classement ouverte pendant un match de la compétition : classement 5 min, buteurs 10 min.
 - Mesures (10/11) : Worker ~15-16 ms CPU médian (avant 30), 0 erreur ; Vercel ~5 min CPU/jour (avant 12-16), limite Hobby 4 h / 30 jours glissants (au-delà : projet mis en pause).
 
+### CPU Vercel (19/11) — projet suspendu une fois pour dépassement (4 h / 30 jours, plan Hobby)
+- Compteur par fonction : `api/_cpuMeter.js` (Redis `cpu:AAAA-MM-JJ`), lecture `/api/debug-push?cpu=1` (ou Upstash → Data Browser). Mesure du 19/11 : calendriers ESPN (`espn:scoreboard`) ≈ 75 % du CPU, 147 ms/appel.
+- Corrections : mois de calendrier gardés en mémoire (`getMonthEvents`, api/espn.js) ; connexions ESPN réutilisées (`api/_espnHttp.js`, aussi mode groupé du Worker, fifa-live) ; `football.js` renvoie le cache Redis en texte (`automaticDeserialization: false`) ; fifa-live : scoreboards en mémoire de l'instance (plus dans Redis), veille seulement si utile, résumé ESPN 30 s.
+- Frein d'urgence : variable Vercel `CPU_SAVER=1` + Redeploy (`api/_cpuSaver.js`, caches ×2,5 à ×4, rien de coupé).
+- Le déblocage exceptionnel Vercel ne sert qu'UNE fois : surveiller le compteur avant tout ajout coûteux côté serveur.
+
 ### Stockage côté app
 - `localCache.js` : moteur IndexedDB (`statfootix-store`) + copie mémoire, chargé avant le 1er rendu. Copies de secours `matches_espn_*` et liste « à venir » gardées 24 h (`KEEP_STALE_FOR`).
 - Cache React Query : IndexedDB (`statfootix-rq`, `utils/rqIdbStorage.js`, persisteur asynchrone).

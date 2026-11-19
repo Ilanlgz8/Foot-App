@@ -22,6 +22,8 @@ import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../src/data/espnSlugs.js'
 import { fuzzyTeam } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
 import { withCpuMeter } from './_cpuMeter.js'
+import { espnGetJson } from './_espnHttp.js'
+import { saver } from './_cpuSaver.js'
 
 // ── État officiel des matchs (06/11, étape 1 « le serveur décide, le téléphone affiche ») ──────────
 // Publié chaque minute par le Worker (cf-worker/src/index.js, publishLiveState) sous `pub:liveState` :
@@ -69,7 +71,7 @@ const ablyClient = process.env.ABLY_API_KEY ? new Ably.Rest(process.env.ABLY_API
 const FIFA_LIVE_URL = 'https://api.fifa.com/api/v3/live/football'
 const FIFA_TTL      = 6           // Cache Redis FIFA live (s)
 const ESPN_BASE     = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-const ESPN_TTL      = 8           // Cache Redis ESPN (s)
+const ESPN_TTL      = saver(8, 20) // Cache ESPN (s) — 20 s en mode économie (api/_cpuSaver.js)
 const MATCH_TTL     = 90 * 24 * 3600   // Données match persistées 90 jours (WC 2026)
 const ESPN_TIMEOUT  = 5_000
 const FIFA_TIMEOUT  = 7_000
@@ -95,7 +97,7 @@ const FIFA_TIMEOUT  = 7_000
 // changement) — aucune perte de fraîcheur perceptible attendue.
 // 18 → 8 s (16/11) : avec le rythme « direct » à 15 s côté app, une copie de 18 s rendait la moitié des
 // interrogations inutiles (même donnée renvoyée).
-const FRESH_TTL     = 8
+const FRESH_TTL     = saver(8, 20) // 20 s en mode économie (api/_cpuSaver.js)
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -406,7 +408,7 @@ function extractEspnCards(comp, homeTeamId, awayTeamId) {
 // prudence délibérée (25% de requêtes en moins qu'à 8s) pour une perte de
 // fraîcheur perçue négligeable. Cache toujours PARTAGÉ entre tous les
 // utilisateurs (une requête ESPN par fenêtre de 10s, pas par utilisateur).
-const SUMMARY_TTL = 10   // Cache Redis summary (s)
+const SUMMARY_TTL = saver(30, 120)   // 120 s en mode économie (api/_cpuSaver.js) — Cache Redis summary (s) — 10 → 30 le 19/11 (CPU Vercel) : un résumé ESPN complet (centaines de Ko) était relu toutes les 10 s par match en direct, pour des stats (possession, tirs) qui n'ont pas besoin de cette fréquence. Buts, cartons, minute : inchangés (scoreboard, 8 s).
 
 // ⚠️ AJOUT (constat utilisateur, chiffres réels : "33K commandes Redis pour 3
 // matchs" — même diagnostic que freshIds plus bas dans le handler) : cette
@@ -434,12 +436,10 @@ async function batchGetSummaryCache(espnEventIds) {
 async function fetchEspnSummaryStatsNetwork(slug, espnEventId) {
   if (!slug || !espnEventId) return null
   try {
-    const r = await fetch(
-      `${ESPN_BASE}/${slug}/summary?event=${espnEventId}`,
-      { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }
-    )
-    if (!r.ok) return null
-    const j = await r.json()
+    // 19/11 : connexion ESPN réutilisée (api/_espnHttp.js).
+    const r = await espnGetJson(`${ESPN_BASE}/${slug}/summary?event=${espnEventId}`, ESPN_TIMEOUT)
+    if (!r.ok || !r.json) return null
+    const j = r.json
 
     // Les stats sont dans boxscore.teams[]
     const teams = j.boxscore?.teams ?? []
@@ -539,54 +539,52 @@ function extractBoxscoreStats(hArr, aArr) {
   }
 }
 
-async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false) {
+// 19/11 (CPU Vercel, projet suspendu) : réécrit pour coûter moins cher à chaque calcul.
+//  • Mémoire de l'instance (espnMem, même fraîcheur ESPN_TTL) au lieu de Redis : avant, chaque calcul
+//    relisait depuis Redis les scoreboards ESPN complets (centaines de Ko, relus en objet) ou les
+//    réécrivait (mis en texte + envoyés) — deux grosses passes de JSON par slug et par calcul.
+//  • Connexions ESPN réutilisées (api/_espnHttp.js) : plus de poignée de main TLS par appel.
+//  • Scoreboard de la veille seulement quand il peut servir (match commencé la veille, ou nuit UTC où
+//    ESPN, à l'heure de New York, range encore les matchs du soir sous la date d'hier).
+const espnMem = new Map()
+async function espnDayEvents(slug, day, bypassCache) {
+  const key = `${slug}:${day}`
+  const hit = espnMem.get(key)
+  if (!bypassCache && hit && hit.exp > Date.now()) return hit.events
+  const r = await espnGetJson(`${ESPN_BASE}/${slug}/scoreboard?dates=${day}&limit=100`, ESPN_TIMEOUT)
+  if (!r.ok || !r.json) return hit?.events ?? []
+  const events = r.json.events ?? []
+  if (espnMem.size > 400) espnMem.delete(espnMem.keys().next().value)
+  espnMem.set(key, { events, exp: Date.now() + ESPN_TTL * 1000 })
+  return events
+}
+async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false, needYesterday = true) {
   const allEvents = []
   const slugs = [...slugSet]
-  // ⚠️ AJOUT (même contexte que le verrou anti-doublon plus haut, réduire le
-  // coût Redis PAR calcul) : avant, chaque slug faisait sa PROPRE commande
-  // kv.get individuelle (jusqu'à N commandes pour N compétitions suivies en
-  // même temps — PL+Bundesliga+Serie A+Ligue 1+C1 un samedi chargé, par
-  // exemple). Un seul MGET groupé lit TOUTES les clés en 1 seule commande
-  // Redis, peu importe le nombre de compétitions — même donnée, même
-  // fraîcheur (ESPN_TTL inchangé), juste moins de commandes facturées.
-  const cachedBySlug = {}
-  if (!bypassCache && slugs.length > 0) {
-    try {
-      const cached = await kv.mget(...slugs.map(s => `espn:fb:${s}`))
-      slugs.forEach((s, i) => { if (cached[i]) cachedBySlug[s] = safeJson(cached[i]) })
-    } catch {}
-  }
   await Promise.allSettled(slugs.map(async slug => {
-    const cKey = `espn:fb:${slug}`
-    let events = cachedBySlug[slug] ?? null
-
-    if (!events) {
-      try {
-        // ⚠️ &limit=100 indispensable : sans lui, ESPN renvoie pour les matchs à
-        // élimination directe pas encore "résolus" par défaut des noms d'équipe
-        // placeholder de bracket ("Round of 32 5 Winner") et un statut/score
-        // figés à SCHEDULED/0-0, même après le vrai coup d'envoi — confirmé en
-        // comparant en direct la même URL avec/sans ce paramètre (voir même fix
-        // dans cron-goals.js, où le bug a été identifié en premier).
-        const [rT, rY] = await Promise.all([
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${today}&limit=100`,     { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
-          fetch(`${ESPN_BASE}/${slug}/scoreboard?dates=${yesterday}&limit=100`, { headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(ESPN_TIMEOUT) }),
-        ])
-        const [jT, jY] = await Promise.all([
-          rT.ok ? rT.json() : { events: [] },
-          rY.ok ? rY.json() : { events: [] },
-        ])
-        events = [...(jT.events ?? []), ...(jY.events ?? [])]
-        try { await kv.set(cKey, JSON.stringify(events), { ex: ESPN_TTL }) } catch {}
-      } catch { events = [] }
-    }
-
-    for (const evt of (events ?? [])) allEvents.push({ slug, evt })
+    let events = []
+    try {
+      const [evT, evY] = await Promise.all([
+        espnDayEvents(slug, today, bypassCache),
+        needYesterday ? espnDayEvents(slug, yesterday, bypassCache) : Promise.resolve([]),
+      ])
+      events = [...evT, ...evY]
+    } catch { events = [] }
+    for (const evt of events) allEvents.push({ slug, evt })
   }))
   return allEvents
 }
 
-// ── Handler ────────────────────────────────────────────────────────────────────
+// Veille utile ? (voir fetchEspnEvents) — en cas de doute, oui.
+function yesterdayNeeded(matches, now = new Date()) {
+  if (now.getUTCHours() < 8) return true
+  const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  return matches.some(m => {
+    const t = Date.parse(m?.utcDate ?? '')
+    return !Number.isFinite(t) || t < todayStart + 6 * 3600_000
+  })
+}
+
 
 async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
@@ -789,7 +787,7 @@ async function handler(req, res) {
   }
 
   const espnEvents = slugSet.size > 0
-    ? await fetchEspnEvents(slugSet, today, yesterday, !!forceFresh)
+    ? await fetchEspnEvents(slugSet, today, yesterday, !!forceFresh, yesterdayNeeded(matches, now))
     : []
 
   // Matcher chaque match FD.org avec un event ESPN

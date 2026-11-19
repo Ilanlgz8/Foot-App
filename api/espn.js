@@ -31,6 +31,7 @@ import { compactEspnSummary, compactEspnStandings, extractMatchDetails } from '.
 import { workerKvGet } from '../src/utils/tursoCache.js'
 import { withCpuMeter } from './_cpuMeter.js'
 import { espnGetText, espnGetJson } from './_espnHttp.js'
+import { saver } from './_cpuSaver.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -371,9 +372,9 @@ function monthTtlMs(ym, events) {
   if (m < cur) return 12 * 3600_000
   if (m > cur + 1) return 6 * 3600_000
   const today = now.toISOString().slice(0, 10)
-  if (events.some(e => LIVE_STATES.has(e?.competitions?.[0]?.status?.type?.state))) return 120_000
-  if (events.some(e => String(e?.date ?? '').slice(0, 10) === today)) return 600_000
-  return 1800_000
+  if (events.some(e => LIVE_STATES.has(e?.competitions?.[0]?.status?.type?.state))) return saver(120_000, 480_000)
+  if (events.some(e => String(e?.date ?? '').slice(0, 10) === today)) return saver(600_000, 2_400_000)
+  return saver(1800_000, 7_200_000)
 }
 async function getMonthEvents(slug, ym, skipCache = false) {
   const key = `${slug}:${ym}`
@@ -1028,7 +1029,7 @@ async function handler(req, res) {
         return !!type && (LIVE_ESPN_TYPE_NAMES.has(type.name) || type.state === 'in')
       })
       // 19/11 : 90 s → 120 s pendant le direct (le direct lui-même passe par fifa-live, pas par ce calendrier).
-      const scoreboardTtl = (isAnyEventLive || partial) ? 120 : 3600
+      const scoreboardTtl = (isAnyEventLive || partial) ? saver(120, 480) : saver(3600, 14400)  // ×4 en mode économie (api/_cpuSaver.js)
       // ⚠️ AJOUT (21/09, demande explicite utilisateur — "si une seule
       // personne consulte l'app ça utilise trop de commandes Upstash") : le
       // kv.mget (voir readCachedChunks) réduit le coût PAR VISITEUR, mais ne
@@ -1171,7 +1172,7 @@ async function handler(req, res) {
     // visiteurs normaux (jamais envoyé avec ce paramètre).
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', skipCache ? 'no-store' : 'public, s-maxage=40, stale-while-revalidate=180')
+       .setHeader('Cache-Control', skipCache ? 'no-store' : `public, s-maxage=${saver(40, 120)}, stale-while-revalidate=180`)
        .send(body)
   } catch (err) {
     clearTimeout(timeoutId)
