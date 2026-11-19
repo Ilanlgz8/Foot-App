@@ -30,6 +30,7 @@ import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings, extractMatchDetails } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
 import { withCpuMeter } from './_cpuMeter.js'
+import { espnGetText, espnGetJson } from './_espnHttp.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -357,6 +358,35 @@ function slimEvent(e) {
 // tranches sont construites contiguës/non chevauchantes, mais un événement à
 // cheval sur minuit UTC pourrait apparaître dans 2 tranches adjacentes selon
 // la version de l'API ESPN — sécurité peu coûteuse).
+// ── Mémoire des mois de calendrier (19/11) ──────────────────────────────────────────────────────────
+// Durée de vie d'un mois en mémoire : mois passé 12 h (figé) ; mois lointain à venir 6 h ; mois en cours
+// et suivant : 2 min si un match est en direct, 10 min si un match a lieu aujourd'hui, 30 min sinon.
+const monthCache = new Map()
+const MONTH_CACHE_MAX = 900
+const LIVE_STATES = new Set(['in'])
+function monthTtlMs(ym, events) {
+  const now = new Date()
+  const cur = now.getUTCFullYear() * 12 + now.getUTCMonth()
+  const m = Number(ym.slice(0, 4)) * 12 + Number(ym.slice(4, 6)) - 1
+  if (m < cur) return 12 * 3600_000
+  if (m > cur + 1) return 6 * 3600_000
+  const today = now.toISOString().slice(0, 10)
+  if (events.some(e => LIVE_STATES.has(e?.competitions?.[0]?.status?.type?.state))) return 120_000
+  if (events.some(e => String(e?.date ?? '').slice(0, 10) === today)) return 600_000
+  return 1800_000
+}
+async function getMonthEvents(slug, ym, skipCache = false) {
+  const key = `${slug}:${ym}`
+  const hit = monthCache.get(key)
+  if (!skipCache && hit && hit.exp > Date.now()) return { ok: true, events: hit.events }
+  const r = await espnGetJson(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${ym}&limit=300`)
+  if (!r.ok || !r.json) return hit ? { ok: true, events: hit.events } : { ok: false, events: [] }
+  const events = (r.json.events ?? []).map(slimEvent)
+  if (monthCache.size >= MONTH_CACHE_MAX) monthCache.delete(monthCache.keys().next().value)
+  monthCache.set(key, { events, exp: Date.now() + monthTtlMs(ym, events) })
+  return { ok: true, events }
+}
+
 function mergeScoreboardChunks(results) {
   const anyOk = results.some(r => r.ok)
   if (!anyOk) return { ok: false, events: [] }
@@ -647,23 +677,12 @@ async function handler(req, res) {
     // (slugDatePairs, toujours une date unique par appel), jamais le client.
     if (!dates || !/^\d{8}$/.test(dates)) return res.status(400).json({ error: 'Paramètre dates invalide (YYYYMMDD attendu)' })
 
+    // 19/11 : connexions ESPN réutilisées (api/_espnHttp.js) au lieu d'un nouveau TLS par slug et par minute.
     const results = await Promise.allSettled(slugList.map(async (s) => {
-      const ctrl = new AbortController()
-      const tid  = setTimeout(() => ctrl.abort(), 8_000)
-      try {
-        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${s}/scoreboard?dates=${dates}&limit=100`
-        const r = await fetch(url, {
-          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-          signal: ctrl.signal,
-        })
-        clearTimeout(tid)
-        if (!r.ok) return { slug: s, ok: false, error: `ESPN a répondu ${r.status}` }
-        const j = await r.json()
-        return { slug: s, ok: true, events: j.events ?? [] }
-      } catch (e) {
-        clearTimeout(tid)
-        return { slug: s, ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message }
-      }
+      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${s}/scoreboard?dates=${dates}&limit=100`
+      const r = await espnGetJson(url)
+      if (!r.ok) return { slug: s, ok: false, error: r.status ? `ESPN a répondu ${r.status}` : (r.error ?? 'erreur') }
+      return { slug: s, ok: true, events: r.json?.events ?? [] }
     }))
 
     const bySlug = {}
@@ -973,19 +992,10 @@ async function handler(req, res) {
       const fetchList = months
       const partial = false
       const tFetch0 = Date.now()
-      const results = await Promise.all(months.map(async ym => {
-        try {
-          const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${ym}&limit=300`, {
-            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-            signal: AbortSignal.timeout(8_000),
-          })
-          if (!r.ok) return { ok: false, events: [] }
-          const j = await r.json()
-          return { ok: true, events: (j.events ?? []).map(slimEvent) }
-        } catch {
-          return { ok: false, events: [] }
-        }
-      }))
+      // 19/11 : chaque mois déjà lu est gardé en mémoire (monthCache, voir monthTtlMs) — un mois passé
+      // ne change plus, inutile de le retélécharger et de le relire à chaque requête (147 ms de CPU par
+      // calendrier mesurés avant, la 1re dépense du projet).
+      const results = await Promise.all(months.map(ym => getMonthEvents(slug, ym, skipCache)))
       const tFetch = Date.now() - tFetch0
       clearTimeout(timeoutId)
       const merged = mergeScoreboardChunks(results)
@@ -1017,7 +1027,8 @@ async function handler(req, res) {
         const type = e?.competitions?.[0]?.status?.type
         return !!type && (LIVE_ESPN_TYPE_NAMES.has(type.name) || type.state === 'in')
       })
-      const scoreboardTtl = (isAnyEventLive || partial) ? 90 : 3600
+      // 19/11 : 90 s → 120 s pendant le direct (le direct lui-même passe par fifa-live, pas par ce calendrier).
+      const scoreboardTtl = (isAnyEventLive || partial) ? 120 : 3600
       // ⚠️ AJOUT (21/09, demande explicite utilisateur — "si une seule
       // personne consulte l'app ça utilise trop de commandes Upstash") : le
       // kv.mget (voir readCachedChunks) réduit le coût PAR VISITEUR, mais ne
@@ -1089,15 +1100,16 @@ async function handler(req, res) {
     const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
     const url  = dates ? `${base}?dates=${dates}&limit=100` : `${base}?limit=100`
 
-    const response = await fetch(url, {
-      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-      signal: controller.signal,
-    })
+    // 19/11 : connexion ESPN réutilisée (api/_espnHttp.js) ; le texte est renvoyé tel quel, sans relecture.
+    const response = await espnGetText(url)
     clearTimeout(timeoutId)
 
-    if (!response.ok) return res.status(response.status).json({ error: `ESPN a répondu ${response.status}` })
+    if (!response.ok) {
+      if (response.error === 'timeout') return res.status(504).json({ error: 'ESPN timeout (>8s)' })
+      return res.status(response.status || 502).json({ error: `ESPN a répondu ${response.status || response.error}` })
+    }
 
-    const body = await response.text()
+    const body = response.text
     // ⚠️ AJOUT (24/09, quota Fluid Active CPU Vercel dépassé — confirmé via
     // dashboard Observability : /api/espn = 14K invocations / 2min de CPU en
     // 12h, très largement devant les autres routes) — ce mode "date simple"
