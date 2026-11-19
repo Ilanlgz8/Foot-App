@@ -40,9 +40,22 @@ describe('computeStandingsMovement', () => {
     expect(computeStandingsMovement(r, matches.slice(0, 2), resolve).size).toBe(0)
   })
   it('pénalité de points conservée', () => {
-    const r = rows.map(x => x.team.id === 4 ? { ...x, points: 0, position: 4 } : x)
+    // T4 pénalisé de 3 pts → dernier ; les autres remontent d'un rang
+    const r = [...rows.slice(1).map((x, i) => ({ ...x, position: i + 1 })), { ...rows[0], points: 0, position: 4 }]
     const mv = computeStandingsMovement(r, matches, resolve)
     expect(mv.get(4)).toBe(0)  // était 4e (−3 pts), reste 4e
+  })
+  it('matchs de coupe et d\'une autre saison ignorés', () => {
+    const extra = [...matches,
+      { ...m(9, null, '2026-08-20T18:00:00Z', 1, 4, 5, 0), isCup: true },
+      { ...m(10, 30, '2025-05-01T18:00:00Z', 2, 3, 5, 0), season: { startDate: '2024-08-01' } },
+    ].map(x => x.season ? x : { ...x, season: { startDate: '2026-08-01' } })
+    expect(computeStandingsMovement(rows, extra, resolve).get(4)).toBe(2)
+  })
+  it('positions officielles ex aequo : rang = ordre des lignes', () => {
+    const r = rows.map((x, i) => (i === 3 ? { ...x, position: 3 } : x))
+    const mv = computeStandingsMovement(r, matches, resolve)
+    expect([...mv.values()].reduce((a, b) => a + b, 0)).toBe(0)
   })
   it('sans numéro de journée : regroupement par dates', () => {
     const noMd = matches.map(x => ({ ...x, matchday: undefined }))

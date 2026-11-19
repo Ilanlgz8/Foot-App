@@ -45,7 +45,11 @@ export function computeStandingsMovement(rows, matches, resolveId) {
   const idOf = new Map()
   for (const r of rows) { const id = resolveId(r.team); if (id != null) idOf.set(r.team.id, id) }
   const inTable = new Set(idOf.values())
-  const started = matches.filter(m => STARTED.has(m.status)
+  // Championnat seulement : les matchs de coupe nationale (isCup, mêlés aux matchs du championnat
+  // par useTeamForm) et ceux d'une autre saison ne comptent pas (19/11, Bundesliga sans flèches).
+  const latestSeason = matches.reduce((acc, m) => (m.season?.startDate && m.season.startDate > acc ? m.season.startDate : acc), '')
+  const started = matches.filter(m => STARTED.has(m.status) && !m.isCup
+    && (!latestSeason || !m.season?.startDate || m.season.startDate === latestSeason)
     && inTable.has(m.homeTeam?.id) && inTable.has(m.awayTeam?.id)
     && finalScore(m.score).home != null)
   if (!started.length) return out
@@ -63,7 +67,9 @@ export function computeStandingsMovement(rows, matches, resolveId) {
 
   // Ligne officielle ↔ recomptage : avec le direct (cas football-data.org) ou sans (cas ESPN).
   const consistent = new Set()
-  const prevRows = rows.map(r => {
+  // Rang actuel = ordre des lignes (pas row.position : deux équipes ex aequo peuvent avoir la même
+  // position officielle, ce qui décalait une flèche — 19/11, Ligue des champions, 29e ex aequo).
+  const prevRows = rows.map((r, idx) => {
     const id = idOf.get(r.team.id)
     const withLive = now.get(id) ?? teamStats()
     const finishedOnly = nowFinished.get(id) ?? teamStats()
@@ -72,7 +78,7 @@ export function computeStandingsMovement(rows, matches, resolveId) {
     const p = prev.get(id) ?? teamStats()
     if (id != null && ref) consistent.add(r.team.id)
     const adj = ref && typeof r.points === 'number' ? r.points - ref.points : 0
-    return { key: r.team.id, pos: r.position, played: p.played, points: p.points + adj, gd: p.gf - p.ga, gf: p.gf }
+    return { key: r.team.id, pos: idx + 1, played: p.played, points: p.points + adj, gd: p.gf - p.ga, gf: p.gf }
   })
   // Aucune journée avant celle-ci (1re journée) : pas de flèches.
   if (!prevRows.some(r => r.played > 0)) return out
