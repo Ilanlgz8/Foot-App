@@ -3,6 +3,7 @@
 // (redeploy forcé — vérif nouvelle clé, tentative 2)
 import { Redis } from '@upstash/redis'
 import crypto from 'node:crypto'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -128,7 +129,7 @@ const PERMANENTLY_DISABLED = true
 
 // Assistant IA foot (28/08) retiré le 15/11 (demande utilisateur).
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Même parsing défensif que cron-goals.js (mode POST) : req.body arrive en
   // string si le client n'a pas posé Content-Type: application/json.
   if (PERMANENTLY_DISABLED) {
@@ -260,3 +261,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message })
   }
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('apifootball', handler)

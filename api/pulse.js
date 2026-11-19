@@ -33,6 +33,7 @@
 //   → { ok, players: {deviceId:name}, predictions: {matchId:{deviceId:{home,away}}} }
 
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -95,7 +96,7 @@ async function readCurve(matchId) {
     .sort((a, b) => a.minute - b.minute)
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const origin = req.headers.origin ?? ''
   if (!isAllowedOrigin(origin)) {
     return res.status(403).json({ error: 'Origine non autorisée' })
@@ -290,3 +291,6 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Écriture temporairement indisponible' })
   }
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('pulse', handler)

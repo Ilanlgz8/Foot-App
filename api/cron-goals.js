@@ -50,6 +50,7 @@ import {
   minuteLabel, dateStr, parseMin,
   pickScorersForNewGoals, goalSignature,
 } from '../src/utils/liveDetection.js'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -414,7 +415,7 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB)
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const secret     = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
   const bearerAuth = req.headers['authorization'] ?? ''
   // Accepte : header x-cron-secret (cron-job.org / cf-worker), ?secret= (debug),
@@ -1275,3 +1276,6 @@ export default async function handler(req, res) {
     log: allLogs,
   })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('cron-goals', handler, req => (req.query || {}).mode || 'full')

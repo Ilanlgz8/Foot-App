@@ -8,6 +8,7 @@
 // problèmes à la fois : coût réel réduit ET une éventuelle boucle d'appels
 // retombe sur le cache au lieu de re-taper les flux à chaque fois.
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 let kv = null
 function getKv() {
@@ -72,7 +73,7 @@ function fetchWithTimeout(url, options, ms = 6000) {
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id))
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const redis = getKv()
   try {
     // ⚠️ AJOUT (30/09, audit "Fluid Active CPU" demandé par l'utilisateur) :
@@ -129,3 +130,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message })
   }
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('news', handler)

@@ -29,6 +29,7 @@ import { Redis } from '@upstash/redis'
 import { removeWhiteBackground } from '../src/utils/logoNoBg.js'
 import { compactEspnSummary, compactEspnStandings, extractMatchDetails } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -504,7 +505,7 @@ function isCompactShape(obj) {
     && !('header' in obj) && !('boxscore' in obj)
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : ce proxy n'avait
   // AUCUNE limite de débit — un endpoint public appelable directement
   // (curl/bot), avec un mode "scoreboard" explicitement SANS cache (données
@@ -1166,3 +1167,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message })
   }
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('espn', handler, req => { const q = req.query || {}; return q.feed ? 'feed' : q.summary || q.eventId ? 'summary' : q.recap ? 'recap' : q.standings ? 'standings' : q.l3logo ? 'l3logo' : q.slugs ? 'slugs' : q.slug ? 'scoreboard' : 'other' })

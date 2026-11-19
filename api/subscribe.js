@@ -9,6 +9,7 @@
 //   • Taille max du body : 4 ko (une subscription ne devrait jamais dépasser 1 ko)
 
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -83,7 +84,7 @@ function sanitizeClubs(clubs) {
     .slice(0, 30)
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // ── Vérification Origin (protection CSRF basique) ─────────────────────────
   // En dev local (origin undefined ou localhost), on laisse passer
   const origin = req.headers.origin ?? ''
@@ -179,3 +180,6 @@ export default async function handler(req, res) {
 
   return res.status(201).json({ ok: true })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('subscribe', handler)

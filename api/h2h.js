@@ -30,6 +30,7 @@
 // fast-path cache d'api/fifa-live.js (voir CLAUDE.md).
 import { Redis } from '@upstash/redis'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../src/data/fdcoukTeamNames.js'
+import { withCpuMeter } from './_cpuMeter.js'
 
 let kv = null
 function getKv() {
@@ -133,7 +134,7 @@ async function fetchSeason(leagueFile, seasonCode) {
   return rows
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const ip    = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'unknown'
   const kvClient = getKv()
   if (kvClient) {
@@ -186,3 +187,6 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=3600')
   return res.status(200).json({ meetings, source: 'football-data.co.uk' })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('h2h', handler)

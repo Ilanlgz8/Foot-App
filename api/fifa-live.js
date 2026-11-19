@@ -21,6 +21,7 @@ import { ESPN_SLUG_BY_COMP_ID, espnNativeSlug } from '../src/data/espnSlugs.js'
 // Monde) par le reste de l'app pour ce même problème.
 import { fuzzyTeam } from '../src/utils/espnSummaryParse.js'
 import { workerKvGet } from '../src/utils/tursoCache.js'
+import { withCpuMeter } from './_cpuMeter.js'
 
 // ── État officiel des matchs (06/11, étape 1 « le serveur décide, le téléphone affiche ») ──────────
 // Publié chaque minute par le Worker (cf-worker/src/index.js, publishLiveState) sous `pub:liveState` :
@@ -587,7 +588,7 @@ async function fetchEspnEvents(slugSet, today, yesterday, bypassCache = false) {
 
 // ── Handler ────────────────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -1448,3 +1449,6 @@ export default async function handler(req, res) {
 
   return res.json(await withServerState(result))
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('fifa-live', handler)

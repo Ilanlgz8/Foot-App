@@ -24,6 +24,7 @@
 // si besoin plutôt que de descendre encore plus bas.
 
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 let kv = null
 function getKv() {
@@ -268,7 +269,7 @@ function getCacheControl() {
   return 'no-store'
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' })
   }
@@ -540,3 +541,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message })
   }
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('football', handler, req => { const p = String((req.query || {}).apiPath || ''); return /standings/.test(p) ? 'standings' : /scorers/.test(p) ? 'scorers' : /matches/.test(p) ? 'matches' : /teams/.test(p) ? 'teams' : 'other' })

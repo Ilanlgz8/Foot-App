@@ -20,6 +20,7 @@
 // autre chose que les scores en direct.
 import Ably from 'ably'
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 let kv = null
 function getKv() {
@@ -29,7 +30,7 @@ function getKv() {
   return kv
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.query.ably !== undefined) {
     const apiKey = process.env.ABLY_API_KEY
     if (!apiKey) {
@@ -83,3 +84,6 @@ export default async function handler(req, res) {
     .setHeader('Cache-Control', 'public, max-age=3600')
     .json({ publicKey })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('vapid-key', handler, req => ((req.query || {}).ably ? 'ably' : 'vapid'))

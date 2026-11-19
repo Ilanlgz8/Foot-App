@@ -12,6 +12,7 @@ import { Redis }  from '@upstash/redis'
 import webpush    from 'web-push'
 import crypto     from 'crypto'
 import { isTursoConfigured, getWorkerKv, getWorkerQueueAll } from '../src/utils/tursoCache.js'
+import { withCpuMeter, readCpuStats } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -30,7 +31,14 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB)
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  // Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js) : lecture publique, chiffres seuls
+  // (noms de fonctions, secondes de CPU, nombre d'appels) — rien de sensible.
+  if (req.query?.cpu) {
+    res.setHeader('Cache-Control', 'no-store')
+    try { return res.status(200).json(await readCpuStats(Math.min(7, Number(req.query.cpu) || 3))) }
+    catch (e) { return res.status(500).json({ error: String(e?.message ?? e) }) }
+  }
   // Auth
   const secret = req.headers['x-cron-secret'] ?? req.query.secret ?? ''
   if (!process.env.CRON_SECRET || !safeCompare(secret, process.env.CRON_SECRET)) {
@@ -166,3 +174,6 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ ok: true, ...info })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('debug-push', handler)

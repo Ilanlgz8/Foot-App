@@ -10,6 +10,7 @@
 // GET /api/fifa-lineups?fdMatchId=&home=&away=&utcDate=
 
 import { Redis } from '@upstash/redis'
+import { withCpuMeter } from './_cpuMeter.js'
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL,
@@ -271,7 +272,7 @@ function parseFifaStats(statsData) {
 
 // ── Handler ────────────────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
   // ⚠️ AJOUT (audit sécurité demandé par l'utilisateur) : aucune limite de
@@ -415,3 +416,6 @@ export default async function handler(req, res) {
 
   return res.json({ ...(lineupResult ?? {}), stats })
 }
+
+// Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
+export default withCpuMeter('fifa-lineups', handler)
