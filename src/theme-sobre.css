@@ -336,3 +336,17 @@
 /* Thème Jaune : pas de liseré non plus — les 3 cotes identiques. */
 :root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"],
 :root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] { box-shadow: none !important; }
+
+/* Thème Jaune + cote animée (AnimatedOdd, 19/11) : le chiffre est affiché par .oddAnim → on coupe
+   le ::after du thème Jaune (plus spécifique que la règle générale d'index.css), sinon la cote
+   apparaît en double (« 2,20 2,20 »). */
+:root[data-odds="jaune"] #root .poster__prono-pillVal.has-anim::after,
+:root[data-odds="jaune"] #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal.has-anim::after,
+:root[data-odds="jaune"] #root .modal__liveProno__pillVal.has-anim::after,
+:root[data-odds="jaune"] #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal.has-anim::after,
+:root[data-odds="jaune"] #root .hubPosters .poster__prono-pillVal.has-anim::after { content: none; }
+:root[data-odds="jaune"] #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #111; }
+/* Même garde pour Sobre / Néon (règles [data-comma]::after d'accueil.css et matchModal.css, même
+   spécificité que celle d'index.css : l'ordre des fichiers ne doit pas décider). */
+#root .poster__prono-pill .poster__prono-pillVal.has-anim::after,
+#root .modal__liveProno__pill .modal__liveProno__pillVal.has-anim::after { content: none; }
