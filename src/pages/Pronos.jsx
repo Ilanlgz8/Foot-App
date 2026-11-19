@@ -30,6 +30,7 @@ import { useTeamFormMulti, formKey } from '../hooks/useTeamForm'
 import { useLiveData } from '../context/LiveProvider'
 import { getMatchState } from '../utils/matchStateTracker'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, isNeutralVenueComp, resolveFdTeamId } from '../utils/matchUtils'
+import { halftimeLabel } from '../utils/halftimeCountdown'
 import { calcPronoAdvanced } from '../utils/calcProno'
 import { COMPETITIONS, SINGLE_MATCH_COMPS, DOMESTIC_CUPS, compForMatch } from '../data/competitions'
 import { translateTeam } from '../data/teamNames'
@@ -607,8 +608,12 @@ function LiveResultRow({ match, espn, players, predictions, deviceId, formMapByC
     return () => clearInterval(id)
   }, [])
 
+  // 19/11 (retour utilisateur) : la minute du match, comme sur les cartes, et non plus « 2e mi-temps ».
+  // Mi-temps : « MT · Reprise dans X min » (halftimeLabel, même décompte que les cartes).
   const period = getMatchPeriod(match)
   const minute = calcMinute(match)
+  const ht = minute === 'MT' ? halftimeLabel(match) : null
+  const liveLabel = minute === 'MT' ? `MT · ${ht ?? 'Mi-temps'}` : (minute ?? period ?? 'En direct')
   const fs = finalScore(match.score)
   const hs = mergeScore(espn?.home, fs.home ?? match.score?.halfTime?.home)
   const as_ = mergeScore(espn?.away, fs.away ?? match.score?.halfTime?.away)
@@ -618,7 +623,7 @@ function LiveResultRow({ match, espn, players, predictions, deviceId, formMapByC
     <div className="pronos__matchRow">
       <div className="pronos__matchMeta">
         <CompLabel match={match} />
-        <span className="pronos__metaTime pronos__liveMinute">{period ?? (minute ?? 'En direct')}</span>
+        <span className="pronos__metaTime pronos__liveMinute">{liveLabel}</span>
       </div>
       <div className="pronos__matchTeams">
         <div className="pronos__team">
