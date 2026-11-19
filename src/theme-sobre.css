@@ -394,12 +394,14 @@
   content: ""; position: absolute; left: -5px; top: 50%; width: 2px; height: 34px; margin-top: -17px;
   background: rgba(255, 255, 255, 0.18); transform: skewX(-18deg); pointer-events: none;
 }
-/* Nom : petites capitales grises */
+/* Nom : petites capitales en blanc transparent (19/11 : le gris #8e97ad se perdait sur les cartes bleues/rouges ;
+   un blanc à 72 % prend la teinte de chaque carte et reste lisible partout) */
 :root:not([data-odds="jaune"]) #root .poster__prono-pillLabel[data-long]::after,
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pillLabel[data-long]::after,
 :root:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillLabel[data-long]::after,
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after {
-  color: #8e97ad; text-transform: uppercase; letter-spacing: 0.1em; font-size: 9px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.72); text-transform: uppercase; letter-spacing: 0.1em; font-size: 9px; font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 /* Cote : gros chiffres italiques blancs */
 :root:not([data-odds="jaune"]) #root .poster__prono-pillVal[data-comma]::after,
