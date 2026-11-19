@@ -18,6 +18,10 @@
 //  - Serie A         → DAZN
 //  - CAN 2027        → beIN Sports
 //
+// ⚠️ MIS À JOUR (19/11, sources Maxifoot 2026-27, Ozap, Afrik-Foot) : Ligue 2 et Coupe de France (dès
+// les 32es) → beIN ; Ligue 3 → Ligue 1+ ; DFB-Pokal et FA Cup → beIN ; Copa del Rey et Coppa Italia →
+// DAZN ; matchs de l'équipe de France (Ligue des nations, éliminatoires de l'Euro) → TF1 ; éliminatoires
+// CAN → beIN pour les sélections annoncées. Le bloc ci-dessous (28/08) est l'état d'alors.
 // ⚠️ Volontairement PAS codées (pas de source fiable donnant une règle
 // certaine à 100% match par match, même logique que le WC hors demi/finale) :
 //  - Ligue des Nations : seulement "plusieurs affiches" sur La chaîne
@@ -39,6 +43,7 @@ const FREE_M6_STAGES = new Set(['SEMI_FINALS', 'THIRD_PLACE', 'FINAL'])
 const PAID_BY_COMP = {
   FL1:  { name: 'Ligue 1+' },
   FL2:  { name: 'beIN Sports' },   // 19/11 : beIN, 100 % des matchs en exclusivité, contrat 2024-2029 (vérifié)
+  L3:   { name: 'Ligue 1+' },      // 19/11 : Ligue 1+ diffuse la Ligue 1 et la Ligue 3 (Maxifoot, droits 2026-27)
   PL:   { name: 'CANAL+' },
   CL:   { name: 'CANAL+' },
   UEL:  { name: 'CANAL+' },
@@ -57,6 +62,26 @@ const PAID_BY_COMP = {
  * accès payant (abonnement), affiché comme simple info pratique, pas comme
  * une offre gratuite.
  */
+// Coupes nationales (19/11, vérifié Maxifoot « où suivre le foot en 2026-2027 ») : un match de coupe
+// porte le code du CHAMPIONNAT (FL1, PD…) avec isCup — avant ce correctif, une rencontre de Coupe de
+// France affichait donc « Ligue 1+ » et une Copa del Rey « DAZN / Disney+ », à tort.
+const PAID_BY_CUP = {
+  FL1: { name: 'beIN Sports', fromMonth: 12 }, // Coupe de France : beIN, à partir des 32es de finale (décembre)
+  BL1: { name: 'beIN Sports' },                // DFB-Pokal
+  PL:  { name: 'beIN Sports' },                // FA Cup
+  PD:  { name: 'DAZN' },                       // Copa del Rey
+  SA:  { name: 'DAZN' },                       // Coppa Italia
+}
+
+// Sélections (19/11, vérifié) : TF1 a l'exclusivité de TOUS les matchs de l'équipe de France jusqu'en 2028
+// (Ligue des nations, amicaux, éliminatoires de l'Euro 2028), en clair. Les autres rencontres : pas de
+// règle sûre match par match → rien.
+const isFrance = t => /^france$/i.test(String(t?.name ?? t?.shortName ?? '').trim())
+// Éliminatoires CAN 2027 : beIN Sports seul en France, mais une sélection de matchs — tous ceux de ces
+// sélections sont annoncés (Afrik-Foot) ; les autres : rien plutôt qu'un diffuseur peut-être faux.
+const CANQ_BEIN_TEAMS = /^(morocco|maroc|algeria|alg[ée]rie|tunisia|tunisie|senegal|s[ée]n[ée]gal|ivory coast|c[ôo]te d.ivoire|cameroon|cameroun|dr congo|congo dr|rd congo|democratic republic of (the )?congo)$/i
+const teamIn = (re, m) => [m?.homeTeam, m?.awayTeam].some(t => re.test(String(t?.name ?? t?.shortName ?? '').trim()))
+
 export function getBroadcaster(match) {
   const isWC = match?.competition?.id === 2000 || match?.competition?.code === 'WC'
   if (isWC) {
@@ -64,13 +89,26 @@ export function getBroadcaster(match) {
     return { name: 'M6', url: 'https://www.6play.fr/m6', free: true }
   }
   const compCode = match?.competition?.code
+  if (compCode === 'NL' || compCode === 'ECQ') {
+    return (isFrance(match?.homeTeam) || isFrance(match?.awayTeam)) ? { name: 'TF1', url: null, free: true } : null
+  }
+  if (compCode === 'CANQ') {
+    return teamIn(CANQ_BEIN_TEAMS, match) ? { name: 'beIN Sports', url: null, free: false } : null
+  }
+  if (match?.isCup) {
+    const cup = compCode ? PAID_BY_CUP[compCode] : null
+    if (!cup) return null
+    if (cup.fromMonth) {
+      const mo = new Date(match?.utcDate).getMonth() + 1
+      if (!(mo >= cup.fromMonth || mo <= 6)) return null   // décembre → juin
+    }
+    return { name: cup.name, url: null, free: false }
+  }
   const paid = compCode ? PAID_BY_COMP[compCode] : null
   if (!paid) return null
   return { name: paid.name, url: null, free: false }
 }
 
-// ⚠️ Conservé pour compat (nom historique) — WatchBadge.jsx utilise
-// désormais getBroadcaster ci-dessus, plus général.
 export function getFreeBroadcaster(match) {
   const b = getBroadcaster(match)
   return b?.free ? b : null
