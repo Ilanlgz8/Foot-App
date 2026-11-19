@@ -368,33 +368,41 @@
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #d9101f; }
 
-/* ═══ Thème Sobre : cotes en « verre lumineux » (19/11, piste 5 de l'aperçu, demande utilisateur) ═══
-   Cases transparentes au contour clair, chiffres blancs ; la cote favorite (la plus basse) en contour
-   rouge qui brille, chiffre rouge. Plus de penché. Cartes (Accueil, Match, Match du jour) ET pages de
-   match. Thème Jaune (qui est un Sobre) et thème Néon : inchangés. */
+/* ═══ Thème Sobre : cotes en verre « reflet en biais » (19/11, piste 3 du 2e aperçu, demande utilisateur) ═══
+   Case de verre légèrement penchée, fin contour clair, traînée de lumière en diagonale ; la cote favorite
+   (la plus basse) teintée de rouge, contour rouge qui brille, chiffre rouge. Chiffres blancs sinon.
+   Cartes (Accueil, Match, Match du jour) ET pages de match. Thème Jaune (qui est un Sobre) et Néon : inchangés. */
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pill,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill {
-  background: rgba(255, 255, 255, 0.07) !important;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04)) !important;
   border-radius: 12px;
-  transform: none;
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.18) !important;
+  transform: skewX(-8deg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14) !important;
+  overflow: hidden;
+  position: relative;
 }
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pill > *,
-:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill > * { transform: none; }
+:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill > * { transform: skewX(8deg); position: relative; z-index: 1; }
+/* Traînée de lumière (décor, sous le texte) */
+:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pill::after,
+:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill::after {
+  content: ""; position: absolute; top: -60%; left: -30%; width: 45%; height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: rotate(18deg); pointer-events: none; z-index: 0;
+}
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"],
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] {
-  box-shadow: inset 0 0 0 1.5px #fb3b4e, 0 0 14px rgba(251, 59, 78, 0.35) !important;
+  background: linear-gradient(180deg, rgba(255, 77, 94, 0.28), rgba(255, 77, 94, 0.08)) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 77, 94, 0.7), 0 0 18px rgba(255, 77, 94, 0.3) !important;
 }
 /* Textes : nom gris clair, cote blanche ; favorite en rouge */
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pillLabel[data-long]::after,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pillLabel[data-long]::after,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillLabel[data-long]::after,
-:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after { color: #c9cfdb; }
+:root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after { color: rgba(235, 240, 255, 0.72); }
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .poster__prono-pillVal[data-comma]::after,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .modal__liveProno__pillVal[data-comma]::after,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ffffff; }
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root [style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
 :root[data-theme="sobre"]:not([data-odds="jaune"]) #root [style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after,
-:root[data-theme="sobre"]:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #fb3b4e; }
+:root[data-theme="sobre"]:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ff4d5e; }
