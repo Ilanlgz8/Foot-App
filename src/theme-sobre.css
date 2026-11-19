@@ -410,10 +410,22 @@
 :root:not([data-odds="jaune"]) #root .hubPosters .poster__prono-pillVal.has-anim .oddAnim { font-size: 22px; }
 :root:not([data-odds="jaune"]) #root .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pillVal[data-comma]::after,
-:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ffffff; }
-/* Favorite : rouge qui brille */
+:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: rgba(255, 255, 255, 0.82); }
+/* Favorite (19/11, 2e version) : plus de rouge (se perdait sur les cartes rouges ou foncées) — blanc pur,
+   un peu plus grande, nom en blanc, petit trait lumineux dessous ; les deux autres en blanc légèrement atténué. */
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after,
-:root:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) {
-  color: #ff1f2f; text-shadow: 0 0 14px rgba(255, 31, 47, 0.6); /* rouge vif (19/11, avant #ff4d5e jugé trop rosé) */
+:root:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #ffffff; text-shadow: none; }
+:root:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillLabel[data-long]::after,
+:root:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillLabel[data-long]::after { color: #ffffff; }
+:root:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
+:root:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal.has-anim .oddAnim { font-size: 27px; }
+:root:not([data-odds="jaune"]) #root .hubPosters .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
+:root:not([data-odds="jaune"]) #root .hubPosters .poster__prono-pill[style*="box-shadow"] .poster__prono-pillVal.has-anim .oddAnim { font-size: 25px; }
+:root:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after,
+:root:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"] .modal__liveProno__pillVal.has-anim .oddAnim { font-size: 29px; }
+:root:not([data-odds="jaune"]) #root .poster__prono-pill[style*="box-shadow"]::after,
+:root:not([data-odds="jaune"]) #root .modal__liveProno__pill[style*="box-shadow"]::after {
+  content: ""; position: absolute; left: 50%; bottom: -5px; width: 26px; height: 3px; margin-left: -13px;
+  border-radius: 3px; background: #ffffff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.8); pointer-events: none;
 }
