@@ -34,6 +34,7 @@
 import { Redis } from '@upstash/redis'
 import webpush   from 'web-push'
 import crypto    from 'crypto'
+import https     from 'https'
 import { TEAM_NAMES_FR } from '../src/data/teamNames.js'
 import { ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS } from '../src/data/espnSlugs.js'
 // ⚠️ Ces fonctions vivaient ici en dur, puis ont été DUPLIQUÉES telles
@@ -307,6 +308,28 @@ async function loadSubscriptions(log) {
   return parsed
 }
 
+// ── Envoi push moins cher en CPU (19/11) ─────────────────────────────────────
+// 1) Connexions HTTPS gardées ouvertes vers les services push (Apple, Google, Mozilla) : sans ça, chaque
+//    notification à chaque abonné refaisait une poignée de main TLS complète, le plus gros coût CPU d'un
+//    envoi. L'instance Vercel (Fluid) étant réutilisée, les connexions servent aussi d'un but à l'autre.
+// 2) Signature VAPID (JWT ES256) calculée une fois par service push et gardée 11 h (valide 12 h), au lieu
+//    d'une signature par abonné et par notification. Le chiffrement du message reste, lui, propre à chaque
+//    abonné (obligatoire).
+const pushAgent = new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 })
+const vapidAuthCache = new Map()
+function vapidAuthFor(endpoint) {
+  const { VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env
+  let audience
+  try { const u = new URL(endpoint); audience = `${u.protocol}//${u.host}` } catch { return null }
+  const now = Math.floor(Date.now() / 1000)
+  const hit = vapidAuthCache.get(audience)
+  if (hit && hit.exp - now > 3600) return hit.auth
+  const exp = now + 12 * 3600
+  const h = webpush.getVapidHeaders(audience, VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, 'aes128gcm', exp)
+  vapidAuthCache.set(audience, { auth: h.Authorization, exp })
+  return h.Authorization
+}
+
 async function sendPushToMatch(payload, slug, options = {}, log = null, subsCache = null) {
   const subs = subsCache ?? await loadSubscriptions(log)
   if (!subs.length) return 0
@@ -343,9 +366,13 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
       // au-delà, le service de push (FCM/Mozilla/Apple) jette la notif au
       // lieu de la garder en attente pour un appareil injoignable — aucun
       // effet sur une livraison normale (toujours quasi instantanée).
+      const auth = vapidAuthFor(sub.endpoint)
       await webpush.sendNotification(sub, payloadStr, {
         TTL: options.ttl ?? 1200,
         urgency: options.urgency ?? 'normal',
+        agent: pushAgent,
+        // Signature VAPID déjà calculée (voir vapidAuthFor) ; repli sur le calcul habituel sinon.
+        ...(auth ? { vapidDetails: null, headers: { Authorization: auth } } : {}),
       })
       sent++
     } catch (err) {
