@@ -1,4 +1,5 @@
 import { useState }      from 'react'
+import { oddsLabel } from '../utils/oddsLabel'
 import { formatGroupName } from '../utils/groupName'
 import { fdFetch, fdUrl } from '../utils/fdFetch'
 import { useQuery }                from '@tanstack/react-query'
@@ -862,7 +863,7 @@ function LivePronoPill({ label, longLabel, value, pct, isFavorite = false }) {
     : { borderColor: 'transparent' }
   return (
     <div className="modal__liveProno__pill" style={style}>
-      <span className="modal__liveProno__pillLabel" data-long={longLabel || label}>{label}</span>
+      <span className="modal__liveProno__pillLabel" data-long={oddsLabel(longLabel || label)}>{label}</span>
       <span className="modal__liveProno__pillVal has-anim" data-comma={frOdd(value)}><AnimatedOdd value={value} /></span>
     </div>
   )

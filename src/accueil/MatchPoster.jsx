@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react'
+import { oddsLabel } from '../utils/oddsLabel'
 import { formKey } from '../hooks/useTeamForm'
 import { translateTeam }              from '../data/teamNames'
 import { calcMinute, getMatchPeriod, mergeScore, finalScore, isNationalTeamComp, resolveFdTeamId, resolveFdCrest, sameJSON } from '../utils/matchUtils'
@@ -517,7 +518,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             className="poster__prono-pill"
             style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
-            <span className="poster__prono-pillLabel" data-long={homeShort}>{homeCode}</span>
+            <span className="poster__prono-pillLabel" data-long={oddsLabel(homeShort)}>{homeCode}</span>
             <span className="poster__prono-pillVal has-anim" data-comma={frOdd(homeOdd)}><AnimatedOdd value={homeOdd} /></span>
           </div>
           {!qualif && (
@@ -533,7 +534,7 @@ function MatchPosterImpl({ match, espnScore = null, live = false, onMatchClick, 
             className="poster__prono-pill"
             style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}
           >
-            <span className="poster__prono-pillLabel" data-long={awayShort}>{awayCode}</span>
+            <span className="poster__prono-pillLabel" data-long={oddsLabel(awayShort)}>{awayCode}</span>
             <span className="poster__prono-pillVal has-anim" data-comma={frOdd(awayOdd)}><AnimatedOdd value={awayOdd} /></span>
           </div>
         </div>

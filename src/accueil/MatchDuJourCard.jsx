@@ -27,6 +27,7 @@ import { useH2HRows } from '../components/MatchModal'
 import { getCompetitionCampColors, compForMatch } from '../data/competitions'
 import { frOdd } from '../utils/frNum'
 import { AnimatedOdd } from '../components/AnimatedOdd'
+import { oddsLabel } from '../utils/oddsLabel'
 
 function shortenName(name) {
   if (!name) return name
@@ -430,7 +431,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
             rétrécies) — plus aucune surcharge de dimension ici. */}
         <div className="poster__prono-row">
           <div className="poster__prono-pill" style={pronoFavorite === 'home' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.home)})`, boxShadow: pronoGlowShadow(displayPct.home), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
-            <span className="poster__prono-pillLabel" data-long={homeName}>{homeCode}</span>
+            <span className="poster__prono-pillLabel" data-long={oddsLabel(homeName)}>{homeCode}</span>
             <span className="poster__prono-pillVal has-anim" data-comma={frOdd(oddsShown.home)}><AnimatedOdd value={oddsShown.home} /></span>
           </div>
           {!qualif && (
@@ -440,7 +441,7 @@ export function MatchDuJourCard({ match, espnScore = null, onClick }) {
           </div>
           )}
           <div className="poster__prono-pill" style={pronoFavorite === 'away' ? { borderColor: `rgba(159,30,52,${pronoIntensity(displayPct.away)})`, boxShadow: pronoGlowShadow(displayPct.away), backgroundClip: 'border-box' } : { borderColor: 'transparent' }}>
-            <span className="poster__prono-pillLabel" data-long={awayName}>{awayCode}</span>
+            <span className="poster__prono-pillLabel" data-long={oddsLabel(awayName)}>{awayCode}</span>
             <span className="poster__prono-pillVal has-anim" data-comma={frOdd(oddsShown.away)}><AnimatedOdd value={oddsShown.away} /></span>
           </div>
         </div>
