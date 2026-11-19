@@ -350,3 +350,14 @@
    spécificité que celle d'index.css : l'ordre des fichiers ne doit pas décider). */
 #root .poster__prono-pill .poster__prono-pillVal.has-anim::after,
 #root .modal__liveProno__pill .modal__liveProno__pillVal.has-anim::after { content: none; }
+
+/* Cotes (19/11, demandes utilisateur) :
+   • thème Néon : fond gris clair (#dee1e6, piste « B » de l'aperçu) au lieu du blanc pur, moins
+     éblouissant sur l'app sombre ; chiffres bordeaux inchangés.
+   • tous les thèmes : plus de contour rouge sur la cote la plus basse — il rognait l'intérieur de la case,
+     qui paraissait plus petite que les deux autres. Les 3 cases sont identiques.
+   Cartes (Accueil, Match, Match du jour) ET pages de match. */
+:root[data-theme="neon"]:not([data-odds="jaune"]) #root .poster__prono-pill,
+:root[data-theme="neon"]:not([data-odds="jaune"]) #root .modal__liveProno__pill { background: #dee1e6; }
+:root #root .poster__prono-pill[style*="box-shadow"],
+:root #root .modal__liveProno__pill[style*="box-shadow"] { box-shadow: none !important; }
