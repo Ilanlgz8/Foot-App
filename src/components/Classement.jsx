@@ -23,6 +23,8 @@ import { useMatches } from '../hooks/useMatchs'
 import { resolveFdTeamId } from '../utils/matchUtils'
 import { formatGroupName } from '../utils/groupName'
 import { StandingsTable } from './StandingsTable'
+import { getStandingsRules, mergeRulesForLegend } from '../data/standingsRules'
+import { computeStandingsMovement } from '../utils/standingsMovement'
 import { usePersistedState } from '../hooks/usePersistedState'
 // Étoile de favori RETIRÉE de cette page (retour utilisateur : pas concluant
 // ici) — ne reste que dans FavoritesPage.jsx (page /favoris, ouverte depuis
@@ -324,119 +326,29 @@ function Classement() {
     }
   }, [groups, initGroup])
 
-  const competitionRules = {
-    FL1: [
-      { label: 'Ligue des champions', start: 1, end: 3, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Barrage',             start: 4, end: 4, dotClassName: 'classement__zoneDot classement__L1__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',    cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl',   cardClassName: 'classement__zoneCard--uecl' },
-    ],
-    SA: [
-      { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
-    ],
-    BL1: [
-      { label: 'Ligue des champions', start: 1, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League',       start: 5, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',   start: 7, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
-    ],
-    CL: [
-      { label: 'Qualifié', start: 1, end: 8,  dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Barrage',  start: 9, end: 24, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-      { label: 'Éliminé',  start: 25,end: 36, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
-    ],
-    WC: [
-      { label: 'Qualifié (2 premières)', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',    cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Éliminé',                start: 3, end: 4, dotClassName: 'classement__zoneDot classement__zoneDot--elimine', cardClassName: 'classement__zoneCard--elimine' },
-    ],
-    // ⚠️ AJOUT (26/09, voir NO_STANDINGS_COMPS/competitions.js) : NL/CAN/COPA/
-    // UEL/UECL rejoignent le sélecteur avec un vrai classement ESPN — sans
-    // entrée dédiée ici, elles seraient tombées sur `default` (zones Ligue des
-    // Champions/Europa/Conférence), qui n'a AUCUN sens pour une poule de
-    // Ligue des Nations/CAN/Copa America à 4 équipes ni pour la "phase de
-    // ligue" UEL/UECL. Légende VIDE plutôt qu'inventée : CAN/Copa America
-    // qualifient un nombre de "meilleurs troisièmes" qui varie d'une édition
-    // à l'autre (aucune donnée fiable ici pour le reproduire sans risquer de
-    // l'afficher faux), NL a une logique de promotion/relégation par division
-    // trop différente d'un simple intervalle de positions, et UEL/UECL
-    // qualifient pour la phase à élimination directe selon un barème propre
-    // à chacune. Pas de zone plutôt qu'une zone fausse.
-    // ⚠️ Bug annexe corrigé au passage : EC (Euro) tombait DÉJÀ sur `default`
-    // depuis toujours, pour exactement la même raison (poule Euro à 4, aucun
-    // rapport avec CL/UEL/UECL) — jamais remarqué car EC était déjà dans le
-    // sélecteur avant ce fix. Vidée ici aussi, même principe.
-    NL: [], CAN: [], CANQ: [], ECQ: [], COPA: [], UEL: [], UECL: [], EC: [],
-    // Ligue 2 2026-27 : 1er-2e promus, 3e à 5e en play-offs (vainqueur contre le 16e de Ligue 1).
-    FL2: [
-      { label: 'Montée en Ligue 1', start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Play-offs',         start: 3, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-    ],
-    // Règlement sportif L3 2026-27 (FFF) : 1er-2e promus en L2, 3e à 6e en play-off d'accession.
-    L3: [
-      { label: 'Montée en Ligue 2',    start: 1, end: 2, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',     cardClassName: 'classement__zoneCard--ucl' },
-      { label: "Play-off d'accession", start: 3, end: 6, dotClassName: 'classement__zoneDot classement__zoneDot--barrage', cardClassName: 'classement__zoneCard--barrage' },
-    ],
-    default: [
-      { label: 'Ligue des champions', start: 1, end: 5, dotClassName: 'classement__zoneDot classement__zoneDot--ucl',  cardClassName: 'classement__zoneCard--ucl' },
-      { label: 'Europa League',       start: 6, end: 7, dotClassName: 'classement__zoneDot classement__zoneDot--uel',  cardClassName: 'classement__zoneCard--uel' },
-      { label: 'Conférence League',   start: 8, end: 8, dotClassName: 'classement__zoneDot classement__zoneDot--uecl', cardClassName: 'classement__zoneCard--uecl' },
-    ],
-  }
+  const isMultiGroup = groups.length > 1
+  // Zones (19/11) : source unique, règles 2026-27 vérifiées — voir src/data/standingsRules.js.
+  const qualificationRules = isMultiGroup
+    ? mergeRulesForLegend(groups.map(g => getStandingsRules(selectedComp, { teamCount: g.table?.length ?? 0, groupName: g.name })))
+    : getStandingsRules(selectedComp, { teamCount: standings.length })
 
-  /* Formate "GROUP_A" → "Groupe A" */
-
-  // ── Zones de relégation (02/09, demande utilisateur) ────────────────────
-  // Règles réelles en vigueur dans les 5 grands championnats :
-  //   • Ligue 1 et Bundesliga (18 clubs) : les 2 derniers descendent
-  //     directement, le 16e joue un BARRAGE contre un club de 2e division ;
-  //   • Premier League, LaLiga et Serie A (20 clubs) : les 3 derniers
-  //     descendent, aucun barrage.
-  // ⚠️ Positions calculées à partir du NOMBRE RÉEL d'équipes du classement
-  // affiché, jamais codées en dur : la Ligue 1 est passée de 20 à 18 clubs en
-  // 2023, et un jour où FD.org renverrait un classement incomplet, des
-  // positions figées colleraient des pastilles rouges sur les mauvaises
-  // lignes. Ici, pas de classement chargé (ou trop court) = pas de zone
-  // affichée, plutôt qu'une information fausse.
-  const RELEGATION_RULES = {
-    FL1: { direct: 2, playoff: 1 },
-    BL1: { direct: 2, playoff: 1 },
-    PL:  { direct: 3, playoff: 0 },
-    PD:  { direct: 3, playoff: 0 },
-    SA:  { direct: 3, playoff: 0 },
-    L3:  { direct: 3, playoff: 0 }, // 16e, 17e et 18e relégués en N1 (règlement 2026-27)
-    FL2: { direct: 2, playoff: 1 }, // 16e en barrage contre le vainqueur du play-off de Ligue 3 (règlement L3 2026-27)
-  }
-
-  const buildRelegationRules = (compId, teamCount) => {
-    const r = RELEGATION_RULES[compId]
-    // Garde-fou : il faut au moins de quoi placer les zones sans mordre sur le
-    // haut de tableau (seuil large à 10, aucun championnat concerné n'est
-    // proche de cette taille).
-    if (!r || !teamCount || teamCount < 10) return []
-    const out = []
-    if (r.playoff > 0) {
-      const start = teamCount - r.direct - r.playoff + 1
-      out.push({
-        label: 'Barrage relégation',
-        start, end: start + r.playoff - 1,
-        dotClassName:  'classement__zoneDot classement__zoneDot--relegBarrage',
-        cardClassName: 'classement__zoneCard--relegBarrage',
-      })
+  // Flèches ▲▼ (19/11) : évolution depuis AVANT la dernière journée, recalculée à partir des matchs
+  // (src/utils/standingsMovement.js) — et non plus depuis la dernière visite de ce téléphone.
+  // Calcul léger (quelques centaines de matchs au plus), refait à chaque rendu : liveNow et
+  // standingsLive sont recréés à chaque rendu de toute façon.
+  const movementMatches = []
+  {
+    const seen = new Set()
+    for (const m of [...(formCompMatches ?? []), ...(wcFin ?? []), ...liveNow]) {
+      if (m?.id == null || seen.has(m.id)) continue
+      seen.add(m.id); movementMatches.push(m)
     }
-    out.push({
-      label: 'Relégation',
-      start: teamCount - r.direct + 1, end: teamCount,
-      dotClassName:  'classement__zoneDot classement__zoneDot--relegation',
-      cardClassName: 'classement__zoneCard--relegation',
-    })
-    return out
   }
-
-  const qualificationRules = [
-    ...(competitionRules[selectedComp] ?? competitionRules.default),
-    ...buildRelegationRules(selectedComp, standings.length),
-  ]
+  const resolveMovementId = team => ownForm ? team?.id : resolveFdTeamId(team, movementMatches, { loose: true, strict: true })
+  const movement = isMultiGroup ? null : computeStandingsMovement(standingsLive, movementMatches, resolveMovementId)
+  const groupMovement = isMultiGroup
+    ? Object.fromEntries(groups.map(g => [g.name, computeStandingsMovement(g.table, movementMatches, resolveMovementId)]))
+    : null
 
   /* Affichage multi-groupes (CdM, etc.) */
   function MultiGroupView() {
@@ -471,9 +383,8 @@ function Classement() {
                 compact={false}
                 formMap={formMap}
                 compMatches={formCompMatches}
-                qualificationRules={qualificationRules}
-                snapshotKey={`standings_prev_${selectedComp}_${group.name}`}
-                snapshotRows={groups.find(g => g.name === group.name)?.table ?? group.table}
+                qualificationRules={getStandingsRules(selectedComp, { teamCount: groups.find(g => g.name === group.name)?.table?.length ?? group.table.length, groupName: group.name })}
+                movement={groupMovement?.[group.name] ?? null}
                 isCountry={isCountryComp}
               />
             </div>
@@ -482,8 +393,6 @@ function Classement() {
       </>
     )
   }
-
-  const isMultiGroup = groups.length > 1
 
   return (
     <section className="classement">
@@ -802,8 +711,7 @@ function Classement() {
                   formMap={formMap}
                   compMatches={formCompMatches}
                   qualificationRules={qualificationRules}
-                  snapshotKey={`standings_prev_${selectedComp}`}
-                  snapshotRows={standingsLive}
+                  movement={movement}
                   isCountry={isCountryComp}
                 />
               : <p className="classement__state">Aucune équipe ne correspond à « {search} ».</p>

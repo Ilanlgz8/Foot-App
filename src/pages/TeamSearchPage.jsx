@@ -27,7 +27,7 @@ import { COMPETITIONS, NO_SCORERS_COMPS, DOMESTIC_CUPS } from '../data/competiti
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { FormDiamonds } from '../accueil/FormDiamonds'
 import { StandingsTable } from '../components/StandingsTable'
-import { COMP_RULES } from '../data/standingsRules'
+import { getStandingsRules } from '../data/standingsRules'
 import LineupPitch from '../components/LineupPitch'
 import '../teamSearchPage.css'
 
@@ -234,7 +234,7 @@ function TeamStandingsOverview({ comps, standingsByComp, teamKey }) {
                 <div className="teamStandOv__table">
                   <StandingsTable
                     rows={rows}
-                    qualificationRules={COMP_RULES[c.code] ?? []}
+                    qualificationRules={getStandingsRules(c.code, { teamCount: rows.length })}
                     highlightTeams={teamRow ? [teamRow.team] : []}
                     showForm={false}
                   />

@@ -7,7 +7,7 @@ import { useTeamForm } from '../hooks/useTeamForm'
 import { useAflLiveStats, useAflLineups, useAflMatchStats, useAflProbableLineups } from '../hooks/useApiFootball'
 import LineupPitch             from './LineupPitch'
 import { StandingsTable }     from './StandingsTable'
-import { DEFAULT_RULES, COMP_RULES } from '../data/standingsRules'
+import { getStandingsRules } from '../data/standingsRules'
 import { useStandings }       from '../hooks/useStandings'
 import { useMatches }         from '../hooks/useMatchs'
 import { reconcileStandings, catchUpStandings } from '../utils/standingsLive'
@@ -1321,7 +1321,6 @@ export function ClassementTab({ match, compId }) {
     return <div style={{ padding: '4px 0' }}><ClassementSkeleton /></div>
   }
 
-  const rules = COMP_RULES[compId] ?? DEFAULT_RULES
   const homeId = match?.homeTeam?.id
   const awayId = match?.awayTeam?.id
   const homeName = match?.homeTeam?.name ?? match?.homeTeam?.shortName ?? ''
@@ -1359,7 +1358,7 @@ export function ClassementTab({ match, compId }) {
                 {formatGroupName(g.name)}
               </p>
             )}
-            <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
+            <StandingsTable rows={g.table} compact={false} formMap={formMap} compMatches={formCompMatches} qualificationRules={getStandingsRules(compId, { teamCount: g.table.length, groupName: g.name })} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
           </div>
         ))}
       </div>
@@ -1373,7 +1372,7 @@ export function ClassementTab({ match, compId }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <StandingsTable rows={reconcileStandings(catchUpStandings(standings, formCompMatches, (team, ms) => resolveFdTeamId(team, ms, { loose: true, strict: true })), liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={rules} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
+      <StandingsTable rows={reconcileStandings(catchUpStandings(standings, formCompMatches, (team, ms) => resolveFdTeamId(team, ms, { loose: true, strict: true })), liveNow)} formMap={formMap} compMatches={formCompMatches} qualificationRules={getStandingsRules(compId, { teamCount: standings.length })} isCountry={compId === 'WC'} highlightTeams={highlightTeams} />
     </div>
   )
 }

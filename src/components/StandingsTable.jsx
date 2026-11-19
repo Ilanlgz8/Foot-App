@@ -1,5 +1,5 @@
 // Composant partagé — utilisé dans Classement.jsx et MatchModal.jsx (onglet Classement)
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { translateTeam } from '../data/teamNames'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { resolveFdTeamId } from '../utils/matchUtils'
@@ -14,50 +14,14 @@ import '../classement.css'
 
 const RESULT_LABEL = { W: 'V', D: 'N', L: 'D' }
 
-// Flèche verte (monté), rouge (descendu) ou barre grise (stable / pas de donnée
-// de comparaison) par rapport à la dernière visite — comparaison faite via un
-// instantané localStorage (voir useStandingsSnapshot ci-dessous).
+// Flèche verte (monté), rouge (descendu) ou barre grise (stable / pas de donnée) par rapport au
+// classement d'AVANT la dernière journée (prop `movement`, voir utils/standingsMovement.js).
 function RankChange({ delta }) {
   if (delta > 0) return <span className="classement__rankChange classement__rankChange--up" title={`+${delta}`}>▲</span>
   if (delta < 0) return <span className="classement__rankChange classement__rankChange--down" title={delta}>▼</span>
   return <span className="classement__rankChange classement__rankChange--flat" aria-hidden="true" />
 }
 
-// Lit l'instantané des positions (par équipe) enregistré lors de la dernière
-// visite sous `snapshotKey`, puis écrit le nouvel instantané (`snapshotRows`,
-// toujours la liste COMPLÈTE non filtrée par la recherche — sinon une
-// recherche active écraserait le snapshot avec seulement les équipes visibles).
-// La lecture (useMemo) ne se relance que si `snapshotKey` change, donc la
-// comparaison reste stable face à la donnée "avant cette session".
-function useStandingsSnapshot(snapshotKey, snapshotRows) {
-  const prevSnapshot = useMemo(() => {
-    if (!snapshotKey) return {}
-    try {
-      const raw = localStorage.getItem(snapshotKey)
-      return raw ? JSON.parse(raw) : {}
-    } catch {
-      return {}
-    }
-  }, [snapshotKey])
-
-  useEffect(() => {
-    if (!snapshotKey || !snapshotRows?.length) return
-    const snap = {}
-    snapshotRows.forEach(r => { snap[r.team.id] = r.position })
-    try { localStorage.setItem(snapshotKey, JSON.stringify(snap)) } catch {}
-  }, [snapshotKey, snapshotRows])
-
-  return prevSnapshot
-}
-
-// Étoile de favori — même principe visuel simple qu'ailleurs dans l'app
-// (icône outline, remplie quand active). stopPropagation() : la ligne entière
-// n'a pas de onClick actuellement, mais StandingsTable est aussi rendue dans
-// des contextes cliquables (GroupModal notamment) — mieux vaut être sûr que
-// le clic sur l'étoile ne se propage jamais à un parent.
-// color : couleur curée de l'équipe (getTeamColor), appliquée seulement à
-// l'état actif — l'étoile inactive reste neutre pour ne pas laisser deviner
-// la couleur avant que l'équipe soit vraiment ajoutée aux favoris.
 function FavStar({ active, onClick, disabled, color }) {
   return (
     <button
@@ -107,7 +71,7 @@ function Forme({ results }) {
  * @param {boolean}  showForm         — affiche la colonne Forme (true par défaut)
  */
 export function StandingsTable({
-  rows, compact = false, formMap = {}, compMatches = [], qualificationRules = [], snapshotKey = null, snapshotRows = null, isCountry = false,
+  rows, compact = false, formMap = {}, compMatches = [], qualificationRules = [], movement = null, isCountry = false,
   favoritable = false, isFavorite = null, onToggleFavorite = null, favLimitReached = false, compCode = null,
   highlightTeams = [], showForm = true,
 }) {
@@ -128,7 +92,6 @@ export function StandingsTable({
   const getZone = (position) =>
     qualificationRules.find(r => position >= r.start && position <= r.end) ?? null
 
-  const prevSnapshot = useStandingsSnapshot(snapshotKey, snapshotRows ?? rows)
 
   return (
     <div className={`classement__tableWrap${compact ? ' classement__tableWrap--compact' : ''}`}>
@@ -188,8 +151,8 @@ export function StandingsTable({
               forme = formMap[team.team.id]
             }
             const formeSlice = compact && forme ? forme.slice(-3) : forme
-            const prevPos = prevSnapshot[team.team.id]
-            const delta   = (snapshotKey && prevPos != null) ? prevPos - team.position : 0
+            // movement : Map(team.id → places gagnées depuis avant la dernière journée), voir standingsMovement.js
+            const delta   = movement?.get(team.team.id) ?? 0
             const isFav   = favoritable && isFavorite ? isFavorite(team.team.id) : false
             const isHighlight = highlightTeams.length > 0 && (highlightIds.has(team.team.id) || highlightKeys.has(teamIdentityKey(team.team)))
             // Couleur réelle de l'équipe (drapeau/maillot curé) — donne à chaque
@@ -212,7 +175,7 @@ export function StandingsTable({
                 <td>
                   <div className="classement__positionWrap">
                     <span className="classement__position">{team.position}</span>
-                    {snapshotKey && <RankChange delta={delta} />}
+                    {movement && <RankChange delta={delta} />}
                   </div>
                 </td>
                 <td>

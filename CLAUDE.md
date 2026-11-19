@@ -193,6 +193,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Elo (19/11)** : `src/utils/elo.js`, mélangé à 65 % au modèle maison (`calcPronoAdvanced`, option `elo`) pour les matchs SANS cote de bookmaker (et le direct qui en repart). Saison en cours + saison précédente déjà chargée (`h2hHistory`) → aucune requête en plus. Validé par `scripts/backtest-elo.mjs` (PL/FL1/PD/SA 2023 et 2024, log loss meilleur partout) — toute retouche d'elo.js doit être re-mesurée avec ce script. Fatigue (jours de repos) testée et écartée (moins bonne partout). Pronos.jsx (jeu entre amis) reste sans Elo.
 
+- **Classements (19/11)** : zones (Europe, montée, barrages, relégation) = source unique `src/data/standingsRules.js` (`getStandingsRules(comp, { teamCount, groupName })`), utilisée par Classement, MatchModal et TeamSearchPage — règles 2026-27 vérifiées, détail en tête du fichier. Flèches ▲▼ = évolution depuis AVANT la dernière journée, recalculée à partir des matchs (`src/utils/standingsMovement.js`) ; pas de flèche si le recomptage ne retombe pas exactement sur les matchs joués officiels (jamais de flèche fausse). Fini l'instantané localStorage `standings_prev_*` (dépendait de la dernière visite du téléphone).
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
