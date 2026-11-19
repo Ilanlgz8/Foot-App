@@ -415,5 +415,5 @@
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .modal__liveProno__pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root [style*="box-shadow"] .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) {
-  color: #ff4d5e; text-shadow: 0 0 16px rgba(255, 77, 94, 0.55);
+  color: #ff1f2f; text-shadow: 0 0 14px rgba(255, 31, 47, 0.6); /* rouge vif (19/11, avant #ff4d5e jugé trop rosé) */
 }
