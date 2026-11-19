@@ -361,8 +361,9 @@
 :root[data-theme="neon"]:not([data-odds="jaune"]) #root .modal__liveProno__pill { background: #dee1e6; }
 :root #root .poster__prono-pill[style*="box-shadow"],
 :root #root .modal__liveProno__pill[style*="box-shadow"] { box-shadow: none !important; }
-/* Chiffres des cotes (19/11, demande utilisateur) : le rouge de StatFootix (celui de « Stat » dans
-   l'en-tête, var(--sf-red)) au lieu du bordeaux — thèmes Néon et Sobre ; Jaune reste en noir. */
+/* Chiffres des cotes (19/11, demande utilisateur) : rouge vif un peu plus foncé (#d9101f) — ni le rouge
+   de l'en-tête (#fb3b4e, trop clair sur le gris) ni l'ancien bordeaux (#9f1e34). Thèmes Néon et Sobre ;
+   Jaune reste en noir. */
 :root:not([data-odds="jaune"]) #root .poster__prono-pillVal[data-comma]::after,
 :root:not([data-odds="jaune"]) #root .modal__liveProno__pillVal[data-comma]::after,
-:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: var(--sf-red, #fb3b4e); }
+:root:not([data-odds="jaune"]) #root .has-anim .oddAnim:not(.oddAnim--up):not(.oddAnim--down) { color: #d9101f; }
