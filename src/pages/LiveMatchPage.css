@@ -577,7 +577,7 @@
 /* Côté domicile (17/11, version validée) : comme le côté extérieur — icône à gauche du nom, texte
    aligné à gauche, mais en partant du bord gauche de la carte (avant : collé au trait du milieu,
    « trop compact », et un nom sur 2 lignes se décalait). Deux colonnes lues de la même façon. */
-.lmp__heroScorersHome { align-items: flex-start; padding-left: 0.6rem; }
+.lmp__heroScorersHome { align-items: flex-start; padding-left: 0.15rem; } /* 20/11 : 0.6 → 0.15rem (« encore un peu de vide à gauche ») */
 .lmp__heroScorersHome .lmp__heroScorerItem { justify-content: flex-start; text-align: left; }
 .lmp__heroScorersHome .lmp__heroScorerItem .lmp__heroScorerText { text-align: left; }
 .lmp__heroScorersHome .lmp__heroScorerItem--sep { align-self: stretch; }
@@ -1603,7 +1603,7 @@
 .lmp__heroScorerItem:has(.lmp__heroSub) { align-items: center; gap: 0.4em; }
 .lmp__heroSubMin { font-size: 0.66rem; font-weight: 600; color: rgba(var(--white-rgb), 0.45); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lmp__heroSub { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-.lmp__heroSubIn { font-size: 0.74rem; font-weight: 800; color: rgba(var(--white-rgb), 0.95); }
+.lmp__heroSubIn { font-size: 0.68rem; font-weight: 700; color: rgba(var(--white-rgb), 0.95); } /* 20/11 : 0.74 → 0.68 (« un peu trop gros ») */
 .lmp__heroSubOut { font-size: 0.66rem; font-weight: 500; color: rgba(var(--white-rgb), 0.45); }
 .lmp__heroSub i { font-style: normal; font-weight: 900; margin-right: 0.25em; }
 .lmp__heroSubIn i { color: #22c55e; }
