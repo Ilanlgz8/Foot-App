@@ -685,3 +685,11 @@ img[data-team*="Juventus" i] {
 #root .poster__prono-pillVal.has-anim .oddAnim { font-size: 18px; }
 #root .hubPosters .poster__prono-pillVal.has-anim .oddAnim { font-size: 16px; }
 #root .modal__liveProno__pillVal.has-anim .oddAnim { font-size: 19px; }
+
+/* Compos (20/11) : retournement des pastilles des joueurs remplacés (LineupPitch.jsx) — en 2D, le
+   contenu change au milieu (pastille aplatie). Pas de 3D : sur iPhone elle cachait les ballons. */
+@keyframes sfDotFlip {
+  0%   { transform: scaleX(1); }
+  50%  { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}

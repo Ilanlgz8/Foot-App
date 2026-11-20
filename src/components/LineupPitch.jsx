@@ -3,7 +3,7 @@
  * Terrain en div CSS propre, joueurs en divs absolus avec glow dynamique.
  * Couleur d'équipe tirée du champ `color` de l'API.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ── Dimensions logiques pour calcul des positions ─────────────────────────────
 const PW = 300, PH = 400
@@ -384,8 +384,8 @@ const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?
 
 const minuteLabel = m => { const t = String(m ?? '').trim(); return !t ? '' : t.endsWith("'") ? t : `${t}'` }
 
-// Pastille ronde (une face de la carte qui se retourne).
-function DotFace({ color, num, back = false }) {
+// Pastille ronde du joueur.
+function DotFace({ color, num }) {
   return (
     <div style={{
       position:           'absolute',
@@ -398,13 +398,10 @@ function DotFace({ color, num, back = false }) {
       fontWeight:         800,
       fontFamily:         'var(--sf-font-ui)',
       color,
-      background:         `radial-gradient(circle, ${alpha(color, 0.13)}, ${alpha(color, 0.13)}), #0d1e11`,
+      background:         alpha(color, 0.13),
       border:             `1.5px solid ${color}`,
       boxShadow:          `0 0 12px ${alpha(color, 0.4)}, inset 0 0 6px ${alpha(color, 0.1)}`,
       lineHeight:         1,
-      backfaceVisibility: 'hidden',
-      WebkitBackfaceVisibility: 'hidden',
-      transform:          back ? 'rotateY(180deg)' : undefined,
     }}>
       {num}
     </div>
@@ -431,7 +428,6 @@ function GoalBadge({ count }) {
       fontSize:       '10px',
       lineHeight:     1,
       zIndex:         3,
-      transform:      'translate3d(0, 0, 0)',
     }} aria-label={`${count} but${count > 1 ? 's' : ''}`}>
       <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
       {count > 1 && (
@@ -443,24 +439,33 @@ function GoalBadge({ count }) {
   )
 }
 
-// Titulaire remplacé (20/11, demande utilisateur) : sa pastille se retourne comme une carte et
-// montre au dos le numéro et le nom du joueur qui a fini le match à sa place, avec une étiquette
-// « double flèche + minute ». Les pastilles se retournent une par une, dans l'ordre des changements
-// (flipDelay), puis en boucle (remplaçant 8 s, titulaire 5 s) ; toucher une pastille la retourne tout de suite.
+// Titulaire remplacé (20/11, demande utilisateur) : sa pastille se retourne et montre le numéro et le
+// nom du joueur qui a fini le match à sa place. Retournements dans l'ordre des changements
+// (flipDelay), puis en boucle (remplaçant 8 s, titulaire 5 s) ; toucher une pastille la retourne.
+// L'étiquette « double flèche + minute » reste affichée en permanence (on voit toujours qui a été
+// remplacé). Retournement en 2D (aplatissement horizontal, échange du contenu au milieu) et plus en
+// 3D : sur iPhone, la 3D faisait disparaître les ballons des buteurs derrière la pastille.
+const FLIP_MS = 600
 function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalCount = 0, flipDelay = 0 }) {
   const sub = player?.replacedBy ?? null
-  const [flipped, setFlipped] = useState(false)
-  // 20/11 (demande utilisateur) : la pastille se retourne en boucle (remplaçant 8 s, titulaire 5 s) pour qu'on voie les deux plusieurs fois ; le 1er retournement garde l'ordre des minutes.
-  // Mouvement réduit (réglage du téléphone) : pas de boucle, le remplaçant reste affiché.
+  const [shown, setShown] = useState(false)   // true = remplaçant affiché
+  const [spin, setSpin]   = useState(0)       // relance l'animation à chaque retournement
+  const swapRef = useRef(null)
+  const flipTo = (v) => {
+    if (reduceMotion()) { setShown(v); return }
+    setSpin(k => k + 1)
+    clearTimeout(swapRef.current)
+    swapRef.current = setTimeout(() => setShown(v), FLIP_MS / 2)
+  }
   useEffect(() => {
     if (!sub) return
-    if (reduceMotion()) { const t0 = setTimeout(() => setFlipped(true), 0); return () => clearTimeout(t0) }
+    if (reduceMotion()) { const t0 = setTimeout(() => setShown(true), 0); return () => clearTimeout(t0) }
     // Remplaçant affiché SHOW_SUB_MS, puis titulaire SHOW_STARTER_MS, et ainsi de suite.
     let t = null
-    const showSub = () => { setFlipped(true); t = setTimeout(showStarter, SHOW_SUB_MS) }
-    const showStarter = () => { setFlipped(false); t = setTimeout(showSub, SHOW_STARTER_MS) }
+    const showSub = () => { flipTo(true); t = setTimeout(showStarter, SHOW_SUB_MS) }
+    const showStarter = () => { flipTo(false); t = setTimeout(showSub, SHOW_STARTER_MS) }
     t = setTimeout(showSub, flipDelay)
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); clearTimeout(swapRef.current) }
   }, [sub, flipDelay])
 
   if (!player) return null
@@ -469,7 +474,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
   const short = (n, sn) => { const nm = formatName(n, sn); return nm.length > 11 ? nm.slice(0, 10) + '.' : nm }
   const label    = short(player.name, player.shortName)
   const subLabel = sub ? short(sub.name, sub.shortName) : ''
-  const showSub  = !!sub && flipped
+  const showSub  = !!sub && shown
   const anim     = reduceMotion() ? 'none' : undefined
   const nameStyle = {
     position:      'absolute',
@@ -488,7 +493,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
 
   return (
     <div
-      onClick={sub ? () => setFlipped(f => !f) : undefined}
+      onClick={sub ? () => flipTo(!shown) : undefined}
       style={{
         position:      'absolute',
         left:          `${leftPct}%`,
@@ -504,19 +509,12 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
       }}
     >
       <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0 }}>
-        {/* Retournement isolé dans sa propre couche (z-index 0) : sur iPhone (Safari), un élément en
-            3D passe sinon PAR-DESSUS les étiquettes ⚽ / minute malgré leur z-index (20/11). */}
-        <div style={{ position: 'absolute', inset: 0, perspective: '300px', zIndex: 0, isolation: 'isolate' }}>
-          <div style={{
-            position:       'absolute',
-            inset:          0,
-            transformStyle: 'preserve-3d',
-            transition:     anim ?? 'transform .7s cubic-bezier(.3,.7,.3,1)',
-            transform:      showSub ? 'rotateY(180deg)' : 'none',
-          }}>
-            <DotFace color={color} num={player.number ?? ''} />
-            {sub && <DotFace color={color} num={sub.number ?? ''} back />}
-          </div>
+        <div key={spin} style={{
+          position:  'absolute',
+          inset:     0,
+          animation: spin > 0 && !anim ? `sfDotFlip ${FLIP_MS}ms ease-in-out` : 'none',
+        }}>
+          <DotFace color={color} num={showSub ? (sub.number ?? '') : (player.number ?? '')} />
         </div>
         <GoalBadge count={showSub ? subGoalCount : goalCount} />
         {sub && (
@@ -538,9 +536,6 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
             fontFamily:   'var(--sf-font-ui)',
             lineHeight:   1,
             zIndex:       3,
-            transform:    'translate3d(0, 0, 0)',
-            opacity:      showSub ? 1 : 0,
-            transition:   anim ?? 'opacity .3s ease .5s',
           }} aria-label={`Remplacé à la ${minuteLabel(sub.minute)}`}>
             <SwapIcon />
             {minuteLabel(sub.minute)}
@@ -552,7 +547,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
           {label}
         </span>
         {sub && (
-          <span style={{ ...nameStyle, color: '#fff', opacity: showSub ? 1 : 0, transitionDelay: showSub && !anim ? '.35s' : '0s' }}>
+          <span style={{ ...nameStyle, color: '#fff', opacity: showSub ? 1 : 0 }}>
             {subLabel}
           </span>
         )}

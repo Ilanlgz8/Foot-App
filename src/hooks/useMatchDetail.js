@@ -404,7 +404,7 @@ async function fetchEspnPregameOddsResult(slug, match, fdHome, fdAway) {
 // isEspnDetailEmpty()/staleTime dynamique dans useEspnMatchDetail.js.
 async function fetchSharedEspnSummary(queryClient, match, slug, fdHome, fdAway, isFinished) {
   return queryClient.fetchQuery({
-    queryKey:  ['espnSummaryShared', match?.id, slug],
+    queryKey:  ['espnSummaryShared2', match?.id, slug], // 2 (20/11) : anciens résumés persistés sans remplacements
     staleTime: (query) => {
       const d = query.state.data
       const empty = !d?.eventId || !d?.summary
