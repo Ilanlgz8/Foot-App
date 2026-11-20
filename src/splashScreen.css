@@ -106,7 +106,9 @@
   opacity: 0;
   background: var(--red);
   box-shadow: 0 0 10px var(--red), 0 0 20px var(--red);
-  animation: splashUnderline 1s cubic-bezier(.2,.7,.3,1) 0.7s forwards;
+  /* 20/11 : démarre à 1,7 s (avant 0,7 s) — le ballon roulait par-dessus le trait pendant qu'il se
+     dessinait (croisement mesuré entre 0,95 s et 1,7 s). Il apparaît maintenant juste après son passage. */
+  animation: splashUnderline 0.8s cubic-bezier(.2,.7,.3,1) 1.7s forwards;
 }
 
 @keyframes splashUnderline {
