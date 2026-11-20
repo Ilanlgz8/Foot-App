@@ -376,7 +376,9 @@ function SwapIcon({ size = 10 }) {
   )
 }
 
-const FLIP_EVERY_MS = 5000
+// Boucle des pastilles remplacées (20/11, choix utilisateur) : remplaçant 8 s, titulaire 5 s.
+const SHOW_SUB_MS = 8000
+const SHOW_STARTER_MS = 5000
 
 const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
@@ -443,22 +445,21 @@ function GoalBadge({ count }) {
 // Titulaire remplacé (20/11, demande utilisateur) : sa pastille se retourne comme une carte et
 // montre au dos le numéro et le nom du joueur qui a fini le match à sa place, avec une étiquette
 // « double flèche + minute ». Les pastilles se retournent une par une, dans l'ordre des changements
-// (flipDelay), puis toutes les 5 s ; toucher une pastille la retourne tout de suite.
+// (flipDelay), puis en boucle (remplaçant 8 s, titulaire 5 s) ; toucher une pastille la retourne tout de suite.
 function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalCount = 0, flipDelay = 0 }) {
   const sub = player?.replacedBy ?? null
   const [flipped, setFlipped] = useState(false)
-  // 20/11 (demande utilisateur) : la pastille se retourne en boucle toutes les 5 s (titulaire ⇄
-  // remplaçant) pour qu'on voie les deux plusieurs fois ; le 1er retournement garde l'ordre des minutes.
+  // 20/11 (demande utilisateur) : la pastille se retourne en boucle (remplaçant 8 s, titulaire 5 s) pour qu'on voie les deux plusieurs fois ; le 1er retournement garde l'ordre des minutes.
   // Mouvement réduit (réglage du téléphone) : pas de boucle, le remplaçant reste affiché.
   useEffect(() => {
     if (!sub) return
     if (reduceMotion()) { const t0 = setTimeout(() => setFlipped(true), 0); return () => clearTimeout(t0) }
-    let iv = null
-    const t = setTimeout(() => {
-      setFlipped(true)
-      iv = setInterval(() => setFlipped(f => !f), FLIP_EVERY_MS)
-    }, flipDelay)
-    return () => { clearTimeout(t); if (iv) clearInterval(iv) }
+    // Remplaçant affiché SHOW_SUB_MS, puis titulaire SHOW_STARTER_MS, et ainsi de suite.
+    let t = null
+    const showSub = () => { setFlipped(true); t = setTimeout(showStarter, SHOW_SUB_MS) }
+    const showStarter = () => { setFlipped(false); t = setTimeout(showSub, SHOW_STARTER_MS) }
+    t = setTimeout(showSub, flipDelay)
+    return () => clearTimeout(t)
   }, [sub, flipDelay])
 
   if (!player) return null
