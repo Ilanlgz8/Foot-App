@@ -376,6 +376,8 @@ function SwapIcon({ size = 10 }) {
   )
 }
 
+const FLIP_EVERY_MS = 5000
+
 const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 const minuteLabel = m => { const t = String(m ?? '').trim(); return !t ? '' : t.endsWith("'") ? t : `${t}'` }
@@ -441,14 +443,22 @@ function GoalBadge({ count }) {
 // Titulaire remplacé (20/11, demande utilisateur) : sa pastille se retourne comme une carte et
 // montre au dos le numéro et le nom du joueur qui a fini le match à sa place, avec une étiquette
 // « double flèche + minute ». Les pastilles se retournent une par une, dans l'ordre des changements
-// (flipDelay) ; toucher une pastille la retourne pour revoir le titulaire, puis le remplaçant.
+// (flipDelay), puis toutes les 5 s ; toucher une pastille la retourne tout de suite.
 function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalCount = 0, flipDelay = 0 }) {
   const sub = player?.replacedBy ?? null
   const [flipped, setFlipped] = useState(false)
+  // 20/11 (demande utilisateur) : la pastille se retourne en boucle toutes les 5 s (titulaire ⇄
+  // remplaçant) pour qu'on voie les deux plusieurs fois ; le 1er retournement garde l'ordre des minutes.
+  // Mouvement réduit (réglage du téléphone) : pas de boucle, le remplaçant reste affiché.
   useEffect(() => {
     if (!sub) return
-    const t = setTimeout(() => setFlipped(true), reduceMotion() ? 0 : flipDelay)
-    return () => clearTimeout(t)
+    if (reduceMotion()) { const t0 = setTimeout(() => setFlipped(true), 0); return () => clearTimeout(t0) }
+    let iv = null
+    const t = setTimeout(() => {
+      setFlipped(true)
+      iv = setInterval(() => setFlipped(f => !f), FLIP_EVERY_MS)
+    }, flipDelay)
+    return () => { clearTimeout(t); if (iv) clearInterval(iv) }
   }, [sub, flipDelay])
 
   if (!player) return null
