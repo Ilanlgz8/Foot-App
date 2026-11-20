@@ -471,7 +471,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
   if (!player) return null
   const isGK  = ['GK','G','GB'].includes(stripSide(player.position))
   const color = isGK ? '#f59e0b' : teamColor
-  const short = (n, sn) => { const nm = formatName(n, sn); return nm.length > 11 ? nm.slice(0, 10) + '.' : nm }
+  const short = (n, sn) => { const nm = formatName(n, sn); return nm.length > 11 ? nm.slice(0, 10).trimEnd() + '.' : nm }
   const label    = short(player.name, player.shortName)
   const subLabel = sub ? short(sub.name, sub.shortName) : ''
   const showSub  = !!sub && shown
@@ -481,6 +481,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
     inset:         0,
     textAlign:     'center',
     fontSize:      'clamp(8.5px, 2.6vw, 11px)',
+    lineHeight:    1.35,
     fontWeight:    600,
     whiteSpace:    'nowrap',
     fontFamily:    'var(--sf-font-ui)',
@@ -542,7 +543,8 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
           </div>
         )}
       </div>
-      <div style={{ position: 'relative', height: 'clamp(11px, 3.3vw, 14px)', width: 'clamp(52px, 17vw, 70px)' }}>
+      {/* Hauteur = 1,35 × la taille du texte (20/11) : avant, les lettres qui descendent (g, y, p) étaient coupées. */}
+      <div style={{ position: 'relative', height: 'calc(clamp(8.5px, 2.6vw, 11px) * 1.35)', width: 'clamp(52px, 17vw, 70px)' }}>
         <span style={{ ...nameStyle, color: isGK ? alpha('#f59e0b', 0.65) : 'rgba(255,255,255,0.52)', opacity: showSub ? 0 : 1 }}>
           {label}
         </span>
