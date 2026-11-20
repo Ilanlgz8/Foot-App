@@ -843,7 +843,8 @@ async function handler(req, res) {
       // le même défaut sur tous les matchs déjà consultés.
       // À REFAIRE à chaque fois que compactEspnSummary change de résultat.
       // v3 (18/11) : les résumés déjà en cache n'avaient pas les tirs au but (voir addShootoutKicks)
-      const cacheKey = `espn:summary:v3:${slug}:${eventId}`
+      // v4 (20/11) : remplacements (lineups.*.changes, replacedBy, subOn/subOff)
+      const cacheKey = `espn:summary:v4:${slug}:${eventId}`
       try {
         const cached = skipCache ? null : await kv.get(cacheKey)
         if (cached) {

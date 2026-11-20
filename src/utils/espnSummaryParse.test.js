@@ -407,3 +407,47 @@ describe('compactEspnSummary', () => {
     expect(compactEspnSummary(json).stats.home.poss).toBe(64)
   })
 })
+
+// ── Remplacements (20/11) — structure réelle ESPN (Rennes-Lille 08/11) ──────────
+import { compactEspnSummary as compactForSubs } from './espnSummaryParse'
+describe('remplacements ESPN', () => {
+  const ath = (id, name, starter, extra = {}) => ({ starter, jersey: String(id), athlete: { id: String(id), displayName: name, shortName: name }, position: { abbreviation: starter ? 'CM' : 'SUB' }, ...extra })
+  const json = {
+    header: { competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '10' } },
+      { homeAway: 'away', team: { id: '20' } },
+    ] }] },
+    rosters: [
+      { team: { id: '10', displayName: 'Home' }, roster: [ath(1, 'A1', true), ath(2, 'A2', true), ath(3, 'B3', false)] },
+      { team: { id: '20', displayName: 'Away' }, roster: [
+        ath(11, 'Verdonk', true, { subbedOut: true, plays: [{ substitution: false, clock: { displayValue: "55'" } }, { substitution: true, clock: { displayValue: "62'" } }] }),
+        ath(12, 'Haraldsson', true, { subbedOut: true, plays: [{ substitution: true, clock: { displayValue: "60'" } }] }),
+        ath(13, 'Perraud', false, { subbedIn: true, plays: [{ substitution: true, clock: { displayValue: "62'" } }] }),
+        ath(14, 'Bakwa', false, { subbedIn: true, subbedOut: true, plays: [{ substitution: true, clock: { displayValue: "60'" } }, { substitution: true, clock: { displayValue: "85'" } }] }),
+        ath(15, 'Giroud', false, { subbedIn: true, plays: [{ substitution: true, clock: { displayValue: "85'" } }] }),
+        ath(16, 'Gill', false),
+      ] },
+    ],
+    keyEvents: [
+      { type: { type: 'substitution', text: 'Substitution' }, clock: { displayValue: "60'" }, team: { id: '20' }, participants: [{ athlete: { id: '14', displayName: 'Bakwa' } }, { athlete: { id: '12', displayName: 'Haraldsson' } }] },
+      { type: { type: 'substitution', text: 'Substitution' }, clock: { displayValue: "62'" }, team: { id: '20' }, participants: [{ athlete: { id: '13', displayName: 'Perraud' } }, { athlete: { id: '11', displayName: 'Verdonk' } }] },
+      { type: { type: 'substitution', text: 'Substitution' }, clock: { displayValue: "85'" }, team: { id: '20' }, participants: [{ athlete: { id: '15', displayName: 'Giroud' } }, { athlete: { id: '14', displayName: 'Bakwa' } }] },
+    ],
+  }
+  const { lineups } = compactForSubs(json)
+  it('liste les changements de chaque équipe, dans l\'ordre', () => {
+    expect(lineups.home.changes).toEqual([])
+    expect(lineups.away.changes.map(c => `${c.minute} ${c.in.name}>${c.out.name}`)).toEqual(["60' Bakwa>Haraldsson", "62' Perraud>Verdonk", "85' Giroud>Bakwa"])
+  })
+  it('remplacé par le joueur qui a fini le match (chaîne suivie), minute du 1er changement', () => {
+    const h = lineups.away.starters.find(p => p.name === 'Haraldsson')
+    expect(h.replacedBy).toMatchObject({ name: 'Giroud', number: '15', minute: "60'" })
+    expect(lineups.away.starters.find(p => p.name === 'Verdonk').replacedBy).toMatchObject({ name: 'Perraud', minute: "62'" })
+  })
+  it('minutes d\'entrée et de sortie sur chaque joueur', () => {
+    const bakwa = lineups.away.subs.find(p => p.name === 'Bakwa')
+    expect([bakwa.subOn, bakwa.subOff]).toEqual(["60'", "85'"])
+    expect(lineups.away.starters.find(p => p.name === 'Verdonk').subOff).toBe("62'")
+    expect(lineups.away.subs.find(p => p.name === 'Gill').subOn).toBeNull()
+  })
+})

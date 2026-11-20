@@ -201,6 +201,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Classements (19/11)** : zones (Europe, montée, barrages, relégation) = source unique `src/data/standingsRules.js` (`getStandingsRules(comp, { teamCount, groupName })`), utilisée par Classement, MatchModal et TeamSearchPage — règles 2026-27 vérifiées, détail en tête du fichier. Flèches ▲▼ = évolution depuis AVANT la dernière journée, recalculée à partir des matchs (`src/utils/standingsMovement.js`) ; pas de flèche si le recomptage ne retombe pas exactement sur les matchs joués officiels (jamais de flèche fausse). Fini l'instantané localStorage `standings_prev_*` (dépendait de la dernière visite du téléphone).
 
+- **Remplacements (20/11)** : source ESPN `summary.keyEvents` (type `substitution`, participants[0] = entrant, [1] = sortant) + `rosters[].roster[].subbedIn/subbedOut/plays`. Parsés dans `espnSummaryParse.js` (`extractSubstitutions`, `attachChanges`) → `lineups.home/away.changes`, `starter.replacedBy` (joueur qui a fini le match, chaîne suivie), `subOn`/`subOff`. Cache serveur `espn:summary:v4`, disque `lineups_*_v3`/`stats_*_v3`. Affichage : fil du match (`MatchTimeline`, `SubIcon` double flèche, entrant ↑ vert / sortant ↓ rouge) dans l'onglet Stats (MatchPage + LiveStatsTab en direct) ; Compos (`LineupPitch.jsx`) : pastille du titulaire qui se retourne (ordre des minutes, toucher = revoir le titulaire), ↑/↓ minute dans la liste.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché

@@ -405,7 +405,13 @@ export function parseEspnRoster(roster) {
   const rawAlt   = roster.team?.alternateColor ?? ''
   const altColor = /^[0-9a-fA-F]{6}$/.test(rawAlt) ? `#${rawAlt}` : '#ffffff'
 
+  // Minutes d'entrée / de sortie (20/11, remplacements) : ESPN marque subbedIn/subbedOut et date
+  // chaque changement dans `plays` (substitution: true). Entré puis ressorti = 2 changements.
+  const subMinutes = a => (a.plays ?? []).filter(p => p.substitution).map(p => p.clock?.displayValue ?? '')
   const mapAthlete = a => ({
+    id:           a.athlete?.id != null ? String(a.athlete.id) : null,
+    subOn:        a.subbedIn  ? (subMinutes(a)[0] || '') : null,
+    subOff:       a.subbedOut ? (subMinutes(a)[a.subbedIn ? 1 : 0] || '') : null,
     name:         a.athlete?.displayName ?? a.displayName ?? '?',
     shortName:    a.athlete?.shortName ?? a.shortName ?? a.athlete?.displayName ?? '?',
     number:       a.athlete?.jersey ?? a.jersey ?? '',
@@ -431,6 +437,7 @@ export function parseEspnRoster(roster) {
     : sorted.slice(11).map(mapAthlete)
 
   return {
+    teamId:    roster.team?.id != null ? String(roster.team.id) : null,
     name:      roster.team?.displayName ?? '?',
     shortName: roster.team?.abbreviation ?? roster.team?.displayName ?? '?',
     color,
@@ -466,7 +473,54 @@ function extractLineups(json, comp, homeTeamId) {
   const home = parseEspnRoster(rosters[homeIdx])
   const away = parseEspnRoster(rosters[awayIdx] ?? rosters[0])
   if (!home?.starters?.length) return null
+  const changes = extractSubstitutions(json)
+  attachChanges(home, changes)
+  if (away !== home) attachChanges(away, changes)
   return { home, away }
+}
+
+// ── Remplacements (20/11) ───────────────────────────────────────────────────
+// Source : summary.keyEvents, type « substitution » — participants[0] = entrant, [1] = sortant
+// (vérifié sur Rennes-Lille du 08/11 : « Romain Perraud replaces Calvin Verdonk »).
+export function extractSubstitutions(json) {
+  return (json?.keyEvents ?? [])
+    .filter(e => e?.type?.type === 'substitution' || /substitution/i.test(e?.type?.text ?? ''))
+    .map(e => {
+      const [pin, pout] = e.participants ?? []
+      return {
+        minute: e.clock?.displayValue ?? '',
+        teamId: e.team?.id != null ? String(e.team.id) : null,
+        inId:   pin?.athlete?.id  != null ? String(pin.athlete.id)  : null,
+        outId:  pout?.athlete?.id != null ? String(pout.athlete.id) : null,
+        inName:  pin?.athlete?.displayName ?? null,
+        outName: pout?.athlete?.displayName ?? null,
+      }
+    })
+    .filter(c => c.inId || c.outId)
+}
+
+// Rattache les changements à une équipe : `team.changes` (fil du match, dans l'ordre) et, sur
+// chaque titulaire remplacé, `replacedBy` = le joueur qui a FINI le match à sa place (si le
+// remplaçant est lui-même remplacé, on suit la chaîne).
+function attachChanges(team, changes) {
+  if (!team) return
+  const roster = [...(team.starters ?? []), ...(team.subs ?? [])]
+  const byId = new Map(roster.filter(p => p.id).map(p => [p.id, p]))
+  const mine = changes.filter(c => (c.teamId && c.teamId === team.teamId) || (!c.teamId && (byId.has(c.inId) || byId.has(c.outId))))
+    .filter(c => byId.has(c.inId) || byId.has(c.outId))
+  const lite = (id, name) => {
+    const p = byId.get(id)
+    return p ? { name: p.name, shortName: p.shortName, number: p.number } : { name: name ?? '?', shortName: initialName(name) ?? '?', number: '' }
+  }
+  team.changes = mine.map(c => ({ minute: c.minute, in: lite(c.inId, c.inName), out: lite(c.outId, c.outName) }))
+  const next = new Map(mine.map(c => [c.outId, c]))
+  for (const s of team.starters ?? []) {
+    let c = next.get(s.id), guard = 0
+    if (!c) continue
+    const minute = c.minute
+    while (next.get(c.inId) && guard++ < 5) c = next.get(c.inId)
+    s.replacedBy = { ...lite(c.inId, c.inName), minute }
+  }
 }
 
 // ── Compaction summary (serveur) ────────────────────────────────────────────

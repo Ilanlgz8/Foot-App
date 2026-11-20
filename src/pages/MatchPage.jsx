@@ -37,6 +37,7 @@ import {
   TabDots,
   TeamFormTable,
   buildMatchEvents,
+  substitutionsFromLineups,
   useH2HRows,
   H2HTabContent,
   fifaStatsToRows,
@@ -536,7 +537,9 @@ function MpMatchStats({ match, dataMatch }) {
   const { detail } = useMatchDetail(dm?.id)
 
   const fdSubs      = detail?.substitutions ?? []
-  const hasEvents   = fdSubs.length > 0
+  // 20/11 : remplacements ESPN (compos du résumé, déjà chargé ci-dessus pour les stats), FD en repli.
+  const espnSubs    = substitutionsFromLineups(espnStatsData?.lineups)
+  const hasEvents   = fdSubs.length > 0 || espnSubs.length > 0
   // (`detailLoading` n'est plus lu ici depuis le retrait du message "Match
   // sans but", qui était le seul à distinguer "pas encore chargé" de
   // "vraiment aucun événement".)
@@ -614,7 +617,7 @@ function MpMatchStats({ match, dataMatch }) {
           0-0 est déjà affiché en grand juste au-dessus, donc la phrase
           n'apprenait rien. Le cas "aucun remplacement mais des buts" ne
           montrait déjà rien ici, on est simplement cohérent avec ça. */}
-      {hasEvents && <MatchTimeline fdSubs={fdSubs} homeId={match.homeTeam?.id} />}
+      {hasEvents && <MatchTimeline fdSubs={fdSubs} espnSubs={espnSubs} homeId={match.homeTeam?.id} />}
 
       {isLoading ? (
         <MpStatsSkeleton />

@@ -3,7 +3,7 @@
  * Terrain en div CSS propre, joueurs en divs absolus avec glow dynamique.
  * Couleur d'équipe tirée du champ `color` de l'API.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // ── Dimensions logiques pour calcul des positions ─────────────────────────────
 const PW = 300, PH = 400
@@ -364,92 +364,191 @@ function getPositions(starters, formation) {
 // goalCount : nombre de buts marqués par CE joueur dans ce match (0 = rien
 // affiché) — demande explicite : petit badge ballon façon appli/site foot,
 // avec "x2"/"x3" si doublé/triplé plutôt que d'empiler plusieurs ballons.
-function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0 }) {
+// ── Remplacements (20/11) ─────────────────────────────────────────────────────
+// Icône double flèche (verte ↑ entrant, rouge ↓ sortant) — même dessin que SubIcon (MatchModal.jsx),
+// recopiée ici pour éviter un import circulaire (MatchModal importe ce fichier).
+function SwapIcon({ size = 10 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
+      <path d="M6 16V5M6 5 2.8 8.2M6 5l3.2 3.2" fill="none" stroke="#22c55e" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 4v11m0 0-3.2-3.2M14 15l3.2-3.2" fill="none" stroke="#ef4444" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+const minuteLabel = m => { const t = String(m ?? '').trim(); return !t ? '' : t.endsWith("'") ? t : `${t}'` }
+
+// Pastille ronde (une face de la carte qui se retourne).
+function DotFace({ color, num, back = false }) {
+  return (
+    <div style={{
+      position:           'absolute',
+      inset:              0,
+      borderRadius:       '50%',
+      display:            'flex',
+      alignItems:         'center',
+      justifyContent:     'center',
+      fontSize:           'clamp(12px, 3.4vw, 16px)',
+      fontWeight:         800,
+      fontFamily:         'var(--sf-font-ui)',
+      color,
+      background:         `radial-gradient(circle, ${alpha(color, 0.13)}, ${alpha(color, 0.13)}), #0d1e11`,
+      border:             `1.5px solid ${color}`,
+      boxShadow:          `0 0 12px ${alpha(color, 0.4)}, inset 0 0 6px ${alpha(color, 0.1)}`,
+      lineHeight:         1,
+      backfaceVisibility: 'hidden',
+      WebkitBackfaceVisibility: 'hidden',
+      transform:          back ? 'rotateY(180deg)' : undefined,
+    }}>
+      {num}
+    </div>
+  )
+}
+
+function GoalBadge({ count }) {
+  if (!(count > 0)) return null
+  return (
+    <div style={{
+      position:       'absolute',
+      top:            '-6px',
+      right:           count > 1 ? '-14px' : '-6px',
+      height:         '17px',
+      minWidth:       '17px',
+      padding:        count > 1 ? '0 5px 0 3px' : '0',
+      borderRadius:   '9px',
+      background:     '#0a0c14',
+      border:         '1.5px solid rgba(255,255,255,0.25)',
+      display:        'flex',
+      alignItems:     'center',
+      justifyContent: 'center',
+      gap:            '2px',
+      fontSize:       '10px',
+      lineHeight:     1,
+      zIndex:         3,
+    }} aria-label={`${count} but${count > 1 ? 's' : ''}`}>
+      <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
+      {count > 1 && (
+        <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--sf-font-ui)' }}>
+          x{count}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Titulaire remplacé (20/11, demande utilisateur) : sa pastille se retourne comme une carte et
+// montre au dos le numéro et le nom du joueur qui a fini le match à sa place, avec une étiquette
+// « double flèche + minute ». Les pastilles se retournent une par une, dans l'ordre des changements
+// (flipDelay) ; toucher une pastille la retourne pour revoir le titulaire, puis le remplaçant.
+function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalCount = 0, flipDelay = 0 }) {
+  const sub = player?.replacedBy ?? null
+  const [flipped, setFlipped] = useState(false)
+  useEffect(() => {
+    if (!sub) return
+    const t = setTimeout(() => setFlipped(true), reduceMotion() ? 0 : flipDelay)
+    return () => clearTimeout(t)
+  }, [sub, flipDelay])
+
   if (!player) return null
   const isGK  = ['GK','G','GB'].includes(stripSide(player.position))
   const color = isGK ? '#f59e0b' : teamColor
-  const nm    = formatName(player.name, player.shortName)
-  const label = nm.length > 11 ? nm.slice(0, 10) + '.' : nm
-  const num   = player.number ?? ''
+  const short = (n, sn) => { const nm = formatName(n, sn); return nm.length > 11 ? nm.slice(0, 10) + '.' : nm }
+  const label    = short(player.name, player.shortName)
+  const subLabel = sub ? short(sub.name, sub.shortName) : ''
+  const showSub  = !!sub && flipped
+  const anim     = reduceMotion() ? 'none' : undefined
+  const nameStyle = {
+    position:      'absolute',
+    inset:         0,
+    textAlign:     'center',
+    fontSize:      'clamp(8.5px, 2.6vw, 11px)',
+    fontWeight:    600,
+    whiteSpace:    'nowrap',
+    fontFamily:    'var(--sf-font-ui)',
+    textShadow:    '0 1px 5px rgba(0,0,0,0.95)',
+    letterSpacing: '0.01em',
+    overflow:      'hidden',
+    textOverflow:  'ellipsis',
+    transition:    anim ?? 'opacity .25s ease',
+  }
 
   return (
-    <div style={{
-      position:      'absolute',
-      left:          `${leftPct}%`,
-      top:           `${topPct}%`,
-      transform:     'translate(-50%, -50%)',
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      gap:           'clamp(3px, 1vw, 5px)',
-      zIndex:        2,
-    }}>
-      <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0 }}>
-      <div style={{
-        width:          '100%',
-        height:         '100%',
-        borderRadius:   '50%',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        fontSize:       'clamp(12px, 3.4vw, 16px)',
-        fontWeight:     800,
-        fontFamily:     'var(--sf-font-ui)',
-        color,
-        background:     alpha(color, 0.13),
-        border:         `1.5px solid ${color}`,
-        boxShadow:      `0 0 12px ${alpha(color, 0.4)}, inset 0 0 6px ${alpha(color, 0.1)}`,
-        lineHeight:     1,
-      }}>
-        {num}
-      </div>
-      {goalCount > 0 && (
+    <div
+      onClick={sub ? () => setFlipped(f => !f) : undefined}
+      style={{
+        position:      'absolute',
+        left:          `${leftPct}%`,
+        top:           `${topPct}%`,
+        transform:     'translate(-50%, -50%)',
+        display:       'flex',
+        flexDirection: 'column',
+        alignItems:    'center',
+        gap:           'clamp(3px, 1vw, 5px)',
+        zIndex:        2,
+        cursor:        sub ? 'pointer' : undefined,
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0, perspective: '300px' }}>
         <div style={{
           position:       'absolute',
-          top:            '-6px',
-          right:           goalCount > 1 ? '-14px' : '-6px',
-          height:         '17px',
-          minWidth:       '17px',
-          padding:        goalCount > 1 ? '0 5px 0 3px' : '0',
-          borderRadius:   '9px',
-          background:     '#0a0c14',
-          border:         '1.5px solid rgba(255,255,255,0.25)',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          gap:            '2px',
-          fontSize:       '10px',
-          lineHeight:     1,
-        }} aria-label={`${goalCount} but${goalCount > 1 ? 's' : ''}`}>
-          <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
-          {goalCount > 1 && (
-            <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--sf-font-ui)' }}>
-              x{goalCount}
-            </span>
-          )}
+          inset:          0,
+          transformStyle: 'preserve-3d',
+          transition:     anim ?? 'transform .7s cubic-bezier(.3,.7,.3,1)',
+          transform:      showSub ? 'rotateY(180deg)' : 'none',
+        }}>
+          <DotFace color={color} num={player.number ?? ''} />
+          {sub && <DotFace color={color} num={sub.number ?? ''} back />}
         </div>
-      )}
+        <GoalBadge count={showSub ? subGoalCount : goalCount} />
+        {sub && (
+          <div style={{
+            position:     'absolute',
+            top:          '-7px',
+            left:         '-16px',
+            height:       '16px',
+            padding:      '0 4px 0 3px',
+            borderRadius: '8px',
+            background:   '#0a0c14',
+            border:       '1.5px solid rgba(255,255,255,0.22)',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '2px',
+            fontSize:     '9px',
+            fontWeight:   700,
+            color:        'rgba(255,255,255,0.8)',
+            fontFamily:   'var(--sf-font-ui)',
+            lineHeight:   1,
+            zIndex:       3,
+            opacity:      showSub ? 1 : 0,
+            transition:   anim ?? 'opacity .3s ease .5s',
+          }} aria-label={`Remplacé à la ${minuteLabel(sub.minute)}`}>
+            <SwapIcon />
+            {minuteLabel(sub.minute)}
+          </div>
+        )}
       </div>
-      <span style={{
-        fontSize:      'clamp(8.5px, 2.6vw, 11px)',
-        fontWeight:    600,
-        color:         isGK ? alpha('#f59e0b', 0.65) : 'rgba(255,255,255,0.52)',
-        whiteSpace:    'nowrap',
-        fontFamily:    'var(--sf-font-ui)',
-        textShadow:    '0 1px 5px rgba(0,0,0,0.95)',
-        letterSpacing: '0.01em',
-        maxWidth:      'clamp(52px, 15vw, 64px)',
-        overflow:      'hidden',
-        textOverflow:  'ellipsis',
-      }}>
-        {label}
-      </span>
+      <div style={{ position: 'relative', height: 'clamp(11px, 3.3vw, 14px)', width: 'clamp(52px, 17vw, 70px)' }}>
+        <span style={{ ...nameStyle, color: isGK ? alpha('#f59e0b', 0.65) : 'rgba(255,255,255,0.52)', opacity: showSub ? 0 : 1 }}>
+          {label}
+        </span>
+        {sub && (
+          <span style={{ ...nameStyle, color: '#fff', opacity: showSub ? 1 : 0, transitionDelay: showSub && !anim ? '.35s' : '0s' }}>
+            {subLabel}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Terrain HTML/CSS ──────────────────────────────────────────────────────────
+const minuteNum = m => { const [a, b] = String(m ?? '').replace(/'/g, '').split('+'); return (parseInt(a, 10) || 0) + (parseInt(b, 10) || 0) / 100 }
+
 function Pitch({ formation, positions, teamColor, goals }) {
+  const subOrder = [...new Set(positions.map(p => p.player?.replacedBy).filter(Boolean).map(r => minuteNum(r.minute)))].sort((a, b) => a - b)
   return (
     <div style={{
       position:    'relative',
@@ -555,7 +654,7 @@ function Pitch({ formation, positions, teamColor, goals }) {
         </div>
       )}
 
-      {/* Joueurs */}
+      {/* Joueurs — les remplacés se retournent dans l'ordre des minutes (0,7 s puis +0,65 s par minute de changement) */}
       {positions.map(({ leftPct, topPct, player }, i) =>
         player
           ? <PlayerDot
@@ -565,6 +664,8 @@ function Pitch({ formation, positions, teamColor, goals }) {
               player={player}
               teamColor={teamColor}
               goalCount={goals?.[normName(player.shortName || player.name)] ?? 0}
+              subGoalCount={player.replacedBy ? (goals?.[normName(player.replacedBy.shortName || player.replacedBy.name)] ?? 0) : 0}
+              flipDelay={player.replacedBy ? 700 + subOrder.indexOf(minuteNum(player.replacedBy.minute)) * 650 : 0}
             />
           : null
       )}
@@ -613,8 +714,10 @@ function PlayerCell({ player, isSub }) {
       <span style={{
         flex:          1,
         fontSize:      10.5,
-        fontWeight:    isSub ? 400 : 500,
-        color:         isSub ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.85)',
+        fontWeight:    isSub && player.subOn == null ? 400 : 500,
+        // Remplaçant entré : en clair comme un titulaire ; titulaire sorti : un peu atténué.
+        color:         isSub ? (player.subOn != null ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.38)')
+                             : (player.subOff != null ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.85)'),
         whiteSpace:    'nowrap',
         overflow:      'hidden',
         textOverflow:  'ellipsis',
@@ -622,6 +725,19 @@ function PlayerCell({ player, isSub }) {
       }}>
         {nm}
       </span>
+      {/* Remplacements (20/11) : ↓ minute en rouge sur le titulaire sorti, ↑ minute en vert sur l'entrant */}
+      {(isSub ? player.subOn : player.subOff) != null && (
+        <span style={{
+          fontSize:   9.5,
+          fontWeight: 800,
+          color:      isSub ? '#22c55e' : '#ef4444',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+          fontFamily: 'var(--sf-font-ui)',
+        }}>
+          {isSub ? '↑' : '↓'} {minuteLabel(isSub ? player.subOn : player.subOff)}
+        </span>
+      )}
       <span style={{
         fontSize:   9,
         fontWeight: 700,
@@ -750,7 +866,7 @@ export default function LineupPitch({ home, away, isCountry = false, hColor = '#
       </div>}
 
       {/* Terrain */}
-      <Pitch formation={team.formation} positions={positions} teamColor={teamColor} goals={goals} />
+      <Pitch key={singleTeam ? 'home' : activeTeam} formation={team.formation} positions={positions} teamColor={teamColor} goals={goals} />
 
       {/* Liste joueurs */}
       <PlayerGrid starters={team.starters ?? []} subs={team.subs ?? []} />

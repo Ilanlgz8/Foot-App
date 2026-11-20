@@ -444,6 +444,16 @@
   white-space: nowrap;
 }
 
+/* Remplacements (20/11) : entrant (↑ vert) au-dessus, sortant (↓ rouge) en dessous, plus petit. */
+.modal__subNames { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; max-width: 130px; }
+.modal__subNames--home { align-items: flex-end; text-align: right; }
+.modal__subIn, .modal__subOut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.modal__subIn { font-size: 0.75rem; font-weight: 700; color: #cbd5e1; }
+.modal__subOut { font-size: 0.66rem; font-weight: 600; color: #94a3b8; }
+.modal__subNames i { font-style: normal; font-weight: 900; margin: 0 2px; }
+.modal__subIn i { color: #22c55e; }
+.modal__subOut i { color: #ef4444; }
+
 /* ── Message "aucun événement" ── */
 .modal__noEvents {
   font-size: 0.72rem;

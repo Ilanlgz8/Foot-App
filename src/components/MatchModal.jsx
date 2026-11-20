@@ -360,7 +360,13 @@ function espnMinuteLabel(raw) {
 // Exportée : réutilisée par MatchPage.jsx pour fusionner buts + cartons dans
 // le hero (au lieu de n'y afficher que les buts), triés par minute — même
 // logique que le Fil du match, sans dupliquer le parsing des minutes.
-export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], homeId }) {
+// Remplacements ESPN (20/11) : tirés des compos (lineups.home/away.changes, voir espnSummaryParse.js).
+export function substitutionsFromLineups(lineups) {
+  const side = (t, s) => (t?.changes ?? []).map(c => ({ ...c, side: s }))
+  return [...side(lineups?.home, 'home'), ...side(lineups?.away, 'away')]
+}
+
+export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], espnSubs = [], homeId }) {
   const events = { home: [], away: [] }
   let k = 0
 
@@ -416,13 +422,27 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
     })
   }
 
-  fdSubs.forEach(s => {
-    const isHome = s.team?.id === homeId
-    events[isHome ? 'home' : 'away'].push({
-      key: `e${k++}`, sort: minuteSort(s.minute), minute: s.minute ? `${s.minute}'` : '',
-      icon: '🔁', name: `${s.playerIn?.shortName ?? s.playerIn?.name ?? '?'} ↔ ${s.playerOut?.shortName ?? s.playerOut?.name ?? '?'}`,
+  // Remplacements : ESPN en priorité, football-data.org en repli. kind 'sub' : rendu sur 2 lignes
+  // (entrant ↑ vert, sortant ↓ rouge) avec l'icône double flèche (SubIcon).
+  if (espnSubs.length > 0) {
+    espnSubs.forEach(s => {
+      events[s.side === 'home' ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(s.minute), minute: espnMinuteLabel(s.minute), icon: '🔁', kind: 'sub',
+        name: `${s.in?.shortName ?? '?'} ↔ ${s.out?.shortName ?? '?'}`,
+        inName: s.in?.shortName ?? s.in?.name ?? '?', outName: s.out?.shortName ?? s.out?.name ?? '?',
+      })
     })
-  })
+  } else {
+    fdSubs.forEach(s => {
+      const isHome = s.team?.id === homeId
+      const inName = s.playerIn?.shortName ?? s.playerIn?.name ?? '?'
+      const outName = s.playerOut?.shortName ?? s.playerOut?.name ?? '?'
+      events[isHome ? 'home' : 'away'].push({
+        key: `e${k++}`, sort: minuteSort(s.minute), minute: s.minute ? `${s.minute}'` : '',
+        icon: '🔁', kind: 'sub', name: `${inName} ↔ ${outName}`, inName, outName,
+      })
+    })
+  }
 
   // 12/11 (demande utilisateur) : les BUTS d'abord, puis les cartons, puis les remplacements —
   // chaque groupe dans l'ordre des minutes — pour lire les buteurs sans qu'ils soient mélangés.
@@ -440,8 +460,29 @@ export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [
   return events
 }
 
-export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, homeId }) {
-  const { home, away } = buildMatchEvents({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, homeId })
+// Icône remplacement (20/11) : flèche verte vers le haut (entrant) + flèche rouge vers le bas (sortant).
+export function SubIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" style={{ flexShrink: 0, display: 'block' }}>
+      <path d="M6 16V5M6 5 2.8 8.2M6 5l3.2 3.2" fill="none" stroke="#22c55e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 4v11m0 0-3.2-3.2M14 15l3.2-3.2" fill="none" stroke="#ef4444" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function SubNames({ e, home }) {
+  return (
+    <span className={`modal__subNames${home ? ' modal__subNames--home' : ''}`}>
+      <span className="modal__subIn">{home ? <>{e.inName}<i>↑</i></> : <><i>↑</i>{e.inName}</>}</span>
+      <span className="modal__subOut">{home ? <>{e.outName}<i>↓</i></> : <><i>↓</i>{e.outName}</>}</span>
+    </span>
+  )
+}
+
+const selectSubs = d => substitutionsFromLineups(d?.lineups)
+
+export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, espnSubs, homeId }) {
+  const { home, away } = buildMatchEvents({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, espnSubs, homeId })
   if (home.length === 0 && away.length === 0) return null
 
   return (
@@ -449,9 +490,9 @@ export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdS
       <div className="modal__statsCol modal__statsCol--home">
         {home.map(e => (
           <div key={e.key} className="modal__goalRow">
-            <span className="modal__goalName">{e.name}</span>
+            {e.kind === 'sub' ? <SubNames e={e} home /> : <span className="modal__goalName">{e.name}</span>}
             <span className="modal__goalMeta">{e.minute}</span>
-            <span className="modal__goalIcon" aria-hidden="true">{e.icon}</span>
+            <span className="modal__goalIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon /> : e.icon}</span>
           </div>
         ))}
       </div>
@@ -459,9 +500,9 @@ export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdS
       <div className="modal__statsCol modal__statsCol--away">
         {away.map(e => (
           <div key={e.key} className="modal__goalRow modal__goalRow--away">
-            <span className="modal__goalIcon" aria-hidden="true">{e.icon}</span>
+            <span className="modal__goalIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon /> : e.icon}</span>
             <span className="modal__goalMeta">{e.minute}</span>
-            <span className="modal__goalName">{e.name}</span>
+            {e.kind === 'sub' ? <SubNames e={e} /> : <span className="modal__goalName">{e.name}</span>}
           </div>
         ))}
       </div>
@@ -479,9 +520,12 @@ export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdS
 // côté serveur (boxscore.teams en priorité, header.competitions en repli —
 // voir compactEspnSummary), au format `stats.home`/`stats.away` attendu ici
 // tel quel. Plus besoin de reparser boxscore.teams à la main.
-function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
+// 20/11 : la requête renvoie le résumé complet (stats + compos, dont les remplacements) ; chaque
+// appelant en extrait ce qu'il lui faut via `select` — une seule requête réseau pour les deux.
+function useEspnSummaryStats(espnEventId, espnSlug, enabled, select = d => d?.stats ?? null) {
   return useQuery({
-    queryKey: ['espnSummary', espnEventId],
+    queryKey: ['espnSummary2', espnEventId],
+    select,
     queryFn: async () => {
       // Retour d'arrière-plan récent (voir useLiveMinute.js onVisible) : on
       // contourne le cache Redis serveur du summary ESPN pour ne pas
@@ -494,7 +538,7 @@ function useEspnSummaryStats(espnEventId, espnSlug, enabled) {
       const res = await fetch(url)
       if (!res.ok) return null
       const json = await res.json()
-      return json?.stats ?? null
+      return json ? { stats: json.stats ?? null, lineups: json.lineups ?? null } : null
     },
     enabled:         enabled && !!espnEventId && !!espnSlug,
     staleTime:       30_000,
@@ -571,6 +615,14 @@ export function LiveStatsTab({ match, espnScore }) {
     espnScore?.espnEventId,
     espnScore?.espnSlug,
     isLive && hasEspnId
+  )
+
+  // Remplacements en direct (20/11) : même requête que les stats (résumé ESPN, rafraîchi chaque minute).
+  const { data: liveSubs } = useEspnSummaryStats(
+    espnScore?.espnEventId,
+    espnScore?.espnSlug,
+    isLive && hasEspnId,
+    selectSubs
   )
 
   // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary) et pas FIFA
@@ -756,6 +808,7 @@ export function LiveStatsTab({ match, espnScore }) {
   return (
     <div>
       {liveProno && <LiveProno prono={liveProno} odds={matchOdds?.odds} match={match} isQualification={isExtraTimeOrTab} />}
+      {liveSubs?.length > 0 && <MatchTimeline espnSubs={liveSubs} />}
       {statsBody}
     </div>
   )

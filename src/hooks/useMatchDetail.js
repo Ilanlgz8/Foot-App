@@ -467,7 +467,7 @@ export function useLineups(match, isFinished = false) {
   // ignorer TOUTES les anciennes entrées d'un coup (readCache renvoie
   // `undefined`), quel que soit le championnat concerné — un seul vrai fetch
   // de plus, avec la bonne logique cette fois, pour chaque match déjà vu.
-  const diskCacheKey = `lineups_${match?.id}_v2`
+  const diskCacheKey = `lineups_${match?.id}_v3`
 
   return useQuery({
     queryKey: ['lineups2', match?.id, slug, date],
@@ -574,7 +574,7 @@ export function useEspnMatchStats(match, isFinished = false) {
   // disque déjà écrite (potentiellement partielle) avant le correctif
   // staleTime, pour TOUS les matchs déjà consultés, tous championnats
   // confondus (ex. Lens-PSG, TDC).
-  const diskCacheKey = `stats_${match?.id}_v2`
+  const diskCacheKey = `stats_${match?.id}_v3`
 
   return useQuery({
     queryKey:  ['espnMatchStats2', match?.id],
