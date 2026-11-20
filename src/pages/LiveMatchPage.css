@@ -1598,11 +1598,14 @@
   text-shadow: 0 4px 20px rgba(var(--black-rgb),0.9);
 }
 
-/* Remplacements dans le déroulement (20/11) : entrant ↑ vert (avec la minute), sortant ↓ rouge
-   en dessous, plus petit et plus discret. */
-.lmp__heroSub { display: flex; flex-direction: column; line-height: 1.25; }
-.lmp__heroSubOut { font-size: 0.64rem; color: rgba(var(--white-rgb), 0.5); }
-.lmp__heroSub i { font-style: normal; font-weight: 900; margin-right: 0.2em; }
+/* Remplacements dans le déroulement (20/11, maquette validée) : icône double flèche, minute à part
+   en gris, entrant en blanc gras (↑ vert), sortant en dessous plus petit et gris (↓ rouge). */
+.lmp__heroScorerItem:has(.lmp__heroSub) { align-items: center; gap: 0.4em; }
+.lmp__heroSubMin { font-size: 0.66rem; font-weight: 600; color: rgba(var(--white-rgb), 0.45); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lmp__heroSub { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.lmp__heroSubIn { font-size: 0.74rem; font-weight: 800; color: rgba(var(--white-rgb), 0.95); }
+.lmp__heroSubOut { font-size: 0.66rem; font-weight: 500; color: rgba(var(--white-rgb), 0.45); }
+.lmp__heroSub i { font-style: normal; font-weight: 900; margin-right: 0.25em; }
 .lmp__heroSubIn i { color: #22c55e; }
 .lmp__heroSubOut i { color: #ef4444; }
-.lmp__heroScorerIcon svg { display: inline-block; vertical-align: -1px; }
+.lmp__heroScorerIcon svg { display: block; }

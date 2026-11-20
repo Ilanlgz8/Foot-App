@@ -482,13 +482,17 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                       au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
                       17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
                       prénom, plus sous le ballon. */}
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={15} /> : e.icon}</span>
                   {e.kind === 'sub' ? (
-                    // Remplacement (20/11) : entrant ↑ vert + minute, sortant ↓ rouge en dessous.
-                    <span className="lmp__heroScorerText lmp__heroSub">
-                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
-                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
-                    </span>
+                    // Remplacement (20/11, maquette validée) : minute à part en gris, entrant en blanc gras ↑ vert,
+                    // sortant en dessous, plus petit et gris, ↓ rouge.
+                    <>
+                      <span className="lmp__heroSubMin">{e.minute}</span>
+                      <span className="lmp__heroScorerText lmp__heroSub">
+                        <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}</span>
+                        <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                      </span>
+                    </>
                   ) : (
                   <span className="lmp__heroScorerText">
                     {keepParticles(e.name)}
@@ -506,13 +510,17 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                       au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
                       17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
                       prénom, plus sous le ballon. */}
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={15} /> : e.icon}</span>
                   {e.kind === 'sub' ? (
-                    // Remplacement (20/11) : entrant ↑ vert + minute, sortant ↓ rouge en dessous.
-                    <span className="lmp__heroScorerText lmp__heroSub">
-                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
-                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
-                    </span>
+                    // Remplacement (20/11, maquette validée) : minute à part en gris, entrant en blanc gras ↑ vert,
+                    // sortant en dessous, plus petit et gris, ↓ rouge.
+                    <>
+                      <span className="lmp__heroSubMin">{e.minute}</span>
+                      <span className="lmp__heroScorerText lmp__heroSub">
+                        <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}</span>
+                        <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                      </span>
+                    </>
                   ) : (
                   <span className="lmp__heroScorerText">
                     {keepParticles(e.name)}

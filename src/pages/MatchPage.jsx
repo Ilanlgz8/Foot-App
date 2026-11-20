@@ -387,12 +387,17 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
-                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={15} /> : e.icon}</span>
                 {e.kind === 'sub' ? (
-                  <span className="lmp__heroScorerText lmp__heroSub">
-                    <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
-                    <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
-                  </span>
+                  // Remplacement (20/11, maquette validée) : minute à part en gris, entrant en blanc gras ↑ vert,
+                  // sortant en dessous, plus petit et gris, ↓ rouge.
+                  <>
+                    <span className="lmp__heroSubMin">{e.minute}</span>
+                    <span className="lmp__heroScorerText lmp__heroSub">
+                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}</span>
+                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                    </span>
+                  </>
                 ) : (
                 <span className="lmp__heroScorerText">
                   {keepParticles(e.name)}
@@ -408,12 +413,17 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
               <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
-                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={15} /> : e.icon}</span>
                 {e.kind === 'sub' ? (
-                  <span className="lmp__heroScorerText lmp__heroSub">
-                    <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
-                    <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
-                  </span>
+                  // Remplacement (20/11, maquette validée) : minute à part en gris, entrant en blanc gras ↑ vert,
+                  // sortant en dessous, plus petit et gris, ↓ rouge.
+                  <>
+                    <span className="lmp__heroSubMin">{e.minute}</span>
+                    <span className="lmp__heroScorerText lmp__heroSub">
+                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}</span>
+                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                    </span>
+                  </>
                 ) : (
                 <span className="lmp__heroScorerText">
                   {keepParticles(e.name)}
