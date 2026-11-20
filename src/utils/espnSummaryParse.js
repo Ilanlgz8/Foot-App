@@ -560,3 +560,10 @@ export function compactEspnSummary(json) {
   const lineups = extractLineups(json, comp, homeTeamId)
   return { scorers, cards, stats, lineups }
 }
+
+// Liste des remplacements des deux équipes ({ minute, side, in, out }) à partir des compos
+// compactées (lineups.home/away.changes) — fil du match et déroulement du hero (20/11).
+export function substitutionsFromLineups(lineups) {
+  const side = (t, s) => (t?.changes ?? []).map(c => ({ ...c, side: s }))
+  return [...side(lineups?.home, 'home'), ...side(lineups?.away, 'away')]
+}

@@ -37,6 +37,7 @@ import {
   TabDots,
   TeamFormTable,
   buildMatchEvents,
+  SubIcon,
   substitutionsFromLineups,
   useH2HRows,
   H2HTabContent,
@@ -215,8 +216,10 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // 16/08, voir la déclaration de `match` dans le composant parent). Utiliser
   // l'id résolu ici casserait l'attribution buteurs/cartons à chaque fois que
   // la résolution échoue légitimement (équipe hors compétitions suivies).
+  // 20/11 : remplacements dans le déroulement aussi (comme LiveMatchPage), après buts et cartons.
+  const espnSubs = fetchedEspn?.subs ?? []
   const { home: homeEvents, away: awayEvents } = buildMatchEvents({
-    espnScorers, espnCards, homeId: rawHomeId ?? match.homeTeam?.id,
+    espnScorers, espnCards, espnSubs, homeId: rawHomeId ?? match.homeTeam?.id,
   })
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
@@ -381,28 +384,42 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
         <div className="lmp__heroScorers">
           <div className="lmp__heroScorersHome">
             {homeEvents.map((e, i, list) => (
-              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
-                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                {e.kind === 'sub' ? (
+                  <span className="lmp__heroScorerText lmp__heroSub">
+                    <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
+                    <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                  </span>
+                ) : (
                 <span className="lmp__heroScorerText">
                   {keepParticles(e.name)}
                   {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
+                )}
               </span>
             ))}
           </div>
           <div className="lmp__heroScorersDiv" />
           <div className="lmp__heroScorersAway">
             {awayEvents.map((e, i, list) => (
-              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
+              <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                 {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                     au 1er mot ; initiale + particules collées au nom ; minute jamais coupée. */}
-                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                {e.kind === 'sub' ? (
+                  <span className="lmp__heroScorerText lmp__heroSub">
+                    <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
+                    <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                  </span>
+                ) : (
                 <span className="lmp__heroScorerText">
                   {keepParticles(e.name)}
                   {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                 </span>
+                )}
               </span>
             ))}
           </div>
@@ -538,8 +555,8 @@ function MpMatchStats({ match, dataMatch }) {
 
   const fdSubs      = detail?.substitutions ?? []
   // 20/11 : remplacements ESPN (compos du résumé, déjà chargé ci-dessus pour les stats), FD en repli.
-  const espnSubs    = substitutionsFromLineups(espnStatsData?.lineups)
-  const hasEvents   = fdSubs.length > 0 || espnSubs.length > 0
+  // (20/11 : les remplacements ESPN sont dans le déroulement du hero, plus ici — pas de doublon.)
+  const hasEvents   = fdSubs.length > 0 && substitutionsFromLineups(espnStatsData?.lineups).length === 0
   // (`detailLoading` n'est plus lu ici depuis le retrait du message "Match
   // sans but", qui était le seul à distinguer "pas encore chargé" de
   // "vraiment aucun événement".)
@@ -617,7 +634,7 @@ function MpMatchStats({ match, dataMatch }) {
           0-0 est déjà affiché en grand juste au-dessus, donc la phrase
           n'apprenait rien. Le cas "aucun remplacement mais des buts" ne
           montrait déjà rien ici, on est simplement cohérent avec ça. */}
-      {hasEvents && <MatchTimeline fdSubs={fdSubs} espnSubs={espnSubs} homeId={match.homeTeam?.id} />}
+      {hasEvents && <MatchTimeline fdSubs={fdSubs} homeId={match.homeTeam?.id} />}
 
       {isLoading ? (
         <MpStatsSkeleton />

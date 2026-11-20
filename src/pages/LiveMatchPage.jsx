@@ -33,6 +33,8 @@ import {
   useH2HRows,
   H2HTabContent,
   buildMatchEvents,
+  useLiveSubstitutions,
+  SubIcon,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
 import './MatchPage.css'
@@ -120,6 +122,8 @@ function LmpPageSkeleton() {
 
 // ── Hero live (style MatchPage + éléments live) ───────────────────────────────
 function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }) {
+  // Remplacements du direct (20/11) : dans le déroulement, avec les buts et les cartons.
+  const { data: liveSubs } = useLiveSubstitutions(espn, !!espn)
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 
@@ -466,38 +470,55 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
         const { home: homeEvents, away: awayEvents } = buildMatchEvents({
           espnScorers: espn?.scorers ?? [],
           espnCards:   espn?.cards   ?? [],
+          espnSubs:    liveSubs ?? [],
         })
         if (homeEvents.length === 0 && awayEvents.length === 0) return null
         return (
           <div className="lmp__heroScorers">
             <div className="lmp__heroScorersHome">
               {homeEvents.map((e, i, list) => (
-                <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
+                <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                       au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
                       17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
                       prénom, plus sous le ballon. */}
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                  {e.kind === 'sub' ? (
+                    // Remplacement (20/11) : entrant ↑ vert + minute, sortant ↓ rouge en dessous.
+                    <span className="lmp__heroScorerText lmp__heroSub">
+                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
+                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                    </span>
+                  ) : (
                   <span className="lmp__heroScorerText">
                     {keepParticles(e.name)}
                     {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
+                  )}
                 </span>
               ))}
             </div>
             <div className="lmp__heroScorersDiv" />
             <div className="lmp__heroScorersAway">
               {awayEvents.map((e, i, list) => (
-                <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
+                <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
                   {/* Nom sur plusieurs lignes si besoin, coupé entre les mots ; l'icône reste collée
                       au 1er mot ; initiale + particules collées au nom ; minute jamais coupée.
                       17/11 : icône SORTIE du texte (colonne à part) → la 2e ligne repart sous le
                       prénom, plus sous le ballon. */}
-                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.icon}</span>
+                  <span className="lmp__heroScorerIcon" aria-hidden="true">{e.kind === 'sub' ? <SubIcon size={12} /> : e.icon}</span>
+                  {e.kind === 'sub' ? (
+                    // Remplacement (20/11) : entrant ↑ vert + minute, sortant ↓ rouge en dessous.
+                    <span className="lmp__heroScorerText lmp__heroSub">
+                      <span className="lmp__heroSubIn"><i>↑</i>{keepParticles(e.inName)}{e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}</span>
+                      <span className="lmp__heroSubOut"><i>↓</i>{keepParticles(e.outName)}</span>
+                    </span>
+                  ) : (
                   <span className="lmp__heroScorerText">
                     {keepParticles(e.name)}
                     {e.minute && <>{minuteJoiner(e.minute)}<span className="lmp__heroScorerMin">{keepTogether(e.minute)}</span></>}
                   </span>
+                  )}
                 </span>
               ))}
             </div>

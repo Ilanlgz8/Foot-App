@@ -16,7 +16,7 @@
 // Passe 1 (scoreboard, jamais mis en cache, toujours au format ESPN natif).
 import { useQuery } from '@tanstack/react-query'
 import { COMP_ESPN, fuzzyTeam } from './useLiveMinute'
-import { extractMatchDetails } from '../utils/espnSummaryParse'
+import { extractMatchDetails, substitutionsFromLineups } from '../utils/espnSummaryParse'
 // ⚠️ AJOUT (constat utilisateur, 17/08 : plus de déroulé buts/cartons ET
 // stats figées en pleine "mi-temps" sur Lens-PSG/Trophée des Champions, une
 // fois le match terminé) : COMP_ESPN (= ESPN_SLUG_BY_COMP_ID) n'est indexé
@@ -140,7 +140,7 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
   const slug = COMP_ESPN[compId] ?? COMP_ESPN[match?.competition?.id] ?? espnNativeSlug(match)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['espnMatchDetail', match?.id, slug],
+    queryKey: ['espnMatchDetail2', match?.id, slug],
     queryFn: async () => {
       if (!slug || !match) return null
 
@@ -200,6 +200,8 @@ export function useEspnMatchDetail(match, compId, enabled = true) {
         scorers: summaryResult?.scorers?.length ? summaryResult.scorers : boardResult.scorers,
         cards:   summaryResult?.cards?.length   ? summaryResult.cards   : boardResult.cards,
         stats:   summaryResult?.stats ?? boardResult.stats,
+        // Remplacements (20/11) : déroulement du hero de MatchPage, avec buts et cartons.
+        subs:    substitutionsFromLineups(summaryResult?.lineups),
       }
 
       // ⚠️ BUG CORRIGÉ (constat utilisateur : timeline vide sur les 2 derniers

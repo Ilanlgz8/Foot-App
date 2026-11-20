@@ -17,7 +17,7 @@ import { getLiveState, getMatchState } from '../utils/matchStateTracker'
 import { finalScore, outcomeForTeam, isNationalTeamComp, resolveFdMatchId, resolveFdTeamId } from '../utils/matchUtils'
 import { pronoToOdds, pronoIntensity, pronoGlowShadow, pronoFavoriteKey, qualificationOdds } from '../utils/calcProno'
 import { getMatchTeamColors } from '../data/teamPhotos'
-import { fuzzyTeam } from '../utils/espnSummaryParse'
+import { fuzzyTeam, substitutionsFromLineups } from '../utils/espnSummaryParse'
 import { FDCOUK_LEAGUE_FILE, toFdcoukName } from '../data/fdcoukTeamNames'
 import { groupScorers } from '../utils/groupScorers'
 import './../matchModal.css'
@@ -361,10 +361,7 @@ function espnMinuteLabel(raw) {
 // le hero (au lieu de n'y afficher que les buts), triés par minute — même
 // logique que le Fil du match, sans dupliquer le parsing des minutes.
 // Remplacements ESPN (20/11) : tirés des compos (lineups.home/away.changes, voir espnSummaryParse.js).
-export function substitutionsFromLineups(lineups) {
-  const side = (t, s) => (t?.changes ?? []).map(c => ({ ...c, side: s }))
-  return [...side(lineups?.home, 'home'), ...side(lineups?.away, 'away')]
-}
+export { substitutionsFromLineups }
 
 export function buildMatchEvents({ espnScorers = [], espnCards = [], fdGoals = [], fdBookings = [], fdSubs = [], espnSubs = [], homeId }) {
   const events = { home: [], away: [] }
@@ -480,6 +477,14 @@ function SubNames({ e, home }) {
 }
 
 const selectSubs = d => substitutionsFromLineups(d?.lineups)
+
+// Remplacements en direct (20/11) : affichés dans le déroulement du hero de LiveMatchPage, avec les
+// buts et les cartons. Même requête (et même cache) que les stats live détaillées : résumé ESPN,
+// rafraîchi chaque minute. Jamais pour les matchs FIFA (pas d'id ESPN).
+export function useLiveSubstitutions(espnScore, enabled = true) {
+  const ok = enabled && espnScore?.espnSlug !== 'fifa'
+  return useEspnSummaryStats(espnScore?.espnEventId, espnScore?.espnSlug, ok, selectSubs)
+}
 
 export function MatchTimeline({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, espnSubs, homeId }) {
   const { home, away } = buildMatchEvents({ espnScorers, espnCards, fdGoals, fdBookings, fdSubs, espnSubs, homeId })
@@ -615,14 +620,6 @@ export function LiveStatsTab({ match, espnScore }) {
     espnScore?.espnEventId,
     espnScore?.espnSlug,
     isLive && hasEspnId
-  )
-
-  // Remplacements en direct (20/11) : même requête que les stats (résumé ESPN, rafraîchi chaque minute).
-  const { data: liveSubs } = useEspnSummaryStats(
-    espnScore?.espnEventId,
-    espnScore?.espnSlug,
-    isLive && hasEspnId,
-    selectSubs
   )
 
   // Fallback api-football — si ESPN n'a rien (ni scoreboard ni summary) et pas FIFA
@@ -808,7 +805,6 @@ export function LiveStatsTab({ match, espnScore }) {
   return (
     <div>
       {liveProno && <LiveProno prono={liveProno} odds={matchOdds?.odds} match={match} isQualification={isExtraTimeOrTab} />}
-      {liveSubs?.length > 0 && <MatchTimeline espnSubs={liveSubs} />}
       {statsBody}
     </div>
   )

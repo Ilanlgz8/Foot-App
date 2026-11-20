@@ -176,8 +176,8 @@ const persister = createAsyncStoragePersister({
 // entrée par compétition/jour, pas une par match jamais consulté), donc
 // aucun risque de croissance illimitée de ce côté-là.
 const UNPERSISTED_QUERY_KEYS = new Set([
-  'espnMatchDetail',   // déroulement (buteurs/cartons) — useEspnMatchDetail.js
-  'espnSummary',       // stats live (MatchModal.jsx)
+  'espnMatchDetail2',  // déroulement (buteurs/cartons) — useEspnMatchDetail.js
+  'espnSummary2',      // stats live + remplacements (MatchModal.jsx)
   'lineups2',          // compos — useLineups
   'espnMatchStats2',   // stats + compos (Résultat) — useEspnMatchStats
   'probableLineups3',  // compos probables — useProbableLineups
