@@ -431,6 +431,7 @@ function GoalBadge({ count }) {
       fontSize:       '10px',
       lineHeight:     1,
       zIndex:         3,
+      transform:      'translate3d(0, 0, 0)',
     }} aria-label={`${count} but${count > 1 ? 's' : ''}`}>
       <span aria-hidden="true" style={{ fontSize: '10px' }}>⚽</span>
       {count > 1 && (
@@ -502,16 +503,20 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0, perspective: '300px' }}>
-        <div style={{
-          position:       'absolute',
-          inset:          0,
-          transformStyle: 'preserve-3d',
-          transition:     anim ?? 'transform .7s cubic-bezier(.3,.7,.3,1)',
-          transform:      showSub ? 'rotateY(180deg)' : 'none',
-        }}>
-          <DotFace color={color} num={player.number ?? ''} />
-          {sub && <DotFace color={color} num={sub.number ?? ''} back />}
+      <div style={{ position: 'relative', width: 'clamp(32px, 9.5vw, 42px)', height: 'clamp(32px, 9.5vw, 42px)', flexShrink: 0 }}>
+        {/* Retournement isolé dans sa propre couche (z-index 0) : sur iPhone (Safari), un élément en
+            3D passe sinon PAR-DESSUS les étiquettes ⚽ / minute malgré leur z-index (20/11). */}
+        <div style={{ position: 'absolute', inset: 0, perspective: '300px', zIndex: 0, isolation: 'isolate' }}>
+          <div style={{
+            position:       'absolute',
+            inset:          0,
+            transformStyle: 'preserve-3d',
+            transition:     anim ?? 'transform .7s cubic-bezier(.3,.7,.3,1)',
+            transform:      showSub ? 'rotateY(180deg)' : 'none',
+          }}>
+            <DotFace color={color} num={player.number ?? ''} />
+            {sub && <DotFace color={color} num={sub.number ?? ''} back />}
+          </div>
         </div>
         <GoalBadge count={showSub ? subGoalCount : goalCount} />
         {sub && (
@@ -533,6 +538,7 @@ function PlayerDot({ leftPct, topPct, player, teamColor, goalCount = 0, subGoalC
             fontFamily:   'var(--sf-font-ui)',
             lineHeight:   1,
             zIndex:       3,
+            transform:    'translate3d(0, 0, 0)',
             opacity:      showSub ? 1 : 0,
             transition:   anim ?? 'opacity .3s ease .5s',
           }} aria-label={`Remplacé à la ${minuteLabel(sub.minute)}`}>
