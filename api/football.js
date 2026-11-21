@@ -25,6 +25,25 @@
 
 import { Redis } from '@upstash/redis'
 import { withCpuMeter } from './_cpuMeter.js'
+import { gzipSync, gunzipSync } from 'node:zlib'
+
+// ── Corps de réponse compressés dans Redis (22/11) ──────────────────────────────
+// La bande passante Upstash (≈ 5 Go/mois sur 10 Go gratuits) venait surtout d'ici : chaque appel relit
+// en entier une réponse football-data.org mise en cache (liste des matchs d'un championnat ≈ plusieurs
+// centaines de Ko). Stockée compressée (gzip + base64, préfixe « gz: »), elle pèse ~6 à 8 fois moins à
+// chaque lecture et écriture. Les anciennes valeurs non compressées restent lisibles telles quelles.
+// CPU : compression seulement à l'écriture (rare), décompression ~1-2 ms à la lecture.
+const GZ_PREFIX = 'gz:'
+function packBody(body) {
+  try { return GZ_PREFIX + gzipSync(Buffer.from(body, 'utf8'), { level: 6 }).toString('base64') } catch { return body }
+}
+function unpackBody(v) {
+  if (v == null) return v
+  const str = typeof v === 'string' ? v : JSON.stringify(v)
+  if (!str.startsWith(GZ_PREFIX)) return str
+  try { return gunzipSync(Buffer.from(str.slice(GZ_PREFIX.length), 'base64')).toString('utf8') } catch { return null }
+}
+
 
 let kv = null
 function getKv() {
@@ -345,14 +364,14 @@ async function handler(req, res) {
     // ── Tentative de lecture depuis Redis ────────────────────────────────────
     if (ttl > 0 && redis) {
       try {
-        const cached = await redis.get(cacheKey)
+        const cached = unpackBody(await redis.get(cacheKey))
         if (cached) {
           return res
             .status(200)
             .setHeader('Content-Type', 'application/json')
             .setHeader('Cache-Control', getCacheControl())
             .setHeader('X-Cache', 'HIT')
-            .send(typeof cached === 'string' ? cached : JSON.stringify(cached))
+            .send(cached)
         }
       } catch { /* Redis indisponible → on continue vers FD.org */ }
     }
@@ -381,26 +400,26 @@ async function handler(req, res) {
       const altQs  = qs.split('&').filter(p => p !== 'live=0').join('&')
       const altKey = `fd:${fdPath}${altQs ? '?' + altQs : ''}`
       try {
-        const cached = await redis.get(altKey)
+        const cached = unpackBody(await redis.get(altKey))
         if (cached) {
           return res
             .status(200)
             .setHeader('Content-Type', 'application/json')
             .setHeader('Cache-Control', getCacheControl())
             .setHeader('X-Cache', 'HIT')
-            .send(typeof cached === 'string' ? cached : JSON.stringify(cached))
+            .send(cached)
         }
       } catch { /* Redis indisponible → on continue */ }
       try {
         const altStaleKey = `fd:stale:${fdPath}${altQs ? '?' + altQs : ''}`
-        const stale = await redis.get(altStaleKey)
+        const stale = unpackBody(await redis.get(altStaleKey))
         if (stale) {
           return res
             .status(200)
             .setHeader('Content-Type', 'application/json')
             .setHeader('Cache-Control', 'no-store')
             .setHeader('X-Cache', 'STALE')
-            .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+            .send(stale)
         }
       } catch { /* Redis indisponible → on continue */ }
     }
@@ -423,14 +442,14 @@ async function handler(req, res) {
       if (!blocked) blocked = !(await reserveQuota(redis))
       if (blocked) {
         try {
-          const stale = await redis.get(staleKey)
+          const stale = unpackBody(await redis.get(staleKey))
           if (stale) {
             return res
               .status(200)
               .setHeader('Content-Type', 'application/json')
               .setHeader('Cache-Control', 'no-store')
               .setHeader('X-Cache', 'STALE')
-              .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+              .send(stale)
           }
         } catch {}
         // ⚠️ AJOUT (05/11, constat utilisateur : « le classement des buteurs de
@@ -450,14 +469,14 @@ async function handler(req, res) {
           const twinPath = `${fdPath}${twinQs ? '?' + twinQs : ''}`
           for (const k of [`fd:${twinPath}`, `fd:stale:${twinPath}`]) {
             try {
-              const twin = await redis.get(k)
+              const twin = unpackBody(await redis.get(k))
               if (twin) {
                 return res
                   .status(200)
                   .setHeader('Content-Type', 'application/json')
                   .setHeader('Cache-Control', 'no-store')
                   .setHeader('X-Cache', 'STALE')
-                  .send(typeof twin === 'string' ? twin : JSON.stringify(twin))
+                  .send(twin)
               }
             } catch {}
           }
@@ -498,8 +517,9 @@ async function handler(req, res) {
     // ── Mise en cache Redis si réponse OK ────────────────────────────────────
     if (redis && response.ok) {
       try {
-        if (ttl > 0) await redis.set(cacheKey, body, { ex: ttl })
-        await redis.set(staleKey, body, { ex: STALE_TTL })
+        const packed = packBody(body)
+        if (ttl > 0) await redis.set(cacheKey, packed, { ex: ttl })
+        await redis.set(staleKey, packed, { ex: STALE_TTL })
       } catch { /* silently ignore — pas critique */ }
     } else if ((response.status === 429 || response.status === 403) && redis) {
       // Vrai 429 (malgré notre propre budget) OU 403 (blocage anti-abus,
@@ -509,14 +529,14 @@ async function handler(req, res) {
       const downTtl = response.status === 403 ? DOWN_TTL_FORBIDDEN : DOWN_TTL
       try { await redis.set(downKey, '1', { ex: downTtl }) } catch {}
       try {
-        const stale = await redis.get(staleKey)
+        const stale = unpackBody(await redis.get(staleKey))
         if (stale) {
           return res
             .status(200)
             .setHeader('Content-Type', 'application/json')
             .setHeader('Cache-Control', 'no-store')
             .setHeader('X-Cache', 'STALE')
-            .send(typeof stale === 'string' ? stale : JSON.stringify(stale))
+            .send(stale)
         }
       } catch {}
     }

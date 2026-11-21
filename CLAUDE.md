@@ -203,6 +203,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Remplacements (20/11)** : source ESPN `summary.keyEvents` (type `substitution`, participants[0] = entrant, [1] = sortant) + `rosters[].roster[].subbedIn/subbedOut/plays`. Parsés dans `espnSummaryParse.js` (`extractSubstitutions`, `attachChanges`) → `lineups.home/away.changes`, `starter.replacedBy` (joueur qui a fini le match, chaîne suivie), `subOn`/`subOff`. Cache serveur `espn:summary:v4`, React Query `espnSummaryShared2` (persisté !), disque `lineups_*_v3`/`stats_*_v3`. Affichage : déroulement du hero, repliés derrière le bouton `SubsToggle` (choix par match, `useShowSubs(matchId)`, gardé le temps de la session) (LiveMatchPage via `useLiveSubstitutions`, MatchPage via `useEspnMatchDetail` → `subs`), après buts et cartons, `SubIcon` double flèche, entrant ↑ vert / sortant ↓ rouge ; Compos (`LineupPitch.jsx`) : pastille du titulaire qui se retourne en 2D (keyframes `sfDotFlip` dans index.css — pas de 3D : sur iPhone elle cachait les ballons) en boucle (remplaçant 8 s, titulaire 5 s), étiquette double flèche + minute permanente, ↑/↓ minute dans la liste.
 
+- **Bande passante Upstash (22/11)** : ~5 Go/mois sur 10 Go gratuits, venue surtout des réponses football-data.org mises en cache en entier dans Redis (`api/football.js`, relues à chaque appel). Désormais stockées compressées (`packBody`/`unpackBody`, préfixe `gz:`, gzip + base64 ; anciennes valeurs non compressées toujours lisibles). Toute nouvelle grosse valeur dans Redis : la compresser pareil.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
