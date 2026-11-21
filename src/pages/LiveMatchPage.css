@@ -1609,3 +1609,21 @@
 .lmp__heroSubIn i { color: #22c55e; }
 .lmp__heroSubOut i { color: #ef4444; }
 .lmp__heroScorerIcon svg { display: block; }
+
+/* Bouton « Remplacements (5 · 5) » sous le déroulement (22/11) : remplacements repliés par défaut,
+   choix retenu sur le téléphone (useShowSubs). */
+.lmp__subsToggle {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 6px;
+  margin: 0.7rem auto 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(var(--white-rgb), 0.08);
+  border: 1px solid rgba(var(--white-rgb), 0.14);
+  color: rgba(var(--white-rgb), 0.85);
+  font: 600 0.7rem/1 var(--sf-font-ui, inherit);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lmp__subsToggle:active { transform: scale(0.97); }
+.lmp__subsToggleChev { opacity: 0.7; }

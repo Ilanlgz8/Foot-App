@@ -478,6 +478,32 @@ function SubNames({ e, home }) {
 
 const selectSubs = d => substitutionsFromLineups(d?.lineups)
 
+// Remplacements repliés dans le déroulement (22/11) : bouton « Remplacements (5 · 5) » sous les buts
+// et cartons. Le choix (ouvert/fermé) est retenu sur le téléphone pour les matchs suivants.
+const SHOW_SUBS_KEY = 'sf_showSubs'
+export function useShowSubs() {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(SHOW_SUBS_KEY) === '1' } catch { return false } })
+  const toggle = () => setOpen(o => {
+    const n = !o
+    try { localStorage.setItem(SHOW_SUBS_KEY, n ? '1' : '0') } catch { /* stockage indisponible : choix non retenu */ }
+    return n
+  })
+  return [open, toggle]
+}
+
+export function SubsToggle({ subs, open, onToggle }) {
+  if (!subs?.length) return null
+  const nh = subs.filter(s => s.side === 'home').length
+  const na = subs.length - nh
+  return (
+    <button type="button" className="lmp__subsToggle" onClick={onToggle} aria-expanded={open}>
+      <SubIcon size={14} />
+      <span>{open ? 'Masquer les remplacements' : `Remplacements (${nh} · ${na})`}</span>
+      <span className="lmp__subsToggleChev" aria-hidden="true">{open ? '▴' : '▾'}</span>
+    </button>
+  )
+}
+
 // Remplacements en direct (20/11) : affichés dans le déroulement du hero de LiveMatchPage, avec les
 // buts et les cartons. Même requête (et même cache) que les stats live détaillées : résumé ESPN,
 // rafraîchi chaque minute. Jamais pour les matchs FIFA (pas d'id ESPN).

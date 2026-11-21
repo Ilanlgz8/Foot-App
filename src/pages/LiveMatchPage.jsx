@@ -35,6 +35,8 @@ import {
   H2HTabContent,
   buildMatchEvents,
   useLiveSubstitutions,
+  useShowSubs,
+  SubsToggle,
   SubIcon,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
@@ -125,6 +127,7 @@ function LmpPageSkeleton() {
 function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }) {
   // Remplacements du direct (20/11) : dans le déroulement, avec les buts et les cartons.
   const { data: liveSubs } = useLiveSubstitutions(espn, !!espn)
+  const [showSubs, toggleSubs] = useShowSubs()
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 
@@ -471,11 +474,13 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
         const { home: homeEvents, away: awayEvents } = buildMatchEvents({
           espnScorers: espn?.scorers ?? [],
           espnCards:   espn?.cards   ?? [],
-          espnSubs:    liveSubs ?? [],
+          espnSubs:    showSubs ? (liveSubs ?? []) : [],
         })
-        if (homeEvents.length === 0 && awayEvents.length === 0) return null
+        const hasEvents = homeEvents.length > 0 || awayEvents.length > 0
+        if (!hasEvents && !liveSubs?.length) return null
         return (
-          <div className="lmp__heroScorers">
+          <>
+          {hasEvents && <div className="lmp__heroScorers">
             <div className="lmp__heroScorersHome">
               {homeEvents.map((e, i, list) => (
                 <span key={e.key} className={`lmp__heroScorerItem${i > 0 && ((e.icon !== '⚽' && list[i - 1].icon === '⚽') || (e.kind === 'sub' && list[i - 1].kind !== 'sub') || (e.kind === 'tab' && list[i - 1].kind !== 'tab')) ? ' lmp__heroScorerItem--sep' : ''}`}>
@@ -531,7 +536,9 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
                 </span>
               ))}
             </div>
-          </div>
+          </div>}
+          <SubsToggle subs={liveSubs} open={showSubs} onToggle={toggleSubs} />
+          </>
         )
       })()}
       </div>

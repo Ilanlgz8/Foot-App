@@ -38,6 +38,8 @@ import {
   TeamFormTable,
   buildMatchEvents,
   SubIcon,
+  useShowSubs,
+  SubsToggle,
   substitutionsFromLineups,
   useH2HRows,
   H2HTabContent,
@@ -218,8 +220,9 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // la résolution échoue légitimement (équipe hors compétitions suivies).
   // 20/11 : remplacements dans le déroulement aussi (comme LiveMatchPage), après buts et cartons.
   const espnSubs = fetchedEspn?.subs ?? []
+  const [showSubs, toggleSubs] = useShowSubs()
   const { home: homeEvents, away: awayEvents } = buildMatchEvents({
-    espnScorers, espnCards, espnSubs, homeId: rawHomeId ?? match.homeTeam?.id,
+    espnScorers, espnCards, espnSubs: showSubs ? espnSubs : [], homeId: rawHomeId ?? match.homeTeam?.id,
   })
 
   // Blason (club, pas de cercle forcé) vs drapeau (pays, cercle) — voir index.css
@@ -435,6 +438,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
           </div>
         </div>
       )}
+      <SubsToggle subs={espnSubs} open={showSubs} onToggle={toggleSubs} />
       </div>
     </div>
   )
