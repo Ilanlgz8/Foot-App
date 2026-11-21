@@ -31,7 +31,15 @@ async function flush() {
   } catch { /* mesure seulement : jamais bloquant */ }
 }
 
+// 22/11 : compteur COUPÉ par défaut. Chaque écriture (jusqu'à 1×/min par instance Vercel, ~2 commandes
+// par fonction mesurée) coûtait plusieurs milliers de commandes Upstash par jour — hausse de conso
+// constatée dès sa mise en place le 19/11. Mesures faites (19-21/11 : 4,4 à 5,2 min de CPU/jour) ; le
+// graphique « Fluid Active CPU » par jour du tableau de bord Vercel suffit pour le suivi. Pour une
+// nouvelle mesure détaillée : variable Vercel CPU_METER=1 + Redeploy, le temps d'une journée.
+const METER_ON = process.env.CPU_METER === '1'
+
 export function withCpuMeter(name, handler, modeOf = null) {
+  if (!METER_ON) return handler
   return async function metered(req, res) {
     const t0 = process.cpuUsage()
     try {
