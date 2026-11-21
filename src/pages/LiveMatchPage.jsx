@@ -27,6 +27,7 @@ import {
   LiveStatsTab,
   SeasonStatsTab,
   StatsSubTabs,
+  LiveOddsBlock,
   ComposTab,
   ClassementTab,
   TabDots,
@@ -790,6 +791,8 @@ export default function LiveMatchPage() {
                     MatchPage.jsx (voir StatsSubTabs). Affichée dès qu'il y a
                     au moins un 2e sous-onglet à proposer (Historique dispo),
                     sinon "Stats live" reste seule sans sélecteur inutile. */}
+                {/* Cotes AU-DESSUS des sous-onglets (22/11, demande utilisateur). */}
+                <LiveOddsBlock match={match} />
                 <StatsSubTabs view={statsView} onChange={setStatsView} showHistorique={showH2HTab} />
                 {statsView === 'historique' ? (
                   <H2HTabContent match={match} rows={h2hRows} isLoading={h2hLoading} homeId={h2hHomeId} />

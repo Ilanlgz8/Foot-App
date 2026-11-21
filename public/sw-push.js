@@ -73,7 +73,7 @@ self.addEventListener('push', event => {
   if (ts != null && Date.now() - ts > MAX_AGE_MS) return
 
   // waitUntil garantit que le SW reste actif jusqu'à la fin de l'affichage
-  event.waitUntil(
+  event.waitUntil(Promise.all([
     self.registration.showNotification(title, {
       body,
       icon:  '/statfootix.png',   // icône app
@@ -81,8 +81,14 @@ self.addEventListener('push', event => {
       tag, silent, renotify,
       // Données transmises au click handler
       data: { url },
-    })
-  )
+    }),
+    // 22/11 (constat utilisateur : notif « fin de match » reçue app ouverte, mais la carte restait en
+    // direct quelques secondes) : on prévient l'app ouverte, qui relance aussitôt une mise à jour
+    // du direct (useLiveMinute.js, écouteur 'sf-push'). Sans effet si l'app est fermée.
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(list => list.forEach(c => { try { c.postMessage({ type: 'sf-push', matchId, title }) } catch { /* fenêtre fermée */ } }))
+      .catch(() => {}),
+  ]))
 })
 
 /**

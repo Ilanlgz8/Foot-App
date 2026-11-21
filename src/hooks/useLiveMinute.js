@@ -1560,6 +1560,25 @@ export function useLiveMinute(matches) {
     }
   }, [queryClient])
 
+  // ── Notification reçue app ouverte (22/11) ────────────────────────────────────
+  // Le service worker (public/sw-push.js) prévient l'app à chaque notif (but, carton, fin…). On relance
+  // aussitôt une mise à jour FRAÎCHE du direct, puis une 2e quelques secondes plus tard : le Worker
+  // Cloudflare envoie la notif AVANT de republier l'état officiel (pub:all, en fin de passe), donc le
+  // 1er appel peut encore lire l'ancien état — le 2e attrape la publication. Rare (une notif), coût nul.
+  useEffect(() => {
+    const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null
+    if (!sw) return
+    const timers = []
+    const onMsg = (ev) => {
+      if (ev?.data?.type !== 'sf-push') return
+      if (document.visibilityState === 'hidden') return
+      pollESPN(matchesRef.current, queryClient, true)
+      timers.push(setTimeout(() => pollESPN(matchesRef.current, queryClient, true), 6_000))
+    }
+    sw.addEventListener('message', onMsg)
+    return () => { sw.removeEventListener('message', onMsg); timers.forEach(clearTimeout) }
+  }, [queryClient])
+
   // ── Ably : réveil instantané dès qu'un AUTRE utilisateur détecte un changement ──
   // Complément du poll ci-dessus, ne le remplace pas (voir commentaire sur
   // getAblyClient() plus haut). S'abonne uniquement aux matchs actuellement

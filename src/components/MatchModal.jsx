@@ -676,8 +676,7 @@ export function LiveStatsTab({ match, espnScore }) {
   // 18/11 : cotes via le hook PARTAGÉ useMatchOdds — EXACTEMENT les mêmes chiffres que les cartes
   // de l'Accueil / de la page Match (constat utilisateur : « c'est pas les mêmes cotes »). L'ancien
   // calcul local (ids, H2H, score et cote de marché pris à d'autres sources) est retiré.
-  const matchOdds = useMatchOdds(match)
-  const liveProno = matchOdds && !matchOdds.isFinished ? matchOdds.displayPct : null
+  // (22/11 : les cotes sont affichées par LiveOddsBlock, au-dessus des sous-onglets de LiveMatchPage.)
 
   // ── Priorité 1 : Stats FIFA live (WC 2026) — vérifié AVANT le scoreboard
   // basique ci-dessous (l'ancien ordre laissait un match CM avec juste
@@ -793,21 +792,25 @@ export function LiveStatsTab({ match, espnScore }) {
     )
   })()
 
-  // Prolongations/tirs au but (period ESPN 3/4/5) : un match à élimination
-  // directe ne peut pas se terminer sur un nul à ce stade — voir LiveProno
-  // ci-dessous, qui bascule alors en affichage "Qualification" 2 issues
-  // plutôt que 1/N/2. Simple à détecter (pas besoin de connaître le stage/la
-  // compétition : SEULS les matchs à élimination directe atteignent jamais
-  // ces périodes ESPN, un match de poules s'arrête toujours à period 2).
-  const espnPeriod       = getMatchState(match?.id)?.espnPeriod
-  const isExtraTimeOrTab = espnPeriod === 3 || espnPeriod === 4 || espnPeriod === 5
-
   return (
     <div>
-      {liveProno && <LiveProno prono={liveProno} odds={matchOdds?.odds} match={match} isQualification={isExtraTimeOrTab} />}
       {statsBody}
     </div>
   )
+}
+
+// Cotes du direct (22/11, demande utilisateur) : sorties des stats live pour être affichées AU-DESSUS
+// des sous-onglets « Stats live / Stats saison / Historique » de LiveMatchPage.
+// 18/11 : cotes via le hook PARTAGÉ useMatchOdds — EXACTEMENT les mêmes chiffres que les cartes.
+export function LiveOddsBlock({ match }) {
+  const matchOdds = useMatchOdds(match)
+  const liveProno = matchOdds && !matchOdds.isFinished ? matchOdds.displayPct : null
+  // Prolongations/tirs au but (period ESPN 3/4/5) : un match à élimination directe ne peut pas se
+  // terminer sur un nul — LiveProno bascule alors en affichage « Qualification » 2 issues.
+  const espnPeriod       = getMatchState(match?.id)?.espnPeriod
+  const isExtraTimeOrTab = espnPeriod === 3 || espnPeriod === 4 || espnPeriod === 5
+  if (!liveProno) return null
+  return <LiveProno prono={liveProno} odds={matchOdds?.odds} match={match} isQualification={isExtraTimeOrTab} />
 }
 
 // ── Pronostic live façon "côtes bookmaker" ────────────────────────────────
