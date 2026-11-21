@@ -127,7 +127,7 @@ function LmpPageSkeleton() {
 function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }) {
   // Remplacements du direct (20/11) : dans le déroulement, avec les buts et les cartons.
   const { data: liveSubs } = useLiveSubstitutions(espn, !!espn)
-  const [showSubs, toggleSubs] = useShowSubs()
+  const [showSubs, toggleSubs] = useShowSubs(match.id)
   const matchSt   = getMatchState(match.id)
   const isTermine = matchSt.ft === true
 

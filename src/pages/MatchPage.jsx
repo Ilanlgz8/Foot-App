@@ -220,7 +220,7 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // la résolution échoue légitimement (équipe hors compétitions suivies).
   // 20/11 : remplacements dans le déroulement aussi (comme LiveMatchPage), après buts et cartons.
   const espnSubs = fetchedEspn?.subs ?? []
-  const [showSubs, toggleSubs] = useShowSubs()
+  const [showSubs, toggleSubs] = useShowSubs(match.id)
   const { home: homeEvents, away: awayEvents } = buildMatchEvents({
     espnScorers, espnCards, espnSubs: showSubs ? espnSubs : [], homeId: rawHomeId ?? match.homeTeam?.id,
   })

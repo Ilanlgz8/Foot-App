@@ -479,13 +479,16 @@ function SubNames({ e, home }) {
 const selectSubs = d => substitutionsFromLineups(d?.lineups)
 
 // Remplacements repliés dans le déroulement (22/11) : bouton « Remplacements (5 · 5) » sous les buts
-// et cartons. Le choix (ouvert/fermé) est retenu sur le téléphone pour les matchs suivants.
-const SHOW_SUBS_KEY = 'sf_showSubs'
-export function useShowSubs() {
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(SHOW_SUBS_KEY) === '1' } catch { return false } })
+// et cartons. Choix PAR MATCH (demande utilisateur : « si une personne veut voir pour un match mais
+// pas les autres ») : chaque match s'ouvre replié ; un match déplié le reste si on y revient pendant
+// la même session (mémoire simple, rien d'enregistré sur le téléphone).
+const openSubsMatches = new Set()
+export function useShowSubs(matchId) {
+  const key = String(matchId ?? '')
+  const [open, setOpen] = useState(() => openSubsMatches.has(key))
   const toggle = () => setOpen(o => {
     const n = !o
-    try { localStorage.setItem(SHOW_SUBS_KEY, n ? '1' : '0') } catch { /* stockage indisponible : choix non retenu */ }
+    if (n) openSubsMatches.add(key); else openSubsMatches.delete(key)
     return n
   })
   return [open, toggle]
