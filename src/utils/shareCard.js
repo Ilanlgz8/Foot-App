@@ -308,7 +308,7 @@ export async function renderShareCard(d) {
     spaced(ctx, col.team.name.toUpperCase(), col.cx, 576, 7, 'center')
     // score géant, penché
     ctx.save()
-    ctx.font = '900 520px Archivo, Inter, system-ui, sans-serif'
+    ctx.font = '900 450px Archivo, Inter, system-ui, sans-serif'
     const sg = ctx.createLinearGradient(0, -390, 0, 5)
     sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(225,232,255,1)')
     ctx.fillStyle = sg // 23/11 : le score du perdant aussi en blanc (seul le gagnant garde le halo)
@@ -317,7 +317,7 @@ export async function renderShareCard(d) {
     // centrage au pixel près sur le blason et le nom (23/11) : centre du DESSIN du chiffre penché,
     // mesuré sur les pixels (pas sa boîte typographique, décalée pour un « 1 » par exemple).
     const ox = -inkCenterX(ctx.font, txt)
-    const place = c => { c.translate(col.cx, 1000); c.transform(1, 0, -SKEW, 1, 0, 0) }
+    const place = c => { c.translate(col.cx, 985); c.transform(1, 0, -SKEW, 1, 0, 0) }
     if (winner === -1 || winner === i) {
       // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct)
       paintLayer(ctx, softLayer(c => { place(c); c.font = ctx.font; c.textAlign = 'left'; c.fillText(txt, ox, 0) }, WHITE, { scale: 1 / 4, radius: 5 }), 0.42)
