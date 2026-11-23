@@ -13,17 +13,13 @@ function icsDate(d) {
 // Échappement iCalendar (RFC 5545) : \ ; , et retours à la ligne.
 const esc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
-export function matchEventInfo({ id, homeName, awayName, utcDate, compLabel, channel, venue, homeCrest, awayCrest }) {
+export function matchEventInfo({ id, homeName, awayName, utcDate, compLabel, channel, venue }) {
   const start = new Date(utcDate)
   if (Number.isNaN(start.getTime())) return null
   const end = new Date(start.getTime() + MATCH_MS)
   const title = `${homeName} – ${awayName}` // sans emoji (23/11, demande utilisateur)
   const details = [compLabel, channel ? `Diffusion : ${channel}` : null, 'Scores et notifs en direct : statfootix.vercel.app'].filter(Boolean).join('\n')
-  return {
-    uid: `match-${id}@statfootix.vercel.app`, title, start, end, details, location: venue || '',
-    // affichage dans la feuille « Ajouter au calendrier » (pas utilisé dans le fichier .ics)
-    view: { homeName, awayName, homeCrest: homeCrest || null, awayCrest: awayCrest || null, compLabel: compLabel || '', channel: channel || null },
-  }
+  return { uid: `match-${id}@statfootix.vercel.app`, title, start, end, details, location: venue || '' }
 }
 
 export function buildIcs(ev) {
@@ -63,6 +59,15 @@ export function openIcs(ev) {
   a.download = `${ev.title.replace(/[^\p{L}\p{N} -]/gu, '').trim() || 'match'}.ics`
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+// Ajout en UN appui (23/11, demande utilisateur : plus de fenêtre « iPhone ou Google ») :
+// Android → Google Agenda (pas de gestion fiable des .ics) ; iPhone/iPad/ordinateur → fichier .ics
+// (iOS affiche son écran « Ajouter tout », rappel 1 h avant compris).
+export function addToCalendar(ev) {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  if (/Android/i.test(ua)) window.open(googleCalendarUrl(ev), '_blank', 'noopener')
+  else openIcs(ev)
 }
 
 // Matchs déjà ajoutés (mémorisés sur le téléphone, survivent à la fermeture de l'app) : le bandeau

@@ -6,8 +6,7 @@ import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
 import { useState } from 'react'
-import { CalendarSheet } from '../components/MatchActions'
-import { matchEventInfo, isAdded, markAdded } from '../utils/calendarEvent'
+import { matchEventInfo, isAdded, markAdded, addToCalendar } from '../utils/calendarEvent'
 import { getBroadcaster } from '../data/broadcasters'
 import { compForMatch } from '../data/competitions'
 
@@ -46,7 +45,6 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
   const favColorRgb = hexToRgbTriplet(favColor)
 
   const [added, setAdded] = useState(() => isAdded(match.id))
-  const [sheet, setSheet] = useState(false)
   const startsIn = new Date(match.utcDate).getTime() - Date.now()
   const showCal = !isLive && startsIn > 0 && startsIn < CAL_WINDOW_MS
   const compName = compForMatch(match)?.name ?? match.competition?.name ?? ''
@@ -54,7 +52,6 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
     id: match.id, homeName, awayName, utcDate: match.utcDate,
     compLabel: `${compName}${match.matchday ? ` · Journée ${match.matchday}` : ''}`.trim(),
     channel: getBroadcaster(match)?.name ?? null,
-    homeCrest: match.homeTeam?.crest, awayCrest: match.awayTeam?.crest,
   }) : null
 
   return (
@@ -104,14 +101,10 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
           Dans l'agenda
         </span>
-      : <button type="button" className="myTeamBanner__cal" onClick={() => setSheet(true)}>
+      : <button type="button" className="myTeamBanner__cal" onClick={() => { addToCalendar(ev); markAdded(match.id); setAdded(true) }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
           Ajouter
         </button>)}
-    {sheet && ev && (
-      <CalendarSheet ev={ev} onClose={() => setSheet(false)}
-        onDone={() => { markAdded(match.id); setAdded(true); setSheet(false) }} />
-    )}
     </div>
   )
 }
