@@ -751,3 +751,27 @@ describe('calcLiveProno — continuité avec la cote d\'avant-match (19/11)', ()
     expect(live.home).toBeGreaterThan(marketPre.home + 15)
   })
 })
+
+// ── 23/11 : grosse équipe menée d'un but en début de match ──────────────────────────────────────
+describe('calcLiveProno — équipe forte menée au score', () => {
+  const strong = { home: 70, draw: 18, away: 12 }   // grosse équipe à domicile (cote ~1,43)
+  it('menée 0-1 tôt, la grosse équipe reste plus probable gagnante que le nul (avant : cote ~4,3)', () => {
+    const live = calcLiveProno([], [], 0, 1, "10'", { marketPre: strong })
+    expect(live.home).toBeGreaterThan(live.draw)
+    expect(100 / live.home).toBeLessThan(2.6)
+  })
+  it('plus le temps passe, plus sa cote monte', () => {
+    const t = ["10'", "30'", "60'", "80'"].map(m => calcLiveProno([], [], 0, 1, m, { marketPre: strong }).home)
+    for (let i = 1; i < t.length; i++) expect(t[i]).toBeLessThan(t[i - 1])
+  })
+  it('une petite équipe menée a beaucoup moins de chances de revenir qu\'une grosse', () => {
+    const weak = { home: 25, draw: 27, away: 48 }
+    const big = calcLiveProno([], [], 0, 1, "20'", { marketPre: strong }).home
+    const small = calcLiveProno([], [], 0, 1, "20'", { marketPre: weak }).home
+    expect(big).toBeGreaterThan(small * 2)
+  })
+  it('1-1 à la 20e : le favori n\'est pas plus favori qu\'avant le match', () => {
+    const live = calcLiveProno([], [], 1, 1, "20'", { marketPre: strong })
+    expect(live.home).toBeLessThanOrEqual(strong.home)
+  })
+})

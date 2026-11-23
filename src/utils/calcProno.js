@@ -1171,9 +1171,11 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // 70e minute) — en dessous de 20min, comportement inchangé (paceFactor=1).
   // Au-delà, le poids donné au rythme observé grandit en continu (même
   // logique de shrinkage que shrinkRatio/RATIO_SHRINK_K plus haut).
-  const MIN_PACE_MINUTES = 20
+  // 23/11 (constat utilisateur : 1-1 à la 20e donnait le favori PLUS favori qu'avant le match) :
+  // rythme observé pris en compte à partir de 30 min seulement, et borné à ×1,6.
+  const MIN_PACE_MINUTES = 30
   const PACE_SHRINK_K = 45  // minutes pour arriver à 50% de confiance dans le rythme observé
-  const MAX_PACE_FACTOR = 2.5  // borné : un coup de chaud dans le match ne doit pas non plus devenir délirant
+  const MAX_PACE_FACTOR = 1.6  // borné : un coup de chaud dans le match ne doit pas non plus devenir délirant
   const totalGoalsSoFar   = (homeGoals ?? 0) + (awayGoals ?? 0)
   const baselinePace      = baseLambdaHome + baseLambdaAway
   let paceFactor = 1
@@ -1183,8 +1185,23 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     const blendedPace = baselinePace * (1 - w) + observedFullMatchPace * w
     paceFactor = Math.max(1 / MAX_PACE_FACTOR, Math.min(MAX_PACE_FACTOR, blendedPace / baselinePace))
   }
-  const lambdaHome = baseLambdaHome * paceFactor
-  const lambdaAway = baseLambdaAway * paceFactor
+  let lambdaHome = baseLambdaHome * paceFactor
+  let lambdaAway = baseLambdaAway * paceFactor
+
+  // ── Effet « équipe qui court après le score » (23/11, constat utilisateur : « une grosse équipe
+  // menée 0-1 en début de match à 5, c'est trop ») : une équipe menée attaque davantage, et d'autant
+  // plus qu'elle est plus forte que l'adversaire (une grosse équipe a les moyens de revenir, une petite
+  // beaucoup moins). Son rythme de buts est augmenté jusqu'à +30 % selon l'écart de niveau
+  // d'avant-match ; l'adversaire, qui recule, marque un peu plus en contre (+5 %).
+  const CHASE_MAX = 0.30
+  if (diff !== 0) {
+    const trailingIsHome = diff < 0
+    const lt = trailingIsHome ? baseLambdaHome : baseLambdaAway
+    const ll = trailingIsHome ? baseLambdaAway : baseLambdaHome
+    const gap = ll > 0 ? Math.max(0, Math.min(1, (lt / ll - 1) / 2)) : 0   // 0 = niveau égal, 1 = 3× plus fort
+    const boost = 1 + 0.08 + CHASE_MAX * gap
+    if (trailingIsHome) { lambdaHome *= boost; lambdaAway *= 1.05 } else { lambdaAway *= boost; lambdaHome *= 1.05 }
+  }
 
   // ── Lissage de la bascule en fin de match (retour utilisateur, 10/09 :
   // "on est souvent trop méchant quand ça approche de la fin du match, à
@@ -1286,10 +1303,13 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // ajustements "pression" ci-dessus (eux ne sont PAS contraints par la
   // même logique Poisson, un gros swing pourrait en théorie repousser home
   // au-dessus de draw même en étant mené).
-  if (diff < 0 && home > draw) {
+  // Mené de 2 buts ou plus : gagner reste moins probable qu'un nul. Mené d'UN seul but, plus de
+  // plafond (23/11) — une grosse équipe menée tôt dans le match a réellement plus de chances de
+  // gagner que de faire nul (le calcul Poisson le montre) ; plus tard, le calcul le fait de lui-même.
+  if (diff <= -2 && home > draw) {
     away += home - draw
     home = draw
-  } else if (diff > 0 && away > draw) {
+  } else if (diff >= 2 && away > draw) {
     home += away - draw
     away = draw
   }
@@ -1318,12 +1338,12 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // victoire (jamais sous 1%) et rendu à l'équipe qui mène — la cote de
   // victoire de l'équipe menée reste ainsi TOUJOURS strictement plus haute
   // (moins probable) que celle du nul, jamais identique.
-  if (diff < 0 && result.home >= result.draw) {
+  if (diff <= -2 && result.home >= result.draw) {
     const target = Math.max(1, result.draw - 1)
     const shift  = result.home - target
     result.home = target
     result.away += shift
-  } else if (diff > 0 && result.away >= result.draw) {
+  } else if (diff >= 2 && result.away >= result.draw) {
     const target = Math.max(1, result.draw - 1)
     const shift  = result.away - target
     result.away = target
