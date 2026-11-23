@@ -219,10 +219,18 @@ function matchesFavoriteClub(subClubs, candidateNames) {
 // ⚠️ paramètre `strict` RETIRÉ (27/10, voir matchesFavoriteStrict ci-dessus) —
 // ne servait qu'au ticker, retiré avec lui. Un seul comportement désormais,
 // identique pour toutes les notifs : pas de filtre configuré = tout recevoir.
+// ⚠️ RÈGLE CHANGÉE (23/11, demande utilisateur) — avant, dès qu'une équipe favorite était choisie, les
+// championnats cochés étaient IGNORÉS (« club > compétition »). Désormais :
+//  • équipes seulement (aucun championnat coché) → uniquement les matchs de ces équipes (inchangé) ;
+//  • équipes + championnats → tous les matchs des championnats cochés ET les matchs des équipes, même
+//    hors de ces championnats (ex. Ligue 1 + PSG + Maroc : toute la Ligue 1, plus le Maroc en CAN) ;
+//  • championnats seulement → ces championnats (inchangé) ; rien du tout → tout (inchangé).
 function subscriberWantsThis(sub, slug, candidateNames) {
   const clubResult = matchesFavoriteClub(sub.clubs, candidateNames ?? [])
-  if (clubResult !== null) return clubResult
-  return matchesFavorite(sub.comps, slug)
+  if (clubResult === null) return matchesFavorite(sub.comps, slug)   // pas d'équipe favorite
+  if (clubResult === true) return true                                // match d'une équipe favorite
+  const hasComps = Array.isArray(sub.comps) && sub.comps.length > 0
+  return hasComps && !!slug && sub.comps.includes(slug)               // sinon : seulement les championnats cochés
 }
 
 // ⚠️ AJOUT (question utilisateur : optimiser encore le CPU du cron) : avant,

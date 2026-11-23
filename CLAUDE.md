@@ -40,6 +40,7 @@ React + Vite + Vercel. Déployé sur `https://statfootix.vercel.app`.
 - `usePushNotifications.js` — hook d'abonnement, auto-subscribe au 1er lancement, re-sync Redis toutes les 5 min
 - `NotificationBell.jsx` — dans la navbar, utilise `usePushNotifications`
 - `public/sw-push.js` — handler `push` event dans le service worker (importé via `importScripts`)
+- **Filtre des notifs (23/11)** : `subscriberWantsThis` (api/cron-goals.js) — équipes seules → que ces équipes ; équipes + championnats → championnats cochés ET équipes (même hors de ces championnats) ; championnats seuls → ces championnats ; rien → tout. Rappel du matin : équipes seulement (`clubsOnly`).
 
 ### Assistant IA (Pronos)
 - `Pronos.jsx` — switcher top-level `mode` (`pronos`/`ia`, 2 boutons tout en haut de la page, indépendant de `activeTab`) ; Assistant accessible sans rejoindre de groupe
