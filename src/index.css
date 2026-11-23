@@ -693,3 +693,22 @@ img[data-team*="Juventus" i] {
   50%  { transform: scaleX(0); }
   100% { transform: scaleX(1); }
 }
+
+/* Menu « Ajouter au calendrier » (MatchActions.jsx — pages de match ET bandeau Mon équipe de l'Accueil,
+   d'où sa place ici, dans le CSS global). */
+.calSheetLayer { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; justify-content: center; }
+.calSheet {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  width: 100%; max-width: 480px; background: #1b1d24; border: 1px solid #2a2d36; border-radius: 20px 20px 0 0;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); color: #fff;
+}
+.calSheet__title { font-weight: 800; font-size: 1rem; }
+.calSheet__sub { margin-top: 4px; font-size: 0.8rem; color: rgba(255,255,255,0.75); }
+.calSheet__opt {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 13px 14px;
+  border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  color: #fff; font: inherit; font-weight: 700; font-size: 0.9rem; text-decoration: none; cursor: pointer; text-align: left;
+}
+.calSheet__opt span { font-size: 1.15rem; width: 22px; text-align: center; }
+.calSheet__note { margin-top: 10px; font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+.calSheet__cancel { width: 100%; margin-top: 10px; padding: 12px; border: 0; background: none; color: rgba(255,255,255,0.8); font: inherit; font-weight: 700; cursor: pointer; }

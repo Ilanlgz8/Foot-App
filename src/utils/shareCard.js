@@ -225,12 +225,13 @@ export async function renderShareCard(d) {
   ctx.fillText(' · scores et notifs en direct', 60 + fw, 1846)
   ctx.textAlign = 'right'; ctx.fillText('statfootix.vercel.app', 1020, 1846)
 
-  return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('image'))), 'image/png'))
+  // JPEG : bien plus léger qu'un PNG (3,5 Mo mesuré en PNG à cause du grain), qualité identique à l'œil.
+  return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('image'))), 'image/jpeg', 0.92))
 }
 
 // Partage via le menu natif (iPhone / Android) ; sinon téléchargement de l'image.
 export async function shareImage(blob, fileName, title) {
-  const file = new File([blob], fileName, { type: 'image/png' })
+  const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' })
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file], title }); return 'shared' } catch (e) { if (e?.name === 'AbortError') return 'cancelled' }
   }

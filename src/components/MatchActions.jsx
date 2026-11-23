@@ -1,6 +1,7 @@
 // Boutons en haut à droite des pages de match (22/11) : Partager (image du match, direct et
 // Résultat) et Ajouter au calendrier (match à venir). Voir shareCard.js / calendarEvent.js.
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { renderShareCard, shareImage } from '../utils/shareCard'
 import { buildMatchSummary } from '../utils/matchSummary'
 import { getMatchTeamColors } from '../data/teamPhotos'
@@ -65,7 +66,7 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
         summary: buildMatchSummary({ homeName, awayName, hs, as, goals, isFinished }),
       })
       const file = `${homeName}-${awayName}`.replace(/[^\p{L}\p{N}-]+/gu, '-').toLowerCase()
-      await shareImage(blob, `statfootix-${file}.png`, `${homeName} ${hs ?? ''}-${as ?? ''} ${awayName}`)
+      await shareImage(blob, `statfootix-${file}.jpg`, `${homeName} ${hs ?? ''}-${as ?? ''} ${awayName}`)
     } catch { /* échec silencieux : rien de cassé, l'utilisateur peut réessayer */ }
     setBusy(false)
   }
@@ -94,8 +95,10 @@ export function CalendarMatchButton({ match, homeName, awayName, compName, chann
 
 export function CalendarSheet({ ev, onClose, onDone }) {
   const when = ev.start.toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-  return (
-    <div className="calSheet__backdrop" onClick={onClose}>
+  // Rendu dans <body> (portail) : hors du conteneur qui défile (sinon la feuille défilerait avec la
+  // page), et classe « calSheetLayer » — le thème Sobre masque tout ce qui finit par « __backdrop ».
+  return createPortal(
+    <div className="calSheetLayer" onClick={onClose}>
       <div className="calSheet" onClick={e => e.stopPropagation()} role="dialog" aria-label="Ajouter au calendrier">
         <div className="calSheet__title">Ajouter au calendrier</div>
         <div className="calSheet__sub">{ev.title.replace(/^⚽\s*/, '')} · {when}</div>
@@ -108,6 +111,7 @@ export function CalendarSheet({ ev, onClose, onDone }) {
         <div className="calSheet__note">Rappel 1 h avant le coup d'envoi (calendrier de l'iPhone).</div>
         <button type="button" className="calSheet__cancel" onClick={onClose}>Annuler</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
