@@ -1,7 +1,7 @@
 // Image à partager d'un match (22/11, maquette validée par l'utilisateur) — dessinée sur le téléphone
 // (canvas 1080×1920, format story), aucun appel serveur sauf les blasons (proxy /espn?crest=, mis en
 // cache CDN un an, pour que le canvas puisse être exporté : une image d'un autre site le bloquerait).
-// Mise en page : fond aux couleurs du championnat, éclair (Z vertical) entre les deux équipes, score géant
+// Mise en page : fond aux couleurs du championnat, trait lumineux en diagonale entre les deux équipes, score géant
 // centré sous chaque blason, buteurs sous chaque équipe (icône, nom, minute), phrase de résumé (matchSummary.js), adresse de l'app en bas.
 
 const W = 1080, H = 1920
@@ -180,33 +180,6 @@ function paintLayer(ctx, layer, alpha = 1) {
   ctx.drawImage(layer, 0, 0, W, H); ctx.restore()
 }
 
-// ── Éclair (23/11, demande utilisateur : « un éclair de Zeus, comme un Z à la verticale ») : forme
-// pleine aux angles vifs, épaisse en haut et effilée en pointe en bas, deux décrochements
-// horizontaux (au-dessus des scores et sous les scores) ; le statut est sur le grand segment central.
-const BOLT = [[668, -40, 46], [508, 432, 40], [618, 404, 36], [486, 1150, 26], [590, 1124, 20], [492, 1590, 0]]
-function boltOutline() {
-  const n = BOLT.length, L = [], R = []
-  const norm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l] }
-  for (let i = 0; i < n; i++) {
-    const [x, y, w] = BOLT[i], h = w / 2
-    let nx, ny
-    if (i === 0) [nx, ny] = norm(BOLT[0], BOLT[1])
-    else if (i === n - 1) [nx, ny] = norm(BOLT[n - 2], BOLT[n - 1])
-    else {
-      // angle vif : point d'onglet entre les deux segments
-      const a = norm(BOLT[i - 1], BOLT[i]), b = norm(BOLT[i], BOLT[i + 1])
-      const mx = a[0] + b[0], my = a[1] + b[1], ml = Math.hypot(mx, my) || 1
-      const k = 1 / Math.max(0.35, (mx / ml) * a[0] + (my / ml) * a[1])
-      nx = (mx / ml) * k; ny = (my / ml) * k
-    }
-    L.push([x + nx * h, y + ny * h]); R.push([x - nx * h, y - ny * h])
-  }
-  return [...L, ...R.reverse()]
-}
-function fillPoly(ctx, pts) {
-  ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill()
-}
-
 /**
  * @param {object} d
  *  d.home / d.away : { name, crest, color }
@@ -269,22 +242,23 @@ export async function renderShareCard(d) {
   g.addColorStop(0.8, 'rgba(3,5,12,0.9)'); g.addColorStop(1, '#03050c')
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
 
-  // séparation = éclair ; s'efface autour du statut (lisible) et vers le bas (résumé)
-  const outline = boltOutline()
+  // séparation = trait blanc en diagonale (23/11 : l'éclair a été essayé puis écarté par
+  // l'utilisateur) ; lueur floutée (softLayer), aucun reflet ni ligne parasite ; il s'efface autour
+  // du statut (lisible) et vers le bas (résumé).
   const fade = c => {
-    const gr = c.createLinearGradient(0, 0, 0, 1600)
-    const st = [[0, 1], [690, 1], [748, 0], [832, 0], [890, 1], [1380, 1], [1600, 0]]
-    st.forEach(([y, a]) => gr.addColorStop(y / 1600, `rgba(255,255,255,${a})`))
+    const gr = c.createLinearGradient(0, 0, 0, 1640)
+    const st = [[0, 1], [690, 1], [748, 0], [832, 0], [890, 1], [1380, 1], [1640, 0]]
+    st.forEach(([y, a]) => gr.addColorStop(y / 1640, `rgba(255,255,255,${a})`))
     return gr
   }
+  const beam = (c, w) => {
+    c.strokeStyle = fade(c); c.lineWidth = w; c.lineCap = 'round'
+    c.beginPath(); c.moveTo(xAt(-40), -40); c.lineTo(xAt(1640), 1640); c.stroke()
+  }
   const tint = mix(p1, WHITE, 0.55)
-  const boltLayer = (grow, color, opt) => softLayer(c => {
-    c.fillStyle = fade(c); c.strokeStyle = fade(c); c.lineJoin = 'miter'; c.lineWidth = grow
-    fillPoly(c, outline); if (grow) { c.beginPath(); outline.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.stroke() }
-  }, color, opt)
-  paintLayer(ctx, boltLayer(90, tint, { scale: 1 / 8, radius: 7 }), 0.75)  // grande lueur
-  paintLayer(ctx, boltLayer(24, tint, { scale: 1 / 3, radius: 5 }), 0.9)   // lueur proche
-  ctx.save(); ctx.fillStyle = fade(ctx); fillPoly(ctx, outline); ctx.restore() // éclair net
+  paintLayer(ctx, softLayer(c => beam(c, 60), tint, { scale: 1 / 8, radius: 6 }), 0.6)  // grande lueur
+  paintLayer(ctx, softLayer(c => beam(c, 18), tint, { scale: 1 / 3, radius: 4 }), 0.85) // lueur proche
+  ctx.save(); beam(ctx, 7); ctx.restore()                                                // trait net
 
   // grain léger
   const n = document.createElement('canvas'); n.width = n.height = 128
