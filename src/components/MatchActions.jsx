@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { renderShareCard, shareImage, preloadShareFonts } from '../utils/shareCard'
 import { compForMatch } from '../data/competitions'
+import { isNationalTeamComp } from '../utils/matchUtils'
 import { matchEventInfo, addToCalendar, isAdded, markAdded } from '../utils/calendarEvent'
 
 const ShareIcon = () => (
@@ -72,6 +73,7 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
     compLogoOpaque: !!compObj?.emblemOpaque,
     home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest },
     away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest },
+    isNational: isNationalTeamComp(match),
     hs, as, isFinished,
     status: isFinished ? 'Terminé' : (statusLabel || ''),
     homeLines: shareLines(scorers, cards, 'home'),

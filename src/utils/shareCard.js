@@ -8,10 +8,18 @@
 // Règles de rendu (constats sur iPhone) : aucun shadowBlur (tache noire), aucun ctx.filter (ignoré par
 // Safari) ; tout est en aplats et dégradés.
 
+import scoreFontUrl from '@fontsource/archivo-black/files/archivo-black-latin-400-normal.woff2?url'
+
 const W = 1080, H = 1920
 const RED = '#e50914'
 const L = 270, R = 810            // centres des deux colonnes
-const SCORE_FONT = px => `400 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif` // choisie par l'utilisateur (23/11), même police que le score du Match du jour
+// Police du score : Archivo Black (choisie par l'utilisateur, 23/11 ; même police que le score du Match
+// du jour). Chargée À PART sous un nom dédié (FontFace, fichier du build) : constat utilisateur, avec la
+// police de l'app (CSS @font-face découpé par plages de caractères) Safari dessinait parfois le score
+// dans une police fine de repli au premier partage. Si le chargement échoue malgré tout : Archivo 900
+// (épaisse) plutôt qu'une police fine.
+let scoreFaceOk = false
+const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
 const SCORE_PX = 320
 
 function crestSrc(url) {
@@ -85,7 +93,25 @@ function inkCenterX(font, txt) {
   }
 }
 
-function drawCrest(ctx, img, cx, cy, size, fallbackText) {
+// Drapeau (sélections nationales) : carré aux coins arrondis rempli par le drapeau, comme dans l'app
+// ([data-crest="country"] d'index.css : rayon 22 %, image recadrée au centre ; les drapeaux ESPN ont une
+// marge interne → agrandis ×1,6 comme dans l'app).
+function drawFlag(ctx, img, cx, cy, size, src) {
+  const x = cx - size / 2, y = cy - size / 2
+  ctx.save()
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, size, size, size * 0.22) : ctx.rect(x, y, size, size); ctx.clip()
+  const zoom = /teamlogos\/countries/.test(src ?? '') ? 1.6 : 1
+  const r = Math.max(size / img.width, size / img.height) * zoom
+  const w = img.width * r, h = img.height * r
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h)
+  ctx.restore()
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x + 1, y + 1, size - 2, size - 2, size * 0.22) : ctx.rect(x + 1, y + 1, size - 2, size - 2); ctx.stroke()
+  ctx.restore()
+}
+
+function drawCrest(ctx, img, cx, cy, size, fallbackText, flagSrc = null) {
+  if (img && flagSrc) { drawFlag(ctx, img, cx, cy, size * 0.82, flagSrc); return }
   ctx.save()
   if (img) {
     const box = inkBox(img)
@@ -143,31 +169,35 @@ function sideLine(ctx, xFrom, xTo, y, a = 0.4) {
 /**
  * @param {object} d
  *  d.home / d.away : { name, crest } ; d.hs, d.as : scores ; d.isFinished ; d.status : libellé en direct ("67'")
- *  d.compLogo (+ d.compLogoOpaque) : logo du championnat
+ *  d.compLogo (+ d.compLogoOpaque) : logo du championnat ; d.isNational : sélections → drapeaux arrondis
  *  d.homeLines / d.awayLines : [{ kind: 'goal'|'red', name, minutes }]
  * @returns {Promise<Blob>}
  */
-// Polices de l'image : chargées AVANT de dessiner (sinon le canvas prend la police de repli — constat
-// utilisateur 23/11 : score dans la mauvaise police en partageant trop vite). Le texte d'essai couvre
-// les chiffres : les polices sont découpées par plages de caractères, un simple espace ne suffit pas.
-const SHARE_FONTS = [SCORE_FONT(100), '800 40px Inter', '600 34px Inter', '500 32px Inter', 'italic 900 40px Inter']
+// Polices de l'image : chargées AVANT de dessiner (sinon le canvas prend la police de repli).
 let fontsPromise = null
+async function loadScoreFace() {
+  if (typeof FontFace === 'undefined' || !document.fonts) return
+  const face = new FontFace('SFShareScore', `url(${scoreFontUrl}) format("woff2")`, { weight: '400', style: 'normal' })
+  await face.load()
+  document.fonts.add(face)
+  // Safari : une police tout juste ajoutée n'est pas toujours prise par le canvas au tout premier
+  // dessin → dessin d'amorçage, puis on laisse passer deux images d'écran.
+  const c = document.createElement('canvas'); c.width = c.height = 8
+  const x = c.getContext('2d'); x.font = '400 8px SFShareScore'; x.fillText('0123456789', 0, 8)
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+  scoreFaceOk = document.fonts.check('400 40px SFShareScore', '0123456789')
+}
 export function preloadShareFonts() {
   if (!fontsPromise) {
     const load = async () => {
-      const fonts = typeof document !== 'undefined' ? document.fonts : null
-      if (!fonts?.load) return
-      const sample = '0123456789–FINDUMATCHStatFootixéè\''
-      for (let i = 0; i < 3; i++) {
-        await Promise.all(SHARE_FONTS.map(f => fonts.load(f, sample).catch(() => [])))
-        if (SHARE_FONTS.every(f => { try { return fonts.check(f, sample) } catch { return true } })) return
-        await new Promise(r => setTimeout(r, 400))
-      }
+      await loadScoreFace().catch(() => {})
+      await document.fonts?.load?.('800 40px Inter', 'FIN').catch(() => {})
     }
-    // jamais bloquant plus de 4 s (réseau très lent : on dessine avec ce qu'on a)
-    fontsPromise = Promise.race([load().catch(() => {}), new Promise(r => setTimeout(r, 4000))])
+    // jamais bloquant plus de 5 s (réseau très lent : repli épais, voir SCORE_FONT)
+    fontsPromise = Promise.race([load(), new Promise(r => setTimeout(r, 5000))])
+      .then(() => { if (!scoreFaceOk) fontsPromise = null }) // raté : on réessaiera au prochain partage
   }
-  return fontsPromise
+  return fontsPromise ?? Promise.resolve()
 }
 
 export async function renderShareCard(d) {
@@ -215,8 +245,8 @@ export async function renderShareCard(d) {
   sideLine(ctx, W - 70, W / 2 + sw / 2 + 40, 430)
 
   // ── Blasons, séparés par un trait vertical ──
-  drawCrest(ctx, hImg, L, 680, 250, (d.home.name ?? '?').slice(0, 3).toUpperCase())
-  drawCrest(ctx, aImg, R, 680, 250, (d.away.name ?? '?').slice(0, 3).toUpperCase())
+  drawCrest(ctx, hImg, L, 680, 250, (d.home.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.home.crest : null)
+  drawCrest(ctx, aImg, R, 680, 250, (d.away.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.away.crest : null)
   fadeLine(ctx, W / 2, 560, W / 2, 820, 0.5)
 
   // ── Noms ──
