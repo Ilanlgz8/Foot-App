@@ -13,13 +13,17 @@ function icsDate(d) {
 // Échappement iCalendar (RFC 5545) : \ ; , et retours à la ligne.
 const esc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
-export function matchEventInfo({ id, homeName, awayName, utcDate, compLabel, channel, venue }) {
+export function matchEventInfo({ id, homeName, awayName, utcDate, compLabel, channel, venue, homeCrest, awayCrest }) {
   const start = new Date(utcDate)
   if (Number.isNaN(start.getTime())) return null
   const end = new Date(start.getTime() + MATCH_MS)
   const title = `${homeName} – ${awayName}` // sans emoji (23/11, demande utilisateur)
   const details = [compLabel, channel ? `Diffusion : ${channel}` : null, 'Scores et notifs en direct : statfootix.vercel.app'].filter(Boolean).join('\n')
-  return { uid: `match-${id}@statfootix.vercel.app`, title, start, end, details, location: venue || '' }
+  return {
+    uid: `match-${id}@statfootix.vercel.app`, title, start, end, details, location: venue || '',
+    // affichage dans la feuille « Ajouter au calendrier » (pas utilisé dans le fichier .ics)
+    view: { homeName, awayName, homeCrest: homeCrest || null, awayCrest: awayCrest || null, compLabel: compLabel || '', channel: channel || null },
+  }
 }
 
 export function buildIcs(ev) {

@@ -217,9 +217,9 @@ export async function renderShareCard(d) {
 
   // halos derrière les blasons
   for (const cx of [252, 828]) {
-    const r = ctx.createRadialGradient(cx, 470, 10, cx, 470, 330)
+    const r = ctx.createRadialGradient(cx, 392, 10, cx, 392, 340)
     r.addColorStop(0, 'rgba(255,255,255,0.26)'); r.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = r; ctx.fillRect(cx - 340, 130, 680, 680)
+    ctx.fillStyle = r; ctx.fillRect(cx - 350, 40, 700, 700)
   }
 
   // nom du championnat en filigrane géant (contour seul), dans l'espace libre sous les buteurs
@@ -301,10 +301,11 @@ export async function renderShareCard(d) {
   ]
   const winner = d.isFinished && d.hs !== d.as ? (d.hs > d.as ? 0 : 1) : -1
   cols.forEach((col, i) => {
-    drawCrest(ctx, col.img, col.cx, 448, 176, (col.team.name ?? '?').slice(0, 3).toUpperCase(), mix(col.c, NIGHT, 0.6))
+    drawCrest(ctx, col.img, col.cx, 392, 236, (col.team.name ?? '?').slice(0, 3).toUpperCase(), mix(col.c, NIGHT, 0.6))
     ctx.fillStyle = '#fff'
-    fitText(ctx, col.team.name.toUpperCase(), 400, px => `800 ${px}px Inter, system-ui, sans-serif`, 27, 18)
-    spaced(ctx, col.team.name.toUpperCase(), col.cx, 592, 6, 'center')
+    // 23/11 : blasons et noms plus grands (demande utilisateur)
+    fitText(ctx, col.team.name.toUpperCase(), 380, px => `800 ${px}px Inter, system-ui, sans-serif`, 36, 22)
+    spaced(ctx, col.team.name.toUpperCase(), col.cx, 576, 7, 'center')
     // score géant, penché
     ctx.save()
     ctx.font = '900 520px Archivo, Inter, system-ui, sans-serif'

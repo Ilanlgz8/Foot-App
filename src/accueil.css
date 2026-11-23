@@ -3545,5 +3545,6 @@
   background: rgba(var(--white-rgb, 255,255,255), 0.08); border: 1px solid rgba(var(--white-rgb, 255,255,255), 0.16);
   color: var(--fg, #fff); font: inherit; font-size: 0.68rem; font-weight: 700; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .myTeamBanner__cal--done { cursor: default; color: #22c55e; border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); }

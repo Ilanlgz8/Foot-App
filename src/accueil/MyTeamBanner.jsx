@@ -54,6 +54,7 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
     id: match.id, homeName, awayName, utcDate: match.utcDate,
     compLabel: `${compName}${match.matchday ? ` · Journée ${match.matchday}` : ''}`.trim(),
     channel: getBroadcaster(match)?.name ?? null,
+    homeCrest: match.homeTeam?.crest, awayCrest: match.awayTeam?.crest,
   }) : null
 
   return (
@@ -99,8 +100,14 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
       </span>
     </button>
     {ev && (added
-      ? <span className="myTeamBanner__cal myTeamBanner__cal--done">✓ Dans l'agenda</span>
-      : <button type="button" className="myTeamBanner__cal" onClick={() => setSheet(true)}>📅 Ajouter</button>)}
+      ? <span className="myTeamBanner__cal myTeamBanner__cal--done">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          Dans l'agenda
+        </span>
+      : <button type="button" className="myTeamBanner__cal" onClick={() => setSheet(true)}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+          Ajouter
+        </button>)}
     {sheet && ev && (
       <CalendarSheet ev={ev} onClose={() => setSheet(false)}
         onDone={() => { markAdded(match.id); setAdded(true); setSheet(false) }} />
