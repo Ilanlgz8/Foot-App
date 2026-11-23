@@ -5,6 +5,16 @@ import { translateTeam } from '../data/teamNames'
 import { calcMinute, mergeScore, finalScore, isNationalTeamComp } from '../utils/matchUtils'
 import { useFavoriteClubs } from '../hooks/useFavoriteClubs'
 import { getTeamColor, hexToRgbTriplet } from '../data/teamPhotos'
+import { useState } from 'react'
+import { CalendarSheet } from '../components/MatchActions'
+import { matchEventInfo, isAdded, markAdded } from '../utils/calendarEvent'
+import { getBroadcaster } from '../data/broadcasters'
+import { compForMatch } from '../data/competitions'
+
+// 22/11 : « Ajouter au calendrier » sur le prochain match d'une équipe favorite, s'il a lieu dans les
+// 7 jours. Une fois ajouté, le bouton devient « ✓ Ajouté » pour ce match — mémorisé sur le téléphone
+// (calendarEvent.js, survit à la fermeture de l'app), donc jamais proposé deux fois.
+const CAL_WINDOW_MS = 7 * 86400000
 
 function formatDate(utcDate) {
   const d = new Date(utcDate)
@@ -35,7 +45,19 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
   const favColor = getTeamColor(homeIsFav ? (match.homeTeam?.shortName || match.homeTeam?.name) : (match.awayTeam?.shortName || match.awayTeam?.name))
   const favColorRgb = hexToRgbTriplet(favColor)
 
+  const [added, setAdded] = useState(() => isAdded(match.id))
+  const [sheet, setSheet] = useState(false)
+  const startsIn = new Date(match.utcDate).getTime() - Date.now()
+  const showCal = !isLive && startsIn > 0 && startsIn < CAL_WINDOW_MS
+  const compName = compForMatch(match)?.name ?? match.competition?.name ?? ''
+  const ev = showCal ? matchEventInfo({
+    id: match.id, homeName, awayName, utcDate: match.utcDate,
+    compLabel: `${compName}${match.matchday ? ` · Journée ${match.matchday}` : ''}`.trim(),
+    channel: getBroadcaster(match)?.name ?? null,
+  }) : null
+
   return (
+    <div className="myTeamBannerWrap">
     <button
       className="myTeamBanner"
       onClick={onClick}
@@ -76,5 +98,13 @@ export function MyTeamBanner({ match, isLive, espnScore, onClick }) {
         </span>
       </span>
     </button>
+    {ev && (added
+      ? <span className="myTeamBanner__cal myTeamBanner__cal--done">✓ Dans l'agenda</span>
+      : <button type="button" className="myTeamBanner__cal" onClick={() => setSheet(true)}>📅 Ajouter</button>)}
+    {sheet && ev && (
+      <CalendarSheet ev={ev} onClose={() => setSheet(false)}
+        onDone={() => { markAdded(match.id); setAdded(true); setSheet(false) }} />
+    )}
+    </div>
   )
 }
