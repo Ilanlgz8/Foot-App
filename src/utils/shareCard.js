@@ -115,30 +115,63 @@ export async function renderShareCard(d) {
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d')
-  const hc = usable(d.home.color), ac = usable(d.away.color)
+  // 23/11 (demande utilisateur) : fond aux couleurs du CHAMPIONNAT (comme les cartes de l'app), plus
+  // celles des équipes. d.palette = [couleur 1, couleur 2] (getCompetitionCampColors) ; repli : équipes.
+  const p1 = usable(d.palette?.[0] ?? d.home.color)
+  const p2 = usable(d.palette?.[1] ?? d.palette?.[0] ?? d.away.color)
+  const hc = p1, ac = lum(p2) < 0.1 ? mix(p2, p1, 0.45) : p2
+  const xAt = y => W * 0.58 - (W * 0.16) * (y / H)   // trait de séparation (diagonale)
 
   // ── Fond : les deux couleurs en diagonale ──
   ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, W, H)
-  const half = (pts, c, dir) => {
-    const g = ctx.createLinearGradient(dir < 0 ? 0 : W, 0, dir < 0 ? W * 0.5 : W * 0.5, H)
-    g.addColorStop(0, rgb(mix(c, WHITE, 0.18))); g.addColorStop(0.4, rgb(c)); g.addColorStop(0.78, rgb(mix(c, NIGHT, 0.78)))
+  const half = (pts, c, x0, x1) => {
+    const g = ctx.createLinearGradient(x0, 0, x1, H)
+    g.addColorStop(0, rgb(mix(c, WHITE, 0.22))); g.addColorStop(0.42, rgb(c)); g.addColorStop(0.8, rgb(mix(c, NIGHT, 0.82)))
     ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill()
   }
-  half([[0, 0], [W * 0.58, 0], [W * 0.42, H], [0, H]], hc, -1)
-  half([[W * 0.58, 0], [W, 0], [W, H], [W * 0.42, H]], ac, 1)
+  half([[0, 0], [W * 0.58, 0], [W * 0.42, H], [0, H]], hc, 0, W * 0.5)
+  half([[W * 0.58, 0], [W, 0], [W, H], [W * 0.42, H]], ac, W, W * 0.5)
+
+  // halos derrière les blasons
+  for (const cx of [252, 828]) {
+    const r = ctx.createRadialGradient(cx, 470, 10, cx, 470, 330)
+    r.addColorStop(0, 'rgba(255,255,255,0.26)'); r.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = r; ctx.fillRect(cx - 340, 130, 680, 680)
+  }
+
+  // nom du championnat en filigrane géant (contour seul), dans l'espace libre sous les buteurs
+  if (d.compLabel) {
+    const label = String(d.compLabel).toUpperCase()
+    ctx.save()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    let px = 260
+    ctx.font = `900 ${px}px Archivo, Inter, system-ui, sans-serif`
+    while (px > 120 && ctx.measureText(label).width > 1000) { px -= 10; ctx.font = `900 ${px}px Archivo, Inter, system-ui, sans-serif` }
+    ctx.translate(W / 2, 1470); ctx.transform(1, 0, -0.16, 1, 0, 0)
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+    ctx.strokeText(label, 0, 0)
+    ctx.restore()
+  }
+
+  // fines lignes de lumière parallèles au trait
+  ctx.save(); ctx.lineWidth = 2
+  for (const [off, a] of [[-46, 0.12], [-80, 0.06], [52, 0.1], [92, 0.05]]) {
+    ctx.strokeStyle = `rgba(255,255,255,${a})`
+    ctx.beginPath(); ctx.moveTo(xAt(0) + off, 0); ctx.lineTo(xAt(H) + off, H); ctx.stroke()
+  }
+  ctx.restore()
+
   // assombrissement du bas (texte lisible)
   let g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, 'rgba(0,0,0,0.22)'); g.addColorStop(0.18, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,0)')
-  g.addColorStop(0.8, 'rgba(3,5,12,0.88)'); g.addColorStop(1, '#03050c')
+  g.addColorStop(0, 'rgba(0,0,0,0.2)'); g.addColorStop(0.16, 'rgba(0,0,0,0)'); g.addColorStop(0.52, 'rgba(0,0,0,0)')
+  g.addColorStop(0.8, 'rgba(3,5,12,0.9)'); g.addColorStop(1, '#03050c')
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
-  // trait lumineux (interrompu au niveau du statut)
-  const seam = (y0, y1) => {
-    const xAt = y => W * 0.58 - (W * 0.16) * (y / H)
-    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3
-    ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 18
-    ctx.beginPath(); ctx.moveTo(xAt(y0), y0); ctx.lineTo(xAt(y1), y1); ctx.stroke(); ctx.restore()
-  }
-  seam(0, 720); seam(860, 1540)
+
+  // trait lumineux continu (comme sur la maquette d'origine)
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3
+  ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 22
+  ctx.beginPath(); ctx.moveTo(xAt(0), 0); ctx.lineTo(xAt(1560), 1560); ctx.stroke(); ctx.restore()
+
   // grain léger
   const n = document.createElement('canvas'); n.width = n.height = 128
   const nx = n.getContext('2d'); const id = nx.createImageData(128, 128)
@@ -170,7 +203,9 @@ export async function renderShareCard(d) {
     // score géant, penché
     ctx.save()
     ctx.font = '900 470px Archivo, Inter, system-ui, sans-serif'
-    ctx.fillStyle = winner === -1 || winner === i ? '#fff' : 'rgba(255,255,255,0.55)'
+    const sg = ctx.createLinearGradient(0, -345, 0, 5)
+    sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(225,232,255,1)')
+    ctx.fillStyle = winner === -1 || winner === i ? sg : 'rgba(255,255,255,0.5)'
     ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 26
     ctx.translate(col.cx, 985); ctx.transform(1, 0, -0.16, 1, 0, 0)
     ctx.textAlign = 'center'; ctx.fillText(String(col.score ?? '–'), 0, 0)
@@ -202,8 +237,8 @@ export async function renderShareCard(d) {
   })
 
   // ── Statut au centre (sans fond) ──
-  ctx.save(); ctx.fillStyle = '#fff'; ctx.font = '900 30px Inter, system-ui, sans-serif'
-  ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.font = '900 32px Inter, system-ui, sans-serif'
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 3
   spaced(ctx, String(d.status ?? '').toUpperCase(), W / 2 + 12, 803, 6, 'center')
   ctx.restore()
 

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { renderShareCard, shareImage } from '../utils/shareCard'
 import { buildMatchSummary } from '../utils/matchSummary'
 import { getMatchTeamColors } from '../data/teamPhotos'
+import { compForMatch, getCompetitionCampColors } from '../data/competitions'
 import { matchEventInfo, openIcs, googleCalendarUrl, markAdded } from '../utils/calendarEvent'
 
 const ShareIcon = () => (
@@ -54,7 +55,11 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
       const colors = getMatchTeamColors(match.homeTeam?.name ?? homeName, match.awayTeam?.name ?? awayName)
       const goals = (scorers ?? []).filter(s => !s.shootout).map(s => ({ side: s.team === 'home' ? 'home' : 'away', name: s.name, minute: s.minute, ownGoal: s.ownGoal, penaltyKick: s.penaltyKick }))
       const md = match.matchday ? ` · J${match.matchday}` : ''
+      const compObj = compForMatch(match)
       const blob = await renderShareCard({
+        palette: getCompetitionCampColors(compObj) ?? null,
+        // filigrane : nom court, sauf s'il est abrégé (« Premier L. » → nom complet)
+        compLabel: (compObj?.shortName && !compObj.shortName.endsWith('.')) ? compObj.shortName : (compObj?.name ?? compName ?? ''),
         home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest, color: colors.home.main },
         away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest, color: colors.away.main },
         hs, as, isFinished,
