@@ -207,7 +207,10 @@ export async function renderShareCard(d) {
   ctx.textBaseline = 'alphabetic'
   // ── En-tête ──
   ctx.font = '900 44px Archivo, Inter, system-ui, sans-serif'
-  ctx.fillStyle = '#ef4444'; ctx.textAlign = 'left'; ctx.fillText('Stat', 60, 112)
+  // même rouge que le logo de l'app (variable --sf-red, #fb3b4e par défaut)
+  let brandRed = '#fb3b4e'
+  try { brandRed = getComputedStyle(document.documentElement).getPropertyValue('--sf-red').trim() || brandRed } catch { /* défaut */ }
+  ctx.fillStyle = brandRed; ctx.textAlign = 'left'; ctx.fillText('Stat', 60, 112)
   const sw = ctx.measureText('Stat').width
   ctx.fillStyle = '#fff'; ctx.fillText('Footix', 60 + sw, 112)
   ctx.font = '800 22px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
