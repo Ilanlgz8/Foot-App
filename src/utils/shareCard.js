@@ -10,7 +10,6 @@
 // Safari) ; tout est en aplats et dégradés.
 
 import scoreFontUrl from '../assets/fonts/archivo-expanded-black.woff2?url'
-import nameFontUrl from '../assets/fonts/archivo-expanded-bold.woff2?url'
 
 const W = 1080, H = 1920
 const RED = '#e50914'
@@ -21,7 +20,6 @@ const L = 270, R = 810            // centres des deux colonnes
 // Chargée À PART sous un nom dédié (FontFace) : avec une police CSS de l'app, Safari dessinait parfois le
 // score dans une police fine de repli au premier partage. Si le chargement échoue : Archivo Black.
 let scoreFaceOk = false
-let nameFaceOk = false
 const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
 const SCORE_PX = 270
 
@@ -129,27 +127,6 @@ function drawCrest(ctx, img, cx, cy, size, fallbackText, flagSrc = null) {
   ctx.restore()
 }
 
-// Ballon monochrome (pas d'emoji : rendu différent selon le téléphone)
-function drawBall(ctx, cx, cy, r) {
-  ctx.save()
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = '#0b0b0d'
-  const pent = (x, y, s, rot) => {
-    ctx.beginPath()
-    for (let i = 0; i < 5; i++) { const a = rot + i * 2 * Math.PI / 5; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * s, y + Math.sin(a) * s) }
-    ctx.closePath(); ctx.fill()
-  }
-  pent(cx, cy, r * 0.36, -Math.PI / 2)
-  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip()
-  for (let i = 0; i < 5; i++) {
-    const a = -Math.PI / 2 + i * 2 * Math.PI / 5
-    pent(cx + Math.cos(a) * r * 1.02, cy + Math.sin(a) * r * 1.02, r * 0.3, a + Math.PI / 5)
-  }
-  ctx.restore()
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = r * 0.14; ctx.beginPath(); ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2); ctx.stroke()
-  ctx.restore()
-}
-
 function drawRedCard(ctx, cx, cy) {
   ctx.save(); ctx.fillStyle = '#ef4444'
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - 10, cy - 14, 20, 28, 4) : ctx.rect(cx - 10, cy - 14, 20, 28); ctx.fill()
@@ -189,14 +166,9 @@ async function loadFace(family, url, sample) {
 }
 async function loadScoreFace() {
   if (typeof FontFace === 'undefined' || !document.fonts) return
-  // score : Archivo Expanded Black ; noms d'équipes : Archivo Expanded Bold (choix utilisateur 23/11)
-  await Promise.all([
-    loadFace('SFShareScore', scoreFontUrl, '0123456789').catch(() => {}),
-    loadFace('SFShareName', nameFontUrl, 'ABCDEFGHIJKLMNOPQRSTUVWXYZÉÈ').catch(() => {}),
-  ])
+  await loadFace('SFShareScore', scoreFontUrl, '0123456789').catch(() => {})
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
   scoreFaceOk = document.fonts.check('400 40px SFShareScore', '0123456789')
-  nameFaceOk = document.fonts.check('400 40px SFShareName', 'NICE')
 }
 
 export function preloadShareFonts() {
@@ -285,12 +257,13 @@ export async function renderShareCard(d) {
   drawCrest(ctx, aImg, R, 790, 260, (d.away.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.away.crest : null)
   fadeLine(ctx, W / 2, 660, W / 2, 930, 0.45)
 
-  // ── Noms : Archivo Expanded Bold, espacés (repli : Inter 800) ──
-  const nameFont = px => (nameFaceOk ? `400 ${px}px SFShareName, Inter, sans-serif` : `800 ${px}px Inter, system-ui, sans-serif`)
+  // ── Noms ──
+  // 23/11 : police de l'app (comme partout ailleurs dans StatFootix), en gras, légèrement espacée
+  const nameFont = px => `800 ${px}px Inter, -apple-system, system-ui, sans-serif`
   for (const [cx, name] of [[L, d.home.name], [R, d.away.name]]) {
     const t = String(name ?? '').toUpperCase()
-    fitText(ctx, t, 430, nameFont, 38, 22, 7)
-    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 1008, 7, 'center')
+    fitText(ctx, t, 430, nameFont, 42, 24, 4)
+    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 1008, 4, 'center')
   }
 
   // ── Score, fin tiret rouge au milieu ──
@@ -317,7 +290,8 @@ export async function renderShareCard(d) {
     const x0 = Math.max(40, Math.min(W - 40 - blockW, cx - blockW / 2))
     rows.forEach((l, k) => {
       const y = 1410 + k * 62
-      if (l.kind === 'red') drawRedCard(ctx, x0 + 17, y - 12); else drawBall(ctx, x0 + 17, y - 12, 17)
+      if (l.kind === 'red') drawRedCard(ctx, x0 + 17, y - 12)
+      else { ctx.font = '30px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('⚽', x0 + 17, y - 1) } // même ballon que dans l'app (emoji ⚽)
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
       ctx.font = '400 34px Inter, system-ui, sans-serif'
       ctx.fillText(l.name, x0 + 56, y)
