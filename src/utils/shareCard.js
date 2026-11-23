@@ -169,13 +169,27 @@ export async function renderShareCard(d) {
 
   // trait de séparation = faisceau lumineux (23/11, « plus impactant ») : large lueur douce, cœur
   // blanc épais, et un éclat de lumière au centre, là où est écrit le statut.
-  // le faisceau s'éteint en douceur vers le bas (pas de bout arrondi visible au-dessus du résumé)
+  // le faisceau s'éteint en douceur vers le bas, et s'interrompt autour du statut (lisible).
+  const GAP = [735, 845]
+  const sepPath = () => {
+    ctx.beginPath()
+    if (d.separator === 'bolt') {
+      // éclair : zigzag régulier le long de la diagonale (mêmes angles à chaque image)
+      const pts = []
+      for (let y = -20, k = 0; y <= 1640; y += 90, k++) pts.push([xAt(y) + (k % 2 ? 22 : -22), y])
+      const seg = (from, to) => { let started = false; for (const [x, y] of pts) { if (y < from || y > to) continue; if (!started) { ctx.moveTo(x, y); started = true } else ctx.lineTo(x, y) } }
+      seg(-20, GAP[0]); seg(GAP[1], 1640)
+    } else {
+      ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(GAP[0]), GAP[0])
+      ctx.moveTo(xAt(GAP[1]), GAP[1]); ctx.lineTo(xAt(1640), 1640)
+    }
+  }
   const beam = (width, a, blur) => {
     const gr = ctx.createLinearGradient(0, 0, 0, 1640)
     gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(0.72, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width
+    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width; ctx.lineJoin = 'miter'; ctx.lineCap = 'round'
     if (blur) { ctx.shadowColor = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.shadowBlur = blur }
-    ctx.beginPath(); ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(1640), 1640); ctx.stroke(); ctx.restore()
+    sepPath(); ctx.stroke(); ctx.restore()
   }
   beam(70, 0.07, 0)
   beam(26, 0.12, 30)
@@ -237,12 +251,6 @@ export async function renderShareCard(d) {
     ctx.shadowColor = 'transparent'
     ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(txt, 0, 0)
     ctx.restore()
-    if (winner === i) {
-      ctx.save(); ctx.fillStyle = '#ef4444'; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 16
-      ctx.beginPath(); ctx.arc(col.cx - 74, 1067, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore()
-      ctx.font = '800 21px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
-      spaced(ctx, 'VICTOIRE', col.cx - 56, 1075, 4.6, 'left')
-    }
     // buteurs / rouges : icône, nom, minute — max 5 lignes
     const lines = col.lines.slice(0, 5)
     const more = col.lines.length - lines.length
