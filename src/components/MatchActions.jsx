@@ -32,7 +32,7 @@ export function shareLines(scorers = [], cards = [], side) {
     if (!byName.has(key)) byName.set(key, [])
     byName.get(key).push(label)
   }
-  const lines = [...byName.entries()].map(([name, mins]) => ({ kind: 'goal', name, minutes: mins.join(' · ') }))
+  const lines = [...byName.entries()].map(([name, mins]) => ({ kind: 'goal', name, minutes: mins.join(', ') }))
   for (const c of cards.filter(c => c.red && (c.team === 'home' ? 'home' : 'away') === side)) {
     lines.push({ kind: 'red', name: dropInitial(c.name), minutes: `${String(c.minute ?? '').replace(/'$/, '')}'` })
   }

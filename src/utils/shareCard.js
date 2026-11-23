@@ -117,9 +117,10 @@ export async function renderShareCard(d) {
   const ctx = canvas.getContext('2d')
   // 23/11 (demande utilisateur) : fond aux couleurs du CHAMPIONNAT (comme les cartes de l'app), plus
   // celles des équipes. d.palette = [couleur 1, couleur 2] (getCompetitionCampColors) ; repli : équipes.
+  // Même couleur des deux côtés (23/11, demande utilisateur) : la couleur principale du championnat ;
+  // c'est le trait lumineux qui sépare les deux équipes.
   const p1 = usable(d.palette?.[0] ?? d.home.color)
-  const p2 = usable(d.palette?.[1] ?? d.palette?.[0] ?? d.away.color)
-  const hc = p1, ac = lum(p2) < 0.1 ? mix(p2, p1, 0.45) : p2
+  const hc = p1, ac = p1
   const xAt = y => W * 0.58 - (W * 0.16) * (y / H)   // trait de séparation (diagonale)
 
   // ── Fond : les deux couleurs en diagonale ──
@@ -173,16 +174,8 @@ export async function renderShareCard(d) {
   const GAP = [735, 845]
   const sepPath = () => {
     ctx.beginPath()
-    if (d.separator === 'bolt') {
-      // éclair : zigzag régulier le long de la diagonale (mêmes angles à chaque image)
-      const pts = []
-      for (let y = -20, k = 0; y <= 1640; y += 90, k++) pts.push([xAt(y) + (k % 2 ? 22 : -22), y])
-      const seg = (from, to) => { let started = false; for (const [x, y] of pts) { if (y < from || y > to) continue; if (!started) { ctx.moveTo(x, y); started = true } else ctx.lineTo(x, y) } }
-      seg(-20, GAP[0]); seg(GAP[1], 1640)
-    } else {
-      ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(GAP[0]), GAP[0])
-      ctx.moveTo(xAt(GAP[1]), GAP[1]); ctx.lineTo(xAt(1640), 1640)
-    }
+    ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(GAP[0]), GAP[0])
+    ctx.moveTo(xAt(GAP[1]), GAP[1]); ctx.lineTo(xAt(1640), 1640)
   }
   const beam = (width, a, blur) => {
     const gr = ctx.createLinearGradient(0, 0, 0, 1640)
@@ -228,7 +221,7 @@ export async function renderShareCard(d) {
   ]
   const winner = d.isFinished && d.hs !== d.as ? (d.hs > d.as ? 0 : 1) : -1
   cols.forEach((col, i) => {
-    drawCrest(ctx, col.img, col.cx, 448, 176, (col.team.name ?? '?').slice(0, 3).toUpperCase(), col.c)
+    drawCrest(ctx, col.img, col.cx, 448, 176, (col.team.name ?? '?').slice(0, 3).toUpperCase(), mix(col.c, NIGHT, 0.6))
     ctx.fillStyle = '#fff'
     fitText(ctx, col.team.name.toUpperCase(), 400, px => `800 ${px}px Inter, system-ui, sans-serif`, 27, 18)
     spaced(ctx, col.team.name.toUpperCase(), col.cx, 592, 6, 'center')
