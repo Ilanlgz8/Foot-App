@@ -4,21 +4,21 @@
 // 23/11 (maquette choisie par l'utilisateur) : même habillage pour tous les matchs — fond noir, lueurs
 // rouges sur les bords, plans en diagonale très discrets ; en-tête logo StatFootix + compétition/journée ;
 // date du match en haut au centre, logo de la compétition tel quel (sans cadre), « FIN DU MATCH » juste
-// dessous ; blasons, noms très espacés, score en Saira Expanded Black (police de sa maquette) + fin
+// dessous ; blasons, noms très espacés, score en Archivo Expanded Black (choisie par l'utilisateur, la plus proche de sa maquette) + fin
 // tiret rouge ; buteurs.
 // Règles de rendu (constats sur iPhone) : aucun shadowBlur (tache noire), aucun ctx.filter (ignoré par
 // Safari) ; tout est en aplats et dégradés.
 
-import scoreFontUrl from '../assets/fonts/saira-expanded-black.woff2?url'
+import scoreFontUrl from '../assets/fonts/archivo-expanded-black.woff2?url'
 
 const W = 1080, H = 1920
 const RED = '#e50914'
 const L = 270, R = 810            // centres des deux colonnes
-// Police du score : Saira Expanded Black (23/11, la plus proche de la maquette de l'utilisateur : large,
-// carrée-arrondie). Fichier statique tiré de la police variable Saira (OFL, @fontsource-variable/saira,
-// wght 900 / wdth 125) : src/assets/fonts/saira-expanded-black.woff2. Chargée À PART sous un nom
-// dédié (FontFace) : avec une police CSS de l'app, Safari dessinait parfois le score dans une police fine
-// de repli au premier partage. Si le chargement échoue malgré tout : Archivo Black (épaisse).
+// Police du score : Archivo Expanded Black (23/11, choisie par l'utilisateur parmi plusieurs, la plus
+// proche de sa maquette : large et arrondie). Fichier statique tiré de la police variable Archivo (OFL,
+// @fontsource-variable/archivo, wght 900 / wdth 125) : src/assets/fonts/archivo-expanded-black.woff2.
+// Chargée À PART sous un nom dédié (FontFace) : avec une police CSS de l'app, Safari dessinait parfois le
+// score dans une police fine de repli au premier partage. Si le chargement échoue : Archivo Black.
 let scoreFaceOk = false
 const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
 const SCORE_PX = 270
