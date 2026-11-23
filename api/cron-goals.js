@@ -355,7 +355,8 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   const candidateNames = [options.rawHomeTeam, options.homeTeam, options.rawAwayTeam, options.awayTeam]
 
   await Promise.allSettled(subs.map(async ({ endpoint, sub }) => {
-    if (!subscriberWantsThis(sub, slug, candidateNames)) return
+    // clubsOnly (22/11, rappel du matin) : uniquement les abonnés qui ont l'une des 2 équipes en favori.
+    if (options.clubsOnly ? matchesFavoriteClub(sub.clubs, candidateNames) !== true : !subscriberWantsThis(sub, slug, candidateNames)) return
     try {
       // urgency: 'high' — sans ça, les services de push (notamment Apple sur
       // iOS, largement majoritaire chez nos abonnés) peuvent différer la

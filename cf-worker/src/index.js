@@ -659,6 +659,58 @@ function pubSignature(live, feed) {
   return `${l}#${f}`
 }
 
+// ── Rappel du matin (22/11, demande utilisateur) ─────────────────────────────────────────────────
+// Le jour d'un match, vers 10 h (heure de Paris), une notif « ⚽ Ce soir 21:00 : A – B » aux SEULS
+// abonnés qui ont l'une des deux équipes en favori (clubsOnly → api/cron-goals.js). Source : la liste
+// des matchs du jour déjà publiée (pub:all, lue en début de passe : aucun appel ESPN en plus).
+// Jamais en double : liste des matchs déjà traités du jour (morning:AAAAMMJJ) + verrou anti-doublon
+// de notifyVercel. Au plus MORNING_MAX_PER_PASS envois par passe (plafond de sous-requêtes du plan
+// gratuit Cloudflare) — la fenêtre 10:00-10:29 laisse 30 passes, largement assez.
+const MORNING_MAX_PER_PASS = 4
+const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
+}).formatToParts(d).map(p => [p.type, p.value]))
+
+async function morningReminders(env, kv, prevPub, now, today, log) {
+  const { hour, minute } = parisParts(now)
+  if (Number(hour) !== 10 || Number(minute) >= 30) return
+  const entries = prevPub?.feed?.entries ?? {}
+  const doneKey = `morning:${today}`
+  let done = []
+  try { done = JSON.parse((await kv.get(doneKey)) ?? '[]') } catch { done = [] }
+  if (!Array.isArray(done)) done = []
+  const todo = []
+  for (const [k, v] of Object.entries(entries)) {
+    if (!k.startsWith(`${today}|`)) continue
+    const slug = k.split('|')[1]
+    for (const evt of v?.events ?? []) {
+      const comp = evt?.competitions?.[0]
+      const kickoff = Date.parse(evt?.date)
+      if (!evt?.id || done.includes(String(evt.id))) continue
+      if (comp?.status?.type?.state !== 'pre' || !Number.isFinite(kickoff) || kickoff <= now.getTime()) continue
+      todo.push({ slug, evt, comp, kickoff })
+    }
+  }
+  if (!todo.length) return
+  todo.sort((a, b) => a.kickoff - b.kickoff)
+  const batch = todo.slice(0, MORNING_MAX_PER_PASS)
+  for (const { slug, evt, comp, kickoff } of batch) {
+    const homeC = comp.competitors?.find(c => c.homeAway === 'home')
+    const awayC = comp.competitors?.find(c => c.homeAway === 'away')
+    const rawHomeTeam = homeC?.team?.shortDisplayName ?? homeC?.team?.displayName ?? ''
+    const rawAwayTeam = awayC?.team?.shortDisplayName ?? awayC?.team?.displayName ?? ''
+    const homeTeam = t(rawHomeTeam || '?'), awayTeam = t(rawAwayTeam || '?')
+    const kp = parisParts(new Date(kickoff))
+    const when = Number(kp.hour) >= 18 ? 'Ce soir' : "Aujourd'hui"
+    const ok = await notifyVercel(env, `push:morning:${evt.id}`,
+      { title: `⚽ ${when} ${kp.hour}:${kp.minute}`, body: `${homeTeam} – ${awayTeam}`, url: '/', tag: `morning-${evt.id}` },
+      slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, clubsOnly: true, ttl: 3 * 3600 }, log, 36 * 3600)
+    if (ok) done.push(String(evt.id))
+  }
+  try { await kv.set(doneKey, JSON.stringify(done), { ex: 36 * 3600 }) } catch {}
+  log.push(`[morning] envoyés=${batch.length} restants=${todo.length - batch.length}`)
+}
+
 async function publishAll(kv, prevParsed, allEvents, allResults, finalIds, today, yesterday, now, log, skippedIdlePairs = 0) {
   // Couples « au repos » sautés (voir pairIsIdle dans runOnePass) : leur version
   // publiée reste valable, on continue donc de rafraîchir updatedAt (sinon
@@ -2338,6 +2390,7 @@ async function runOnePass(env) {
     await Promise.allSettled(pendingFinalRechecks)
   }
 
+  try { await morningReminders(env, kv, prevPub, now, today, log) } catch (e) { log.push(`[morning] error=${e.message}`) }
   await publishAll(kv, prevPub, allEvents, allResults, alreadyDoneIds, today, yesterday, now, log, skippedIdlePairs)
   const warmPlan = await updateWarmPlan(kv, rawWarmPlan, allEvents, now, log)
   return { events: allEvents.length, log, warmPlan }

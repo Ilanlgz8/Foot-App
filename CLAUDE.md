@@ -205,6 +205,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 
 - **Bande passante Upstash (22/11)** : ~5 Go/mois sur 10 Go gratuits, venue surtout des réponses football-data.org mises en cache en entier dans Redis (`api/football.js`, relues à chaque appel). Désormais stockées compressées (`packBody`/`unpackBody`, préfixe `gz:`, gzip + base64 ; anciennes valeurs non compressées toujours lisibles). Toute nouvelle grosse valeur dans Redis : la compresser pareil.
 
+- **Partage & calendrier (22/11)** : bouton Partager (icône carré + flèche) en haut à droite de LiveMatchPage et MatchPage terminée → affiche 1080×1920 dessinée sur le téléphone (`src/utils/shareCard.js`, maquette validée : couleurs des 2 clubs en diagonale, score géant, buteurs icône/nom/minute, phrase `matchSummary.js` sans IA), blasons via `/espn?crest=` (proxy, cache CDN 1 an, sinon canvas bloqué). Match à venir : icône calendrier (`MatchActions.jsx`, `calendarEvent.js` : .ics rappel 1 h avant / lien Google Agenda). Bandeau « Mon équipe » : « 📅 Ajouter » si match dans les 7 jours, « ✓ Dans l'agenda » mémorisé (`sf_calendarAdded`). Rappel du matin : Worker `morningReminders` (10:00-10:29 Paris, notif « ⚽ Ce soir 21:00 » aux seuls abonnés qui suivent l'équipe, option `clubsOnly` de cron-goals, sans doublon : `morning:AAAAMMJJ` + verrou `push:morning:{id}`, ≤ 4 envois/passe) — **Worker à redéployer**.
+
 ## Conventions
 - Noms français partout dans l'UI
 - `translateTeam(name)` pour tout nom d'équipe affiché
