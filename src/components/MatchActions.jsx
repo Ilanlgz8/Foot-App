@@ -1,10 +1,8 @@
 // Boutons en haut à droite des pages de match (22/11) : Partager (image du match, direct et
 // Résultat) et Ajouter au calendrier (match à venir). Voir shareCard.js / calendarEvent.js.
-import { useState } from 'react'
-import { renderShareCard, shareImage } from '../utils/shareCard'
-import { buildMatchSummary } from '../utils/matchSummary'
-import { getMatchTeamColors } from '../data/teamPhotos'
-import { compForMatch, getCompetitionCampColors } from '../data/competitions'
+import { useEffect, useMemo, useState } from 'react'
+import { renderShareCard, shareImage, preloadShareFonts } from '../utils/shareCard'
+import { compForMatch } from '../data/competitions'
 import { matchEventInfo, addToCalendar, isAdded, markAdded } from '../utils/calendarEvent'
 
 const ShareIcon = () => (
@@ -38,47 +36,76 @@ export function shareLines(scorers = [], cards = [], side) {
   return lines
 }
 
-function frDateShort(utcDate) {
-  const d = new Date(utcDate)
-  if (Number.isNaN(d.getTime())) return ''
-  const s = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
+const Spinner = () => (
+  <svg className="lmp__heroSpin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+    <path d="M12 3a9 9 0 1 1-9 9" />
+  </svg>
+)
 
-export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCrest, hs, as, scorers, cards, isFinished, statusLabel, compName }) {
+// Bouton Partager (23/11, constat utilisateur : en appuyant trop vite, la police du score n'était pas
+// encore chargée et les buteurs pas encore arrivés). Désormais l'image est PRÉPARÉE à l'avance :
+//  • polices préchargées dès l'arrivée sur la page ;
+//  • buteurs considérés complets quand leur nombre = total du score (ou après 6 s, au cas où la source
+//    n'a pas de buteurs pour ce match) ;
+//  • l'image est redessinée en arrière-plan dès que les données changent (direct compris).
+// Tant qu'elle n'est pas prête, le bouton tourne et ne réagit pas ; une fois prête, un appui la
+// partage tout de suite (et le partage iPhone exige un appui récent : pas d'attente avant share()).
+export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCrest, hs, as, scorers, cards, isFinished, statusLabel }) {
+  const [fontsOk, setFontsOk] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const [ready, setReady] = useState(null)      // { key, blob }
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let alive = true
+    preloadShareFonts().finally(() => { if (alive) setFontsOk(true) })
+    const t = setTimeout(() => { if (alive) setTimedOut(true) }, 6000)
+    return () => { alive = false; clearTimeout(t) }
+  }, [])
+
+  const goalsKnown = (scorers ?? []).filter(s => !s.shootout).length
+  const goalsTotal = (Number(hs) || 0) + (Number(as) || 0)
+  const dataOk = goalsKnown >= goalsTotal || timedOut
+
+  const compObj = compForMatch(match)
+  const data = useMemo(() => ({
+    compLogo: compObj?.emblem ?? match.competition?.emblem ?? null,
+    compLogoOpaque: !!compObj?.emblemOpaque,
+    home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest },
+    away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest },
+    hs, as, isFinished,
+    status: isFinished ? 'Terminé' : (statusLabel || ''),
+    homeLines: shareLines(scorers, cards, 'home'),
+    awayLines: shareLines(scorers, cards, 'away'),
+  }), [compObj, match, homeName, awayName, homeCrest, awayCrest, hs, as, isFinished, statusLabel, scorers, cards])
+  const key = JSON.stringify(data)
+
+  useEffect(() => {
+    if (!fontsOk || !dataOk) return
+    let alive = true
+    const t = setTimeout(async () => {
+      try {
+        const blob = await renderShareCard(data)
+        if (alive) setReady({ key, blob })
+      } catch { /* l'appui réessaiera */ }
+    }, 250)
+    return () => { alive = false; clearTimeout(t) }
+  }, [key, fontsOk, dataOk]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const prepared = ready && ready.key === key ? ready.blob : null
+  const waiting = !prepared
   const onClick = async () => {
-    if (busy) return
+    if (busy || !prepared) return
     setBusy(true)
     try {
-      const colors = getMatchTeamColors(match.homeTeam?.name ?? homeName, match.awayTeam?.name ?? awayName)
-      const goals = (scorers ?? []).filter(s => !s.shootout).map(s => ({ side: s.team === 'home' ? 'home' : 'away', name: s.name, minute: s.minute, ownGoal: s.ownGoal, penaltyKick: s.penaltyKick }))
-      const md = match.matchday ? ` · J${match.matchday}` : ''
-      const compObj = compForMatch(match)
-      const blob = await renderShareCard({
-        palette: getCompetitionCampColors(compObj) ?? null,
-        compLogo: compObj?.emblem ?? match.competition?.emblem ?? null,
-        compLogoOpaque: !!compObj?.emblemOpaque,
-        // filigrane : nom court, sauf s'il est abrégé (« Premier L. » → nom complet)
-        compLabel: (compObj?.shortName && !compObj.shortName.endsWith('.')) ? compObj.shortName : (compObj?.name ?? compName ?? ''),
-        home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest, color: colors.home.main },
-        away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest, color: colors.away.main },
-        hs, as, isFinished,
-        status: isFinished ? 'Terminé' : (statusLabel || 'En direct'),
-        meta1: `${compName ?? ''}${md}`.trim(),
-        meta2: frDateShort(match.utcDate),
-        homeLines: shareLines(scorers, cards, 'home'),
-        awayLines: shareLines(scorers, cards, 'away'),
-        summary: buildMatchSummary({ homeName, awayName, hs, as, goals, isFinished }),
-      })
       const file = `${homeName}-${awayName}`.replace(/[^\p{L}\p{N}-]+/gu, '-').toLowerCase()
-      await shareImage(blob, `statfootix-${file}.jpg`, `${homeName} ${hs ?? ''}-${as ?? ''} ${awayName}`)
-    } catch { /* échec silencieux : rien de cassé, l'utilisateur peut réessayer */ }
+      await shareImage(prepared, `statfootix-${file}.jpg`)
+    } catch { /* échec silencieux : l'utilisateur peut réessayer */ }
     setBusy(false)
   }
   return (
-    <button type="button" className={`lmp__heroAction${busy ? ' lmp__heroAction--busy' : ''}`} onClick={onClick} aria-label="Partager le match">
-      <ShareIcon />
+    <button type="button" className={`lmp__heroAction${waiting || busy ? ' lmp__heroAction--busy' : ''}`} onClick={onClick}
+      aria-label={waiting ? "Préparation de l'image…" : 'Partager le match'} aria-busy={waiting}>
+      {waiting ? <Spinner /> : <ShareIcon />}
     </button>
   )
 }

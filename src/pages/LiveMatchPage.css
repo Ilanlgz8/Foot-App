@@ -1642,5 +1642,7 @@
 }
 .lmp__heroAction:active { transform: scale(0.94); }
 .lmp__heroAction--busy { opacity: 0.5; pointer-events: none; }
+.lmp__heroSpin { animation: lmpSpin .8s linear infinite; }
+@keyframes lmpSpin { to { transform: rotate(360deg) } }
 .lmp__heroAction--done { color: #22c55e; border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.12); }
 

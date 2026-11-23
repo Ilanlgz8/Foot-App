@@ -147,12 +147,31 @@ function sideLine(ctx, xFrom, xTo, y, a = 0.4) {
  *  d.homeLines / d.awayLines : [{ kind: 'goal'|'red', name, minutes }]
  * @returns {Promise<Blob>}
  */
+// Polices de l'image : chargées AVANT de dessiner (sinon le canvas prend la police de repli — constat
+// utilisateur 23/11 : score dans la mauvaise police en partageant trop vite). Le texte d'essai couvre
+// les chiffres : les polices sont découpées par plages de caractères, un simple espace ne suffit pas.
+const SHARE_FONTS = [SCORE_FONT(100), '800 40px Inter', '600 34px Inter', '500 32px Inter', 'italic 900 40px Inter']
+let fontsPromise = null
+export function preloadShareFonts() {
+  if (!fontsPromise) {
+    const load = async () => {
+      const fonts = typeof document !== 'undefined' ? document.fonts : null
+      if (!fonts?.load) return
+      const sample = '0123456789–FINDUMATCHStatFootixéè\''
+      for (let i = 0; i < 3; i++) {
+        await Promise.all(SHARE_FONTS.map(f => fonts.load(f, sample).catch(() => [])))
+        if (SHARE_FONTS.every(f => { try { return fonts.check(f, sample) } catch { return true } })) return
+        await new Promise(r => setTimeout(r, 400))
+      }
+    }
+    // jamais bloquant plus de 4 s (réseau très lent : on dessine avec ce qu'on a)
+    fontsPromise = Promise.race([load().catch(() => {}), new Promise(r => setTimeout(r, 4000))])
+  }
+  return fontsPromise
+}
+
 export async function renderShareCard(d) {
-  try {
-    await Promise.all([
-      SCORE_FONT(100), '800 40px Inter', '600 34px Inter', '500 32px Inter', '900 40px Inter', 'italic 900 40px Inter',
-    ].map(f => document.fonts?.load?.(f).catch(() => {})))
-  } catch { /* polices système en repli */ }
+  await preloadShareFonts()
   const [hImg, aImg, compImg] = await Promise.all([loadImage(crestSrc(d.home.crest)), loadImage(crestSrc(d.away.crest)), loadImage(crestSrc(d.compLogo))])
 
   const canvas = document.createElement('canvas')
