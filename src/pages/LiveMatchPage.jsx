@@ -40,6 +40,7 @@ import {
   SubIcon,
 } from '../components/MatchModal'
 import './LiveMatchPage.css'
+import { ShareMatchButton } from '../components/MatchActions'
 import './MatchPage.css'
 import '../live.css'
 import '../matchModal.css'
@@ -285,7 +286,16 @@ function MatchHeader({ match, espn, onBack, hForm, aForm, homeCrest, awayCrest }
     <div className="lmp__heroOuter">
       {/* Le retour sort du panneau : c'est une action de navigation, pas une
           info du match — il n'a rien à faire dans la carte. */}
-      <button className="lmp__heroBack" onClick={onBack}>‹ En Direct</button>
+      {/* 22/11 : Retour à gauche, Partager à droite (image du match en direct). */}
+      <div className="lmp__heroTopBar">
+        <button className="lmp__heroBack" onClick={onBack}>‹ En Direct</button>
+        <div className="lmp__heroActions">
+          <ShareMatchButton match={match} homeName={homeName} awayName={awayName}
+            homeCrest={homeCrest ?? match.homeTeam?.crest} awayCrest={awayCrest ?? match.awayTeam?.crest}
+            hs={hs} as={as_} scorers={espn?.scorers ?? []} cards={espn?.cards ?? []}
+            isFinished={isTermine} statusLabel={minuteLabel} compName={compName} />
+        </div>
+      </div>
 
       {/* ⚠️ .sf-liveBorder UNIQUEMENT tant que le match n'est pas terminé
           (05/09). Le contour rouge fixe du panneau est désormais présent sur

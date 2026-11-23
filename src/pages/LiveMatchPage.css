@@ -1627,3 +1627,35 @@
 }
 .lmp__subsToggle:active { transform: scale(0.97); }
 .lmp__subsToggleChev { opacity: 0.7; }
+
+/* Barre du haut des pages de match (22/11) : « Retour » à gauche, actions (partager, calendrier) à
+   droite, même style de pastille que « Retour ». */
+.lmp__heroTopBar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.6rem; }
+.lmp__heroTopBar .lmp__heroBack { margin-bottom: 0; }
+.lmp__heroActions { display: flex; gap: 8px; }
+.lmp__heroAction {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 31px;
+  border: 1px solid rgba(var(--white-rgb),0.12); border-radius: 20px;
+  background: rgba(var(--white-rgb),0.05); color: rgba(var(--white-rgb),0.9);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.lmp__heroAction:active { transform: scale(0.94); }
+.lmp__heroAction--busy { opacity: 0.5; pointer-events: none; }
+
+/* Menu « Ajouter au calendrier » (feuille en bas de l'écran). */
+.calSheet__backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; justify-content: center; }
+.calSheet {
+  width: 100%; max-width: 480px; background: #1b1d24; border: 1px solid #2a2d36; border-radius: 20px 20px 0 0;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); color: #fff;
+}
+.calSheet__title { font-weight: 800; font-size: 1rem; }
+.calSheet__sub { margin-top: 4px; font-size: 0.8rem; color: rgba(255,255,255,0.75); }
+.calSheet__opt {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 13px 14px;
+  border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  color: #fff; font: inherit; font-weight: 700; font-size: 0.9rem; text-decoration: none; cursor: pointer; text-align: left;
+}
+.calSheet__opt span { font-size: 1.15rem; width: 22px; text-align: center; }
+.calSheet__note { margin-top: 10px; font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+.calSheet__cancel { width: 100%; margin-top: 10px; padding: 12px; border: 0; background: none; color: rgba(255,255,255,0.8); font: inherit; font-weight: 700; cursor: pointer; }

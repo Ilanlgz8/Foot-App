@@ -57,6 +57,8 @@ import '../live.css'
 // risque de dérive entre les deux (même pattern déjà utilisé ailleurs dans
 // l'app, ex: Resultat.jsx qui importe match.css).
 import './LiveMatchPage.css'
+import { ShareMatchButton, CalendarMatchButton } from '../components/MatchActions'
+import { getBroadcaster } from '../data/broadcasters'
 import { frNum } from '../utils/frNum'
 import { useLiveData } from '../context/LiveProvider'
 
@@ -136,6 +138,8 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // voir matchStateTracker.js) a toujours priorité sur match.status pour
   // cette raison — ce composant était le seul oublié.
   const isFinished = match.status === 'FINISHED' || getMatchState(match.id).ft === true
+  // Match à venir (bouton calendrier) : pas commencé et coup d'envoi dans le futur.
+  const isUpcoming = !isFinished && ['SCHEDULED', 'TIMED'].includes(match.status) && new Date(match.utcDate).getTime() > Date.now()
 
   // Buteurs + cartons — même source/logique que MpMatchStats (cache
   // localStorage persistant si le match a été suivi en live, sinon fetch ESPN
@@ -240,7 +244,21 @@ function MatchPageHero({ match, navigate, hForm, aForm, rawHomeId }) {
   // prochain ajustement.
   return (
     <div className="lmp__heroOuter">
-      <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
+      {/* 22/11 : Retour à gauche, actions à droite — Partager (match terminé) ou Ajouter au
+          calendrier (match à venir). Voir MatchActions.jsx. */}
+      <div className="lmp__heroTopBar">
+        <button className="lmp__heroBack" onClick={() => navigate(-1)}>‹ Retour</button>
+        <div className="lmp__heroActions">
+          {isFinished ? (
+            <ShareMatchButton match={match} homeName={homeName} awayName={awayName}
+              homeCrest={match.homeTeam?.crest} awayCrest={match.awayTeam?.crest}
+              hs={hs} as={as_} scorers={espnScorers} cards={espnCards} isFinished compName={compName} />
+          ) : isUpcoming ? (
+            <CalendarMatchButton match={match} homeName={homeName} awayName={awayName} compName={compName}
+              channel={getBroadcaster(match)?.name ?? null} />
+          ) : null}
+        </div>
+      </div>
 
       <div
         className={`mp__hero lmp__hero${isFinished ? ' lmp__hero--ft' : ''}${comp?.tintLight ? ' lmp__hero--lightTint' : ''}${comp?.tint ? ' lmp__hero--tinted' : ''}${comp?.tintSoft ? ' lmp__hero--softTint' : ''}${comp?.tintSilverText ? ' lmp__hero--silverText' : ''}${comp?.tintTheme ? ` lmp__hero--theme-${comp.tintTheme}` : ''}`}

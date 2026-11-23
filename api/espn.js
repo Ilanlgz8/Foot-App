@@ -573,6 +573,28 @@ async function handler(req, res) {
 
   // ── Mode « l3logo » (12/11) : logo d'un club de Ligue 3 détouré (fond blanc retiré), voir
   // src/utils/logoNoBg.js. Calculé une fois par logo puis servi par le cache CDN pendant 1 an.
+  // ── Mode « crest » (22/11) : blason recopié depuis notre domaine pour l'image à partager
+  // (src/utils/shareCard.js) — un canvas qui dessine une image d'un autre site ne peut plus être
+  // exporté. Hôtes autorisés uniquement ; cache CDN 1 an → presque jamais exécuté.
+  if (req.query.crest) {
+    let u
+    try { u = new URL(String(req.query.crest)) } catch { return res.status(400).json({ error: 'url invalide' }) }
+    const okHost = ['a.espncdn.com', 'crests.football-data.org', 'flagcdn.com', 'cdn-transverse.azureedge.net'].includes(u.hostname)
+    if (u.protocol !== 'https:' || !okHost) return res.status(400).json({ error: 'hôte refusé' })
+    try {
+      const r = await fetch(u.toString(), { signal: AbortSignal.timeout(6000) })
+      if (!r.ok) throw new Error(String(r.status))
+      const type = r.headers.get('content-type') || 'image/png'
+      if (!/^image\//.test(type)) throw new Error('type')
+      return res.status(200)
+        .setHeader('Content-Type', type)
+        .setHeader('Cache-Control', 'public, max-age=604800, s-maxage=31536000, immutable')
+        .send(Buffer.from(await r.arrayBuffer()))
+    } catch {
+      return res.status(404).setHeader('Cache-Control', 'public, s-maxage=3600').json({ error: 'blason indisponible' })
+    }
+  }
+
   if (req.query.l3logo) {
     const id = String(req.query.l3logo)
     if (!/^BC\d{3,9}$/.test(id)) return res.status(400).json({ error: 'id invalide' })
@@ -1183,4 +1205,4 @@ async function handler(req, res) {
 }
 
 // Compteur de CPU par fonction (19/11, voir api/_cpuMeter.js)
-export default withCpuMeter('espn', handler, req => { const q = req.query || {}; return q.feed ? 'feed' : q.summary || q.eventId ? 'summary' : q.recap ? 'recap' : q.standings ? 'standings' : q.l3logo ? 'l3logo' : q.slugs ? 'slugs' : q.slug ? 'scoreboard' : 'other' })
+export default withCpuMeter('espn', handler, req => { const q = req.query || {}; return q.feed ? 'feed' : q.summary || q.eventId ? 'summary' : q.recap ? 'recap' : q.standings ? 'standings' : q.l3logo ? 'l3logo' : q.crest ? 'crest' : q.slugs ? 'slugs' : q.slug ? 'scoreboard' : 'other' })
