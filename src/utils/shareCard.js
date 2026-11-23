@@ -247,7 +247,7 @@ export async function renderShareCard(d) {
   // du statut (lisible) et vers le bas (résumé).
   const fade = c => {
     const gr = c.createLinearGradient(0, 0, 0, 1640)
-    const st = [[0, 1], [690, 1], [748, 0], [832, 0], [890, 1], [1380, 1], [1640, 0]]
+    const st = [[0, 0], [150, 0], [270, 1], [690, 1], [748, 0], [832, 0], [890, 1], [1380, 1], [1640, 0]] // ne traverse pas l'en-tête
     st.forEach(([y, a]) => gr.addColorStop(y / 1640, `rgba(255,255,255,${a})`))
     return gr
   }
@@ -276,7 +276,12 @@ export async function renderShareCard(d) {
   ctx.fillStyle = brandRed; ctx.textAlign = 'left'; ctx.fillText('Stat', 60, 112)
   const sw = ctx.measureText('Stat').width
   ctx.fillStyle = '#fff'; ctx.fillText('Footix', 60 + sw, 112)
-  ctx.font = '800 22px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
+  // en-tête à droite : réduit si le nom de la compétition est long (« Ligue 1 McDonald's · J11 »)
+  { let px = 22; const longest = [d.meta1, d.meta2].filter(Boolean).map(t => t.toUpperCase()).sort((x, y) => y.length - x.length)[0] ?? ''
+    const width = f => { ctx.font = `800 ${f}px Inter, system-ui, sans-serif`; return [...longest].reduce((sum, c) => sum + ctx.measureText(c).width, 0) + 4.4 * (longest.length - 1) }
+    while (px > 16 && width(px) > 520) px -= 1
+    ctx.font = `800 ${px}px Inter, system-ui, sans-serif` }
+  ctx.fillStyle = '#fff'
   const m1w = d.meta1 ? spaced(ctx, d.meta1.toUpperCase(), 1018, 84, 4.4, 'right') : 0
   const m2w = d.meta2 ? spaced(ctx, d.meta2.toUpperCase(), 1018, 120, 4.4, 'right') : 0
   // logo du championnat à gauche du texte (23/11), comme dans l'app : coins arrondis s'il a un fond
