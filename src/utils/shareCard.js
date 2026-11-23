@@ -167,10 +167,28 @@ export async function renderShareCard(d) {
   g.addColorStop(0.8, 'rgba(3,5,12,0.9)'); g.addColorStop(1, '#03050c')
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
 
-  // trait lumineux continu (comme sur la maquette d'origine)
-  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3
-  ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 22
-  ctx.beginPath(); ctx.moveTo(xAt(0), 0); ctx.lineTo(xAt(1560), 1560); ctx.stroke(); ctx.restore()
+  // trait de séparation = faisceau lumineux (23/11, « plus impactant ») : large lueur douce, cœur
+  // blanc épais, et un éclat de lumière au centre, là où est écrit le statut.
+  // le faisceau s'éteint en douceur vers le bas (pas de bout arrondi visible au-dessus du résumé)
+  const beam = (width, a, blur) => {
+    const gr = ctx.createLinearGradient(0, 0, 0, 1640)
+    gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(0.72, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width
+    if (blur) { ctx.shadowColor = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.shadowBlur = blur }
+    ctx.beginPath(); ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(1640), 1640); ctx.stroke(); ctx.restore()
+  }
+  beam(70, 0.07, 0)
+  beam(26, 0.12, 30)
+  beam(7, 0.95, 26)
+  const fx = xAt(790), fy = 790
+  const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, 260)
+  flare.addColorStop(0, 'rgba(255,255,255,0.55)'); flare.addColorStop(0.25, 'rgba(255,255,255,0.18)'); flare.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = flare; ctx.fillRect(fx - 260, fy - 260, 520, 520)
+  ctx.save(); ctx.globalAlpha = 0.5
+  const streak = ctx.createLinearGradient(0, fy, W, fy)
+  streak.addColorStop(0, 'rgba(255,255,255,0)'); streak.addColorStop(0.5, 'rgba(255,255,255,0.9)'); streak.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = streak; ctx.fillRect(0, fy - 1.5, W, 3)
+  ctx.restore()
 
   // grain léger
   const n = document.createElement('canvas'); n.width = n.height = 128
@@ -202,25 +220,34 @@ export async function renderShareCard(d) {
     spaced(ctx, col.team.name.toUpperCase(), col.cx, 592, 6, 'center')
     // score géant, penché
     ctx.save()
-    ctx.font = '900 470px Archivo, Inter, system-ui, sans-serif'
-    const sg = ctx.createLinearGradient(0, -345, 0, 5)
+    ctx.font = '900 520px Archivo, Inter, system-ui, sans-serif'
+    const sg = ctx.createLinearGradient(0, -390, 0, 5)
     sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(225,232,255,1)')
     ctx.fillStyle = winner === -1 || winner === i ? sg : 'rgba(255,255,255,0.5)'
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 26
-    ctx.translate(col.cx, 985); ctx.transform(1, 0, -0.16, 1, 0, 0)
-    ctx.textAlign = 'center'; ctx.fillText(String(col.score ?? '–'), 0, 0)
+    ctx.translate(col.cx, 1000); ctx.transform(1, 0, -0.16, 1, 0, 0)
+    ctx.textAlign = 'center'
+    const txt = String(col.score ?? '–')
+    if (winner === -1 || winner === i) {
+      // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct)
+      ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 70
+      ctx.fillText(txt, 0, 0)
+    }
+    ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 24
+    ctx.fillText(txt, 0, 0)
+    ctx.shadowColor = 'transparent'
+    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(txt, 0, 0)
     ctx.restore()
     if (winner === i) {
       ctx.save(); ctx.fillStyle = '#ef4444'; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 16
-      ctx.beginPath(); ctx.arc(col.cx - 74, 1052, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore()
+      ctx.beginPath(); ctx.arc(col.cx - 74, 1067, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore()
       ctx.font = '800 21px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
-      spaced(ctx, 'VICTOIRE', col.cx - 56, 1060, 4.6, 'left')
+      spaced(ctx, 'VICTOIRE', col.cx - 56, 1075, 4.6, 'left')
     }
     // buteurs / rouges : icône, nom, minute — max 5 lignes
     const lines = col.lines.slice(0, 5)
     const more = col.lines.length - lines.length
     lines.forEach((l, k) => {
-      const y = 1180 + k * 66
+      const y = 1192 + k * 66
       if (l.kind === 'red') drawRedCard(ctx, col.x0 + 2, y - 12)
       else { ctx.font = '28px system-ui, "Apple Color Emoji", sans-serif'; ctx.textAlign = 'left'; ctx.fillText('⚽', col.x0 - 4, y - 1) }
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
