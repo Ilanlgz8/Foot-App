@@ -1,10 +1,11 @@
 // Image à partager d'un match — dessinée sur le téléphone (canvas 1080×1920, format story), aucun
 // appel serveur sauf les blasons (proxy /espn?crest=, mis en cache CDN un an, pour que le canvas
 // puisse être exporté : une image d'un autre site le bloquerait).
-// 23/11 (maquette choisie par l'utilisateur) : même habillage pour tous les matchs, aux couleurs de
-// l'app — fond noir, lueurs rouges dans deux coins, logo du championnat en haut, « FIN DU MATCH »,
-// blasons, noms, score géant avec tiret rouge, buteurs, logo StatFootix en bas. Seuls le championnat,
-// les équipes, le score et les buteurs changent.
+// 23/11 (maquette choisie par l'utilisateur) : même habillage pour tous les matchs — fond noir, lueurs
+// rouges sur les bords, plans en diagonale très discrets ; en-tête logo StatFootix + compétition/journée ;
+// logo de la compétition, « FIN DU MATCH » juste dessous ; blasons, noms très espacés, score Archivo
+// Black + fin tiret rouge ; buteurs ; date en bas. Seuls le championnat, les équipes, le score et les
+// buteurs changent.
 // Règles de rendu (constats sur iPhone) : aucun shadowBlur (tache noire), aucun ctx.filter (ignoré par
 // Safari) ; tout est en aplats et dégradés.
 
@@ -20,7 +21,7 @@ const L = 270, R = 810            // centres des deux colonnes
 // (épaisse) plutôt qu'une police fine.
 let scoreFaceOk = false
 const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
-const SCORE_PX = 320
+const SCORE_PX = 300
 
 function crestSrc(url) {
   if (!url) return null
@@ -169,7 +170,7 @@ function sideLine(ctx, xFrom, xTo, y, a = 0.4) {
 /**
  * @param {object} d
  *  d.home / d.away : { name, crest } ; d.hs, d.as : scores ; d.isFinished ; d.status : libellé en direct ("67'")
- *  d.compLogo (+ d.compLogoOpaque) : logo du championnat ; d.isNational : sélections → drapeaux arrondis
+ *  d.compLabel, d.matchday, d.dateLabel : en-tête / pied ; d.compLogo (+ d.compLogoOpaque) : logo du championnat ; d.isNational : sélections → drapeaux arrondis
  *  d.homeLines / d.awayLines : [{ kind: 'goal'|'red', name, minutes }]
  * @returns {Promise<Blob>}
  */
@@ -215,8 +216,9 @@ export async function renderShareCard(d) {
     g.addColorStop(0, `rgba(200,8,20,${a})`); g.addColorStop(0.45, `rgba(140,6,16,${a * 0.45})`); g.addColorStop(1, 'rgba(120,0,10,0)')
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
   }
-  glow(-60, 120, 820, 0.9)
-  glow(W + 80, H - 260, 900, 0.85)
+  glow(-80, 260, 760, 0.95)
+  glow(W + 60, 820, 520, 0.7)
+  glow(W + 40, H - 160, 760, 0.95)
   // grain léger (évite les bandes dans les dégradés)
   const n = document.createElement('canvas'); n.width = n.height = 128
   const nx = n.getContext('2d'); const id = nx.createImageData(128, 128)
@@ -225,76 +227,87 @@ export async function renderShareCard(d) {
   ctx.fillStyle = ctx.createPattern(n, 'repeat'); ctx.fillRect(0, 0, W, H)
   ctx.textBaseline = 'alphabetic'
 
-  // ── Logo du championnat ──
+  // ── Plans en diagonale, très discrets (profondeur sans effet) ──
+  const plane = (pts, a) => { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill() }
+  plane([[620, 0], [W, 0], [W, 260], [430, 1150], [300, 1150]], 0.025)
+  plane([[0, 1250], [520, 980], [W, 1500], [W, H], [0, H]], 0.018)
+
+  // ── En-tête : logo StatFootix, trait, compétition + journée, barre rouge ──
+  let brandRed = '#fb3b4e'
+  try { brandRed = getComputedStyle(document.documentElement).getPropertyValue('--sf-red').trim() || brandRed } catch { /* défaut */ }
+  ctx.font = 'italic 900 58px Inter, system-ui, sans-serif'; ctx.textAlign = 'left'
+  const sW = ctx.measureText('Stat').width, fW = ctx.measureText('Footix').width
+  ctx.fillStyle = brandRed; ctx.fillText('Stat', 86, 135); ctx.fillStyle = '#fff'; ctx.fillText('Footix', 86 + sW, 135)
+  ctx.fillStyle = RED; ctx.fillRect(W - 92, 88, 6, 62)
+  ctx.fillStyle = '#fff'; ctx.font = '700 24px Inter, system-ui, sans-serif'
+  const l1 = String(d.compLabel ?? '').toUpperCase(), l2 = d.matchday ? `JOURNÉE ${d.matchday}` : ''
+  const w1 = spaced(ctx, l1, W - 116, l2 ? 113 : 127, 7, 'right')
+  ctx.font = '600 20px Inter, system-ui, sans-serif'
+  const w2 = l2 ? spaced(ctx, l2, W - 116, 145, 6, 'right') : 0
+  { const x0 = 86 + sW + fW + 36, x1 = W - 116 - Math.max(w1, w2) - 36
+    if (x1 - x0 > 60) { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(x0, 117, x1 - x0, 2) } }
+
+  // ── Logo de la compétition ──
   if (compImg) {
     const box = d.compLogoOpaque ? { x: 0, y: 0, w: compImg.width, h: compImg.height } : inkBox(compImg)
-    const max = 190, r = Math.min(max / box.w, max / box.h)
-    const w = box.w * r, h = box.h * r, x = W / 2 - w / 2, y = 225 - h / 2
+    const max = 180, r = Math.min(max / box.w, max / box.h)
+    const w = box.w * r, h = box.h * r, x = W / 2 - w / 2, y = 375 - h / 2
     ctx.save()
-    if (d.compLogoOpaque) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, 28) : ctx.rect(x, y, w, h); ctx.clip() }
+    if (d.compLogoOpaque) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, 34) : ctx.rect(x, y, w, h); ctx.clip() }
     ctx.drawImage(compImg, box.x, box.y, box.w, box.h, x, y, w, h)
     ctx.restore()
   }
 
-  // ── « FIN DU MATCH » entre deux traits ──
-  const live = String(d.status ?? '').toUpperCase()
-  const status = d.isFinished ? 'FIN DU MATCH' : (live ? `EN DIRECT · ${live}` : 'EN DIRECT')
-  ctx.fillStyle = '#fff'; ctx.font = '800 36px Inter, system-ui, sans-serif'
-  const sw = spaced(ctx, status, W / 2, 442, 14, 'center')
-  sideLine(ctx, 70, W / 2 - sw / 2 - 40, 430)
-  sideLine(ctx, W - 70, W / 2 + sw / 2 + 40, 430)
+  // ── « FIN DU MATCH » sous le logo de la compétition (demande utilisateur 23/11) ──
+  { const live = String(d.status ?? '').toUpperCase()
+    const st = d.isFinished ? 'FIN DU MATCH' : (live ? `EN DIRECT · ${live}` : 'EN DIRECT')
+    ctx.font = '700 30px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
+    const tw = spaced(ctx, st, W / 2, 545, 13, 'center')
+    sideLine(ctx, W / 2 - tw / 2 - 190, W / 2 - tw / 2 - 30, 535, 0.5)
+    sideLine(ctx, W / 2 + tw / 2 + 190, W / 2 + tw / 2 + 30, 535, 0.5) }
 
   // ── Blasons, séparés par un trait vertical ──
-  drawCrest(ctx, hImg, L, 680, 250, (d.home.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.home.crest : null)
-  drawCrest(ctx, aImg, R, 680, 250, (d.away.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.away.crest : null)
-  fadeLine(ctx, W / 2, 560, W / 2, 820, 0.5)
+  drawCrest(ctx, hImg, L, 790, 260, (d.home.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.home.crest : null)
+  drawCrest(ctx, aImg, R, 790, 260, (d.away.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.away.crest : null)
+  fadeLine(ctx, W / 2, 660, W / 2, 930, 0.45)
 
-  // ── Noms ──
+  // ── Noms, très espacés ──
   for (const [cx, name] of [[L, d.home.name], [R, d.away.name]]) {
     const t = String(name ?? '').toUpperCase()
-    fitText(ctx, t, 400, px => `800 ${px}px Inter, system-ui, sans-serif`, 46, 26, 5)
-    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 893, 5, 'center')
+    fitText(ctx, t, 420, px => `500 ${px}px Inter, system-ui, sans-serif`, 40, 24, 16)
+    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 1008, 16, 'center')
   }
 
-  // ── Score : chiffres géants centrés sous chaque blason, tiret rouge au milieu ──
+  // ── Score, fin tiret rouge au milieu ──
   ctx.font = SCORE_FONT(SCORE_PX); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
   for (const [cx, v] of [[L, d.hs], [R, d.as]]) {
     const txt = String(v ?? '–')
-    ctx.fillText(txt, cx - inkCenterX(ctx.font, txt), 1215)
+    ctx.fillText(txt, cx - inkCenterX(ctx.font, txt), 1300)
   }
-  ctx.fillStyle = RED; ctx.fillRect(W / 2 - 46, 1078, 92, 30)
+  ctx.fillStyle = RED; ctx.fillRect(W / 2 - 52, 1186, 104, 9)
 
-  // ── Buteurs / cartons rouges, séparés par un trait vertical ──
-  const colLines = [d.homeLines ?? [], d.awayLines ?? []]
-  const maxRows = Math.max(1, ...colLines.map(l => Math.min(l.length, 5)))
-  colLines.forEach((all, i) => {
-    const x0 = i ? 640 : 150
+  // ── Buteurs / cartons rouges ──
+  ;[d.homeLines ?? [], d.awayLines ?? []].forEach((all, i) => {
+    const x0 = i ? 650 : 175
     all.slice(0, 5).forEach((l, k) => {
-      const y = 1330 + k * 60
+      const y = 1410 + k * 62
       if (l.kind === 'red') drawRedCard(ctx, x0, y - 12); else drawBall(ctx, x0, y - 12, 17)
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
-      ctx.font = '600 34px Inter, system-ui, sans-serif'
+      ctx.font = '400 34px Inter, system-ui, sans-serif'
       let name = l.name
-      while (ctx.measureText(name).width > 230 && name.length > 3) name = name.slice(0, -2) + '.'
-      ctx.fillText(name, x0 + 40, y)
+      while (ctx.measureText(name).width > 220 && name.length > 3) name = name.slice(0, -2) + '.'
+      ctx.fillText(name, x0 + 48, y)
       const nw = ctx.measureText(name).width
-      ctx.font = '500 32px Inter, system-ui, sans-serif'
-      ctx.fillText(l.minutes, x0 + 40 + nw + 14, y)
+      ctx.fillText(l.minutes, x0 + 48 + nw + 22, y)
     })
-    if (all.length > 5) { ctx.font = '600 28px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(`+${all.length - 5}`, x0 + 40, 1330 + 5 * 60) }
   })
-  if (colLines.some(l => l.length)) fadeLine(ctx, W / 2, 1270, W / 2, 1330 + maxRows * 60 + 10, 0.5)
 
-  // ── Logo StatFootix entre deux traits (couleurs du logo de l'app : « Stat » rouge, « Footix » blanc) ──
-  ctx.font = 'italic 900 76px Inter, system-ui, sans-serif'; ctx.textAlign = 'left'
-  let brandRed = '#fb3b4e'
-  try { brandRed = getComputedStyle(document.documentElement).getPropertyValue('--sf-red').trim() || brandRed } catch { /* défaut */ }
-  const sW = ctx.measureText('Stat').width, fW = ctx.measureText('Footix').width
-  const bx = W / 2 - (sW + fW) / 2, by = 1742
-  ctx.fillStyle = brandRed; ctx.fillText('Stat', bx, by)
-  ctx.fillStyle = '#fff'; ctx.fillText('Footix', bx + sW, by)
-  sideLine(ctx, 70, bx - 40, by - 27)
-  sideLine(ctx, W - 70, bx + sW + fW + 40, by - 27)
+  // ── Pied : date du match, trait ──
+  if (d.dateLabel) {
+    ctx.font = '600 26px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
+    const tw = spaced(ctx, String(d.dateLabel).toUpperCase(), 86, 1805, 10, 'left')
+    sideLine(ctx, W - 86, 86 + tw + 36, 1796, 0.45)
+  }
 
   // JPEG : bien plus léger qu'un PNG, qualité identique à l'œil.
   return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('image'))), 'image/jpeg', 0.92))

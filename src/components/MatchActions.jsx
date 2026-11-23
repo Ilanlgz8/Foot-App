@@ -37,6 +37,12 @@ export function shareLines(scorers = [], cards = [], side) {
   return lines
 }
 
+function frDate(utcDate) {
+  const d = new Date(utcDate)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 const Spinner = () => (
   <svg className="lmp__heroSpin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
     <path d="M12 3a9 9 0 1 1-9 9" />
@@ -51,7 +57,7 @@ const Spinner = () => (
 //  • l'image est redessinée en arrière-plan dès que les données changent (direct compris).
 // Tant qu'elle n'est pas prête, le bouton tourne et ne réagit pas ; une fois prête, un appui la
 // partage tout de suite (et le partage iPhone exige un appui récent : pas d'attente avant share()).
-export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCrest, hs, as, scorers, cards, isFinished, statusLabel }) {
+export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCrest, hs, as, scorers, cards, isFinished, statusLabel, compName }) {
   const [fontsOk, setFontsOk] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [ready, setReady] = useState(null)      // { key, blob }
@@ -74,11 +80,15 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
     home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest },
     away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest },
     isNational: isNationalTeamComp(match),
+    // en-tête : nom court de la compétition (sauf abrégé « Premier L. » → nom complet), journée ; pied : date
+    compLabel: (compObj?.shortName && !compObj.shortName.endsWith('.')) ? compObj.shortName : (compObj?.name ?? compName ?? ''),
+    matchday: match.matchday ?? null,
+    dateLabel: frDate(match.utcDate),
     hs, as, isFinished,
     status: isFinished ? 'Terminé' : (statusLabel || ''),
     homeLines: shareLines(scorers, cards, 'home'),
     awayLines: shareLines(scorers, cards, 'away'),
-  }), [compObj, match, homeName, awayName, homeCrest, awayCrest, hs, as, isFinished, statusLabel, scorers, cards])
+  }), [compObj, compName, match, homeName, awayName, homeCrest, awayCrest, hs, as, isFinished, statusLabel, scorers, cards])
   const key = JSON.stringify(data)
 
   useEffect(() => {
