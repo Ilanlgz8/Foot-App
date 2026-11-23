@@ -1191,9 +1191,9 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
   // ── Effet « équipe qui court après le score » (23/11, constat utilisateur : « une grosse équipe
   // menée 0-1 en début de match à 5, c'est trop ») : une équipe menée attaque davantage, et d'autant
   // plus qu'elle est plus forte que l'adversaire (une grosse équipe a les moyens de revenir, une petite
-  // beaucoup moins). Son rythme de buts est augmenté jusqu'à +30 % selon l'écart de niveau
+  // beaucoup moins). Son rythme de buts est augmenté jusqu'à +28 % selon l'écart de niveau
   // d'avant-match ; l'adversaire, qui recule, marque un peu plus en contre (+5 %).
-  const CHASE_MAX = 0.30
+  const CHASE_MAX = 0.20  // 23/11 : 0,30 → 0,20 (grosse équipe menée tôt : ~2,1 au lieu de 1,92, plus proche des bookmakers)
   if (diff !== 0) {
     const trailingIsHome = diff < 0
     const lt = trailingIsHome ? baseLambdaHome : baseLambdaAway
@@ -1265,7 +1265,9 @@ export function calcLiveProno(homeForm, awayForm, homeGoals, awayGoals, minute, 
     statsSwing += Math.max(-8, Math.min(8, (homePoss - awayPoss) * 0.15))
   }
   if (homeShotsOnTarget != null && awayShotsOnTarget != null) {
-    statsSwing += Math.max(-10, Math.min(10, (homeShotsOnTarget - awayShotsOnTarget) * 1.5))
+    // 23/11 : tirs cadrés renforcés (1,5 → 2,5 pts par tir d'écart, plafond 10 → 15) : meilleur signal
+    // de domination réelle — une équipe menée qui cadre beaucoup garde de vraies chances.
+    statsSwing += Math.max(-15, Math.min(15, (homeShotsOnTarget - awayShotsOnTarget) * 2.5))
   }
   // Corners : indicateur de pression territoriale plus faible/bruyant que
   // les tirs cadrés (beaucoup de corners ne débouchent sur rien) — poids et

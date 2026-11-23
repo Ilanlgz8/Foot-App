@@ -74,15 +74,21 @@ function fitText(ctx, text, maxW, font, startPx, minPx) {
 }
 
 function drawCrest(ctx, img, cx, cy, size, fallbackText, color) {
+  // Ombre douce sous le blason : dégradé radial (et pas shadowBlur, que Safari/iPhone rend en tache
+  // noire nette — constat utilisateur 23/11 : l'image enregistrée n'était pas la même que l'aperçu).
   ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 22
+  ctx.translate(cx, cy + size * 0.42); ctx.scale(1, 0.32)
+  const sh = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.6)
+  sh.addColorStop(0, 'rgba(0,0,0,0.38)'); sh.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, size * 0.6, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
+  ctx.save()
   if (img) {
     const r = Math.min(size / img.width, size / img.height)
     const w = img.width * r, h = img.height * r
     ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h)
   } else {
     ctx.fillStyle = rgb(color); ctx.beginPath(); ctx.arc(cx, cy, size / 2.3, 0, Math.PI * 2); ctx.fill()
-    ctx.shadowColor = 'transparent'
     ctx.fillStyle = '#fff'; ctx.font = `900 ${size / 3}px Archivo, Inter, system-ui, sans-serif`
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(fallbackText, cx, cy + 2)
   }
@@ -177,16 +183,14 @@ export async function renderShareCard(d) {
     ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(GAP[0]), GAP[0])
     ctx.moveTo(xAt(GAP[1]), GAP[1]); ctx.lineTo(xAt(1640), 1640)
   }
-  const beam = (width, a, blur) => {
+  // Lueur obtenue par plusieurs traits superposés (pas de shadowBlur : rendu identique partout).
+  const beam = (width, a) => {
     const gr = ctx.createLinearGradient(0, 0, 0, 1640)
     gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(0.72, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width; ctx.lineJoin = 'miter'; ctx.lineCap = 'round'
-    if (blur) { ctx.shadowColor = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.shadowBlur = blur }
+    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width; ctx.lineCap = 'round'
     sepPath(); ctx.stroke(); ctx.restore()
   }
-  beam(70, 0.07, 0)
-  beam(26, 0.12, 30)
-  beam(7, 0.95, 26)
+  for (const [w, a] of [[78, 0.045], [52, 0.055], [34, 0.07], [20, 0.1], [12, 0.2], [6, 0.95]]) beam(w, a)
   const fx = xAt(790), fy = 790
   const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, 260)
   flare.addColorStop(0, 'rgba(255,255,255,0.55)'); flare.addColorStop(0.25, 'rgba(255,255,255,0.18)'); flare.addColorStop(1, 'rgba(255,255,255,0)')
@@ -246,14 +250,15 @@ export async function renderShareCard(d) {
     ctx.translate(col.cx, 1000); ctx.transform(1, 0, -0.16, 1, 0, 0)
     ctx.textAlign = 'center'
     const txt = String(col.score ?? '–')
+    ctx.lineJoin = 'round'
     if (winner === -1 || winner === i) {
-      // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct)
-      ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 70
-      ctx.fillText(txt, 0, 0)
+      // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct) : contours
+      // blancs très transparents de plus en plus larges — pas de shadowBlur (tache noire sur iPhone).
+      for (const [w, a] of [[64, 0.035], [44, 0.05], [28, 0.07], [16, 0.09]]) {
+        ctx.lineWidth = w; ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.strokeText(txt, 0, 0)
+      }
     }
-    ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 24
     ctx.fillText(txt, 0, 0)
-    ctx.shadowColor = 'transparent'
     ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(txt, 0, 0)
     ctx.restore()
     // buteurs / rouges : icône, nom, minute — max 5 lignes
@@ -277,9 +282,14 @@ export async function renderShareCard(d) {
   })
 
   // ── Statut au centre (sans fond) ──
-  ctx.save(); ctx.fillStyle = '#fff'; ctx.font = '900 32px Inter, system-ui, sans-serif'
-  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 3
-  spaced(ctx, String(d.status ?? '').toUpperCase(), W / 2 + 12, 803, 6, 'center')
+  ctx.save(); ctx.font = '900 32px Inter, system-ui, sans-serif'
+  // contour sombre discret (lisible sur l'éclat lumineux), puis le texte blanc par-dessus
+  const stTxt = String(d.status ?? '').toUpperCase()
+  ctx.lineJoin = 'round'; ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(4,10,30,0.35)'
+  { const chars = [...stTxt]; const ws = chars.map(c => ctx.measureText(c).width); const tot = ws.reduce((a, b) => a + b, 0) + 6 * (chars.length - 1)
+    let x = W / 2 + 12 - tot / 2; ctx.textAlign = 'left'; chars.forEach((c, k) => { ctx.strokeText(c, x, 803); x += ws[k] + 6 }) }
+  ctx.fillStyle = '#fff'
+  spaced(ctx, stTxt, W / 2 + 12, 803, 6, 'center')
   ctx.restore()
 
   // ── Résumé ──
@@ -308,7 +318,8 @@ export async function renderShareCard(d) {
 export async function shareImage(blob, fileName, title) {
   const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' })
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title }); return 'shared' } catch (e) { if (e?.name === 'AbortError') return 'cancelled' }
+    // fichier SEUL : avec un titre, Snapchat (et d'autres) prennent le texte au lieu de l'image → écran noir
+    try { await navigator.share({ files: [file] }); return 'shared' } catch (e) { if (e?.name === 'AbortError') return 'cancelled' }
   }
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a'); a.href = url; a.download = fileName
