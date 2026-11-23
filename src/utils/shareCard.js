@@ -300,23 +300,36 @@ export async function renderShareCard(d) {
     const txt = String(v ?? '–')
     ctx.fillText(txt, cx - inkCenterX(ctx.font, txt), 1300)
   }
-  ctx.fillStyle = RED; ctx.fillRect(W / 2 - 52, 1186, 104, 9)
+  // tiret centré sur le milieu des chiffres (haut 1111, bas 1300 mesurés au pixel, 23/11)
+  ctx.fillStyle = RED; ctx.fillRect(W / 2 - 52, 1201, 104, 9)
 
-  // ── Buteurs / cartons rouges ──
-  ;[d.homeLines ?? [], d.awayLines ?? []].forEach((all, i) => {
-    const x0 = i ? 650 : 175
-    all.slice(0, 5).forEach((l, k) => {
-      const y = 1410 + k * 62
-      if (l.kind === 'red') drawRedCard(ctx, x0, y - 12); else drawBall(ctx, x0, y - 12, 17)
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
+  // ── Buteurs / cartons rouges : bloc centré sous chaque chiffre (23/11), lignes alignées à gauche
+  //    dans le bloc pour que les ballons restent les uns sous les autres ──
+  ;[[L, d.homeLines ?? []], [R, d.awayLines ?? []]].forEach(([cx, all]) => {
+    const rows = all.slice(0, 5).map(l => {
       ctx.font = '400 34px Inter, system-ui, sans-serif'
       let name = l.name
       while (ctx.measureText(name).width > 220 && name.length > 3) name = name.slice(0, -2) + '.'
-      ctx.fillText(name, x0 + 48, y)
       const nw = ctx.measureText(name).width
-      ctx.fillText(l.minutes, x0 + 48 + nw + 22, y)
+      return { ...l, name, nw, w: 56 + nw + 22 + ctx.measureText(l.minutes).width }
+    })
+    const blockW = Math.min(470, Math.max(0, ...rows.map(r => r.w)))
+    const x0 = Math.max(40, Math.min(W - 40 - blockW, cx - blockW / 2))
+    rows.forEach((l, k) => {
+      const y = 1410 + k * 62
+      if (l.kind === 'red') drawRedCard(ctx, x0 + 17, y - 12); else drawBall(ctx, x0 + 17, y - 12, 17)
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
+      ctx.font = '400 34px Inter, system-ui, sans-serif'
+      ctx.fillText(l.name, x0 + 56, y)
+      ctx.fillText(l.minutes, x0 + 56 + l.nw + 22, y)
     })
   })
+
+  // ── Pied : adresse de l'app, entre deux traits ──
+  { ctx.font = '600 28px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
+    const tw = spaced(ctx, 'statfootix.vercel.app', W / 2, 1822, 3, 'center')
+    sideLine(ctx, 86, W / 2 - tw / 2 - 34, 1812, 0.45)
+    sideLine(ctx, W - 86, W / 2 + tw / 2 + 34, 1812, 0.45) }
 
   // JPEG : bien plus léger qu'un PNG, qualité identique à l'œil.
   return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('image'))), 'image/jpeg', 0.92))
