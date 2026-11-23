@@ -10,6 +10,7 @@
 // Safari) ; tout est en aplats et dégradés.
 
 import scoreFontUrl from '../assets/fonts/archivo-expanded-black.woff2?url'
+import nameFontUrl from '../assets/fonts/archivo-expanded-bold.woff2?url'
 
 const W = 1080, H = 1920
 const RED = '#e50914'
@@ -20,6 +21,7 @@ const L = 270, R = 810            // centres des deux colonnes
 // Chargée À PART sous un nom dédié (FontFace) : avec une police CSS de l'app, Safari dessinait parfois le
 // score dans une police fine de repli au premier partage. Si le chargement échoue : Archivo Black.
 let scoreFaceOk = false
+let nameFaceOk = false
 const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
 const SCORE_PX = 270
 
@@ -176,18 +178,27 @@ function sideLine(ctx, xFrom, xTo, y, a = 0.4) {
  */
 // Polices de l'image : chargées AVANT de dessiner (sinon le canvas prend la police de repli).
 let fontsPromise = null
-async function loadScoreFace() {
-  if (typeof FontFace === 'undefined' || !document.fonts) return
-  const face = new FontFace('SFShareScore', `url(${scoreFontUrl}) format("woff2")`, { weight: '400', style: 'normal' })
+async function loadFace(family, url, sample) {
+  const face = new FontFace(family, `url(${url}) format("woff2")`, { weight: '400', style: 'normal' })
   await face.load()
   document.fonts.add(face)
   // Safari : une police tout juste ajoutée n'est pas toujours prise par le canvas au tout premier
-  // dessin → dessin d'amorçage, puis on laisse passer deux images d'écran.
+  // dessin → dessin d'amorçage.
   const c = document.createElement('canvas'); c.width = c.height = 8
-  const x = c.getContext('2d'); x.font = '400 8px SFShareScore'; x.fillText('0123456789', 0, 8)
+  const x = c.getContext('2d'); x.font = `400 8px ${family}`; x.fillText(sample, 0, 8)
+}
+async function loadScoreFace() {
+  if (typeof FontFace === 'undefined' || !document.fonts) return
+  // score : Archivo Expanded Black ; noms d'équipes : Archivo Expanded Bold (choix utilisateur 23/11)
+  await Promise.all([
+    loadFace('SFShareScore', scoreFontUrl, '0123456789').catch(() => {}),
+    loadFace('SFShareName', nameFontUrl, 'ABCDEFGHIJKLMNOPQRSTUVWXYZÉÈ').catch(() => {}),
+  ])
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
   scoreFaceOk = document.fonts.check('400 40px SFShareScore', '0123456789')
+  nameFaceOk = document.fonts.check('400 40px SFShareName', 'NICE')
 }
+
 export function preloadShareFonts() {
   if (!fontsPromise) {
     const load = async () => {
@@ -274,11 +285,12 @@ export async function renderShareCard(d) {
   drawCrest(ctx, aImg, R, 790, 260, (d.away.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.away.crest : null)
   fadeLine(ctx, W / 2, 660, W / 2, 930, 0.45)
 
-  // ── Noms, très espacés ──
+  // ── Noms : Archivo Expanded Bold, espacés (repli : Inter 800) ──
+  const nameFont = px => (nameFaceOk ? `400 ${px}px SFShareName, Inter, sans-serif` : `800 ${px}px Inter, system-ui, sans-serif`)
   for (const [cx, name] of [[L, d.home.name], [R, d.away.name]]) {
     const t = String(name ?? '').toUpperCase()
-    fitText(ctx, t, 420, px => `500 ${px}px Inter, system-ui, sans-serif`, 40, 24, 16)
-    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 1008, 16, 'center')
+    fitText(ctx, t, 430, nameFont, 38, 22, 7)
+    ctx.fillStyle = '#fff'; spaced(ctx, t, cx, 1008, 7, 'center')
   }
 
   // ── Score, fin tiret rouge au milieu ──
