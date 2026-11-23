@@ -3,25 +3,25 @@
 // puisse être exporté : une image d'un autre site le bloquerait).
 // 23/11 (maquette choisie par l'utilisateur) : même habillage pour tous les matchs — fond noir, lueurs
 // rouges sur les bords, plans en diagonale très discrets ; en-tête logo StatFootix + compétition/journée ;
-// logo de la compétition, « FIN DU MATCH » juste dessous ; blasons, noms très espacés, score Archivo
-// Black + fin tiret rouge ; buteurs ; date en bas. Seuls le championnat, les équipes, le score et les
-// buteurs changent.
+// date du match en haut au centre, logo de la compétition tel quel (sans cadre), « FIN DU MATCH » juste
+// dessous ; blasons, noms très espacés, score en Saira Expanded Black (police de sa maquette) + fin
+// tiret rouge ; buteurs.
 // Règles de rendu (constats sur iPhone) : aucun shadowBlur (tache noire), aucun ctx.filter (ignoré par
 // Safari) ; tout est en aplats et dégradés.
 
-import scoreFontUrl from '@fontsource/archivo-black/files/archivo-black-latin-400-normal.woff2?url'
+import scoreFontUrl from '../assets/fonts/saira-expanded-black.woff2?url'
 
 const W = 1080, H = 1920
 const RED = '#e50914'
 const L = 270, R = 810            // centres des deux colonnes
-// Police du score : Archivo Black (choisie par l'utilisateur, 23/11 ; même police que le score du Match
-// du jour). Chargée À PART sous un nom dédié (FontFace, fichier du build) : constat utilisateur, avec la
-// police de l'app (CSS @font-face découpé par plages de caractères) Safari dessinait parfois le score
-// dans une police fine de repli au premier partage. Si le chargement échoue malgré tout : Archivo 900
-// (épaisse) plutôt qu'une police fine.
+// Police du score : Saira Expanded Black (23/11, la plus proche de la maquette de l'utilisateur : large,
+// carrée-arrondie). Fichier statique tiré de la police variable Saira (OFL, @fontsource-variable/saira,
+// wght 900 / wdth 125) : src/assets/fonts/saira-expanded-black.woff2. Chargée À PART sous un nom
+// dédié (FontFace) : avec une police CSS de l'app, Safari dessinait parfois le score dans une police fine
+// de repli au premier partage. Si le chargement échoue malgré tout : Archivo Black (épaisse).
 let scoreFaceOk = false
 const SCORE_FONT = px => (scoreFaceOk ? `400 ${px}px SFShareScore, "Archivo Black", Archivo, sans-serif` : `900 ${px}px "Archivo Black", Archivo, Inter, system-ui, sans-serif`)
-const SCORE_PX = 300
+const SCORE_PX = 270
 
 function crestSrc(url) {
   if (!url) return null
@@ -170,7 +170,7 @@ function sideLine(ctx, xFrom, xTo, y, a = 0.4) {
 /**
  * @param {object} d
  *  d.home / d.away : { name, crest } ; d.hs, d.as : scores ; d.isFinished ; d.status : libellé en direct ("67'")
- *  d.compLabel, d.matchday, d.dateLabel : en-tête / pied ; d.compLogo (+ d.compLogoOpaque) : logo du championnat ; d.isNational : sélections → drapeaux arrondis
+ *  d.compLogo (+ d.compLogoOpaque) : logo du championnat ; d.isNational : sélections → drapeaux arrondis
  *  d.homeLines / d.awayLines : [{ kind: 'goal'|'red', name, minutes }]
  * @returns {Promise<Blob>}
  */
@@ -247,24 +247,27 @@ export async function renderShareCard(d) {
   { const x0 = 86 + sW + fW + 36, x1 = W - 116 - Math.max(w1, w2) - 36
     if (x1 - x0 > 60) { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(x0, 117, x1 - x0, 2) } }
 
-  // ── Logo de la compétition ──
+  // ── Date du match, en haut au centre ──
+  if (d.dateLabel) {
+    ctx.font = '600 26px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
+    spaced(ctx, String(d.dateLabel).toUpperCase(), W / 2, 262, 9, 'center')
+  }
+
+  // ── Logo de la compétition, tel quel (pas de cadre ni d'arrondi) ──
   if (compImg) {
-    const box = d.compLogoOpaque ? { x: 0, y: 0, w: compImg.width, h: compImg.height } : inkBox(compImg)
-    const max = 180, r = Math.min(max / box.w, max / box.h)
-    const w = box.w * r, h = box.h * r, x = W / 2 - w / 2, y = 375 - h / 2
-    ctx.save()
-    if (d.compLogoOpaque) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, 34) : ctx.rect(x, y, w, h); ctx.clip() }
-    ctx.drawImage(compImg, box.x, box.y, box.w, box.h, x, y, w, h)
-    ctx.restore()
+    const box = inkBox(compImg)
+    const max = 170, r = Math.min(max / box.w, max / box.h)
+    const w = box.w * r, h = box.h * r
+    ctx.drawImage(compImg, box.x, box.y, box.w, box.h, W / 2 - w / 2, 410 - h / 2, w, h)
   }
 
   // ── « FIN DU MATCH » sous le logo de la compétition (demande utilisateur 23/11) ──
   { const live = String(d.status ?? '').toUpperCase()
     const st = d.isFinished ? 'FIN DU MATCH' : (live ? `EN DIRECT · ${live}` : 'EN DIRECT')
     ctx.font = '700 30px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
-    const tw = spaced(ctx, st, W / 2, 545, 13, 'center')
-    sideLine(ctx, W / 2 - tw / 2 - 190, W / 2 - tw / 2 - 30, 535, 0.5)
-    sideLine(ctx, W / 2 + tw / 2 + 190, W / 2 + tw / 2 + 30, 535, 0.5) }
+    const tw = spaced(ctx, st, W / 2, 580, 13, 'center')
+    sideLine(ctx, W / 2 - tw / 2 - 190, W / 2 - tw / 2 - 30, 570, 0.5)
+    sideLine(ctx, W / 2 + tw / 2 + 190, W / 2 + tw / 2 + 30, 570, 0.5) }
 
   // ── Blasons, séparés par un trait vertical ──
   drawCrest(ctx, hImg, L, 790, 260, (d.home.name ?? '?').slice(0, 3).toUpperCase(), d.isNational ? d.home.crest : null)
@@ -279,7 +282,8 @@ export async function renderShareCard(d) {
   }
 
   // ── Score, fin tiret rouge au milieu ──
-  ctx.font = SCORE_FONT(SCORE_PX); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'
+  ctx.font = SCORE_FONT(SCORE_PX); ctx.textAlign = 'left'
+  { const g = ctx.createLinearGradient(0, 1080, 0, 1300); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#d8d9de'); ctx.fillStyle = g }
   for (const [cx, v] of [[L, d.hs], [R, d.as]]) {
     const txt = String(v ?? '–')
     ctx.fillText(txt, cx - inkCenterX(ctx.font, txt), 1300)
@@ -301,13 +305,6 @@ export async function renderShareCard(d) {
       ctx.fillText(l.minutes, x0 + 48 + nw + 22, y)
     })
   })
-
-  // ── Pied : date du match, trait ──
-  if (d.dateLabel) {
-    ctx.font = '600 26px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
-    const tw = spaced(ctx, String(d.dateLabel).toUpperCase(), 86, 1805, 10, 'left')
-    sideLine(ctx, W - 86, 86 + tw + 36, 1796, 0.45)
-  }
 
   // JPEG : bien plus léger qu'un PNG, qualité identique à l'œil.
   return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('image'))), 'image/jpeg', 0.92))

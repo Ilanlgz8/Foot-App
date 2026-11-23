@@ -31,6 +31,8 @@
 import bundesligaLogo from '../assets/leagues/bundesliga-2026.png'
 import laligaLogo from '../assets/leagues/laliga-ea-sports.svg'
 import ligue1Logo from '../assets/leagues/ligue1-2026.png'
+// version blanche sur fond transparent (sans la tuile bleue) : image à partager (shareCard.js, emblemOnDark)
+import ligue1LogoOnDark from '../assets/leagues/ligue1-2026-transparent.png'
 import premierLeagueLogo from '../assets/leagues/premier-league-2026.png'
 import serieALogo from '../assets/leagues/serie-a-2026.png'
 import worldCupLogo from '../assets/leagues/coupe-du-monde.png'
@@ -420,6 +422,7 @@ export const COMPETITIONS = [
     // ⚠️ Logo à FOND PLEIN (tuile bleue), pas un tracé sur transparent —
     // voir emblemOpaque plus bas dans ce fichier.
     emblemOpaque: true,
+    emblemOnDark: ligue1LogoOnDark,
   },
   {
     // Ligue 2 (12/11, demande utilisateur) : vraie compétition suivie en direct (source ESPN

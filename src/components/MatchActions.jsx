@@ -75,8 +75,8 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
 
   const compObj = compForMatch(match)
   const data = useMemo(() => ({
-    compLogo: compObj?.emblem ?? match.competition?.emblem ?? null,
-    compLogoOpaque: !!compObj?.emblemOpaque,
+    // logo tel quel sur fond noir : version transparente si elle existe (Ligue 1 : sans la tuile bleue)
+    compLogo: compObj?.emblemOnDark ?? compObj?.emblem ?? match.competition?.emblem ?? null,
     home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest },
     away: { name: awayName, crest: awayCrest ?? match.awayTeam?.crest },
     isNational: isNationalTeamComp(match),
