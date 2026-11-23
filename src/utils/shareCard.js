@@ -1,10 +1,11 @@
 // Image à partager d'un match (22/11, maquette validée par l'utilisateur) — dessinée sur le téléphone
 // (canvas 1080×1920, format story), aucun appel serveur sauf les blasons (proxy /espn?crest=, mis en
 // cache CDN un an, pour que le canvas puisse être exporté : une image d'un autre site le bloquerait).
-// Mise en page : couleurs des deux clubs coupées en diagonale, score géant, buteurs sous chaque
-// équipe (icône, nom, minute), phrase de résumé (matchSummary.js), adresse de l'app en bas.
+// Mise en page : fond aux couleurs du championnat, éclair entre les deux équipes, score géant
+// centré sous chaque blason, buteurs sous chaque équipe (icône, nom, minute), phrase de résumé (matchSummary.js), adresse de l'app en bas.
 
 const W = 1080, H = 1920
+const SKEW = 0.16
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex ?? '').trim())
@@ -73,6 +74,41 @@ function fitText(ctx, text, maxW, font, startPx, minPx) {
   return px
 }
 
+// Centre horizontal réel (pixels) d'un score dessiné penché à x = 0.
+function inkCenterX(font, txt) {
+  try {
+    const cw = 1100, ch = 640, ox = 200, base = 560
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch
+    const x = c.getContext('2d', { willReadFrequently: true })
+    x.font = font; x.textAlign = 'left'; x.fillStyle = '#fff'
+    x.translate(ox, base); x.transform(1, 0, -SKEW, 1, 0, 0); x.fillText(txt, 0, 0)
+    const px = x.getImageData(0, 0, cw, ch).data
+    let x0 = cw, x1 = -1
+    for (let i = 0; i < cw; i++) for (let y = 0; y < ch; y += 2) if (px[(y * cw + i) * 4 + 3] > 64) { if (i < x0) x0 = i; x1 = i; break }
+    if (x1 < 0) throw 0
+    return (x0 + x1) / 2 - ox
+  } catch {
+    return 0
+  }
+}
+
+function inkBox(img) {
+  const full = { x: 0, y: 0, w: img.width, h: img.height }
+  try {
+    const n = 96, k = n / Math.max(img.width, img.height)
+    const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k))
+    const c = document.createElement('canvas'); c.width = w; c.height = h
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, w, h)
+    const px = x.getImageData(0, 0, w, h).data
+    let x0 = w, y0 = h, x1 = -1, y1 = -1
+    for (let y = 0; y < h; y++) for (let i = 0; i < w; i++) {
+      if (px[(y * w + i) * 4 + 3] > 24) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y }
+    }
+    if (x1 < 0) return full
+    return { x: x0 / k, y: y0 / k, w: (x1 - x0 + 1) / k, h: (y1 - y0 + 1) / k }
+  } catch { return full }
+}
+
 function drawCrest(ctx, img, cx, cy, size, fallbackText, color) {
   // Ombre douce sous le blason : dégradé radial (et pas shadowBlur, que Safari/iPhone rend en tache
   // noire nette — constat utilisateur 23/11 : l'image enregistrée n'était pas la même que l'aperçu).
@@ -84,12 +120,14 @@ function drawCrest(ctx, img, cx, cy, size, fallbackText, color) {
   ctx.restore()
   ctx.save()
   if (img) {
-    const r = Math.min(size / img.width, size / img.height)
-    const w = img.width * r, h = img.height * r
-    ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h)
+    // centré sur la partie VISIBLE du blason (beaucoup de logos ont une marge transparente inégale)
+    const box = inkBox(img)
+    const r = Math.min(size / box.w, size / box.h)
+    ctx.drawImage(img, box.x, box.y, box.w, box.h, cx - box.w * r / 2, cy - box.h * r / 2, box.w * r, box.h * r)
   } else {
     ctx.fillStyle = rgb(color); ctx.beginPath(); ctx.arc(cx, cy, size / 2.3, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#fff'; ctx.font = `900 ${size / 3}px Archivo, Inter, system-ui, sans-serif`
+    ctx.fillStyle = '#fff'
+    fitText(ctx, fallbackText, size * 0.62, px => `900 ${px}px Archivo, Inter, system-ui, sans-serif`, Math.round(size / 3), 24)
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(fallbackText, cx, cy + 2)
   }
   ctx.restore()
@@ -99,6 +137,96 @@ function drawRedCard(ctx, x, y) {
   ctx.save(); ctx.fillStyle = '#ef4444'
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y - 15, 22, 30, 4) : ctx.rect(x, y - 15, 22, 30); ctx.fill()
   ctx.restore()
+}
+
+// ── Lueurs douces, rendu identique sur tous les navigateurs ──
+// Ni shadowBlur (tache noire nette sur iPhone, 23/11) ni ctx.filter (ignoré par Safari), ni traits
+// superposés (laissaient des fines lignes autour, 23/11) : on dessine la forme en petit, on floute
+// sa transparence à la main, puis on l'agrandit (lissage) dans la couleur voulue.
+function blurAlpha(a, w, h, r, passes) {
+  const tmp = new Float32Array(Math.max(w, h))
+  const run = (get, set, len, count) => {
+    for (let k = 0; k < count; k++) {
+      let sum = 0
+      for (let i = -r; i <= r; i++) sum += get(k, Math.min(len - 1, Math.max(0, i)))
+      for (let i = 0; i < len; i++) {
+        tmp[i] = sum / (2 * r + 1)
+        sum += get(k, Math.min(len - 1, i + r + 1)) - get(k, Math.max(0, i - r))
+      }
+      for (let i = 0; i < len; i++) set(k, i, tmp[i])
+    }
+  }
+  for (let p = 0; p < passes; p++) {
+    run((y, x) => a[y * w + x], (y, x, v) => { a[y * w + x] = v }, w, h)
+    run((x, y) => a[y * w + x], (x, y, v) => { a[y * w + x] = v }, h, w)
+  }
+}
+function softLayer(draw, color, { scale = 1 / 4, radius = 4, passes = 3 } = {}) {
+  const w = Math.ceil(W * scale), h = Math.ceil(H * scale)
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  const x = c.getContext('2d', { willReadFrequently: true })
+  x.scale(scale, scale); x.fillStyle = '#fff'; x.strokeStyle = '#fff'
+  draw(x)
+  const img = x.getImageData(0, 0, w, h), px = img.data
+  const a = new Float32Array(w * h)
+  for (let i = 0; i < a.length; i++) a[i] = px[i * 4 + 3]
+  blurAlpha(a, w, h, radius, passes)
+  for (let i = 0; i < a.length; i++) { px[i * 4] = color.r; px[i * 4 + 1] = color.g; px[i * 4 + 2] = color.b; px[i * 4 + 3] = a[i] }
+  x.putImageData(img, 0, 0)
+  return c
+}
+function paintLayer(ctx, layer, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(layer, 0, 0, W, H); ctx.restore()
+}
+
+// ── Éclair (23/11, « un éclair de Zeus », pas un zigzag de dessin animé) : vraie forme de foudre,
+// tracé principal brisé (déplacement du point milieu) + quelques ramifications plus fines. Graine
+// tirée des noms des équipes : le même match donne toujours le même éclair.
+function seeded(str) {
+  let s = 2166136261
+  for (const ch of String(str)) s = Math.imul(s ^ ch.charCodeAt(0), 16777619)
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 }
+}
+function jagged(x0, y0, x1, y1, disp, rand, out = [[x0, y0]]) {
+  const len = Math.hypot(x1 - x0, y1 - y0)
+  if (len < 14) { out.push([x1, y1]); return out }
+  const nx = -(y1 - y0) / len, ny = (x1 - x0) / len
+  const o = (rand() - 0.5) * disp
+  const mx = (x0 + x1) / 2 + nx * o, my = (y0 + y1) / 2 + ny * o
+  jagged(x0, y0, mx, my, disp * 0.58, rand, out)
+  jagged(mx, my, x1, y1, disp * 0.58, rand, out)
+  return out
+}
+// zones à ne jamais traverser avec une ramification : blasons + noms, scores, buteurs
+const KEEP_OUT = [[130, 340, 380, 610], [700, 340, 960, 610], [60, 610, 500, 1020], [640, 610, 1000, 1020], [60, 1140, 480, 1290], [600, 1140, 900, 1290], [380, 700, 740, 880]]
+const blocked = pts => pts.some(([x, y]) => KEEP_OUT.some(([a, b, c, e]) => x > a && x < c && y > b && y < e))
+function buildBolt(xAt, seed) {
+  const rand = seeded(seed)
+  const main = jagged(xAt(-40), -40, xAt(1720), 1720, 130, rand)
+  const branches = []
+  // ramifications : vers le bas, en s'écartant ; jamais sur un blason, un score, les buteurs, le statut
+  for (const t of [0.05, 0.12, 0.2, 0.3, 0.56, 0.66, 0.76, 0.86]) {
+    const [bx, by] = main[Math.floor(t * (main.length - 1))]
+    const first = rand() < 0.5 ? -1 : 1
+    const tilt = 0.4 + rand() * 0.4, L0 = 130 + rand() * 170
+    let b = null
+    for (const dir of [first, -first]) for (const L of [L0, L0 * 0.6]) {
+      if (b) break
+      const cand = jagged(bx, by, bx + Math.sin(tilt * dir) * L, by + Math.cos(tilt * dir) * L, 60, rand)
+      if (!blocked(cand)) b = { pts: cand, w: 2.8, ang: tilt * dir, L }
+    }
+    if (!b) continue
+    branches.push(b)
+    const [sx, sy] = b.pts[Math.floor(b.pts.length * (0.35 + rand() * 0.3))]
+    const a2 = b.ang + (rand() < 0.5 ? -0.55 : 0.55)
+    const twig = jagged(sx, sy, sx + Math.sin(a2) * b.L * 0.45, sy + Math.cos(a2) * b.L * 0.45, 28, rand)
+    if (!blocked(twig)) branches.push({ pts: twig, w: 1.6 })
+  }
+  return { main, branches }
+}
+function strokePts(ctx, pts) {
+  ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke()
 }
 
 /**
@@ -131,13 +259,10 @@ export async function renderShareCard(d) {
 
   // ── Fond : les deux couleurs en diagonale ──
   ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, W, H)
-  const half = (pts, c, x0, x1) => {
-    const g = ctx.createLinearGradient(x0, 0, x1, H)
-    g.addColorStop(0, rgb(mix(c, WHITE, 0.22))); g.addColorStop(0.42, rgb(c)); g.addColorStop(0.8, rgb(mix(c, NIGHT, 0.82)))
-    ctx.fillStyle = g; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill()
-  }
-  half([[0, 0], [W * 0.58, 0], [W * 0.42, H], [0, H]], hc, 0, W * 0.5)
-  half([[W * 0.58, 0], [W, 0], [W, H], [W * 0.42, H]], ac, W, W * 0.5)
+  // un seul dégradé pour toute l'image (plus de couture le long de la diagonale)
+  { const bg = ctx.createLinearGradient(0, 0, 0, H)
+    bg.addColorStop(0, rgb(mix(p1, WHITE, 0.2))); bg.addColorStop(0.4, rgb(p1)); bg.addColorStop(0.8, rgb(mix(p1, NIGHT, 0.82)))
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H) }
 
   // halos derrière les blasons
   for (const cx of [252, 828]) {
@@ -155,18 +280,10 @@ export async function renderShareCard(d) {
     ctx.font = `900 ${px}px Archivo, Inter, system-ui, sans-serif`
     while (px > 120 && ctx.measureText(label).width > 1000) { px -= 10; ctx.font = `900 ${px}px Archivo, Inter, system-ui, sans-serif` }
     ctx.translate(W / 2, 1470); ctx.transform(1, 0, -0.16, 1, 0, 0)
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.2)'
-    ctx.strokeText(label, 0, 0)
+    ctx.fillStyle = 'rgba(255,255,255,0.07)'
+    ctx.fillText(label, 0, 0)
     ctx.restore()
   }
-
-  // fines lignes de lumière parallèles au trait
-  ctx.save(); ctx.lineWidth = 2
-  for (const [off, a] of [[-46, 0.12], [-80, 0.06], [52, 0.1], [92, 0.05]]) {
-    ctx.strokeStyle = `rgba(255,255,255,${a})`
-    ctx.beginPath(); ctx.moveTo(xAt(0) + off, 0); ctx.lineTo(xAt(H) + off, H); ctx.stroke()
-  }
-  ctx.restore()
 
   // assombrissement du bas (texte lisible)
   let g = ctx.createLinearGradient(0, 0, 0, H)
@@ -174,32 +291,24 @@ export async function renderShareCard(d) {
   g.addColorStop(0.8, 'rgba(3,5,12,0.9)'); g.addColorStop(1, '#03050c')
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
 
-  // trait de séparation = faisceau lumineux (23/11, « plus impactant ») : large lueur douce, cœur
-  // blanc épais, et un éclat de lumière au centre, là où est écrit le statut.
-  // le faisceau s'éteint en douceur vers le bas, et s'interrompt autour du statut (lisible).
-  const GAP = [735, 845]
-  const sepPath = () => {
-    ctx.beginPath()
-    ctx.moveTo(xAt(-20), -20); ctx.lineTo(xAt(GAP[0]), GAP[0])
-    ctx.moveTo(xAt(GAP[1]), GAP[1]); ctx.lineTo(xAt(1640), 1640)
+  // séparation = éclair, qui s'efface autour du statut (lisible) et en bas (résumé)
+  const bolt = buildBolt(xAt, `${d.home?.name}|${d.away?.name}`)
+  const fade = c => {
+    const gr = c.createLinearGradient(0, 0, 0, 1720)
+    const st = [[0, 1], [670, 1], [745, 0], [835, 0], [905, 1], [1380, 1], [1640, 0], [1720, 0]]
+    st.forEach(([y, a]) => gr.addColorStop(y / 1720, `rgba(255,255,255,${a})`))
+    return gr
   }
-  // Lueur obtenue par plusieurs traits superposés (pas de shadowBlur : rendu identique partout).
-  const beam = (width, a) => {
-    const gr = ctx.createLinearGradient(0, 0, 0, 1640)
-    gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(0.72, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.save(); ctx.strokeStyle = gr; ctx.lineWidth = width; ctx.lineCap = 'round'
-    sepPath(); ctx.stroke(); ctx.restore()
+  const boltShape = (c, k) => {
+    c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = fade(c)
+    c.lineWidth = 7 * k; strokePts(c, bolt.main)
+    bolt.branches.forEach(b => { c.lineWidth = b.w * k; strokePts(c, b.pts) })
   }
-  for (const [w, a] of [[78, 0.045], [52, 0.055], [34, 0.07], [20, 0.1], [12, 0.2], [6, 0.95]]) beam(w, a)
-  const fx = xAt(790), fy = 790
-  const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, 260)
-  flare.addColorStop(0, 'rgba(255,255,255,0.55)'); flare.addColorStop(0.25, 'rgba(255,255,255,0.18)'); flare.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = flare; ctx.fillRect(fx - 260, fy - 260, 520, 520)
-  ctx.save(); ctx.globalAlpha = 0.5
-  const streak = ctx.createLinearGradient(0, fy, W, fy)
-  streak.addColorStop(0, 'rgba(255,255,255,0)'); streak.addColorStop(0.5, 'rgba(255,255,255,0.9)'); streak.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = streak; ctx.fillRect(0, fy - 1.5, W, 3)
-  ctx.restore()
+  const tint = mix(p1, WHITE, 0.55)
+  paintLayer(ctx, softLayer(c => boltShape(c, 9), tint, { scale: 1 / 8, radius: 6 }), 0.7)   // grande lueur
+  paintLayer(ctx, softLayer(c => boltShape(c, 3), tint, { scale: 1 / 3, radius: 4 }), 0.95)  // lueur proche
+  paintLayer(ctx, softLayer(c => boltShape(c, 1.4), WHITE, { scale: 1 / 2, radius: 2 }), 0.9) // éclat
+  ctx.save(); boltShape(ctx, 1); ctx.restore()                                                  // cœur net
 
   // grain léger
   const n = document.createElement('canvas'); n.width = n.height = 128
@@ -247,19 +356,18 @@ export async function renderShareCard(d) {
     const sg = ctx.createLinearGradient(0, -390, 0, 5)
     sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(225,232,255,1)')
     ctx.fillStyle = sg // 23/11 : le score du perdant aussi en blanc (seul le gagnant garde le halo)
-    ctx.translate(col.cx, 1000); ctx.transform(1, 0, -0.16, 1, 0, 0)
-    ctx.textAlign = 'center'
+    ctx.textAlign = 'left'
     const txt = String(col.score ?? '–')
-    ctx.lineJoin = 'round'
+    // centrage au pixel près sur le blason et le nom (23/11) : centre du DESSIN du chiffre penché,
+    // mesuré sur les pixels (pas sa boîte typographique, décalée pour un « 1 » par exemple).
+    const ox = -inkCenterX(ctx.font, txt)
+    const place = c => { c.translate(col.cx, 1000); c.transform(1, 0, -SKEW, 1, 0, 0) }
     if (winner === -1 || winner === i) {
-      // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct) : contours
-      // blancs très transparents de plus en plus larges — pas de shadowBlur (tache noire sur iPhone).
-      for (const [w, a] of [[64, 0.035], [44, 0.05], [28, 0.07], [16, 0.09]]) {
-        ctx.lineWidth = w; ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.strokeText(txt, 0, 0)
-      }
+      // halo lumineux derrière le score (gagnant, ou les deux en cas de nul / en direct)
+      paintLayer(ctx, softLayer(c => { place(c); c.font = ctx.font; c.textAlign = 'left'; c.fillText(txt, ox, 0) }, WHITE, { scale: 1 / 4, radius: 5 }), 0.42)
     }
-    ctx.fillText(txt, 0, 0)
-    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(txt, 0, 0)
+    place(ctx)
+    ctx.fillText(txt, ox, 0)
     ctx.restore()
     // buteurs / rouges : icône, nom, minute — max 5 lignes
     const lines = col.lines.slice(0, 5)
@@ -283,13 +391,9 @@ export async function renderShareCard(d) {
 
   // ── Statut au centre (sans fond) ──
   ctx.save(); ctx.font = '900 32px Inter, system-ui, sans-serif'
-  // contour sombre discret (lisible sur l'éclat lumineux), puis le texte blanc par-dessus
   const stTxt = String(d.status ?? '').toUpperCase()
-  ctx.lineJoin = 'round'; ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(4,10,30,0.35)'
-  { const chars = [...stTxt]; const ws = chars.map(c => ctx.measureText(c).width); const tot = ws.reduce((a, b) => a + b, 0) + 6 * (chars.length - 1)
-    let x = W / 2 + 12 - tot / 2; ctx.textAlign = 'left'; chars.forEach((c, k) => { ctx.strokeText(c, x, 803); x += ws[k] + 6 }) }
   ctx.fillStyle = '#fff'
-  spaced(ctx, stTxt, W / 2 + 12, 803, 6, 'center')
+  spaced(ctx, stTxt, xAt(790), 803, 6, 'center')
   ctx.restore()
 
   // ── Résumé ──
