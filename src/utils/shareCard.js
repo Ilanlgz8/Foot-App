@@ -110,7 +110,7 @@ export async function renderShareCard(d) {
       '900 100px Archivo', '800 40px Inter', '700 30px Inter', '600 22px Inter', '900 40px Inter',
     ].map(f => document.fonts?.load?.(f).catch(() => {})))
   } catch { /* polices système en repli */ }
-  const [hImg, aImg] = await Promise.all([loadImage(crestSrc(d.home.crest)), loadImage(crestSrc(d.away.crest))])
+  const [hImg, aImg, compImg] = await Promise.all([loadImage(crestSrc(d.home.crest)), loadImage(crestSrc(d.away.crest)), loadImage(crestSrc(d.compLogo))])
 
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
@@ -211,8 +211,17 @@ export async function renderShareCard(d) {
   const sw = ctx.measureText('Stat').width
   ctx.fillStyle = '#fff'; ctx.fillText('Footix', 60 + sw, 112)
   ctx.font = '800 22px Inter, system-ui, sans-serif'; ctx.fillStyle = '#fff'
-  if (d.meta1) spaced(ctx, d.meta1.toUpperCase(), 1018, 84, 4.4, 'right')
-  if (d.meta2) spaced(ctx, d.meta2.toUpperCase(), 1018, 120, 4.4, 'right')
+  const m1w = d.meta1 ? spaced(ctx, d.meta1.toUpperCase(), 1018, 84, 4.4, 'right') : 0
+  const m2w = d.meta2 ? spaced(ctx, d.meta2.toUpperCase(), 1018, 120, 4.4, 'right') : 0
+  // logo du championnat à gauche du texte (23/11), comme dans l'app : coins arrondis s'il a un fond
+  if (compImg) {
+    const hgt = 66, w = Math.min(110, compImg.width * (hgt / compImg.height))
+    const x = 1018 - Math.max(m1w, m2w) - 20 - w, y = 58
+    ctx.save()
+    if (d.compLogoOpaque) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, hgt, 12) : ctx.rect(x, y, w, hgt); ctx.clip() }
+    ctx.drawImage(compImg, x, y, w, hgt)
+    ctx.restore()
+  }
 
   // ── Deux moitiés ──
   const cols = [
@@ -230,7 +239,7 @@ export async function renderShareCard(d) {
     ctx.font = '900 520px Archivo, Inter, system-ui, sans-serif'
     const sg = ctx.createLinearGradient(0, -390, 0, 5)
     sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(225,232,255,1)')
-    ctx.fillStyle = winner === -1 || winner === i ? sg : 'rgba(255,255,255,0.5)'
+    ctx.fillStyle = sg // 23/11 : le score du perdant aussi en blanc (seul le gagnant garde le halo)
     ctx.translate(col.cx, 1000); ctx.transform(1, 0, -0.16, 1, 0, 0)
     ctx.textAlign = 'center'
     const txt = String(col.score ?? '–')

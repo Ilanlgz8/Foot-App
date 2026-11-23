@@ -58,6 +58,8 @@ export function ShareMatchButton({ match, homeName, awayName, homeCrest, awayCre
       const compObj = compForMatch(match)
       const blob = await renderShareCard({
         palette: getCompetitionCampColors(compObj) ?? null,
+        compLogo: compObj?.emblem ?? match.competition?.emblem ?? null,
+        compLogoOpaque: !!compObj?.emblemOpaque,
         // filigrane : nom court, sauf s'il est abrégé (« Premier L. » → nom complet)
         compLabel: (compObj?.shortName && !compObj.shortName.endsWith('.')) ? compObj.shortName : (compObj?.name ?? compName ?? ''),
         home: { name: homeName, crest: homeCrest ?? match.homeTeam?.crest, color: colors.home.main },
