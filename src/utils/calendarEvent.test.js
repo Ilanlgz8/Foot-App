@@ -15,7 +15,7 @@ describe('calendrier', () => {
   it('lien Google Agenda', () => {
     const u = new URL(googleCalendarUrl(ev))
     expect(u.searchParams.get('dates')).toBe('20261129T200000Z/20261129T220000Z')
-    expect(u.searchParams.get('text')).toBe('⚽ PSG – OM')
+    expect(u.searchParams.get('text')).toBe('PSG – OM')
   })
   it('date invalide → null', () => { expect(matchEventInfo({ utcDate: 'x' })).toBeNull() })
 })

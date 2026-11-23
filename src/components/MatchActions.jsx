@@ -108,12 +108,12 @@ export function CalendarSheet({ ev, onClose, onDone }) {
     <div className="calSheetLayer" onClick={onClose}>
       <div className="calSheet" onClick={e => e.stopPropagation()} role="dialog" aria-label="Ajouter au calendrier">
         <div className="calSheet__title">Ajouter au calendrier</div>
-        <div className="calSheet__sub">{ev.title.replace(/^⚽\s*/, '')} · {when}</div>
+        <div className="calSheet__sub">{ev.title} · {when}</div>
         <button type="button" className="calSheet__opt" onClick={() => { openIcs(ev); onDone() }}>
-          <span aria-hidden="true">🍎</span> Calendrier de l'iPhone
+          Calendrier de l'iPhone
         </button>
         <a className="calSheet__opt" href={googleCalendarUrl(ev)} target="_blank" rel="noopener noreferrer" onClick={onDone}>
-          <span aria-hidden="true">📅</span> Google Agenda
+          Google Agenda
         </a>
         <div className="calSheet__note">Rappel 1 h avant le coup d'envoi (calendrier de l'iPhone).</div>
         <button type="button" className="calSheet__cancel" onClick={onClose}>Annuler</button>

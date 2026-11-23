@@ -17,8 +17,8 @@ export function matchEventInfo({ id, homeName, awayName, utcDate, compLabel, cha
   const start = new Date(utcDate)
   if (Number.isNaN(start.getTime())) return null
   const end = new Date(start.getTime() + MATCH_MS)
-  const title = `⚽ ${homeName} – ${awayName}`
-  const details = [compLabel, channel ? `📺 ${channel}` : null, 'Scores et notifs en direct : statfootix.vercel.app'].filter(Boolean).join('\n')
+  const title = `${homeName} – ${awayName}` // sans emoji (23/11, demande utilisateur)
+  const details = [compLabel, channel ? `Diffusion : ${channel}` : null, 'Scores et notifs en direct : statfootix.vercel.app'].filter(Boolean).join('\n')
   return { uid: `match-${id}@statfootix.vercel.app`, title, start, end, details, location: venue || '' }
 }
 

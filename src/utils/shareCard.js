@@ -1,7 +1,7 @@
 // Image à partager d'un match (22/11, maquette validée par l'utilisateur) — dessinée sur le téléphone
 // (canvas 1080×1920, format story), aucun appel serveur sauf les blasons (proxy /espn?crest=, mis en
 // cache CDN un an, pour que le canvas puisse être exporté : une image d'un autre site le bloquerait).
-// Mise en page : fond aux couleurs du championnat, éclair entre les deux équipes, score géant
+// Mise en page : fond aux couleurs du championnat, éclair (Z vertical) entre les deux équipes, score géant
 // centré sous chaque blason, buteurs sous chaque équipe (icône, nom, minute), phrase de résumé (matchSummary.js), adresse de l'app en bas.
 
 const W = 1080, H = 1920
@@ -180,53 +180,31 @@ function paintLayer(ctx, layer, alpha = 1) {
   ctx.drawImage(layer, 0, 0, W, H); ctx.restore()
 }
 
-// ── Éclair (23/11, « un éclair de Zeus », pas un zigzag de dessin animé) : vraie forme de foudre,
-// tracé principal brisé (déplacement du point milieu) + quelques ramifications plus fines. Graine
-// tirée des noms des équipes : le même match donne toujours le même éclair.
-function seeded(str) {
-  let s = 2166136261
-  for (const ch of String(str)) s = Math.imul(s ^ ch.charCodeAt(0), 16777619)
-  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 }
-}
-function jagged(x0, y0, x1, y1, disp, rand, out = [[x0, y0]]) {
-  const len = Math.hypot(x1 - x0, y1 - y0)
-  if (len < 14) { out.push([x1, y1]); return out }
-  const nx = -(y1 - y0) / len, ny = (x1 - x0) / len
-  const o = (rand() - 0.5) * disp
-  const mx = (x0 + x1) / 2 + nx * o, my = (y0 + y1) / 2 + ny * o
-  jagged(x0, y0, mx, my, disp * 0.58, rand, out)
-  jagged(mx, my, x1, y1, disp * 0.58, rand, out)
-  return out
-}
-// zones à ne jamais traverser avec une ramification : blasons + noms, scores, buteurs
-const KEEP_OUT = [[130, 340, 380, 610], [700, 340, 960, 610], [60, 610, 500, 1020], [640, 610, 1000, 1020], [60, 1140, 480, 1290], [600, 1140, 900, 1290], [380, 700, 740, 880]]
-const blocked = pts => pts.some(([x, y]) => KEEP_OUT.some(([a, b, c, e]) => x > a && x < c && y > b && y < e))
-function buildBolt(xAt, seed) {
-  const rand = seeded(seed)
-  const main = jagged(xAt(-40), -40, xAt(1720), 1720, 130, rand)
-  const branches = []
-  // ramifications : vers le bas, en s'écartant ; jamais sur un blason, un score, les buteurs, le statut
-  for (const t of [0.05, 0.12, 0.2, 0.3, 0.56, 0.66, 0.76, 0.86]) {
-    const [bx, by] = main[Math.floor(t * (main.length - 1))]
-    const first = rand() < 0.5 ? -1 : 1
-    const tilt = 0.4 + rand() * 0.4, L0 = 130 + rand() * 170
-    let b = null
-    for (const dir of [first, -first]) for (const L of [L0, L0 * 0.6]) {
-      if (b) break
-      const cand = jagged(bx, by, bx + Math.sin(tilt * dir) * L, by + Math.cos(tilt * dir) * L, 60, rand)
-      if (!blocked(cand)) b = { pts: cand, w: 2.8, ang: tilt * dir, L }
+// ── Éclair (23/11, demande utilisateur : « un éclair de Zeus, comme un Z à la verticale ») : forme
+// pleine aux angles vifs, épaisse en haut et effilée en pointe en bas, deux décrochements
+// horizontaux (au-dessus des scores et sous les scores) ; le statut est sur le grand segment central.
+const BOLT = [[668, -40, 46], [508, 432, 40], [618, 404, 36], [486, 1150, 26], [590, 1124, 20], [492, 1590, 0]]
+function boltOutline() {
+  const n = BOLT.length, L = [], R = []
+  const norm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l] }
+  for (let i = 0; i < n; i++) {
+    const [x, y, w] = BOLT[i], h = w / 2
+    let nx, ny
+    if (i === 0) [nx, ny] = norm(BOLT[0], BOLT[1])
+    else if (i === n - 1) [nx, ny] = norm(BOLT[n - 2], BOLT[n - 1])
+    else {
+      // angle vif : point d'onglet entre les deux segments
+      const a = norm(BOLT[i - 1], BOLT[i]), b = norm(BOLT[i], BOLT[i + 1])
+      const mx = a[0] + b[0], my = a[1] + b[1], ml = Math.hypot(mx, my) || 1
+      const k = 1 / Math.max(0.35, (mx / ml) * a[0] + (my / ml) * a[1])
+      nx = (mx / ml) * k; ny = (my / ml) * k
     }
-    if (!b) continue
-    branches.push(b)
-    const [sx, sy] = b.pts[Math.floor(b.pts.length * (0.35 + rand() * 0.3))]
-    const a2 = b.ang + (rand() < 0.5 ? -0.55 : 0.55)
-    const twig = jagged(sx, sy, sx + Math.sin(a2) * b.L * 0.45, sy + Math.cos(a2) * b.L * 0.45, 28, rand)
-    if (!blocked(twig)) branches.push({ pts: twig, w: 1.6 })
+    L.push([x + nx * h, y + ny * h]); R.push([x - nx * h, y - ny * h])
   }
-  return { main, branches }
+  return [...L, ...R.reverse()]
 }
-function strokePts(ctx, pts) {
-  ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke()
+function fillPoly(ctx, pts) {
+  ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill()
 }
 
 /**
@@ -291,24 +269,22 @@ export async function renderShareCard(d) {
   g.addColorStop(0.8, 'rgba(3,5,12,0.9)'); g.addColorStop(1, '#03050c')
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
 
-  // séparation = éclair, qui s'efface autour du statut (lisible) et en bas (résumé)
-  const bolt = buildBolt(xAt, `${d.home?.name}|${d.away?.name}`)
+  // séparation = éclair ; s'efface autour du statut (lisible) et vers le bas (résumé)
+  const outline = boltOutline()
   const fade = c => {
-    const gr = c.createLinearGradient(0, 0, 0, 1720)
-    const st = [[0, 1], [670, 1], [745, 0], [835, 0], [905, 1], [1380, 1], [1640, 0], [1720, 0]]
-    st.forEach(([y, a]) => gr.addColorStop(y / 1720, `rgba(255,255,255,${a})`))
+    const gr = c.createLinearGradient(0, 0, 0, 1600)
+    const st = [[0, 1], [690, 1], [748, 0], [832, 0], [890, 1], [1380, 1], [1600, 0]]
+    st.forEach(([y, a]) => gr.addColorStop(y / 1600, `rgba(255,255,255,${a})`))
     return gr
   }
-  const boltShape = (c, k) => {
-    c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = fade(c)
-    c.lineWidth = 7 * k; strokePts(c, bolt.main)
-    bolt.branches.forEach(b => { c.lineWidth = b.w * k; strokePts(c, b.pts) })
-  }
   const tint = mix(p1, WHITE, 0.55)
-  paintLayer(ctx, softLayer(c => boltShape(c, 9), tint, { scale: 1 / 8, radius: 6 }), 0.7)   // grande lueur
-  paintLayer(ctx, softLayer(c => boltShape(c, 3), tint, { scale: 1 / 3, radius: 4 }), 0.95)  // lueur proche
-  paintLayer(ctx, softLayer(c => boltShape(c, 1.4), WHITE, { scale: 1 / 2, radius: 2 }), 0.9) // éclat
-  ctx.save(); boltShape(ctx, 1); ctx.restore()                                                  // cœur net
+  const boltLayer = (grow, color, opt) => softLayer(c => {
+    c.fillStyle = fade(c); c.strokeStyle = fade(c); c.lineJoin = 'miter'; c.lineWidth = grow
+    fillPoly(c, outline); if (grow) { c.beginPath(); outline.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.stroke() }
+  }, color, opt)
+  paintLayer(ctx, boltLayer(90, tint, { scale: 1 / 8, radius: 7 }), 0.75)  // grande lueur
+  paintLayer(ctx, boltLayer(24, tint, { scale: 1 / 3, radius: 5 }), 0.9)   // lueur proche
+  ctx.save(); ctx.fillStyle = fade(ctx); fillPoly(ctx, outline); ctx.restore() // éclair net
 
   // grain léger
   const n = document.createElement('canvas'); n.width = n.height = 128
