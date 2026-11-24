@@ -41,6 +41,7 @@
 import { createTursoKv } from './tursoKv.js'
 import { extractPregameOddsFromComp } from '../../src/utils/espnOdds.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
+import { buildMorningMessage } from '../../src/utils/morningMessage.js'
 import {
   ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS,
   NATIONAL_COMP_SLUGS, EUROPEAN_CUP_SLUGS, NATIONAL_SUPER_CUP_SLUGS,
@@ -634,6 +635,8 @@ function compactScoreboardEvent(e) {
         // Accueil/Résultats/page du match terminé affichaient « 0 – 0 » sans « T.A.B (4-1) ».
         shootoutScore: x.shootoutScore ?? null,
         winner: x.winner ?? null,
+        // 24/11 : forme ESPN (« WWDLW ») pour le rappel du matin (série de victoires, morningMessage.js)
+        form: typeof x.form === 'string' ? x.form : null,
         team: x.team ? {
           id: x.team.id ?? null,
           displayName: x.team.displayName ?? null,
@@ -667,6 +670,8 @@ function pubSignature(live, feed) {
 // de notifyVercel. Au plus MORNING_MAX_PER_PASS envois par passe (plafond de sous-requêtes du plan
 // gratuit Cloudflare) — la fenêtre 10:00-10:29 laisse 30 passes, largement assez.
 const MORNING_MAX_PER_PASS = 4
+// championnats dont le classement sert au rappel du matin (morningMessage.js)
+const MORNING_STANDINGS_SLUGS = new Set(['fra.1', 'fra.2', 'eng.1', 'esp.1', 'ger.1', 'ita.1'])
 const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
 }).formatToParts(d).map(p => [p.type, p.value]))
@@ -694,6 +699,20 @@ async function morningReminders(env, kv, prevPub, now, today, log) {
   if (!todo.length) return
   todo.sort((a, b) => a.kickoff - b.kickoff)
   const batch = todo.slice(0, MORNING_MAX_PER_PASS)
+  // Classements ESPN (24/11, « choc au sommet » / « 1er contre 5e ») : un appel par championnat
+  // concerné, mis en cache côté Vercel (api/espn.js mode standings). Échec = message sans classement.
+  const standings = new Map()
+  const standingsFor = async slug => {
+    if (!MORNING_STANDINGS_SLUGS.has(slug)) return null
+    if (standings.has(slug)) return standings.get(slug)
+    let table = null
+    try {
+      const r = await fetch(`${VERCEL_ESPN_PROXY}?slug=${slug}&standings=1`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6_000) })
+      if (r.ok) table = (await r.json())?.table ?? null
+    } catch (e) { log.push(`[morning] standings ${slug} error=${e.message}`) }
+    standings.set(slug, table)
+    return table
+  }
   for (const { slug, evt, comp, kickoff } of batch) {
     const homeC = comp.competitors?.find(c => c.homeAway === 'home')
     const awayC = comp.competitors?.find(c => c.homeAway === 'away')
@@ -701,10 +720,23 @@ async function morningReminders(env, kv, prevPub, now, today, log) {
     const rawAwayTeam = awayC?.team?.shortDisplayName ?? awayC?.team?.displayName ?? ''
     const homeTeam = t(rawHomeTeam || '?'), awayTeam = t(rawAwayTeam || '?')
     const kp = parisParts(new Date(kickoff))
-    const when = Number(kp.hour) >= 18 ? 'Ce soir' : "Aujourd'hui"
+    const table = await standingsFor(slug)
+    const rowOf = c => (Array.isArray(table) ? table.find(r => String(r?.team?.id) === String(c?.team?.id)) : null)
+    const side = (c, name) => {
+      const row = rowOf(c)
+      return {
+        name, form: c?.form ?? null,
+        names: [c?.team?.displayName, c?.team?.shortDisplayName, c?.team?.name].filter(Boolean),
+        rank: Number.isFinite(row?.position) ? row.position : undefined,
+        points: Number.isFinite(row?.points) ? row.points : undefined,
+      }
+    }
+    const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
+    // variantes : api/cron-goals.js envoie à chaque abonné celle de l'équipe qu'il suit
     const ok = await notifyVercel(env, `push:morning:${evt.id}`,
-      { title: `⚽ ${when} ${kp.hour}:${kp.minute}`, body: `${homeTeam} – ${awayTeam}`, url: '/', tag: `morning-${evt.id}` },
+      { title: msg.home.title, body: msg.home.body, url: '/', tag: `morning-${evt.id}`, variants: { home: msg.home, away: msg.away } },
       slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, clubsOnly: true, ttl: 3 * 3600 }, log, 36 * 3600)
+    log.push(`[morning] ${evt.id} ${msg.kind}`)
     if (ok) done.push(String(evt.id))
   }
   try { await kv.set(doneKey, JSON.stringify(done), { ex: 36 * 3600 }) } catch {}

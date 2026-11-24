@@ -355,7 +355,22 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
   // arrête de la garder après 20min, `ts` pour rattraper le cas où elle est
   // quand même délivrée juste avant expiration alors qu'entre-temps le match
   // (ou la nuit) est bien fini.
-  const payloadStr = JSON.stringify({ ...payload, ts: payload.ts ?? Date.now() })
+  // 24/11 (rappel du matin) : `variants` { home, away } = texte selon l'équipe suivie par l'abonné.
+  const { variants, ...basePayload } = payload
+  const ts = payload.ts ?? Date.now()
+  const payloadStr = JSON.stringify({ ...basePayload, ts })
+  const variantStr = variants
+    ? { home: JSON.stringify({ ...basePayload, ...variants.home, ts }), away: JSON.stringify({ ...basePayload, ...variants.away, ts }) }
+    : null
+  const homeNamesNorm = [options.rawHomeTeam, options.homeTeam].filter(Boolean).map(normalizeFifa)
+  const awayNamesNorm = [options.rawAwayTeam, options.awayTeam].filter(Boolean).map(normalizeFifa)
+  const payloadFor = sub => {
+    if (!variantStr) return payloadStr
+    const clubs = (Array.isArray(sub.clubs) ? sub.clubs : []).map(normalizeFifa)
+    if (clubs.some(c => homeNamesNorm.includes(c))) return variantStr.home
+    if (clubs.some(c => awayNamesNorm.includes(c))) return variantStr.away
+    return variantStr.home
+  }
   const stale = []
   let sent = 0
   let failed = 0
@@ -376,7 +391,7 @@ async function sendPushToMatch(payload, slug, options = {}, log = null, subsCach
       // lieu de la garder en attente pour un appareil injoignable — aucun
       // effet sur une livraison normale (toujours quasi instantanée).
       const auth = vapidAuthFor(sub.endpoint)
-      await webpush.sendNotification(sub, payloadStr, {
+      await webpush.sendNotification(sub, payloadFor(sub), {
         TTL: options.ttl ?? 1200,
         urgency: options.urgency ?? 'normal',
         agent: pushAgent,
