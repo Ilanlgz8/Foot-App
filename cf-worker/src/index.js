@@ -41,7 +41,7 @@
 import { createTursoKv } from './tursoKv.js'
 import { extractPregameOddsFromComp } from '../../src/utils/espnOdds.js'
 import { TEAM_NAMES_FR } from '../../src/data/teamNames.js'
-import { buildMorningMessage } from '../../src/utils/morningMessage.js'
+import { buildMorningMessage, roundFromCalendar } from '../../src/utils/morningMessage.js'
 import {
   ESPN_SLUG_BY_COMP_ID, EXTRA_NOTIFY_SLUGS,
   NATIONAL_COMP_SLUGS, EUROPEAN_CUP_SLUGS, NATIONAL_SUPER_CUP_SLUGS,
@@ -672,6 +672,7 @@ function pubSignature(live, feed) {
 const MORNING_MAX_PER_PASS = 4
 // championnats dont le classement sert au rappel du matin (morningMessage.js)
 const MORNING_STANDINGS_SLUGS = new Set(['fra.1', 'fra.2', 'eng.1', 'esp.1', 'ger.1', 'ita.1'])
+const MORNING_ROUND_SLUGS = new Set(['fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa', 'ita.coppa_italia', 'ger.dfb_pokal', 'uefa.champions', 'uefa.europa', 'uefa.europa.conf'])
 const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
 }).formatToParts(d).map(p => [p.type, p.value]))
@@ -713,6 +714,20 @@ async function morningReminders(env, kv, prevPub, now, today, log) {
     standings.set(slug, table)
     return table
   }
+  // Tour en jeu (coupes, phases finales européennes) : calendrier ESPN de la compétition, renvoyé avec
+  // le tableau des matchs (leagues[0].calendar) ; un appel par compétition concernée, mis en cache.
+  const calendars = new Map()
+  const calendarFor = async slug => {
+    if (!MORNING_ROUND_SLUGS.has(slug)) return null
+    if (calendars.has(slug)) return calendars.get(slug)
+    let cal = null
+    try {
+      const r = await fetch(`${VERCEL_ESPN_PROXY}?slug=${slug}&dates=${today}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6_000) })
+      if (r.ok) cal = (await r.json())?.leagues?.[0]?.calendar ?? null
+    } catch (e) { log.push(`[morning] calendar ${slug} error=${e.message}`) }
+    calendars.set(slug, cal)
+    return cal
+  }
   for (const { slug, evt, comp, kickoff } of batch) {
     const homeC = comp.competitors?.find(c => c.homeAway === 'home')
     const awayC = comp.competitors?.find(c => c.homeAway === 'away')
@@ -725,13 +740,15 @@ async function morningReminders(env, kv, prevPub, now, today, log) {
     const side = (c, name) => {
       const row = rowOf(c)
       return {
-        name, form: c?.form ?? null,
+        id: c?.team?.id ?? null, name, form: c?.form ?? null,
         names: [c?.team?.displayName, c?.team?.shortDisplayName, c?.team?.name].filter(Boolean),
         rank: Number.isFinite(row?.position) ? row.position : undefined,
         points: Number.isFinite(row?.points) ? row.points : undefined,
       }
     }
-    const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
+    const roundLabel = roundFromCalendar(await calendarFor(slug), evt.date)
+    const tableRows = Array.isArray(table) ? table.map(r => ({ id: r?.team?.id, position: r?.position, points: r?.points })) : null
+    const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, roundLabel, table: tableRows, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
     // variantes : api/cron-goals.js envoie à chaque abonné celle de l'équipe qu'il suit
     const ok = await notifyVercel(env, `push:morning:${evt.id}`,
       { title: msg.home.title, body: msg.home.body, url: '/', tag: `morning-${evt.id}`, variants: { home: msg.home, away: msg.away } },
