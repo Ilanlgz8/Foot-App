@@ -178,8 +178,8 @@ Historique complet de chaque problème/correction : `docs/HISTORIQUE.md` (dépla
 - Heures des matchs : police Lexend 700 (index.css, bloc « HEURES ») ; scores : Inter 900.
 
 ### Temporaire (à retirer quand tout est stable)
-- `LiveDiag.jsx` (5 taps sur « En direct ») + `utils/reloadTrace.js` (journal des relances) + diagnostics `window.__sfAllComps` / `__sfEspnWin`.
-- Journal de l'ancienne logique du direct (`noteLegacyFt` → `sf_legacy_ft`, useLiveMinute.js, affiché dans LiveDiag) : chaque fin de match décidée par le TÉLÉPHONE (garde-fous 1-4, double confirmation locale, repli 10 min). S'il reste vide pendant une semaine de matchs, désactiver ces chemins (code gardé) — étape prévue après validation.
+- ~~`LiveDiag.jsx`~~ retiré le 24/11 (demande utilisateur). Restent : `utils/reloadTrace.js` (journal des relances) + diagnostics `window.__sfAllComps` / `__sfEspnWin` (plus affichés nulle part).
+- Journal de l'ancienne logique du direct (`noteLegacyFt` → `sf_legacy_ft`, useLiveMinute.js ; plus affiché depuis le retrait de LiveDiag le 24/11, lisible dans localStorage) : chaque fin de match décidée par le TÉLÉPHONE (garde-fous 1-4, double confirmation locale, repli 10 min). S'il reste vide pendant une semaine de matchs, désactiver ces chemins (code gardé) — étape prévue après validation.
 
 ### Déploiement
 - App : push sur `main` → Vercel. Dire à l'utilisateur de recharger l'app 2 fois.

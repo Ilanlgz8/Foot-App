@@ -14,7 +14,6 @@ import { getDayLabel } from '../utils/dayUtils'
 import { groupMatchesByCompetition } from '../utils/competitionGroups'
 import { Cocoon } from '../hub/Cocoon'
 import { LazyPoster } from '../accueil/MatchCard'
-import { LiveDiag } from './LiveDiag'
 import { useMatchEndedRefresh } from '../hooks/useMatchEndedRefresh'
 import '../accueil.css'
 import '../live.css'
@@ -229,15 +228,8 @@ export default function Live() {
     return () => clearTimeout(id)
   }, [todayAllDone, nextMatchDayOffset, endedVersion])
 
-  // Diagnostic temporaire (05/11, voir LiveDiag.jsx) : 5 appuis rapides sur « En direct ».
-  const [showDiag, setShowDiag] = useState(false)
-  const diagTapsRef = useRef([])
-  const onLiveTabTap = useCallback(() => {
-    setTab('live')
-    const t = Date.now()
-    diagTapsRef.current = [...diagTapsRef.current.filter(x => t - x < 2500), t]
-    if (diagTapsRef.current.length >= 5) { diagTapsRef.current = []; setShowDiag(v => !v) }
-  }, [])
+  // (24/11 : diagnostic LiveDiag « 5 appuis sur En direct » retiré, demande utilisateur)
+  const onLiveTabTap = useCallback(() => setTab('live'), [])
 
   const onMatchClick = useCallback(m => navigate(`/match/${m.id}`, { state: { match: m } }), [navigate])
   const onLiveClick  = useCallback(m => navigate(`/live/${m.id}`), [navigate])
@@ -277,7 +269,6 @@ export default function Live() {
           </button>
         </div>
 
-        {showDiag && <LiveDiag dayMatches={dayMatches} liveMatches={liveMatches} live={live} espnScores={espnScores} />}
 
         {activeTab === 'live' && (
           !hasLive ? (
