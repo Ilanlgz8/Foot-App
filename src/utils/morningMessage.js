@@ -5,7 +5,7 @@
 // morningReminders) ; fonctions pures, testées dans morningMessage.test.js.
 //
 // Ordre des règles (la première qui colle gagne) :
-//  1. Classico : les deux équipes sont dans la liste des « grands » (clubs ou sélections) ;
+//  1. Classico : PSG-OM, Real-Barça, City-Arsenal, Inter-Milan, Bayern-Dortmund (et rien d'autre) ;
 //  2. Coupe : compétition à élimination directe (coupes nationales) ou supercoupe ;
 //  3. Choc au sommet : les deux dans le top 4 du classement, 3 points d'écart ou moins ;
 //  4. Série : l'équipe suivie a gagné ses 5 derniers matchs (forme ESPN « WWWWW ») ;
@@ -16,27 +16,23 @@ import { getBroadcaster } from '../data/broadcasters.js'
 
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-// « Grands » clubs (noms ESPN, plusieurs variantes) : un match entre deux d'entre eux = classico.
-// Volontairement court (demande utilisateur : PSG-OM, Real-Barça, City-Arsenal oui ; pas les
-// derbys locaux type Liverpool-Everton).
-const BIG = [
-  ['paris saint germain', 'psg', 'paris sg'], ['marseille', 'olympique de marseille'], ['lyon', 'olympique lyonnais'],
-  ['real madrid'], ['barcelona', 'fc barcelona', 'barcelone'], ['atletico madrid', 'atletico de madrid', 'atletico'],
-  ['manchester city', 'man city'], ['arsenal'], ['liverpool'], ['manchester united', 'man utd', 'man united'],
-  ['chelsea'], ['tottenham hotspur', 'tottenham', 'spurs'],
-  ['internazionale', 'inter milan', 'inter'], ['ac milan', 'milan'], ['juventus'], ['napoli', 'naples'],
-  ['bayern munich', 'bayern munchen', 'bayern'], ['borussia dortmund', 'dortmund'], ['bayer leverkusen', 'leverkusen'],
-  // sélections
-  ['france'], ['brazil', 'bresil'], ['argentina', 'argentine'], ['spain', 'espagne'], ['england', 'angleterre'],
-  ['germany', 'allemagne'], ['italy', 'italie'], ['portugal'], ['netherlands', 'pays bas'],
-].map(list => new Set(list))
-export function bigIndex(...names) {
+// Classicos : UN seul par championnat, liste fixée par l'utilisateur (24/11) — PSG-OM, Real-Barça,
+// City-Arsenal, Inter-Milan, Bayern-Dortmund. Rien d'autre (ni derbys locaux, ni sélections).
+const CLUBS = {
+  psg: ['paris saint germain', 'psg', 'paris sg'], om: ['marseille', 'olympique de marseille', 'om'],
+  real: ['real madrid'], barca: ['barcelona', 'fc barcelona', 'barcelone', 'barca'],
+  city: ['manchester city', 'man city'], arsenal: ['arsenal'],
+  inter: ['internazionale', 'inter milan', 'inter'], milan: ['ac milan', 'milan'],
+  bayern: ['bayern munich', 'bayern munchen', 'bayern'], bvb: ['borussia dortmund', 'dortmund'],
+}
+const CLASSICOS = [['psg', 'om'], ['real', 'barca'], ['city', 'arsenal'], ['inter', 'milan'], ['bayern', 'bvb']]
+export function clubKey(...names) {
   const ns = names.map(norm).filter(Boolean)
-  return BIG.findIndex(set => ns.some(n => set.has(n)))
+  return Object.keys(CLUBS).find(k => ns.some(n => CLUBS[k].includes(n))) ?? null
 }
 export function isClassico(home, away) {
-  const h = bigIndex(...home.names), a = bigIndex(...away.names)
-  return h >= 0 && a >= 0 && h !== a
+  const h = clubKey(...home.names), a = clubKey(...away.names)
+  return !!h && !!a && CLASSICOS.some(([x, y]) => (x === h && y === a) || (x === a && y === h))
 }
 
 export const COMP_NAMES = {

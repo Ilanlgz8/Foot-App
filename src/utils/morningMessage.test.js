@@ -15,6 +15,13 @@ describe('buildMorningMessage', () => {
     expect(isClassico(T('Liverpool', ['Liverpool']), T('Everton', ['Everton']))).toBe(false)
     expect(isClassico(T('Man City', ['Manchester City']), T('Arsenal', ['Arsenal']))).toBe(true)
     expect(isClassico(T('Real Madrid', ['Real Madrid']), T('Barcelone', ['Barcelona']))).toBe(true)
+    expect(isClassico(T('Inter', ['Internazionale']), T('Milan', ['AC Milan']))).toBe(true)
+    expect(isClassico(T('Bayern', ['Bayern Munich']), T('Dortmund', ['Borussia Dortmund']))).toBe(true)
+    // seulement les 5 classicos choisis : pas de croisement entre grands clubs, pas de sélections
+    expect(isClassico(T('Real Madrid', ['Real Madrid']), T('Paris SG', ['Paris Saint-Germain']))).toBe(false)
+    expect(isClassico(T('Liverpool', ['Liverpool']), T('Man City', ['Manchester City']))).toBe(false)
+    expect(isClassico(T('Lyon', ['Lyon']), T('Marseille', ['Marseille']))).toBe(false)
+    expect(isClassico(T('France', ['France']), T('Brésil', ['Brazil']))).toBe(false)
   })
   it('coupe : titre selon l’équipe suivie', () => {
     const m = buildMorningMessage({ ...base, slug: 'fra.coupe_de_france', utcDate: '2026-12-20T20:00:00Z', home: T('Lens', ['Lens']), away: T('Lille', ['Lille']) })
