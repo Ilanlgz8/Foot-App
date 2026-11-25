@@ -4,17 +4,20 @@
 // emoji ni cotes. Partagé : utilisé par le Worker Cloudflare (cf-worker/src/index.js,
 // morningReminders) ; fonctions pures, testées dans morningMessage.test.js.
 //
-// Ordre des règles (la première qui colle gagne) :
-//  1. Classico : PSG-OM, Real-Barça, City-Arsenal, Inter-Milan, Bayern-Dortmund (et rien d'autre) ;
-//  2. Coupe / phase finale européenne : le tour en jeu (« joue sa place en quarts ») d'après le
-//     calendrier ESPN de la compétition ; supercoupe = un trophée ;
-//  3. Choc au sommet : les deux dans le top 4 du classement, 3 points d'écart ou moins ;
-//  4. Enjeu au classement pour l'équipe suivie : avec une victoire, elle passe en tête / monte sur
-//     le podium / sort de la zone rouge (calcul sur le classement du matin, égalités ignorées) ;
-//  5. Série : l'équipe suivie a gagné ses 5 derniers matchs (forme ESPN « WWWWW ») ;
-//  6. Sinon : « Jour de match pour <équipe> ».
-// Le titre peut dépendre de l'équipe suivie → deux variantes (home / away), choisies par
-// api/cron-goals.js selon l'équipe favorite de chaque abonné.
+// Format (25/11, choisi avec l'utilisateur) :
+//   titre  : « Le PSG reçoit Rome en Ligue des champions » (point de vue de l'équipe suivie ;
+//            « défie » à l'extérieur ; classico : « C'est le classico : le PSG reçoit l'OM »)
+//   ligne 1: « Ce soir à 21:00 · À regarder sur CANAL+ »
+//   ligne 2: UNE phrase d'enjeu, la plus forte, et SEULEMENT si elle est sûre — sinon rien :
+//     1. sûr mathématiquement (matchs restants de TOUTES les équipes) : champion / relégué / qualifié
+//        pour les 8es / au moins les barrages / éliminé ;
+//     2. tour de coupe (match unique) : « Une victoire et Lens file en quarts » / remporte la coupe ;
+//     3. dépasse une équipe nommée ou prend la tête — seulement si cette équipe ne joue pas
+//        aujourd'hui (ou si c'est l'adversaire) ; égalité de points départagée à la différence de buts
+//        uniquement là où c'est la règle (LDC, Premier League), sinon pas d'annonce ;
+//     4. fait : bilan parfait (« 4 victoires en 4 matchs de LDC ») / invaincu / 5 victoires de suite.
+// Le titre et l'enjeu dépendent de l'équipe suivie → variantes home / away, choisies par
+// api/cron-goals.js (payloadFor) selon l'équipe favorite de chaque abonné.
 import { getBroadcaster } from '../data/broadcasters.js'
 
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -68,7 +71,25 @@ export function channelFor(slug, homeName, awayName, utcDate) {
   } catch { return null }
 }
 
-const ord = n => (n === 1 ? '1er' : `${n}e`)
+const cap = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+const compWithArticle = c => (/^(Trophée|Community)/.test(c) ? `le ${c}` : /^Euro/.test(c) ? `l'${c}` : `la ${c}`)
+
+// Nom avec article pour une phrase (« le PSG », « l'OM »…) ; sinon le nom affiché tel quel.
+const ARTICLE = {
+  psg: 'le PSG', om: "l'OM", real: 'le Real', barca: 'le Barça', bayern: 'le Bayern', inter: "l'Inter", milan: "l'AC Milan",
+  city: 'Manchester City', arsenal: 'Arsenal', bvb: 'Dortmund',
+}
+const MORE_ARTICLES = [
+  [['lyon', 'olympique lyonnais'], "l'OL"], [['atletico madrid', 'atletico de madrid', 'atletico'], "l'Atlético"],
+  [['juventus'], 'la Juventus'], [['as roma', 'roma'], "l'AS Rome"],
+]
+export function phraseName(t) {
+  const k = clubKey(...(t.names ?? []))
+  if (k && ARTICLE[k]) return ARTICLE[k]
+  const ns = (t.names ?? []).map(norm)
+  const hit = MORE_ARTICLES.find(([alias]) => ns.some(n => alias.includes(n)))
+  return hit ? hit[1] : t.name
+}
 
 // Tours à élimination directe (libellés du calendrier ESPN) → [tour joué, tour suivant]
 const ROUNDS = [
@@ -94,79 +115,131 @@ export function roundFromCalendar(calendar, utcDate) {
   return null
 }
 
-// Enjeu au classement si l'équipe gagne (classement du matin ; une égalité de points = pas d'annonce,
-// la différence de buts déciderait). table : [{ id, position, points }]
-export function stakeIfWin(table, teamId) {
-  if (!Array.isArray(table) || !table.length || teamId == null) return null
-  const rows = table.filter(r => Number.isFinite(r?.position) && Number.isFinite(r?.points)).sort((a, b) => a.position - b.position)
-  const me = rows.find(r => String(r.id) === String(teamId))
+// Égalité de points départagée à la différence de buts générale : seulement là où c'est sûr.
+const GD_TIEBREAK = new Set(['uefa.champions', 'eng.1'])
+const RELEGATION_SLOTS = { 'fra.1': 2, 'fra.2': 2, 'ger.1': 2, 'eng.1': 3, 'esp.1': 3, 'ita.1': 3 }
+const totalGames = (slug, n) => (slug === 'uefa.champions' ? 8 : 2 * (n - 1))
+const sameId = (a, b) => a != null && b != null && String(a) === String(b)
+
+/**
+ * Enjeux SÛRS pour l'équipe `teamId` qui joue `oppId` aujourd'hui.
+ * table : [{ id, position, points, played, gd, won, lost }] ; playingToday : Set d'ids (toutes les
+ * équipes de la compétition qui jouent aujourd'hui).
+ * @returns {{ type: string, target?: object } | null}
+ */
+export function safeStake(slug, table, teamId, oppId, playingToday = new Set()) {
+  if (!Array.isArray(table) || table.length < 4) return null
+  const rows = table.filter(r => Number.isFinite(r?.points) && Number.isFinite(r?.position)).sort((a, b) => a.position - b.position)
+  const me = rows.find(r => sameId(r.id, teamId))
   if (!me) return null
-  const after = me.points + 3
-  const others = rows.filter(r => String(r.id) !== String(teamId))
-  const ahead = others.filter(r => r.points >= after).length           // équipes encore devant ou à égalité
-  const newPos = ahead + 1
-  const tied = others.some(r => r.points === after)
-  if (tied) return null
   const n = rows.length
-  if (me.position > 1 && newPos === 1) return 'lead'
-  if (me.position > 3 && newPos <= 3) return 'podium'
-  if (n >= 10 && me.position > n - 3 && newPos <= n - 3) return 'safe'
+  const total = totalGames(slug, n)
+  const others = rows.filter(r => !sameId(r.id, teamId))
+  const remaining = r => (Number.isFinite(r.played) ? Math.max(0, total - r.played) : null)
+  const myRem = remaining(me)
+  const canClinch = myRem != null && myRem >= 1 && others.every(r => remaining(r) != null)
+  const win = me.points + 3
+
+  if (canClinch) {
+    // max possible de chaque autre équipe si on gagne (l'adversaire perd ce match : 1 match de moins)
+    const maxIfWin = r => r.points + 3 * (remaining(r) - (sameId(r.id, oppId) ? 1 : 0))
+    const threatsIfWin = others.filter(r => maxIfWin(r) >= win).length          // égalité = menace
+    // sur une défaite : notre max, et les équipes déjà sûres de finir devant (l'adversaire prend 3 pts)
+    const myMaxIfLoss = me.points + 3 * (myRem - 1)
+    const surelyAboveIfLoss = others.filter(r => r.points + (sameId(r.id, oppId) ? 3 : 0) > myMaxIfLoss).length
+    if (slug === 'uefa.champions' && n >= 30) {
+      if (threatsIfWin <= 7 && me.position > 8) return { type: 'top8' }
+      if (threatsIfWin <= 23 && me.position > 24) return { type: 'top24' }
+      if (surelyAboveIfLoss >= 24) return { type: 'out' }
+    } else if (RELEGATION_SLOTS[slug]) {
+      const k = RELEGATION_SLOTS[slug]
+      if (threatsIfWin === 0) return { type: 'champion' }
+      if (surelyAboveIfLoss >= n - k) return { type: 'relegated' }
+      if (me.position > n - k - 3 && threatsIfWin <= n - k - 1) return { type: 'safe' }
+    }
+  }
+
+  // Dépasser une équipe nommée : la mieux classée qu'on passe à coup sûr avec une victoire.
+  const tieOk = GD_TIEBREAK.has(slug)
+  const passable = rows.filter(r => r.position < me.position && !sameId(r.id, teamId)).filter(r => {
+    if (!sameId(r.id, oppId) && playingToday.has(String(r.id))) return false   // peut encore gagner aujourd'hui
+    if (win > r.points) return true
+    return tieOk && win === r.points && Number.isFinite(me.gd) && Number.isFinite(r.gd) && me.gd + 1 > r.gd
+  })
+  if (passable.length) {
+    const best = passable[0]                 // le mieux classé
+    // « prend la tête » seulement si on passe AUSSI toutes les équipes entre lui et nous (sinon « passe devant »)
+    const between = rows.filter(r => r.position < me.position && r.position > best.position)
+    const passesAll = between.every(r => passable.includes(r))
+    if (best.position === 1 && passesAll) return { type: 'lead' }
+    return { type: 'overtake', target: best }
+  }
   return null
 }
-const SP = '  ' // deux espaces : « Paris SG  21:00  Nantes » (format choisi par l'utilisateur)
 
 /**
  * @param {object} p
- *  p.slug, p.utcDate, p.hhmm ('21:00'), p.roundLabel? (libellé ESPN du tour), p.table? ([{ id, position, points }])
- *  p.home / p.away : { id?, name (affiché, FR), names: [variantes brutes ESPN…], rank?, points?, form? ('WWDLW') }
+ *  p.slug, p.utcDate, p.hhmm ('21:00'), p.roundLabel? (libellé ESPN du tour)
+ *  p.table? ([{ id, position, points, played, gd, won, lost }]), p.playingToday? (Set d'ids)
+ *  p.home / p.away : { id?, name (affiché, FR), names: [variantes brutes ESPN…], form? }
  * @returns {{ home: {title, body}, away: {title, body}, kind }}
  */
 export function buildMorningMessage(p) {
   const { slug, hhmm, home, away } = p
   const comp = COMP_NAMES[slug] ?? null
+  const compShort = slug === 'uefa.champions' ? 'LDC' : comp
   const chan = channelFor(slug, home.names?.[0] ?? home.name, away.names?.[0] ?? away.name, p.utcDate)
-  const line1 = `${home.name}${SP}${hhmm}${SP}${away.name}`
-  const infoLine = [comp, chan ? `À regarder sur ${chan}` : null].filter(Boolean).join(' · ')
-  const hasRanks = Number.isFinite(home.rank) && Number.isFinite(away.rank)
-  const rankLine = hasRanks && comp ? `${ord(home.rank)} contre ${ord(away.rank)} en ${comp}.` : null
-  const both = (title, l2) => {
-    const body = [line1, l2].filter(Boolean).join('\n')
-    return { home: { title, body }, away: { title, body } }
-  }
-  const perTeam = (fn, l2) => ({
-    home: { title: fn(home.name), body: [line1, l2].filter(Boolean).join('\n') },
-    away: { title: fn(away.name), body: [line1, l2].filter(Boolean).join('\n') },
-  })
-
-  // 1. Classico
-  if (isClassico(home, away)) return { kind: 'classico', ...both("C'est le classico ce soir", rankLine ?? infoLine) }
-  // 2. Coupe / supercoupe
-  if (SUPER_CUP_SLUGS.has(slug)) return { kind: 'cup', ...perTeam(n => `${n} joue un trophée ce soir`, infoLine) }
+  const h = Number(String(hhmm).split(':')[0])
+  const when = h >= 18 ? 'Ce soir' : h >= 12 ? 'Cet après-midi' : 'Ce matin'
+  const line1 = [`${when} à ${hhmm}`, chan ? `À regarder sur ${chan}` : null].filter(Boolean).join(' · ')
   const round = roundInfo(p.roundLabel)
-  if (round && (CUP_SLUGS.has(slug) || KO_SLUGS.has(slug))) {
-    const title = round.next ? (n => `${n} joue sa place en ${round.next} ce soir`) : (n => `${n} joue la finale ce soir`)
-    return { kind: 'cup', ...perTeam(title, [comp ? `${comp}, ${round.name}` : null, chan ? `À regarder sur ${chan}` : null].filter(Boolean).join(' · ')) }
-  }
-  if (CUP_SLUGS.has(slug)) return { kind: 'cup', ...perTeam(n => `${n} joue sa qualification ce soir`, [comp ? `${comp}. Le vainqueur passe au tour suivant.` : null, chan ? `À regarder sur ${chan}` : null].filter(Boolean).join('\n')) }
-  // 3. Choc au sommet
-  if (hasRanks && home.rank <= 4 && away.rank <= 4 && Number.isFinite(home.points) && Number.isFinite(away.points)) {
-    const d = Math.abs(home.points - away.points)
-    if (d <= 3) {
-      const ecart = d === 0 ? 'à égalité de points' : `${d} point${d > 1 ? 's' : ''} d'écart`
-      return { kind: 'top', ...both('Choc au sommet ce soir', `${ord(home.rank)} contre ${ord(away.rank)} en ${comp}, ${ecart}.`) }
-    }
-  }
-  // 4. Enjeu au classement ; 5. série ; 6. repli — par équipe suivie
-  const STAKE = { lead: n => `Une victoire et ${n} passe en tête`, podium: n => `Une victoire et ${n} monte sur le podium`, safe: n => `Une victoire et ${n} sort de la zone rouge` }
-  const streak = t => typeof t.form === 'string' && t.form.length >= 5 && /^W+$/.test(t.form.slice(-5))
-  const placeLine = t => (Number.isFinite(t.rank) && comp ? [`${ord(t.rank)} de ${comp}`, chan ? `À regarder sur ${chan}` : null].filter(Boolean).join(' · ') : infoLine)
+  const classico = isClassico(home, away)
+  const tableByid = id => (Array.isArray(p.table) ? p.table.find(r => sameId(r.id, id)) : null)
   let kind = 'default'
-  const pick = t => {
-    const stake = LEAGUE_SLUGS.has(slug) ? stakeIfWin(p.table, t.id) : null
-    if (stake) { kind = 'stake'; return { title: STAKE[stake](t.name), body: [line1, placeLine(t)].filter(Boolean).join('\n') } }
-    if (streak(t)) return { title: `${t.name} reste sur 5 victoires`, body: [line1, infoLine].filter(Boolean).join('\n') }
-    return { title: `Jour de match pour ${t.name}`, body: [line1, infoLine].filter(Boolean).join('\n') }
+
+  const forTeam = (me, opp, isHome) => {
+    const meN = phraseName(me), oppN = phraseName(opp)
+    const verb = isHome ? 'reçoit' : 'défie'
+    const where = comp ? (round && !LEAGUE_SLUGS.has(slug) ? ` en ${round.name} de ${comp}` : SUPER_CUP_SLUGS.has(slug) ? ` pour ${compWithArticle(comp)}` : ` en ${comp}`) : ''
+    const title = classico ? `C'est le classico : ${meN} ${verb} ${oppN}` : cap(`${meN} ${verb} ${oppN}${where}`)
+
+    // phrase d'enjeu (une seule, la plus forte, seulement si sûre)
+    let stake = null
+    const singleLegKO = CUP_SLUGS.has(slug) || SUPER_CUP_SLUGS.has(slug) || (round && round.next === null)
+    if (round && singleLegKO) {
+      stake = round.next ? `Une victoire et ${meN} file en ${round.next}.` : `Une victoire et ${meN} remporte ${comp ? compWithArticle(comp) : 'le titre'}.`
+      kind = 'cup'
+    } else if (SUPER_CUP_SLUGS.has(slug)) {
+      stake = `Un trophée en jeu pour ${meN}.`; kind = 'cup'
+    } else if (!round && (LEAGUE_SLUGS.has(slug) || slug === 'uefa.champions')) {
+      const st = safeStake(slug, p.table, me.id, opp.id, p.playingToday)
+      const S = {
+        champion: () => `Une victoire et ${meN} est champion.`,
+        relegated: () => `En cas de défaite, ${meN} est relégué.`,
+        safe: () => `Une victoire et ${meN} assure son maintien.`,
+        top8: () => `Une victoire et ${meN} est qualifié pour les 8es.`,
+        top24: () => `Une victoire et ${meN} est assuré de jouer les barrages.`,
+        out: () => `En cas de défaite, ${meN} est éliminé.`,
+        lead: () => `Une victoire et ${meN} prend la tête.`,
+        overtake: t => `Une victoire et ${meN} passe devant ${phraseName({ name: t.name ?? '', names: t.names ?? [t.name] })}.`,
+      }
+      if (st) { stake = S[st.type](st.target ?? {}); kind = 'stake' }
+    }
+    if (!stake) {
+      const row = tableByid(me.id)
+      if (row && Number.isFinite(row.played) && row.played >= 3 && row.won === row.played && compShort) {
+        stake = `${row.won} victoires en ${row.played} matchs de ${compShort}.`; kind = 'fact'
+      } else if (row && Number.isFinite(row.played) && row.played >= 5 && row.lost === 0 && comp) {
+        stake = `Invaincu en ${row.played} matchs de ${compShort}.`; kind = 'fact'
+      } else if (typeof me.form === 'string' && /^W{5}$/.test(me.form.slice(-5))) {
+        stake = '5 victoires lors des 5 derniers matchs.'; kind = 'fact'
+      }
+    }
+    return { title, body: [line1, stake].filter(Boolean).join('\n') }
   }
-  const h = pick(home), a = pick(away)
-  return { kind, home: h, away: a }
+
+  const homeV = forTeam(home, away, true)
+  const awayV = forTeam(away, home, false)
+  if (classico && kind === 'default') kind = 'classico'
+  return { kind, home: homeV, away: awayV }
 }

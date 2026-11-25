@@ -671,7 +671,7 @@ function pubSignature(live, feed) {
 // gratuit Cloudflare) — la fenêtre 10:00-10:29 laisse 30 passes, largement assez.
 const MORNING_MAX_PER_PASS = 4
 // championnats dont le classement sert au rappel du matin (morningMessage.js)
-const MORNING_STANDINGS_SLUGS = new Set(['fra.1', 'fra.2', 'eng.1', 'esp.1', 'ger.1', 'ita.1'])
+const MORNING_STANDINGS_SLUGS = new Set(['fra.1', 'fra.2', 'eng.1', 'esp.1', 'ger.1', 'ita.1', 'uefa.champions'])
 const MORNING_ROUND_SLUGS = new Set(['fra.coupe_de_france', 'esp.copa_del_rey', 'eng.fa', 'ita.coppa_italia', 'ger.dfb_pokal', 'uefa.champions', 'uefa.europa', 'uefa.europa.conf'])
 const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -764,8 +764,14 @@ async function morningRemindersInner(env, kv, prevPub, now, today, log, opts = {
       }
     }
     const roundLabel = roundFromCalendar(await calendarFor(slug), evt.date)
-    const tableRows = Array.isArray(table) ? table.map(r => ({ id: r?.team?.id, position: r?.position, points: r?.points })) : null
-    const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, roundLabel, table: tableRows, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
+    const tableRows = Array.isArray(table) ? table.map(r => ({
+      id: r?.team?.id, position: r?.position, points: r?.points, played: r?.playedGames, gd: r?.goalDifference,
+      won: r?.won, lost: r?.lost, name: t(r?.team?.shortName ?? r?.team?.name ?? ''), names: [r?.team?.name, r?.team?.shortName].filter(Boolean),
+    })) : null
+    // équipes de cette compétition qui jouent aujourd'hui (un enjeu « passe devant X » n'est sûr que si X ne joue pas)
+    const playingToday = new Set()
+    for (const e of entries[`${today}|${slug}`]?.events ?? []) for (const c of e?.competitions?.[0]?.competitors ?? []) if (c?.team?.id) playingToday.add(String(c.team.id))
+    const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, roundLabel, table: tableRows, playingToday, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
     // variantes : api/cron-goals.js envoie à chaque abonné celle de l'équipe qu'il suit
     const ok = await notifyVercel(env, opts.force ? `push:morning:test:${evt.id}:${now.getTime()}` : opts.catchup ? `push:morning:catchup:${evt.id}` : `push:morning:${evt.id}`,
       { title: msg.home.title, body: msg.home.body, url: '/', tag: `morning-${evt.id}`, variants: { home: msg.home, away: msg.away } },
