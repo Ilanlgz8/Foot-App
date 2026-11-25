@@ -689,7 +689,7 @@ async function morningReminders(env, kv, prevPub, now, today, log) {
   try { await morningRemindersInner(env, kv, prevPub, now, today, log) } finally { env._isRecoveryPass = wasRecovery }
 }
 
-async function morningRemindersInner(env, kv, prevPub, now, today, log) {
+async function morningRemindersInner(env, kv, prevPub, now, today, log, opts = {}) {
   const entries = prevPub?.feed?.entries ?? {}
   const doneKey = `morning:${today}`
   let done = []
@@ -702,7 +702,8 @@ async function morningRemindersInner(env, kv, prevPub, now, today, log) {
     for (const evt of v?.events ?? []) {
       const comp = evt?.competitions?.[0]
       const kickoff = Date.parse(evt?.date)
-      if (!evt?.id || done.includes(String(evt.id))) continue
+      if (!evt?.id) continue
+      if (opts.force ? String(evt.id) !== String(opts.force) : done.includes(String(evt.id))) continue
       if (comp?.status?.type?.state !== 'pre' || !Number.isFinite(kickoff) || kickoff <= now.getTime()) continue
       todo.push({ slug, evt, comp, kickoff })
     }
@@ -760,13 +761,13 @@ async function morningRemindersInner(env, kv, prevPub, now, today, log) {
     const tableRows = Array.isArray(table) ? table.map(r => ({ id: r?.team?.id, position: r?.position, points: r?.points })) : null
     const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, roundLabel, table: tableRows, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
     // variantes : api/cron-goals.js envoie à chaque abonné celle de l'équipe qu'il suit
-    const ok = await notifyVercel(env, `push:morning:${evt.id}`,
+    const ok = await notifyVercel(env, opts.force ? `push:morning:test:${evt.id}:${now.getTime()}` : `push:morning:${evt.id}`,
       { title: msg.home.title, body: msg.home.body, url: '/', tag: `morning-${evt.id}`, variants: { home: msg.home, away: msg.away } },
       slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, clubsOnly: true, ttl: 3 * 3600 }, log, 36 * 3600)
     log.push(`[morning] ${evt.id} ${msg.kind}`)
     if (ok) done.push(String(evt.id))
   }
-  try { await kv.set(doneKey, JSON.stringify(done), { ex: 36 * 3600 }) } catch {}
+  if (!opts.force) { try { await kv.set(doneKey, JSON.stringify(done), { ex: 36 * 3600 }) } catch {} }
   log.push(`[morning] envoyés=${batch.length} restants=${todo.length - batch.length}`)
 }
 
@@ -3090,6 +3091,21 @@ export default {
     const secret = url.searchParams.get('secret') ?? req.headers.get('x-cron-secret') ?? ''
     if (!env.CRON_SECRET || !safeCompare(secret, env.CRON_SECRET)) {
       return new Response(JSON.stringify({ error: 'Non autorisé' }), { status: 401 })
+    }
+    // 25/11 : test manuel du rappel du matin pour UN match (?morningTest=<id ESPN>), à n'importe quelle
+    // heure — envoie le vrai message aux abonnés qui suivent l'une des deux équipes, sans toucher à
+    // la liste « déjà envoyés » du jour. Même protection par secret que la passe manuelle.
+    const morningTest = url.searchParams.get('morningTest')
+    if (morningTest) {
+      const kv = await createKv(env)
+      env._kv = kv
+      env._isRecoveryPass = false
+      const log = []
+      const now = new Date()
+      let prevPub = null
+      try { prevPub = safeJsonParse(await kv.get(PUB_ALL_KEY), null) } catch {}
+      await morningRemindersInner(env, kv, prevPub, now, dateStr(now), log, { force: morningTest })
+      return new Response(JSON.stringify({ ok: true, morningTest, log }, null, 2), { headers: { 'Content-Type': 'application/json' } })
     }
     const result = await handlePass(env)
     return new Response(JSON.stringify({ ok: true, ...result }), {
