@@ -677,21 +677,27 @@ const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
 }).formatToParts(d).map(p => [p.type, p.value]))
 
+// Rattrapage UNIQUE du 25/11 (rappels de 10h perdus à cause du bug corrigé le jour même) : même envoi
+// entre 12:00 et 12:29, avec sa propre liste « déjà envoyés ». Ne fait plus rien à partir du 26/11.
+const MORNING_CATCHUP = { date: '20261125', hour: 12 }
+const isMorningCatchup = (today, hour) => today === MORNING_CATCHUP.date && Number(hour) === MORNING_CATCHUP.hour
+
 async function morningReminders(env, kv, prevPub, now, today, log) {
   const { hour, minute } = parisParts(now)
-  if (Number(hour) !== 10 || Number(minute) >= 30) return
+  const catchup = isMorningCatchup(today, hour)
+  if ((Number(hour) !== 10 && !catchup) || Number(minute) >= 30) return
   // 25/11 (bug : rappel du matin jamais reçu) : la « passe de rattrapage » (> 5 min depuis la dernière
   // vérification, cas normal d'une matinée sans match en cours) jette les notifs pour ne pas envoyer
   // un but en retard — mais elle jetait AUSSI le rappel du matin, en le marquant comme envoyé.
   // Le rappel n'est pas un événement en direct : il est toujours envoyé, la fenêtre 10:00-10:29 suffit.
   const wasRecovery = env._isRecoveryPass
   env._isRecoveryPass = false
-  try { await morningRemindersInner(env, kv, prevPub, now, today, log) } finally { env._isRecoveryPass = wasRecovery }
+  try { await morningRemindersInner(env, kv, prevPub, now, today, log, { catchup }) } finally { env._isRecoveryPass = wasRecovery }
 }
 
 async function morningRemindersInner(env, kv, prevPub, now, today, log, opts = {}) {
   const entries = prevPub?.feed?.entries ?? {}
-  const doneKey = `morning:${today}`
+  const doneKey = opts.catchup ? `morning:catchup:${today}` : `morning:${today}`
   let done = []
   try { done = JSON.parse((await kv.get(doneKey)) ?? '[]') } catch { done = [] }
   if (!Array.isArray(done)) done = []
@@ -761,7 +767,7 @@ async function morningRemindersInner(env, kv, prevPub, now, today, log, opts = {
     const tableRows = Array.isArray(table) ? table.map(r => ({ id: r?.team?.id, position: r?.position, points: r?.points })) : null
     const msg = buildMorningMessage({ slug, utcDate: evt.date, hhmm: `${kp.hour}:${kp.minute}`, roundLabel, table: tableRows, home: side(homeC, homeTeam), away: side(awayC, awayTeam) })
     // variantes : api/cron-goals.js envoie à chaque abonné celle de l'équipe qu'il suit
-    const ok = await notifyVercel(env, opts.force ? `push:morning:test:${evt.id}:${now.getTime()}` : `push:morning:${evt.id}`,
+    const ok = await notifyVercel(env, opts.force ? `push:morning:test:${evt.id}:${now.getTime()}` : opts.catchup ? `push:morning:catchup:${evt.id}` : `push:morning:${evt.id}`,
       { title: msg.home.title, body: msg.home.body, url: '/', tag: `morning-${evt.id}`, variants: { home: msg.home, away: msg.away } },
       slug, { homeTeam, awayTeam, rawHomeTeam, rawAwayTeam, clubsOnly: true, ttl: 3 * 3600 }, log, 36 * 3600)
     log.push(`[morning] ${evt.id} ${msg.kind}`)
@@ -1065,7 +1071,7 @@ async function runOnePass(env) {
   // 25/11 (bug : rappel du matin jamais reçu) : pendant la fenêtre du rappel (10:00-10:29, heure de
   // Paris), on ne saute AUCUNE passe — sinon un « blackout » de 25 min (nextCheck) pouvait ne laisser
   // passer qu'une ou deux passes dans la fenêtre, et seuls les premiers matchs du jour étaient traités.
-  const inMorningWindow = (() => { const pp = parisParts(now); return Number(pp.hour) === 10 && Number(pp.minute) < 30 })()
+  const inMorningWindow = (() => { const pp = parisParts(now); return (Number(pp.hour) === 10 || isMorningCatchup(today, pp.hour)) && Number(pp.minute) < 30 })()
   if (trackingLiveAtStart === 0 && !inMorningWindow) {
     if (knownEmpty) {
       return { events: 0, log: [], quiet: true, warmPlan: safeJsonParse(rawWarmPlan, null) }
