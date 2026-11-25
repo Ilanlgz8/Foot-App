@@ -680,6 +680,16 @@ const parisParts = d => Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {
 async function morningReminders(env, kv, prevPub, now, today, log) {
   const { hour, minute } = parisParts(now)
   if (Number(hour) !== 10 || Number(minute) >= 30) return
+  // 25/11 (bug : rappel du matin jamais reçu) : la « passe de rattrapage » (> 5 min depuis la dernière
+  // vérification, cas normal d'une matinée sans match en cours) jette les notifs pour ne pas envoyer
+  // un but en retard — mais elle jetait AUSSI le rappel du matin, en le marquant comme envoyé.
+  // Le rappel n'est pas un événement en direct : il est toujours envoyé, la fenêtre 10:00-10:29 suffit.
+  const wasRecovery = env._isRecoveryPass
+  env._isRecoveryPass = false
+  try { await morningRemindersInner(env, kv, prevPub, now, today, log) } finally { env._isRecoveryPass = wasRecovery }
+}
+
+async function morningRemindersInner(env, kv, prevPub, now, today, log) {
   const entries = prevPub?.feed?.entries ?? {}
   const doneKey = `morning:${today}`
   let done = []
@@ -1051,7 +1061,11 @@ async function runOnePass(env) {
     rawLiveSlugs = rawSlugs
   } catch {}
 
-  if (trackingLiveAtStart === 0) {
+  // 25/11 (bug : rappel du matin jamais reçu) : pendant la fenêtre du rappel (10:00-10:29, heure de
+  // Paris), on ne saute AUCUNE passe — sinon un « blackout » de 25 min (nextCheck) pouvait ne laisser
+  // passer qu'une ou deux passes dans la fenêtre, et seuls les premiers matchs du jour étaient traités.
+  const inMorningWindow = (() => { const pp = parisParts(now); return Number(pp.hour) === 10 && Number(pp.minute) < 30 })()
+  if (trackingLiveAtStart === 0 && !inMorningWindow) {
     if (knownEmpty) {
       return { events: 0, log: [], quiet: true, warmPlan: safeJsonParse(rawWarmPlan, null) }
     }
